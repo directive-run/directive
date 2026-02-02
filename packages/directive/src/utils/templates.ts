@@ -5,7 +5,7 @@
  * like data fetching, polling, debouncing, and validation.
  */
 
-import { forType } from "./requirements.js";
+import { forType } from "../core/requirements.js";
 import type {
 	ConstraintsDef,
 	Facts,
@@ -14,7 +14,7 @@ import type {
 	ResolverContext,
 	ResolversDef,
 	Schema,
-} from "./types.js";
+} from "../core/types.js";
 
 // ============================================================================
 // Type Helpers

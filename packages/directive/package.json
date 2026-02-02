@@ -67,6 +67,31 @@
       "types": "./dist/templates.d.ts",
       "require": "./dist/templates.cjs",
       "import": "./dist/templates.js"
+    },
+    "./zustand": {
+      "types": "./dist/zustand.d.ts",
+      "require": "./dist/zustand.cjs",
+      "import": "./dist/zustand.js"
+    },
+    "./react-query": {
+      "types": "./dist/react-query.d.ts",
+      "require": "./dist/react-query.cjs",
+      "import": "./dist/react-query.js"
+    },
+    "./xstate": {
+      "types": "./dist/xstate.d.ts",
+      "require": "./dist/xstate.cjs",
+      "import": "./dist/xstate.js"
+    },
+    "./redux": {
+      "types": "./dist/redux.d.ts",
+      "require": "./dist/redux.cjs",
+      "import": "./dist/redux.js"
+    },
+    "./openai-agents": {
+      "types": "./dist/openai-agents.d.ts",
+      "require": "./dist/openai-agents.cjs",
+      "import": "./dist/openai-agents.js"
     }
   },
   "files": [
@@ -84,7 +109,12 @@
     "vue": ">=3",
     "svelte": ">=4",
     "solid-js": ">=1",
-    "lit": ">=3"
+    "lit": ">=3",
+    "zustand": ">=4",
+    "@tanstack/react-query": ">=5",
+    "xstate": ">=5",
+    "@reduxjs/toolkit": ">=2",
+    "@openai/agents": ">=0.1"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -100,6 +130,21 @@
       "optional": true
     },
     "lit": {
+      "optional": true
+    },
+    "zustand": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "xstate": {
+      "optional": true
+    },
+    "@reduxjs/toolkit": {
+      "optional": true
+    },
+    "@openai/agents": {
       "optional": true
     }
   },

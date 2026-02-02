@@ -8,7 +8,7 @@
  * - Export/import state history
  */
 
-import type { DebugConfig, Facts, FactsStore, Schema, Snapshot, TimeTravelAPI } from "./types.js";
+import type { DebugConfig, Facts, FactsStore, Schema, Snapshot, TimeTravelAPI } from "../core/types.js";
 import { isPrototypeSafe } from "./utils.js";
 
 // ============================================================================

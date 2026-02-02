@@ -18,7 +18,8 @@ import {
 	type Ref,
 	type ShallowRef,
 } from "vue";
-import type { Facts, Schema, System, SystemInspection } from "./types.js";
+import { createSystem, type CreateSystemOptions } from "../core/system.js";
+import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
 
 // ============================================================================
 // Context
@@ -305,4 +306,68 @@ export function useWatch<T>(
 	const unsubscribe = system.watch<T>(derivationId, callback);
 
 	onUnmounted(unsubscribe);
+}
+
+// ============================================================================
+// Scoped System Composable (like XState's useActorRef)
+// ============================================================================
+
+/** Options for useDirective composable */
+export type UseDirectiveOptions<S extends Schema> =
+	| ModuleDef<S, DerivationsDef<S>>
+	| CreateSystemOptions<S>;
+
+// Cache for memoization - prevents re-creation in reactive contexts
+const systemCache = new WeakMap<object, System<Schema>>();
+
+/**
+ * Create a scoped Directive system with automatic lifecycle management.
+ * The system is automatically started on mount and destroyed on unmount.
+ *
+ * @param options - Either a single module or full system options
+ * @returns The system instance
+ *
+ * @see {@link useDerivation} for reading derived values
+ * @see {@link useFacts} for direct fact access
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useDirective, useDerivation } from 'directive/vue';
+ *
+ * // With a single module
+ * const system = useDirective(counterModule);
+ * provideSystem(system); // Make available to children
+ *
+ * const count = useDerivation('count');
+ * </script>
+ * ```
+ */
+export function useDirective<S extends Schema>(
+	options: UseDirectiveOptions<S>,
+): System<S> {
+	// Check cache to prevent re-creation in reactive contexts
+	const cached = systemCache.get(options as object);
+	if (cached) {
+		return cached as System<S>;
+	}
+
+	// Check if options is a module or system options
+	const isModule = "id" in options && "schema" in options;
+
+	const system = isModule
+		? createSystem({ modules: [options as ModuleDef<S, DerivationsDef<S>>] })
+		: createSystem(options as CreateSystemOptions<S>);
+
+	// Cache the system
+	systemCache.set(options as object, system as System<Schema>);
+
+	system.start();
+
+	onUnmounted(() => {
+		system.destroy();
+		systemCache.delete(options as object);
+	});
+
+	return system;
 }

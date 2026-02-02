@@ -12,12 +12,14 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useSyncExternalStore,
 	type ReactNode,
 } from "react";
-import type { Facts, Schema, System, SystemInspection } from "./types.js";
-import { shallowEqual } from "./utils.js";
+import { createSystem, type CreateSystemOptions } from "../core/system.js";
+import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
+import { shallowEqual } from "../utils/utils.js";
 
 // ============================================================================
 // Context
@@ -482,4 +484,83 @@ export function useAwaitSettled(): void {
 		// Create a promise that resolves when settled
 		throw system.settle();
 	}
+}
+
+// ============================================================================
+// Scoped System Hook (like XState's useActorRef)
+// ============================================================================
+
+/** Options for useDirective hook */
+export type UseDirectiveOptions<S extends Schema> =
+	| ModuleDef<S, DerivationsDef<S>>
+	| CreateSystemOptions<S>;
+
+/**
+ * Create a scoped Directive system with automatic lifecycle management.
+ * Similar to XState's useActorRef, this creates a stable system reference
+ * that is automatically started on mount and destroyed on unmount.
+ *
+ * @param options - Either a single module or full system options
+ * @returns The system instance
+ *
+ * @example
+ * ```tsx
+ * import { useDirective } from 'directive/react';
+ *
+ * // With a single module
+ * function Counter() {
+ *   const system = useDirective(counterModule);
+ *   const count = useDerivation('count');
+ *   return <button onClick={() => system.facts.count++}>{count}</button>;
+ * }
+ *
+ * // With full options
+ * function App() {
+ *   const system = useDirective({
+ *     modules: [moduleA, moduleB],
+ *     plugins: [loggingPlugin()],
+ *     zeroConfig: true,
+ *   });
+ *   return (
+ *     <DirectiveProvider system={system}>
+ *       <MyComponent />
+ *     </DirectiveProvider>
+ *   );
+ * }
+ * ```
+ */
+export function useDirective<S extends Schema>(
+	options: UseDirectiveOptions<S>,
+): System<S> {
+	// Create the system once on mount
+	const systemRef = useRef<System<S> | null>(null);
+
+	// Create system lazily
+	const system = useMemo(() => {
+		if (systemRef.current) {
+			return systemRef.current;
+		}
+
+		// Check if options is a module or system options
+		const isModule = "id" in options && "schema" in options;
+
+		const newSystem = isModule
+			? createSystem({ modules: [options as ModuleDef<S, DerivationsDef<S>>] })
+			: createSystem(options as CreateSystemOptions<S>);
+
+		systemRef.current = newSystem;
+		return newSystem;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []); // Intentionally empty - only create once
+
+	// Start on mount, destroy on unmount
+	useEffect(() => {
+		system.start();
+		return () => {
+			system.destroy();
+			systemRef.current = null;
+		};
+	}, [system]);
+
+	return system;
 }

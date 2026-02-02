@@ -59,7 +59,8 @@ export interface CreateDerivationsOptions<S extends Schema, D extends Derivation
 export function createDerivationsManager<S extends Schema, D extends DerivationsDef<S>>(
 	options: CreateDerivationsOptions<S, D>,
 ): DerivationsManager<S, D> {
-	const { definitions, facts, store, onCompute, onInvalidate, onError } = options;
+	const { definitions, facts, store: _store, onCompute, onInvalidate, onError } = options;
+	// Note: _store is kept for API compatibility but invalidation is handled by the engine calling invalidate()
 
 	// Internal state for each derivation
 	const states = new Map<string, DerivationState<unknown>>();
@@ -224,11 +225,7 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 		},
 	});
 
-	// Subscribe to fact changes
-	store.subscribeAll(() => {
-		// This is called after any fact change
-		// We'll handle invalidation via the invalidate method called by the engine
-	});
+	// Note: Fact change invalidation is handled by the engine calling invalidate()
 
 	const manager: DerivationsManager<S, D> = {
 		get<K extends keyof D>(id: K): ReturnType<D[K]> {

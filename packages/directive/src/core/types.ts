@@ -673,8 +673,47 @@ export interface System<S extends Schema = Schema> {
 	stop(): void;
 	destroy(): void;
 
+	/**
+	 * Whether the system is currently running (started and not stopped).
+	 */
+	readonly isRunning: boolean;
+
+	/**
+	 * Whether the system is settled (no unmet requirements and no inflight resolvers).
+	 * This is a convenience getter for the common `inspect().unmet.length === 0 && inspect().inflight.length === 0` check.
+	 *
+	 * @example
+	 * ```typescript
+	 * if (system.isSettled) {
+	 *   console.log("System is idle, safe to read state");
+	 * }
+	 * ```
+	 */
+	readonly isSettled: boolean;
+
 	// Events
 	dispatch(event: SystemEvent): void;
+
+	/**
+	 * Batch multiple fact updates into a single reconciliation cycle.
+	 * This improves performance when updating multiple facts at once.
+	 *
+	 * @param fn - Function that performs multiple fact updates
+	 *
+	 * @example
+	 * ```typescript
+	 * // Without batch: triggers reconciliation twice
+	 * system.facts.name = "John";
+	 * system.facts.age = 30;
+	 *
+	 * // With batch: triggers reconciliation once
+	 * system.batch(() => {
+	 *   system.facts.name = "John";
+	 *   system.facts.age = 30;
+	 * });
+	 * ```
+	 */
+	batch(fn: () => void): void;
 
 	// Derivations
 	/**
@@ -760,6 +799,47 @@ export interface System<S extends Schema = Schema> {
 	 * ```
 	 */
 	explain(requirementId: string): string | null;
+
+	/**
+	 * Get a serializable snapshot of the current system state.
+	 * Useful for SSR, persistence, or debugging.
+	 *
+	 * @returns Serializable snapshot object
+	 *
+	 * @example
+	 * ```typescript
+	 * // Server-side rendering
+	 * const snapshot = system.getSnapshot();
+	 * const html = renderToString(<App />, { snapshot });
+	 *
+	 * // Client-side hydration
+	 * const system = createSystem({ modules, snapshot: serverSnapshot });
+	 * ```
+	 */
+	getSnapshot(): SystemSnapshot;
+
+	/**
+	 * Restore system state from a snapshot.
+	 * Typically used for SSR hydration or loading persisted state.
+	 *
+	 * @param snapshot - Snapshot to restore from
+	 *
+	 * @example
+	 * ```typescript
+	 * // Load from localStorage
+	 * const saved = localStorage.getItem("appState");
+	 * if (saved) {
+	 *   system.restore(JSON.parse(saved));
+	 * }
+	 * ```
+	 */
+	restore(snapshot: SystemSnapshot): void;
+}
+
+/** Serializable system snapshot for SSR/persistence */
+export interface SystemSnapshot {
+	facts: Record<string, unknown>;
+	version?: number;
 }
 
 /** Explanation of why a requirement exists */

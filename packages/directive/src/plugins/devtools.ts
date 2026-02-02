@@ -4,7 +4,7 @@
  * Exposes the system to browser devtools via window.__DIRECTIVE__
  */
 
-import type { Plugin, Schema, System } from "../types.js";
+import type { Plugin, Schema, System } from "../core/types.js";
 
 export interface DevtoolsPluginOptions {
 	/** Name for this system in devtools */

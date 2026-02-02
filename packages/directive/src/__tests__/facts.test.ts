@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createFacts, createFactsStore, t } from "../facts.js";
-import { isTracking, withTracking } from "../tracking.js";
+import { createFacts, createFactsStore, t } from "../core/facts.js";
+import { isTracking, withTracking } from "../core/tracking.js";
 
 describe("Facts Store", () => {
 	const schema = {

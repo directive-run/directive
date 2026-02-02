@@ -8,7 +8,8 @@
  */
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import type { Facts, Schema, System, SystemInspection } from "./types.js";
+import { createSystem, type CreateSystemOptions } from "../core/system.js";
+import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
 
 // ============================================================================
 // Context
@@ -435,4 +436,116 @@ export function createWatch<T>(
 	callback: (newValue: T, previousValue: T | undefined) => void,
 ): WatchController<T> {
 	return new WatchController<T>(host, system, derivationId, callback);
+}
+
+// ============================================================================
+// System Controller (like XState's useActorRef)
+// ============================================================================
+
+/** Options for SystemController */
+export type SystemControllerOptions<S extends Schema> =
+	| ModuleDef<S, DerivationsDef<S>>
+	| CreateSystemOptions<S>;
+
+/**
+ * Reactive controller that creates and manages a Directive system.
+ * The system is automatically started when the host connects and destroyed when it disconnects.
+ *
+ * @see {@link DerivationController} for reading derived values
+ * @see {@link FactController} for reactive fact access
+ *
+ * @example
+ * ```ts
+ * import { LitElement, html } from 'lit';
+ * import { SystemController, DerivationController } from 'directive/lit';
+ *
+ * class CounterElement extends LitElement {
+ *   private directive = new SystemController(this, counterModule);
+ *
+ *   // Access the system
+ *   private count = new DerivationController(this, this.directive.system, 'count');
+ *
+ *   render() {
+ *     return html`
+ *       <button @click=${() => this.directive.system.facts.count++}>
+ *         Count: ${this.count.value}
+ *       </button>
+ *     `;
+ *   }
+ * }
+ * ```
+ */
+export class SystemController<S extends Schema> implements ReactiveController {
+	private options: SystemControllerOptions<S>;
+	private _system: System<S> | null = null;
+
+	constructor(host: ReactiveControllerHost, options: SystemControllerOptions<S>) {
+		this.options = options;
+		host.addController(this);
+	}
+
+	get system(): System<S> {
+		if (!this._system) {
+			throw new Error("[Directive] SystemController.system accessed before hostConnected");
+		}
+		return this._system;
+	}
+
+	hostConnected(): void {
+		// Check if options is a module or system options
+		const isModule = "id" in this.options && "schema" in this.options;
+
+		this._system = isModule
+			? createSystem({ modules: [this.options as ModuleDef<S, DerivationsDef<S>>] })
+			: createSystem(this.options as CreateSystemOptions<S>);
+
+		this._system.start();
+	}
+
+	hostDisconnected(): void {
+		this._system?.destroy();
+		this._system = null;
+	}
+}
+
+// ============================================================================
+// Functional Helpers (for parity with other adapters)
+// ============================================================================
+
+/**
+ * Create a derivation value getter.
+ * Functional alternative for use outside of class components.
+ *
+ * @see {@link DerivationController} for class-based usage
+ *
+ * @example
+ * ```ts
+ * const isRed = useDerivation<boolean>(system, 'isRed');
+ * console.log(isRed()); // Get current value
+ * ```
+ */
+export function useDerivation<T>(
+	system: System<Schema>,
+	derivationId: string,
+): () => T {
+	return () => system.read(derivationId) as T;
+}
+
+/**
+ * Create a fact value getter.
+ * Functional alternative for use outside of class components.
+ *
+ * @see {@link FactController} for class-based usage
+ *
+ * @example
+ * ```ts
+ * const phase = useFact<string>(system, 'phase');
+ * console.log(phase()); // Get current value
+ * ```
+ */
+export function useFact<T>(
+	system: System<Schema>,
+	factKey: string,
+): () => T | undefined {
+	return () => system.facts.$store.get(factKey) as T | undefined;
 }

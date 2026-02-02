@@ -93,6 +93,11 @@ export interface CreateSystemOptions<S extends Schema> {
 export function createSystem<S extends Schema>(
 	options: CreateSystemOptions<S>,
 ): System<S> {
+	// Validate tickMs if provided
+	if (options.tickMs !== undefined && options.tickMs <= 0) {
+		throw new Error("[Directive] tickMs must be a positive number");
+	}
+
 	// Apply zero-config defaults if enabled
 	let debug = options.debug;
 	let errorBoundary = options.errorBoundary;
@@ -135,6 +140,14 @@ export function createSystem<S extends Schema>(
 			facts: engine.facts,
 			debug: engine.debug,
 
+			get isRunning() {
+				return engine.isRunning;
+			},
+
+			get isSettled() {
+				return engine.isSettled;
+			},
+
 			start(): void {
 				engine.start();
 				tickInterval = setInterval(() => {
@@ -162,6 +175,9 @@ export function createSystem<S extends Schema>(
 			inspect: engine.inspect.bind(engine),
 			settle: engine.settle.bind(engine),
 			explain: engine.explain.bind(engine),
+			getSnapshot: engine.getSnapshot.bind(engine),
+			restore: engine.restore.bind(engine),
+			batch: engine.batch.bind(engine),
 		};
 
 		return system;

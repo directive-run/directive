@@ -17,13 +17,14 @@ import { createFacts } from "./facts.js";
 import { createPluginManager, type PluginManager } from "./plugins.js";
 import { RequirementSet } from "./requirements.js";
 import { createResolversManager, type ResolversManager } from "./resolvers.js";
-import { createDisabledTimeTravel, createTimeTravelManager, type TimeTravelManager } from "./time-travel.js";
+import { createDisabledTimeTravel, createTimeTravelManager, type TimeTravelManager } from "../utils/time-travel.js";
 import type {
 	ConstraintsDef,
 	DerivationsDef,
 	EffectsDef,
 	EventsDef,
 	FactsSnapshot,
+	InferSchema,
 	ReconcileResult,
 	ResolversDef,
 	Schema,
@@ -474,12 +475,12 @@ export function createEngine<S extends Schema>(
 
 				// Check if we have inflight resolvers or unmet requirements with resolvers
 				const inspection = this.inspect();
-				const isSettled =
+				const settled =
 					inspection.inflight.length === 0 &&
 					!state.isReconciling &&
 					!state.reconcileScheduled;
 
-				if (isSettled) {
+				if (settled) {
 					return;
 				}
 
@@ -512,6 +513,45 @@ export function createEngine<S extends Schema>(
 				// Wait a bit and check again
 				await new Promise((resolve) => setTimeout(resolve, 10));
 			}
+		},
+
+		getSnapshot() {
+			return {
+				facts: store.toObject(),
+				version: 1,
+			};
+		},
+
+		restore(snapshot) {
+			if (!snapshot || typeof snapshot !== "object") {
+				throw new Error("[Directive] restore() requires a valid snapshot object");
+			}
+			if (!snapshot.facts || typeof snapshot.facts !== "object") {
+				throw new Error("[Directive] restore() snapshot must have a facts object");
+			}
+
+			store.batch(() => {
+				for (const [key, value] of Object.entries(snapshot.facts)) {
+					store.set(key as keyof InferSchema<S>, value as InferSchema<S>[keyof InferSchema<S>]);
+				}
+			});
+		},
+
+		batch(fn: () => void): void {
+			store.batch(fn);
+		},
+
+		get isSettled(): boolean {
+			const inspection = this.inspect();
+			return (
+				inspection.inflight.length === 0 &&
+				!state.isReconciling &&
+				!state.reconcileScheduled
+			);
+		},
+
+		get isRunning(): boolean {
+			return state.isRunning;
 		},
 	};
 

@@ -9,7 +9,7 @@
  */
 
 import type { Requirement, RequirementKeyFn, RequirementWithId } from "./types.js";
-import { stableStringify } from "./utils.js";
+import { stableStringify } from "../utils/utils.js";
 
 // ============================================================================
 // Requirement Identity
