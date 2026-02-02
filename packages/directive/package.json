@@ -1,0 +1,107 @@
+{
+  "name": "directive",
+  "version": "0.0.1",
+  "description": "Constraint-driven runtime for TypeScript. Declare requirements, let the runtime resolve them.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive"
+  },
+  "homepage": "https://directive.run",
+  "keywords": [
+    "state-management",
+    "constraints",
+    "reactive",
+    "runtime",
+    "typescript",
+    "signals"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "require": "./dist/react.cjs",
+      "import": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "require": "./dist/vue.cjs",
+      "import": "./dist/vue.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte.d.ts",
+      "require": "./dist/svelte.cjs",
+      "import": "./dist/svelte.js"
+    },
+    "./solid": {
+      "types": "./dist/solid.d.ts",
+      "require": "./dist/solid.cjs",
+      "import": "./dist/solid.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins/index.d.ts",
+      "require": "./dist/plugins/index.cjs",
+      "import": "./dist/plugins/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "require": "./dist/testing.cjs",
+      "import": "./dist/testing.js"
+    },
+    "./templates": {
+      "types": "./dist/templates.d.ts",
+      "require": "./dist/templates.cjs",
+      "import": "./dist/templates.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "vue": ">=3",
+    "svelte": ">=4",
+    "solid-js": ">=1"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0",
+    "@types/react": "^18.3.3",
+    "react": "^18.3.1",
+    "solid-js": "^1.8.0",
+    "svelte": "^4.2.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vue": "^3.4.0"
+  }
+}
