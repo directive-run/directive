@@ -1,12 +1,12 @@
 {
   "name": "directive",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Constraint-driven runtime for TypeScript. Declare requirements, let the runtime resolve them.",
   "license": "MIT",
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/directive-run/directive"
+    "url": "https://github.com/DirectiveRun/DirectiveJS"
   },
   "homepage": "https://directive.run",
   "keywords": [
@@ -48,6 +48,11 @@
       "require": "./dist/solid.cjs",
       "import": "./dist/solid.js"
     },
+    "./lit": {
+      "types": "./dist/lit.d.ts",
+      "require": "./dist/lit.cjs",
+      "import": "./dist/lit.js"
+    },
     "./plugins": {
       "types": "./dist/plugins/index.d.ts",
       "require": "./dist/plugins/index.cjs",
@@ -78,7 +83,8 @@
     "react": ">=18",
     "vue": ">=3",
     "svelte": ">=4",
-    "solid-js": ">=1"
+    "solid-js": ">=1",
+    "lit": ">=3"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -92,11 +98,15 @@
     },
     "solid-js": {
       "optional": true
+    },
+    "lit": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@types/node": "^25.2.0",
     "@types/react": "^18.3.3",
+    "lit": "^3.1.0",
     "react": "^18.3.1",
     "solid-js": "^1.8.0",
     "svelte": "^4.2.0",

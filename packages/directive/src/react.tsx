@@ -177,7 +177,7 @@ export function useDerivations<T extends Record<string, unknown>>(
 }
 
 /**
- * Get direct access to facts for mutations (use sparingly, prefer derivations).
+ * Get direct access to facts for mutations.
  *
  * WARNING: This does NOT trigger re-renders when facts change. This hook is
  * intended for event handlers and imperative code, not for rendering. Use
@@ -186,7 +186,7 @@ export function useDerivations<T extends Record<string, unknown>>(
  * @example
  * ```tsx
  * function Controls() {
- *   const facts = useFactsMutable();
+ *   const facts = useFacts();
  *   // Good: Use in event handlers
  *   const handleClick = () => { facts.count = (facts.count ?? 0) + 1; };
  *   return <button onClick={handleClick}>Increment</button>;
@@ -194,20 +194,15 @@ export function useDerivations<T extends Record<string, unknown>>(
  *
  * // Bad: Don't use for rendering (won't re-render on changes)
  * function BadExample() {
- *   const facts = useFactsMutable();
+ *   const facts = useFacts();
  *   return <div>{facts.count}</div>; // Won't update!
  * }
  * ```
  */
-export function useFactsMutable<S extends Schema>(): Facts<S> {
+export function useFacts<S extends Schema>(): Facts<S> {
 	const system = useSystem<S>();
 	return system.facts;
 }
-
-/**
- * @deprecated Use `useFactsMutable` instead. This alias exists for backwards compatibility.
- */
-export const useFacts = useFactsMutable;
 
 /**
  * Subscribe to a single fact value with automatic re-renders.

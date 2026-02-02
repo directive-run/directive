@@ -75,6 +75,17 @@ export function createDerivationStore<T>(
 	system: System<Schema>,
 	derivationId: string,
 ): Readable<T> {
+	// Dev warning for invalid derivation IDs
+	if (process.env.NODE_ENV !== "production") {
+		const initialValue = system.read(derivationId);
+		if (initialValue === undefined) {
+			console.warn(
+				`[Directive] createDerivationStore("${derivationId}") returned undefined. ` +
+					`Check that "${derivationId}" is defined in your module's derive property.`,
+			);
+		}
+	}
+
 	return readable<T>(system.read(derivationId) as T, (set) => {
 		const unsubscribe = system.subscribe([derivationId], () => {
 			set(system.read(derivationId) as T);
