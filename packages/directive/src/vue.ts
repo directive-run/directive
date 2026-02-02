@@ -104,6 +104,18 @@ export function useSystem<S extends Schema>(): System<S> {
  */
 export function useDerivation<T>(derivationId: string): Ref<T> {
 	const system = useSystem();
+
+	// Dev warning for invalid derivation IDs
+	if (process.env.NODE_ENV !== "production") {
+		const initialValue = system.read(derivationId);
+		if (initialValue === undefined) {
+			console.warn(
+				`[Directive] useDerivation("${derivationId}") returned undefined. ` +
+					`Check that "${derivationId}" is defined in your module's derive property.`,
+			);
+		}
+	}
+
 	const value = ref<T>(system.read(derivationId) as T) as Ref<T>;
 
 	const unsubscribe = system.subscribe([derivationId], () => {

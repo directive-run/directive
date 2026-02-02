@@ -7,6 +7,7 @@ export default defineConfig({
 		vue: "src/vue.ts",
 		svelte: "src/svelte.ts",
 		solid: "src/solid.ts",
+		lit: "src/lit.ts",
 		"plugins/index": "src/plugins/index.ts",
 		testing: "src/testing.ts",
 		templates: "src/templates.ts",
@@ -18,5 +19,5 @@ export default defineConfig({
 	splitting: false,
 	treeshake: true,
 	target: "es2022",
-	external: ["react", "react-dom", "vue", "svelte", "solid-js"],
+	external: ["react", "react-dom", "vue", "svelte", "solid-js", "lit"],
 });
