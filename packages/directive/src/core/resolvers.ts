@@ -22,7 +22,7 @@ import type {
 	RetryPolicy,
 	Schema,
 } from "./types.js";
-import { withTimeout } from "./utils.js";
+import { withTimeout } from "../utils/utils.js";
 
 // ============================================================================
 // Resolvers Manager

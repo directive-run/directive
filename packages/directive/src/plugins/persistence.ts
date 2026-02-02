@@ -2,8 +2,8 @@
  * Persistence Plugin - Save/restore facts to storage
  */
 
-import type { Plugin, Schema, System } from "../types.js";
-import { isPrototypeSafe } from "../utils.js";
+import type { Plugin, Schema, System } from "../core/types.js";
+import { isPrototypeSafe } from "../utils/utils.js";
 
 export interface PersistencePluginOptions {
 	/** Storage backend (localStorage, sessionStorage, or custom) */

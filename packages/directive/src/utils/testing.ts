@@ -8,7 +8,7 @@
  * - Snapshot testing support
  */
 
-import { createSystem, type CreateSystemOptions } from "./system.js";
+import { createSystem, type CreateSystemOptions } from "../core/system.js";
 import type {
 	DerivationsDef,
 	ModuleDef,
@@ -17,7 +17,7 @@ import type {
 	ResolversDef,
 	Schema,
 	System,
-} from "./types.js";
+} from "../core/types.js";
 
 // ============================================================================
 // Fake Timers Integration

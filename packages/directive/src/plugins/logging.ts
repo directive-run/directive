@@ -2,7 +2,7 @@
  * Logging Plugin - Console logging for Directive events
  */
 
-import type { Plugin, Schema } from "../types.js";
+import type { Plugin, Schema } from "../core/types.js";
 
 export interface LoggingPluginOptions {
 	/** Log level */

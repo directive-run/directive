@@ -9,7 +9,7 @@ import {
 	stableStringify,
 	isPrototypeSafe,
 	shallowEqual,
-} from "../utils.js";
+} from "../utils/utils.js";
 
 describe("withTimeout", () => {
 	it("resolves when promise completes before timeout", async () => {

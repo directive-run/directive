@@ -9,7 +9,8 @@
 
 import { getContext, setContext, onDestroy } from "svelte";
 import { readable, type Readable } from "svelte/store";
-import type { Facts, Schema, System, SystemInspection } from "./types.js";
+import { createSystem, type CreateSystemOptions } from "../core/system.js";
+import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
 
 // ============================================================================
 // Context
@@ -333,3 +334,75 @@ export function useWatch<T>(
 	const unsubscribe = system.watch<T>(derivationId, callback);
 	onDestroy(unsubscribe);
 }
+
+/**
+ * Alias for getDirectiveContext for consistency with other adapters.
+ */
+export const useSystem = getDirectiveContext;
+
+// ============================================================================
+// Scoped System (like XState's useActorRef)
+// ============================================================================
+
+/** Options for createDirective/useDirective */
+export type CreateDirectiveOptions<S extends Schema> =
+	| ModuleDef<S, DerivationsDef<S>>
+	| CreateSystemOptions<S>;
+
+// Cache for memoization - prevents re-creation in reactive contexts
+const systemCache = new WeakMap<object, System<Schema>>();
+
+/**
+ * Create a scoped Directive system with automatic lifecycle management.
+ * The system is automatically started and destroyed when component unmounts.
+ *
+ * @param options - Either a single module or full system options
+ * @returns The system instance
+ *
+ * @see {@link useDerivation} for reading derived values
+ * @see {@link useFacts} for direct fact access
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { createDirective, setDirectiveContext } from 'directive/svelte';
+ *
+ *   const system = createDirective(counterModule);
+ *   setDirectiveContext(system); // Make available to children
+ * </script>
+ * ```
+ */
+export function createDirective<S extends Schema>(
+	options: CreateDirectiveOptions<S>,
+): System<S> {
+	// Check cache to prevent re-creation in reactive contexts
+	const cached = systemCache.get(options as object);
+	if (cached) {
+		return cached as System<S>;
+	}
+
+	// Check if options is a module or system options
+	const isModule = "id" in options && "schema" in options;
+
+	const system = isModule
+		? createSystem({ modules: [options as ModuleDef<S, DerivationsDef<S>>] })
+		: createSystem(options as CreateSystemOptions<S>);
+
+	// Cache the system
+	systemCache.set(options as object, system as System<Schema>);
+
+	system.start();
+
+	onDestroy(() => {
+		system.destroy();
+		systemCache.delete(options as object);
+	});
+
+	return system;
+}
+
+/**
+ * Alias for createDirective for consistency with other adapters.
+ * @see {@link createDirective}
+ */
+export const useDirective = createDirective;
