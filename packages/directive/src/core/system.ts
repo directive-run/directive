@@ -7,11 +7,10 @@
 import { createEngine } from "./engine.js";
 import type {
 	DebugConfig,
-	DerivationsDef,
 	ErrorBoundaryConfig,
 	ModuleDef,
+	ModuleSchema,
 	Plugin,
-	Schema,
 	System,
 } from "./types.js";
 
@@ -20,11 +19,12 @@ import type {
 // ============================================================================
 
 /** Options for createSystem */
-export interface CreateSystemOptions<S extends Schema> {
+export interface CreateSystemOptions<M extends ModuleSchema> {
 	/** Modules to include in the system */
-	modules: Array<ModuleDef<S, DerivationsDef<S>>>;
+	modules: Array<ModuleDef<M>>;
 	/** Plugins to register */
-	plugins?: Array<Plugin<S>>;
+	// biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
+	plugins?: Array<Plugin<any>>;
 	/** Debug configuration */
 	debug?: DebugConfig;
 	/** Error boundary configuration */
@@ -41,8 +41,14 @@ export interface CreateSystemOptions<S extends Schema> {
 	 * @example
 	 * ```typescript
 	 * const module = createModule("timer", {
-	 *   schema: { elapsed: t.number() },
+	 *   schema: {
+	 *     facts: { elapsed: t.number() },
+	 *     derivations: {},
+	 *     events: { tick: {} },
+	 *     requirements: {},
+	 *   },
 	 *   init: (facts) => { facts.elapsed = 0; },
+	 *   derive: {},
 	 *   events: {
 	 *     tick: (facts) => { facts.elapsed += 1; },
 	 *   },
@@ -68,17 +74,24 @@ export interface CreateSystemOptions<S extends Schema> {
 }
 
 /**
- * Create a Directive system.
+ * Create a Directive system with full type inference.
+ *
+ * The consolidated schema provides:
+ * - Derivation composition (`derive.otherDerivation` is typed)
+ * - Event dispatch (`system.dispatch({ type: "..." })` has autocomplete)
+ * - Resolver requirements (`req.payload` is typed based on requirement type)
  *
  * @example
  * ```ts
  * const system = createSystem({
  *   modules: [trafficLight],
- *   plugins: [loggingPlugin(), devtoolsPlugin()],
- *   debug: { timeTravel: true, maxSnapshots: 100 },
+ *   plugins: [loggingPlugin()],
+ *   debug: { timeTravel: true },
  * });
  *
  * system.start();
+ * system.dispatch({ type: "tick" }); // Fully typed from schema.events
+ * const isRed = system.derive.isRed; // Typed as boolean from schema.derivations
  * ```
  *
  * @example Zero-config mode
@@ -90,12 +103,26 @@ export interface CreateSystemOptions<S extends Schema> {
  * });
  * ```
  */
-export function createSystem<S extends Schema>(
-	options: CreateSystemOptions<S>,
-): System<S> {
+export function createSystem<const M extends ModuleSchema>(
+	options: CreateSystemOptions<M>,
+): System<M> {
 	// Validate tickMs if provided
 	if (options.tickMs !== undefined && options.tickMs <= 0) {
 		throw new Error("[Directive] tickMs must be a positive number");
+	}
+
+	// Dev-mode warning: tickMs set without tick event handler
+	if (process.env.NODE_ENV !== "production" && options.tickMs && options.tickMs > 0) {
+		const hasTickHandler = options.modules.some(
+			(m) => m.events && "tick" in m.events,
+		);
+		if (!hasTickHandler) {
+			console.warn(
+				`[Directive] tickMs is set to ${options.tickMs}ms but no module defines a "tick" event handler. ` +
+					`The system will dispatch { type: "tick" } events but they will be ignored. ` +
+					`Add a tick handler to one of your modules, or remove tickMs if not needed.`,
+			);
+		}
 	}
 
 	// Apply zero-config defaults if enabled
@@ -122,8 +149,27 @@ export function createSystem<S extends Schema>(
 		};
 	}
 
+	// Convert ModuleDef to the engine's expected format
+	// The engine internally works with flat schema format, so we transform
+	// the consolidated schema to extract facts and requirements
+	const engineModules = options.modules.map((mod) => ({
+		id: mod.id,
+		// Extract facts schema from consolidated schema
+		schema: mod.schema.facts,
+		// Extract requirements schema (for typed resolvers)
+		requirements: mod.schema.requirements,
+		init: mod.init,
+		derive: mod.derive,
+		events: mod.events,
+		effects: mod.effects,
+		constraints: mod.constraints,
+		resolvers: mod.resolvers,
+		hooks: mod.hooks,
+	}));
+
 	const engine = createEngine({
-		modules: options.modules,
+		// biome-ignore lint/suspicious/noExplicitAny: Module format conversion
+		modules: engineModules as any,
 		plugins: options.plugins,
 		debug,
 		errorBoundary,
@@ -136,9 +182,11 @@ export function createSystem<S extends Schema>(
 		const tickMs = options.tickMs;
 
 		// Create wrapper that composes tick behavior
-		const system: System<S> = {
+		const system: System<M> = {
 			facts: engine.facts,
 			debug: engine.debug,
+			derive: engine.derive,
+			events: engine.events,
 
 			get isRunning() {
 				return engine.isRunning;
@@ -178,10 +226,12 @@ export function createSystem<S extends Schema>(
 			getSnapshot: engine.getSnapshot.bind(engine),
 			restore: engine.restore.bind(engine),
 			batch: engine.batch.bind(engine),
-		};
+		// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for System
+		} as any;
 
 		return system;
 	}
 
-	return engine;
+	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for System
+	return engine as any;
 }

@@ -131,7 +131,7 @@ export function createFetchConstraint<
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			retry: retry
 				? {
 						attempts: retry.attempts ?? 3,
@@ -236,7 +236,7 @@ export function createPollingConstraint<S extends Schema>(
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			resolve: async (_req: Requirement, ctx: ResolverContext<S>) => {
 				await action(ctx.facts, ctx.signal);
 				setFact(ctx.facts, lastPollKey, clock() as FactValue<S, typeof lastPollKey>);
@@ -347,7 +347,7 @@ export function createDebouncedConstraint<S extends Schema>(
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			resolve: async (_req: Requirement, ctx: ResolverContext<S>) => {
 				const { facts } = ctx;
 
@@ -434,7 +434,7 @@ export function createThrottleConstraint<S extends Schema>(
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			resolve: async (_req: Requirement, ctx: ResolverContext<S>) => {
 				// Record execution time immediately (throttle pattern)
 				setFact(ctx.facts, lastExecutionKey, clock() as FactValue<S, typeof lastExecutionKey>);
@@ -555,7 +555,7 @@ export function createValidationConstraint<S extends Schema>(
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			resolve: async (_req: Requirement, ctx: ResolverContext<S>) => {
 				const { facts } = ctx;
 
@@ -657,7 +657,7 @@ export function createRetryUntilSuccess<S extends Schema, TResult = unknown>(
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			retry: {
 				attempts: maxAttempts,
 				backoff: "none",
@@ -779,7 +779,7 @@ export function createOptimisticUpdate<S extends Schema, TPayload = unknown, TRe
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			resolve: async (_req: Requirement, ctx: ResolverContext<S>) => {
 				const { facts } = ctx;
 				const payload = getPayload(facts);
@@ -950,7 +950,7 @@ export function createAgentConstraint<S extends Schema>(
 
 	const resolvers: ResolversDef<S> = {
 		[id]: {
-			handles: forType(requirementType),
+			requirement: forType(requirementType),
 			resolve: async (req: Requirement, ctx: ResolverContext<S>) => {
 				const { facts } = ctx;
 				const toolReq = req as Requirement & AgentToolRequest;

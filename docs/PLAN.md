@@ -361,7 +361,7 @@ const trafficLight = createModule("traffic-light", {
   // 7. Resolvers with retry, batch, custom keys
   resolvers: {
     transition: {
-      handles: (req) => req.type === "TRANSITION",
+      requirement: (req) => req.type === "TRANSITION",
       // Custom dedupe key
       key: (req) => `transition-to-${req.to}`,
       // Retry policy
@@ -372,7 +372,7 @@ const trafficLight = createModule("traffic-light", {
       },
     },
     fetchUsers: {
-      handles: (req) => req.type === "FETCH_USER",
+      requirement: (req) => req.type === "FETCH_USER",
       // Batch similar requirements
       batch: { enabled: true, windowMs: 50 },
       resolve: async (reqs, ctx) => {

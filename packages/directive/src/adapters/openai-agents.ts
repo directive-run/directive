@@ -31,11 +31,16 @@
 
 import type {
   Requirement,
-  Schema,
+  ModuleSchema,
   Plugin,
   System,
-  Facts,
 } from "../core/types.js";
+import {
+  setBridgeFact,
+  getBridgeFact,
+  createCallbackPlugin,
+  requirementGuard,
+} from "../core/types/adapter-utils.js";
 import { createModule } from "../core/module.js";
 import { createSystem } from "../core/system.js";
 import { t } from "../core/facts.js";
@@ -184,7 +189,7 @@ export interface OrchestratorConstraint<F extends Record<string, unknown>> {
 
 /** Resolver context for orchestrator */
 export interface OrchestratorResolverContext<F extends Record<string, unknown>> {
-  facts: Facts<Schema> & F & OrchestratorState;
+  facts: F & OrchestratorState;
   runAgent: <T>(agent: AgentLike, input: string, options?: RunOptions) => Promise<RunResult<T>>;
   signal: AbortSignal;
 }
@@ -194,7 +199,7 @@ export interface OrchestratorResolver<
   F extends Record<string, unknown>,
   R extends Requirement = Requirement
 > {
-  handles: (req: Requirement) => req is R;
+  requirement: (req: Requirement) => req is R;
   key?: (req: R) => string;
   resolve: (req: R, ctx: OrchestratorResolverContext<F>) => void | Promise<void>;
 }
@@ -205,6 +210,173 @@ export interface OrchestratorState {
   approval: ApprovalState;
   conversation: Message[];
   toolCalls: ToolCall[];
+}
+
+// ============================================================================
+// Bridge Schema
+// ============================================================================
+
+/** Bridge schema keys for orchestrator state */
+const AGENT_KEY = "__agent" as const;
+const APPROVAL_KEY = "__approval" as const;
+const CONVERSATION_KEY = "__conversation" as const;
+const TOOL_CALLS_KEY = "__toolCalls" as const;
+
+/** Bridge schema for orchestrator */
+const orchestratorBridgeSchema = {
+  facts: {
+    [AGENT_KEY]: t.any<AgentState>(),
+    [APPROVAL_KEY]: t.any<ApprovalState>(),
+    [CONVERSATION_KEY]: t.any<Message[]>(),
+    [TOOL_CALLS_KEY]: t.any<ToolCall[]>(),
+  },
+  derivations: {},
+  events: {},
+  requirements: {},
+} satisfies ModuleSchema;
+
+// ============================================================================
+// Bridge Accessors
+// ============================================================================
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function getAgentState(facts: any): AgentState {
+  return getBridgeFact<AgentState>(facts, AGENT_KEY);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function setAgentState(facts: any, state: AgentState): void {
+  setBridgeFact(facts, AGENT_KEY, state);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function getApprovalState(facts: any): ApprovalState {
+  return getBridgeFact<ApprovalState>(facts, APPROVAL_KEY);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function setApprovalState(facts: any, state: ApprovalState): void {
+  setBridgeFact(facts, APPROVAL_KEY, state);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function getConversation(facts: any): Message[] {
+  return getBridgeFact<Message[]>(facts, CONVERSATION_KEY);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function setConversation(facts: any, messages: Message[]): void {
+  setBridgeFact(facts, CONVERSATION_KEY, messages);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function getToolCalls(facts: any): ToolCall[] {
+  return getBridgeFact<ToolCall[]>(facts, TOOL_CALLS_KEY);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function setToolCalls(facts: any, toolCalls: ToolCall[]): void {
+  setBridgeFact(facts, TOOL_CALLS_KEY, toolCalls);
+}
+
+/** Get full orchestrator state from facts */
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function getOrchestratorState(facts: any): OrchestratorState {
+  return {
+    agent: getAgentState(facts),
+    approval: getApprovalState(facts),
+    conversation: getConversation(facts),
+    toolCalls: getToolCalls(facts),
+  };
+}
+
+// ============================================================================
+// Constraint/Resolver Converters
+// ============================================================================
+
+// biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
+function convertOrchestratorConstraints<F extends Record<string, unknown>>(
+  constraints: Record<string, OrchestratorConstraint<F>>,
+): Record<string, any> {
+  // biome-ignore lint/suspicious/noExplicitAny: Result type is complex
+  const result: Record<string, any> = {};
+
+  for (const [id, constraint] of Object.entries(constraints)) {
+    result[id] = {
+      priority: constraint.priority ?? 0,
+      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+      when: (facts: any) => {
+        const state = getOrchestratorState(facts);
+        const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
+        return constraint.when(combinedFacts);
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+      require: (facts: any) => {
+        const state = getOrchestratorState(facts);
+        const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
+        return typeof constraint.require === "function"
+          ? constraint.require(combinedFacts)
+          : constraint.require;
+      },
+    };
+  }
+
+  return result;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
+function convertOrchestratorResolvers<F extends Record<string, unknown>>(
+  resolvers: Record<string, OrchestratorResolver<F, Requirement>>,
+  runAgentWithGuardrails: <T>(
+    agent: AgentLike,
+    input: string,
+    currentFacts: F & OrchestratorState,
+    opts?: RunOptions
+  ) => Promise<RunResult<T>>,
+  // biome-ignore lint/suspicious/noExplicitAny: Facts getter type varies
+  getSystemFacts: () => any,
+): Record<string, any> {
+  // biome-ignore lint/suspicious/noExplicitAny: Result type is complex
+  const result: Record<string, any> = {};
+
+  for (const [id, resolver] of Object.entries(resolvers)) {
+    result[id] = {
+      requirement: resolver.requirement,
+      key: resolver.key,
+      // biome-ignore lint/suspicious/noExplicitAny: Context type varies
+      resolve: async (req: Requirement, ctx: any) => {
+        const state = getOrchestratorState(ctx.facts);
+        const combinedFacts = { ...ctx.facts, ...state } as unknown as F & OrchestratorState;
+
+        const orchestratorCtx: OrchestratorResolverContext<F> = {
+          facts: combinedFacts,
+          runAgent: async <T>(agent: AgentLike, input: string, opts?: RunOptions) => {
+            return runAgentWithGuardrails<T>(
+              agent,
+              input,
+              getCombinedFactsFromSystem(getSystemFacts()) as unknown as F & OrchestratorState,
+              opts
+            );
+          },
+          signal: ctx.signal,
+        };
+        await resolver.resolve(req, orchestratorCtx);
+      },
+    };
+  }
+
+  return result;
+}
+
+/** Helper to get combined facts from system facts */
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+function getCombinedFactsFromSystem(facts: any): OrchestratorState {
+  return getOrchestratorState(facts);
+}
+
+/** Built-in pause requirement type */
+interface PauseBudgetExceededReq extends Requirement {
+  type: "__PAUSE_BUDGET_EXCEEDED";
 }
 
 /** Orchestrator options */
@@ -228,14 +400,15 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Max token budget */
   maxTokenBudget?: number;
   /** Plugins */
-  plugins?: Array<Plugin<Schema>>;
+  plugins?: Plugin[];
   /** Enable debugging */
   debug?: boolean;
 }
 
 /** Orchestrator instance */
 export interface AgentOrchestrator<F extends Record<string, unknown>> {
-  system: System<Schema>;
+  // biome-ignore lint/suspicious/noExplicitAny: System type varies
+  system: System<any>;
   facts: F & OrchestratorState;
   /** Run an agent with guardrails */
   run<T>(agent: AgentLike, input: string): Promise<RunResult<T>>;
@@ -316,91 +489,78 @@ export function createAgentOrchestrator<
     debug = false,
   } = options;
 
-  // Build schema
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const schema: any = {
-    agent: t.object<Record<string, unknown>>(),
-    approval: t.object<Record<string, unknown>>(),
-    conversation: t.array<Record<string, unknown>>(),
-    toolCalls: t.array<Record<string, unknown>>(),
-    ...factsSchema,
-  };
+  // Build schema by combining bridge schema with user-provided schema
+  const combinedSchema = {
+    facts: {
+      ...orchestratorBridgeSchema.facts,
+      ...factsSchema,
+    },
+    derivations: {},
+    events: {},
+    requirements: {},
+  } satisfies ModuleSchema;
 
-  // Convert constraints
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const directiveConstraints: Record<string, any> = {};
-  for (const [id, constraint] of Object.entries(constraints)) {
-    const requireFn = constraint.require;
-    directiveConstraints[id] = {
-      priority: constraint.priority ?? 0,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      when: (facts: any) => constraint.when(facts as F & OrchestratorState),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      require: typeof requireFn === "function"
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? (facts: any) => requireFn(facts as F & OrchestratorState)
-        : requireFn,
-    };
-  }
+  // Forward declaration for runAgentWithGuardrails (used in resolver converter)
+  let runAgentWithGuardrailsFn: <T>(
+    agent: AgentLike,
+    input: string,
+    currentFacts: F & OrchestratorState,
+    opts?: RunOptions
+  ) => Promise<RunResult<T>>;
 
-  // Add built-in constraints
+  // Forward declaration for system (used in resolver converter)
+  // biome-ignore lint/suspicious/noExplicitAny: System type varies
+  let system: System<any>;
+
+  // Convert user constraints
+  // biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
+  const directiveConstraints: Record<string, any> =
+    convertOrchestratorConstraints<F>(constraints);
+
+  // Add built-in budget limit constraint
   if (maxTokenBudget) {
     directiveConstraints["__budgetLimit"] = {
       priority: 100, // High priority
-      when: (facts: { agent: AgentState }) => facts.agent.tokenUsage > maxTokenBudget,
-      require: { type: "__PAUSE_BUDGET_EXCEEDED" },
+      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+      when: (facts: any) => getAgentState(facts).tokenUsage > maxTokenBudget,
+      require: { type: "__PAUSE_BUDGET_EXCEEDED" } as PauseBudgetExceededReq,
     };
   }
 
-  // Convert resolvers
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const directiveResolvers: Record<string, any> = {};
+  // Convert user resolvers
+  // biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
+  const directiveResolvers: Record<string, any> =
+    convertOrchestratorResolvers<F>(
+      resolvers,
+      (agent, input, currentFacts, opts) => runAgentWithGuardrailsFn(agent, input, currentFacts, opts),
+      () => system.facts,
+    );
 
-  // Built-in pause resolver
+  // Add built-in pause resolver
   directiveResolvers["__pause"] = {
-    handles: (req: Requirement): req is { type: "__PAUSE_BUDGET_EXCEEDED" } =>
-      req.type === "__PAUSE_BUDGET_EXCEEDED",
-    resolve: async (_req: Requirement, ctx: { facts: { agent: AgentState } }) => {
-      ctx.facts.agent = {
-        ...ctx.facts.agent,
+    requirement: requirementGuard<PauseBudgetExceededReq>("__PAUSE_BUDGET_EXCEEDED"),
+    // biome-ignore lint/suspicious/noExplicitAny: Context type varies
+    resolve: async (_req: Requirement, ctx: any) => {
+      const currentAgent = getAgentState(ctx.facts);
+      setAgentState(ctx.facts, {
+        ...currentAgent,
         status: "paused",
-      };
+      });
     },
   };
 
-  // User resolvers
-  for (const [id, resolver] of Object.entries(resolvers)) {
-    directiveResolvers[id] = {
-      handles: resolver.handles,
-      key: resolver.key,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      resolve: async (req: Requirement, ctx: any) => {
-        const orchestratorCtx: OrchestratorResolverContext<F> = {
-          facts: ctx.facts as unknown as Facts<Schema> & F & OrchestratorState,
-          runAgent: async <T>(
-            agent: AgentLike,
-            input: string,
-            opts?: RunOptions
-          ) => {
-            return runAgentWithGuardrails<T>(
-              agent,
-              input,
-              ctx.facts as unknown as F & OrchestratorState,
-              opts
-            );
-          },
-          signal: ctx.signal,
-        };
-        await resolver.resolve(req, orchestratorCtx);
-      },
-    };
-  }
+  // Create callback plugin for onApprovalRequest
+  const callbackPlugin = createCallbackPlugin(
+    "openai-agents-callbacks",
+    {}, // No requirement callbacks needed, approval is handled separately
+  );
 
   // Create module
+  // biome-ignore lint/suspicious/noExplicitAny: Bridge module uses dynamic constraints/resolvers
   const orchestratorModule = createModule("openai-agents-orchestrator", {
-    schema,
+    schema: combinedSchema,
     init: (facts) => {
-      facts.agent = {
+      setAgentState(facts, {
         status: "idle",
         currentAgent: null,
         input: null,
@@ -410,25 +570,28 @@ export function createAgentOrchestrator<
         turnCount: 0,
         startedAt: null,
         completedAt: null,
-      };
-      facts.approval = {
+      });
+      setApprovalState(facts, {
         pending: [],
         approved: [],
         rejected: [],
-      };
-      facts.conversation = [];
-      facts.toolCalls = [];
-      init?.(facts as unknown as F & OrchestratorState);
+      });
+      setConversation(facts, []);
+      setToolCalls(facts, []);
+      if (init) {
+        const state = getOrchestratorState(facts);
+        const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
+        init(combinedFacts);
+      }
     },
-    constraints: directiveConstraints as unknown as Parameters<typeof createModule>[1]["constraints"],
-    resolvers: directiveResolvers as unknown as Parameters<typeof createModule>[1]["resolvers"],
+    constraints: directiveConstraints,
+    resolvers: directiveResolvers as any,
   });
 
   // Create system
-  // Use type assertion to work around Schema generic variance issues
-  const system = createSystem({
-    modules: [orchestratorModule as unknown as Parameters<typeof createSystem>[0]["modules"][0]],
-    plugins: plugins as unknown as Array<Plugin<Schema>>,
+  system = createSystem({
+    modules: [orchestratorModule],
+    plugins: [...plugins, callbackPlugin],
     debug: debug ? { timeTravel: true } : undefined,
   });
 
@@ -441,8 +604,6 @@ export function createAgentOrchestrator<
     _currentFacts: F & OrchestratorState,
     opts?: RunOptions
   ): Promise<RunResult<T>> {
-    const facts = system.facts as unknown as F & OrchestratorState;
-
     // Run input guardrails
     for (const guardrail of guardrails.input ?? []) {
       const result = await guardrail(
@@ -463,13 +624,14 @@ export function createAgentOrchestrator<
 
     // Update state
     system.batch(() => {
-      facts.agent = {
-        ...facts.agent,
+      const currentAgent = getAgentState(system.facts);
+      setAgentState(system.facts, {
+        ...currentAgent,
         status: "running",
         currentAgent: agent.name,
         input,
         startedAt: Date.now(),
-      };
+      });
     });
 
     // Run the agent
@@ -477,7 +639,8 @@ export function createAgentOrchestrator<
       ...opts,
       signal: opts?.signal,
       onMessage: (message) => {
-        system.facts.conversation = [...facts.conversation, message];
+        const currentConversation = getConversation(system.facts);
+        setConversation(system.facts, [...currentConversation, message]);
         opts?.onMessage?.(message);
       },
       onToolCall: async (toolCall) => {
@@ -509,10 +672,11 @@ export function createAgentOrchestrator<
           };
 
           system.batch(() => {
-            facts.approval = {
-              ...facts.approval,
-              pending: [...facts.approval.pending, approvalRequest],
-            };
+            const currentApproval = getApprovalState(system.facts);
+            setApprovalState(system.facts, {
+              ...currentApproval,
+              pending: [...currentApproval.pending, approvalRequest],
+            });
           });
 
           onApprovalRequest?.(approvalRequest);
@@ -521,7 +685,8 @@ export function createAgentOrchestrator<
           await waitForApproval(approvalId);
         }
 
-        system.facts.toolCalls = [...facts.toolCalls, toolCall];
+        const currentToolCalls = getToolCalls(system.facts);
+        setToolCalls(system.facts, [...currentToolCalls, toolCall]);
         opts?.onToolCall?.(toolCall);
       },
     });
@@ -551,24 +716,28 @@ export function createAgentOrchestrator<
 
     // Update state
     system.batch(() => {
-      facts.agent = {
-        ...facts.agent,
+      const currentAgent = getAgentState(system.facts);
+      setAgentState(system.facts, {
+        ...currentAgent,
         status: "completed",
         output: result.finalOutput,
-        tokenUsage: facts.agent.tokenUsage + result.totalTokens,
-        turnCount: facts.agent.turnCount + result.messages.length,
+        tokenUsage: currentAgent.tokenUsage + result.totalTokens,
+        turnCount: currentAgent.turnCount + result.messages.length,
         completedAt: Date.now(),
-      };
+      });
     });
 
     return result;
   }
 
+  // Assign the function to the forward-declared variable
+  runAgentWithGuardrailsFn = runAgentWithGuardrails;
+
   // Wait for approval
   function waitForApproval(requestId: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const unsubscribe = system.facts.$store.subscribe(["approval"], () => {
-        const approval = system.facts.approval as ApprovalState;
+      const unsubscribe = system.facts.$store.subscribe([APPROVAL_KEY], () => {
+        const approval = getApprovalState(system.facts);
         if (approval.approved.includes(requestId)) {
           unsubscribe();
           resolve();
@@ -580,57 +749,65 @@ export function createAgentOrchestrator<
     });
   }
 
+  /** Get facts as the combined type for external access */
+  function getCombinedFacts(): F & OrchestratorState {
+    const state = getOrchestratorState(system.facts);
+    return { ...state } as unknown as F & OrchestratorState;
+  }
+
   const orchestrator: AgentOrchestrator<F> = {
-    system: system as System<Schema>,
-    facts: system.facts as unknown as F & OrchestratorState,
+    system,
+    get facts() {
+      return getCombinedFacts();
+    },
 
     async run<T>(agent: AgentLike, input: string): Promise<RunResult<T>> {
-      return runAgentWithGuardrails<T>(agent, input, system.facts as unknown as F & OrchestratorState) as Promise<RunResult<T>>;
+      return runAgentWithGuardrails<T>(agent, input, getCombinedFacts());
     },
 
     approve(requestId: string): void {
-      const approval = (system.facts as unknown as OrchestratorState).approval;
       system.batch(() => {
-        (system.facts as unknown as OrchestratorState).approval = {
+        const approval = getApprovalState(system.facts);
+        setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
           approved: [...approval.approved, requestId],
-        };
+        });
       });
     },
 
     reject(requestId: string, _reason?: string): void {
-      const approval = (system.facts as unknown as OrchestratorState).approval;
       system.batch(() => {
-        (system.facts as unknown as OrchestratorState).approval = {
+        const approval = getApprovalState(system.facts);
+        setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
           rejected: [...approval.rejected, requestId],
-        };
+        });
       });
     },
 
     pause(): void {
-      (system.facts as unknown as OrchestratorState).agent = {
-        ...((system.facts as unknown as OrchestratorState).agent),
+      const currentAgent = getAgentState(system.facts);
+      setAgentState(system.facts, {
+        ...currentAgent,
         status: "paused",
-      };
+      });
     },
 
     resume(): void {
-      const agent = (system.facts as unknown as OrchestratorState).agent;
+      const agent = getAgentState(system.facts);
       if (agent.status === "paused") {
-        (system.facts as unknown as OrchestratorState).agent = {
+        setAgentState(system.facts, {
           ...agent,
           status: agent.currentAgent ? "running" : "idle",
-        };
+        });
       }
     },
 
     reset(): void {
-      const facts = system.facts as unknown as OrchestratorState;
       system.batch(() => {
-        facts.agent = {
+        setAgentState(system.facts, {
           status: "idle",
           currentAgent: null,
           input: null,
@@ -640,14 +817,14 @@ export function createAgentOrchestrator<
           turnCount: 0,
           startedAt: null,
           completedAt: null,
-        };
-        facts.approval = {
+        });
+        setApprovalState(system.facts, {
           pending: [],
           approved: [],
           rejected: [],
-        };
-        facts.conversation = [];
-        facts.toolCalls = [];
+        });
+        setConversation(system.facts, []);
+        setToolCalls(system.facts, []);
       });
     },
 
@@ -778,9 +955,10 @@ export function createRateLimitGuardrail(options: {
       requestHistory.shift();
     }
 
-    // Check limits
-    const orchestratorState = context.facts as unknown as OrchestratorState | undefined;
-    const tokenUsage = orchestratorState?.agent?.tokenUsage ?? 0;
+    // Check limits - safely extract token usage from context facts
+    const factsObj = context.facts as Record<string, unknown>;
+    const agentState = factsObj[AGENT_KEY] as AgentState | undefined;
+    const tokenUsage = agentState?.tokenUsage ?? 0;
     const recentTokens = tokenHistory.length;
     const recentRequests = requestHistory.length;
 

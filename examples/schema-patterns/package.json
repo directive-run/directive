@@ -1,0 +1,22 @@
+{
+  "name": "schema-patterns-example",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:builders": "npx tsx builders.ts",
+    "test:xstate": "npx tsx xstate-style.ts",
+    "test:zod": "npx tsx zod-schema.ts",
+    "test:mixed": "npx tsx mixed.ts",
+    "test": "pnpm typecheck && pnpm test:builders && pnpm test:xstate && pnpm test:zod && pnpm test:mixed"
+  },
+  "dependencies": {
+    "directive": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "tsx": "^4.0.0"
+  }
+}

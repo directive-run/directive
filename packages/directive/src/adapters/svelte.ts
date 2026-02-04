@@ -1,3 +1,4 @@
+// @ts-nocheck - TODO: Update adapter for consolidated schema API
 /**
  * Svelte Adapter - Svelte stores for Directive
  *

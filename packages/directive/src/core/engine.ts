@@ -18,6 +18,10 @@ import { createPluginManager, type PluginManager } from "./plugins.js";
 import { RequirementSet } from "./requirements.js";
 import { createResolversManager, type ResolversManager } from "./resolvers.js";
 import { createDisabledTimeTravel, createTimeTravelManager, type TimeTravelManager } from "../utils/time-travel.js";
+import { isPrototypeSafe } from "../utils/utils.js";
+
+// Blocked properties for prototype pollution protection
+const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
 import type {
 	ConstraintsDef,
 	DerivationsDef,
@@ -50,9 +54,10 @@ interface EngineState<_S extends Schema> {
 /**
  * Create the Directive engine.
  */
+// biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
 export function createEngine<S extends Schema>(
-	config: SystemConfig<S>,
-): System<S> {
+	config: SystemConfig<any>,
+): System<any> {
 	// Merge all module definitions with collision detection
 	const mergedSchema = {} as S;
 	const mergedEvents: EventsDef<S> = {};
@@ -65,6 +70,27 @@ export function createEngine<S extends Schema>(
 	const schemaOwners = new Map<string, string>();
 
 	for (const module of config.modules) {
+		// Security: Validate module definitions for dangerous keys
+		if (process.env.NODE_ENV !== "production") {
+			const validateKeys = (obj: object | undefined, section: string) => {
+				if (!obj) return;
+				for (const key of Object.keys(obj)) {
+					if (BLOCKED_PROPS.has(key)) {
+						throw new Error(
+							`[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. ` +
+								`This could indicate a prototype pollution attempt.`,
+						);
+					}
+				}
+			};
+			validateKeys(module.schema, "schema");
+			validateKeys(module.events, "events");
+			validateKeys(module.derive, "derive");
+			validateKeys(module.effects, "effects");
+			validateKeys(module.constraints, "constraints");
+			validateKeys(module.resolvers, "resolvers");
+		}
+
 		// Check for schema collisions
 		if (process.env.NODE_ENV !== "production") {
 			for (const key of Object.keys(module.schema)) {
@@ -301,10 +327,84 @@ export function createEngine<S extends Schema>(
 		}
 	}
 
+	// Create typed derive accessor using a Proxy
+	const deriveAccessor = new Proxy({} as Record<string, unknown>, {
+		get(_, prop: string | symbol) {
+			if (typeof prop === "symbol") return undefined;
+			// Prototype pollution protection
+			if (BLOCKED_PROPS.has(prop)) return undefined;
+			return derivationsManager.get(prop as keyof DerivationsDef<S>);
+		},
+		has(_, prop: string | symbol) {
+			if (typeof prop === "symbol") return false;
+			// Prototype pollution protection
+			if (BLOCKED_PROPS.has(prop)) return false;
+			return prop in mergedDerive;
+		},
+		ownKeys() {
+			return Object.keys(mergedDerive);
+		},
+		getOwnPropertyDescriptor(_, prop: string | symbol) {
+			if (typeof prop === "symbol") return undefined;
+			// Prototype pollution protection
+			if (BLOCKED_PROPS.has(prop)) return undefined;
+			if (prop in mergedDerive) {
+				return { configurable: true, enumerable: true };
+			}
+			return undefined;
+		},
+	});
+
+	// Create typed events accessor using a Proxy
+	// This provides system.events.eventName(payload) syntax
+	const eventsAccessor = new Proxy({} as Record<string, (payload?: Record<string, unknown>) => void>, {
+		get(_, prop: string | symbol) {
+			if (typeof prop === "symbol") return undefined;
+			// Prototype pollution protection
+			if (BLOCKED_PROPS.has(prop)) return undefined;
+			// Return a function that dispatches the event
+			return (payload?: Record<string, unknown>) => {
+				const handler = mergedEvents[prop];
+				if (handler) {
+					store.batch(() => {
+						handler(facts, { type: prop, ...payload });
+					});
+				} else if (process.env.NODE_ENV !== "production") {
+					console.warn(
+						`[Directive] Unknown event type "${prop}". ` +
+							`No handler is registered for this event. ` +
+							`Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
+					);
+				}
+			};
+		},
+		has(_, prop: string | symbol) {
+			if (typeof prop === "symbol") return false;
+			// Prototype pollution protection
+			if (BLOCKED_PROPS.has(prop)) return false;
+			return prop in mergedEvents;
+		},
+		ownKeys() {
+			return Object.keys(mergedEvents);
+		},
+		getOwnPropertyDescriptor(_, prop: string | symbol) {
+			if (typeof prop === "symbol") return undefined;
+			// Prototype pollution protection
+			if (BLOCKED_PROPS.has(prop)) return undefined;
+			if (prop in mergedEvents) {
+				return { configurable: true, enumerable: true };
+			}
+			return undefined;
+		},
+	});
+
 	// Create the system interface
-	const system: System<S> = {
+	// biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
+	const system: System<any> = {
 		facts,
 		debug: timeTravelManager.isEnabled ? timeTravelManager : null,
+		derive: deriveAccessor,
+		events: eventsAccessor,
 
 		start(): void {
 			if (state.isRunning) return;
@@ -314,12 +414,14 @@ export function createEngine<S extends Schema>(
 			for (const module of config.modules) {
 				if (module.init) {
 					store.batch(() => {
-						module.init!(facts);
+						// biome-ignore lint/suspicious/noExplicitAny: Engine internal type coercion
+						module.init!(facts as any);
 					});
 				}
 
 				// Call module hooks
-				module.hooks?.onStart?.(system);
+				// biome-ignore lint/suspicious/noExplicitAny: Engine internal type coercion
+				module.hooks?.onStart?.(system as any);
 			}
 
 			// Emit start event
@@ -530,8 +632,18 @@ export function createEngine<S extends Schema>(
 				throw new Error("[Directive] restore() snapshot must have a facts object");
 			}
 
+			// Security: Validate snapshot for prototype pollution
+			if (!isPrototypeSafe(snapshot)) {
+				throw new Error(
+					"[Directive] restore() rejected: snapshot contains potentially dangerous keys " +
+						"(__proto__, constructor, or prototype). This may indicate a prototype pollution attack.",
+				);
+			}
+
 			store.batch(() => {
 				for (const [key, value] of Object.entries(snapshot.facts)) {
+					// Skip dangerous keys (defense in depth)
+					if (BLOCKED_PROPS.has(key)) continue;
 					store.set(key as keyof InferSchema<S>, value as InferSchema<S>[keyof InferSchema<S>]);
 				}
 			});

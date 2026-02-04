@@ -1,0 +1,159 @@
+/**
+ * System Types - Type definitions for the system
+ */
+
+import type {
+	ModuleSchema,
+	InferDerivations,
+	InferEvents,
+	InferSchemaType,
+} from "./schema.js";
+import type { Facts } from "./facts.js";
+import type {
+	SystemEvent,
+	EventsAccessorFromSchema,
+} from "./events.js";
+import type { RequirementWithId } from "./requirements.js";
+import type { ResolverStatus } from "./resolvers.js";
+import type { Plugin, Snapshot } from "./plugins.js";
+import type { ErrorBoundaryConfig } from "./errors.js";
+import type { ModuleDef } from "./module.js";
+
+// ============================================================================
+// Derive Accessor Types
+// ============================================================================
+
+/**
+ * Derive accessor from module schema.
+ */
+export type DeriveAccessor<M extends ModuleSchema> = InferDerivations<M>;
+
+/**
+ * Derivation keys from module schema.
+ */
+export type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] & string;
+
+/**
+ * Get derivation return type from module schema.
+ */
+export type DerivationReturnType<M extends ModuleSchema, K extends keyof M["derivations"]> =
+	InferSchemaType<M["derivations"][K]>;
+
+// ============================================================================
+// Events Accessor Types
+// ============================================================================
+
+/**
+ * Events accessor from module schema.
+ */
+export type EventsAccessor<M extends ModuleSchema> = EventsAccessorFromSchema<M>;
+
+// ============================================================================
+// Debug & Time-Travel Types
+// ============================================================================
+
+/** Debug configuration */
+export interface DebugConfig {
+	timeTravel?: boolean;
+	maxSnapshots?: number;
+}
+
+/** Time-travel API */
+export interface TimeTravelAPI {
+	readonly snapshots: Snapshot[];
+	readonly currentIndex: number;
+	goBack(steps?: number): void;
+	goForward(steps?: number): void;
+	goTo(snapshotId: number): void;
+	replay(): void;
+	export(): string;
+	import(json: string): void;
+}
+
+// ============================================================================
+// System Inspection Types
+// ============================================================================
+
+/** System inspection result */
+export interface SystemInspection {
+	unmet: RequirementWithId[];
+	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	constraints: Array<{ id: string; active: boolean; priority: number }>;
+	resolvers: Record<string, ResolverStatus>;
+}
+
+/** Explanation of why a requirement exists */
+export interface RequirementExplanation {
+	requirementId: string;
+	requirementType: string;
+	constraintId: string;
+	constraintPriority: number;
+	relevantFacts: Record<string, unknown>;
+	resolverStatus: ResolverStatus;
+}
+
+/** Serializable system snapshot for SSR/persistence */
+export interface SystemSnapshot {
+	facts: Record<string, unknown>;
+	version?: number;
+}
+
+// ============================================================================
+// System Interface
+// ============================================================================
+
+/**
+ * System interface using consolidated module schema.
+ * Provides full type inference for facts, derivations, events, and dispatch.
+ */
+export interface System<M extends ModuleSchema = ModuleSchema> {
+	readonly facts: Facts<M["facts"]>;
+	readonly debug: TimeTravelAPI | null;
+	readonly derive: InferDerivations<M>;
+	readonly events: EventsAccessorFromSchema<M>;
+
+	start(): void;
+	stop(): void;
+	destroy(): void;
+
+	readonly isRunning: boolean;
+	readonly isSettled: boolean;
+
+	dispatch(event: InferEvents<M>): void;
+	dispatch(event: SystemEvent): void;
+
+	batch(fn: () => void): void;
+
+	read<K extends DerivationKeys<M>>(derivationId: K): DerivationReturnType<M, K>;
+	read<T = unknown>(derivationId: string): T;
+	subscribe(derivationIds: string[], listener: () => void): () => void;
+
+	watch<K extends DerivationKeys<M>>(
+		derivationId: K,
+		callback: (newValue: DerivationReturnType<M, K>, previousValue: DerivationReturnType<M, K> | undefined) => void,
+	): () => void;
+	watch<T = unknown>(
+		derivationId: string,
+		callback: (newValue: T, previousValue: T | undefined) => void,
+	): () => void;
+
+	inspect(): SystemInspection;
+	settle(maxWait?: number): Promise<void>;
+	explain(requirementId: string): string | null;
+	getSnapshot(): SystemSnapshot;
+	restore(snapshot: SystemSnapshot): void;
+}
+
+// ============================================================================
+// System Configuration
+// ============================================================================
+
+/** System configuration */
+export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
+	modules: Array<ModuleDef<M>>;
+	// biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
+	plugins?: Array<Plugin<any>>;
+	debug?: DebugConfig;
+	errorBoundary?: ErrorBoundaryConfig;
+	tickMs?: number;
+}

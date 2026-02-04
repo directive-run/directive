@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traffic Intersection - Directive Example</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      color: #888;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    /* Main container */
+    .container {
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
+    }
+
+    /* Intersection grid */
+    .intersection {
+      display: grid;
+      grid-template-columns: 120px 200px 120px;
+      grid-template-rows: 120px 200px 120px;
+      gap: 0;
+      background: #333;
+      border-radius: 8px;
+      padding: 10px;
+      position: relative;
+    }
+
+    /* Road cells */
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Corner cells (grass) */
+    .corner {
+      background: #2d5a27;
+      border-radius: 4px;
+    }
+
+    /* Road cells */
+    .road {
+      background: #444;
+      position: relative;
+    }
+
+    .road.vertical {
+      background: linear-gradient(90deg, #444 45%, #666 50%, #444 55%);
+    }
+
+    .road.horizontal {
+      background: linear-gradient(180deg, #444 45%, #666 50%, #444 55%);
+    }
+
+    /* Center intersection */
+    .center {
+      background: #555;
+      position: relative;
+    }
+
+    .center::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #666;
+    }
+
+    .center::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #666;
+    }
+
+    /* Car queue areas */
+    .queue-area {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 8px;
+      min-height: 40px;
+    }
+
+    .queue-area.north, .queue-area.south {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .queue-area.east, .queue-area.west {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .queue-area.north {
+      justify-content: flex-end;
+    }
+
+    .queue-area.south {
+      justify-content: flex-start;
+    }
+
+    .queue-area.east {
+      justify-content: flex-start;
+    }
+
+    .queue-area.west {
+      justify-content: flex-end;
+    }
+
+    .car {
+      font-size: 20px;
+      animation: arrive 0.3s ease-out;
+    }
+
+    @keyframes arrive {
+      from {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .more-cars {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    /* Traffic lights */
+    .traffic-light {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 6px;
+      background: #222;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .traffic-light.horizontal {
+      flex-direction: row;
+    }
+
+    .light {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #333;
+      transition: all 0.3s;
+    }
+
+    .light.red { background: #500; }
+    .light.yellow { background: #550; }
+    .light.green { background: #050; }
+
+    .light.red.active { background: #f44; box-shadow: 0 0 20px #f44; }
+    .light.yellow.active { background: #ff0; box-shadow: 0 0 20px #ff0; }
+    .light.green.active { background: #4f4; box-shadow: 0 0 20px #4f4; }
+
+    /* Add car buttons */
+    .add-car-btn {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #4a90d9;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .add-car-btn:hover {
+      background: #5aa0e9;
+      transform: scale(1.1);
+    }
+
+    .add-car-btn:active {
+      transform: scale(0.95);
+    }
+
+    .cell.north .add-car-btn { top: -20px; left: 50%; transform: translateX(-50%); }
+    .cell.south .add-car-btn { bottom: -20px; left: 50%; transform: translateX(-50%); }
+    .cell.east .add-car-btn { right: -20px; top: 50%; transform: translateY(-50%); }
+    .cell.west .add-car-btn { left: -20px; top: 50%; transform: translateY(-50%); }
+
+    /* Pedestrian buttons */
+    .ped-btn {
+      position: absolute;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: 2px solid #666;
+      background: #333;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .ped-btn:hover {
+      background: #444;
+      border-color: #888;
+    }
+
+    .ped-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #333;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    .ped-indicator.waiting {
+      background: #ff0;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Control panel */
+    .controls {
+      background: #252540;
+      border-radius: 8px;
+      padding: 20px;
+      width: 280px;
+    }
+
+    .controls h2 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #444;
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+
+    .control-group h3 {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .btn-primary {
+      background: #4a90d9;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5aa0e9;
+    }
+
+    .btn-danger {
+      background: #d94a4a;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #e95a5a;
+    }
+
+    .btn-warning {
+      background: #d9a04a;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #e9b05a;
+    }
+
+    .btn-secondary {
+      background: #555;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #666;
+    }
+
+    /* Stats */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat {
+      background: #333;
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4a90d9;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    /* Phase timer */
+    .phase-timer {
+      background: #333;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 15px;
+    }
+
+    .timer-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .timer-label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .timer-value {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: #444;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      transition: width 0.1s linear;
+      border-radius: 4px;
+    }
+
+    .progress-fill.green { background: #4f4; }
+    .progress-fill.yellow { background: #ff0; }
+    .progress-fill.red { background: #f44; }
+
+    /* Status bar */
+    .status-bar {
+      margin-top: 15px;
+      padding: 10px;
+      background: #333;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    /* Emergency overlay */
+    .emergency-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 10px;
+      background: #f00;
+      color: white;
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px;
+      display: none;
+      animation: flash 0.5s infinite;
+      z-index: 100;
+    }
+
+    .emergency-overlay.active {
+      display: block;
+    }
+
+    @keyframes flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* Keyboard shortcuts */
+    .shortcuts {
+      margin-top: 15px;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .shortcuts kbd {
+      background: #444;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    /* Pedestrian crosswalks */
+    .crosswalk {
+      position: absolute;
+      background: repeating-linear-gradient(
+        90deg,
+        #fff 0px,
+        #fff 8px,
+        transparent 8px,
+        transparent 16px
+      );
+      opacity: 0.3;
+    }
+
+    .crosswalk.ns {
+      width: 40px;
+      height: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .crosswalk.ew {
+      height: 40px;
+      width: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* Direction labels */
+    .direction-label {
+      position: absolute;
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <h1>Traffic Intersection</h1>
+  <p class="subtitle">A comprehensive Directive example showing schema, events, constraints, resolvers, and more</p>
+
+  <div id="emergency-overlay" class="emergency-overlay"></div>
+
+  <div class="container">
+    <!-- Intersection Grid -->
+    <div class="intersection">
+      <!-- Row 1: NW corner, North road, NE corner -->
+      <div class="cell corner nw">
+        <button class="ped-btn" id="ped-ns" title="Request NS Crossing">
+          <span class="ped-indicator" id="ped-ns-indicator"></span>🚶
+        </button>
+      </div>
+      <div class="cell road vertical north">
+        <div id="north-queue" class="queue-area north"></div>
+        <button class="add-car-btn" id="add-north" title="Add car from North">+</button>
+        <span class="direction-label" style="top: 5px;">NORTH</span>
+      </div>
+      <div class="cell corner ne">
+        <!-- NS Traffic Light -->
+        <div class="traffic-light" id="ns-light">
+          <div class="light red"></div>
+          <div class="light yellow"></div>
+          <div class="light green"></div>
+        </div>
+      </div>
+
+      <!-- Row 2: West road, Center, East road -->
+      <div class="cell road horizontal west">
+        <div id="west-queue" class="queue-area west"></div>
+        <button class="add-car-btn" id="add-west" title="Add car from West">+</button>
+        <span class="direction-label" style="left: 5px;">WEST</span>
+      </div>
+      <div class="cell center">
+        <div class="crosswalk ns"></div>
+        <div class="crosswalk ew"></div>
+      </div>
+      <div class="cell road horizontal east">
+        <div id="east-queue" class="queue-area east"></div>
+        <button class="add-car-btn" id="add-east" title="Add car from East">+</button>
+        <span class="direction-label" style="right: 5px;">EAST</span>
+      </div>
+
+      <!-- Row 3: SW corner, South road, SE corner -->
+      <div class="cell corner sw">
+        <!-- EW Traffic Light -->
+        <div class="traffic-light horizontal" id="ew-light">
+          <div class="light red"></div>
+          <div class="light yellow"></div>
+          <div class="light green"></div>
+        </div>
+      </div>
+      <div class="cell road vertical south">
+        <div id="south-queue" class="queue-area south"></div>
+        <button class="add-car-btn" id="add-south" title="Add car from South">+</button>
+        <span class="direction-label" style="bottom: 5px;">SOUTH</span>
+      </div>
+      <div class="cell corner se">
+        <button class="ped-btn" id="ped-ew" title="Request EW Crossing">
+          <span class="ped-indicator" id="ped-ew-indicator"></span>🚶
+        </button>
+      </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="controls">
+      <h2>Control Panel</h2>
+
+      <!-- Phase Timer -->
+      <div class="phase-timer">
+        <div class="timer-header">
+          <span class="timer-label">Phase Timer</span>
+          <span class="timer-value" id="phase-timer">0s</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill green" id="phase-progress" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Emergency Controls -->
+      <div class="control-group">
+        <h3>Emergency</h3>
+        <button class="btn btn-danger" id="emergency-btn">🚨 Trigger Emergency</button>
+        <button class="btn btn-warning" id="clear-emergency-btn" style="display: none;">✓ Clear Emergency</button>
+      </div>
+
+      <!-- Statistics -->
+      <div class="control-group">
+        <h3>Statistics</h3>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="cars-passed">0</div>
+            <div class="stat-label">Cars Passed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="pedestrians-crossed">0</div>
+            <div class="stat-label">Pedestrians</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reset -->
+      <div class="control-group">
+        <button class="btn btn-secondary" id="reset-btn">↺ Reset Intersection</button>
+      </div>
+
+      <!-- Status -->
+      <div class="status-bar" id="status-text">NS: GO | EW: STOP</div>
+
+      <!-- Keyboard Shortcuts -->
+      <div class="shortcuts">
+        <strong>Keyboard:</strong><br>
+        <kbd>N</kbd><kbd>S</kbd><kbd>E</kbd><kbd>W</kbd> Add car<br>
+        <kbd>1</kbd><kbd>2</kbd> Pedestrian request<br>
+        <kbd>Space</kbd> Toggle emergency<br>
+        <kbd>R</kbd> Reset
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

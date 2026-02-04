@@ -10,12 +10,9 @@
 
 import { createSystem, type CreateSystemOptions } from "../core/system.js";
 import type {
-	DerivationsDef,
 	ModuleDef,
+	ModuleSchema,
 	Requirement,
-	ResolverContext,
-	ResolversDef,
-	Schema,
 	System,
 } from "../core/types.js";
 
@@ -67,8 +64,8 @@ export async function flushMicrotasks(): Promise<void> {
  * expect(system.facts.result).toBe("done");
  * ```
  */
-export async function settleWithFakeTimers<S extends Schema>(
-	system: System<S>,
+export async function settleWithFakeTimers<M extends ModuleSchema>(
+	system: System<M>,
 	advanceTime: (ms: number) => void,
 	options: {
 		/** Total time to advance (default: 5000ms) */
@@ -114,7 +111,7 @@ export async function settleWithFakeTimers<S extends Schema>(
 }
 
 // ============================================================================
-// Legacy Fake Timers (for standalone use without vi.useFakeTimers)
+// Fake Timers (for standalone use without vi.useFakeTimers)
 // ============================================================================
 
 export interface FakeTimers {
@@ -184,11 +181,20 @@ export function createFakeTimers(): FakeTimers {
 // Mock Resolvers
 // ============================================================================
 
+/** Context passed to mock resolver resolve functions */
+export interface MockResolverContext {
+	/** Facts object (use type assertion for specific facts) */
+	// biome-ignore lint/suspicious/noExplicitAny: Facts type varies by system
+	facts: any;
+	/** Abort signal for cancellation */
+	signal: AbortSignal;
+}
+
 export interface MockResolverOptions<R extends Requirement = Requirement> {
 	/** Predicate to check if this resolver handles a requirement */
-	handles?: (req: Requirement) => req is R;
+	requirement?: (req: Requirement) => req is R;
 	/** Mock implementation */
-	resolve?: (req: R, ctx: ResolverContext) => void | Promise<void>;
+	resolve?: (req: R, ctx: MockResolverContext) => void | Promise<void>;
 	/** Delay before resolving (ms) */
 	delay?: number;
 	/** Simulate an error */
@@ -197,22 +203,28 @@ export interface MockResolverOptions<R extends Requirement = Requirement> {
 	calls?: R[];
 }
 
+/** Internal resolver definition type for mock resolvers */
+interface MockResolverDef {
+	requirement: (req: Requirement) => boolean;
+	resolve: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
+}
+
 /**
  * Create a mock resolver for testing.
  */
 export function createMockResolver<R extends Requirement = Requirement>(
 	typeOrOptions: string | MockResolverOptions<R>,
-): ResolversDef<Schema>[string] {
+): MockResolverDef {
 	const options: MockResolverOptions<R> =
 		typeof typeOrOptions === "string"
-			? { handles: ((req: Requirement) => req.type === typeOrOptions) as (req: Requirement) => req is R }
+			? { requirement: ((req: Requirement) => req.type === typeOrOptions) as (req: Requirement) => req is R }
 			: typeOrOptions;
 
 	const calls: R[] = options.calls ?? [];
 
 	return {
-		handles: options.handles ?? ((_req: Requirement): _req is R => true),
-		async resolve(req: Requirement, ctx: ResolverContext): Promise<void> {
+		requirement: options.requirement ?? ((_req: Requirement): _req is R => true),
+		async resolve(req: Requirement, ctx: MockResolverContext): Promise<void> {
 			calls.push(req as R);
 
 			if (options.delay) {
@@ -234,7 +246,7 @@ export function createMockResolver<R extends Requirement = Requirement>(
 // Test System
 // ============================================================================
 
-export interface TestSystem<S extends Schema> extends System<S> {
+export interface TestSystem<M extends ModuleSchema> extends System<M> {
 	/**
 	 * Wait for all pending operations to complete.
 	 * @param maxWait - Maximum time to wait in ms (default: 5000)
@@ -251,8 +263,8 @@ export interface TestSystem<S extends Schema> extends System<S> {
 	assertResolverCalled(type: string, times?: number): void;
 }
 
-export interface CreateTestSystemOptions<S extends Schema>
-	extends Omit<CreateSystemOptions<S>, "plugins"> {
+export interface CreateTestSystemOptions<M extends ModuleSchema>
+	extends Omit<CreateSystemOptions<M>, "plugins"> {
 	/** Mock resolvers by type */
 	mocks?: {
 		resolvers?: Record<string, MockResolverOptions>;
@@ -262,14 +274,14 @@ export interface CreateTestSystemOptions<S extends Schema>
 /**
  * Create a test system with additional testing utilities.
  */
-export function createTestSystem<S extends Schema>(
-	options: CreateTestSystemOptions<S>,
-): TestSystem<S> {
+export function createTestSystem<M extends ModuleSchema>(
+	options: CreateTestSystemOptions<M>,
+): TestSystem<M> {
 	const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
 	const resolverCalls = new Map<string, Requirement[]>();
 
 	// Create mock resolvers
-	const mockResolvers: ResolversDef<Schema> = {};
+	const mockResolvers: Record<string, MockResolverDef> = {};
 	if (options.mocks?.resolvers) {
 		for (const [type, mockOptions] of Object.entries(options.mocks.resolvers)) {
 			const calls: Requirement[] = [];
@@ -279,7 +291,8 @@ export function createTestSystem<S extends Schema>(
 	}
 
 	// Create modules with mock resolvers
-	const modulesWithMocks = options.modules.map((module) => ({
+	// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
+	const modulesWithMocks = options.modules.map((module: ModuleDef<any>) => ({
 		...module,
 		resolvers: {
 			...module.resolvers,
@@ -290,17 +303,19 @@ export function createTestSystem<S extends Schema>(
 	// Create the underlying system
 	const system = createSystem({
 		...options,
-		modules: modulesWithMocks as Array<ModuleDef<S, DerivationsDef<S>>>,
-	});
+		// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
+		modules: modulesWithMocks as Array<ModuleDef<any>>,
+	}) as System<M>;
 
 	// Wrap dispatch to track events
 	const originalDispatch = system.dispatch.bind(system);
-	system.dispatch = (event) => {
+	// biome-ignore lint/suspicious/noExplicitAny: Event type varies
+	(system as any).dispatch = (event: any) => {
 		eventHistory.push(event);
 		originalDispatch(event);
 	};
 
-	const testSystem: TestSystem<S> = {
+	const testSystem: TestSystem<M> = {
 		...system,
 		eventHistory,
 		resolverCalls,

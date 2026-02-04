@@ -21,7 +21,7 @@
  *   },
  *   resolvers: {
  *     prefetch: {
- *       handles: (req) => req.type === 'PREFETCH',
+ *       requirement: (req) => req.type === 'PREFETCH',
  *       resolve: (req) => queryClient.prefetchQuery({
  *         queryKey: req.queryKey,
  *         queryFn: () => api.fetch(req.queryKey)
@@ -33,12 +33,15 @@
  */
 
 import type {
-  Requirement,
-  Schema,
-  Plugin,
-  System,
-  Facts,
+	Requirement,
+	ModuleSchema,
+	Plugin,
+	System,
 } from "../core/types.js";
+import {
+	setBridgeFact,
+	getBridgeFact,
+} from "../core/types/adapter-utils.js";
 import { createModule } from "../core/module.js";
 import { createSystem } from "../core/system.js";
 import { t } from "../core/facts.js";
@@ -49,143 +52,222 @@ import { t } from "../core/facts.js";
 
 /** Simplified QueryClient interface for type compatibility */
 export interface QueryClientLike {
-  getQueryCache(): QueryCacheLike;
-  prefetchQuery(options: PrefetchOptions): Promise<void>;
-  fetchQuery<T>(options: FetchOptions): Promise<T>;
-  invalidateQueries(filters?: InvalidateFilters): Promise<void>;
-  setQueryData<T>(queryKey: QueryKey, data: T): void;
-  getQueryData<T>(queryKey: QueryKey): T | undefined;
-  getQueryState(queryKey: QueryKey): QueryStateLike | undefined;
-  cancelQueries(filters?: InvalidateFilters): Promise<void>;
+	getQueryCache(): QueryCacheLike;
+	prefetchQuery(options: PrefetchOptions): Promise<void>;
+	fetchQuery<T>(options: FetchOptions): Promise<T>;
+	invalidateQueries(filters?: InvalidateFilters): Promise<void>;
+	setQueryData<T>(queryKey: QueryKey, data: T): void;
+	getQueryData<T>(queryKey: QueryKey): T | undefined;
+	getQueryState(queryKey: QueryKey): QueryStateLike | undefined;
+	cancelQueries(filters?: InvalidateFilters): Promise<void>;
 }
 
 interface QueryCacheLike {
-  subscribe(callback: (event: QueryCacheEvent) => void): () => void;
-  findAll(filters?: { queryKey?: QueryKey }): Array<QueryLike>;
+	subscribe(callback: (event: QueryCacheEvent) => void): () => void;
+	findAll(filters?: { queryKey?: QueryKey }): Array<QueryLike>;
 }
 
 interface QueryLike {
-  queryKey: QueryKey;
-  state: QueryStateLike;
+	queryKey: QueryKey;
+	state: QueryStateLike;
 }
 
 interface QueryStateLike {
-  status: "pending" | "error" | "success";
-  fetchStatus: "fetching" | "paused" | "idle";
-  data?: unknown;
-  error?: Error | null;
-  dataUpdatedAt?: number;
+	status: "pending" | "error" | "success";
+	fetchStatus: "fetching" | "paused" | "idle";
+	data?: unknown;
+	error?: Error | null;
+	dataUpdatedAt?: number;
 }
 
 interface QueryCacheEvent {
-  type: "added" | "removed" | "updated";
-  query: QueryLike;
+	type: "added" | "removed" | "updated";
+	query: QueryLike;
 }
 
 type QueryKey = readonly unknown[];
 
 interface PrefetchOptions {
-  queryKey: QueryKey;
-  queryFn?: () => Promise<unknown>;
-  staleTime?: number;
+	queryKey: QueryKey;
+	queryFn?: () => Promise<unknown>;
+	staleTime?: number;
 }
 
 interface FetchOptions extends PrefetchOptions {
-  throwOnError?: boolean;
+	throwOnError?: boolean;
 }
 
 interface InvalidateFilters {
-  queryKey?: QueryKey;
-  exact?: boolean;
-  predicate?: (query: QueryLike) => boolean;
+	queryKey?: QueryKey;
+	exact?: boolean;
+	predicate?: (query: QueryLike) => boolean;
 }
 
 // ============================================================================
 // Bridge Types
 // ============================================================================
 
-
 /** Query state information stored in facts */
 export interface QueryStateInfo {
-  status: "pending" | "error" | "success";
-  fetchStatus: "fetching" | "paused" | "idle";
-  hasData: boolean;
-  dataUpdatedAt: number | undefined;
-  error: string | null;
+	status: "pending" | "error" | "success";
+	fetchStatus: "fetching" | "paused" | "idle";
+	hasData: boolean;
+	dataUpdatedAt: number | undefined;
+	error: string | null;
 }
 
 /** Prefetch requirement */
 export interface PrefetchRequirement extends Requirement {
-  type: "PREFETCH";
-  queryKey: QueryKey;
-  queryFn?: () => Promise<unknown>;
-  staleTime?: number;
+	type: "PREFETCH";
+	queryKey: QueryKey;
+	queryFn?: () => Promise<unknown>;
+	staleTime?: number;
 }
 
 /** Invalidate requirement */
 export interface InvalidateRequirement extends Requirement {
-  type: "INVALIDATE";
-  queryKey?: QueryKey;
-  exact?: boolean;
+	type: "INVALIDATE";
+	queryKey?: QueryKey;
+	exact?: boolean;
 }
 
 /** Constraint for query bridge */
 export interface QueryConstraint<F extends Record<string, unknown>> {
-  when: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => boolean | Promise<boolean>;
-  require:
-    | Requirement
-    | ((facts: F & { queryStates: Record<string, QueryStateInfo> }) => Requirement);
-  priority?: number;
+	when: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => boolean | Promise<boolean>;
+	require:
+		| Requirement
+		| ((facts: F & { queryStates: Record<string, QueryStateInfo> }) => Requirement);
+	priority?: number;
 }
 
 /** Resolver context for query bridge */
 export interface QueryResolverContext<F extends Record<string, unknown>> {
-  facts: Facts<Schema> & F & { queryStates: Record<string, QueryStateInfo> };
-  queryClient: QueryClientLike;
-  signal: AbortSignal;
+	facts: F & { queryStates: Record<string, QueryStateInfo> };
+	queryClient: QueryClientLike;
+	signal: AbortSignal;
 }
 
 /** Resolver for query bridge */
 export interface QueryResolver<F extends Record<string, unknown>, R extends Requirement = Requirement> {
-  handles: (req: Requirement) => req is R;
-  key?: (req: R) => string;
-  resolve: (req: R, ctx: QueryResolverContext<F>) => void | Promise<void>;
+	requirement: (req: Requirement) => req is R;
+	key?: (req: R) => string;
+	resolve: (req: R, ctx: QueryResolverContext<F>) => void | Promise<void>;
 }
 
 /** Options for creating a query bridge */
 export interface QueryBridgeOptions<F extends Record<string, unknown>> {
-  /** Application-level facts schema */
-  factsSchema?: Record<string, { _type: unknown; _validators: [] }>;
-  /** Initialize application facts */
-  init?: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => void;
-  /** Constraints that produce requirements based on facts */
-  constraints?: Record<string, QueryConstraint<F>>;
-  /** Resolvers that fulfill requirements */
-  resolvers?: Record<string, QueryResolver<F, Requirement>>;
-  /** Plugins to add to the Directive system */
-  plugins?: Array<Plugin<Schema>>;
-  /** Enable time-travel debugging */
-  debug?: boolean;
-  /** Auto-start the system (default: true) */
-  autoStart?: boolean;
-  /** Sync interval for cache state (ms, default: 100) */
-  syncIntervalMs?: number;
+	/** Application-level facts schema */
+	factsSchema?: Record<string, { _type: unknown; _validators: [] }>;
+	/** Initialize application facts */
+	init?: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => void;
+	/** Constraints that produce requirements based on facts */
+	constraints?: Record<string, QueryConstraint<F>>;
+	/** Resolvers that fulfill requirements */
+	resolvers?: Record<string, QueryResolver<F, Requirement>>;
+	/** Plugins to add to the Directive system */
+	plugins?: Plugin[];
+	/** Enable time-travel debugging */
+	debug?: boolean;
+	/** Auto-start the system (default: true) */
+	autoStart?: boolean;
+	/** Sync interval for cache state (ms, default: 100) */
+	syncIntervalMs?: number;
 }
 
 /** Query bridge instance */
 export interface QueryBridge<F extends Record<string, unknown>> {
-  /** The underlying Directive system */
-  system: System<Schema>;
-  /** Application-level facts */
-  facts: F & { queryStates: Record<string, QueryStateInfo> };
-  /** Start syncing cache events to facts */
-  startSync(): void;
-  /** Stop syncing cache events */
-  stopSync(): void;
-  /** Wait for system to settle */
-  settle(): Promise<void>;
-  /** Destroy the bridge */
-  destroy(): void;
+	/** The underlying Directive system */
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>;
+	/** Application-level facts */
+	facts: F & { queryStates: Record<string, QueryStateInfo> };
+	/** Start syncing cache events to facts */
+	startSync(): void;
+	/** Stop syncing cache events */
+	stopSync(): void;
+	/** Wait for system to settle */
+	settle(): Promise<void>;
+	/** Destroy the bridge */
+	destroy(): void;
+}
+
+// ============================================================================
+// Bridge Schema
+// ============================================================================
+
+const QUERY_STATES_KEY = "__queryStates" as const;
+
+const queryBridgeSchema = {
+	facts: {
+		[QUERY_STATES_KEY]: t.object<Record<string, QueryStateInfo>>(),
+	},
+	derivations: {},
+	events: {},
+	requirements: {},
+} satisfies ModuleSchema;
+
+// ============================================================================
+// Constraint/Resolver Converters
+// ============================================================================
+
+// biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
+function convertQueryConstraints<F extends Record<string, unknown>>(
+	constraints: Record<string, QueryConstraint<F>>,
+): Record<string, any> {
+	// biome-ignore lint/suspicious/noExplicitAny: Result type is complex
+	const result: Record<string, any> = {};
+
+	for (const [id, constraint] of Object.entries(constraints)) {
+		result[id] = {
+			priority: constraint.priority ?? 0,
+			// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+			when: (facts: any) => {
+				const queryStates = getBridgeFact<Record<string, QueryStateInfo>>(facts, QUERY_STATES_KEY);
+				return constraint.when({ ...facts, queryStates } as F & { queryStates: Record<string, QueryStateInfo> });
+			},
+			// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+			require: (facts: any) => {
+				const queryStates = getBridgeFact<Record<string, QueryStateInfo>>(facts, QUERY_STATES_KEY);
+				const typedFacts = { ...facts, queryStates } as F & { queryStates: Record<string, QueryStateInfo> };
+				return typeof constraint.require === "function"
+					? constraint.require(typedFacts)
+					: constraint.require;
+			},
+		};
+	}
+
+	return result;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
+function convertQueryResolvers<F extends Record<string, unknown>>(
+	resolvers: Record<string, QueryResolver<F, Requirement>>,
+	queryClient: QueryClientLike,
+	// biome-ignore lint/suspicious/noExplicitAny: Facts getter type varies
+	getFacts: () => any,
+): Record<string, any> {
+	// biome-ignore lint/suspicious/noExplicitAny: Result type is complex
+	const result: Record<string, any> = {};
+
+	for (const [id, resolver] of Object.entries(resolvers)) {
+		result[id] = {
+			requirement: resolver.requirement,
+			key: resolver.key,
+			// biome-ignore lint/suspicious/noExplicitAny: Context type varies
+			resolve: async (req: Requirement, ctx: any) => {
+				const facts = getFacts();
+				const queryStates = getBridgeFact<Record<string, QueryStateInfo>>(facts, QUERY_STATES_KEY);
+				const queryCtx: QueryResolverContext<F> = {
+					facts: { ...facts, queryStates } as F & { queryStates: Record<string, QueryStateInfo> },
+					queryClient,
+					signal: ctx.signal,
+				};
+				await resolver.resolve(req, queryCtx);
+			},
+		};
+	}
+
+	return result;
 }
 
 // ============================================================================
@@ -219,193 +301,170 @@ export interface QueryBridge<F extends Record<string, unknown>> {
  * ```
  */
 export function createQueryBridge<F extends Record<string, unknown> = Record<string, never>>(
-  queryClient: QueryClientLike,
-  options: QueryBridgeOptions<F> = {}
+	queryClient: QueryClientLike,
+	options: QueryBridgeOptions<F> = {}
 ): QueryBridge<F> {
-  const {
-    factsSchema = {},
-    init,
-    constraints = {},
-    resolvers = {},
-    plugins = [],
-    debug = false,
-    autoStart = true,
-    syncIntervalMs = 100,
-  } = options;
+	const {
+		factsSchema = {},
+		init,
+		constraints = {},
+		resolvers = {},
+		plugins = [],
+		debug = false,
+		autoStart = true,
+		syncIntervalMs = 100,
+	} = options;
 
-  // Build the combined schema
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const schema: any = {
-    queryStates: t.object<Record<string, QueryStateInfo>>(),
-    ...factsSchema,
-  };
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	let system: System<any>;
 
-  // Convert constraints to Directive format
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const directiveConstraints: Record<string, any> = {};
-  for (const [id, constraint] of Object.entries(constraints)) {
-    directiveConstraints[id] = {
-      priority: constraint.priority ?? 0,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      when: (facts: any) => constraint.when(facts as F & { queryStates: Record<string, QueryStateInfo> }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      require: (facts: any) =>
-        typeof constraint.require === "function"
-          ? constraint.require(facts as F & { queryStates: Record<string, QueryStateInfo> })
-          : constraint.require,
-    };
-  }
+	// Build the combined schema
+	const combinedSchema = {
+		facts: {
+			...queryBridgeSchema.facts,
+			...factsSchema,
+		},
+		derivations: {},
+		events: {},
+		requirements: {},
+	} satisfies ModuleSchema;
 
-  // Add built-in prefetch and invalidate resolvers
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const directiveResolvers: Record<string, any> = {
-    // Built-in prefetch resolver
-    __prefetch: {
-      handles: (req: Requirement): req is PrefetchRequirement => req.type === "PREFETCH",
-      key: (req: PrefetchRequirement) => `prefetch:${stringifyQueryKey(req.queryKey)}`,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-      resolve: async (req: PrefetchRequirement, _ctx: any) => {
-        await queryClient.prefetchQuery({
-          queryKey: req.queryKey as QueryKey,
-          queryFn: req.queryFn as (() => Promise<unknown>) | undefined,
-          staleTime: req.staleTime as number | undefined,
-        });
-      },
-    },
-    // Built-in invalidate resolver
-    __invalidate: {
-      handles: (req: Requirement): req is InvalidateRequirement => req.type === "INVALIDATE",
-      key: (req: InvalidateRequirement) => `invalidate:${req.queryKey ? stringifyQueryKey(req.queryKey as QueryKey) : "all"}`,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      resolve: async (req: InvalidateRequirement) => {
-        await queryClient.invalidateQueries({
-          queryKey: req.queryKey as QueryKey | undefined,
-          exact: req.exact as boolean | undefined,
-        });
-      },
-    },
-  };
+	// Convert constraints
+	const directiveConstraints = convertQueryConstraints<F>(constraints);
 
-  // Add user-defined resolvers
-  for (const [id, resolver] of Object.entries(resolvers)) {
-    directiveResolvers[id] = {
-      handles: resolver.handles,
-      key: resolver.key,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      resolve: async (req: Requirement, ctx: any) => {
-        const queryCtx: QueryResolverContext<F> = {
-          facts: ctx.facts as unknown as Facts<Schema> & F & { queryStates: Record<string, QueryStateInfo> },
-          queryClient,
-          signal: ctx.signal,
-        };
-        await resolver.resolve(req, queryCtx);
-      },
-    };
-  }
+	// Add built-in prefetch and invalidate resolvers
+	// biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
+	const builtInResolvers: Record<string, any> = {
+		__prefetch: {
+			requirement: (req: Requirement): req is PrefetchRequirement => req.type === "PREFETCH",
+			key: (req: Requirement) => `prefetch:${stringifyQueryKey((req as PrefetchRequirement).queryKey)}`,
+			resolve: async (req: Requirement) => {
+				const prefetchReq = req as PrefetchRequirement;
+				await queryClient.prefetchQuery({
+					queryKey: prefetchReq.queryKey,
+					queryFn: prefetchReq.queryFn,
+					staleTime: prefetchReq.staleTime,
+				});
+			},
+		},
+		__invalidate: {
+			requirement: (req: Requirement): req is InvalidateRequirement => req.type === "INVALIDATE",
+			key: (req: Requirement) => `invalidate:${(req as InvalidateRequirement).queryKey ? stringifyQueryKey((req as InvalidateRequirement).queryKey!) : "all"}`,
+			resolve: async (req: Requirement) => {
+				const invalidateReq = req as InvalidateRequirement;
+				await queryClient.invalidateQueries({
+					queryKey: invalidateReq.queryKey,
+					exact: invalidateReq.exact,
+				});
+			},
+		},
+	};
 
-  // Create the Directive module
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const queryBridgeModule = createModule("react-query-bridge", {
-    schema,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    init: (facts: any) => {
-      facts.queryStates = {};
-      init?.(facts as unknown as F & { queryStates: Record<string, QueryStateInfo> });
-    },
-    constraints: directiveConstraints as unknown as Parameters<typeof createModule>[1]["constraints"],
-    resolvers: directiveResolvers as unknown as Parameters<typeof createModule>[1]["resolvers"],
-  });
+	// Convert user resolvers and merge with built-ins
+	const userResolvers = convertQueryResolvers<F>(resolvers, queryClient, () => system.facts);
+	const allResolvers = { ...builtInResolvers, ...userResolvers };
 
-  // Create the Directive system
-  // Use type assertion to work around Schema generic variance issues
-  const system = createSystem({
-    modules: [queryBridgeModule as unknown as Parameters<typeof createSystem>[0]["modules"][0]],
-    plugins: plugins as unknown as Array<Plugin<Schema>>,
-    debug: debug ? { timeTravel: true } : undefined,
-  });
+	// Create the Directive module
+	// biome-ignore lint/suspicious/noExplicitAny: Bridge module uses dynamic constraints/resolvers
+	const queryBridgeModule = createModule("react-query-bridge", {
+		schema: combinedSchema,
+		init: (facts) => {
+			setBridgeFact(facts, QUERY_STATES_KEY, {});
+			init?.(facts as unknown as F & { queryStates: Record<string, QueryStateInfo> });
+		},
+		constraints: directiveConstraints,
+		resolvers: allResolvers as any,
+	});
 
-  // Cache sync functionality
-  let syncUnsubscribe: (() => void) | null = null;
-  let syncInterval: ReturnType<typeof setInterval> | null = null;
+	// Create the Directive system
+	system = createSystem({
+		modules: [queryBridgeModule],
+		plugins,
+		debug: debug ? { timeTravel: true } : undefined,
+	});
 
-  const syncCacheToFacts = () => {
-    const queries = queryClient.getQueryCache().findAll();
-    const newStates: Record<string, QueryStateInfo> = {};
+	// Cache sync functionality
+	let syncUnsubscribe: (() => void) | null = null;
+	let syncInterval: ReturnType<typeof setInterval> | null = null;
 
-    for (const query of queries) {
-      const key = stringifyQueryKey(query.queryKey);
-      newStates[key] = {
-        status: query.state.status,
-        fetchStatus: query.state.fetchStatus,
-        hasData: query.state.data !== undefined,
-        dataUpdatedAt: query.state.dataUpdatedAt,
-        error: query.state.error?.message ?? null,
-      };
-    }
+	const syncCacheToFacts = () => {
+		const queries = queryClient.getQueryCache().findAll();
+		const newStates: Record<string, QueryStateInfo> = {};
 
-    // Only update if changed
-    const currentStates = system.facts.queryStates as Record<string, QueryStateInfo>;
-    if (JSON.stringify(currentStates) !== JSON.stringify(newStates)) {
-      system.facts.queryStates = newStates;
-    }
-  };
+		for (const query of queries) {
+			const key = stringifyQueryKey(query.queryKey);
+			newStates[key] = {
+				status: query.state.status,
+				fetchStatus: query.state.fetchStatus,
+				hasData: query.state.data !== undefined,
+				dataUpdatedAt: query.state.dataUpdatedAt,
+				error: query.state.error?.message ?? null,
+			};
+		}
 
-  const startSync = () => {
-    if (syncUnsubscribe) return;
+		// Only update if changed
+		const currentStates = getBridgeFact<Record<string, QueryStateInfo>>(system.facts, QUERY_STATES_KEY);
+		if (JSON.stringify(currentStates) !== JSON.stringify(newStates)) {
+			setBridgeFact(system.facts, QUERY_STATES_KEY, newStates);
+		}
+	};
 
-    // Subscribe to cache events
-    syncUnsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      const key = stringifyQueryKey(event.query.queryKey);
-      const states = { ...(system.facts.queryStates as Record<string, QueryStateInfo>) };
+	const startSync = () => {
+		if (syncUnsubscribe) return;
 
-      if (event.type === "removed") {
-        delete states[key];
-      } else {
-        states[key] = {
-          status: event.query.state.status,
-          fetchStatus: event.query.state.fetchStatus,
-          hasData: event.query.state.data !== undefined,
-          dataUpdatedAt: event.query.state.dataUpdatedAt,
-          error: event.query.state.error?.message ?? null,
-        };
-      }
+		// Subscribe to cache events
+		syncUnsubscribe = queryClient.getQueryCache().subscribe((event) => {
+			const key = stringifyQueryKey(event.query.queryKey);
+			const states = { ...getBridgeFact<Record<string, QueryStateInfo>>(system.facts, QUERY_STATES_KEY) };
 
-      system.facts.queryStates = states;
-    });
+			if (event.type === "removed") {
+				delete states[key];
+			} else {
+				states[key] = {
+					status: event.query.state.status,
+					fetchStatus: event.query.state.fetchStatus,
+					hasData: event.query.state.data !== undefined,
+					dataUpdatedAt: event.query.state.dataUpdatedAt,
+					error: event.query.state.error?.message ?? null,
+				};
+			}
 
-    // Also poll periodically for any missed updates
-    syncInterval = setInterval(syncCacheToFacts, syncIntervalMs);
+			setBridgeFact(system.facts, QUERY_STATES_KEY, states);
+		});
 
-    // Initial sync
-    syncCacheToFacts();
-  };
+		// Also poll periodically for any missed updates
+		syncInterval = setInterval(syncCacheToFacts, syncIntervalMs);
 
-  const stopSync = () => {
-    syncUnsubscribe?.();
-    syncUnsubscribe = null;
-    if (syncInterval) {
-      clearInterval(syncInterval);
-      syncInterval = null;
-    }
-  };
+		// Initial sync
+		syncCacheToFacts();
+	};
 
-  // Auto-start if enabled
-  if (autoStart) {
-    system.start();
-    startSync();
-  }
+	const stopSync = () => {
+		syncUnsubscribe?.();
+		syncUnsubscribe = null;
+		if (syncInterval) {
+			clearInterval(syncInterval);
+			syncInterval = null;
+		}
+	};
 
-  return {
-    system: system as System<Schema>,
-    facts: system.facts as unknown as F & { queryStates: Record<string, QueryStateInfo> },
-    startSync,
-    stopSync,
-    settle: () => system.settle(),
-    destroy: () => {
-      stopSync();
-      system.destroy();
-    },
-  };
+	// Auto-start if enabled
+	if (autoStart) {
+		system.start();
+		startSync();
+	}
+
+	return {
+		system,
+		facts: system.facts as unknown as F & { queryStates: Record<string, QueryStateInfo> },
+		startSync,
+		stopSync,
+		settle: () => system.settle(),
+		destroy: () => {
+			stopSync();
+			system.destroy();
+		},
+	};
 }
 
 // ============================================================================
@@ -416,61 +475,61 @@ export function createQueryBridge<F extends Record<string, unknown> = Record<str
  * Stringify a query key for use as a facts key.
  */
 function stringifyQueryKey(queryKey: QueryKey): string {
-  return JSON.stringify(queryKey);
+	return JSON.stringify(queryKey);
 }
 
 /**
  * Check if a query is loading (pending or fetching).
  */
 export function isQueryLoading(state: QueryStateInfo | undefined): boolean {
-  if (!state) return false;
-  return state.status === "pending" || state.fetchStatus === "fetching";
+	if (!state) return false;
+	return state.status === "pending" || state.fetchStatus === "fetching";
 }
 
 /**
  * Check if a query has fresh data (not stale).
  */
 export function isQueryFresh(
-  state: QueryStateInfo | undefined,
-  staleTime: number
+	state: QueryStateInfo | undefined,
+	staleTime: number
 ): boolean {
-  if (!state || !state.hasData || !state.dataUpdatedAt) return false;
-  return Date.now() - state.dataUpdatedAt < staleTime;
+	if (!state || !state.hasData || !state.dataUpdatedAt) return false;
+	return Date.now() - state.dataUpdatedAt < staleTime;
 }
 
 /**
  * Check if a query has an error.
  */
 export function isQueryError(state: QueryStateInfo | undefined): boolean {
-  return state?.status === "error";
+	return state?.status === "error";
 }
 
 /**
  * Create a prefetch requirement.
  */
 export function prefetch(
-  queryKey: QueryKey,
-  options?: { queryFn?: () => Promise<unknown>; staleTime?: number }
+	queryKey: QueryKey,
+	options?: { queryFn?: () => Promise<unknown>; staleTime?: number }
 ): PrefetchRequirement {
-  return {
-    type: "PREFETCH",
-    queryKey,
-    ...options,
-  };
+	return {
+		type: "PREFETCH",
+		queryKey,
+		...options,
+	};
 }
 
 /**
  * Create an invalidate requirement.
  */
 export function invalidate(
-  queryKey?: QueryKey,
-  options?: { exact?: boolean }
+	queryKey?: QueryKey,
+	options?: { exact?: boolean }
 ): InvalidateRequirement {
-  return {
-    type: "INVALIDATE",
-    queryKey,
-    ...options,
-  };
+	return {
+		type: "INVALIDATE",
+		queryKey,
+		...options,
+	};
 }
 
 /**
@@ -487,15 +546,15 @@ export function invalidate(
  * ```
  */
 export function whenThenPrefetch<F extends Record<string, unknown>>(
-  when: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => boolean,
-  queryKey: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => QueryKey,
-  options?: { queryFn?: () => Promise<unknown>; staleTime?: number; priority?: number }
+	when: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => boolean,
+	queryKey: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => QueryKey,
+	options?: { queryFn?: () => Promise<unknown>; staleTime?: number; priority?: number }
 ): QueryConstraint<F> {
-  return {
-    when,
-    require: (facts) => prefetch(queryKey(facts), options),
-    priority: options?.priority,
-  };
+	return {
+		when,
+		require: (facts) => prefetch(queryKey(facts), options),
+		priority: options?.priority,
+	};
 }
 
 /**
@@ -512,15 +571,15 @@ export function whenThenPrefetch<F extends Record<string, unknown>>(
  * ```
  */
 export function whenThenInvalidate<F extends Record<string, unknown>>(
-  when: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => boolean,
-  queryKey?: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => QueryKey,
-  options?: { exact?: boolean; priority?: number }
+	when: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => boolean,
+	queryKey?: (facts: F & { queryStates: Record<string, QueryStateInfo> }) => QueryKey,
+	options?: { exact?: boolean; priority?: number }
 ): QueryConstraint<F> {
-  return {
-    when,
-    require: (facts) => invalidate(queryKey?.(facts), options),
-    priority: options?.priority,
-  };
+	return {
+		when,
+		require: (facts) => invalidate(queryKey?.(facts), options),
+		priority: options?.priority,
+	};
 }
 
 // ============================================================================
@@ -547,65 +606,65 @@ export function whenThenInvalidate<F extends Record<string, unknown>>(
  * ```
  */
 export function createQueryBridgeHooks<F extends Record<string, unknown>>(
-  bridge: QueryBridge<F>
+	bridge: QueryBridge<F>
 ) {
-  // Dynamic import check for React
-  let React: typeof import("react") | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    React = require("react");
-  } catch {
-    // React not available
-  }
+	// Dynamic import check for React
+	let React: typeof import("react") | null = null;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		React = require("react");
+	} catch {
+		// React not available
+	}
 
-  if (!React) {
-    throw new Error(
-      "[Directive] createQueryBridgeHooks requires React to be installed"
-    );
-  }
+	if (!React) {
+		throw new Error(
+			"[Directive] createQueryBridgeHooks requires React to be installed"
+		);
+	}
 
-  const { useSyncExternalStore, useCallback } = React;
+	const { useSyncExternalStore, useCallback } = React;
 
-  /**
-   * Subscribe to all application facts.
-   */
-  function useFacts(): F & { queryStates: Record<string, QueryStateInfo> } {
-    const subscribe = useCallback(
-      (onStoreChange: () => void) => {
-        return bridge.system.facts.$store.subscribeAll(onStoreChange);
-      },
-      []
-    );
+	/**
+	 * Subscribe to all application facts.
+	 */
+	function useFacts(): F & { queryStates: Record<string, QueryStateInfo> } {
+		const subscribe = useCallback(
+			(onStoreChange: () => void) => {
+				return bridge.system.facts.$store.subscribeAll(onStoreChange);
+			},
+			[]
+		);
 
-    const getSnapshot = useCallback(() => {
-      return bridge.facts;
-    }, []);
+		const getSnapshot = useCallback(() => {
+			return bridge.facts;
+		}, []);
 
-    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  }
+		return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+	}
 
-  /**
-   * Subscribe to a specific query's state.
-   */
-  function useQueryState(queryKey: QueryKey): QueryStateInfo | undefined {
-    const key = stringifyQueryKey(queryKey);
+	/**
+	 * Subscribe to a specific query's state.
+	 */
+	function useQueryState(queryKey: QueryKey): QueryStateInfo | undefined {
+		const key = stringifyQueryKey(queryKey);
 
-    const subscribe = useCallback(
-      (onStoreChange: () => void) => {
-        return bridge.system.facts.$store.subscribe(["queryStates"], onStoreChange);
-      },
-      []
-    );
+		const subscribe = useCallback(
+			(onStoreChange: () => void) => {
+				return bridge.system.facts.$store.subscribe([QUERY_STATES_KEY], onStoreChange);
+			},
+			[]
+		);
 
-    const getSnapshot = useCallback(() => {
-      return (bridge.facts.queryStates as Record<string, QueryStateInfo>)[key];
-    }, [key]);
+		const getSnapshot = useCallback(() => {
+			return getBridgeFact<Record<string, QueryStateInfo>>(bridge.system.facts, QUERY_STATES_KEY)[key];
+		}, [key]);
 
-    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  }
+		return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+	}
 
-  return {
-    useFacts,
-    useQueryState,
-  };
+	return {
+		useFacts,
+		useQueryState,
+	};
 }

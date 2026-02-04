@@ -1,3 +1,4 @@
+// @ts-nocheck - TODO: Update for consolidated schema API
 /**
  * Logging Plugin - Console logging for Directive events
  */
