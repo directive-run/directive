@@ -311,6 +311,146 @@ system.dispatch({ type: "increment" });
 system.dispatch({ type: "addItem", item: "new item" });
 ```
 
+## Multi-Module Architecture
+
+Directive uses a **flat merge** architecture where all modules share one facts store. This is intentional - constraints need a complete view of the world to decide what requirements are needed.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    createSystem()                       │
+│                                                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
+│  │ authModule  │  │ dataModule  │  │  uiModule   │    │
+│  │             │  │             │  │             │    │
+│  │ isAuth: ●───┼──┼──→ can read │  │ can read ←──┼────│
+│  │ token: ●────┼──┼──→ can read │  │ can read ←──┼────│
+│  │             │  │ data: ●─────┼──┼──→ can read │    │
+│  └─────────────┘  └─────────────┘  └─────────────┘    │
+│                         │                              │
+│                         ▼                              │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │           SHARED FACTS STORE                    │  │
+│  │  { isAuth, token, data, ... }                   │  │
+│  └─────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Why Flat Merge?
+
+If modules were isolated, a constraint couldn't check multiple conditions across domains:
+
+```typescript
+// This constraint needs visibility into BOTH auth and data modules
+constraints: {
+  fetchUserData: {
+    when: (facts) => facts.auth_isAuthenticated && !facts.data_user,
+    require: { type: "FETCH_USER_DATA" },
+  },
+},
+```
+
+### Collision Protection
+
+If two modules define the same fact key, you'll get a dev-mode error:
+
+```typescript
+const mod1 = createModule("a", { schema: { facts: { count: t.number() } } });
+const mod2 = createModule("b", { schema: { facts: { count: t.number() } } });
+
+createSystem({ modules: [mod1, mod2] });
+// Error: Schema collision: Fact "count" is defined in both module "a" and "b"
+```
+
+### Comparison with Other Libraries
+
+| Library | State Model | Module Isolation |
+|---------|-------------|------------------|
+| **Redux** | Single store, slices | Slices isolated, explicit connections |
+| **Zustand** | Multiple stores | Completely isolated |
+| **XState** | Actors | Completely isolated, message passing |
+| **Directive** | Single store, merged modules | No isolation (intentional) |
+
+See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for a deep dive into the design rationale.
+
+## Namespace Conventions
+
+For multi-module applications, use the `moduleName_factName` pattern to prevent collisions and improve clarity:
+
+```typescript
+const authModule = createModule("auth", {
+  schema: {
+    facts: {
+      auth_token: t.string().nullable(),
+      auth_user: t.object<User>().nullable(),
+      auth_isAuthenticated: t.boolean(),
+    },
+    // ...
+  },
+});
+
+const dataModule = createModule("data", {
+  schema: {
+    facts: {
+      data_items: t.array<Item>(),
+      data_loading: t.boolean(),
+      data_error: t.string().nullable(),
+    },
+    // ...
+  },
+  constraints: {
+    fetchItems: {
+      // Cross-module constraint - can read auth facts
+      when: (facts) => facts.auth_isAuthenticated && facts.data_items.length === 0,
+      require: { type: "FETCH_ITEMS" },
+    },
+  },
+});
+```
+
+### When to Use Namespacing
+
+| # Modules | Recommendation |
+|-----------|----------------|
+| 1-2 | Optional - use if you prefer consistency |
+| 3-5 | Recommended - prevents accidental collisions |
+| 6+ | Required - consider splitting into separate systems |
+
+### Type-Safe Cross-Module Access
+
+When constraints or effects need to read facts from other modules, create a combined type and helper:
+
+```typescript
+// types.ts - Define combined facts type
+type CombinedFacts = {
+  auth_isAuthenticated: boolean;
+  auth_user: User | null;
+  data_users: UserData[];
+  data_loading: boolean;
+};
+
+function asCombined<T>(facts: T): CombinedFacts & T {
+  return facts as CombinedFacts & T;
+}
+
+// data.ts - Type-safe cross-module constraint
+import { asCombined } from "./types";
+
+constraints: {
+  fetchWhenAuth: {
+    when: (facts) => {
+      const combined = asCombined(facts);
+      return combined.auth_isAuthenticated && combined.data_users.length === 0;
+    },
+    require: { type: "FETCH_USERS" },
+  },
+},
+```
+
+This pattern gives you:
+- Full autocomplete for cross-module facts
+- Type errors if you access non-existent facts
+- Single source of truth for combined types
+
 ## Comparison
 
 | Feature | Directive | XState | Redux | Zustand | React Query |

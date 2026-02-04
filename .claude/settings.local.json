@@ -21,7 +21,14 @@
       "Bash(grep:*)",
       "Bash(pnpm test:xstate:*)",
       "Bash(pnpm test:zod:*)",
-      "Bash(pnpm test:mixed:*)"
+      "Bash(pnpm test:mixed:*)",
+      "WebFetch(domain:stately.ai)",
+      "WebFetch(domain:redux-toolkit.js.org)",
+      "WebFetch(domain:zustand.docs.pmnd.rs)",
+      "WebFetch(domain:effector.dev)",
+      "WebFetch(domain:jotai.org)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(git diff:*)"
     ]
   }
 }
