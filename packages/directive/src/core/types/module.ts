@@ -17,6 +17,10 @@ import type { Facts } from "./facts.js";
 import type { EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
 import type { System } from "./system.js";
+import type {
+	CrossModuleDeps,
+	CrossModuleFactsWithSelf,
+} from "./composition.js";
 
 // ============================================================================
 // Module Hooks
@@ -120,6 +124,102 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
 export type TypedConstraintsDef<M extends ModuleSchema> = Record<string, TypedConstraintDef<M>>;
 
 // ============================================================================
+// Cross-Module Typed Definitions (for modules with crossModuleDeps)
+// ============================================================================
+
+/**
+ * Constraint definition with cross-module typed facts.
+ * Used when a module declares crossModuleDeps for type-safe access to other modules.
+ *
+ * At runtime, constraints receive facts with:
+ * - `facts.self.*` for own module's facts
+ * - `facts.{dep}.*` for cross-module facts
+ */
+export interface CrossModuleConstraintDef<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+> {
+	/** Priority for ordering (higher runs first) */
+	priority?: number;
+	/** Mark this constraint as async */
+	async?: boolean;
+	/** Condition function with cross-module facts access */
+	when: (facts: CrossModuleFactsWithSelf<M, Deps>) => boolean | Promise<boolean>;
+	/**
+	 * Requirement(s) to produce when condition is met.
+	 */
+	require:
+		| RequirementOutput<InferRequirements<M>>
+		| ((facts: CrossModuleFactsWithSelf<M, Deps>) => RequirementOutput<InferRequirements<M>>);
+	/** Timeout for async constraints (ms) */
+	timeout?: number;
+}
+
+/**
+ * Cross-module constraints definition.
+ */
+export type CrossModuleConstraintsDef<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+> = Record<string, CrossModuleConstraintDef<M, Deps>>;
+
+/**
+ * Effect definition with cross-module typed facts.
+ * Used when a module declares crossModuleDeps for type-safe access to other modules.
+ *
+ * At runtime, effects receive facts with:
+ * - `facts.self.*` for own module's facts
+ * - `facts.{dep}.*` for cross-module facts
+ */
+export interface CrossModuleEffectDef<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+> {
+	/** Effect function with cross-module facts access */
+	run: (
+		facts: CrossModuleFactsWithSelf<M, Deps>,
+		prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
+	) => void | Promise<void>;
+	/** Optional dependency keys to filter when effect runs */
+	deps?: string[];
+}
+
+/**
+ * Cross-module effects definition.
+ */
+export type CrossModuleEffectsDef<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+> = Record<string, CrossModuleEffectDef<M, Deps>>;
+
+/**
+ * Derivation function with cross-module typed facts.
+ * Used when a module declares crossModuleDeps for type-safe access to other modules' facts.
+ *
+ * At runtime, derivations receive facts with:
+ * - `facts.self.*` for own module's facts
+ * - `facts.{dep}.*` for cross-module facts (read-only)
+ */
+export type CrossModuleDerivationFn<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+	K extends keyof GetDerivationsSchema<M>,
+> = (
+	facts: CrossModuleFactsWithSelf<M, Deps>,
+	derive: InferDerivations<M>,
+) => InferSchemaType<GetDerivationsSchema<M>[K]>;
+
+/**
+ * Cross-module derivations definition.
+ */
+export type CrossModuleDerivationsDef<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+> = {
+	[K in keyof GetDerivationsSchema<M>]: CrossModuleDerivationFn<M, Deps, K>;
+};
+
+// ============================================================================
 // Typed Resolvers Definition
 // ============================================================================
 
@@ -195,4 +295,10 @@ export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
 	constraints?: TypedConstraintsDef<M>;
 	resolvers?: TypedResolversDef<M>;
 	hooks?: ModuleHooks<M>;
+	/**
+	 * Cross-module dependencies (runtime marker).
+	 * When present, constraints/effects receive `facts.self.*` + `facts.{dep}.*`.
+	 * @internal
+	 */
+	crossModuleDeps?: CrossModuleDeps;
 }

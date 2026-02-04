@@ -14,6 +14,10 @@ import type {
 	TypedEventsDef,
 	TypedConstraintsDef,
 	TypedResolversDef,
+	CrossModuleDeps,
+	CrossModuleConstraintsDef,
+	CrossModuleEffectsDef,
+	CrossModuleDerivationsDef,
 } from "./types.js";
 
 // ============================================================================
@@ -32,6 +36,79 @@ export interface ModuleConfig<M extends ModuleSchema> {
 	events?: TypedEventsDef<M>;
 	effects?: EffectsDef<M["facts"]>;
 	constraints?: TypedConstraintsDef<M>;
+	resolvers?: TypedResolversDef<M>;
+	hooks?: ModuleHooks<M>;
+}
+
+/**
+ * Module configuration with cross-module dependencies for type-safe access
+ * to other modules' facts in effects and constraints.
+ *
+ * When crossModuleDeps is provided:
+ * - Own module facts: `facts.self.*`
+ * - Cross-module facts: `facts.{dep}.*`
+ *
+ * @example
+ * ```typescript
+ * import { authSchema } from './auth';
+ * import { dataSchema } from './data';
+ *
+ * const uiModule = createModule("ui", {
+ *   schema: uiSchema,
+ *   crossModuleDeps: { auth: authSchema, data: dataSchema },
+ *   effects: {
+ *     onAuthChange: {
+ *       run: (facts) => {
+ *         facts.self.notifications   // ✅ own module via "self"
+ *         facts.auth.isAuthenticated // ✅ cross-module (namespaced)
+ *         facts.data.users           // ✅ cross-module (namespaced)
+ *       }
+ *     }
+ *   },
+ *   constraints: {
+ *     fetchWhenAuth: {
+ *       when: (facts) => facts.auth.isAuthenticated && facts.self.users.length === 0,
+ *       require: { type: "FETCH_USERS" },
+ *     }
+ *   }
+ * });
+ * ```
+ */
+export interface ModuleConfigWithDeps<
+	M extends ModuleSchema,
+	Deps extends CrossModuleDeps,
+> {
+	schema: M;
+	/**
+	 * Cross-module dependencies for type-safe access in derive/effects/constraints.
+	 *
+	 * **Access patterns by context:**
+	 * - `derive`, `effects`, `constraints`: Use `facts.self.*` for own module, `facts.{dep}.*` for cross-module
+	 * - `init`, `events`, `resolvers`: Use flat access (`facts.myFact`) - no cross-module access
+	 *
+	 * This separation ensures initialization and event handling stay scoped to own module,
+	 * while observers (derive/effects/constraints) can see across modules.
+	 *
+	 * @example
+	 * ```typescript
+	 * crossModuleDeps: { auth: authSchema },
+	 * init: (facts) => { facts.users = []; },              // flat access
+	 * derive: { count: (facts) => facts.self.users.length }, // facts.self.*
+	 * effects: { log: { run: (facts) => console.log(facts.auth.token) } }, // facts.{dep}.*
+	 * ```
+	 */
+	crossModuleDeps: Deps;
+	/** Initialize module facts. Uses flat access (`facts.myFact`) to ensure modules initialize independently. */
+	init?: (facts: Facts<M["facts"]>) => void;
+	/** Derivations with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
+	derive?: CrossModuleDerivationsDef<M, Deps>;
+	/** Event handlers. Uses flat access (`facts.myFact`) to keep mutations scoped to own module. */
+	events?: TypedEventsDef<M>;
+	/** Effects with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
+	effects?: CrossModuleEffectsDef<M, Deps>;
+	/** Constraints with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
+	constraints?: CrossModuleConstraintsDef<M, Deps>;
+	/** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
 	resolvers?: TypedResolversDef<M>;
 	hooks?: ModuleHooks<M>;
 }
@@ -96,10 +173,48 @@ export interface ModuleConfig<M extends ModuleSchema> {
  *   },
  * });
  * ```
+ *
+ * @example With cross-module dependencies
+ * ```ts
+ * import { authSchema } from './auth';
+ *
+ * const dataModule = createModule("data", {
+ *   schema: dataSchema,
+ *   crossModuleDeps: { auth: authSchema },
+ *   constraints: {
+ *     fetchWhenAuth: {
+ *       when: (facts) => {
+ *         // facts.self.* for own module, facts.auth.* for cross-module
+ *         return facts.auth.isAuthenticated && facts.self.users.length === 0;
+ *       },
+ *       require: { type: "FETCH_USERS" },
+ *     },
+ *   },
+ *   derive: {
+ *     canFetch: (facts) => facts.auth.isAuthenticated && facts.self.users.length === 0,
+ *   },
+ * });
+ * ```
  */
+// Overload 1: With crossModuleDeps
+export function createModule<
+	const M extends ModuleSchema,
+	const Deps extends CrossModuleDeps,
+>(
+	id: string,
+	config: ModuleConfigWithDeps<M, Deps>,
+): ModuleDef<M>;
+
+// Overload 2: Without crossModuleDeps (original signature)
 export function createModule<const M extends ModuleSchema>(
 	id: string,
 	config: ModuleConfig<M>,
+): ModuleDef<M>;
+
+// Implementation
+export function createModule<const M extends ModuleSchema>(
+	id: string,
+	config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): ModuleDef<M> {
 	// Dev-mode validations
 	if (process.env.NODE_ENV !== "production") {
@@ -172,15 +287,21 @@ export function createModule<const M extends ModuleSchema>(
 		}
 	}
 
+	// Extract crossModuleDeps if present (for runtime proxy creation)
+	const crossModuleDeps = "crossModuleDeps" in config ? config.crossModuleDeps : undefined;
+
 	return {
 		id,
 		schema: config.schema,
 		init: config.init,
-		derive: config.derive ?? ({} as TypedDerivationsDef<M>),
+		// Cast to TypedDerivationsDef for ModuleDef compatibility (runtime handles both types)
+		derive: (config.derive ?? {}) as TypedDerivationsDef<M>,
 		events: config.events ?? ({} as TypedEventsDef<M>),
-		effects: config.effects,
-		constraints: config.constraints,
+		effects: config.effects as EffectsDef<M["facts"]> | undefined,
+		constraints: config.constraints as TypedConstraintsDef<M> | undefined,
 		resolvers: config.resolvers,
 		hooks: config.hooks,
+		// Store crossModuleDeps for runtime proxy creation
+		crossModuleDeps: crossModuleDeps as CrossModuleDeps | undefined,
 	};
 }

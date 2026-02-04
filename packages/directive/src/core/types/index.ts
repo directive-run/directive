@@ -99,6 +99,13 @@ export type {
 	TypedResolverDef,
 	TypedResolversDef,
 	RequirementOutput,
+	// Cross-module typed definitions
+	CrossModuleDerivationFn,
+	CrossModuleDerivationsDef,
+	CrossModuleConstraintDef,
+	CrossModuleConstraintsDef,
+	CrossModuleEffectDef,
+	CrossModuleEffectsDef,
 } from "./module.js";
 
 // System types
@@ -154,3 +161,26 @@ export {
 	requirementGuard,
 	requirementGuardMultiple,
 } from "./adapter-utils.js";
+
+// Composition types for namespaced multi-module systems
+export type {
+	// Cross-module type helpers (for module-level type hints)
+	SchemasMap,
+	CrossModuleFacts,
+	CrossModuleDerivations,
+	// Cross-module dependencies (for module-level crossModuleDeps)
+	CrossModuleDeps,
+	CrossModuleFactsWithSelf,
+	// System composition types
+	ExtractSchema,
+	ModulesMap,
+	IsModulesObject,
+	NamespacedFacts,
+	MutableNamespacedFacts,
+	NamespacedDerivations,
+	UnionEvents,
+	CreateSystemOptionsNamed,
+	NamespacedSystem,
+	NamespacedEventsAccessor,
+	MergedModuleSchema,
+} from "./composition.js";

@@ -95,6 +95,24 @@ export type {
 	// Typed Helper Utilities
 	TypedConstraint,
 	TypedResolver,
+	// Composition (Namespaced Multi-Module)
+	ModulesMap,
+	NamespacedFacts,
+	MutableNamespacedFacts,
+	NamespacedDerivations,
+	UnionEvents,
+	NamespacedSystem,
+	NamespacedEventsAccessor,
+	CreateSystemOptionsNamed,
+	// Cross-Module Dependencies (for modules)
+	CrossModuleDeps,
+	CrossModuleFactsWithSelf,
+	CrossModuleDerivationFn,
+	CrossModuleDerivationsDef,
+	CrossModuleConstraintDef,
+	CrossModuleConstraintsDef,
+	CrossModuleEffectDef,
+	CrossModuleEffectsDef,
 } from "./core/types.js";
 
 // ============================================================================
@@ -186,6 +204,7 @@ export { t, type Branded, type ExtendedSchemaType, type ChainableSchemaType } fr
 export {
 	createModule,
 	type ModuleConfig,
+	type ModuleConfigWithDeps,
 } from "./core/module.js";
 export {
 	createSystem,

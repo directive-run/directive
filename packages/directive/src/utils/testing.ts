@@ -2,17 +2,19 @@
  * Testing Utilities - Helpers for testing Directive systems
  *
  * Features:
- * - Mock resolvers
+ * - Mock resolvers with manual resolve/reject
  * - Fake timers integration (works with Vitest/Jest fake timers)
  * - Assertion helpers
- * - Snapshot testing support
+ * - Facts history tracking
+ * - Pending requirements tracking
  */
 
-import { createSystem, type CreateSystemOptions } from "../core/system.js";
+import { type CreateSystemOptions, createSystem } from "../core/system.js";
 import type {
 	ModuleDef,
 	ModuleSchema,
 	Requirement,
+	RequirementWithId,
 	System,
 } from "../core/types.js";
 
@@ -102,10 +104,11 @@ export async function settleWithFakeTimers<M extends ModuleSchema>(
 	// Final check
 	const finalInspection = system.inspect();
 	if (finalInspection.inflight.length > 0) {
+		const resolverIds = finalInspection.inflight
+			.map((r) => r.resolverId)
+			.join(", ");
 		throw new Error(
-			`[Directive] settleWithFakeTimers did not settle after ${totalTime}ms. ` +
-				`${finalInspection.inflight.length} resolvers still inflight: ` +
-				finalInspection.inflight.map((r) => r.resolverId).join(", "),
+			`[Directive] settleWithFakeTimers did not settle after ${totalTime}ms. ${finalInspection.inflight.length} resolvers still inflight: ${resolverIds}`,
 		);
 	}
 }
@@ -217,13 +220,18 @@ export function createMockResolver<R extends Requirement = Requirement>(
 ): MockResolverDef {
 	const options: MockResolverOptions<R> =
 		typeof typeOrOptions === "string"
-			? { requirement: ((req: Requirement) => req.type === typeOrOptions) as (req: Requirement) => req is R }
+			? {
+					requirement: ((req: Requirement) => req.type === typeOrOptions) as (
+						req: Requirement,
+					) => req is R,
+				}
 			: typeOrOptions;
 
 	const calls: R[] = options.calls ?? [];
 
 	return {
-		requirement: options.requirement ?? ((_req: Requirement): _req is R => true),
+		requirement:
+			options.requirement ?? ((_req: Requirement): _req is R => true),
 		async resolve(req: Requirement, ctx: MockResolverContext): Promise<void> {
 			calls.push(req as R);
 
@@ -232,7 +240,9 @@ export function createMockResolver<R extends Requirement = Requirement>(
 			}
 
 			if (options.error) {
-				throw typeof options.error === "string" ? new Error(options.error) : options.error;
+				throw typeof options.error === "string"
+					? new Error(options.error)
+					: options.error;
 			}
 
 			if (options.resolve) {
@@ -240,6 +250,146 @@ export function createMockResolver<R extends Requirement = Requirement>(
 			}
 		},
 	};
+}
+
+// ============================================================================
+// Mock Resolver (Advanced)
+// ============================================================================
+
+/**
+ * A mock resolver that captures requirements for manual resolution.
+ * Use this when you need fine-grained control over when and how requirements resolve.
+ */
+export interface MockResolver<R extends Requirement = Requirement> {
+	/** All requirements received by this resolver */
+	readonly calls: R[];
+	/** Pending requirements waiting to be resolved/rejected */
+	readonly pending: Array<{
+		requirement: R;
+		resolve: (result?: unknown) => void;
+		reject: (error: Error) => void;
+	}>;
+	/** Resolve the next pending requirement */
+	resolve(result?: unknown): void;
+	/** Reject the next pending requirement */
+	reject(error: Error): void;
+	/** Resolve all pending requirements */
+	resolveAll(result?: unknown): void;
+	/** Reject all pending requirements */
+	rejectAll(error: Error): void;
+	/** Clear call history and pending queue */
+	reset(): void;
+}
+
+/**
+ * Create a mock resolver that captures requirements instead of resolving them.
+ * This gives you manual control over requirement resolution in tests.
+ *
+ * @example
+ * ```typescript
+ * const fetchMock = mockResolver<{ type: "FETCH_USER"; id: string }>("FETCH_USER");
+ *
+ * const system = createTestSystem({
+ *   modules: [userModule],
+ *   mocks: {
+ *     resolvers: {
+ *       FETCH_USER: { resolve: fetchMock.handler },
+ *     },
+ *   },
+ * });
+ *
+ * system.facts.userId = "123";
+ * await flushMicrotasks();
+ *
+ * // Requirement is pending
+ * expect(fetchMock.calls).toHaveLength(1);
+ * expect(fetchMock.calls[0].id).toBe("123");
+ *
+ * // Manually resolve it
+ * fetchMock.resolve({ name: "John" });
+ * await flushMicrotasks();
+ *
+ * expect(system.facts.user).toEqual({ name: "John" });
+ * ```
+ */
+export function mockResolver<R extends Requirement = Requirement>(
+	_requirementType: string,
+): MockResolver<R> & {
+	handler: (req: R, ctx: MockResolverContext) => Promise<void>;
+} {
+	const calls: R[] = [];
+	const pending: Array<{
+		requirement: R;
+		resolve: (result?: unknown) => void;
+		reject: (error: Error) => void;
+	}> = [];
+
+	const mock: MockResolver<R> = {
+		get calls() {
+			return calls;
+		},
+		get pending() {
+			return pending;
+		},
+		resolve(result?: unknown) {
+			const item = pending.shift();
+			if (item) {
+				item.resolve(result);
+			}
+		},
+		reject(error: Error) {
+			const item = pending.shift();
+			if (item) {
+				item.reject(error);
+			}
+		},
+		resolveAll(result?: unknown) {
+			while (pending.length > 0) {
+				this.resolve(result);
+			}
+		},
+		rejectAll(error: Error) {
+			while (pending.length > 0) {
+				this.reject(error);
+			}
+		},
+		reset() {
+			calls.length = 0;
+			pending.length = 0;
+		},
+	};
+
+	const handler = (req: R, _ctx: MockResolverContext): Promise<void> => {
+		calls.push(req);
+		return new Promise<void>((resolve, reject) => {
+			pending.push({
+				requirement: req,
+				resolve: () => resolve(),
+				reject,
+			});
+		});
+	};
+
+	return {
+		...mock,
+		handler,
+	};
+}
+
+// ============================================================================
+// Fact Change Tracking
+// ============================================================================
+
+/** Record of a single fact change */
+export interface FactChangeRecord {
+	/** The fact key that changed */
+	key: string;
+	/** The previous value */
+	previousValue: unknown;
+	/** The new value */
+	newValue: unknown;
+	/** Timestamp of the change */
+	timestamp: number;
 }
 
 // ============================================================================
@@ -257,10 +407,31 @@ export interface TestSystem<M extends ModuleSchema> extends System<M> {
 	eventHistory: Array<{ type: string; [key: string]: unknown }>;
 	/** Get resolver call history */
 	resolverCalls: Map<string, Requirement[]>;
+	/**
+	 * Get all requirements that have been generated (both resolved and pending).
+	 * Unlike `inspect().unmet`, this includes requirements that have already been handled.
+	 */
+	readonly allRequirements: RequirementWithId[];
+	/**
+	 * Get all fact changes since system start or last reset.
+	 */
+	getFactsHistory(): FactChangeRecord[];
+	/**
+	 * Reset the facts history tracking.
+	 */
+	resetFactsHistory(): void;
 	/** Assert that a requirement was created */
 	assertRequirement(type: string): void;
 	/** Assert that a resolver was called */
 	assertResolverCalled(type: string, times?: number): void;
+	/**
+	 * Assert that a fact was set to a specific value.
+	 */
+	assertFactSet(key: string, value?: unknown): void;
+	/**
+	 * Assert the number of times a fact was changed.
+	 */
+	assertFactChanges(key: string, times: number): void;
 }
 
 export interface CreateTestSystemOptions<M extends ModuleSchema>
@@ -269,6 +440,9 @@ export interface CreateTestSystemOptions<M extends ModuleSchema>
 	mocks?: {
 		resolvers?: Record<string, MockResolverOptions>;
 	};
+	/** Additional plugins (tracking plugin is added automatically) */
+	// biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
+	plugins?: Array<any>;
 }
 
 /**
@@ -279,6 +453,8 @@ export function createTestSystem<M extends ModuleSchema>(
 ): TestSystem<M> {
 	const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
 	const resolverCalls = new Map<string, Requirement[]>();
+	const allRequirements: RequirementWithId[] = [];
+	const factsHistory: FactChangeRecord[] = [];
 
 	// Create mock resolvers
 	const mockResolvers: Record<string, MockResolverDef> = {};
@@ -300,11 +476,28 @@ export function createTestSystem<M extends ModuleSchema>(
 		},
 	}));
 
+	// Create tracking plugin
+	const trackingPlugin = {
+		name: "__test-tracking__",
+		onFactSet: (key: string, value: unknown, previousValue: unknown) => {
+			factsHistory.push({
+				key,
+				previousValue,
+				newValue: value,
+				timestamp: Date.now(),
+			});
+		},
+		onRequirementCreated: (requirement: RequirementWithId) => {
+			allRequirements.push(requirement);
+		},
+	};
+
 	// Create the underlying system
 	const system = createSystem({
 		...options,
 		// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
 		modules: modulesWithMocks as Array<ModuleDef<any>>,
+		plugins: [trackingPlugin, ...(options.plugins ?? [])],
 	}) as System<M>;
 
 	// Wrap dispatch to track events
@@ -320,6 +513,18 @@ export function createTestSystem<M extends ModuleSchema>(
 		eventHistory,
 		resolverCalls,
 
+		get allRequirements() {
+			return allRequirements;
+		},
+
+		getFactsHistory(): FactChangeRecord[] {
+			return [...factsHistory];
+		},
+
+		resetFactsHistory(): void {
+			factsHistory.length = 0;
+		},
+
 		async waitForIdle(maxWait = 5000): Promise<void> {
 			const startTime = Date.now();
 
@@ -332,10 +537,9 @@ export function createTestSystem<M extends ModuleSchema>(
 				if (inspection.inflight.length > 0) {
 					// Check timeout
 					if (Date.now() - startTime > maxWait) {
+						const resolverIds = inspection.inflight.map((r) => r.id).join(", ");
 						throw new Error(
-							`[Directive] waitForIdle timed out after ${maxWait}ms. ` +
-								`${inspection.inflight.length} resolvers still inflight: ` +
-								inspection.inflight.map((r) => r.id).join(", "),
+							`[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
 						);
 					}
 					// Wait a bit more and check again
@@ -348,12 +552,13 @@ export function createTestSystem<M extends ModuleSchema>(
 		},
 
 		assertRequirement(type: string): void {
-			const inspection = system.inspect();
-			const hasRequirement = inspection.unmet.some(
+			const hasRequirement = allRequirements.some(
 				(r) => r.requirement.type === type,
 			);
 			if (!hasRequirement) {
-				throw new Error(`Expected requirement of type "${type}" but none found`);
+				throw new Error(
+					`Expected requirement of type "${type}" but none found`,
+				);
 			}
 		},
 
@@ -366,7 +571,36 @@ export function createTestSystem<M extends ModuleSchema>(
 					);
 				}
 			} else if (calls.length === 0) {
-				throw new Error(`Expected resolver "${type}" to be called but it was not`);
+				throw new Error(
+					`Expected resolver "${type}" to be called but it was not`,
+				);
+			}
+		},
+
+		assertFactSet(key: string, value?: unknown): void {
+			const changes = factsHistory.filter((c) => c.key === key);
+			if (changes.length === 0) {
+				throw new Error(`Expected fact "${key}" to be set but it was not`);
+			}
+			if (value !== undefined) {
+				const hasValue = changes.some((c) => c.newValue === value);
+				if (!hasValue) {
+					const actualValues = changes
+						.map((c) => JSON.stringify(c.newValue))
+						.join(", ");
+					throw new Error(
+						`Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
+					);
+				}
+			}
+		},
+
+		assertFactChanges(key: string, times: number): void {
+			const changes = factsHistory.filter((c) => c.key === key);
+			if (changes.length !== times) {
+				throw new Error(
+					`Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
+				);
 			}
 		},
 	};
