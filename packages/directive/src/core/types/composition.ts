@@ -1,25 +1,23 @@
 /**
- * Composition Types - Type definitions for namespaced multi-module systems
+ * Composition Types - Type definitions for single and multi-module systems
  *
- * When modules are passed as an object to createSystem, facts and derivations
- * are automatically namespaced under module keys:
- *
+ * Single module = direct access (no namespace):
  * @example
  * ```typescript
- * // Object modules = namespaced access
+ * const system = createSystem({ modules: counterModule });
+ * system.facts.count           // Direct access
+ * system.events.increment()    // Direct events
+ * ```
+ *
+ * Multiple modules = namespaced access:
+ * @example
+ * ```typescript
  * const system = createSystem({
  *   modules: { auth: authModule, data: dataModule },
  * });
- *
  * system.facts.auth.token       // Namespaced access
  * system.derive.data.userCount  // Namespaced derivations
- *
- * // Array modules = flat access (existing behavior)
- * const system = createSystem({
- *   modules: [authModule, dataModule],
- * });
- *
- * system.facts.token            // Flat access (requires manual prefixing)
+ * system.events.auth.login()    // Namespaced events
  * ```
  */
 
@@ -29,6 +27,7 @@ import type {
 	InferDerivations,
 	InferEvents,
 } from "./schema.js";
+import type { Facts } from "./facts.js";
 import type { ModuleDef } from "./module.js";
 import type {
 	DebugConfig,
@@ -57,15 +56,6 @@ export type ExtractSchema<M> = M extends ModuleDef<infer S> ? S : never;
  */
 // biome-ignore lint/suspicious/noExplicitAny: Required for TypeScript to preserve specific module schema types during inference
 export type ModulesMap = Record<string, ModuleDef<any>>;
-
-/**
- * Detect if modules parameter is an object (namespaced) or array (flat).
- */
-export type IsModulesObject<T> = T extends ModulesMap
-	? T extends unknown[]
-		? false
-		: true
-	: false;
 
 // ============================================================================
 // Cross-Module Facts Types (for module-level type hints)
@@ -224,6 +214,31 @@ export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
 	 * Enable zero-config mode with sensible defaults.
 	 */
 	zeroConfig?: boolean;
+	/**
+	 * Initial facts to set after module init (namespaced format).
+	 * Applied after all module `init()` functions but before reconciliation.
+	 *
+	 * @example
+	 * ```typescript
+	 * createSystem({
+	 *   modules: { auth, data },
+	 *   initialFacts: {
+	 *     auth: { token: "restored-token", user: cachedUser },
+	 *     data: { users: preloadedUsers },
+	 *   },
+	 * });
+	 * ```
+	 */
+	initialFacts?: Partial<{
+		[K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
+	}>;
+	/**
+	 * Init order strategy:
+	 * - "auto" (default): Sort by crossModuleDeps topology
+	 * - "declaration": Use object key order (current behavior)
+	 * - string[]: Explicit order by namespace
+	 */
+	initOrder?: "auto" | "declaration" | Array<keyof Modules & string>;
 }
 
 // ============================================================================
@@ -235,6 +250,8 @@ export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
  * Facts and derivations are accessed via module namespaces.
  */
 export interface NamespacedSystem<Modules extends ModulesMap> {
+	/** System mode discriminator for type guards */
+	readonly _mode: "namespaced";
 	/** Namespaced facts accessor: system.facts.auth.token */
 	readonly facts: MutableNamespacedFacts<Modules>;
 	/** Time-travel debugging API (if enabled) */
@@ -255,6 +272,35 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	readonly isRunning: boolean;
 	/** Whether all resolvers have completed */
 	readonly isSettled: boolean;
+	/** Whether all modules have completed initialization */
+	readonly isInitialized: boolean;
+	/** Whether system has completed first reconciliation */
+	readonly isReady: boolean;
+
+	/** Wait for system to be fully ready (after first reconciliation) */
+	whenReady(): Promise<void>;
+
+	/**
+	 * Hydrate facts from async source (call before start).
+	 * Useful for restoring state from localStorage, API, etc.
+	 *
+	 * @example
+	 * ```typescript
+	 * const system = createSystem({ modules: { auth, data } });
+	 * await system.hydrate(async () => {
+	 *   const stored = localStorage.getItem("app-state");
+	 *   return stored ? JSON.parse(stored) : {};
+	 * });
+	 * system.start();
+	 * ```
+	 */
+	hydrate(
+		loader: () => Promise<Partial<{
+			[K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
+		}>> | Partial<{
+			[K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
+		}>,
+	): Promise<void>;
 
 	/** Dispatch an event (union of all module events) */
 	dispatch(event: UnionEvents<Modules>): void;
@@ -389,3 +435,189 @@ type MergeRequirementsWithPrefix<Modules extends ModulesMap> = {
 		? ExtractSchema<Modules[K]>["requirements"][keyof ExtractSchema<Modules[K]>["requirements"]]
 		: never;
 };
+
+// ============================================================================
+// Single Module Types (no namespace)
+// ============================================================================
+
+/**
+ * Options for createSystem with a single module (no namespacing).
+ */
+export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
+	/** Single module = direct access (use `modules` for multiple) */
+	module: ModuleDef<S>;
+	/** Plugins to register */
+	plugins?: Array<Plugin<ModuleSchema>>;
+	/** Debug configuration */
+	debug?: DebugConfig;
+	/** Error boundary configuration */
+	errorBoundary?: ErrorBoundaryConfig;
+	/** Tick interval for time-based systems (ms) */
+	tickMs?: number;
+	/** Enable zero-config mode with sensible defaults */
+	zeroConfig?: boolean;
+	/**
+	 * Initial facts to set after module init.
+	 * Applied after module `init()` but before reconciliation.
+	 */
+	initialFacts?: Partial<InferFacts<S>>;
+}
+
+/**
+ * System interface for a single module (no namespace).
+ * Facts, derivations, and events are accessed directly.
+ */
+export interface SingleModuleSystem<S extends ModuleSchema> {
+	/** System mode discriminator for type guards */
+	readonly _mode: "single";
+	/** Direct facts accessor: system.facts.count */
+	readonly facts: Facts<S["facts"]>;
+	/** Time-travel debugging API (if enabled) */
+	readonly debug: TimeTravelAPI | null;
+	/** Direct derivations accessor: system.derive.doubled */
+	readonly derive: InferDerivations<S>;
+	/** Direct events accessor: system.events.increment() */
+	readonly events: SingleModuleEvents<S>;
+
+	/** Start the system (initialize modules, begin reconciliation) */
+	start(): void;
+	/** Stop the system (cancel resolvers, stop reconciliation) */
+	stop(): void;
+	/** Destroy the system (stop and cleanup) */
+	destroy(): void;
+
+	/** Whether the system is currently running */
+	readonly isRunning: boolean;
+	/** Whether all resolvers have completed */
+	readonly isSettled: boolean;
+	/** Whether module has completed initialization */
+	readonly isInitialized: boolean;
+	/** Whether system has completed first reconciliation */
+	readonly isReady: boolean;
+
+	/** Wait for system to be fully ready (after first reconciliation) */
+	whenReady(): Promise<void>;
+
+	/**
+	 * Hydrate facts from async source (call before start).
+	 */
+	hydrate(
+		loader: () => Promise<Partial<InferFacts<S>>> | Partial<InferFacts<S>>,
+	): Promise<void>;
+
+	/** Dispatch an event */
+	dispatch(event: InferEvents<S>): void;
+
+	/** Batch multiple fact changes */
+	batch(fn: () => void): void;
+
+	/**
+	 * Read a derivation value by key.
+	 * @example system.read("doubled")
+	 */
+	read<T = unknown>(derivationId: string): T;
+
+	/**
+	 * Subscribe to derivation changes.
+	 * @example system.subscribe(["doubled", "isPositive"], () => { ... })
+	 */
+	subscribe(derivationIds: string[], listener: () => void): () => void;
+
+	/**
+	 * Watch a derivation for changes.
+	 * @example system.watch("doubled", (newVal, oldVal) => { ... })
+	 */
+	watch<T = unknown>(
+		derivationId: string,
+		callback: (newValue: T, previousValue: T | undefined) => void,
+	): () => void;
+
+	/** Inspect system state */
+	inspect(): SystemInspection;
+	/** Wait for system to settle (all resolvers complete) */
+	settle(maxWait?: number): Promise<void>;
+	/** Explain why a requirement exists */
+	explain(requirementId: string): string | null;
+	/** Get serializable snapshot of system state */
+	getSnapshot(): SystemSnapshot;
+	/** Restore system state from snapshot */
+	restore(snapshot: SystemSnapshot): void;
+}
+
+/**
+ * Events dispatcher for a single module (direct access).
+ */
+type SingleModuleEvents<S extends ModuleSchema> = S["events"] extends Record<
+	string,
+	unknown
+>
+	? {
+			[E in keyof S["events"]]: S["events"][E] extends Record<string, unknown>
+				? keyof S["events"][E] extends never
+					? () => void
+					: (payload: InferEventPayload<S["events"][E]>) => void
+				: () => void;
+		}
+	: Record<string, never>;
+
+// ============================================================================
+// Type Guards
+// ============================================================================
+
+/**
+ * System mode discriminator.
+ * - "single": Single module with direct access (`system.facts.count`)
+ * - "namespaced": Multiple modules with namespaced access (`system.facts.auth.token`)
+ */
+export type SystemMode = "single" | "namespaced";
+
+/**
+ * Base system type for type guards.
+ * Use this for functions that accept either system type.
+ */
+export interface AnySystem {
+	readonly _mode: SystemMode;
+	readonly isRunning: boolean;
+	readonly isSettled: boolean;
+	readonly isInitialized: boolean;
+	readonly isReady: boolean;
+	start(): void;
+	stop(): void;
+	destroy(): void;
+}
+
+/**
+ * Check if a system is a single module system.
+ * Returns true if the system was created with `module:` (singular).
+ *
+ * @example
+ * ```typescript
+ * const system = createSystem({ module: counterModule });
+ *
+ * if (isSingleModuleSystem(system)) {
+ *   // system._mode === "single"
+ *   console.log(system.facts.count);
+ * }
+ * ```
+ */
+export function isSingleModuleSystem(system: AnySystem): boolean {
+	return system._mode === "single";
+}
+
+/**
+ * Check if a system is a namespaced (multi-module) system.
+ * Returns true if the system was created with `modules:` (plural, object).
+ *
+ * @example
+ * ```typescript
+ * const system = createSystem({ modules: { auth, data } });
+ *
+ * if (isNamespacedSystem(system)) {
+ *   // system._mode === "namespaced"
+ *   console.log(system.facts.auth.token);
+ * }
+ * ```
+ */
+export function isNamespacedSystem(system: AnySystem): boolean {
+	return system._mode === "namespaced";
+}

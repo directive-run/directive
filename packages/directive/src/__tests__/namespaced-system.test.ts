@@ -266,22 +266,6 @@ describe("Namespaced System", () => {
     });
   });
 
-  describe("backwards compatibility", () => {
-    it("should still support array modules (flat mode)", () => {
-      const system = createSystem({
-        modules: [authModule, dataModule],
-      });
-
-      system.start();
-
-      // Flat access with prefixed keys
-      expect((system.facts as Record<string, unknown>).token).toBe(null);
-      expect((system.facts as Record<string, unknown>).isAuthenticated).toBe(false);
-
-      system.destroy();
-    });
-  });
-
   describe("type safety", () => {
     it("should have namespaced types flow correctly", () => {
       const system = createSystem({
@@ -548,7 +532,8 @@ describe("Namespaced System", () => {
       // Verify watch callbacks
       expect(watched.length).toBeGreaterThan(0);
       // Last watched value should be 3
-      expect(watched[watched.length - 1].newVal).toBe(3);
+      const lastWatched = watched[watched.length - 1];
+      expect(lastWatched?.newVal).toBe(3);
 
       unwatch();
       system.destroy();
@@ -794,7 +779,7 @@ describe("Namespaced System", () => {
         },
         derive: {
           // With empty deps, uses flat access (module-scoped proxy, not cross-module)
-          doubled: (facts) => (facts as { value: number }).value * 2,
+          doubled: (facts) => (facts as unknown as { value: number }).value * 2,
         },
       });
 
@@ -852,6 +837,555 @@ describe("Namespaced System", () => {
 
       system.destroy();
       warnSpy.mockRestore();
+    });
+  });
+
+  describe("deferred reconciliation", () => {
+    it("should not trigger constraints during module initialization", async () => {
+      let constraintEvaluationsDuringInit = 0;
+      let initComplete = false;
+
+      const testSchema = {
+        facts: {
+          value: t.number(),
+          initialized: t.boolean(),
+        },
+        derivations: {},
+        events: {},
+        requirements: {
+          TEST_REQ: {},
+        },
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => {
+          // Set multiple facts - should NOT trigger constraint during init
+          facts.value = 10;
+          facts.initialized = true;
+          // Mark init as complete AFTER setting facts
+          initComplete = true;
+        },
+        derive: {},
+        events: {},
+        constraints: {
+          test: {
+            when: (facts) => {
+              // Track evaluations that happen during init
+              if (!initComplete) {
+                constraintEvaluationsDuringInit++;
+              }
+              // @ts-expect-error - Runtime typing
+              return facts.test?.value > 5 && facts.test?.initialized;
+            },
+            require: { type: "TEST_REQ" },
+          },
+        },
+        resolvers: {
+          test: {
+            requirement: "TEST_REQ",
+            resolve: async () => {},
+          },
+        },
+      });
+
+      const system = createSystem({
+        modules: { test: testModule },
+      });
+
+      // Before start - no evaluations
+      expect(constraintEvaluationsDuringInit).toBe(0);
+
+      system.start();
+      await system.settle();
+
+      // No constraint evaluations should have happened DURING init
+      // They should only happen AFTER all modules are initialized
+      expect(constraintEvaluationsDuringInit).toBe(0);
+
+      system.destroy();
+    });
+  });
+
+  describe("dependency-ordered initialization", () => {
+    it("should initialize modules in crossModuleDeps order", () => {
+      const initOrder: string[] = [];
+
+      const authSchema = {
+        facts: { token: t.string().nullable() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const dataSchema = {
+        facts: { items: t.array<string>() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const uiSchema = {
+        facts: { ready: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const authMod = createModule("auth", {
+        schema: authSchema,
+        init: () => { initOrder.push("auth"); },
+        derive: {},
+        events: {},
+      });
+
+      const dataMod = createModule("data", {
+        schema: dataSchema,
+        crossModuleDeps: { auth: authSchema },
+        init: () => { initOrder.push("data"); },
+        derive: {},
+        events: {},
+      });
+
+      const uiMod = createModule("ui", {
+        schema: uiSchema,
+        crossModuleDeps: { auth: authSchema, data: dataSchema },
+        init: () => { initOrder.push("ui"); },
+        derive: {},
+        events: {},
+      });
+
+      // Pass in "wrong" order - should be reordered by topological sort
+      const system = createSystem({
+        modules: { ui: uiMod, auth: authMod, data: dataMod },
+      });
+
+      system.start();
+
+      // auth has no deps, should be first
+      // data depends on auth, should be second
+      // ui depends on both, should be last
+      expect(initOrder).toEqual(["auth", "data", "ui"]);
+
+      system.destroy();
+    });
+
+    it("should detect circular dependencies", () => {
+      const schemaA = {
+        facts: { a: t.string() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const schemaB = {
+        facts: { b: t.string() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const modA = createModule("a", {
+        schema: schemaA,
+        crossModuleDeps: { b: schemaB },
+        init: () => {},
+        derive: {},
+        events: {},
+      });
+
+      const modB = createModule("b", {
+        schema: schemaB,
+        crossModuleDeps: { a: schemaA },
+        init: () => {},
+        derive: {},
+        events: {},
+      });
+
+      expect(() => {
+        createSystem({ modules: { a: modA, b: modB } });
+      }).toThrow(/Circular dependency detected/);
+    });
+
+    it("should respect explicit initOrder over auto", () => {
+      const initOrder: string[] = [];
+
+      const schemaA = {
+        facts: { a: t.string() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const schemaB = {
+        facts: { b: t.string() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const modA = createModule("a", {
+        schema: schemaA,
+        init: () => { initOrder.push("a"); },
+        derive: {},
+        events: {},
+      });
+
+      const modB = createModule("b", {
+        schema: schemaB,
+        init: () => { initOrder.push("b"); },
+        derive: {},
+        events: {},
+      });
+
+      // Force b before a, even though object order is a, b
+      const system = createSystem({
+        modules: { a: modA, b: modB },
+        initOrder: ["b", "a"],
+      });
+
+      system.start();
+      expect(initOrder).toEqual(["b", "a"]);
+
+      system.destroy();
+    });
+  });
+
+  describe("initial facts injection", () => {
+    it("should apply initialFacts after module init", () => {
+      const initFacts: string[] = [];
+
+      const testSchema = {
+        facts: {
+          token: t.string().nullable(),
+          user: t.string().nullable(),
+        },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("auth", {
+        schema: testSchema,
+        init: (facts) => {
+          facts.token = "default-token";
+          facts.user = "default-user";
+          initFacts.push(`init: token=${facts.token}`);
+        },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { auth: testModule },
+        initialFacts: {
+          auth: { token: "restored-token" }, // Override token, keep user default
+        },
+      });
+
+      system.start();
+
+      // Module init ran first
+      expect(initFacts).toEqual(["init: token=default-token"]);
+
+      // initialFacts overrode token but kept user
+      expect(system.facts.auth.token).toBe("restored-token");
+      expect(system.facts.auth.user).toBe("default-user");
+
+      system.destroy();
+    });
+  });
+
+  describe("ready state API", () => {
+    it("should track isInitialized and isReady states", async () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { test: testModule },
+      });
+
+      // Before start
+      expect(system.isInitialized).toBe(false);
+      expect(system.isReady).toBe(false);
+
+      system.start();
+
+      // After start, should be initialized
+      expect(system.isInitialized).toBe(true);
+
+      // Wait for first reconcile
+      await system.whenReady();
+
+      expect(system.isReady).toBe(true);
+
+      system.destroy();
+    });
+
+    it("should resolve whenReady immediately if already ready", async () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { test: testModule },
+      });
+
+      system.start();
+      await system.whenReady();
+
+      // Call again - should resolve immediately
+      const start = Date.now();
+      await system.whenReady();
+      const elapsed = Date.now() - start;
+
+      expect(elapsed).toBeLessThan(10); // Should be nearly instant
+
+      system.destroy();
+    });
+  });
+
+  describe("prototype pollution protection", () => {
+    it("should reject initialFacts with __proto__ key (via JSON.parse)", () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      // Simulate malicious JSON payload (how prototype pollution typically enters)
+      const maliciousPayload = JSON.parse('{"test": {"__proto__": {"isAdmin": true}}}');
+
+      const system = createSystem({
+        modules: { test: testModule },
+        initialFacts: maliciousPayload,
+      });
+
+      expect(() => system.start()).toThrow(/prototype pollution/);
+    });
+
+    it("should reject initialFacts with constructor key", () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      // Constructor is another prototype pollution vector
+      const maliciousPayload = JSON.parse('{"test": {"constructor": {"prototype": {}}}}');
+
+      const system = createSystem({
+        modules: { test: testModule },
+        initialFacts: maliciousPayload,
+      });
+
+      expect(() => system.start()).toThrow(/prototype pollution/);
+    });
+
+    it("should reject any initialFacts object containing prototype key", () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      // Having any dangerous key in the facts object should reject the entire object
+      // This is a security best practice - don't partially accept potentially malicious data
+      const system = createSystem({
+        modules: { test: testModule },
+        initialFacts: {
+          test: JSON.parse('{"value": 42, "prototype": "bad"}'),
+        },
+      });
+
+      expect(() => system.start()).toThrow(/prototype pollution/);
+    });
+  });
+
+  describe("whenReady before start", () => {
+    it("should reject whenReady() called before start()", async () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { test: testModule },
+      });
+
+      // Should reject because system isn't started
+      await expect(system.whenReady()).rejects.toThrow(/before start/);
+
+      system.destroy();
+    });
+  });
+
+  describe("hydrate", () => {
+    it("should apply hydrated facts before start", async () => {
+      const testSchema = {
+        facts: {
+          token: t.string().nullable(),
+          user: t.string().nullable(),
+        },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("auth", {
+        schema: testSchema,
+        init: (facts) => {
+          facts.token = "init-token";
+          facts.user = "init-user";
+        },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { auth: testModule },
+      });
+
+      // Hydrate before start
+      await system.hydrate(async () => ({
+        auth: { token: "hydrated-token" },
+      }));
+
+      system.start();
+
+      // Module init ran, then hydrate overrode token
+      expect(system.facts.auth.token).toBe("hydrated-token");
+      expect(system.facts.auth.user).toBe("init-user");
+
+      system.destroy();
+    });
+
+    it("should throw if called after start", async () => {
+      const testSchema = {
+        facts: { value: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => { facts.value = 0; },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { test: testModule },
+      });
+
+      system.start();
+
+      await expect(
+        system.hydrate(() => ({ test: { value: 1 } })),
+      ).rejects.toThrow(/must be called before start/);
+
+      system.destroy();
+    });
+
+    it("should apply both initialFacts and hydrate (hydrate wins)", async () => {
+      const testSchema = {
+        facts: {
+          a: t.string(),
+          b: t.string(),
+          c: t.string(),
+        },
+        derivations: {},
+        events: {},
+        requirements: {},
+      } satisfies ModuleSchema;
+
+      const testModule = createModule("test", {
+        schema: testSchema,
+        init: (facts) => {
+          facts.a = "init-a";
+          facts.b = "init-b";
+          facts.c = "init-c";
+        },
+        derive: {},
+        events: {},
+      });
+
+      const system = createSystem({
+        modules: { test: testModule },
+        initialFacts: {
+          test: { a: "initial-a", b: "initial-b" },
+        },
+      });
+
+      await system.hydrate(() => ({
+        test: { b: "hydrate-b", c: "hydrate-c" },
+      }));
+
+      system.start();
+
+      // Order: init → initialFacts → hydrate
+      // a: init → initial → (not in hydrate) = initial-a
+      // b: init → initial → hydrate = hydrate-b
+      // c: init → (not in initial) → hydrate = hydrate-c
+      expect(system.facts.test.a).toBe("initial-a");
+      expect(system.facts.test.b).toBe("hydrate-b");
+      expect(system.facts.test.c).toBe("hydrate-c");
+
+      system.destroy();
     });
   });
 
