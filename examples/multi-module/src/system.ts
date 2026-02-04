@@ -1,13 +1,15 @@
 /**
  * System Configuration
  *
- * Combines all modules using OBJECT syntax for automatic namespacing:
- * - `modules: { auth, data, ui }` → namespaced access
- * - Access via `system.facts.auth.token`, `system.derive.data.userCount`
+ * Two ways to create a system:
  *
- * This replaces the array syntax:
- * - `modules: [authModule, dataModule]` → flat access
- * - Requires manual prefixes like `auth_token`, `data_users`
+ * 1. Single module (direct access):
+ *    `module: counterModule` → `system.facts.count`
+ *
+ * 2. Multiple modules (namespaced access):
+ *    `modules: { auth, data, ui }` → `system.facts.auth.token`
+ *
+ * This example uses multiple modules with namespaced access.
  */
 
 import { createSystem } from "directive";

@@ -176,7 +176,7 @@ const userProfileModule = createModule("user-profile", {
 async function main() {
   console.log("=== Pattern 4: Mixed Schema Patterns ===\n");
 
-  const system = createSystem({ modules: [userProfileModule] });
+  const system = createSystem({ module: userProfileModule });
   system.start();
 
   // Initial state

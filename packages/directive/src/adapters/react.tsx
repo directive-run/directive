@@ -366,6 +366,82 @@ export function useInspect() {
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+/** Requirements state returned by useRequirements */
+export interface RequirementsState {
+	/** Array of unmet requirements waiting to be resolved */
+	unmet: Array<{ id: string; requirement: { type: string; [key: string]: unknown }; fromConstraint: string }>;
+	/** Array of requirements currently being resolved */
+	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	/** Whether there are any unmet requirements */
+	hasUnmet: boolean;
+	/** Whether there are any inflight requirements */
+	hasInflight: boolean;
+	/** Whether the system is actively working (has unmet or inflight requirements) */
+	isWorking: boolean;
+}
+
+/**
+ * Hook to get current requirements state reactively.
+ *
+ * Provides a focused view of just requirements without full inspection overhead.
+ *
+ * @returns The current requirements state
+ *
+ * @example
+ * ```tsx
+ * function LoadingIndicator() {
+ *   const { isWorking, hasUnmet, hasInflight } = useRequirements();
+ *   if (!isWorking) return null;
+ *   return <Spinner label={hasInflight ? 'Loading...' : 'Processing...'} />;
+ * }
+ * ```
+ */
+export function useRequirements(): RequirementsState {
+	const system = useSystem();
+	const cachedSnapshot = useRef<RequirementsState | null>(null);
+	const cachedUnmetJson = useRef<string>("");
+	const cachedInflightJson = useRef<string>("");
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			return system.facts.$store.subscribeAll(onStoreChange);
+		},
+		[system],
+	);
+
+	const getSnapshot = useCallback(() => {
+		const inspection = system.inspect();
+		const unmetJson = JSON.stringify(inspection.unmet);
+		const inflightJson = JSON.stringify(inspection.inflight);
+
+		// Only return new object if content actually changed
+		if (
+			unmetJson !== cachedUnmetJson.current ||
+			inflightJson !== cachedInflightJson.current
+		) {
+			cachedUnmetJson.current = unmetJson;
+			cachedInflightJson.current = inflightJson;
+			cachedSnapshot.current = {
+				unmet: inspection.unmet,
+				inflight: inspection.inflight,
+				hasUnmet: inspection.unmet.length > 0,
+				hasInflight: inspection.inflight.length > 0,
+				isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+			};
+		}
+
+		return cachedSnapshot.current ?? {
+			unmet: inspection.unmet,
+			inflight: inspection.inflight,
+			hasUnmet: inspection.unmet.length > 0,
+			hasInflight: inspection.inflight.length > 0,
+			isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+		};
+	}, [system]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
 /**
  * Hook to get requirement status reactively.
  *
@@ -463,6 +539,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 		derivationId: K,
 	) => InferDerivations<M>[K];
 	useFact: <K extends keyof InferFacts<M>>(factKey: K) => InferFacts<M>[K];
+	useFacts: () => System<M>["facts"];
 	useDispatch: () => (event: InferEvents<M>) => void;
 	useSystem: () => System<M>;
 } {
@@ -471,6 +548,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			useDerivation<InferDerivations<M>[K]>(derivationId as string),
 		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
 			useFact<InferFacts<M>[K]>(factKey as string),
+		useFacts: () => useSystem<M>().facts,
 		useDispatch: () => useDispatch<M>(),
 		useSystem: () => useSystem<M>(),
 	};

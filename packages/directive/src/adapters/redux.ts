@@ -27,6 +27,7 @@ import type {
 	Requirement,
 	ModuleSchema,
 	Plugin,
+	SingleModuleSystem,
 	System,
 	SystemEvent,
 } from "../core/types.js";
@@ -300,7 +301,7 @@ export function createDirectiveMiddleware<S>(
 	} = options;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	let system: System<any> | null = null;
+	let system: SingleModuleSystem<any> | null = null;
 	let store: MiddlewareAPI<Dispatch, S> | null = null;
 
 	// Convert constraints and resolvers
@@ -341,7 +342,7 @@ export function createDirectiveMiddleware<S>(
 		// Create system if not exists
 		if (!system) {
 			system = createSystem({
-				modules: [reduxModule],
+				module: reduxModule,
 				plugins: [...plugins, callbackPlugin],
 				debug: debug ? { timeTravel: true } : undefined,
 			});

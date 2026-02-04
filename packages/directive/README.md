@@ -80,7 +80,7 @@ const userModule = createModule("user", {
 });
 
 // Create and start the system
-const system = createSystem({ modules: [userModule] });
+const system = createSystem({ module: userModule });
 system.start();
 
 // Set userId - the constraint will automatically trigger FETCH_USER
@@ -357,8 +357,9 @@ If two modules define the same fact key, you'll get a dev-mode error:
 const mod1 = createModule("a", { schema: { facts: { count: t.number() } } });
 const mod2 = createModule("b", { schema: { facts: { count: t.number() } } });
 
-createSystem({ modules: [mod1, mod2] });
-// Error: Schema collision: Fact "count" is defined in both module "a" and "b"
+// With namespaced modules (object syntax), facts are accessed via their namespace:
+createSystem({ modules: { a: mod1, b: mod2 } });
+// system.facts.a.count, system.facts.b.count - no collision!
 ```
 
 ### Comparison with Other Libraries
@@ -468,7 +469,7 @@ This pattern gives you:
 import { loggingPlugin, devtoolsPlugin, persistencePlugin } from 'directive/plugins';
 
 const system = createSystem({
-  modules: [myModule],
+  module: myModule,
   plugins: [
     loggingPlugin({ level: "debug" }),
     devtoolsPlugin({ name: "my-app" }),
@@ -483,7 +484,7 @@ const system = createSystem({
 import { createTestSystem, mockResolver } from 'directive/testing';
 
 const system = createTestSystem({
-  modules: [myModule],
+  modules: { my: myModule },
   mocks: {
     fetchUser: mockResolver(() => ({ id: 1, name: "Test" })),
   },
@@ -610,7 +611,7 @@ const userModule = createModule("user", {
 // Use createRequirementStatusPlugin for loading/error tracking
 import { createRequirementStatusPlugin } from 'directive';
 const statusPlugin = createRequirementStatusPlugin();
-const system = createSystem({ modules: [userModule], plugins: [statusPlugin.plugin] });
+const system = createSystem({ module: userModule, plugins: [statusPlugin.plugin] });
 
 // Check loading state
 const status = statusPlugin.getStatus("FETCH_USER");

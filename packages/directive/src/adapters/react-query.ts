@@ -36,6 +36,7 @@ import type {
 	Requirement,
 	ModuleSchema,
 	Plugin,
+	SingleModuleSystem,
 	System,
 } from "../core/types.js";
 import {
@@ -316,7 +317,7 @@ export function createQueryBridge<F extends Record<string, unknown> = Record<str
 	} = options;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	let system: System<any>;
+	let system: SingleModuleSystem<any>;
 
 	// Build the combined schema
 	const combinedSchema = {
@@ -378,7 +379,7 @@ export function createQueryBridge<F extends Record<string, unknown> = Record<str
 
 	// Create the Directive system
 	system = createSystem({
-		modules: [queryBridgeModule],
+		module: queryBridgeModule,
 		plugins,
 		debug: debug ? { timeTravel: true } : undefined,
 	});

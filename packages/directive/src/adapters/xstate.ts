@@ -420,7 +420,7 @@ export function createActorBridge<
 
 	// Create the Directive system
 	const system = createSystem({
-		modules: [actorModule],
+		module: actorModule,
 		plugins,
 		debug: debug ? { timeTravel: true } : undefined,
 	});
@@ -711,7 +711,7 @@ export function createActorCoordinator<F extends Record<string, unknown> = Recor
 
 	// Create system
 	const system = createSystem({
-		modules: [coordinatorModule],
+		module: coordinatorModule,
 		plugins,
 		debug: debug ? { timeTravel: true } : undefined,
 	});

@@ -42,6 +42,10 @@ export interface ConstraintsManager<_S extends Schema> {
 	enable(id: string): void;
 	/** Invalidate constraints that depend on the given fact key */
 	invalidate(factKey: string): void;
+	/** Mark a constraint's resolver as completed (for `after` ordering) */
+	markResolved(constraintId: string): void;
+	/** Check if a constraint has been resolved (for `after` ordering) */
+	isResolved(constraintId: string): boolean;
 }
 
 /** Options for creating a constraints manager */
@@ -93,6 +97,58 @@ export function createConstraintsManager<S extends Schema>(
 	const lastRequirements = new Map<string, RequirementWithId[]>();
 	// First evaluation flag
 	let hasEvaluated = false;
+	// Track resolved constraints (for `after` ordering)
+	const resolvedConstraints = new Set<string>();
+	// Track constraints that didn't fire (when() returned false) - they don't block
+	const noFireConstraints = new Set<string>();
+
+	/**
+	 * Detect cycles in the constraint dependency graph (via `after` property).
+	 * Uses DFS to find back edges.
+	 */
+	function detectCycles(): void {
+		const visited = new Set<string>();
+		const visiting = new Set<string>();
+
+		function visit(id: string, path: string[]): void {
+			if (visited.has(id)) return;
+
+			if (visiting.has(id)) {
+				const cycleStart = path.indexOf(id);
+				const cycle = [...path.slice(cycleStart), id].join(" → ");
+				throw new Error(
+					`[Directive] Constraint cycle detected: ${cycle}. ` +
+					`Remove one of the \`after\` dependencies to break the cycle.`,
+				);
+			}
+
+			visiting.add(id);
+			path.push(id);
+
+			const def = definitions[id];
+			if (def?.after) {
+				for (const depId of def.after) {
+					// Only check deps that exist in this manager
+					if (definitions[depId]) {
+						visit(depId, path);
+					}
+				}
+			}
+
+			path.pop();
+			visiting.delete(id);
+			visited.add(id);
+		}
+
+		for (const id of Object.keys(definitions)) {
+			visit(id, []);
+		}
+	}
+
+	// Validate constraint graph in dev mode
+	if (process.env.NODE_ENV !== "production") {
+		detectCycles();
+	}
 
 	/**
 	 * Determine if a constraint is async.
@@ -134,6 +190,8 @@ export function createConstraintsManager<S extends Schema>(
 			lastResult: null,
 			isEvaluating: false,
 			error: null,
+			lastResolvedAt: null,
+			after: def.after ?? [],
 		};
 
 		states.set(id, state);
@@ -346,6 +404,37 @@ export function createConstraintsManager<S extends Schema>(
 		initState(id);
 	}
 
+	/**
+	 * Check if a constraint's `after` dependencies are satisfied.
+	 * A dependency is satisfied if:
+	 * - It has been resolved (resolver completed successfully)
+	 * - It didn't fire (when() returned false) - nothing to wait for
+	 * - It is disabled - can't fire
+	 * - It doesn't exist in this manager (cross-module, handled externally)
+	 */
+	function areAfterDependenciesSatisfied(id: string): boolean {
+		const state = states.get(id);
+		if (!state || state.after.length === 0) return true;
+
+		for (const depId of state.after) {
+			// Skip deps that don't exist (cross-module, handled externally)
+			if (!definitions[depId]) continue;
+
+			// Skip disabled deps - they can't fire
+			if (disabled.has(depId)) continue;
+
+			// If dep didn't fire (when returned false), no need to wait
+			if (noFireConstraints.has(depId)) continue;
+
+			// If dep hasn't been resolved yet, we're blocked
+			if (!resolvedConstraints.has(depId)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	const manager: ConstraintsManager<S> = {
 		async evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]> {
 			const requirements = new RequirementSet();
@@ -395,16 +484,63 @@ export function createConstraintsManager<S extends Schema>(
 				}
 			}
 
-			// Separate sync and async constraints
+			// Filter out constraints blocked by `after` dependencies
+			const blockedConstraints: string[] = [];
+			const readyToEvaluate: string[] = [];
+
+			for (const id of constraintsToEvaluate) {
+				if (areAfterDependenciesSatisfied(id)) {
+					readyToEvaluate.push(id);
+				} else {
+					blockedConstraints.push(id);
+					// Keep last requirements for blocked constraints
+					const lastReqs = lastRequirements.get(id);
+					if (lastReqs) {
+						for (const req of lastReqs) {
+							requirements.add(req);
+						}
+					}
+				}
+			}
+
+			// Separate sync and async constraints from ready-to-evaluate
 			const syncConstraints: string[] = [];
 			const asyncConstraints: string[] = [];
 
-			for (const id of constraintsToEvaluate) {
+			for (const id of readyToEvaluate) {
 				const state = getState(id);
 				if (state.isAsync) {
 					asyncConstraints.push(id);
 				} else {
 					syncConstraints.push(id);
+				}
+			}
+
+			/**
+			 * Process a constraint result: handle requirements and track no-fire state
+			 */
+			function processConstraintResult(id: string, active: boolean): void {
+				if (active) {
+					// Remove from no-fire tracking since it fired
+					noFireConstraints.delete(id);
+
+					const { requirements: reqs, deps: requireDeps } = getRequirements(id);
+					// Merge require() deps into constraint deps
+					mergeDependencies(id, requireDeps);
+					if (reqs.length > 0) {
+						const keyFn = requirementKeys[id];
+						const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
+						for (const reqWithId of reqsWithId) {
+							requirements.add(reqWithId);
+						}
+						lastRequirements.set(id, reqsWithId);
+					} else {
+						lastRequirements.set(id, []);
+					}
+				} else {
+					// Track that this constraint didn't fire (when returned false)
+					noFireConstraints.add(id);
+					lastRequirements.set(id, []);
 				}
 			}
 
@@ -421,23 +557,7 @@ export function createConstraintsManager<S extends Schema>(
 					continue;
 				}
 
-				if (result) {
-					const { requirements: reqs, deps: requireDeps } = getRequirements(id);
-					// Merge require() deps into constraint deps
-					mergeDependencies(id, requireDeps);
-					if (reqs.length > 0) {
-						const keyFn = requirementKeys[id];
-						const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
-						for (const reqWithId of reqsWithId) {
-							requirements.add(reqWithId);
-						}
-						lastRequirements.set(id, reqsWithId);
-					} else {
-						lastRequirements.set(id, []);
-					}
-				} else {
-					lastRequirements.set(id, []);
-				}
+				processConstraintResult(id, result);
 			}
 
 			// Handle any sync constraints that turned out to be async
@@ -450,22 +570,7 @@ export function createConstraintsManager<S extends Schema>(
 				);
 
 				for (const { id, active } of asyncResults) {
-					if (active) {
-						const { requirements: reqs, deps: requireDeps } = getRequirements(id);
-						mergeDependencies(id, requireDeps);
-						if (reqs.length > 0) {
-							const keyFn = requirementKeys[id];
-							const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
-							for (const reqWithId of reqsWithId) {
-								requirements.add(reqWithId);
-							}
-							lastRequirements.set(id, reqsWithId);
-						} else {
-							lastRequirements.set(id, []);
-						}
-					} else {
-						lastRequirements.set(id, []);
-					}
+					processConstraintResult(id, active);
 				}
 			}
 
@@ -479,22 +584,7 @@ export function createConstraintsManager<S extends Schema>(
 				);
 
 				for (const { id, active } of asyncResults) {
-					if (active) {
-						const { requirements: reqs, deps: requireDeps } = getRequirements(id);
-						mergeDependencies(id, requireDeps);
-						if (reqs.length > 0) {
-							const keyFn = requirementKeys[id];
-							const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
-							for (const reqWithId of reqsWithId) {
-								requirements.add(reqWithId);
-							}
-							lastRequirements.set(id, reqsWithId);
-						} else {
-							lastRequirements.set(id, []);
-						}
-					} else {
-						lastRequirements.set(id, []);
-					}
+					processConstraintResult(id, active);
 				}
 			}
 
@@ -533,6 +623,18 @@ export function createConstraintsManager<S extends Schema>(
 					dirtyConstraints.add(id);
 				}
 			}
+		},
+
+		markResolved(constraintId: string): void {
+			resolvedConstraints.add(constraintId);
+			const state = states.get(constraintId);
+			if (state) {
+				state.lastResolvedAt = Date.now();
+			}
+		},
+
+		isResolved(constraintId: string): boolean {
+			return resolvedConstraints.has(constraintId);
 		},
 	};
 

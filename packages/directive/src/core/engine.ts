@@ -202,6 +202,8 @@ export function createEngine<S extends Schema>(
 		onComplete: (resolver, req, duration) => {
 			pluginManager.emitResolverComplete(resolver, req, duration);
 			pluginManager.emitRequirementMet(req, resolver);
+			// Mark the constraint as resolved for `after` ordering
+			constraintsManager.markResolved(req.fromConstraint);
 		},
 		onError: (resolver, req, error) => {
 			errorBoundary.handleError("resolver", resolver, error, req);

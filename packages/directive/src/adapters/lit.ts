@@ -1,4 +1,3 @@
-// @ts-nocheck - TODO: Update adapter for consolidated schema API
 /**
  * Lit Adapter - Web Components integration for Directive
  *
@@ -6,11 +5,24 @@
  * - Reactive Controllers for derivations and facts
  * - Context protocol integration via @lit/context
  * - Automatic cleanup on disconnect
+ * - RequirementStatusController for loading/error states
+ * - createTypedHooks for schema-specific hooks
  */
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import { createSystem, type CreateSystemOptions } from "../core/system.js";
-import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
+import { createSystem } from "../core/system.js";
+import type { CreateSystemOptionsSingle, ModuleSchema, InferFacts, InferDerivations, InferEvents } from "../core/types.js";
+import type { ModuleDef, System, SystemInspection } from "../core/types.js";
+import {
+	createRequirementStatusPlugin,
+	type RequirementTypeStatus,
+} from "../utils/requirement-status.js";
+
+// Re-export for convenience
+export type { RequirementTypeStatus };
+
+/** Type for the requirement status plugin return value */
+type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Context
@@ -45,10 +57,12 @@ export const directiveContext = Symbol("directive");
  */
 abstract class DirectiveController implements ReactiveController {
 	protected host: ReactiveControllerHost;
-	protected system: System<Schema>;
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	protected system: System<any>;
 	protected unsubscribe?: () => void;
 
-	constructor(host: ReactiveControllerHost, system: System<Schema>) {
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>) {
 		this.host = host;
 		this.system = system;
 		host.addController(this);
@@ -94,7 +108,8 @@ export class DerivationController<T> extends DirectiveController {
 
 	constructor(
 		host: ReactiveControllerHost,
-		system: System<Schema>,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
 		derivationId: string,
 	) {
 		super(host, system);
@@ -150,12 +165,25 @@ export class DerivationsController<
 
 	constructor(
 		host: ReactiveControllerHost,
-		system: System<Schema>,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
 		derivationIds: string[],
 	) {
 		super(host, system);
 		this.derivationIds = derivationIds;
 		this.value = this.getValues();
+
+		// Dev warning for invalid derivation IDs
+		if (process.env.NODE_ENV !== "production") {
+			for (const id of derivationIds) {
+				if (this.value[id as keyof T] === undefined) {
+					console.warn(
+						`[Directive] DerivationsController("${id}") returned undefined. ` +
+							`Check that "${id}" is defined in your module's derive property.`,
+					);
+				}
+			}
+		}
 	}
 
 	private getValues(): T {
@@ -199,7 +227,8 @@ export class FactController<T> extends DirectiveController {
 
 	constructor(
 		host: ReactiveControllerHost,
-		system: System<Schema>,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
 		factKey: string,
 	) {
 		super(host, system);
@@ -226,10 +255,10 @@ export class FactController<T> extends DirectiveController {
  * @example
  * ```ts
  * import { LitElement, html } from 'lit';
- * import { InspectionController } from 'directive/lit';
+ * import { InspectController } from 'directive/lit';
  *
  * class Inspector extends LitElement {
- *   private inspection = new InspectionController(this, system);
+ *   private inspection = new InspectController(this, system);
  *
  *   render() {
  *     return html`<div>Unmet: ${this.inspection.value.unmet.length}</div>`;
@@ -237,10 +266,11 @@ export class FactController<T> extends DirectiveController {
  * }
  * ```
  */
-export class InspectionController extends DirectiveController {
+export class InspectController extends DirectiveController {
 	value: SystemInspection;
 
-	constructor(host: ReactiveControllerHost, system: System<Schema>) {
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>) {
 		super(host, system);
 		this.value = system.inspect();
 	}
@@ -249,6 +279,68 @@ export class InspectionController extends DirectiveController {
 		this.value = this.system.inspect();
 		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
 			this.value = this.system.inspect();
+			this.requestUpdate();
+		});
+	}
+}
+
+/** Requirements state returned by RequirementsController */
+export interface RequirementsState {
+	/** Array of unmet requirements waiting to be resolved */
+	unmet: Array<{ id: string; requirement: { type: string; [key: string]: unknown }; fromConstraint: string }>;
+	/** Array of requirements currently being resolved */
+	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	/** Whether there are any unmet requirements */
+	hasUnmet: boolean;
+	/** Whether there are any inflight requirements */
+	hasInflight: boolean;
+	/** Whether the system is actively working (has unmet or inflight requirements) */
+	isWorking: boolean;
+}
+
+/**
+ * Reactive controller for current requirements state.
+ * Provides a focused view of just requirements without full inspection overhead.
+ *
+ * @example
+ * ```ts
+ * import { LitElement, html } from 'lit';
+ * import { RequirementsController } from 'directive/lit';
+ *
+ * class LoadingIndicator extends LitElement {
+ *   private requirements = new RequirementsController(this, system);
+ *
+ *   render() {
+ *     if (!this.requirements.value.isWorking) return html``;
+ *     return html`<spinner-element></spinner-element>`;
+ *   }
+ * }
+ * ```
+ */
+export class RequirementsController extends DirectiveController {
+	value: RequirementsState;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>) {
+		super(host, system);
+		this.value = this.getState();
+	}
+
+	private getState(): RequirementsState {
+		const inspection = this.system.inspect();
+		return {
+			unmet: inspection.unmet,
+			inflight: inspection.inflight,
+			hasUnmet: inspection.unmet.length > 0,
+			hasInflight: inspection.inflight.length > 0,
+			isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+		};
+	}
+
+	protected subscribe(): void {
+		this.value = this.getState();
+		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
+			this.value = this.getState();
 			this.requestUpdate();
 		});
 	}
@@ -274,13 +366,68 @@ export class InspectionController extends DirectiveController {
  * }
  * ```
  */
+
+/**
+ * Reactive controller for requirement status.
+ * Tracks loading/error states for requirement types.
+ *
+ * @example
+ * ```ts
+ * import { LitElement, html } from 'lit';
+ * import { RequirementStatusController } from 'directive/lit';
+ *
+ * class UserLoader extends LitElement {
+ *   private status = new RequirementStatusController(this, statusPlugin, 'FETCH_USER');
+ *
+ *   render() {
+ *     if (this.status.value.isLoading) return html`<spinner-el></spinner-el>`;
+ *     if (this.status.value.hasError) return html`<error-el .message=${this.status.value.lastError?.message}></error-el>`;
+ *     return html`<user-content></user-content>`;
+ *   }
+ * }
+ * ```
+ */
+export class RequirementStatusController implements ReactiveController {
+	private host: ReactiveControllerHost;
+	private statusPlugin: StatusPlugin;
+	private type: string;
+	private unsubscribe?: () => void;
+	value: RequirementTypeStatus;
+
+	constructor(
+		host: ReactiveControllerHost,
+		statusPlugin: StatusPlugin,
+		type: string,
+	) {
+		this.host = host;
+		this.statusPlugin = statusPlugin;
+		this.type = type;
+		this.value = statusPlugin.getStatus(type);
+		host.addController(this);
+	}
+
+	hostConnected(): void {
+		this.value = this.statusPlugin.getStatus(this.type);
+		this.unsubscribe = this.statusPlugin.subscribe(() => {
+			this.value = this.statusPlugin.getStatus(this.type);
+			this.host.requestUpdate();
+		});
+	}
+
+	hostDisconnected(): void {
+		this.unsubscribe?.();
+		this.unsubscribe = undefined;
+	}
+}
+
 export class WatchController<T> extends DirectiveController {
 	private derivationId: string;
 	private callback: (newValue: T, previousValue: T | undefined) => void;
 
 	constructor(
 		host: ReactiveControllerHost,
-		system: System<Schema>,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
 		derivationId: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	) {
@@ -311,7 +458,8 @@ export class WatchController<T> extends DirectiveController {
  */
 export function createDerivation<T>(
 	host: ReactiveControllerHost,
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationId: string,
 ): DerivationController<T> {
 	return new DerivationController<T>(host, system, derivationId);
@@ -331,7 +479,8 @@ export function createDerivation<T>(
  */
 export function createDerivations<T extends Record<string, unknown>>(
 	host: ReactiveControllerHost,
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationIds: string[],
 ): DerivationsController<T> {
 	return new DerivationsController<T>(host, system, derivationIds);
@@ -349,7 +498,8 @@ export function createDerivations<T extends Record<string, unknown>>(
  */
 export function createFact<T>(
 	host: ReactiveControllerHost,
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	factKey: string,
 ): FactController<T> {
 	return new FactController<T>(host, system, factKey);
@@ -357,7 +507,11 @@ export function createFact<T>(
 
 /**
  * Get direct access to facts for mutations.
- * Returns the facts proxy - changes will trigger updates in any controllers.
+ *
+ * WARNING: The returned facts object is NOT reactive. Use this for event handlers
+ * and imperative code, not for rendering. Use `DerivationController` or `FactController`
+ * for reactive values. Changes to facts will trigger updates in controllers that
+ * subscribe to the affected derivations.
  *
  * @example
  * ```ts
@@ -370,7 +524,7 @@ export function createFact<T>(
  * }
  * ```
  */
-export function useFacts<S extends Schema>(system: System<S>): Facts<S> {
+export function useFacts<M extends ModuleSchema>(system: System<M>): System<M>["facts"] {
 	return system.facts;
 }
 
@@ -388,7 +542,8 @@ export function useFacts<S extends Schema>(system: System<S>): Facts<S> {
  * }
  * ```
  */
-export function useDispatch(system: System<Schema>) {
+// biome-ignore lint/suspicious/noExplicitAny: System type varies
+export function useDispatch(system: System<any>) {
 	return (event: { type: string; [key: string]: unknown }) => {
 		system.dispatch(event);
 	};
@@ -397,25 +552,70 @@ export function useDispatch(system: System<Schema>) {
 /**
  * Get time-travel debug API (if enabled).
  */
-export function useTimeTravel(system: System<Schema>) {
+// biome-ignore lint/suspicious/noExplicitAny: System type varies
+export function useTimeTravel(system: System<any>) {
 	return system.debug;
 }
 
 /**
- * Create an inspection controller.
+ * Create an inspect controller.
  *
  * @example
  * ```ts
  * class Inspector extends LitElement {
- *   private inspection = createInspection(this, system);
+ *   private inspection = createInspect(this, system);
  * }
  * ```
  */
-export function createInspection(
+export function createInspect(
 	host: ReactiveControllerHost,
-	system: System<Schema>,
-): InspectionController {
-	return new InspectionController(host, system);
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+): InspectController {
+	return new InspectController(host, system);
+}
+
+/**
+ * Create a requirements controller.
+ *
+ * Provides a focused view of just requirements without full inspection overhead.
+ *
+ * @example
+ * ```ts
+ * class LoadingIndicator extends LitElement {
+ *   private requirements = createRequirements(this, system);
+ *
+ *   render() {
+ *     if (!this.requirements.value.isWorking) return html``;
+ *     return html`<spinner-element></spinner-element>`;
+ *   }
+ * }
+ * ```
+ */
+export function createRequirements(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+): RequirementsController {
+	return new RequirementsController(host, system);
+}
+
+/**
+ * Create a requirement status controller.
+ *
+ * @example
+ * ```ts
+ * class UserLoader extends LitElement {
+ *   private status = createRequirementStatus(this, statusPlugin, 'FETCH_USER');
+ * }
+ * ```
+ */
+export function createRequirementStatus(
+	host: ReactiveControllerHost,
+	statusPlugin: StatusPlugin,
+	type: string,
+): RequirementStatusController {
+	return new RequirementStatusController(host, statusPlugin, type);
 }
 
 /**
@@ -432,7 +632,8 @@ export function createInspection(
  */
 export function createWatch<T>(
 	host: ReactiveControllerHost,
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationId: string,
 	callback: (newValue: T, previousValue: T | undefined) => void,
 ): WatchController<T> {
@@ -444,9 +645,9 @@ export function createWatch<T>(
 // ============================================================================
 
 /** Options for SystemController */
-export type SystemControllerOptions<S extends Schema> =
-	| ModuleDef<S, DerivationsDef<S>>
-	| CreateSystemOptions<S>;
+export type SystemControllerOptions<M extends ModuleSchema> =
+	| ModuleDef<M>
+	| CreateSystemOptionsSingle<M>;
 
 /**
  * Reactive controller that creates and manages a Directive system.
@@ -476,18 +677,21 @@ export type SystemControllerOptions<S extends Schema> =
  * }
  * ```
  */
-export class SystemController<S extends Schema> implements ReactiveController {
-	private options: SystemControllerOptions<S>;
-	private _system: System<S> | null = null;
+export class SystemController<M extends ModuleSchema> implements ReactiveController {
+	private options: SystemControllerOptions<M>;
+	private _system: System<M> | null = null;
 
-	constructor(host: ReactiveControllerHost, options: SystemControllerOptions<S>) {
+	constructor(host: ReactiveControllerHost, options: SystemControllerOptions<M>) {
 		this.options = options;
 		host.addController(this);
 	}
 
-	get system(): System<S> {
+	get system(): System<M> {
 		if (!this._system) {
-			throw new Error("[Directive] SystemController.system accessed before hostConnected");
+			throw new Error(
+				"[Directive] SystemController.system accessed before hostConnected. " +
+					"Ensure the controller is attached to a host element that has been connected to the DOM.",
+			);
 		}
 		return this._system;
 	}
@@ -496,10 +700,12 @@ export class SystemController<S extends Schema> implements ReactiveController {
 		// Check if options is a module or system options
 		const isModule = "id" in this.options && "schema" in this.options;
 
-		this._system = isModule
-			? createSystem({ modules: [this.options as ModuleDef<S, DerivationsDef<S>>] })
-			: createSystem(this.options as CreateSystemOptions<S>);
+		const system = isModule
+			? createSystem({ module: this.options as ModuleDef<M> })
+			: createSystem(this.options as CreateSystemOptionsSingle<M>);
 
+		// Cast to System<M> - the underlying type matches
+		this._system = system as unknown as System<M>;
 		this._system.start();
 	}
 
@@ -526,7 +732,8 @@ export class SystemController<S extends Schema> implements ReactiveController {
  * ```
  */
 export function useDerivation<T>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationId: string,
 ): () => T {
 	return () => system.read(derivationId) as T;
@@ -545,8 +752,73 @@ export function useDerivation<T>(
  * ```
  */
 export function useFact<T>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	factKey: string,
 ): () => T | undefined {
 	return () => system.facts.$store.get(factKey) as T | undefined;
+}
+
+// ============================================================================
+// Typed Hooks Factory
+// ============================================================================
+
+/**
+ * Create typed controllers and helpers for a specific system schema.
+ *
+ * This provides better type inference than the generic controllers.
+ *
+ * @example
+ * ```ts
+ * import { createTypedHooks } from 'directive/lit';
+ *
+ * // Define your schema
+ * const schema = {
+ *   facts: { count: t.number(), user: t.any<User | null>() },
+ *   derivations: { doubled: t.number() },
+ *   events: { increment: {}, setUser: { user: t.any<User>() } },
+ *   requirements: {},
+ * } satisfies ModuleSchema;
+ *
+ * // Create typed hooks
+ * const { createDerivation, createFact, useDispatch } = createTypedHooks<typeof schema>();
+ *
+ * class Counter extends LitElement {
+ *   private count = createFact(this, system, "count"); // Type: FactController<number>
+ *   private doubled = createDerivation(this, system, "doubled"); // Type: DerivationController<number>
+ * }
+ * ```
+ */
+export function createTypedHooks<M extends ModuleSchema>(): {
+	createDerivation: <K extends keyof InferDerivations<M>>(
+		host: ReactiveControllerHost,
+		system: System<M>,
+		derivationId: K,
+	) => DerivationController<InferDerivations<M>[K]>;
+	createFact: <K extends keyof InferFacts<M>>(
+		host: ReactiveControllerHost,
+		system: System<M>,
+		factKey: K,
+	) => FactController<InferFacts<M>[K]>;
+	useDispatch: (system: System<M>) => (event: InferEvents<M>) => void;
+	useFacts: (system: System<M>) => System<M>["facts"];
+} {
+	return {
+		createDerivation: <K extends keyof InferDerivations<M>>(
+			host: ReactiveControllerHost,
+			system: System<M>,
+			derivationId: K,
+		) => createDerivation<InferDerivations<M>[K]>(host, system, derivationId as string),
+		createFact: <K extends keyof InferFacts<M>>(
+			host: ReactiveControllerHost,
+			system: System<M>,
+			factKey: K,
+		) => createFact<InferFacts<M>[K]>(host, system, factKey as string),
+		useDispatch: (system: System<M>) => {
+			return (event: InferEvents<M>) => {
+				system.dispatch(event);
+			};
+		},
+		useFacts: (system: System<M>) => system.facts,
+	};
 }

@@ -100,6 +100,13 @@ export interface ConstraintDef<S extends Schema, R extends Requirement = Require
 	require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
 	/** Timeout for async constraints (ms) */
 	timeout?: number;
+	/**
+	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
+	 * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
+	 * If a dependency's resolver fails, this constraint remains blocked.
+	 * Cross-module: use "moduleName.constraintName" format.
+	 */
+	after?: string[];
 }
 
 /** Map of constraint definitions (generic) */
@@ -122,4 +129,8 @@ export interface ConstraintState {
 	lastResult: boolean | null;
 	isEvaluating: boolean;
 	error: Error | null;
+	/** Timestamp when this constraint's resolver(s) last completed successfully */
+	lastResolvedAt: number | null;
+	/** Constraint IDs this constraint is waiting on (from `after` property) */
+	after: string[];
 }

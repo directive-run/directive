@@ -1,4 +1,3 @@
-// @ts-nocheck - TODO: Update adapter for consolidated schema API
 /**
  * Solid Adapter - SolidJS primitives for Directive
  *
@@ -6,6 +5,8 @@
  * - createDerivationSignal for reactive derived values
  * - createFactSignal for reactive fact values
  * - Context provider for system
+ * - useRequirementStatus for loading/error states
+ * - createTypedHooks for schema-specific hooks
  */
 
 import {
@@ -16,21 +17,38 @@ import {
 	type Accessor,
 	type JSX,
 } from "solid-js";
-import { createSystem, type CreateSystemOptions } from "../core/system.js";
-import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
+import { createSystem } from "../core/system.js";
+import type { CreateSystemOptionsSingle, ModuleSchema, InferFacts, InferDerivations, InferEvents } from "../core/types.js";
+import type { ModuleDef, System, SystemInspection } from "../core/types.js";
+import {
+	createRequirementStatusPlugin,
+	type RequirementTypeStatus,
+} from "../utils/requirement-status.js";
+
+// Re-export for convenience
+export type { RequirementTypeStatus };
+
+/** Type for the requirement status plugin return value */
+type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Context
 // ============================================================================
 
-const DirectiveContext = createContext<System<Schema>>();
+// biome-ignore lint/suspicious/noExplicitAny: Context needs to work with any schema
+const DirectiveContext = createContext<System<any>>();
+
+/** Context for the requirement status plugin */
+const StatusPluginContext = createContext<StatusPlugin | null>();
 
 /**
  * Props for DirectiveProvider
  */
-export interface DirectiveProviderProps<S extends Schema> {
-	system: System<S>;
+export interface DirectiveProviderProps<M extends ModuleSchema> {
+	system: System<M>;
 	children: JSX.Element;
+	/** Optional requirement status plugin for useRequirementStatus hook */
+	statusPlugin?: StatusPlugin;
 }
 
 /**
@@ -51,13 +69,17 @@ export interface DirectiveProviderProps<S extends Schema> {
  * }
  * ```
  */
-export function DirectiveProvider<S extends Schema>(
-	props: DirectiveProviderProps<S>,
+export function DirectiveProvider<M extends ModuleSchema>(
+	props: DirectiveProviderProps<M>,
 ): JSX.Element {
 	// Use the Provider property directly to avoid JSX compilation issues
 	return DirectiveContext.Provider({
-		value: props.system as System<Schema>,
-		children: props.children,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		value: props.system as System<any>,
+		children: StatusPluginContext.Provider({
+			value: props.statusPlugin ?? null,
+			children: props.children,
+		}),
 	});
 }
 
@@ -70,14 +92,15 @@ export function DirectiveProvider<S extends Schema>(
  *
  * @throws If used outside of DirectiveProvider
  */
-export function useSystem<S extends Schema>(): System<S> {
+export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
 	const system = useContext(DirectiveContext);
 	if (!system) {
 		throw new Error(
-			"[Directive] useSystem must be used within a DirectiveProvider",
+			"[Directive] useSystem must be used within a DirectiveProvider. " +
+				"Wrap your component tree with <DirectiveProvider system={system}>.",
 		);
 	}
-	return system as System<S>;
+	return system as System<M>;
 }
 
 /**
@@ -176,8 +199,8 @@ export function useDerivations<T extends Record<string, unknown>>(
  * }
  * ```
  */
-export function useFacts<S extends Schema>(): Facts<S> {
-	const system = useSystem<S>();
+export function useFacts<M extends ModuleSchema>(): System<M>["facts"] {
+	const system = useSystem<M>();
 	return system.facts;
 }
 
@@ -236,15 +259,15 @@ export function useDispatch() {
  *
  * @example
  * ```tsx
- * import { useInspection } from 'directive/solid';
+ * import { useInspect } from 'directive/solid';
  *
  * function Inspector() {
- *   const inspection = useInspection();
+ *   const inspection = useInspect();
  *   return <div>Unmet: {inspection().unmet.length}</div>;
  * }
  * ```
  */
-export function useInspection(): Accessor<SystemInspection> {
+export function useInspect(): Accessor<SystemInspection> {
 	const system = useSystem();
 	const [inspection, setInspection] = createSignal<SystemInspection>(
 		system.inspect(),
@@ -257,6 +280,112 @@ export function useInspection(): Accessor<SystemInspection> {
 	onCleanup(unsubscribe);
 
 	return inspection;
+}
+
+/** Requirements state returned by useRequirements */
+export interface RequirementsState {
+	/** Array of unmet requirements waiting to be resolved */
+	unmet: Array<{ id: string; requirement: { type: string; [key: string]: unknown }; fromConstraint: string }>;
+	/** Array of requirements currently being resolved */
+	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	/** Whether there are any unmet requirements */
+	hasUnmet: boolean;
+	/** Whether there are any inflight requirements */
+	hasInflight: boolean;
+	/** Whether the system is actively working (has unmet or inflight requirements) */
+	isWorking: boolean;
+}
+
+/**
+ * Get current requirements state as a signal.
+ *
+ * Provides a focused view of just requirements without full inspection overhead.
+ *
+ * @returns Accessor with the current requirements state
+ *
+ * @example
+ * ```tsx
+ * import { useRequirements } from 'directive/solid';
+ *
+ * function LoadingIndicator() {
+ *   const requirements = useRequirements();
+ *   return (
+ *     <Show when={requirements().isWorking}>
+ *       <Spinner />
+ *     </Show>
+ *   );
+ * }
+ * ```
+ */
+export function useRequirements(): Accessor<RequirementsState> {
+	const system = useSystem();
+
+	const getState = (): RequirementsState => {
+		const inspection = system.inspect();
+		return {
+			unmet: inspection.unmet,
+			inflight: inspection.inflight,
+			hasUnmet: inspection.unmet.length > 0,
+			hasInflight: inspection.inflight.length > 0,
+			isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+		};
+	};
+
+	const [state, setState] = createSignal<RequirementsState>(getState());
+
+	const unsubscribe = system.facts.$store.subscribeAll(() => {
+		setState(getState);
+	});
+
+	onCleanup(unsubscribe);
+
+	return state;
+}
+
+/**
+ * Get requirement status as a signal.
+ *
+ * Requires a statusPlugin to be passed to DirectiveProvider.
+ *
+ * @param type - The requirement type to get status for
+ * @returns Accessor with the current status
+ *
+ * @example
+ * ```tsx
+ * import { useRequirementStatus } from 'directive/solid';
+ *
+ * function UserLoader() {
+ *   const status = useRequirementStatus('FETCH_USER');
+ *   return (
+ *     <Show when={!status().isLoading} fallback={<Spinner />}>
+ *       <Show when={!status().hasError} fallback={<Error message={status().lastError?.message} />}>
+ *         <UserContent />
+ *       </Show>
+ *     </Show>
+ *   );
+ * }
+ * ```
+ */
+export function useRequirementStatus(type: string): Accessor<RequirementTypeStatus> {
+	const statusPlugin = useContext(StatusPluginContext);
+	if (!statusPlugin) {
+		throw new Error(
+			"[Directive] useRequirementStatus requires a statusPlugin. " +
+				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
+		);
+	}
+
+	const [status, setStatus] = createSignal<RequirementTypeStatus>(
+		statusPlugin.getStatus(type),
+	);
+
+	const unsubscribe = statusPlugin.subscribe(() => {
+		setStatus(statusPlugin.getStatus(type));
+	});
+
+	onCleanup(unsubscribe);
+
+	return status;
 }
 
 /**
@@ -313,7 +442,8 @@ export function useWatch<T>(
  * ```
  */
 export function createDerivationSignal<T>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationId: string,
 ): [Accessor<T>, () => void] {
 	const [value, setValue] = createSignal<T>(system.read(derivationId) as T);
@@ -340,7 +470,8 @@ export function createDerivationSignal<T>(
  * ```
  */
 export function createFactSignal<T>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	factKey: string,
 ): [Accessor<T | undefined>, () => void] {
 	const [value, setValue] = createSignal<T | undefined>(
@@ -359,12 +490,13 @@ export function createFactSignal<T>(
 // ============================================================================
 
 /** Options for createDirective/useDirective */
-export type CreateDirectiveOptions<S extends Schema> =
-	| ModuleDef<S, DerivationsDef<S>>
-	| CreateSystemOptions<S>;
+export type CreateDirectiveOptions<M extends ModuleSchema> =
+	| ModuleDef<M>
+	| CreateSystemOptionsSingle<M>;
 
 // Cache for memoization - prevents re-creation in reactive contexts
-const systemCache = new WeakMap<object, System<Schema>>();
+// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+const systemCache = new WeakMap<object, System<any>>();
 
 /**
  * Create a scoped Directive system with automatic lifecycle management.
@@ -390,24 +522,25 @@ const systemCache = new WeakMap<object, System<Schema>>();
  * }
  * ```
  */
-export function createDirective<S extends Schema>(
-	options: CreateDirectiveOptions<S>,
-): System<S> {
+export function createDirective<M extends ModuleSchema>(
+	options: CreateDirectiveOptions<M>,
+): System<M> {
 	// Check cache to prevent re-creation in reactive contexts
 	const cached = systemCache.get(options as object);
 	if (cached) {
-		return cached as System<S>;
+		return cached as System<M>;
 	}
 
 	// Check if options is a module or system options
 	const isModule = "id" in options && "schema" in options;
 
 	const system = isModule
-		? createSystem({ modules: [options as ModuleDef<S, DerivationsDef<S>>] })
-		: createSystem(options as CreateSystemOptions<S>);
+		? createSystem({ module: options as ModuleDef<M> })
+		: createSystem(options as CreateSystemOptionsSingle<M>);
 
 	// Cache the system
-	systemCache.set(options as object, system as System<Schema>);
+	// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+	systemCache.set(options as object, system as System<any>);
 
 	system.start();
 
@@ -416,7 +549,8 @@ export function createDirective<S extends Schema>(
 		systemCache.delete(options as object);
 	});
 
-	return system;
+	// Return as System<M> - the underlying type matches
+	return system as unknown as System<M>;
 }
 
 /**
@@ -424,3 +558,56 @@ export function createDirective<S extends Schema>(
  * @see {@link createDirective}
  */
 export const useDirective = createDirective;
+
+// ============================================================================
+// Typed Hooks Factory
+// ============================================================================
+
+/**
+ * Create typed hooks for a specific system schema.
+ *
+ * This provides better type inference than the generic hooks.
+ *
+ * @example
+ * ```ts
+ * import { createTypedHooks } from 'directive/solid';
+ *
+ * // Define your schema
+ * const schema = {
+ *   facts: { count: t.number(), user: t.any<User | null>() },
+ *   derivations: { doubled: t.number() },
+ *   events: { increment: {}, setUser: { user: t.any<User>() } },
+ *   requirements: {},
+ * } satisfies ModuleSchema;
+ *
+ * // Create typed hooks
+ * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ *
+ * function Counter() {
+ *   const count = useFact("count"); // Type: Accessor<number>
+ *   const doubled = useDerivation("doubled"); // Type: Accessor<number>
+ * }
+ * ```
+ */
+export function createTypedHooks<M extends ModuleSchema>(): {
+	useDerivation: <K extends keyof InferDerivations<M>>(
+		derivationId: K,
+	) => Accessor<InferDerivations<M>[K]>;
+	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Accessor<InferFacts<M>[K] | undefined>;
+	useDispatch: () => (event: InferEvents<M>) => void;
+	useSystem: () => System<M>;
+} {
+	return {
+		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
+			useFact<InferFacts<M>[K]>(factKey as string),
+		useDispatch: () => {
+			const system = useSystem<M>();
+			return (event: InferEvents<M>) => {
+				system.dispatch(event);
+			};
+		},
+		useSystem: () => useSystem<M>(),
+	};
+}
