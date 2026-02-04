@@ -104,6 +104,12 @@ export type {
 	NamespacedSystem,
 	NamespacedEventsAccessor,
 	CreateSystemOptionsNamed,
+	// Single Module (no namespace)
+	CreateSystemOptionsSingle,
+	SingleModuleSystem,
+	// Type Guards
+	SystemMode,
+	AnySystem,
 	// Cross-Module Dependencies (for modules)
 	CrossModuleDeps,
 	CrossModuleFactsWithSelf,
@@ -206,10 +212,7 @@ export {
 	type ModuleConfig,
 	type ModuleConfigWithDeps,
 } from "./core/module.js";
-export {
-	createSystem,
-	type CreateSystemOptions,
-} from "./core/system.js";
+export { createSystem } from "./core/system.js";
 export {
 	module,
 	type ModuleBuilder,
@@ -234,6 +237,15 @@ export {
 	generateRequirementId,
 	RequirementSet,
 } from "./core/requirements.js";
+
+// ============================================================================
+// Type Guards
+// ============================================================================
+
+export {
+	isSingleModuleSystem,
+	isNamespacedSystem,
+} from "./core/types/composition.js";
 
 // ============================================================================
 // Constants

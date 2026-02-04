@@ -28,7 +28,14 @@
       "WebFetch(domain:effector.dev)",
       "WebFetch(domain:jotai.org)",
       "Bash(pnpm exec tsc:*)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(echo:*)",
+      "Bash(npm test:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm --filter \"./packages/*\" typecheck:*)",
+      "Bash(pkill:*)",
+      "Bash(pnpm exec vitest:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

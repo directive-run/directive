@@ -33,7 +33,7 @@ describe("Testing Utilities", () => {
 				},
 			});
 
-			const system = createTestSystem({ modules: [counter] });
+			const system = createTestSystem({ modules: { counter } });
 			system.start();
 
 			system.dispatch({ type: "increment" });
@@ -59,12 +59,12 @@ describe("Testing Utilities", () => {
 				events: {},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 
-			system.facts.value = 10;
-			system.facts.name = "test";
-			system.facts.value = 20;
+			system.facts.test.value = 10;
+			system.facts.test.name = "test";
+			system.facts.test.value = 20;
 
 			const history = system.getFactsHistory();
 			expect(history.filter((c) => c.key === "value")).toHaveLength(2);
@@ -88,16 +88,16 @@ describe("Testing Utilities", () => {
 				events: {},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 
-			system.facts.value = 10;
+			system.facts.test.value = 10;
 			expect(system.getFactsHistory()).toHaveLength(1);
 
 			system.resetFactsHistory();
 			expect(system.getFactsHistory()).toHaveLength(0);
 
-			system.facts.value = 20;
+			system.facts.test.value = 20;
 			expect(system.getFactsHistory()).toHaveLength(1);
 
 			system.stop();
@@ -118,10 +118,10 @@ describe("Testing Utilities", () => {
 				events: {},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 
-			system.facts.value = 42;
+			system.facts.test.value = 42;
 
 			// Should not throw
 			system.assertFactSet("value");
@@ -151,12 +151,12 @@ describe("Testing Utilities", () => {
 				events: {},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 
-			system.facts.value = 1;
-			system.facts.value = 2;
-			system.facts.value = 3;
+			system.facts.test.value = 1;
+			system.facts.test.value = 2;
+			system.facts.test.value = 3;
 
 			// Should not throw
 			system.assertFactChanges("value", 3);
@@ -196,7 +196,7 @@ describe("Testing Utilities", () => {
 				},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 			await system.settle();
 
@@ -228,7 +228,7 @@ describe("Testing Utilities", () => {
 				},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 			await flushMicrotasks();
 
@@ -267,7 +267,7 @@ describe("Testing Utilities", () => {
 			const fetchMock = mockResolver<{ type: "FETCH"; id: string }>("FETCH");
 
 			const system = createTestSystem({
-				modules: [module],
+				modules: { test: module },
 				mocks: {
 					resolvers: {
 						FETCH: { resolve: fetchMock.handler },
@@ -318,7 +318,7 @@ describe("Testing Utilities", () => {
 			const fetchMock = mockResolver<{ type: "FETCH_USER" }>("FETCH_USER");
 
 			const system = createTestSystem({
-				modules: [module],
+				modules: { test: module },
 				mocks: {
 					resolvers: {
 						fetchUser: {
@@ -332,19 +332,19 @@ describe("Testing Utilities", () => {
 			});
 
 			system.start();
-			system.facts.userId = "123";
+			system.facts.test.userId = "123";
 			await flushMicrotasks();
 
 			// Requirement is pending
 			expect(fetchMock.pending).toHaveLength(1);
-			expect(system.facts.user).toBeNull();
+			expect(system.facts.test.user).toBeNull();
 
 			// Resolve it
 			fetchMock.resolve();
 			await flushMicrotasks();
 			await system.settle();
 
-			expect(system.facts.user).toEqual({ name: "John" });
+			expect(system.facts.test.user).toEqual({ name: "John" });
 			expect(fetchMock.pending).toHaveLength(0);
 
 			system.stop();
@@ -375,7 +375,7 @@ describe("Testing Utilities", () => {
 			const errorHandler = vi.fn();
 
 			const system = createTestSystem({
-				modules: [module],
+				modules: { test: module },
 				mocks: {
 					resolvers: {
 						FAIL_ME: { resolve: failMock.handler },
@@ -430,7 +430,7 @@ describe("Testing Utilities", () => {
 			const workMock = mockResolver<{ type: "WORK"; id: number }>("WORK");
 
 			const system = createTestSystem({
-				modules: [module],
+				modules: { test: module },
 				mocks: {
 					resolvers: {
 						WORK: { resolve: workMock.handler },
@@ -512,7 +512,7 @@ describe("Testing Utilities", () => {
 				},
 			});
 
-			const system = createTestSystem({ modules: [module] });
+			const system = createTestSystem({ modules: { test: module } });
 			system.start();
 
 			await settleWithFakeTimers(system, vi.advanceTimersByTime.bind(vi), {
@@ -520,7 +520,7 @@ describe("Testing Utilities", () => {
 				stepSize: 10,
 			});
 
-			expect(system.facts.done).toBe(true);
+			expect(system.facts.test.done).toBe(true);
 
 			system.stop();
 			vi.useRealTimers();

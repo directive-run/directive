@@ -125,7 +125,7 @@ const userModule = createModule("user", {
 async function main() {
   console.log("=== Pattern 1: t.*() Schema Builders ===\n");
 
-  const system = createSystem({ modules: [userModule] });
+  const system = createSystem({ module: userModule });
   system.start();
 
   // Test facts typing

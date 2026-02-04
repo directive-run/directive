@@ -17,11 +17,13 @@ const authModule = createModule("auth", { ... });
 const dataModule = createModule("data", { ... });
 
 // System = runtime instance (actual state created here)
+// For multiple modules, use object syntax (namespaced access):
 const system = createSystem({
-  modules: [authModule, dataModule],
+  modules: { auth: authModule, data: dataModule },
   plugins: [loggingPlugin()],
   debug: { timeTravel: true },
 });
+// Access: system.facts.auth.token, system.facts.data.users
 ```
 
 **Why not combine them?**
@@ -33,7 +35,7 @@ const system = createSystem({
 
 ### The Design Decision
 
-All modules in a system share **one facts store**. When you call `createSystem({ modules: [a, b, c] })`, the facts from all modules are merged into a single store.
+All modules in a system share **one facts store**. When you call `createSystem({ modules: { a, b, c } })`, the facts from all modules are merged into a single store, accessible via their namespaces (`system.facts.a.count`, `system.facts.b.count`).
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -89,6 +91,249 @@ With flat merge, constraints just read what they need.
 | **Zustand** | Multiple stores | Completely isolated | Manual subscription |
 | **XState** | Actors | Completely isolated | Message passing |
 | **Directive** | Single store, merged | No isolation | Direct read (intentional) |
+
+## Mutating Facts
+
+### The Reactive Proxy
+
+Facts in Directive are accessed through a **reactive Proxy**. When you write `facts.token = "abc"`, you're not mutating a plain object - the Proxy intercepts the assignment and:
+
+1. Stores the new value
+2. Tracks the change for reconciliation
+3. Notifies subscribers (watchers, React hooks)
+4. Triggers constraint re-evaluation
+5. Creates a snapshot (if time-travel enabled)
+
+### Where You Can Mutate Facts
+
+Facts can be mutated in three places:
+
+```typescript
+const module = createModule("auth", {
+  // 1. Module init - set initial values
+  init: (facts) => {
+    facts.token = null;
+    facts.isAuthenticated = false;
+  },
+
+  // 2. Event handlers - respond to user actions
+  events: {
+    login: (facts, payload) => {
+      facts.token = payload.token;
+      facts.isAuthenticated = true;
+    },
+    logout: (facts) => {
+      facts.token = null;
+      facts.isAuthenticated = false;
+    },
+  },
+
+  // 3. Resolvers - fulfill requirements
+  resolvers: {
+    fetchUser: {
+      requirement: "FETCH_USER",
+      resolve: async (req, ctx) => {
+        const user = await api.getUser(req.id);
+        ctx.facts.user = user;        // ✅ Safe - goes through Proxy
+        ctx.facts.loading = false;
+      },
+    },
+  },
+});
+```
+
+### Top-Level vs Nested Mutation
+
+**Important:** The Proxy only tracks top-level fact keys. Nested mutations won't trigger reactivity:
+
+```typescript
+// ❌ Won't trigger reactivity (mutating nested property)
+ctx.facts.user.name = "John";
+ctx.facts.config.timeout = 5000;
+ctx.facts.items.push("new item");
+
+// ✅ Replace the entire object/array instead
+ctx.facts.user = { ...ctx.facts.user, name: "John" };
+ctx.facts.config = { ...ctx.facts.config, timeout: 5000 };
+ctx.facts.items = [...ctx.facts.items, "new item"];
+```
+
+This is the same pattern used by:
+- **React useState**: `setUser({ ...user, name: "John" })`
+- **Redux**: Reducers return new state objects
+- **Zustand**: `set({ items: [...items, newItem] })`
+
+### Batching Multiple Changes
+
+When you mutate multiple facts in a handler, they're automatically batched:
+
+```typescript
+events: {
+  reset: (facts) => {
+    // All three changes trigger ONE reconciliation cycle
+    facts.token = null;
+    facts.user = null;
+    facts.isAuthenticated = false;
+  },
+},
+```
+
+For mutations outside handlers (rare), use `system.batch()`:
+
+```typescript
+system.batch(() => {
+  system.facts.a = 1;
+  system.facts.b = 2;
+  system.facts.c = 3;
+}); // Single reconciliation after batch completes
+```
+
+## Derivations (Computed Values)
+
+Derivations are **computed values derived from facts**. They're like selectors in Redux, computed properties in Vue/MobX, or useMemo in React - but with automatic dependency tracking.
+
+### Defining Derivations
+
+```typescript
+const module = createModule("data", {
+  schema: {
+    facts: {
+      users: t.array<User>(),
+      filter: t.string(),
+      isLoading: t.boolean(),
+    },
+    derivations: {
+      // Declare the return type
+      userCount: t.number(),
+      filteredUsers: t.array<User>(),
+      status: t.string<"idle" | "loading" | "ready">(),
+    },
+  },
+
+  derive: {
+    // Simple computation
+    userCount: (facts) => facts.users.length,
+
+    // Filtering
+    filteredUsers: (facts) =>
+      facts.users.filter(u => u.name.includes(facts.filter)),
+
+    // Conditional logic
+    status: (facts) => {
+      if (facts.isLoading) return "loading";
+      if (facts.users.length > 0) return "ready";
+      return "idle";
+    },
+  },
+});
+```
+
+### Accessing Derivations
+
+```typescript
+// Via the derive accessor (type-safe)
+const count = system.derive.userCount;           // number
+const status = system.derive.status;             // "idle" | "loading" | "ready"
+
+// Via read() method
+const count = system.read("userCount");          // number
+const status = system.read<string>("status");    // with type hint
+
+// Namespaced systems
+const count = system.derive.data.userCount;      // number
+```
+
+### Auto-Tracking (No Manual Dependencies)
+
+Unlike React's useMemo or Redux selectors, you don't declare dependencies - Directive tracks them automatically:
+
+```typescript
+derive: {
+  // Directive automatically knows this depends on `users` and `filter`
+  // When either changes, this recomputes
+  filteredUsers: (facts) =>
+    facts.users.filter(u => u.name.includes(facts.filter)),
+}
+```
+
+How it works:
+1. When you access `system.derive.filteredUsers`, Directive runs the function
+2. During execution, it tracks which facts are read (`users`, `filter`)
+3. When those facts change, the derivation is marked stale
+4. Next access recomputes the value
+
+### Subscribing to Derivation Changes
+
+```typescript
+// Subscribe to be notified when derivation changes
+const unsubscribe = system.subscribe(["userCount", "status"], () => {
+  console.log("Count or status changed!");
+  console.log("New count:", system.derive.userCount);
+});
+
+// Watch with old/new values
+const unwatch = system.watch("userCount", (newValue, oldValue) => {
+  console.log(`Count changed from ${oldValue} to ${newValue}`);
+});
+
+// Clean up
+unsubscribe();
+unwatch();
+```
+
+### Using Derivations in Constraints
+
+Derivations can be used in constraint conditions:
+
+```typescript
+constraints: {
+  fetchMoreWhenLow: {
+    when: (facts, derive) =>
+      derive.userCount < 10 && !facts.isLoading,
+    require: { type: "FETCH_MORE_USERS" },
+  },
+}
+```
+
+### Derivations vs Facts
+
+| | Facts | Derivations |
+|---|---|---|
+| **Storage** | Stored in memory | Computed on demand |
+| **Mutation** | Can be mutated | Read-only (computed) |
+| **Source** | Set by init, events, resolvers | Calculated from facts |
+| **Use case** | Raw state | Transformed/filtered views |
+
+```typescript
+// Facts = raw data
+facts.users = [{ name: "Alice" }, { name: "Bob" }];
+facts.filter = "Ali";
+
+// Derivations = computed views
+derive.userCount      // 2 (computed from facts.users)
+derive.filteredUsers  // [{ name: "Alice" }] (computed from users + filter)
+```
+
+### React Integration
+
+The `useDirective` hook automatically subscribes to derivations:
+
+```tsx
+import { useDirective } from "directive/react";
+
+function UserList() {
+  // Component re-renders when userCount changes
+  const count = useDirective(system, (s) => s.derive.userCount);
+  const users = useDirective(system, (s) => s.derive.filteredUsers);
+
+  return (
+    <div>
+      <p>Showing {count} users</p>
+      {users.map(u => <UserCard key={u.id} user={u} />)}
+    </div>
+  );
+}
+```
 
 ## Data Flow
 
@@ -205,8 +450,9 @@ Directive detects fact key collisions in dev mode:
 const mod1 = createModule("a", { schema: { facts: { count: t.number() } } });
 const mod2 = createModule("b", { schema: { facts: { count: t.number() } } });
 
-createSystem({ modules: [mod1, mod2] });
-// Error: Schema collision: Fact "count" is defined in both module "a" and "b"
+// With namespaced modules (object syntax), facts are accessed via their namespace:
+createSystem({ modules: { a: mod1, b: mod2 } });
+// system.facts.a.count, system.facts.b.count - no collision!
 ```
 
 ### Type-Safe Cross-Module Access
@@ -256,9 +502,9 @@ Despite the flat merge at runtime, you can test modules in isolation:
 ```typescript
 import { createTestSystem, mockResolver } from 'directive/testing';
 
-// Test authModule without dataModule
+// Test authModule in isolation
 const testSystem = createTestSystem({
-  modules: [authModule],
+  modules: { auth: authModule },
   mocks: {
     resolvers: {
       VALIDATE_TOKEN: mockResolver(() => ({ valid: true })),
@@ -266,10 +512,10 @@ const testSystem = createTestSystem({
   },
 });
 
-testSystem.facts.auth_token = "test-token";
+testSystem.facts.auth.token = "test-token";
 await testSystem.settle();
 
-expect(testSystem.facts.auth_isAuthenticated).toBe(true);
+expect(testSystem.facts.auth.isAuthenticated).toBe(true);
 ```
 
 ## Design Rationale Summary

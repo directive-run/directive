@@ -1,4 +1,3 @@
-// @ts-nocheck - TODO: Update adapter for consolidated schema API
 /**
  * Svelte Adapter - Svelte stores for Directive
  *
@@ -6,18 +5,32 @@
  * - createDerivationStore for reactive derived values
  * - createFactStore for reactive fact values
  * - Svelte context for system
+ * - useRequirementStatus for loading/error states
+ * - createTypedHooks for schema-specific hooks
  */
 
 import { getContext, setContext, onDestroy } from "svelte";
 import { readable, type Readable } from "svelte/store";
-import { createSystem, type CreateSystemOptions } from "../core/system.js";
-import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
+import { createSystem } from "../core/system.js";
+import type { CreateSystemOptionsSingle, ModuleSchema, InferFacts, InferDerivations, InferEvents } from "../core/types.js";
+import type { ModuleDef, System, SystemInspection } from "../core/types.js";
+import {
+	createRequirementStatusPlugin,
+	type RequirementTypeStatus,
+} from "../utils/requirement-status.js";
+
+// Re-export for convenience
+export type { RequirementTypeStatus };
+
+/** Type for the requirement status plugin return value */
+type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Context
 // ============================================================================
 
 const DIRECTIVE_KEY = Symbol("directive");
+const STATUS_PLUGIN_KEY = Symbol("directive-status");
 
 /**
  * Set the Directive system in Svelte context.
@@ -34,8 +47,12 @@ const DIRECTIVE_KEY = Symbol("directive");
  * </script>
  * ```
  */
-export function setDirectiveContext<S extends Schema>(system: System<S>): void {
+export function setDirectiveContext<M extends ModuleSchema>(
+	system: System<M>,
+	statusPlugin?: StatusPlugin
+): void {
 	setContext(DIRECTIVE_KEY, system);
+	setContext(STATUS_PLUGIN_KEY, statusPlugin ?? null);
 }
 
 /**
@@ -43,15 +60,16 @@ export function setDirectiveContext<S extends Schema>(system: System<S>): void {
  *
  * @throws If system is not set in context
  */
-export function getDirectiveContext<S extends Schema>(): System<S> {
-	const system = getContext<System<Schema> | undefined>(DIRECTIVE_KEY);
+export function getDirectiveContext<M extends ModuleSchema = ModuleSchema>(): System<M> {
+	// biome-ignore lint/suspicious/noExplicitAny: Context needs to work with any schema
+	const system = getContext<System<any> | undefined>(DIRECTIVE_KEY);
 	if (!system) {
 		throw new Error(
 			"[Directive] getDirectiveContext must be called within a component tree that has a Directive system set. " +
 			"Use setDirectiveContext() in a parent component.",
 		);
 	}
-	return system as System<S>;
+	return system as System<M>;
 }
 
 // ============================================================================
@@ -74,7 +92,8 @@ export function getDirectiveContext<S extends Schema>(): System<S> {
  * ```
  */
 export function createDerivationStore<T>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationId: string,
 ): Readable<T> {
 	// Dev warning for invalid derivation IDs
@@ -112,7 +131,8 @@ export function createDerivationStore<T>(
  * ```
  */
 export function createDerivationsStore<T extends Record<string, unknown>>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	derivationIds: string[],
 ): Readable<T> {
 	const getValues = (): T => {
@@ -147,7 +167,8 @@ export function createDerivationsStore<T extends Record<string, unknown>>(
  * ```
  */
 export function createFactStore<T>(
-	system: System<Schema>,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 	factKey: string,
 ): Readable<T | undefined> {
 	return readable<T | undefined>(
@@ -169,17 +190,18 @@ export function createFactStore<T>(
  * @example
  * ```svelte
  * <script>
- *   import { getDirectiveContext, createInspectionStore } from 'directive/svelte';
+ *   import { getDirectiveContext, createInspectStore } from 'directive/svelte';
  *
  *   const system = getDirectiveContext();
- *   const inspection = createInspectionStore(system);
+ *   const inspection = createInspectStore(system);
  * </script>
  *
  * <div>Unmet: {$inspection.unmet.length}</div>
  * ```
  */
-export function createInspectionStore(
-	system: System<Schema>,
+export function createInspectStore(
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
 ): Readable<SystemInspection> {
 	return readable<SystemInspection>(system.inspect(), (set) => {
 		const unsubscribe = system.facts.$store.subscribeAll(() => {
@@ -235,7 +257,10 @@ export function useDerivations<T extends Record<string, unknown>>(
 }
 
 /**
- * Get facts for mutations (not reactive).
+ * Get direct access to facts for mutations.
+ *
+ * WARNING: The returned facts object is NOT reactive. Use this for event handlers
+ * and imperative code, not for rendering. Use `useDerivation` or `useFact` for reactive values.
  *
  * @example
  * ```svelte
@@ -251,8 +276,8 @@ export function useDerivations<T extends Record<string, unknown>>(
  * </script>
  * ```
  */
-export function useFacts<S extends Schema>(): Facts<S> {
-	const system = getDirectiveContext<S>();
+export function useFacts<M extends ModuleSchema>(): System<M>["facts"] {
+	const system = getDirectiveContext<M>();
 	return system.facts;
 }
 
@@ -299,9 +324,107 @@ export function useDispatch() {
 /**
  * Get inspection store using context.
  */
-export function useInspection(): Readable<SystemInspection> {
+export function useInspect(): Readable<SystemInspection> {
 	const system = getDirectiveContext();
-	return createInspectionStore(system);
+	return createInspectStore(system);
+}
+
+/** Requirements state returned by useRequirements */
+export interface RequirementsState {
+	/** Array of unmet requirements waiting to be resolved */
+	unmet: Array<{ id: string; requirement: { type: string; [key: string]: unknown }; fromConstraint: string }>;
+	/** Array of requirements currently being resolved */
+	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	/** Whether there are any unmet requirements */
+	hasUnmet: boolean;
+	/** Whether there are any inflight requirements */
+	hasInflight: boolean;
+	/** Whether the system is actively working (has unmet or inflight requirements) */
+	isWorking: boolean;
+}
+
+/**
+ * Get current requirements state as a readable store.
+ *
+ * Provides a focused view of just requirements without full inspection overhead.
+ *
+ * @returns Readable store with the current requirements state
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { useRequirements } from 'directive/svelte';
+ *
+ *   const requirements = useRequirements();
+ * </script>
+ *
+ * {#if $requirements.isWorking}
+ *   <Spinner />
+ * {/if}
+ * ```
+ */
+export function useRequirements(): Readable<RequirementsState> {
+	const system = getDirectiveContext();
+
+	const getState = (): RequirementsState => {
+		const inspection = system.inspect();
+		return {
+			unmet: inspection.unmet,
+			inflight: inspection.inflight,
+			hasUnmet: inspection.unmet.length > 0,
+			hasInflight: inspection.inflight.length > 0,
+			isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+		};
+	};
+
+	return readable<RequirementsState>(getState(), (set) => {
+		const unsubscribe = system.facts.$store.subscribeAll(() => {
+			set(getState());
+		});
+		return unsubscribe;
+	});
+}
+
+/**
+ * Get requirement status store using context.
+ *
+ * Requires a statusPlugin to be passed to setDirectiveContext().
+ *
+ * @param type - The requirement type to get status for
+ * @returns Readable store with the current status
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { useRequirementStatus } from 'directive/svelte';
+ *
+ *   const status = useRequirementStatus('FETCH_USER');
+ * </script>
+ *
+ * {#if $status.isLoading}
+ *   <Spinner />
+ * {:else if $status.hasError}
+ *   <Error message={$status.lastError?.message} />
+ * {:else}
+ *   <UserContent />
+ * {/if}
+ * ```
+ */
+export function useRequirementStatus(type: string): Readable<RequirementTypeStatus> {
+	const statusPlugin = getContext<StatusPlugin | null>(STATUS_PLUGIN_KEY);
+	if (!statusPlugin) {
+		throw new Error(
+			"[Directive] useRequirementStatus requires a statusPlugin. " +
+				"Pass statusPlugin to setDirectiveContext().",
+		);
+	}
+
+	return readable<RequirementTypeStatus>(statusPlugin.getStatus(type), (set) => {
+		const unsubscribe = statusPlugin.subscribe(() => {
+			set(statusPlugin.getStatus(type));
+		});
+		return unsubscribe;
+	});
 }
 
 /**
@@ -346,12 +469,13 @@ export const useSystem = getDirectiveContext;
 // ============================================================================
 
 /** Options for createDirective/useDirective */
-export type CreateDirectiveOptions<S extends Schema> =
-	| ModuleDef<S, DerivationsDef<S>>
-	| CreateSystemOptions<S>;
+export type CreateDirectiveOptions<M extends ModuleSchema> =
+	| ModuleDef<M>
+	| CreateSystemOptionsSingle<M>;
 
 // Cache for memoization - prevents re-creation in reactive contexts
-const systemCache = new WeakMap<object, System<Schema>>();
+// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+const systemCache = new WeakMap<object, System<any>>();
 
 /**
  * Create a scoped Directive system with automatic lifecycle management.
@@ -373,24 +497,25 @@ const systemCache = new WeakMap<object, System<Schema>>();
  * </script>
  * ```
  */
-export function createDirective<S extends Schema>(
-	options: CreateDirectiveOptions<S>,
-): System<S> {
+export function createDirective<M extends ModuleSchema>(
+	options: CreateDirectiveOptions<M>,
+): System<M> {
 	// Check cache to prevent re-creation in reactive contexts
 	const cached = systemCache.get(options as object);
 	if (cached) {
-		return cached as System<S>;
+		return cached as System<M>;
 	}
 
 	// Check if options is a module or system options
 	const isModule = "id" in options && "schema" in options;
 
 	const system = isModule
-		? createSystem({ modules: [options as ModuleDef<S, DerivationsDef<S>>] })
-		: createSystem(options as CreateSystemOptions<S>);
+		? createSystem({ module: options as ModuleDef<M> })
+		: createSystem(options as CreateSystemOptionsSingle<M>);
 
 	// Cache the system
-	systemCache.set(options as object, system as System<Schema>);
+	// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+	systemCache.set(options as object, system as System<any>);
 
 	system.start();
 
@@ -399,7 +524,8 @@ export function createDirective<S extends Schema>(
 		systemCache.delete(options as object);
 	});
 
-	return system;
+	// Return as System<M> - the underlying type matches
+	return system as unknown as System<M>;
 }
 
 /**
@@ -407,3 +533,55 @@ export function createDirective<S extends Schema>(
  * @see {@link createDirective}
  */
 export const useDirective = createDirective;
+
+// ============================================================================
+// Typed Hooks Factory
+// ============================================================================
+
+/**
+ * Create typed stores for a specific system schema.
+ *
+ * This provides better type inference than the generic stores.
+ *
+ * @example
+ * ```ts
+ * import { createTypedHooks } from 'directive/svelte';
+ *
+ * // Define your schema
+ * const schema = {
+ *   facts: { count: t.number(), user: t.any<User | null>() },
+ *   derivations: { doubled: t.number() },
+ *   events: { increment: {}, setUser: { user: t.any<User>() } },
+ *   requirements: {},
+ * } satisfies ModuleSchema;
+ *
+ * // Create typed hooks
+ * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ *
+ * // In your component:
+ * const count = useFact("count"); // Type: Readable<number>
+ * const doubled = useDerivation("doubled"); // Type: Readable<number>
+ * ```
+ */
+export function createTypedHooks<M extends ModuleSchema>(): {
+	useDerivation: <K extends keyof InferDerivations<M>>(
+		derivationId: K,
+	) => Readable<InferDerivations<M>[K]>;
+	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Readable<InferFacts<M>[K] | undefined>;
+	useDispatch: () => (event: InferEvents<M>) => void;
+	useSystem: () => System<M>;
+} {
+	return {
+		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
+			useFact<InferFacts<M>[K]>(factKey as string),
+		useDispatch: () => {
+			const system = getDirectiveContext<M>();
+			return (event: InferEvents<M>) => {
+				system.dispatch(event);
+			};
+		},
+		useSystem: () => getDirectiveContext<M>(),
+	};
+}

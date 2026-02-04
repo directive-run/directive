@@ -28,17 +28,20 @@ system.events.auth.login({ token: "abc" });
 system.events.data.refresh();
 ```
 
-### Flat Mode (Array) - Existing Behavior
+### Single Module Mode (Direct Access)
+
+For single-module apps, use `module:` (singular) for simpler access:
 
 ```typescript
-// Pass modules as an ARRAY → flat access
+// Pass a single module → direct access
 const system = createSystem({
-  modules: [authModule, dataModule],
+  module: counterModule,
+  initialFacts: { count: 10 },  // Optional initial state
 });
 
-// Access with manual prefixes
-system.facts.auth_token          // requires auth_token in schema
-system.dispatch({ type: "auth_login", token: "abc" });
+// Direct access - no namespace needed
+system.facts.count              // number
+system.events.increment();      // direct event call
 ```
 
 ## Cross-Module Constraints

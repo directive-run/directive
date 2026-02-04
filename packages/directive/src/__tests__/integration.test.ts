@@ -38,7 +38,7 @@ describe("Integration", () => {
 			},
 		});
 
-		const system = createSystem({ modules: [counter] });
+		const system = createSystem({ module: counter });
 		system.start();
 
 		expect(system.facts.count).toBe(0);
@@ -97,7 +97,7 @@ describe("Integration", () => {
 			},
 		});
 
-		const system = createSystem({ modules: [fetchModule] });
+		const system = createSystem({ module: fetchModule });
 		system.start();
 
 		system.dispatch({ type: "setUserId", userId: 1 });
@@ -137,7 +137,7 @@ describe("Integration", () => {
 			},
 		});
 
-		const system = createSystem({ modules: [effectModule] });
+		const system = createSystem({ module: effectModule });
 		system.start();
 
 		system.facts.value = 42;
@@ -181,7 +181,7 @@ describe("Integration", () => {
 			events: {},
 		});
 
-		const system = createSystem({ modules: [mathModule] });
+		const system = createSystem({ module: mathModule });
 		system.start();
 
 		expect(system.read("sum")).toBe(5);
@@ -221,7 +221,7 @@ describe("Integration", () => {
 		};
 
 		const system = createSystem({
-			modules: [counter],
+			module: counter,
 			plugins: [trackingPlugin],
 		});
 
@@ -262,7 +262,7 @@ describe("Integration", () => {
 			},
 		});
 
-		const system = createSystem({ modules: [counter] });
+		const system = createSystem({ module: counter });
 		system.start();
 
 		const inspection = system.inspect();
@@ -322,7 +322,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [multiModule] });
+			const system = createSystem({ module: multiModule });
 			system.start();
 			await system.settle();
 			system.stop();
@@ -370,7 +370,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [dynamicModule] });
+			const system = createSystem({ module: dynamicModule });
 			system.start();
 			await system.settle();
 			system.stop();
@@ -416,7 +416,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [nullModule] });
+			const system = createSystem({ module: nullModule });
 			system.start();
 			await system.settle();
 
@@ -477,7 +477,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [filterModule] });
+			const system = createSystem({ module: filterModule });
 			system.start();
 			await system.settle();
 			system.stop();
@@ -532,7 +532,7 @@ describe("Integration", () => {
 			};
 
 			const system = createSystem({
-				modules: [errorModule],
+				module: errorModule,
 				plugins: [errorPlugin],
 			});
 			system.start();
@@ -595,7 +595,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [retryModule] });
+			const system = createSystem({ module: retryModule });
 			system.start();
 			await system.settle();
 			system.stop();
@@ -649,7 +649,7 @@ describe("Integration", () => {
 			};
 
 			const system = createSystem({
-				modules: [timeoutModule],
+				module: timeoutModule,
 				plugins: [errorPlugin],
 			});
 			system.start();
@@ -707,7 +707,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [cancelModule] });
+			const system = createSystem({ module: cancelModule });
 			system.start();
 
 			// Wait for resolver to start
@@ -767,7 +767,7 @@ describe("Integration", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [abortModule] });
+			const system = createSystem({ module: abortModule });
 			system.start();
 
 			// Wait for resolver to start
@@ -834,7 +834,7 @@ describe("Integration", () => {
 			};
 
 			const system = createSystem({
-				modules: [multiFailModule],
+				module: multiFailModule,
 				plugins: [errorPlugin],
 			});
 			system.start();
