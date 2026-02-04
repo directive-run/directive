@@ -57,6 +57,13 @@ export interface TypedConstraint<
 	require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
 	/** Timeout for async constraints (ms) */
 	timeout?: number;
+	/**
+	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
+	 * - If dependency's `when()` returns false, this constraint proceeds (nothing to wait for)
+	 * - If dependency's resolver fails, this constraint remains blocked until it succeeds
+	 * - Cross-module: use the constraint ID as it appears in the merged system
+	 */
+	after?: string[];
 }
 
 // ============================================================================

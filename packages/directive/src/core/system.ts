@@ -701,6 +701,65 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		explain: engine.explain.bind(engine),
 		getSnapshot: engine.getSnapshot.bind(engine),
 		restore: engine.restore.bind(engine),
+
+		/**
+		 * Get a distributable snapshot with namespaced key translation.
+		 * Accepts "namespace.key" format in options (e.g., "auth.effectivePlan").
+		 * Returns data with namespaced keys (e.g., { auth: { effectivePlan: ... } }).
+		 */
+		getDistributableSnapshot<T = Record<string, unknown>>(
+			options?: {
+				includeDerivations?: string[];
+				excludeDerivations?: string[];
+				includeFacts?: string[];
+				ttlSeconds?: number;
+				metadata?: Record<string, unknown>;
+				includeVersion?: boolean;
+			},
+		): {
+			data: T;
+			createdAt: number;
+			expiresAt?: number;
+			version?: string;
+			metadata?: Record<string, unknown>;
+		} {
+			// Translate namespaced keys to internal format
+			const internalOptions = {
+				...options,
+				includeDerivations: options?.includeDerivations?.map(toInternalKey),
+				excludeDerivations: options?.excludeDerivations?.map(toInternalKey),
+				includeFacts: options?.includeFacts?.map(toInternalKey),
+			};
+
+			const snapshot = engine.getDistributableSnapshot(internalOptions);
+
+			// Transform data keys from internal format (auth_status) to namespaced format (auth: { status })
+			const namespacedData: Record<string, Record<string, unknown>> = {};
+
+			for (const [key, value] of Object.entries(snapshot.data as Record<string, unknown>)) {
+				// Find the namespace prefix (first underscore)
+				const underscoreIndex = key.indexOf("_");
+				if (underscoreIndex > 0) {
+					const namespace = key.slice(0, underscoreIndex);
+					const localKey = key.slice(underscoreIndex + 1);
+					if (!namespacedData[namespace]) {
+						namespacedData[namespace] = {};
+					}
+					namespacedData[namespace][localKey] = value;
+				} else {
+					// No namespace found, keep as-is
+					if (!namespacedData["_root"]) {
+						namespacedData["_root"] = {};
+					}
+					namespacedData["_root"][key] = value;
+				}
+			}
+
+			return {
+				...snapshot,
+				data: namespacedData as T,
+			};
+		},
 	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for NamespacedSystem
 	} as any;
 
@@ -1309,6 +1368,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 		explain: engine.explain.bind(engine),
 		getSnapshot: engine.getSnapshot.bind(engine),
 		restore: engine.restore.bind(engine),
+		getDistributableSnapshot: engine.getDistributableSnapshot.bind(engine),
 	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing
 	} as any;
 

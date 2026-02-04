@@ -84,6 +84,8 @@ export type {
 	SystemConfig,
 	SystemInspection,
 	SystemSnapshot,
+	DistributableSnapshotOptions,
+	DistributableSnapshot,
 	DebugConfig,
 	TimeTravelAPI,
 	RequirementExplanation,
@@ -314,3 +316,13 @@ export {
 	createStatusHook,
 	type RequirementTypeStatus,
 } from "./utils/requirement-status.js";
+
+// ============================================================================
+// Distributable Snapshot Utilities
+// ============================================================================
+
+export {
+	isSnapshotExpired,
+	validateSnapshot,
+	type DistributableSnapshotLike,
+} from "./utils/utils.js";

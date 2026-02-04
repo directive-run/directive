@@ -99,6 +99,63 @@ export interface SystemSnapshot {
 }
 
 // ============================================================================
+// Distributable Snapshot Types
+// ============================================================================
+
+/**
+ * Options for creating a distributable snapshot.
+ * Distributable snapshots contain computed derivation values that can be
+ * serialized and distributed (JWT, Redis, edge KV) for use outside the runtime.
+ */
+export interface DistributableSnapshotOptions {
+	/** Derivation keys to include (default: all) */
+	includeDerivations?: string[];
+	/** Derivation keys to exclude */
+	excludeDerivations?: string[];
+	/** Fact keys to include (default: none) */
+	includeFacts?: string[];
+	/** TTL in seconds */
+	ttlSeconds?: number;
+	/** Custom metadata */
+	metadata?: Record<string, unknown>;
+	/** Include version hash for cache invalidation */
+	includeVersion?: boolean;
+}
+
+/**
+ * A distributable snapshot containing computed state.
+ * This is a serializable object that can be stored in Redis, JWT, etc.
+ *
+ * @example
+ * ```typescript
+ * const snapshot = system.getDistributableSnapshot({
+ *   includeDerivations: ['effectivePlan', 'canUseFeature', 'limits'],
+ *   ttlSeconds: 3600,
+ * });
+ * // { data: { effectivePlan: "pro", canUseFeature: {...} }, createdAt: ..., expiresAt: ... }
+ *
+ * // Store in Redis
+ * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+ *
+ * // Later, in an API route (no Directive runtime needed)
+ * const cached = JSON.parse(await redis.get(`entitlements:${userId}`));
+ * if (!cached.data.canUseFeature.api) throw new ForbiddenError();
+ * ```
+ */
+export interface DistributableSnapshot<T = Record<string, unknown>> {
+	/** The computed derivation values and optionally included facts */
+	data: T;
+	/** Timestamp when this snapshot was created (ms since epoch) */
+	createdAt: number;
+	/** Timestamp when this snapshot expires (ms since epoch), if TTL was specified */
+	expiresAt?: number;
+	/** Version hash for cache invalidation, if includeVersion was true */
+	version?: string;
+	/** Custom metadata passed in options */
+	metadata?: Record<string, unknown>;
+}
+
+// ============================================================================
 // System Interface
 // ============================================================================
 
@@ -149,6 +206,24 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	explain(requirementId: string): string | null;
 	getSnapshot(): SystemSnapshot;
 	restore(snapshot: SystemSnapshot): void;
+
+	/**
+	 * Get a distributable snapshot of computed derivations.
+	 * This creates a serializable object that can be stored in Redis, JWT, etc.
+	 * for use outside the Directive runtime.
+	 *
+	 * @example
+	 * ```typescript
+	 * const snapshot = system.getDistributableSnapshot({
+	 *   includeDerivations: ['effectivePlan', 'canUseFeature'],
+	 *   ttlSeconds: 3600,
+	 * });
+	 * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+	 * ```
+	 */
+	getDistributableSnapshot<T = Record<string, unknown>>(
+		options?: DistributableSnapshotOptions,
+	): DistributableSnapshot<T>;
 }
 
 // ============================================================================

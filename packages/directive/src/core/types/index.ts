@@ -122,6 +122,9 @@ export type {
 	SystemInspection,
 	RequirementExplanation,
 	SystemSnapshot,
+	// Distributable snapshots
+	DistributableSnapshotOptions,
+	DistributableSnapshot,
 	// System interfaces
 	System,
 	SystemConfig,
