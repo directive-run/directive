@@ -157,7 +157,7 @@ const trafficLight = createModule("traffic-light", {
 });
 
 const system = createSystem({
-  modules: [trafficLight],
+  module: trafficLight,  // Single module: direct access
   plugins: [loggingPlugin(), devtoolsPlugin()],
   debug: { timeTravel: true, maxSnapshots: 100 },
 });

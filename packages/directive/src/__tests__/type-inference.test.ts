@@ -28,7 +28,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.facts.count).toBe(0);
@@ -58,7 +58,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.derive.doubled).toBe(10);
@@ -88,7 +88,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			system.dispatch({ type: "increment" });
@@ -128,7 +128,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			// System should start to resolve
@@ -161,7 +161,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.facts.count).toBe(0);
@@ -197,7 +197,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.facts.count).toBe(5);
@@ -219,7 +219,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.facts.count).toBe(42);
@@ -260,7 +260,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.facts.count).toBe(0);
@@ -309,7 +309,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.derive.sum).toBe(7);
@@ -355,7 +355,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.derive.doubled).toBe(4);
@@ -412,7 +412,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			system.dispatch({ type: "increment" });
@@ -478,7 +478,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			system.facts.userId = 42;
@@ -541,7 +541,7 @@ describe("Type Inference", () => {
 				},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 			await system.settle();
 
@@ -585,7 +585,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.derive.apiUrl).toBe("https://api.example.com");
@@ -638,7 +638,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			// subtotal = 10*2 + 5*3 = 35
@@ -680,7 +680,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			expect(system.derive.sum).toBe(7);
@@ -729,7 +729,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			const total = system.read("total");
@@ -772,7 +772,7 @@ describe("Type Inference", () => {
 				events: {},
 			});
 
-			const system = createSystem({ modules: [mod] });
+			const system = createSystem({ module: mod });
 			system.start();
 
 			const unwatch = system.watch("doubled", (newValue, oldValue) => {
@@ -820,7 +820,7 @@ describe("Type Inference", () => {
 			});
 
 			const system = createSystem({
-				modules: [mod],
+				module: mod,
 				tickMs: 50,
 			});
 

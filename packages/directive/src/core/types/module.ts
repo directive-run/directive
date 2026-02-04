@@ -116,6 +116,13 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
 		| ((facts: Facts<M["facts"]>) => RequirementOutput<InferRequirements<M>>);
 	/** Timeout for async constraints (ms) */
 	timeout?: number;
+	/**
+	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
+	 * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
+	 * If a dependency's resolver fails, this constraint remains blocked.
+	 * Cross-module: use "moduleName.constraintName" format.
+	 */
+	after?: string[];
 }
 
 /**
@@ -153,6 +160,13 @@ export interface CrossModuleConstraintDef<
 		| ((facts: CrossModuleFactsWithSelf<M, Deps>) => RequirementOutput<InferRequirements<M>>);
 	/** Timeout for async constraints (ms) */
 	timeout?: number;
+	/**
+	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
+	 * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
+	 * If a dependency's resolver fails, this constraint remains blocked.
+	 * Cross-module: use "moduleName.constraintName" format.
+	 */
+	after?: string[];
 }
 
 /**

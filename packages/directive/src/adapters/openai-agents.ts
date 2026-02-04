@@ -33,6 +33,7 @@ import type {
   Requirement,
   ModuleSchema,
   Plugin,
+  SingleModuleSystem,
   System,
 } from "../core/types.js";
 import {
@@ -510,7 +511,7 @@ export function createAgentOrchestrator<
 
   // Forward declaration for system (used in resolver converter)
   // biome-ignore lint/suspicious/noExplicitAny: System type varies
-  let system: System<any>;
+  let system: SingleModuleSystem<any>;
 
   // Convert user constraints
   // biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
@@ -590,7 +591,7 @@ export function createAgentOrchestrator<
 
   // Create system
   system = createSystem({
-    modules: [orchestratorModule],
+    module: orchestratorModule,
     plugins: [...plugins, callbackPlugin],
     debug: debug ? { timeTravel: true } : undefined,
   });

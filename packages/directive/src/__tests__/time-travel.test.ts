@@ -29,46 +29,46 @@ describe("Time-Travel", () => {
 
 	it("should capture snapshots when facts change", async () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
 		system.start();
 
 		// Initial state (no snapshots yet - snapshots are taken on fact changes)
-		expect(system.facts.count).toBe(0);
+		expect(system.facts.counter.count).toBe(0);
 		expect(system.debug).not.toBeNull();
 
 		// Change facts - this should trigger a snapshot
-		system.dispatch({ type: "increment" });
+		system.events.counter.increment();
 		await new Promise((resolve) => setTimeout(resolve, 20));
 
 		// Now we should have snapshots
 		expect(system.debug?.snapshots.length).toBeGreaterThan(0);
-		expect(system.facts.count).toBe(1);
+		expect(system.facts.counter.count).toBe(1);
 
 		system.stop();
 	});
 
 	it("should go back and forward in time", async () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
 		system.start();
 
 		// Make several changes with delays to ensure snapshots are captured
-		system.dispatch({ type: "increment" }); // count = 1
+		system.events.counter.increment(); // count = 1
 		await new Promise((resolve) => setTimeout(resolve, 30));
 
-		system.dispatch({ type: "increment" }); // count = 2
+		system.events.counter.increment(); // count = 2
 		await new Promise((resolve) => setTimeout(resolve, 30));
 
-		system.dispatch({ type: "increment" }); // count = 3
+		system.events.counter.increment(); // count = 3
 		await new Promise((resolve) => setTimeout(resolve, 30));
 
-		expect(system.facts.count).toBe(3);
+		expect(system.facts.counter.count).toBe(3);
 
 		const snapshotCount = system.debug?.snapshots.length ?? 0;
 		expect(snapshotCount).toBeGreaterThanOrEqual(1);
@@ -78,26 +78,26 @@ describe("Time-Travel", () => {
 
 		// After going back, we should be at a previous state
 		// The exact value depends on how many snapshots were captured
-		expect(system.facts.count).toBeLessThan(3);
+		expect(system.facts.counter.count).toBeLessThan(3);
 
 		system.stop();
 	});
 
 	it("should export and import state", async () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
 		system.start();
 
-		system.dispatch({ type: "increment" });
-		system.dispatch({ type: "increment" });
+		system.events.counter.increment();
+		system.events.counter.increment();
 
 		// Wait for reconciliation
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(system.facts.count).toBe(2);
+		expect(system.facts.counter.count).toBe(2);
 
 		// Export
 		const exported = system.debug?.export();
@@ -111,12 +111,12 @@ describe("Time-Travel", () => {
 
 		// Create a new system and import
 		const system2 = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
 		system2.start();
-		expect(system2.facts.count).toBe(0);
+		expect(system2.facts.counter.count).toBe(0);
 
 		// Import the state
 		system2.debug?.import(exported!);
@@ -130,7 +130,7 @@ describe("Time-Travel", () => {
 
 	it("should reject prototype pollution in import", () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
@@ -147,7 +147,7 @@ describe("Time-Travel", () => {
 					timestamp: Date.now(),
 					trigger: "test",
 					facts: {
-						count: 0,
+						counter_count: 0,
 						__proto__: { malicious: true },
 					},
 				},
@@ -168,7 +168,7 @@ describe("Time-Travel", () => {
 					timestamp: Date.now(),
 					trigger: "test",
 					facts: {
-						count: 0,
+						counter_count: 0,
 						constructor: { malicious: true },
 					},
 				},
@@ -187,7 +187,7 @@ describe("Time-Travel", () => {
 
 	it("should respect maxSnapshots limit", async () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 3 },
 		});
 
@@ -195,7 +195,7 @@ describe("Time-Travel", () => {
 
 		// Make many changes with delays to ensure each triggers a snapshot
 		for (let i = 0; i < 10; i++) {
-			system.dispatch({ type: "increment" });
+			system.events.counter.increment();
 			await new Promise((resolve) => setTimeout(resolve, 20));
 		}
 
@@ -207,19 +207,19 @@ describe("Time-Travel", () => {
 
 	it("should goTo specific snapshot", async () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
 		system.start();
 
-		system.dispatch({ type: "increment" }); // count = 1
+		system.events.counter.increment(); // count = 1
 		await new Promise((resolve) => setTimeout(resolve, 30));
 
-		system.dispatch({ type: "increment" }); // count = 2
+		system.events.counter.increment(); // count = 2
 		await new Promise((resolve) => setTimeout(resolve, 30));
 
-		expect(system.facts.count).toBe(2);
+		expect(system.facts.counter.count).toBe(2);
 
 		// Get snapshots
 		const snapshots = system.debug?.snapshots ?? [];
@@ -238,19 +238,19 @@ describe("Time-Travel", () => {
 
 	it("should replay from beginning", async () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 
 		system.start();
 
-		system.dispatch({ type: "increment" });
-		system.dispatch({ type: "increment" });
-		system.dispatch({ type: "increment" });
+		system.events.counter.increment();
+		system.events.counter.increment();
+		system.events.counter.increment();
 
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(system.facts.count).toBe(3);
+		expect(system.facts.counter.count).toBe(3);
 
 		// Replay from beginning - restores to first snapshot
 		const snapshots = system.debug?.snapshots ?? [];
@@ -264,7 +264,7 @@ describe("Time-Travel", () => {
 
 	it("should not capture snapshots when disabled", () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			// debug not enabled
 		});
 
@@ -272,15 +272,15 @@ describe("Time-Travel", () => {
 
 		expect(system.debug).toBeNull();
 
-		system.dispatch({ type: "increment" });
-		expect(system.facts.count).toBe(1);
+		system.events.counter.increment();
+		expect(system.facts.counter.count).toBe(1);
 
 		system.stop();
 	});
 
 	it("should warn on invalid goTo snapshot ID", () => {
 		const system = createSystem({
-			modules: [counterModule],
+			modules: { counter: counterModule },
 			debug: { timeTravel: true, maxSnapshots: 10 },
 		});
 

@@ -162,7 +162,7 @@ export {
 	requirementGuardMultiple,
 } from "./adapter-utils.js";
 
-// Composition types for namespaced multi-module systems
+// Composition types for multi-module systems
 export type {
 	// Cross-module type helpers (for module-level type hints)
 	SchemasMap,
@@ -174,7 +174,6 @@ export type {
 	// System composition types
 	ExtractSchema,
 	ModulesMap,
-	IsModulesObject,
 	NamespacedFacts,
 	MutableNamespacedFacts,
 	NamespacedDerivations,
@@ -183,4 +182,13 @@ export type {
 	NamespacedSystem,
 	NamespacedEventsAccessor,
 	MergedModuleSchema,
+	// Single module types (no namespace)
+	CreateSystemOptionsSingle,
+	SingleModuleSystem,
+	// Type guards
+	SystemMode,
+	AnySystem,
 } from "./composition.js";
+
+// Type guard functions
+export { isSingleModuleSystem, isNamespacedSystem } from "./composition.js";

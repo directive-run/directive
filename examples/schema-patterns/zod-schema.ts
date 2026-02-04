@@ -128,7 +128,7 @@ const userModule = createModule("user", {
 async function main() {
   console.log("=== Pattern 3: Zod Schemas ===\n");
 
-  const system = createSystem({ modules: [userModule] });
+  const system = createSystem({ module: userModule });
   system.start();
 
   // Test facts typing

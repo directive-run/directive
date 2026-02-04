@@ -1,4 +1,3 @@
-// @ts-nocheck - TODO: Update adapter for consolidated schema API
 /**
  * Vue Adapter - Vue 3 composables for Directive
  *
@@ -6,6 +5,8 @@
  * - useDerivation for reactive computed values
  * - useFacts for direct fact access
  * - provide/inject for system context
+ * - useRequirementStatus for loading/error states
+ * - createTypedHooks for schema-specific hooks
  */
 
 import {
@@ -19,14 +20,29 @@ import {
 	type Ref,
 	type ShallowRef,
 } from "vue";
-import { createSystem, type CreateSystemOptions } from "../core/system.js";
-import type { DerivationsDef, Facts, ModuleDef, Schema, System, SystemInspection } from "../core/types.js";
+import { createSystem } from "../core/system.js";
+import type { CreateSystemOptionsSingle, ModuleSchema, InferFacts, InferDerivations, InferEvents } from "../core/types.js";
+import type { ModuleDef, System, SystemInspection } from "../core/types.js";
+import {
+	createRequirementStatusPlugin,
+	type RequirementTypeStatus,
+} from "../utils/requirement-status.js";
+
+// Re-export for convenience
+export type { RequirementTypeStatus };
+
+/** Type for the requirement status plugin return value */
+type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Context
 // ============================================================================
 
-const DirectiveKey: InjectionKey<System<Schema>> = Symbol("directive");
+// biome-ignore lint/suspicious/noExplicitAny: Context needs to work with any schema
+const DirectiveKey: InjectionKey<System<any>> = Symbol("directive");
+
+/** Injection key for the requirement status plugin */
+const StatusPluginKey: InjectionKey<StatusPlugin | null> = Symbol("directive-status");
 
 /**
  * Vue plugin to provide the Directive system globally.
@@ -43,10 +59,15 @@ const DirectiveKey: InjectionKey<System<Schema>> = Symbol("directive");
  * app.mount('#app');
  * ```
  */
-export function createDirectivePlugin<S extends Schema>(system: System<S>) {
+export function createDirectivePlugin<M extends ModuleSchema>(
+	system: System<M>,
+	statusPlugin?: StatusPlugin
+) {
 	return {
 		install(app: App) {
-			app.provide(DirectiveKey, system as System<Schema>);
+			// biome-ignore lint/suspicious/noExplicitAny: System type varies
+			app.provide(DirectiveKey, system as System<any>);
+			app.provide(StatusPluginKey, statusPlugin ?? null);
 		},
 	};
 }
@@ -64,8 +85,13 @@ export function createDirectivePlugin<S extends Schema>(system: System<S>) {
  * </script>
  * ```
  */
-export function provideSystem<S extends Schema>(system: System<S>): void {
-	provide(DirectiveKey, system as System<Schema>);
+export function provideSystem<M extends ModuleSchema>(
+	system: System<M>,
+	statusPlugin?: StatusPlugin
+): void {
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	provide(DirectiveKey, system as System<any>);
+	provide(StatusPluginKey, statusPlugin ?? null);
 }
 
 // ============================================================================
@@ -77,7 +103,7 @@ export function provideSystem<S extends Schema>(system: System<S>): void {
  *
  * @throws If system is not provided
  */
-export function useSystem<S extends Schema>(): System<S> {
+export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
 	const system = inject(DirectiveKey);
 	if (!system) {
 		throw new Error(
@@ -85,7 +111,7 @@ export function useSystem<S extends Schema>(): System<S> {
 			"Use createDirectivePlugin() or provideSystem() in a parent component.",
 		);
 	}
-	return system as System<S>;
+	return system as System<M>;
 }
 
 /**
@@ -188,8 +214,8 @@ export function useDerivations<T extends Record<string, unknown>>(
  * </script>
  * ```
  */
-export function useFacts<S extends Schema>(): Facts<S> {
-	const system = useSystem<S>();
+export function useFacts<M extends ModuleSchema>(): System<M>["facts"] {
+	const system = useSystem<M>();
 	return system.facts;
 }
 
@@ -253,9 +279,9 @@ export function useDispatch() {
  * @example
  * ```vue
  * <script setup>
- * import { useInspection } from 'directive/vue';
+ * import { useInspect } from 'directive/vue';
  *
- * const inspection = useInspection();
+ * const inspection = useInspect();
  * </script>
  *
  * <template>
@@ -263,7 +289,7 @@ export function useDispatch() {
  * </template>
  * ```
  */
-export function useInspection(): ShallowRef<SystemInspection> {
+export function useInspect(): ShallowRef<SystemInspection> {
 	const system = useSystem();
 	const inspection = shallowRef<SystemInspection>(system.inspect());
 
@@ -274,6 +300,108 @@ export function useInspection(): ShallowRef<SystemInspection> {
 	onUnmounted(unsubscribe);
 
 	return inspection;
+}
+
+/** Requirements state returned by useRequirements */
+export interface RequirementsState {
+	/** Array of unmet requirements waiting to be resolved */
+	unmet: Array<{ id: string; requirement: { type: string; [key: string]: unknown }; fromConstraint: string }>;
+	/** Array of requirements currently being resolved */
+	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	/** Whether there are any unmet requirements */
+	hasUnmet: boolean;
+	/** Whether there are any inflight requirements */
+	hasInflight: boolean;
+	/** Whether the system is actively working (has unmet or inflight requirements) */
+	isWorking: boolean;
+}
+
+/**
+ * Get current requirements state as a reactive ref.
+ *
+ * Provides a focused view of just requirements without full inspection overhead.
+ *
+ * @returns Reactive ref with the current requirements state
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useRequirements } from 'directive/vue';
+ *
+ * const requirements = useRequirements();
+ * </script>
+ *
+ * <template>
+ *   <Spinner v-if="requirements.isWorking" />
+ * </template>
+ * ```
+ */
+export function useRequirements(): ShallowRef<RequirementsState> {
+	const system = useSystem();
+
+	const getState = (): RequirementsState => {
+		const inspection = system.inspect();
+		return {
+			unmet: inspection.unmet,
+			inflight: inspection.inflight,
+			hasUnmet: inspection.unmet.length > 0,
+			hasInflight: inspection.inflight.length > 0,
+			isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+		};
+	};
+
+	const state = shallowRef<RequirementsState>(getState());
+
+	const unsubscribe = system.facts.$store.subscribeAll(() => {
+		state.value = getState();
+	});
+
+	onUnmounted(unsubscribe);
+
+	return state;
+}
+
+/**
+ * Get requirement status as a reactive ref.
+ *
+ * Requires a statusPlugin to be provided via createDirectivePlugin() or provideSystem().
+ *
+ * @param type - The requirement type to get status for
+ * @returns Reactive ref with the current status
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useRequirementStatus } from 'directive/vue';
+ *
+ * const status = useRequirementStatus('FETCH_USER');
+ * </script>
+ *
+ * <template>
+ *   <Spinner v-if="status.isLoading" />
+ *   <Error v-else-if="status.hasError" :message="status.lastError?.message" />
+ *   <UserContent v-else />
+ * </template>
+ * ```
+ */
+export function useRequirementStatus(type: string): ShallowRef<RequirementTypeStatus> {
+	const statusPlugin = inject(StatusPluginKey);
+	if (!statusPlugin) {
+		throw new Error(
+			"[Directive] useRequirementStatus requires a statusPlugin. " +
+				"Pass statusPlugin to createDirectivePlugin() or provideSystem().",
+		);
+	}
+
+	const status = shallowRef<RequirementTypeStatus>(statusPlugin.getStatus(type));
+
+	const unsubscribe = statusPlugin.subscribe(() => {
+		status.value = statusPlugin.getStatus(type);
+	});
+
+	onUnmounted(unsubscribe);
+
+	return status;
 }
 
 /**
@@ -314,12 +442,13 @@ export function useWatch<T>(
 // ============================================================================
 
 /** Options for useDirective composable */
-export type UseDirectiveOptions<S extends Schema> =
-	| ModuleDef<S, DerivationsDef<S>>
-	| CreateSystemOptions<S>;
+export type UseDirectiveOptions<M extends ModuleSchema> =
+	| ModuleDef<M>
+	| CreateSystemOptionsSingle<M>;
 
 // Cache for memoization - prevents re-creation in reactive contexts
-const systemCache = new WeakMap<object, System<Schema>>();
+// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+const systemCache = new WeakMap<object, System<any>>();
 
 /**
  * Create a scoped Directive system with automatic lifecycle management.
@@ -344,24 +473,25 @@ const systemCache = new WeakMap<object, System<Schema>>();
  * </script>
  * ```
  */
-export function useDirective<S extends Schema>(
-	options: UseDirectiveOptions<S>,
-): System<S> {
+export function useDirective<M extends ModuleSchema>(
+	options: UseDirectiveOptions<M>,
+): System<M> {
 	// Check cache to prevent re-creation in reactive contexts
 	const cached = systemCache.get(options as object);
 	if (cached) {
-		return cached as System<S>;
+		return cached as System<M>;
 	}
 
 	// Check if options is a module or system options
 	const isModule = "id" in options && "schema" in options;
 
 	const system = isModule
-		? createSystem({ modules: [options as ModuleDef<S, DerivationsDef<S>>] })
-		: createSystem(options as CreateSystemOptions<S>);
+		? createSystem({ module: options as ModuleDef<M> })
+		: createSystem(options as CreateSystemOptionsSingle<M>);
 
 	// Cache the system
-	systemCache.set(options as object, system as System<Schema>);
+	// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+	systemCache.set(options as object, system as System<any>);
 
 	system.start();
 
@@ -370,5 +500,60 @@ export function useDirective<S extends Schema>(
 		systemCache.delete(options as object);
 	});
 
-	return system;
+	// Return as System<M> - the underlying type matches
+	return system as unknown as System<M>;
+}
+
+// ============================================================================
+// Typed Hooks Factory
+// ============================================================================
+
+/**
+ * Create typed composables for a specific system schema.
+ *
+ * This provides better type inference than the generic composables.
+ *
+ * @example
+ * ```ts
+ * import { createTypedHooks } from 'directive/vue';
+ *
+ * // Define your schema
+ * const schema = {
+ *   facts: { count: t.number(), user: t.any<User | null>() },
+ *   derivations: { doubled: t.number() },
+ *   events: { increment: {}, setUser: { user: t.any<User>() } },
+ *   requirements: {},
+ * } satisfies ModuleSchema;
+ *
+ * // Create typed hooks
+ * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ *
+ * // In your component:
+ * const count = useFact("count"); // Type: Ref<number>
+ * const doubled = useDerivation("doubled"); // Type: Ref<number>
+ * ```
+ */
+export function createTypedHooks<M extends ModuleSchema>(): {
+	useDerivation: <K extends keyof InferDerivations<M>>(
+		derivationId: K,
+	) => Ref<InferDerivations<M>[K]>;
+	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Ref<InferFacts<M>[K] | undefined>;
+	useFacts: () => System<M>["facts"];
+	useDispatch: () => (event: InferEvents<M>) => void;
+	useSystem: () => System<M>;
+} {
+	return {
+		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
+			useFact<InferFacts<M>[K]>(factKey as string),
+		useFacts: () => useFacts<M>(),
+		useDispatch: () => {
+			const system = useSystem<M>();
+			return (event: InferEvents<M>) => {
+				system.dispatch(event);
+			};
+		},
+		useSystem: () => useSystem<M>(),
+	};
 }

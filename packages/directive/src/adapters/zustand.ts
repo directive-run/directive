@@ -39,7 +39,7 @@ import type {
 	Requirement,
 	ModuleSchema,
 	Plugin,
-	System,
+	SingleModuleSystem,
 } from "../core/types.js";
 import {
 	setBridgeFact,
@@ -124,7 +124,7 @@ export interface DirectiveMiddlewareOptions<T> {
 export interface DirectiveStoreApi<T> extends StoreApi<T> {
 	/** Access to the underlying Directive system */
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	directive: System<any>;
+	directive: SingleModuleSystem<any>;
 	/** Manually trigger constraint evaluation */
 	evaluate: () => Promise<void>;
 }
@@ -231,7 +231,7 @@ export function directiveMiddleware<T extends object>(
 	initializer: StateCreator<T>,
 	options: DirectiveMiddlewareOptions<T> = {}
 	// biome-ignore lint/suspicious/noExplicitAny: Return type is complex
-): StateCreator<T & { __directive?: System<any> }, [], []> {
+): StateCreator<T & { __directive?: SingleModuleSystem<any> }, [], []> {
 	const {
 		constraints = {},
 		resolvers = {},
@@ -245,7 +245,7 @@ export function directiveMiddleware<T extends object>(
 	return (set, get, api) => {
 		// Create the Directive module first (system reference will be updated)
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		let system: System<any>;
+		let system: SingleModuleSystem<any>;
 
 		// Sync function to update facts from Zustand state
 		const syncToFacts = (state: T) => {
@@ -285,7 +285,7 @@ export function directiveMiddleware<T extends object>(
 
 		// Create the Directive system
 		system = createSystem({
-			modules: [zustandModule],
+			module: zustandModule,
 			plugins: [...plugins, callbackPlugin],
 			debug: debug ? { timeTravel: true } : undefined,
 		});
@@ -378,7 +378,7 @@ export function createResolver<T, R extends Requirement = Requirement>(
 export function getDirectiveSystem<T>(
 	store: StoreApi<T>
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-): System<any> | undefined {
+): SingleModuleSystem<any> | undefined {
 	return (store as DirectiveStoreApi<T>).directive;
 }
 
@@ -464,7 +464,7 @@ export function subscribeToRequirements<T>(
  */
 export function bindZustandToDirective<T extends object, M extends ModuleSchema>(
 	store: StoreApi<T>,
-	system: System<M>,
+	system: SingleModuleSystem<M>,
 	mapping: {
 		toFacts: (state: T) => Partial<Record<string, unknown>>;
 		fromFacts: (facts: Record<string, unknown>) => Partial<T>;

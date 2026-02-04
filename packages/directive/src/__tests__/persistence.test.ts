@@ -68,7 +68,7 @@ describe("Persistence Plugin", () => {
 		it("saves facts to storage", async () => {
 			const onSave = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -79,25 +79,25 @@ describe("Persistence Plugin", () => {
 			});
 
 			system.start();
-			system.dispatch({ type: "increment" });
+			system.events.test.increment();
 
 			// Wait for debounced save
 			await new Promise((resolve) => setTimeout(resolve, 150));
 
 			expect(onSave).toHaveBeenCalled();
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.count).toBe(1);
+			expect(saved.test_count).toBe(1);
 
 			system.destroy();
 		});
 
 		it("restores facts from storage", () => {
-			// Pre-populate storage
-			storage.setItem("test-state", JSON.stringify({ count: 42, name: "restored" }));
+			// Pre-populate storage (using internal prefixed format)
+			storage.setItem("test-state", JSON.stringify({ test_count: 42, test_name: "restored" }));
 
 			const onRestore = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -109,9 +109,9 @@ describe("Persistence Plugin", () => {
 
 			system.start();
 
-			expect(onRestore).toHaveBeenCalledWith({ count: 42, name: "restored" });
-			expect(system.facts.count).toBe(42);
-			expect(system.facts.name).toBe("restored");
+			expect(onRestore).toHaveBeenCalledWith({ test_count: 42, test_name: "restored" });
+			expect(system.facts.test.count).toBe(42);
+			expect(system.facts.test.name).toBe("restored");
 
 			system.destroy();
 		});
@@ -120,51 +120,51 @@ describe("Persistence Plugin", () => {
 	describe("include/exclude filtering", () => {
 		it("only persists included keys", async () => {
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
 						key: "test-state",
-						include: ["count"],
+						include: ["test_count"],
 					}),
 				],
 			});
 
 			system.start();
-			system.dispatch({ type: "increment" });
-			system.dispatch({ type: "setName", name: "new name" });
+			system.events.test.increment();
+			system.events.test.setName({ name: "new name" });
 
 			// Wait for debounced save
 			await new Promise((resolve) => setTimeout(resolve, 150));
 
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.count).toBe(1);
-			expect(saved.name).toBeUndefined();
+			expect(saved.test_count).toBe(1);
+			expect(saved.test_name).toBeUndefined();
 
 			system.destroy();
 		});
 
 		it("excludes specified keys", async () => {
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
 						key: "test-state",
-						exclude: ["secret"],
+						exclude: ["test_secret"],
 					}),
 				],
 			});
 
 			system.start();
-			system.dispatch({ type: "increment" });
+			system.events.test.increment();
 
 			// Wait for debounced save
 			await new Promise((resolve) => setTimeout(resolve, 150));
 
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.count).toBe(1);
-			expect(saved.secret).toBeUndefined();
+			expect(saved.test_count).toBe(1);
+			expect(saved.test_secret).toBeUndefined();
 
 			system.destroy();
 		});
@@ -174,7 +174,7 @@ describe("Persistence Plugin", () => {
 		it("debounces multiple rapid saves", async () => {
 			const onSave = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -188,9 +188,9 @@ describe("Persistence Plugin", () => {
 			system.start();
 
 			// Rapid updates
-			system.dispatch({ type: "increment" });
-			system.dispatch({ type: "increment" });
-			system.dispatch({ type: "increment" });
+			system.events.test.increment();
+			system.events.test.increment();
+			system.events.test.increment();
 
 			// Should not have saved yet
 			expect(onSave).not.toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe("Persistence Plugin", () => {
 			// Should have saved once with final value
 			expect(onSave).toHaveBeenCalledTimes(1);
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.count).toBe(3);
+			expect(saved.test_count).toBe(3);
 
 			system.destroy();
 		});
@@ -213,7 +213,7 @@ describe("Persistence Plugin", () => {
 
 			const onError = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -241,7 +241,7 @@ describe("Persistence Plugin", () => {
 
 			const onError = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage: failingStorage,
@@ -252,7 +252,7 @@ describe("Persistence Plugin", () => {
 			});
 
 			system.start();
-			system.dispatch({ type: "increment" });
+			system.events.test.increment();
 
 			// Wait for debounced save
 			await new Promise((resolve) => setTimeout(resolve, 150));
@@ -269,12 +269,12 @@ describe("Persistence Plugin", () => {
 			// Store malicious data
 			storage.setItem(
 				"test-state",
-				'{"count": 1, "__proto__": {"polluted": true}}',
+				'{"test_count": 1, "__proto__": {"polluted": true}}',
 			);
 
 			const onError = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -291,7 +291,7 @@ describe("Persistence Plugin", () => {
 			expect(onError.mock.calls[0]?.[0]?.message).toContain("prototype pollution");
 
 			// Facts should use default values, not the polluted data
-			expect(system.facts.count).toBe(0);
+			expect(system.facts.test.count).toBe(0);
 
 			// Verify Object.prototype was not polluted
 			expect(({} as Record<string, unknown>).polluted).toBeUndefined();
@@ -302,12 +302,12 @@ describe("Persistence Plugin", () => {
 		it("rejects nested prototype pollution", () => {
 			storage.setItem(
 				"test-state",
-				'{"count": 1, "nested": {"__proto__": {"evil": true}}}',
+				'{"test_count": 1, "nested": {"__proto__": {"evil": true}}}',
 			);
 
 			const onError = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -330,7 +330,7 @@ describe("Persistence Plugin", () => {
 
 			const onError = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -353,7 +353,7 @@ describe("Persistence Plugin", () => {
 		it("saves final state on destroy", async () => {
 			const onSave = vi.fn();
 			const system = createSystem({
-				modules: [createTestModule()],
+				modules: { test: createTestModule() },
 				plugins: [
 					persistencePlugin({
 						storage,
@@ -365,7 +365,7 @@ describe("Persistence Plugin", () => {
 			});
 
 			system.start();
-			system.dispatch({ type: "increment" });
+			system.events.test.increment();
 
 			// Destroy immediately (before debounce)
 			system.destroy();
@@ -373,7 +373,7 @@ describe("Persistence Plugin", () => {
 			// Should have saved immediately on destroy
 			expect(onSave).toHaveBeenCalled();
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.count).toBe(1);
+			expect(saved.test_count).toBe(1);
 		});
 	});
 });

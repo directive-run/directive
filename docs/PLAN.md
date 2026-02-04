@@ -390,9 +390,9 @@ const trafficLight = createModule("traffic-light", {
   },
 });
 
-// Create system with plugins
+// Create system with plugins (single module mode)
 const system = createSystem({
-  modules: [trafficLight],
+  module: trafficLight,
   plugins: [
     loggingPlugin({ level: 'debug' }),
     persistencePlugin({
@@ -425,7 +425,7 @@ system.debug.import(json);   // Import history
 import { createTestSystem, mockResolver, fakeTimers } from 'directive/testing';
 
 const testSystem = createTestSystem({
-  modules: [trafficLight],
+  modules: { traffic: trafficLight },
   mocks: {
     resolvers: {
       transition: mockResolver((req) => ({ phase: req.to, elapsed: 0 })),
