@@ -34,6 +34,8 @@ import type {
 	TimeTravelAPI,
 	SystemInspection,
 	SystemSnapshot,
+	DistributableSnapshotOptions,
+	DistributableSnapshot,
 } from "./system.js";
 import type { Plugin } from "./plugins.js";
 import type { ErrorBoundaryConfig } from "./errors.js";
@@ -353,6 +355,23 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	getSnapshot(): SystemSnapshot;
 	/** Restore system state from snapshot */
 	restore(snapshot: SystemSnapshot): void;
+
+	/**
+	 * Get a distributable snapshot of computed derivations.
+	 * Use "namespace.key" format for derivation keys.
+	 *
+	 * @example
+	 * ```typescript
+	 * const snapshot = system.getDistributableSnapshot({
+	 *   includeDerivations: ['auth.effectivePlan', 'auth.canUseFeature'],
+	 *   ttlSeconds: 3600,
+	 * });
+	 * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+	 * ```
+	 */
+	getDistributableSnapshot<T = Record<string, unknown>>(
+		options?: DistributableSnapshotOptions,
+	): DistributableSnapshot<T>;
 }
 
 /**
@@ -542,6 +561,22 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	getSnapshot(): SystemSnapshot;
 	/** Restore system state from snapshot */
 	restore(snapshot: SystemSnapshot): void;
+
+	/**
+	 * Get a distributable snapshot of computed derivations.
+	 *
+	 * @example
+	 * ```typescript
+	 * const snapshot = system.getDistributableSnapshot({
+	 *   includeDerivations: ['effectivePlan', 'canUseFeature'],
+	 *   ttlSeconds: 3600,
+	 * });
+	 * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+	 * ```
+	 */
+	getDistributableSnapshot<T = Record<string, unknown>>(
+		options?: DistributableSnapshotOptions,
+	): DistributableSnapshot<T>;
 }
 
 /**

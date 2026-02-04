@@ -18,7 +18,7 @@ import { createPluginManager, type PluginManager } from "./plugins.js";
 import { RequirementSet } from "./requirements.js";
 import { createResolversManager, type ResolversManager } from "./resolvers.js";
 import { createDisabledTimeTravel, createTimeTravelManager, type TimeTravelManager } from "../utils/time-travel.js";
-import { isPrototypeSafe } from "../utils/utils.js";
+import { isPrototypeSafe, hashObject } from "../utils/utils.js";
 
 // Blocked properties for prototype pollution protection
 const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
@@ -659,6 +659,129 @@ export function createEngine<S extends Schema>(
 				facts: store.toObject(),
 				version: 1,
 			};
+		},
+
+		getDistributableSnapshot<T = Record<string, unknown>>(
+			options: {
+				includeDerivations?: string[];
+				excludeDerivations?: string[];
+				includeFacts?: string[];
+				ttlSeconds?: number;
+				metadata?: Record<string, unknown>;
+				includeVersion?: boolean;
+			} = {},
+		): {
+			data: T;
+			createdAt: number;
+			expiresAt?: number;
+			version?: string;
+			metadata?: Record<string, unknown>;
+		} {
+			const {
+				includeDerivations,
+				excludeDerivations,
+				includeFacts,
+				ttlSeconds,
+				metadata,
+				includeVersion,
+			} = options;
+
+			const data: Record<string, unknown> = {};
+
+			// Collect derivation keys to include
+			const allDerivationKeys = Object.keys(mergedDerive);
+			let derivationKeys: string[];
+
+			if (includeDerivations) {
+				// Only include specified derivations
+				derivationKeys = includeDerivations.filter((k) => allDerivationKeys.includes(k));
+
+				// Warn about unknown derivation keys in dev mode
+				if (process.env.NODE_ENV !== "production") {
+					const unknown = includeDerivations.filter((k) => !allDerivationKeys.includes(k));
+					if (unknown.length > 0) {
+						console.warn(
+							`[Directive] getDistributableSnapshot: Unknown derivation keys ignored: ${unknown.join(", ")}. ` +
+								`Available: ${allDerivationKeys.join(", ") || "(none)"}`,
+						);
+					}
+				}
+			} else {
+				// Include all derivations by default
+				derivationKeys = allDerivationKeys;
+			}
+
+			// Apply exclusions
+			if (excludeDerivations) {
+				const excludeSet = new Set(excludeDerivations);
+				derivationKeys = derivationKeys.filter((k) => !excludeSet.has(k));
+			}
+
+			// Read derivation values
+			for (const key of derivationKeys) {
+				try {
+					data[key] = derivationsManager.get(key as keyof DerivationsDef<S>);
+				} catch (error) {
+					// Skip derivations that error during computation
+					if (process.env.NODE_ENV !== "production") {
+						console.warn(`[Directive] getDistributableSnapshot: Skipping derivation "${key}" due to error:`, error);
+					}
+				}
+			}
+
+			// Include specified facts
+			if (includeFacts && includeFacts.length > 0) {
+				const factsSnapshot = store.toObject();
+				const allFactKeys = Object.keys(factsSnapshot);
+
+				// Warn about unknown fact keys in dev mode
+				if (process.env.NODE_ENV !== "production") {
+					const unknown = includeFacts.filter((k) => !(k in factsSnapshot));
+					if (unknown.length > 0) {
+						console.warn(
+							`[Directive] getDistributableSnapshot: Unknown fact keys ignored: ${unknown.join(", ")}. ` +
+								`Available: ${allFactKeys.join(", ") || "(none)"}`,
+						);
+					}
+				}
+
+				for (const key of includeFacts) {
+					if (key in factsSnapshot) {
+						data[key] = factsSnapshot[key];
+					}
+				}
+			}
+
+			// Build the snapshot
+			const createdAt = Date.now();
+			const snapshot: {
+				data: T;
+				createdAt: number;
+				expiresAt?: number;
+				version?: string;
+				metadata?: Record<string, unknown>;
+			} = {
+				data: data as T,
+				createdAt,
+			};
+
+			// Add TTL
+			if (ttlSeconds !== undefined && ttlSeconds > 0) {
+				snapshot.expiresAt = createdAt + ttlSeconds * 1000;
+			}
+
+			// Add version hash
+			if (includeVersion) {
+				// Simple version hash based on data content
+				snapshot.version = hashObject(data);
+			}
+
+			// Add metadata
+			if (metadata) {
+				snapshot.metadata = metadata;
+			}
+
+			return snapshot;
 		},
 
 		restore(snapshot) {

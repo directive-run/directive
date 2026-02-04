@@ -257,6 +257,48 @@ constraints: {
 },
 ```
 
+### Constraint Ordering (`after`)
+
+Control the sequence of resolver execution using the `after` property. This is useful when one operation must complete before another begins.
+
+```typescript
+constraints: {
+  // First: Run credit check
+  creditCheck: {
+    when: (facts) => facts.step >= 2 && !facts.creditScore,
+    require: { type: "RUN_CREDIT_CHECK" },
+  },
+  // Second: Only verify address after credit check completes
+  addressVerification: {
+    after: ["creditCheck"],  // Wait for creditCheck's resolver to complete
+    when: (facts) => facts.step >= 2 && !facts.addressVerified,
+    require: { type: "VERIFY_ADDRESS" },
+  },
+  // Third: Final approval after both previous steps
+  finalApproval: {
+    after: ["creditCheck", "addressVerification"],
+    when: (facts) => facts.creditScore && facts.addressVerified,
+    require: { type: "FINAL_APPROVAL" },
+  },
+},
+```
+
+**Behavior:**
+- If constraint B has `after: ["A"]`, B's `when()` is not called until A's resolver completes
+- If A's `when()` returns false (no requirement), B proceeds immediately—nothing to wait for
+- If A's resolver fails, B remains blocked until A succeeds (retries apply)
+- Cycles are detected at startup: `"[Directive] Constraint cycle detected: A → B → A"`
+
+**Priority vs `after`:**
+- `after` always takes precedence—a constraint with `after: ["A"]` will always wait for A, regardless of priority
+- `priority` only affects ordering among constraints that have no `after` dependencies on each other
+- Constraints with the same priority and no mutual `after` dependencies may run in parallel
+
+**Use cases:**
+- Multi-step workflows (onboarding, checkout, verification)
+- Dependent API calls where order matters
+- Chained operations where later steps need data from earlier ones
+
 ### Resolvers
 
 Async handlers that fulfill requirements with retry, timeout, and cancellation.
@@ -494,6 +536,190 @@ system.facts.userId = 1;
 await system.settle();
 expect(system.facts.user).toEqual({ id: 1, name: "Test" });
 ```
+
+## Distributable Snapshots
+
+Directive centralizes your business rules, but computed state often needs checking in places where running the full runtime is impractical—API routes, edge functions, background jobs. **Distributable snapshots** solve this by producing serializable objects containing computed derivation values.
+
+```typescript
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan', 'canUseFeature', 'limits'],
+  ttlSeconds: 3600,
+});
+// {
+//   data: { effectivePlan: "pro", canUseFeature: { api: true, export: true }, limits: {...} },
+//   createdAt: 1706745600000,
+//   expiresAt: 1706749200000
+// }
+```
+
+### Use Case: Redis Caching
+
+Cache expensive entitlement computations and check them in API routes without running Directive:
+
+```typescript
+// On login or plan change - compute and cache
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan', 'canUseFeature', 'apiRateLimit'],
+  ttlSeconds: 3600, // 1 hour
+  includeVersion: true, // For cache invalidation
+});
+await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+
+// In API routes - no Directive runtime needed
+async function checkEntitlements(userId: string) {
+  const cached = await redis.get(`entitlements:${userId}`);
+  if (!cached) throw new UnauthorizedError('Session expired');
+
+  const snapshot = JSON.parse(cached);
+
+  // Check expiration
+  if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+    throw new UnauthorizedError('Session expired');
+  }
+
+  return snapshot.data;
+}
+
+// Usage in route handler
+app.post('/api/export', async (req, res) => {
+  const entitlements = await checkEntitlements(req.userId);
+  if (!entitlements.canUseFeature.export) {
+    return res.status(403).json({ error: 'Export not available on your plan' });
+  }
+  // ... proceed with export
+});
+```
+
+### Use Case: JWT Claims
+
+Embed computed permissions in JWTs for stateless authorization:
+
+```typescript
+// Token generation
+function generateToken(system: System) {
+  const snapshot = system.getDistributableSnapshot({
+    includeDerivations: ['permissions', 'role'],
+    includeFacts: ['userId', 'teamId'],
+    metadata: { purpose: 'api-access' },
+  });
+
+  return jwt.sign({
+    ...snapshot.data,
+    iat: Math.floor(snapshot.createdAt / 1000),
+  }, SECRET, { expiresIn: '1h' });
+}
+
+// Token verification - no database needed
+function verifyToken(token: string) {
+  const decoded = jwt.verify(token, SECRET);
+  // decoded.permissions, decoded.role available directly
+  return decoded;
+}
+```
+
+### Use Case: SSR Hydration
+
+Pass computed state to client without re-running rules:
+
+```typescript
+// Server: compute once
+export async function getServerSideProps({ req }) {
+  const system = await initializeSystem(req.session.userId);
+  await system.settle();
+
+  const snapshot = system.getDistributableSnapshot({
+    includeDerivations: ['userProfile', 'preferences', 'notifications'],
+  });
+
+  return {
+    props: {
+      initialState: snapshot.data,
+    },
+  };
+}
+
+// Client: use directly, hydrate later if needed
+function Page({ initialState }) {
+  // Use initialState.userProfile immediately
+  // Optionally hydrate full Directive system in background
+}
+```
+
+### API Reference
+
+```typescript
+interface DistributableSnapshotOptions {
+  /** Derivation keys to include (default: all) */
+  includeDerivations?: string[];
+  /** Derivation keys to exclude */
+  excludeDerivations?: string[];
+  /** Fact keys to include (default: none - derivations only) */
+  includeFacts?: string[];
+  /** TTL in seconds - sets expiresAt timestamp */
+  ttlSeconds?: number;
+  /** Custom metadata (e.g., purpose, source) */
+  metadata?: Record<string, unknown>;
+  /** Include version hash for cache invalidation */
+  includeVersion?: boolean;
+}
+
+interface DistributableSnapshot<T> {
+  data: T;                     // Computed values
+  createdAt: number;           // ms since epoch
+  expiresAt?: number;          // ms since epoch (if ttlSeconds set)
+  version?: string;            // Hash for cache invalidation
+  metadata?: Record<string, unknown>;
+}
+```
+
+### When to Use
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Checking permissions in API routes | Redis cache with TTL |
+| Stateless microservices | JWT claims |
+| Server-side rendering | SSR hydration |
+| Edge functions | Short-lived cache |
+| Background jobs | Redis or message payload |
+
+### Utility Functions
+
+Directive provides helper functions for working with distributable snapshots:
+
+```typescript
+import {
+  isSnapshotExpired,
+  validateSnapshot,
+  type DistributableSnapshotLike  // For typing custom snapshot structures
+} from 'directive';
+
+// Check if expired (returns boolean)
+if (isSnapshotExpired(snapshot)) {
+  // Refresh the snapshot
+}
+
+// Validate and extract data (throws if malformed or expired)
+try {
+  const data = validateSnapshot(snapshot);
+  // Use data.canUseFeature, etc.
+} catch (e) {
+  // Snapshot invalid or expired, refresh it
+}
+
+// Type your own snapshot structures
+interface MySnapshot extends DistributableSnapshotLike<{ permissions: string[] }> {
+  // Additional custom fields...
+}
+```
+
+**Note:** `validateSnapshot` performs structural validation—it will throw if the snapshot is missing required `data` or `createdAt` properties, making it safe to use with untrusted input (e.g., parsed from Redis/JWT).
+
+### When NOT to Use
+
+- **Reactive UI** - Use framework adapters (`directive/react`, etc.) instead
+- **Real-time updates** - Snapshots are point-in-time; use `subscribe()` for live data
+- **Sensitive data** - Be mindful of what you include in JWTs (they're readable)
 
 ## Migration Guides
 
