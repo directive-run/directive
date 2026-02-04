@@ -544,24 +544,21 @@ export function createIntersection(options?: {
   const { debug = false, greenDuration, yellowDuration } = options ?? {};
 
   const system = createSystem({
-    modules: [intersectionModule],
+    module: intersectionModule,
     plugins: debug ? [createLoggingPlugin()] : [],
     debug: debug ? { timeTravel: true, maxSnapshots: 100 } : undefined,
+    // Use initialFacts to set configuration before system starts
+    initialFacts: {
+      ...(greenDuration && { greenDuration }),
+      ...(yellowDuration && { yellowDuration }),
+    },
   });
-
-  // Type-safe access to facts
-  const facts = system.facts as unknown as IntersectionFacts;
-
-  // Apply custom configuration
-  if (greenDuration) {
-    facts.greenDuration = greenDuration;
-  }
-  if (yellowDuration) {
-    facts.yellowDuration = yellowDuration;
-  }
 
   let tickInterval: ReturnType<typeof setInterval> | null = null;
   let carCounter = 0;
+
+  // Alias for cleaner access
+  const facts = system.facts;
 
   // Helper to get queue by direction
   const getQueue = (direction: Direction): Car[] => {

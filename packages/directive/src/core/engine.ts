@@ -47,8 +47,13 @@ interface EngineState<_S extends Schema> {
 	isRunning: boolean;
 	isReconciling: boolean;
 	reconcileScheduled: boolean;
+	isInitializing: boolean;
+	isInitialized: boolean;
+	isReady: boolean;
 	changedKeys: Set<string>;
 	previousRequirements: RequirementSet;
+	readyPromise: Promise<void> | null;
+	readyResolve: (() => void) | null;
 }
 
 /**
@@ -229,18 +234,24 @@ export function createEngine<S extends Schema>(
 		isRunning: false,
 		isReconciling: false,
 		reconcileScheduled: false,
+		isInitializing: false,
+		isInitialized: false,
+		isReady: false,
 		changedKeys: new Set(),
 		previousRequirements: new RequirementSet(),
+		readyPromise: null,
+		readyResolve: null,
 	};
 
 	/** Schedule a reconciliation on the next microtask */
 	function scheduleReconcile(): void {
-		if (!state.isRunning || state.reconcileScheduled) return;
+		// Suppress reconciliation during initialization phase
+		if (!state.isRunning || state.reconcileScheduled || state.isInitializing) return;
 
 		state.reconcileScheduled = true;
 		queueMicrotask(() => {
 			state.reconcileScheduled = false;
-			if (state.isRunning) {
+			if (state.isRunning && !state.isInitializing) {
 				// Await reconcile to prevent race conditions
 				// Error is caught inside reconcile, so no need to handle here
 				reconcile().catch((error) => {
@@ -317,6 +328,15 @@ export function createEngine<S extends Schema>(
 			};
 
 			pluginManager.emitReconcileEnd(result);
+
+			// Mark system as ready after first successful reconcile
+			if (!state.isReady) {
+				state.isReady = true;
+				if (state.readyResolve) {
+					state.readyResolve();
+					state.readyResolve = null;
+				}
+			}
 		} finally {
 			state.isReconciling = false;
 		}
@@ -410,7 +430,10 @@ export function createEngine<S extends Schema>(
 			if (state.isRunning) return;
 			state.isRunning = true;
 
-			// Initialize modules
+			// Mark as initializing to suppress reconciliation during module init
+			state.isInitializing = true;
+
+			// Initialize modules (reconciliation is suppressed during this phase)
 			for (const module of config.modules) {
 				if (module.init) {
 					store.batch(() => {
@@ -424,10 +447,22 @@ export function createEngine<S extends Schema>(
 				module.hooks?.onStart?.(system as any);
 			}
 
+			// Apply initialFacts/hydrate via callback (still in init phase)
+			// This ensures initialFacts are applied AFTER module init but BEFORE reconcile
+			if (config.onAfterModuleInit) {
+				store.batch(() => {
+					config.onAfterModuleInit!();
+				});
+			}
+
+			// Mark initialization complete
+			state.isInitializing = false;
+			state.isInitialized = true;
+
 			// Emit start event
 			pluginManager.emitStart(system);
 
-			// Initial reconcile
+			// Initial reconcile (now that all modules are initialized)
 			scheduleReconcile();
 		},
 
@@ -664,6 +699,40 @@ export function createEngine<S extends Schema>(
 
 		get isRunning(): boolean {
 			return state.isRunning;
+		},
+
+		get isInitialized(): boolean {
+			return state.isInitialized;
+		},
+
+		get isReady(): boolean {
+			return state.isReady;
+		},
+
+		whenReady(): Promise<void> {
+			// If already ready, resolve immediately
+			if (state.isReady) {
+				return Promise.resolve();
+			}
+
+			// If not running, the promise would never resolve
+			if (!state.isRunning) {
+				return Promise.reject(
+					new Error(
+						"[Directive] whenReady() called before start(). " +
+						"Call system.start() first, then await system.whenReady().",
+					),
+				);
+			}
+
+			// Create promise if not exists
+			if (!state.readyPromise) {
+				state.readyPromise = new Promise<void>((resolve) => {
+					state.readyResolve = resolve;
+				});
+			}
+
+			return state.readyPromise;
 		},
 	};
 
