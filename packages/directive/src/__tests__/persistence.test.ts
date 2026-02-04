@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ModuleSchema } from "../index.js";
 import { createModule, createSystem, t } from "../index.js";
 import { persistencePlugin } from "../plugins/persistence.js";
 
@@ -22,24 +23,35 @@ function createMockStorage(): Storage {
 }
 
 function createTestModule() {
-	return createModule("test", {
-		schema: {
+	const schema = {
+		facts: {
 			count: t.number(),
 			name: t.string(),
 			secret: t.string(),
 		},
+		derivations: {},
+		events: {
+			increment: {},
+			setName: { name: t.string() },
+		},
+		requirements: {},
+	} satisfies ModuleSchema;
+
+	return createModule("test", {
+		schema,
 		init: (facts) => {
 			// Only set defaults if not already set (e.g., by persistence)
 			if (facts.count === undefined) facts.count = 0;
 			if (facts.name === undefined) facts.name = "test";
 			if (facts.secret === undefined) facts.secret = "hidden";
 		},
+		derive: {},
 		events: {
 			increment: (facts) => {
 				facts.count = (facts.count ?? 0) + 1;
 			},
-			setName: (facts, event) => {
-				facts.name = event.name as string;
+			setName: (facts, { name }) => {
+				facts.name = name;
 			},
 		},
 	});
@@ -214,7 +226,7 @@ describe("Persistence Plugin", () => {
 			system.start();
 
 			expect(onError).toHaveBeenCalled();
-			expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
+			expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
 
 			system.destroy();
 		});
@@ -246,7 +258,7 @@ describe("Persistence Plugin", () => {
 			await new Promise((resolve) => setTimeout(resolve, 150));
 
 			expect(onError).toHaveBeenCalled();
-			expect(onError.mock.calls[0][0].message).toBe("Storage quota exceeded");
+			expect(onError.mock.calls[0]?.[0]?.message).toBe("Storage quota exceeded");
 
 			system.destroy();
 		});
@@ -276,7 +288,7 @@ describe("Persistence Plugin", () => {
 
 			// Should have called onError with prototype pollution warning
 			expect(onError).toHaveBeenCalled();
-			expect(onError.mock.calls[0][0].message).toContain("prototype pollution");
+			expect(onError.mock.calls[0]?.[0]?.message).toContain("prototype pollution");
 
 			// Facts should use default values, not the polluted data
 			expect(system.facts.count).toBe(0);
@@ -308,7 +320,7 @@ describe("Persistence Plugin", () => {
 			system.start();
 
 			expect(onError).toHaveBeenCalled();
-			expect(onError.mock.calls[0][0].message).toContain("prototype pollution");
+			expect(onError.mock.calls[0]?.[0]?.message).toContain("prototype pollution");
 
 			system.destroy();
 		});
@@ -331,7 +343,7 @@ describe("Persistence Plugin", () => {
 			system.start();
 
 			expect(onError).toHaveBeenCalled();
-			expect(onError.mock.calls[0][0].message).toContain("prototype pollution");
+			expect(onError.mock.calls[0]?.[0]?.message).toContain("prototype pollution");
 
 			system.destroy();
 		});

@@ -25,7 +25,7 @@
  *       },
  *       resolvers: {
  *         reset: {
- *           handles: (req) => req.type === 'RESET_COUNT',
+ *           requirement: (req) => req.type === 'RESET_COUNT',
  *           resolve: (req, { setState }) => setState({ count: 0 })
  *         }
  *       }
@@ -36,11 +36,16 @@
  */
 
 import type {
-  Requirement,
-  Schema,
-  Plugin,
-  System,
+	Requirement,
+	ModuleSchema,
+	Plugin,
+	System,
 } from "../core/types.js";
+import {
+	setBridgeFact,
+	getBridgeFact,
+	createCallbackPlugin,
+} from "../core/types/adapter-utils.js";
 import { createModule } from "../core/module.js";
 import { createSystem } from "../core/system.js";
 import { t } from "../core/facts.js";
@@ -50,77 +55,166 @@ import { t } from "../core/facts.js";
 // ============================================================================
 
 /** Zustand StateCreator type (simplified for compatibility) */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type StateCreator<T, _Mps = [], _Ms = []> = (
-  set: (partial: Partial<T> | ((state: T) => Partial<T>), replace?: boolean) => void,
-  get: () => T,
-  api: StoreApi<T>
+	set: (partial: Partial<T> | ((state: T) => Partial<T>), replace?: boolean) => void,
+	get: () => T,
+	api: StoreApi<T>
 ) => T;
 
 /** Zustand StoreApi type (simplified) */
 interface StoreApi<T> {
-  getState: () => T;
-  setState: (partial: Partial<T> | ((state: T) => Partial<T>), replace?: boolean) => void;
-  subscribe: (listener: (state: T, prevState: T) => void) => () => void;
-  destroy?: () => void;
+	getState: () => T;
+	setState: (partial: Partial<T> | ((state: T) => Partial<T>), replace?: boolean) => void;
+	subscribe: (listener: (state: T, prevState: T) => void) => () => void;
+	destroy?: () => void;
 }
 
 /** Constraint definition for Zustand adapter */
 export interface ZustandConstraint<T> {
-  /** Condition that activates this constraint */
-  when: (state: T) => boolean | Promise<boolean>;
-  /** Requirement to produce when condition is met */
-  require: Requirement | ((state: T) => Requirement);
-  /** Priority for ordering (higher runs first) */
-  priority?: number;
+	/** Condition that activates this constraint */
+	when: (state: T) => boolean | Promise<boolean>;
+	/** Requirement to produce when condition is met */
+	require: Requirement | ((state: T) => Requirement);
+	/** Priority for ordering (higher runs first) */
+	priority?: number;
 }
 
 /** Resolver definition for Zustand adapter */
 export interface ZustandResolver<T, R extends Requirement = Requirement> {
-  /** Predicate to match requirements */
-  handles: (req: Requirement) => req is R;
-  /** Custom key for deduplication */
-  key?: (req: R) => string;
-  /** Resolution function */
-  resolve: (req: R, ctx: ZustandResolverContext<T>) => void | Promise<void>;
+	/** Predicate to match requirements */
+	requirement: (req: Requirement) => req is R;
+	/** Custom key for deduplication */
+	key?: (req: R) => string;
+	/** Resolution function */
+	resolve: (req: R, ctx: ZustandResolverContext<T>) => void | Promise<void>;
 }
 
 /** Context passed to Zustand resolvers */
 export interface ZustandResolverContext<T> {
-  /** Get current state */
-  getState: () => T;
-  /** Set state (merged) */
-  setState: (partial: Partial<T> | ((state: T) => Partial<T>)) => void;
-  /** Replace entire state */
-  replaceState: (state: T) => void;
-  /** Abort signal for cancellation */
-  signal: AbortSignal;
+	/** Get current state */
+	getState: () => T;
+	/** Set state (merged) */
+	setState: (partial: Partial<T> | ((state: T) => Partial<T>)) => void;
+	/** Replace entire state */
+	replaceState: (state: T) => void;
+	/** Abort signal for cancellation */
+	signal: AbortSignal;
 }
 
 /** Options for Directive middleware */
 export interface DirectiveMiddlewareOptions<T> {
-  /** Constraints that produce requirements based on state */
-  constraints?: Record<string, ZustandConstraint<T>>;
-  /** Resolvers that fulfill requirements */
-  resolvers?: Record<string, ZustandResolver<T, Requirement>>;
-  /** Callback when a requirement is created */
-  onRequirementCreated?: (req: Requirement) => void;
-  /** Callback when a requirement is resolved */
-  onRequirementResolved?: (req: Requirement) => void;
-  /** Whether to start the Directive system automatically (default: true) */
-  autoStart?: boolean;
-  /** Plugins to add to the Directive system */
-  plugins?: Array<Plugin<Schema>>;
-  /** Enable time-travel debugging */
-  debug?: boolean;
+	/** Constraints that produce requirements based on state */
+	constraints?: Record<string, ZustandConstraint<T>>;
+	/** Resolvers that fulfill requirements */
+	resolvers?: Record<string, ZustandResolver<T, Requirement>>;
+	/** Callback when a requirement is created */
+	onRequirementCreated?: (req: Requirement) => void;
+	/** Callback when a requirement is resolved */
+	onRequirementResolved?: (req: Requirement) => void;
+	/** Whether to start the Directive system automatically (default: true) */
+	autoStart?: boolean;
+	/** Plugins to add to the Directive system */
+	plugins?: Plugin[];
+	/** Enable time-travel debugging */
+	debug?: boolean;
 }
 
 /** Extended store API with Directive system access */
+// biome-ignore lint/suspicious/noExplicitAny: System type varies
 export interface DirectiveStoreApi<T> extends StoreApi<T> {
-  /** Access to the underlying Directive system */
-  directive: System<Schema>;
-  /** Manually trigger constraint evaluation */
-  evaluate: () => Promise<void>;
+	/** Access to the underlying Directive system */
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	directive: System<any>;
+	/** Manually trigger constraint evaluation */
+	evaluate: () => Promise<void>;
+}
+
+// ============================================================================
+// Bridge Schema
+// ============================================================================
+
+/** Bridge schema for Zustand state */
+const BRIDGE_KEY = "__zustandState" as const;
+
+const zustandBridgeSchema = {
+	facts: {
+		[BRIDGE_KEY]: t.object<Record<string, unknown>>(),
+	},
+	derivations: {},
+	events: {},
+	requirements: {},
+} satisfies ModuleSchema;
+
+// Type unused but kept for documentation
+// type ZustandBridgeSchema = typeof zustandBridgeSchema;
+
+// ============================================================================
+// Constraint/Resolver Converters
+// ============================================================================
+
+// biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
+function convertZustandConstraints<T>(
+	constraints: Record<string, ZustandConstraint<T>>,
+): Record<string, any> {
+	// biome-ignore lint/suspicious/noExplicitAny: Result type is complex
+	const result: Record<string, any> = {};
+
+	for (const [id, constraint] of Object.entries(constraints)) {
+		result[id] = {
+			priority: constraint.priority ?? 0,
+			// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+			when: (facts: any) => {
+				const state = getBridgeFact<T>(facts, BRIDGE_KEY);
+				return constraint.when(state);
+			},
+			// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+			require: (facts: any) => {
+				const state = getBridgeFact<T>(facts, BRIDGE_KEY);
+				return typeof constraint.require === "function"
+					? constraint.require(state)
+					: constraint.require;
+			},
+		};
+	}
+
+	return result;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
+function convertZustandResolvers<T>(
+	resolvers: Record<string, ZustandResolver<T, Requirement>>,
+	getState: () => T,
+	setState: (partial: Partial<T> | ((state: T) => Partial<T>), replace?: boolean) => void,
+	syncToFacts: (state: T) => void,
+): Record<string, any> {
+	// biome-ignore lint/suspicious/noExplicitAny: Result type is complex
+	const result: Record<string, any> = {};
+
+	for (const [id, resolver] of Object.entries(resolvers)) {
+		result[id] = {
+			requirement: resolver.requirement,
+			key: resolver.key,
+			// biome-ignore lint/suspicious/noExplicitAny: Context type varies
+			resolve: async (req: Requirement, ctx: any) => {
+				const zustandCtx: ZustandResolverContext<T> = {
+					getState,
+					setState: (partial) => {
+						const newState = typeof partial === "function" ? partial(getState()) : partial;
+						setState(newState as Partial<T>);
+						syncToFacts(getState());
+					},
+					replaceState: (state) => {
+						setState(state as T, true);
+						syncToFacts(state);
+					},
+					signal: ctx.signal,
+				};
+				await resolver.resolve(req, zustandCtx);
+			},
+		};
+	}
+
+	return result;
 }
 
 // ============================================================================
@@ -134,141 +228,101 @@ export interface DirectiveStoreApi<T> extends StoreApi<T> {
  * Bi-directional sync: Zustand changes → Directive facts, Directive resolutions → Zustand state.
  */
 export function directiveMiddleware<T extends object>(
-  initializer: StateCreator<T>,
-  options: DirectiveMiddlewareOptions<T> = {}
-): StateCreator<T & { __directive?: System<Schema> }, [], []> {
-  const {
-    constraints = {},
-    resolvers = {},
-    onRequirementCreated,
-    onRequirementResolved,
-    autoStart = true,
-    plugins = [],
-    debug = false,
-  } = options;
+	initializer: StateCreator<T>,
+	options: DirectiveMiddlewareOptions<T> = {}
+	// biome-ignore lint/suspicious/noExplicitAny: Return type is complex
+): StateCreator<T & { __directive?: System<any> }, [], []> {
+	const {
+		constraints = {},
+		resolvers = {},
+		onRequirementCreated,
+		onRequirementResolved,
+		autoStart = true,
+		plugins = [],
+		debug = false,
+	} = options;
 
-  return (set, get, api) => {
-    // Create a schema that mirrors the Zustand state shape
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stateSchema: any = { __zustandState: t.object<Record<string, unknown>>() };
+	return (set, get, api) => {
+		// Create the Directive module first (system reference will be updated)
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		let system: System<any>;
 
-    // Convert Zustand constraints to Directive format
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const directiveConstraints: Record<string, any> = {};
-    for (const [id, constraint] of Object.entries(constraints)) {
-      directiveConstraints[id] = {
-        priority: constraint.priority ?? 0,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        when: (facts: any) => {
-          const state = facts.__zustandState as T;
-          return constraint.when(state);
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        require: (facts: any) => {
-          const state = facts.__zustandState as T;
-          return typeof constraint.require === "function"
-            ? constraint.require(state)
-            : constraint.require;
-        },
-      };
-    }
+		// Sync function to update facts from Zustand state
+		const syncToFacts = (state: T) => {
+			setBridgeFact(system.facts, BRIDGE_KEY, state);
+		};
 
-    // Convert Zustand resolvers to Directive format
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const directiveResolvers: Record<string, any> = {};
-    for (const [id, resolver] of Object.entries(resolvers)) {
-      directiveResolvers[id] = {
-        handles: resolver.handles,
-        key: resolver.key,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        resolve: async (req: Requirement, ctx: any) => {
-          const zustandCtx: ZustandResolverContext<T> = {
-            getState: get,
-            setState: (partial) => {
-              const newState =
-                typeof partial === "function" ? partial(get()) : partial;
-              // Update Zustand state
-              set(newState as Partial<T>);
-              // Sync to Directive facts
-              ctx.facts.__zustandState = get() as T;
-            },
-            replaceState: (state) => {
-              set(state as T, true);
-              ctx.facts.__zustandState = state;
-            },
-            signal: ctx.signal,
-          };
-          await resolver.resolve(req, zustandCtx);
-        },
-      };
-    }
+		// Convert constraints and resolvers
+		const directiveConstraints = convertZustandConstraints<T>(constraints);
+		const directiveResolvers = convertZustandResolvers<T>(
+			resolvers,
+			get,
+			set,
+			syncToFacts,
+		);
 
-    // Create the Directive module
-    const zustandModule = createModule("zustand-bridge", {
-      schema: stateSchema,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      init: (facts: any) => {
-        // Will be set when Zustand initializes
-        facts.__zustandState = {} as T;
-      },
-      constraints: directiveConstraints as unknown as Parameters<typeof createModule>[1]["constraints"],
-      resolvers: directiveResolvers as unknown as Parameters<typeof createModule>[1]["resolvers"],
-    });
+		// Create the Directive module
+		// biome-ignore lint/suspicious/noExplicitAny: Bridge module uses dynamic constraints/resolvers
+		const zustandModule = createModule("zustand-bridge", {
+			schema: zustandBridgeSchema,
+			init: (facts) => {
+				setBridgeFact(facts, BRIDGE_KEY, {} as T);
+			},
+			derive: {},
+			events: {},
+			constraints: directiveConstraints,
+			resolvers: directiveResolvers as any,
+		});
 
-    // Create callback plugins for events
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const callbackPlugin: Plugin<any> = {
-      name: "zustand-callbacks",
-      onRequirementCreated: onRequirementCreated
-        ? (req) => onRequirementCreated(req.requirement)
-        : undefined,
-      onRequirementMet: onRequirementResolved
-        ? (req) => onRequirementResolved(req.requirement)
-        : undefined,
-    };
+		// Create callback plugin
+		const callbackPlugin = createCallbackPlugin(
+			"zustand-callbacks",
+			{
+				onRequirementCreated,
+				onRequirementResolved,
+			},
+		);
 
-    // Create the Directive system
-    // Use type assertion to work around Schema generic variance issues
-    const system = createSystem({
-      modules: [zustandModule as unknown as Parameters<typeof createSystem>[0]["modules"][0]],
-      plugins: [...plugins, callbackPlugin] as unknown as Array<Plugin<Schema>>,
-      debug: debug ? { timeTravel: true } : undefined,
-    });
+		// Create the Directive system
+		system = createSystem({
+			modules: [zustandModule],
+			plugins: [...plugins, callbackPlugin],
+			debug: debug ? { timeTravel: true } : undefined,
+		});
 
-    // Wrap setState to sync to Directive and trigger evaluation
-    const originalSetState = api.setState;
-    api.setState = (partial, replace) => {
-      originalSetState(partial, replace);
-      // Sync Zustand state to Directive facts
-      system.facts.__zustandState = get() as T;
-    };
+		// Wrap setState to sync to Directive and trigger evaluation
+		const originalSetState = api.setState;
+		api.setState = (partial, replace) => {
+			originalSetState(partial, replace);
+			syncToFacts(get());
+		};
 
-    // Add Directive API to the store
-    (api as DirectiveStoreApi<T>).directive = system as System<Schema>;
-    (api as DirectiveStoreApi<T>).evaluate = async () => {
-      await system.settle();
-    };
+		// Add Directive API to the store
+		(api as DirectiveStoreApi<T>).directive = system;
+		(api as DirectiveStoreApi<T>).evaluate = async () => {
+			await system.settle();
+		};
 
-    // Add destroy handler
-    const originalDestroy = api.destroy;
-    api.destroy = () => {
-      system.destroy();
-      originalDestroy?.();
-    };
+		// Add destroy handler
+		const originalDestroy = api.destroy;
+		api.destroy = () => {
+			system.destroy();
+			originalDestroy?.();
+		};
 
-    // Initialize the underlying store
-    const initialState = initializer(set, get, api);
+		// Initialize the underlying store
+		const initialState = initializer(set, get, api);
 
-    // Initialize Directive facts with initial state
-    system.facts.__zustandState = initialState;
+		// Initialize Directive facts with initial state
+		syncToFacts(initialState);
 
-    // Start the system if autoStart is enabled
-    if (autoStart) {
-      system.start();
-    }
+		// Start the system if autoStart is enabled
+		if (autoStart) {
+			system.start();
+		}
 
-    return initialState;
-  };
+		return initialState;
+	};
 }
 
 // ============================================================================
@@ -287,9 +341,9 @@ export function directiveMiddleware<T extends object>(
  * ```
  */
 export function createConstraint<T>(
-  constraint: ZustandConstraint<T>
+	constraint: ZustandConstraint<T>
 ): ZustandConstraint<T> {
-  return constraint;
+	return constraint;
 }
 
 /**
@@ -300,15 +354,15 @@ export function createConstraint<T>(
  * interface ResetCountReq extends Requirement { type: 'RESET_COUNT' }
  *
  * const resetResolver = createResolver<MyState, ResetCountReq>({
- *   handles: (req): req is ResetCountReq => req.type === 'RESET_COUNT',
+ *   requirement: (req): req is ResetCountReq => req.type === 'RESET_COUNT',
  *   resolve: (req, { setState }) => setState({ count: 0 })
  * });
  * ```
  */
 export function createResolver<T, R extends Requirement = Requirement>(
-  resolver: ZustandResolver<T, R>
+	resolver: ZustandResolver<T, R>
 ): ZustandResolver<T, R> {
-  return resolver;
+	return resolver;
 }
 
 /**
@@ -322,9 +376,10 @@ export function createResolver<T, R extends Requirement = Requirement>(
  * ```
  */
 export function getDirectiveSystem<T>(
-  store: StoreApi<T>
-): System<Schema> | undefined {
-  return (store as DirectiveStoreApi<T>).directive;
+	store: StoreApi<T>
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+): System<any> | undefined {
+	return (store as DirectiveStoreApi<T>).directive;
 }
 
 /**
@@ -340,42 +395,42 @@ export function getDirectiveSystem<T>(
  * ```
  */
 export function subscribeToRequirements<T>(
-  store: StoreApi<T>,
-  callback: (req: Requirement, event: "created" | "resolved" | "canceled") => void
+	store: StoreApi<T>,
+	callback: (req: Requirement, event: "created" | "resolved" | "canceled") => void
 ): () => void {
-  const system = getDirectiveSystem(store);
-  if (!system) {
-    console.warn("[Directive] Store was not created with directiveMiddleware");
-    return () => {};
-  }
+	const system = getDirectiveSystem(store);
+	if (!system) {
+		console.warn("[Directive] Store was not created with directiveMiddleware");
+		return () => {};
+	}
 
-  // Subscribe to fact changes and inspect for requirement changes
-  let lastUnmetIds = new Set<string>();
+	// Subscribe to fact changes and inspect for requirement changes
+	let lastUnmetIds = new Set<string>();
 
-  const unsubscribe = system.facts.$store.subscribeAll(() => {
-    const inspection = system.inspect();
-    const currentUnmetIds = new Set(inspection.unmet.map((r) => r.id));
+	const unsubscribe = system.facts.$store.subscribeAll(() => {
+		const inspection = system.inspect();
+		const currentUnmetIds = new Set(inspection.unmet.map((r) => r.id));
 
-    // New requirements
-    for (const req of inspection.unmet) {
-      if (!lastUnmetIds.has(req.id)) {
-        callback(req.requirement, "created");
-      }
-    }
+		// New requirements
+		for (const req of inspection.unmet) {
+			if (!lastUnmetIds.has(req.id)) {
+				callback(req.requirement, "created");
+			}
+		}
 
-    // Resolved/canceled requirements
-    for (const id of lastUnmetIds) {
-      if (!currentUnmetIds.has(id)) {
-        // Find the original requirement (it's been resolved or canceled)
-        const wasInflight = inspection.inflight.some((i) => i.id === id);
-        callback({ type: "UNKNOWN", id }, wasInflight ? "resolved" : "canceled");
-      }
-    }
+		// Resolved/canceled requirements
+		for (const id of lastUnmetIds) {
+			if (!currentUnmetIds.has(id)) {
+				// Find the original requirement (it's been resolved or canceled)
+				const wasInflight = inspection.inflight.some((i) => i.id === id);
+				callback({ type: "UNKNOWN", id }, wasInflight ? "resolved" : "canceled");
+			}
+		}
 
-    lastUnmetIds = currentUnmetIds;
-  });
+		lastUnmetIds = currentUnmetIds;
+	});
 
-  return unsubscribe;
+	return unsubscribe;
 }
 
 // ============================================================================
@@ -407,61 +462,61 @@ export function subscribeToRequirements<T>(
  * unsync();
  * ```
  */
-export function bindZustandToDirective<T extends object, S extends Schema>(
-  store: StoreApi<T>,
-  system: System<S>,
-  mapping: {
-    toFacts: (state: T) => Partial<Record<keyof S, unknown>>;
-    fromFacts: (facts: Record<string, unknown>) => Partial<T>;
-    /** Keys to watch in Directive (defaults to all keys from toFacts) */
-    watchFacts?: Array<keyof S>;
-  }
+export function bindZustandToDirective<T extends object, M extends ModuleSchema>(
+	store: StoreApi<T>,
+	system: System<M>,
+	mapping: {
+		toFacts: (state: T) => Partial<Record<string, unknown>>;
+		fromFacts: (facts: Record<string, unknown>) => Partial<T>;
+		/** Keys to watch in Directive (defaults to all keys from toFacts) */
+		watchFacts?: string[];
+	}
 ): { sync: () => void; unsync: () => void } {
-  let unsubscribeZustand: (() => void) | null = null;
-  let unsubscribeDirective: (() => void) | null = null;
-  let isSyncing = false;
+	let unsubscribeZustand: (() => void) | null = null;
+	let unsubscribeDirective: (() => void) | null = null;
+	let isSyncing = false;
 
-  const sync = () => {
-    if (isSyncing) return;
-    isSyncing = true;
+	const sync = () => {
+		if (isSyncing) return;
+		isSyncing = true;
 
-    // Zustand → Directive
-    unsubscribeZustand = store.subscribe((state) => {
-      const facts = mapping.toFacts(state);
-      system.batch(() => {
-        for (const [key, value] of Object.entries(facts)) {
-          (system.facts as Record<string, unknown>)[key] = value;
-        }
-      });
-    });
+		// Zustand → Directive
+		unsubscribeZustand = store.subscribe((state) => {
+			const facts = mapping.toFacts(state);
+			system.batch(() => {
+				for (const [key, value] of Object.entries(facts)) {
+					setBridgeFact(system.facts, key, value);
+				}
+			});
+		});
 
-    // Directive → Zustand
-    const factsToWatch = mapping.watchFacts ?? Object.keys(mapping.toFacts(store.getState()));
-    unsubscribeDirective = system.facts.$store.subscribe(
-      factsToWatch as string[],
-      () => {
-        const facts = system.facts.$store.toObject();
-        const stateUpdate = mapping.fromFacts(facts);
-        store.setState(stateUpdate);
-      }
-    );
+		// Directive → Zustand
+		const factsToWatch = mapping.watchFacts ?? Object.keys(mapping.toFacts(store.getState()));
+		unsubscribeDirective = system.facts.$store.subscribe(
+			factsToWatch,
+			() => {
+				const facts = system.facts.$store.toObject();
+				const stateUpdate = mapping.fromFacts(facts);
+				store.setState(stateUpdate);
+			}
+		);
 
-    // Initial sync: Zustand → Directive
-    const initialFacts = mapping.toFacts(store.getState());
-    system.batch(() => {
-      for (const [key, value] of Object.entries(initialFacts)) {
-        (system.facts as Record<string, unknown>)[key] = value;
-      }
-    });
-  };
+		// Initial sync: Zustand → Directive
+		const initialFacts = mapping.toFacts(store.getState());
+		system.batch(() => {
+			for (const [key, value] of Object.entries(initialFacts)) {
+				setBridgeFact(system.facts, key, value);
+			}
+		});
+	};
 
-  const unsync = () => {
-    isSyncing = false;
-    unsubscribeZustand?.();
-    unsubscribeDirective?.();
-    unsubscribeZustand = null;
-    unsubscribeDirective = null;
-  };
+	const unsync = () => {
+		isSyncing = false;
+		unsubscribeZustand?.();
+		unsubscribeDirective?.();
+		unsubscribeZustand = null;
+		unsubscribeDirective = null;
+	};
 
-  return { sync, unsync };
+	return { sync, unsync };
 }

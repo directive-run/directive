@@ -63,6 +63,8 @@ interface ResolverState {
 	startedAt: number;
 	attempt: number;
 	status: ResolverStatus;
+	/** Original requirement for proper cancel callback */
+	originalRequirement: RequirementWithId;
 }
 
 /** Batch state for batched resolvers */
@@ -196,6 +198,50 @@ export function createResolversManager<S extends Schema>(
 		}
 	}
 
+	/** Type guard for resolver with string `requirement` property */
+	function hasStringRequirement(
+		def: unknown,
+	): def is { requirement: string } {
+		return (
+			typeof def === "object" &&
+			def !== null &&
+			"requirement" in def &&
+			typeof (def as { requirement: unknown }).requirement === "string"
+		);
+	}
+
+	/** Type guard for resolver with function `requirement` property */
+	function hasFunctionRequirement(
+		def: unknown,
+	): def is { requirement: (req: Requirement) => boolean } {
+		return (
+			typeof def === "object" &&
+			def !== null &&
+			"requirement" in def &&
+			typeof (def as { requirement: unknown }).requirement === "function"
+		);
+	}
+
+	/**
+	 * Check if a resolver handles a requirement.
+	 * Supports:
+	 * - `requirement: "TYPE"` - string matching
+	 * - `requirement: (req) => req is T` - function type guard
+	 */
+	function resolverHandles(def: ResolversDef<S>[string], req: Requirement): boolean {
+		// Check string-based `requirement`
+		if (hasStringRequirement(def)) {
+			return req.type === def.requirement;
+		}
+
+		// Check function-based `requirement` (type guard)
+		if (hasFunctionRequirement(def)) {
+			return def.requirement(req);
+		}
+
+		return false;
+	}
+
 	/** Find a resolver that handles a requirement */
 	function findResolver(req: Requirement): string | null {
 		// Check cache first for this requirement type
@@ -205,7 +251,7 @@ export function createResolversManager<S extends Schema>(
 			// Try cached resolvers first
 			for (const id of cached) {
 				const def = definitions[id];
-				if (def?.handles(req)) {
+				if (def && resolverHandles(def, req)) {
 					return id;
 				}
 			}
@@ -213,7 +259,7 @@ export function createResolversManager<S extends Schema>(
 
 		// Fallback to full search and cache the result
 		for (const [id, def] of Object.entries(definitions)) {
-			if (def.handles(req)) {
+			if (resolverHandles(def, req)) {
 				// Cache this resolver for this type
 				if (!resolversByType.has(reqType)) {
 					resolversByType.set(reqType, []);
@@ -342,7 +388,7 @@ export function createResolversManager<S extends Schema>(
 		onError?.(resolverId, req, lastError);
 	}
 
-	/** Execute a batch of requirements */
+	/** Execute a batch of requirements with retry and timeout support */
 	async function executeBatch(
 		resolverId: string,
 		requirements: RequirementWithId[],
@@ -361,40 +407,94 @@ export function createResolversManager<S extends Schema>(
 			return;
 		}
 
+		const retryPolicy = { ...DEFAULT_RETRY, ...def.retry };
 		const controller = new AbortController();
-		const ctx = createContext(controller.signal);
 		const startedAt = Date.now();
+		let lastError: Error | null = null;
 
-		try {
-			await def.resolveBatch(
-				requirements.map((r) => r.requirement as Parameters<NonNullable<typeof def.resolveBatch>>[0][number]),
-				ctx,
-			);
+		for (let attempt = 1; attempt <= retryPolicy.attempts; attempt++) {
+			// Check if canceled
+			if (controller.signal.aborted) {
+				return;
+			}
 
-			// Mark all as success
-			const duration = Date.now() - startedAt;
-			for (const req of requirements) {
-				statuses.set(req.id, {
-					state: "success",
-					requirementId: req.id,
-					completedAt: Date.now(),
-					duration,
-				});
-				onComplete?.(resolverId, req, duration);
+			try {
+				const ctx = createContext(controller.signal);
+
+				// Apply timeout if configured
+				const timeout = def.timeout;
+				if (timeout && timeout > 0) {
+					await withTimeout(
+						def.resolveBatch(
+							requirements.map((r) => r.requirement as Parameters<NonNullable<typeof def.resolveBatch>>[0][number]),
+							ctx,
+						),
+						timeout,
+						`Batch resolver "${resolverId}" timed out after ${timeout}ms`,
+					);
+				} else {
+					await def.resolveBatch(
+						requirements.map((r) => r.requirement as Parameters<NonNullable<typeof def.resolveBatch>>[0][number]),
+						ctx,
+					);
+				}
+
+				// Mark all as success
+				const duration = Date.now() - startedAt;
+				for (const req of requirements) {
+					statuses.set(req.id, {
+						state: "success",
+						requirementId: req.id,
+						completedAt: Date.now(),
+						duration,
+					});
+					onComplete?.(resolverId, req, duration);
+				}
+				return;
+			} catch (error) {
+				lastError = error instanceof Error ? error : new Error(String(error));
+
+				// Check if it was an abort
+				if (controller.signal.aborted) {
+					return;
+				}
+
+				// If we have more attempts, wait and retry
+				if (attempt < retryPolicy.attempts) {
+					const delay = calculateDelay(retryPolicy, attempt);
+					// Notify retry for all requirements
+					for (const req of requirements) {
+						onRetry?.(resolverId, req, attempt + 1);
+					}
+
+					// Use AbortSignal-aware sleep
+					await new Promise<void>((resolve) => {
+						const timeoutId = setTimeout(resolve, delay);
+						const abortHandler = () => {
+							clearTimeout(timeoutId);
+							resolve();
+						};
+						controller.signal.addEventListener("abort", abortHandler, { once: true });
+					});
+
+					// Check abort after sleep
+					if (controller.signal.aborted) {
+						return;
+					}
+				}
 			}
-		} catch (error) {
-			// Mark all as error
-			const err = error instanceof Error ? error : new Error(String(error));
-			for (const req of requirements) {
-				statuses.set(req.id, {
-					state: "error",
-					requirementId: req.id,
-					error: err,
-					failedAt: Date.now(),
-					attempts: 1,
-				});
-				onError?.(resolverId, req, error);
-			}
+		}
+
+		// All attempts failed - mark all as error
+		for (const req of requirements) {
+			statuses.set(req.id, {
+				state: "error",
+				requirementId: req.id,
+				error: lastError!,
+				failedAt: Date.now(),
+				attempts: retryPolicy.attempts,
+			});
+			onError?.(resolverId, req, lastError);
 		}
 	}
 
@@ -478,6 +578,7 @@ export function createResolversManager<S extends Schema>(
 					requirementId: req.id,
 					startedAt,
 				},
+				originalRequirement: req,
 			};
 
 			inflight.set(req.id, state);
@@ -504,11 +605,7 @@ export function createResolversManager<S extends Schema>(
 				canceledAt: Date.now(),
 			});
 
-			onCancel?.(state.resolverId, {
-				requirement: {} as Requirement, // We don't have the full req here
-				id: requirementId,
-				fromConstraint: "",
-			});
+			onCancel?.(state.resolverId, state.originalRequirement);
 		},
 
 		cancelAll(): void {

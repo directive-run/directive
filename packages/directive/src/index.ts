@@ -15,6 +15,19 @@ export type {
 	Schema,
 	SchemaType,
 	InferSchema,
+	InferSchemaType,
+	// Consolidated Module Schema
+	ModuleSchema,
+	DerivationsSchema,
+	EventsSchema,
+	EventPayloadSchema,
+	InferFacts,
+	InferDerivations,
+	InferEventPayloadFromSchema,
+	InferEvents,
+	InferRequirementPayloadFromSchema,
+	InferRequirements,
+	InferRequirementTypes,
 	// Facts
 	Facts,
 	FactsSnapshot,
@@ -24,21 +37,30 @@ export type {
 	DerivationsDef,
 	DerivationState,
 	DerivedValues,
+	TypedDerivationsDef,
 	// Effects
 	EffectsDef,
 	// Requirements
 	Requirement,
 	RequirementWithId,
 	RequirementKeyFn,
+	RequirementPayloadSchema,
+	RequirementsSchema,
+	RequirementOutput,
 	// Constraints
 	ConstraintsDef,
 	ConstraintState,
+	TypedConstraintDef,
+	TypedConstraintsDef,
 	// Resolvers
 	ResolversDef,
 	ResolverContext,
 	ResolverStatus,
 	RetryPolicy,
 	BatchConfig,
+	TypedResolverContext,
+	TypedResolverDef,
+	TypedResolversDef,
 	// Plugins
 	Plugin,
 	ReconcileResult,
@@ -50,20 +72,29 @@ export type {
 	// Module
 	ModuleDef,
 	ModuleHooks,
+	TypedEventsDef,
+	// Events
 	EventsDef,
+	SystemEvent,
+	EventsAccessorFromSchema,
+	DispatchEventsFromSchema,
+	FlexibleEventHandler,
 	// System
 	System,
 	SystemConfig,
-	SystemEvent,
 	SystemInspection,
 	SystemSnapshot,
 	DebugConfig,
 	TimeTravelAPI,
 	RequirementExplanation,
-	// Typed Events
-	TypedEvent,
-	TypedEventHandler,
-	TypedEventHandlers,
+	// Accessors
+	DeriveAccessor,
+	EventsAccessor,
+	DerivationKeys,
+	DerivationReturnType,
+	// Typed Helper Utilities
+	TypedConstraint,
+	TypedResolver,
 } from "./core/types.js";
 
 // ============================================================================
@@ -79,35 +110,99 @@ export { DirectiveError } from "./core/types.js";
 /**
  * Schema type builders for defining fact types.
  *
+ * Provides type-safe schema definitions with optional runtime validation:
+ *
+ * **Basic Types:**
+ * - `t.string<T>()` - String type (with optional literal union)
+ * - `t.number()` - Number type with `.min()` and `.max()` validation
+ * - `t.boolean()` - Boolean type
+ * - `t.bigint()` - BigInt type for large integers
+ *
+ * **Complex Types:**
+ * - `t.array<T>()` - Array type with `.of()`, `.nonEmpty()`, `.minLength()`, `.maxLength()`
+ * - `t.object<T>()` - Object type with `.shape()`, `.nonNull()`, `.hasKeys()`
+ * - `t.record<V>(valueType)` - Record/map type `Record<string, V>`
+ * - `t.tuple(types...)` - Fixed-length tuple type
+ * - `t.union(types...)` - Union of multiple types
+ *
+ * **Literal & Enum Types:**
+ * - `t.enum(...values)` - String enum from literal values
+ * - `t.literal(value)` - Exact value matching (string, number, or boolean)
+ *
+ * **Wrappers:**
+ * - `t.nullable(type)` - Nullable wrapper (`T | null`)
+ * - `t.optional(type)` - Optional wrapper (`T | undefined`)
+ *
+ * **Validation Types:**
+ * - `t.date()` - Date type
+ * - `t.uuid()` - UUID string format
+ * - `t.email()` - Email string format
+ * - `t.url()` - URL string format
+ *
+ * **Escape Hatch:**
+ * - `t.any<T>()` - Bypass validation (warns in dev)
+ *
+ * **Chainable Methods (available on most types):**
+ * - `.default(value)` - Set default value
+ * - `.transform(fn)` - Transform values
+ * - `.brand<B>()` - Add branded/nominal type
+ * - `.describe(text)` - Add schema documentation
+ * - `.refine(predicate, message)` - Custom validation with error message
+ * - `.nullable()` - Make nullable (chainable alternative to `t.nullable()`)
+ * - `.optional()` - Make optional (chainable alternative to `t.optional()`)
+ * - `.validate(fn)` - Add custom validator
+ *
  * @example
  * ```ts
  * import { t } from 'directive';
- * // or for discoverability:
- * import { schema } from 'directive';
  *
- * const mySchema = {
- *   count: t.number(),
- *   name: t.string(),
- *   active: t.boolean(),
+ * const schema = {
+ *   facts: {
+ *     count: t.number().min(0).default(0),
+ *     name: t.string().describe("User's display name"),
+ *     status: t.enum("idle", "loading", "success", "error"),
+ *     user: t.object<User>().nullable(),
+ *     config: t.object<Config>().optional(),
+ *     userId: t.string().brand<"UserId">(),
+ *     age: t.number().refine(n => n >= 0, "Age must be non-negative"),
+ *   },
+ *   derivations: {
+ *     doubled: t.number(),
+ *   },
+ *   events: {
+ *     increment: {},
+ *     setStatus: { status: t.enum("idle", "loading", "success", "error") },
+ *   },
+ *   requirements: {},
  * };
  * ```
  */
-export { t } from "./core/facts.js";
-
-/**
- * Alias for `t` - Schema type builders for defining fact types.
- * Use this for better discoverability if you prefer explicit naming.
- *
- * @see {@link t} for the shorter alias
- */
-export { t as schema } from "./core/facts.js";
+export { t, type Branded, type ExtendedSchemaType, type ChainableSchemaType } from "./core/facts.js";
 
 // ============================================================================
 // Module & System
 // ============================================================================
 
-export { createModule, type ModuleConfig } from "./core/module.js";
-export { createSystem, type CreateSystemOptions } from "./core/system.js";
+export {
+	createModule,
+	type ModuleConfig,
+} from "./core/module.js";
+export {
+	createSystem,
+	type CreateSystemOptions,
+} from "./core/system.js";
+export {
+	module,
+	type ModuleBuilder,
+} from "./core/builder.js";
+
+// Helper factory functions for external constraint/resolver definitions
+export {
+	constraintFactory,
+	resolverFactory,
+	typedConstraint,
+	typedResolver,
+} from "./core/types.js";
 
 // ============================================================================
 // Requirements Helpers
@@ -134,7 +229,7 @@ export {
  * import { Backoff } from 'directive';
  *
  * const resolver = {
- *   handles: forType("FETCH_DATA"),
+ *   requirement: "FETCH_DATA",
  *   retry: {
  *     attempts: 3,
  *     backoff: Backoff.Exponential, // Autocomplete-friendly!
@@ -178,3 +273,13 @@ export {
 	withoutTracking,
 	trackAccess,
 } from "./core/tracking.js";
+
+// ============================================================================
+// Requirement Status Utilities
+// ============================================================================
+
+export {
+	createRequirementStatusPlugin,
+	createStatusHook,
+	type RequirementTypeStatus,
+} from "./utils/requirement-status.js";

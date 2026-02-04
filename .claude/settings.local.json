@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsx:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm start)",
+      "WebSearch",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm vitest run:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(for dir in examples/0*-*/)",
+      "Bash(do echo \"=== Running $dir ===\")",
+      "Bash(done)",
+      "Bash(pnpm --filter directive test:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(pnpm test:xstate:*)",
+      "Bash(pnpm test:zod:*)",
+      "Bash(pnpm test:mixed:*)"
+    ]
+  }
+}

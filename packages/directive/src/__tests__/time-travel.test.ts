@@ -1,14 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ModuleSchema } from "../index.js";
 import { createModule, createSystem, t } from "../index.js";
 
 describe("Time-Travel", () => {
-	const counterModule = createModule("counter", {
-		schema: {
+	const schema = {
+		facts: {
 			count: t.number(),
 		},
+		derivations: {},
+		events: {
+			increment: {},
+		},
+		requirements: {},
+	} satisfies ModuleSchema;
+
+	const counterModule = createModule("counter", {
+		schema,
 		init: (facts) => {
 			facts.count = 0;
 		},
+		derive: {},
 		events: {
 			increment: (facts) => {
 				facts.count = (facts.count ?? 0) + 1;

@@ -24,19 +24,28 @@ import { DirectiveError } from "./types.js";
 // Plugin Manager
 // ============================================================================
 
-export interface PluginManager<S extends Schema> {
+// Note: PluginManager uses Schema (flat) internally because the engine works with flat schemas.
+// The public API uses ModuleSchema (consolidated), and the conversion happens in createSystem.
+// biome-ignore lint/suspicious/noExplicitAny: Internal type - plugins are schema-agnostic at runtime
+export interface PluginManager<_S extends Schema = any> {
 	/** Register a plugin */
-	register(plugin: Plugin<S>): void;
+	// biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
+	register(plugin: Plugin<any>): void;
 	/** Unregister a plugin by name */
 	unregister(name: string): void;
 	/** Get all registered plugins */
-	getPlugins(): Plugin<S>[];
+	// biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
+	getPlugins(): Plugin<any>[];
 
 	// Lifecycle hooks
-	emitInit(system: System<S>): Promise<void>;
-	emitStart(system: System<S>): void;
-	emitStop(system: System<S>): void;
-	emitDestroy(system: System<S>): void;
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
+	emitInit(system: System<any>): Promise<void>;
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
+	emitStart(system: System<any>): void;
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
+	emitStop(system: System<any>): void;
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
+	emitDestroy(system: System<any>): void;
 
 	// Fact hooks
 	emitFactSet(key: string, value: unknown, prev: unknown): void;
@@ -48,7 +57,8 @@ export interface PluginManager<S extends Schema> {
 	emitDerivationInvalidate(id: string): void;
 
 	// Reconciliation hooks
-	emitReconcileStart(snapshot: FactsSnapshot<S>): void;
+	// biome-ignore lint/suspicious/noExplicitAny: Schema type varies
+	emitReconcileStart(snapshot: FactsSnapshot<any>): void;
 	emitReconcileEnd(result: ReconcileResult): void;
 
 	// Constraint hooks
@@ -83,8 +93,10 @@ export interface PluginManager<S extends Schema> {
 /**
  * Create a plugin manager.
  */
-export function createPluginManager<S extends Schema>(): PluginManager<S> {
-	const plugins: Plugin<S>[] = [];
+// biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
+export function createPluginManager<S extends Schema = any>(): PluginManager<S> {
+	// biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
+	const plugins: Plugin<any>[] = [];
 
 	/** Safe call - wraps plugin hook calls to prevent errors from breaking the system */
 	function safeCall<T>(fn: (() => T) | undefined): T | undefined {
@@ -109,7 +121,8 @@ export function createPluginManager<S extends Schema>(): PluginManager<S> {
 	}
 
 	const manager: PluginManager<S> = {
-		register(plugin: Plugin<S>): void {
+		// biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
+		register(plugin: Plugin<any>): void {
 			// Check for duplicate names
 			if (plugins.some((p) => p.name === plugin.name)) {
 				console.warn(`[Directive] Plugin "${plugin.name}" is already registered, replacing...`);
@@ -125,30 +138,35 @@ export function createPluginManager<S extends Schema>(): PluginManager<S> {
 			}
 		},
 
-		getPlugins(): Plugin<S>[] {
+		// biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
+		getPlugins(): Plugin<any>[] {
 			return [...plugins];
 		},
 
 		// Lifecycle hooks
-		async emitInit(system: System<S>): Promise<void> {
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		async emitInit(system: System<any>): Promise<void> {
 			for (const plugin of plugins) {
 				await safeCallAsync(() => plugin.onInit?.(system) as Promise<void>);
 			}
 		},
 
-		emitStart(system: System<S>): void {
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		emitStart(system: System<any>): void {
 			for (const plugin of plugins) {
 				safeCall(() => plugin.onStart?.(system));
 			}
 		},
 
-		emitStop(system: System<S>): void {
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		emitStop(system: System<any>): void {
 			for (const plugin of plugins) {
 				safeCall(() => plugin.onStop?.(system));
 			}
 		},
 
-		emitDestroy(system: System<S>): void {
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		emitDestroy(system: System<any>): void {
 			for (const plugin of plugins) {
 				safeCall(() => plugin.onDestroy?.(system));
 			}
@@ -187,7 +205,8 @@ export function createPluginManager<S extends Schema>(): PluginManager<S> {
 		},
 
 		// Reconciliation hooks
-		emitReconcileStart(snapshot: FactsSnapshot<S>): void {
+		// biome-ignore lint/suspicious/noExplicitAny: Schema type varies
+		emitReconcileStart(snapshot: FactsSnapshot<any>): void {
 			for (const plugin of plugins) {
 				safeCall(() => plugin.onReconcileStart?.(snapshot));
 			}

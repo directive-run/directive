@@ -9,16 +9,33 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ModuleSchema } from "../index.js";
 import { createModule, createSystem, t } from "../index.js";
 
-// Create a test module
+// Create a test module with consolidated schema
 function createTestModule() {
-	return createModule("test", {
-		schema: {
+	const schema = {
+		facts: {
 			count: t.number(),
 			name: t.string(),
 			items: t.array<string>(),
 		},
+		derivations: {
+			doubled: t.number(),
+			isPositive: t.boolean(),
+			itemCount: t.number(),
+			summary: t.object<{ count: number; doubled: number }>(),
+		},
+		events: {
+			increment: {},
+			setName: { name: t.string() },
+			addItem: { item: t.string() },
+		},
+		requirements: {},
+	} satisfies ModuleSchema;
+
+	return createModule("test", {
+		schema,
 		init: (facts) => {
 			facts.count = 0;
 			facts.name = "test";
@@ -28,27 +45,31 @@ function createTestModule() {
 			doubled: (facts) => (facts.count ?? 0) * 2,
 			isPositive: (facts) => (facts.count ?? 0) > 0,
 			itemCount: (facts) => (facts.items ?? []).length,
-			summary: (facts, derive) => ({
-				count: facts.count,
-				doubled: derive.doubled,
-			}),
+			summary: (facts, derive) => {
+				facts.count;
+				return {
+					count: facts.count,
+					doubled: derive.doubled,
+				};
+			},
 		},
 		events: {
 			increment: (facts) => {
 				facts.count = (facts.count ?? 0) + 1;
 			},
-			setName: (facts, event) => {
-				facts.name = event.name as string;
+			setName: (facts, { name }) => {
+				facts.name = name;
 			},
-			addItem: (facts, event) => {
-				facts.items = [...(facts.items ?? []), event.item as string];
+			addItem: (facts, { item }) => {
+				facts.items = [...(facts.items ?? []), item];
 			},
 		},
 	});
 }
 
 describe("React Adapter - System Integration", () => {
-	let system: ReturnType<typeof createSystem>;
+	// biome-ignore lint/suspicious/noExplicitAny: Test uses generic system for runtime behavior testing
+	let system: any;
 
 	beforeEach(() => {
 		system = createSystem({ modules: [createTestModule()] });
@@ -62,7 +83,7 @@ describe("React Adapter - System Integration", () => {
 		});
 
 		it("returns typed values with generic parameter", () => {
-			const doubled = system.read<number>("doubled");
+			const doubled = system.read("doubled") as number;
 			expect(typeof doubled).toBe("number");
 		});
 
@@ -73,11 +94,11 @@ describe("React Adapter - System Integration", () => {
 		});
 
 		it("handles composed derivations", () => {
-			const summary = system.read<{ count: number; doubled: number }>("summary");
+			const summary = system.read("summary");
 			expect(summary).toEqual({ count: 0, doubled: 0 });
 
 			system.dispatch({ type: "increment" });
-			const updated = system.read<{ count: number; doubled: number }>("summary");
+			const updated = system.read("summary");
 			expect(updated).toEqual({ count: 1, doubled: 2 });
 		});
 	});
@@ -156,7 +177,7 @@ describe("React Adapter - System Integration", () => {
 			// watch() reads the derivation internally to get initial value,
 			// which establishes dependency tracking
 			const callback = vi.fn();
-			const unwatch = system.watch<number>("doubled", callback);
+			const unwatch = system.watch("doubled", callback);
 
 			system.dispatch({ type: "increment" });
 			await new Promise((resolve) => setTimeout(resolve, 0));
@@ -174,7 +195,7 @@ describe("React Adapter - System Integration", () => {
 			expect(system.read("doubled")).toBe(0);
 
 			const callback = vi.fn();
-			const unwatch = system.watch<number>("doubled", callback);
+			const unwatch = system.watch("doubled", callback);
 
 			// Dispatch an event that doesn't change the derivation
 			system.dispatch({ type: "setName", name: "new name" });
@@ -190,7 +211,7 @@ describe("React Adapter - System Integration", () => {
 			freshSystem.start();
 
 			let firstPrev: number | undefined;
-			const unwatch = freshSystem.watch<number>("doubled", (_, prev) => {
+			const unwatch = freshSystem.watch("doubled", (_, prev) => {
 				firstPrev = prev;
 			});
 
@@ -205,7 +226,7 @@ describe("React Adapter - System Integration", () => {
 
 		it("stops watching after unwatch is called", async () => {
 			const callback = vi.fn();
-			const unwatch = system.watch<number>("doubled", callback);
+			const unwatch = system.watch("doubled", callback);
 
 			system.dispatch({ type: "increment" });
 			await new Promise((resolve) => setTimeout(resolve, 0));
@@ -220,7 +241,7 @@ describe("React Adapter - System Integration", () => {
 
 		it("handles boolean derivations", async () => {
 			const callback = vi.fn();
-			const unwatch = system.watch<boolean>("isPositive", callback);
+			const unwatch = system.watch("isPositive", callback);
 
 			expect(system.read("isPositive")).toBe(false);
 			system.dispatch({ type: "increment" });
@@ -237,8 +258,8 @@ describe("React Adapter - Reference Stability", () => {
 		const system = createSystem({ modules: [createTestModule()] });
 		system.start();
 
-		const summary1 = system.read<{ count: number; doubled: number }>("summary");
-		const summary2 = system.read<{ count: number; doubled: number }>("summary");
+		const summary1 = system.read("summary");
+		const summary2 = system.read("summary");
 
 		// Derivation caching ensures same reference
 		expect(summary1).toBe(summary2);

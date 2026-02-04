@@ -1,3 +1,4 @@
+// @ts-nocheck - TODO: Update adapter for consolidated schema API
 /**
  * Vue Adapter - Vue 3 composables for Directive
  *

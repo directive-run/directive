@@ -106,20 +106,27 @@ export function isRequirementType<T extends string>(
 }
 
 /**
- * Create a type guard for resolver `handles` predicate.
+ * Create a type guard for resolver `requirement` predicate.
  * Cleaner alternative to writing verbose type guards.
  *
  * @example
  * ```typescript
- * resolvers: {
- *   fetchUser: {
- *     // Instead of: handles: (req): req is { type: "FETCH_USER" } => req.type === "FETCH_USER"
- *     handles: forType("FETCH_USER"),
- *     resolve: async (req, ctx) => { ... }
- *   }
- * }
+ * // With explicit requirement type (recommended for complex types)
+ * interface FetchUserRequirement { type: "FETCH_USER"; userId: string }
+ * requirement: forType<FetchUserRequirement>("FETCH_USER"),
+ * key: (req) => req.userId,  // req is FetchUserRequirement
+ *
+ * // Or simple string literal (for basic types)
+ * requirement: forType("FETCH_USER"),
+ * key: (req) => req.type,  // req is Requirement & { type: "FETCH_USER" }
  * ```
  */
+export function forType<R extends Requirement>(
+	type: R["type"],
+): (req: Requirement) => req is R;
+export function forType<T extends string>(
+	type: T,
+): (req: Requirement) => req is Requirement & { type: T };
 export function forType<T extends string>(
 	type: T,
 ): (req: Requirement) => req is Requirement & { type: T } {

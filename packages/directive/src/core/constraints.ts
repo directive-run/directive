@@ -21,6 +21,9 @@ import type {
 } from "./types.js";
 import { withTimeout } from "../utils/utils.js";
 
+// Local type alias for requirement output (avoid type arg issues)
+type RequirementOutput = Requirement | Requirement[] | null;
+
 // ============================================================================
 // Constraints Manager
 // ============================================================================
@@ -86,8 +89,8 @@ export function createConstraintsManager<S extends Schema>(
 	const factToConstraints = new Map<string, Set<string>>();
 	// Track which constraints need re-evaluation
 	const dirtyConstraints = new Set<string>();
-	// Track last requirement for each constraint (for incremental updates)
-	const lastRequirements = new Map<string, RequirementWithId | null>();
+	// Track last requirements for each constraint (for incremental updates)
+	const lastRequirements = new Map<string, RequirementWithId[]>();
 	// First evaluation flag
 	let hasEvaluated = false;
 
@@ -258,19 +261,55 @@ export function createConstraintsManager<S extends Schema>(
 		}
 	}
 
-	/** Get the requirement for a constraint, tracking dependencies if require is a function */
-	function getRequirement(id: string): { requirement: Requirement | null; deps: Set<string> } {
+	/** Max requirements per constraint before warning in dev mode */
+	const MAX_REQUIREMENTS_WARNING_THRESHOLD = 10;
+
+	/**
+	 * Normalize a requirement output to an array of requirements.
+	 * - null/undefined → []
+	 * - single requirement → [requirement]
+	 * - array → filtered to remove null/undefined
+	 */
+	function normalizeRequirements(output: RequirementOutput, constraintId?: string): Requirement[] {
+		if (output === null || output === undefined) {
+			return [];
+		}
+		if (Array.isArray(output)) {
+			// Filter out null/undefined from arrays
+			const filtered = output.filter((r): r is Requirement => r !== null && r !== undefined);
+
+			// Warn in dev mode if constraint produces many requirements
+			if (
+				process.env.NODE_ENV !== "production" &&
+				filtered.length > MAX_REQUIREMENTS_WARNING_THRESHOLD &&
+				constraintId
+			) {
+				console.warn(
+					`[Directive] Constraint "${constraintId}" produced ${filtered.length} requirements. ` +
+						`Consider splitting into multiple constraints for better performance.`,
+				);
+			}
+
+			return filtered;
+		}
+		return [output];
+	}
+
+	/** Get the requirements for a constraint, tracking dependencies if require is a function */
+	function getRequirements(id: string): { requirements: Requirement[]; deps: Set<string> } {
 		const def = definitions[id];
-		if (!def) return { requirement: null, deps: new Set() };
+		if (!def) return { requirements: [], deps: new Set() };
 
 		const requireDef = def.require;
 		if (typeof requireDef === "function") {
 			// Track dependencies when require is a function
-			const { value: requirement, deps } = withTracking(() => requireDef(facts));
-			return { requirement: requirement as Requirement, deps };
+			const { value: output, deps } = withTracking(() => requireDef(facts));
+			const requirements = normalizeRequirements(output as RequirementOutput, id);
+			return { requirements, deps };
 		}
 
-		return { requirement: requireDef, deps: new Set() };
+		const requirements = normalizeRequirements(requireDef as RequirementOutput, id);
+		return { requirements, deps: new Set() };
 	}
 
 	/** Merge additional dependencies into existing constraint deps */
@@ -346,9 +385,11 @@ export function createConstraintsManager<S extends Schema>(
 				// For constraints NOT being re-evaluated, add their last requirements
 				for (const id of allConstraintIds) {
 					if (!affected.has(id)) {
-						const lastReq = lastRequirements.get(id);
-						if (lastReq) {
-							requirements.add(lastReq);
+						const lastReqs = lastRequirements.get(id);
+						if (lastReqs) {
+							for (const req of lastReqs) {
+								requirements.add(req);
+							}
 						}
 					}
 				}
@@ -381,19 +422,21 @@ export function createConstraintsManager<S extends Schema>(
 				}
 
 				if (result) {
-					const { requirement, deps: requireDeps } = getRequirement(id);
+					const { requirements: reqs, deps: requireDeps } = getRequirements(id);
 					// Merge require() deps into constraint deps
 					mergeDependencies(id, requireDeps);
-					if (requirement) {
+					if (reqs.length > 0) {
 						const keyFn = requirementKeys[id];
-						const reqWithId = createRequirementWithId(requirement, id, keyFn);
-						requirements.add(reqWithId);
-						lastRequirements.set(id, reqWithId);
+						const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
+						for (const reqWithId of reqsWithId) {
+							requirements.add(reqWithId);
+						}
+						lastRequirements.set(id, reqsWithId);
 					} else {
-						lastRequirements.set(id, null);
+						lastRequirements.set(id, []);
 					}
 				} else {
-					lastRequirements.set(id, null);
+					lastRequirements.set(id, []);
 				}
 			}
 
@@ -408,18 +451,20 @@ export function createConstraintsManager<S extends Schema>(
 
 				for (const { id, active } of asyncResults) {
 					if (active) {
-						const { requirement, deps: requireDeps } = getRequirement(id);
+						const { requirements: reqs, deps: requireDeps } = getRequirements(id);
 						mergeDependencies(id, requireDeps);
-						if (requirement) {
+						if (reqs.length > 0) {
 							const keyFn = requirementKeys[id];
-							const reqWithId = createRequirementWithId(requirement, id, keyFn);
-							requirements.add(reqWithId);
-							lastRequirements.set(id, reqWithId);
+							const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
+							for (const reqWithId of reqsWithId) {
+								requirements.add(reqWithId);
+							}
+							lastRequirements.set(id, reqsWithId);
 						} else {
-							lastRequirements.set(id, null);
+							lastRequirements.set(id, []);
 						}
 					} else {
-						lastRequirements.set(id, null);
+						lastRequirements.set(id, []);
 					}
 				}
 			}
@@ -435,18 +480,20 @@ export function createConstraintsManager<S extends Schema>(
 
 				for (const { id, active } of asyncResults) {
 					if (active) {
-						const { requirement, deps: requireDeps } = getRequirement(id);
+						const { requirements: reqs, deps: requireDeps } = getRequirements(id);
 						mergeDependencies(id, requireDeps);
-						if (requirement) {
+						if (reqs.length > 0) {
 							const keyFn = requirementKeys[id];
-							const reqWithId = createRequirementWithId(requirement, id, keyFn);
-							requirements.add(reqWithId);
-							lastRequirements.set(id, reqWithId);
+							const reqsWithId = reqs.map((req) => createRequirementWithId(req, id, keyFn));
+							for (const reqWithId of reqsWithId) {
+								requirements.add(reqWithId);
+							}
+							lastRequirements.set(id, reqsWithId);
 						} else {
-							lastRequirements.set(id, null);
+							lastRequirements.set(id, []);
 						}
 					} else {
-						lastRequirements.set(id, null);
+						lastRequirements.set(id, []);
 					}
 				}
 			}
