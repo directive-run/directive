@@ -2,23 +2,30 @@
  * System - The top-level API for creating a Directive runtime
  *
  * A system combines modules with plugins and configuration.
+ * Modules are passed as an object with namespaced access:
  *
- * Supports two modes:
- * - **Array modules** (flat): `modules: [auth, data]` → `facts.token`
- * - **Object modules** (namespaced): `modules: { auth, data }` → `facts.auth.token`
+ * @example
+ * ```typescript
+ * const system = createSystem({
+ *   modules: { auth: authModule, data: dataModule },
+ * });
+ *
+ * system.facts.auth.token       // Namespaced facts
+ * system.derive.data.userCount  // Namespaced derivations
+ * system.events.auth.login()    // Namespaced events
+ * ```
  */
 
 import { createEngine } from "./engine.js";
+import { isPrototypeSafe } from "../utils/utils.js";
 import type {
-	DebugConfig,
-	ErrorBoundaryConfig,
 	ModuleDef,
 	ModuleSchema,
-	Plugin,
-	System,
 	ModulesMap,
 	NamespacedSystem,
 	CreateSystemOptionsNamed,
+	CreateSystemOptionsSingle,
+	SingleModuleSystem,
 } from "./types.js";
 
 // ============================================================================
@@ -28,6 +35,65 @@ import type {
 const BLOCKED_PROPS = Object.freeze(
 	new Set(["__proto__", "constructor", "prototype"]),
 );
+
+// ============================================================================
+// Topological Sort for Module Dependencies
+// ============================================================================
+
+/**
+ * Perform topological sort on modules based on crossModuleDeps.
+ * Returns module namespaces in dependency order (dependencies first).
+ *
+ * @throws Error if circular dependency detected
+ */
+function topologicalSort<Modules extends ModulesMap>(
+	modulesMap: Modules,
+): Array<keyof Modules & string> {
+	const namespaces = Object.keys(modulesMap) as Array<keyof Modules & string>;
+	const visited = new Set<string>();
+	const visiting = new Set<string>(); // For cycle detection
+	const result: Array<keyof Modules & string> = [];
+	const path: string[] = []; // Reuse array to avoid O(n²) memory
+
+	function visit(namespace: string): void {
+		if (visited.has(namespace)) return;
+
+		// Cycle detection
+		if (visiting.has(namespace)) {
+			const cycleStart = path.indexOf(namespace);
+			const cycle = [...path.slice(cycleStart), namespace].join(" → ");
+			throw new Error(
+				`[Directive] Circular dependency detected: ${cycle}. ` +
+				`Modules cannot have circular crossModuleDeps. ` +
+				`Break the cycle by removing one of the cross-module references.`,
+			);
+		}
+
+		visiting.add(namespace);
+		path.push(namespace);
+
+		// Visit dependencies first
+		const mod = modulesMap[namespace];
+		if (mod?.crossModuleDeps) {
+			for (const depNamespace of Object.keys(mod.crossModuleDeps)) {
+				if (namespaces.includes(depNamespace as keyof Modules & string)) {
+					visit(depNamespace);
+				}
+			}
+		}
+
+		path.pop();
+		visiting.delete(namespace);
+		visited.add(namespace);
+		result.push(namespace as keyof Modules & string);
+	}
+
+	for (const namespace of namespaces) {
+		visit(namespace);
+	}
+
+	return result;
+}
 
 // ============================================================================
 // Proxy Cache (Performance)
@@ -67,290 +133,72 @@ const moduleDeriveProxyCache = new WeakMap<
 >();
 
 // ============================================================================
-// System Configuration
-// ============================================================================
-
-/** Options for createSystem with array modules (flat mode) */
-export interface CreateSystemOptions<M extends ModuleSchema> {
-	/** Modules to include in the system */
-	modules: Array<ModuleDef<M>>;
-	/** Plugins to register */
-	// biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
-	plugins?: Array<Plugin<any>>;
-	/** Debug configuration */
-	debug?: DebugConfig;
-	/** Error boundary configuration */
-	errorBoundary?: ErrorBoundaryConfig;
-	/**
-	 * Tick interval for time-based systems (ms).
-	 *
-	 * When set, automatically dispatches `{ type: "tick" }` events at this interval
-	 * after `system.start()` is called. The interval is cleared when `system.stop()`
-	 * is called.
-	 *
-	 * Define a handler in your module's `events` property to respond to tick events.
-	 *
-	 * @example
-	 * ```typescript
-	 * const module = createModule("timer", {
-	 *   schema: {
-	 *     facts: { elapsed: t.number() },
-	 *     derivations: {},
-	 *     events: { tick: {} },
-	 *     requirements: {},
-	 *   },
-	 *   init: (facts) => { facts.elapsed = 0; },
-	 *   derive: {},
-	 *   events: {
-	 *     tick: (facts) => { facts.elapsed += 1; },
-	 *   },
-	 * });
-	 *
-	 * const system = createSystem({
-	 *   modules: [module],
-	 *   tickMs: 1000, // Dispatch { type: "tick" } every second
-	 * });
-	 * ```
-	 */
-	tickMs?: number;
-	/**
-	 * Enable zero-config mode with sensible defaults.
-	 *
-	 * When true, automatically enables:
-	 * - Time-travel debugging in development (process.env.NODE_ENV !== 'production')
-	 * - Skip recovery strategy for errors (prevents cascading failures)
-	 *
-	 * @default false
-	 */
-	zeroConfig?: boolean;
-}
-
-// ============================================================================
-// Function Overloads
-// ============================================================================
-
-/**
- * Create a Directive system with namespaced modules.
- *
- * When modules are passed as an **object**, facts and derivations are
- * automatically namespaced under module keys:
- *
- * @example
- * ```ts
- * // Object modules = namespaced access
- * const system = createSystem({
- *   modules: {
- *     auth: authModule,
- *     data: dataModule,
- *   },
- * });
- *
- * // Namespaced access - fully typed!
- * system.facts.auth.token          // string | null
- * system.facts.data.users          // User[]
- * system.derive.auth.status        // "authenticated" | "guest"
- * system.derive.data.userCount     // number
- *
- * // Cross-module constraints can access all facts
- * constraints: {
- *   fetchWhenAuth: {
- *     when: (facts) => facts.auth.isAuthenticated && facts.data.users.length === 0,
- *     require: { type: "FETCH_USERS" },
- *   },
- * },
- * ```
- */
-export function createSystem<const Modules extends ModulesMap>(
-	options: CreateSystemOptionsNamed<Modules>,
-): NamespacedSystem<Modules>;
-
-/**
- * Create a Directive system with flat modules (existing behavior).
- *
- * When modules are passed as an **array**, facts are merged into a flat
- * namespace. Use prefixes to avoid collisions.
- *
- * @example
- * ```ts
- * // Array modules = flat access (existing behavior)
- * const system = createSystem({
- *   modules: [authModule, dataModule],
- * });
- *
- * // Flat access (requires manual prefixing)
- * system.facts.auth_token
- * system.facts.data_users
- * ```
- */
-export function createSystem<const M extends ModuleSchema>(
-	options: CreateSystemOptions<M>,
-): System<M>;
-
-// ============================================================================
-// Implementation
+// createSystem
 // ============================================================================
 
 /**
  * Create a Directive system.
  *
- * The module format determines the access pattern:
- * - **`modules: { ... }`** (object) → Namespaced access: `facts.auth.token`
- * - **`modules: [ ... ]`** (array) → Flat access: `facts.auth_token`
+ * Supports two modes:
+ * - **Single module**: Use `module` prop for direct access without namespace
+ * - **Multiple modules**: Use `modules` prop for namespaced access
+ *
+ * @example Single module (direct access)
+ * ```ts
+ * const system = createSystem({ module: counterModule });
+ * system.facts.count           // Direct access
+ * system.events.increment()    // Direct events
+ * ```
+ *
+ * @example Multiple modules (namespaced access)
+ * ```ts
+ * const system = createSystem({
+ *   modules: { auth: authModule, data: dataModule },
+ * });
+ * system.facts.auth.token      // Namespaced access
+ * system.events.auth.login()   // Namespaced events
+ * ```
  */
-export function createSystem(
-	// biome-ignore lint/suspicious/noExplicitAny: Overloaded function implementation
-	options: CreateSystemOptions<any> | CreateSystemOptionsNamed<any>,
-	// biome-ignore lint/suspicious/noExplicitAny: Return type depends on overload
-): any {
-	// Detect if modules is object (namespaced) or array (flat)
-	const isNamespaced = !Array.isArray(options.modules);
-
-	if (isNamespaced) {
-		return createNamespacedSystem(options as CreateSystemOptionsNamed<ModulesMap>);
-	}
-
-	return createFlatSystem(options as CreateSystemOptions<ModuleSchema>);
-}
-
-// ============================================================================
-// Flat System (Existing Behavior)
-// ============================================================================
-
-function createFlatSystem<M extends ModuleSchema>(
-	options: CreateSystemOptions<M>,
-): System<M> {
-	// Validate tickMs if provided
-	if (options.tickMs !== undefined && options.tickMs <= 0) {
-		throw new Error("[Directive] tickMs must be a positive number");
-	}
-
-	// Dev-mode warning: tickMs set without tick event handler
-	if (process.env.NODE_ENV !== "production" && options.tickMs && options.tickMs > 0) {
-		const hasTickHandler = options.modules.some(
-			(m) => m.events && "tick" in m.events,
-		);
-		if (!hasTickHandler) {
-			console.warn(
-				`[Directive] tickMs is set to ${options.tickMs}ms but no module defines a "tick" event handler. ` +
-					`The system will dispatch { type: "tick" } events but they will be ignored. ` +
-					`Add a tick handler to one of your modules, or remove tickMs if not needed.`,
+export function createSystem<S extends ModuleSchema>(
+	options: CreateSystemOptionsSingle<S>,
+): SingleModuleSystem<S>;
+export function createSystem<const Modules extends ModulesMap>(
+	options: CreateSystemOptionsNamed<Modules>,
+): NamespacedSystem<Modules>;
+export function createSystem<S extends ModuleSchema, Modules extends ModulesMap>(
+	options: CreateSystemOptionsSingle<S> | CreateSystemOptionsNamed<Modules>,
+): SingleModuleSystem<S> | NamespacedSystem<Modules> {
+	// Single module mode (module prop)
+	if ("module" in options) {
+		if (!options.module) {
+			throw new Error(
+				"[Directive] createSystem requires a module. Got: " + typeof options.module,
 			);
 		}
+		return createSingleModuleSystem(options as CreateSystemOptionsSingle<S>) as SingleModuleSystem<S>;
 	}
 
-	// Apply zero-config defaults if enabled
-	let debug = options.debug;
-	let errorBoundary = options.errorBoundary;
+	// Namespaced mode (modules prop)
+	const namedOptions = options as CreateSystemOptionsNamed<Modules>;
 
-	if (options.zeroConfig) {
-		const isDev = process.env.NODE_ENV !== "production";
-
-		// Enable time-travel in development by default
-		debug = {
-			timeTravel: isDev,
-			maxSnapshots: 100,
-			...options.debug,
-		};
-
-		// Use skip recovery strategy by default (prevents cascading failures)
-		errorBoundary = {
-			onConstraintError: "skip",
-			onResolverError: "skip",
-			onEffectError: "skip",
-			onDerivationError: "skip",
-			...options.errorBoundary,
-		};
+	// Validate not an array
+	if (Array.isArray(namedOptions.modules)) {
+		throw new Error(
+			`[Directive] createSystem expects modules as an object, not an array.\n\n` +
+			`Instead of:\n` +
+			`  createSystem({ modules: [authModule, dataModule] })\n\n` +
+			`Use:\n` +
+			`  createSystem({ modules: { auth: authModule, data: dataModule } })\n\n` +
+			`Or for a single module:\n` +
+			`  createSystem({ module: counterModule })`,
+		);
 	}
 
-	// Convert ModuleDef to the engine's expected format
-	// The engine internally works with flat schema format, so we transform
-	// the consolidated schema to extract facts and requirements
-	const engineModules = options.modules.map((mod) => ({
-		id: mod.id,
-		// Extract facts schema from consolidated schema
-		schema: mod.schema.facts,
-		// Extract requirements schema (for typed resolvers)
-		requirements: mod.schema.requirements,
-		init: mod.init,
-		derive: mod.derive,
-		events: mod.events,
-		effects: mod.effects,
-		constraints: mod.constraints,
-		resolvers: mod.resolvers,
-		hooks: mod.hooks,
-	}));
-
-	const engine = createEngine({
-		// biome-ignore lint/suspicious/noExplicitAny: Module format conversion
-		modules: engineModules as any,
-		plugins: options.plugins,
-		debug,
-		errorBoundary,
-		tickMs: options.tickMs,
-	});
-
-	// If tickMs is specified, wrap the system with tick interval management
-	if (options.tickMs && options.tickMs > 0) {
-		let tickInterval: ReturnType<typeof setInterval> | null = null;
-		const tickMs = options.tickMs;
-
-		// Create wrapper that composes tick behavior
-		const system: System<M> = {
-			facts: engine.facts,
-			debug: engine.debug,
-			derive: engine.derive,
-			events: engine.events,
-
-			get isRunning() {
-				return engine.isRunning;
-			},
-
-			get isSettled() {
-				return engine.isSettled;
-			},
-
-			start(): void {
-				engine.start();
-				tickInterval = setInterval(() => {
-					engine.dispatch({ type: "tick" });
-				}, tickMs);
-			},
-
-			stop(): void {
-				if (tickInterval) {
-					clearInterval(tickInterval);
-					tickInterval = null;
-				}
-				engine.stop();
-			},
-
-			destroy(): void {
-				this.stop();
-				engine.destroy();
-			},
-
-			dispatch: engine.dispatch.bind(engine),
-			read: engine.read.bind(engine),
-			subscribe: engine.subscribe.bind(engine),
-			watch: engine.watch.bind(engine),
-			inspect: engine.inspect.bind(engine),
-			settle: engine.settle.bind(engine),
-			explain: engine.explain.bind(engine),
-			getSnapshot: engine.getSnapshot.bind(engine),
-			restore: engine.restore.bind(engine),
-			batch: engine.batch.bind(engine),
-		// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for System
-		} as any;
-
-		return system;
-	}
-
-	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for System
-	return engine as any;
+	return createNamespacedSystem(namedOptions) as NamespacedSystem<Modules>;
 }
 
 // ============================================================================
-// Namespaced System (New Feature)
+// Internal Implementation
 // ============================================================================
 
 function createNamespacedSystem<Modules extends ModulesMap>(
@@ -386,6 +234,31 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		}
 	}
 
+	// Determine module initialization order
+	let orderedNamespaces: Array<keyof Modules & string>;
+	const initOrder = options.initOrder ?? "auto";
+
+	if (Array.isArray(initOrder)) {
+		// Explicit order provided - validate it includes all modules
+		const explicitOrder = initOrder as Array<keyof Modules & string>;
+		const missingModules = Object.keys(modulesMap).filter(
+			(ns) => !explicitOrder.includes(ns as keyof Modules & string),
+		);
+		if (missingModules.length > 0) {
+			throw new Error(
+				`[Directive] initOrder is missing modules: ${missingModules.join(", ")}. ` +
+				`All modules must be included in the explicit order.`,
+			);
+		}
+		orderedNamespaces = explicitOrder;
+	} else if (initOrder === "declaration") {
+		// Use object key order (current behavior)
+		orderedNamespaces = Object.keys(modulesMap) as Array<keyof Modules & string>;
+	} else {
+		// "auto" - use topological sort based on crossModuleDeps
+		orderedNamespaces = topologicalSort(modulesMap);
+	}
+
 	// Apply zero-config defaults if enabled
 	let debug = options.debug;
 	let errorBoundary = options.errorBoundary;
@@ -410,9 +283,12 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
 	// Transform modules to flat format with prefixed keys
 	// auth.token → auth_token internally
+	// Process in dependency order (determined above)
 	const flatModules: Array<ModuleDef<ModuleSchema>> = [];
 
-	for (const [namespace, mod] of Object.entries(modulesMap)) {
+	for (const namespace of orderedNamespaces) {
+		const mod = modulesMap[namespace];
+		if (!mod) continue; // TypeScript guard - should never happen
 		// Compute cross-module deps info once per module (used by derive, constraints, effects)
 		const hasCrossModuleDeps = mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0;
 		const depNamespaces = hasCrossModuleDeps ? Object.keys(mod.crossModuleDeps!) : [];
@@ -602,8 +478,61 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		}
 	}
 
+	// Store for hydrated facts (set by hydrate(), applied during init)
+	let hydratedFacts: Record<string, Record<string, unknown>> | null = null;
+
+	// Engine reference (set after creation, used by applyNamespacedFacts)
+	// biome-ignore lint/suspicious/noExplicitAny: Engine type
+	let engine: any = null;
+
+	/**
+	 * Apply namespaced facts to the engine's flat store.
+	 * Converts { auth: { token: "x" } } to { auth_token: "x" }
+	 * Includes prototype pollution protection.
+	 */
+	function applyNamespacedFacts(
+		namespacedFacts: Record<string, Record<string, unknown>>,
+	): void {
+		for (const [namespace, facts] of Object.entries(namespacedFacts)) {
+			// Skip blocked property names
+			if (BLOCKED_PROPS.has(namespace)) {
+				if (process.env.NODE_ENV !== "production") {
+					console.warn(
+						`[Directive] initialFacts/hydrate contains blocked namespace "${namespace}". Skipping.`,
+					);
+				}
+				continue;
+			}
+
+			if (!moduleNamespaces.has(namespace)) {
+				if (process.env.NODE_ENV !== "production") {
+					console.warn(
+						`[Directive] initialFacts/hydrate contains unknown namespace "${namespace}". ` +
+						`Available modules: ${[...moduleNamespaces].join(", ")}`,
+					);
+				}
+				continue;
+			}
+
+			// Validate facts object for prototype pollution
+			if (facts && typeof facts === "object" && !isPrototypeSafe(facts)) {
+				throw new Error(
+					`[Directive] initialFacts/hydrate for namespace "${namespace}" contains potentially ` +
+					`dangerous keys (__proto__, constructor, or prototype). This may indicate a ` +
+					`prototype pollution attack.`,
+				);
+			}
+
+			for (const [key, value] of Object.entries(facts)) {
+				// Skip blocked keys
+				if (BLOCKED_PROPS.has(key)) continue;
+				(engine.facts as Record<string, unknown>)[`${namespace}_${key}`] = value;
+			}
+		}
+	}
+
 	// Create engine with flat modules
-	const engine = createEngine({
+	engine = createEngine({
 		// biome-ignore lint/suspicious/noExplicitAny: Module format conversion
 		modules: flatModules.map((mod) => ({
 			id: mod.id,
@@ -621,6 +550,18 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		debug,
 		errorBoundary,
 		tickMs: options.tickMs,
+		// Callback to apply initialFacts/hydrate during init phase (after module inits, before reconcile)
+		onAfterModuleInit: () => {
+			// Apply initialFacts first
+			if (options.initialFacts) {
+				applyNamespacedFacts(options.initialFacts as Record<string, Record<string, unknown>>);
+			}
+			// Apply hydrated facts second (takes precedence)
+			if (hydratedFacts) {
+				applyNamespacedFacts(hydratedFacts);
+				hydratedFacts = null;
+			}
+		},
 	});
 
 	// Create namespaced proxies for external access
@@ -633,6 +574,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 	const tickMs = options.tickMs;
 
 	const system: NamespacedSystem<Modules> = {
+		_mode: "namespaced",
 		facts: namespacedFactsProxy,
 		debug: engine.debug,
 		derive: namespacedDeriveProxy,
@@ -646,8 +588,38 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 			return engine.isSettled;
 		},
 
+		get isInitialized() {
+			return engine.isInitialized;
+		},
+
+		get isReady() {
+			return engine.isReady;
+		},
+
+		whenReady: engine.whenReady.bind(engine),
+
+		async hydrate(
+			loader: () =>
+				| Promise<Record<string, Record<string, unknown>>>
+				| Record<string, Record<string, unknown>>,
+		) {
+			if (engine.isRunning) {
+				throw new Error(
+					"[Directive] hydrate() must be called before start(). " +
+					"The system is already running.",
+				);
+			}
+
+			const result = await loader();
+			if (result && typeof result === "object") {
+				hydratedFacts = result;
+			}
+		},
+
 		start(): void {
+			// Engine.start() runs module inits, then applies initialFacts/hydrate via callback
 			engine.start();
+
 			if (tickMs && tickMs > 0) {
 				// Find the first module with a tick event and dispatch to it
 				const tickEventKey = Object.keys(flatModules[0]?.events ?? {}).find((k) => k.endsWith("_tick"));
@@ -1102,3 +1074,244 @@ function createNamespacedEventsProxy(
 		},
 	});
 }
+
+// ============================================================================
+// Single Module System
+// ============================================================================
+
+/**
+ * Create a system with a single module (no namespacing).
+ * Facts, derivations, and events are accessed directly.
+ */
+function createSingleModuleSystem<S extends ModuleSchema>(
+	options: CreateSystemOptionsSingle<S>,
+): SingleModuleSystem<S> {
+	const mod = options.module;
+
+	// Validate module is provided
+	if (!mod) {
+		throw new Error(
+			"[Directive] createSystem requires a module. Got: " + typeof mod,
+		);
+	}
+
+	// Validate tickMs if provided
+	if (options.tickMs !== undefined && options.tickMs <= 0) {
+		throw new Error("[Directive] tickMs must be a positive number");
+	}
+
+	// Validate initialFacts for prototype pollution
+	if (options.initialFacts && !isPrototypeSafe(options.initialFacts)) {
+		throw new Error(
+			"[Directive] initialFacts contains potentially dangerous keys " +
+			"(__proto__, constructor, or prototype). This may indicate a " +
+			"prototype pollution attack.",
+		);
+	}
+
+	// Dev-mode warnings
+	if (process.env.NODE_ENV !== "production") {
+		// Warn if crossModuleDeps is defined (ignored in single module mode)
+		if (mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0) {
+			console.warn(
+				"[Directive] Single module mode ignores crossModuleDeps. " +
+				"Use multiple modules if cross-module access is needed: " +
+				"createSystem({ modules: { ... } })",
+			);
+		}
+
+		// Warn if tickMs set without tick event handler
+		if (options.tickMs && options.tickMs > 0) {
+			const hasTickHandler = mod.events && "tick" in mod.events;
+			if (!hasTickHandler) {
+				console.warn(
+					`[Directive] tickMs is set to ${options.tickMs}ms but module has no "tick" event handler.`,
+				);
+			}
+		}
+	}
+
+	// Apply zero-config defaults if enabled
+	let debug = options.debug;
+	let errorBoundary = options.errorBoundary;
+
+	if (options.zeroConfig) {
+		const isDev = process.env.NODE_ENV !== "production";
+
+		debug = {
+			timeTravel: isDev,
+			maxSnapshots: 100,
+			...options.debug,
+		};
+
+		errorBoundary = {
+			onConstraintError: "skip",
+			onResolverError: "skip",
+			onEffectError: "skip",
+			onDerivationError: "skip",
+			...options.errorBoundary,
+		};
+	}
+
+	// Store for hydrated facts
+	let hydratedFacts: Record<string, unknown> | null = null;
+
+	// Engine reference
+	// biome-ignore lint/suspicious/noExplicitAny: Engine type
+	let engine: any = null;
+
+	// Create engine with the module directly (no prefixing needed)
+	engine = createEngine({
+		modules: [
+			{
+				id: mod.id,
+				schema: mod.schema.facts,
+				requirements: mod.schema.requirements,
+				init: mod.init,
+				derive: mod.derive,
+				events: mod.events,
+				effects: mod.effects,
+				constraints: mod.constraints,
+				resolvers: mod.resolvers,
+				hooks: mod.hooks,
+			},
+		// biome-ignore lint/suspicious/noExplicitAny: Module format
+		] as any,
+		plugins: options.plugins,
+		debug,
+		errorBoundary,
+		tickMs: options.tickMs,
+		onAfterModuleInit: () => {
+			// Apply initialFacts
+			if (options.initialFacts) {
+				for (const [key, value] of Object.entries(options.initialFacts)) {
+					if (BLOCKED_PROPS.has(key)) continue;
+					(engine.facts as Record<string, unknown>)[key] = value;
+				}
+			}
+			// Apply hydrated facts (takes precedence)
+			if (hydratedFacts) {
+				for (const [key, value] of Object.entries(hydratedFacts)) {
+					if (BLOCKED_PROPS.has(key)) continue;
+					(engine.facts as Record<string, unknown>)[key] = value;
+				}
+				hydratedFacts = null;
+			}
+		},
+	});
+
+	// Create events proxy for direct access
+	const eventsProxy = new Proxy({} as Record<string, (payload?: Record<string, unknown>) => void>, {
+		get(_, eventName: string | symbol) {
+			if (typeof eventName === "symbol") return undefined;
+			if (BLOCKED_PROPS.has(eventName)) return undefined;
+
+			return (payload?: Record<string, unknown>) => {
+				engine.dispatch({ type: eventName, ...payload });
+			};
+		},
+	});
+
+	// Build the single module system
+	let tickInterval: ReturnType<typeof setInterval> | null = null;
+	const tickMs = options.tickMs;
+
+	const system: SingleModuleSystem<S> = {
+		_mode: "single",
+		facts: engine.facts,
+		debug: engine.debug,
+		derive: engine.derive,
+		events: eventsProxy as SingleModuleSystem<S>["events"],
+
+		get isRunning() {
+			return engine.isRunning;
+		},
+
+		get isSettled() {
+			return engine.isSettled;
+		},
+
+		get isInitialized() {
+			return engine.isInitialized;
+		},
+
+		get isReady() {
+			return engine.isReady;
+		},
+
+		whenReady: engine.whenReady.bind(engine),
+
+		async hydrate(
+			loader: () => Promise<Record<string, unknown>> | Record<string, unknown>,
+		) {
+			if (engine.isRunning) {
+				throw new Error(
+					"[Directive] hydrate() must be called before start(). " +
+					"The system is already running.",
+				);
+			}
+
+			const result = await loader();
+			if (result && typeof result === "object") {
+				hydratedFacts = result as Record<string, unknown>;
+			}
+		},
+
+		start(): void {
+			engine.start();
+
+			if (tickMs && tickMs > 0) {
+				const hasTickHandler = mod.events && "tick" in mod.events;
+				if (hasTickHandler) {
+					tickInterval = setInterval(() => {
+						engine.dispatch({ type: "tick" });
+					}, tickMs);
+				}
+			}
+		},
+
+		stop(): void {
+			if (tickInterval) {
+				clearInterval(tickInterval);
+				tickInterval = null;
+			}
+			engine.stop();
+		},
+
+		destroy(): void {
+			this.stop();
+			engine.destroy();
+		},
+
+		dispatch(event: { type: string; [key: string]: unknown }) {
+			engine.dispatch(event);
+		},
+
+		batch: engine.batch.bind(engine),
+
+		read<T = unknown>(derivationId: string): T {
+			return engine.read(derivationId);
+		},
+
+		subscribe(derivationIds: string[], listener: () => void): () => void {
+			return engine.subscribe(derivationIds, listener);
+		},
+
+		watch<T = unknown>(
+			derivationId: string,
+			callback: (newValue: T, previousValue: T | undefined) => void,
+		): () => void {
+			return engine.watch(derivationId, callback);
+		},
+
+		inspect: engine.inspect.bind(engine),
+		settle: engine.settle.bind(engine),
+		explain: engine.explain.bind(engine),
+		getSnapshot: engine.getSnapshot.bind(engine),
+		restore: engine.restore.bind(engine),
+	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing
+	} as any;
+
+	return system;
+}
+

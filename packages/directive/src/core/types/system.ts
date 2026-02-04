@@ -118,6 +118,13 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 
 	readonly isRunning: boolean;
 	readonly isSettled: boolean;
+	/** Whether all modules have completed initialization */
+	readonly isInitialized: boolean;
+	/** Whether system has completed first reconciliation */
+	readonly isReady: boolean;
+
+	/** Wait for system to be fully ready (after first reconciliation) */
+	whenReady(): Promise<void>;
 
 	dispatch(event: InferEvents<M>): void;
 	dispatch(event: SystemEvent): void;
@@ -155,5 +162,11 @@ export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
 	plugins?: Array<Plugin<any>>;
 	debug?: DebugConfig;
 	errorBoundary?: ErrorBoundaryConfig;
+	/**
+	 * Callback invoked after module inits but before first reconcile.
+	 * Used by system wrapper to apply initialFacts/hydrate at the right time.
+	 * @internal
+	 */
+	onAfterModuleInit?: () => void;
 	tickMs?: number;
 }

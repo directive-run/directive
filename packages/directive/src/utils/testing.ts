@@ -9,13 +9,14 @@
  * - Pending requirements tracking
  */
 
-import { type CreateSystemOptions, createSystem } from "../core/system.js";
+import { createSystem } from "../core/system.js";
 import type {
-	ModuleDef,
-	ModuleSchema,
+	CreateSystemOptionsNamed,
+	ModulesMap,
+	NamespacedSystem,
 	Requirement,
 	RequirementWithId,
-	System,
+	SystemInspection,
 } from "../core/types.js";
 
 // ============================================================================
@@ -66,8 +67,8 @@ export async function flushMicrotasks(): Promise<void> {
  * expect(system.facts.result).toBe("done");
  * ```
  */
-export async function settleWithFakeTimers<M extends ModuleSchema>(
-	system: System<M>,
+export async function settleWithFakeTimers(
+	system: { inspect(): SystemInspection },
 	advanceTime: (ms: number) => void,
 	options: {
 		/** Total time to advance (default: 5000ms) */
@@ -315,7 +316,8 @@ export interface MockResolver<R extends Requirement = Requirement> {
 export function mockResolver<R extends Requirement = Requirement>(
 	_requirementType: string,
 ): MockResolver<R> & {
-	handler: (req: R, ctx: MockResolverContext) => Promise<void>;
+	/** Handler that can be passed to createTestSystem mocks */
+	handler: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
 } {
 	const calls: R[] = [];
 	const pending: Array<{
@@ -359,11 +361,11 @@ export function mockResolver<R extends Requirement = Requirement>(
 		},
 	};
 
-	const handler = (req: R, _ctx: MockResolverContext): Promise<void> => {
-		calls.push(req);
+	const handler = (req: Requirement, _ctx: MockResolverContext): Promise<void> => {
+		calls.push(req as R);
 		return new Promise<void>((resolve, reject) => {
 			pending.push({
-				requirement: req,
+				requirement: req as R,
 				resolve: () => resolve(),
 				reject,
 			});
@@ -396,7 +398,7 @@ export interface FactChangeRecord {
 // Test System
 // ============================================================================
 
-export interface TestSystem<M extends ModuleSchema> extends System<M> {
+export interface TestSystem<Modules extends ModulesMap> extends NamespacedSystem<Modules> {
 	/**
 	 * Wait for all pending operations to complete.
 	 * @param maxWait - Maximum time to wait in ms (default: 5000)
@@ -434,8 +436,8 @@ export interface TestSystem<M extends ModuleSchema> extends System<M> {
 	assertFactChanges(key: string, times: number): void;
 }
 
-export interface CreateTestSystemOptions<M extends ModuleSchema>
-	extends Omit<CreateSystemOptions<M>, "plugins"> {
+export interface CreateTestSystemOptions<Modules extends ModulesMap>
+	extends Omit<CreateSystemOptionsNamed<Modules>, "plugins"> {
 	/** Mock resolvers by type */
 	mocks?: {
 		resolvers?: Record<string, MockResolverOptions>;
@@ -448,9 +450,9 @@ export interface CreateTestSystemOptions<M extends ModuleSchema>
 /**
  * Create a test system with additional testing utilities.
  */
-export function createTestSystem<M extends ModuleSchema>(
-	options: CreateTestSystemOptions<M>,
-): TestSystem<M> {
+export function createTestSystem<Modules extends ModulesMap>(
+	options: CreateTestSystemOptions<Modules>,
+): TestSystem<Modules> {
 	const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
 	const resolverCalls = new Map<string, Requirement[]>();
 	const allRequirements: RequirementWithId[] = [];
@@ -467,14 +469,17 @@ export function createTestSystem<M extends ModuleSchema>(
 	}
 
 	// Create modules with mock resolvers
-	// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
-	const modulesWithMocks = options.modules.map((module: ModuleDef<any>) => ({
-		...module,
-		resolvers: {
-			...module.resolvers,
-			...mockResolvers,
-		},
-	}));
+	const modulesWithMocks: Modules = {} as Modules;
+	for (const [name, module] of Object.entries(options.modules)) {
+		// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
+		(modulesWithMocks as any)[name] = {
+			...module,
+			resolvers: {
+				...module.resolvers,
+				...mockResolvers,
+			},
+		};
+	}
 
 	// Create tracking plugin
 	const trackingPlugin = {
@@ -495,10 +500,9 @@ export function createTestSystem<M extends ModuleSchema>(
 	// Create the underlying system
 	const system = createSystem({
 		...options,
-		// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
-		modules: modulesWithMocks as Array<ModuleDef<any>>,
+		modules: modulesWithMocks,
 		plugins: [trackingPlugin, ...(options.plugins ?? [])],
-	}) as System<M>;
+	}) as NamespacedSystem<Modules>;
 
 	// Wrap dispatch to track events
 	const originalDispatch = system.dispatch.bind(system);
@@ -508,7 +512,7 @@ export function createTestSystem<M extends ModuleSchema>(
 		originalDispatch(event);
 	};
 
-	const testSystem: TestSystem<M> = {
+	const testSystem: TestSystem<Modules> = {
 		...system,
 		eventHistory,
 		resolverCalls,
