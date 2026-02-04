@@ -101,14 +101,43 @@ export function createConstraintsManager<S extends Schema>(
 	const resolvedConstraints = new Set<string>();
 	// Track constraints that didn't fire (when() returned false) - they don't block
 	const noFireConstraints = new Set<string>();
+	// Reverse dependency map: which constraints depend on this one (for O(1) markResolved)
+	const dependsOnMe = new Map<string, Set<string>>();
+	// Topological order of constraints (dependencies before dependents)
+	let topologicalOrder: string[] = [];
+	// Cached topological index map for O(1) lookups during sorting
+	let topologicalIndex: Map<string, number> = new Map();
 
 	/**
-	 * Detect cycles in the constraint dependency graph (via `after` property).
-	 * Uses DFS to find back edges.
+	 * Build reverse dependency map for O(1) lookups in markResolved.
+	 * Maps each constraint ID to the set of constraints that depend on it via `after`.
 	 */
-	function detectCycles(): void {
+	function buildReverseDependencyMap(): void {
+		for (const [id, def] of Object.entries(definitions)) {
+			if (def.after) {
+				for (const depId of def.after) {
+					if (definitions[depId]) {
+						if (!dependsOnMe.has(depId)) {
+							dependsOnMe.set(depId, new Set());
+						}
+						dependsOnMe.get(depId)!.add(id);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Detect cycles in the constraint dependency graph and compute topological order.
+	 * Uses DFS to find back edges and post-order for topological sort.
+	 *
+	 * The DFS visits dependencies first (via `after`), so post-order naturally gives us
+	 * topological order where dependencies appear before their dependents.
+	 */
+	function detectCyclesAndComputeTopoOrder(): void {
 		const visited = new Set<string>();
 		const visiting = new Set<string>();
+		const postOrder: string[] = [];
 
 		function visit(id: string, path: string[]): void {
 			if (visited.has(id)) return;
@@ -138,16 +167,42 @@ export function createConstraintsManager<S extends Schema>(
 			path.pop();
 			visiting.delete(id);
 			visited.add(id);
+			postOrder.push(id);
 		}
 
 		for (const id of Object.keys(definitions)) {
 			visit(id, []);
 		}
+
+		// Post-order with dependency-first traversal gives us topological order
+		// (dependencies are added before dependents)
+		topologicalOrder = postOrder;
+
+		// Build index map for O(1) lookups during sorting
+		topologicalIndex = new Map(topologicalOrder.map((id, index) => [id, index]));
 	}
 
-	// Validate constraint graph in dev mode
+	// Validate constraint graph (always run - cycle in production would cause deadlock)
+	// Also computes topological order for O(n) evaluation
+	detectCyclesAndComputeTopoOrder();
+
+	// Build reverse dependency map for O(1) markResolved lookups
+	buildReverseDependencyMap();
+
+	// Validate `after` references in dev mode (catch typos early)
 	if (process.env.NODE_ENV !== "production") {
-		detectCycles();
+		for (const [id, def] of Object.entries(definitions)) {
+			if (def.after) {
+				for (const depId of def.after) {
+					if (!definitions[depId]) {
+						console.warn(
+							`[Directive] Constraint "${id}" references unknown constraint "${depId}" in \`after\`. ` +
+								`This dependency will be ignored. Check for typos or ensure the constraint exists.`,
+						);
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -389,12 +444,29 @@ export function createConstraintsManager<S extends Schema>(
 	// Initialize all constraint states and cache sorted order
 	let sortedConstraintIds: string[] | null = null;
 
+	/**
+	 * Get constraint IDs sorted by:
+	 * 1. Priority (higher first)
+	 * 2. Topological order (dependencies before dependents) for same priority
+	 * This enables O(n) evaluation in the best case when priorities align with dependencies.
+	 *
+	 * Uses cached topologicalIndex for O(1) lookups during comparison.
+	 */
 	function getSortedConstraintIds(): string[] {
 		if (!sortedConstraintIds) {
 			sortedConstraintIds = Object.keys(definitions).sort((a, b) => {
 				const stateA = getState(a);
 				const stateB = getState(b);
-				return stateB.priority - stateA.priority;
+
+				// Primary sort: priority (higher first)
+				const priorityDiff = stateB.priority - stateA.priority;
+				if (priorityDiff !== 0) return priorityDiff;
+
+				// Secondary sort: topological order (dependencies first)
+				// Uses cached topologicalIndex for O(1) lookups
+				const topoA = topologicalIndex.get(a) ?? 0;
+				const topoB = topologicalIndex.get(b) ?? 0;
+				return topoA - topoB;
 			});
 		}
 		return sortedConstraintIds;
@@ -484,38 +556,6 @@ export function createConstraintsManager<S extends Schema>(
 				}
 			}
 
-			// Filter out constraints blocked by `after` dependencies
-			const blockedConstraints: string[] = [];
-			const readyToEvaluate: string[] = [];
-
-			for (const id of constraintsToEvaluate) {
-				if (areAfterDependenciesSatisfied(id)) {
-					readyToEvaluate.push(id);
-				} else {
-					blockedConstraints.push(id);
-					// Keep last requirements for blocked constraints
-					const lastReqs = lastRequirements.get(id);
-					if (lastReqs) {
-						for (const req of lastReqs) {
-							requirements.add(req);
-						}
-					}
-				}
-			}
-
-			// Separate sync and async constraints from ready-to-evaluate
-			const syncConstraints: string[] = [];
-			const asyncConstraints: string[] = [];
-
-			for (const id of readyToEvaluate) {
-				const state = getState(id);
-				if (state.isAsync) {
-					asyncConstraints.push(id);
-				} else {
-					syncConstraints.push(id);
-				}
-			}
-
 			/**
 			 * Process a constraint result: handle requirements and track no-fire state
 			 */
@@ -544,48 +584,107 @@ export function createConstraintsManager<S extends Schema>(
 				}
 			}
 
-			// Evaluate sync constraints first (they're fast)
-			// Some may turn out to be async at runtime - collect those for async evaluation
-			const unexpectedAsync: Array<{ id: string; promise: Promise<boolean> }> = [];
+			/**
+			 * Evaluate constraints, respecting `after` dependencies.
+			 * Returns list of constraints that are still blocked after this pass.
+			 */
+			async function evaluateConstraintBatch(constraintIds: string[]): Promise<string[]> {
+				// Filter out constraints blocked by `after` dependencies
+				const blockedConstraints: string[] = [];
+				const readyToEvaluate: string[] = [];
 
-			for (const id of syncConstraints) {
-				const result = evaluateSync(id);
-
-				// Handle runtime-detected async constraints
-				if (result instanceof Promise) {
-					unexpectedAsync.push({ id, promise: result });
-					continue;
+				for (const id of constraintIds) {
+					if (areAfterDependenciesSatisfied(id)) {
+						readyToEvaluate.push(id);
+					} else {
+						blockedConstraints.push(id);
+						// Keep last requirements for blocked constraints
+						const lastReqs = lastRequirements.get(id);
+						if (lastReqs) {
+							for (const req of lastReqs) {
+								requirements.add(req);
+							}
+						}
+					}
 				}
 
-				processConstraintResult(id, result);
+				if (readyToEvaluate.length === 0) {
+					return blockedConstraints;
+				}
+
+				// Separate sync and async constraints from ready-to-evaluate
+				const syncConstraints: string[] = [];
+				const asyncConstraints: string[] = [];
+
+				for (const id of readyToEvaluate) {
+					const state = getState(id);
+					if (state.isAsync) {
+						asyncConstraints.push(id);
+					} else {
+						syncConstraints.push(id);
+					}
+				}
+
+				// Evaluate sync constraints first (they're fast)
+				// Some may turn out to be async at runtime - collect those for async evaluation
+				const unexpectedAsync: Array<{ id: string; promise: Promise<boolean> }> = [];
+
+				for (const id of syncConstraints) {
+					const result = evaluateSync(id);
+
+					// Handle runtime-detected async constraints
+					if (result instanceof Promise) {
+						unexpectedAsync.push({ id, promise: result });
+						continue;
+					}
+
+					processConstraintResult(id, result);
+				}
+
+				// Handle any sync constraints that turned out to be async
+				if (unexpectedAsync.length > 0) {
+					const asyncResults = await Promise.all(
+						unexpectedAsync.map(async ({ id, promise }) => ({
+							id,
+							active: await promise,
+						})),
+					);
+
+					for (const { id, active } of asyncResults) {
+						processConstraintResult(id, active);
+					}
+				}
+
+				// Evaluate async constraints in parallel
+				if (asyncConstraints.length > 0) {
+					const asyncResults = await Promise.all(
+						asyncConstraints.map(async (id) => ({
+							id,
+							active: await evaluateAsync(id),
+						})),
+					);
+
+					for (const { id, active } of asyncResults) {
+						processConstraintResult(id, active);
+					}
+				}
+
+				return blockedConstraints;
 			}
 
-			// Handle any sync constraints that turned out to be async
-			if (unexpectedAsync.length > 0) {
-				const asyncResults = await Promise.all(
-					unexpectedAsync.map(async ({ id, promise }) => ({
-						id,
-						active: await promise,
-					})),
-				);
+			// Evaluate constraints in passes until no blocked constraints become unblocked
+			let remainingToEvaluate = constraintsToEvaluate;
+			let maxPasses = constraintsToEvaluate.length + 1; // Prevent infinite loops
 
-				for (const { id, active } of asyncResults) {
-					processConstraintResult(id, active);
+			while (remainingToEvaluate.length > 0 && maxPasses > 0) {
+				const previousRemaining = remainingToEvaluate.length;
+				remainingToEvaluate = await evaluateConstraintBatch(remainingToEvaluate);
+
+				// If no progress was made (all still blocked), break
+				if (remainingToEvaluate.length === previousRemaining) {
+					break;
 				}
-			}
-
-			// Evaluate async constraints in parallel
-			if (asyncConstraints.length > 0) {
-				const asyncResults = await Promise.all(
-					asyncConstraints.map(async (id) => ({
-						id,
-						active: await evaluateAsync(id),
-					})),
-				);
-
-				for (const { id, active } of asyncResults) {
-					processConstraintResult(id, active);
-				}
+				maxPasses--;
 			}
 
 			return requirements.all();
@@ -630,6 +729,16 @@ export function createConstraintsManager<S extends Schema>(
 			const state = states.get(constraintId);
 			if (state) {
 				state.lastResolvedAt = Date.now();
+			}
+
+			// Mark all constraints that depend on this one (via `after`) as dirty
+			// so they get re-evaluated on the next reconcile
+			// Uses reverse dependency map for O(1) lookup instead of O(n*m) iteration
+			const dependents = dependsOnMe.get(constraintId);
+			if (dependents) {
+				for (const id of dependents) {
+					dirtyConstraints.add(id);
+				}
 			}
 		},
 

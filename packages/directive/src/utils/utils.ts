@@ -178,3 +178,126 @@ export function shallowEqual<T extends Record<string, unknown>>(a: T, b: T): boo
 
 	return true;
 }
+
+/**
+ * Generate a simple hash string from an object.
+ * Uses djb2 algorithm on the stable stringified value.
+ *
+ * **Limitations:**
+ * - 32-bit hash output means collision probability increases with data set size
+ *   (birthday paradox: ~50% collision chance at ~77,000 distinct values)
+ * - Suitable for: cache invalidation, change detection, deduplication of small sets
+ * - NOT suitable for: cryptographic use, security-sensitive operations, large-scale deduplication
+ *
+ * For security-sensitive use cases requiring stronger collision resistance,
+ * consider using a cryptographic hash like SHA-256.
+ *
+ * @param value - The value to hash
+ * @returns A hex hash string (8 characters, 32 bits)
+ */
+export function hashObject(value: unknown): string {
+	const str = stableStringify(value);
+	let hash = 5381;
+	for (let i = 0; i < str.length; i++) {
+		hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+	}
+	// Convert to unsigned 32-bit and then to hex
+	return (hash >>> 0).toString(16);
+}
+
+// ============================================================================
+// Distributable Snapshot Utilities
+// ============================================================================
+
+/**
+ * Distributable snapshot type for type-safe helper functions.
+ */
+export interface DistributableSnapshotLike<T = Record<string, unknown>> {
+	data: T;
+	createdAt: number;
+	expiresAt?: number;
+	version?: string;
+	metadata?: Record<string, unknown>;
+}
+
+/**
+ * Check if a distributable snapshot has expired.
+ * Returns false if the snapshot has no expiresAt field.
+ *
+ * @example
+ * ```typescript
+ * const snapshot = system.getDistributableSnapshot({ ttlSeconds: 3600 });
+ * // ... later ...
+ * if (isSnapshotExpired(snapshot)) {
+ *   // Refresh the snapshot
+ * }
+ * ```
+ *
+ * @param snapshot - The snapshot to check
+ * @param now - Optional current timestamp (defaults to Date.now())
+ * @returns True if the snapshot has expired, false otherwise
+ */
+export function isSnapshotExpired<T>(
+	snapshot: DistributableSnapshotLike<T>,
+	now: number = Date.now(),
+): boolean {
+	return snapshot.expiresAt !== undefined && now > snapshot.expiresAt;
+}
+
+/**
+ * Validate a distributable snapshot and return its data.
+ * Throws if the snapshot is malformed or has expired.
+ *
+ * @example
+ * ```typescript
+ * const cached = JSON.parse(await redis.get(`entitlements:${userId}`));
+ * try {
+ *   const data = validateSnapshot(cached);
+ *   // Use data.canUseFeature, etc.
+ * } catch (e) {
+ *   // Snapshot invalid or expired, refresh it
+ * }
+ * ```
+ *
+ * @example Using custom timestamp for testing
+ * ```typescript
+ * const snapshot = { data: { test: true }, createdAt: 1000, expiresAt: 2000 };
+ * validateSnapshot(snapshot, 1500); // Returns { test: true }
+ * validateSnapshot(snapshot, 2500); // Throws: Snapshot expired
+ * ```
+ *
+ * @param snapshot - The snapshot to validate
+ * @param now - Optional current timestamp (defaults to Date.now())
+ * @returns The snapshot data if valid
+ * @throws Error if the snapshot is malformed or has expired
+ */
+export function validateSnapshot<T>(
+	snapshot: DistributableSnapshotLike<T>,
+	now: number = Date.now(),
+): T {
+	// Structural validation
+	if (!snapshot || typeof snapshot !== "object") {
+		throw new Error(
+			"[Directive] Invalid snapshot: expected an object with 'data' and 'createdAt' properties.",
+		);
+	}
+	if (!("data" in snapshot)) {
+		throw new Error(
+			"[Directive] Invalid snapshot: missing required 'data' property.",
+		);
+	}
+	if (!("createdAt" in snapshot) || typeof snapshot.createdAt !== "number") {
+		throw new Error(
+			"[Directive] Invalid snapshot: missing or invalid 'createdAt' property (expected number).",
+		);
+	}
+
+	// Expiration validation
+	if (isSnapshotExpired(snapshot, now)) {
+		const expiredAt = new Date(snapshot.expiresAt!).toISOString();
+		throw new Error(
+			`[Directive] Snapshot expired at ${expiredAt}. Obtain a fresh snapshot from the source.`,
+		);
+	}
+	return snapshot.data;
+}

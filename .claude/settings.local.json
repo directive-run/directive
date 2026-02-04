@@ -35,7 +35,9 @@
       "Bash(pnpm --filter \"./packages/*\" typecheck:*)",
       "Bash(pkill:*)",
       "Bash(pnpm exec vitest:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git stash:*)",
+      "Bash(git add:*)"
     ]
   }
 }
