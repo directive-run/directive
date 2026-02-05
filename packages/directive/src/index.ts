@@ -220,6 +220,9 @@ export {
 	type ModuleBuilder,
 } from "./core/builder.js";
 
+// Convenience helper for status plugin setup
+export { createSystemWithStatus } from "./utils/system-with-status.js";
+
 // Helper factory functions for external constraint/resolver definitions
 export {
 	constraintFactory,
