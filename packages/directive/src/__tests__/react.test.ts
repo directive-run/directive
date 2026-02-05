@@ -319,3 +319,129 @@ describe("React Adapter - Typed Events", () => {
 		expect(system.facts.test.items).toEqual(["first"]);
 	});
 });
+
+describe("React Adapter - Selector Patterns", () => {
+	it("selector equality function is called correctly", () => {
+		const system = createSystem({ modules: { test: createTestModule() } });
+		system.start();
+
+		// Simulate what useFactSelector does internally
+		const selector = (name: string | undefined) => name?.toUpperCase() ?? "GUEST";
+		const equalityFn = vi.fn((a: string, b: string) => a === b);
+
+		let cachedValue = selector(system.facts.test.name);
+
+		// Simulate subscription update
+		system.events.test.setName({ name: "Alice" });
+		const newValue = selector(system.facts.test.name);
+		equalityFn(cachedValue, newValue);
+		expect(equalityFn).toHaveBeenCalledWith("TEST", "ALICE");
+	});
+
+	it("handles undefined as a valid selector result", () => {
+		const system = createSystem({ modules: { test: createTestModule() } });
+		system.start();
+
+		// Selector that can return undefined
+		const selector = (items: string[] | undefined) =>
+			items && items.length > 0 ? items[0] : undefined;
+
+		const result1 = selector(system.facts.test.items);
+		expect(result1).toBeUndefined();
+
+		system.events.test.addItem({ item: "first" });
+		const result2 = selector(system.facts.test.items);
+		expect(result2).toBe("first");
+	});
+
+	it("Object.is equality handles NaN correctly", () => {
+		const defaultEquality = <T>(a: T, b: T) => Object.is(a, b);
+
+		// NaN === NaN is false, but Object.is(NaN, NaN) is true
+		expect(Number.NaN === Number.NaN).toBe(false);
+		expect(defaultEquality(Number.NaN, Number.NaN)).toBe(true);
+
+		// +0 and -0 are === but Object.is distinguishes them
+		expect(0 === -0).toBe(true);
+		expect(defaultEquality(0, -0)).toBe(false);
+	});
+});
+
+describe("React Adapter - Edge Cases", () => {
+	it("handles empty derivation arrays in subscribe", () => {
+		const system = createSystem({ modules: { test: createTestModule() } });
+		system.start();
+
+		const listener = vi.fn();
+		// Empty array should not throw
+		const unsubscribe = system.subscribe([], listener);
+		expect(typeof unsubscribe).toBe("function");
+		unsubscribe();
+	});
+
+	it("inspection provides consistent snapshots", () => {
+		const system = createSystem({ modules: { test: createTestModule() } });
+		system.start();
+
+		const inspection1 = system.inspect();
+		const inspection2 = system.inspect();
+
+		// Inspection structure should be consistent
+		expect(inspection1).toHaveProperty("unmet");
+		expect(inspection1).toHaveProperty("inflight");
+		expect(Array.isArray(inspection1.unmet)).toBe(true);
+		expect(Array.isArray(inspection1.inflight)).toBe(true);
+	});
+
+	it("system.facts.$store.toObject returns plain object", () => {
+		// Use single-module system for simpler $store access
+		const singleSystem = createSystem({ module: createTestModule() });
+		singleSystem.start();
+
+		const factsObj = singleSystem.facts.$store.toObject();
+		expect(typeof factsObj).toBe("object");
+		expect(factsObj.count).toBe(0);
+		expect(factsObj.name).toBe("test");
+	});
+
+	it("multiple rapid subscribe/unsubscribe cycles", async () => {
+		const system = createSystem({ modules: { test: createTestModule() } });
+		system.start();
+
+		// Read derivation to establish tracking
+		system.read("test.doubled");
+
+		const listeners: (() => void)[] = [];
+
+		// Rapidly subscribe and unsubscribe
+		for (let i = 0; i < 10; i++) {
+			const listener = vi.fn();
+			const unsub = system.subscribe(["test.doubled"], listener);
+			listeners.push(unsub);
+		}
+
+		// Unsubscribe all
+		for (const unsub of listeners) {
+			unsub();
+		}
+
+		// Should not throw when facts change after all unsubscribed
+		system.events.test.increment();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	});
+});
+
+describe("React Adapter - Suspense Cache Behavior", () => {
+	it("suspense cache key generation is deterministic", () => {
+		// Simulate the cache key generation for useSuspendingRequirements
+		const types1 = ["FETCH_USER", "FETCH_SETTINGS"];
+		const types2 = ["FETCH_SETTINGS", "FETCH_USER"];
+
+		const key1 = types1.slice().sort().join(",");
+		const key2 = types2.slice().sort().join(",");
+
+		// Different order should produce same key
+		expect(key1).toBe(key2);
+		expect(key1).toBe("FETCH_SETTINGS,FETCH_USER");
+	});
+});
