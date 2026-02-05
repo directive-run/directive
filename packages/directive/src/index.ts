@@ -329,3 +329,206 @@ export {
 	validateSnapshot,
 	type DistributableSnapshotLike,
 } from "./utils/utils.js";
+
+// ============================================================================
+// OpenAI Agents Adapter
+// ============================================================================
+
+export {
+	createAgentOrchestrator,
+	createOrchestratorBuilder,
+	createPIIGuardrail,
+	createModerationGuardrail,
+	createRateLimitGuardrail,
+	createToolGuardrail,
+	isAgentRunning,
+	hasPendingApprovals,
+	estimateCost,
+	GuardrailError,
+	isGuardrailError,
+	type AgentLike,
+	type RunResult,
+	type Message,
+	type ToolCall,
+	type RunFn,
+	type RunOptions,
+	type GuardrailFn,
+	type GuardrailContext,
+	type GuardrailResult,
+	type InputGuardrailData,
+	type OutputGuardrailData,
+	type ToolCallGuardrailData,
+	type NamedGuardrail,
+	type GuardrailsConfig,
+	type AgentState,
+	type ApprovalState,
+	type ApprovalRequest,
+	type OrchestratorState,
+	type OrchestratorConstraint,
+	type OrchestratorResolver,
+	type OrchestratorResolverContext,
+	type OrchestratorOptions,
+	type AgentOrchestrator,
+	type OrchestratorBuilder,
+	type GuardrailErrorCode,
+} from "./adapters/openai-agents.js";
+
+// ============================================================================
+// OpenAI Agents Streaming
+// ============================================================================
+
+export {
+	createStreamingRunner,
+	createToxicityStreamingGuardrail,
+	createLengthStreamingGuardrail,
+	createPatternStreamingGuardrail,
+	combineStreamingGuardrails,
+	adaptOutputGuardrail,
+	collectTokens,
+	tapStream,
+	filterStream,
+	mapStream,
+	type StreamChunk,
+	type TokenChunk,
+	type ToolStartChunk,
+	type ToolEndChunk,
+	type MessageChunk,
+	type GuardrailTriggeredChunk,
+	type ProgressChunk,
+	type DoneChunk,
+	type ErrorChunk,
+	type StreamRunOptions,
+	type StreamRunFn,
+	type StreamingRunResult,
+	type StreamingGuardrail,
+	type StreamingGuardrailResult,
+	type BackpressureStrategy,
+} from "./adapters/openai-agents-streaming.js";
+
+// ============================================================================
+// OpenAI Agents Multi-Agent Patterns
+// ============================================================================
+
+export {
+	createMultiAgentOrchestrator,
+	parallel,
+	sequential,
+	supervisor,
+	selectAgent,
+	runAgentRequirement,
+	concatResults,
+	pickBestResult,
+	collectOutputs,
+	aggregateTokens,
+	type AgentRegistration,
+	type AgentRegistry,
+	type AgentRunState,
+	type ParallelPattern,
+	type SequentialPattern,
+	type SupervisorPattern,
+	type ExecutionPattern,
+	type HandoffRequest,
+	type HandoffResult,
+	type AgentSelectionConstraint,
+	type RunAgentRequirement,
+	type MultiAgentOrchestratorOptions,
+	type MultiAgentState,
+	type MultiAgentOrchestrator as MultiAgentOrchestratorInstance,
+} from "./adapters/openai-agents-multi.js";
+
+// ============================================================================
+// OpenAI Agents Testing Utilities
+// ============================================================================
+
+export {
+	createMockAgentRunner,
+	testGuardrail,
+	testGuardrailBatch,
+	createApprovalSimulator,
+	createTestOrchestrator,
+	createConstraintRecorder,
+	assertOrchestratorState,
+	createTimeController,
+	type MockAgentConfig,
+	type MockAgentRunnerOptions,
+	type RecordedCall,
+	type MockAgentRunner,
+	type GuardrailTestInput,
+	type GuardrailTestResult,
+	type ApprovalSimulatorOptions,
+	type ApprovalSimulator,
+	type TestOrchestratorOptions,
+	type TestOrchestrator,
+	type ConstraintSnapshot,
+} from "./adapters/openai-agents-testing.js";
+
+// ============================================================================
+// Security Guardrails
+// ============================================================================
+
+export {
+	createPromptInjectionGuardrail,
+	createUntrustedContentGuardrail,
+	detectPromptInjection,
+	sanitizeInjection,
+	markUntrustedContent,
+	DEFAULT_INJECTION_PATTERNS,
+	STRICT_INJECTION_PATTERNS,
+	createEnhancedPIIGuardrail,
+	createOutputPIIGuardrail,
+	detectPII,
+	redactPII,
+	regexDetector,
+	createOutputSanitizer,
+	composeGuardrails,
+	conditionalGuardrail,
+	retryableGuardrail,
+	type InjectionPattern,
+	type InjectionCategory,
+	type InjectionDetectionResult,
+	type PromptInjectionGuardrailOptions,
+	type PIIType,
+	type DetectedPII,
+	type PIIDetectionResult,
+	type PIIDetector,
+	type RedactionStyle,
+	type EnhancedPIIGuardrailOptions,
+	type OutputSanitizerOptions,
+} from "./adapters/guardrails/index.js";
+
+// ============================================================================
+// MCP Adapter
+// ============================================================================
+
+export {
+	createMCPAdapter,
+	convertToolsForLLM,
+	mcpCallTool,
+	mcpReadResource,
+	mcpGetPrompt,
+	mcpSyncResources,
+	isMCPRequirement,
+	isMCPCallToolRequirement,
+	isMCPReadResourceRequirement,
+	isMCPGetPromptRequirement,
+	isMCPSyncResourcesRequirement,
+	type MCPAdapter,
+	type MCPServerConfig,
+	type MCPTransport,
+	type MCPTool,
+	type MCPResource,
+	type MCPPrompt,
+	type MCPClient,
+	type MCPCapabilities,
+	type MCPToolResult,
+	type MCPContent,
+	type MCPToolConstraint,
+	type MCPResourceMapping,
+	type MCPAdapterConfig,
+	type MCPAdapterEvents,
+	type MCPRequirement,
+	type MCPCallToolRequirement,
+	type MCPReadResourceRequirement,
+	type MCPGetPromptRequirement,
+	type MCPSyncResourcesRequirement,
+} from "./adapters/mcp.js";

@@ -141,14 +141,24 @@ export interface ToolCallGuardrailData {
   input: string;
 }
 
+/** Named guardrail for better debugging */
+export interface NamedGuardrail<T = unknown> {
+  /** Unique name for debugging and error messages */
+  name: string;
+  /** The guardrail function */
+  fn: GuardrailFn<T>;
+  /** Whether this guardrail is critical (default: true) */
+  critical?: boolean;
+}
+
 /** Guardrails configuration */
 export interface GuardrailsConfig {
   /** Validate/transform input before agent runs */
-  input?: GuardrailFn<InputGuardrailData>[];
+  input?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
   /** Validate/transform output after agent runs */
-  output?: GuardrailFn<OutputGuardrailData>[];
+  output?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
   /** Validate tool calls before execution */
-  toolCall?: GuardrailFn<ToolCallGuardrailData>[];
+  toolCall?: Array<GuardrailFn<ToolCallGuardrailData> | NamedGuardrail<ToolCallGuardrailData>>;
 }
 
 /** Agent state in facts */
@@ -404,7 +414,32 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   plugins?: Plugin[];
   /** Enable debugging */
   debug?: boolean;
+  /** Approval timeout in milliseconds (default: 300000 = 5 minutes) */
+  approvalTimeoutMs?: number;
 }
+
+/** Streaming run result from orchestrator */
+export interface OrchestratorStreamResult<T = unknown> {
+  /** Async iterator for streaming chunks */
+  stream: AsyncIterable<OrchestratorStreamChunk>;
+  /** Promise that resolves to the final result */
+  result: Promise<RunResult<T>>;
+  /** Abort the stream */
+  abort: () => void;
+}
+
+/** Stream chunk types for orchestrator */
+export type OrchestratorStreamChunk =
+  | { type: "token"; data: string; tokenCount: number }
+  | { type: "tool_start"; tool: string; toolCallId: string }
+  | { type: "tool_end"; tool: string; toolCallId: string; result: string }
+  | { type: "message"; message: Message }
+  | { type: "guardrail_triggered"; guardrailName: string; reason: string; stopped: boolean }
+  | { type: "approval_required"; requestId: string; toolName: string }
+  | { type: "approval_resolved"; requestId: string; approved: boolean }
+  | { type: "progress"; phase: string; message?: string }
+  | { type: "done"; totalTokens: number; duration: number }
+  | { type: "error"; error: Error };
 
 /** Orchestrator instance */
 export interface AgentOrchestrator<F extends Record<string, unknown>> {
@@ -413,6 +448,24 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   facts: F & OrchestratorState;
   /** Run an agent with guardrails */
   run<T>(agent: AgentLike, input: string): Promise<RunResult<T>>;
+  /**
+   * Run an agent with streaming support.
+   * Returns an async iterator for chunks and a promise for the final result.
+   *
+   * @example
+   * ```typescript
+   * const { stream, result, abort } = orchestrator.runStream(agent, input);
+   *
+   * for await (const chunk of stream) {
+   *   if (chunk.type === 'token') process.stdout.write(chunk.data);
+   *   if (chunk.type === 'approval_required') showApprovalDialog(chunk);
+   *   if (chunk.type === 'guardrail_triggered') handleGuardrail(chunk);
+   * }
+   *
+   * const finalResult = await result;
+   * ```
+   */
+  runStream<T>(agent: AgentLike, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
   /** Approve a pending request */
   approve(requestId: string): void;
   /** Reject a pending request */
@@ -430,6 +483,26 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
 // ============================================================================
 // Implementation
 // ============================================================================
+
+// ============================================================================
+// Helper: Normalize Guardrail (internal)
+// ============================================================================
+
+/** Normalize a guardrail to a named guardrail */
+function normalizeGuardrail<T>(
+  guardrail: GuardrailFn<T> | NamedGuardrail<T>,
+  index: number,
+  type: string
+): NamedGuardrail<T> {
+  if (typeof guardrail === "function") {
+    return {
+      name: `${type}-guardrail-${index}`,
+      fn: guardrail,
+      critical: true,
+    };
+  }
+  return guardrail;
+}
 
 /**
  * Create an orchestrator for OpenAI agents with Directive constraints.
@@ -488,7 +561,19 @@ export function createAgentOrchestrator<
     maxTokenBudget,
     plugins = [],
     debug = false,
+    approvalTimeoutMs = 300000,
   } = options;
+
+  // Warn if approval workflow is configured but no callback is provided
+  if (!autoApproveToolCalls && !onApprovalRequest) {
+    console.warn(
+      "[Directive] autoApproveToolCalls is false but no onApprovalRequest callback provided. " +
+      "Tool calls will wait for approval indefinitely. Either:\n" +
+      "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
+      "  - Provide an onApprovalRequest callback to handle approvals\n" +
+      "  - Call orchestrator.approve(requestId) or orchestrator.reject(requestId) manually"
+    );
+  }
 
   // Build schema by combining bridge schema with user-provided schema
   const combinedSchema = {
@@ -606,8 +691,11 @@ export function createAgentOrchestrator<
     opts?: RunOptions
   ): Promise<RunResult<T>> {
     // Run input guardrails
-    for (const guardrail of guardrails.input ?? []) {
-      const result = await guardrail(
+    const inputGuardrails = (guardrails.input ?? []).map((g, i) =>
+      normalizeGuardrail(g, i, "input")
+    );
+    for (const { name, fn } of inputGuardrails) {
+      const result = await fn(
         { input, agentName: agent.name },
         {
           agentName: agent.name,
@@ -616,7 +704,15 @@ export function createAgentOrchestrator<
         }
       );
       if (!result.passed) {
-        throw new Error(`Input guardrail failed: ${result.reason}`);
+        throw new GuardrailError({
+          code: "INPUT_GUARDRAIL_FAILED",
+          message: `Input guardrail "${name}" failed: ${result.reason}`,
+          guardrailName: name,
+          guardrailType: "input",
+          userMessage: result.reason ?? "Input validation failed",
+          agentName: agent.name,
+          input,
+        });
       }
       if (result.transformed !== undefined) {
         input = result.transformed as string;
@@ -646,8 +742,11 @@ export function createAgentOrchestrator<
       },
       onToolCall: async (toolCall) => {
         // Run tool call guardrails
-        for (const guardrail of guardrails.toolCall ?? []) {
-          const guardResult = await guardrail(
+        const toolCallGuardrails = (guardrails.toolCall ?? []).map((g, i) =>
+          normalizeGuardrail(g, i, "toolCall")
+        );
+        for (const { name, fn } of toolCallGuardrails) {
+          const guardResult = await fn(
             { toolCall, agentName: agent.name, input },
             {
               agentName: agent.name,
@@ -656,7 +755,16 @@ export function createAgentOrchestrator<
             }
           );
           if (!guardResult.passed) {
-            throw new Error(`Tool call guardrail failed: ${guardResult.reason}`);
+            throw new GuardrailError({
+              code: "TOOL_CALL_GUARDRAIL_FAILED",
+              message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
+              guardrailName: name,
+              guardrailType: "toolCall",
+              userMessage: guardResult.reason ?? "Tool call blocked",
+              data: { toolCall },
+              agentName: agent.name,
+              input,
+            });
           }
         }
 
@@ -693,8 +801,11 @@ export function createAgentOrchestrator<
     });
 
     // Run output guardrails
-    for (const guardrail of guardrails.output ?? []) {
-      const guardResult = await guardrail(
+    const outputGuardrails = (guardrails.output ?? []).map((g, i) =>
+      normalizeGuardrail(g, i, "output")
+    );
+    for (const { name, fn } of outputGuardrails) {
+      const guardResult = await fn(
         {
           output: result.finalOutput,
           agentName: agent.name,
@@ -708,7 +819,15 @@ export function createAgentOrchestrator<
         }
       );
       if (!guardResult.passed) {
-        throw new Error(`Output guardrail failed: ${guardResult.reason}`);
+        throw new GuardrailError({
+          code: "OUTPUT_GUARDRAIL_FAILED",
+          message: `Output guardrail "${name}" failed: ${guardResult.reason}`,
+          guardrailName: name,
+          guardrailType: "output",
+          userMessage: guardResult.reason ?? "Output validation failed",
+          agentName: agent.name,
+          input,
+        });
       }
       if (guardResult.transformed !== undefined) {
         (result as { finalOutput: unknown }).finalOutput = guardResult.transformed;
@@ -734,19 +853,41 @@ export function createAgentOrchestrator<
   // Assign the function to the forward-declared variable
   runAgentWithGuardrailsFn = runAgentWithGuardrails;
 
-  // Wait for approval
+  // Wait for approval with configurable timeout
   function waitForApproval(requestId: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
       const unsubscribe = system.facts.$store.subscribe([APPROVAL_KEY], () => {
         const approval = getApprovalState(system.facts);
         if (approval.approved.includes(requestId)) {
+          cleanup();
           unsubscribe();
           resolve();
         } else if (approval.rejected.includes(requestId)) {
+          cleanup();
           unsubscribe();
-          reject(new Error("Request rejected"));
+          reject(new Error(`Request ${requestId} rejected`));
         }
       });
+
+      // Set timeout to prevent indefinite hanging (uses configured approvalTimeoutMs)
+      timeoutId = setTimeout(() => {
+        unsubscribe();
+        const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
+        reject(new Error(
+          `[Directive] Approval timeout: Request ${requestId} was not approved or rejected within ${timeoutSeconds}s (${approvalTimeoutMs}ms). ` +
+          `Call orchestrator.approve("${requestId}") or orchestrator.reject("${requestId}") to resolve. ` +
+          `Current timeout: ${approvalTimeoutMs}ms. Configure via 'approvalTimeoutMs' option.`
+        ));
+      }, approvalTimeoutMs);
     });
   }
 
@@ -766,6 +907,296 @@ export function createAgentOrchestrator<
       return runAgentWithGuardrails<T>(agent, input, getCombinedFacts());
     },
 
+    runStream<T>(
+      agent: AgentLike,
+      input: string,
+      options: { signal?: AbortSignal } = {}
+    ): OrchestratorStreamResult<T> {
+      const abortController = new AbortController();
+      const chunks: OrchestratorStreamChunk[] = [];
+      const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
+      let closed = false;
+      const startTime = Date.now();
+      let tokenCount = 0;
+
+      // Combine external abort signal
+      let abortHandler: (() => void) | undefined;
+      if (options.signal) {
+        abortHandler = () => abortController.abort();
+        options.signal.addEventListener("abort", abortHandler);
+      }
+
+      const cleanup = () => {
+        if (abortHandler && options.signal) {
+          options.signal.removeEventListener("abort", abortHandler);
+        }
+      };
+
+      // Push a chunk to the stream
+      const pushChunk = (chunk: OrchestratorStreamChunk) => {
+        if (closed) return;
+        const waiter = waiters.shift();
+        if (waiter) {
+          waiter(chunk);
+        } else {
+          chunks.push(chunk);
+        }
+      };
+
+      // Close the stream
+      const closeStream = () => {
+        closed = true;
+        cleanup();
+        for (const waiter of waiters) {
+          waiter(null);
+        }
+        waiters.length = 0;
+      };
+
+      // Run the agent with streaming callbacks
+      const resultPromise = (async (): Promise<RunResult<T>> => {
+        pushChunk({ type: "progress", phase: "starting", message: "Running input guardrails" });
+
+        try {
+          // Run input guardrails first
+          let processedInput = input;
+          const inputGuardrails = (guardrails.input ?? []).map((g, i) =>
+            normalizeGuardrail(g, i, "input")
+          );
+          for (const { name, fn } of inputGuardrails) {
+            const result = await fn(
+              { input: processedInput, agentName: agent.name },
+              {
+                agentName: agent.name,
+                input: processedInput,
+                facts: system.facts.$store.toObject(),
+              }
+            );
+            if (!result.passed) {
+              pushChunk({
+                type: "guardrail_triggered",
+                guardrailName: name,
+                reason: result.reason ?? "Input validation failed",
+                stopped: true,
+              });
+              throw new GuardrailError({
+                code: "INPUT_GUARDRAIL_FAILED",
+                message: `Input guardrail "${name}" failed: ${result.reason}`,
+                guardrailName: name,
+                guardrailType: "input",
+                userMessage: result.reason ?? "Input validation failed",
+                agentName: agent.name,
+                input: processedInput,
+              });
+            }
+            if (result.transformed !== undefined) {
+              processedInput = result.transformed as string;
+            }
+          }
+
+          pushChunk({ type: "progress", phase: "generating", message: "Starting agent" });
+
+          // Update state
+          system.batch(() => {
+            const currentAgent = getAgentState(system.facts);
+            setAgentState(system.facts, {
+              ...currentAgent,
+              status: "running",
+              currentAgent: agent.name,
+              input: processedInput,
+              startedAt: Date.now(),
+            });
+          });
+
+          // Run agent with streaming callbacks
+          const result = await runAgent<T>(agent, processedInput, {
+            signal: abortController.signal,
+            onMessage: (message) => {
+              const currentConversation = getConversation(system.facts);
+              setConversation(system.facts, [...currentConversation, message]);
+              pushChunk({ type: "message", message });
+
+              // Approximate token counting from content
+              if (message.role === "assistant" && message.content) {
+                const newTokens = Math.ceil(message.content.length / 4);
+                tokenCount += newTokens;
+                pushChunk({ type: "token", data: message.content, tokenCount });
+              }
+            },
+            onToolCall: async (toolCall) => {
+              pushChunk({ type: "tool_start", tool: toolCall.name, toolCallId: toolCall.id });
+
+              // Run tool call guardrails
+              const toolCallGuardrails = (guardrails.toolCall ?? []).map((g, i) =>
+                normalizeGuardrail(g, i, "toolCall")
+              );
+              for (const { name, fn } of toolCallGuardrails) {
+                const guardResult = await fn(
+                  { toolCall, agentName: agent.name, input: processedInput },
+                  {
+                    agentName: agent.name,
+                    input: processedInput,
+                    facts: system.facts.$store.toObject(),
+                  }
+                );
+                if (!guardResult.passed) {
+                  pushChunk({
+                    type: "guardrail_triggered",
+                    guardrailName: name,
+                    reason: guardResult.reason ?? "Tool call blocked",
+                    stopped: true,
+                  });
+                  throw new GuardrailError({
+                    code: "TOOL_CALL_GUARDRAIL_FAILED",
+                    message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
+                    guardrailName: name,
+                    guardrailType: "toolCall",
+                    userMessage: guardResult.reason ?? "Tool call blocked",
+                    data: { toolCall },
+                    agentName: agent.name,
+                    input: processedInput,
+                  });
+                }
+              }
+
+              // Check if approval is needed
+              if (!autoApproveToolCalls) {
+                const approvalId = `tool-${toolCall.id}`;
+                pushChunk({ type: "approval_required", requestId: approvalId, toolName: toolCall.name });
+
+                const approvalRequest: ApprovalRequest = {
+                  id: approvalId,
+                  type: "tool_call",
+                  agentName: agent.name,
+                  description: `Tool call: ${toolCall.name}`,
+                  data: toolCall,
+                  requestedAt: Date.now(),
+                };
+
+                system.batch(() => {
+                  const currentApproval = getApprovalState(system.facts);
+                  setApprovalState(system.facts, {
+                    ...currentApproval,
+                    pending: [...currentApproval.pending, approvalRequest],
+                  });
+                });
+
+                onApprovalRequest?.(approvalRequest);
+                await waitForApproval(approvalId);
+                pushChunk({ type: "approval_resolved", requestId: approvalId, approved: true });
+              }
+
+              const currentToolCalls = getToolCalls(system.facts);
+              setToolCalls(system.facts, [...currentToolCalls, toolCall]);
+
+              if (toolCall.result) {
+                pushChunk({ type: "tool_end", tool: toolCall.name, toolCallId: toolCall.id, result: toolCall.result });
+              }
+            },
+          });
+
+          // Run output guardrails
+          pushChunk({ type: "progress", phase: "finishing", message: "Running output guardrails" });
+
+          const outputGuardrails = (guardrails.output ?? []).map((g, i) =>
+            normalizeGuardrail(g, i, "output")
+          );
+          for (const { name, fn } of outputGuardrails) {
+            const guardResult = await fn(
+              {
+                output: result.finalOutput,
+                agentName: agent.name,
+                input: processedInput,
+                messages: result.messages,
+              },
+              {
+                agentName: agent.name,
+                input: processedInput,
+                facts: system.facts.$store.toObject(),
+              }
+            );
+            if (!guardResult.passed) {
+              pushChunk({
+                type: "guardrail_triggered",
+                guardrailName: name,
+                reason: guardResult.reason ?? "Output validation failed",
+                stopped: true,
+              });
+              throw new GuardrailError({
+                code: "OUTPUT_GUARDRAIL_FAILED",
+                message: `Output guardrail "${name}" failed: ${guardResult.reason}`,
+                guardrailName: name,
+                guardrailType: "output",
+                userMessage: guardResult.reason ?? "Output validation failed",
+                agentName: agent.name,
+                input: processedInput,
+              });
+            }
+            if (guardResult.transformed !== undefined) {
+              (result as { finalOutput: unknown }).finalOutput = guardResult.transformed;
+            }
+          }
+
+          // Update final state
+          system.batch(() => {
+            const currentAgent = getAgentState(system.facts);
+            setAgentState(system.facts, {
+              ...currentAgent,
+              status: "completed",
+              output: result.finalOutput,
+              tokenUsage: currentAgent.tokenUsage + result.totalTokens,
+              turnCount: currentAgent.turnCount + result.messages.length,
+              completedAt: Date.now(),
+            });
+          });
+
+          const duration = Date.now() - startTime;
+          pushChunk({ type: "done", totalTokens: result.totalTokens, duration });
+          closeStream();
+
+          return result;
+        } catch (error) {
+          pushChunk({ type: "error", error: error instanceof Error ? error : new Error(String(error)) });
+          closeStream();
+          throw error;
+        }
+      })();
+
+      // Create async iterator
+      const stream: AsyncIterable<OrchestratorStreamChunk> = {
+        [Symbol.asyncIterator](): AsyncIterator<OrchestratorStreamChunk> {
+          return {
+            async next(): Promise<IteratorResult<OrchestratorStreamChunk>> {
+              if (chunks.length > 0) {
+                return { done: false, value: chunks.shift()! };
+              }
+              if (closed) {
+                return { done: true, value: undefined };
+              }
+              return new Promise<IteratorResult<OrchestratorStreamChunk>>((resolve) => {
+                waiters.push((chunk) => {
+                  if (chunk === null) {
+                    resolve({ done: true, value: undefined });
+                  } else {
+                    resolve({ done: false, value: chunk });
+                  }
+                });
+              });
+            },
+          };
+        },
+      };
+
+      return {
+        stream,
+        result: resultPromise,
+        abort: () => {
+          abortController.abort();
+          closeStream();
+        },
+      };
+    },
+
     approve(requestId: string): void {
       system.batch(() => {
         const approval = getApprovalState(system.facts);
@@ -777,9 +1208,13 @@ export function createAgentOrchestrator<
       });
     },
 
-    reject(requestId: string, _reason?: string): void {
+    reject(requestId: string, reason?: string): void {
       system.batch(() => {
         const approval = getApprovalState(system.facts);
+        // Note: reason is available for logging/audit purposes
+        if (reason && debug) {
+          console.debug(`[Directive] Request ${requestId} rejected: ${reason}`);
+        }
         setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
@@ -924,8 +1359,15 @@ export function createModerationGuardrail(options: {
   };
 }
 
+/** Rate limiter with reset capability for testing */
+export interface RateLimitGuardrail extends GuardrailFn<InputGuardrailData> {
+  /** Reset the rate limiter state (useful for testing) */
+  reset(): void;
+}
+
 /**
  * Create a rate limit guardrail based on token usage.
+ * Returns a guardrail function with an additional `reset()` method for testing.
  *
  * @example
  * ```typescript
@@ -933,35 +1375,60 @@ export function createModerationGuardrail(options: {
  *   maxTokensPerMinute: 10000,
  *   maxRequestsPerMinute: 60,
  * });
+ *
+ * // For testing, reset the state between tests
+ * rateLimitGuardrail.reset();
  * ```
  */
 export function createRateLimitGuardrail(options: {
   maxTokensPerMinute?: number;
   maxRequestsPerMinute?: number;
-}): GuardrailFn<InputGuardrailData> {
+}): RateLimitGuardrail {
   const { maxTokensPerMinute = 100000, maxRequestsPerMinute = 60 } = options;
 
-  const tokenHistory: number[] = [];
-  const requestHistory: number[] = [];
+  // Use bounded arrays with binary search for O(log n) cleanup instead of O(n) shift()
+  // Max entries = max requests per minute (bounded)
+  const maxEntries = Math.max(maxRequestsPerMinute, 1000);
+  let tokenTimestamps: number[] = [];
+  let requestTimestamps: number[] = [];
   const windowMs = 60000;
 
-  return (_data, context) => {
-    const now = Date.now();
-
-    // Clean old entries
-    while (tokenHistory.length > 0 && (tokenHistory[0] ?? 0) < now - windowMs) {
-      tokenHistory.shift();
+  // Binary search to find cutoff index
+  function findCutoffIndex(arr: number[], cutoffTime: number): number {
+    let low = 0;
+    let high = arr.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if ((arr[mid] ?? 0) < cutoffTime) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
     }
-    while (requestHistory.length > 0 && (requestHistory[0] ?? 0) < now - windowMs) {
-      requestHistory.shift();
+    return low;
+  }
+
+  const guardrail: RateLimitGuardrail = (_data, context) => {
+    const now = Date.now();
+    const cutoffTime = now - windowMs;
+
+    // Clean old entries with binary search + splice (O(log n) + O(k) where k = removed entries)
+    const tokenCutoff = findCutoffIndex(tokenTimestamps, cutoffTime);
+    if (tokenCutoff > 0) {
+      tokenTimestamps = tokenTimestamps.slice(tokenCutoff);
+    }
+
+    const requestCutoff = findCutoffIndex(requestTimestamps, cutoffTime);
+    if (requestCutoff > 0) {
+      requestTimestamps = requestTimestamps.slice(requestCutoff);
     }
 
     // Check limits - safely extract token usage from context facts
     const factsObj = context.facts as Record<string, unknown>;
     const agentState = factsObj[AGENT_KEY] as AgentState | undefined;
     const tokenUsage = agentState?.tokenUsage ?? 0;
-    const recentTokens = tokenHistory.length;
-    const recentRequests = requestHistory.length;
+    const recentTokens = tokenTimestamps.length;
+    const recentRequests = requestTimestamps.length;
 
     if (recentTokens + tokenUsage > maxTokensPerMinute) {
       return { passed: false, reason: "Token rate limit exceeded" };
@@ -971,12 +1438,23 @@ export function createRateLimitGuardrail(options: {
       return { passed: false, reason: "Request rate limit exceeded" };
     }
 
-    // Record this request
-    requestHistory.push(now);
-    tokenHistory.push(now);
+    // Record this request (bounded to prevent unbounded growth)
+    if (requestTimestamps.length < maxEntries) {
+      requestTimestamps.push(now);
+    }
+    if (tokenTimestamps.length < maxEntries) {
+      tokenTimestamps.push(now);
+    }
 
     return { passed: true };
   };
+
+  guardrail.reset = () => {
+    tokenTimestamps = [];
+    requestTimestamps = [];
+  };
+
+  return guardrail;
 }
 
 /**
@@ -994,18 +1472,24 @@ export function createRateLimitGuardrail(options: {
 export function createToolGuardrail(options: {
   allowlist?: string[];
   denylist?: string[];
+  /** Case-sensitive matching (default: false for more robust matching) */
+  caseSensitive?: boolean;
 }): GuardrailFn<ToolCallGuardrailData> {
-  const { allowlist, denylist } = options;
+  const { allowlist, denylist, caseSensitive = false } = options;
+
+  // Normalize lists for case-insensitive matching
+  const normalizedAllowlist = allowlist?.map((t) => caseSensitive ? t : t.toLowerCase());
+  const normalizedDenylist = denylist?.map((t) => caseSensitive ? t : t.toLowerCase());
 
   return (data) => {
-    const toolName = data.toolCall.name;
+    const toolName = caseSensitive ? data.toolCall.name : data.toolCall.name.toLowerCase();
 
-    if (allowlist && !allowlist.includes(toolName)) {
-      return { passed: false, reason: `Tool "${toolName}" not in allowlist` };
+    if (normalizedAllowlist && !normalizedAllowlist.includes(toolName)) {
+      return { passed: false, reason: `Tool "${data.toolCall.name}" not in allowlist` };
     }
 
-    if (denylist && denylist.includes(toolName)) {
-      return { passed: false, reason: `Tool "${toolName}" is blocked` };
+    if (normalizedDenylist && normalizedDenylist.includes(toolName)) {
+      return { passed: false, reason: `Tool "${data.toolCall.name}" is blocked` };
     }
 
     return { passed: true };
@@ -1039,3 +1523,409 @@ export function estimateCost(
 ): number {
   return (tokenUsage / 1_000_000) * ratePerMillionTokens;
 }
+
+// ============================================================================
+// Structured Errors
+// ============================================================================
+
+/** Error codes for guardrail errors */
+export type GuardrailErrorCode =
+  | "INPUT_GUARDRAIL_FAILED"
+  | "OUTPUT_GUARDRAIL_FAILED"
+  | "TOOL_CALL_GUARDRAIL_FAILED"
+  | "APPROVAL_REJECTED"
+  | "BUDGET_EXCEEDED"
+  | "RATE_LIMIT_EXCEEDED"
+  | "AGENT_ERROR";
+
+/**
+ * Structured error for guardrail failures.
+ * Provides detailed context for debugging and error handling.
+ *
+ * **Security:** The `input` and `data` properties are non-enumerable to prevent
+ * accidental leakage of sensitive data via JSON.stringify or console.log on the error object.
+ */
+export class GuardrailError extends Error {
+  /** Error code for programmatic handling */
+  readonly code: GuardrailErrorCode;
+  /** Name of the guardrail that failed (if named) */
+  readonly guardrailName: string;
+  /** Type of guardrail that failed */
+  readonly guardrailType: "input" | "output" | "toolCall";
+  /** User-friendly error message */
+  readonly userMessage: string;
+  /** Additional data from the guardrail (non-enumerable for security) */
+  declare readonly data: unknown;
+  /** Agent that was running when the error occurred */
+  readonly agentName: string;
+  /** Input that triggered the error (non-enumerable for security) */
+  declare readonly input: string;
+
+  constructor(options: {
+    code: GuardrailErrorCode;
+    message: string;
+    guardrailName: string;
+    guardrailType: "input" | "output" | "toolCall";
+    userMessage?: string;
+    data?: unknown;
+    agentName: string;
+    input: string;
+    cause?: Error;
+  }) {
+    super(options.message, { cause: options.cause });
+    this.name = "GuardrailError";
+    this.code = options.code;
+    this.guardrailName = options.guardrailName;
+    this.guardrailType = options.guardrailType;
+    this.userMessage = options.userMessage ?? options.message;
+    this.agentName = options.agentName;
+
+    // Make sensitive fields non-enumerable to prevent accidental serialization/logging
+    Object.defineProperty(this, "input", {
+      value: options.input,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+    Object.defineProperty(this, "data", {
+      value: options.data,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  }
+
+  /** Convert to a plain object for logging/serialization */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      guardrailName: this.guardrailName,
+      guardrailType: this.guardrailType,
+      userMessage: this.userMessage,
+      agentName: this.agentName,
+      // Intentionally exclude input and data for security
+    };
+  }
+}
+
+/**
+ * Check if an error is a GuardrailError.
+ */
+export function isGuardrailError(error: unknown): error is GuardrailError {
+  return error instanceof GuardrailError;
+}
+
+// ============================================================================
+// Builder Pattern
+// ============================================================================
+
+/** Builder for type-safe orchestrator configuration */
+export interface OrchestratorBuilder<F extends Record<string, unknown>> {
+  /** Add a constraint */
+  withConstraint<K extends string>(
+    id: K,
+    constraint: OrchestratorConstraint<F>
+  ): OrchestratorBuilder<F>;
+
+  /** Add a resolver */
+  withResolver<R extends Requirement>(
+    id: string,
+    resolver: OrchestratorResolver<F, R>
+  ): OrchestratorBuilder<F>;
+
+  /** Add an input guardrail */
+  withInputGuardrail(
+    nameOrGuardrail: string | NamedGuardrail<InputGuardrailData>,
+    fn?: GuardrailFn<InputGuardrailData>
+  ): OrchestratorBuilder<F>;
+
+  /** Add an output guardrail */
+  withOutputGuardrail(
+    nameOrGuardrail: string | NamedGuardrail<OutputGuardrailData>,
+    fn?: GuardrailFn<OutputGuardrailData>
+  ): OrchestratorBuilder<F>;
+
+  /** Add a tool call guardrail */
+  withToolCallGuardrail(
+    nameOrGuardrail: string | NamedGuardrail<ToolCallGuardrailData>,
+    fn?: GuardrailFn<ToolCallGuardrailData>
+  ): OrchestratorBuilder<F>;
+
+  /** Add a plugin */
+  withPlugin(plugin: Plugin): OrchestratorBuilder<F>;
+
+  /** Set max token budget */
+  withBudget(maxTokens: number): OrchestratorBuilder<F>;
+
+  /** Enable debug mode */
+  withDebug(enabled?: boolean): OrchestratorBuilder<F>;
+
+  /** Build the orchestrator */
+  build(options: { runAgent: RunFn }): AgentOrchestrator<F>;
+}
+
+/**
+ * Create a type-safe orchestrator builder.
+ *
+ * @example
+ * ```typescript
+ * const orchestrator = createOrchestratorBuilder<MyFacts>()
+ *   .withConstraint('budget', {
+ *     when: (facts) => facts.cost > 100,
+ *     require: { type: 'PAUSE' },
+ *   })
+ *   .withInputGuardrail('pii', createPIIGuardrail())
+ *   .withOutputGuardrail('toxicity', createModerationGuardrail({ ... }))
+ *   .withBudget(10000)
+ *   .withDebug()
+ *   .build({ runAgent: run });
+ * ```
+ */
+export function createOrchestratorBuilder<
+  F extends Record<string, unknown> = Record<string, never>
+>(): OrchestratorBuilder<F> {
+  const constraints: Record<string, OrchestratorConstraint<F>> = {};
+  const resolvers: Record<string, OrchestratorResolver<F, Requirement>> = {};
+  const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [];
+  const outputGuardrails: NamedGuardrail<OutputGuardrailData>[] = [];
+  const toolCallGuardrails: NamedGuardrail<ToolCallGuardrailData>[] = [];
+  const plugins: Plugin[] = [];
+  let maxTokenBudget: number | undefined;
+  let debug = false;
+
+  const builder: OrchestratorBuilder<F> = {
+    withConstraint(id, constraint) {
+      constraints[id] = constraint;
+      return builder;
+    },
+
+    withResolver(id, resolver) {
+      resolvers[id] = resolver as unknown as OrchestratorResolver<F, Requirement>;
+      return builder;
+    },
+
+    withInputGuardrail(nameOrGuardrail, fn) {
+      if (typeof nameOrGuardrail === "string" && fn) {
+        inputGuardrails.push({ name: nameOrGuardrail, fn });
+      } else if (typeof nameOrGuardrail === "object") {
+        inputGuardrails.push(nameOrGuardrail);
+      }
+      return builder;
+    },
+
+    withOutputGuardrail(nameOrGuardrail, fn) {
+      if (typeof nameOrGuardrail === "string" && fn) {
+        outputGuardrails.push({ name: nameOrGuardrail, fn });
+      } else if (typeof nameOrGuardrail === "object") {
+        outputGuardrails.push(nameOrGuardrail);
+      }
+      return builder;
+    },
+
+    withToolCallGuardrail(nameOrGuardrail, fn) {
+      if (typeof nameOrGuardrail === "string" && fn) {
+        toolCallGuardrails.push({ name: nameOrGuardrail, fn });
+      } else if (typeof nameOrGuardrail === "object") {
+        toolCallGuardrails.push(nameOrGuardrail);
+      }
+      return builder;
+    },
+
+    withPlugin(plugin) {
+      plugins.push(plugin);
+      return builder;
+    },
+
+    withBudget(maxTokens) {
+      maxTokenBudget = maxTokens;
+      return builder;
+    },
+
+    withDebug(enabled = true) {
+      debug = enabled;
+      return builder;
+    },
+
+    build(options) {
+      return createAgentOrchestrator<F>({
+        runAgent: options.runAgent,
+        constraints,
+        resolvers,
+        guardrails: {
+          input: inputGuardrails,
+          output: outputGuardrails,
+          toolCall: toolCallGuardrails,
+        },
+        plugins,
+        maxTokenBudget,
+        debug,
+      });
+    },
+  };
+
+  return builder;
+}
+
+// ============================================================================
+// Re-exports from Sub-modules
+// ============================================================================
+
+// Memory system
+export {
+  createAgentMemory,
+  createSlidingWindowStrategy,
+  createTokenBasedStrategy,
+  createHybridStrategy,
+  createTruncationSummarizer,
+  createKeyPointsSummarizer,
+  createLLMSummarizer,
+  type AgentMemory,
+  type AgentMemoryConfig,
+  type MemoryState,
+  type MemoryManageResult,
+  type MemoryStrategy,
+  type MemoryStrategyConfig,
+  type MemoryStrategyResult,
+  type MessageSummarizer,
+} from "./openai-agents-memory.js";
+
+// Streaming utilities
+export {
+  createStreamingRunner,
+  createLengthStreamingGuardrail,
+  createPatternStreamingGuardrail,
+  createToxicityStreamingGuardrail,
+  combineStreamingGuardrails,
+  adaptOutputGuardrail,
+  collectTokens,
+  tapStream,
+  filterStream,
+  mapStream,
+  type StreamChunk,
+  type TokenChunk,
+  type ToolStartChunk,
+  type ToolEndChunk,
+  type MessageChunk,
+  type GuardrailTriggeredChunk,
+  type ProgressChunk,
+  type DoneChunk,
+  type ErrorChunk,
+  type StreamRunOptions,
+  type StreamRunFn,
+  type StreamingRunResult,
+  type StreamingGuardrail,
+  type StreamingGuardrailResult,
+  type BackpressureStrategy,
+} from "./openai-agents-streaming.js";
+
+// Multi-agent orchestration
+export {
+  createMultiAgentOrchestrator,
+  Semaphore,
+  parallel,
+  sequential,
+  supervisor,
+  selectAgent,
+  runAgentRequirement,
+  concatResults,
+  pickBestResult,
+  collectOutputs,
+  aggregateTokens,
+  type MultiAgentOrchestrator,
+  type MultiAgentOrchestratorOptions,
+  type MultiAgentState,
+  type AgentRegistration,
+  type AgentRegistry,
+  type AgentRunState,
+  type ExecutionPattern,
+  type ParallelPattern,
+  type SequentialPattern,
+  type SupervisorPattern,
+  type HandoffRequest,
+  type HandoffResult,
+  type AgentSelectionConstraint,
+  type RunAgentRequirement,
+} from "./openai-agents-multi.js";
+
+// Agent communication
+export {
+  createMessageBus,
+  createAgentNetwork,
+  createResponder,
+  createDelegator,
+  createPubSub,
+  type MessageBus,
+  type MessageBusConfig,
+  type AgentNetwork,
+  type AgentNetworkConfig,
+  type AgentInfo,
+  type AgentMessage,
+  type AgentMessageType,
+  type TypedAgentMessage,
+  type RequestMessage,
+  type ResponseMessage,
+  type DelegationMessage,
+  type DelegationResultMessage,
+  type QueryMessage,
+  type InformMessage,
+  type UpdateMessage,
+  type MessageHandler,
+  type Subscription,
+  type MessageFilter,
+} from "./openai-agents-communication.js";
+
+// Observability
+export {
+  createObservability,
+  createAgentMetrics,
+  type ObservabilityInstance,
+  type ObservabilityConfig,
+  type MetricType,
+  type MetricDataPoint,
+  type AggregatedMetric,
+  type TraceSpan,
+  type AlertConfig,
+  type AlertEvent,
+  type DashboardData,
+} from "./plugins/observability.js";
+
+// OTLP Exporter
+export {
+  createOTLPExporter,
+  type OTLPExporterConfig,
+  type OTLPExporter,
+} from "./plugins/otlp-exporter.js";
+
+// Circuit Breaker
+export {
+  createCircuitBreaker,
+  type CircuitBreaker,
+  type CircuitBreakerConfig,
+  type CircuitBreakerStats,
+  type CircuitState,
+} from "./plugins/circuit-breaker.js";
+
+// ANN Index
+export {
+  createBruteForceIndex,
+  createVPTreeIndex,
+  type ANNIndex,
+  type ANNSearchResult,
+  type VPTreeIndexConfig,
+} from "./guardrails/ann-index.js";
+
+export { type Embedding } from "./guardrails/semantic-cache.js";
+
+// Stream Channels
+export {
+  createStreamChannel,
+  createBidirectionalStream,
+  pipeThrough,
+  mergeStreams,
+  type StreamChannel,
+  type StreamChannelConfig,
+  type StreamChannelState,
+  type BidirectionalStream,
+} from "./openai-agents-stream-channel.js";
