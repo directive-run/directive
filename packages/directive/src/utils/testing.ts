@@ -384,8 +384,12 @@ export function mockResolver<R extends Requirement = Requirement>(
 
 /** Record of a single fact change */
 export interface FactChangeRecord {
-	/** The fact key that changed */
+	/** The fact key that changed (without namespace prefix for namespaced systems) */
 	key: string;
+	/** The full key including namespace prefix (e.g., "test_value") */
+	fullKey: string;
+	/** The namespace (e.g., "test") - undefined for single-module systems */
+	namespace?: string;
 	/** The previous value */
 	previousValue: unknown;
 	/** The new value */
@@ -481,12 +485,34 @@ export function createTestSystem<Modules extends ModulesMap>(
 		};
 	}
 
+	// Get module namespaces for key parsing
+	const moduleNamespaces = new Set(Object.keys(options.modules));
+
 	// Create tracking plugin
 	const trackingPlugin = {
 		name: "__test-tracking__",
-		onFactSet: (key: string, value: unknown, previousValue: unknown) => {
+		onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
+			// Parse namespaced key (e.g., "test_value" -> namespace: "test", key: "value")
+			const underscoreIndex = fullKey.indexOf("_");
+			let namespace: string | undefined;
+			let key: string;
+
+			if (underscoreIndex > 0) {
+				const possibleNamespace = fullKey.substring(0, underscoreIndex);
+				if (moduleNamespaces.has(possibleNamespace)) {
+					namespace = possibleNamespace;
+					key = fullKey.substring(underscoreIndex + 1);
+				} else {
+					key = fullKey;
+				}
+			} else {
+				key = fullKey;
+			}
+
 			factsHistory.push({
 				key,
+				fullKey,
+				namespace,
 				previousValue,
 				newValue: value,
 				timestamp: Date.now(),
