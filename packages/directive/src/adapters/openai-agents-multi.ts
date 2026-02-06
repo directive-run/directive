@@ -63,7 +63,7 @@ import type { Requirement } from "../core/types.js";
 export class Semaphore {
   private count: number;
   private readonly maxPermits: number;
-  private readonly queue: Array<() => void> = [];
+  private readonly queue: Array<{ resolve: (release: () => void) => void; reject: (error: Error) => void }> = [];
 
   constructor(max: number) {
     this.maxPermits = max;
@@ -76,10 +76,10 @@ export class Semaphore {
       return () => this.release();
     }
 
-    return new Promise<() => void>((resolve) => {
-      this.queue.push(() => {
-        this.count--;
-        resolve(() => this.release());
+    return new Promise<() => void>((resolve, reject) => {
+      this.queue.push({
+        resolve: (releaseFn: () => void) => resolve(releaseFn),
+        reject,
       });
     });
   }
@@ -88,7 +88,8 @@ export class Semaphore {
     this.count++;
     const next = this.queue.shift();
     if (next) {
-      next();
+      this.count--;
+      next.resolve(() => this.release());
     }
   }
 
@@ -105,6 +106,16 @@ export class Semaphore {
   /** Get maximum permits */
   get max(): number {
     return this.maxPermits;
+  }
+
+  /** Reject all pending waiters with an error and reset permits */
+  drain(): void {
+    const err = new Error("[Directive Semaphore] Semaphore drained - all pending acquisitions rejected");
+    const pending = this.queue.splice(0, this.queue.length);
+    for (const waiter of pending) {
+      waiter.reject(err);
+    }
+    this.count = this.maxPermits;
   }
 }
 
@@ -244,15 +255,6 @@ export interface MultiAgentOrchestratorOptions {
   agents: AgentRegistry;
   /** Execution patterns */
   patterns?: Record<string, ExecutionPattern>;
-  /**
-   * Agent selection constraints (for constraint-driven agent routing).
-   *
-   * @experimental This feature is planned but not yet implemented.
-   * Use `selectAgent()` helper with custom constraint integration for now.
-   *
-   * @see selectAgent for manual constraint-driven selection
-   */
-  selectionConstraints?: Record<string, AgentSelectionConstraint>;
   /** Handoff callbacks */
   onHandoff?: (request: HandoffRequest) => void;
   /** Handoff completion callbacks */
@@ -308,8 +310,8 @@ export interface MultiAgentOrchestrator {
   getPendingHandoffs(): HandoffRequest[];
   /** Reset all agent states */
   reset(): void;
-  /** Destroy the orchestrator */
-  destroy(): void;
+  /** Dispose of the orchestrator, resetting all state */
+  dispose(): void;
 }
 
 // ============================================================================
@@ -339,13 +341,6 @@ export interface MultiAgentOrchestrator {
  *       agents: ['writer', 'reviewer'],
  *     },
  *   },
- *   selectionConstraints: {
- *     needsResearch: {
- *       when: (facts) => facts.hasUnknowns,
- *       select: 'researcher',
- *       input: (facts) => facts.query,
- *     },
- *   },
  * });
  *
  * // Run pattern
@@ -361,6 +356,8 @@ export interface MultiAgentOrchestrator {
  * // Handoff
  * const reviewed = await orchestrator.handoff('writer', 'reviewer', draft);
  * ```
+ *
+ * @throws {Error} If a pattern references an agent that is not in the registry
  */
 export function createMultiAgentOrchestrator(
   options: MultiAgentOrchestratorOptions
@@ -373,6 +370,41 @@ export function createMultiAgentOrchestrator(
     onHandoffComplete,
     maxHandoffHistory = 1000,
   } = options;
+
+  // Validate that all pattern agents exist in the registry
+  const registeredAgentIds = new Set(Object.keys(agents));
+  const missingAgents: Array<{ patternId: string; agentId: string }> = [];
+
+  for (const [patternId, pattern] of Object.entries(patterns)) {
+    const agentsToCheck: string[] = [];
+
+    switch (pattern.type) {
+      case "parallel":
+        agentsToCheck.push(...pattern.agents);
+        break;
+      case "sequential":
+        agentsToCheck.push(...pattern.agents);
+        break;
+      case "supervisor":
+        agentsToCheck.push(pattern.supervisor, ...pattern.workers);
+        break;
+    }
+
+    for (const agentId of agentsToCheck) {
+      if (!registeredAgentIds.has(agentId)) {
+        missingAgents.push({ patternId, agentId });
+      }
+    }
+  }
+
+  if (missingAgents.length > 0) {
+    const details = missingAgents
+      .map(({ patternId, agentId }) => `  - Pattern "${patternId}" references unknown agent "${agentId}"`)
+      .join("\n");
+    throw new Error(
+      `[Directive MultiAgent] Pattern validation failed. The following agents are not registered:\n${details}\n\nRegistered agents: ${[...registeredAgentIds].join(", ") || "(none)"}`
+    );
+  }
 
   // Semaphores for controlling concurrent access per agent (no polling)
   const semaphores = new Map<string, Semaphore>();
@@ -729,14 +761,18 @@ export function createMultiAgentOrchestrator(
           runCount: 0,
           totalTokens: 0,
         };
-        // Recreate semaphore with original capacity
+        // Drain existing semaphore to reject pending waiters, then recreate
+        const existing = semaphores.get(agentId);
+        if (existing) {
+          existing.drain();
+        }
         semaphores.set(agentId, new Semaphore(maxConcurrent));
       }
       pendingHandoffs.length = 0;
       handoffResults.length = 0;
     },
 
-    destroy() {
+    dispose() {
       orchestrator.reset();
     },
   };

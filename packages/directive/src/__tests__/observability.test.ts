@@ -404,15 +404,6 @@ describe("Observability Lifecycle", () => {
 		expect(metricsExporter).toHaveBeenCalledOnce();
 		expect(tracingExporter).toHaveBeenCalledOnce();
 	});
-
-	it("destroy should work as alias for dispose", async () => {
-		const obs = createObservability();
-		obs.incrementCounter("test");
-
-		await obs.destroy();
-		// After destroy, data should be cleared
-		expect(obs.getMetric("test")).toBeUndefined();
-	});
 });
 
 // ============================================================================

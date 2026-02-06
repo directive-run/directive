@@ -48,6 +48,8 @@ export interface ANNIndex {
 	size(): number;
 	/** Clear the index */
 	clear(): void;
+	/** Check if the index needs to be rebuilt (e.g., after additions/removals) */
+	needsRebuild(): boolean;
 }
 
 // ============================================================================
@@ -124,6 +126,10 @@ export function createBruteForceIndex(): ANNIndex {
 		clear(): void {
 			vectors.clear();
 			expectedDimension = null;
+		},
+
+		needsRebuild(): boolean {
+			return false; // Brute force doesn't need rebuilding
 		},
 	};
 }
@@ -329,6 +335,10 @@ export function createVPTreeIndex(vpConfig: VPTreeIndexConfig = {}): ANNIndex {
 			root = null;
 			needsRebuild = false;
 			expectedDimension = null;
+		},
+
+		needsRebuild(): boolean {
+			return needsRebuild;
 		},
 	};
 }

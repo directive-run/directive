@@ -215,7 +215,7 @@ export interface MessageBus {
 // ============================================================================
 
 function generateId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 /**
@@ -307,6 +307,9 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
     const recipients = getRecipients(message);
     const deliveredTo: string[] = [];
 
+    // Build delivery promises for all recipients in parallel
+    const deliveryPromises: Promise<void>[] = [];
+
     for (const recipientId of recipients) {
       const recipientSubs = subscriptions.get(recipientId) ?? [];
 
@@ -324,14 +327,19 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
 
       for (const sub of recipientSubs) {
         if (!sub.filter || matchesFilter(message, sub.filter)) {
-          try {
-            await sub.handler(message);
-            deliveredTo.push(recipientId);
-          } catch (error) {
-            onDeliveryError?.(message, error instanceof Error ? error : new Error(String(error)));
-          }
+          deliveryPromises.push(
+            Promise.resolve(sub.handler(message)).then(
+              () => { deliveredTo.push(recipientId); },
+              (error) => { onDeliveryError?.(message, error instanceof Error ? error : new Error(String(error))); }
+            )
+          );
         }
       }
+    }
+
+    // Wait for all deliveries to settle in parallel
+    if (deliveryPromises.length > 0) {
+      await Promise.allSettled(deliveryPromises);
     }
 
     if (deliveredTo.length > 0) {
@@ -367,7 +375,14 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
       }
 
       // Deliver asynchronously
-      deliverMessage(message).catch(console.error);
+      deliverMessage(message).catch((error) => {
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (onDeliveryError) {
+          onDeliveryError(message, err);
+        } else {
+          console.error("[Directive MessageBus] Delivery error:", err);
+        }
+      });
 
       return message.id;
     },
@@ -400,7 +415,14 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
         if (!filter || matchesFilter(msg, filter)) {
           const result = handler(msg);
           if (result instanceof Promise) {
-            result.catch(console.error);
+            result.catch((error) => {
+              const err = error instanceof Error ? error : new Error(String(error));
+              if (onDeliveryError) {
+                onDeliveryError(msg, err);
+              } else {
+                console.error("[Directive MessageBus] Pending delivery error:", err);
+              }
+            });
           }
         }
       }

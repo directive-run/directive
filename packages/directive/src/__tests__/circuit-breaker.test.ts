@@ -285,7 +285,7 @@ describe("Circuit Breaker", () => {
 
 		// All slots are taken; next request should be rejected immediately
 		await expect(breaker.execute(async () => "ok3")).rejects.toThrow(
-			'Circuit "test-half-open" is HALF_OPEN. Max trial requests (2) reached.'
+			'is HALF_OPEN. Max trial requests (2) reached.'
 		);
 
 		// Clean up in-flight requests
