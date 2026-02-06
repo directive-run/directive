@@ -860,6 +860,10 @@ export function createFactsStore<S extends Schema>(
 			validateValue(key as string, value);
 
 			const prev = map.get(key as string);
+
+			// Skip if value hasn't changed (prevents unnecessary cascade)
+			if (Object.is(prev, value)) return;
+
 			map.set(key as string, value);
 			knownKeys.add(key as string); // Track known keys for serialization
 

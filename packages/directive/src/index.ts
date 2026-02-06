@@ -327,8 +327,31 @@ export {
 export {
 	isSnapshotExpired,
 	validateSnapshot,
+	diffSnapshots,
+	signSnapshot,
+	verifySnapshotSignature,
+	isSignedSnapshot,
 	type DistributableSnapshotLike,
+	type SnapshotDiff,
+	type SnapshotDiffEntry,
+	type SignedSnapshot,
 } from "./utils/utils.js";
+
+// ============================================================================
+// Migration Utilities
+// ============================================================================
+
+export {
+	analyzeReduxSlice,
+	analyzeZustandStore,
+	analyzeXStateMachine,
+	generateModuleCode,
+	generateMigrationChecklist,
+	type ReduxSliceConfig,
+	type ZustandStoreConfig,
+	type XStateMachineConfig,
+	type DirectiveModuleStructure,
+} from "./utils/migration.js";
 
 // ============================================================================
 // OpenAI Agents Adapter

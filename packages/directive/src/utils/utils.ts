@@ -301,3 +301,314 @@ export function validateSnapshot<T>(
 	}
 	return snapshot.data;
 }
+
+/**
+ * Diff result for a single changed value.
+ */
+export interface SnapshotDiffEntry {
+	/** The key path that changed (e.g., "canUseApi" or "limits.apiCalls") */
+	path: string;
+	/** The value in the old snapshot */
+	oldValue: unknown;
+	/** The value in the new snapshot */
+	newValue: unknown;
+	/** Type of change: "added", "removed", or "changed" */
+	type: "added" | "removed" | "changed";
+}
+
+/**
+ * Result of diffing two snapshots.
+ */
+export interface SnapshotDiff {
+	/** Whether the snapshots are identical */
+	identical: boolean;
+	/** List of changes between snapshots */
+	changes: SnapshotDiffEntry[];
+	/** Whether the version changed (if both have versions) */
+	versionChanged: boolean;
+	/** Old version (if available) */
+	oldVersion?: string;
+	/** New version (if available) */
+	newVersion?: string;
+}
+
+/**
+ * Compare two distributable snapshots and return the differences.
+ * Useful for debugging, audit logs, and webhook payloads.
+ *
+ * @example
+ * ```typescript
+ * const oldSnapshot = system.getDistributableSnapshot({ includeVersion: true });
+ * system.dispatch({ type: "upgradePlan", plan: "pro" });
+ * const newSnapshot = system.getDistributableSnapshot({ includeVersion: true });
+ *
+ * const diff = diffSnapshots(oldSnapshot, newSnapshot);
+ * if (!diff.identical) {
+ *   console.log("Changes:", diff.changes);
+ *   // [{ path: "canUseApi", oldValue: false, newValue: true, type: "changed" }]
+ * }
+ * ```
+ *
+ * @param oldSnapshot - The previous snapshot
+ * @param newSnapshot - The new snapshot
+ * @returns A diff result with all changes
+ */
+export function diffSnapshots<T = Record<string, unknown>>(
+	oldSnapshot: DistributableSnapshotLike<T>,
+	newSnapshot: DistributableSnapshotLike<T>,
+): SnapshotDiff {
+	const changes: SnapshotDiffEntry[] = [];
+
+	// Deep compare function
+	function compare(
+		oldObj: unknown,
+		newObj: unknown,
+		path: string,
+	): void {
+		// Handle null/undefined
+		if (oldObj === null || oldObj === undefined) {
+			if (newObj !== null && newObj !== undefined) {
+				changes.push({ path, oldValue: oldObj, newValue: newObj, type: "added" });
+			}
+			return;
+		}
+		if (newObj === null || newObj === undefined) {
+			changes.push({ path, oldValue: oldObj, newValue: newObj, type: "removed" });
+			return;
+		}
+
+		// Handle primitives
+		if (typeof oldObj !== "object" || typeof newObj !== "object") {
+			if (!Object.is(oldObj, newObj)) {
+				changes.push({ path, oldValue: oldObj, newValue: newObj, type: "changed" });
+			}
+			return;
+		}
+
+		// Handle arrays
+		if (Array.isArray(oldObj) && Array.isArray(newObj)) {
+			if (oldObj.length !== newObj.length) {
+				changes.push({ path, oldValue: oldObj, newValue: newObj, type: "changed" });
+				return;
+			}
+			for (let i = 0; i < oldObj.length; i++) {
+				compare(oldObj[i], newObj[i], `${path}[${i}]`);
+			}
+			return;
+		}
+
+		// Handle objects
+		const oldRecord = oldObj as Record<string, unknown>;
+		const newRecord = newObj as Record<string, unknown>;
+		const allKeys = new Set([...Object.keys(oldRecord), ...Object.keys(newRecord)]);
+
+		for (const key of allKeys) {
+			const childPath = path ? `${path}.${key}` : key;
+			if (!(key in oldRecord)) {
+				changes.push({ path: childPath, oldValue: undefined, newValue: newRecord[key], type: "added" });
+			} else if (!(key in newRecord)) {
+				changes.push({ path: childPath, oldValue: oldRecord[key], newValue: undefined, type: "removed" });
+			} else {
+				compare(oldRecord[key], newRecord[key], childPath);
+			}
+		}
+	}
+
+	// Compare data
+	compare(oldSnapshot.data, newSnapshot.data, "");
+
+	// Check version change
+	const versionChanged = oldSnapshot.version !== newSnapshot.version &&
+		(oldSnapshot.version !== undefined || newSnapshot.version !== undefined);
+
+	return {
+		identical: changes.length === 0,
+		changes,
+		versionChanged,
+		oldVersion: oldSnapshot.version,
+		newVersion: newSnapshot.version,
+	};
+}
+
+// ============================================================================
+// Snapshot Signing (HMAC)
+// ============================================================================
+
+/**
+ * A signed distributable snapshot.
+ * Contains the original snapshot plus a cryptographic signature.
+ */
+export interface SignedSnapshot<T = Record<string, unknown>>
+	extends DistributableSnapshotLike<T> {
+	/** HMAC-SHA256 signature in hex format */
+	signature: string;
+	/** Signing algorithm used */
+	algorithm: "hmac-sha256";
+}
+
+/**
+ * Check if a snapshot is signed.
+ *
+ * @param snapshot - The snapshot to check
+ * @returns True if the snapshot has a signature
+ */
+export function isSignedSnapshot<T>(
+	snapshot: DistributableSnapshotLike<T> | SignedSnapshot<T>,
+): snapshot is SignedSnapshot<T> {
+	return "signature" in snapshot && typeof snapshot.signature === "string";
+}
+
+/**
+ * Sign a distributable snapshot using HMAC-SHA256.
+ * Creates a tamper-proof signature that can be verified later.
+ *
+ * **Security Notes:**
+ * - Use a cryptographically random secret of at least 32 bytes
+ * - Store the secret securely (environment variable, secrets manager)
+ * - Never expose the secret to clients
+ * - The signature covers all snapshot fields for integrity
+ *
+ * @example
+ * ```typescript
+ * const snapshot = system.getDistributableSnapshot({
+ *   includeDerivations: ['canUseFeature', 'limits'],
+ *   ttlSeconds: 3600,
+ * });
+ *
+ * // Sign the snapshot (server-side only)
+ * const signed = await signSnapshot(snapshot, process.env.SNAPSHOT_SECRET);
+ *
+ * // Store in JWT, Redis, or send to client
+ * const jwt = createJWT({ snapshot: signed });
+ *
+ * // Later, verify the signature
+ * const isValid = await verifySnapshotSignature(signed, process.env.SNAPSHOT_SECRET);
+ * if (!isValid) {
+ *   throw new Error('Snapshot has been tampered with');
+ * }
+ * ```
+ *
+ * @param snapshot - The snapshot to sign
+ * @param secret - The HMAC secret (string or Uint8Array)
+ * @returns A signed snapshot with the signature attached
+ */
+export async function signSnapshot<T>(
+	snapshot: DistributableSnapshotLike<T>,
+	secret: string | Uint8Array,
+): Promise<SignedSnapshot<T>> {
+	// Create a canonical representation for signing
+	const payload = stableStringify({
+		data: snapshot.data,
+		createdAt: snapshot.createdAt,
+		expiresAt: snapshot.expiresAt,
+		version: snapshot.version,
+		metadata: snapshot.metadata,
+	});
+
+	const signature = await hmacSha256(payload, secret);
+
+	return {
+		...snapshot,
+		signature,
+		algorithm: "hmac-sha256",
+	};
+}
+
+/**
+ * Verify the signature of a signed snapshot.
+ * Returns true if the signature is valid, false otherwise.
+ *
+ * **Important:** Always verify signatures before trusting snapshot data,
+ * especially if the snapshot was received from an untrusted source (client, cache).
+ *
+ * @example
+ * ```typescript
+ * // Receive signed snapshot from client or cache
+ * const snapshot = JSON.parse(cachedData);
+ *
+ * // Verify before using
+ * const isValid = await verifySnapshotSignature(snapshot, process.env.SNAPSHOT_SECRET);
+ * if (!isValid) {
+ *   throw new Error('Invalid snapshot signature - possible tampering');
+ * }
+ *
+ * // Now safe to use snapshot.data
+ * if (snapshot.data.canUseFeature.api) {
+ *   // Grant access
+ * }
+ * ```
+ *
+ * @param signedSnapshot - The signed snapshot to verify
+ * @param secret - The HMAC secret (must match the signing secret)
+ * @returns True if signature is valid, false otherwise
+ */
+export async function verifySnapshotSignature<T>(
+	signedSnapshot: SignedSnapshot<T>,
+	secret: string | Uint8Array,
+): Promise<boolean> {
+	if (!signedSnapshot.signature || signedSnapshot.algorithm !== "hmac-sha256") {
+		return false;
+	}
+
+	// Recreate the canonical payload (same as signing)
+	const payload = stableStringify({
+		data: signedSnapshot.data,
+		createdAt: signedSnapshot.createdAt,
+		expiresAt: signedSnapshot.expiresAt,
+		version: signedSnapshot.version,
+		metadata: signedSnapshot.metadata,
+	});
+
+	const expectedSignature = await hmacSha256(payload, secret);
+
+	// Use timing-safe comparison
+	return timingSafeEqual(signedSnapshot.signature, expectedSignature);
+}
+
+/**
+ * Create HMAC-SHA256 signature of a message.
+ * Uses Web Crypto API for cross-platform support (Node.js, browsers, Deno, Bun).
+ */
+async function hmacSha256(
+	message: string,
+	secret: string | Uint8Array,
+): Promise<string> {
+	// Convert secret to Uint8Array if string
+	const secretBytes: Uint8Array =
+		typeof secret === "string" ? new TextEncoder().encode(secret) : secret;
+
+	// Import key for HMAC
+	const algorithm: HmacImportParams = { name: "HMAC", hash: { name: "SHA-256" } };
+	const key = await crypto.subtle.importKey(
+		"raw",
+		secretBytes as unknown as ArrayBuffer,
+		algorithm,
+		false,
+		["sign"],
+	);
+
+	// Sign the message
+	const messageBytes = new TextEncoder().encode(message);
+	const signature = await crypto.subtle.sign("HMAC", key, messageBytes);
+
+	// Convert to hex string
+	return Array.from(new Uint8Array(signature))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks.
+ * Both strings should be the same length (hex signatures from same algorithm).
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+	if (a.length !== b.length) {
+		return false;
+	}
+
+	let result = 0;
+	for (let i = 0; i < a.length; i++) {
+		result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	}
+	return result === 0;
+}

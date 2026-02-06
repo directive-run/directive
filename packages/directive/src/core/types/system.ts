@@ -224,6 +224,30 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	getDistributableSnapshot<T = Record<string, unknown>>(
 		options?: DistributableSnapshotOptions,
 	): DistributableSnapshot<T>;
+
+	/**
+	 * Watch for changes to distributable snapshot derivations.
+	 * Calls the callback whenever any of the included derivations change.
+	 * Returns an unsubscribe function.
+	 *
+	 * @example
+	 * ```typescript
+	 * const unsubscribe = system.watchDistributableSnapshot(
+	 *   { includeDerivations: ['effectivePlan', 'canUseFeature'] },
+	 *   (snapshot) => {
+	 *     // Snapshot changed - push to Redis/edge cache
+	 *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+	 *   }
+	 * );
+	 *
+	 * // Later, cleanup
+	 * unsubscribe();
+	 * ```
+	 */
+	watchDistributableSnapshot<T = Record<string, unknown>>(
+		options: DistributableSnapshotOptions,
+		callback: (snapshot: DistributableSnapshot<T>) => void,
+	): () => void;
 }
 
 // ============================================================================
