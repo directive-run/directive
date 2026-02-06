@@ -469,7 +469,7 @@ export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
 
   return {
     getState() {
-      return { ...state };
+      return { ...state, messages: [...state.messages], summaries: state.summaries.map(s => ({ ...s })) };
     },
 
     addMessage(message: Message) {

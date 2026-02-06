@@ -107,12 +107,17 @@ function convertMetrics(
 	scopeVersion: string,
 ): Record<string, unknown> {
 	const scopeMetrics = metrics.map((metric) => {
+		// Known limitation: startTimeUnixNano is approximated as lastUpdated minus 60s.
+		// A more accurate value would require tracking the actual collection start time
+		// per metric, which is not available in the current AggregatedMetric type.
+		const startTimeMs = metric.lastUpdated - 60000;
+
 		const dataPoints = [
 			{
 				asInt: metric.type === "counter" ? metric.sum : undefined,
 				asDouble: metric.type !== "counter" ? metric.lastValue : undefined,
 				timeUnixNano: toNanos(metric.lastUpdated),
-				startTimeUnixNano: toNanos(metric.lastUpdated - 60000),
+				startTimeUnixNano: toNanos(startTimeMs),
 				attributes: [],
 			},
 		];
@@ -138,7 +143,7 @@ function convertMetrics(
 						min: metric.min,
 						max: metric.max,
 						timeUnixNano: toNanos(metric.lastUpdated),
-						startTimeUnixNano: toNanos(metric.lastUpdated - 60000),
+						startTimeUnixNano: toNanos(startTimeMs),
 						attributes: [],
 					},
 				],
@@ -271,6 +276,15 @@ export function createOTLPExporter(config: OTLPExporterConfig): OTLPExporter {
 	} catch (error) {
 		throw new Error(
 			`[Directive OTLP] Invalid endpoint URL "${endpoint}": ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+
+	// Warn if endpoint already contains a path like /v1/metrics or /v1/traces
+	if (/\/v1\/(metrics|traces)/.test(endpoint)) {
+		console.warn(
+			`[Directive OTLP] Endpoint "${endpoint}" already contains a /v1/metrics or /v1/traces path. ` +
+			`The exporter will append /v1/metrics or /v1/traces automatically. ` +
+			`Use the base URL (e.g., "http://localhost:4318") instead.`
 		);
 	}
 

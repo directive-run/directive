@@ -357,6 +357,7 @@ export function mergeStreams<T>(...sources: AsyncIterable<T>[]): AsyncIterable<T
 			let waiter: ((value: IteratorResult<T>) => void) | null = null;
 			let errorState: Error | null = null;
 			let stopped = false;
+			let hasWarnedDrop = false;
 			const sourceIterators: AsyncIterator<T>[] = [];
 
 			function notifyWaiter(result: IteratorResult<T>): boolean {
@@ -381,6 +382,12 @@ export function mergeStreams<T>(...sources: AsyncIterable<T>[]): AsyncIterable<T
 							if (!notifyWaiter({ value: result.value, done: false })) {
 								if (buffer.length < MAX_BUFFER) {
 									buffer.push(result.value);
+								} else if (!hasWarnedDrop) {
+									hasWarnedDrop = true;
+									console.warn(
+										`[Directive mergeStreams] Buffer exceeded ${MAX_BUFFER} items. ` +
+										`Values are being dropped. Ensure the consumer keeps up or use bounded StreamChannel sources.`
+									);
 								}
 							}
 						}
