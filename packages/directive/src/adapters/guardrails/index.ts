@@ -79,6 +79,26 @@ export {
   type SemanticCacheGuardrailResult,
 } from "./semantic-cache.js";
 
+// Streaming constraints
+export {
+  createStreamingConstraintRunner,
+  withStreamingConstraints,
+  createLengthConstraint,
+  createFormatConstraint,
+  createSemanticConstraint,
+  createPIIStreamingConstraint,
+  createPatternConstraint,
+  createLatencyConstraint,
+  allOf,
+  anyOf,
+  DEFAULT_CONSTRAINT_INTERVAL,
+  type StreamingConstraint,
+  type StreamingConstraintContext,
+  type StreamingConstraintResult,
+  type StreamingConstraintRunnerConfig,
+  type StreamingConstraintViolatedChunk,
+} from "./streaming-constraints.js";
+
 // Re-export existing guardrails from main module for convenience
 export {
   createPIIGuardrail,

@@ -506,6 +506,18 @@ export {
 	composeGuardrails,
 	conditionalGuardrail,
 	retryableGuardrail,
+	// Streaming constraints
+	createStreamingConstraintRunner,
+	withStreamingConstraints,
+	createLengthConstraint,
+	createFormatConstraint,
+	createSemanticConstraint,
+	createPIIStreamingConstraint,
+	createPatternConstraint,
+	createLatencyConstraint,
+	allOf,
+	anyOf,
+	DEFAULT_CONSTRAINT_INTERVAL,
 	type InjectionPattern,
 	type InjectionCategory,
 	type InjectionDetectionResult,
@@ -517,6 +529,12 @@ export {
 	type RedactionStyle,
 	type EnhancedPIIGuardrailOptions,
 	type OutputSanitizerOptions,
+	// Streaming constraint types
+	type StreamingConstraint,
+	type StreamingConstraintContext,
+	type StreamingConstraintResult,
+	type StreamingConstraintRunnerConfig,
+	type StreamingConstraintViolatedChunk,
 } from "./adapters/guardrails/index.js";
 
 // ============================================================================
@@ -555,3 +573,42 @@ export {
 	type MCPGetPromptRequirement,
 	type MCPSyncResourcesRequirement,
 } from "./adapters/mcp.js";
+
+// ============================================================================
+// Audit Plugin
+// ============================================================================
+
+export {
+	createAuditTrail,
+	createAgentAuditHandlers,
+	type AuditEntry,
+	type AuditEntryFilter,
+	type AuditEventType,
+	type AuditInstance,
+	type AuditPluginConfig,
+	type AuditStats,
+	type AuditVerificationResult,
+	type PIIMaskingConfig,
+	type SigningConfig,
+} from "./adapters/plugins/audit.js";
+
+// ============================================================================
+// Compliance Plugin
+// ============================================================================
+
+export {
+	createCompliance,
+	createInMemoryComplianceStorage,
+	type ComplianceConfig,
+	type ComplianceInstance,
+	type ComplianceStorage,
+	type ConsentRecord,
+	type ConsentTracker,
+	type DataDeletionRequest,
+	type DataDeletionResult,
+	type DataExportRequest,
+	type DataExportResult,
+	type DeletionCertificate,
+	type DeletionScope,
+	type RetentionPolicy,
+} from "./adapters/plugins/compliance.js";
