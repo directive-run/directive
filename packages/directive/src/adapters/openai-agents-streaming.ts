@@ -23,6 +23,22 @@
 import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData } from "./openai-agents.js";
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Default buffer size for streaming backpressure */
+export const DEFAULT_BUFFER_SIZE = 1000;
+
+/** Default interval (in tokens) between guardrail checks during streaming */
+export const DEFAULT_GUARDRAIL_CHECK_INTERVAL = 50;
+
+/** Default toxicity threshold for toxicity streaming guardrail */
+export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
+
+/** Maximum number of stream keys to track for warning deduplication */
+export const MAX_TRACKED_STREAMS = 100;
+
+// ============================================================================
 // Stream Event Types
 // ============================================================================
 
@@ -189,7 +205,7 @@ class StreamBuffer<T> {
   private closed = false;
   private droppedCount = 0;
 
-  constructor(strategy: BackpressureStrategy = "buffer", maxSize = 1000) {
+  constructor(strategy: BackpressureStrategy = "buffer", maxSize = DEFAULT_BUFFER_SIZE) {
     this.strategy = strategy;
     this.maxSize = maxSize;
   }
@@ -304,10 +320,17 @@ export function createStreamingRunner(
     const {
       signal,
       backpressure = "buffer",
-      bufferSize = 1000,
-      guardrailCheckInterval = 50,
+      bufferSize = DEFAULT_BUFFER_SIZE,
+      guardrailCheckInterval = DEFAULT_GUARDRAIL_CHECK_INTERVAL,
       stopOnGuardrail = true,
     } = runOptions;
+
+    // Validate configuration
+    if (guardrailCheckInterval <= 0 || !Number.isFinite(guardrailCheckInterval)) {
+      throw new Error(
+        `[Directive Streaming] guardrailCheckInterval must be a positive number, got ${guardrailCheckInterval}`
+      );
+    }
 
     const buffer = new StreamBuffer<StreamChunk>(backpressure, bufferSize);
     const abortController = new AbortController();
@@ -416,7 +439,6 @@ export function createStreamingRunner(
           droppedTokens,
         });
 
-        cleanup();
         buffer.close();
         return result as RunResult<T>;
       } catch (error) {
@@ -426,9 +448,11 @@ export function createStreamingRunner(
           partialOutput: partialOutput || undefined,
         };
         await buffer.push(errorChunk);
-        cleanup();
         buffer.close();
         throw error;
+      } finally {
+        // Always cleanup abort signal listener to prevent memory leaks
+        cleanup();
       }
     })();
 
@@ -478,7 +502,7 @@ export function createToxicityStreamingGuardrail(options: {
   /** Stop the stream on detection (default: true) */
   stopOnFail?: boolean;
 }): StreamingGuardrail {
-  const { checkFn, threshold = 0.8, stopOnFail = true } = options;
+  const { checkFn, threshold = DEFAULT_TOXICITY_THRESHOLD, stopOnFail = true } = options;
 
   return {
     name: "toxicity-streaming",
@@ -518,16 +542,16 @@ export function createLengthStreamingGuardrail(options: {
 }): StreamingGuardrail {
   const { maxTokens, warnAt, stopOnFail = true } = options;
 
-  // Use a WeakMap to track warned state per-stream context
-  // This allows the guardrail to be reused across multiple streams
+  // Track warned state per-stream with bounded size to prevent memory leaks
+  // Uses a simple FIFO eviction when max size is reached
   const warnedStreams = new Set<string>();
 
   return {
     name: "length-streaming",
     stopOnFail,
     check(_partialOutput, tokenCount) {
-      // Generate a unique key for this stream based on content hash
-      // This ensures warned state is per-stream, not per-guardrail-instance
+      // Generate a unique key for this stream based on content length + token count
+      // This allows warning to trigger once per stream when threshold is crossed
       const streamKey = `${_partialOutput.length}-${tokenCount}`;
 
       if (tokenCount >= maxTokens) {
@@ -541,6 +565,11 @@ export function createLengthStreamingGuardrail(options: {
       if (warnAt && tokenCount >= warnAt && !warnedStreams.has(streamKey)) {
         // Mark as warned for token counts at or above warnAt threshold
         warnedStreams.add(streamKey);
+        // Evict oldest entries if we exceed max tracked streams
+        if (warnedStreams.size > MAX_TRACKED_STREAMS) {
+          const firstKey = warnedStreams.values().next().value;
+          if (firstKey) warnedStreams.delete(firstKey);
+        }
         // Emit warning but don't fail
         return {
           passed: true,

@@ -96,6 +96,27 @@ export interface CircuitBreaker {
 }
 
 // ============================================================================
+// Errors
+// ============================================================================
+
+/** Error thrown when a request is rejected because the circuit is open */
+export class CircuitBreakerOpenError extends Error {
+	readonly code = "CIRCUIT_OPEN" as const;
+	readonly retryAfterMs: number;
+	readonly state: "OPEN" | "HALF_OPEN";
+
+	constructor(name: string, retryAfterMs: number, state: "OPEN" | "HALF_OPEN" = "OPEN", detail?: string) {
+		const msg = detail
+			? `[Directive CircuitBreaker] Circuit "${name}" is ${state}. ${detail}`
+			: `[Directive CircuitBreaker] Circuit "${name}" is ${state}. Request rejected. Try again in ${Math.ceil(retryAfterMs / 1000)}s.`;
+		super(msg);
+		this.name = "CircuitBreakerOpenError";
+		this.retryAfterMs = retryAfterMs;
+		this.state = state;
+	}
+}
+
+// ============================================================================
 // Factory
 // ============================================================================
 
@@ -121,6 +142,11 @@ export interface CircuitBreaker {
  *   }
  * }
  * ```
+ *
+ * @throws {Error} If failureThreshold is less than 1 or not a finite number
+ * @throws {Error} If recoveryTimeMs is not positive or not a finite number
+ * @throws {Error} If halfOpenMaxRequests is less than 1 or not a finite number
+ * @throws {Error} If failureWindowMs is not positive or not a finite number
  */
 export function createCircuitBreaker(config: CircuitBreakerConfig = {}): CircuitBreaker {
 	const {
@@ -260,19 +286,14 @@ export function createCircuitBreaker(config: CircuitBreakerConfig = {}): Circuit
 					if (observability) {
 						observability.incrementCounter(`${metricPrefix}.rejected`, { name });
 					}
-					throw new Error(
-						`[Directive CircuitBreaker] Circuit "${name}" is OPEN. Request rejected. ` +
-						`Try again in ${Math.ceil((recoveryTimeMs - (Date.now() - openedAt)) / 1000)}s.`
-					);
+					throw new CircuitBreakerOpenError(name, recoveryTimeMs - (Date.now() - openedAt));
 				}
 			}
 
 			if (state === "HALF_OPEN") {
 				if (halfOpenRequests >= halfOpenMaxRequests) {
 					totalRejected++;
-					throw new Error(
-						`[Directive CircuitBreaker] Circuit "${name}" is HALF_OPEN. Max trial requests (${halfOpenMaxRequests}) reached.`
-					);
+					throw new CircuitBreakerOpenError(name, recoveryTimeMs, "HALF_OPEN", `Max trial requests (${halfOpenMaxRequests}) reached.`);
 				}
 				halfOpenRequests++;
 			}

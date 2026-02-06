@@ -503,15 +503,20 @@ export function createEnhancedPIIGuardrail(
     }
 
     // Custom detectors get a timeout
-    return Promise.race([
-      detectorInstance.detect(text, piiTypes),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`[Directive] PII detector '${detectorInstance.name}' timed out after ${detectorTimeout}ms`)),
-          detectorTimeout
-        )
-      ),
-    ]);
+    let timer: ReturnType<typeof setTimeout>;
+    try {
+      return await Promise.race([
+        detectorInstance.detect(text, piiTypes),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`[Directive] PII detector '${detectorInstance.name}' timed out after ${detectorTimeout}ms`)),
+            detectorTimeout
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer!);
+    }
   }
 
   return async (data): Promise<GuardrailResult> => {
@@ -629,15 +634,20 @@ export async function detectPII(
     items = await detectorInstance.detect(text, types);
   } else {
     // Custom detectors get a timeout
-    items = await Promise.race([
-      detectorInstance.detect(text, types),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`[Directive] PII detector '${detectorInstance.name}' timed out after ${timeout}ms`)),
-          timeout
-        )
-      ),
-    ]);
+    let timer: ReturnType<typeof setTimeout>;
+    try {
+      items = await Promise.race([
+        detectorInstance.detect(text, types),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`[Directive] PII detector '${detectorInstance.name}' timed out after ${timeout}ms`)),
+            timeout
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer!);
+    }
   }
 
   const filtered = items.filter((item) => item.confidence >= minConfidence);

@@ -76,6 +76,8 @@ export interface SemanticCacheConfig {
   onHit?: (entry: CacheEntry, similarity: number) => void;
   /** Callback when cache miss occurs */
   onMiss?: (query: string) => void;
+  /** Callback when cache lookup encounters an error */
+  onError?: (error: Error) => void;
   /** Whether to include agent name in cache key */
   perAgent?: boolean;
 }
@@ -275,6 +277,7 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
     storage = createInMemoryStorage(),
     onHit,
     onMiss,
+    onError,
     perAgent = false,
   } = config;
 
@@ -386,6 +389,7 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
       } catch (error) {
         // On error, treat as cache miss
         stats.totalMisses++;
+        onError?.(error instanceof Error ? error : new Error(String(error)));
         return {
           hit: false,
           latencyMs: Date.now() - start,
@@ -403,7 +407,7 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
       const queryEmbedding = await embedder(query);
 
       const entry: CacheEntry = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         query,
         queryEmbedding,
         response,
@@ -649,6 +653,10 @@ export function createBatchedEmbedder(config: {
   maxWaitMs?: number;
 }): BatchedEmbedder {
   const { batchSize = 20, embedBatch, maxWaitMs = 50 } = config;
+
+  if (batchSize < 1 || !Number.isFinite(batchSize)) {
+    throw new Error(`[Directive SemanticCache] batchSize must be >= 1, got ${batchSize}`);
+  }
 
   let pendingBatch: Array<{
     text: string;
