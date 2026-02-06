@@ -372,6 +372,27 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	getDistributableSnapshot<T = Record<string, unknown>>(
 		options?: DistributableSnapshotOptions,
 	): DistributableSnapshot<T>;
+
+	/**
+	 * Watch for changes to distributable snapshot derivations.
+	 * Calls the callback whenever any of the included derivations change.
+	 * Use "namespace.key" format for derivation keys.
+	 * Returns an unsubscribe function.
+	 *
+	 * @example
+	 * ```typescript
+	 * const unsubscribe = system.watchDistributableSnapshot(
+	 *   { includeDerivations: ['auth.effectivePlan', 'auth.canUseFeature'] },
+	 *   (snapshot) => {
+	 *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+	 *   }
+	 * );
+	 * ```
+	 */
+	watchDistributableSnapshot<T = Record<string, unknown>>(
+		options: DistributableSnapshotOptions,
+		callback: (snapshot: DistributableSnapshot<T>) => void,
+	): () => void;
 }
 
 /**
@@ -577,6 +598,26 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	getDistributableSnapshot<T = Record<string, unknown>>(
 		options?: DistributableSnapshotOptions,
 	): DistributableSnapshot<T>;
+
+	/**
+	 * Watch for changes to distributable snapshot derivations.
+	 * Calls the callback whenever any of the included derivations change.
+	 * Returns an unsubscribe function.
+	 *
+	 * @example
+	 * ```typescript
+	 * const unsubscribe = system.watchDistributableSnapshot(
+	 *   { includeDerivations: ['effectivePlan', 'canUseFeature'] },
+	 *   (snapshot) => {
+	 *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+	 *   }
+	 * );
+	 * ```
+	 */
+	watchDistributableSnapshot<T = Record<string, unknown>>(
+		options: DistributableSnapshotOptions,
+		callback: (snapshot: DistributableSnapshot<T>) => void,
+	): () => void;
 }
 
 /**

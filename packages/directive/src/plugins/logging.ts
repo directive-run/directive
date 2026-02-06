@@ -1,9 +1,8 @@
-// @ts-nocheck - TODO: Update for consolidated schema API
 /**
  * Logging Plugin - Console logging for Directive events
  */
 
-import type { Plugin, Schema } from "../core/types.js";
+import type { Plugin, ModuleSchema } from "../core/types.js";
 
 export interface LoggingPluginOptions {
 	/** Log level */
@@ -29,9 +28,9 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
  * });
  * ```
  */
-export function loggingPlugin<S extends Schema>(
+export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
 	options: LoggingPluginOptions = {},
-): Plugin<S> {
+): Plugin<M> {
 	const {
 		level = "info",
 		filter = () => true,

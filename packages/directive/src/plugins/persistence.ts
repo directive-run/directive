@@ -1,9 +1,8 @@
-// @ts-nocheck - TODO: Update for consolidated schema API
 /**
  * Persistence Plugin - Save/restore facts to storage
  */
 
-import type { Plugin, Schema, System } from "../core/types.js";
+import type { Plugin, ModuleSchema, System } from "../core/types.js";
 import { isPrototypeSafe } from "../utils/utils.js";
 
 export interface PersistencePluginOptions {
@@ -42,9 +41,9 @@ export interface PersistencePluginOptions {
  * });
  * ```
  */
-export function persistencePlugin<S extends Schema>(
+export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
 	options: PersistencePluginOptions,
-): Plugin<S> {
+): Plugin<M> {
 	const {
 		storage,
 		key,
@@ -57,7 +56,7 @@ export function persistencePlugin<S extends Schema>(
 	} = options;
 
 	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-	let system: System<S> | null = null;
+	let system: System<M> | null = null;
 	const trackedKeys = new Set<string>();
 
 	/** Check if a key should be persisted */

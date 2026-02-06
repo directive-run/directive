@@ -1,11 +1,10 @@
-// @ts-nocheck - TODO: Update for consolidated schema API
 /**
  * Devtools Plugin - Browser devtools integration
  *
  * Exposes the system to browser devtools via window.__DIRECTIVE__
  */
 
-import type { Plugin, Schema, System } from "../core/types.js";
+import type { Plugin, ModuleSchema, System } from "../core/types.js";
 
 export interface DevtoolsPluginOptions {
 	/** Name for this system in devtools */
@@ -14,8 +13,8 @@ export interface DevtoolsPluginOptions {
 	trace?: boolean;
 }
 
-interface DevtoolsState<S extends Schema> {
-	system: System<S> | null;
+interface DevtoolsState<M extends ModuleSchema> {
+	system: System<M> | null;
 	events: Array<{ timestamp: number; type: string; data: unknown }>;
 	maxEvents: number;
 }
@@ -23,8 +22,8 @@ interface DevtoolsState<S extends Schema> {
 declare global {
 	interface Window {
 		__DIRECTIVE__?: {
-			systems: Map<string, DevtoolsState<Schema>>;
-			getSystem(name?: string): System<Schema> | null;
+			systems: Map<string, DevtoolsState<ModuleSchema>>;
+			getSystem(name?: string): System<ModuleSchema> | null;
 			getSystems(): string[];
 			inspect(name?: string): unknown;
 			getEvents(name?: string): Array<{ timestamp: number; type: string; data: unknown }>;
@@ -48,7 +47,7 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 	}
 
 	if (!window.__DIRECTIVE__) {
-		const systems = new Map<string, DevtoolsState<Schema>>();
+		const systems = new Map<string, DevtoolsState<ModuleSchema>>();
 
 		window.__DIRECTIVE__ = {
 			systems,
@@ -95,19 +94,19 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
  * // __DIRECTIVE__.getEvents()
  * ```
  */
-export function devtoolsPlugin<S extends Schema>(
+export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 	options: DevtoolsPluginOptions = {},
-): Plugin<S> {
+): Plugin<M> {
 	const { name = "default", trace = false } = options;
 
 	const devtools = initDevtools();
-	const state: DevtoolsState<S> = {
+	const state: DevtoolsState<M> = {
 		system: null,
 		events: [],
 		maxEvents: 1000,
 	};
 
-	devtools.systems.set(name, state as DevtoolsState<Schema>);
+	devtools.systems.set(name, state as DevtoolsState<ModuleSchema>);
 
 	const addEvent = (type: string, data: unknown) => {
 		if (!trace) return;

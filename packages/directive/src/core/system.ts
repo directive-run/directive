@@ -760,6 +760,67 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 				data: namespacedData as T,
 			};
 		},
+
+		/**
+		 * Watch for changes to distributable snapshot derivations.
+		 * Accepts "namespace.key" format in options.
+		 * Callback receives data with namespaced keys.
+		 */
+		watchDistributableSnapshot<T = Record<string, unknown>>(
+			options: {
+				includeDerivations?: string[];
+				excludeDerivations?: string[];
+				includeFacts?: string[];
+				ttlSeconds?: number;
+				metadata?: Record<string, unknown>;
+				includeVersion?: boolean;
+			},
+			callback: (snapshot: {
+				data: T;
+				createdAt: number;
+				expiresAt?: number;
+				version?: string;
+				metadata?: Record<string, unknown>;
+			}) => void,
+		): () => void {
+			// Translate namespaced keys to internal format
+			const internalOptions = {
+				...options,
+				includeDerivations: options?.includeDerivations?.map(toInternalKey),
+				excludeDerivations: options?.excludeDerivations?.map(toInternalKey),
+				includeFacts: options?.includeFacts?.map(toInternalKey),
+			};
+
+			return engine.watchDistributableSnapshot(
+				internalOptions,
+				(snapshot: { data: Record<string, unknown>; createdAt: number; expiresAt?: number; version?: string; metadata?: Record<string, unknown> }) => {
+					// Transform data keys from internal format to namespaced format
+					const namespacedData: Record<string, Record<string, unknown>> = {};
+
+					for (const [key, value] of Object.entries(snapshot.data)) {
+						const underscoreIndex = key.indexOf("_");
+						if (underscoreIndex > 0) {
+							const namespace = key.slice(0, underscoreIndex);
+							const localKey = key.slice(underscoreIndex + 1);
+							if (!namespacedData[namespace]) {
+								namespacedData[namespace] = {};
+							}
+							namespacedData[namespace][localKey] = value;
+						} else {
+							if (!namespacedData["_root"]) {
+								namespacedData["_root"] = {};
+							}
+							namespacedData["_root"][key] = value;
+						}
+					}
+
+					callback({
+						...snapshot,
+						data: namespacedData as T,
+					});
+				},
+			);
+		},
 	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for NamespacedSystem
 	} as any;
 
@@ -1369,6 +1430,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 		getSnapshot: engine.getSnapshot.bind(engine),
 		restore: engine.restore.bind(engine),
 		getDistributableSnapshot: engine.getDistributableSnapshot.bind(engine),
+		watchDistributableSnapshot: engine.watchDistributableSnapshot.bind(engine),
 	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing
 	} as any;
 

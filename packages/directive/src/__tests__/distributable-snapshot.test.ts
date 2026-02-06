@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { ModuleSchema } from "../index.js";
-import { createModule, createSystem, t, isSnapshotExpired, validateSnapshot } from "../index.js";
+import { createModule, createSystem, t, isSnapshotExpired, validateSnapshot, diffSnapshots, signSnapshot, verifySnapshotSignature, isSignedSnapshot } from "../index.js";
 
 describe("Distributable Snapshots", () => {
 	const createEntitlementsModule = () => {
@@ -549,6 +549,520 @@ describe("Distributable Snapshots", () => {
 		it("throws when createdAt is not a number", () => {
 			const snapshot = { data: { test: true }, createdAt: "2024-01-01" };
 			expect(() => validateSnapshot(snapshot as any)).toThrow(/invalid.*createdAt/i);
+		});
+	});
+
+	describe("diffSnapshots utility", () => {
+		it("returns identical: true when snapshots are the same", () => {
+			const snapshot = {
+				data: { canUseApi: true, limits: { apiCalls: 1000 } },
+				createdAt: Date.now(),
+				version: "abc123",
+			};
+
+			const diff = diffSnapshots(snapshot, snapshot);
+
+			expect(diff.identical).toBe(true);
+			expect(diff.changes).toHaveLength(0);
+			expect(diff.versionChanged).toBe(false);
+		});
+
+		it("detects primitive value changes", () => {
+			const oldSnapshot = {
+				data: { canUseApi: false, plan: "free" },
+				createdAt: Date.now(),
+			};
+			const newSnapshot = {
+				data: { canUseApi: true, plan: "pro" },
+				createdAt: Date.now(),
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			expect(diff.changes).toHaveLength(2);
+			expect(diff.changes).toContainEqual({
+				path: "canUseApi",
+				oldValue: false,
+				newValue: true,
+				type: "changed",
+			});
+			expect(diff.changes).toContainEqual({
+				path: "plan",
+				oldValue: "free",
+				newValue: "pro",
+				type: "changed",
+			});
+		});
+
+		it("detects added properties", () => {
+			const oldSnapshot = {
+				data: { canUseApi: true },
+				createdAt: Date.now(),
+			};
+			const newSnapshot = {
+				data: { canUseApi: true, canExport: true },
+				createdAt: Date.now(),
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			expect(diff.changes).toContainEqual({
+				path: "canExport",
+				oldValue: undefined,
+				newValue: true,
+				type: "added",
+			});
+		});
+
+		it("detects removed properties", () => {
+			const oldSnapshot = {
+				data: { canUseApi: true, canExport: true },
+				createdAt: Date.now(),
+			};
+			const newSnapshot = {
+				data: { canUseApi: true },
+				createdAt: Date.now(),
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			expect(diff.changes).toContainEqual({
+				path: "canExport",
+				oldValue: true,
+				newValue: undefined,
+				type: "removed",
+			});
+		});
+
+		it("detects nested object changes", () => {
+			const oldSnapshot = {
+				data: { limits: { apiCalls: 100, storage: 1 } },
+				createdAt: Date.now(),
+			};
+			const newSnapshot = {
+				data: { limits: { apiCalls: 10000, storage: 100 } },
+				createdAt: Date.now(),
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			expect(diff.changes).toContainEqual({
+				path: "limits.apiCalls",
+				oldValue: 100,
+				newValue: 10000,
+				type: "changed",
+			});
+			expect(diff.changes).toContainEqual({
+				path: "limits.storage",
+				oldValue: 1,
+				newValue: 100,
+				type: "changed",
+			});
+		});
+
+		it("detects array changes", () => {
+			const oldSnapshot = {
+				data: { features: ["api", "export"] },
+				createdAt: Date.now(),
+			};
+			const newSnapshot = {
+				data: { features: ["api", "export", "analytics"] },
+				createdAt: Date.now(),
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			// Arrays with different lengths are reported as changed
+			expect(diff.changes).toContainEqual({
+				path: "features",
+				oldValue: ["api", "export"],
+				newValue: ["api", "export", "analytics"],
+				type: "changed",
+			});
+		});
+
+		it("detects version changes", () => {
+			const oldSnapshot = {
+				data: { test: true },
+				createdAt: Date.now(),
+				version: "abc123",
+			};
+			const newSnapshot = {
+				data: { test: true },
+				createdAt: Date.now(),
+				version: "def456",
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(true); // data is the same
+			expect(diff.versionChanged).toBe(true);
+			expect(diff.oldVersion).toBe("abc123");
+			expect(diff.newVersion).toBe("def456");
+		});
+
+		it("handles null values", () => {
+			const oldSnapshot = {
+				data: { value: null },
+				createdAt: Date.now(),
+			};
+			const newSnapshot = {
+				data: { value: "something" },
+				createdAt: Date.now(),
+			};
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			expect(diff.changes).toContainEqual({
+				path: "value",
+				oldValue: null,
+				newValue: "something",
+				type: "added",
+			});
+		});
+
+		it("works with real system snapshots", () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			const oldSnapshot = system.getDistributableSnapshot({ includeVersion: true });
+
+			system.dispatch({ type: "setPlan", plan: "pro" });
+
+			const newSnapshot = system.getDistributableSnapshot({ includeVersion: true });
+
+			const diff = diffSnapshots(oldSnapshot, newSnapshot);
+
+			expect(diff.identical).toBe(false);
+			expect(diff.versionChanged).toBe(true);
+			expect(diff.changes.some(c => c.path === "canUseApi")).toBe(true);
+			expect(diff.changes.some(c => c.path === "effectivePlan")).toBe(true);
+
+			system.stop();
+		});
+	});
+
+	describe("watchDistributableSnapshot", () => {
+		it("calls callback when derivations change", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			const snapshots: Array<{ data: Record<string, unknown>; version?: string }> = [];
+
+			const unsubscribe = system.watchDistributableSnapshot(
+				{ includeDerivations: ["canUseApi", "effectivePlan"] },
+				(snapshot) => {
+					snapshots.push(snapshot);
+				},
+			);
+
+			// Change plan which should trigger callback
+			system.dispatch({ type: "setPlan", plan: "pro" });
+			await new Promise((r) => setTimeout(r, 10));
+
+			expect(snapshots.length).toBe(1);
+			expect(snapshots[0].data).toHaveProperty("canUseApi", true);
+			expect(snapshots[0].data).toHaveProperty("effectivePlan", "pro");
+
+			// Change plan again
+			system.dispatch({ type: "setPlan", plan: "enterprise" });
+			await new Promise((r) => setTimeout(r, 10));
+
+			expect(snapshots.length).toBe(2);
+			expect(snapshots[1].data).toHaveProperty("effectivePlan", "enterprise");
+
+			unsubscribe();
+			system.stop();
+		});
+
+		it("returns unsubscribe function that stops callbacks", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			let callCount = 0;
+			const unsubscribe = system.watchDistributableSnapshot(
+				{ includeDerivations: ["canUseApi"] },
+				() => {
+					callCount++;
+				},
+			);
+
+			system.dispatch({ type: "setPlan", plan: "pro" });
+			await new Promise((r) => setTimeout(r, 10));
+			expect(callCount).toBe(1);
+
+			// Unsubscribe
+			unsubscribe();
+
+			// Should not trigger callback
+			system.dispatch({ type: "setPlan", plan: "enterprise" });
+			await new Promise((r) => setTimeout(r, 10));
+			expect(callCount).toBe(1);
+
+			system.stop();
+		});
+
+		it("does not call callback when values are unchanged", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			let callCount = 0;
+			const unsubscribe = system.watchDistributableSnapshot(
+				{ includeDerivations: ["canUseApi"] },
+				() => {
+					callCount++;
+				},
+			);
+
+			// Change to same plan (free -> free)
+			system.dispatch({ type: "setPlan", plan: "free" });
+			await new Promise((r) => setTimeout(r, 10));
+
+			// Should not trigger callback because derivation value is the same
+			expect(callCount).toBe(0);
+
+			unsubscribe();
+			system.stop();
+		});
+
+		it("respects options like ttlSeconds and metadata", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			let capturedSnapshot: {
+				data: Record<string, unknown>;
+				expiresAt?: number;
+				metadata?: Record<string, unknown>;
+			} | null = null;
+
+			const unsubscribe = system.watchDistributableSnapshot(
+				{
+					includeDerivations: ["canUseApi"],
+					ttlSeconds: 3600,
+					metadata: { source: "watch" },
+				},
+				(snapshot) => {
+					capturedSnapshot = snapshot;
+				},
+			);
+
+			system.dispatch({ type: "setPlan", plan: "pro" });
+			await new Promise((r) => setTimeout(r, 10));
+
+			expect(capturedSnapshot).not.toBeNull();
+			expect(capturedSnapshot!.expiresAt).toBeDefined();
+			expect(capturedSnapshot!.metadata).toEqual({ source: "watch" });
+
+			unsubscribe();
+			system.stop();
+		});
+
+		it("works with namespaced systems", async () => {
+			const authSchema = {
+				facts: {
+					role: t.string<"user" | "admin">(),
+				},
+				derivations: {
+					isAdmin: t.boolean(),
+				},
+				events: {
+					setRole: { role: t.string<"user" | "admin">() },
+				},
+				requirements: {},
+			} satisfies ModuleSchema;
+
+			const authModule = createModule("auth", {
+				schema: authSchema,
+				init: (facts) => {
+					facts.role = "user";
+				},
+				derive: {
+					isAdmin: (facts) => facts.role === "admin",
+				},
+				events: {
+					setRole: (facts, { role }) => {
+						facts.role = role;
+					},
+				},
+			});
+
+			const system = createSystem({
+				modules: { auth: authModule },
+			});
+			system.start();
+
+			const snapshots: Array<{ data: Record<string, Record<string, unknown>> }> = [];
+
+			const unsubscribe = system.watchDistributableSnapshot(
+				{ includeDerivations: ["auth.isAdmin"] },
+				(snapshot) => {
+					snapshots.push(snapshot as { data: Record<string, Record<string, unknown>> });
+				},
+			);
+
+			system.events.auth.setRole({ role: "admin" });
+			await new Promise((r) => setTimeout(r, 10));
+
+			expect(snapshots.length).toBe(1);
+			expect(snapshots[0].data.auth).toHaveProperty("isAdmin", true);
+
+			unsubscribe();
+			system.stop();
+		});
+
+		it("warns when no derivations to watch", () => {
+			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+			try {
+				const module = createEntitlementsModule();
+				const system = createSystem({ module });
+				system.start();
+
+				const unsubscribe = system.watchDistributableSnapshot(
+					{ includeDerivations: ["nonExistent"] },
+					() => {},
+				);
+
+				expect(warnSpy).toHaveBeenCalledWith(
+					expect.stringContaining("No derivations to watch"),
+				);
+
+				unsubscribe();
+				system.stop();
+			} finally {
+				warnSpy.mockRestore();
+			}
+		});
+	});
+
+	describe("snapshot signing (HMAC)", () => {
+		const TEST_SECRET = "test-secret-key-for-hmac-signing-32bytes!";
+
+		it("signs and verifies a snapshot", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			const snapshot = system.getDistributableSnapshot({
+				includeDerivations: ["canUseApi", "effectivePlan"],
+				ttlSeconds: 3600,
+			});
+
+			// Sign the snapshot
+			const signed = await signSnapshot(snapshot, TEST_SECRET);
+
+			// Verify it has signature
+			expect(signed.signature).toBeDefined();
+			expect(signed.algorithm).toBe("hmac-sha256");
+			expect(typeof signed.signature).toBe("string");
+			expect(signed.signature.length).toBe(64); // SHA-256 = 32 bytes = 64 hex chars
+
+			// Verify the signature
+			const isValid = await verifySnapshotSignature(signed, TEST_SECRET);
+			expect(isValid).toBe(true);
+
+			system.stop();
+		});
+
+		it("fails verification with wrong secret", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			const snapshot = system.getDistributableSnapshot();
+			const signed = await signSnapshot(snapshot, TEST_SECRET);
+
+			// Verify with wrong secret
+			const isValid = await verifySnapshotSignature(signed, "wrong-secret");
+			expect(isValid).toBe(false);
+
+			system.stop();
+		});
+
+		it("fails verification if data is tampered", async () => {
+			const module = createEntitlementsModule();
+			const system = createSystem({ module });
+			system.start();
+
+			const snapshot = system.getDistributableSnapshot();
+			const signed = await signSnapshot(snapshot, TEST_SECRET);
+
+			// Tamper with the data
+			const tampered = {
+				...signed,
+				data: { ...signed.data, canUseApi: true }, // Changed from false
+			};
+
+			const isValid = await verifySnapshotSignature(tampered, TEST_SECRET);
+			expect(isValid).toBe(false);
+
+			system.stop();
+		});
+
+		it("fails verification if signature is missing", async () => {
+			const snapshot = {
+				data: { test: true },
+				createdAt: Date.now(),
+			};
+
+			// Try to verify unsigned snapshot
+			const isValid = await verifySnapshotSignature(
+				snapshot as never, // Force type for test
+				TEST_SECRET,
+			);
+			expect(isValid).toBe(false);
+		});
+
+		it("isSignedSnapshot returns correct result", async () => {
+			const unsigned = {
+				data: { test: true },
+				createdAt: Date.now(),
+			};
+
+			expect(isSignedSnapshot(unsigned)).toBe(false);
+
+			const signed = await signSnapshot(unsigned, TEST_SECRET);
+			expect(isSignedSnapshot(signed)).toBe(true);
+		});
+
+		it("signature is deterministic for same data", async () => {
+			const snapshot1 = {
+				data: { value: 42 },
+				createdAt: 1000,
+			};
+			const snapshot2 = {
+				data: { value: 42 },
+				createdAt: 1000,
+			};
+
+			const signed1 = await signSnapshot(snapshot1, TEST_SECRET);
+			const signed2 = await signSnapshot(snapshot2, TEST_SECRET);
+
+			expect(signed1.signature).toBe(signed2.signature);
+		});
+
+		it("supports Uint8Array secret", async () => {
+			const binarySecret = new Uint8Array([
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+			]);
+
+			const snapshot = { data: { test: true }, createdAt: Date.now() };
+			const signed = await signSnapshot(snapshot, binarySecret);
+
+			const isValid = await verifySnapshotSignature(signed, binarySecret);
+			expect(isValid).toBe(true);
 		});
 	});
 });

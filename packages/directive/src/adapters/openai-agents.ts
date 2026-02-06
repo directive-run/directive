@@ -1847,7 +1847,7 @@ export interface SchemaValidationResult {
 }
 
 /** Schema validator function type */
-export type SchemaValidator<T = unknown> = (
+export type SchemaValidator<_T = unknown> = (
   value: unknown
 ) => SchemaValidationResult | boolean;
 
