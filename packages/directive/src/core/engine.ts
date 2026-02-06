@@ -784,6 +784,79 @@ export function createEngine<S extends Schema>(
 			return snapshot;
 		},
 
+		watchDistributableSnapshot<T = Record<string, unknown>>(
+			options: {
+				includeDerivations?: string[];
+				excludeDerivations?: string[];
+				includeFacts?: string[];
+				ttlSeconds?: number;
+				metadata?: Record<string, unknown>;
+				includeVersion?: boolean;
+			},
+			callback: (snapshot: {
+				data: T;
+				createdAt: number;
+				expiresAt?: number;
+				version?: string;
+				metadata?: Record<string, unknown>;
+			}) => void,
+		): () => void {
+			const { includeDerivations, excludeDerivations } = options;
+
+			// Determine which derivations to watch
+			const allDerivationKeys = Object.keys(mergedDerive);
+			let derivationKeys: string[];
+
+			if (includeDerivations) {
+				derivationKeys = includeDerivations.filter((k) => allDerivationKeys.includes(k));
+			} else {
+				derivationKeys = allDerivationKeys;
+			}
+
+			if (excludeDerivations) {
+				const excludeSet = new Set(excludeDerivations);
+				derivationKeys = derivationKeys.filter((k) => !excludeSet.has(k));
+			}
+
+			if (derivationKeys.length === 0) {
+				// Nothing to watch, return no-op unsubscribe
+				if (process.env.NODE_ENV !== "production") {
+					console.warn(
+						"[Directive] watchDistributableSnapshot: No derivations to watch. " +
+							"Callback will never be called.",
+					);
+				}
+				return () => {};
+			}
+
+			// Get initial snapshot to seed version and ensure derivations are computed
+			// (derivations must be computed before subscribing so listeners are called on invalidation)
+			const initialSnapshot = this.getDistributableSnapshot<T>({
+				...options,
+				includeVersion: true,
+			});
+			let previousVersion = initialSnapshot.version;
+
+			// Subscribe to all watched derivations
+			return derivationsManager.subscribe(
+				derivationKeys as Array<keyof DerivationsDef<S>>,
+				() => {
+					// Generate a new snapshot
+					const snapshot = this.getDistributableSnapshot<T>({
+						...options,
+						// Always include version for change detection
+						includeVersion: true,
+					});
+
+					// Only call callback if snapshot actually changed
+					if (snapshot.version !== previousVersion) {
+						previousVersion = snapshot.version;
+						callback(snapshot);
+					}
+				},
+			);
+		},
+
 		restore(snapshot) {
 			if (!snapshot || typeof snapshot !== "object") {
 				throw new Error("[Directive] restore() requires a valid snapshot object");

@@ -13,6 +13,7 @@ export default defineConfig({
 		xstate: "src/adapters/xstate.ts",
 		redux: "src/adapters/redux.ts",
 		"openai-agents": "src/adapters/openai-agents.ts",
+		worker: "src/adapters/worker.ts",
 		"plugins/index": "src/plugins/index.ts",
 		testing: "src/utils/testing.ts",
 		templates: "src/utils/templates.ts",
