@@ -623,10 +623,10 @@ export class LatestErrorController implements ReactiveController {
  * @example
  * ```ts
  * import { LitElement, html } from 'lit';
- * import { AllRequirementStatusesController } from 'directive/lit';
+ * import { RequirementStatusesController } from 'directive/lit';
  *
  * class RequirementsDashboard extends LitElement {
- *   private allStatuses = new AllRequirementStatusesController(this, statusPlugin);
+ *   private allStatuses = new RequirementStatusesController(this, statusPlugin);
  *
  *   render() {
  *     return html`
@@ -640,7 +640,7 @@ export class LatestErrorController implements ReactiveController {
  * }
  * ```
  */
-export class AllRequirementStatusesController implements ReactiveController {
+export class RequirementStatusesController implements ReactiveController {
 	private host: ReactiveControllerHost;
 	private statusPlugin: StatusPlugin;
 	private unsubscribe?: () => void;
@@ -747,11 +747,11 @@ export class FactSelectorController<T, R> extends DirectiveController {
  * @example
  * ```ts
  * import { LitElement, html } from 'lit';
- * import { DerivationSelectorController } from 'directive/lit';
+ * import { DerivedSelectorController } from 'directive/lit';
  *
  * class StatusLabel extends LitElement {
  *   // Only re-render when status text changes
- *   private statusText = new DerivationSelectorController<Status, string>(
+ *   private statusText = new DerivedSelectorController<Status, string>(
  *     this, system, 'status', (s) => s?.label ?? 'Unknown'
  *   );
  *
@@ -761,7 +761,7 @@ export class FactSelectorController<T, R> extends DirectiveController {
  * }
  * ```
  */
-export class DerivationSelectorController<T, R> extends DirectiveController {
+export class DerivedSelectorController<T, R> extends DirectiveController {
 	private derivationId: string;
 	private selector: (value: T) => R;
 	private equalityFn: (a: R, b: R) => boolean;
@@ -1220,7 +1220,7 @@ export function createLatestError(
  * @example
  * ```ts
  * class RequirementsDashboard extends LitElement {
- *   private allStatuses = createAllRequirementStatuses(this, statusPlugin);
+ *   private allStatuses = createRequirementStatuses(this, statusPlugin);
  *
  *   render() {
  *     return html`
@@ -1234,11 +1234,11 @@ export function createLatestError(
  * }
  * ```
  */
-export function createAllRequirementStatuses(
+export function createRequirementStatuses(
 	host: ReactiveControllerHost,
 	statusPlugin: StatusPlugin,
-): AllRequirementStatusesController {
-	return new AllRequirementStatusesController(host, statusPlugin);
+): RequirementStatusesController {
+	return new RequirementStatusesController(host, statusPlugin);
 }
 
 /**
@@ -1300,7 +1300,7 @@ export function createFactSelector<T, R>(
  * @example
  * ```ts
  * class StatusLabel extends LitElement {
- *   private statusText = createDerivationSelector<Status, string>(
+ *   private statusText = createDerivedSelector<Status, string>(
  *     this, system, 'status', (s) => s?.label ?? 'Unknown'
  *   );
  *
@@ -1310,15 +1310,15 @@ export function createFactSelector<T, R>(
  * }
  * ```
  */
-export function createDerivationSelector<T, R>(
+export function createDerivedSelector<T, R>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
 	derivationId: string,
 	selector: (value: T) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): DerivationSelectorController<T, R> {
-	return new DerivationSelectorController<T, R>(host, system, derivationId, selector, equalityFn);
+): DerivedSelectorController<T, R> {
+	return new DerivedSelectorController<T, R>(host, system, derivationId, selector, equalityFn);
 }
 
 /**

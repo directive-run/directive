@@ -145,7 +145,7 @@ const trafficLight = createModule("traffic-light", {
   // With retry + custom key
   resolvers: {
     transition: {
-      handles: (req) => req.type === "TRANSITION",
+      requirement: "TRANSITION",
       key: (req) => `transition-${req.to}`,
       retry: { attempts: 3, backoff: "exponential" },
       resolve: async (req, ctx) => {

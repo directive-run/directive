@@ -2,7 +2,7 @@
  * Svelte Adapter - Svelte stores for Directive
  *
  * Features:
- * - createDerivationStore for reactive derived values
+ * - createDerivedStore for reactive derived value stores
  * - createFactStore for reactive fact values
  * - Svelte context for system
  * - useRequirementStatus for loading/error states
@@ -133,16 +133,16 @@ export function getDirectiveContext<M extends ModuleSchema = ModuleSchema>(): Sy
  * @example
  * ```svelte
  * <script>
- *   import { getDirectiveContext, createDerivationStore } from 'directive/svelte';
+ *   import { getDirectiveContext, createDerivedStore } from 'directive/svelte';
  *
  *   const system = getDirectiveContext();
- *   const isRed = createDerivationStore(system, 'isRed');
+ *   const isRed = createDerivedStore(system, 'isRed');
  * </script>
  *
  * <div>{$isRed ? 'Red' : 'Not Red'}</div>
  * ```
  */
-export function createDerivationStore<T>(
+export function createDerivedStore<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
 	derivationId: string,
@@ -152,7 +152,7 @@ export function createDerivationStore<T>(
 		const initialValue = system.read(derivationId);
 		if (initialValue === undefined) {
 			console.warn(
-				`[Directive] createDerivationStore("${derivationId}") returned undefined. ` +
+				`[Directive] createDerivedStore("${derivationId}") returned undefined. ` +
 					`Check that "${derivationId}" is defined in your module's derive property.`,
 			);
 		}
@@ -172,16 +172,16 @@ export function createDerivationStore<T>(
  * @example
  * ```svelte
  * <script>
- *   import { getDirectiveContext, createDerivationsStore } from 'directive/svelte';
+ *   import { getDirectiveContext, createDerivedsStore } from 'directive/svelte';
  *
  *   const system = getDirectiveContext();
- *   const state = createDerivationsStore(system, ['isRed', 'elapsed']);
+ *   const state = createDerivedsStore(system, ['isRed', 'elapsed']);
  * </script>
  *
  * <div>{$state.isRed ? `Red for ${$state.elapsed}s` : 'Not Red'}</div>
  * ```
  */
-export function createDerivationsStore<T extends Record<string, unknown>>(
+export function createDerivedsStore<T extends Record<string, unknown>>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
 	derivationIds: string[],
@@ -268,22 +268,22 @@ export function createInspectStore(
 
 /**
  * Get a derived value store using context.
- * Shorthand for getDirectiveContext() + createDerivationStore().
+ * Shorthand for getDirectiveContext() + createDerivedStore().
  *
  * @example
  * ```svelte
  * <script>
- *   import { useDerivation } from 'directive/svelte';
+ *   import { useDerived } from 'directive/svelte';
  *
- *   const isRed = useDerivation('isRed');
+ *   const isRed = useDerived('isRed');
  * </script>
  *
  * <div>{$isRed ? 'Red' : 'Not Red'}</div>
  * ```
  */
-export function useDerivation<T>(derivationId: string): Readable<T> {
+export function useDerived<T>(derivationId: string): Readable<T> {
 	const system = getDirectiveContext();
-	return createDerivationStore<T>(system, derivationId);
+	return createDerivedStore<T>(system, derivationId);
 }
 
 /**
@@ -292,26 +292,26 @@ export function useDerivation<T>(derivationId: string): Readable<T> {
  * @example
  * ```svelte
  * <script>
- *   import { useDerivations } from 'directive/svelte';
+ *   import { useDeriveds } from 'directive/svelte';
  *
- *   const state = useDerivations(['isRed', 'elapsed']);
+ *   const state = useDeriveds(['isRed', 'elapsed']);
  * </script>
  *
  * <div>{$state.isRed ? `Red for ${$state.elapsed}s` : 'Not Red'}</div>
  * ```
  */
-export function useDerivations<T extends Record<string, unknown>>(
+export function useDeriveds<T extends Record<string, unknown>>(
 	derivationIds: string[],
 ): Readable<T> {
 	const system = getDirectiveContext();
-	return createDerivationsStore<T>(system, derivationIds);
+	return createDerivedsStore<T>(system, derivationIds);
 }
 
 /**
  * Get direct access to facts for mutations.
  *
  * WARNING: The returned facts object is NOT reactive. Use this for event handlers
- * and imperative code, not for rendering. Use `useDerivation` or `useFact` for reactive values.
+ * and imperative code, not for rendering. Use `useDerived` or `useFact` for reactive values.
  *
  * @example
  * ```svelte
@@ -657,9 +657,9 @@ export function useLatestError(type: string): Readable<Error | null> {
  * @example
  * ```svelte
  * <script>
- *   import { useAllRequirementStatuses } from 'directive/svelte';
+ *   import { useRequirementStatuses } from 'directive/svelte';
  *
- *   const allStatuses = useAllRequirementStatuses();
+ *   const allStatuses = useRequirementStatuses();
  * </script>
  *
  * <ul>
@@ -669,11 +669,11 @@ export function useLatestError(type: string): Readable<Error | null> {
  * </ul>
  * ```
  */
-export function useAllRequirementStatuses(): Readable<Map<string, RequirementTypeStatus>> {
+export function useRequirementStatuses(): Readable<Map<string, RequirementTypeStatus>> {
 	const statusPlugin = getContext<StatusPlugin | null>(STATUS_PLUGIN_KEY);
 	if (!statusPlugin) {
 		throw new Error(
-			"[Directive] useAllRequirementStatuses requires a statusPlugin. " +
+			"[Directive] useRequirementStatuses requires a statusPlugin. " +
 				"Pass statusPlugin to setDirectiveContext().",
 		);
 	}
@@ -752,7 +752,7 @@ const warnedOptions = new WeakSet<object>();
  * @param options - Either a single module or full system options (must be stable reference)
  * @returns The system instance
  *
- * @see {@link useDerivation} for reading derived values
+ * @see {@link useDerived} for reading derived values
  * @see {@link useFacts} for direct fact access
  *
  * @example
@@ -892,16 +892,16 @@ export function useFactSelector<T, R>(
  * @example
  * ```svelte
  * <script>
- *   import { useDerivationSelector } from 'directive/svelte';
+ *   import { useDerivedSelector } from 'directive/svelte';
  *
  *   // Only re-render when status text changes
- *   const statusText = useDerivationSelector('status', (s) => s?.label ?? 'Unknown');
+ *   const statusText = useDerivedSelector('status', (s) => s?.label ?? 'Unknown');
  * </script>
  *
  * <span>{$statusText}</span>
  * ```
  */
-export function useDerivationSelector<T, R>(
+export function useDerivedSelector<T, R>(
 	derivationId: string,
 	selector: (value: T) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
@@ -936,10 +936,10 @@ export function useDerivationSelector<T, R>(
  * @example
  * ```svelte
  * <script>
- *   import { useDirectiveSelector } from 'directive/svelte';
+ *   import { useSelector } from 'directive/svelte';
  *
  *   // Select derived state from multiple facts
- *   const summary = useDirectiveSelector((facts) => ({
+ *   const summary = useSelector((facts) => ({
  *     count: facts.items?.length ?? 0,
  *     isLoading: facts.loading ?? false,
  *   }), (a, b) => a.count === b.count && a.isLoading === b.isLoading);
@@ -948,7 +948,7 @@ export function useDerivationSelector<T, R>(
  * <div>{$summary.count} items</div>
  * ```
  */
-export function useDirectiveSelector<R>(
+export function useSelector<R>(
 	selector: (facts: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
 ): Readable<R> {
@@ -995,15 +995,15 @@ export function useDirectiveSelector<R>(
  * } satisfies ModuleSchema;
  *
  * // Create typed hooks
- * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ * const { useDerived, useFact, useDispatch } = createTypedHooks<typeof schema>();
  *
  * // In your component:
  * const count = useFact("count"); // Type: Readable<number>
- * const doubled = useDerivation("doubled"); // Type: Readable<number>
+ * const doubled = useDerived("doubled"); // Type: Readable<number>
  * ```
  */
 export function createTypedHooks<M extends ModuleSchema>(): {
-	useDerivation: <K extends keyof InferDerivations<M>>(
+	useDerived: <K extends keyof InferDerivations<M>>(
 		derivationId: K,
 	) => Readable<InferDerivations<M>[K]>;
 	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Readable<InferFacts<M>[K] | undefined>;
@@ -1011,8 +1011,8 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	useSystem: () => System<M>;
 } {
 	return {
-		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
-			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerived<InferDerivations<M>[K]>(derivationId as string),
 		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
 			useFact<InferFacts<M>[K]>(factKey as string),
 		useDispatch: () => {

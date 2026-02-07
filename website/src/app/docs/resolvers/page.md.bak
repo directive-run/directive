@@ -1,0 +1,473 @@
+---
+title: Resolvers
+description: Resolvers fulfill requirements raised by constraints. They fetch data, perform async operations, and update facts to satisfy the system.
+---
+
+Resolvers are how requirements get fulfilled - they do the actual work. {% .lead %}
+
+---
+
+## Basic Resolvers
+
+Define resolvers in your module:
+
+```typescript
+const userModule = createModule("user", {
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.object<User>().nullable(),
+    },
+    requirements: {
+      FETCH_USER: t.object<{ userId: number }>(),
+    },
+  },
+
+  resolvers: {
+    fetchUser: {
+      requirement: "FETCH_USER",
+      resolve: async (req, ctx) => {
+        const user = await api.getUser(req.userId);
+        ctx.facts.user = user;
+      },
+    },
+  },
+});
+```
+
+---
+
+## Anatomy of a Resolver
+
+```typescript
+resolvers: {
+  resolverName: {
+    // Which requirement this handles
+    requirement: "REQUIREMENT_TYPE",
+
+    // Custom identity key (optional)
+    key: (req) => `fetch-${req.userId}`,
+
+    // Retry configuration (optional)
+    retry: { attempts: 3, backoff: "exponential" },
+
+    // Timeout in milliseconds (optional)
+    timeout: 5000,
+
+    // Batch similar requirements (optional)
+    batch: { maxSize: 10, debounceMs: 50 },
+
+    // The resolver function
+    resolve: async (req, ctx) => {
+      // Fulfill the requirement
+    },
+  },
+}
+```
+
+---
+
+## The `resolve` Function
+
+Resolvers receive the requirement and a context object:
+
+```typescript
+resolve: async (req, ctx) => {
+  // req: The requirement object with type and payload
+  // ctx: Context with facts, derivations, and helpers
+
+  const data = await fetchData(req.id);
+  ctx.facts.data = data;
+}
+```
+
+### Context Object
+
+```typescript
+resolve: async (req, ctx) => {
+  // Access facts
+  const userId = ctx.facts.userId;
+
+  // Access derivations
+  const isAdmin = ctx.derive.isAdmin;
+
+  // Update facts
+  ctx.facts.user = await api.getUser(userId);
+
+  // Dispatch events
+  ctx.dispatch("USER_LOADED", { userId });
+
+  // Batch updates
+  ctx.batch(() => {
+    ctx.facts.loading = false;
+    ctx.facts.error = null;
+  });
+}
+```
+
+---
+
+## Matching Requirements
+
+### By Type
+
+The simplest matching - by requirement type:
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    resolve: async (req, ctx) => {
+      // Handles all FETCH_USER requirements
+    },
+  },
+}
+```
+
+### By Function
+
+Match with a function for complex logic:
+
+```typescript
+resolvers: {
+  fetchData: {
+    handles: (req) => req.type.startsWith("FETCH_"),
+    resolve: async (req, ctx) => {
+      // Handles FETCH_USER, FETCH_PROFILE, FETCH_SETTINGS, etc.
+    },
+  },
+}
+```
+
+---
+
+## Requirement Identity
+
+### Default Identity
+
+By default, requirements are deduplicated by their entire payload:
+
+```typescript
+// These are the same requirement (deduplicated)
+require: { type: "FETCH_USER", userId: 123 }
+require: { type: "FETCH_USER", userId: 123 }
+
+// These are different requirements (both run)
+require: { type: "FETCH_USER", userId: 123 }
+require: { type: "FETCH_USER", userId: 456 }
+```
+
+### Custom Keys
+
+Use custom keys for fine-grained control:
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    key: (req) => `user-${req.userId}`,
+    resolve: async (req, ctx) => {
+      // Only one fetch per userId at a time
+    },
+  },
+}
+```
+
+---
+
+## Retry Policies
+
+Configure automatic retries:
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    retry: {
+      attempts: 3,          // Max retry attempts
+      backoff: "exponential", // "fixed" | "linear" | "exponential"
+      initialDelay: 100,    // First retry delay (ms)
+      maxDelay: 5000,       // Max delay between retries
+    },
+    resolve: async (req, ctx) => {
+      // Will retry on failure
+    },
+  },
+}
+```
+
+### Backoff Strategies
+
+| Strategy | Pattern |
+|----------|---------|
+| `fixed` | Same delay every time (e.g., 100, 100, 100) |
+| `linear` | Increasing by initial (e.g., 100, 200, 300) |
+| `exponential` | Doubles each time (e.g., 100, 200, 400) |
+
+### Conditional Retry
+
+```typescript
+retry: {
+  attempts: 3,
+  shouldRetry: (error, attempt) => {
+    // Don't retry 4xx errors
+    if (error.status >= 400 && error.status < 500) {
+      return false;
+    }
+    return attempt < 3;
+  },
+}
+```
+
+---
+
+## Timeouts
+
+Set maximum execution time:
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    timeout: 5000, // 5 seconds
+    resolve: async (req, ctx) => {
+      // Aborts if takes longer than 5s
+    },
+  },
+}
+```
+
+### Timeout Handling
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    timeout: 5000,
+    onTimeout: (req, ctx) => {
+      ctx.facts.error = "Request timed out";
+      ctx.facts.loading = false;
+    },
+    resolve: async (req, ctx) => {
+      // ...
+    },
+  },
+}
+```
+
+---
+
+## Batching
+
+Group similar requirements together:
+
+```typescript
+resolvers: {
+  fetchUsers: {
+    requirement: "FETCH_USER",
+    batch: {
+      maxSize: 10,      // Max items per batch
+      debounceMs: 50,   // Wait time to collect more
+    },
+    resolve: async (requirements, ctx) => {
+      // requirements is an array when batching
+      const userIds = requirements.map(r => r.userId);
+      const users = await api.getUsers(userIds);
+
+      // Update facts for each
+      users.forEach(user => {
+        ctx.facts.usersById[user.id] = user;
+      });
+    },
+  },
+}
+```
+
+### When to Batch
+
+- Fetching multiple similar resources
+- Avoiding N+1 problems
+- API supports batch endpoints
+
+---
+
+## Error Handling
+
+### In Resolvers
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    resolve: async (req, ctx) => {
+      try {
+        ctx.facts.user = await api.getUser(req.userId);
+      } catch (error) {
+        ctx.facts.error = error.message;
+        ctx.facts.user = null;
+      }
+    },
+  },
+}
+```
+
+### Error Handler
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    onError: (error, req, ctx) => {
+      ctx.facts.error = error.message;
+      ctx.dispatch("ERROR", { type: "FETCH_FAILED", error });
+    },
+    resolve: async (req, ctx) => {
+      ctx.facts.user = await api.getUser(req.userId);
+    },
+  },
+}
+```
+
+---
+
+## Parallel vs Sequential
+
+### Parallel (Default)
+
+Independent requirements resolve in parallel:
+
+```typescript
+// These run in parallel
+constraints: {
+  fetchUser: {
+    when: (facts) => !facts.user,
+    require: { type: "FETCH_USER" },
+  },
+  fetchSettings: {
+    when: (facts) => !facts.settings,
+    require: { type: "FETCH_SETTINGS" },
+  },
+}
+```
+
+### Sequential
+
+Use constraint ordering for sequential resolution:
+
+```typescript
+constraints: {
+  fetchUser: {
+    when: (facts) => !facts.user,
+    require: { type: "FETCH_USER" },
+  },
+  fetchProfile: {
+    after: ["fetchUser"],
+    when: (facts) => facts.user && !facts.profile,
+    require: { type: "FETCH_PROFILE", userId: (facts) => facts.user.id },
+  },
+}
+```
+
+---
+
+## Common Patterns
+
+### Loading States
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    resolve: async (req, ctx) => {
+      ctx.facts.loading = true;
+      try {
+        ctx.facts.user = await api.getUser(req.userId);
+        ctx.facts.error = null;
+      } catch (error) {
+        ctx.facts.error = error.message;
+      } finally {
+        ctx.facts.loading = false;
+      }
+    },
+  },
+}
+```
+
+### Optimistic Updates
+
+```typescript
+resolvers: {
+  updateUser: {
+    requirement: "UPDATE_USER",
+    resolve: async (req, ctx) => {
+      // Save original for rollback
+      const original = ctx.facts.user;
+
+      // Optimistic update
+      ctx.facts.user = { ...original, ...req.updates };
+
+      try {
+        ctx.facts.user = await api.updateUser(req.userId, req.updates);
+      } catch (error) {
+        // Rollback on failure
+        ctx.facts.user = original;
+        ctx.facts.error = error.message;
+      }
+    },
+  },
+}
+```
+
+### Cache-First
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    resolve: async (req, ctx) => {
+      // Check cache first
+      const cached = ctx.facts.cache[req.id];
+      if (cached && !isStale(cached)) {
+        return; // Use cached data
+      }
+
+      // Fetch fresh
+      const data = await api.getData(req.id);
+      ctx.facts.data = data;
+      ctx.facts.cache[req.id] = { data, fetchedAt: Date.now() };
+    },
+  },
+}
+```
+
+---
+
+## TypeScript Integration
+
+Requirements and resolvers are fully typed:
+
+```typescript
+schema: {
+  requirements: {
+    FETCH_USER: t.object<{ userId: number; includeProfile?: boolean }>(),
+  },
+}
+
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    resolve: async (req, ctx) => {
+      req.userId;         // number
+      req.includeProfile; // boolean | undefined
+    },
+  },
+}
+```
+
+---
+
+## Next Steps
+
+- **[Constraints](/docs/constraints)** - How requirements get raised
+- **[Effects](/docs/effects)** - Fire-and-forget side effects
+- **[Error Handling](/docs/advanced/errors)** - Advanced error patterns
