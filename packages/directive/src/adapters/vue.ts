@@ -2,7 +2,7 @@
  * Vue Adapter - Vue 3 composables for Directive
  *
  * Features:
- * - useDerivation for reactive computed values
+ * - useDerived for reactive computed values
  * - useFacts for direct fact access
  * - provide/inject for system context
  * - useRequirementStatus for loading/error states
@@ -128,9 +128,9 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
  * @example
  * ```vue
  * <script setup>
- * import { useDerivation } from 'directive/vue';
+ * import { useDerived } from 'directive/vue';
  *
- * const isRed = useDerivation<boolean>('isRed');
+ * const isRed = useDerived<boolean>('isRed');
  * </script>
  *
  * <template>
@@ -138,7 +138,7 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
  * </template>
  * ```
  */
-export function useDerivation<T>(derivationId: string): Ref<T> {
+export function useDerived<T>(derivationId: string): Ref<T> {
 	const system = useSystem();
 
 	// Dev warning for invalid derivation IDs
@@ -146,7 +146,7 @@ export function useDerivation<T>(derivationId: string): Ref<T> {
 		const initialValue = system.read(derivationId);
 		if (initialValue === undefined) {
 			console.warn(
-				`[Directive] useDerivation("${derivationId}") returned undefined. ` +
+				`[Directive] useDerived("${derivationId}") returned undefined. ` +
 					`Check that "${derivationId}" is defined in your module's derive property.`,
 			);
 		}
@@ -169,9 +169,9 @@ export function useDerivation<T>(derivationId: string): Ref<T> {
  * @example
  * ```vue
  * <script setup>
- * import { useDerivations } from 'directive/vue';
+ * import { useDeriveds } from 'directive/vue';
  *
- * const state = useDerivations<{ isRed: boolean; elapsed: number }>(['isRed', 'elapsed']);
+ * const state = useDeriveds<{ isRed: boolean; elapsed: number }>(['isRed', 'elapsed']);
  * </script>
  *
  * <template>
@@ -179,7 +179,7 @@ export function useDerivation<T>(derivationId: string): Ref<T> {
  * </template>
  * ```
  */
-export function useDerivations<T extends Record<string, unknown>>(
+export function useDeriveds<T extends Record<string, unknown>>(
 	derivationIds: string[],
 ): ShallowRef<T> {
 	const system = useSystem();
@@ -207,7 +207,7 @@ export function useDerivations<T extends Record<string, unknown>>(
  * Get direct access to facts for mutations.
  *
  * WARNING: The returned facts object is NOT reactive. Use this for event handlers
- * and imperative code, not for rendering. Use `useDerivation` for reactive values.
+ * and imperative code, not for rendering. Use `useDerived` for reactive values.
  *
  * @example
  * ```vue
@@ -571,9 +571,9 @@ export function useLatestError(type: string): ComputedRef<Error | null> {
  * @example
  * ```vue
  * <script setup>
- * import { useAllRequirementStatuses } from 'directive/vue';
+ * import { useRequirementStatuses } from 'directive/vue';
  *
- * const allStatuses = useAllRequirementStatuses();
+ * const allStatuses = useRequirementStatuses();
  * </script>
  *
  * <template>
@@ -585,11 +585,11 @@ export function useLatestError(type: string): ComputedRef<Error | null> {
  * </template>
  * ```
  */
-export function useAllRequirementStatuses(): Ref<Map<string, RequirementTypeStatus>> {
+export function useRequirementStatuses(): Ref<Map<string, RequirementTypeStatus>> {
 	const statusPlugin = inject(StatusPluginKey);
 	if (!statusPlugin) {
 		throw new Error(
-			"[Directive] useAllRequirementStatuses requires a statusPlugin. " +
+			"[Directive] useRequirementStatuses requires a statusPlugin. " +
 				"Pass statusPlugin to createDirectivePlugin() or provideSystem().",
 		);
 	}
@@ -667,13 +667,13 @@ const warnedOptions = new WeakSet<object>();
  * @param options - Either a single module or full system options (must be stable reference)
  * @returns The system instance
  *
- * @see {@link useDerivation} for reading derived values
+ * @see {@link useDerived} for reading derived values
  * @see {@link useFacts} for direct fact access
  *
  * @example
  * ```vue
  * <script setup>
- * import { useDirective, useDerivation } from 'directive/vue';
+ * import { useDirective, useDerived } from 'directive/vue';
  *
  * // CORRECT: Define module outside component for stable reference
  * import { counterModule } from './counterModule';
@@ -808,19 +808,19 @@ export function useFactSelector<T, R>(
  * @example
  * ```vue
  * <script setup>
- * import { useDerivationSelector } from 'directive/vue';
+ * import { useDerivedSelector } from 'directive/vue';
  *
  * // Only re-render when status text changes
- * const statusText = useDerivationSelector('status', (s) => s?.label ?? 'Unknown');
+ * const statusText = useDerivedSelector('status', (s) => s?.label ?? 'Unknown');
  *
  * // With custom equality for arrays
- * const todoIds = useDerivationSelector('todos', (todos) => todos.map(t => t.id),
+ * const todoIds = useDerivedSelector('todos', (todos) => todos.map(t => t.id),
  *   (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
  * );
  * </script>
  * ```
  */
-export function useDerivationSelector<T, R>(
+export function useDerivedSelector<T, R>(
 	derivationId: string,
 	selector: (value: T) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
@@ -855,17 +855,17 @@ export function useDerivationSelector<T, R>(
  * @example
  * ```vue
  * <script setup>
- * import { useDirectiveSelector } from 'directive/vue';
+ * import { useSelector } from 'directive/vue';
  *
  * // Select derived state from multiple facts
- * const summary = useDirectiveSelector((facts) => ({
+ * const summary = useSelector((facts) => ({
  *   count: facts.items?.length ?? 0,
  *   isLoading: facts.loading ?? false,
  * }), (a, b) => a.count === b.count && a.isLoading === b.isLoading);
  * </script>
  * ```
  */
-export function useDirectiveSelector<R>(
+export function useSelector<R>(
 	selector: (facts: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
 ): Ref<R> {
@@ -911,15 +911,15 @@ export function useDirectiveSelector<R>(
  * } satisfies ModuleSchema;
  *
  * // Create typed hooks
- * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ * const { useDerived, useFact, useDispatch } = createTypedHooks<typeof schema>();
  *
  * // In your component:
  * const count = useFact("count"); // Type: Ref<number>
- * const doubled = useDerivation("doubled"); // Type: Ref<number>
+ * const doubled = useDerived("doubled"); // Type: Ref<number>
  * ```
  */
 export function createTypedHooks<M extends ModuleSchema>(): {
-	useDerivation: <K extends keyof InferDerivations<M>>(
+	useDerived: <K extends keyof InferDerivations<M>>(
 		derivationId: K,
 	) => Ref<InferDerivations<M>[K]>;
 	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Ref<InferFacts<M>[K] | undefined>;
@@ -928,8 +928,8 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	useSystem: () => System<M>;
 } {
 	return {
-		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
-			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerived<InferDerivations<M>[K]>(derivationId as string),
 		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
 			useFact<InferFacts<M>[K]>(factKey as string),
 		useFacts: () => useFacts<M>(),

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eleven Up - Directive Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a472a 0%, #0d2818 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #fff;
+      padding: 1rem;
+    }
+
+    .header { text-align: center; margin-bottom: 1rem; }
+    .header h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    .header p { color: #8fbc8f; font-size: 0.8rem; }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: rgba(0,0,0,0.3);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      text-align: center;
+      min-width: 60px;
+    }
+
+    .stat-label { font-size: 0.6rem; color: #8fbc8f; text-transform: uppercase; }
+    .stat-value { font-size: 1rem; font-weight: bold; }
+
+    .feedback {
+      text-align: center;
+      padding: 0.6rem;
+      border-radius: 6px;
+      max-width: 350px;
+      margin: 0 auto 1rem;
+      font-size: 0.8rem;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+
+    .feedback.info { background: rgba(33, 150, 243, 0.3); }
+    .feedback.warning { background: rgba(255, 152, 0, 0.3); }
+    .feedback.error { background: rgba(244, 67, 54, 0.3); }
+    .feedback.success { background: rgba(76, 175, 80, 0.3); }
+
+    .progress-bar {
+      max-width: 350px;
+      margin: 0 auto 1rem;
+      height: 6px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      transition: width 0.3s;
+    }
+
+    .table {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      max-width: 320px;
+      margin: 0 auto 1rem;
+    }
+
+    .card-slot {
+      aspect-ratio: 2.5/3.5;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      border: 2px dashed rgba(255,255,255,0.15);
+    }
+
+    .card {
+      aspect-ratio: 2.5/3.5;
+      background: #fff;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+      position: relative;
+      user-select: none;
+    }
+
+    .card:hover { transform: translateY(-2px); }
+    .card.selected {
+      transform: translateY(-6px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.4), 0 0 0 3px #ffd700;
+    }
+
+    .card.hint {
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3), 0 0 0 3px #2196F3;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .card.removing {
+      animation: removeCard 0.3s ease-out forwards;
+    }
+
+    @keyframes removeCard {
+      to { transform: scale(0) rotate(10deg); opacity: 0; }
+    }
+
+    .card.red { color: #c41e3a; }
+    .card.black { color: #1a1a1a; }
+
+    .card-corner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: bold;
+      line-height: 1.1;
+    }
+
+    .card-corner.bottom { transform: rotate(180deg); }
+
+    .card-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.75rem;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    button:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary { background: #4CAF50; border-color: #4CAF50; }
+
+    .rules {
+      background: rgba(0,0,0,0.2);
+      padding: 0.75rem;
+      border-radius: 8px;
+      max-width: 350px;
+      margin: 0 auto;
+      font-size: 0.7rem;
+      color: #8fbc8f;
+    }
+
+    .rules strong { color: #fff; }
+    .rules ul { margin: 0.5rem 0 0 1.25rem; padding: 0; }
+
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #1a472a 0%, #0d2818 100%);
+      padding: 2rem;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 300px;
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+
+    .modal-title { font-size: 2rem; margin-bottom: 0.5rem; }
+    .modal-content p { margin-bottom: 1rem; color: #8fbc8f; }
+
+    .hidden { display: none !important; }
+
+    /* Constraint indicator */
+    .constraint-log {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.8);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.65rem;
+      max-width: 250px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .constraint-log-entry {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .constraint-log-entry:last-child { border-bottom: none; }
+    .constraint-log-entry.constraint { color: #64B5F6; }
+    .constraint-log-entry.resolver { color: #81C784; }
+    .constraint-log-entry.effect { color: #FFB74D; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>🃏 Eleven Up</h1>
+    <p>Cards auto-remove when they add to 11!</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Deck</div>
+      <div class="stat-value" id="deck-count">43</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Removed</div>
+      <div class="stat-value" id="removed-count">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Moves</div>
+      <div class="stat-value" id="move-count">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Valid</div>
+      <div class="stat-value" id="valid-moves">0</div>
+    </div>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress" style="width: 0%"></div>
+  </div>
+
+  <div class="feedback info" id="feedback">Select cards that add to 11</div>
+
+  <div class="table" id="table"></div>
+
+  <div class="controls">
+    <button id="clear-btn" disabled>Clear Selection</button>
+    <button id="new-game-btn" class="primary">New Game</button>
+  </div>
+
+  <div class="rules">
+    <strong>Constraints automatically trigger when:</strong>
+    <ul>
+      <li>Two cards add to 11 → <code>REMOVE_CARDS</code></li>
+      <li>J + Q + K selected → <code>REMOVE_CARDS</code></li>
+      <li>Invalid pair → <code>SHOW_FEEDBACK</code></li>
+      <li>Table &lt; 9 cards → <code>REFILL_TABLE</code></li>
+      <li>No moves left → <code>END_GAME</code></li>
+    </ul>
+  </div>
+
+  <div class="constraint-log" id="log"></div>
+
+  <div class="modal hidden" id="modal">
+    <div class="modal-content">
+      <div class="modal-title" id="modal-title">🎉</div>
+      <p id="modal-message">You win!</p>
+      <button class="primary" id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // Directive-style Game Engine (simulated)
+    // =========================================================================
+
+    const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'];
+    const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const SUIT_SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
+
+    function createDeck() {
+      const cards = [];
+      for (const suit of SUITS) {
+        for (const rank of RANKS) {
+          let value;
+          if (rank === 'A') value = 1;
+          else if (['J', 'Q', 'K'].includes(rank)) value = 0;
+          else value = parseInt(rank);
+          cards.push({ id: `${rank}-${suit}`, suit, rank, value });
+        }
+      }
+      return cards;
+    }
+
+    function shuffle(array) {
+      const result = [...array];
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+      }
+      return result;
+    }
+
+    function isFaceCard(card) { return ['J', 'Q', 'K'].includes(card.rank); }
+    function isRedSuit(suit) { return suit === 'hearts' || suit === 'diamonds'; }
+
+    function countValidMoves(table) {
+      let pairs = 0, faceCardSets = 0;
+      const numberCards = table.filter(c => !isFaceCard(c));
+      for (let i = 0; i < numberCards.length; i++) {
+        for (let j = i + 1; j < numberCards.length; j++) {
+          if (numberCards[i].value + numberCards[j].value === 11) pairs++;
+        }
+      }
+      const jacks = table.filter(c => c.rank === 'J').length;
+      const queens = table.filter(c => c.rank === 'Q').length;
+      const kings = table.filter(c => c.rank === 'K').length;
+      faceCardSets = jacks * queens * kings;
+      return { pairs, faceCardSets, total: pairs + faceCardSets };
+    }
+
+    // Facts
+    const facts = {
+      deck: [], table: [], removed: [], selected: [], hintCards: [],
+      feedback: '', feedbackSeverity: 'info',
+      gameOver: false, won: false, moveCount: 0
+    };
+
+    // Log constraint activity
+    function log(type, message) {
+      const logEl = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `constraint-log-entry ${type}`;
+      entry.textContent = `[${type}] ${message}`;
+      logEl.insertBefore(entry, logEl.firstChild);
+      if (logEl.children.length > 10) logEl.removeChild(logEl.lastChild);
+    }
+
+    // =========================================================================
+    // Constraint Evaluation (the magic!)
+    // =========================================================================
+
+    function evaluateConstraints() {
+      const selected = facts.table.filter(c => facts.selected.includes(c.id));
+
+      // Priority 200: Check win condition
+      if (!facts.gameOver && facts.table.length === 0) {
+        log('constraint', 'playerWins triggered');
+        resolveEndGame({ won: true, reason: `Cleared all cards in ${facts.moveCount} moves!` });
+        return;
+      }
+
+      // Priority 190: Check lose condition
+      if (!facts.gameOver && facts.table.length > 0 && facts.deck.length === 0) {
+        const { total } = countValidMoves(facts.table);
+        if (total === 0) {
+          log('constraint', 'playerLoses triggered');
+          resolveEndGame({ won: false, reason: `Removed ${facts.removed.length} of 52 cards.` });
+          return;
+        }
+      }
+
+      // Priority 100: Valid pair (adds to 11)
+      if (selected.length === 2) {
+        const [a, b] = selected;
+        if (!isFaceCard(a) && !isFaceCard(b) && a.value + b.value === 11) {
+          log('constraint', `pairAddsToEleven: ${a.value} + ${b.value} = 11`);
+          resolveRemoveCards(facts.selected, 'pair');
+          return;
+        }
+      }
+
+      // Priority 100: Valid face card trio (J+Q+K)
+      if (selected.length === 3 && selected.every(isFaceCard)) {
+        const ranks = selected.map(c => c.rank).sort();
+        if (ranks[0] === 'J' && ranks[1] === 'K' && ranks[2] === 'Q') {
+          log('constraint', 'faceCardTrio: J + Q + K');
+          resolveRemoveCards(facts.selected, 'faceCards');
+          return;
+        }
+      }
+
+      // Priority 95: Too many selected
+      if (selected.length > 3) {
+        log('constraint', 'tooManySelected');
+        resolveClearSelection('Maximum 3 cards');
+        return;
+      }
+
+      // Priority 90: Invalid pair
+      if (selected.length === 2) {
+        const [a, b] = selected;
+        if (!isFaceCard(a) && !isFaceCard(b)) {
+          const sum = a.value + b.value;
+          log('constraint', `invalidPair: ${a.value} + ${b.value} = ${sum}`);
+          resolveShowFeedback(`${a.value} + ${b.value} = ${sum} (need 11)`, 'warning');
+          return;
+        }
+        // Mixed face and number
+        if (isFaceCard(a) !== isFaceCard(b)) {
+          log('constraint', 'mixedFaceAndNumber');
+          resolveShowFeedback("Can't mix face cards with numbers", 'warning');
+          return;
+        }
+        // Two face cards - need third
+        if (isFaceCard(a) && isFaceCard(b)) {
+          const ranks = [a.rank, b.rank];
+          const missing = ['J', 'Q', 'K'].find(r => !ranks.includes(r));
+          log('constraint', `incompleteFaceCards: need ${missing}`);
+          resolveShowFeedback(`Need ${missing} to complete set`, 'info');
+          return;
+        }
+      }
+
+      // Priority 90: Invalid face card trio
+      if (selected.length === 3 && selected.every(isFaceCard)) {
+        log('constraint', 'invalidFaceCardTrio');
+        resolveShowFeedback('Need exactly J + Q + K', 'error');
+        return;
+      }
+
+      // Priority 50: Refill table
+      if (facts.table.length < 9 && facts.deck.length > 0 && !facts.gameOver) {
+        const count = Math.min(9 - facts.table.length, facts.deck.length);
+        log('constraint', `refillTable: dealing ${count}`);
+        resolveRefillTable(count);
+      }
+
+      // Clear feedback if no constraint matched
+      if (selected.length === 0 && facts.feedback && !facts.gameOver) {
+        facts.feedback = '';
+      }
+    }
+
+    // =========================================================================
+    // Resolvers
+    // =========================================================================
+
+    function resolveRemoveCards(cardIds, reason) {
+      log('resolver', `removeCards (${reason})`);
+      const cards = facts.table.filter(c => cardIds.includes(c.id));
+
+      // Animate removal
+      cardIds.forEach(id => {
+        const el = document.querySelector(`[data-id="${id}"]`);
+        if (el) el.classList.add('removing');
+      });
+
+      setTimeout(() => {
+        facts.table = facts.table.filter(c => !cardIds.includes(c.id));
+        facts.removed = [...facts.removed, ...cards];
+        facts.selected = [];
+        facts.moveCount++;
+
+        const msg = reason === 'pair'
+          ? `Removed ${cards[0].value} + ${cards[1].value} = 11!`
+          : 'Removed J + Q + K!';
+        facts.feedback = msg;
+        facts.feedbackSeverity = 'success';
+
+        render();
+        setTimeout(() => evaluateConstraints(), 100);
+      }, 300);
+    }
+
+    function resolveRefillTable(count) {
+      log('resolver', `refillTable: ${count} cards`);
+      const newCards = facts.deck.slice(0, count);
+      facts.deck = facts.deck.slice(count);
+      facts.table = [...facts.table, ...newCards];
+      render();
+    }
+
+    function resolveEndGame({ won, reason }) {
+      log('resolver', `endGame: ${won ? 'WIN' : 'LOSE'}`);
+      facts.gameOver = true;
+      facts.won = won;
+      facts.feedback = reason;
+      facts.feedbackSeverity = won ? 'success' : 'error';
+      render();
+    }
+
+    function resolveClearSelection(reason) {
+      log('resolver', 'clearSelection');
+      facts.selected = [];
+      facts.feedback = reason;
+      facts.feedbackSeverity = 'warning';
+      render();
+    }
+
+    function resolveShowFeedback(message, severity) {
+      log('resolver', `showFeedback: ${message}`);
+      facts.feedback = message;
+      facts.feedbackSeverity = severity;
+      render();
+    }
+
+    // =========================================================================
+    // Events
+    // =========================================================================
+
+    const events = {
+      newGame() {
+        log('effect', 'New game started');
+        const deck = shuffle(createDeck());
+        facts.deck = deck.slice(9);
+        facts.table = deck.slice(0, 9);
+        facts.removed = [];
+        facts.selected = [];
+        facts.feedback = 'Select cards that add to 11';
+        facts.feedbackSeverity = 'info';
+        facts.gameOver = false;
+        facts.won = false;
+        facts.moveCount = 0;
+        document.getElementById('log').innerHTML = '';
+        render();
+      },
+
+      selectCard(cardId) {
+        if (facts.gameOver) return;
+        if (facts.selected.includes(cardId)) {
+          facts.selected = facts.selected.filter(id => id !== cardId);
+        } else {
+          facts.selected = [...facts.selected, cardId];
+        }
+        render();
+        evaluateConstraints();
+      },
+
+      clearSelection() {
+        facts.selected = [];
+        facts.feedback = '';
+        render();
+      }
+    };
+
+    // =========================================================================
+    // Rendering
+    // =========================================================================
+
+    function renderCard(card) {
+      const isSelected = facts.selected.includes(card.id);
+      const isHint = facts.hintCards.includes(card.id);
+      const isRed = isRedSuit(card.suit);
+      const symbol = SUIT_SYMBOLS[card.suit];
+
+      return `
+        <div class="card ${isRed ? 'red' : 'black'} ${isSelected ? 'selected' : ''} ${isHint ? 'hint' : ''}"
+             data-id="${card.id}"
+             onclick="events.selectCard('${card.id}')">
+          <div class="card-corner">
+            <span>${card.rank}</span>
+            <span>${symbol}</span>
+          </div>
+          <div class="card-center">${symbol}</div>
+          <div class="card-corner bottom">
+            <span>${card.rank}</span>
+            <span>${symbol}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function render() {
+      document.getElementById('deck-count').textContent = facts.deck.length;
+      document.getElementById('removed-count').textContent = facts.removed.length;
+      document.getElementById('move-count').textContent = facts.moveCount;
+
+      const { total } = countValidMoves(facts.table);
+      document.getElementById('valid-moves').textContent = total;
+
+      const progress = Math.round((facts.removed.length / 52) * 100);
+      document.getElementById('progress').style.width = `${progress}%`;
+
+      const feedback = document.getElementById('feedback');
+      feedback.textContent = facts.feedback || 'Select cards that add to 11';
+      feedback.className = `feedback ${facts.feedbackSeverity || 'info'}`;
+
+      const table = document.getElementById('table');
+      let html = facts.table.map(renderCard).join('');
+      for (let i = facts.table.length; i < 9; i++) {
+        html += '<div class="card-slot"></div>';
+      }
+      table.innerHTML = html;
+
+      document.getElementById('clear-btn').disabled = facts.selected.length === 0;
+
+      const modal = document.getElementById('modal');
+      if (facts.gameOver) {
+        modal.classList.remove('hidden');
+        document.getElementById('modal-title').textContent = facts.won ? '🎉 You Win!' : '😔 Game Over';
+        document.getElementById('modal-message').textContent = facts.feedback;
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // =========================================================================
+    // Event Listeners
+    // =========================================================================
+
+    document.getElementById('clear-btn').addEventListener('click', () => events.clearSelection());
+    document.getElementById('new-game-btn').addEventListener('click', () => events.newGame());
+    document.getElementById('play-again-btn').addEventListener('click', () => events.newGame());
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') events.clearSelection();
+      if (e.key === 'n' && e.ctrlKey) { e.preventDefault(); events.newGame(); }
+    });
+
+    // Start
+    events.newGame();
+  </script>
+</body>
+</html>

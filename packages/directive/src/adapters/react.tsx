@@ -5,7 +5,7 @@
  *
  * @example
  * ```tsx
- * import { DirectiveProvider, useDerivation, useDispatch, useFact } from 'directive/react';
+ * import { DirectiveProvider, useDerived, useDispatch, useFact } from 'directive/react';
  *
  * function App() {
  *   return (
@@ -17,7 +17,7 @@
  *
  * function Counter() {
  *   const count = useFact("count");
- *   const doubled = useDerivation("doubled");
+ *   const doubled = useDerived("doubled");
  *   const dispatch = useDispatch();
  *
  *   return (
@@ -177,12 +177,12 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
  * @example
  * ```tsx
  * function Counter() {
- *   const doubled = useDerivation<number>("doubled");
+ *   const doubled = useDerived<number>("doubled");
  *   return <p>Doubled: {doubled}</p>;
  * }
  * ```
  */
-export function useDerivation<T>(derivationId: string): T {
+export function useDerived<T>(derivationId: string): T {
 	const system = useSystem();
 
 	// Dev warning for invalid derivation IDs
@@ -190,7 +190,7 @@ export function useDerivation<T>(derivationId: string): T {
 		const initialValue = system.read(derivationId);
 		if (initialValue === undefined) {
 			console.warn(
-				`[Directive] useDerivation("${derivationId}") returned undefined. ` +
+				`[Directive] useDerived("${derivationId}") returned undefined. ` +
 					`Check that "${derivationId}" is defined in your module's derive property.`,
 			);
 		}
@@ -214,7 +214,7 @@ export function useDerivation<T>(derivationId: string): T {
  * Hook to read multiple derivation values reactively.
  *
  * The component will re-render when any of the specified derivations change.
- * This is more efficient than multiple `useDerivation` calls when you need
+ * This is more efficient than multiple `useDerived` calls when you need
  * several related values.
  *
  * @param derivationIds - Array of derivation IDs to read
@@ -382,7 +382,7 @@ export function useFactSelector<T, R>(
 /**
  * Hook to read a derived value from a derivation using a selector.
  *
- * This is more efficient than `useDerivation` when you only need part of a
+ * This is more efficient than `useDerived` when you only need part of a
  * derivation result, as it only re-renders when the selected value changes.
  *
  * @param derivationId - The ID of the derivation to read
@@ -394,7 +394,7 @@ export function useFactSelector<T, R>(
  * ```tsx
  * function ItemCount() {
  *   // Only re-renders when the count changes, not other stats properties
- *   const count = useDerivationSelector(
+ *   const count = useDerivedSelector(
  *     "stats",
  *     (stats) => stats.itemCount
  *   );
@@ -402,7 +402,7 @@ export function useFactSelector<T, R>(
  * }
  * ```
  */
-export function useDerivationSelector<T, R>(
+export function useDerivedSelector<T, R>(
 	derivationId: string,
 	selector: (value: T) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
@@ -454,7 +454,7 @@ export function useDerivationSelector<T, R>(
  * ```tsx
  * function Summary() {
  *   // Select from multiple sources
- *   const summary = useDirectiveSelector((facts) => ({
+ *   const summary = useSelector((facts) => ({
  *     userName: facts.user?.name,
  *     itemCount: facts.items?.length ?? 0,
  *   }));
@@ -470,7 +470,7 @@ export function useDerivationSelector<T, R>(
  * }
  *
  * function UserSummary() {
- *   const user = useDirectiveSelector(
+ *   const user = useSelector(
  *     (facts) => ({ id: facts.user?.id, name: facts.user?.name }),
  *     shallowEqual
  *   );
@@ -478,7 +478,7 @@ export function useDerivationSelector<T, R>(
  * }
  * ```
  */
-export function useDirectiveSelector<R>(
+export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
 	selector: (facts: Record<string, any>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
@@ -551,7 +551,7 @@ export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
 /**
  * Hook to watch a derivation and execute a callback when it changes.
  *
- * Unlike useDerivation, this doesn't cause re-renders - it just executes
+ * Unlike useDerived, this doesn't cause re-renders - it just executes
  * the callback as a side effect.
  *
  * @param derivationId - The ID of the derivation to watch
@@ -933,7 +933,7 @@ export function useLatestError(type: string): Error | null {
  * @example
  * ```tsx
  * function RequirementsDashboard() {
- *   const allStatuses = useAllRequirementStatuses();
+ *   const allStatuses = useRequirementStatuses();
  *
  *   return (
  *     <ul>
@@ -947,11 +947,11 @@ export function useLatestError(type: string): Error | null {
  * }
  * ```
  */
-export function useAllRequirementStatuses(): Map<string, RequirementTypeStatus> {
+export function useRequirementStatuses(): Map<string, RequirementTypeStatus> {
 	const statusPlugin = useContext(StatusPluginContext);
 	if (!statusPlugin) {
 		throw new Error(
-			"[Directive] useAllRequirementStatuses requires a statusPlugin. " +
+			"[Directive] useRequirementStatuses requires a statusPlugin. " +
 				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
 		);
 	}
@@ -997,11 +997,11 @@ const suspenseCache = new Map<string, Promise<void>>();
  * @example
  * ```tsx
  * import { Suspense } from 'react';
- * import { useSuspendingRequirement } from 'directive/react';
+ * import { useSuspenseRequirement } from 'directive/react';
  *
  * function UserProfile() {
  *   // This will suspend until FETCH_USER is resolved
- *   const status = useSuspendingRequirement("FETCH_USER");
+ *   const status = useSuspenseRequirement("FETCH_USER");
  *   // Component only renders after requirement is resolved
  *   return <div>User loaded!</div>;
  * }
@@ -1015,11 +1015,11 @@ const suspenseCache = new Map<string, Promise<void>>();
  * }
  * ```
  */
-export function useSuspendingRequirement(type: string): RequirementTypeStatus {
+export function useSuspenseRequirement(type: string): RequirementTypeStatus {
 	const statusPlugin = useContext(StatusPluginContext);
 	if (!statusPlugin) {
 		throw new Error(
-			"[Directive] useSuspendingRequirement requires a statusPlugin. " +
+			"[Directive] useSuspenseRequirement requires a statusPlugin. " +
 				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
 		);
 	}
@@ -1077,16 +1077,16 @@ export function useSuspendingRequirement(type: string): RequirementTypeStatus {
  * ```tsx
  * function Dashboard() {
  *   // Suspends until both requirements are resolved
- *   const statuses = useSuspendingRequirements(["FETCH_USER", "FETCH_SETTINGS"]);
+ *   const statuses = useSuspenseRequirements(["FETCH_USER", "FETCH_SETTINGS"]);
  *   return <div>All data loaded!</div>;
  * }
  * ```
  */
-export function useSuspendingRequirements(types: string[]): Map<string, RequirementTypeStatus> {
+export function useSuspenseRequirements(types: string[]): Map<string, RequirementTypeStatus> {
 	const statusPlugin = useContext(StatusPluginContext);
 	if (!statusPlugin) {
 		throw new Error(
-			"[Directive] useSuspendingRequirements requires a statusPlugin. " +
+			"[Directive] useSuspenseRequirements requires a statusPlugin. " +
 				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
 		);
 	}
@@ -1148,8 +1148,8 @@ export function useSuspendingRequirements(types: string[]): Map<string, Requirem
 // Scoped System Hook (like XState's useActorRef)
 // ============================================================================
 
-/** Options for useDirectiveSystem hook */
-export type UseDirectiveSystemOptions<M extends ModuleSchema> =
+/** Options for useDirectiveRef hook */
+export type UseDirectiveRefOptions<M extends ModuleSchema> =
 	| ModuleDef<M>
 	| {
 			module: ModuleDef<M>;
@@ -1178,12 +1178,12 @@ export type UseDirectiveSystemOptions<M extends ModuleSchema> =
  *
  * @example
  * ```tsx
- * import { useDirectiveSystem } from 'directive/react';
+ * import { useDirectiveRef } from 'directive/react';
  * import { counterModule } from './counter';
  *
  * function Counter() {
  *   // System is created once and stable across re-renders
- *   const { system, Provider } = useDirectiveSystem(counterModule);
+ *   const { system, Provider } = useDirectiveRef(counterModule);
  *
  *   return (
  *     <Provider>
@@ -1197,7 +1197,7 @@ export type UseDirectiveSystemOptions<M extends ModuleSchema> =
  *
  * // Or with inline options (still stable!)
  * function Counter() {
- *   const { system, Provider } = useDirectiveSystem({
+ *   const { system, Provider } = useDirectiveRef({
  *     module: counterModule,
  *     debug: { timeTravel: true },
  *   });
@@ -1205,8 +1205,8 @@ export type UseDirectiveSystemOptions<M extends ModuleSchema> =
  * }
  * ```
  */
-export function useDirectiveSystem<M extends ModuleSchema>(
-	options: UseDirectiveSystemOptions<M>,
+export function useDirectiveRef<M extends ModuleSchema>(
+	options: UseDirectiveRefOptions<M>,
 ): {
 	system: System<M>;
 	Provider: (props: { children: ReactNode }) => ReactNode;
@@ -1225,7 +1225,7 @@ export function useDirectiveSystem<M extends ModuleSchema>(
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
 			systemRef.current = createSystem({ module: options as ModuleDef<M> } as any) as System<M>;
 		} else {
-			const opts = options as Exclude<UseDirectiveSystemOptions<M>, ModuleDef<M>>;
+			const opts = options as Exclude<UseDirectiveRefOptions<M>, ModuleDef<M>>;
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
 			systemRef.current = createSystem({
 				module: opts.module,
@@ -1263,7 +1263,7 @@ export function useDirectiveSystem<M extends ModuleSchema>(
 
 /**
  * Hook to create a scoped system with status plugin pre-configured.
- * Combines useDirectiveSystem with createRequirementStatusPlugin.
+ * Combines useDirectiveRef with createRequirementStatusPlugin.
  *
  * @param options - Either a module or full system options
  * @returns A stable system, statusPlugin, and Provider component
@@ -1271,7 +1271,7 @@ export function useDirectiveSystem<M extends ModuleSchema>(
  * @example
  * ```tsx
  * function App() {
- *   const { system, statusPlugin, Provider } = useDirectiveSystemWithStatus(myModule);
+ *   const { system, statusPlugin, Provider } = useDirectiveRefWithStatus(myModule);
  *
  *   return (
  *     <Provider>
@@ -1288,8 +1288,8 @@ export function useDirectiveSystem<M extends ModuleSchema>(
  * }
  * ```
  */
-export function useDirectiveSystemWithStatus<M extends ModuleSchema>(
-	options: UseDirectiveSystemOptions<M>,
+export function useDirectiveRefWithStatus<M extends ModuleSchema>(
+	options: UseDirectiveRefOptions<M>,
 ): {
 	system: System<M>;
 	statusPlugin: ReturnType<typeof createRequirementStatusPlugin>;
@@ -1316,7 +1316,7 @@ export function useDirectiveSystemWithStatus<M extends ModuleSchema>(
 				plugins: [statusPluginRef.current.plugin as Plugin<any>],
 			} as any) as System<M>;
 		} else {
-			const opts = options as Exclude<UseDirectiveSystemOptions<M>, ModuleDef<M>>;
+			const opts = options as Exclude<UseDirectiveRefOptions<M>, ModuleDef<M>>;
 			// biome-ignore lint/suspicious/noExplicitAny: Plugin<never> requires cast
 			const allPlugins = [...(opts.plugins ?? []), statusPluginRef.current.plugin as Plugin<any>];
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
@@ -1366,7 +1366,7 @@ export function useDirectiveSystemWithStatus<M extends ModuleSchema>(
  *
  * This provides better type inference than the generic hooks.
  *
- * @returns An object containing typed versions of useDerivation, useFact, useFacts, useDispatch, and useSystem
+ * @returns An object containing typed versions of useDerived, useFact, useFacts, useDispatch, and useSystem
  *
  * @example
  * ```tsx
@@ -1381,11 +1381,11 @@ export function useDirectiveSystemWithStatus<M extends ModuleSchema>(
  * } satisfies ModuleSchema;
  *
  * // Create typed hooks
- * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ * const { useDerived, useFact, useDispatch } = createTypedHooks<typeof schema>();
  *
  * function Counter() {
  *   const count = useFact("count"); // Type: number
- *   const doubled = useDerivation("doubled"); // Type: number
+ *   const doubled = useDerived("doubled"); // Type: number
  *   const dispatch = useDispatch();
  *
  *   // dispatch({ type: "increment" }); // Typed!
@@ -1394,7 +1394,7 @@ export function useDirectiveSystemWithStatus<M extends ModuleSchema>(
  * ```
  */
 export function createTypedHooks<M extends ModuleSchema>(): {
-	useDerivation: <K extends keyof InferDerivations<M>>(
+	useDerived: <K extends keyof InferDerivations<M>>(
 		derivationId: K,
 	) => InferDerivations<M>[K];
 	useFact: <K extends keyof InferFacts<M>>(factKey: K) => InferFacts<M>[K] | undefined;
@@ -1403,8 +1403,8 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	useSystem: () => System<M>;
 } {
 	return {
-		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
-			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerived<InferDerivations<M>[K]>(derivationId as string),
 		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
 			useFact<InferFacts<M>[K]>(factKey as string),
 		useFacts: () => useSystem<M>().facts,

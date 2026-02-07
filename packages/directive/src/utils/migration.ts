@@ -387,7 +387,7 @@ export function generateMigrationChecklist(
 			"[ ] Convert reducers to event handlers",
 			"[ ] Convert selectors to derivations",
 			"[ ] Convert thunks to constraints + resolvers",
-			"[ ] Update useSelector to useDerivation",
+			"[ ] Update useSelector to useDerived",
 			"[ ] Update useDispatch to system.dispatch",
 		],
 		zustand: [

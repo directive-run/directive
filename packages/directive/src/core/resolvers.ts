@@ -11,6 +11,7 @@
 
 import type {
 	BatchConfig,
+	BatchResolveResults,
 	Facts,
 	FactsSnapshot,
 	FactsStore,
@@ -142,6 +143,7 @@ export function createResolversManager<S extends Schema>(
 	const {
 		definitions,
 		facts,
+		store,
 		onStart,
 		onComplete,
 		onError,
@@ -316,16 +318,23 @@ export function createResolversManager<S extends Schema>(
 				const ctx = createContext(controller.signal);
 
 				if (def.resolve) {
-					// Apply timeout if configured (with proper cleanup)
+					// Batch the synchronous portion of resolve to coalesce fact mutations.
+					// For sync-body async resolvers, all mutations are batched and flushed once.
+					// For truly async resolvers, mutations before the first await are batched.
+					let resolvePromise!: Promise<void>;
+					store.batch(() => {
+						resolvePromise = def.resolve!(req.requirement as Parameters<NonNullable<typeof def.resolve>>[0], ctx) as Promise<void>;
+					});
+
 					const timeout = def.timeout;
 					if (timeout && timeout > 0) {
 						await withTimeout(
-							def.resolve(req.requirement as Parameters<NonNullable<typeof def.resolve>>[0], ctx),
+							resolvePromise,
 							timeout,
 							`Resolver "${resolverId}" timed out after ${timeout}ms`,
 						);
 					} else {
-						await def.resolve(req.requirement as Parameters<NonNullable<typeof def.resolve>>[0], ctx);
+						await resolvePromise;
 					}
 				}
 
@@ -388,7 +397,7 @@ export function createResolversManager<S extends Schema>(
 		onError?.(resolverId, req, lastError);
 	}
 
-	/** Execute a batch of requirements with retry and timeout support */
+	/** Execute a batch of requirements with retry, timeout, and partial failure support */
 	async function executeBatch(
 		resolverId: string,
 		requirements: RequirementWithId[],
@@ -396,8 +405,8 @@ export function createResolversManager<S extends Schema>(
 		const def = definitions[resolverId];
 		if (!def) return;
 
-		if (!def.resolveBatch) {
-			// Fallback to individual resolution
+		// If no batch handler, fall back to individual resolution
+		if (!def.resolveBatch && !def.resolveBatchWithResults) {
 			await Promise.all(
 				requirements.map((req) => {
 					const controller = new AbortController();
@@ -408,9 +417,13 @@ export function createResolversManager<S extends Schema>(
 		}
 
 		const retryPolicy = { ...DEFAULT_RETRY, ...def.retry };
+		const batchConfig = { ...DEFAULT_BATCH, ...def.batch };
 		const controller = new AbortController();
 		const startedAt = Date.now();
 		let lastError: Error | null = null;
+
+		// Use batch timeout if configured, otherwise fall back to resolver timeout
+		const timeout = batchConfig.timeoutMs ?? def.timeout;
 
 		for (let attempt = 1; attempt <= retryPolicy.attempts; attempt++) {
 			// Check if canceled
@@ -420,37 +433,104 @@ export function createResolversManager<S extends Schema>(
 
 			try {
 				const ctx = createContext(controller.signal);
+				const reqPayloads = requirements.map((r) => r.requirement);
 
-				// Apply timeout if configured
-				const timeout = def.timeout;
-				if (timeout && timeout > 0) {
-					await withTimeout(
-						def.resolveBatch(
-							requirements.map((r) => r.requirement as Parameters<NonNullable<typeof def.resolveBatch>>[0][number]),
-							ctx,
-						),
-						timeout,
-						`Batch resolver "${resolverId}" timed out after ${timeout}ms`,
-					);
-				} else {
-					await def.resolveBatch(
-						requirements.map((r) => r.requirement as Parameters<NonNullable<typeof def.resolveBatch>>[0][number]),
-						ctx,
-					);
-				}
+				// Check for resolveBatchWithResults (per-item results)
+				if (def.resolveBatchWithResults) {
+					let results: BatchResolveResults;
 
-				// Mark all as success
-				const duration = Date.now() - startedAt;
-				for (const req of requirements) {
-					statuses.set(req.id, {
-						state: "success",
-						requirementId: req.id,
-						completedAt: Date.now(),
-						duration,
+					// Batch fact mutations for the synchronous portion of the resolver
+					let resolvePromise!: Promise<BatchResolveResults>;
+					store.batch(() => {
+						// biome-ignore lint/suspicious/noExplicitAny: Requirement type varies
+						resolvePromise = def.resolveBatchWithResults!(reqPayloads as any, ctx);
 					});
-					onComplete?.(resolverId, req, duration);
+
+					if (timeout && timeout > 0) {
+						results = await withTimeout(
+							resolvePromise,
+							timeout,
+							`Batch resolver "${resolverId}" timed out after ${timeout}ms`,
+						);
+					} else {
+						results = await resolvePromise;
+					}
+
+					// Validate results length
+					if (results.length !== requirements.length) {
+						throw new Error(
+							`[Directive] Batch resolver "${resolverId}" returned ${results.length} results ` +
+								`but expected ${requirements.length}. Results array must match input order.`,
+						);
+					}
+
+					// Process per-item results
+					const duration = Date.now() - startedAt;
+					let hasFailures = false;
+
+					for (let i = 0; i < requirements.length; i++) {
+						const req = requirements[i]!;
+						const result = results[i]!;
+
+						if (result.success) {
+							statuses.set(req.id, {
+								state: "success",
+								requirementId: req.id,
+								completedAt: Date.now(),
+								duration,
+							});
+							onComplete?.(resolverId, req, duration);
+						} else {
+							hasFailures = true;
+							const error = result.error ?? new Error("Batch item failed");
+							statuses.set(req.id, {
+								state: "error",
+								requirementId: req.id,
+								error,
+								failedAt: Date.now(),
+								attempts: attempt,
+							});
+							onError?.(resolverId, req, error);
+						}
+					}
+
+					// If there were failures but some succeeded, don't retry (partial success)
+					// If ALL failed and we have retries left, continue to retry logic
+					if (!hasFailures || requirements.every((_, i) => !results[i]?.success)) {
+						return;
+					}
+				} else {
+					// Use all-or-nothing resolveBatch
+					// Batch fact mutations for the synchronous portion of the resolver
+					let resolvePromise!: Promise<void>;
+					store.batch(() => {
+						// biome-ignore lint/suspicious/noExplicitAny: Requirement type varies
+						resolvePromise = def.resolveBatch!(reqPayloads as any, ctx) as Promise<void>;
+					});
+
+					if (timeout && timeout > 0) {
+						await withTimeout(
+							resolvePromise,
+							timeout,
+							`Batch resolver "${resolverId}" timed out after ${timeout}ms`,
+						);
+					} else {
+						await resolvePromise;
+					}
+
+					// Mark all as success
+					const duration = Date.now() - startedAt;
+					for (const req of requirements) {
+						statuses.set(req.id, {
+							state: "success",
+							requirementId: req.id,
+							completedAt: Date.now(),
+							duration,
+						});
+						onComplete?.(resolverId, req, duration);
+					}
+					return;
 				}
-				return;
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error));
 

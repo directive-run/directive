@@ -433,7 +433,7 @@ describe("React Adapter - Edge Cases", () => {
 
 describe("React Adapter - Suspense Cache Behavior", () => {
 	it("suspense cache key generation is deterministic", () => {
-		// Simulate the cache key generation for useSuspendingRequirements
+		// Simulate the cache key generation for useSuspenseRequirements
 		const types1 = ["FETCH_USER", "FETCH_SETTINGS"];
 		const types2 = ["FETCH_SETTINGS", "FETCH_USER"];
 

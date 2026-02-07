@@ -58,6 +58,8 @@ export type {
 	ResolverStatus,
 	RetryPolicy,
 	BatchConfig,
+	BatchItemResult,
+	BatchResolveResults,
 	TypedResolverContext,
 	TypedResolverDef,
 	TypedResolversDef,
@@ -69,6 +71,9 @@ export type {
 	// Errors
 	ErrorSource,
 	ErrorBoundaryConfig,
+	RetryLaterConfig,
+	CircuitBreakerConfig,
+	CircuitBreakerState,
 	// Module
 	ModuleDef,
 	ModuleHooks,
@@ -294,7 +299,11 @@ export { createEffectsManager } from "./core/effects.js";
 export { createConstraintsManager } from "./core/constraints.js";
 export { createResolversManager, type InflightInfo } from "./core/resolvers.js";
 export { createPluginManager } from "./core/plugins.js";
-export { createErrorBoundaryManager } from "./core/errors.js";
+export {
+	createErrorBoundaryManager,
+	createRetryLaterManager,
+	type PendingRetry,
+} from "./core/errors.js";
 export { createTimeTravelManager, createDisabledTimeTravel } from "./utils/time-travel.js";
 export { createEngine } from "./core/engine.js";
 

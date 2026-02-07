@@ -372,17 +372,17 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					...constraintDef,
 					when: (facts: unknown) => {
 						// Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-						// Otherwise use the full namespaced proxy for backwards compatibility
+						// Otherwise use module-scoped proxy for direct access (facts.key → namespace_key)
 						const factsProxy = hasCrossModuleDeps
 							? createCrossModuleFactsProxy(facts as Record<string, unknown>, namespace, depNamespaces)
-							: createNamespacedFactsProxy(facts as Record<string, unknown>, modulesMap);
+							: createModuleFactsProxy(facts as Record<string, unknown>, namespace);
 						return constraintDef.when(factsProxy);
 					},
 					require: typeof constraintDef.require === "function"
 						? (facts: unknown) => {
 								const factsProxy = hasCrossModuleDeps
 									? createCrossModuleFactsProxy(facts as Record<string, unknown>, namespace, depNamespaces)
-									: createNamespacedFactsProxy(facts as Record<string, unknown>, modulesMap);
+									: createModuleFactsProxy(facts as Record<string, unknown>, namespace);
 								return (constraintDef.require as (facts: unknown) => unknown)(factsProxy);
 							}
 						: constraintDef.require,
@@ -430,14 +430,14 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					// biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
 					run: (facts: any, prev: any) => {
 						// Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-						// Otherwise use the full namespaced proxy for backwards compatibility
+						// Otherwise use module-scoped proxy for direct access (facts.key → namespace_key)
 						const factsProxy = hasCrossModuleDeps
 							? createCrossModuleFactsProxy(facts as Record<string, unknown>, namespace, depNamespaces)
-							: createNamespacedFactsProxy(facts as Record<string, unknown>, modulesMap);
+							: createModuleFactsProxy(facts as Record<string, unknown>, namespace);
 						const prevProxy = prev
 							? (hasCrossModuleDeps
 									? createCrossModuleFactsProxy(prev as Record<string, unknown>, namespace, depNamespaces)
-									: createNamespacedFactsProxy(prev as Record<string, unknown>, modulesMap))
+									: createModuleFactsProxy(prev as Record<string, unknown>, namespace))
 							: undefined;
 						return effectDef.run(factsProxy, prevProxy);
 					},
@@ -579,6 +579,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		debug: engine.debug,
 		derive: namespacedDeriveProxy,
 		events: namespacedEventsProxy,
+		constraints: engine.constraints,
+		effects: engine.effects,
 
 		get isRunning() {
 			return engine.isRunning;
@@ -1342,6 +1344,8 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 		debug: engine.debug,
 		derive: engine.derive,
 		events: eventsProxy as SingleModuleSystem<S>["events"],
+		constraints: engine.constraints,
+		effects: engine.effects,
 
 		get isRunning() {
 			return engine.isRunning;

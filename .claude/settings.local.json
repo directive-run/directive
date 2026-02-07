@@ -37,7 +37,18 @@
       "Bash(pnpm exec vitest:*)",
       "Bash(git commit:*)",
       "Bash(git stash:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(curl:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm run build:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(for dir in resolvers effects events module-system)",
+      "Bash(do cp -r src/app_backup/$dir src/app/docs/)",
+      "Bash(timeout 15 pnpm run dev:*)",
+      "Bash(timeout 15 /opt/homebrew/bin/node ./node_modules/.bin/next dev:*)",
+      "Bash(xargs cat:*)"
     ]
   }
 }

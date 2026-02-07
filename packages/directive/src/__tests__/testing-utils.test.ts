@@ -167,9 +167,7 @@ describe("Testing Utilities", () => {
 			system.stop();
 		});
 
-		// TODO: Investigate why onRequirementCreated hook isn't being called
-		// The constraint evaluation may not be emitting requirements properly in namespaced systems
-		it.skip("should track all requirements including resolved ones", async () => {
+		it("should track all requirements including resolved ones", async () => {
 			const schema = {
 				facts: { trigger: t.boolean(), done: t.boolean() },
 				derivations: {},
@@ -209,8 +207,7 @@ describe("Testing Utilities", () => {
 			system.stop();
 		});
 
-		// TODO: Investigate why requirement tracking isn't working in test system
-		it.skip("should assert requirement type exists", async () => {
+		it("should assert requirement type exists", async () => {
 			const schema = {
 				facts: { trigger: t.boolean() },
 				derivations: {},
@@ -245,9 +242,7 @@ describe("Testing Utilities", () => {
 		});
 	});
 
-	// TODO: Mock resolver integration needs work - resolvers aren't being called properly
-	// The mock resolvers aren't being properly integrated with the Directive constraint system
-	describe.skip("mockResolver", () => {
+	describe("mockResolver", () => {
 		it("should capture requirements", async () => {
 			const schema = {
 				facts: { trigger: t.boolean() },
@@ -484,8 +479,7 @@ describe("Testing Utilities", () => {
 		});
 	});
 
-	// TODO: settleWithFakeTimers needs investigation - resolvers aren't being triggered
-	describe.skip("settleWithFakeTimers", () => {
+	describe("settleWithFakeTimers", () => {
 		it("should settle system with fake timers", async () => {
 			vi.useFakeTimers();
 

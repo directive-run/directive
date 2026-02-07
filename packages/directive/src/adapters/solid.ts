@@ -2,7 +2,7 @@
  * Solid Adapter - SolidJS primitives for Directive
  *
  * Features:
- * - createDerivationSignal for reactive derived values
+ * - createDerivedSignal for reactive derived value signals
  * - createFactSignal for reactive fact values
  * - Context provider for system
  * - useRequirementStatus for loading/error states
@@ -114,15 +114,15 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
  *
  * @example
  * ```tsx
- * import { useDerivation } from 'directive/solid';
+ * import { useDerived } from 'directive/solid';
  *
  * function StatusDisplay() {
- *   const isRed = useDerivation<boolean>('isRed');
+ *   const isRed = useDerived<boolean>('isRed');
  *   return <div>{isRed() ? 'Red' : 'Not Red'}</div>;
  * }
  * ```
  */
-export function useDerivation<T>(derivationId: string): Accessor<T> {
+export function useDerived<T>(derivationId: string): Accessor<T> {
 	const system = useSystem();
 
 	// Dev warning for invalid derivation IDs
@@ -130,7 +130,7 @@ export function useDerivation<T>(derivationId: string): Accessor<T> {
 		const initialValue = system.read(derivationId);
 		if (initialValue === undefined) {
 			console.warn(
-				`[Directive] useDerivation("${derivationId}") returned undefined. ` +
+				`[Directive] useDerived("${derivationId}") returned undefined. ` +
 					`Check that "${derivationId}" is defined in your module's derive property.`,
 			);
 		}
@@ -152,15 +152,15 @@ export function useDerivation<T>(derivationId: string): Accessor<T> {
  *
  * @example
  * ```tsx
- * import { useDerivations } from 'directive/solid';
+ * import { useDeriveds } from 'directive/solid';
  *
  * function StatusDisplay() {
- *   const state = useDerivations<{ isRed: boolean; elapsed: number }>(['isRed', 'elapsed']);
+ *   const state = useDeriveds<{ isRed: boolean; elapsed: number }>(['isRed', 'elapsed']);
  *   return <div>{state().isRed ? `Red for ${state().elapsed}s` : 'Not Red'}</div>;
  * }
  * ```
  */
-export function useDerivations<T extends Record<string, unknown>>(
+export function useDeriveds<T extends Record<string, unknown>>(
 	derivationIds: string[],
 ): Accessor<T> {
 	const system = useSystem();
@@ -188,7 +188,7 @@ export function useDerivations<T extends Record<string, unknown>>(
  * Get direct access to facts for mutations.
  *
  * WARNING: The returned facts object is NOT reactive. Use this for event handlers,
- * not for rendering. Use `useDerivation` for reactive values.
+ * not for rendering. Use `useDerived` for reactive values.
  *
  * @example
  * ```tsx
@@ -562,10 +562,10 @@ export function useLatestError(type: string): Accessor<Error | null> {
  *
  * @example
  * ```tsx
- * import { useAllRequirementStatuses } from 'directive/solid';
+ * import { useRequirementStatuses } from 'directive/solid';
  *
  * function RequirementsDashboard() {
- *   const allStatuses = useAllRequirementStatuses();
+ *   const allStatuses = useRequirementStatuses();
  *
  *   return (
  *     <ul>
@@ -579,11 +579,11 @@ export function useLatestError(type: string): Accessor<Error | null> {
  * }
  * ```
  */
-export function useAllRequirementStatuses(): Accessor<Map<string, RequirementTypeStatus>> {
+export function useRequirementStatuses(): Accessor<Map<string, RequirementTypeStatus>> {
 	const statusPlugin = useContext(StatusPluginContext);
 	if (!statusPlugin) {
 		throw new Error(
-			"[Directive] useAllRequirementStatuses requires a statusPlugin. " +
+			"[Directive] useRequirementStatuses requires a statusPlugin. " +
 				"Pass statusPlugin to DirectiveProvider.",
 		);
 	}
@@ -645,16 +645,16 @@ export function useWatch<T>(
  *
  * @example
  * ```ts
- * import { createDerivationSignal } from 'directive/solid';
+ * import { createDerivedSignal } from 'directive/solid';
  *
  * const system = createSystem({ modules: [myModule] });
- * const [isRed, cleanup] = createDerivationSignal(system, 'isRed');
+ * const [isRed, cleanup] = createDerivedSignal(system, 'isRed');
  *
  * // Later, when done:
  * cleanup();
  * ```
  */
-export function createDerivationSignal<T>(
+export function createDerivedSignal<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
 	derivationId: string,
@@ -727,7 +727,7 @@ const warnedOptions = new WeakSet<object>();
  * @param options - Either a single module or full system options (must be stable reference)
  * @returns The system instance
  *
- * @see {@link useDerivation} for reading derived values
+ * @see {@link useDerived} for reading derived values
  * @see {@link useFacts} for direct fact access
  *
  * @example
@@ -872,16 +872,16 @@ export function useFactSelector<T, R>(
  *
  * @example
  * ```tsx
- * import { useDerivationSelector } from 'directive/solid';
+ * import { useDerivedSelector } from 'directive/solid';
  *
  * function StatusLabel() {
  *   // Only re-render when status text changes
- *   const statusText = useDerivationSelector('status', (s) => s?.label ?? 'Unknown');
+ *   const statusText = useDerivedSelector('status', (s) => s?.label ?? 'Unknown');
  *   return <span>{statusText()}</span>;
  * }
  * ```
  */
-export function useDerivationSelector<T, R>(
+export function useDerivedSelector<T, R>(
 	derivationId: string,
 	selector: (value: T) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
@@ -918,11 +918,11 @@ export function useDerivationSelector<T, R>(
  *
  * @example
  * ```tsx
- * import { useDirectiveSelector } from 'directive/solid';
+ * import { useSelector } from 'directive/solid';
  *
  * function Summary() {
  *   // Select derived state from multiple facts
- *   const summary = useDirectiveSelector((facts) => ({
+ *   const summary = useSelector((facts) => ({
  *     count: facts.items?.length ?? 0,
  *     isLoading: facts.loading ?? false,
  *   }), (a, b) => a.count === b.count && a.isLoading === b.isLoading);
@@ -931,7 +931,7 @@ export function useDerivationSelector<T, R>(
  * }
  * ```
  */
-export function useDirectiveSelector<R>(
+export function useSelector<R>(
 	selector: (facts: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
 ): Accessor<R> {
@@ -980,16 +980,16 @@ export function useDirectiveSelector<R>(
  * } satisfies ModuleSchema;
  *
  * // Create typed hooks
- * const { useDerivation, useFact, useDispatch } = createTypedHooks<typeof schema>();
+ * const { useDerived, useFact, useDispatch } = createTypedHooks<typeof schema>();
  *
  * function Counter() {
  *   const count = useFact("count"); // Type: Accessor<number>
- *   const doubled = useDerivation("doubled"); // Type: Accessor<number>
+ *   const doubled = useDerived("doubled"); // Type: Accessor<number>
  * }
  * ```
  */
 export function createTypedHooks<M extends ModuleSchema>(): {
-	useDerivation: <K extends keyof InferDerivations<M>>(
+	useDerived: <K extends keyof InferDerivations<M>>(
 		derivationId: K,
 	) => Accessor<InferDerivations<M>[K]>;
 	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Accessor<InferFacts<M>[K] | undefined>;
@@ -997,8 +997,8 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	useSystem: () => System<M>;
 } {
 	return {
-		useDerivation: <K extends keyof InferDerivations<M>>(derivationId: K) =>
-			useDerivation<InferDerivations<M>[K]>(derivationId as string),
+		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
+			useDerived<InferDerivations<M>[K]>(derivationId as string),
 		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
 			useFact<InferFacts<M>[K]>(factKey as string),
 		useDispatch: () => {

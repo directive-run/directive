@@ -214,6 +214,10 @@ describe("Namespaced System", () => {
 
       const crossModuleDataModule = createModule("data", {
         schema: crossModuleDataSchema,
+        // Declare cross-module dependencies for type-safe access
+        crossModuleDeps: {
+          auth: authSchema,
+        },
         init: (facts) => {
           facts.items = [];
           facts.isLoading = false;
@@ -223,9 +227,11 @@ describe("Namespaced System", () => {
         constraints: {
           fetchWhenAuth: {
             when: (facts) => {
-              // Cross-module access: facts.auth.isAuthenticated
-              // @ts-expect-error - Types work at runtime with object modules
-              return facts.auth?.isAuthenticated === true && facts.data?.items?.length === 0;
+              // Cross-module access via crossModuleDeps:
+              // - facts.self.items for own module
+              // - facts.auth.isAuthenticated for auth module
+              // @ts-expect-error - Runtime typing
+              return facts.auth?.isAuthenticated === true && facts.self?.items?.length === 0;
             },
             require: { type: "FETCH_DATA" },
           },
@@ -1422,11 +1428,10 @@ describe("Namespaced System", () => {
         },
         constraints: {
           test: {
-            // Constraint checks namespaced facts
+            // Constraint receives module-scoped facts (direct access to own module)
             when: (facts) => {
-              // In namespaced mode, facts is facts.test
-              // @ts-expect-error - Runtime typing
-              return facts.test?.triggered === true;
+              // facts.triggered directly accesses this module's fact
+              return facts.triggered === true;
             },
             require: { type: "TEST_REQ" },
           },
