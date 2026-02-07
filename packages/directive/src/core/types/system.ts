@@ -163,11 +163,31 @@ export interface DistributableSnapshot<T = Record<string, unknown>> {
  * System interface using consolidated module schema.
  * Provides full type inference for facts, derivations, events, and dispatch.
  */
+/** Runtime control for constraints */
+export interface ConstraintsControl {
+	/** Disable a constraint by ID — it will be excluded from evaluation */
+	disable(id: string): void;
+	/** Enable a previously disabled constraint — it will be re-evaluated on the next cycle */
+	enable(id: string): void;
+}
+
+/** Runtime control for effects */
+export interface EffectsControl {
+	/** Disable an effect by ID — it will be skipped during reconciliation */
+	disable(id: string): void;
+	/** Enable a previously disabled effect */
+	enable(id: string): void;
+	/** Check if an effect is currently enabled */
+	isEnabled(id: string): boolean;
+}
+
 export interface System<M extends ModuleSchema = ModuleSchema> {
 	readonly facts: Facts<M["facts"]>;
 	readonly debug: TimeTravelAPI | null;
 	readonly derive: InferDerivations<M>;
 	readonly events: EventsAccessorFromSchema<M>;
+	readonly constraints: ConstraintsControl;
+	readonly effects: EffectsControl;
 
 	start(): void;
 	stop(): void;

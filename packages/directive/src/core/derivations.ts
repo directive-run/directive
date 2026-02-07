@@ -30,6 +30,8 @@ export interface DerivationsManager<S extends Schema, D extends DerivationsDef<S
 	isStale(id: keyof D): boolean;
 	/** Invalidate derivations that depend on a fact key */
 	invalidate(factKey: string): void;
+	/** Invalidate derivations for multiple fact keys, notifying listeners once at the end */
+	invalidateMany(factKeys: Iterable<string>): void;
 	/** Invalidate all derivations */
 	invalidateAll(): void;
 	/** Subscribe to derivation changes */
@@ -70,6 +72,11 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 	const factToDerivedDeps = new Map<string, Set<string>>();
 	// Track which derivations depend on which other derivations
 	const derivedToDerivedDeps = new Map<string, Set<string>>();
+
+	// Deferred notification: during invalidation, collect IDs to notify.
+	// Listeners fire AFTER all invalidations complete so they see consistent state.
+	let invalidationDepth = 0;
+	const pendingNotifications = new Set<string>();
 
 	// The proxy for composition (derivations accessing other derivations)
 	let derivedProxy: DerivedValues<S, D>;
@@ -184,6 +191,19 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 		state.dependencies = newDeps;
 	}
 
+	/** Flush deferred notifications after all invalidations complete */
+	function flushNotifications(): void {
+		if (invalidationDepth > 0) return;
+
+		// Snapshot and clear before firing — listeners may trigger new invalidations
+		const ids = [...pendingNotifications];
+		pendingNotifications.clear();
+
+		for (const id of ids) {
+			listeners.get(id)?.forEach((listener) => listener());
+		}
+	}
+
 	/** Invalidate a derivation and its dependents */
 	function invalidateDerivation(id: string, visited = new Set<string>()): void {
 		if (visited.has(id)) return;
@@ -195,8 +215,11 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 		state.isStale = true;
 		onInvalidate?.(id);
 
-		// Notify listeners
-		listeners.get(id)?.forEach((listener) => listener());
+		// Defer listener notification until all invalidations complete.
+		// This prevents listeners from observing partially-stale state and
+		// avoids infinite loops from Set mutation during iteration (listeners
+		// recompute derivations → updateDependencies → modify dep Sets).
+		pendingNotifications.add(id);
 
 		// Invalidate derivations that depend on this one
 		const dependents = derivedToDerivedDeps.get(id);
@@ -247,15 +270,45 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 			const dependents = factToDerivedDeps.get(factKey);
 			if (!dependents) return;
 
-			for (const id of dependents) {
-				invalidateDerivation(id);
+			invalidationDepth++;
+			try {
+				for (const id of dependents) {
+					invalidateDerivation(id);
+				}
+			} finally {
+				invalidationDepth--;
+				flushNotifications();
+			}
+		},
+
+		invalidateMany(factKeys: Iterable<string>): void {
+			invalidationDepth++;
+			try {
+				for (const factKey of factKeys) {
+					const dependents = factToDerivedDeps.get(factKey);
+					if (!dependents) continue;
+					for (const id of dependents) {
+						invalidateDerivation(id);
+					}
+				}
+			} finally {
+				invalidationDepth--;
+				flushNotifications();
 			}
 		},
 
 		invalidateAll(): void {
-			for (const state of states.values()) {
-				state.isStale = true;
-				listeners.get(state.id)?.forEach((listener) => listener());
+			invalidationDepth++;
+			try {
+				for (const state of states.values()) {
+					if (!state.isStale) {
+						state.isStale = true;
+						pendingNotifications.add(state.id);
+					}
+				}
+			} finally {
+				invalidationDepth--;
+				flushNotifications();
 			}
 		},
 
