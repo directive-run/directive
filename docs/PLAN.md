@@ -601,7 +601,7 @@ class DirectiveError extends Error {
 │   └── Engine Lifecycle
 ├── React Integration
 │   ├── Setup
-│   ├── useDerivation
+│   ├── useDerived
 │   ├── useFacts
 │   └── SSR & Hydration
 ├── Plugins

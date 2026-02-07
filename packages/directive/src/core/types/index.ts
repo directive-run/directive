@@ -71,6 +71,8 @@ export type {
 export type {
 	RetryPolicy,
 	BatchConfig,
+	BatchItemResult,
+	BatchResolveResults,
 	ResolverContext,
 	ResolverDef,
 	InferredReq,
@@ -83,7 +85,14 @@ export type { ReconcileResult, Snapshot, Plugin } from "./plugins.js";
 
 // Error types
 export { DirectiveError } from "./errors.js";
-export type { ErrorSource, RecoveryStrategy, ErrorBoundaryConfig } from "./errors.js";
+export type {
+	ErrorSource,
+	RecoveryStrategy,
+	ErrorBoundaryConfig,
+	RetryLaterConfig,
+	CircuitBreakerConfig,
+	CircuitBreakerState,
+} from "./errors.js";
 
 // Module types
 export type {

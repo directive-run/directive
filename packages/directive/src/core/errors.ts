@@ -3,11 +3,124 @@
  *
  * Features:
  * - Catch errors in constraints/resolvers/effects/derivations
- * - Configurable recovery strategies
+ * - Configurable recovery strategies (skip, retry, retry-later, disable, throw)
+ * - Circuit breaker pattern for automatic failure protection
  * - Error reporting to plugins
  */
 
-import { DirectiveError, type ErrorBoundaryConfig, type ErrorSource, type RecoveryStrategy } from "./types.js";
+import {
+	DirectiveError,
+	type ErrorBoundaryConfig,
+	type ErrorSource,
+	type RecoveryStrategy,
+	type RetryLaterConfig,
+} from "./types.js";
+
+// ============================================================================
+// Retry-Later Queue
+// ============================================================================
+
+/**
+ * Pending retry entry.
+ */
+export interface PendingRetry {
+	source: ErrorSource;
+	sourceId: string;
+	context: unknown;
+	attempt: number;
+	nextRetryTime: number;
+	callback?: () => void;
+}
+
+/**
+ * Create a retry-later manager.
+ */
+export function createRetryLaterManager(config: RetryLaterConfig = {}): {
+	/** Schedule a retry */
+	scheduleRetry: (
+		source: ErrorSource,
+		sourceId: string,
+		context: unknown,
+		attempt: number,
+		callback?: () => void,
+	) => PendingRetry | null;
+	/** Get pending retries */
+	getPendingRetries: () => PendingRetry[];
+	/** Process due retries */
+	processDueRetries: () => PendingRetry[];
+	/** Cancel a retry */
+	cancelRetry: (sourceId: string) => void;
+	/** Clear all pending retries */
+	clearAll: () => void;
+} {
+	const {
+		delayMs = 1000,
+		maxRetries = 3,
+		backoffMultiplier = 2,
+		maxDelayMs = 30000,
+	} = config;
+
+	const pendingRetries: Map<string, PendingRetry> = new Map();
+
+	function calculateDelay(attempt: number): number {
+		const delay = delayMs * Math.pow(backoffMultiplier, attempt - 1);
+		return Math.min(delay, maxDelayMs);
+	}
+
+	return {
+		scheduleRetry(
+			source: ErrorSource,
+			sourceId: string,
+			context: unknown,
+			attempt: number,
+			callback?: () => void,
+		): PendingRetry | null {
+			// Check if max retries exceeded
+			if (attempt > maxRetries) {
+				return null;
+			}
+
+			const delay = calculateDelay(attempt);
+			const entry: PendingRetry = {
+				source,
+				sourceId,
+				context,
+				attempt,
+				nextRetryTime: Date.now() + delay,
+				callback,
+			};
+
+			pendingRetries.set(sourceId, entry);
+			return entry;
+		},
+
+		getPendingRetries(): PendingRetry[] {
+			return Array.from(pendingRetries.values());
+		},
+
+		processDueRetries(): PendingRetry[] {
+			const now = Date.now();
+			const dueRetries: PendingRetry[] = [];
+
+			for (const [sourceId, entry] of pendingRetries) {
+				if (entry.nextRetryTime <= now) {
+					dueRetries.push(entry);
+					pendingRetries.delete(sourceId);
+				}
+			}
+
+			return dueRetries;
+		},
+
+		cancelRetry(sourceId: string): void {
+			pendingRetries.delete(sourceId);
+		},
+
+		clearAll(): void {
+			pendingRetries.clear();
+		},
+	};
+}
 
 // ============================================================================
 // Error Boundary Manager
@@ -22,6 +135,12 @@ export interface ErrorBoundaryManager {
 	getAllErrors(): DirectiveError[];
 	/** Clear all errors */
 	clearErrors(): void;
+	/** Get retry-later manager */
+	getRetryLaterManager(): ReturnType<typeof createRetryLaterManager>;
+	/** Process due retries (call periodically or on reconcile) */
+	processDueRetries(): PendingRetry[];
+	/** Clear retry attempts for a source ID (call on success) */
+	clearRetryAttempts(sourceId: string): void;
 }
 
 /** Options for creating an error boundary manager */
@@ -53,6 +172,12 @@ export function createErrorBoundaryManager(
 	// Store errors for inspection
 	const errors: DirectiveError[] = [];
 	const maxErrors = 100; // Keep last 100 errors
+
+	// Retry-later manager
+	const retryLaterManager = createRetryLaterManager(config.retryLater);
+
+	// Track retry attempts per source ID
+	const retryAttempts = new Map<string, number>();
 
 	/** Convert unknown error to DirectiveError */
 	function toDirectiveError(
@@ -124,11 +249,36 @@ export function createErrorBoundaryManager(
 			config.onError?.(directiveError);
 
 			// Get recovery strategy
-			const strategy = getStrategy(
+			let strategy = getStrategy(
 				source,
 				sourceId,
 				error instanceof Error ? error : new Error(String(error)),
 			);
+
+			// Handle retry-later strategy
+			if (strategy === "retry-later") {
+				const attempt = (retryAttempts.get(sourceId) ?? 0) + 1;
+				retryAttempts.set(sourceId, attempt);
+
+				const scheduled = retryLaterManager.scheduleRetry(
+					source,
+					sourceId,
+					context,
+					attempt,
+				);
+
+				if (!scheduled) {
+					// Max retries exceeded, fall back to skip
+					strategy = "skip";
+					retryAttempts.delete(sourceId);
+
+					if (process.env.NODE_ENV !== "production") {
+						console.warn(
+							`[Directive] ${source} "${sourceId}" exceeded max retry-later attempts. Skipping.`,
+						);
+					}
+				}
+			}
 
 			// Notify recovery callback
 			onRecovery?.(directiveError, strategy);
@@ -151,6 +301,19 @@ export function createErrorBoundaryManager(
 
 		clearErrors(): void {
 			errors.length = 0;
+		},
+
+		getRetryLaterManager() {
+			return retryLaterManager;
+		},
+
+		processDueRetries(): PendingRetry[] {
+			return retryLaterManager.processDueRetries();
+		},
+
+		clearRetryAttempts(sourceId: string): void {
+			retryAttempts.delete(sourceId);
+			retryLaterManager.cancelRetry(sourceId);
 		},
 	};
 

@@ -134,6 +134,7 @@ export function createEngine<S extends Schema>(
 	// Create facts store and proxy
 	// Note: We need to create a local invalidate function that will be set after derivationsManager is created
 	let invalidateDerivation: (key: string) => void = () => {};
+	let invalidateManyDerivations: (keys: string[]) => void = () => {};
 
 	const { store, facts } = createFacts<S>({
 		schema: mergedSchema,
@@ -146,11 +147,14 @@ export function createEngine<S extends Schema>(
 		},
 		onBatch: (changes) => {
 			pluginManager.emitFactsBatch(changes);
+			const keys: string[] = [];
 			for (const change of changes) {
 				state.changedKeys.add(change.key);
-				// Immediately invalidate derivations when facts change
-				invalidateDerivation(change.key);
+				keys.push(change.key);
 			}
+			// Invalidate all affected derivations at once — listeners fire only
+			// after ALL keys are invalidated, so they see consistent state.
+			invalidateManyDerivations(keys);
 			scheduleReconcile();
 		},
 	});
@@ -169,6 +173,7 @@ export function createEngine<S extends Schema>(
 
 	// Now wire up derivation invalidation
 	invalidateDerivation = (key: string) => derivationsManager.invalidate(key);
+	invalidateManyDerivations = (keys: string[]) => derivationsManager.invalidateMany(keys);
 
 	// Create effects manager
 	const effectsManager: EffectsManager<S> = createEffectsManager({
@@ -427,6 +432,15 @@ export function createEngine<S extends Schema>(
 		debug: timeTravelManager.isEnabled ? timeTravelManager : null,
 		derive: deriveAccessor,
 		events: eventsAccessor,
+		constraints: {
+			disable: (id: string) => constraintsManager.disable(id),
+			enable: (id: string) => constraintsManager.enable(id),
+		},
+		effects: {
+			disable: (id: string) => effectsManager.disable(id),
+			enable: (id: string) => effectsManager.enable(id),
+			isEnabled: (id: string) => effectsManager.isEnabled(id),
+		},
 
 		start(): void {
 			if (state.isRunning) return;

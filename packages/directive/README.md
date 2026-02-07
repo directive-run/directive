@@ -62,9 +62,9 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
-        const response = await fetch(`/api/users/${ctx.facts.userId}`);
-        ctx.facts.user = await response.json();
+      resolve: async (req, context) => {
+        const response = await fetch(`/api/users/${context.facts.userId}`);
+        context.facts.user = await response.json();
       },
     },
   },
@@ -94,7 +94,7 @@ console.log(system.read("greeting")); // "Hello, John!"
 ## React Integration
 
 ```tsx
-import { DirectiveProvider, useDerivation, useDispatch } from 'directive/react';
+import { DirectiveProvider, useDerived, useDispatch } from 'directive/react';
 
 function App() {
   return (
@@ -105,8 +105,8 @@ function App() {
 }
 
 function UserGreeting() {
-  const greeting = useDerivation<string>("greeting");
-  const isLoggedIn = useDerivation<boolean>("isLoggedIn");
+  const greeting = useDerived<string>("greeting");
+  const isLoggedIn = useDerived<boolean>("isLoggedIn");
 
   return (
     <div>
@@ -257,7 +257,98 @@ constraints: {
 },
 ```
 
-### Constraint Ordering (`after`)
+#### Constraint Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `when` | `(facts) => boolean \| Promise<boolean>` | Condition — returns true when the constraint is active |
+| `require` | `Requirement \| Requirement[] \| (facts) => Requirement \| Requirement[] \| null` | What to produce when `when` is true |
+| `priority` | `number` | Evaluation order (higher runs first, default: 0) |
+| `after` | `string[]` | Constraint IDs that must resolve before this one evaluates |
+| `async` | `boolean` | Mark as async (avoids runtime detection overhead) |
+| `timeout` | `number` | Timeout in ms for async `when()` evaluation (default: 5000) |
+
+#### Auto-Tracking
+
+Constraint `when()` functions are auto-tracked — Directive records which facts are read during evaluation. On subsequent reconciliation cycles, only constraints affected by changed facts are re-evaluated (incremental evaluation).
+
+#### Priority
+
+Higher priority constraints are evaluated first. Use this when evaluation order matters but there's no data dependency between constraints:
+
+```typescript
+constraints: {
+  emergency: {
+    priority: 100,  // Evaluated first
+    when: (facts) => facts.temperature > 200,
+    require: { type: "EMERGENCY_SHUTDOWN" },
+  },
+  routine: {
+    priority: 10,   // Evaluated after emergency
+    when: (facts) => facts.needsMaintenance,
+    require: { type: "SCHEDULE_MAINTENANCE" },
+  },
+},
+```
+
+#### Require Variants
+
+The `require` field supports multiple forms:
+
+```typescript
+constraints: {
+  // Static object — always produces the same requirement
+  simple: {
+    when: (facts) => !facts.data,
+    require: { type: "FETCH_DATA" },
+  },
+
+  // Function — dynamic requirement based on current facts
+  dynamic: {
+    when: (facts) => facts.userId && !facts.user,
+    require: (facts) => ({ type: "FETCH_USER", userId: facts.userId }),
+  },
+
+  // Array — produce multiple requirements at once
+  multiple: {
+    when: (facts) => facts.isNewUser,
+    require: [
+      { type: "SEND_WELCOME_EMAIL" },
+      { type: "CREATE_DEFAULT_SETTINGS" },
+    ],
+  },
+
+  // Conditional — function returning null to skip
+  conditional: {
+    when: (facts) => facts.needsSync,
+    require: (facts) => facts.isCritical
+      ? [{ type: "SYNC_NOW" }, { type: "NOTIFY_ADMIN" }]
+      : null,  // No requirement produced
+  },
+},
+```
+
+#### Async Constraints
+
+The `when()` function can be async for conditions that require I/O (e.g., checking external state). Mark with `async: true` to avoid runtime detection overhead:
+
+```typescript
+constraints: {
+  needsRefresh: {
+    async: true,
+    timeout: 3000,  // Override default 5s timeout
+    when: async (facts) => {
+      const lastSync = facts.lastSyncAt;
+      return Date.now() - lastSync > 60000;
+    },
+    require: { type: "REFRESH_DATA" },
+  },
+},
+```
+
+If you omit `async: true` and `when()` returns a Promise, Directive detects it at runtime and logs a dev warning. Async constraints within the same evaluation cycle run in parallel.
+
+#### Constraint Ordering (`after`)
 
 Control the sequence of resolver execution using the `after` property. This is useful when one operation must complete before another begins.
 
@@ -299,9 +390,10 @@ constraints: {
 - Dependent API calls where order matters
 - Chained operations where later steps need data from earlier ones
 
+
 ### Resolvers
 
-Async handlers that fulfill requirements with retry, timeout, and cancellation.
+Async handlers that fulfill requirements with retry, timeout, cancellation, and batching.
 
 ```typescript
 resolvers: {
@@ -309,12 +401,186 @@ resolvers: {
     requirement: "FETCH_DATA",
     retry: { attempts: 3, backoff: "exponential" },
     timeout: 5000,
-    resolve: async (req, ctx) => {
-      ctx.facts.data = await fetchData(req.id);
+    resolve: async (req, context) => {
+      context.facts.data = await fetchData(req.id);
     },
   },
 },
 ```
+
+#### Resolver Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `requirement` | `string \| (req) => req is R` | Which requirements this resolver handles |
+| `resolve` | `(req, context) => Promise<void>` | Handler for single requirements |
+| `key` | `(req) => string` | Custom deduplication key (prevents duplicate resolution) |
+| `retry` | `RetryPolicy` | Retry configuration (see below) |
+| `timeout` | `number` | Timeout in ms for resolver execution |
+| `batch` | `BatchConfig` | Batching configuration (see below) |
+| `resolveBatch` | `(reqs, context) => Promise<void>` | All-or-nothing batch handler |
+| `resolveBatchWithResults` | `(reqs, context) => Promise<BatchItemResult[]>` | Per-item batch handler |
+
+#### Resolver Context (`context`)
+
+Every resolver receives a context object with:
+
+```typescript
+resolve: async (req, context) => {
+  context.facts;        // Read/write facts (mutations are auto-batched)
+  context.signal;       // AbortSignal — check context.signal.aborted or pass to fetch()
+  context.snapshot();   // Get a read-only snapshot of current facts
+}
+```
+
+Fact mutations inside `resolve` are automatically batched — all synchronous writes are coalesced into a single notification.
+
+#### Dynamic Requirement Matching
+
+The `requirement` field accepts a string or a function. The string form matches `req.type` directly. The function form lets you match dynamically — useful for wildcards, prefix matching, or matching on payload fields:
+
+```typescript
+resolvers: {
+  // String: exact match on req.type
+  fetchUser: {
+    requirement: "FETCH_USER",
+    resolve: async (req, context) => { /* ... */ },
+  },
+
+  // Function: prefix match — handles any "API_*" requirement
+  apiHandler: {
+    requirement: (req): req is Requirement => req.type.startsWith("API_"),
+    resolve: async (req, context) => { /* ... */ },
+  },
+
+  // Function: match on payload fields
+  highPriorityFetch: {
+    requirement: (req): req is Requirement =>
+      req.type === "FETCH" && req.priority === "high",
+    resolve: async (req, context) => { /* ... */ },
+  },
+
+  // Function: catch-all wildcard
+  fallback: {
+    requirement: (req): req is Requirement => true,
+    resolve: async (req, context) => {
+      console.warn(`Unhandled requirement: ${req.type}`);
+    },
+  },
+},
+```
+
+**Note:** Resolvers are checked in definition order. The first matching resolver wins, so place specific matchers before wildcards.
+
+#### Deduplication Keys
+
+By default, requirements are deduplicated by `constraintName:type`. Use `key` to customize when the same requirement type can have multiple distinct instances:
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    key: (req) => `fetch-user-${req.userId}`,  // Dedupe per user
+    resolve: async (req, context) => {
+      context.facts.user = await api.getUser(req.userId);
+    },
+  },
+},
+```
+
+#### Retry Policies
+
+Configure automatic retries with backoff strategies:
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    retry: {
+      attempts: 3,            // Max attempts (default: 1)
+      backoff: "exponential",  // "none" | "linear" | "exponential"
+      initialDelay: 100,       // First retry delay in ms (default: 100)
+      maxDelay: 30000,         // Cap delay at 30s (default: 30000)
+    },
+    resolve: async (req, context) => { /* ... */ },
+  },
+},
+```
+
+Backoff calculation:
+- `"none"` — constant delay (`initialDelay` every time)
+- `"linear"` — `initialDelay * attempt` (100ms, 200ms, 300ms...)
+- `"exponential"` — `initialDelay * 2^(attempt-1)` (100ms, 200ms, 400ms...)
+
+Retries are AbortSignal-aware — cancelling a resolver immediately interrupts retry sleep.
+
+#### Cancellation
+
+Resolvers receive an `AbortSignal` via `context.signal`. Pass it to fetch calls or check it in long-running operations:
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    resolve: async (req, context) => {
+      // Automatically cancelled if requirement is no longer needed
+      const res = await fetch(`/api/data/${req.id}`, { signal: context.signal });
+      context.facts.data = await res.json();
+    },
+  },
+},
+```
+
+When a constraint's `when()` becomes false while its resolver is running, the resolver is cancelled via the AbortSignal.
+
+#### Batched Resolution
+
+Prevent N+1 problems by collecting requirements that match the same resolver over a time window, then resolving them in a single call:
+
+```typescript
+resolvers: {
+  fetchUsers: {
+    requirement: "FETCH_USER",
+    batch: {
+      enabled: true,
+      windowMs: 50,       // Collect for 50ms before processing
+      maxSize: 100,       // Max batch size (default: unlimited)
+      timeoutMs: 10000,   // Per-batch timeout (overrides resolver timeout)
+    },
+    // All-or-nothing: if this throws, all requirements in the batch fail
+    resolveBatch: async (reqs, context) => {
+      const ids = reqs.map(r => r.userId);
+      const users = await api.getUsersBatch(ids);
+      users.forEach(user => { context.facts[`user_${user.id}`] = user; });
+    },
+  },
+},
+```
+
+For partial failure handling, use `resolveBatchWithResults`:
+
+```typescript
+resolvers: {
+  fetchUsers: {
+    requirement: "FETCH_USER",
+    batch: { enabled: true, windowMs: 50 },
+    // Per-item results: some can succeed while others fail
+    resolveBatchWithResults: async (reqs, context) => {
+      return Promise.all(reqs.map(async (req) => {
+        try {
+          const user = await api.getUser(req.userId);
+          context.facts[`user_${user.id}`] = user;
+          return { success: true };
+        } catch (error) {
+          return { success: false, error };
+        }
+      }));
+    },
+  },
+},
+```
+
+The returned results array **must** match the order of the input requirements.
 
 ### Derivations
 
@@ -352,6 +618,23 @@ events: {
 system.dispatch({ type: "increment" });
 system.dispatch({ type: "addItem", item: "new item" });
 ```
+
+### Runtime Control
+
+Disable or enable constraints and effects at runtime:
+
+```typescript
+// Constraints
+system.constraints.disable("expensiveCheck");
+system.constraints.enable("expensiveCheck");
+
+// Effects
+system.effects.disable("analytics");
+system.effects.enable("analytics");
+system.effects.isEnabled("analytics"); // true
+```
+
+---
 
 ## Multi-Module Architecture
 
@@ -764,8 +1047,8 @@ const store = createModule("store", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      resolve: async (req, context) => {
+        context.facts.user = await api.getUser(context.facts.userId);
       },
     },
   },
@@ -827,8 +1110,8 @@ const userModule = createModule("user", {
     fetchUser: {
       requirement: "FETCH_USER",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      resolve: async (req, context) => {
+        context.facts.user = await api.getUser(context.facts.userId);
       },
     },
   },
@@ -894,9 +1177,9 @@ const trafficLight = createModule("traffic-light", {
   resolvers: {
     transition: {
       requirement: "TRANSITION",
-      resolve: (req, ctx) => {
-        ctx.facts.phase = req.to;
-        ctx.facts.elapsed = 0;
+      resolve: (req, context) => {
+        context.facts.phase = req.to;
+        context.facts.elapsed = 0;
       },
     },
   },

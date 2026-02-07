@@ -34,7 +34,35 @@ export interface BatchConfig {
 	enabled: boolean;
 	/** Time window to collect requirements (ms) */
 	windowMs: number;
+	/** Maximum batch size (default: unlimited) */
+	maxSize?: number;
+	/** Per-batch timeout in ms (overrides resolver timeout for batches) */
+	timeoutMs?: number;
+	/**
+	 * Failure strategy for partial batch failures:
+	 * - "all-or-nothing" (default): If resolveBatch throws, all requirements fail
+	 * - "per-item": Use resolveBatchWithResults to get per-item results
+	 */
+	failureStrategy?: "all-or-nothing" | "per-item";
 }
+
+/**
+ * Result for a single item in a batch resolution.
+ */
+export interface BatchItemResult<T = unknown> {
+	/** Whether this item succeeded */
+	success: boolean;
+	/** Error if the item failed */
+	error?: Error;
+	/** Optional result value if the item succeeded */
+	value?: T;
+}
+
+/**
+ * Results from batch resolution with per-item status.
+ * The array order must match the order of requirements passed in.
+ */
+export type BatchResolveResults<T = unknown> = Array<BatchItemResult<T>>;
 
 /** Resolver context passed to resolve function */
 export interface ResolverContext<S extends Schema = Schema> {
@@ -65,8 +93,31 @@ export interface ResolverDef<S extends Schema, R extends Requirement = Requireme
 	batch?: BatchConfig;
 	/** Resolve function for single requirement */
 	resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
-	/** Resolve function for batched requirements */
+	/**
+	 * Resolve function for batched requirements (all-or-nothing).
+	 * If this throws, all requirements in the batch fail.
+	 */
 	resolveBatch?: (reqs: R[], ctx: ResolverContext<S>) => Promise<void>;
+	/**
+	 * Resolve function for batched requirements with per-item results.
+	 * Use this when you need to handle partial failures.
+	 * The returned array must match the order of input requirements.
+	 *
+	 * @example
+	 * ```typescript
+	 * resolveBatchWithResults: async (reqs, ctx) => {
+	 *   return Promise.all(reqs.map(async (req) => {
+	 *     try {
+	 *       await processItem(req);
+	 *       return { success: true };
+	 *     } catch (error) {
+	 *       return { success: false, error };
+	 *     }
+	 *   }));
+	 * }
+	 * ```
+	 */
+	resolveBatchWithResults?: (reqs: R[], ctx: ResolverContext<S>) => Promise<BatchResolveResults>;
 }
 
 /**
