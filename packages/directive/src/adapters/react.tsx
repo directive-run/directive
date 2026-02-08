@@ -66,6 +66,15 @@ import {
 // Re-export for convenience
 export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions };
 
+/**
+ * Options for selector hooks that support both an equality function and a system override.
+ */
+export type SelectorOptions<R> = {
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system?: System<any>;
+	equalityFn?: (a: R, b: R) => boolean;
+};
+
 // ============================================================================
 // Context
 // ============================================================================
@@ -83,6 +92,43 @@ type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
  * Internal context for the requirement status plugin.
  */
 const StatusPluginContext = createContext<StatusPlugin | null>(null);
+
+// ============================================================================
+// Internal Helpers
+// ============================================================================
+
+/**
+ * Resolve the system to use: explicit override first, then context fallback.
+ * @internal
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+function useResolvedSystem(override?: System<any>): System<any> {
+	const contextSystem = useContext(DirectiveContext);
+	const system = override ?? contextSystem;
+	if (!system) {
+		throw new Error(
+			"[Directive] No system available. Wrap your component in <DirectiveProvider> " +
+				"or pass a system to the hook.",
+		);
+	}
+	return system;
+}
+
+/**
+ * Resolve the status plugin to use: explicit override first, then context fallback.
+ * @internal
+ */
+function useResolvedStatusPlugin(override?: StatusPlugin): StatusPlugin {
+	const contextPlugin = useContext(StatusPluginContext);
+	const plugin = override ?? contextPlugin;
+	if (!plugin) {
+		throw new Error(
+			"[Directive] No statusPlugin available. Pass statusPlugin to <DirectiveProvider> " +
+				"or pass it directly to the hook.",
+		);
+	}
+	return plugin;
+}
 
 // ============================================================================
 // Provider
@@ -182,8 +228,9 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
  * }
  * ```
  */
-export function useDerived<T>(derivationId: string): T {
-	const system = useSystem();
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+export function useDerived<T>(derivationId: string, overrideSystem?: System<any>): T {
+	const system = useResolvedSystem(overrideSystem);
 
 	// Dev warning for invalid derivation IDs
 	if (process.env.NODE_ENV !== "production") {
@@ -234,8 +281,10 @@ export function useDerived<T>(derivationId: string): T {
  */
 export function useDerivations<T extends Record<string, unknown>>(
 	derivationIds: string[],
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	overrideSystem?: System<any>,
 ): T {
-	const system = useSystem();
+	const system = useResolvedSystem(overrideSystem);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -274,8 +323,9 @@ export function useDerivations<T extends Record<string, unknown>>(
  * }
  * ```
  */
-export function useFact<T>(factKey: string): T | undefined {
-	const system = useSystem();
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+export function useFact<T>(factKey: string, overrideSystem?: System<any>): T | undefined {
+	const system = useResolvedSystem(overrideSystem);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -343,9 +393,20 @@ const UNINITIALIZED = Symbol("directive.uninitialized");
 export function useFactSelector<T, R>(
 	factKey: string,
 	selector: (value: T | undefined) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
+	eqOrOpts?: ((a: R, b: R) => boolean) | SelectorOptions<R>,
 ): R {
-	const system = useSystem();
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	let overrideSystem: System<any> | undefined;
+	let equalityFn: (a: R, b: R) => boolean = defaultEquality;
+
+	if (typeof eqOrOpts === "function") {
+		equalityFn = eqOrOpts;
+	} else if (eqOrOpts) {
+		overrideSystem = eqOrOpts.system;
+		if (eqOrOpts.equalityFn) equalityFn = eqOrOpts.equalityFn;
+	}
+
+	const system = useResolvedSystem(overrideSystem);
 	// Use sentinel value to properly handle undefined as a valid selected value
 	const cachedValue = useRef<R | typeof UNINITIALIZED>(UNINITIALIZED);
 
@@ -405,9 +466,20 @@ export function useFactSelector<T, R>(
 export function useDerivedSelector<T, R>(
 	derivationId: string,
 	selector: (value: T) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
+	eqOrOpts?: ((a: R, b: R) => boolean) | SelectorOptions<R>,
 ): R {
-	const system = useSystem();
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	let overrideSystem: System<any> | undefined;
+	let equalityFn: (a: R, b: R) => boolean = defaultEquality;
+
+	if (typeof eqOrOpts === "function") {
+		equalityFn = eqOrOpts;
+	} else if (eqOrOpts) {
+		overrideSystem = eqOrOpts.system;
+		if (eqOrOpts.equalityFn) equalityFn = eqOrOpts.equalityFn;
+	}
+
+	const system = useResolvedSystem(overrideSystem);
 	// Use sentinel value to properly handle undefined as a valid selected value
 	const cachedValue = useRef<R | typeof UNINITIALIZED>(UNINITIALIZED);
 
@@ -481,9 +553,20 @@ export function useDerivedSelector<T, R>(
 export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
 	selector: (facts: Record<string, any>) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
+	eqOrOpts?: ((a: R, b: R) => boolean) | SelectorOptions<R>,
 ): R {
-	const system = useSystem();
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	let overrideSystem: System<any> | undefined;
+	let equalityFn: (a: R, b: R) => boolean = defaultEquality;
+
+	if (typeof eqOrOpts === "function") {
+		equalityFn = eqOrOpts;
+	} else if (eqOrOpts) {
+		overrideSystem = eqOrOpts.system;
+		if (eqOrOpts.equalityFn) equalityFn = eqOrOpts.equalityFn;
+	}
+
+	const system = useResolvedSystem(overrideSystem);
 	// Use sentinel value to properly handle undefined as a valid selected value
 	const cachedValue = useRef<R | typeof UNINITIALIZED>(UNINITIALIZED);
 
@@ -536,10 +619,11 @@ export function useSelector<R>(
  * }
  * ```
  */
-export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
-	event: InferEvents<M>,
-) => void {
-	const system = useSystem<M>();
+export function useDispatch<M extends ModuleSchema = ModuleSchema>(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	overrideSystem?: System<any>,
+): (event: InferEvents<M>) => void {
+	const system = useResolvedSystem(overrideSystem) as System<M>;
 	return useCallback(
 		(event: InferEvents<M>) => {
 			system.dispatch(event);
@@ -570,8 +654,10 @@ export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
 export function useWatch<T>(
 	derivationId: string,
 	callback: (newValue: T, prevValue: T | undefined) => void,
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	overrideSystem?: System<any>,
 ): void {
-	const system = useSystem();
+	const system = useResolvedSystem(overrideSystem);
 	const callbackRef = useRef(callback);
 
 	// Keep callback ref up to date synchronously before subscription can fire
@@ -599,8 +685,9 @@ export function useWatch<T>(
  * }
  * ```
  */
-export function useIsSettled(): boolean {
-	const system = useSystem();
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+export function useIsSettled(overrideSystem?: System<any>): boolean {
+	const system = useResolvedSystem(overrideSystem);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -637,8 +724,9 @@ export function useIsSettled(): boolean {
  * }
  * ```
  */
-export function useInspect() {
-	const system = useSystem();
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+export function useInspect(overrideSystem?: System<any>) {
+	const system = useResolvedSystem(overrideSystem);
 	const cachedSnapshot = useRef<ReturnType<typeof system.inspect> | null>(null);
 	// Track array lengths and first/last items for efficient comparison
 	const cachedUnmetLength = useRef<number>(-1);
@@ -697,9 +785,12 @@ export function useInspect() {
  * }
  * ```
  */
-export function useInspectThrottled(options: ThrottledHookOptions = {}) {
-	const { throttleMs = 100 } = options;
-	const system = useSystem();
+export function useInspectThrottled(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	options: ThrottledHookOptions & { system?: System<any> } = {},
+) {
+	const { throttleMs = 100, system: overrideSystem } = options;
+	const system = useResolvedSystem(overrideSystem);
 	const [inspection, setInspection] = useState(() => system.inspect());
 
 	useEffect(() => {
@@ -734,8 +825,9 @@ export function useInspectThrottled(options: ThrottledHookOptions = {}) {
  * }
  * ```
  */
-export function useRequirements(): RequirementsState {
-	const system = useSystem();
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+export function useRequirements(overrideSystem?: System<any>): RequirementsState {
+	const system = useResolvedSystem(overrideSystem);
 	const cachedSnapshot = useRef<RequirementsState | null>(null);
 	const cachedUnmetJson = useRef<string>("");
 	const cachedInflightJson = useRef<string>("");
@@ -788,10 +880,11 @@ export function useRequirements(): RequirementsState {
  * ```
  */
 export function useRequirementsThrottled(
-	options: ThrottledHookOptions = {},
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	options: ThrottledHookOptions & { system?: System<any> } = {},
 ): RequirementsState {
-	const { throttleMs = 100 } = options;
-	const system = useSystem();
+	const { throttleMs = 100, system: overrideSystem } = options;
+	const system = useResolvedSystem(overrideSystem);
 	const [state, setState] = useState(() =>
 		computeRequirementsState(system.inspect()),
 	);
@@ -847,14 +940,11 @@ export function useRequirementsThrottled(
  * }
  * ```
  */
-export function useRequirementStatus(type: string): RequirementTypeStatus {
-	const statusPlugin = useContext(StatusPluginContext);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] useRequirementStatus requires a statusPlugin. " +
-				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
-		);
-	}
+export function useRequirementStatus(
+	type: string,
+	overrideStatusPlugin?: StatusPlugin,
+): RequirementTypeStatus {
+	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -891,8 +981,11 @@ export function useRequirementStatus(type: string): RequirementTypeStatus {
  * }
  * ```
  */
-export function useIsResolving(type: string): boolean {
-	const status = useRequirementStatus(type);
+export function useIsResolving(
+	type: string,
+	overrideStatusPlugin?: StatusPlugin,
+): boolean {
+	const status = useRequirementStatus(type, overrideStatusPlugin);
 	return status.inflight > 0;
 }
 
@@ -914,8 +1007,11 @@ export function useIsResolving(type: string): boolean {
  * }
  * ```
  */
-export function useLatestError(type: string): Error | null {
-	const status = useRequirementStatus(type);
+export function useLatestError(
+	type: string,
+	overrideStatusPlugin?: StatusPlugin,
+): Error | null {
+	const status = useRequirementStatus(type, overrideStatusPlugin);
 	return status.lastError;
 }
 
@@ -947,14 +1043,10 @@ export function useLatestError(type: string): Error | null {
  * }
  * ```
  */
-export function useRequirementStatuses(): Map<string, RequirementTypeStatus> {
-	const statusPlugin = useContext(StatusPluginContext);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] useRequirementStatuses requires a statusPlugin. " +
-				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
-		);
-	}
+export function useRequirementStatuses(
+	overrideStatusPlugin?: StatusPlugin,
+): Map<string, RequirementTypeStatus> {
+	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -1015,14 +1107,11 @@ const suspenseCache = new Map<string, Promise<void>>();
  * }
  * ```
  */
-export function useSuspenseRequirement(type: string): RequirementTypeStatus {
-	const statusPlugin = useContext(StatusPluginContext);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] useSuspenseRequirement requires a statusPlugin. " +
-				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
-		);
-	}
+export function useSuspenseRequirement(
+	type: string,
+	overrideStatusPlugin?: StatusPlugin,
+): RequirementTypeStatus {
+	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
 
 	// Cleanup suspense cache on unmount to prevent memory leaks
 	useEffect(() => {
@@ -1082,14 +1171,11 @@ export function useSuspenseRequirement(type: string): RequirementTypeStatus {
  * }
  * ```
  */
-export function useSuspenseRequirements(types: string[]): Map<string, RequirementTypeStatus> {
-	const statusPlugin = useContext(StatusPluginContext);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] useSuspenseRequirements requires a statusPlugin. " +
-				"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
-		);
-	}
+export function useSuspenseRequirements(
+	types: string[],
+	overrideStatusPlugin?: StatusPlugin,
+): Map<string, RequirementTypeStatus> {
+	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
 
 	// Cleanup suspense cache on unmount to prevent memory leaks
 	const cacheKey = types.slice().sort().join(",");
@@ -1223,7 +1309,7 @@ export function useDirectiveRef<M extends ModuleSchema>(
 
 		if (isModule) {
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			systemRef.current = createSystem({ module: options as ModuleDef<M> } as any) as System<M>;
+			systemRef.current = createSystem({ module: options as ModuleDef<M> } as any) as unknown as System<M>;
 		} else {
 			const opts = options as Exclude<UseDirectiveRefOptions<M>, ModuleDef<M>>;
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
@@ -1234,7 +1320,7 @@ export function useDirectiveRef<M extends ModuleSchema>(
 				tickMs: opts.tickMs,
 				zeroConfig: opts.zeroConfig,
 				initialFacts: opts.initialFacts,
-			} as any) as System<M>;
+			} as any) as unknown as System<M>;
 		}
 
 		systemRef.current.start();
@@ -1314,7 +1400,7 @@ export function useDirectiveRefWithStatus<M extends ModuleSchema>(
 				module: options as ModuleDef<M>,
 				// biome-ignore lint/suspicious/noExplicitAny: Plugin<never> requires cast
 				plugins: [statusPluginRef.current.plugin as Plugin<any>],
-			} as any) as System<M>;
+			} as any) as unknown as System<M>;
 		} else {
 			const opts = options as Exclude<UseDirectiveRefOptions<M>, ModuleDef<M>>;
 			// biome-ignore lint/suspicious/noExplicitAny: Plugin<never> requires cast
@@ -1327,7 +1413,7 @@ export function useDirectiveRefWithStatus<M extends ModuleSchema>(
 				tickMs: opts.tickMs,
 				zeroConfig: opts.zeroConfig,
 				initialFacts: opts.initialFacts,
-			} as any) as System<M>;
+			} as any) as unknown as System<M>;
 		}
 
 		systemRef.current.start();
@@ -1396,19 +1482,35 @@ export function useDirectiveRefWithStatus<M extends ModuleSchema>(
 export function createTypedHooks<M extends ModuleSchema>(): {
 	useDerived: <K extends keyof InferDerivations<M>>(
 		derivationId: K,
+		// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+		system?: System<any>,
 	) => InferDerivations<M>[K];
-	useFact: <K extends keyof InferFacts<M>>(factKey: K) => InferFacts<M>[K] | undefined;
+	useFact: <K extends keyof InferFacts<M>>(
+		factKey: K,
+		// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+		system?: System<any>,
+	) => InferFacts<M>[K] | undefined;
 	useFacts: () => System<M>["facts"];
-	useDispatch: () => (event: InferEvents<M>) => void;
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	useDispatch: (system?: System<any>) => (event: InferEvents<M>) => void;
 	useSystem: () => System<M>;
 } {
 	return {
-		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
-			useDerived<InferDerivations<M>[K]>(derivationId as string),
-		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
-			useFact<InferFacts<M>[K]>(factKey as string),
+		useDerived: <K extends keyof InferDerivations<M>>(
+			derivationId: K,
+			// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+			system?: System<any>,
+		) => useDerived<InferDerivations<M>[K]>(derivationId as string, system),
+		useFact: <K extends keyof InferFacts<M>>(
+			factKey: K,
+			// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+			system?: System<any>,
+		) => useFact<InferFacts<M>[K]>(factKey as string, system),
 		useFacts: () => useSystem<M>().facts,
-		useDispatch: () => useDispatch<M>(),
+		useDispatch: (
+			// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+			system?: System<any>,
+		) => useDispatch<M>(system),
 		useSystem: () => useSystem<M>(),
 	};
 }

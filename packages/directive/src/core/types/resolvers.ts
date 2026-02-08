@@ -26,6 +26,15 @@ export interface RetryPolicy {
 	initialDelay?: number;
 	/** Maximum delay in ms */
 	maxDelay?: number;
+	/**
+	 * Optional predicate to decide whether to retry after an error.
+	 * Return `true` to retry, `false` to stop immediately.
+	 * If omitted, all errors are retried (up to `attempts`).
+	 *
+	 * @param error - The error that occurred
+	 * @param attempt - The attempt number that just failed (1-based)
+	 */
+	shouldRetry?: (error: Error, attempt: number) => boolean;
 }
 
 /** Batch configuration */
