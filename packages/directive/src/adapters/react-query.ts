@@ -456,7 +456,7 @@ export function createQueryBridge<F extends Record<string, unknown> = Record<str
 	}
 
 	return {
-		system,
+		system: system as unknown as System<any>,
 		facts: system.facts as unknown as F & { queryStates: Record<string, QueryStateInfo> },
 		startSync,
 		stopSync,

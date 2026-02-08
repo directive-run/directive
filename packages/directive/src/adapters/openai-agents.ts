@@ -1226,7 +1226,7 @@ export function createAgentOrchestrator<
   }
 
   const orchestrator: AgentOrchestrator<F> = {
-    system,
+    system: system as unknown as System<any>,
     get facts() {
       return getCombinedFacts();
     },

@@ -357,6 +357,11 @@ export function createResolversManager<S extends Schema>(
 					return;
 				}
 
+				// Check shouldRetry predicate — if it returns false, stop immediately
+				if (retryPolicy.shouldRetry && !retryPolicy.shouldRetry(lastError, attempt)) {
+					break;
+				}
+
 				// If we have more attempts, wait and retry
 				if (attempt < retryPolicy.attempts) {
 					// Check abort before starting delay (avoids unnecessary waiting)
@@ -386,7 +391,7 @@ export function createResolversManager<S extends Schema>(
 			}
 		}
 
-		// All attempts failed
+		// All attempts failed (or shouldRetry returned false)
 		statuses.set(req.id, {
 			state: "error",
 			requirementId: req.id,
@@ -539,6 +544,11 @@ export function createResolversManager<S extends Schema>(
 					return;
 				}
 
+				// Check shouldRetry predicate — if it returns false, stop immediately
+				if (retryPolicy.shouldRetry && !retryPolicy.shouldRetry(lastError, attempt)) {
+					break;
+				}
+
 				// If we have more attempts, wait and retry
 				if (attempt < retryPolicy.attempts) {
 					const delay = calculateDelay(retryPolicy, attempt);
@@ -565,7 +575,7 @@ export function createResolversManager<S extends Schema>(
 			}
 		}
 
-		// All attempts failed - mark all as error
+		// All attempts failed (or shouldRetry returned false) - mark all as error
 		for (const req of requirements) {
 			statuses.set(req.id, {
 				state: "error",

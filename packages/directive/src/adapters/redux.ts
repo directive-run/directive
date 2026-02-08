@@ -346,7 +346,7 @@ export function createDirectiveMiddleware<S>(
 				plugins: [...plugins, callbackPlugin],
 				debug: debug ? { timeTravel: true } : undefined,
 			});
-			middleware.__directiveSystem = system;
+			middleware.__directiveSystem = system as unknown as System<any>;
 			system.start();
 		}
 
