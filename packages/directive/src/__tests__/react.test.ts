@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ModuleSchema } from "../index.js";
+import type { ModuleSchema, System } from "../index.js";
 import { createModule, createSystem, t } from "../index.js";
 
 // Create a test module with consolidated schema
@@ -443,5 +443,338 @@ describe("React Adapter - Suspense Cache Behavior", () => {
 		// Different order should produce same key
 		expect(key1).toBe(key2);
 		expect(key1).toBe("FETCH_SETTINGS,FETCH_USER");
+	});
+});
+
+// ============================================================================
+// System Override Tests
+// ============================================================================
+
+describe("React Adapter - System Override", () => {
+	function createModuleA() {
+		return createModule("modA", {
+			schema: {
+				facts: { theme: t.string() },
+				derivations: { isDark: t.boolean() },
+				events: { setTheme: { theme: t.string() } },
+				requirements: {},
+			},
+			init: (facts) => {
+				facts.theme = "light";
+			},
+			derive: {
+				isDark: (facts) => facts.theme === "dark",
+			},
+			events: {
+				setTheme: (facts, { theme }) => {
+					facts.theme = theme;
+				},
+			},
+		});
+	}
+
+	function createModuleB() {
+		return createModule("modB", {
+			schema: {
+				facts: { email: t.string(), count: t.number() },
+				derivations: { isValid: t.boolean(), doubled: t.number() },
+				events: { setEmail: { email: t.string() }, increment: {} },
+				requirements: {},
+			},
+			init: (facts) => {
+				facts.email = "";
+				facts.count = 0;
+			},
+			derive: {
+				isValid: (facts) => (facts.email ?? "").includes("@"),
+				doubled: (facts) => (facts.count ?? 0) * 2,
+			},
+			events: {
+				setEmail: (facts, { email }) => {
+					facts.email = email;
+				},
+				increment: (facts) => {
+					facts.count = (facts.count ?? 0) + 1;
+				},
+			},
+		});
+	}
+
+	describe("two systems coexisting", () => {
+		it("reads facts from different systems independently", () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			// Each system has its own facts
+			expect(systemA.facts.theme).toBe("light");
+			expect(systemB.facts.email).toBe("");
+			expect(systemB.facts.count).toBe(0);
+
+			// Mutating one doesn't affect the other
+			systemA.events.setTheme({ theme: "dark" });
+			expect(systemA.facts.theme).toBe("dark");
+			expect(systemB.facts.email).toBe("");
+		});
+
+		it("reads derivations from different systems independently", () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			expect(systemA.read("isDark")).toBe(false);
+			expect(systemB.read("isValid")).toBe(false);
+			expect(systemB.read("doubled")).toBe(0);
+
+			systemA.events.setTheme({ theme: "dark" });
+			expect(systemA.read("isDark")).toBe(true);
+			// System B unaffected
+			expect(systemB.read("isValid")).toBe(false);
+		});
+
+		it("subscribes to derivations on different systems", async () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			// Read to establish tracking
+			systemA.read("isDark");
+			systemB.read("doubled");
+
+			const listenerA = vi.fn();
+			const listenerB = vi.fn();
+
+			const unsubA = systemA.subscribe(["isDark"], listenerA);
+			const unsubB = systemB.subscribe(["doubled"], listenerB);
+
+			// Change system A — only listener A fires
+			systemA.events.setTheme({ theme: "dark" });
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(listenerA).toHaveBeenCalled();
+			expect(listenerB).not.toHaveBeenCalled();
+
+			listenerA.mockClear();
+
+			// Change system B — only listener B fires
+			systemB.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(listenerA).not.toHaveBeenCalled();
+			expect(listenerB).toHaveBeenCalled();
+
+			unsubA();
+			unsubB();
+		});
+
+		it("dispatches events to correct system", () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			// Dispatch to A
+			systemA.dispatch({ type: "setTheme", theme: "dark" });
+			expect(systemA.facts.theme).toBe("dark");
+			expect(systemB.facts.count).toBe(0);
+
+			// Dispatch to B
+			systemB.dispatch({ type: "increment" });
+			expect(systemB.facts.count).toBe(1);
+			expect(systemA.facts.theme).toBe("dark");
+		});
+	});
+
+	describe("explicit system reads from passed system", () => {
+		it("fact store subscriptions work across systems", async () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			// Simulate what useFact does: subscribe to fact store + read fact
+			const listenerForTheme = vi.fn();
+			const unsubTheme = systemA.facts.$store.subscribe(["theme"], listenerForTheme);
+
+			const listenerForEmail = vi.fn();
+			const unsubEmail = systemB.facts.$store.subscribe(["email"], listenerForEmail);
+
+			// Change A
+			systemA.events.setTheme({ theme: "dark" });
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(listenerForTheme).toHaveBeenCalled();
+			expect(listenerForEmail).not.toHaveBeenCalled();
+
+			listenerForTheme.mockClear();
+
+			// Change B
+			systemB.events.setEmail({ email: "test@example.com" });
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(listenerForTheme).not.toHaveBeenCalled();
+			expect(listenerForEmail).toHaveBeenCalled();
+
+			unsubTheme();
+			unsubEmail();
+		});
+
+		it("selector can extract values from a specific system's facts", () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			// Simulate what useFactSelector does internally
+			const selectThemeUpper = (theme: string | undefined) =>
+				(theme ?? "").toUpperCase();
+			const selectEmailDomain = (email: string | undefined) =>
+				(email ?? "").split("@")[1] ?? "";
+
+			// Read from A
+			const themeResult = selectThemeUpper(systemA.facts.theme);
+			expect(themeResult).toBe("LIGHT");
+
+			// Read from B
+			systemB.events.setEmail({ email: "user@example.com" });
+			const emailResult = selectEmailDomain(systemB.facts.email);
+			expect(emailResult).toBe("example.com");
+		});
+	});
+
+	describe("selector overload argument parsing", () => {
+		it("parses function as equality function (backward compat)", () => {
+			// Simulate the overloaded arg parsing from useFactSelector
+			const eqFn = (a: string, b: string) => a === b;
+			const eqOrOpts: ((a: string, b: string) => boolean) | { system?: any; equalityFn?: any } = eqFn;
+
+			let resolvedSystem: any;
+			let resolvedEqFn: any;
+
+			if (typeof eqOrOpts === "function") {
+				resolvedEqFn = eqOrOpts;
+			} else if (eqOrOpts) {
+				resolvedSystem = eqOrOpts.system;
+				resolvedEqFn = eqOrOpts.equalityFn;
+			}
+
+			expect(resolvedSystem).toBeUndefined();
+			expect(resolvedEqFn).toBe(eqFn);
+		});
+
+		it("parses options object with system", () => {
+			const fakeSystem = { id: "fake" };
+			const eqOrOpts: any = { system: fakeSystem };
+
+			let resolvedSystem: any;
+			let resolvedEqFn: any;
+
+			if (typeof eqOrOpts === "function") {
+				resolvedEqFn = eqOrOpts;
+			} else if (eqOrOpts) {
+				resolvedSystem = eqOrOpts.system;
+				resolvedEqFn = eqOrOpts.equalityFn;
+			}
+
+			expect(resolvedSystem).toBe(fakeSystem);
+			expect(resolvedEqFn).toBeUndefined();
+		});
+
+		it("parses options object with both system and equalityFn", () => {
+			const fakeSystem = { id: "fake" };
+			const eqFn = (a: number, b: number) => a === b;
+			const eqOrOpts: any = { system: fakeSystem, equalityFn: eqFn };
+
+			let resolvedSystem: any;
+			let resolvedEqFn: any;
+
+			if (typeof eqOrOpts === "function") {
+				resolvedEqFn = eqOrOpts;
+			} else if (eqOrOpts) {
+				resolvedSystem = eqOrOpts.system;
+				resolvedEqFn = eqOrOpts.equalityFn;
+			}
+
+			expect(resolvedSystem).toBe(fakeSystem);
+			expect(resolvedEqFn).toBe(eqFn);
+		});
+
+		it("handles undefined (no third arg)", () => {
+			const eqOrOpts: any = undefined;
+
+			let resolvedSystem: any;
+			let resolvedEqFn: any;
+
+			if (typeof eqOrOpts === "function") {
+				resolvedEqFn = eqOrOpts;
+			} else if (eqOrOpts) {
+				resolvedSystem = eqOrOpts.system;
+				resolvedEqFn = eqOrOpts.equalityFn;
+			}
+
+			expect(resolvedSystem).toBeUndefined();
+			expect(resolvedEqFn).toBeUndefined();
+		});
+	});
+
+	describe("watch on different systems", () => {
+		it("watches derivation on a specific system", async () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			const callbackA = vi.fn();
+			const callbackB = vi.fn();
+
+			const unwatchA = systemA.watch("isDark", callbackA);
+			const unwatchB = systemB.watch("doubled", callbackB);
+
+			systemA.events.setTheme({ theme: "dark" });
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(callbackA).toHaveBeenCalledWith(true, false);
+			expect(callbackB).not.toHaveBeenCalled();
+
+			systemB.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(callbackB).toHaveBeenCalledWith(2, 0);
+
+			unwatchA();
+			unwatchB();
+		});
+	});
+
+	describe("inspect on different systems", () => {
+		it("returns independent inspection for each system", () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			const inspA = systemA.inspect();
+			const inspB = systemB.inspect();
+
+			expect(inspA).toHaveProperty("unmet");
+			expect(inspA).toHaveProperty("inflight");
+			expect(inspB).toHaveProperty("unmet");
+			expect(inspB).toHaveProperty("inflight");
+
+			// They are independent objects
+			expect(inspA).not.toBe(inspB);
+		});
+	});
+
+	describe("isSettled on different systems", () => {
+		it("reports settled state independently", async () => {
+			const systemA = createSystem({ module: createModuleA() });
+			const systemB = createSystem({ module: createModuleB() });
+			systemA.start();
+			systemB.start();
+
+			// Wait for initial reconciliation tick to settle
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(systemA.isSettled).toBe(true);
+			expect(systemB.isSettled).toBe(true);
+		});
 	});
 });
