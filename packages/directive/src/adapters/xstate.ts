@@ -449,7 +449,7 @@ export function createActorBridge<
 	};
 
 	const bridge: ActorBridge<TContext, TEvent, TOutput> = {
-		system,
+		system: system as unknown as System<any>,
 		actor: actor as ActorLike<SnapshotLike<TContext, TOutput>, TEvent>,
 		facts: system.facts as ActorBridge<TContext, TEvent, TOutput>["facts"],
 		send: (event) => actor.send(event),
@@ -750,7 +750,7 @@ export function createActorCoordinator<F extends Record<string, unknown> = Recor
 	};
 
 	const coordinator: ActorCoordinator<F> = {
-		system,
+		system: system as unknown as System<any>,
 		actors,
 		facts: system.facts as unknown as F & CoordinatedActorsState,
 		send: (actorId, event) => {

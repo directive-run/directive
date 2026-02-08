@@ -456,7 +456,7 @@ function GameBoard() {
  */
 export function App() {
   return (
-    <DirectiveProvider system={system}>
+    <DirectiveProvider system={system as any}>
       <GameBoard />
     </DirectiveProvider>
   );

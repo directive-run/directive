@@ -784,7 +784,7 @@ export function createDirective<M extends ModuleSchema>(
 
 	// Cache the system
 	// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
-	systemCache.set(options as object, system as System<any>);
+	systemCache.set(options as object, system as unknown as System<any>);
 
 	system.start();
 
