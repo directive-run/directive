@@ -247,10 +247,10 @@ const adapter = createMCPAdapter({
   servers: [...],
   events: {
     onConnect: (server) => console.log(`Connected: ${server}`),
-    onDisconnect: (server, reason) => console.log(`Disconnected: ${server} (${reason})`),
+    onDisconnect: (server) => console.log(`Disconnected: ${server}`),
     onToolCall: (server, tool, args) => console.log(`Calling: ${server}.${tool}`),
     onToolResult: (server, tool, result) => console.log(`Result: ${server}.${tool}`),
-    onResourceUpdate: (server, uri) => console.log(`Resource updated: ${uri}`),
+    onResourceUpdate: (server, uri, content) => console.log(`Resource updated: ${uri}`),
     onError: (server, error) => console.error(`Error on ${server}:`, error),
   },
 });

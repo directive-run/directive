@@ -17,10 +17,6 @@ const authModule = createModule("auth", {
       token: t.string().nullable(),
       loading: t.boolean(),
     },
-    events: {
-      LOGGED_IN: t.object<{ userId: string }>(),
-      LOGGED_OUT: t.void(),
-    },
   },
 
   derive: {
@@ -41,7 +37,6 @@ const authModule = createModule("auth", {
         context.facts.loading = true;
         try {
           context.facts.user = await api.validateToken(context.facts.token);
-          context.dispatch("LOGGED_IN", { userId: context.facts.user.id });
         } catch {
           context.facts.token = null;
         } finally {
@@ -112,12 +107,11 @@ const checkoutModule = createModule("checkout", {
 
   constraints: {
     processOrder: {
-      when: (facts, { modules }) =>
+      when: (facts) =>
         facts.step === "review" &&
         facts.shippingAddress &&
         facts.paymentMethod &&
-        modules.auth.derive.isAuthenticated &&
-        modules.cart.derive.itemCount > 0,
+        !facts.processing,
       require: { type: "PROCESS_ORDER" },
     },
   },
@@ -125,10 +119,9 @@ const checkoutModule = createModule("checkout", {
   resolvers: {
     processOrder: {
       requirement: "PROCESS_ORDER",
-      resolve: async (req, context, { modules }) => {
+      resolve: async (req, context) => {
         context.facts.processing = true;
         await api.createOrder({
-          items: modules.cart.facts.items,
           shipping: context.facts.shippingAddress,
           payment: context.facts.paymentMethod,
         });
@@ -145,14 +138,14 @@ const checkoutModule = createModule("checkout", {
 ## Composing Modules
 
 ```typescript
-import { createSystem, composeModules } from 'directive';
+import { createSystem } from 'directive';
 
 const system = createSystem({
-  modules: composeModules({
+  modules: {
     auth: authModule,
     cart: cartModule,
     checkout: checkoutModule,
-  }),
+  },
 });
 
 // Access namespaced facts
@@ -165,6 +158,6 @@ system.facts.checkout.step;
 
 ## Next Steps
 
-- See Multi-Module for composition patterns
-- See Data Fetching for async patterns
-- See Module and System for setup
+- See [Multi-Module](/docs/advanced/multi-module) for composition patterns
+- See [Data Fetching](/docs/examples/data-fetching) for async patterns
+- See [Module and System](/docs/module-system) for setup

@@ -65,8 +65,13 @@ const formModule = createModule("signup-form", {
       require: { type: "CHECK_EMAIL" },
     },
     canSubmit: {
-      when: (facts, derive) =>
-        facts.submitted && derive.isValid,
+      when: (facts) =>
+        facts.submitted &&
+        facts.emailValid === true &&
+        facts.password.length >= 8 &&
+        /[A-Z]/.test(facts.password) &&
+        /[0-9]/.test(facts.password) &&
+        facts.password === facts.confirmPassword,
       require: { type: "SUBMIT_FORM" },
     },
   },
@@ -91,7 +96,7 @@ const formModule = createModule("signup-form", {
           email: context.facts.email,
           password: context.facts.password,
         });
-        context.dispatch("SIGNUP_COMPLETE");
+        context.facts.submitted = false;
       },
     },
   },
@@ -103,26 +108,30 @@ const formModule = createModule("signup-form", {
 ## React Component
 
 ```typescript
+import { useFact, useDerived } from 'directive/react';
+
+const system = createSystem({ module: formModule });
+system.start();
+
 function SignupForm() {
-  const email = useFact('email');
-  const password = useFact('password');
-  const confirmPassword = useFact('confirmPassword');
-  const emailValid = useFact('emailValid');
-  const emailChecking = useFact('emailChecking');
-  const passwordErrors = useDerived('passwordErrors');
-  const passwordsMatch = useDerived('passwordsMatch');
-  const isValid = useDerived('isValid');
-  const { facts } = useSystem();
+  const email = useFact(system, 'email');
+  const password = useFact(system, 'password');
+  const confirmPassword = useFact(system, 'confirmPassword');
+  const emailValid = useFact(system, 'emailValid');
+  const emailChecking = useFact(system, 'emailChecking');
+  const passwordErrors = useDerived(system, 'passwordErrors');
+  const passwordsMatch = useDerived(system, 'passwordsMatch');
+  const isValid = useDerived(system, 'isValid');
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); facts.submitted = true; }}>
+    <form onSubmit={(e) => { e.preventDefault(); system.facts.submitted = true; }}>
       <div>
         <input
           type="email"
           value={email}
           onChange={(e) => {
-            facts.email = e.target.value;
-            facts.emailValid = null;
+            system.facts.email = e.target.value;
+            system.facts.emailValid = null;
           }}
         />
         {emailChecking && <span>Checking...</span>}
@@ -134,7 +143,7 @@ function SignupForm() {
         <input
           type="password"
           value={password}
-          onChange={(e) => { facts.password = e.target.value }}
+          onChange={(e) => { system.facts.password = e.target.value }}
         />
         {passwordErrors.map((err) => <p key={err}>{err}</p>)}
       </div>
@@ -143,7 +152,7 @@ function SignupForm() {
         <input
           type="password"
           value={confirmPassword}
-          onChange={(e) => { facts.confirmPassword = e.target.value }}
+          onChange={(e) => { system.facts.confirmPassword = e.target.value }}
         />
         {!passwordsMatch && <span>Passwords must match</span>}
       </div>
@@ -158,6 +167,6 @@ function SignupForm() {
 
 ## Next Steps
 
-- See Data Fetching for async patterns
-- See Derivations for computed values
-- See Constraints for validation logic
+- See [Data Fetching](/docs/examples/data-fetching) for input handling
+- See [Derivations](/docs/derivations) for computed values
+- See [Constraints](/docs/constraints) for validation logic

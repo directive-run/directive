@@ -164,7 +164,7 @@ Resolvers receive facts via `context.facts`:
 ```typescript
 resolvers: {
   fetchUser: {
-    requirement: (req) => req.type === "FETCH_USER",
+    requirement: "FETCH_USER",
     resolve: async (req, context) => {
       const userId = context.facts.userId;          // Read
       context.facts.user = await api.getUser(userId); // Write

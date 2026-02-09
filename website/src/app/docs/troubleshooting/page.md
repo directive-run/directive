@@ -126,14 +126,22 @@ resolvers: {
 },
 ```
 
-Or use the global error handler:
+Or use the error boundary configuration:
 
 ```typescript
 const system = createSystem({
   module: myModule,
-  onError: (error, context) => {
-    console.error('Resolver error:', error, context);
-    // Report to error tracking service
+  errorBoundary: {
+    onResolverError: (error, resolver) => {
+      console.error('Resolver error:', error, resolver);
+      // Report to error tracking service
+    },
+    onConstraintError: (error, constraint) => {
+      console.error('Constraint error:', error, constraint);
+    },
+    onError: (error) => {
+      console.error('System error:', error);
+    },
   },
 });
 ```
@@ -237,23 +245,21 @@ derive: {
 
 ### "Cannot read properties of undefined"
 
-**Symptoms**: Error when using `useFacts()` or `useDerive()`.
+**Symptoms**: Error when using `useFact()` or `useDerived()`.
 
-**Cause**: Component not wrapped in `DirectiveProvider`.
+**Cause**: The system reference passed to the hook is undefined or not yet created.
 
 ```tsx
-// Bad: missing provider
-function App() {
-  return <UserProfile />;  // Error!
+// Bad: system not created or not imported
+function UserProfile() {
+  const name = useFact(undefined, "name");  // Error!
 }
 
-// Good: wrap in provider
-function App() {
-  return (
-    <DirectiveProvider system={system}>
-      <UserProfile />
-    </DirectiveProvider>
-  );
+// Good: pass a valid system reference
+import { system } from './system';
+
+function UserProfile() {
+  const name = useFact(system, "name");
 }
 ```
 
@@ -263,14 +269,13 @@ function App() {
 
 **Causes**:
 
-1. **Selector returns new object each time**:
+1. **Subscribing too broadly**:
 ```tsx
-// Bad: new object every render
-const user = useFacts((f) => ({ name: f.name, id: f.id }));
+// Bad: subscribing to the whole user fact when you only need the name
+const user = useFact(system, "user");
 
-// Good: use shallow comparison or select primitives
-const name = useFacts((f) => f.name);
-const id = useFacts((f) => f.id);
+// Good: use useFactSelector to select only what you need
+const userName = useFactSelector(system, "user", (u) => u?.name);
 ```
 
 2. **Reading from stale closure**:
@@ -283,8 +288,8 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
-// Good: read from facts
-const count = useFacts((f) => f.count);
+// Good: read from facts via hook
+const count = useFact(system, "count");
 ```
 
 ---
@@ -354,7 +359,7 @@ import { createModule, createSystem } from 'directive';
 import { loggingPlugin } from 'directive/plugins';
 
 // Also good
-import { useFacts } from 'directive/react';
+import { useFact } from 'directive/react';
 ```
 
 ---
@@ -365,7 +370,7 @@ import { useFacts } from 'directive/react';
 ```typescript
 const system = createSystem({
   module: myModule,
-  debug: true,  // Enables verbose logging
+  debug: { timeTravel: true },  // Enables verbose logging
 });
 ```
 

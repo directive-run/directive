@@ -95,13 +95,13 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      retry: { attempts: 3 },
+      retry: { attempts: 3, backoff: "exponential" },
       resolve: async (req, context) => {
         context.facts.loading = true;
         try {
           context.facts.user = await api.getUser(context.facts.userId);
         } catch (e) {
-          context.facts.error = e.message;
+          context.facts.error = e instanceof Error ? e.message : 'Failed';
         }
         context.facts.loading = false;
       },

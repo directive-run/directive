@@ -1,57 +1,61 @@
 /**
- * React Adapter - Hooks and Provider for React integration
+ * React Adapter - Consolidated hooks for React integration
  *
- * Provides type-safe React hooks for working with Directive systems.
+ * 19 public exports: useFact, useDerived, useDispatch, useDirective,
+ * useDirectiveRef, useSelector, useWatch, useInspect, useRequirementStatus,
+ * useSuspenseRequirement, useEvents, useModule, useExplain, useConstraintStatus,
+ * useOptimisticUpdate, DirectiveDevTools, DirectiveHydrator, useHydratedSystem,
+ * shallowEqual
  *
  * @example
  * ```tsx
- * import { DirectiveProvider, useDerived, useDispatch, useFact } from 'directive/react';
+ * import { useFact, useDerived, useEvents } from 'directive/react';
  *
- * function App() {
- *   return (
- *     <DirectiveProvider system={system}>
- *       <Counter />
- *     </DirectiveProvider>
- *   );
- * }
+ * const system = createSystem({ module: counterModule });
+ * system.start();
  *
  * function Counter() {
- *   const count = useFact("count");
- *   const doubled = useDerived("doubled");
- *   const dispatch = useDispatch();
+ *   const count = useFact(system, "count");
+ *   const doubled = useDerived(system, "doubled");
+ *   const events = useEvents(system);
  *
  *   return (
  *     <div>
  *       <p>Count: {count}</p>
  *       <p>Doubled: {doubled}</p>
- *       <button onClick={() => dispatch({ type: "increment" })}>+</button>
+ *       <button onClick={() => events.increment()}>+</button>
  *     </div>
  *   );
  * }
  * ```
  */
 
+import type { ReactNode } from "react";
 import {
-	createContext,
-	useContext,
 	useSyncExternalStore,
 	useCallback,
 	useEffect,
-	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
-	type ReactNode,
+	createContext,
+	useContext,
 } from "react";
 import type {
-	System,
 	ModuleSchema,
 	ModuleDef,
 	Plugin,
+	DebugConfig,
+	ErrorBoundaryConfig,
 	InferFacts,
 	InferDerivations,
 	InferEvents,
+	SingleModuleSystem,
+	SystemSnapshot,
+	DistributableSnapshot,
 } from "../core/types.js";
 import { createSystem } from "../core/system.js";
+import { withTracking } from "../core/tracking.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
@@ -59,185 +63,256 @@ import {
 import {
 	type RequirementsState,
 	type ThrottledHookOptions,
-	computeRequirementsState,
-	createThrottle,
+	type InspectState,
+	type ConstraintInfo,
+	computeInspectState,
 } from "./shared.js";
 
 // Re-export for convenience
-export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions };
-
-/**
- * Options for selector hooks that support both an equality function and a system override.
- */
-export type SelectorOptions<R> = {
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	system?: System<any>;
-	equalityFn?: (a: R, b: R) => boolean;
-};
-
-// ============================================================================
-// Context
-// ============================================================================
-
-/**
- * Internal context for the Directive system.
- */
-// biome-ignore lint/suspicious/noExplicitAny: Context needs to work with any schema
-const DirectiveContext = createContext<System<any> | null>(null);
+export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions, InspectState, ConstraintInfo };
+export { shallowEqual } from "../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
-type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
-
-/**
- * Internal context for the requirement status plugin.
- */
-const StatusPluginContext = createContext<StatusPlugin | null>(null);
+export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Internal Helpers
 // ============================================================================
 
-/**
- * Resolve the system to use: explicit override first, then context fallback.
- * @internal
- */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-function useResolvedSystem(override?: System<any>): System<any> {
-	const contextSystem = useContext(DirectiveContext);
-	const system = override ?? contextSystem;
-	if (!system) {
-		throw new Error(
-			"[Directive] No system available. Wrap your component in <DirectiveProvider> " +
-				"or pass a system to the hook.",
-		);
+/** Default equality function using Object.is */
+function defaultEquality<T>(a: T, b: T): boolean {
+	return Object.is(a, b);
+}
+
+/** Sentinel value for uninitialized selector cache */
+const UNINITIALIZED = Symbol("directive.uninitialized");
+
+// ============================================================================
+// useFact — single key, multi key, or selector
+// ============================================================================
+
+/** Single key overload */
+export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(
+	system: SingleModuleSystem<S>,
+	factKey: K,
+): InferFacts<S>[K] | undefined;
+
+/** Multi-key overload */
+export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(
+	system: SingleModuleSystem<S>,
+	factKeys: K[],
+): Pick<InferFacts<S>, K>;
+
+/** Selector overload: useFact(system, factKey, selector, eq?) */
+export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string, R>(
+	system: SingleModuleSystem<S>,
+	factKey: K,
+	selector: (value: InferFacts<S>[K] | undefined) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
+/** Implementation */
+export function useFact(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	keyOrKeysOrSelector: string | string[],
+	selectorOrUndefined?: ((value: unknown) => unknown),
+	equalityFn?: (a: unknown, b: unknown) => boolean,
+): unknown {
+	// Selector path: useFact(system, factKey, selector, eq?)
+	if (typeof keyOrKeysOrSelector === "string" && typeof selectorOrUndefined === "function") {
+		if (process.env.NODE_ENV !== "production" && keyOrKeysOrSelector === undefined) {
+			throw new Error("[Directive] useFact selector overload requires a factKey argument.");
+		}
+		return _useFactSelector(system, keyOrKeysOrSelector, selectorOrUndefined, equalityFn);
 	}
-	return system;
-}
 
-/**
- * Resolve the status plugin to use: explicit override first, then context fallback.
- * @internal
- */
-function useResolvedStatusPlugin(override?: StatusPlugin): StatusPlugin {
-	const contextPlugin = useContext(StatusPluginContext);
-	const plugin = override ?? contextPlugin;
-	if (!plugin) {
-		throw new Error(
-			"[Directive] No statusPlugin available. Pass statusPlugin to <DirectiveProvider> " +
-				"or pass it directly to the hook.",
-		);
+	// Multi-key path: useFact(system, [keys])
+	if (Array.isArray(keyOrKeysOrSelector)) {
+		return _useFacts(system, keyOrKeysOrSelector);
 	}
-	return plugin;
+
+	// Single key path: useFact(system, key)
+	return _useSingleFact(system, keyOrKeysOrSelector);
 }
 
-// ============================================================================
-// Provider
-// ============================================================================
-
-/**
- * Props for DirectiveProvider
- */
-export interface DirectiveProviderProps<M extends ModuleSchema> {
-	/** The Directive system instance */
-	system: System<M>;
-	/** Child components */
-	children: ReactNode;
-	/** Optional requirement status plugin for useRequirementStatus hook */
-	statusPlugin?: StatusPlugin;
-}
-
-/**
- * Provider component that makes the Directive system available to child components.
- *
- * @returns The provider component wrapping children
- *
- * @example
- * ```tsx
- * import { createSystem } from 'directive';
- * import { DirectiveProvider } from 'directive/react';
- *
- * const system = createSystem({ module: myModule });
- * system.start();
- *
- * function App() {
- *   return (
- *     <DirectiveProvider system={system}>
- *       <MyApp />
- *     </DirectiveProvider>
- *   );
- * }
- * ```
- */
-export function DirectiveProvider<M extends ModuleSchema>({
-	system,
-	children,
-	statusPlugin,
-}: DirectiveProviderProps<M>): ReactNode {
-	return (
-		<DirectiveContext.Provider value={system}>
-			<StatusPluginContext.Provider value={statusPlugin ?? null}>
-				{children}
-			</StatusPluginContext.Provider>
-		</DirectiveContext.Provider>
-	);
-}
-
-// ============================================================================
-// Hooks
-// ============================================================================
-
-/**
- * Hook to access the Directive system.
- *
- * @returns The Directive system instance
- * @throws Error if used outside of DirectiveProvider
- *
- * @example
- * ```tsx
- * function MyComponent() {
- *   const system = useSystem();
- *   const inspection = system.inspect();
- *   return <pre>{JSON.stringify(inspection, null, 2)}</pre>;
- * }
- * ```
- */
-export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
-	const system = useContext(DirectiveContext);
-	if (!system) {
-		throw new Error(
-			"[Directive] useSystem must be used within a DirectiveProvider. " +
-				"Wrap your component tree with <DirectiveProvider system={system}>.",
-		);
-	}
-	return system as System<M>;
-}
-
-/**
- * Hook to read a derivation value reactively.
- *
- * The component will re-render when the derivation value changes.
- *
- * @param derivationId - The ID of the derivation to read
- * @returns The current value of the derivation
- *
- * @example
- * ```tsx
- * function Counter() {
- *   const doubled = useDerived<number>("doubled");
- *   return <p>Doubled: {doubled}</p>;
- * }
- * ```
- */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-export function useDerived<T>(derivationId: string, overrideSystem?: System<any>): T {
-	const system = useResolvedSystem(overrideSystem);
-
-	// Dev warning for invalid derivation IDs
+function _useSingleFact(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
+	factKey: string,
+): unknown {
 	if (process.env.NODE_ENV !== "production") {
-		const initialValue = system.read(derivationId);
-		if (initialValue === undefined) {
+		if (!(factKey in system.facts.$store.toObject())) {
 			console.warn(
-				`[Directive] useDerived("${derivationId}") returned undefined. ` +
+				`[Directive] useFact("${factKey}") — fact not found in store. ` +
+					`Check that "${factKey}" is defined in your module's schema.`,
+			);
+		}
+	}
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			return system.facts.$store.subscribe([factKey], onStoreChange);
+		},
+		[system, factKey],
+	);
+
+	const getSnapshot = useCallback(() => {
+		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+		return (system.facts as any)[factKey];
+	}, [system, factKey]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+function _useFacts(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
+	factKeys: string[],
+): Record<string, unknown> {
+	const cachedValue = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			return system.facts.$store.subscribe(factKeys, onStoreChange);
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[system, ...factKeys],
+	);
+
+	const getSnapshot = useCallback(() => {
+		const result: Record<string, unknown> = {};
+		for (const key of factKeys) {
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+			result[key] = (system.facts as any)[key];
+		}
+
+		if (cachedValue.current !== UNINITIALIZED) {
+			let same = true;
+			for (const key of factKeys) {
+				if (!Object.is((cachedValue.current as Record<string, unknown>)[key], result[key])) {
+					same = false;
+					break;
+				}
+			}
+			if (same) return cachedValue.current;
+		}
+
+		cachedValue.current = result;
+		return result;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [system, ...factKeys]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+function _useFactSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
+	factKey: string,
+	selector: (value: unknown) => unknown,
+	equalityFn: ((a: unknown, b: unknown) => boolean) | undefined,
+): unknown {
+	// Store selector/eq in refs to avoid resubscription churn with inline fns (Zustand pattern)
+	const selectorRef = useRef(selector);
+	const eqRef = useRef(equalityFn ?? defaultEquality);
+	selectorRef.current = selector;
+	eqRef.current = equalityFn ?? defaultEquality;
+	const cachedValue = useRef<unknown>(UNINITIALIZED);
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			return system.facts.$store.subscribe([factKey], onStoreChange);
+		},
+		[system, factKey],
+	);
+
+	const getSnapshot = useCallback(() => {
+		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+		const fact = (system.facts as any)[factKey];
+		const newValue = selectorRef.current(fact);
+
+		if (cachedValue.current === UNINITIALIZED) {
+			cachedValue.current = newValue;
+			return newValue;
+		}
+
+		if (eqRef.current(cachedValue.current, newValue)) {
+			return cachedValue.current;
+		}
+
+		cachedValue.current = newValue;
+		return newValue;
+	}, [system, factKey]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+// ============================================================================
+// useDerived — single key, multi key, or selector
+// ============================================================================
+
+/** Single key overload */
+export function useDerived<S extends ModuleSchema, K extends keyof InferDerivations<S> & string>(
+	system: SingleModuleSystem<S>,
+	derivationId: K,
+): InferDerivations<S>[K];
+
+/** Multi-key overload */
+export function useDerived<
+	S extends ModuleSchema,
+	K extends keyof InferDerivations<S> & string,
+>(
+	system: SingleModuleSystem<S>,
+	derivationIds: K[],
+): Pick<InferDerivations<S>, K>;
+
+/** Selector overload: useDerived(system, derivationId, selector, eq?) */
+export function useDerived<
+	S extends ModuleSchema,
+	K extends keyof InferDerivations<S> & string,
+	R,
+>(
+	system: SingleModuleSystem<S>,
+	derivationId: K,
+	selector: (value: InferDerivations<S>[K]) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
+/** Implementation */
+export function useDerived(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	keyOrKeysOrSelector: string | string[],
+	selectorOrUndefined?: ((value: unknown) => unknown),
+	equalityFn?: (a: unknown, b: unknown) => boolean,
+): unknown {
+	// Selector path: useDerived(system, derivationId, selector, eq?)
+	if (typeof keyOrKeysOrSelector === "string" && typeof selectorOrUndefined === "function") {
+		if (process.env.NODE_ENV !== "production" && keyOrKeysOrSelector === undefined) {
+			throw new Error("[Directive] useDerived selector overload requires a derivationId argument.");
+		}
+		return _useDerivedSelector(system, keyOrKeysOrSelector, selectorOrUndefined, equalityFn);
+	}
+
+	// Multi-key path
+	if (Array.isArray(keyOrKeysOrSelector)) {
+		return _useDerivedMulti(system, keyOrKeysOrSelector);
+	}
+
+	// Single key path
+	return _useSingleDerived(system, keyOrKeysOrSelector);
+}
+
+function _useSingleDerived(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
+	derivationId: string,
+): unknown {
+	if (process.env.NODE_ENV !== "production") {
+		if (!(derivationId in system.derive)) {
+			console.warn(
+				`[Directive] useDerived("${derivationId}") — derivation not found. ` +
 					`Check that "${derivationId}" is defined in your module's derive property.`,
 			);
 		}
@@ -251,40 +326,18 @@ export function useDerived<T>(derivationId: string, overrideSystem?: System<any>
 	);
 
 	const getSnapshot = useCallback(() => {
-		return system.read<T>(derivationId);
+		return system.read(derivationId);
 	}, [system, derivationId]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/**
- * Hook to read multiple derivation values reactively.
- *
- * The component will re-render when any of the specified derivations change.
- * This is more efficient than multiple `useDerived` calls when you need
- * several related values.
- *
- * @param derivationIds - Array of derivation IDs to read
- * @returns An object containing the current values of all requested derivations
- *
- * @example
- * ```tsx
- * function StatusDisplay() {
- *   const state = useDerivations<{ isRed: boolean; elapsed: number }>(["isRed", "elapsed"]);
- *   return (
- *     <p>
- *       {state.isRed ? `Red for ${state.elapsed}s` : "Not red"}
- *     </p>
- *   );
- * }
- * ```
- */
-export function useDerivations<T extends Record<string, unknown>>(
+function _useDerivedMulti(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
 	derivationIds: string[],
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	overrideSystem?: System<any>,
-): T {
-	const system = useResolvedSystem(overrideSystem);
+): Record<string, unknown> {
+	const cachedValue = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -299,189 +352,39 @@ export function useDerivations<T extends Record<string, unknown>>(
 		for (const id of derivationIds) {
 			result[id] = system.read(id);
 		}
-		return result as T;
+
+		if (cachedValue.current !== UNINITIALIZED) {
+			let same = true;
+			for (const id of derivationIds) {
+				if (!Object.is((cachedValue.current as Record<string, unknown>)[id], result[id])) {
+					same = false;
+					break;
+				}
+			}
+			if (same) return cachedValue.current;
+		}
+
+		cachedValue.current = result;
+		return result;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [system, ...derivationIds]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/**
- * Hook to read a fact value reactively.
- *
- * The component will re-render when the fact value changes.
- *
- * @param factKey - The key of the fact to read
- * @returns The current value of the fact, or undefined if not set
- *
- * @example
- * ```tsx
- * function UserDisplay() {
- *   const userId = useFact<number>("userId");
- *   const user = useFact<User | null>("user");
- *   return user ? <p>Hello, {user.name}</p> : <p>Loading user {userId}...</p>;
- * }
- * ```
- */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-export function useFact<T>(factKey: string, overrideSystem?: System<any>): T | undefined {
-	const system = useResolvedSystem(overrideSystem);
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.facts.$store.subscribe([factKey], onStoreChange);
-		},
-		[system, factKey],
-	);
-
-	const getSnapshot = useCallback(() => {
-		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-		return (system.facts as any)[factKey] as T | undefined;
-	}, [system, factKey]);
-
-	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/**
- * Default equality function using Object.is
- */
-function defaultEquality<T>(a: T, b: T): boolean {
-	return Object.is(a, b);
-}
-
-/** Sentinel value for uninitialized selector cache */
-const UNINITIALIZED = Symbol("directive.uninitialized");
-
-/**
- * Hook to read a derived value from a fact using a selector.
- *
- * This is more efficient than `useFact` when you only need part of a fact,
- * as it only re-renders when the selected value changes.
- *
- * **IMPORTANT: Selector Stability**
- *
- * For optimal performance, define your `selector` and `equalityFn` outside the
- * component or memoize them with `useCallback`. Inline functions work correctly
- * but may cause the internal cache to reset when the function reference changes.
- *
- * @param factKey - The key of the fact to read
- * @param selector - Function to extract the desired value from the fact
- * @param equalityFn - Optional equality function (defaults to Object.is)
- * @returns The selected value
- *
- * @example
- * ```tsx
- * // RECOMMENDED: Define selector outside component for stable reference
- * const selectUserName = (user) => user?.name ?? "Guest";
- *
- * function UserName() {
- *   const name = useFactSelector("user", selectUserName);
- *   return <p>Hello, {name}</p>;
- * }
- *
- * // Also works with inline selectors:
- * function UserIds() {
- *   const ids = useFactSelector(
- *     "users",
- *     (users) => users?.map(u => u.id) ?? [],
- *     (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
- *   );
- *   return <p>IDs: {ids.join(", ")}</p>;
- * }
- * ```
- */
-export function useFactSelector<T, R>(
-	factKey: string,
-	selector: (value: T | undefined) => R,
-	eqOrOpts?: ((a: R, b: R) => boolean) | SelectorOptions<R>,
-): R {
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	let overrideSystem: System<any> | undefined;
-	let equalityFn: (a: R, b: R) => boolean = defaultEquality;
-
-	if (typeof eqOrOpts === "function") {
-		equalityFn = eqOrOpts;
-	} else if (eqOrOpts) {
-		overrideSystem = eqOrOpts.system;
-		if (eqOrOpts.equalityFn) equalityFn = eqOrOpts.equalityFn;
-	}
-
-	const system = useResolvedSystem(overrideSystem);
-	// Use sentinel value to properly handle undefined as a valid selected value
-	const cachedValue = useRef<R | typeof UNINITIALIZED>(UNINITIALIZED);
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.facts.$store.subscribe([factKey], onStoreChange);
-		},
-		[system, factKey],
-	);
-
-	const getSnapshot = useCallback(() => {
-		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-		const fact = (system.facts as any)[factKey] as T | undefined;
-		const newValue = selector(fact);
-
-		// On first render, just cache and return
-		if (cachedValue.current === UNINITIALIZED) {
-			cachedValue.current = newValue;
-			return newValue;
-		}
-
-		// If equal to cached, return cached to prevent re-render
-		if (equalityFn(cachedValue.current, newValue)) {
-			return cachedValue.current;
-		}
-
-		cachedValue.current = newValue;
-		return newValue;
-	}, [system, factKey, selector, equalityFn]);
-
-	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/**
- * Hook to read a derived value from a derivation using a selector.
- *
- * This is more efficient than `useDerived` when you only need part of a
- * derivation result, as it only re-renders when the selected value changes.
- *
- * @param derivationId - The ID of the derivation to read
- * @param selector - Function to extract the desired value from the derivation
- * @param equalityFn - Optional equality function (defaults to Object.is)
- * @returns The selected value
- *
- * @example
- * ```tsx
- * function ItemCount() {
- *   // Only re-renders when the count changes, not other stats properties
- *   const count = useDerivedSelector(
- *     "stats",
- *     (stats) => stats.itemCount
- *   );
- *   return <p>Items: {count}</p>;
- * }
- * ```
- */
-export function useDerivedSelector<T, R>(
+function _useDerivedSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
 	derivationId: string,
-	selector: (value: T) => R,
-	eqOrOpts?: ((a: R, b: R) => boolean) | SelectorOptions<R>,
-): R {
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	let overrideSystem: System<any> | undefined;
-	let equalityFn: (a: R, b: R) => boolean = defaultEquality;
-
-	if (typeof eqOrOpts === "function") {
-		equalityFn = eqOrOpts;
-	} else if (eqOrOpts) {
-		overrideSystem = eqOrOpts.system;
-		if (eqOrOpts.equalityFn) equalityFn = eqOrOpts.equalityFn;
-	}
-
-	const system = useResolvedSystem(overrideSystem);
-	// Use sentinel value to properly handle undefined as a valid selected value
-	const cachedValue = useRef<R | typeof UNINITIALIZED>(UNINITIALIZED);
+	selector: (value: unknown) => unknown,
+	equalityFn: ((a: unknown, b: unknown) => boolean) | undefined,
+): unknown {
+	// Store selector/eq in refs to avoid resubscription churn (Zustand pattern)
+	const selectorRef = useRef(selector);
+	const eqRef = useRef(equalityFn ?? defaultEquality);
+	selectorRef.current = selector;
+	eqRef.current = equalityFn ?? defaultEquality;
+	const cachedValue = useRef<unknown>(UNINITIALIZED);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -491,460 +394,402 @@ export function useDerivedSelector<T, R>(
 	);
 
 	const getSnapshot = useCallback(() => {
-		const derivation = system.read<T>(derivationId);
-		const newValue = selector(derivation);
+		const derivation = system.read(derivationId);
+		const newValue = selectorRef.current(derivation);
 
-		// On first render, just cache and return
 		if (cachedValue.current === UNINITIALIZED) {
 			cachedValue.current = newValue;
 			return newValue;
 		}
 
-		// If equal to cached, return cached to prevent re-render
-		if (equalityFn(cachedValue.current, newValue)) {
+		if (eqRef.current(cachedValue.current, newValue)) {
 			return cachedValue.current;
 		}
 
 		cachedValue.current = newValue;
 		return newValue;
-	}, [system, derivationId, selector, equalityFn]);
+	}, [system, derivationId]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+// ============================================================================
+// useSelector — cross-fact Zustand-style selector
+// ============================================================================
+
 /**
- * Hook to select values from the entire system (like Zustand's useStore).
- *
- * This provides a flexible way to derive values from any combination of
- * facts and derivations, with fine-grained re-render control.
- *
- * @param selector - Function that receives facts and derives a value
- * @param equalityFn - Optional equality function (defaults to Object.is)
- * @returns The selected value
- *
- * @example
- * ```tsx
- * function Summary() {
- *   // Select from multiple sources
- *   const summary = useSelector((facts) => ({
- *     userName: facts.user?.name,
- *     itemCount: facts.items?.length ?? 0,
- *   }));
- *   return <p>{summary.userName} has {summary.itemCount} items</p>;
- * }
- *
- * // With shallow equality
- * function shallowEqual(a: object, b: object) {
- *   const keysA = Object.keys(a);
- *   const keysB = Object.keys(b);
- *   if (keysA.length !== keysB.length) return false;
- *   return keysA.every(key => a[key] === b[key]);
- * }
- *
- * function UserSummary() {
- *   const user = useSelector(
- *     (facts) => ({ id: facts.user?.id, name: facts.user?.name }),
- *     shallowEqual
- *   );
- *   return <p>{user.name}</p>;
- * }
- * ```
+ * Auto-tracking cross-fact selector (Zustand-style).
+ * Uses `withTracking()` to detect which facts the selector accesses,
+ * then subscribes only to those keys. Falls back to subscribeAll
+ * if no keys are detected.
  */
+export function useSelector<S extends ModuleSchema, R>(
+	system: SingleModuleSystem<S>,
+	selector: (facts: InferFacts<S>) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
 export function useSelector<R>(
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any>,
 	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
 	selector: (facts: Record<string, any>) => R,
-	eqOrOpts?: ((a: R, b: R) => boolean) | SelectorOptions<R>,
-): R {
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	let overrideSystem: System<any> | undefined;
-	let equalityFn: (a: R, b: R) => boolean = defaultEquality;
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+export function useSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	selector: (facts: any) => unknown,
+	equalityFn?: (a: unknown, b: unknown) => boolean,
+): unknown {
+	// Store selector/eq in refs to avoid resubscription churn
+	const selectorRef = useRef(selector);
+	const eqRef = useRef(equalityFn ?? defaultEquality);
+	selectorRef.current = selector;
+	eqRef.current = equalityFn ?? defaultEquality;
 
-	if (typeof eqOrOpts === "function") {
-		equalityFn = eqOrOpts;
-	} else if (eqOrOpts) {
-		overrideSystem = eqOrOpts.system;
-		if (eqOrOpts.equalityFn) equalityFn = eqOrOpts.equalityFn;
-	}
-
-	const system = useResolvedSystem(overrideSystem);
-	// Use sentinel value to properly handle undefined as a valid selected value
-	const cachedValue = useRef<R | typeof UNINITIALIZED>(UNINITIALIZED);
+	const trackedKeysRef = useRef<string[]>([]);
+	const cachedValue = useRef<unknown>(UNINITIALIZED);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
-			// Subscribe to all fact changes
-			return system.facts.$store.subscribeAll(onStoreChange);
+			// Run selector with tracking to detect accessed keys
+			const facts = system.facts.$store.toObject();
+			const { deps } = withTracking(() => selectorRef.current(facts));
+			const keys = Array.from(deps) as string[];
+			trackedKeysRef.current = keys;
+
+			// Subscribe only to accessed keys (not all facts)
+			if (keys.length === 0) {
+				return system.facts.$store.subscribeAll(onStoreChange);
+			}
+			return system.facts.$store.subscribe(keys, onStoreChange);
 		},
 		[system],
 	);
 
 	const getSnapshot = useCallback(() => {
-		// Get all facts as a plain object
 		const facts = system.facts.$store.toObject();
+		const newValue = selectorRef.current(facts);
 
-		const newValue = selector(facts);
-
-		// On first render, just cache and return
-		if (cachedValue.current === UNINITIALIZED) {
-			cachedValue.current = newValue;
-			return newValue;
-		}
-
-		// If equal to cached, return cached to prevent re-render
-		if (equalityFn(cachedValue.current, newValue)) {
+		if (
+			cachedValue.current !== UNINITIALIZED &&
+			eqRef.current(cachedValue.current, newValue)
+		) {
 			return cachedValue.current;
 		}
-
 		cachedValue.current = newValue;
 		return newValue;
-	}, [system, selector, equalityFn]);
+	}, [system]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/**
- * Hook to get the dispatch function for sending events.
- *
- * @returns A stable dispatch function typed to the system's event schema
- *
- * @example
- * ```tsx
- * function IncrementButton() {
- *   const dispatch = useDispatch();
- *   return (
- *     <button onClick={() => dispatch({ type: "increment" })}>
- *       Increment
- *     </button>
- *   );
- * }
- * ```
- */
-export function useDispatch<M extends ModuleSchema = ModuleSchema>(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	overrideSystem?: System<any>,
-): (event: InferEvents<M>) => void {
-	const system = useResolvedSystem(overrideSystem) as System<M>;
+// ============================================================================
+// useDispatch
+// ============================================================================
+
+export function useDispatch<S extends ModuleSchema>(
+	system: SingleModuleSystem<S>,
+): (event: InferEvents<S>) => void {
 	return useCallback(
-		(event: InferEvents<M>) => {
+		(event: InferEvents<S>) => {
 			system.dispatch(event);
 		},
 		[system],
 	);
 }
 
-/**
- * Hook to watch a derivation and execute a callback when it changes.
- *
- * Unlike useDerived, this doesn't cause re-renders - it just executes
- * the callback as a side effect.
- *
- * @param derivationId - The ID of the derivation to watch
- * @param callback - Function to call when the value changes
- *
- * @example
- * ```tsx
- * function Analytics() {
- *   useWatch("pageViews", (newValue, prevValue) => {
- *     analytics.track("pageViews", { from: prevValue, to: newValue });
- *   });
- *   return null;
- * }
- * ```
- */
+// ============================================================================
+// useWatch — derivation or fact side-effect (no re-render)
+// ============================================================================
+
+/** Watch a derivation */
+export function useWatch<
+	S extends ModuleSchema,
+	K extends keyof InferDerivations<S> & string,
+>(
+	system: SingleModuleSystem<S>,
+	derivationId: K,
+	callback: (
+		newValue: InferDerivations<S>[K],
+		prevValue: InferDerivations<S>[K] | undefined,
+	) => void,
+): void;
+
+/** Watch a fact */
+export function useWatch<
+	S extends ModuleSchema,
+	K extends keyof InferFacts<S> & string,
+>(
+	system: SingleModuleSystem<S>,
+	kind: "fact",
+	factKey: K,
+	callback: (
+		newValue: InferFacts<S>[K] | undefined,
+		prevValue: InferFacts<S>[K] | undefined,
+	) => void,
+): void;
+
+/** Watch derivation (generic fallback) */
 export function useWatch<T>(
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any>,
 	derivationId: string,
 	callback: (newValue: T, prevValue: T | undefined) => void,
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	overrideSystem?: System<any>,
+): void;
+
+/** Implementation */
+export function useWatch(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	derivationIdOrKind: string,
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
+	callbackOrFactKey: string | ((newValue: any, prevValue: any) => void),
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
+	maybeCallback?: (newValue: any, prevValue: any) => void,
 ): void {
-	const system = useResolvedSystem(overrideSystem);
+	// Determine if this is the fact-watching overload: useWatch(system, "fact", factKey, callback)
+	const isFact =
+		derivationIdOrKind === "fact" &&
+		typeof callbackOrFactKey === "string" &&
+		typeof maybeCallback === "function";
+	const factKey = isFact ? (callbackOrFactKey as string) : undefined;
+	const callback = isFact
+		// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
+		? (maybeCallback as (newValue: any, prevValue: any) => void)
+		// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
+		: (callbackOrFactKey as (newValue: any, prevValue: any) => void);
+	const derivationId = isFact ? undefined : derivationIdOrKind;
+
+	// Assign callbackRef directly in render (React-recommended pattern)
 	const callbackRef = useRef(callback);
-
-	// Keep callback ref up to date synchronously before subscription can fire
-	useLayoutEffect(() => {
-		callbackRef.current = callback;
-	}, [callback]);
+	callbackRef.current = callback;
 
 	useEffect(() => {
-		return system.watch(derivationId, (newValue, prevValue) => {
-			callbackRef.current(newValue as T, prevValue as T | undefined);
+		if (factKey) {
+			// Fact-watching path: subscribe to fact store changes
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+			let prev = (system.facts as any)[factKey];
+			return system.facts.$store.subscribe([factKey], () => {
+				// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+				const next = (system.facts as any)[factKey];
+				if (!Object.is(next, prev)) {
+					callbackRef.current(next, prev);
+					prev = next;
+				}
+			});
+		}
+		// Derivation-watching path
+		return system.watch(derivationId!, (newValue, prevValue) => {
+			callbackRef.current(newValue, prevValue);
 		});
-	}, [system, derivationId]);
+	}, [system, derivationId, factKey]);
+}
+
+// ============================================================================
+// useInspect — consolidated inspection hook
+// ============================================================================
+
+// InspectState is imported from ./shared.js and re-exported above
+
+/** Options for useInspect */
+export interface UseInspectOptions {
+	/** Throttle updates to this interval (ms). When set, uses useState instead of useSyncExternalStore. */
+	throttleMs?: number;
 }
 
 /**
- * Hook to check if the system has settled (no pending operations).
+ * Hook to get consolidated system inspection data reactively.
  *
- * @returns Whether the system is settled
+ * Merges isSettled, unmet/inflight requirements, and working state
+ * into a single subscription. Optionally throttle updates.
  *
  * @example
  * ```tsx
- * function LoadingIndicator() {
- *   const isSettled = useIsSettled();
- *   return isSettled ? null : <Spinner />;
- * }
+ * const { isSettled, isWorking, hasUnmet } = useInspect(system);
+ * const throttled = useInspect(system, { throttleMs: 200 });
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-export function useIsSettled(overrideSystem?: System<any>): boolean {
-	const system = useResolvedSystem(overrideSystem);
+export function useInspect(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	options?: UseInspectOptions,
+): InspectState {
+	// Always call the sync version (useSyncExternalStore path) — no conditional hooks
+	const syncState = _useInspectSync(system);
+
+	// Throttle is a ref-based overlay, not a separate hook path
+	const throttleMs = options?.throttleMs;
+	const throttledState = useRef(syncState);
+	const lastUpdate = useRef(0);
+
+	if (!throttleMs || throttleMs <= 0) return syncState;
+
+	const now = Date.now();
+	if (now - lastUpdate.current >= throttleMs) {
+		throttledState.current = syncState;
+		lastUpdate.current = now;
+	}
+	return throttledState.current;
+}
+
+function _buildInspectState(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
+): InspectState {
+	return computeInspectState(system);
+}
+
+function _useInspectSync(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: SingleModuleSystem<any>,
+): InspectState {
+	const cachedSnapshot = useRef<InspectState | null>(null);
+	const cachedUnmetIds = useRef<string[]>([]);
+	const cachedInflightIds = useRef<string[]>([]);
+	const cachedIsSettled = useRef<boolean | null>(null);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
-			// Subscribe to all facts changes as a proxy for system activity
-			return system.facts.$store.subscribeAll(onStoreChange);
+			const unsubFacts = system.facts.$store.subscribeAll(onStoreChange);
+			const unsubSettled = system.onSettledChange(onStoreChange);
+			return () => {
+				unsubFacts();
+				unsubSettled();
+			};
 		},
 		[system],
 	);
 
 	const getSnapshot = useCallback(() => {
-		return system.isSettled;
+		const state = _buildInspectState(system);
+
+		const unmetSame =
+			state.unmet.length === cachedUnmetIds.current.length &&
+			state.unmet.every((u, i) => u.id === cachedUnmetIds.current[i]);
+		const inflightSame =
+			state.inflight.length === cachedInflightIds.current.length &&
+			state.inflight.every((f, i) => f.id === cachedInflightIds.current[i]);
+		const settledSame = state.isSettled === cachedIsSettled.current;
+
+		if (unmetSame && inflightSame && settledSame && cachedSnapshot.current) {
+			return cachedSnapshot.current;
+		}
+
+		cachedSnapshot.current = state;
+		cachedUnmetIds.current = state.unmet.map((u) => u.id);
+		cachedInflightIds.current = state.inflight.map((f) => f.id);
+		cachedIsSettled.current = state.isSettled;
+
+		return state;
 	}, [system]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+
+// ============================================================================
+// useTimeTravel — reactive time-travel state
+// ============================================================================
+
+import type { TimeTravelState } from "../core/types.js";
+
 /**
- * Hook to get system inspection data reactively.
- *
- * Useful for debugging and showing system status.
- *
- * @returns The current system inspection with unmet requirements and inflight operations
+ * Reactive time-travel hook. Returns null when time-travel is disabled.
+ * Re-renders when snapshots are taken or navigation occurs.
  *
  * @example
  * ```tsx
- * function DebugPanel() {
- *   const inspection = useInspect();
+ * const tt = useTimeTravel(system);
+ * if (tt) {
  *   return (
- *     <pre>
- *       Unmet: {inspection.unmet.length}
- *       Inflight: {inspection.inflight.length}
- *     </pre>
+ *     <div>
+ *       <button disabled={!tt.canUndo} onClick={tt.undo}>Undo</button>
+ *       <button disabled={!tt.canRedo} onClick={tt.redo}>Redo</button>
+ *       <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+ *     </div>
  *   );
  * }
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-export function useInspect(overrideSystem?: System<any>) {
-	const system = useResolvedSystem(overrideSystem);
-	const cachedSnapshot = useRef<ReturnType<typeof system.inspect> | null>(null);
-	// Track array lengths and first/last items for efficient comparison
-	const cachedUnmetLength = useRef<number>(-1);
-	const cachedInflightLength = useRef<number>(-1);
-	const cachedUnmetFirst = useRef<unknown>(null);
-	const cachedInflightFirst = useRef<unknown>(null);
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.facts.$store.subscribeAll(onStoreChange);
-		},
-		[system],
-	);
-
-	const getSnapshot = useCallback(() => {
-		const current = system.inspect();
-
-		// Efficient comparison: check lengths and first items instead of JSON.stringify
-		// This is O(1) instead of O(n) serialization
-		const unmetChanged =
-			current.unmet.length !== cachedUnmetLength.current ||
-			current.unmet[0] !== cachedUnmetFirst.current;
-		const inflightChanged =
-			current.inflight.length !== cachedInflightLength.current ||
-			current.inflight[0] !== cachedInflightFirst.current;
-
-		if (unmetChanged || inflightChanged) {
-			cachedSnapshot.current = current;
-			cachedUnmetLength.current = current.unmet.length;
-			cachedInflightLength.current = current.inflight.length;
-			cachedUnmetFirst.current = current.unmet[0];
-			cachedInflightFirst.current = current.inflight[0];
-		}
-
-		return cachedSnapshot.current ?? current;
-	}, [system]);
-
-	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/**
- * Hook to get system inspection data with throttled updates.
- *
- * Use this instead of useInspect when updates are too frequent.
- * The throttle uses trailing-edge behavior, so you'll always see the latest state.
- *
- * @param options - Throttling options
- * @returns The current system inspection (updated at most every throttleMs)
- *
- * @example
- * ```tsx
- * function DebugPanel() {
- *   // Update at most every 200ms
- *   const inspection = useInspectThrottled({ throttleMs: 200 });
- *   return <pre>Unmet: {inspection.unmet.length}</pre>;
- * }
- * ```
- */
-export function useInspectThrottled(
+export function useTimeTravel(
 	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	options: ThrottledHookOptions & { system?: System<any> } = {},
-) {
-	const { throttleMs = 100, system: overrideSystem } = options;
-	const system = useResolvedSystem(overrideSystem);
-	const [inspection, setInspection] = useState(() => system.inspect());
-
-	useEffect(() => {
-		const { throttled, cleanup } = createThrottle(() => {
-			setInspection(system.inspect());
-		}, throttleMs);
-
-		const unsubscribe = system.facts.$store.subscribeAll(throttled);
-
-		return () => {
-			cleanup();
-			unsubscribe();
-		};
-	}, [system, throttleMs]);
-
-	return inspection;
-}
-
-/**
- * Hook to get current requirements state reactively.
- *
- * Provides a focused view of just requirements without full inspection overhead.
- *
- * @returns The current requirements state
- *
- * @example
- * ```tsx
- * function LoadingIndicator() {
- *   const { isWorking, hasUnmet, hasInflight } = useRequirements();
- *   if (!isWorking) return null;
- *   return <Spinner label={hasInflight ? 'Loading...' : 'Processing...'} />;
- * }
- * ```
- */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-export function useRequirements(overrideSystem?: System<any>): RequirementsState {
-	const system = useResolvedSystem(overrideSystem);
-	const cachedSnapshot = useRef<RequirementsState | null>(null);
-	const cachedUnmetJson = useRef<string>("");
-	const cachedInflightJson = useRef<string>("");
+	system: SingleModuleSystem<any>,
+): TimeTravelState | null {
+	const cachedRef = useRef<TimeTravelState | null>(null);
 
 	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.facts.$store.subscribeAll(onStoreChange);
-		},
+		(onStoreChange: () => void) => system.onTimeTravelChange(onStoreChange),
 		[system],
 	);
 
 	const getSnapshot = useCallback(() => {
-		const inspection = system.inspect();
-		const unmetJson = JSON.stringify(inspection.unmet);
-		const inflightJson = JSON.stringify(inspection.inflight);
+		const debug = system.debug;
+		if (!debug) return null;
 
-		// Only return new object if content actually changed
+		const canUndo = debug.currentIndex > 0;
+		const canRedo = debug.currentIndex < debug.snapshots.length - 1;
+		const currentIndex = debug.currentIndex;
+		const totalSnapshots = debug.snapshots.length;
+
+		// Return stable reference when values haven't changed
 		if (
-			unmetJson !== cachedUnmetJson.current ||
-			inflightJson !== cachedInflightJson.current
+			cachedRef.current &&
+			cachedRef.current.canUndo === canUndo &&
+			cachedRef.current.canRedo === canRedo &&
+			cachedRef.current.currentIndex === currentIndex &&
+			cachedRef.current.totalSnapshots === totalSnapshots
 		) {
-			cachedUnmetJson.current = unmetJson;
-			cachedInflightJson.current = inflightJson;
-			cachedSnapshot.current = computeRequirementsState(inspection);
+			return cachedRef.current;
 		}
 
-		return cachedSnapshot.current ?? computeRequirementsState(inspection);
+		cachedRef.current = {
+			canUndo,
+			canRedo,
+			undo: () => debug.goBack(),
+			redo: () => debug.goForward(),
+			currentIndex,
+			totalSnapshots,
+		};
+		return cachedRef.current;
 	}, [system]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/**
- * Hook to get current requirements state with throttled updates.
- *
- * Use this instead of useRequirements when updates are too frequent.
- * The throttle uses trailing-edge behavior, so you'll always see the latest state.
- *
- * @param options - Throttling options
- * @returns The current requirements state (updated at most every throttleMs)
- *
- * @example
- * ```tsx
- * function LoadingIndicator() {
- *   // Update at most every 200ms
- *   const { isWorking } = useRequirementsThrottled({ throttleMs: 200 });
- *   if (!isWorking) return null;
- *   return <Spinner />;
- * }
- * ```
- */
-export function useRequirementsThrottled(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	options: ThrottledHookOptions & { system?: System<any> } = {},
-): RequirementsState {
-	const { throttleMs = 100, system: overrideSystem } = options;
-	const system = useResolvedSystem(overrideSystem);
-	const [state, setState] = useState(() =>
-		computeRequirementsState(system.inspect()),
-	);
+// ============================================================================
+// useRequirementStatus — single or multi
+// ============================================================================
 
-	useEffect(() => {
-		const { throttled, cleanup } = createThrottle(() => {
-			setState(computeRequirementsState(system.inspect()));
-		}, throttleMs);
+/** Single type overload */
+export function useRequirementStatus(
+	statusPlugin: StatusPlugin,
+	type: string,
+): RequirementTypeStatus;
 
-		const unsubscribe = system.facts.$store.subscribeAll(throttled);
+/** Multi-type overload */
+export function useRequirementStatus(
+	statusPlugin: StatusPlugin,
+	types: string[],
+): Record<string, RequirementTypeStatus>;
 
-		return () => {
-			cleanup();
-			unsubscribe();
-		};
-	}, [system, throttleMs]);
-
-	return state;
+/** Implementation */
+export function useRequirementStatus(
+	statusPlugin: StatusPlugin,
+	typeOrTypes: string | string[],
+): RequirementTypeStatus | Record<string, RequirementTypeStatus> {
+	if (Array.isArray(typeOrTypes)) {
+		return _useRequirementStatusMulti(statusPlugin, typeOrTypes);
+	}
+	return _useRequirementStatusSingle(statusPlugin, typeOrTypes);
 }
 
-/**
- * Hook to get requirement status reactively.
- *
- * Requires a statusPlugin to be passed to DirectiveProvider.
- *
- * @param type - The requirement type to get status for
- * @returns The current status of the requirement type
- *
- * @example
- * ```tsx
- * import { createRequirementStatusPlugin } from 'directive';
- * import { DirectiveProvider, useRequirementStatus } from 'directive/react';
- *
- * const statusPlugin = createRequirementStatusPlugin();
- * const system = createSystem({
- *   modules: [myModule],
- *   plugins: [statusPlugin.plugin],
- * });
- *
- * function App() {
- *   return (
- *     <DirectiveProvider system={system} statusPlugin={statusPlugin}>
- *       <UserLoader />
- *     </DirectiveProvider>
- *   );
- * }
- *
- * function UserLoader() {
- *   const status = useRequirementStatus("FETCH_USER");
- *   if (status.isLoading) return <Spinner />;
- *   if (status.hasError) return <Error message={status.lastError?.message} />;
- *   return <UserContent />;
- * }
- * ```
- */
-export function useRequirementStatus(
+function _useRequirementStatusSingle(
+	statusPlugin: StatusPlugin,
 	type: string,
-	overrideStatusPlugin?: StatusPlugin,
 ): RequirementTypeStatus {
-	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
+	const cachedRef = useRef<RequirementTypeStatus | typeof UNINITIALIZED>(UNINITIALIZED);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -954,99 +799,35 @@ export function useRequirementStatus(
 	);
 
 	const getSnapshot = useCallback(() => {
-		return statusPlugin.getStatus(type);
+		const status = statusPlugin.getStatus(type);
+
+		if (cachedRef.current !== UNINITIALIZED) {
+			const prev = cachedRef.current;
+			if (
+				prev.pending === status.pending &&
+				prev.inflight === status.inflight &&
+				prev.failed === status.failed &&
+				prev.isLoading === status.isLoading &&
+				prev.hasError === status.hasError &&
+				prev.lastError === status.lastError
+			) {
+				return cachedRef.current;
+			}
+		}
+
+		cachedRef.current = status;
+		return status;
 	}, [statusPlugin, type]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/**
- * Hook to check if a requirement type is currently being resolved.
- *
- * Simplified version of useRequirementStatus that returns only the resolving state.
- * Requires a statusPlugin to be passed to DirectiveProvider.
- *
- * @param type - The requirement type to check
- * @returns Whether the requirement type has inflight resolvers
- *
- * @example
- * ```tsx
- * function SaveButton() {
- *   const isSaving = useIsResolving("SAVE_DATA");
- *   return (
- *     <button disabled={isSaving}>
- *       {isSaving ? "Saving..." : "Save"}
- *     </button>
- *   );
- * }
- * ```
- */
-export function useIsResolving(
-	type: string,
-	overrideStatusPlugin?: StatusPlugin,
-): boolean {
-	const status = useRequirementStatus(type, overrideStatusPlugin);
-	return status.inflight > 0;
-}
-
-/**
- * Hook to get the last error for a requirement type.
- *
- * Simplified version of useRequirementStatus that returns only the error.
- * Requires a statusPlugin to be passed to DirectiveProvider.
- *
- * @param type - The requirement type to get error for
- * @returns The last error, or null if no error
- *
- * @example
- * ```tsx
- * function ErrorDisplay() {
- *   const error = useLatestError("FETCH_USER");
- *   if (!error) return null;
- *   return <div className="error">{error.message}</div>;
- * }
- * ```
- */
-export function useLatestError(
-	type: string,
-	overrideStatusPlugin?: StatusPlugin,
-): Error | null {
-	const status = useRequirementStatus(type, overrideStatusPlugin);
-	return status.lastError;
-}
-
-/**
- * Hook to get status for all tracked requirement types.
- *
- * Returns a Map of all requirement types that have been tracked, with their
- * current status. Useful for dashboard/admin UIs that need to show all
- * requirement states at once.
- *
- * Requires a statusPlugin to be passed to DirectiveProvider.
- *
- * @returns Map of requirement type to status
- *
- * @example
- * ```tsx
- * function RequirementsDashboard() {
- *   const allStatuses = useRequirementStatuses();
- *
- *   return (
- *     <ul>
- *       {Array.from(allStatuses.entries()).map(([type, status]) => (
- *         <li key={type}>
- *           {type}: {status.isLoading ? "Loading" : status.hasError ? "Error" : "Ready"}
- *         </li>
- *       ))}
- *     </ul>
- *   );
- * }
- * ```
- */
-export function useRequirementStatuses(
-	overrideStatusPlugin?: StatusPlugin,
-): Map<string, RequirementTypeStatus> {
-	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
+function _useRequirementStatusMulti(
+	statusPlugin: StatusPlugin,
+	types: string[],
+): Record<string, RequirementTypeStatus> {
+	const cachedRef = useRef<Record<string, RequirementTypeStatus> | null>(null);
+	const cachedKey = useRef<string>("");
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
@@ -1056,95 +837,92 @@ export function useRequirementStatuses(
 	);
 
 	const getSnapshot = useCallback(() => {
-		return statusPlugin.getAllStatus();
-	}, [statusPlugin]);
+		const result: Record<string, RequirementTypeStatus> = {};
+		const parts: string[] = [];
+		for (const type of types) {
+			const status = statusPlugin.getStatus(type);
+			result[type] = status;
+			parts.push(`${type}:${status.pending}:${status.inflight}:${status.failed}:${status.hasError}:${status.lastError?.message ?? ""}`);
+		}
+		const key = parts.join("|");
+
+		if (key !== cachedKey.current) {
+			cachedKey.current = key;
+			cachedRef.current = result;
+		}
+
+		return cachedRef.current ?? result;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [statusPlugin, ...types]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 // ============================================================================
-// Suspense Integration
+// useSuspenseRequirement — single or multi
 // ============================================================================
 
-// Cache for pending promises to prevent creating new ones on re-render
-const suspenseCache = new Map<string, Promise<void>>();
+// Cache for pending promises, scoped per statusPlugin to prevent cross-system leaks.
+const suspenseCacheMap = new WeakMap<StatusPlugin, Map<string, Promise<void>>>();
 
-/**
- * Hook that suspends while a requirement is being resolved.
- *
- * This enables React Suspense integration - wrap your component in a
- * `<Suspense>` boundary to show a fallback while requirements are loading.
- *
- * **Behavior:**
- * - If the requirement is loading (pending or inflight), throws a Promise (suspends)
- * - If the requirement has an error, throws the error
- * - If the requirement is idle, returns the status
- *
- * Requires a statusPlugin to be passed to DirectiveProvider.
- *
- * @param type - The requirement type to wait for
- * @returns The requirement status (only when not loading)
- * @throws Promise when loading, Error when failed
- *
- * @example
- * ```tsx
- * import { Suspense } from 'react';
- * import { useSuspenseRequirement } from 'directive/react';
- *
- * function UserProfile() {
- *   // This will suspend until FETCH_USER is resolved
- *   const status = useSuspenseRequirement("FETCH_USER");
- *   // Component only renders after requirement is resolved
- *   return <div>User loaded!</div>;
- * }
- *
- * function App() {
- *   return (
- *     <Suspense fallback={<Spinner />}>
- *       <UserProfile />
- *     </Suspense>
- *   );
- * }
- * ```
- */
+function getSuspenseCache(plugin: StatusPlugin): Map<string, Promise<void>> {
+	let cache = suspenseCacheMap.get(plugin);
+	if (!cache) {
+		cache = new Map();
+		suspenseCacheMap.set(plugin, cache);
+	}
+	return cache;
+}
+
+/** Single type overload */
 export function useSuspenseRequirement(
+	statusPlugin: StatusPlugin,
 	type: string,
-	overrideStatusPlugin?: StatusPlugin,
+): RequirementTypeStatus;
+
+/** Multi-type overload */
+export function useSuspenseRequirement(
+	statusPlugin: StatusPlugin,
+	types: string[],
+): Record<string, RequirementTypeStatus>;
+
+/** Implementation */
+export function useSuspenseRequirement(
+	statusPlugin: StatusPlugin,
+	typeOrTypes: string | string[],
+): RequirementTypeStatus | Record<string, RequirementTypeStatus> {
+	if (Array.isArray(typeOrTypes)) {
+		return _useSuspenseRequirementMulti(statusPlugin, typeOrTypes);
+	}
+	return _useSuspenseRequirementSingle(statusPlugin, typeOrTypes);
+}
+
+function _useSuspenseRequirementSingle(
+	statusPlugin: StatusPlugin,
+	type: string,
 ): RequirementTypeStatus {
-	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
-
-	// Cleanup suspense cache on unmount to prevent memory leaks
-	useEffect(() => {
-		return () => {
-			suspenseCache.delete(type);
-		};
-	}, [type]);
-
 	const status = statusPlugin.getStatus(type);
 
-	// If there's an error, throw it for error boundaries
 	if (status.hasError && status.lastError) {
 		throw status.lastError;
 	}
 
-	// If loading, throw a promise for Suspense
 	if (status.isLoading) {
-		// Check if we already have a pending promise for this type
-		let promise = suspenseCache.get(type);
+		const cache = getSuspenseCache(statusPlugin);
+		let promise = cache.get(type);
 
 		if (!promise) {
-			// Create a new promise that resolves when the requirement is done
 			promise = new Promise<void>((resolve) => {
 				const unsubscribe = statusPlugin.subscribe(() => {
 					const currentStatus = statusPlugin.getStatus(type);
 					if (!currentStatus.isLoading) {
-						suspenseCache.delete(type);
+						cache.delete(type);
 						unsubscribe();
 						resolve();
 					}
 				});
 			});
-			suspenseCache.set(type, promise);
+			cache.set(type, promise);
 		}
 
 		throw promise;
@@ -1153,45 +931,17 @@ export function useSuspenseRequirement(
 	return status;
 }
 
-/**
- * Hook that waits for multiple requirements and suspends until all are resolved.
- *
- * This is useful when a component depends on multiple data requirements.
- *
- * @param types - Array of requirement types to wait for
- * @returns Map of requirement type to status (only when none are loading)
- * @throws Promise when any are loading, Error when any have failed
- *
- * @example
- * ```tsx
- * function Dashboard() {
- *   // Suspends until both requirements are resolved
- *   const statuses = useSuspenseRequirements(["FETCH_USER", "FETCH_SETTINGS"]);
- *   return <div>All data loaded!</div>;
- * }
- * ```
- */
-export function useSuspenseRequirements(
+function _useSuspenseRequirementMulti(
+	statusPlugin: StatusPlugin,
 	types: string[],
-	overrideStatusPlugin?: StatusPlugin,
-): Map<string, RequirementTypeStatus> {
-	const statusPlugin = useResolvedStatusPlugin(overrideStatusPlugin);
-
-	// Cleanup suspense cache on unmount to prevent memory leaks
-	const cacheKey = types.slice().sort().join(",");
-	useEffect(() => {
-		return () => {
-			suspenseCache.delete(cacheKey);
-		};
-	}, [cacheKey]);
-
-	const result = new Map<string, RequirementTypeStatus>();
+): Record<string, RequirementTypeStatus> {
+	const result: Record<string, RequirementTypeStatus> = {};
 	let hasLoading = false;
 	let firstError: Error | null = null;
 
 	for (const type of types) {
 		const status = statusPlugin.getStatus(type);
-		result.set(type, status);
+		result[type] = status;
 
 		if (status.hasError && status.lastError && !firstError) {
 			firstError = status.lastError;
@@ -1201,27 +951,27 @@ export function useSuspenseRequirements(
 		}
 	}
 
-	// Throw first error for error boundaries
 	if (firstError) {
 		throw firstError;
 	}
 
-	// If any are loading, create a combined promise
 	if (hasLoading) {
-		let promise = suspenseCache.get(cacheKey);
+		const cache = getSuspenseCache(statusPlugin);
+		const cacheKey = types.slice().sort().join(",");
+		let promise = cache.get(cacheKey);
 
 		if (!promise) {
 			promise = new Promise<void>((resolve) => {
 				const unsubscribe = statusPlugin.subscribe(() => {
 					const allDone = types.every((t) => !statusPlugin.getStatus(t).isLoading);
 					if (allDone) {
-						suspenseCache.delete(cacheKey);
+						cache.delete(cacheKey);
 						unsubscribe();
 						resolve();
 					}
 				});
 			});
-			suspenseCache.set(cacheKey, promise);
+			cache.set(cacheKey, promise);
 		}
 
 		throw promise;
@@ -1231,286 +981,1110 @@ export function useSuspenseRequirements(
 }
 
 // ============================================================================
-// Scoped System Hook (like XState's useActorRef)
+// useDirectiveRef — scoped system lifecycle
 // ============================================================================
 
-/** Options for useDirectiveRef hook */
+/** Base options for creating a scoped system */
+interface DirectiveRefBaseConfig {
+	// biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
+	plugins?: Plugin<any>[];
+	debug?: DebugConfig;
+	errorBoundary?: ErrorBoundaryConfig;
+	tickMs?: number;
+	zeroConfig?: boolean;
+	// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+	initialFacts?: Record<string, any>;
+}
+
+/** Options for useDirectiveRef: module directly, or config object */
 export type UseDirectiveRefOptions<M extends ModuleSchema> =
 	| ModuleDef<M>
-	| {
-			module: ModuleDef<M>;
-			// biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
-			plugins?: Plugin<any>[];
-			debug?: { timeTravel?: boolean; maxSnapshots?: number };
-			tickMs?: number;
-			zeroConfig?: boolean;
-			// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
-			initialFacts?: Record<string, any>;
-	  };
+	| (DirectiveRefBaseConfig & { module: ModuleDef<M> });
 
-/**
- * Hook to create and manage a Directive system with automatic lifecycle.
- * The system is created once on mount and destroyed on unmount.
- *
- * **This is stable across re-renders** - like XState's `useActorRef`.
- * The system reference never changes, regardless of how you define options.
- *
- * Use this when you want to create a system inside a component rather than
- * at the module level. For most apps, creating the system outside React and
- * passing to `DirectiveProvider` is preferred.
- *
- * @param options - Either a module or full system options
- * @returns A stable system reference and a Provider component
- *
- * @example
- * ```tsx
- * import { useDirectiveRef } from 'directive/react';
- * import { counterModule } from './counter';
- *
- * function Counter() {
- *   // System is created once and stable across re-renders
- *   const { system, Provider } = useDirectiveRef(counterModule);
- *
- *   return (
- *     <Provider>
- *       <CounterDisplay />
- *       <button onClick={() => system.dispatch({ type: 'increment' })}>
- *         +
- *       </button>
- *     </Provider>
- *   );
- * }
- *
- * // Or with inline options (still stable!)
- * function Counter() {
- *   const { system, Provider } = useDirectiveRef({
- *     module: counterModule,
- *     debug: { timeTravel: true },
- *   });
- *   // ...
- * }
- * ```
- */
+/** Without status (no config): returns system directly */
 export function useDirectiveRef<M extends ModuleSchema>(
 	options: UseDirectiveRefOptions<M>,
-): {
-	system: System<M>;
-	Provider: (props: { children: ReactNode }) => ReactNode;
-} {
-	// Use ref to store the system - created once, stable forever
-	const systemRef = useRef<System<M> | null>(null);
-	const isInitialized = useRef(false);
+): SingleModuleSystem<M>;
 
-	// Initialize system only once (not in useEffect to avoid double-creation in StrictMode)
-	if (!isInitialized.current) {
-		isInitialized.current = true;
+/** Without status (with config): returns system directly */
+export function useDirectiveRef<M extends ModuleSchema>(
+	options: UseDirectiveRefOptions<M>,
+	config: DirectiveRefBaseConfig,
+): SingleModuleSystem<M>;
 
+/** With status: returns { system, statusPlugin } */
+export function useDirectiveRef<M extends ModuleSchema>(
+	options: UseDirectiveRefOptions<M>,
+	config: { status: true } & DirectiveRefBaseConfig,
+): { system: SingleModuleSystem<M>; statusPlugin: StatusPlugin };
+
+/** Implementation */
+export function useDirectiveRef<M extends ModuleSchema>(
+	options: UseDirectiveRefOptions<M>,
+	config?: { status?: boolean } & DirectiveRefBaseConfig,
+): SingleModuleSystem<M> | { system: SingleModuleSystem<M>; statusPlugin: StatusPlugin } {
+	const systemRef = useRef<SingleModuleSystem<M> | null>(null);
+	const statusPluginRef = useRef<StatusPlugin | null>(null);
+	const wantStatus = config?.status === true;
+
+	if (!systemRef.current) {
 		const isModule = "id" in options && "schema" in options;
+		const mod = isModule ? (options as ModuleDef<M>) : (options as { module: ModuleDef<M> }).module;
+		const baseOpts = isModule ? {} : (options as DirectiveRefBaseConfig);
+		// Merge config-level options over options-level (config takes precedence)
+		const plugins = config?.plugins ?? baseOpts.plugins ?? [];
+		const debug = config?.debug ?? baseOpts.debug;
+		const errorBoundary = config?.errorBoundary ?? baseOpts.errorBoundary;
+		const tickMs = config?.tickMs ?? baseOpts.tickMs;
+		const zeroConfig = config?.zeroConfig ?? baseOpts.zeroConfig;
+		const initialFacts = config?.initialFacts ?? baseOpts.initialFacts;
 
-		if (isModule) {
-			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			systemRef.current = createSystem({ module: options as ModuleDef<M> } as any) as unknown as System<M>;
-		} else {
-			const opts = options as Exclude<UseDirectiveRefOptions<M>, ModuleDef<M>>;
-			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			systemRef.current = createSystem({
-				module: opts.module,
-				plugins: opts.plugins,
-				debug: opts.debug,
-				tickMs: opts.tickMs,
-				zeroConfig: opts.zeroConfig,
-				initialFacts: opts.initialFacts,
-			} as any) as unknown as System<M>;
+		let allPlugins = [...plugins];
+
+		if (wantStatus) {
+			statusPluginRef.current = createRequirementStatusPlugin();
+			// biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
+			allPlugins = [...allPlugins, statusPluginRef.current.plugin as Plugin<any>];
 		}
 
-		systemRef.current.start();
+		// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+		systemRef.current = createSystem({
+			module: mod,
+			plugins: allPlugins.length > 0 ? allPlugins : undefined,
+			debug,
+			errorBoundary,
+			tickMs,
+			zeroConfig,
+			initialFacts,
+		} as any) as unknown as SingleModuleSystem<M>;
+
 	}
 
-	// Cleanup on unmount
 	useEffect(() => {
+		const sys = systemRef.current;
+		sys?.start();
 		return () => {
-			systemRef.current?.destroy();
+			sys?.destroy();
+			systemRef.current = null;
+			statusPluginRef.current = null;
 		};
 	}, []);
 
-	// Create a stable Provider component using useCallback
-	const Provider = useCallback(
-		({ children }: { children: ReactNode }) => (
-			<DirectiveProvider system={systemRef.current!}>{children}</DirectiveProvider>
-		),
-		[],
-	);
+	if (wantStatus) {
+		return {
+			system: systemRef.current!,
+			statusPlugin: statusPluginRef.current!,
+		};
+	}
 
-	return {
-		system: systemRef.current!,
-		Provider,
-	};
+	return systemRef.current!;
 }
 
+// ============================================================================
+// useDirective — scoped system with selected values in containers
+// ============================================================================
+
+/** Options for useDirective hook */
+export interface UseDirectiveOptions<
+	S extends ModuleSchema,
+	FK extends keyof InferFacts<S> & string = never,
+	DK extends keyof InferDerivations<S> & string = never,
+> extends DirectiveRefBaseConfig {
+	/** Fact keys to subscribe to */
+	facts?: FK[];
+	/** Derivation keys to subscribe to */
+	derived?: DK[];
+	/** Enable status plugin */
+	status?: boolean;
+}
+
+/** Return type for useDirective hook (without status) */
+export type UseDirectiveReturn<
+	S extends ModuleSchema,
+	FK extends keyof InferFacts<S> & string,
+	DK extends keyof InferDerivations<S> & string,
+> = {
+	system: SingleModuleSystem<S>;
+	dispatch: (event: InferEvents<S>) => void;
+	facts: Pick<InferFacts<S>, FK>;
+	derived: Pick<InferDerivations<S>, DK>;
+};
+
+/** Return type for useDirective hook (with status) */
+export type UseDirectiveReturnWithStatus<
+	S extends ModuleSchema,
+	FK extends keyof InferFacts<S> & string,
+	DK extends keyof InferDerivations<S> & string,
+> = UseDirectiveReturn<S, FK, DK> & {
+	statusPlugin: StatusPlugin;
+};
+
 /**
- * Hook to create a scoped system with status plugin pre-configured.
- * Combines useDirectiveRef with createRequirementStatusPlugin.
- *
- * @param options - Either a module or full system options
- * @returns A stable system, statusPlugin, and Provider component
+ * Convenience hook that creates a scoped system and reads selected facts/derivations
+ * into container objects.
  *
  * @example
  * ```tsx
- * function App() {
- *   const { system, statusPlugin, Provider } = useDirectiveRefWithStatus(myModule);
+ * const { dispatch, facts: { count }, derived: { doubled } } = useDirective(counterModule, {
+ *   facts: ["count"],
+ *   derived: ["doubled"],
+ * });
+ * ```
+ */
+export function useDirective<
+	S extends ModuleSchema,
+	FK extends keyof InferFacts<S> & string = never,
+	DK extends keyof InferDerivations<S> & string = never,
+>(
+	moduleOrOptions: UseDirectiveRefOptions<S>,
+	selections: UseDirectiveOptions<S, FK, DK> = {} as UseDirectiveOptions<S, FK, DK>,
+): UseDirectiveReturn<S, FK, DK> | UseDirectiveReturnWithStatus<S, FK, DK> {
+	const { facts: factKeysOpt, derived: derivedKeysOpt, status, ...configRest } = selections;
+	const factKeys = (factKeysOpt ?? []) as FK[];
+	const derivedKeys = (derivedKeysOpt ?? []) as DK[];
+
+	// Create system via useDirectiveRef (handles lifecycle)
+	// biome-ignore lint/suspicious/noExplicitAny: Conditional overload dispatch
+	const refResult: any = status
+		? useDirectiveRef(moduleOrOptions, { status: true as const, ...configRest })
+		: useDirectiveRef(moduleOrOptions, configRest);
+
+	const system: SingleModuleSystem<S> = status
+		? refResult.system
+		: refResult;
+
+	const statusPlugin = status
+		? (refResult as { system: SingleModuleSystem<S>; statusPlugin: StatusPlugin }).statusPlugin
+		: undefined;
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			const unsubs: Array<() => void> = [];
+			if (factKeys.length > 0) {
+				unsubs.push(system.facts.$store.subscribe(factKeys, onStoreChange));
+			}
+			if (derivedKeys.length > 0) {
+				unsubs.push(system.subscribe(derivedKeys, onStoreChange));
+			}
+			return () => {
+				for (const unsub of unsubs) unsub();
+			};
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[system, ...factKeys, ...derivedKeys],
+	);
+
+	const cachedFacts = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+	const cachedDerived = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+	const cachedWrapper = useRef<{ facts: Record<string, unknown>; derived: Record<string, unknown> } | null>(null);
+
+	const getSnapshot = useCallback(() => {
+		// Build facts container
+		const factsResult: Record<string, unknown> = {};
+		for (const key of factKeys) {
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+			factsResult[key] = (system.facts as any)[key];
+		}
+		// Build derived container
+		const derivedResult: Record<string, unknown> = {};
+		for (const key of derivedKeys) {
+			derivedResult[key] = system.read(key);
+		}
+
+		// Check facts stability
+		let factsSame = cachedFacts.current !== UNINITIALIZED;
+		if (factsSame) {
+			for (const key of factKeys) {
+				if (!Object.is((cachedFacts.current as Record<string, unknown>)[key], factsResult[key])) {
+					factsSame = false;
+					break;
+				}
+			}
+		}
+
+		// Check derived stability
+		let derivedSame = cachedDerived.current !== UNINITIALIZED;
+		if (derivedSame) {
+			for (const key of derivedKeys) {
+				if (!Object.is((cachedDerived.current as Record<string, unknown>)[key], derivedResult[key])) {
+					derivedSame = false;
+					break;
+				}
+			}
+		}
+
+		const stableFacts = factsSame ? cachedFacts.current as Record<string, unknown> : factsResult;
+		const stableDerived = derivedSame ? cachedDerived.current as Record<string, unknown> : derivedResult;
+
+		if (!factsSame) cachedFacts.current = factsResult;
+		if (!derivedSame) cachedDerived.current = derivedResult;
+
+		// Return same wrapper reference when both containers are unchanged
+		if (factsSame && derivedSame && cachedWrapper.current) {
+			return cachedWrapper.current;
+		}
+
+		cachedWrapper.current = { facts: stableFacts, derived: stableDerived };
+		return cachedWrapper.current;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [system, ...factKeys, ...derivedKeys]);
+
+	const values = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+	const dispatch = useCallback(
+		(event: InferEvents<S>) => system.dispatch(event),
+		[system],
+	);
+
+	const base = {
+		system,
+		dispatch,
+		facts: values.facts as Pick<InferFacts<S>, FK>,
+		derived: values.derived as Pick<InferDerivations<S>, DK>,
+	};
+
+	if (status && statusPlugin) {
+		return { ...base, statusPlugin } as UseDirectiveReturnWithStatus<S, FK, DK>;
+	}
+
+	return base as UseDirectiveReturn<S, FK, DK>;
+}
+
+// ============================================================================
+// DevTools Component
+// ============================================================================
+
+/** Props for DirectiveDevTools component */
+export interface DirectiveDevToolsProps {
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>;
+	/** Position of the panel */
+	position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+	/** Whether the panel starts open */
+	defaultOpen?: boolean;
+}
+
+/**
+ * Dev-only floating panel that shows system state.
+ * Tree-shaken in production builds via `process.env.NODE_ENV` check.
+ */
+export function DirectiveDevTools({
+	system,
+	position = "bottom-right",
+	defaultOpen = false,
+}: DirectiveDevToolsProps): ReturnType<typeof import("react").createElement> | null {
+	const [isOpen, setIsOpen] = useState(defaultOpen);
+	const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+	const { isSettled, unmet, inflight } = useInspect(system);
+
+	// Auto-focus close button when panel opens
+	useEffect(() => {
+		if (isOpen && closeButtonRef.current) {
+			closeButtonRef.current.focus();
+		}
+	}, [isOpen]);
+
+	// Facts subscription for devtools
+	const factsSubscribe = useCallback(
+		(onStoreChange: () => void) => system.facts.$store.subscribeAll(onStoreChange),
+		[system],
+	);
+	const factsRef = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+	const getFactsSnapshot = useCallback(() => {
+		const current = system.facts.$store.toObject();
+		if (factsRef.current !== UNINITIALIZED) {
+			const prevKeys = Object.keys(factsRef.current as Record<string, unknown>);
+			const currKeys = Object.keys(current);
+			if (prevKeys.length === currKeys.length) {
+				let same = true;
+				for (const key of currKeys) {
+					if (!Object.is((factsRef.current as Record<string, unknown>)[key], current[key])) {
+						same = false;
+						break;
+					}
+				}
+				if (same) return factsRef.current as Record<string, unknown>;
+			}
+		}
+		factsRef.current = current;
+		return current;
+	}, [system]);
+	const facts = useSyncExternalStore(factsSubscribe, getFactsSnapshot, getFactsSnapshot);
+
+	if (process.env.NODE_ENV === "production") return null;
+
+	const positionStyles: Record<string, string | number> = {
+		position: "fixed",
+		zIndex: 99999,
+		...(position.includes("bottom") ? { bottom: 12 } : { top: 12 }),
+		...(position.includes("right") ? { right: 12 } : { left: 12 }),
+	};
+
+	if (!isOpen) {
+		return (
+			<button
+				type="button"
+				onClick={() => setIsOpen(true)}
+				aria-label={`Open Directive DevTools${isSettled ? "" : " (system working)"}`}
+				aria-expanded={false}
+				style={{
+					...positionStyles,
+					background: "#1a1a2e",
+					color: "#e0e0e0",
+					border: "1px solid #333",
+					borderRadius: 6,
+					padding: "6px 12px",
+					cursor: "pointer",
+					fontFamily: "monospace",
+					fontSize: 12,
+				}}
+			>
+				{isSettled ? "Directive" : "Directive..."}
+			</button>
+		);
+	}
+
+	const derivationKeys = Object.keys(system.derive);
+	const derivations: Record<string, unknown> = {};
+	for (const key of derivationKeys) {
+		try {
+			derivations[key] = system.read(key);
+		} catch {
+			derivations[key] = "<error>";
+		}
+	}
+
+	return (
+		<div
+			role="region"
+			aria-label="Directive DevTools"
+			tabIndex={-1}
+			onKeyDown={(e) => {
+				if (e.key === "Escape") setIsOpen(false);
+			}}
+			style={{
+				...positionStyles,
+				background: "#1a1a2e",
+				color: "#e0e0e0",
+				border: "1px solid #333",
+				borderRadius: 8,
+				padding: 12,
+				fontFamily: "monospace",
+				fontSize: 11,
+				maxWidth: 380,
+				maxHeight: 500,
+				overflow: "auto",
+				boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+			}}
+		>
+			<div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+				<strong style={{ color: "#7c8aff" }}>Directive DevTools</strong>
+				<button
+					ref={closeButtonRef}
+					type="button"
+					onClick={() => setIsOpen(false)}
+					aria-label="Close DevTools"
+					style={{
+						background: "none",
+						border: "none",
+						color: "#888",
+						cursor: "pointer",
+						fontSize: 14,
+					}}
+				>
+					{"\u00D7"}
+				</button>
+			</div>
+
+			<div style={{ marginBottom: 6 }} aria-live="polite">
+				<span style={{ color: isSettled ? "#4ade80" : "#fbbf24" }}>
+					{isSettled ? "Settled" : "Working..."}
+				</span>
+			</div>
+
+			<details open>
+				<summary style={{ cursor: "pointer", color: "#7c8aff", marginBottom: 4 }}>
+					Facts ({Object.keys(facts).length})
+				</summary>
+				<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+					<thead>
+						<tr>
+							<th style={{ textAlign: "left", padding: "2px 4px", color: "#7c8aff" }}>Key</th>
+							<th style={{ textAlign: "left", padding: "2px 4px", color: "#7c8aff" }}>Value</th>
+						</tr>
+					</thead>
+					<tbody>
+						{Object.entries(facts).map(([key, value]) => {
+							let display: string;
+							try {
+								display = typeof value === "object" ? JSON.stringify(value) : String(value);
+							} catch {
+								display = "<error>";
+							}
+							return (
+								<tr key={key} style={{ borderBottom: "1px solid #2a2a4a" }}>
+									<td style={{ padding: "2px 4px", color: "#a0a0c0" }}>{key}</td>
+									<td style={{ padding: "2px 4px" }}>{display}</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</details>
+
+			{derivationKeys.length > 0 && (
+				<details>
+					<summary style={{ cursor: "pointer", color: "#7c8aff", marginBottom: 4 }}>
+						Derivations ({derivationKeys.length})
+					</summary>
+					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+						<thead>
+							<tr>
+								<th style={{ textAlign: "left", padding: "2px 4px", color: "#7c8aff" }}>Key</th>
+								<th style={{ textAlign: "left", padding: "2px 4px", color: "#7c8aff" }}>Value</th>
+							</tr>
+						</thead>
+						<tbody>
+							{Object.entries(derivations).map(([key, value]) => (
+								<tr key={key} style={{ borderBottom: "1px solid #2a2a4a" }}>
+									<td style={{ padding: "2px 4px", color: "#a0a0c0" }}>{key}</td>
+									<td style={{ padding: "2px 4px" }}>
+										{typeof value === "object" ? JSON.stringify(value) : String(value)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</details>
+			)}
+
+			{inflight.length > 0 && (
+				<details open>
+					<summary style={{ cursor: "pointer", color: "#fbbf24", marginBottom: 4 }}>
+						Inflight ({inflight.length})
+					</summary>
+					<ul style={{ margin: 0, paddingLeft: 16 }}>
+						{inflight.map((r) => (
+							<li key={r.id} style={{ fontSize: 11 }}>
+								{r.resolverId} ({r.id})
+							</li>
+						))}
+					</ul>
+				</details>
+			)}
+
+			{unmet.length > 0 && (
+				<details open>
+					<summary style={{ cursor: "pointer", color: "#f87171", marginBottom: 4 }}>
+						Unmet ({unmet.length})
+					</summary>
+					<ul style={{ margin: 0, paddingLeft: 16 }}>
+						{unmet.map((r) => (
+							<li key={r.id} style={{ fontSize: 11 }}>
+								{r.requirement.type} from {r.fromConstraint}
+							</li>
+						))}
+					</ul>
+				</details>
+			)}
+		</div>
+	);
+}
+
+// ============================================================================
+// useEvents — memoized events reference
+// ============================================================================
+
+/**
+ * Returns the system's events dispatcher. Provides autocomplete for event names
+ * and avoids needing useCallback wrappers for event dispatch.
  *
- *   return (
- *     <Provider>
- *       <LoadingIndicator />
- *       <Content />
- *     </Provider>
- *   );
- * }
+ * @example
+ * ```tsx
+ * const events = useEvents(system);
+ * <button onClick={() => events.increment()}>+</button>
+ * ```
+ */
+export function useEvents<S extends ModuleSchema>(
+	system: SingleModuleSystem<S>,
+): SingleModuleSystem<S>["events"] {
+	return useMemo(() => system.events, [system]);
+}
+
+// ============================================================================
+// useModule — zero-config all-in-one hook
+// ============================================================================
+
+/**
+ * Zero-config hook that creates a scoped system from a module definition,
+ * subscribes to ALL facts and derivations, and returns everything.
  *
- * function LoadingIndicator() {
- *   const status = useRequirementStatus("FETCH_DATA");
- *   if (status.isLoading) return <Spinner />;
- *   return null;
+ * @example
+ * ```tsx
+ * function Counter() {
+ *   const { facts, derived, events } = useModule(counterModule);
+ *   return <div>{facts.count} (doubled: {derived.doubled})</div>;
  * }
  * ```
+ */
+export function useModule<S extends ModuleSchema>(
+	moduleDef: ModuleDef<S>,
+	config?: DirectiveRefBaseConfig & { status?: boolean },
+) {
+	// biome-ignore lint/suspicious/noExplicitAny: Conditional overload dispatch
+	const refResult: any = config?.status
+		? useDirectiveRef(moduleDef, { status: true as const, ...config })
+		: useDirectiveRef(moduleDef, config ?? {});
+
+	const system: SingleModuleSystem<S> = config?.status
+		? refResult.system
+		: refResult;
+
+	const statusPlugin = config?.status ? refResult.statusPlugin as StatusPlugin : undefined;
+
+	// Subscribe to ALL facts
+	const factsSubscribe = useCallback(
+		(onStoreChange: () => void) => system.facts.$store.subscribeAll(onStoreChange),
+		[system],
+	);
+	const cachedFacts = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+	const getFactsSnapshot = useCallback(() => {
+		const current = system.facts.$store.toObject();
+		if (cachedFacts.current !== UNINITIALIZED) {
+			const prev = cachedFacts.current as Record<string, unknown>;
+			const currKeys = Object.keys(current);
+			if (Object.keys(prev).length === currKeys.length) {
+				let same = true;
+				for (const key of currKeys) {
+					if (!Object.is(prev[key], current[key])) { same = false; break; }
+				}
+				if (same) return prev;
+			}
+		}
+		cachedFacts.current = current;
+		return current;
+	}, [system]);
+	const facts = useSyncExternalStore(factsSubscribe, getFactsSnapshot, getFactsSnapshot) as InferFacts<S>;
+
+	// Subscribe to ALL derivations
+	const derivationKeys = useMemo(() => Object.keys(system.derive), [system]);
+	const derivedSubscribe = useCallback(
+		(onStoreChange: () => void) => {
+			if (derivationKeys.length === 0) return () => {};
+			return system.subscribe(derivationKeys, onStoreChange);
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[system, ...derivationKeys],
+	);
+	const cachedDerived = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+	const getDerivedSnapshot = useCallback(() => {
+		const result: Record<string, unknown> = {};
+		for (const key of derivationKeys) {
+			result[key] = system.read(key);
+		}
+		if (cachedDerived.current !== UNINITIALIZED) {
+			const prev = cachedDerived.current as Record<string, unknown>;
+			let same = true;
+			for (const key of derivationKeys) {
+				if (!Object.is(prev[key], result[key])) { same = false; break; }
+			}
+			if (same) return prev;
+		}
+		cachedDerived.current = result;
+		return result;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [system, ...derivationKeys]);
+	const derived = useSyncExternalStore(derivedSubscribe, getDerivedSnapshot, getDerivedSnapshot) as InferDerivations<S>;
+
+	const events = useEvents(system);
+	const dispatch = useDispatch(system);
+
+	return { system, facts, derived, events, dispatch, statusPlugin };
+}
+
+// ============================================================================
+// useExplain — reactive requirement explanation
+// ============================================================================
+
+/**
+ * Reactively returns the explanation string for a requirement.
+ * Updates whenever system state changes.
+ *
+ * @example
+ * ```tsx
+ * const explanation = useExplain(system, "req-123");
+ * if (explanation) <pre>{explanation}</pre>;
+ * ```
+ */
+export function useExplain(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	requirementId: string,
+): string | null {
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			const unsubFacts = system.facts.$store.subscribeAll(onStoreChange);
+			const unsubSettled = system.onSettledChange(onStoreChange);
+			return () => {
+				unsubFacts();
+				unsubSettled();
+			};
+		},
+		[system],
+	);
+
+	const getSnapshot = useCallback(() => {
+		return system.explain(requirementId);
+	}, [system, requirementId]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+// ============================================================================
+// useConstraintStatus — reactive constraint inspection
+// ============================================================================
+
+// ConstraintInfo is imported from ./shared.js and re-exported above
+
+/** Get all constraints or a single constraint by ID */
+export function useConstraintStatus(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	constraintId?: string,
+): ConstraintInfo[] | ConstraintInfo | null {
+	const inspectState = useInspect(system);
+
+	return useMemo(() => {
+		const inspection = system.inspect();
+		if (!constraintId) return inspection.constraints;
+		return inspection.constraints.find((c) => c.id === constraintId) ?? null;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [system, constraintId, inspectState]);
+}
+
+// ============================================================================
+// useOptimisticUpdate — batch with rollback on failure
+// ============================================================================
+
+/** Result of useOptimisticUpdate */
+export interface OptimisticUpdateResult {
+	/** Apply an optimistic update (saves snapshot, then runs updateFn in batch) */
+	mutate: (updateFn: () => void) => void;
+	/** Whether a resolver is currently processing the optimistic change */
+	isPending: boolean;
+	/** Error if the resolver failed */
+	error: Error | null;
+	/** Manually rollback to the pre-mutation snapshot */
+	rollback: () => void;
+}
+
+/**
+ * Optimistic update hook. Saves a snapshot before mutating, monitors
+ * a requirement type via statusPlugin, and rolls back on failure.
+ *
+ * @example
+ * ```tsx
+ * const { mutate, isPending, error, rollback } = useOptimisticUpdate(
+ *   system, statusPlugin, "SAVE_ITEM"
+ * );
+ * mutate(() => { system.facts.items = [...system.facts.items, newItem]; });
+ * ```
+ */
+export function useOptimisticUpdate(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	statusPlugin?: StatusPlugin,
+	requirementType?: string,
+): OptimisticUpdateResult {
+	const [isPending, setIsPending] = useState(false);
+	const [error, setError] = useState<Error | null>(null);
+	const snapshotRef = useRef<SystemSnapshot | null>(null);
+
+	const rollback = useCallback(() => {
+		if (snapshotRef.current) {
+			system.restore(snapshotRef.current);
+			snapshotRef.current = null;
+		}
+		setIsPending(false);
+		setError(null);
+	}, [system]);
+
+	const mutate = useCallback(
+		(updateFn: () => void) => {
+			snapshotRef.current = system.getSnapshot();
+			setIsPending(true);
+			setError(null);
+			system.batch(updateFn);
+		},
+		[system],
+	);
+
+	// Watch for resolver completion/failure
+	useEffect(() => {
+		if (!statusPlugin || !requirementType || !isPending) return;
+
+		return statusPlugin.subscribe(() => {
+			const status = statusPlugin.getStatus(requirementType);
+			if (!status.isLoading && !status.hasError) {
+				// Resolved successfully — keep optimistic state
+				snapshotRef.current = null;
+				setIsPending(false);
+			} else if (status.hasError) {
+				// Failed — rollback
+				setError(status.lastError);
+				rollback();
+			}
+		});
+	}, [statusPlugin, requirementType, isPending, rollback]);
+
+	return { mutate, isPending, error, rollback };
+}
+
+// ============================================================================
+// DirectiveHydrator + useHydratedSystem — SSR/RSC hydration
+// ============================================================================
+
+/** Props for DirectiveHydrator component */
+export interface HydratorProps {
+	snapshot: DistributableSnapshot;
+	children: ReactNode;
+}
+
+/** Context for hydrated snapshot */
+const HydrationContext = createContext<DistributableSnapshot | null>(null);
+
+/**
+ * SSR/RSC hydration component. Wraps children with a snapshot context
+ * that `useHydratedSystem` can consume on the client.
+ *
+ * @example
+ * ```tsx
+ * // Server component
+ * <DirectiveHydrator snapshot={serverSnapshot}>
+ *   <ClientApp />
+ * </DirectiveHydrator>
+ * ```
+ */
+export function DirectiveHydrator({ snapshot, children }: HydratorProps) {
+	return (
+		<HydrationContext.Provider value={snapshot}>
+			{children}
+		</HydrationContext.Provider>
+	);
+}
+
+/**
+ * Client-side hook that creates a system hydrated from a server snapshot.
+ * Must be used inside a `<DirectiveHydrator>`.
+ *
+ * @example
+ * ```tsx
+ * function ClientApp() {
+ *   const system = useHydratedSystem(counterModule);
+ *   const count = useFact(system, "count");
+ *   return <div>{count}</div>;
+ * }
+ * ```
+ */
+export function useHydratedSystem<S extends ModuleSchema>(
+	moduleDef: ModuleDef<S>,
+	config?: DirectiveRefBaseConfig,
+): SingleModuleSystem<S> {
+	const snapshot = useContext(HydrationContext);
+
+	// Merge snapshot data as initial facts if available
+	const mergedConfig = useMemo(() => {
+		if (!snapshot?.data) return config ?? {};
+		return {
+			...(config ?? {}),
+			initialFacts: {
+				...(config?.initialFacts ?? {}),
+				...snapshot.data,
+			},
+		};
+	}, [snapshot, config]);
+
+	return useDirectiveRef(moduleDef, mergedConfig) as SingleModuleSystem<S>;
+}
+
+// ============================================================================
+// Deprecated Re-exports (one release cycle)
+// ============================================================================
+
+/**
+ * @deprecated Use `useFact(system, [keys])` instead.
+ */
+export function useFacts<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(
+	system: SingleModuleSystem<S>,
+	factKeys: K[],
+): Pick<InferFacts<S>, K> {
+	return useFact(system, factKeys);
+}
+
+/**
+ * @deprecated Use `useFact(system, factKey, selector)` instead.
+ */
+export function useFactSelector<S extends ModuleSchema, K extends keyof InferFacts<S> & string, R>(
+	system: SingleModuleSystem<S>,
+	factKey: K,
+	selector: (value: InferFacts<S>[K] | undefined) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R {
+	// Direct pass-through: deprecated API has same (system, factKey, selector) order as new useFact selector overload
+	return useFact(system, factKey, selector, equalityFn);
+}
+
+/**
+ * @deprecated Use `useDerived(system, [keys])` instead.
+ */
+export function useDerivations<
+	S extends ModuleSchema,
+	K extends keyof InferDerivations<S> & string,
+>(
+	system: SingleModuleSystem<S>,
+	derivationIds: K[],
+): Pick<InferDerivations<S>, K>;
+export function useDerivations<T extends Record<string, unknown>>(
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any>,
+	derivationIds: string[],
+): T;
+export function useDerivations(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	derivationIds: string[],
+): Record<string, unknown> {
+	return useDerived(system, derivationIds) as Record<string, unknown>;
+}
+
+/**
+ * @deprecated Use `useDerived(system, derivationId, selector)` instead.
+ */
+export function useDerivedSelector<
+	S extends ModuleSchema,
+	K extends keyof InferDerivations<S> & string,
+	R,
+>(
+	system: SingleModuleSystem<S>,
+	derivationId: K,
+	selector: (value: InferDerivations<S>[K]) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+export function useDerivedSelector<T, R>(
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any>,
+	derivationId: string,
+	selector: (value: T) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+export function useDerivedSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	derivationId: string,
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	selector: (value: any) => unknown,
+	equalityFn?: (a: unknown, b: unknown) => boolean,
+): unknown {
+	return useDerived(system, derivationId, selector, equalityFn);
+}
+
+/**
+ * @deprecated Use `useDirectiveRef(mod, { status: true })` instead.
  */
 export function useDirectiveRefWithStatus<M extends ModuleSchema>(
 	options: UseDirectiveRefOptions<M>,
-): {
-	system: System<M>;
-	statusPlugin: ReturnType<typeof createRequirementStatusPlugin>;
-	Provider: (props: { children: ReactNode }) => ReactNode;
-} {
-	// Use refs to store the system and plugin - created once, stable forever
-	const systemRef = useRef<System<M> | null>(null);
-	const statusPluginRef = useRef<ReturnType<typeof createRequirementStatusPlugin> | null>(null);
-	const isInitialized = useRef(false);
-
-	// Initialize system and plugin only once
-	if (!isInitialized.current) {
-		isInitialized.current = true;
-
-		statusPluginRef.current = createRequirementStatusPlugin();
-
-		const isModule = "id" in options && "schema" in options;
-
-		if (isModule) {
-			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			systemRef.current = createSystem({
-				module: options as ModuleDef<M>,
-				// biome-ignore lint/suspicious/noExplicitAny: Plugin<never> requires cast
-				plugins: [statusPluginRef.current.plugin as Plugin<any>],
-			} as any) as unknown as System<M>;
-		} else {
-			const opts = options as Exclude<UseDirectiveRefOptions<M>, ModuleDef<M>>;
-			// biome-ignore lint/suspicious/noExplicitAny: Plugin<never> requires cast
-			const allPlugins = [...(opts.plugins ?? []), statusPluginRef.current.plugin as Plugin<any>];
-			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			systemRef.current = createSystem({
-				module: opts.module,
-				plugins: allPlugins,
-				debug: opts.debug,
-				tickMs: opts.tickMs,
-				zeroConfig: opts.zeroConfig,
-				initialFacts: opts.initialFacts,
-			} as any) as unknown as System<M>;
-		}
-
-		systemRef.current.start();
-	}
-
-	// Cleanup on unmount
-	useEffect(() => {
-		return () => {
-			systemRef.current?.destroy();
-		};
-	}, []);
-
-	// Create a stable Provider component using useCallback
-	const Provider = useCallback(
-		({ children }: { children: ReactNode }) => (
-			<DirectiveProvider system={systemRef.current!} statusPlugin={statusPluginRef.current!}>
-				{children}
-			</DirectiveProvider>
-		),
-		[],
-	);
-
-	return {
-		system: systemRef.current!,
-		statusPlugin: statusPluginRef.current!,
-		Provider,
+): { system: SingleModuleSystem<M>; statusPlugin: StatusPlugin } {
+	return useDirectiveRef(options, { status: true }) as {
+		system: SingleModuleSystem<M>;
+		statusPlugin: StatusPlugin;
 	};
 }
 
-// ============================================================================
-// Typed Hooks Factory
-// ============================================================================
+/** @deprecated Use `useInspect(system).isSettled` instead. */
+export function useIsSettled(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+): boolean {
+	return useInspect(system).isSettled;
+}
+
+/** @deprecated Use `useInspect(system)` instead. */
+export function useRequirements(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+): RequirementsState {
+	const { unmet, inflight, isWorking, hasUnmet, hasInflight } = useInspect(system);
+	return { unmet, inflight, isWorking, hasUnmet, hasInflight };
+}
+
+/** @deprecated Use `useInspect(system, { throttleMs })` instead. */
+export function useRequirementsThrottled(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	options: ThrottledHookOptions = {},
+): RequirementsState {
+	const { unmet, inflight, isWorking, hasUnmet, hasInflight } = useInspect(system, { throttleMs: options.throttleMs });
+	return { unmet, inflight, isWorking, hasUnmet, hasInflight };
+}
+
+/** @deprecated Use `useInspect(system, { throttleMs })` instead. */
+export function useInspectThrottled(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	options: ThrottledHookOptions = {},
+) {
+	return useInspect(system, { throttleMs: options.throttleMs ?? 100 });
+}
+
+/** @deprecated Use `useRequirementStatus(plugin, type).isLoading` instead. */
+export function useIsResolving(
+	statusPlugin: StatusPlugin,
+	type: string,
+): boolean {
+	const status = useRequirementStatus(statusPlugin, type);
+	return status.inflight > 0;
+}
+
+/** @deprecated Use `useRequirementStatus(plugin, type).lastError` instead. */
+export function useLatestError(
+	statusPlugin: StatusPlugin,
+	type: string,
+): Error | null {
+	const status = useRequirementStatus(statusPlugin, type);
+	return status.lastError;
+}
+
+/** @deprecated Use `useRequirementStatus(plugin, [types])` instead. */
+export function useRequirementStatuses(
+	statusPlugin: StatusPlugin,
+): Map<string, RequirementTypeStatus> {
+	const cachedRef = useRef<Map<string, RequirementTypeStatus> | null>(null);
+	const cachedKey = useRef<string>("");
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			return statusPlugin.subscribe(onStoreChange);
+		},
+		[statusPlugin],
+	);
+
+	const getSnapshot = useCallback(() => {
+		const current = statusPlugin.getAllStatus();
+		const parts: string[] = [];
+		for (const [type, status] of current) {
+			parts.push(`${type}:${status.pending}:${status.inflight}:${status.failed}:${status.hasError}:${status.lastError?.message ?? ""}`);
+		}
+		const key = parts.join("|");
+
+		if (key !== cachedKey.current) {
+			cachedKey.current = key;
+			cachedRef.current = current;
+		}
+
+		return cachedRef.current ?? current;
+	}, [statusPlugin]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** @deprecated Use `useSuspenseRequirement(plugin, [types])` instead. */
+export function useSuspenseRequirements(
+	statusPlugin: StatusPlugin,
+	types: string[],
+): Record<string, RequirementTypeStatus> {
+	return useSuspenseRequirement(statusPlugin, types);
+}
 
 /**
- * Create typed hooks for a specific system schema.
- *
- * This provides better type inference than the generic hooks.
- *
- * @returns An object containing typed versions of useDerived, useFact, useFacts, useDispatch, and useSystem
- *
- * @example
- * ```tsx
- * import { createTypedHooks } from 'directive/react';
- *
- * // Define your schema
- * const schema = {
- *   facts: { count: t.number(), user: t.any<User | null>() },
- *   derivations: { doubled: t.number() },
- *   events: { increment: {}, setUser: { user: t.any<User>() } },
- *   requirements: {},
- * } satisfies ModuleSchema;
- *
- * // Create typed hooks
- * const { useDerived, useFact, useDispatch } = createTypedHooks<typeof schema>();
- *
- * function Counter() {
- *   const count = useFact("count"); // Type: number
- *   const doubled = useDerived("doubled"); // Type: number
- *   const dispatch = useDispatch();
- *
- *   // dispatch({ type: "increment" }); // Typed!
- *   // dispatch({ type: "setUser", user: { id: 1, name: "John" } }); // Typed!
- * }
- * ```
+ * @deprecated Use `useDirective` instead.
+ * Note: The old API used `derivations` key; the new API uses `derived`.
  */
-export function createTypedHooks<M extends ModuleSchema>(): {
-	useDerived: <K extends keyof InferDerivations<M>>(
-		derivationId: K,
-		// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-		system?: System<any>,
-	) => InferDerivations<M>[K];
-	useFact: <K extends keyof InferFacts<M>>(
-		factKey: K,
-		// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-		system?: System<any>,
-	) => InferFacts<M>[K] | undefined;
-	useFacts: () => System<M>["facts"];
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	useDispatch: (system?: System<any>) => (event: InferEvents<M>) => void;
-	useSystem: () => System<M>;
-} {
+export function useSystem<
+	S extends ModuleSchema,
+	FK extends keyof InferFacts<S> & string = never,
+	DK extends keyof InferDerivations<S> & string = never,
+>(
+	moduleOrOptions: UseDirectiveRefOptions<S>,
+	selections: { facts?: FK[]; derivations?: DK[] } = {},
+): {
+	system: SingleModuleSystem<S>;
+	dispatch: (event: InferEvents<S>) => void;
+} & Pick<InferFacts<S>, FK> & Pick<InferDerivations<S>, DK> {
+	// Map old 'derivations' key to new 'derived' key
+	const result = useDirective(moduleOrOptions, {
+		facts: selections.facts,
+		derived: selections.derivations,
+	});
+
+	// Flatten facts and derived into top level for backward compat
 	return {
-		useDerived: <K extends keyof InferDerivations<M>>(
-			derivationId: K,
-			// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-			system?: System<any>,
-		) => useDerived<InferDerivations<M>[K]>(derivationId as string, system),
-		useFact: <K extends keyof InferFacts<M>>(
-			factKey: K,
-			// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-			system?: System<any>,
-		) => useFact<InferFacts<M>[K]>(factKey as string, system),
-		useFacts: () => useSystem<M>().facts,
-		useDispatch: (
-			// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-			system?: System<any>,
-		) => useDispatch<M>(system),
-		useSystem: () => useSystem<M>(),
-	};
+		system: result.system,
+		dispatch: result.dispatch,
+		...result.facts,
+		...result.derived,
+	} as {
+		system: SingleModuleSystem<S>;
+		dispatch: (event: InferEvents<S>) => void;
+	} & Pick<InferFacts<S>, FK> & Pick<InferDerivations<S>, DK>;
+}
+
+/** @deprecated Internal to DirectiveDevTools. Use DirectiveDevTools component instead. */
+export function useDirectiveDevTools(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+): {
+	inspection: ReturnType<typeof system.inspect>;
+	isSettled: boolean;
+	facts: Record<string, unknown>;
+} {
+	const inspectState = useInspect(system);
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			return system.facts.$store.subscribeAll(onStoreChange);
+		},
+		[system],
+	);
+
+	const factsRef = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
+	const getFactsSnapshot = useCallback(() => {
+		const current = system.facts.$store.toObject();
+
+		if (factsRef.current !== UNINITIALIZED) {
+			const prevKeys = Object.keys(factsRef.current as Record<string, unknown>);
+			const currKeys = Object.keys(current);
+			if (prevKeys.length === currKeys.length) {
+				let same = true;
+				for (const key of currKeys) {
+					if (!Object.is((factsRef.current as Record<string, unknown>)[key], current[key])) {
+						same = false;
+						break;
+					}
+				}
+				if (same) return factsRef.current as Record<string, unknown>;
+			}
+		}
+
+		factsRef.current = current;
+		return current;
+	}, [system]);
+
+	const facts = useSyncExternalStore(subscribe, getFactsSnapshot, getFactsSnapshot);
+
+	return { inspection: system.inspect(), isSettled: inspectState.isSettled, facts };
+}
+
+/**
+ * @deprecated Use `useWatch(system, "fact", factKey, callback)` instead.
+ */
+export function useWatchFact<
+	S extends ModuleSchema,
+	K extends keyof InferFacts<S> & string,
+>(
+	system: SingleModuleSystem<S>,
+	factKey: K,
+	callback: (newValue: InferFacts<S>[K] | undefined, prevValue: InferFacts<S>[K] | undefined) => void,
+): void {
+	// Delegate to new useWatch fact overload
+	useWatch(system, "fact", factKey, callback);
 }

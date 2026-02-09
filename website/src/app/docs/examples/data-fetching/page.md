@@ -83,14 +83,13 @@ const system = createSystem({ module: userModule });
 ## React Component
 
 ```typescript
-import { useFact, useSystem } from 'directive/react';
+import { useFact } from 'directive/react';
 
 function UserProfile() {
-  const userId = useFact('userId');
-  const user = useFact('user');
-  const loading = useFact('loading');
-  const error = useFact('error');
-  const { facts } = useSystem();
+  const userId = useFact(system, 'userId');
+  const user = useFact(system, 'user');
+  const loading = useFact(system, 'loading');
+  const error = useFact(system, 'error');
 
   if (loading) {
     return <div>Loading...</div>;
@@ -100,7 +99,7 @@ function UserProfile() {
     return (
       <div>
         <p>Error: {error}</p>
-        <button onClick={() => { facts.error = null }}>
+        <button onClick={() => { system.facts.error = null }}>
           Retry
         </button>
       </div>
@@ -113,7 +112,7 @@ function UserProfile() {
         <input
           type="number"
           placeholder="Enter user ID"
-          onChange={(e) => { facts.userId = Number(e.target.value) }}
+          onChange={(e) => { system.facts.userId = Number(e.target.value) }}
         />
       </div>
     );
@@ -143,6 +142,6 @@ function UserProfile() {
 
 ## Next Steps
 
-- See Form Validation for input handling
-- See Constraints for more patterns
-- See Resolvers for retry configuration
+- See [Form Validation](/docs/examples/form-validation) for input handling
+- See [Constraints](/docs/constraints) for more patterns
+- See [Resolvers](/docs/resolvers) for retry configuration

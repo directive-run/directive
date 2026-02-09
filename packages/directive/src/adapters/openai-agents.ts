@@ -1,16 +1,16 @@
 /**
- * OpenAI Agents Adapter - Constraint-driven agent orchestration with guardrails
+ * AI Adapter - Constraint-driven agent orchestration with guardrails
  *
- * Philosophy: "Use Directive WITH OpenAI Agents"
- * - OpenAI Agents handles LLM tool execution
+ * Philosophy: "Use Directive WITH any LLM agent framework"
+ * - Your framework handles LLM tool execution
  * - Directive adds safety guardrails, approval workflows, state persistence
  *
  * @example
  * ```typescript
- * import { Agent, run } from '@openai/agents'
- * import { createAgentOrchestrator } from 'directive/openai-agents'
+ * import { createAgentOrchestrator } from 'directive/ai'
  *
  * const orchestrator = createAgentOrchestrator({
+ *   run: myRunFn,
  *   constraints: {
  *     needsExpertReview: {
  *       when: (facts) => facts.decision.confidence < 0.7,
@@ -36,6 +36,8 @@ import type {
   SingleModuleSystem,
   System,
 } from "../core/types.js";
+import type { AgentMemory } from "./openai-agents-memory.js";
+import type { CircuitBreaker } from "./plugins/circuit-breaker.js";
 import {
   setBridgeFact,
   getBridgeFact,
@@ -44,277 +46,106 @@ import {
 } from "../core/types/adapter-utils.js";
 import { createModule } from "../core/module.js";
 import { createSystem } from "../core/system.js";
-import { t } from "../core/facts.js";
 
 // ============================================================================
-// Types (OpenAI Agents compatible, without direct dependency)
+// Re-export all types from dedicated module
 // ============================================================================
 
-/** Simplified Agent interface */
-export interface AgentLike {
-  name: string;
-  instructions?: string;
-  model?: string;
-  tools?: unknown[];
-}
+export type {
+  AgentLike,
+  RunResult,
+  Message,
+  ToolCall,
+  RunFn,
+  RunOptions,
+  GuardrailFn,
+  GuardrailContext,
+  GuardrailResult,
+  InputGuardrailData,
+  OutputGuardrailData,
+  ToolCallGuardrailData,
+  GuardrailRetryConfig,
+  AgentRetryConfig,
+  NamedGuardrail,
+  GuardrailsConfig,
+  AgentState,
+  ApprovalState,
+  RejectedRequest,
+  ApprovalRequest,
+  OrchestratorConstraint,
+  OrchestratorResolverContext,
+  OrchestratorResolver,
+  OrchestratorState,
+  OrchestratorLifecycleHooks,
+  GuardrailErrorCode,
+  SchemaValidationResult,
+  SchemaValidator,
+} from "./openai-agents-types.js";
 
-/** Agent run result */
-export interface RunResult<T = unknown> {
-  finalOutput: T;
-  messages: Message[];
-  toolCalls: ToolCall[];
-  totalTokens: number;
-}
+export { GuardrailError, isGuardrailError } from "./openai-agents-types.js";
 
-/** Message from agent run */
-export interface Message {
-  role: "user" | "assistant" | "tool" | "system";
-  content: string;
-  toolCallId?: string;
-}
+import type {
+  AgentLike,
+  RunResult,
+  Message,
+  ToolCall,
+  RunFn,
+  RunOptions,
+  GuardrailFn,
+  GuardrailContext,
+  GuardrailResult,
+  InputGuardrailData,
+  OutputGuardrailData,
+  ToolCallGuardrailData,
+  GuardrailRetryConfig,
+  AgentRetryConfig,
+  NamedGuardrail,
+  GuardrailsConfig,
+  AgentState,
+  ApprovalState,
+  RejectedRequest,
+  ApprovalRequest,
+  OrchestratorConstraint,
+  OrchestratorResolverContext,
+  OrchestratorResolver,
+  OrchestratorState,
+  OrchestratorLifecycleHooks,
+} from "./openai-agents-types.js";
 
-/** Tool call record */
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: string;
-  result?: string;
-}
+import {
+  GuardrailError,
+  AGENT_KEY,
+  APPROVAL_KEY,
+  CONVERSATION_KEY,
+  TOOL_CALLS_KEY,
+  orchestratorBridgeSchema,
+} from "./openai-agents-types.js";
 
-/** Run function type */
-export type RunFn = <T = unknown>(
-  agent: AgentLike,
-  input: string,
-  options?: RunOptions
-) => Promise<RunResult<T>>;
+// Re-export built-in guardrails
+export {
+  createPIIGuardrail,
+  createModerationGuardrail,
+  createRateLimitGuardrail,
+  createToolGuardrail,
+  createOutputSchemaGuardrail,
+  createOutputTypeGuardrail,
+  type RateLimitGuardrail,
+} from "./openai-agents-builtin-guardrails.js";
 
-/** Run options */
-export interface RunOptions {
-  maxTurns?: number;
-  signal?: AbortSignal;
-  onMessage?: (message: Message) => void;
-  onToolCall?: (toolCall: ToolCall) => void;
-}
-
-// ============================================================================
-// Orchestrator Types
-// ============================================================================
-
-/** Guardrail function */
-export type GuardrailFn<T = unknown> = (
-  data: T,
-  context: GuardrailContext
-) => GuardrailResult | Promise<GuardrailResult>;
-
-/** Guardrail context */
-export interface GuardrailContext {
-  agentName: string;
-  input: string;
-  facts: Record<string, unknown>;
-}
-
-/** Guardrail result */
-export interface GuardrailResult {
-  passed: boolean;
-  reason?: string;
-  transformed?: unknown;
-}
-
-/** Input guardrail data */
-export interface InputGuardrailData {
-  input: string;
-  agentName: string;
-}
-
-/** Output guardrail data */
-export interface OutputGuardrailData {
-  output: unknown;
-  agentName: string;
-  input: string;
-  messages: Message[];
-}
-
-/** Tool call guardrail data */
-export interface ToolCallGuardrailData {
-  toolCall: ToolCall;
-  agentName: string;
-  input: string;
-}
-
-/** Retry configuration for guardrails */
-export interface GuardrailRetryConfig {
-  /**
-   * Maximum number of attempts
-   * @default 1
-   */
-  attempts?: number;
-  /**
-   * Backoff strategy
-   * @default "exponential"
-   */
-  backoff?: "exponential" | "linear" | "fixed";
-  /**
-   * Base delay in ms
-   * @default 100
-   */
-  baseDelayMs?: number;
-  /**
-   * Maximum delay in ms
-   * @default 5000
-   */
-  maxDelayMs?: number;
-}
-
-/** Retry configuration for agent runs */
-export interface AgentRetryConfig {
-  /**
-   * Maximum number of attempts
-   * @default 1
-   */
-  attempts?: number;
-  /**
-   * Backoff strategy
-   * @default "exponential"
-   */
-  backoff?: "exponential" | "linear" | "fixed";
-  /**
-   * Base delay in ms
-   * @default 1000
-   */
-  baseDelayMs?: number;
-  /**
-   * Maximum delay in ms
-   * @default 30000
-   */
-  maxDelayMs?: number;
-  /**
-   * Function to determine if an error is retryable
-   * @default () => true (all errors are retryable)
-   */
-  isRetryable?: (error: Error) => boolean;
-  /** Callback fired before each retry attempt */
-  onRetry?: (attempt: number, error: Error, delayMs: number) => void;
-}
-
-/** Named guardrail for better debugging */
-export interface NamedGuardrail<T = unknown> {
-  /** Unique name for debugging and error messages */
-  name: string;
-  /** The guardrail function */
-  fn: GuardrailFn<T>;
-  /**
-   * Whether this guardrail is critical (blocking)
-   * @default true
-   */
-  critical?: boolean;
-  /** Retry configuration for transient failures */
-  retry?: GuardrailRetryConfig;
-}
-
-/** Guardrails configuration */
-export interface GuardrailsConfig {
-  /** Validate/transform input before agent runs */
-  input?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
-  /** Validate/transform output after agent runs */
-  output?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
-  /** Validate tool calls before execution */
-  toolCall?: Array<GuardrailFn<ToolCallGuardrailData> | NamedGuardrail<ToolCallGuardrailData>>;
-}
-
-/** Agent state in facts */
-export interface AgentState {
-  status: "idle" | "running" | "paused" | "completed" | "error";
-  currentAgent: string | null;
-  input: string | null;
-  output: unknown | null;
-  error: string | null;
-  tokenUsage: number;
-  turnCount: number;
-  startedAt: number | null;
-  completedAt: number | null;
-}
-
-/** Approval state */
-export interface ApprovalState {
-  pending: ApprovalRequest[];
-  approved: string[];
-  rejected: RejectedRequest[];
-}
-
-/** Rejected request with tracking information */
-export interface RejectedRequest {
-  /** The request ID that was rejected */
-  id: string;
-  /** Optional reason for rejection */
-  reason?: string;
-  /** Timestamp when the rejection occurred */
-  rejectedAt: number;
-}
-
-/** Approval request */
-export interface ApprovalRequest {
-  id: string;
-  type: "tool_call" | "output" | "handoff";
-  agentName: string;
-  description: string;
-  data: unknown;
-  requestedAt: number;
-}
-
-/** Constraint for orchestrator */
-export interface OrchestratorConstraint<F extends Record<string, unknown>> {
-  when: (facts: F & OrchestratorState) => boolean | Promise<boolean>;
-  require: Requirement | ((facts: F & OrchestratorState) => Requirement);
-  priority?: number;
-}
-
-/** Resolver context for orchestrator */
-export interface OrchestratorResolverContext<F extends Record<string, unknown>> {
-  facts: F & OrchestratorState;
-  runAgent: <T>(agent: AgentLike, input: string, options?: RunOptions) => Promise<RunResult<T>>;
-  signal: AbortSignal;
-}
-
-/** Resolver for orchestrator */
-export interface OrchestratorResolver<
-  F extends Record<string, unknown>,
-  R extends Requirement = Requirement
-> {
-  requirement: (req: Requirement) => req is R;
-  key?: (req: R) => string;
-  resolve: (req: R, ctx: OrchestratorResolverContext<F>) => void | Promise<void>;
-}
-
-/** Combined orchestrator state */
-export interface OrchestratorState {
-  agent: AgentState;
-  approval: ApprovalState;
-  conversation: Message[];
-  toolCalls: ToolCall[];
-}
-
-// ============================================================================
-// Bridge Schema
-// ============================================================================
-
-/** Bridge schema keys for orchestrator state */
-const AGENT_KEY = "__agent" as const;
-const APPROVAL_KEY = "__approval" as const;
-const CONVERSATION_KEY = "__conversation" as const;
-const TOOL_CALLS_KEY = "__toolCalls" as const;
-
-/** Bridge schema for orchestrator */
-const orchestratorBridgeSchema = {
-  facts: {
-    [AGENT_KEY]: t.any<AgentState>(),
-    [APPROVAL_KEY]: t.any<ApprovalState>(),
-    [CONVERSATION_KEY]: t.any<Message[]>(),
-    [TOOL_CALLS_KEY]: t.any<ToolCall[]>(),
-  },
-  derivations: {},
-  events: {},
-  requirements: {},
-} satisfies ModuleSchema;
+// Re-export helpers
+export {
+  isAgentRunning,
+  hasPendingApprovals,
+  estimateCost,
+  createRunFn,
+  createOpenAIRunFn,
+  createAnthropicRunFn,
+  createOllamaRunFn,
+  type CreateRunFnOptions,
+  type OpenAIRunFnOptions,
+  type AnthropicRunFnOptions,
+  type OllamaRunFnOptions,
+} from "./openai-agents-helpers.js";
 
 // ============================================================================
 // Bridge Accessors
@@ -460,55 +291,12 @@ interface PauseBudgetExceededReq extends Requirement {
   type: "__PAUSE_BUDGET_EXCEEDED";
 }
 
-/** Lifecycle hooks for observability */
-export interface OrchestratorLifecycleHooks {
-  /** Called when an agent run starts */
-  onAgentStart?: (event: {
-    agentName: string;
-    input: string;
-    timestamp: number;
-  }) => void;
-  /** Called when an agent run completes successfully */
-  onAgentComplete?: (event: {
-    agentName: string;
-    input: string;
-    output: unknown;
-    tokenUsage: number;
-    durationMs: number;
-    timestamp: number;
-  }) => void;
-  /** Called when an agent run fails */
-  onAgentError?: (event: {
-    agentName: string;
-    input: string;
-    error: Error;
-    durationMs: number;
-    timestamp: number;
-  }) => void;
-  /** Called when a guardrail check completes */
-  onGuardrailCheck?: (event: {
-    guardrailName: string;
-    guardrailType: "input" | "output" | "toolCall";
-    passed: boolean;
-    reason?: string;
-    durationMs: number;
-    timestamp: number;
-  }) => void;
-  /** Called when an agent run is retried */
-  onAgentRetry?: (event: {
-    agentName: string;
-    input: string;
-    attempt: number;
-    error: Error;
-    delayMs: number;
-    timestamp: number;
-  }) => void;
-}
-
 /** Orchestrator options */
 export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Function to run an agent */
-  runAgent: RunFn;
+  run?: RunFn;
+  /** @deprecated Use `run` instead */
+  runAgent?: RunFn;
   /** Additional facts schema */
   factsSchema?: Record<string, { _type: unknown; _validators: [] }>;
   /** Initialize additional facts */
@@ -523,7 +311,7 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   onApprovalRequest?: (request: ApprovalRequest) => void;
   /**
    * Auto-approve tool calls
-   * @default false
+   * @default true
    */
   autoApproveToolCalls?: boolean;
   /**
@@ -564,6 +352,16 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   agentRetry?: AgentRetryConfig;
   /** Lifecycle hooks for observability */
   hooks?: OrchestratorLifecycleHooks;
+  /**
+   * Optional memory instance. When provided, context messages are auto-injected
+   * into agent instructions before each run, and result messages are auto-stored.
+   */
+  memory?: AgentMemory;
+  /**
+   * Optional circuit breaker. Wraps every run() call.
+   * When OPEN, throws CircuitBreakerOpenError instead of calling the agent.
+   */
+  circuitBreaker?: CircuitBreaker;
 }
 
 /** Streaming run result from orchestrator */
@@ -589,13 +387,23 @@ export type OrchestratorStreamChunk =
   | { type: "done"; totalTokens: number; duration: number }
   | { type: "error"; error: Error };
 
+/** Per-call options for run() */
+export interface RunCallOptions {
+  /** Override output guardrails for this call only. Set to [] to skip. */
+  outputGuardrails?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
+  /** Override input guardrails for this call only. Set to [] to skip. */
+  inputGuardrails?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
+  /** Signal for abort */
+  signal?: AbortSignal;
+}
+
 /** Orchestrator instance */
 export interface AgentOrchestrator<F extends Record<string, unknown>> {
   // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: System<any>;
   facts: F & OrchestratorState;
-  /** Run an agent with guardrails */
-  run<T>(agent: AgentLike, input: string): Promise<RunResult<T>>;
+  /** Run an agent with guardrails. Pass options to override guardrails per-call. */
+  run<T>(agent: AgentLike, input: string, options?: RunCallOptions): Promise<RunResult<T>>;
   /**
    * Run an agent with streaming support.
    * Returns an async iterator for chunks and a promise for the final result.
@@ -802,21 +610,30 @@ export function createAgentOrchestrator<
   F extends Record<string, unknown> = Record<string, never>
 >(options: OrchestratorOptions<F>): AgentOrchestrator<F> {
   const {
-    runAgent,
+    run: runOption,
+    runAgent: runAgentOption,
     factsSchema = {},
     init,
     constraints = {},
     resolvers = {},
     guardrails = {},
     onApprovalRequest,
-    autoApproveToolCalls = false,
+    autoApproveToolCalls = true,
     maxTokenBudget,
     plugins = [],
     debug = false,
     approvalTimeoutMs = 300000,
     agentRetry,
     hooks = {},
+    memory,
+    circuitBreaker,
   } = options;
+
+  const runAgentResolved = runOption ?? runAgentOption;
+  if (!runAgentResolved) {
+    throw new Error("[Directive] createAgentOrchestrator requires a 'run' function.");
+  }
+  const runAgent: RunFn = runAgentResolved;
 
   // Enforce approval workflow configuration - require either auto-approve or callback
   if (!autoApproveToolCalls && !onApprovalRequest) {
@@ -844,7 +661,8 @@ export function createAgentOrchestrator<
     agent: AgentLike,
     input: string,
     currentFacts: F & OrchestratorState,
-    opts?: RunOptions
+    opts?: RunOptions,
+    callOptions?: RunCallOptions
   ) => Promise<RunResult<T>>;
 
   // Forward declaration for system (used in resolver converter)
@@ -941,9 +759,40 @@ export function createAgentOrchestrator<
     agent: AgentLike,
     input: string,
     _currentFacts: F & OrchestratorState,
-    opts?: RunOptions
+    opts?: RunOptions,
+    callOptions?: RunCallOptions
+  ): Promise<RunResult<T>> {
+    // Wrap in circuit breaker if configured
+    if (circuitBreaker) {
+      return circuitBreaker.execute(() =>
+        runAgentWithGuardrailsInner<T>(agent, input, _currentFacts, opts, callOptions)
+      );
+    }
+    return runAgentWithGuardrailsInner<T>(agent, input, _currentFacts, opts, callOptions);
+  }
+
+  async function runAgentWithGuardrailsInner<T>(
+    agent: AgentLike,
+    input: string,
+    _currentFacts: F & OrchestratorState,
+    opts?: RunOptions,
+    callOptions?: RunCallOptions
   ): Promise<RunResult<T>> {
     const startTime = Date.now();
+
+    // Inject memory context into agent instructions if memory is configured
+    if (memory) {
+      const contextMessages = memory.getContextMessages();
+      if (contextMessages.length > 0) {
+        const contextStr = contextMessages
+          .map((m) => `${m.role}: ${m.content}`)
+          .join("\n");
+        agent = {
+          ...agent,
+          instructions: (agent.instructions ?? "") + "\n\nConversation context:\n" + contextStr,
+        };
+      }
+    }
 
     // Call onAgentStart hook
     hooks.onAgentStart?.({
@@ -952,11 +801,19 @@ export function createAgentOrchestrator<
       timestamp: startTime,
     });
 
+    // Resolve which guardrails to use: per-call override > orchestrator defaults
+    const effectiveInputGuardrails = callOptions?.inputGuardrails !== undefined
+      ? callOptions.inputGuardrails
+      : (guardrails.input ?? []);
+    const effectiveOutputGuardrails = callOptions?.outputGuardrails !== undefined
+      ? callOptions.outputGuardrails
+      : (guardrails.output ?? []);
+
     // Run input guardrails with retry support
-    const inputGuardrails = (guardrails.input ?? []).map((g, i) =>
+    const inputGuardrailsList = effectiveInputGuardrails.map((g, i) =>
       normalizeGuardrail(g, i, "input")
     );
-    for (const guardrail of inputGuardrails) {
+    for (const guardrail of inputGuardrailsList) {
       const { name } = guardrail;
       const context = {
         agentName: agent.name,
@@ -1101,10 +958,10 @@ export function createAgentOrchestrator<
     } : undefined);
 
     // Run output guardrails with retry support
-    const outputGuardrails = (guardrails.output ?? []).map((g, i) =>
+    const outputGuardrailsList = effectiveOutputGuardrails.map((g, i) =>
       normalizeGuardrail(g, i, "output")
     );
-    for (const guardrail of outputGuardrails) {
+    for (const guardrail of outputGuardrailsList) {
       const { name } = guardrail;
       const context = {
         agentName: agent.name,
@@ -1158,6 +1015,11 @@ export function createAgentOrchestrator<
         completedAt: Date.now(),
       });
     });
+
+    // Store messages in memory if configured
+    if (memory && result.messages.length > 0) {
+      memory.addMessages(result.messages);
+    }
 
     // Call onAgentComplete hook
     hooks.onAgentComplete?.({
@@ -1231,8 +1093,8 @@ export function createAgentOrchestrator<
       return getCombinedFacts();
     },
 
-    async run<T>(agent: AgentLike, input: string): Promise<RunResult<T>> {
-      return runAgentWithGuardrails<T>(agent, input, getCombinedFacts());
+    async run<T>(agent: AgentLike, input: string, options?: RunCallOptions): Promise<RunResult<T>> {
+      return runAgentWithGuardrails<T>(agent, input, getCombinedFacts(), undefined, options);
     },
 
     runStream<T>(
@@ -1537,10 +1399,16 @@ export function createAgentOrchestrator<
     approve(requestId: string): void {
       system.batch(() => {
         const approval = getApprovalState(system.facts);
+        if (!approval.pending.some((r) => r.id === requestId)) {
+          if (debug) console.debug(`[Directive] approve() ignored: no pending request "${requestId}"`);
+          return;
+        }
+        const MAX_APPROVAL_HISTORY = 200;
+        const approved = [...approval.approved, requestId];
         setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
-          approved: [...approval.approved, requestId],
+          approved: approved.length > MAX_APPROVAL_HISTORY ? approved.slice(-MAX_APPROVAL_HISTORY) : approved,
         });
       });
     },
@@ -1548,6 +1416,10 @@ export function createAgentOrchestrator<
     reject(requestId: string, reason?: string): void {
       system.batch(() => {
         const approval = getApprovalState(system.facts);
+        if (!approval.pending.some((r) => r.id === requestId)) {
+          if (debug) console.debug(`[Directive] reject() ignored: no pending request "${requestId}"`);
+          return;
+        }
         if (reason && debug) {
           console.debug(`[Directive] Request ${requestId} rejected: ${reason}`);
         }
@@ -1556,10 +1428,12 @@ export function createAgentOrchestrator<
           reason,
           rejectedAt: Date.now(),
         };
+        const MAX_REJECTION_HISTORY = 200;
+        const rejected = [...approval.rejected, rejectedRequest];
         setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
-          rejected: [...approval.rejected, rejectedRequest],
+          rejected: rejected.length > MAX_REJECTION_HISTORY ? rejected.slice(-MAX_REJECTION_HISTORY) : rejected,
         });
       });
     },
@@ -1613,673 +1487,11 @@ export function createAgentOrchestrator<
   return orchestrator;
 }
 
-// ============================================================================
-// Built-in Guardrails
-// ============================================================================
+// (Built-in guardrails moved to openai-agents-builtin-guardrails.ts)
 
-/**
- * Create a PII detection guardrail.
- *
- * @example
- * ```typescript
- * const piiGuardrail = createPIIGuardrail({
- *   patterns: [
- *     /\b\d{3}-\d{2}-\d{4}\b/, // SSN
- *     /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, // Email
- *   ],
- *   redact: true,
- * });
- * ```
- */
-export function createPIIGuardrail(options: {
-  patterns?: RegExp[];
-  redact?: boolean;
-  redactReplacement?: string;
-}): GuardrailFn<InputGuardrailData> {
-  const {
-    patterns = [
-      /\b\d{3}-\d{2}-\d{4}\b/, // SSN
-      /\b\d{16}\b/, // Credit card
-      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, // Email
-    ],
-    redact = false,
-    redactReplacement = "[REDACTED]",
-  } = options;
+// (Helper functions moved to openai-agents-helpers.ts)
 
-  return (data) => {
-    let text = data.input;
-    let hasPII = false;
-
-    for (const pattern of patterns) {
-      if (pattern.test(text)) {
-        hasPII = true;
-        if (redact) {
-          text = text.replace(pattern, redactReplacement);
-        }
-      }
-    }
-
-    if (hasPII && !redact) {
-      return { passed: false, reason: "Input contains PII" };
-    }
-
-    return { passed: true, transformed: redact && hasPII ? text : undefined };
-  };
-}
-
-/**
- * Create a content moderation guardrail.
- *
- * @example
- * ```typescript
- * const moderationGuardrail = createModerationGuardrail({
- *   checkFn: async (text) => {
- *     const result = await openai.moderations.create({ input: text });
- *     return result.results[0].flagged;
- *   },
- * });
- * ```
- */
-export function createModerationGuardrail(options: {
-  checkFn: (text: string) => boolean | Promise<boolean>;
-  message?: string;
-}): GuardrailFn<InputGuardrailData | OutputGuardrailData> {
-  const { checkFn, message = "Content flagged by moderation" } = options;
-
-  return async (data) => {
-    const text =
-      "output" in data
-        ? typeof data.output === "string"
-          ? data.output
-          : JSON.stringify(data.output)
-        : data.input;
-
-    const flagged = await checkFn(text);
-
-    return { passed: !flagged, reason: flagged ? message : undefined };
-  };
-}
-
-/** Rate limiter with reset capability for testing */
-export interface RateLimitGuardrail extends GuardrailFn<InputGuardrailData> {
-  /** Reset the rate limiter state (useful for testing) */
-  reset(): void;
-}
-
-/**
- * Create a rate limit guardrail based on token usage.
- * Returns a guardrail function with an additional `reset()` method for testing.
- *
- * @example
- * ```typescript
- * const rateLimitGuardrail = createRateLimitGuardrail({
- *   maxTokensPerMinute: 10000,
- *   maxRequestsPerMinute: 60,
- * });
- *
- * // For testing, reset the state between tests
- * rateLimitGuardrail.reset();
- * ```
- */
-export function createRateLimitGuardrail(options: {
-  maxTokensPerMinute?: number;
-  maxRequestsPerMinute?: number;
-}): RateLimitGuardrail {
-  const { maxTokensPerMinute = 100000, maxRequestsPerMinute = 60 } = options;
-
-  // Use bounded arrays with binary search for O(log n) cleanup instead of O(n) shift()
-  // Max entries = max requests per minute (bounded)
-  const maxEntries = Math.max(maxRequestsPerMinute, 1000);
-  let tokenTimestamps: number[] = [];
-  let requestTimestamps: number[] = [];
-  const windowMs = 60000;
-
-  // Binary search to find cutoff index
-  function findCutoffIndex(arr: number[], cutoffTime: number): number {
-    let low = 0;
-    let high = arr.length;
-    while (low < high) {
-      const mid = (low + high) >>> 1;
-      if ((arr[mid] ?? 0) < cutoffTime) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-    return low;
-  }
-
-  const guardrail: RateLimitGuardrail = (_data, context) => {
-    const now = Date.now();
-    const cutoffTime = now - windowMs;
-
-    // Clean old entries with binary search + splice (O(log n) + O(k) where k = removed entries)
-    const tokenCutoff = findCutoffIndex(tokenTimestamps, cutoffTime);
-    if (tokenCutoff > 0) {
-      tokenTimestamps = tokenTimestamps.slice(tokenCutoff);
-    }
-
-    const requestCutoff = findCutoffIndex(requestTimestamps, cutoffTime);
-    if (requestCutoff > 0) {
-      requestTimestamps = requestTimestamps.slice(requestCutoff);
-    }
-
-    // Check limits - safely extract token usage from context facts
-    const factsObj = context.facts as Record<string, unknown>;
-    const agentState = factsObj[AGENT_KEY] as AgentState | undefined;
-    const tokenUsage = agentState?.tokenUsage ?? 0;
-    const recentTokens = tokenTimestamps.length;
-    const recentRequests = requestTimestamps.length;
-
-    if (recentTokens + tokenUsage > maxTokensPerMinute) {
-      return { passed: false, reason: "Token rate limit exceeded" };
-    }
-
-    if (recentRequests >= maxRequestsPerMinute) {
-      return { passed: false, reason: "Request rate limit exceeded" };
-    }
-
-    // Record this request (bounded to prevent unbounded growth)
-    if (requestTimestamps.length < maxEntries) {
-      requestTimestamps.push(now);
-    }
-    if (tokenTimestamps.length < maxEntries) {
-      tokenTimestamps.push(now);
-    }
-
-    return { passed: true };
-  };
-
-  guardrail.reset = () => {
-    tokenTimestamps = [];
-    requestTimestamps = [];
-  };
-
-  return guardrail;
-}
-
-/**
- * Create a tool allowlist/denylist guardrail.
- *
- * @example
- * ```typescript
- * const toolGuardrail = createToolGuardrail({
- *   allowlist: ['search', 'calculator'],
- *   // or
- *   denylist: ['shell', 'filesystem'],
- * });
- * ```
- */
-export function createToolGuardrail(options: {
-  allowlist?: string[];
-  denylist?: string[];
-  /**
-   * Case-sensitive matching
-   * @default false
-   */
-  caseSensitive?: boolean;
-}): GuardrailFn<ToolCallGuardrailData> {
-  const { allowlist, denylist, caseSensitive = false } = options;
-
-  // Normalize lists for case-insensitive matching
-  const normalizedAllowlist = allowlist?.map((t) => caseSensitive ? t : t.toLowerCase());
-  const normalizedDenylist = denylist?.map((t) => caseSensitive ? t : t.toLowerCase());
-
-  return (data) => {
-    const toolName = caseSensitive ? data.toolCall.name : data.toolCall.name.toLowerCase();
-
-    if (normalizedAllowlist && !normalizedAllowlist.includes(toolName)) {
-      return { passed: false, reason: `Tool "${data.toolCall.name}" not in allowlist` };
-    }
-
-    if (normalizedDenylist && normalizedDenylist.includes(toolName)) {
-      return { passed: false, reason: `Tool "${data.toolCall.name}" is blocked` };
-    }
-
-    return { passed: true };
-  };
-}
-
-/** Schema validation result */
-export interface SchemaValidationResult {
-  valid: boolean;
-  errors?: string[];
-}
-
-/** Schema validator function type */
-export type SchemaValidator<_T = unknown> = (
-  value: unknown
-) => SchemaValidationResult | boolean;
-
-/**
- * Create an output schema validation guardrail.
- *
- * Validates that agent outputs match a specified schema or validation function.
- * Useful for ensuring structured outputs from agents.
- *
- * @example
- * ```typescript
- * // With a custom validation function
- * const schemaGuardrail = createOutputSchemaGuardrail({
- *   validate: (output) => {
- *     if (typeof output !== 'object' || output === null) {
- *       return { valid: false, errors: ['Output must be an object'] };
- *     }
- *     if (!('answer' in output)) {
- *       return { valid: false, errors: ['Output must have an answer field'] };
- *     }
- *     return { valid: true };
- *   },
- * });
- *
- * // With Zod schema (if you have Zod installed)
- * import { z } from 'zod';
- * const OutputSchema = z.object({
- *   answer: z.string(),
- *   confidence: z.number().min(0).max(1),
- * });
- * const zodGuardrail = createOutputSchemaGuardrail({
- *   validate: (output) => {
- *     const result = OutputSchema.safeParse(output);
- *     if (result.success) return { valid: true };
- *     return {
- *       valid: false,
- *       errors: result.error.errors.map(e => e.message),
- *     };
- *   },
- * });
- * ```
- */
-export function createOutputSchemaGuardrail<T = unknown>(options: {
-  /** Validation function that checks if output matches expected schema */
-  validate: SchemaValidator<T>;
-  /** Custom error message prefix */
-  errorPrefix?: string;
-}): GuardrailFn<OutputGuardrailData> {
-  const { validate, errorPrefix = "Output schema validation failed" } = options;
-
-  return (data) => {
-    const result = validate(data.output);
-
-    // Handle boolean return (simple valid/invalid)
-    if (typeof result === "boolean") {
-      return {
-        passed: result,
-        reason: result ? undefined : errorPrefix,
-      };
-    }
-
-    // Handle detailed validation result
-    if (result.valid) {
-      return { passed: true };
-    }
-
-    const errorMessage = result.errors?.length
-      ? `${errorPrefix}: ${result.errors.join("; ")}`
-      : errorPrefix;
-
-    return { passed: false, reason: errorMessage };
-  };
-}
-
-/**
- * Create a simple type check guardrail for common output types.
- *
- * @example
- * ```typescript
- * // Ensure output is a string
- * const stringGuardrail = createOutputTypeGuardrail({ type: 'string' });
- *
- * // Ensure output is an object with required fields
- * const objectGuardrail = createOutputTypeGuardrail({
- *   type: 'object',
- *   requiredFields: ['answer', 'sources'],
- * });
- *
- * // Ensure output is an array
- * const arrayGuardrail = createOutputTypeGuardrail({ type: 'array' });
- * ```
- */
-export function createOutputTypeGuardrail(options: {
-  /** Expected output type */
-  type: "string" | "number" | "boolean" | "object" | "array";
-  /** For objects, specify required fields */
-  requiredFields?: string[];
-  /** For arrays, minimum length */
-  minLength?: number;
-  /** For arrays, maximum length */
-  maxLength?: number;
-  /** For strings, minimum length */
-  minStringLength?: number;
-  /** For strings, maximum length */
-  maxStringLength?: number;
-}): GuardrailFn<OutputGuardrailData> {
-  const {
-    type,
-    requiredFields = [],
-    minLength,
-    maxLength,
-    minStringLength,
-    maxStringLength,
-  } = options;
-
-  return (data) => {
-    const output = data.output;
-
-    // Type checks
-    switch (type) {
-      case "string":
-        if (typeof output !== "string") {
-          return { passed: false, reason: `Expected string, got ${typeof output}` };
-        }
-        if (minStringLength !== undefined && output.length < minStringLength) {
-          return { passed: false, reason: `String too short: ${output.length} < ${minStringLength}` };
-        }
-        if (maxStringLength !== undefined && output.length > maxStringLength) {
-          return { passed: false, reason: `String too long: ${output.length} > ${maxStringLength}` };
-        }
-        return { passed: true };
-
-      case "number":
-        if (typeof output !== "number" || Number.isNaN(output)) {
-          return { passed: false, reason: `Expected number, got ${typeof output}` };
-        }
-        return { passed: true };
-
-      case "boolean":
-        if (typeof output !== "boolean") {
-          return { passed: false, reason: `Expected boolean, got ${typeof output}` };
-        }
-        return { passed: true };
-
-      case "object":
-        if (typeof output !== "object" || output === null || Array.isArray(output)) {
-          return { passed: false, reason: `Expected object, got ${Array.isArray(output) ? "array" : typeof output}` };
-        }
-        for (const field of requiredFields) {
-          if (!(field in output)) {
-            return { passed: false, reason: `Missing required field: ${field}` };
-          }
-        }
-        return { passed: true };
-
-      case "array":
-        if (!Array.isArray(output)) {
-          return { passed: false, reason: `Expected array, got ${typeof output}` };
-        }
-        if (minLength !== undefined && output.length < minLength) {
-          return { passed: false, reason: `Array too short: ${output.length} < ${minLength}` };
-        }
-        if (maxLength !== undefined && output.length > maxLength) {
-          return { passed: false, reason: `Array too long: ${output.length} > ${maxLength}` };
-        }
-        return { passed: true };
-
-      default:
-        return { passed: false, reason: `Unknown type: ${type}` };
-    }
-  };
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Check if agent is currently running.
- */
-export function isAgentRunning(state: AgentState): boolean {
-  return state.status === "running";
-}
-
-/**
- * Check if there are pending approvals.
- */
-export function hasPendingApprovals(state: ApprovalState): boolean {
-  return state.pending.length > 0;
-}
-
-// ============================================================================
-// Cost Management
-// ============================================================================
-
-/**
- * ## Cost-Aware Constraint Patterns
- *
- * Directive provides multiple strategies for managing AI costs:
- *
- * ### 1. Token Budget (Built-in)
- *
- * Set a hard token limit that automatically pauses agents:
- *
- * ```typescript
- * const orchestrator = createAgentOrchestrator({
- *   maxTokenBudget: 10000, // Pause when exceeded
- *   // ...
- * });
- * ```
- *
- * ### 2. Custom Cost Constraints
- *
- * Create constraints based on estimated costs:
- *
- * ```typescript
- * const RATE_GPT4 = 30; // $30 per million tokens
- *
- * const orchestrator = createAgentOrchestrator({
- *   constraints: {
- *     costWarning: {
- *       priority: 100, // High priority
- *       when: (facts) => {
- *         const cost = estimateCost(facts.agent.tokenUsage, RATE_GPT4);
- *         return cost > 1.00; // $1 warning threshold
- *       },
- *       require: { type: 'COST_WARNING', amount: 'threshold exceeded' }
- *     },
- *     costLimit: {
- *       priority: 200, // Higher priority = evaluated first
- *       when: (facts) => {
- *         const cost = estimateCost(facts.agent.tokenUsage, RATE_GPT4);
- *         return cost > 5.00; // $5 hard limit
- *       },
- *       require: { type: 'PAUSE_AGENTS' }
- *     }
- *   },
- *   resolvers: {
- *     costWarning: {
- *       requirement: (req) => req.type === 'COST_WARNING',
- *       resolve: async (req, ctx) => {
- *         console.warn('Cost warning:', req.amount);
- *         // Optionally notify via webhook, email, etc.
- *       }
- *     }
- *   }
- * });
- * ```
- *
- * ### 3. Per-User/Session Budgets
- *
- * Track costs across multiple orchestrator instances:
- *
- * ```typescript
- * // In-memory (use Redis/DB for production)
- * const userBudgets = new Map<string, number>();
- *
- * function createUserOrchestrator(userId: string) {
- *   return createAgentOrchestrator({
- *     constraints: {
- *       userBudget: {
- *         when: (facts) => {
- *           const currentUsage = userBudgets.get(userId) ?? 0;
- *           return currentUsage + facts.agent.tokenUsage > 50000;
- *         },
- *         require: { type: 'USER_BUDGET_EXCEEDED', userId }
- *       }
- *     },
- *     hooks: {
- *       onAgentComplete: ({ tokenUsage }) => {
- *         const current = userBudgets.get(userId) ?? 0;
- *         userBudgets.set(userId, current + tokenUsage);
- *       }
- *     }
- *   });
- * }
- * ```
- *
- * ### 4. Tiered Responses
- *
- * Use cheaper models for simple queries:
- *
- * ```typescript
- * const orchestrator = createAgentOrchestrator({
- *   constraints: {
- *     routeToBasic: {
- *       when: (facts) => facts.queryComplexity < 0.3,
- *       require: { type: 'RUN_AGENT', agent: 'gpt-3.5-turbo' }
- *     },
- *     routeToAdvanced: {
- *       when: (facts) => facts.queryComplexity >= 0.3,
- *       require: { type: 'RUN_AGENT', agent: 'gpt-4' }
- *     }
- *   }
- * });
- * ```
- *
- * ### 5. Rate-Based Budgeting
- *
- * Use the built-in rate limiting guardrail with cost tracking:
- *
- * ```typescript
- * const orchestrator = createAgentOrchestrator({
- *   guardrails: {
- *     input: [
- *       createRateLimitGuardrail({
- *         maxRequestsPerMinute: 10,
- *         maxTokensPerMinute: 5000,
- *       })
- *     ]
- *   }
- * });
- * ```
- */
-
-/**
- * Get total cost estimate based on token usage.
- *
- * @param tokenUsage - Total token count
- * @param ratePerMillionTokens - Cost per million tokens (required, no default to avoid stale pricing)
- * @returns Estimated cost in dollars
- *
- * @example
- * ```typescript
- * // GPT-4 pricing (example - check current rates)
- * const RATE_GPT4_INPUT = 30;  // $30 per 1M input tokens
- * const RATE_GPT4_OUTPUT = 60; // $60 per 1M output tokens
- *
- * const inputCost = estimateCost(inputTokens, RATE_GPT4_INPUT);
- * const outputCost = estimateCost(outputTokens, RATE_GPT4_OUTPUT);
- * const totalCost = inputCost + outputCost;
- * ```
- */
-export function estimateCost(
-  tokenUsage: number,
-  ratePerMillionTokens: number
-): number {
-  return (tokenUsage / 1_000_000) * ratePerMillionTokens;
-}
-
-// ============================================================================
-// Structured Errors
-// ============================================================================
-
-/** Error codes for guardrail errors */
-export type GuardrailErrorCode =
-  | "INPUT_GUARDRAIL_FAILED"
-  | "OUTPUT_GUARDRAIL_FAILED"
-  | "TOOL_CALL_GUARDRAIL_FAILED"
-  | "APPROVAL_REJECTED"
-  | "BUDGET_EXCEEDED"
-  | "RATE_LIMIT_EXCEEDED"
-  | "AGENT_ERROR";
-
-/**
- * Structured error for guardrail failures.
- * Provides detailed context for debugging and error handling.
- *
- * **Security:** The `input` and `data` properties are non-enumerable to prevent
- * accidental leakage of sensitive data via JSON.stringify or console.log on the error object.
- */
-export class GuardrailError extends Error {
-  /** Error code for programmatic handling */
-  readonly code: GuardrailErrorCode;
-  /** Name of the guardrail that failed (if named) */
-  readonly guardrailName: string;
-  /** Type of guardrail that failed */
-  readonly guardrailType: "input" | "output" | "toolCall";
-  /** User-friendly error message */
-  readonly userMessage: string;
-  /** Additional data from the guardrail (non-enumerable for security) */
-  declare readonly data: unknown;
-  /** Agent that was running when the error occurred */
-  readonly agentName: string;
-  /** Input that triggered the error (non-enumerable for security) */
-  declare readonly input: string;
-
-  constructor(options: {
-    code: GuardrailErrorCode;
-    message: string;
-    guardrailName: string;
-    guardrailType: "input" | "output" | "toolCall";
-    userMessage?: string;
-    data?: unknown;
-    agentName: string;
-    input: string;
-    cause?: Error;
-  }) {
-    super(options.message, { cause: options.cause });
-    this.name = "GuardrailError";
-    this.code = options.code;
-    this.guardrailName = options.guardrailName;
-    this.guardrailType = options.guardrailType;
-    this.userMessage = options.userMessage ?? options.message;
-    this.agentName = options.agentName;
-
-    // Make sensitive fields non-enumerable to prevent accidental serialization/logging
-    Object.defineProperty(this, "input", {
-      value: options.input,
-      enumerable: false,
-      writable: false,
-      configurable: false,
-    });
-    Object.defineProperty(this, "data", {
-      value: options.data,
-      enumerable: false,
-      writable: false,
-      configurable: false,
-    });
-  }
-
-  /** Convert to a plain object for logging/serialization */
-  toJSON(): Record<string, unknown> {
-    return {
-      name: this.name,
-      code: this.code,
-      message: this.message,
-      guardrailName: this.guardrailName,
-      guardrailType: this.guardrailType,
-      userMessage: this.userMessage,
-      agentName: this.agentName,
-      // Intentionally exclude input and data for security
-    };
-  }
-}
-
-/**
- * Check if an error is a GuardrailError.
- */
-export function isGuardrailError(error: unknown): error is GuardrailError {
-  return error instanceof GuardrailError;
-}
+// (Cost helpers + errors moved to openai-agents-helpers.ts + openai-agents-types.ts)
 
 // ============================================================================
 // Builder Pattern
@@ -2319,6 +1531,12 @@ export interface OrchestratorBuilder<F extends Record<string, unknown>> {
 
   /** Add a plugin */
   withPlugin(plugin: Plugin): OrchestratorBuilder<F>;
+
+  /** Set memory instance for auto context injection and message storage */
+  withMemory(memory: AgentMemory): OrchestratorBuilder<F>;
+
+  /** Set circuit breaker to wrap all run() calls */
+  withCircuitBreaker(cb: CircuitBreaker): OrchestratorBuilder<F>;
 
   /** Set max token budget */
   withBudget(maxTokens: number): OrchestratorBuilder<F>;
@@ -2362,6 +1580,8 @@ export function createOrchestratorBuilder<
   const plugins: Plugin[] = [];
   let maxTokenBudget: number | undefined;
   let debug = false;
+  let memoryInstance: AgentMemory | undefined;
+  let circuitBreakerInstance: CircuitBreaker | undefined;
 
   const builder: OrchestratorBuilder<F> = {
     withConstraint(id, constraint) {
@@ -2406,6 +1626,16 @@ export function createOrchestratorBuilder<
       return builder;
     },
 
+    withMemory(mem) {
+      memoryInstance = mem;
+      return builder;
+    },
+
+    withCircuitBreaker(cb) {
+      circuitBreakerInstance = cb;
+      return builder;
+    },
+
     withBudget(maxTokens) {
       maxTokenBudget = maxTokens;
       return builder;
@@ -2431,12 +1661,16 @@ export function createOrchestratorBuilder<
         plugins,
         maxTokenBudget,
         debug,
+        memory: memoryInstance,
+        circuitBreaker: circuitBreakerInstance,
       });
     },
   };
 
   return builder;
 }
+
+// (createRunFn moved to openai-agents-helpers.ts)
 
 // ============================================================================
 // Re-exports from Sub-modules
@@ -2615,3 +1849,19 @@ export {
   type StreamChannelState,
   type BidirectionalStream,
 } from "./openai-agents-stream-channel.js";
+
+// Agent Stack — Composition API
+export {
+  createAgentStack,
+  type AgentStack,
+  type AgentStackConfig,
+  type AgentStackState,
+  type StackRunOptions,
+  type StackStreamOptions,
+  type StructuredRunOptions,
+  type TokenStream,
+  type StreamingCallbackRunFn,
+} from "./openai-agents-stack.js";
+
+// AI Bridge — Sync AgentStack state into Directive system
+export { createAISyncer } from "./ai-bridge.js";

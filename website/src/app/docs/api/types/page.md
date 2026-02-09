@@ -26,21 +26,72 @@ interface Module<T extends ModuleSchema> {
 ### System
 
 ```typescript
-interface System<T extends ModuleSchema> {
-  facts: Facts<T>;
-  derive: DeriveProxy<T>;
-  on: <K extends keyof T["events"]>(
-    event: K,
-    handler: (payload: T["events"][K]) => void
-  ) => () => void;
-  dispatch: <K extends keyof T["events"]>(
-    event: K,
-    payload: T["events"][K]
-  ) => void;
-  snapshot: (keys?: string[]) => Partial<Facts<T>>;
-  restore: (state: Partial<Facts<T>>) => void;
-  settle: () => Promise<void>;
-  dispose: () => void;
+interface System<M extends ModuleSchema> {
+  readonly facts: Facts<M["facts"]>;
+  readonly debug: TimeTravelAPI | null;
+  readonly derive: InferDerivations<M>;
+  readonly events: EventsAccessor<M>;
+  readonly constraints: ConstraintsControl;
+  readonly effects: EffectsControl;
+
+  start(): void;
+  stop(): void;
+  destroy(): void;
+
+  readonly isRunning: boolean;
+  readonly isSettled: boolean;
+  readonly isInitialized: boolean;
+  readonly isReady: boolean;
+  whenReady(): Promise<void>;
+
+  dispatch(event: SystemEvent): void;
+  batch(fn: () => void): void;
+
+  read(derivationId: string): unknown;
+  subscribe(derivationIds: string[], listener: () => void): () => void;
+  watch(derivationId: string, callback: (newValue, previousValue) => void): () => void;
+
+  inspect(): SystemInspection;
+  settle(maxWait?: number): Promise<void>;
+  explain(requirementId: string): string | null;
+  getSnapshot(): SystemSnapshot;
+  restore(snapshot: SystemSnapshot): void;
+  getDistributableSnapshot(options?: DistributableSnapshotOptions): DistributableSnapshot;
+  watchDistributableSnapshot(options: DistributableSnapshotOptions, callback: (snapshot) => void): () => void;
+}
+```
+
+### ConstraintsControl
+
+```typescript
+interface ConstraintsControl {
+  disable(id: string): void;
+  enable(id: string): void;
+}
+```
+
+### EffectsControl
+
+```typescript
+interface EffectsControl {
+  disable(id: string): void;
+  enable(id: string): void;
+  isEnabled(id: string): boolean;
+}
+```
+
+### TimeTravelAPI
+
+```typescript
+interface TimeTravelAPI {
+  readonly snapshots: Snapshot[];
+  readonly currentIndex: number;
+  goBack(steps?: number): void;
+  goForward(steps?: number): void;
+  goTo(snapshotId: number): void;
+  replay(): void;
+  export(): string;
+  import(json: string): void;
 }
 ```
 
@@ -73,16 +124,16 @@ interface TypeBuilder<T> {
 
 ## Constraint Types
 
-### Constraint
+### ConstraintDef
 
 ```typescript
-interface Constraint<T> {
+interface ConstraintDef<S, R extends Requirement> {
   priority?: number;
-  after?: string[];
-  when: (facts: Facts<T>, derive: DeriveProxy<T>) => boolean | Promise<boolean>;
-  require: Requirement | ((facts: Facts<T>) => Requirement);
+  async?: boolean;
+  when: (facts: Facts<S>) => boolean | Promise<boolean>;
+  require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
   timeout?: number;
-  onTimeout?: (ctx: Context<T>) => void;
+  after?: string[];
 }
 ```
 
@@ -99,26 +150,37 @@ interface Requirement {
 
 ## Resolver Types
 
-### Resolver
+### ResolverDef
 
 ```typescript
-interface Resolver<T> {
-  requirement: string;
-  key?: (req: Requirement) => string;
-  retry?: RetryConfig;
+interface ResolverDef<S, R extends Requirement> {
+  requirement: string | ((req: Requirement) => req is R);
+  key?: (req: R) => string;
+  retry?: RetryPolicy;
   timeout?: number;
-  onTimeout?: (req: Requirement, ctx: Context<T>) => void;
-  onError?: (error: Error, req: Requirement, ctx: Context<T>) => void;
-  resolve: (req: Requirement, ctx: Context<T>) => void | Promise<void>;
+  batch?: BatchConfig;
+  resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
+  resolveBatch?: (reqs: R[], ctx: ResolverContext<S>) => Promise<void>;
+  resolveBatchWithResults?: (reqs: R[], ctx: ResolverContext<S>) => Promise<BatchItemResult[]>;
 }
 ```
 
-### RetryConfig
+### ResolverContext
 
 ```typescript
-interface RetryConfig {
+interface ResolverContext<S> {
+  readonly facts: Facts<S>;
+  readonly signal: AbortSignal;
+  readonly snapshot: () => FactsSnapshot<S>;
+}
+```
+
+### RetryPolicy
+
+```typescript
+interface RetryPolicy {
   attempts: number;
-  backoff?: "linear" | "exponential";
+  backoff: "none" | "linear" | "exponential";
   initialDelay?: number;
   maxDelay?: number;
   shouldRetry?: (error: Error, attempt: number) => boolean;
@@ -145,19 +207,43 @@ interface Effect<T> {
 
 ---
 
-## Context Types
+## Error Types
 
-### Context
+### ErrorBoundaryConfig
 
 ```typescript
-interface Context<T> {
-  facts: Facts<T>;
-  derive: DeriveProxy<T>;
-  dispatch: <K extends keyof T["events"]>(
-    event: K,
-    payload: T["events"][K]
-  ) => void;
-  system: System<T>;
+interface ErrorBoundaryConfig {
+  onConstraintError?: RecoveryStrategy | ((error: Error, constraint: string) => void);
+  onResolverError?: RecoveryStrategy | ((error: Error, resolver: string) => void);
+  onEffectError?: RecoveryStrategy | ((error: Error, effect: string) => void);
+  onDerivationError?: RecoveryStrategy | ((error: Error, derivation: string) => void);
+  onError?: (error: DirectiveError) => void;
+  retryLater?: RetryLaterConfig;
+  circuitBreaker?: CircuitBreakerConfig;
+}
+```
+
+---
+
+## Snapshot Types
+
+### SystemSnapshot
+
+```typescript
+interface SystemSnapshot {
+  facts: Record<string, unknown>;
+  version?: number;
+}
+```
+
+### SystemInspection
+
+```typescript
+interface SystemInspection {
+  unmet: RequirementWithId[];
+  inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+  constraints: Array<{ id: string; active: boolean; priority: number }>;
+  resolvers: Record<string, ResolverStatus>;
 }
 ```
 
@@ -165,6 +251,6 @@ interface Context<T> {
 
 ## Next Steps
 
-- See Core API for function reference
-- See React Hooks for React API
-- See Type Builders for schema types
+- See [Core API](/docs/api/core) for function reference
+- See [React Hooks](/docs/api/react) for React API
+- See [Type Builders](/docs/type-builders) for schema types

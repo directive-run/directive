@@ -1,125 +1,186 @@
 ---
 title: PII Detection
-description: Detect and protect personally identifiable information in Directive systems.
+description: Detect and redact personally identifiable information in AI agent inputs and outputs.
 ---
 
-Automatically detect and handle PII in your data flows. {% .lead %}
+Detect SSNs, credit cards, emails, phone numbers, and more -- then block, redact, or mask them before they reach your AI agents. {% .lead %}
 
 ---
 
-## Basic Setup
-
-Enable PII detection:
+## Quick Start
 
 ```typescript
-import { piiPlugin } from 'directive/security';
+import { createEnhancedPIIGuardrail } from 'directive';
 
-const system = createSystem({
-  module: myModule,
-  plugins: [
-    piiPlugin({
-      types: ['email', 'phone', 'ssn', 'creditCard'],
-      action: 'redact',
-    }),
-  ],
+const piiGuardrail = createEnhancedPIIGuardrail({
+  types: ['ssn', 'credit_card', 'email'],
+  redact: true,
+  redactionStyle: 'typed', // replaces with [SSN], [CREDIT_CARD], etc.
+});
+```
+
+Use with an orchestrator:
+
+```typescript
+import { createAgentOrchestrator } from 'directive/openai-agents';
+
+const orchestrator = createAgentOrchestrator({
+  runAgent: run,
+  guardrails: {
+    input: [{ name: 'pii', fn: piiGuardrail }],
+  },
 });
 ```
 
 ---
 
-## Detection Types
+## Supported PII Types
 
-| Type | Pattern |
-|------|---------|
+| Type | Description |
+|------|-------------|
+| `ssn` | US Social Security Numbers |
+| `credit_card` | Credit/debit card numbers |
 | `email` | Email addresses |
-| `phone` | Phone numbers |
-| `ssn` | Social Security numbers |
-| `creditCard` | Credit card numbers |
-| `ip` | IP addresses |
-| `name` | Personal names |
+| `phone` | Phone numbers (various formats) |
 | `address` | Physical addresses |
+| `name` | Personal names (context-aware) |
+| `date_of_birth` | Birth dates |
+| `passport` | Passport numbers |
+| `driver_license` | Driver's license numbers |
+| `ip_address` | IP addresses |
+| `bank_account` | Bank account numbers |
+| `medical_id` | Medical record numbers |
+| `national_id` | Non-US national IDs |
 
 ---
 
-## Actions
-
-Configure how PII is handled:
+## Configuration
 
 ```typescript
-piiPlugin({
-  types: ['email', 'ssn'],
-
-  // 'redact' - Replace with [REDACTED]
-  // 'mask' - Partial masking (j***@email.com)
-  // 'hash' - One-way hash
-  // 'warn' - Log warning only
-  // 'block' - Prevent the operation
-  action: 'redact',
-})
-```
-
----
-
-## Custom Patterns
-
-Add custom PII patterns:
-
-```typescript
-piiPlugin({
-  custom: [
-    {
-      name: 'employeeId',
-      pattern: /EMP-\d{6}/g,
-      action: 'redact',
-    },
-    {
-      name: 'internalCode',
-      pattern: /INTERNAL-[A-Z]{4}/g,
-      action: 'mask',
-    },
-  ],
-})
-```
-
----
-
-## Field-Level Control
-
-Configure per-field behavior:
-
-```typescript
-piiPlugin({
-  fields: {
-    'user.email': { action: 'mask' },
-    'user.ssn': { action: 'redact' },
-    'logs.*': { action: 'hash' },
+const guardrail = createEnhancedPIIGuardrail({
+  types: ['ssn', 'credit_card', 'email', 'phone'],
+  detector: 'regex',         // 'regex' or a custom PIIDetector
+  redact: true,              // redact instead of blocking
+  redactionStyle: 'typed',   // 'typed' | 'masked' | 'hash'
+  minConfidence: 0.7,        // confidence threshold (0-1)
+  allowlist: ['test@example.com'],  // values to skip
+  minItemsToBlock: 1,        // minimum PII items to trigger
+  detectorTimeout: 5000,     // timeout for custom detectors (ms)
+  onDetected: (items) => {
+    console.log(`Found ${items.length} PII items`);
   },
-})
+});
+```
+
+### Redaction Styles
+
+| Style | Example |
+|-------|---------|
+| `typed` | `My SSN is [SSN]` |
+| `masked` | `My SSN is ***-**-1234` |
+| `hash` | `My SSN is a1b2c3d4...` |
+
+---
+
+## Output PII Guardrail
+
+Scan agent outputs for PII leakage:
+
+```typescript
+import { createOutputPIIGuardrail } from 'directive';
+
+const outputGuardrail = createOutputPIIGuardrail({
+  types: ['ssn', 'credit_card'],
+  redact: true,
+});
+
+const orchestrator = createAgentOrchestrator({
+  runAgent: run,
+  guardrails: {
+    output: [{ name: 'output-pii', fn: outputGuardrail }],
+  },
+});
 ```
 
 ---
 
-## Audit Logging
+## Standalone Detection
 
-Log PII detections:
+Use PII detection outside of guardrails:
 
 ```typescript
-piiPlugin({
-  onDetection: (field, type, value) => {
-    auditLog.write({
-      event: 'pii_detected',
-      field,
-      type,
-      timestamp: Date.now(),
+import { detectPII, redactPII } from 'directive';
+
+// Detect PII in text
+const result = await detectPII('My SSN is 123-45-6789', {
+  types: ['ssn', 'email'],
+  minConfidence: 0.7,
+});
+
+console.log(result.detected);  // true
+console.log(result.items);     // [{ type: 'ssn', value: '123-45-6789', confidence: 0.95, ... }]
+
+// Redact PII from text
+const redacted = redactPII(
+  'My SSN is 123-45-6789',
+  result.items,
+  'typed'
+);
+console.log(redacted); // 'My SSN is [SSN]'
+```
+
+---
+
+## Custom Detector
+
+Plug in an external detection service (like Microsoft Presidio):
+
+```typescript
+const customDetector = {
+  name: 'presidio',
+  detect: async (text, types) => {
+    const response = await fetch('https://presidio.internal/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ text, entities: types }),
     });
+    const results = await response.json();
+    return results.map(r => ({
+      type: r.entity_type,
+      value: r.text,
+      position: { start: r.start, end: r.end },
+      confidence: r.score,
+    }));
   },
-})
+};
+
+const guardrail = createEnhancedPIIGuardrail({
+  detector: customDetector,
+  detectorTimeout: 5000, // timeout prevents DoS from slow services
+});
 ```
+
+---
+
+## Simple PII Guardrail
+
+For basic use with the orchestrator, a simpler guardrail is available:
+
+```typescript
+import { createPIIGuardrail } from 'directive/openai-agents';
+
+const guardrail = createPIIGuardrail({
+  patterns: [/\b\d{3}-\d{2}-\d{4}\b/, /\b\d{16}\b/],
+  redact: true,
+  redactReplacement: '[REDACTED]',
+});
+```
+
+This version uses regex patterns directly without the full detection pipeline.
 
 ---
 
 ## Next Steps
 
-- See Prompt Injection for input safety
-- See Audit Trail for compliance logging
-- See GDPR/CCPA for regulations
+- [Prompt Injection](/docs/security/prompt-injection) -- block injection attacks
+- [Audit Trail](/docs/security/audit) -- audit logging with PII masking
+- [Compliance](/docs/security/compliance) -- GDPR/CCPA data subject rights

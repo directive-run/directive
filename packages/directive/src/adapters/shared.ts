@@ -5,7 +5,7 @@
  * @internal
  */
 
-import type { SystemInspection } from "../core/types.js";
+import type { SystemInspection, System } from "../core/types.js";
 
 // ============================================================================
 // Requirements State
@@ -43,6 +43,56 @@ export function computeRequirementsState(inspection: SystemInspection): Requirem
 		hasUnmet: inspection.unmet.length > 0,
 		hasInflight: inspection.inflight.length > 0,
 		isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+	};
+}
+
+// ============================================================================
+// Inspect State (shared across all adapters)
+// ============================================================================
+
+/**
+ * Consolidated inspection state returned by useInspect hooks.
+ * Identical shape across React, Vue, Svelte, Solid, and Lit adapters.
+ */
+export interface InspectState {
+	/** Whether the system has settled (no pending operations) */
+	isSettled: boolean;
+	/** Array of unmet requirements */
+	unmet: RequirementsState["unmet"];
+	/** Array of inflight requirements */
+	inflight: RequirementsState["inflight"];
+	/** Whether the system is actively working */
+	isWorking: boolean;
+	/** Whether there are any unmet requirements */
+	hasUnmet: boolean;
+	/** Whether there are any inflight requirements */
+	hasInflight: boolean;
+}
+
+/**
+ * Information about a single constraint.
+ */
+export interface ConstraintInfo {
+	id: string;
+	active: boolean;
+	priority: number;
+}
+
+/**
+ * Compute InspectState from a system instance.
+ * Centralizes the logic currently duplicated across adapters.
+ * @internal
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+export function computeInspectState(system: System<any>): InspectState {
+	const inspection = system.inspect();
+	return {
+		isSettled: system.isSettled,
+		unmet: inspection.unmet,
+		inflight: inspection.inflight,
+		isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+		hasUnmet: inspection.unmet.length > 0,
+		hasInflight: inspection.inflight.length > 0,
 	};
 }
 

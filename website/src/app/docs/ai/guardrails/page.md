@@ -221,7 +221,7 @@ rateLimiter.reset();
 
 ## Custom Guardrails
 
-Write your own guardrail as a function that returns `{ passed, reason?, transformed? }`:
+Write your own guardrail as a function that returns `{ passed, reason?, transformed? }`. The function receives `(data, context)` — you can omit `context` if you don't need it:
 
 ```typescript
 import { createAgentOrchestrator } from 'directive/openai-agents';
@@ -345,8 +345,8 @@ const lengthGuard = createLengthStreamingGuardrail({
 // Pattern detection — stop on forbidden patterns
 const patternGuard = createPatternStreamingGuardrail({
   patterns: [
-    { pattern: /\b(SSN|social security)\b/i, reason: 'PII detected' },
-    { pattern: /\b\d{3}-\d{2}-\d{4}\b/, reason: 'SSN pattern detected' },
+    { regex: /\b(SSN|social security)\b/i, name: 'PII' },
+    { regex: /\b\d{3}-\d{2}-\d{4}\b/, name: 'SSN' },
   ],
 });
 

@@ -19,6 +19,9 @@ const counterModule = createModule("counter", {
     facts: {
       count: t.number(),
     },
+    derivations: {},
+    events: {},
+    requirements: {},
   },
   init: (facts) => {
     facts.count = 0;
@@ -61,11 +64,13 @@ const system = createSystem({
 
 | Option | Description |
 |--------|-------------|
-| `module` | Single module to run |
-| `modules` | Multiple modules (multi-module system) |
+| `module` | Single module to run (direct access) |
+| `modules` | Multiple modules as `{ name: module }` (namespaced access) |
 | `plugins` | Array of plugins |
-| `debug` | Debug options |
-| `onError` | Global error handler |
+| `debug` | Debug options (`{ timeTravel, maxSnapshots }`) |
+| `errorBoundary` | Error handling strategies per subsystem |
+| `initialFacts` | Override initial fact values |
+| `zeroConfig` | Enable sensible defaults for dev mode |
 
 ---
 
@@ -109,29 +114,45 @@ await system.settle();
 
 ### Subscribe
 
-React to changes:
+React to derivation changes:
 
 ```typescript
-const unsubscribe = system.subscribe((facts, derive) => {
-  console.log('Facts changed:', facts);
+// Subscribe to specific derivations
+const unsubscribe = system.subscribe(["displayName", "isLoggedIn"], () => {
+  console.log('Derivation changed:', system.derive.displayName);
+});
+
+// Watch a single derivation with values
+const unsub2 = system.watch("displayName", (newValue, prevValue) => {
+  console.log(`Changed from "${prevValue}" to "${newValue}"`);
 });
 
 // Later
 unsubscribe();
+unsub2();
 ```
 
 ### Events
 
-Emit and listen to events:
+Dispatch events to update facts:
 
 ```typescript
-// Emit
-system.emit({ type: 'USER_CLICKED', payload: { x: 100, y: 200 } });
+// Via typed accessor (preferred)
+system.events.increment();
+system.events.setUser({ user: newUser });
 
-// Listen
-system.on('USER_CLICKED', (event) => {
-  console.log('User clicked at:', event.payload);
-});
+// Via dispatch
+system.dispatch({ type: "increment" });
+system.dispatch({ type: "setUser", user: newUser });
+```
+
+Events are defined in the module and handler functions update facts:
+
+```typescript
+events: {
+  increment: (facts) => { facts.count += 1; },
+  setUser: (facts, { user }) => { facts.user = user; },
+},
 ```
 
 ### Snapshot
@@ -139,8 +160,8 @@ system.on('USER_CLICKED', (event) => {
 Get a snapshot of current state:
 
 ```typescript
-const snapshot = system.snapshot();
-// { facts: {...}, derive: {...}, timestamp: 1234567890 }
+const snapshot = system.getSnapshot();
+// { facts: { userId: 123, user: {...} }, version: 1 }
 ```
 
 ### Restore
@@ -168,7 +189,7 @@ const system = createSystem({
 
 // Access with namespace
 system.facts.user.userId = 123;
-system.facts.cart.items.push(item);
+system.facts.cart.items = [...system.facts.cart.items, item];
 ```
 
 See **[Multi-Module](/docs/advanced/multi-module)** for more details.
@@ -177,10 +198,11 @@ See **[Multi-Module](/docs/advanced/multi-module)** for more details.
 
 ## Module Lifecycle
 
-1. createModule creates the module definition
-2. createSystem creates the runtime with the module
-3. init function runs to set initial facts
-4. System is ready - constraints start evaluating
+1. `createModule()` creates the module definition
+2. `createSystem()` creates the runtime with the module (plugins initialized)
+3. `system.start()` runs the `init` function, applies `initialFacts`/`hydrate`, then triggers the first reconciliation
+4. Constraints evaluate, requirements are generated, resolvers execute
+5. System settles when all requirements are fulfilled
 
 When facts change, the reconciliation loop runs until all constraints are satisfied.
 

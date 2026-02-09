@@ -9,17 +9,17 @@ Build complex applications with composable modules. {% .lead %}
 
 ## Basic Composition
 
-Combine modules in a system:
+Pass a `modules` map to create a namespaced system:
 
 ```typescript
-import { createSystem, composeModules } from 'directive';
+import { createSystem } from 'directive';
 
 const system = createSystem({
-  modules: composeModules({
+  modules: {
     auth: authModule,
     cart: cartModule,
     user: userModule,
-  }),
+  },
 });
 ```
 
@@ -27,7 +27,7 @@ const system = createSystem({
 
 ## Namespaced Access
 
-Access facts by namespace:
+Facts, derivations, and events are accessed by namespace:
 
 ```typescript
 // Access auth facts
@@ -38,62 +38,53 @@ system.facts.auth.token;
 system.facts.cart.items;
 system.facts.cart.total;
 
-// Access user facts
-system.facts.user.profile;
-system.facts.user.preferences;
+// Dispatch module events
+system.dispatch({ type: "ADD_ITEM", item: product });
 ```
 
 ---
 
-## Cross-Module Constraints
+## Module Definition
 
-Reference other modules in constraints:
+Each module defines its own schema, constraints, resolvers, and effects:
 
 ```typescript
 const cartModule = createModule("cart", {
-  constraints: {
-    canCheckout: {
-      when: (facts, { modules }) =>
-        facts.items.length > 0 &&
-        modules.auth.facts.isAuthenticated,
-      require: { type: "CHECKOUT" },
+  schema: {
+    facts: {
+      items: t.array(t.object<CartItem>()),
+      couponCode: t.string().nullable(),
+      discount: t.number(),
     },
   },
-});
-```
 
----
-
-## Shared Derivations
-
-Derive values across modules:
-
-```typescript
-const appModule = createModule("app", {
-  derive: {
-    isReady: (facts, { modules }) =>
-      modules.auth.facts.initialized &&
-      modules.user.facts.loaded &&
-      modules.config.facts.fetched,
+  init: (facts) => {
+    facts.items = [];
+    facts.couponCode = null;
+    facts.discount = 0;
   },
-});
-```
 
----
-
-## Module Dependencies
-
-Declare dependencies explicitly:
-
-```typescript
-const cartModule = createModule("cart", {
-  dependencies: ["auth", "user"],
+  derive: {
+    subtotal: (facts) =>
+      facts.items.reduce((sum, item) => sum + item.price * item.qty, 0),
+    total: (facts, derive) =>
+      derive.subtotal - facts.discount,
+  },
 
   constraints: {
-    loadCart: {
-      after: ["auth.initialized", "user.loaded"],
-      when: (facts) => !facts.loaded,
-      require: { type: "LOAD_CART" },
+    applyCoupon: {
+      when: (facts) => facts.couponCode !== null && facts.discount === 0,
+      require: { type: "APPLY_COUPON" },
+    },
+  },
+
+  resolvers: {
+    applyCoupon: {
+      requirement: "APPLY_COUPON",
+      resolve: async (req, context) => {
+        const result = await api.validateCoupon(context.facts.couponCode);
+        context.facts.discount = result.discount;
+      },
     },
   },
 });
@@ -103,22 +94,53 @@ const cartModule = createModule("cart", {
 
 ## Independent Systems
 
-Run modules as separate systems:
+You can also run modules as separate systems and coordinate through your application layer:
 
 ```typescript
 const authSystem = createSystem({ module: authModule });
 const cartSystem = createSystem({ module: cartModule });
 
-// Connect via events
-authSystem.on("LOGGED_OUT", () => {
+// Coordinate at the application level
+function handleLogout() {
+  authSystem.facts.token = null;
   cartSystem.facts.items = [];
+}
+```
+
+---
+
+## React with Multiple Modules
+
+With independent systems, pass each system directly to the components that need it -- no provider needed:
+
+```typescript
+function App() {
+  return (
+    <Layout authSystem={authSystem} cartSystem={cartSystem} />
+  );
+}
+```
+
+Or use a single namespaced system and pass it to hooks:
+
+```typescript
+import { useFact } from 'directive/react';
+
+const system = createSystem({
+  modules: { auth: authModule, cart: cartModule },
 });
+
+function App() {
+  // Access namespaced facts directly
+  const isAuthenticated = system.facts.auth.isAuthenticated;
+  return <Layout system={system} />;
+}
 ```
 
 ---
 
 ## Next Steps
 
-- See Module and System for basics
-- See Time-Travel for debugging
-- See Snapshots for state management
+- See [Module and System](/docs/module-system) for basics
+- See [Time-Travel](/docs/advanced/time-travel) for debugging
+- See [Snapshots](/docs/advanced/snapshots) for state management

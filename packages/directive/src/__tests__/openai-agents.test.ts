@@ -10,7 +10,7 @@
  * - Builder pattern
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	createAgentOrchestrator,
 	createOrchestratorBuilder,
@@ -20,16 +20,15 @@ import {
 	createToolGuardrail,
 	createOutputSchemaGuardrail,
 	createOutputTypeGuardrail,
+	createRunFn,
 	GuardrailError,
 	type AgentLike,
 	type RunFn,
 	type RunResult,
-	type GuardrailFn,
-	type InputGuardrailData,
 	type OutputGuardrailData,
-	type ToolCallGuardrailData,
-	type ApprovalRequest,
 } from "../adapters/openai-agents.js";
+import { createAgentMemory, createSlidingWindowStrategy } from "../adapters/openai-agents-memory.js";
+import { createCircuitBreaker, CircuitBreakerOpenError } from "../adapters/plugins/circuit-breaker.js";
 
 // ============================================================================
 // Helpers
@@ -118,7 +117,15 @@ describe("createAgentOrchestrator", () => {
 	});
 
 	describe("approval workflow validation", () => {
-		it("should throw when autoApproveToolCalls is false and no callback", () => {
+		it("should default autoApproveToolCalls to true (no throw without callback)", () => {
+			expect(() =>
+				createAgentOrchestrator({
+					runAgent: createMockRunFn(),
+				}),
+			).not.toThrow();
+		});
+
+		it("should throw when autoApproveToolCalls is explicitly false and no callback", () => {
 			expect(() =>
 				createAgentOrchestrator({
 					runAgent: createMockRunFn(),
@@ -153,6 +160,15 @@ describe("createAgentOrchestrator", () => {
 				onApprovalRequest: () => {},
 			});
 
+			// Seed a pending request before rejecting
+			orchestrator.system.batch(() => {
+				orchestrator.system.facts.__approval = {
+					pending: [{ id: "test-request-123", toolName: "test", arguments: "{}", createdAt: Date.now() }],
+					approved: [],
+					rejected: [],
+				};
+			});
+
 			const beforeReject = Date.now();
 			orchestrator.reject("test-request-123", "Security policy violation");
 			const afterReject = Date.now();
@@ -172,6 +188,15 @@ describe("createAgentOrchestrator", () => {
 				onApprovalRequest: () => {},
 			});
 
+			// Seed a pending request before rejecting
+			orchestrator.system.batch(() => {
+				orchestrator.system.facts.__approval = {
+					pending: [{ id: "test-request-456", toolName: "test", arguments: "{}", createdAt: Date.now() }],
+					approved: [],
+					rejected: [],
+				};
+			});
+
 			orchestrator.reject("test-request-456");
 
 			const rejected = orchestrator.facts.approval.rejected;
@@ -179,6 +204,21 @@ describe("createAgentOrchestrator", () => {
 			expect(rejected[0].id).toBe("test-request-456");
 			expect(rejected[0].reason).toBeUndefined();
 			expect(rejected[0].rejectedAt).toBeGreaterThan(0);
+		});
+
+		it("should ignore approve/reject for non-pending IDs", () => {
+			const orchestrator = createAgentOrchestrator({
+				runAgent: createMockRunFn(),
+				autoApproveToolCalls: false,
+				onApprovalRequest: () => {},
+			});
+
+			// No pending requests — approve/reject should be no-ops
+			orchestrator.approve("phantom-id");
+			orchestrator.reject("phantom-id", "test");
+
+			expect(orchestrator.facts.approval.approved.length).toBe(0);
+			expect(orchestrator.facts.approval.rejected.length).toBe(0);
 		});
 	});
 
@@ -995,5 +1035,328 @@ describe("lifecycle hooks", () => {
 				delayMs: expect.any(Number),
 			}),
 		);
+	});
+});
+
+// ============================================================================
+// Memory Integration
+// ============================================================================
+
+describe("memory integration", () => {
+	it("should auto-inject memory context into agent instructions", async () => {
+		const memory = createAgentMemory({
+			strategy: createSlidingWindowStrategy(),
+			strategyConfig: { maxMessages: 50 },
+		});
+
+		// Seed memory with a message
+		memory.addMessage({ role: "user", content: "previous question" });
+		memory.addMessage({ role: "assistant", content: "previous answer" });
+
+		let capturedAgent: AgentLike | undefined;
+		const mockRun: RunFn = vi.fn(async <T = unknown>(agent: AgentLike, _input: string) => {
+			capturedAgent = agent;
+			return makeRunResult<T>("response" as T);
+		}) as unknown as RunFn;
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: mockRun,
+			memory,
+		});
+
+		await orchestrator.run(makeAgent("test-agent"), "hello");
+
+		// Agent instructions should include memory context
+		expect(capturedAgent).toBeDefined();
+		expect(capturedAgent!.instructions).toContain("previous question");
+		expect(capturedAgent!.instructions).toContain("previous answer");
+	});
+
+	it("should auto-store result messages in memory after run", async () => {
+		const memory = createAgentMemory({
+			strategy: createSlidingWindowStrategy(),
+			strategyConfig: { maxMessages: 50 },
+		});
+
+		const mockRun: RunFn = vi.fn(async <T = unknown>(_agent: AgentLike, _input: string) => {
+			return {
+				finalOutput: "response" as T,
+				messages: [
+					{ role: "user" as const, content: "hello" },
+					{ role: "assistant" as const, content: "hi back" },
+				],
+				toolCalls: [],
+				totalTokens: 10,
+			};
+		}) as unknown as RunFn;
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: mockRun,
+			memory,
+		});
+
+		await orchestrator.run(makeAgent("test"), "hello");
+
+		// Memory should now contain the messages from the run
+		const state = memory.getState();
+		expect(state.messages.length).toBe(2);
+		expect(state.messages[0]!.content).toBe("hello");
+		expect(state.messages[1]!.content).toBe("hi back");
+	});
+
+	it("should not mutate the original agent object", async () => {
+		const memory = createAgentMemory({
+			strategy: createSlidingWindowStrategy(),
+			strategyConfig: { maxMessages: 50 },
+		});
+		memory.addMessage({ role: "user", content: "context" });
+
+		const originalAgent = makeAgent("test");
+		originalAgent.instructions = "Be helpful";
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: createMockRunFn(),
+			memory,
+		});
+
+		await orchestrator.run(originalAgent, "hello");
+
+		// Original agent should not be mutated
+		expect(originalAgent.instructions).toBe("Be helpful");
+	});
+});
+
+// ============================================================================
+// Circuit Breaker Integration
+// ============================================================================
+
+describe("circuit breaker integration", () => {
+	it("should wrap agent runs in circuit breaker", async () => {
+		const cb = createCircuitBreaker({
+			failureThreshold: 2,
+			recoveryTimeMs: 30000,
+			name: "test-cb",
+		});
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: createMockRunFn(),
+			circuitBreaker: cb,
+		});
+
+		const result = await orchestrator.run(makeAgent("test"), "hello");
+		expect(result.finalOutput).toBe("response from test");
+
+		// Circuit should still be closed after success
+		expect(cb.getState()).toBe("CLOSED");
+		expect(cb.getStats().totalSuccesses).toBe(1);
+	});
+
+	it("should throw CircuitBreakerOpenError when circuit is open", async () => {
+		const cb = createCircuitBreaker({
+			failureThreshold: 1,
+			recoveryTimeMs: 60000,
+			name: "test-cb",
+		});
+
+		const failingRun = vi.fn(async () => {
+			throw new Error("API down");
+		}) as unknown as RunFn;
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: failingRun,
+			circuitBreaker: cb,
+		});
+
+		// First call fails, opens the circuit
+		await expect(orchestrator.run(makeAgent("test"), "hello")).rejects.toThrow("API down");
+
+		// Second call should be rejected by circuit breaker
+		await expect(orchestrator.run(makeAgent("test"), "hello")).rejects.toThrow(CircuitBreakerOpenError);
+	});
+});
+
+// ============================================================================
+// Per-Call Guardrail Overrides
+// ============================================================================
+
+describe("per-call guardrail overrides", () => {
+	it("should skip output guardrails when overridden with empty array", async () => {
+		const outputGuardrail = vi.fn(async () => ({
+			passed: false,
+			reason: "Always fails",
+		}));
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: createMockRunFn(),
+			guardrails: {
+				output: [outputGuardrail],
+			},
+		});
+
+		// With default guardrails, this would throw
+		await expect(orchestrator.run(makeAgent("test"), "input")).rejects.toThrow();
+
+		// With empty override, output guardrails are skipped
+		const result = await orchestrator.run(makeAgent("test"), "input", {
+			outputGuardrails: [],
+		});
+		expect(result.finalOutput).toBe("response from test");
+		// The output guardrail was called once (first run), not in the second
+		expect(outputGuardrail).toHaveBeenCalledTimes(1);
+	});
+
+	it("should use per-call guardrails instead of defaults", async () => {
+		const defaultGuardrail = vi.fn(async () => ({ passed: true }));
+		const perCallGuardrail = vi.fn(async () => ({ passed: true }));
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: createMockRunFn(),
+			guardrails: {
+				output: [defaultGuardrail],
+			},
+		});
+
+		await orchestrator.run(makeAgent("test"), "input", {
+			outputGuardrails: [perCallGuardrail],
+		});
+
+		expect(defaultGuardrail).not.toHaveBeenCalled();
+		expect(perCallGuardrail).toHaveBeenCalledOnce();
+	});
+
+	it("should skip input guardrails when overridden with empty array", async () => {
+		const inputGuardrail = vi.fn(async () => ({
+			passed: false,
+			reason: "Blocked",
+		}));
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: createMockRunFn(),
+			guardrails: {
+				input: [inputGuardrail],
+			},
+		});
+
+		// Override input guardrails for this call
+		const result = await orchestrator.run(makeAgent("test"), "input", {
+			inputGuardrails: [],
+		});
+		expect(result.finalOutput).toBe("response from test");
+		expect(inputGuardrail).not.toHaveBeenCalled();
+	});
+
+	it("should use default guardrails when options is undefined", async () => {
+		const outputGuardrail = vi.fn(async () => ({ passed: true }));
+
+		const orchestrator = createAgentOrchestrator({
+			runAgent: createMockRunFn(),
+			guardrails: {
+				output: [outputGuardrail],
+			},
+		});
+
+		await orchestrator.run(makeAgent("test"), "input");
+		expect(outputGuardrail).toHaveBeenCalledOnce();
+	});
+});
+
+// ============================================================================
+// createRunFn
+// ============================================================================
+
+describe("createRunFn", () => {
+	it("should create a working RunFn from buildRequest/parseResponse", async () => {
+		const mockFetch = vi.fn(async () => ({
+			ok: true,
+			json: async () => ({ text: "hello world", tokens: 42 }),
+			status: 200,
+			statusText: "OK",
+		})) as unknown as typeof fetch;
+
+		const runFn = createRunFn({
+			fetch: mockFetch,
+			buildRequest: (agent, input) => ({
+				url: "https://api.example.com/chat",
+				init: {
+					method: "POST",
+					body: JSON.stringify({ model: agent.model, input }),
+				},
+			}),
+			parseResponse: async (response) => {
+				const data = await response.json() as { text: string; tokens: number };
+				return { text: data.text, totalTokens: data.tokens };
+			},
+		});
+
+		const result = await runFn(makeAgent("test"), "hello");
+
+		expect(result.finalOutput).toBe("hello world");
+		expect(result.totalTokens).toBe(42);
+		expect(result.messages).toHaveLength(2);
+		expect(result.messages[0]!.role).toBe("user");
+		expect(result.messages[1]!.role).toBe("assistant");
+		expect(mockFetch).toHaveBeenCalledOnce();
+	});
+
+	it("should throw on non-OK response", async () => {
+		const mockFetch = vi.fn(async () => ({
+			ok: false,
+			status: 500,
+			statusText: "Internal Server Error",
+		})) as unknown as typeof fetch;
+
+		const runFn = createRunFn({
+			fetch: mockFetch,
+			buildRequest: () => ({ url: "https://api.example.com/chat", init: {} }),
+			parseResponse: async () => ({ text: "", totalTokens: 0 }),
+		});
+
+		await expect(runFn(makeAgent("test"), "hello")).rejects.toThrow("500");
+	});
+
+	it("should parse JSON output by default", async () => {
+		const mockFetch = vi.fn(async () => ({
+			ok: true,
+			json: async () => ({ text: '{"answer": "42"}', tokens: 10 }),
+			status: 200,
+			statusText: "OK",
+		})) as unknown as typeof fetch;
+
+		const runFn = createRunFn({
+			fetch: mockFetch,
+			buildRequest: () => ({ url: "/api/chat", init: {} }),
+			parseResponse: async (res) => {
+				const data = await res.json() as { text: string; tokens: number };
+				return { text: data.text, totalTokens: data.tokens };
+			},
+		});
+
+		const result = await runFn<{ answer: string }>(makeAgent("test"), "hello");
+		expect(result.finalOutput).toEqual({ answer: "42" });
+	});
+
+	it("should use custom parseOutput when provided", async () => {
+		const mockFetch = vi.fn(async () => ({
+			ok: true,
+			json: async () => ({ text: "custom-format:42", tokens: 5 }),
+			status: 200,
+			statusText: "OK",
+		})) as unknown as typeof fetch;
+
+		const runFn = createRunFn({
+			fetch: mockFetch,
+			buildRequest: () => ({ url: "/api/chat", init: {} }),
+			parseResponse: async (res) => {
+				const data = await res.json() as { text: string; tokens: number };
+				return { text: data.text, totalTokens: data.tokens };
+			},
+			parseOutput: <T>(text: string): T => {
+				const [format, value] = text.split(":");
+				return { format, value: Number(value) } as T;
+			},
+		});
+
+		const result = await runFn(makeAgent("test"), "hello");
+		expect(result.finalOutput).toEqual({ format: "custom-format", value: 42 });
 	});
 });

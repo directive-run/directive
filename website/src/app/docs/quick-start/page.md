@@ -45,6 +45,9 @@ export const userModule = createModule("user", {
       loading: t.boolean(),
       error: t.string().nullable(),
     },
+    derivations: {},
+    events: {},
+    requirements: {},
   },
 
   init: (facts) => {
@@ -56,7 +59,7 @@ export const userModule = createModule("user", {
 });
 ```
 
-This creates a module with typed facts. The `init` function sets initial values.
+This creates a module with typed facts. The `init` function sets initial values. The schema sections for `derivations`, `events`, and `requirements` start empty — we'll fill them in as we go.
 
 ---
 
@@ -66,7 +69,13 @@ Constraints declare what must be true. When a constraint's `when` condition is t
 
 ```typescript
 export const userModule = createModule("user", {
-  // ... schema and init from above
+  schema: {
+    // ... facts from above, plus:
+    requirements: {
+      FETCH_USER: {},
+    },
+  },
+  // ... init from above
 
   constraints: {
     needsUser: {
@@ -77,7 +86,7 @@ export const userModule = createModule("user", {
 });
 ```
 
-This constraint says: "When we have a userId but no user (and we're not already loading), we need to fetch the user."
+This constraint says: "When we have a userId but no user (and we're not already loading), we need to fetch the user." The `FETCH_USER` requirement type is declared in the schema so resolvers can reference it.
 
 ---
 
@@ -130,6 +139,7 @@ import { createSystem } from 'directive';
 import { userModule } from './user.module';
 
 const system = createSystem({ module: userModule });
+system.start();
 
 // Set the userId - the constraint will trigger automatically
 system.facts.userId = 123;
@@ -151,7 +161,15 @@ Derivations are computed values that automatically track dependencies.
 
 ```typescript
 export const userModule = createModule("user", {
-  // ... previous code
+  schema: {
+    // ... facts, events, requirements from above, plus:
+    derivations: {
+      displayName: t.string(),
+      isLoggedIn: t.boolean(),
+      status: t.string<"idle" | "loading" | "error" | "ready">(),
+    },
+  },
+  // ... init, constraints, resolvers from above
 
   derive: {
     displayName: (facts) => facts.user?.name ?? "Guest",
@@ -197,6 +215,14 @@ const userModule = createModule("user", {
       loading: t.boolean(),
       error: t.string().nullable(),
     },
+    derivations: {
+      displayName: t.string(),
+      isLoggedIn: t.boolean(),
+    },
+    events: {},
+    requirements: {
+      FETCH_USER: {},
+    },
   },
 
   init: (facts) => {
@@ -241,6 +267,7 @@ const userModule = createModule("user", {
 
 // Usage
 const system = createSystem({ module: userModule });
+system.start();
 system.facts.userId = 123;
 await system.settle();
 console.log(system.derive.displayName); // "John"
@@ -253,31 +280,28 @@ console.log(system.derive.displayName); // "John"
 Directive has first-class React support:
 
 ```tsx
-import { DirectiveProvider, useFacts, useDerive } from 'directive/react';
+import { useFact, useDerived } from 'directive/react';
 import { createSystem } from 'directive';
 import { userModule } from './user.module';
 
 const system = createSystem({ module: userModule });
+system.start();
 
 function App() {
-  return (
-    <DirectiveProvider system={system}>
-      <UserProfile />
-    </DirectiveProvider>
-  );
+  return <UserProfile />;
 }
 
 function UserProfile() {
-  const { userId } = useFacts();
-  const { displayName, isLoggedIn } = useDerive();
-  const setFacts = useFacts.set();
+  const userId = useFact(system, "userId");
+  const displayName = useDerived(system, "displayName");
+  const isLoggedIn = useDerived(system, "isLoggedIn");
 
   return (
     <div>
       <input
         type="number"
-        value={userId}
-        onChange={(e) => setFacts({ userId: parseInt(e.target.value) })}
+        value={userId ?? 0}
+        onChange={(e) => { system.facts.userId = parseInt(e.target.value); }}
       />
       <p>Welcome, {displayName}!</p>
       <p>Logged in: {isLoggedIn ? 'Yes' : 'No'}</p>

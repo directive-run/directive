@@ -59,24 +59,21 @@ export interface SystemWithStatus<M extends ModuleSchema> {
  * @example
  * ```tsx
  * import { createSystemWithStatus } from 'directive';
- * import { DirectiveProvider, useRequirementStatus } from 'directive/react';
+ * import { useRequirementStatus, useFact } from 'directive/react';
  *
- * // Simple setup - no need to manually wire the plugin
+ * // Simple setup - no provider needed
  * const { system, statusPlugin } = createSystemWithStatus({
  *   module: myModule,
  * });
  * system.start();
  *
  * function App() {
- *   return (
- *     <DirectiveProvider system={system} statusPlugin={statusPlugin}>
- *       <MyApp />
- *     </DirectiveProvider>
- *   );
+ *   const data = useFact(system, "data");
+ *   return <LoadingIndicator />;
  * }
  *
  * function LoadingIndicator() {
- *   const status = useRequirementStatus("FETCH_DATA");
+ *   const status = useRequirementStatus(statusPlugin, "FETCH_DATA");
  *   if (status.isLoading) return <Spinner />;
  *   if (status.hasError) return <Error message={status.lastError?.message} />;
  *   return <Content />;

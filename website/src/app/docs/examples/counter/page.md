@@ -138,16 +138,19 @@ const counterWithEffectsModule = createModule("counter-effects", {
 
   effects: {
     trackHistory: {
-      filter: (facts, prev) => prev && prev.count !== facts.count,
+      deps: ['count'],
       run: (facts, prev) => {
-        // In a real app, you'd update facts in a resolver
-        console.log(`Count changed: ${prev?.count} to ${facts.count}`);
+        if (prev && prev.count !== facts.count) {
+          console.log(`Count changed: ${prev.count} to ${facts.count}`);
+        }
       },
     },
     notifyMilestone: {
-      filter: (facts) => facts.count % 10 === 0 && facts.count !== 0,
+      deps: ['count'],
       run: (facts) => {
-        console.log(`Milestone reached: ${facts.count}!`);
+        if (facts.count % 10 === 0 && facts.count !== 0) {
+          console.log(`Milestone reached: ${facts.count}!`);
+        }
       },
     },
   },
@@ -162,7 +165,7 @@ Here's a complete React implementation:
 
 ```tsx
 import { createModule, createSystem, t } from 'directive';
-import { DirectiveProvider, useFacts, useDerive } from 'directive/react';
+import { useFact, useDerived } from 'directive/react';
 
 // Module
 const counterModule = createModule("counter", {
@@ -185,9 +188,9 @@ const system = createSystem({ module: counterModule });
 
 // Components
 function Counter() {
-  const { count } = useFacts();
-  const { doubled, isEven } = useDerive();
-  const setFacts = useFacts.set();
+  const count = useFact(system, 'count');
+  const doubled = useDerived(system, 'doubled');
+  const isEven = useDerived(system, 'isEven');
 
   return (
     <div className="counter">
@@ -195,20 +198,16 @@ function Counter() {
       <p>Doubled: {doubled}</p>
       <p>Is even: {isEven ? 'Yes' : 'No'}</p>
       <div className="buttons">
-        <button onClick={() => setFacts({ count: count - 1 })}>-</button>
-        <button onClick={() => setFacts({ count: count + 1 })}>+</button>
-        <button onClick={() => setFacts({ count: 0 })}>Reset</button>
+        <button onClick={() => { system.facts.count = count - 1 }}>-</button>
+        <button onClick={() => { system.facts.count = count + 1 }}>+</button>
+        <button onClick={() => { system.facts.count = 0 }}>Reset</button>
       </div>
     </div>
   );
 }
 
 function App() {
-  return (
-    <DirectiveProvider system={system}>
-      <Counter />
-    </DirectiveProvider>
-  );
+  return <Counter />;
 }
 ```
 

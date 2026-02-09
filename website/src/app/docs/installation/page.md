@@ -45,13 +45,13 @@ Directive uses subpath exports for tree-shaking and smaller bundles:
 import { createModule, createSystem, t } from 'directive';
 
 // React adapter
-import { DirectiveProvider, useFacts, useDerive } from 'directive/react';
+import { useFact, useDerived, useDispatch } from 'directive/react';
 
 // Plugins
 import { loggingPlugin, devtoolsPlugin, persistencePlugin } from 'directive/plugins';
 
 // Testing utilities
-import { createTestSystem, mockResolver, fakeTimers } from 'directive/testing';
+import { createTestSystem, createMockResolver, flushMicrotasks } from 'directive/testing';
 ```
 
 ---
@@ -96,17 +96,16 @@ All exports are tree-shakeable. Import only what you use.
 
 ```tsx
 import { createSystem } from 'directive';
-import { DirectiveProvider } from 'directive/react';
+import { useFact, useDerived } from 'directive/react';
 import { userModule } from './modules/user';
 
 const system = createSystem({ module: userModule });
+system.start();
 
+// No provider needed — pass system directly to hooks
 function App() {
-  return (
-    <DirectiveProvider system={system}>
-      <YourApp />
-    </DirectiveProvider>
-  );
+  const displayName = useDerived(system, "displayName");
+  return <div>Hello, {displayName}</div>;
 }
 ```
 
@@ -119,6 +118,7 @@ import { provideDirective } from 'directive/vue';
 import { userModule } from './modules/user';
 
 const system = createSystem({ module: userModule });
+system.start();
 provideDirective(system);
 </script>
 ```
@@ -132,6 +132,7 @@ provideDirective(system);
   import { userModule } from './modules/user';
 
   const system = createSystem({ module: userModule });
+  system.start();
   setDirectiveContext(system);
 </script>
 ```
@@ -143,13 +144,14 @@ import { createSystem } from 'directive';
 import { userModule } from './modules/user';
 
 const system = createSystem({ module: userModule });
+system.start();
 
-// Subscribe to changes
-system.subscribe((facts, derive) => {
-  console.log('State updated:', facts);
+// Watch a derivation for changes
+system.watch("displayName", (newValue, prevValue) => {
+  console.log('Display name changed:', newValue);
 });
 
-// Update facts
+// Update facts — constraints trigger automatically
 system.facts.userId = 123;
 await system.settle();
 ```
@@ -176,6 +178,7 @@ const system = createSystem({
     maxSnapshots: 100,
   },
 });
+system.start();
 ```
 
 ---
@@ -189,11 +192,17 @@ For quick prototyping, you can use Directive from a CDN:
   import { createModule, createSystem, t } from 'https://esm.sh/directive';
 
   const counterModule = createModule("counter", {
-    schema: { facts: { count: t.number() } },
+    schema: {
+      facts: { count: t.number() },
+      derivations: {},
+      events: {},
+      requirements: {},
+    },
     init: (facts) => { facts.count = 0; },
   });
 
   const system = createSystem({ module: counterModule });
+  system.start();
   system.facts.count++;
   console.log(system.facts.count); // 1
 </script>
