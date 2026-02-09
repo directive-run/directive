@@ -17,14 +17,17 @@ describe('MyModule', () => {
   let system;
 
   beforeEach(() => {
-    system = createTestSystem({ module: myModule });
+    system = createTestSystem({ modules: { app: myModule } });
+    system.start();
   });
 
   afterEach(() => {
-    system.dispose();
+    system.destroy();
   });
 });
 ```
+
+`createTestSystem` takes a `modules` map where keys become namespaces. Facts and derivations are accessed through these namespaces.
 
 ---
 
@@ -32,23 +35,13 @@ describe('MyModule', () => {
 
 ```typescript
 test('initial facts', () => {
-  expect(system.facts.count).toBe(0);
-  expect(system.facts.user).toBeNull();
+  expect(system.facts.app.count).toBe(0);
+  expect(system.facts.app.user).toBeNull();
 });
 
 test('updating facts', () => {
-  system.facts.count = 5;
-  expect(system.facts.count).toBe(5);
-});
-
-test('batch updates', () => {
-  system.batch(() => {
-    system.facts.count = 10;
-    system.facts.name = 'Test';
-  });
-
-  expect(system.facts.count).toBe(10);
-  expect(system.facts.name).toBe('Test');
+  system.facts.app.count = 5;
+  expect(system.facts.app.count).toBe(5);
 });
 ```
 
@@ -63,61 +56,63 @@ const userModule = createModule("user", {
       firstName: t.string(),
       lastName: t.string(),
     },
+    derivations: {
+      fullName: t.string(),
+    },
+    events: {},
+  },
+  init: (facts) => {
+    facts.firstName = '';
+    facts.lastName = '';
   },
   derive: {
     fullName: (facts) => `${facts.firstName} ${facts.lastName}`,
   },
+  events: {},
 });
 
 test('derivations update automatically', () => {
-  system.facts.firstName = 'John';
-  system.facts.lastName = 'Doe';
+  const system = createTestSystem({ modules: { user: userModule } });
+  system.start();
 
-  expect(system.derive.fullName).toBe('John Doe');
+  system.facts.user.firstName = 'John';
+  system.facts.user.lastName = 'Doe';
+
+  expect(system.derive.user.fullName).toBe('John Doe');
 });
 ```
+
+Derivations are accessed via `system.derive.namespace.derivationName`.
 
 ---
 
 ## Mock Resolvers
 
 ```typescript
-import { createTestSystem, mockResolver } from 'directive/testing';
+import { createTestSystem, mockResolver, flushMicrotasks } from 'directive/testing';
 
-test('mock resolver response', async () => {
+test('mock resolver with manual control', async () => {
+  const fetchMock = mockResolver<{ type: 'FETCH_USER'; userId: number }>('FETCH_USER');
+
   const system = createTestSystem({
-    module: userModule,
+    modules: { user: userModule },
     mocks: {
-      fetchUser: mockResolver((req) => ({
-        id: req.userId,
-        name: 'Mock User',
-      })),
+      resolvers: {
+        FETCH_USER: { resolve: fetchMock.handler },
+      },
     },
   });
+  system.start();
 
-  system.facts.userId = 123;
-  await system.settle();
+  system.facts.user.userId = 123;
+  await flushMicrotasks();
 
-  expect(system.facts.user).toEqual({
-    id: 123,
-    name: 'Mock User',
-  });
-});
+  // Requirement is pending
+  expect(fetchMock.calls).toHaveLength(1);
 
-test('mock resolver error', async () => {
-  const system = createTestSystem({
-    module: userModule,
-    mocks: {
-      fetchUser: mockResolver(() => {
-        throw new Error('Network error');
-      }),
-    },
-  });
-
-  system.facts.userId = 123;
-  await system.settle();
-
-  expect(system.facts.error).toBe('Network error');
+  // Manually resolve it
+  fetchMock.resolve();
+  await flushMicrotasks();
 });
 ```
 
@@ -125,39 +120,34 @@ test('mock resolver error', async () => {
 
 ## Testing Constraints
 
+Use `assertRequirement` and `allRequirements` on the test system to verify constraints generated the expected requirements:
+
 ```typescript
 test('constraint triggers requirement', async () => {
-  const requirements: any[] = [];
-
   const system = createTestSystem({
-    module: userModule,
-    onRequirement: (req) => requirements.push(req),
+    modules: { user: userModule },
   });
+  system.start();
 
-  system.facts.userId = 123;
-  await system.settle();
+  system.facts.user.userId = 123;
+  await system.waitForIdle();
 
-  expect(requirements).toContainEqual({
-    type: 'FETCH_USER',
-    userId: 123,
-  });
+  system.assertRequirement('FETCH_USER');
 });
 
-test('constraint does not trigger when condition false', async () => {
-  const requirements: any[] = [];
-
+test('check all generated requirements', async () => {
   const system = createTestSystem({
-    module: userModule,
-    onRequirement: (req) => requirements.push(req),
+    modules: { user: userModule },
   });
+  system.start();
 
-  // User already loaded
-  system.facts.user = { id: 123, name: 'Existing' };
-  system.facts.userId = 123;
-  await system.settle();
+  system.facts.user.userId = 123;
+  await system.waitForIdle();
 
-  expect(requirements).not.toContainEqual(
-    expect.objectContaining({ type: 'FETCH_USER' })
+  expect(system.allRequirements).toContainEqual(
+    expect.objectContaining({
+      requirement: expect.objectContaining({ type: 'FETCH_USER' }),
+    })
   );
 });
 ```
@@ -167,55 +157,34 @@ test('constraint does not trigger when condition false', async () => {
 ## Fake Timers
 
 ```typescript
-import { createTestSystem, useFakeTimers } from 'directive/testing';
+import { createFakeTimers, settleWithFakeTimers } from 'directive/testing';
 
-test('debounced updates', async () => {
-  const { advanceTime, runAllTimers } = useFakeTimers();
+test('standalone fake timers', async () => {
+  const timers = createFakeTimers();
 
-  const system = createTestSystem({ module: myModule });
+  await timers.advance(500);
+  expect(timers.now()).toBe(500);
 
-  system.facts.query = 'test';
-
-  // Advance past debounce delay
-  await advanceTime(500);
-  await system.settle();
-
-  expect(system.facts.searchResults).toBeDefined();
-
-  runAllTimers.restore();
+  await timers.runAll();
+  timers.reset();
 });
 
-test('retry with backoff', async () => {
-  const { advanceTime } = useFakeTimers();
+test('settle with Vitest fake timers', async () => {
+  vi.useFakeTimers();
 
-  let attempts = 0;
-  const system = createTestSystem({
-    module: myModule,
-    mocks: {
-      fetchData: mockResolver(() => {
-        attempts++;
-        if (attempts < 3) throw new Error('Fail');
-        return { data: 'success' };
-      }),
-    },
+  const system = createTestSystem({ modules: { app: myModule } });
+  system.start();
+
+  system.facts.app.query = 'test';
+
+  await settleWithFakeTimers(system, vi.advanceTimersByTime.bind(vi), {
+    totalTime: 1000,
+    stepSize: 10,
   });
 
-  system.facts.dataId = 1;
+  expect(system.facts.app.searchResults).toBeDefined();
 
-  // First attempt fails immediately
-  await advanceTime(0);
-  expect(attempts).toBe(1);
-
-  // Retry after 100ms
-  await advanceTime(100);
-  expect(attempts).toBe(2);
-
-  // Retry after 200ms (exponential)
-  await advanceTime(200);
-  expect(attempts).toBe(3);
-
-  await system.settle();
-  expect(system.facts.data).toEqual({ data: 'success' });
+  vi.useRealTimers();
 });
 ```
 
@@ -230,22 +199,29 @@ test('effect runs on fact change', async () => {
   const moduleWithEffect = createModule("test", {
     schema: {
       facts: { value: t.string() },
+      derivations: {},
+      events: {},
     },
+    init: (facts) => { facts.value = ''; },
+    derive: {},
     effects: {
       logChange: {
-        watch: (facts) => facts.value,
-        run: (value) => logs.push(value),
+        run: (facts, prev) => {
+          if (prev?.value !== facts.value) logs.push(facts.value);
+        },
       },
     },
+    events: {},
   });
 
-  const system = createTestSystem({ module: moduleWithEffect });
+  const system = createTestSystem({ modules: { test: moduleWithEffect } });
+  system.start();
 
-  system.facts.value = 'first';
-  await system.settle();
+  system.facts.test.value = 'first';
+  await system.waitForIdle();
 
-  system.facts.value = 'second';
-  await system.settle();
+  system.facts.test.value = 'second';
+  await system.waitForIdle();
 
   expect(logs).toEqual(['first', 'second']);
 });
@@ -253,34 +229,26 @@ test('effect runs on fact change', async () => {
 
 ---
 
-## Testing Events
+## Fact History Tracking
+
+The test system tracks all fact changes automatically:
 
 ```typescript
-test('event is dispatched', async () => {
-  const events: any[] = [];
+test('track fact changes', () => {
+  const system = createTestSystem({ modules: { app: myModule } });
+  system.start();
 
-  const system = createTestSystem({ module: userModule });
-  system.on('USER_LOGGED_IN', (payload) => events.push(payload));
+  system.facts.app.count = 1;
+  system.facts.app.count = 2;
+  system.facts.app.count = 3;
 
-  system.facts.userId = 123;
-  await system.settle();
+  const history = system.getFactsHistory();
+  expect(history).toHaveLength(3);
+  expect(history[2].newValue).toBe(3);
 
-  expect(events).toContainEqual(
-    expect.objectContaining({ userId: 123 })
-  );
-});
-```
-
----
-
-## Snapshot Testing
-
-```typescript
-test('facts snapshot', async () => {
-  system.facts.userId = 123;
-  await system.settle();
-
-  expect(system.snapshot()).toMatchSnapshot();
+  // Reset tracking
+  system.resetFactsHistory();
+  expect(system.getFactsHistory()).toHaveLength(0);
 });
 ```
 
@@ -288,21 +256,20 @@ test('facts snapshot', async () => {
 
 ## Integration Testing
 
+No provider needed -- hooks take the system directly as their first argument:
+
 ```typescript
 import { render, screen, waitFor } from '@testing-library/react';
-import { DirectiveProvider } from 'directive/react';
 
 test('component with Directive', async () => {
-  const system = createTestSystem({ module: userModule });
+  const system = createTestSystem({ modules: { user: userModule } });
+  system.start();
 
-  render(
-    <DirectiveProvider system={system}>
-      <UserProfile />
-    </DirectiveProvider>
-  );
+  // Pass system directly to the component -- no DirectiveProvider wrapper
+  render(<UserProfile system={system} />);
 
-  system.facts.userId = 123;
-  await system.settle();
+  system.facts.user.userId = 123;
+  await system.waitForIdle();
 
   await waitFor(() => {
     expect(screen.getByText('Mock User')).toBeInTheDocument();
@@ -314,6 +281,6 @@ test('component with Directive', async () => {
 
 ## Next Steps
 
-- See Error Handling for testing error scenarios
-- See Resolvers for mock configuration
-- See React Adapter for component testing
+- See [Mock Resolvers](/docs/testing/mock-resolvers) for detailed resolver mocking
+- See [Fake Timers](/docs/testing/fake-timers) for time control
+- See [Assertions](/docs/testing/assertions) for test helpers

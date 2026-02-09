@@ -302,6 +302,6 @@ constraints: {
 
 ## Next Steps
 
-- See Facts for the state store
-- See Constraints for declarative rules
-- See Derivations for computed values
+- See [Facts](/docs/facts) for the state store
+- See [Constraints](/docs/constraints) for declarative rules
+- See [Derivations](/docs/derivations) for computed values

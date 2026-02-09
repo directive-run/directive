@@ -311,6 +311,16 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	batch(fn: () => void): void;
 
 	/**
+	 * Subscribe to settlement state changes.
+	 * Called whenever the system's settled state may have changed
+	 * (resolver starts/completes, reconcile starts/ends).
+	 */
+	onSettledChange(listener: () => void): () => void;
+
+	/** Subscribe to time-travel state changes (snapshot taken, navigation). */
+	onTimeTravelChange(listener: () => void): () => void;
+
+	/**
 	 * Read a derivation value by namespaced key.
 	 * Accepts "namespace.key" format (e.g., "auth.status").
 	 *
@@ -323,13 +333,27 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	/**
 	 * Subscribe to derivation changes using namespaced keys.
 	 * Accepts "namespace.key" format (e.g., "auth.status").
+	 * Supports wildcard "namespace.*" to subscribe to all keys in a module.
 	 *
 	 * @example
 	 * system.subscribe(["auth.status", "data.count"], () => {
 	 *   console.log("Auth or data changed");
 	 * });
+	 *
+	 * @example Wildcard
+	 * system.subscribe(["game.*"], () => render());
 	 */
 	subscribe(derivationIds: string[], listener: () => void): () => void;
+
+	/**
+	 * Subscribe to ALL fact and derivation changes in a module namespace.
+	 * Shorthand for subscribing to every key in a module.
+	 *
+	 * @example
+	 * system.subscribeModule("game", () => render());
+	 * system.subscribeModule("chat", () => render());
+	 */
+	subscribeModule(namespace: keyof Modules & string, listener: () => void): () => void;
 
 	/**
 	 * Watch a derivation for changes using namespaced key.
@@ -550,6 +574,16 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 
 	/** Batch multiple fact changes */
 	batch(fn: () => void): void;
+
+	/**
+	 * Subscribe to settlement state changes.
+	 * Called whenever the system's settled state may have changed
+	 * (resolver starts/completes, reconcile starts/ends).
+	 */
+	onSettledChange(listener: () => void): () => void;
+
+	/** Subscribe to time-travel state changes (snapshot taken, navigation). */
+	onTimeTravelChange(listener: () => void): () => void;
 
 	/**
 	 * Read a derivation value by key.

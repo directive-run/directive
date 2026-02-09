@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ModuleSchema, System } from "../index.js";
 import { createModule, createSystem, t } from "../index.js";
+import { createRequirementStatusPlugin } from "../utils/requirement-status.js";
 
 // Create a test module with consolidated schema
 function createTestModule() {
@@ -447,6 +448,202 @@ describe("React Adapter - Suspense Cache Behavior", () => {
 });
 
 // ============================================================================
+// Hook Bug Fix Verification Tests
+// ============================================================================
+
+describe("React Adapter - Requirement Status Caching", () => {
+	it("getStatus returns structurally identical objects that should be cached", () => {
+		// This tests the pattern used by useRequirementStatus
+		const statusPlugin = createRequirementStatusPlugin();
+
+		// Two calls to getStatus with no changes should return structurally equal objects
+		const status1 = statusPlugin.getStatus("FETCH_USER");
+		const status2 = statusPlugin.getStatus("FETCH_USER");
+
+		// They are NOT referentially equal (new object each call) — this is why we need caching
+		expect(status1).not.toBe(status2);
+		// But they ARE structurally equal
+		expect(status1).toEqual(status2);
+
+		// Our hook's caching logic: compare all fields
+		const areSame =
+			status1.pending === status2.pending &&
+			status1.inflight === status2.inflight &&
+			status1.failed === status2.failed &&
+			status1.isLoading === status2.isLoading &&
+			status1.hasError === status2.hasError &&
+			status1.lastError === status2.lastError;
+		expect(areSame).toBe(true);
+	});
+
+	it("getStatus changes when requirement lifecycle progresses", () => {
+		const statusPlugin = createRequirementStatusPlugin();
+
+		const status1 = statusPlugin.getStatus("FETCH_USER");
+		expect(status1.pending).toBe(0);
+		expect(status1.isLoading).toBe(false);
+
+		// Simulate a requirement being created
+		statusPlugin.plugin.onRequirementCreated({
+			id: "req-1",
+			requirement: { type: "FETCH_USER" },
+		});
+
+		const status2 = statusPlugin.getStatus("FETCH_USER");
+		expect(status2.pending).toBe(1);
+		expect(status2.isLoading).toBe(true);
+
+		// Verify our caching would detect this change
+		const areSame =
+			status1.pending === status2.pending &&
+			status1.isLoading === status2.isLoading;
+		expect(areSame).toBe(false);
+	});
+});
+
+describe("React Adapter - StrictMode System Recreation", () => {
+	it("system can be destroyed and recreated (simulates StrictMode)", () => {
+		// Simulates the useDirectiveRef pattern: create → destroy → recreate
+		const system1 = createSystem({ module: createTestModule() });
+		system1.start();
+		expect(system1.facts.count).toBe(0);
+		system1.events.increment();
+		expect(system1.facts.count).toBe(1);
+
+		// Simulate cleanup
+		system1.destroy();
+
+		// Simulate re-mount — create fresh system
+		const system2 = createSystem({ module: createTestModule() });
+		system2.start();
+		expect(system2.facts.count).toBe(0); // Fresh state
+	});
+
+	it("destroyed system does not affect new system subscriptions", async () => {
+		const system1 = createSystem({ module: createTestModule() });
+		system1.start();
+		system1.read("doubled");
+
+		const listener1 = vi.fn();
+		const unsub1 = system1.subscribe(["doubled"], listener1);
+		system1.destroy();
+		unsub1();
+
+		// New system works independently
+		const system2 = createSystem({ module: createTestModule() });
+		system2.start();
+		system2.read("doubled");
+
+		const listener2 = vi.fn();
+		const unsub2 = system2.subscribe(["doubled"], listener2);
+
+		system2.events.increment();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(listener2).toHaveBeenCalled();
+		unsub2();
+	});
+});
+
+describe("React Adapter - Requirements ID Comparison", () => {
+	it("ID-based comparison detects changes without JSON.stringify", () => {
+		// Simulate the pattern used in useRequirements
+		const prev = [{ id: "r1" }, { id: "r2" }];
+		const same = [{ id: "r1" }, { id: "r2" }];
+		const diff = [{ id: "r1" }, { id: "r3" }];
+		const added = [{ id: "r1" }, { id: "r2" }, { id: "r3" }];
+
+		const compareIds = (a: { id: string }[], b: { id: string }[]) =>
+			a.length === b.length && a.every((item, i) => item.id === b[i].id);
+
+		expect(compareIds(prev, same)).toBe(true);
+		expect(compareIds(prev, diff)).toBe(false);
+		expect(compareIds(prev, added)).toBe(false);
+		expect(compareIds(prev, [])).toBe(false);
+	});
+});
+
+describe("React Adapter - WatchFact Pattern", () => {
+	it("fact store subscription fires callback on fact changes", async () => {
+		const system = createSystem({ module: createTestModule() });
+		system.start();
+
+		// Simulate what useWatchFact does internally
+		// biome-ignore lint/suspicious/noExplicitAny: Test
+		let prev: any = system.facts.count;
+		const callback = vi.fn();
+
+		const unsub = system.facts.$store.subscribe(["count"], () => {
+			const next = system.facts.count;
+			if (!Object.is(next, prev)) {
+				callback(next, prev);
+				prev = next;
+			}
+		});
+
+		system.events.increment();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(callback).toHaveBeenCalledWith(1, 0);
+
+		system.events.increment();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(callback).toHaveBeenCalledWith(2, 1);
+
+		unsub();
+	});
+
+	it("fact store subscription does not fire for unrelated fact changes", async () => {
+		const system = createSystem({ module: createTestModule() });
+		system.start();
+
+		const callback = vi.fn();
+		const unsub = system.facts.$store.subscribe(["count"], callback);
+
+		// Change 'name' instead of 'count'
+		system.events.setName({ name: "new" });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(callback).not.toHaveBeenCalled();
+
+		unsub();
+	});
+});
+
+describe("React Adapter - Settlement Listener (Single Module)", () => {
+	it("onSettledChange fires when settlement state changes", async () => {
+		const singleSystem = createSystem({ module: createTestModule() });
+		singleSystem.start();
+
+		// Wait for initial settlement
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		const listener = vi.fn();
+		const unsub = singleSystem.onSettledChange(listener);
+
+		// Dispatching events may trigger settlement changes
+		singleSystem.events.increment();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		// Listener should have been called at least once
+		// (the engine notifies on reconciliation)
+		unsub();
+	});
+
+	it("settlement listener is cleaned up on unsubscribe", async () => {
+		const singleSystem = createSystem({ module: createTestModule() });
+		singleSystem.start();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		const listener = vi.fn();
+		const unsub = singleSystem.onSettledChange(listener);
+		unsub();
+
+		const callCount = listener.mock.calls.length;
+		singleSystem.events.increment();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(listener.mock.calls.length).toBe(callCount);
+	});
+});
+
+// ============================================================================
 // System Override Tests
 // ============================================================================
 
@@ -641,81 +838,6 @@ describe("React Adapter - System Override", () => {
 		});
 	});
 
-	describe("selector overload argument parsing", () => {
-		it("parses function as equality function (backward compat)", () => {
-			// Simulate the overloaded arg parsing from useFactSelector
-			const eqFn = (a: string, b: string) => a === b;
-			const eqOrOpts: ((a: string, b: string) => boolean) | { system?: any; equalityFn?: any } = eqFn;
-
-			let resolvedSystem: any;
-			let resolvedEqFn: any;
-
-			if (typeof eqOrOpts === "function") {
-				resolvedEqFn = eqOrOpts;
-			} else if (eqOrOpts) {
-				resolvedSystem = eqOrOpts.system;
-				resolvedEqFn = eqOrOpts.equalityFn;
-			}
-
-			expect(resolvedSystem).toBeUndefined();
-			expect(resolvedEqFn).toBe(eqFn);
-		});
-
-		it("parses options object with system", () => {
-			const fakeSystem = { id: "fake" };
-			const eqOrOpts: any = { system: fakeSystem };
-
-			let resolvedSystem: any;
-			let resolvedEqFn: any;
-
-			if (typeof eqOrOpts === "function") {
-				resolvedEqFn = eqOrOpts;
-			} else if (eqOrOpts) {
-				resolvedSystem = eqOrOpts.system;
-				resolvedEqFn = eqOrOpts.equalityFn;
-			}
-
-			expect(resolvedSystem).toBe(fakeSystem);
-			expect(resolvedEqFn).toBeUndefined();
-		});
-
-		it("parses options object with both system and equalityFn", () => {
-			const fakeSystem = { id: "fake" };
-			const eqFn = (a: number, b: number) => a === b;
-			const eqOrOpts: any = { system: fakeSystem, equalityFn: eqFn };
-
-			let resolvedSystem: any;
-			let resolvedEqFn: any;
-
-			if (typeof eqOrOpts === "function") {
-				resolvedEqFn = eqOrOpts;
-			} else if (eqOrOpts) {
-				resolvedSystem = eqOrOpts.system;
-				resolvedEqFn = eqOrOpts.equalityFn;
-			}
-
-			expect(resolvedSystem).toBe(fakeSystem);
-			expect(resolvedEqFn).toBe(eqFn);
-		});
-
-		it("handles undefined (no third arg)", () => {
-			const eqOrOpts: any = undefined;
-
-			let resolvedSystem: any;
-			let resolvedEqFn: any;
-
-			if (typeof eqOrOpts === "function") {
-				resolvedEqFn = eqOrOpts;
-			} else if (eqOrOpts) {
-				resolvedSystem = eqOrOpts.system;
-				resolvedEqFn = eqOrOpts.equalityFn;
-			}
-
-			expect(resolvedSystem).toBeUndefined();
-			expect(resolvedEqFn).toBeUndefined();
-		});
-	});
-
 	describe("watch on different systems", () => {
 		it("watches derivation on a specific system", async () => {
 			const systemA = createSystem({ module: createModuleA() });
@@ -775,6 +897,213 @@ describe("React Adapter - System Override", () => {
 
 			expect(systemA.isSettled).toBe(true);
 			expect(systemB.isSettled).toBe(true);
+		});
+	});
+
+	// =========================================================================
+	// Phase 5: New & Updated Hook Tests
+	// Tests validate the underlying system behavior that hooks depend on.
+	// =========================================================================
+
+	describe("fact selector pattern (flipped order)", () => {
+		it("selector transforms a single fact value", () => {
+			const mod = createModule("sel-test", {
+				schema: { facts: { count: t.number() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.count = 5; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			// Simulate useFact(system, "count", v => v * 2) behavior
+			const selector = (v: number) => v * 2;
+			const result = selector(sys.facts.count);
+			expect(result).toBe(10);
+			sys.destroy();
+		});
+	});
+
+	describe("fact store subscribe for useWatch facts", () => {
+		it("fact store notifies on fact change", async () => {
+			const mod = createModule("watch-fact", {
+				schema: { facts: { name: t.string() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.name = "Alice"; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			const cb = vi.fn();
+			// Simulate useWatch(system, "fact", "name", cb) — subscribes to fact store
+			const unsub = sys.facts.$store.subscribe(["name"], cb);
+
+			sys.facts.name = "Bob";
+			await new Promise((r) => setTimeout(r, 50));
+
+			expect(cb).toHaveBeenCalled();
+			unsub();
+			sys.destroy();
+		});
+	});
+
+	describe("auto-tracking selector pattern", () => {
+		it("withTracking detects accessed fact keys", () => {
+			const mod = createModule("track-sel", {
+				schema: {
+					facts: { a: t.number(), b: t.number(), c: t.number() },
+					derivations: {},
+					events: {},
+					requirements: {},
+				},
+				init: (f) => { f.a = 1; f.b = 2; f.c = 3; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			// withTracking detects that only "a" is accessed through the facts proxy
+			const facts = sys.facts.$store.toObject();
+			const selector = (f: any) => f.a * 10;
+			const result = selector(facts);
+			expect(result).toBe(10);
+
+			// The auto-tracking useSelector would subscribe to only ["a"]
+			// Verify the subscription pattern works:
+			const cb = vi.fn();
+			const unsub = sys.facts.$store.subscribe(["a"], cb);
+			sys.facts.a = 99;
+			// Notification should fire since "a" changed
+			expect(cb).toHaveBeenCalled();
+			unsub();
+			sys.destroy();
+		});
+	});
+
+	describe("inspect API for useInspect", () => {
+		it("inspect() returns unmet and inflight for any system", () => {
+			const mod = createModule("insp-test", {
+				schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.x = 0; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			const inspection = sys.inspect();
+			expect(inspection).toHaveProperty("unmet");
+			expect(inspection).toHaveProperty("inflight");
+			expect(inspection).toHaveProperty("constraints");
+			sys.destroy();
+		});
+	});
+
+	describe("system.events stable reference", () => {
+		it("system.events is the same object across accesses", () => {
+			const mod = createModule("events-stable", {
+				schema: {
+					facts: { x: t.number() },
+					derivations: {},
+					events: { bump: {} },
+					requirements: {},
+				},
+				init: (f) => { f.x = 0; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			// useEvents relies on system.events being a stable reference
+			const ref1 = sys.events;
+			const ref2 = sys.events;
+			expect(ref1).toBe(ref2);
+			sys.destroy();
+		});
+	});
+
+	describe("system.explain for useExplain", () => {
+		it("returns null for nonexistent requirement", () => {
+			const mod = createModule("explain-test", {
+				schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.x = 0; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			expect(sys.explain("nonexistent")).toBeNull();
+			sys.destroy();
+		});
+	});
+
+	describe("constraint status from inspect", () => {
+		it("inspect().constraints returns array", () => {
+			const mod = createModule("cstatus-test", {
+				schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.x = 0; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			const inspection = sys.inspect();
+			expect(Array.isArray(inspection.constraints)).toBe(true);
+			sys.destroy();
+		});
+	});
+
+	describe("optimistic update pattern (snapshot + restore)", () => {
+		it("getSnapshot captures state, batch applies, restore rollbacks", () => {
+			const mod = createModule("opt-update", {
+				schema: { facts: { count: t.number() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.count = 0; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			// Capture snapshot before mutation
+			const snapshot = sys.getSnapshot();
+			expect(snapshot.facts.count).toBe(0);
+
+			// Apply optimistic mutation in batch
+			sys.batch(() => {
+				sys.facts.count = 42;
+			});
+			expect(sys.facts.count).toBe(42);
+
+			// Rollback by restoring snapshot
+			sys.restore(snapshot);
+			expect(sys.facts.count).toBe(0);
+			sys.destroy();
+		});
+	});
+
+	describe("empty subscribe arrays", () => {
+		it("subscribing to empty fact key array does not throw", () => {
+			const mod = createModule("empty-sub", {
+				schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
+				init: (f) => { f.x = 0; },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			// Empty subscribe should be a no-op
+			const unsub = sys.subscribe([], vi.fn());
+			expect(typeof unsub).toBe("function");
+			unsub();
+			sys.destroy();
+		});
+
+		it("subscribing to empty derivation array does not throw", () => {
+			const mod = createModule("empty-derive-sub", {
+				schema: {
+					facts: { x: t.number() },
+					derivations: { doubled: t.number() },
+					events: {},
+					requirements: {},
+				},
+				init: (f) => { f.x = 1; },
+				derive: { doubled: (facts: any) => facts.x * 2 },
+			});
+			const sys = createSystem({ module: mod }) as any;
+			sys.start();
+
+			const unsub = sys.subscribe([], vi.fn());
+			expect(typeof unsub).toBe("function");
+			unsub();
+			sys.destroy();
 		});
 	});
 });

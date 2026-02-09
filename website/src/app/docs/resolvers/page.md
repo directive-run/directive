@@ -145,6 +145,37 @@ resolvers: {
 | `backoff` | `"none" \| "linear" \| "exponential"` | `"none"` | Delay growth strategy |
 | `initialDelay` | `number` | `100` | First retry delay in ms |
 | `maxDelay` | `number` | `30000` | Maximum delay between retries |
+| `shouldRetry` | `(error, attempt) => boolean` | — | Predicate to control whether to retry |
+
+### Conditional Retries
+
+Use `shouldRetry` to only retry specific errors. Return `true` to retry, `false` to stop immediately:
+
+```typescript
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    retry: {
+      attempts: 5,
+      backoff: "exponential",
+      initialDelay: 200,
+      shouldRetry: (error, attempt) => {
+        // Don't retry client errors (4xx)
+        if (error.message.includes("404") || error.message.includes("403")) {
+          return false;
+        }
+        // Retry server errors (5xx) and network failures
+        return true;
+      },
+    },
+    resolve: async (req, context) => {
+      context.facts.data = await api.getData(req.id);
+    },
+  },
+}
+```
+
+If `shouldRetry` is omitted, all errors are retried up to `attempts`.
 
 ### Backoff Calculation
 
@@ -443,6 +474,6 @@ resolve: async (req, context) => {
 
 ## Next Steps
 
-- See Constraints for raising requirements
-- See Effects for side effects
-- See Error Handling for comprehensive error strategies
+- See [Constraints](/docs/constraints) for raising requirements
+- See [Effects](/docs/effects) for side effects
+- See [Error Handling](/docs/advanced/errors) for comprehensive error strategies

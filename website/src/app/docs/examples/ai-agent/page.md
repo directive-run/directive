@@ -31,10 +31,6 @@ const agentModule = createModule("agent", {
       isThinking: t.boolean(),
       error: t.string().nullable(),
     },
-    events: {
-      RESPONSE_COMPLETE: t.object<{ content: string }>(),
-      TOOL_EXECUTED: t.object<{ name: string; result: unknown }>(),
-    },
   },
 
   init: (facts) => {
@@ -105,9 +101,6 @@ const agentModule = createModule("agent", {
               ...context.facts.messages,
               { role: "assistant", content: choice.message.content },
             ];
-            context.dispatch("RESPONSE_COMPLETE", {
-              content: choice.message.content,
-            });
           }
         } catch (error) {
           context.facts.error = error.message;
@@ -140,7 +133,6 @@ const agentModule = createModule("agent", {
         ];
 
         context.facts.pendingToolCall = null;
-        context.dispatch("TOOL_EXECUTED", { name, result });
       },
     },
   },
@@ -152,15 +144,19 @@ const agentModule = createModule("agent", {
 ## React Chat Interface
 
 ```typescript
+import { useFact } from 'directive/react';
+
+const system = createSystem({ module: agentModule });
+system.start();
+
 function ChatInterface() {
-  const messages = useFact('messages');
-  const isThinking = useFact('isThinking');
-  const { facts } = useSystem();
+  const messages = useFact(system, 'messages');
+  const isThinking = useFact(system, 'isThinking');
   const [input, setInput] = useState('');
 
   const sendMessage = () => {
-    facts.messages = [
-      ...facts.messages,
+    system.facts.messages = [
+      ...system.facts.messages,
       { role: 'user', content: input },
     ];
     setInput('');
@@ -192,6 +188,6 @@ function ChatInterface() {
 
 ## Next Steps
 
-- See OpenAI Agents for more patterns
-- See Guardrails for safety
-- See Streaming for real-time responses
+- See [OpenAI Agents](/docs/ai/openai-agents) for more patterns
+- See [Guardrails](/docs/ai/guardrails) for safety
+- See [Streaming](/docs/ai/streaming) for real-time responses

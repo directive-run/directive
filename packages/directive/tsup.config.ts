@@ -12,6 +12,7 @@ export default defineConfig({
 		"react-query": "src/adapters/react-query.ts",
 		xstate: "src/adapters/xstate.ts",
 		redux: "src/adapters/redux.ts",
+		ai: "src/adapters/openai-agents.ts",
 		"openai-agents": "src/adapters/openai-agents.ts",
 		worker: "src/adapters/worker.ts",
 		"plugins/index": "src/plugins/index.ts",

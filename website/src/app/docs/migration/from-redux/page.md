@@ -269,7 +269,7 @@ directiveSystem.subscribe((facts) => {
 ```typescript
 // Move counter from Redux to Directive
 // 1. Create Directive module
-// 2. Update components to use useSystem() instead of useSelector()
+// 2. Update components to use useFact(system, "key") instead of useSelector()
 // 3. Remove Redux slice
 ```
 
@@ -307,10 +307,10 @@ function Counter() {
 
 ```typescript
 import { useFact } from 'directive/react';
+import { system } from './system';
 
 function Counter() {
-  const count = useFact('value');
-  const system = useSystem();
+  const count = useFact(system, "value");
 
   return (
     <div>
@@ -326,6 +326,6 @@ function Counter() {
 
 ## Next Steps
 
-- See the Quick Start for a complete tutorial
-- See Constraints for declarative logic
-- See the React Adapter for hook patterns
+- See the [Quick Start](/docs/quick-start) for a complete tutorial
+- See [Constraints](/docs/constraints) for declarative logic
+- See the [React Adapter](/docs/adapters/react) for hook patterns

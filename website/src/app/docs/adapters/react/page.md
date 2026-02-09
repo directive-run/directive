@@ -1,9 +1,9 @@
 ---
 title: React Adapter
-description: Integrate Directive with React using hooks for reactive state management. DirectiveProvider, useFact, useDerived, useDispatch, and more.
+description: Integrate Directive with React using system-first hooks. useFact, useDerived, useEvents, useDispatch — types flow from the system reference, no provider needed.
 ---
 
-Directive provides first-class React integration with hooks that automatically re-render on state changes. {% .lead %}
+Directive's React hooks use a **system-first** pattern: pass the system as the first argument, and TypeScript infers everything else. No context, no provider, no factory. {% .lead %}
 
 ---
 
@@ -12,31 +12,36 @@ Directive provides first-class React integration with hooks that automatically r
 The React adapter is included in the main package:
 
 ```typescript
-import { DirectiveProvider, useFact, useDerived, useDispatch } from 'directive/react';
+import { useFact, useDerived, useEvents, useDispatch } from 'directive/react';
 ```
 
 ---
 
-## Setup
-
-Wrap your app with `DirectiveProvider`:
+## Quick Start
 
 ```tsx
 import { createSystem } from 'directive';
-import { DirectiveProvider } from 'directive/react';
-import { userModule } from './modules/user';
+import { useFact, useDerived, useEvents } from 'directive/react';
+import { counterModule } from './modules/counter';
 
-const system = createSystem({ module: userModule });
+const system = createSystem({ module: counterModule });
 system.start();
 
-function App() {
+function Counter() {
+  const count = useFact(system, "count");        // inferred: number
+  const doubled = useDerived(system, "doubled");  // inferred: number
+  const events = useEvents(system);               // typed event dispatchers
+
   return (
-    <DirectiveProvider system={system}>
-      <YourApp />
-    </DirectiveProvider>
+    <div>
+      <p>Count: {count}, Doubled: {doubled}</p>
+      <button onClick={() => events.increment()}>+</button>
+    </div>
   );
 }
 ```
+
+Every hook takes the system as its first parameter. TypeScript infers the fact keys, derivation keys, and event types from the system reference — no manual generics needed.
 
 ---
 
@@ -44,163 +49,242 @@ function App() {
 
 ### useFact
 
-Read a single fact reactively. The component re-renders when the fact changes:
+Read a single fact, multiple facts, or a selected slice of a fact:
 
 ```tsx
-function UserProfile() {
-  const userId = useFact<number>("userId");
-  const user = useFact<User | null>("user");
+// Single fact — re-renders when "userId" changes
+const userId = useFact(system, "userId");
 
-  return (
-    <div>
-      <p>ID: {userId}</p>
-      <p>User: {user?.name}</p>
-    </div>
-  );
-}
-```
+// Multiple facts — re-renders when any listed fact changes
+const { name, email, avatar } = useFact(system, ["name", "email", "avatar"]);
 
-### useFactSelector
+// Selector — re-renders only when the selected value changes
+const upperName = useFact(system, "user", (user) => user?.name?.toUpperCase() ?? "GUEST");
 
-Select part of a fact — only re-renders when the selected value changes:
-
-```tsx
-function UserName() {
-  const name = useFactSelector("user", (user) => user?.name ?? "Guest");
-  return <span>{name}</span>;
-}
-```
-
-With custom equality:
-
-```tsx
-const ids = useFactSelector(
-  "users",
-  (users) => users?.map(u => u.id) ?? [],
-  (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
-);
+// Selector with custom equality
+const ids = useFact(system, "users", (users) => users?.map(u => u.id) ?? [], shallowEqual);
 ```
 
 ### useDerived
 
-Read a single derivation reactively:
+Read a single derivation, multiple derivations, or a selected slice:
 
 ```tsx
-function Greeting() {
-  const displayName = useDerived<string>("displayName");
-  return <h1>Hello, {displayName}!</h1>;
-}
-```
+// Single derivation
+const displayName = useDerived(system, "displayName");
 
-### useDerivations
+// Multiple derivations
+const { isLoggedIn, isAdmin } = useDerived(system, ["isLoggedIn", "isAdmin"]);
 
-Read multiple derivations at once:
-
-```tsx
-function StatusBar() {
-  const state = useDerivations<{ isLoggedIn: boolean; isAdmin: boolean }>(
-    ["isLoggedIn", "isAdmin"]
-  );
-
-  return <span>{state.isLoggedIn ? (state.isAdmin ? "Admin" : "User") : "Guest"}</span>;
-}
-```
-
-### useDerivedSelector
-
-Select part of a derivation — only re-renders when the selected value changes:
-
-```tsx
-function ItemCount() {
-  const count = useDerivedSelector("stats", (stats) => stats.itemCount);
-  return <p>Items: {count}</p>;
-}
+// Selector — only re-renders when selected value changes
+const itemCount = useDerived(system, "stats", (stats) => stats.itemCount);
 ```
 
 ### useSelector
 
-Select from all facts (like Zustand's `useStore`):
+Select from all facts with **auto-tracking**. Directive detects which fact keys your selector reads and subscribes only to those — no manual dependency lists:
 
 ```tsx
-function Summary() {
-  const summary = useSelector((facts) => ({
-    userName: facts.user?.name,
-    itemCount: facts.items?.length ?? 0,
-  }));
-
-  return <p>{summary.userName} has {summary.itemCount} items</p>;
-}
+const summary = useSelector(system, (facts) => ({
+  userName: facts.user?.name,
+  itemCount: facts.items?.length ?? 0,
+}));
 ```
 
-### useDispatch
+{% callout type="note" title="Auto-tracking" %}
+`useSelector` uses Directive's tracking system to detect accessed fact keys at subscription time. Inline selectors work without `useCallback` — the hook stores the selector in a ref internally (Zustand pattern).
+{% /callout %}
 
-Dispatch events:
+### useEvents
 
-```tsx
-function IncrementButton() {
-  const dispatch = useDispatch();
-
-  return (
-    <button onClick={() => dispatch({ type: "increment" })}>
-      +1
-    </button>
-  );
-}
-```
-
-### useSystem
-
-Access the full system instance:
+Get a typed reference to the system's event dispatchers:
 
 ```tsx
-function DebugPanel() {
-  const system = useSystem();
+function Counter() {
+  const events = useEvents(system);
 
   return (
     <div>
-      <button onClick={() => console.log(system.getSnapshot())}>Snapshot</button>
-      <button onClick={() => console.log(system.inspect())}>Inspect</button>
+      <button onClick={() => events.increment()}>+</button>
+      <button onClick={() => events.setCount({ count: 0 })}>Reset</button>
     </div>
   );
+}
+```
+
+The returned reference is stable across renders (memoized on the system instance).
+
+### useDispatch
+
+Low-level event dispatch for untyped or system events:
+
+```tsx
+const dispatch = useDispatch(system);
+dispatch({ type: "increment" });
+```
+
+### useWatch
+
+Watch a derivation or fact for changes without causing re-renders — runs a callback as a side effect:
+
+```tsx
+// Watch a derivation
+useWatch(system, "pageViews", (newValue, prevValue) => {
+  analytics.track("pageViews", { from: prevValue, to: newValue });
+});
+
+// Watch a fact
+useWatch(system, "fact", "userId", (newValue, prevValue) => {
+  analytics.track("userId_changed", { from: prevValue, to: newValue });
+});
+```
+
+---
+
+## Scoped Systems
+
+### useDirectiveRef
+
+Create a system scoped to a component's lifecycle. The system starts in a `useEffect` and is destroyed on unmount:
+
+```tsx
+import { useDirectiveRef, useFact, useEvents } from 'directive/react';
+
+function Counter() {
+  const system = useDirectiveRef(counterModule);
+  const count = useFact(system, "count");
+  const events = useEvents(system);
+
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={() => events.increment()}>+</button>
+    </div>
+  );
+}
+```
+
+With status plugin:
+
+```tsx
+function App() {
+  const { system, statusPlugin } = useDirectiveRef(myModule, { status: true });
+  const status = useRequirementStatus(statusPlugin, "FETCH_DATA");
+  const count = useFact(system, "count");
+  // ...
+}
+```
+
+With initial facts and plugins:
+
+```tsx
+const system = useDirectiveRef(myModule, {
+  initialFacts: { count: 10 },
+  plugins: [loggingPlugin()],
+  debug: { timeTravel: true },
+});
+```
+
+### useDirective
+
+Higher-level hook that creates a scoped system and subscribes to selected facts and derivations in one call:
+
+```tsx
+import { useDirective } from 'directive/react';
+
+function Counter() {
+  const { dispatch, snapshot } = useDirective(counterModule, {
+    facts: ["count"],
+    derivations: ["doubled"],
+  });
+
+  return (
+    <div>
+      <p>Count: {snapshot.facts.count}, Doubled: {snapshot.derived.doubled}</p>
+      <button onClick={() => dispatch({ type: "increment" })}>+</button>
+    </div>
+  );
+}
+```
+
+### useModule
+
+Zero-config hook that creates a scoped system and subscribes to all facts and derivations:
+
+```tsx
+import { useModule } from 'directive/react';
+
+function Counter() {
+  const { system, facts, derived, events, dispatch } = useModule(counterModule);
+
+  return (
+    <div>
+      <p>Count: {facts.count}, Doubled: {derived.doubled}</p>
+      <button onClick={() => events.increment()}>+</button>
+    </div>
+  );
+}
+```
+
+With status plugin:
+
+```tsx
+const { system, facts, derived, events, dispatch, statusPlugin } = useModule(counterModule, {
+  status: true,
+});
+```
+
+---
+
+## SSR & Hydration
+
+### DirectiveHydrator
+
+Wrap your app (or a subtree) with a distributable snapshot from the server:
+
+```tsx
+// Server: generate snapshot
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan', 'canUseFeature'],
+  ttlSeconds: 3600,
+});
+
+// Client: hydrate
+import { DirectiveHydrator, useHydratedSystem } from 'directive/react';
+
+function App({ serverSnapshot }) {
+  return (
+    <DirectiveHydrator snapshot={serverSnapshot}>
+      <Dashboard />
+    </DirectiveHydrator>
+  );
+}
+```
+
+### useHydratedSystem
+
+Create a scoped system pre-populated with data from the server snapshot:
+
+```tsx
+function Dashboard() {
+  const system = useHydratedSystem(dashboardModule);
+  const plan = useDerived(system, "effectivePlan");
+  // system.facts are pre-populated from the server snapshot
+  return <p>Plan: {plan}</p>;
 }
 ```
 
 ---
 
-## Status Hooks
-
-### useIsSettled
-
-Check if the system has settled (no pending work):
-
-```tsx
-function LoadingIndicator() {
-  const isSettled = useIsSettled();
-  return isSettled ? null : <Spinner />;
-}
-```
-
-### useWatch
-
-Watch a derivation without causing re-renders — runs a callback as a side effect:
-
-```tsx
-function Analytics() {
-  useWatch("pageViews", (newValue, prevValue) => {
-    analytics.track("pageViews", { from: prevValue, to: newValue });
-  });
-
-  return null;
-}
-```
+## Inspection
 
 ### useInspect
 
-Get system inspection data (unmet requirements, inflight resolvers):
+Get system inspection data (unmet requirements, inflight resolvers, constraint status):
 
 ```tsx
 function DebugPanel() {
-  const inspection = useInspect();
+  const inspection = useInspect(system);
 
   return (
     <pre>
@@ -211,27 +295,48 @@ function DebugPanel() {
 }
 ```
 
-### useRequirements
-
-Focused view of requirement state:
+With throttling for high-frequency updates:
 
 ```tsx
-function LoadingBar() {
-  const { isWorking, hasUnmet, hasInflight } = useRequirements();
-  if (!isWorking) return null;
-  return <Spinner label={hasInflight ? 'Loading...' : 'Processing...'} />;
+const inspection = useInspect(system, { throttleMs: 200 });
+```
+
+### useConstraintStatus
+
+Read constraint status reactively:
+
+```tsx
+// All constraints
+const constraints = useConstraintStatus(system);
+// constraints: Array<{ id: string; active: boolean; priority: number }>
+
+// Single constraint
+const auth = useConstraintStatus(system, "requireAuth");
+// auth: { id: "requireAuth", active: true, priority: 50 } | null
+```
+
+### useExplain
+
+Get a reactive explanation of why a requirement exists:
+
+```tsx
+function RequirementDebug({ requirementId }) {
+  const explanation = useExplain(system, requirementId);
+
+  if (!explanation) return <p>No active requirement</p>;
+  return <pre>{explanation}</pre>;
 }
 ```
 
 ---
 
-## Requirement Status Hooks
+## Async Status
 
-These hooks require a `statusPlugin` — either via `DirectiveProvider` or passed directly to the hook:
+These hooks require a `statusPlugin`:
 
 ```tsx
-import { createRequirementStatusPlugin } from 'directive';
-import { DirectiveProvider, useRequirementStatus } from 'directive/react';
+import { createRequirementStatusPlugin, createSystem } from 'directive';
+import { useRequirementStatus, useSuspenseRequirement } from 'directive/react';
 
 const statusPlugin = createRequirementStatusPlugin();
 const system = createSystem({
@@ -239,63 +344,38 @@ const system = createSystem({
   plugins: [statusPlugin.plugin],
 });
 system.start();
-
-function App() {
-  return (
-    <DirectiveProvider system={system} statusPlugin={statusPlugin}>
-      <YourApp />
-    </DirectiveProvider>
-  );
-}
 ```
 
 ### useRequirementStatus
 
 ```tsx
-function UserLoader() {
-  const status = useRequirementStatus("FETCH_USER");
+// Single requirement type
+const status = useRequirementStatus(statusPlugin, "FETCH_USER");
+// status: { isLoading, hasError, pending, inflight, failed, lastError }
 
-  if (status.isLoading) return <Spinner />;
-  if (status.hasError) return <Error message={status.lastError?.message} />;
-  return <UserContent />;
-}
-```
-
-### useIsResolving
-
-```tsx
-function SaveButton() {
-  const isSaving = useIsResolving("SAVE_DATA");
-  return (
-    <button disabled={isSaving}>
-      {isSaving ? "Saving..." : "Save"}
-    </button>
-  );
-}
-```
-
-### useLatestError
-
-```tsx
-function ErrorDisplay() {
-  const error = useLatestError("FETCH_USER");
-  if (!error) return null;
-  return <div className="error">{error.message}</div>;
-}
+// Multiple requirement types
+const statuses = useRequirementStatus(statusPlugin, ["FETCH_USER", "FETCH_SETTINGS"]);
+// statuses: Record<string, RequirementTypeStatus>
 ```
 
 ### useSuspenseRequirement
 
-Integrates with React Suspense:
+Integrates with React Suspense — throws a promise while the requirement is pending:
 
 ```tsx
 import { Suspense } from 'react';
-import { useSuspenseRequirement } from 'directive/react';
 
 function UserProfile() {
-  useSuspenseRequirement("FETCH_USER");
-  // Only renders after FETCH_USER is resolved
+  useSuspenseRequirement(statusPlugin, "FETCH_USER");
+  // Only renders after FETCH_USER resolves
   return <div>User loaded!</div>;
+}
+
+// Multiple requirements
+function Dashboard() {
+  useSuspenseRequirement(statusPlugin, ["FETCH_USER", "FETCH_SETTINGS"]);
+  // Only renders after both resolve
+  return <div>Everything loaded!</div>;
 }
 
 function App() {
@@ -309,190 +389,75 @@ function App() {
 
 ---
 
-## System Override
+## Optimistic Updates
 
-All hooks accept an optional `system` parameter that bypasses the context provider. This is useful when you have nested providers and need to access an outer system from inside an inner scope.
+### useOptimisticUpdate
 
-### Problem: Provider Shadowing
-
-When you nest providers, the inner one shadows the outer — components inside lose access to the global system:
+Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```tsx
-<DirectiveProvider system={globalSystem}>
-  {/* globalSystem is available here */}
-  <DirectiveProvider system={formSystem}>
-    {/* Only formSystem is available — globalSystem is shadowed */}
-  </DirectiveProvider>
-</DirectiveProvider>
-```
+function SaveButton() {
+  const { mutate, isPending, error, rollback } = useOptimisticUpdate(
+    system,
+    statusPlugin,    // optional — enables auto-rollback on resolver failure
+    "SAVE_DATA"      // requirement type to watch
+  );
 
-### Solution: Pass the System Directly
-
-Every hook accepts an optional system as the last positional argument:
-
-```tsx
-function FormPage() {
-  const appSystem = useSystem();  // grab global before scoping
-  const { system: formSystem, Provider } = useDirectiveRef(formModule);
+  const handleSave = () => {
+    mutate(() => {
+      // Optimistic update — applied immediately via system.batch()
+      system.facts.savedAt = Date.now();
+      system.facts.status = "saved";
+    });
+    // If "SAVE_DATA" resolver fails, facts are rolled back automatically
+  };
 
   return (
-    <Provider>
-      <FormFields appSystem={appSystem} />
-    </Provider>
+    <button onClick={handleSave} disabled={isPending}>
+      {isPending ? "Saving..." : "Save"}
+    </button>
   );
 }
-
-function FormFields({ appSystem }) {
-  // Scoped system (via context — default)
-  const email = useFact('email');
-  const isValid = useDerived('isFormValid');
-
-  // Global system (via explicit override)
-  const theme = useFact('theme', appSystem);
-  const user = useDerived('currentUser', appSystem);
-
-  return <input value={email} />;
-}
 ```
 
-### Hook Signatures
-
-**Simple hooks** — positional `system?` as last arg:
-
-```tsx
-useFact('count')                     // from context (unchanged)
-useFact('count', globalSystem)       // from explicit system
-useDerived('doubled', globalSystem)
-useDerivations(['a', 'b'], globalSystem)
-useDispatch(globalSystem)
-useWatch('id', callback, globalSystem)
-useIsSettled(globalSystem)
-useInspect(globalSystem)
-useRequirements(globalSystem)
-```
-
-**Selector hooks** — last arg is either a function (equality) or an options object:
-
-```tsx
-// Existing: equality function
-useFactSelector('user', u => u.name, shallowEqual)
-
-// New: options object with system
-useFactSelector('user', u => u.name, { system: globalSystem })
-
-// New: options object with both
-useFactSelector('user', u => u.name, { system: globalSystem, equalityFn: shallowEqual })
-
-// Same pattern for useDerivedSelector and useSelector
-useDerivedSelector('stats', s => s.count, { system: globalSystem })
-useSelector(facts => facts.count, { system: globalSystem })
-```
-
-**Throttled hooks** — `system` merged into options:
-
-```tsx
-useInspectThrottled({ throttleMs: 200, system: globalSystem })
-useRequirementsThrottled({ throttleMs: 200, system: globalSystem })
-```
-
-**Status hooks** — positional `statusPlugin?` as last arg:
-
-```tsx
-useRequirementStatus('FETCH_USER', statusPlugin)
-useIsResolving('FETCH_USER', statusPlugin)
-useLatestError('FETCH_USER', statusPlugin)
-useRequirementStatuses(statusPlugin)
-useSuspenseRequirement('FETCH_USER', statusPlugin)
-useSuspenseRequirements(['FETCH_USER', 'FETCH_SETTINGS'], statusPlugin)
-```
+Manual rollback is also available via `rollback()`.
 
 ---
 
-## Scoped Systems
+## DevTools
 
-### useDirectiveRef
+### DirectiveDevTools
 
-Create a system scoped to a component's lifecycle (like XState's `useActorRef`):
-
-```tsx
-import { useDirectiveRef } from 'directive/react';
-
-function Counter() {
-  const { system, Provider } = useDirectiveRef(counterModule);
-
-  return (
-    <Provider>
-      <CounterDisplay />
-      <button onClick={() => system.dispatch({ type: 'increment' })}>+</button>
-    </Provider>
-  );
-}
-```
-
-### useDirectiveRefWithStatus
-
-Same as `useDirectiveRef` but with status plugin pre-configured:
+Dev-only floating panel (tree-shaken in production):
 
 ```tsx
+import { DirectiveDevTools } from 'directive/react';
+
 function App() {
-  const { Provider } = useDirectiveRefWithStatus(myModule);
-
   return (
-    <Provider>
-      <Content />
-    </Provider>
+    <>
+      <MyApp />
+      <DirectiveDevTools system={system} position="bottom-right" defaultOpen={false} />
+    </>
   );
 }
 ```
 
----
-
-## Typed Hooks
-
-Create fully typed hooks for your module schema:
-
-```tsx
-import { createTypedHooks } from 'directive/react';
-
-const { useDerived, useFact, useFacts, useDispatch, useSystem } = createTypedHooks<typeof myModule.schema>();
-
-function Profile() {
-  const count = useFact("count");    // Type: number
-  const doubled = useDerived("doubled"); // Type: number
-  const dispatch = useDispatch();
-
-  dispatch({ type: "increment" });   // Typed!
-}
-```
+Features:
+- Facts and derivations tables with live values
+- Unmet requirements and inflight resolver counts
+- Keyboard shortcut: press `Escape` to close
+- Accessible: proper table headers, focus management
 
 ---
 
-## Patterns
-
-### Loading States
-
-```tsx
-function UserCard() {
-  const loading = useFact<boolean>("loading");
-  const error = useFact<string | null>("error");
-  const user = useFact<User | null>("user");
-
-  if (loading) return <Spinner />;
-  if (error) return <Error message={error} />;
-  if (!user) return <EmptyState />;
-
-  return <UserDetails user={user} />;
-}
-```
-
-### Writing Facts
+## Writing Facts
 
 Write facts through the system directly:
 
 ```tsx
 function UserIdInput() {
-  const system = useSystem();
-  const userId = useFact<number>("userId");
+  const userId = useFact(system, "userId");
 
   return (
     <input
@@ -504,14 +469,30 @@ function UserIdInput() {
 }
 ```
 
-Or dispatch events:
+---
 
-```tsx
-function IncrementButton() {
-  const dispatch = useDispatch();
-  return <button onClick={() => dispatch({ type: "increment" })}>+</button>;
-}
-```
+## Migration from Deprecated Hooks
+
+The following hooks are deprecated but still work. They delegate to the new consolidated API:
+
+| Deprecated | Use Instead |
+|---|---|
+| `useFacts(system, keys)` | `useFact(system, keys)` |
+| `useFactSelector(system, key, fn)` | `useFact(system, key, fn)` |
+| `useDerivations(system, keys)` | `useDerived(system, keys)` |
+| `useDerivedSelector(system, key, fn)` | `useDerived(system, key, fn)` |
+| `useDirectiveRefWithStatus(mod)` | `useDirectiveRef(mod, { status: true })` |
+| `useIsSettled(system)` | `useInspect(system).isSettled` |
+| `useRequirements(system)` | `useInspect(system)` |
+| `useRequirementsThrottled(system, opts)` | `useInspect(system, opts)` |
+| `useInspectThrottled(system, opts)` | `useInspect(system, opts)` |
+| `useIsResolving(plugin, type)` | `useRequirementStatus(plugin, type).isLoading` |
+| `useLatestError(plugin, type)` | `useRequirementStatus(plugin, type).lastError` |
+| `useRequirementStatuses(plugin, types)` | `useRequirementStatus(plugin, types)` |
+| `useSuspenseRequirements(plugin, opts)` | `useSuspenseRequirement(plugin, types)` |
+| `useSystem(mod, opts)` | `useDirective(mod, opts)` or `useModule(mod)` |
+| `useDirectiveDevTools(system)` | `useInspect(system)` |
+| `useWatchFact(system, key, fn)` | `useWatch(system, "fact", key, fn)` |
 
 ---
 
@@ -520,23 +501,76 @@ function IncrementButton() {
 ```tsx
 import { render, screen } from '@testing-library/react';
 import { createTestSystem } from 'directive/testing';
-import { DirectiveProvider } from 'directive/react';
+import { useFact } from 'directive/react';
 import { userModule } from './modules/user';
-import { UserProfile } from './UserProfile';
+
+function UserProfile({ system }) {
+  const user = useFact(system, "user");
+  return <p>{user?.name}</p>;
+}
 
 test('displays user name', async () => {
   const system = createTestSystem({ module: userModule });
   system.facts.user = { id: 1, name: 'Test User' };
 
-  render(
-    <DirectiveProvider system={system}>
-      <UserProfile />
-    </DirectiveProvider>
-  );
+  render(<UserProfile system={system} />);
 
   expect(screen.getByText('Test User')).toBeInTheDocument();
 });
 ```
+
+---
+
+## API Reference
+
+| Export | Type | Description |
+|---|---|---|
+| `useFact` | Hook | Read single/multi facts or apply selector |
+| `useDerived` | Hook | Read single/multi derivations or apply selector |
+| `useSelector` | Hook | Auto-tracking selector over all facts |
+| `useEvents` | Hook | Typed event dispatchers |
+| `useDispatch` | Hook | Low-level event dispatch |
+| `useWatch` | Hook | Side-effect watcher for facts or derivations |
+| `useInspect` | Hook | System inspection (unmet, inflight, constraints) |
+| `useRequirementStatus` | Hook | Single/multi requirement status |
+| `useSuspenseRequirement` | Hook | Suspense integration for requirements |
+| `useDirectiveRef` | Hook | Scoped system tied to component lifecycle |
+| `useDirective` | Hook | Scoped system with selected subscriptions |
+| `useModule` | Hook | Zero-config scoped system |
+| `useExplain` | Hook | Reactive requirement explanation |
+| `useConstraintStatus` | Hook | Reactive constraint inspection |
+| `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
+| `DirectiveDevTools` | Component | Floating debug panel |
+| `DirectiveHydrator` | Component | SSR snapshot hydration provider |
+| `useHydratedSystem` | Hook | Create system from hydration context |
+| `useSystem` | Hook | Access the full system instance |
+| `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `shallowEqual` | Utility | Shallow equality for selectors |
+
+---
+
+## Time-Travel Debugging
+
+Use `useTimeTravel` for reactive undo/redo controls that re-render when snapshot state changes:
+
+```tsx
+import { useTimeTravel } from 'directive/react';
+
+function UndoControls() {
+  const tt = useTimeTravel(system);
+  if (!tt) return null;
+
+  return (
+    <div>
+      <button onClick={tt.undo} disabled={!tt.canUndo}>Undo</button>
+      <button onClick={tt.redo} disabled={!tt.canRedo}>Redo</button>
+      <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+    </div>
+  );
+}
+```
+
+Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
 
 ---
 

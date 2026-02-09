@@ -11,11 +11,11 @@ Save and restore system state with snapshots. {% .lead %}
 
 ```typescript
 // Capture current state
-const snapshot = system.snapshot();
+const snapshot = system.getSnapshot();
 
-// Snapshot is a plain object
+// Snapshot is a SystemSnapshot object
 console.log(snapshot);
-// { count: 5, user: { name: "John" }, items: [...] }
+// { facts: { count: 5, user: { name: "John" } }, ... }
 ```
 
 ---
@@ -32,74 +32,38 @@ console.log(system.facts.count); // 5
 
 ---
 
-## Partial Snapshots
-
-Snapshot specific facts:
-
-```typescript
-// Only snapshot certain facts
-const partial = system.snapshot(['user', 'preferences']);
-// { user: {...}, preferences: {...} }
-
-// Restore partial (other facts unchanged)
-system.restore(partial);
-```
-
----
-
 ## Signed Snapshots
 
-Create tamper-proof snapshots:
+Create tamper-proof snapshots for secure transmission:
 
 ```typescript
-import { signSnapshot, verifySnapshot } from 'directive';
+import { signSnapshot, verifySnapshotSignature } from 'directive';
 
-// Sign a snapshot
-const signed = await signSnapshot(snapshot, {
-  key: process.env.SIGNING_KEY,
-  algorithm: 'sha256',
-});
+// Sign a snapshot with a secret
+const signed = signSnapshot(snapshot, process.env.SIGNING_SECRET);
 
 // Verify before restoring
-const isValid = await verifySnapshot(signed, {
-  key: process.env.SIGNING_KEY,
-});
+const isValid = verifySnapshotSignature(signed, process.env.SIGNING_SECRET);
 
 if (isValid) {
-  system.restore(signed.data);
+  system.restore(signed);
 }
 ```
 
----
-
-## Compression
-
-Compress large snapshots:
-
-```typescript
-import { compressSnapshot, decompressSnapshot } from 'directive';
-
-const compressed = await compressSnapshot(snapshot);
-localStorage.setItem('state', compressed);
-
-const decompressed = await decompressSnapshot(
-  localStorage.getItem('state')
-);
-system.restore(decompressed);
-```
+Both functions use the secret string for HMAC-based signing and verification.
 
 ---
 
 ## Diff Snapshots
 
-Compare two snapshots:
+Compare two snapshots to see what changed:
 
 ```typescript
 import { diffSnapshots } from 'directive';
 
-const before = system.snapshot();
+const before = system.getSnapshot();
 // ... changes happen ...
-const after = system.snapshot();
+const after = system.getSnapshot();
 
 const diff = diffSnapshots(before, after);
 // { changed: ['count'], added: [], removed: [] }
@@ -107,8 +71,37 @@ const diff = diffSnapshots(before, after);
 
 ---
 
+## Distributable Snapshots
+
+Export computed derivations for use outside the Directive runtime (e.g., Redis, CDN edge caches):
+
+```typescript
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan', 'canUseFeature'],
+  ttlSeconds: 3600,
+});
+
+// { data: { effectivePlan: "pro", ... }, createdAt: ..., expiresAt: ... }
+
+// Store in Redis
+await redis.setex(`state:${userId}`, 3600, JSON.stringify(snapshot));
+```
+
+Watch for changes and push updates:
+
+```typescript
+const unsubscribe = system.watchDistributableSnapshot(
+  { includeDerivations: ['effectivePlan', 'canUseFeature'] },
+  (snapshot) => {
+    redis.setex(`state:${userId}`, 3600, JSON.stringify(snapshot));
+  },
+);
+```
+
+---
+
 ## Next Steps
 
-- See Time-Travel for navigation
-- See Persistence for automatic saving
-- See SSR for server-side usage
+- See [Time-Travel](/docs/advanced/time-travel) for navigation
+- See [Persistence](/docs/plugins/persistence) for automatic saving
+- See [SSR](/docs/advanced/ssr) for server-side usage

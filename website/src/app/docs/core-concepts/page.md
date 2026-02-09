@@ -198,8 +198,8 @@ Resolvers have powerful built-in features:
 ```typescript
 retry: {
   attempts: 3,
-  backoff: "exponential",  // or "linear" or custom function
-  delay: 1000,  // Base delay in ms
+  backoff: "exponential",  // or "linear" or "none"
+  initialDelay: 1000,  // Base delay in ms
 }
 ```
 
@@ -212,15 +212,15 @@ timeout: 5000,  // Fail after 5 seconds
 #### Deduplication
 
 ```typescript
-key: (req) => `fetch-user-${req.payload.id}`,
+key: (req) => `fetch-user-${req.userId}`,
 // Same key = same resolution, won't run twice simultaneously
 ```
 
-#### Custom Matching
+#### Predicate Matching
 
 ```typescript
-handles: (req) => req.type.startsWith("FETCH_"),
-// Handle multiple requirement types
+requirement: (req): req is FetchRequirement => req.type.startsWith("FETCH_"),
+// Handle multiple requirement types with a type guard
 ```
 
 ---
@@ -348,6 +348,15 @@ const userModule = createModule("user", {
       loading: t.boolean(),
       error: t.string().nullable(),
     },
+    derivations: {
+      displayName: t.string(),
+      isLoggedIn: t.boolean(),
+      isAdmin: t.boolean(),
+    },
+    events: {},
+    requirements: {
+      FETCH_USER: {},
+    },
   },
 
   init: (facts) => {
@@ -406,6 +415,7 @@ const userModule = createModule("user", {
 
 // Create and use the system
 const system = createSystem({ module: userModule });
+system.start();
 
 // Just set userId - everything else happens automatically
 system.facts.userId = 123;

@@ -401,6 +401,6 @@ const fileModule = createModule("file", {
 
 ## Next Steps
 
-- See the Quick Start for a complete tutorial
-- See Constraints for declarative logic
-- See Resolvers for async handling
+- See the [Quick Start](/docs/quick-start) for a complete tutorial
+- See [Constraints](/docs/constraints) for declarative logic
+- See [Resolvers](/docs/resolvers) for async handling

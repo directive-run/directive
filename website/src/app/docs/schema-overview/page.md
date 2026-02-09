@@ -22,18 +22,20 @@ const myModule = createModule("my-module", {
 });
 ```
 
+Only `facts` is required. Other sections default to empty.
+
 ---
 
 ## Facts Schema
 
-Define the shape of your module's state:
+Define the shape of your module's state using `t` type builders:
 
 ```typescript
 schema: {
   facts: {
     userId: t.number(),
     user: t.object<User>().nullable(),
-    items: t.array(t.object<CartItem>()),
+    items: t.array<CartItem>().of(t.object<CartItem>()),
     preferences: t.object<Preferences>().optional(),
     status: t.string<"idle" | "loading" | "error">(),
   },
@@ -42,16 +44,32 @@ schema: {
 
 ---
 
+## Derivations Schema
+
+Declare the return types for computed values:
+
+```typescript
+schema: {
+  derivations: {
+    displayName: t.string(),
+    isLoggedIn: t.boolean(),
+    itemCount: t.number(),
+  },
+}
+```
+
+---
+
 ## Events Schema
 
-Define type-safe event payloads:
+Define event names and their payload shapes. Each event maps to an object describing its payload properties. An empty object `{}` means no payload:
 
 ```typescript
 schema: {
   events: {
-    USER_LOGGED_IN: t.object<{ userId: string; method: string }>(),
-    USER_LOGGED_OUT: t.void(),
-    ERROR_OCCURRED: t.object<{ code: string; message: string }>(),
+    USER_LOGGED_IN: { userId: t.string(), method: t.string() },
+    USER_LOGGED_OUT: {},  // No payload
+    ERROR_OCCURRED: { code: t.string(), message: t.string() },
   },
 }
 ```
@@ -60,14 +78,14 @@ schema: {
 
 ## Requirements Schema
 
-Define requirement payloads for constraints:
+Define requirement names and their payload shapes. Each requirement maps to an object describing its additional properties:
 
 ```typescript
 schema: {
   requirements: {
-    FETCH_USER: t.object<{ userId: number }>(),
-    UPDATE_SETTINGS: t.object<{ key: string; value: unknown }>(),
-    SEND_NOTIFICATION: t.object<{ title: string; body: string }>(),
+    FETCH_USER: { userId: t.number() },
+    UPDATE_SETTINGS: { key: t.string() },
+    SEND_NOTIFICATION: { title: t.string(), body: t.string() },
   },
 }
 ```
@@ -76,28 +94,49 @@ schema: {
 
 ## Type Inference
 
-Schemas enable full TypeScript inference:
+Schemas enable full TypeScript inference throughout the system:
 
 ```typescript
 // Facts are typed
 system.facts.userId = 123;        // OK
 system.facts.userId = "invalid";  // Type error
 
-// Events are typed
-system.on("USER_LOGGED_IN", (payload) => {
-  console.log(payload.userId);    // string - inferred
-  console.log(payload.invalid);   // Type error
-});
+// Events are typed via system.events accessor
+system.events.USER_LOGGED_IN({ userId: "abc", method: "email" }); // OK
+system.events.USER_LOGGED_OUT();  // OK — no payload
 
-// Requirements are typed
-context.dispatch("FETCH_USER", { userId: 123 });  // OK
-context.dispatch("FETCH_USER", {});               // Type error
+// Requirements are typed in constraints
+constraints: {
+  needsUser: {
+    when: (facts) => facts.userId > 0 && !facts.user,
+    require: { type: "FETCH_USER", userId: 123 },  // Typed payload
+  },
+},
 ```
+
+---
+
+## Type Assertion Pattern
+
+For maximum TypeScript control with no runtime validation, use type assertions:
+
+```typescript
+const myModule = createModule("my-module", {
+  schema: {
+    facts: {} as { userId: number; user: User | null },
+    derivations: {} as { displayName: string; isLoggedIn: boolean },
+    events: {} as { increment: {}; setPhase: { phase: "a" | "b" } },
+    requirements: {} as { FETCH: { id: string } },
+  },
+});
+```
+
+This provides full type inference without any runtime overhead.
 
 ---
 
 ## Next Steps
 
-- See Type Builders for the complete `t.*` API
-- See Zod Integration for runtime validation
-- See Facts for working with state
+- **[Type Builders](/docs/type-builders)** — Complete `t.*` API reference
+- **[Facts](/docs/facts)** — Working with state
+- **[Events](/docs/events)** — Dispatching events

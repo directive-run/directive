@@ -352,6 +352,6 @@ This is useful for suppressing noisy effects during tests, pausing analytics, or
 
 ## Next Steps
 
-- See Constraints for declarative rules
-- See Resolvers for handling requirements
-- See Events for state mutations
+- See [Constraints](/docs/constraints) for declarative rules
+- See [Resolvers](/docs/resolvers) for handling requirements
+- See [Events](/docs/events) for state mutations

@@ -67,15 +67,15 @@ Every stream chunk has a `type` discriminant:
 | Type | Fields | When |
 |------|--------|------|
 | `token` | `data`, `tokenCount` | Each token from the agent |
-| `tool_start` | `tool`, `toolCallId` | Agent starts calling a tool |
+| `tool_start` | `tool`, `toolCallId`, `arguments` | Agent starts calling a tool |
 | `tool_end` | `tool`, `toolCallId`, `result` | Tool call completes |
 | `message` | `message` | Full message added to conversation |
-| `guardrail_triggered` | `guardrailName`, `reason`, `stopped` | A guardrail blocked content |
+| `guardrail_triggered` | `guardrailName`, `reason`, `partialOutput`, `stopped` | A guardrail blocked content |
 | `approval_required` | `requestId`, `toolName` | Tool call needs approval |
 | `approval_resolved` | `requestId`, `approved` | Approval decision made |
-| `progress` | `phase`, `message` | Status update (starting, generating, finishing) |
-| `done` | `totalTokens`, `duration` | Stream completed |
-| `error` | `error` | An error occurred |
+| `progress` | `phase`, `message` | Status update (starting, generating, tool_calling, finishing) |
+| `done` | `totalTokens`, `duration`, `droppedTokens` | Stream completed |
+| `error` | `error`, `partialOutput?` | An error occurred |
 
 ---
 
@@ -202,8 +202,8 @@ const streamRunner = createStreamingRunner(baseRunFn, {
     // Stop on forbidden patterns
     createPatternStreamingGuardrail({
       patterns: [
-        { pattern: /\b\d{3}-\d{2}-\d{4}\b/, reason: 'SSN detected in output' },
-        { pattern: /\bpassword\s*[:=]/i, reason: 'Password leak detected' },
+        { regex: /\b\d{3}-\d{2}-\d{4}\b/, name: 'SSN' },
+        { regex: /\bpassword\s*[:=]/i, name: 'Password leak' },
       ],
     }),
   ],
@@ -246,10 +246,11 @@ Reuse existing output guardrails as streaming guardrails:
 ```typescript
 import { adaptOutputGuardrail } from 'directive/openai-agents';
 
-const streamingVersion = adaptOutputGuardrail(myOutputGuardrail, {
-  agentName: 'assistant',
-  input: 'original input',
-});
+const streamingVersion = adaptOutputGuardrail(
+  'pii-streaming',        // name
+  myOutputGuardrail,       // existing guardrail function
+  { minTokens: 100 },     // options (optional)
+);
 ```
 
 ---

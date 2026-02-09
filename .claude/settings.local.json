@@ -48,7 +48,8 @@
       "Bash(do cp -r src/app_backup/$dir src/app/docs/)",
       "Bash(timeout 15 pnpm run dev:*)",
       "Bash(timeout 15 /opt/homebrew/bin/node ./node_modules/.bin/next dev:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "WebFetch(domain:xstate.js.org)"
     ]
   }
 }
