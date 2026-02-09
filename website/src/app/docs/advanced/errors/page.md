@@ -3,13 +3,13 @@ title: Error Handling
 description: Handle errors gracefully with Directive's error boundaries, retry policies, and recovery strategies.
 ---
 
-Directive provides robust error handling for resolvers, constraints, and effects. {% .lead %}
+Directive provides robust error handling for resolvers, constraints, effects, and derivations. {% .lead %}
 
 ---
 
 ## Resolver Error Handling
 
-### Try-Catch in Resolvers
+Handle errors directly in resolver logic with try-catch:
 
 ```typescript
 resolvers: {
@@ -31,32 +31,11 @@ resolvers: {
 }
 ```
 
-### Error Handler Callback
-
-```typescript
-resolvers: {
-  fetchUser: {
-    requirement: "FETCH_USER",
-    onError: (error, req, context) => {
-      context.facts.error = error.message;
-      context.dispatch("ERROR_OCCURRED", {
-        type: "FETCH_FAILED",
-        message: error.message,
-        requirement: req,
-      });
-    },
-    resolve: async (req, context) => {
-      context.facts.user = await api.getUser(req.userId);
-    },
-  },
-}
-```
-
 ---
 
 ## Retry Policies
 
-### Automatic Retries
+Configure automatic retries with backoff:
 
 ```typescript
 resolvers: {
@@ -64,9 +43,9 @@ resolvers: {
     requirement: "FETCH_DATA",
     retry: {
       attempts: 3,
-      backoff: "exponential",
-      initialDelay: 100,
-      maxDelay: 5000,
+      backoff: "exponential",  // "none" | "linear" | "exponential"
+      initialDelay: 100,       // ms before first retry
+      maxDelay: 5000,          // maximum delay between retries
     },
     resolve: async (req, context) => {
       context.facts.data = await api.getData(req.id);
@@ -75,35 +54,41 @@ resolvers: {
 }
 ```
 
-### Conditional Retry
+| Option | Type | Description |
+|--------|------|-------------|
+| `attempts` | `number` | Maximum retry attempts |
+| `backoff` | `"none" \| "linear" \| "exponential"` | Backoff strategy |
+| `initialDelay` | `number` | Delay before first retry (ms) |
+| `maxDelay` | `number` | Maximum delay between retries (ms) |
+| `shouldRetry` | `(error, attempt) => boolean` | Predicate to control whether to retry |
+
+Use `shouldRetry` to skip retries for non-transient errors:
 
 ```typescript
 retry: {
-  attempts: 3,
+  attempts: 5,
+  backoff: "exponential",
   shouldRetry: (error, attempt) => {
-    // Don't retry client errors (4xx)
-    if (error.status >= 400 && error.status < 500) {
+    // Don't retry 404s or auth errors
+    if (error.message.includes("404") || error.message.includes("401")) {
       return false;
     }
-    // Don't retry after 3 attempts
-    return attempt < 3;
+    return true;
   },
-}
+},
 ```
 
 ---
 
-## Timeout Handling
+## Timeout
+
+Set a timeout for resolver execution:
 
 ```typescript
 resolvers: {
   fetchData: {
     requirement: "FETCH_DATA",
-    timeout: 5000,
-    onTimeout: (req, context) => {
-      context.facts.error = "Request timed out after 5 seconds";
-      context.facts.loading = false;
-    },
+    timeout: 5000, // ms
     resolve: async (req, context) => {
       context.facts.data = await slowApi.getData(req.id);
     },
@@ -111,40 +96,59 @@ resolvers: {
 }
 ```
 
+When a resolver exceeds its timeout, it is aborted via the `context.signal` (an `AbortSignal`). Use it to cancel in-flight requests:
+
+```typescript
+resolve: async (req, context) => {
+  const res = await fetch(`/api/data/${req.id}`, {
+    signal: context.signal,
+  });
+  context.facts.data = await res.json();
+},
+```
+
 ---
 
-## Global Error Handling
+## Error Boundary
 
-### System-Level Error Handler
+Configure system-level error handling with `errorBoundary`:
 
 ```typescript
 const system = createSystem({
   module: myModule,
-  onError: (error, context) => {
-    console.error("System error:", error);
-    errorReporter.capture(error, context);
+  errorBoundary: {
+    onConstraintError: "skip",     // RecoveryStrategy or callback
+    onResolverError: "retry",
+    onEffectError: "skip",
+    onDerivationError: "skip",
+    onError: (error) => {
+      // Called for any error
+      console.error(`[${error.source}] ${error.sourceId}:`, error.message);
+      errorReporter.capture(error);
+    },
   },
 });
 ```
 
-### Error Events
+### Recovery Strategies
+
+| Strategy | Behavior |
+|----------|----------|
+| `"skip"` | Ignore the error and continue |
+| `"retry"` | Retry the operation immediately |
+| `"retry-later"` | Retry after a delay (configurable) |
+| `"disable"` | Disable the failing constraint/effect/resolver |
+| `"throw"` | Re-throw the error (stops the system) |
+
+You can also pass a callback instead of a strategy string:
 
 ```typescript
-schema: {
-  events: {
-    ERROR_OCCURRED: t.object<{
-      code: string;
-      message: string;
-      context?: unknown;
-    }>(),
+errorBoundary: {
+  onResolverError: (error, resolver) => {
+    console.error(`Resolver ${resolver} failed:`, error);
+    // Custom recovery logic
   },
-}
-
-// Listen for errors
-system.on("ERROR_OCCURRED", (payload) => {
-  showErrorToast(payload.message);
-  analytics.track("error", payload);
-});
+},
 ```
 
 ---
@@ -185,7 +189,7 @@ resolvers: {
       try {
         context.facts.data = await api.getData(req.id);
       } catch (error) {
-        // Try fallback source
+        // Try cache as fallback
         try {
           context.facts.data = await cache.getData(req.id);
           context.facts.isStale = true;
@@ -202,13 +206,12 @@ resolvers: {
 
 ## React Error Boundaries
 
+Combine Directive's error handling with React error boundaries. Pass the system directly -- no provider needed:
+
 ```typescript
-import { DirectiveProvider, useSystem } from 'directive/react';
 import { ErrorBoundary } from 'react-error-boundary';
 
-function ErrorFallback({ error, resetErrorBoundary }) {
-  const system = useSystem();
-
+function ErrorFallback({ error, resetErrorBoundary, system }) {
   const handleRetry = () => {
     system.facts.error = null;
     resetErrorBoundary();
@@ -223,65 +226,61 @@ function ErrorFallback({ error, resetErrorBoundary }) {
   );
 }
 
-function App() {
+function App({ system }) {
   return (
-    <DirectiveProvider system={system}>
-      <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <MyComponent />
-      </ErrorBoundary>
-    </DirectiveProvider>
+    <ErrorBoundary FallbackComponent={(props) => <ErrorFallback {...props} system={system} />}>
+      <MyComponent system={system} />
+    </ErrorBoundary>
   );
 }
 ```
 
 ---
 
-## Best Practices
+## Error States in Derivations
 
-### Always Handle Errors
-
-```typescript
-// Good - comprehensive error handling
-resolvers: {
-  fetchUser: {
-    requirement: "FETCH_USER",
-    retry: { attempts: 2, backoff: "exponential" },
-    timeout: 10000,
-    onError: (error, req, context) => {
-      context.facts.error = error.message;
-      context.dispatch("ERROR", { type: "FETCH_FAILED" });
-    },
-    resolve: async (req, context) => {
-      context.facts.user = await api.getUser(req.userId);
-    },
-  },
-}
-```
-
-### Use Error States in UI
+Use derivations to expose error state to the UI:
 
 ```typescript
 derive: {
   hasError: (facts) => facts.error !== null,
-  canRetry: (facts) => facts.error && facts.retryCount < 3,
+  canRetry: (facts) => facts.error !== null && facts.retryCount < 3,
 }
 ```
 
-### Log and Monitor
+---
+
+## Monitoring with Plugins
+
+Use the plugin system to report errors to monitoring services:
 
 ```typescript
-onError: (error, req, context) => {
-  // Log to monitoring service
-  Sentry.captureException(error, {
-    extra: { requirement: req, facts: context.facts },
-  });
-}
+const errorMonitor: Plugin = {
+  name: 'error-monitor',
+
+  onResolverError: (resolver, req, error) => {
+    Sentry.captureException(error, {
+      extra: { resolver, requirement: req },
+    });
+  },
+
+  onError: (error) => {
+    Sentry.captureException(error, {
+      extra: { source: error.source, sourceId: error.sourceId },
+    });
+  },
+};
+
+const system = createSystem({
+  module: myModule,
+  plugins: [errorMonitor],
+});
 ```
 
 ---
 
 ## Next Steps
 
-- See Resolvers for retry configuration
-- See Testing for testing error scenarios
-- See Effects for error side effects
+- See [Resolvers](/docs/resolvers) for retry configuration
+- See [Custom Plugins](/docs/plugins/custom) for monitoring hooks
+- See [Testing](/docs/testing/overview) for testing error scenarios

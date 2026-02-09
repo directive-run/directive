@@ -362,6 +362,6 @@ This is useful for feature flags, A/B testing, or temporarily suppressing constr
 
 ## Next Steps
 
-- See Resolvers for handling requirements
-- See Derivations for computed values
-- See Effects for side effects
+- See [Resolvers](/docs/resolvers) for handling requirements
+- See [Derivations](/docs/derivations) for computed values
+- See [Effects](/docs/effects) for side effects

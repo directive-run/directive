@@ -68,6 +68,18 @@ export interface TimeTravelAPI {
 	replay(): void;
 	export(): string;
 	import(json: string): void;
+	beginChangeset(label: string): void;
+	endChangeset(): void;
+}
+
+/** Reactive time-travel state for framework hooks */
+export interface TimeTravelState {
+	canUndo: boolean;
+	canRedo: boolean;
+	undo: () => void;
+	redo: () => void;
+	currentIndex: number;
+	totalSnapshots: number;
 }
 
 // ============================================================================
@@ -207,6 +219,20 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	dispatch(event: SystemEvent): void;
 
 	batch(fn: () => void): void;
+
+	/**
+	 * Subscribe to settlement state changes.
+	 * Called whenever the system's settled state may have changed
+	 * (resolver starts/completes, reconcile starts/ends).
+	 */
+	onSettledChange(listener: () => void): () => void;
+
+	/**
+	 * Subscribe to time-travel state changes.
+	 * Called whenever a snapshot is taken or time-travel navigation occurs.
+	 * Returns an unsubscribe function.
+	 */
+	onTimeTravelChange(listener: () => void): () => void;
 
 	read<K extends DerivationKeys<M>>(derivationId: K): DerivationReturnType<M, K>;
 	read<T = unknown>(derivationId: string): T;

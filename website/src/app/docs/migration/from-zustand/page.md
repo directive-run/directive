@@ -54,7 +54,7 @@ function Counter() {
 ```typescript
 // Directive
 import { createModule, createSystem, t } from 'directive';
-import { useFact, useSystem } from 'directive/react';
+import { useFact } from 'directive/react';
 
 const counterModule = createModule("counter", {
   schema: {
@@ -69,14 +69,13 @@ const system = createSystem({ module: counterModule });
 
 // Usage
 function Counter() {
-  const count = useFact('count');
-  const { facts } = useSystem();
+  const count = useFact(system, "count");
 
   return (
     <div>
       <p>{count}</p>
-      <button onClick={() => facts.count--}>-</button>
-      <button onClick={() => facts.count++}>+</button>
+      <button onClick={() => system.facts.count--}>-</button>
+      <button onClick={() => system.facts.count++}>+</button>
     </div>
   );
 }
@@ -161,13 +160,12 @@ const userModule = createModule("user", {
 
 // Usage - just set userId, fetching is automatic
 function UserProfile() {
-  const userId = useFact('userId');
-  const user = useFact('user');
-  const { facts } = useSystem();
+  const userId = useFact(system, "userId");
+  const user = useFact(system, "user");
 
   // Setting userId triggers constraint automatically
   const handleUserChange = (id) => {
-    facts.userId = id;
+    system.facts.userId = id;
   };
 }
 ```
@@ -213,7 +211,7 @@ const cartModule = createModule("cart", {
 });
 
 function CartTotal() {
-  const total = useDerived('total');
+  const total = useDerived(system, "total");
   return <p>Total: ${total}</p>;
 }
 ```
@@ -334,6 +332,6 @@ function toggleTodo(id: number) {
 
 ## Next Steps
 
-- See the Quick Start for a complete tutorial
-- See Derivations for reactive computed values
-- See the React Adapter for hook patterns
+- See the [Quick Start](/docs/quick-start) for a complete tutorial
+- See [Derivations](/docs/derivations) for reactive computed values
+- See the [React Adapter](/docs/adapters/react) for hook patterns

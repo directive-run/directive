@@ -1,9 +1,7 @@
 {
-  "/page": "app/page.js",
-  "/docs/resolvers/page": "app/docs/resolvers/page.js",
-  "/docs/constraints/page": "app/docs/constraints/page.js",
-  "/docs/derivations/page": "app/docs/derivations/page.js",
+  "/docs/adapters/react/page": "app/docs/adapters/react/page.js",
+  "/docs/module-system/page": "app/docs/module-system/page.js",
   "/docs/facts/page": "app/docs/facts/page.js",
-  "/docs/glossary/page": "app/docs/glossary/page.js",
-  "/docs/core-concepts/page": "app/docs/core-concepts/page.js"
+  "/docs/derivations/page": "app/docs/derivations/page.js",
+  "/docs/constraints/page": "app/docs/constraints/page.js"
 }

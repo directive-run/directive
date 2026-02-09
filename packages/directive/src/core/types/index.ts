@@ -127,6 +127,7 @@ export type {
 	// Debug & time-travel
 	DebugConfig,
 	TimeTravelAPI,
+	TimeTravelState,
 	// Inspection
 	SystemInspection,
 	RequirementExplanation,

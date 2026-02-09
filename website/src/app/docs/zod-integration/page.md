@@ -1,19 +1,19 @@
 ---
 title: Zod Integration
-description: Use Zod schemas for runtime validation in Directive modules.
+description: Use Zod schemas directly in Directive modules for runtime validation.
 ---
 
-Directive integrates with Zod for runtime type validation. {% .lead %}
+Directive natively supports Zod schemas — use them directly in your facts definition for full runtime validation. {% .lead %}
 
 ---
 
 ## Basic Usage
 
-Use Zod schemas instead of type builders:
+Pass Zod schemas directly as fact types — no wrapper needed:
 
 ```typescript
 import { z } from 'zod';
-import { createModule, fromZod } from 'directive';
+import { createModule, t } from 'directive';
 
 const UserSchema = z.object({
   id: z.string(),
@@ -24,62 +24,62 @@ const UserSchema = z.object({
 const myModule = createModule("users", {
   schema: {
     facts: {
-      user: fromZod(UserSchema).nullable(),
-      users: fromZod(z.array(UserSchema)),
+      user: UserSchema,              // Zod schema used directly
+      users: z.array(UserSchema),    // Zod arrays work too
+      count: t.number(),             // Mix with t.* builders
     },
+    derivations: {},
+    events: {},
+    requirements: {},
+  },
+  init: (facts) => {
+    facts.user = null;
+    facts.users = [];
+    facts.count = 0;
   },
 });
 ```
 
+Directive auto-detects Zod schemas at runtime and uses `safeParse` for validation.
+
 ---
 
-## Runtime Validation
+## How It Works
 
-Enable validation in development:
+Directive's type system supports three kinds of schema values:
+
+1. **`t.*()` builders** — Directive's built-in type builders (detected via `_validators`)
+2. **Zod schemas** — Auto-detected via `safeParse` + `_def` + `parse` (validated with `safeParse`)
+3. **Type assertions** — Plain types via `{} as { ... }` (no runtime validation)
+
+For TypeScript inference, Zod's `_output` type is extracted automatically, so `z.string()` infers as `string`, `z.object({...})` infers the object shape, etc.
+
+---
+
+## Validation Behavior
+
+Validation runs automatically in development mode (`process.env.NODE_ENV !== 'production'`). In production, validation is tree-shaken away.
 
 ```typescript
-const system = createSystem({
-  module: myModule,
-  validate: process.env.NODE_ENV === 'development',
-});
-
-// In development, invalid data throws
-system.facts.user = { id: 123 }; // Error: Expected string, received number
+// In development, invalid data throws with a descriptive error
+system.facts.user = { id: 123 };
+// Error: [Directive] Validation failed for "user": expected object, got object {"id":123}. Expected string, received number
 ```
 
----
-
-## Validation Modes
+The facts store's `validate` option controls this:
 
 ```typescript
-const system = createSystem({
-  module: myModule,
-  validate: {
-    mode: 'strict',      // Throw on invalid data (default)
-    // mode: 'warn',     // Log warning but allow
-    // mode: 'silent',   // Just return validation result
-  },
-});
-```
-
----
-
-## Custom Error Handling
-
-```typescript
-const system = createSystem({
-  module: myModule,
-  validate: true,
-  onValidationError: (error, key, value) => {
-    console.error(`Validation failed for ${key}:`, error);
-    Sentry.captureException(error);
-  },
+const { store, facts } = createFacts({
+  schema: myModule.schema.facts,
+  validate: true,  // Force validation on (default: true in dev, false in prod)
 });
 ```
 
 ---
 
 ## Complex Schemas
+
+Zod's full API works seamlessly:
 
 ```typescript
 const OrderSchema = z.object({
@@ -91,12 +91,32 @@ const OrderSchema = z.object({
   })),
   total: z.number().nonnegative(),
   status: z.enum(['pending', 'processing', 'shipped', 'delivered']),
-  createdAt: z.date(),
 });
 
 schema: {
   facts: {
-    order: fromZod(OrderSchema).nullable(),
+    order: OrderSchema.nullable(),
+  },
+}
+```
+
+---
+
+## Mixing Zod and Type Builders
+
+You can freely mix Zod schemas with `t.*()` builders in the same module:
+
+```typescript
+schema: {
+  facts: {
+    // Zod for complex validated types
+    user: UserSchema.nullable(),
+    order: OrderSchema.nullable(),
+
+    // t.* for simple types
+    loading: t.boolean(),
+    error: t.string().nullable(),
+    count: t.number().min(0),
   },
 }
 ```
@@ -105,6 +125,6 @@ schema: {
 
 ## Next Steps
 
-- See Type Builders for built-in types
-- See Type Assertions for custom validation
-- See Schema Overview for structure
+- **[Type Builders](/docs/type-builders)** — Built-in `t.*` types
+- **[Schema Overview](/docs/schema-overview)** — Schema structure
+- **[Facts](/docs/facts)** — Working with state

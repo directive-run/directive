@@ -1,68 +1,102 @@
 ---
-title: Type Assertions
-description: Create custom type validators and assertions for Directive schemas.
+title: Type Assertions & Custom Validation
+description: Use type assertions for zero-overhead typing, or add custom validation with chainable methods.
 ---
 
-Define custom validation logic for your schema types. {% .lead %}
+Two patterns for types without runtime validation, plus custom validation for when you need it. {% .lead %}
 
 ---
 
-## Custom Validators
+## Type Assertions
 
-Create validators with the `t.custom()` builder:
+For zero-overhead typing, use the type assertion pattern. This gives full TypeScript inference without any runtime validation:
+
+```typescript
+import { createModule } from 'directive';
+
+const myModule = createModule("example", {
+  schema: {
+    facts: {} as {
+      userId: number;
+      user: User | null;
+      items: CartItem[];
+    },
+    derivations: {} as {
+      displayName: string;
+      total: number;
+    },
+    events: {} as {
+      addItem: { item: CartItem };
+      clear: {};
+    },
+    requirements: {} as {
+      FETCH_USER: { userId: number };
+    },
+  },
+  // ...
+});
+```
+
+Type assertions are ideal when:
+- You want maximum TypeScript control
+- Runtime validation isn't needed
+- You're working with complex or external types
+
+---
+
+## Custom Validation
+
+For runtime validation, use the chainable `.validate()` and `.refine()` methods on any `t.*()` builder:
+
+### Basic Validator
 
 ```typescript
 import { t } from 'directive';
 
-const positiveNumber = t.custom<number>({
-  validate: (value) => typeof value === 'number' && value > 0,
-  message: 'Must be a positive number',
-});
-
 schema: {
   facts: {
-    quantity: positiveNumber,
-    price: positiveNumber,
+    quantity: t.number().validate(v => v > 0),
+    price: t.number().min(0),  // Built-in min/max for numbers
   },
 }
 ```
 
----
+### Refinement with Error Messages
 
-## Email Validator Example
+`.refine()` adds validation with a descriptive error message:
 
 ```typescript
-const email = t.custom<string>({
-  validate: (value) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return typeof value === 'string' && emailRegex.test(value);
-  },
-  message: 'Must be a valid email address',
-});
-
 schema: {
   facts: {
-    userEmail: email.nullable(),
+    email: t.string().refine(
+      s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s),
+      "Must be a valid email address"
+    ),
+    password: t.string().refine(
+      s => s.length >= 8,
+      "Must be at least 8 characters"
+    ),
   },
 }
 ```
 
----
-
-## Range Validator
+Or use the built-in `t.email()` type:
 
 ```typescript
-function range(min: number, max: number) {
-  return t.custom<number>({
-    validate: (value) => value >= min && value <= max,
-    message: `Must be between ${min} and ${max}`,
-  });
-}
-
 schema: {
   facts: {
-    rating: range(1, 5),
-    percentage: range(0, 100),
+    userEmail: t.email().nullable(),
+  },
+}
+```
+
+### Range Validation
+
+```typescript
+schema: {
+  facts: {
+    rating: t.number().min(1).max(5),
+    percentage: t.number().min(0).max(100),
   },
 }
 ```
@@ -71,25 +105,43 @@ schema: {
 
 ## Branded Types
 
-Create branded types for extra safety:
+Create nominal types that prevent accidental mixing of values:
 
 ```typescript
-type UserId = string & { readonly brand: unique symbol };
-type OrderId = string & { readonly brand: unique symbol };
-
-const userId = t.custom<UserId>({
-  validate: (v) => typeof v === 'string' && v.startsWith('user_'),
-});
-
-const orderId = t.custom<OrderId>({
-  validate: (v) => typeof v === 'string' && v.startsWith('order_'),
-});
-
-// Type-safe - can't mix up IDs
 schema: {
   facts: {
-    currentUserId: userId.nullable(),
-    selectedOrderId: orderId.nullable(),
+    currentUserId: t.string().brand<"UserId">().nullable(),
+    selectedOrderId: t.string().brand<"OrderId">().nullable(),
+  },
+}
+
+// Type-safe — can't assign a UserId where OrderId is expected
+```
+
+Add validation to branded types:
+
+```typescript
+schema: {
+  facts: {
+    userId: t.string()
+      .refine(v => v.startsWith("user_"), "Must start with user_")
+      .brand<"UserId">()
+      .nullable(),
+  },
+}
+```
+
+---
+
+## Transforms
+
+Transform values on assignment:
+
+```typescript
+schema: {
+  facts: {
+    name: t.string().transform(s => s.trim()),
+    tags: t.string().transform(s => s.toLowerCase()),
   },
 }
 ```
@@ -98,7 +150,7 @@ schema: {
 
 ## Async Validation
 
-For async validation, use constraints instead:
+For validation that requires async work (API calls, database lookups), use constraints and resolvers instead:
 
 ```typescript
 constraints: {
@@ -122,6 +174,6 @@ resolvers: {
 
 ## Next Steps
 
-- See Type Builders for built-in types
-- See Zod Integration for Zod schemas
-- See Constraints for runtime validation
+- **[Type Builders](/docs/type-builders)** — Full `t.*` API reference
+- **[Zod Integration](/docs/zod-integration)** — Zod schemas for validation
+- **[Constraints](/docs/constraints)** — Runtime validation via constraints

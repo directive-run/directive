@@ -111,12 +111,12 @@ Yes! Directive is SSR-ready:
 ```typescript
 // Server: create system and serialize
 const system = createSystem({ module: myModule });
-const snapshot = system.snapshot();
+const snapshot = system.getSnapshot();
 
 // Client: hydrate from snapshot
 const system = createSystem({
   module: myModule,
-  initialState: snapshot,
+  initialFacts: snapshot.facts,
 });
 ```
 
@@ -157,33 +157,29 @@ Common issues:
 
 ### Do I need to wrap my app in a Provider?
 
-Yes, use `DirectiveProvider`:
+No. Directive uses a system-first pattern where hooks take the system as their first parameter. No provider or context is needed:
 
 ```tsx
-import { DirectiveProvider } from 'directive/react';
+import { useFact } from 'directive/react';
 
-function App() {
-  return (
-    <DirectiveProvider system={system}>
-      <MyApp />
-    </DirectiveProvider>
-  );
+function MyComponent() {
+  const count = useFact(system, "count");
+  return <p>{count}</p>;
 }
 ```
 
 ### Why is my component re-rendering too often?
 
-1. **Reading entire facts object** - Select specific facts
-2. **Missing selector memoization** - Use `useFacts` with selector
+1. **Reading too broadly** - Select only the specific facts you need
+2. **Missing selector memoization** - Use `useFactSelector` with a stable selector
 3. **Derivation recreating** - Check derivation dependencies
 
 ```tsx
-// Bad: reads all facts
-const facts = useFacts();
+// Bad: subscribe to a whole fact when you only need one property
+const user = useFact(system, "user");
 
-// Good: reads only what's needed
-const userId = useFacts((f) => f.userId);
-const { userId, status } = useFacts((f) => ({ userId: f.userId, status: f.status }));
+// Good: select only the property you need
+const userName = useFactSelector(system, "user", (u) => u?.name);
 ```
 
 ---
