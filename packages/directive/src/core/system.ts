@@ -564,6 +564,23 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		},
 	});
 
+	// Build namespace → internal keys map (for subscribeModule / wildcard support)
+	const namespaceKeysMap = new Map<string, string[]>();
+	for (const namespace of Object.keys(modulesMap)) {
+		const mod = modulesMap[namespace];
+		if (!mod) continue;
+		const keys: string[] = [];
+		for (const key of Object.keys(mod.schema.facts)) {
+			keys.push(`${namespace}_${key}`);
+		}
+		if (mod.schema.derivations) {
+			for (const key of Object.keys(mod.schema.derivations)) {
+				keys.push(`${namespace}_${key}`);
+			}
+		}
+		namespaceKeysMap.set(namespace, keys);
+	}
+
 	// Create namespaced proxies for external access
 	const namespacedFactsProxy = createNamespacedFactsProxy(engine.facts as unknown as Record<string, unknown>, modulesMap);
 	const namespacedDeriveProxy = createNamespacedDeriveProxy(engine.derive as unknown as Record<string, unknown>, modulesMap);
@@ -671,15 +688,53 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		/**
 		 * Subscribe to derivation changes using namespaced syntax.
 		 * Accepts either "namespace.key" or "namespace_key" format.
+		 * Supports wildcard "namespace.*" to subscribe to all keys in a module.
 		 *
 		 * @example
 		 * system.subscribe(["auth.status", "data.count"], () => {
 		 *   console.log("Auth or data changed");
 		 * });
+		 *
+		 * @example Wildcard
+		 * system.subscribe(["game.*", "chat.*"], () => render());
 		 */
 		subscribe(derivationIds: string[], listener: () => void): () => void {
-			const internalIds = derivationIds.map(toInternalKey);
+			const internalIds: string[] = [];
+			for (const id of derivationIds) {
+				if (id.endsWith(".*")) {
+					const ns = id.slice(0, -2);
+					const keys = namespaceKeysMap.get(ns);
+					if (keys) {
+						internalIds.push(...keys);
+					} else if (process.env.NODE_ENV !== "production") {
+						console.warn(`[Directive] subscribe wildcard "${id}" — namespace "${ns}" not found.`);
+					}
+				} else {
+					internalIds.push(toInternalKey(id));
+				}
+			}
 			return engine.subscribe(internalIds, listener);
+		},
+
+		/**
+		 * Subscribe to ALL fact and derivation changes in a module namespace.
+		 * Shorthand for subscribing to every key in a module.
+		 *
+		 * @example
+		 * const unsub = system.subscribeModule("game", () => render());
+		 */
+		subscribeModule(namespace: string, listener: () => void): () => void {
+			const keys = namespaceKeysMap.get(namespace);
+			if (!keys || keys.length === 0) {
+				if (process.env.NODE_ENV !== "production") {
+					console.warn(
+						`[Directive] subscribeModule("${namespace}") — namespace not found. ` +
+						`Available: ${[...namespaceKeysMap.keys()].join(", ")}`,
+					);
+				}
+				return () => {};
+			}
+			return engine.subscribe(keys, listener);
 		},
 
 		/**
@@ -698,6 +753,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 			return engine.watch(toInternalKey(derivationId), callback);
 		},
 
+		onSettledChange: engine.onSettledChange.bind(engine),
+		onTimeTravelChange: engine.onTimeTravelChange.bind(engine),
 		inspect: engine.inspect.bind(engine),
 		settle: engine.settle.bind(engine),
 		explain: engine.explain.bind(engine),
@@ -1428,6 +1485,8 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 			return engine.watch(derivationId, callback);
 		},
 
+		onSettledChange: engine.onSettledChange.bind(engine),
+		onTimeTravelChange: engine.onTimeTravelChange.bind(engine),
 		inspect: engine.inspect.bind(engine),
 		settle: engine.settle.bind(engine),
 		explain: engine.explain.bind(engine),

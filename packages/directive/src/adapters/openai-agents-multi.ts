@@ -33,6 +33,9 @@ import type {
   RunResult,
   RunOptions,
   RunFn,
+  GuardrailFn,
+  OutputGuardrailData,
+  NamedGuardrail,
 } from "./openai-agents.js";
 import type { Requirement } from "../core/types.js";
 
@@ -137,6 +140,10 @@ export interface AgentRegistration {
   description?: string;
   /** Capabilities this agent has */
   capabilities?: string[];
+  /** Per-agent output guardrails (applied in addition to stack-level guardrails) */
+  guardrails?: {
+    output?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
+  };
 }
 
 /** Agent registry configuration */

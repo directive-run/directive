@@ -8,7 +8,6 @@ import { useCallback } from "react";
 import type React from "react";
 import { createSystem } from "directive";
 import {
-  DirectiveProvider,
   useFact,
   useDerived,
 } from "directive/react";
@@ -259,26 +258,25 @@ const system = createSystem({ module: elevenUpGame });
 system.start();
 
 /**
- * Inner game component that uses Directive hooks
+ * App — uses system-first hooks directly, no Provider needed
  */
-function GameBoard() {
+export function App() {
   // Facts (reactive state)
-  const deck = useFact<Card[]>("deck") ?? [];
-  const table = useFact<Card[]>("table") ?? [];
-  const selected = useFact<string[]>("selected") ?? [];
-  const gameOver = useFact<boolean>("gameOver") ?? false;
-  const won = useFact<boolean>("won") ?? false;
+  const deck = useFact(system, "deck") ?? [];
+  const table = useFact(system, "table") ?? [];
+  const selected = useFact(system, "selected") ?? [];
+  const gameOver = useFact(system, "gameOver") ?? false;
+  const won = useFact(system, "won") ?? false;
 
   // Derivations (computed values)
-  const deckCount = useDerived<number>("deckCount");
-  const removedCount = useDerived<number>("removedCount");
-  const selectionFeedback = useDerived<string>("selectionFeedback");
-  const hasValidMoves = useDerived<boolean>("hasValidMoves");
-  const totalValidMoves = useDerived<number>("totalValidMoves");
-  const progress = useDerived<number>("progress");
-  const scoreLabel = useDerived<string>("scoreLabel");
-  const comboMessage = useDerived<string>("comboMessage");
-  const streakInfo = useDerived<{ current: number; max: number; isHot: boolean }>("streakInfo");
+  const deckCount = useDerived(system, "deckCount");
+  const removedCount = useDerived(system, "removedCount");
+  const selectionFeedback = useDerived(system, "selectionFeedback");
+  const hasValidMoves = useDerived(system, "hasValidMoves");
+  const progress = useDerived(system, "progress");
+  const scoreLabel = useDerived(system, "scoreLabel");
+  const comboMessage = useDerived(system, "comboMessage");
+  const streakInfo = useDerived(system, "streakInfo");
 
   // Use system.events directly for single-module systems
   const handleCardClick = useCallback(
@@ -448,17 +446,6 @@ function GameBoard() {
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * App wrapper with DirectiveProvider
- */
-export function App() {
-  return (
-    <DirectiveProvider system={system as any}>
-      <GameBoard />
-    </DirectiveProvider>
   );
 }
 

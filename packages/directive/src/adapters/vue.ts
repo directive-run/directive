@@ -1,12 +1,12 @@
 /**
- * Vue Adapter - Vue 3 composables for Directive
+ * Vue Adapter - Consolidated Vue 3 composables for Directive
  *
- * Features:
- * - useDerived for reactive computed values
- * - useFacts for direct fact access
- * - provide/inject for system context
- * - useRequirementStatus for loading/error states
- * - createTypedHooks for schema-specific hooks
+ * 19 active exports: useFact, useDerived, useFacts, useDispatch, useSelector,
+ * useWatch, useInspect, useRequirementStatus, useEvents, useModule, useExplain,
+ * useConstraintStatus, useOptimisticUpdate, useDirective, useTimeTravel,
+ * useSystem, provideSystem, createDirectivePlugin, createTypedHooks, shallowEqual
+ *
+ * 10 deprecated shims for backward compatibility.
  */
 
 import {
@@ -23,8 +23,21 @@ import {
 	type ShallowRef,
 } from "vue";
 import { createSystem } from "../core/system.js";
-import type { CreateSystemOptionsSingle, ModuleSchema, InferFacts, InferDerivations, InferEvents } from "../core/types.js";
-import type { ModuleDef, System, SystemInspection } from "../core/types.js";
+import { withTracking } from "../core/tracking.js";
+import type {
+	CreateSystemOptionsSingle,
+	ModuleSchema,
+	ModuleDef,
+	Plugin,
+	DebugConfig,
+	ErrorBoundaryConfig,
+	InferFacts,
+	InferDerivations,
+	InferEvents,
+	System,
+	SystemInspection,
+	SystemSnapshot,
+} from "../core/types.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
@@ -32,15 +45,19 @@ import {
 import {
 	type RequirementsState,
 	type ThrottledHookOptions,
+	type InspectState,
+	type ConstraintInfo,
 	computeRequirementsState,
+	computeInspectState,
 	createThrottle,
 } from "./shared.js";
 
 // Re-export for convenience
-export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions };
+export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions, InspectState, ConstraintInfo };
+export { shallowEqual } from "../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
-type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
+export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Context
@@ -48,24 +65,10 @@ type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // biome-ignore lint/suspicious/noExplicitAny: Context needs to work with any schema
 const DirectiveKey: InjectionKey<System<any>> = Symbol("directive");
-
-/** Injection key for the requirement status plugin */
 const StatusPluginKey: InjectionKey<StatusPlugin | null> = Symbol("directive-status");
 
 /**
  * Vue plugin to provide the Directive system globally.
- *
- * @example
- * ```ts
- * import { createApp } from 'vue';
- * import { createDirectivePlugin } from 'directive/vue';
- *
- * const system = createSystem({ modules: [myModule] });
- * const app = createApp(App);
- *
- * app.use(createDirectivePlugin(system));
- * app.mount('#app');
- * ```
  */
 export function createDirectivePlugin<M extends ModuleSchema>(
 	system: System<M>,
@@ -82,16 +85,6 @@ export function createDirectivePlugin<M extends ModuleSchema>(
 
 /**
  * Provide Directive system to child components (alternative to plugin).
- *
- * @example
- * ```vue
- * <script setup>
- * import { provideSystem } from 'directive/vue';
- *
- * const system = createSystem({ modules: [myModule] });
- * provideSystem(system);
- * </script>
- * ```
  */
 export function provideSystem<M extends ModuleSchema>(
 	system: System<M>,
@@ -103,15 +96,15 @@ export function provideSystem<M extends ModuleSchema>(
 }
 
 // ============================================================================
-// Composables
+// Internal Helpers
 // ============================================================================
 
-/**
- * Get the Directive system from context.
- *
- * @throws If system is not provided
- */
-export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
+/** Default equality function using Object.is */
+function defaultEquality<T>(a: T, b: T): boolean {
+	return Object.is(a, b);
+}
+
+function _useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
 	const system = inject(DirectiveKey);
 	if (!system) {
 		throw new Error(
@@ -122,762 +115,220 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
 	return system as System<M>;
 }
 
-/**
- * Subscribe to a derived value as a reactive ref.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useDerived } from 'directive/vue';
- *
- * const isRed = useDerived<boolean>('isRed');
- * </script>
- *
- * <template>
- *   <div>{{ isRed ? 'Red' : 'Not Red' }}</div>
- * </template>
- * ```
- */
-export function useDerived<T>(derivationId: string): Ref<T> {
-	const system = useSystem();
+function _getStatusPlugin(): StatusPlugin {
+	const statusPlugin = inject(StatusPluginKey);
+	if (!statusPlugin) {
+		throw new Error(
+			"[Directive] This hook requires a statusPlugin. " +
+			"Pass statusPlugin to createDirectivePlugin() or provideSystem().",
+		);
+	}
+	return statusPlugin;
+}
 
-	// Dev warning for invalid derivation IDs
+// ============================================================================
+// useFact — single key, multi key, or selector
+// ============================================================================
+
+/** Single key overload */
+export function useFact<T>(factKey: string): Ref<T | undefined>;
+/** Multi-key overload */
+export function useFact<T extends Record<string, unknown>>(factKeys: string[]): ShallowRef<T>;
+/** Selector overload */
+export function useFact<T, R>(
+	factKey: string,
+	selector: (value: T | undefined) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): Ref<R>;
+/** Implementation */
+export function useFact(
+	keyOrKeys: string | string[],
+	selectorOrUndefined?: (value: unknown) => unknown,
+	equalityFn?: (a: unknown, b: unknown) => boolean,
+): Ref<unknown> | ShallowRef<unknown> {
+	const system = _useSystem();
+
+	// Selector path: useFact(factKey, selector, eq?)
+	if (typeof keyOrKeys === "string" && typeof selectorOrUndefined === "function") {
+		return _useFactSelector(system, keyOrKeys, selectorOrUndefined, equalityFn ?? defaultEquality);
+	}
+
+	// Multi-key path: useFact([keys])
+	if (Array.isArray(keyOrKeys)) {
+		return _useFactMulti(system, keyOrKeys);
+	}
+
+	// Single key path: useFact(key)
+	return _useFactSingle(system, keyOrKeys);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Internal
+function _useFactSingle(system: System<any>, factKey: string): Ref<unknown> {
+	const value = ref(system.facts.$store.get(factKey));
+	const unsubscribe = system.facts.$store.subscribe([factKey], () => {
+		value.value = system.facts.$store.get(factKey);
+	});
+	onUnmounted(unsubscribe);
+	return value;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Internal
+function _useFactMulti(system: System<any>, factKeys: string[]): ShallowRef<Record<string, unknown>> {
+	const getValues = (): Record<string, unknown> => {
+		const result: Record<string, unknown> = {};
+		for (const key of factKeys) {
+			result[key] = system.facts.$store.get(key);
+		}
+		return result;
+	};
+	const state = shallowRef(getValues());
+	const unsubscribe = system.facts.$store.subscribe(factKeys, () => {
+		state.value = getValues();
+	});
+	onUnmounted(unsubscribe);
+	return state;
+}
+
+function _useFactSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: System<any>,
+	factKey: string,
+	selector: (value: unknown) => unknown,
+	equalityFn: (a: unknown, b: unknown) => boolean,
+): Ref<unknown> {
+	const initialValue = system.facts.$store.get(factKey);
+	const selected = ref(selector(initialValue));
+	const unsubscribe = system.facts.$store.subscribe([factKey], () => {
+		const newValue = system.facts.$store.get(factKey);
+		const newSelected = selector(newValue);
+		if (!equalityFn(selected.value, newSelected)) {
+			selected.value = newSelected;
+		}
+	});
+	onUnmounted(unsubscribe);
+	return selected;
+}
+
+// ============================================================================
+// useDerived — single key, multi key, or selector
+// ============================================================================
+
+/** Single key overload */
+export function useDerived<T>(derivationId: string): Ref<T>;
+/** Multi-key overload */
+export function useDerived<T extends Record<string, unknown>>(derivationIds: string[]): ShallowRef<T>;
+/** Selector overload */
+export function useDerived<T, R>(
+	derivationId: string,
+	selector: (value: T) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): Ref<R>;
+/** Implementation */
+export function useDerived(
+	idOrIds: string | string[],
+	selectorOrUndefined?: (value: unknown) => unknown,
+	equalityFn?: (a: unknown, b: unknown) => boolean,
+): Ref<unknown> | ShallowRef<unknown> {
+	const system = _useSystem();
+
+	// Selector path
+	if (typeof idOrIds === "string" && typeof selectorOrUndefined === "function") {
+		return _useDerivedSelector(system, idOrIds, selectorOrUndefined, equalityFn ?? defaultEquality);
+	}
+
+	// Multi-key path
+	if (Array.isArray(idOrIds)) {
+		return _useDerivedMulti(system, idOrIds);
+	}
+
+	// Single key path
+	return _useDerivedSingle(system, idOrIds);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Internal
+function _useDerivedSingle(system: System<any>, derivationId: string): Ref<unknown> {
 	if (process.env.NODE_ENV !== "production") {
 		const initialValue = system.read(derivationId);
 		if (initialValue === undefined) {
 			console.warn(
 				`[Directive] useDerived("${derivationId}") returned undefined. ` +
-					`Check that "${derivationId}" is defined in your module's derive property.`,
+				`Check that "${derivationId}" is defined in your module's derive property.`,
 			);
 		}
 	}
-
-	const value = ref<T>(system.read(derivationId) as T) as Ref<T>;
-
+	const value = ref(system.read(derivationId));
 	const unsubscribe = system.subscribe([derivationId], () => {
-		value.value = system.read(derivationId) as T;
+		value.value = system.read(derivationId);
 	});
-
 	onUnmounted(unsubscribe);
-
 	return value;
 }
 
-/**
- * Subscribe to multiple derived values as a reactive object.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useDeriveds } from 'directive/vue';
- *
- * const state = useDeriveds<{ isRed: boolean; elapsed: number }>(['isRed', 'elapsed']);
- * </script>
- *
- * <template>
- *   <div>{{ state.isRed ? `Red for ${state.elapsed}s` : 'Not Red' }}</div>
- * </template>
- * ```
- */
-export function useDeriveds<T extends Record<string, unknown>>(
-	derivationIds: string[],
-): ShallowRef<T> {
-	const system = useSystem();
-
-	const getValues = (): T => {
+// biome-ignore lint/suspicious/noExplicitAny: Internal
+function _useDerivedMulti(system: System<any>, derivationIds: string[]): ShallowRef<Record<string, unknown>> {
+	const getValues = (): Record<string, unknown> => {
 		const result: Record<string, unknown> = {};
 		for (const id of derivationIds) {
 			result[id] = system.read(id);
 		}
-		return result as T;
+		return result;
 	};
-
-	const state: ShallowRef<T> = shallowRef(getValues()) as ShallowRef<T>;
-
+	const state = shallowRef(getValues());
 	const unsubscribe = system.subscribe(derivationIds, () => {
 		state.value = getValues();
 	});
-
 	onUnmounted(unsubscribe);
-
 	return state;
 }
 
-/**
- * Get direct access to facts for mutations.
- *
- * WARNING: The returned facts object is NOT reactive. Use this for event handlers
- * and imperative code, not for rendering. Use `useDerived` for reactive values.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useFacts } from 'directive/vue';
- *
- * const facts = useFacts();
- *
- * function increment() {
- *   facts.count = (facts.count ?? 0) + 1;
- * }
- * </script>
- * ```
- */
-export function useFacts<M extends ModuleSchema>(): System<M>["facts"] {
-	const system = useSystem<M>();
-	return system.facts;
-}
-
-/**
- * Subscribe to a single fact value as a reactive ref.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useFact } from 'directive/vue';
- *
- * const phase = useFact<string>('phase');
- * </script>
- *
- * <template>
- *   <div>Current phase: {{ phase }}</div>
- * </template>
- * ```
- */
-export function useFact<T>(factKey: string): Ref<T | undefined> {
-	const system = useSystem();
-	const value: Ref<T | undefined> = ref(system.facts.$store.get(factKey) as T | undefined) as Ref<T | undefined>;
-
-	const unsubscribe = system.facts.$store.subscribe([factKey], () => {
-		value.value = system.facts.$store.get(factKey) as T | undefined;
-	});
-
-	onUnmounted(unsubscribe);
-
-	return value;
-}
-
-/**
- * Get a dispatch function for sending events.
- *
- * @returns A dispatch function typed to the system's event schema
- *
- * @example
- * ```vue
- * <script setup>
- * import { useDispatch } from 'directive/vue';
- *
- * const dispatch = useDispatch();
- * </script>
- *
- * <template>
- *   <button @click="dispatch({ type: 'tick' })">Tick</button>
- * </template>
- * ```
- */
-export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
-	event: InferEvents<M>,
-) => void {
-	const system = useSystem<M>();
-	return (event: InferEvents<M>) => {
-		system.dispatch(event);
-	};
-}
-
-/**
- * Get system inspection data as a reactive ref.
- *
- * NOTE: This re-renders on every fact change. Use sparingly in production.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useInspect } from 'directive/vue';
- *
- * const inspection = useInspect();
- * </script>
- *
- * <template>
- *   <div>Unmet: {{ inspection.unmet.length }}</div>
- * </template>
- * ```
- */
-export function useInspect(): ShallowRef<SystemInspection> {
-	const system = useSystem();
-	const inspection = shallowRef<SystemInspection>(system.inspect());
-
-	const unsubscribe = system.facts.$store.subscribeAll(() => {
-		inspection.value = system.inspect();
-	});
-
-	onUnmounted(unsubscribe);
-
-	return inspection;
-}
-
-/**
- * Get system inspection data with throttled updates.
- *
- * Use this instead of useInspect when updates are too frequent.
- *
- * @param options - Throttling options
- * @returns Reactive ref with the current system inspection
- *
- * @example
- * ```vue
- * <script setup>
- * import { useInspectThrottled } from 'directive/vue';
- *
- * const inspection = useInspectThrottled({ throttleMs: 200 });
- * </script>
- * ```
- */
-export function useInspectThrottled(
-	options: ThrottledHookOptions = {},
-): ShallowRef<SystemInspection> {
-	const { throttleMs = 100 } = options;
-	const system = useSystem();
-	const inspection = shallowRef<SystemInspection>(system.inspect());
-
-	const { throttled, cleanup } = createThrottle(() => {
-		inspection.value = system.inspect();
-	}, throttleMs);
-
-	const unsubscribe = system.facts.$store.subscribeAll(throttled);
-
-	onUnmounted(() => {
-		cleanup();
-		unsubscribe();
-	});
-
-	return inspection;
-}
-
-/**
- * Get current requirements state as a reactive ref.
- *
- * Provides a focused view of just requirements without full inspection overhead.
- *
- * @returns Reactive ref with the current requirements state
- *
- * @example
- * ```vue
- * <script setup>
- * import { useRequirements } from 'directive/vue';
- *
- * const requirements = useRequirements();
- * </script>
- *
- * <template>
- *   <Spinner v-if="requirements.isWorking" />
- * </template>
- * ```
- */
-export function useRequirements(): ShallowRef<RequirementsState> {
-	const system = useSystem();
-
-	const state = shallowRef<RequirementsState>(
-		computeRequirementsState(system.inspect()),
-	);
-
-	const unsubscribe = system.facts.$store.subscribeAll(() => {
-		state.value = computeRequirementsState(system.inspect());
-	});
-
-	onUnmounted(unsubscribe);
-
-	return state;
-}
-
-/**
- * Get current requirements state with throttled updates.
- *
- * Use this instead of useRequirements when updates are too frequent.
- *
- * @param options - Throttling options
- * @returns Reactive ref with the current requirements state
- *
- * @example
- * ```vue
- * <script setup>
- * import { useRequirementsThrottled } from 'directive/vue';
- *
- * const requirements = useRequirementsThrottled({ throttleMs: 200 });
- * </script>
- * ```
- */
-export function useRequirementsThrottled(
-	options: ThrottledHookOptions = {},
-): ShallowRef<RequirementsState> {
-	const { throttleMs = 100 } = options;
-	const system = useSystem();
-
-	const state = shallowRef<RequirementsState>(
-		computeRequirementsState(system.inspect()),
-	);
-
-	const { throttled, cleanup } = createThrottle(() => {
-		state.value = computeRequirementsState(system.inspect());
-	}, throttleMs);
-
-	const unsubscribe = system.facts.$store.subscribeAll(throttled);
-
-	onUnmounted(() => {
-		cleanup();
-		unsubscribe();
-	});
-
-	return state;
-}
-
-/**
- * Check if the system has settled (no pending operations) as a reactive ref.
- *
- * @returns Reactive ref with boolean indicating whether the system is settled
- *
- * @example
- * ```vue
- * <script setup>
- * import { useIsSettled } from 'directive/vue';
- *
- * const isSettled = useIsSettled();
- * </script>
- *
- * <template>
- *   <Spinner v-if="!isSettled" />
- *   <Content v-else />
- * </template>
- * ```
- */
-export function useIsSettled(): Ref<boolean> {
-	const system = useSystem();
-	const isSettled = ref(system.isSettled);
-
-	const unsubscribe = system.facts.$store.subscribeAll(() => {
-		isSettled.value = system.isSettled;
-	});
-
-	onUnmounted(unsubscribe);
-
-	return isSettled;
-}
-
-/**
- * Get requirement status as a reactive ref.
- *
- * Requires a statusPlugin to be provided via createDirectivePlugin() or provideSystem().
- *
- * @param type - The requirement type to get status for
- * @returns Reactive ref with the current status
- *
- * @example
- * ```vue
- * <script setup>
- * import { useRequirementStatus } from 'directive/vue';
- *
- * const status = useRequirementStatus('FETCH_USER');
- * </script>
- *
- * <template>
- *   <Spinner v-if="status.isLoading" />
- *   <Error v-else-if="status.hasError" :message="status.lastError?.message" />
- *   <UserContent v-else />
- * </template>
- * ```
- */
-export function useRequirementStatus(type: string): ShallowRef<RequirementTypeStatus> {
-	const statusPlugin = inject(StatusPluginKey);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] useRequirementStatus requires a statusPlugin. " +
-				"Pass statusPlugin to createDirectivePlugin() or provideSystem().",
-		);
-	}
-
-	const status = shallowRef<RequirementTypeStatus>(statusPlugin.getStatus(type));
-
-	const unsubscribe = statusPlugin.subscribe(() => {
-		status.value = statusPlugin.getStatus(type);
-	});
-
-	onUnmounted(unsubscribe);
-
-	return status;
-}
-
-/**
- * Check if a requirement type is currently being resolved.
- *
- * Simplified version of useRequirementStatus that returns only the resolving state.
- * Requires a statusPlugin to be provided.
- *
- * @param type - The requirement type to check
- * @returns Reactive ref with boolean indicating if the type is being resolved
- *
- * @example
- * ```vue
- * <script setup>
- * import { useIsResolving } from 'directive/vue';
- *
- * const isSaving = useIsResolving('SAVE_DATA');
- * </script>
- *
- * <template>
- *   <button :disabled="isSaving">{{ isSaving ? 'Saving...' : 'Save' }}</button>
- * </template>
- * ```
- */
-export function useIsResolving(type: string): ComputedRef<boolean> {
-	const status = useRequirementStatus(type);
-	return computed(() => status.value.inflight > 0);
-}
-
-/**
- * Get the last error for a requirement type.
- *
- * Simplified version of useRequirementStatus that returns only the error.
- * Requires a statusPlugin to be provided.
- *
- * @param type - The requirement type to get error for
- * @returns Reactive ref with the last error, or null if no error
- *
- * @example
- * ```vue
- * <script setup>
- * import { useLatestError } from 'directive/vue';
- *
- * const error = useLatestError('FETCH_USER');
- * </script>
- *
- * <template>
- *   <div v-if="error" class="error">{{ error.message }}</div>
- * </template>
- * ```
- */
-export function useLatestError(type: string): ComputedRef<Error | null> {
-	const status = useRequirementStatus(type);
-	return computed(() => status.value.lastError);
-}
-
-/**
- * Get status for all tracked requirement types.
- *
- * Returns a reactive ref containing a Map of all requirement types that have
- * been tracked, with their current status. Useful for dashboard/admin UIs.
- *
- * Requires a statusPlugin to be provided.
- *
- * @returns Reactive ref with Map of requirement type to status
- *
- * @example
- * ```vue
- * <script setup>
- * import { useRequirementStatuses } from 'directive/vue';
- *
- * const allStatuses = useRequirementStatuses();
- * </script>
- *
- * <template>
- *   <ul>
- *     <li v-for="[type, status] in allStatuses" :key="type">
- *       {{ type }}: {{ status.isLoading ? 'Loading' : status.hasError ? 'Error' : 'Ready' }}
- *     </li>
- *   </ul>
- * </template>
- * ```
- */
-export function useRequirementStatuses(): Ref<Map<string, RequirementTypeStatus>> {
-	const statusPlugin = inject(StatusPluginKey);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] useRequirementStatuses requires a statusPlugin. " +
-				"Pass statusPlugin to createDirectivePlugin() or provideSystem().",
-		);
-	}
-
-	const allStatuses = ref<Map<string, RequirementTypeStatus>>(statusPlugin.getAllStatus());
-
-	const unsubscribe = statusPlugin.subscribe(() => {
-		allStatuses.value = statusPlugin.getAllStatus();
-	});
-
-	onUnmounted(unsubscribe);
-
-	return allStatuses;
-}
-
-/**
- * Get time-travel debug API (if enabled).
- */
-export function useTimeTravel() {
-	const system = useSystem();
-	return system.debug;
-}
-
-/**
- * Watch a derivation and call a callback when its value changes.
- *
- * @example
- * ```vue
- * <script setup>
- * import { useWatch } from 'directive/vue';
- *
- * useWatch<string>('phase', (newPhase, oldPhase) => {
- *   console.log(`Phase changed from ${oldPhase} to ${newPhase}`);
- * });
- * </script>
- * ```
- */
-export function useWatch<T>(
+function _useDerivedSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal
+	system: System<any>,
 	derivationId: string,
-	callback: (newValue: T, previousValue: T | undefined) => void,
-): void {
-	const system = useSystem();
-
-	const unsubscribe = system.watch<T>(derivationId, callback);
-
-	onUnmounted(unsubscribe);
-}
-
-// ============================================================================
-// Scoped System Composable (like XState's useActorRef)
-// ============================================================================
-
-/** Options for useDirective composable */
-export type UseDirectiveOptions<M extends ModuleSchema> =
-	| ModuleDef<M>
-	| CreateSystemOptionsSingle<M>;
-
-// Cache for memoization - prevents re-creation in reactive contexts
-// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
-const systemCache = new WeakMap<object, System<any>>();
-
-// Track options we've warned about to avoid duplicate warnings
-const warnedOptions = new WeakSet<object>();
-
-/**
- * Create a scoped Directive system with automatic lifecycle management.
- * The system is automatically started on mount and destroyed on unmount.
- *
- * **IMPORTANT: Stability Requirements**
- *
- * The `options` parameter must be a stable reference (defined outside the component
- * or memoized) for the system to persist across re-renders. If you pass an inline
- * object, a new system will be created on each reactive update.
- *
- * @param options - Either a single module or full system options (must be stable reference)
- * @returns The system instance
- *
- * @see {@link useDerived} for reading derived values
- * @see {@link useFacts} for direct fact access
- *
- * @example
- * ```vue
- * <script setup>
- * import { useDirective, useDerived } from 'directive/vue';
- *
- * // CORRECT: Define module outside component for stable reference
- * import { counterModule } from './counterModule';
- *
- * const system = useDirective(counterModule);
- * provideSystem(system); // Make available to children
- *
- * // INCORRECT: Inline options will create new system on each reactive update
- * // const system = useDirective({ module: counterModule }); // Don't do this!
- * </script>
- * ```
- */
-export function useDirective<M extends ModuleSchema>(
-	options: UseDirectiveOptions<M>,
-): System<M> {
-	// Check cache to prevent re-creation in reactive contexts
-	const cached = systemCache.get(options as object);
-	if (cached) {
-		return cached as System<M>;
-	}
-
-	// Dev warning for unstable options (new object not seen before in this session)
-	if (process.env.NODE_ENV !== "production") {
-		if (!warnedOptions.has(options as object)) {
-			warnedOptions.add(options as object);
-			// Only warn if this looks like it might be an inline object (not a module)
-			const isInlineOptions = !("id" in options && "schema" in options);
-			if (isInlineOptions) {
-				console.warn(
-					"[Directive] useDirective received options that may not be stable. " +
-						"If you see this warning repeatedly, ensure your options object is defined " +
-						"outside the component or memoized. Inline options create a new system on each render.",
-				);
-			}
-		}
-	}
-
-	// Check if options is a module or system options
-	const isModule = "id" in options && "schema" in options;
-
-	const system = isModule
-		? createSystem({ module: options as ModuleDef<M> })
-		: createSystem(options as CreateSystemOptionsSingle<M>);
-
-	// Cache the system
-	// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
-	systemCache.set(options as object, system as unknown as System<any>);
-
-	system.start();
-
-	onUnmounted(() => {
-		system.destroy();
-		systemCache.delete(options as object);
-	});
-
-	// Return as System<M> - the underlying type matches
-	return system as unknown as System<M>;
-}
-
-// ============================================================================
-// Typed Hooks Factory
-// ============================================================================
-
-// ============================================================================
-// Selector Hooks (like XState's useSelector)
-// ============================================================================
-
-/** Default equality function for selectors (uses Object.is for consistency with React) */
-function defaultEquality<T>(a: T, b: T): boolean {
-	return Object.is(a, b);
-}
-
-/**
- * Subscribe to a fact with a selector function.
- *
- * This allows fine-grained subscriptions - the component only re-renders when
- * the selected value changes (according to the equality function).
- *
- * @param factKey - The fact key to subscribe to
- * @param selector - Function to transform the fact value
- * @param equalityFn - Optional equality function (default: ===)
- * @returns Reactive ref with the selected value
- *
- * @example
- * ```vue
- * <script setup>
- * import { useFactSelector } from 'directive/vue';
- *
- * // Only re-render when user's name changes, not other user properties
- * const userName = useFactSelector('user', (u) => u?.name ?? 'Guest');
- *
- * // With custom equality for objects
- * const coords = useFactSelector('position', (p) => ({ x: p?.x, y: p?.y }),
- *   (a, b) => a.x === b.x && a.y === b.y
- * );
- * </script>
- * ```
- */
-export function useFactSelector<T, R>(
-	factKey: string,
-	selector: (value: T | undefined) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): Ref<R> {
-	const system = useSystem();
-	const initialValue = system.facts.$store.get(factKey) as T | undefined;
-	const selected = ref<R>(selector(initialValue)) as Ref<R>;
-
-	const unsubscribe = system.facts.$store.subscribe([factKey], () => {
-		const newValue = system.facts.$store.get(factKey) as T | undefined;
-		const newSelected = selector(newValue);
-		if (!equalityFn(selected.value, newSelected)) {
-			selected.value = newSelected;
-		}
-	});
-
-	onUnmounted(unsubscribe);
-
-	return selected;
-}
-
-/**
- * Subscribe to a derivation with a selector function.
- *
- * This allows fine-grained subscriptions - the component only re-renders when
- * the selected value changes (according to the equality function).
- *
- * @param derivationId - The derivation ID to subscribe to
- * @param selector - Function to transform the derivation value
- * @param equalityFn - Optional equality function (default: ===)
- * @returns Reactive ref with the selected value
- *
- * @example
- * ```vue
- * <script setup>
- * import { useDerivedSelector } from 'directive/vue';
- *
- * // Only re-render when status text changes
- * const statusText = useDerivedSelector('status', (s) => s?.label ?? 'Unknown');
- *
- * // With custom equality for arrays
- * const todoIds = useDerivedSelector('todos', (todos) => todos.map(t => t.id),
- *   (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
- * );
- * </script>
- * ```
- */
-export function useDerivedSelector<T, R>(
-	derivationId: string,
-	selector: (value: T) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): Ref<R> {
-	const system = useSystem();
-	const initialValue = system.read(derivationId) as T;
-	const selected = ref<R>(selector(initialValue)) as Ref<R>;
-
+	selector: (value: unknown) => unknown,
+	equalityFn: (a: unknown, b: unknown) => boolean,
+): Ref<unknown> {
+	const initialValue = system.read(derivationId);
+	const selected = ref(selector(initialValue));
 	const unsubscribe = system.subscribe([derivationId], () => {
-		const newValue = system.read(derivationId) as T;
+		const newValue = system.read(derivationId);
 		const newSelected = selector(newValue);
 		if (!equalityFn(selected.value, newSelected)) {
 			selected.value = newSelected;
 		}
 	});
-
 	onUnmounted(unsubscribe);
-
 	return selected;
 }
 
+// ============================================================================
+// useSelector — auto-tracking cross-fact selector
+// ============================================================================
+
 /**
- * Subscribe to all facts with a selector function.
- *
- * This allows selecting derived values across multiple facts with fine-grained
- * re-rendering control.
- *
- * @param selector - Function that receives all facts and returns selected value
- * @param equalityFn - Optional equality function (default: ===)
- * @returns Reactive ref with the selected value
- *
- * @example
- * ```vue
- * <script setup>
- * import { useSelector } from 'directive/vue';
- *
- * // Select derived state from multiple facts
- * const summary = useSelector((facts) => ({
- *   count: facts.items?.length ?? 0,
- *   isLoading: facts.loading ?? false,
- * }), (a, b) => a.count === b.count && a.isLoading === b.isLoading);
- * </script>
- * ```
+ * Auto-tracking cross-fact selector.
+ * Uses `withTracking()` to detect which facts the selector accesses,
+ * then subscribes only to those keys.
  */
 export function useSelector<R>(
 	selector: (facts: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
 ): Ref<R> {
-	const system = useSystem();
+	const system = _useSystem();
 
-	const getFacts = (): Record<string, unknown> => {
-		return system.facts.$store.toObject();
-	};
+	const getFacts = (): Record<string, unknown> => system.facts.$store.toObject();
+
+	// Run selector with tracking to detect accessed keys
+	const { deps } = withTracking(() => selector(getFacts()));
+	const keys = Array.from(deps) as string[];
 
 	const selected = ref<R>(selector(getFacts())) as Ref<R>;
 
-	const unsubscribe = system.facts.$store.subscribeAll(() => {
+	const subscribeFn = keys.length === 0
+		? (cb: () => void) => system.facts.$store.subscribeAll(cb)
+		: (cb: () => void) => system.facts.$store.subscribe(keys, cb);
+
+	const unsubscribe = subscribeFn(() => {
 		const newSelected = selector(getFacts());
 		if (!equalityFn(selected.value, newSelected)) {
 			selected.value = newSelected;
@@ -890,34 +341,480 @@ export function useSelector<R>(
 }
 
 // ============================================================================
-// Typed Hooks Factory
+// useFacts — mutation accessor
 // ============================================================================
 
 /**
- * Create typed composables for a specific system schema.
- *
- * This provides better type inference than the generic composables.
+ * Get direct access to facts for mutations.
+ * WARNING: NOT reactive. Use for event handlers and imperative code only.
+ */
+export function useFacts<M extends ModuleSchema>(): System<M>["facts"] {
+	const system = _useSystem<M>();
+	return system.facts;
+}
+
+// ============================================================================
+// useDispatch
+// ============================================================================
+
+export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
+	event: InferEvents<M>,
+) => void {
+	const system = _useSystem<M>();
+	return (event: InferEvents<M>) => {
+		system.dispatch(event);
+	};
+}
+
+// ============================================================================
+// useEvents — memoized events reference
+// ============================================================================
+
+/**
+ * Returns the system's events dispatcher.
+ */
+export function useEvents<M extends ModuleSchema = ModuleSchema>(): System<M>["events"] {
+	const system = _useSystem<M>();
+	return system.events;
+}
+
+// ============================================================================
+// useWatch — derivation or fact side-effect
+// ============================================================================
+
+/** Watch a derivation */
+export function useWatch<T>(
+	derivationId: string,
+	callback: (newValue: T, previousValue: T | undefined) => void,
+): void;
+/** Watch a fact */
+export function useWatch<T>(
+	kind: "fact",
+	factKey: string,
+	callback: (newValue: T | undefined, previousValue: T | undefined) => void,
+): void;
+/** Implementation */
+export function useWatch(
+	derivationIdOrKind: string,
+	callbackOrFactKey: string | ((newValue: unknown, prevValue: unknown) => void),
+	maybeCallback?: (newValue: unknown, prevValue: unknown) => void,
+): void {
+	const system = _useSystem();
+
+	const isFact =
+		derivationIdOrKind === "fact" &&
+		typeof callbackOrFactKey === "string" &&
+		typeof maybeCallback === "function";
+
+	if (isFact) {
+		const factKey = callbackOrFactKey as string;
+		const callback = maybeCallback!;
+		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+		let prev = (system.facts as any)[factKey];
+		const unsubscribe = system.facts.$store.subscribe([factKey], () => {
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+			const next = (system.facts as any)[factKey];
+			if (!Object.is(next, prev)) {
+				callback(next, prev);
+				prev = next;
+			}
+		});
+		onUnmounted(unsubscribe);
+	} else {
+		const derivationId = derivationIdOrKind;
+		const callback = callbackOrFactKey as (newValue: unknown, prevValue: unknown) => void;
+		const unsubscribe = system.watch(derivationId, callback);
+		onUnmounted(unsubscribe);
+	}
+}
+
+// ============================================================================
+// useInspect — consolidated inspection hook
+// ============================================================================
+
+/** Options for useInspect */
+export interface UseInspectOptions {
+	throttleMs?: number;
+}
+
+/**
+ * Consolidated system inspection hook.
+ * Returns InspectState with optional throttling.
+ */
+export function useInspect(options?: UseInspectOptions): ShallowRef<InspectState> {
+	const system = _useSystem();
+	const state = shallowRef<InspectState>(computeInspectState(system));
+
+	const update = () => {
+		state.value = computeInspectState(system);
+	};
+
+	if (options?.throttleMs && options.throttleMs > 0) {
+		const { throttled, cleanup } = createThrottle(update, options.throttleMs);
+		const unsubFacts = system.facts.$store.subscribeAll(throttled);
+		const unsubSettled = system.onSettledChange(throttled);
+		onUnmounted(() => {
+			cleanup();
+			unsubFacts();
+			unsubSettled();
+		});
+	} else {
+		const unsubFacts = system.facts.$store.subscribeAll(update);
+		const unsubSettled = system.onSettledChange(update);
+		onUnmounted(() => {
+			unsubFacts();
+			unsubSettled();
+		});
+	}
+
+	return state;
+}
+
+// ============================================================================
+// useRequirementStatus — single or multi
+// ============================================================================
+
+/** Single type overload */
+export function useRequirementStatus(type: string): ShallowRef<RequirementTypeStatus>;
+/** Multi-type overload */
+export function useRequirementStatus(types: string[]): ShallowRef<Record<string, RequirementTypeStatus>>;
+/** Implementation */
+export function useRequirementStatus(
+	typeOrTypes: string | string[],
+): ShallowRef<RequirementTypeStatus> | ShallowRef<Record<string, RequirementTypeStatus>> {
+	const statusPlugin = _getStatusPlugin();
+
+	if (Array.isArray(typeOrTypes)) {
+		const getValues = (): Record<string, RequirementTypeStatus> => {
+			const result: Record<string, RequirementTypeStatus> = {};
+			for (const type of typeOrTypes) {
+				result[type] = statusPlugin.getStatus(type);
+			}
+			return result;
+		};
+		const state = shallowRef(getValues());
+		const unsubscribe = statusPlugin.subscribe(() => {
+			state.value = getValues();
+		});
+		onUnmounted(unsubscribe);
+		return state;
+	}
+
+	const status = shallowRef<RequirementTypeStatus>(statusPlugin.getStatus(typeOrTypes));
+	const unsubscribe = statusPlugin.subscribe(() => {
+		status.value = statusPlugin.getStatus(typeOrTypes);
+	});
+	onUnmounted(unsubscribe);
+	return status;
+}
+
+// ============================================================================
+// useExplain — reactive requirement explanation
+// ============================================================================
+
+/**
+ * Reactively returns the explanation string for a requirement.
+ */
+export function useExplain(requirementId: string): Ref<string | null> {
+	const system = _useSystem();
+	const explanation = ref<string | null>(system.explain(requirementId)) as Ref<string | null>;
+
+	const update = () => {
+		explanation.value = system.explain(requirementId);
+	};
+
+	const unsubFacts = system.facts.$store.subscribeAll(update);
+	const unsubSettled = system.onSettledChange(update);
+	onUnmounted(() => {
+		unsubFacts();
+		unsubSettled();
+	});
+
+	return explanation;
+}
+
+// ============================================================================
+// useConstraintStatus — reactive constraint inspection
+// ============================================================================
+
+/**
+ * Get all constraints or a single constraint by ID.
+ */
+export function useConstraintStatus(
+	constraintId?: string,
+): ShallowRef<ConstraintInfo[] | ConstraintInfo | null> {
+	const inspectState = useInspect();
+
+	return computed(() => {
+		const inspection = inspectState.value;
+		// We need the raw constraint list from inspect()
+		const system = _useSystem();
+		const fullInspection = system.inspect();
+		if (!constraintId) return fullInspection.constraints;
+		return fullInspection.constraints.find((c) => c.id === constraintId) ?? null;
+	}) as unknown as ShallowRef<ConstraintInfo[] | ConstraintInfo | null>;
+}
+
+// ============================================================================
+// useOptimisticUpdate — batch with rollback on failure
+// ============================================================================
+
+export interface OptimisticUpdateResult {
+	mutate: (updateFn: () => void) => void;
+	isPending: Ref<boolean>;
+	error: Ref<Error | null>;
+	rollback: () => void;
+}
+
+/**
+ * Optimistic update hook. Saves a snapshot before mutating, monitors
+ * a requirement type via statusPlugin, and rolls back on failure.
+ */
+export function useOptimisticUpdate(
+	statusPlugin?: StatusPlugin,
+	requirementType?: string,
+): OptimisticUpdateResult {
+	const system = _useSystem();
+	const isPending = ref(false);
+	const error = ref<Error | null>(null) as Ref<Error | null>;
+	let snapshot: SystemSnapshot | null = null;
+	let unsubscribe: (() => void) | null = null;
+
+	const rollback = () => {
+		if (snapshot) {
+			system.restore(snapshot);
+			snapshot = null;
+		}
+		isPending.value = false;
+		error.value = null;
+		unsubscribe?.();
+		unsubscribe = null;
+	};
+
+	const mutate = (updateFn: () => void) => {
+		snapshot = system.getSnapshot();
+		isPending.value = true;
+		error.value = null;
+		system.batch(updateFn);
+
+		// Watch for resolver completion/failure
+		if (statusPlugin && requirementType) {
+			unsubscribe?.();
+			unsubscribe = statusPlugin.subscribe(() => {
+				const status = statusPlugin.getStatus(requirementType);
+				if (!status.isLoading && !status.hasError) {
+					snapshot = null;
+					isPending.value = false;
+					unsubscribe?.();
+					unsubscribe = null;
+				} else if (status.hasError) {
+					error.value = status.lastError;
+					rollback();
+				}
+			});
+		}
+	};
+
+	onUnmounted(() => {
+		unsubscribe?.();
+	});
+
+	return { mutate, isPending, error, rollback };
+}
+
+// ============================================================================
+// useModule — zero-config all-in-one hook
+// ============================================================================
+
+interface ModuleConfig {
+	// biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
+	plugins?: Plugin<any>[];
+	debug?: DebugConfig;
+	errorBoundary?: ErrorBoundaryConfig;
+	tickMs?: number;
+	zeroConfig?: boolean;
+	// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+	initialFacts?: Record<string, any>;
+	status?: boolean;
+}
+
+/**
+ * Zero-config hook that creates a scoped system from a module definition,
+ * subscribes to ALL facts and derivations, and returns everything.
+ */
+export function useModule<M extends ModuleSchema>(
+	moduleDef: ModuleDef<M>,
+	config?: ModuleConfig,
+) {
+	const allPlugins = [...(config?.plugins ?? [])];
+	let statusPlugin: StatusPlugin | undefined;
+
+	if (config?.status) {
+		const sp = createRequirementStatusPlugin();
+		statusPlugin = sp;
+		// biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
+		allPlugins.push(sp.plugin as Plugin<any>);
+	}
+
+	// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+	const system = createSystem({
+		module: moduleDef,
+		plugins: allPlugins.length > 0 ? allPlugins : undefined,
+		debug: config?.debug,
+		errorBoundary: config?.errorBoundary,
+		tickMs: config?.tickMs,
+		zeroConfig: config?.zeroConfig,
+		initialFacts: config?.initialFacts,
+	} as any) as unknown as System<M>;
+
+	system.start();
+
+	onUnmounted(() => {
+		system.destroy();
+	});
+
+	// Subscribe to all facts
+	const factsState = shallowRef(system.facts.$store.toObject() as InferFacts<M>);
+	const unsubFacts = system.facts.$store.subscribeAll(() => {
+		factsState.value = system.facts.$store.toObject() as InferFacts<M>;
+	});
+
+	// Subscribe to all derivations
+	const derivationKeys = Object.keys(system.derive ?? {});
+	const getDerived = (): InferDerivations<M> => {
+		const result: Record<string, unknown> = {};
+		for (const key of derivationKeys) {
+			result[key] = system.read(key);
+		}
+		return result as InferDerivations<M>;
+	};
+	const derivedState = shallowRef(getDerived());
+	const unsubDerived = derivationKeys.length > 0
+		? system.subscribe(derivationKeys, () => { derivedState.value = getDerived(); })
+		: () => {};
+
+	onUnmounted(() => {
+		unsubFacts();
+		unsubDerived();
+	});
+
+	const events = system.events;
+	const dispatch = (event: InferEvents<M>) => system.dispatch(event);
+
+	return {
+		system,
+		facts: factsState as ShallowRef<InferFacts<M>>,
+		derived: derivedState as ShallowRef<InferDerivations<M>>,
+		events,
+		dispatch,
+		statusPlugin,
+	};
+}
+
+// ============================================================================
+// useSystem — get system from context
+// ============================================================================
+
+export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
+	return _useSystem<M>();
+}
+
+// ============================================================================
+// useTimeTravel — reactive time-travel state
+// ============================================================================
+
+import type { TimeTravelState } from "../core/types.js";
+
+function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
+	const debug = system.debug;
+	if (!debug) return null;
+	return {
+		canUndo: debug.currentIndex > 0,
+		canRedo: debug.currentIndex < debug.snapshots.length - 1,
+		undo: () => debug.goBack(),
+		redo: () => debug.goForward(),
+		currentIndex: debug.currentIndex,
+		totalSnapshots: debug.snapshots.length,
+	};
+}
+
+/**
+ * Reactive time-travel composable. Returns a ShallowRef that updates
+ * when snapshots are taken or navigation occurs.
  *
  * @example
- * ```ts
- * import { createTypedHooks } from 'directive/vue';
- *
- * // Define your schema
- * const schema = {
- *   facts: { count: t.number(), user: t.any<User | null>() },
- *   derivations: { doubled: t.number() },
- *   events: { increment: {}, setUser: { user: t.any<User>() } },
- *   requirements: {},
- * } satisfies ModuleSchema;
- *
- * // Create typed hooks
- * const { useDerived, useFact, useDispatch } = createTypedHooks<typeof schema>();
- *
- * // In your component:
- * const count = useFact("count"); // Type: Ref<number>
- * const doubled = useDerived("doubled"); // Type: Ref<number>
+ * ```vue
+ * const tt = useTimeTravel();
+ * <button :disabled="!tt.value?.canUndo" @click="tt.value?.undo()">Undo</button>
  * ```
  */
+export function useTimeTravel(): ShallowRef<TimeTravelState | null> {
+	const system = _useSystem();
+	const state = shallowRef<TimeTravelState | null>(_buildTTState(system));
+	const unsub = system.onTimeTravelChange(() => {
+		state.value = _buildTTState(system);
+	});
+	onUnmounted(unsub);
+	return state;
+}
+
+// ============================================================================
+// Scoped System Composable
+// ============================================================================
+
+export type UseDirectiveOptions<M extends ModuleSchema> =
+	| ModuleDef<M>
+	| CreateSystemOptionsSingle<M>;
+
+// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+const systemCache = new WeakMap<object, System<any>>();
+const warnedOptions = new WeakSet<object>();
+
+/**
+ * Create a scoped Directive system with automatic lifecycle management.
+ */
+export function useDirective<M extends ModuleSchema>(
+	options: UseDirectiveOptions<M>,
+): System<M> {
+	const cached = systemCache.get(options as object);
+	if (cached) return cached as System<M>;
+
+	if (process.env.NODE_ENV !== "production") {
+		if (!warnedOptions.has(options as object)) {
+			warnedOptions.add(options as object);
+			const isInlineOptions = !("id" in options && "schema" in options);
+			if (isInlineOptions) {
+				console.warn(
+					"[Directive] useDirective received options that may not be stable. " +
+					"If you see this warning repeatedly, ensure your options object is defined " +
+					"outside the component or memoized.",
+				);
+			}
+		}
+	}
+
+	const isModule = "id" in options && "schema" in options;
+	const system = isModule
+		? createSystem({ module: options as ModuleDef<M> })
+		: createSystem(options as CreateSystemOptionsSingle<M>);
+
+	// biome-ignore lint/suspicious/noExplicitAny: Cache needs to work with any schema
+	systemCache.set(options as object, system as unknown as System<any>);
+
+	system.start();
+
+	onUnmounted(() => {
+		system.destroy();
+		systemCache.delete(options as object);
+	});
+
+	return system as unknown as System<M>;
+}
+
+// ============================================================================
+// Typed Hooks Factory
+// ============================================================================
+
 export function createTypedHooks<M extends ModuleSchema>(): {
 	useDerived: <K extends keyof InferDerivations<M>>(
 		derivationId: K,
@@ -926,6 +823,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	useFacts: () => System<M>["facts"];
 	useDispatch: () => (event: InferEvents<M>) => void;
 	useSystem: () => System<M>;
+	useEvents: () => System<M>["events"];
 } {
 	return {
 		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
@@ -934,11 +832,128 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			useFact<InferFacts<M>[K]>(factKey as string),
 		useFacts: () => useFacts<M>(),
 		useDispatch: () => {
-			const system = useSystem<M>();
+			const system = _useSystem<M>();
 			return (event: InferEvents<M>) => {
 				system.dispatch(event);
 			};
 		},
-		useSystem: () => useSystem<M>(),
+		useSystem: () => _useSystem<M>(),
+		useEvents: () => useEvents<M>(),
 	};
+}
+
+// ============================================================================
+// Deprecated Re-exports (one release cycle)
+// ============================================================================
+
+/**
+ * @deprecated Use `useDerived(ids)` instead.
+ */
+export function useDeriveds<T extends Record<string, unknown>>(
+	derivationIds: string[],
+): ShallowRef<T> {
+	return useDerived<T>(derivationIds);
+}
+
+/**
+ * @deprecated Use `useFact(key, selector, eq?)` instead.
+ */
+export function useFactSelector<T, R>(
+	factKey: string,
+	selector: (value: T | undefined) => R,
+	equalityFn: (a: R, b: R) => boolean = defaultEquality,
+): Ref<R> {
+	return useFact<T, R>(factKey, selector, equalityFn);
+}
+
+/**
+ * @deprecated Use `useDerived(id, selector, eq?)` instead.
+ */
+export function useDerivedSelector<T, R>(
+	derivationId: string,
+	selector: (value: T) => R,
+	equalityFn: (a: R, b: R) => boolean = defaultEquality,
+): Ref<R> {
+	return useDerived<T, R>(derivationId, selector, equalityFn);
+}
+
+/**
+ * @deprecated Use `useInspect({ throttleMs })` instead.
+ */
+export function useInspectThrottled(
+	options: ThrottledHookOptions = {},
+): ShallowRef<InspectState> {
+	return useInspect({ throttleMs: options.throttleMs ?? 100 });
+}
+
+/**
+ * @deprecated Use `useInspect()` instead.
+ */
+export function useRequirements(): ShallowRef<RequirementsState> {
+	const system = _useSystem();
+	const state = shallowRef<RequirementsState>(computeRequirementsState(system.inspect()));
+	const unsubscribe = system.facts.$store.subscribeAll(() => {
+		state.value = computeRequirementsState(system.inspect());
+	});
+	onUnmounted(unsubscribe);
+	return state;
+}
+
+/**
+ * @deprecated Use `useInspect({ throttleMs })` instead.
+ */
+export function useRequirementsThrottled(
+	options: ThrottledHookOptions = {},
+): ShallowRef<RequirementsState> {
+	const { throttleMs = 100 } = options;
+	const system = _useSystem();
+	const state = shallowRef<RequirementsState>(computeRequirementsState(system.inspect()));
+	const { throttled, cleanup } = createThrottle(() => {
+		state.value = computeRequirementsState(system.inspect());
+	}, throttleMs);
+	const unsubscribe = system.facts.$store.subscribeAll(throttled);
+	onUnmounted(() => { cleanup(); unsubscribe(); });
+	return state;
+}
+
+/**
+ * @deprecated Use `useInspect().value.isSettled` instead.
+ */
+export function useIsSettled(): Ref<boolean> {
+	const system = _useSystem();
+	const isSettled = ref(system.isSettled);
+	const unsubscribe = system.facts.$store.subscribeAll(() => {
+		isSettled.value = system.isSettled;
+	});
+	onUnmounted(unsubscribe);
+	return isSettled;
+}
+
+/**
+ * @deprecated Use `useRequirementStatus(type).value.inflight > 0` instead.
+ */
+export function useIsResolving(type: string): ComputedRef<boolean> {
+	const status = useRequirementStatus(type);
+	return computed(() => status.value.inflight > 0);
+}
+
+/**
+ * @deprecated Use `useRequirementStatus(type).value.lastError` instead.
+ */
+export function useLatestError(type: string): ComputedRef<Error | null> {
+	const status = useRequirementStatus(type);
+	return computed(() => status.value.lastError);
+}
+
+/**
+ * @deprecated Use `useRequirementStatus(types)` instead.
+ */
+export function useRequirementStatuses(): Ref<Map<string, RequirementTypeStatus>> {
+	const statusPlugin = _getStatusPlugin();
+	const allStatuses = ref<Map<string, RequirementTypeStatus>>(statusPlugin.getAllStatus());
+	const unsubscribe = statusPlugin.subscribe(() => {
+		allStatuses.value = statusPlugin.getAllStatus();
+	});
+	onUnmounted(unsubscribe);
+	return allStatuses;
 }

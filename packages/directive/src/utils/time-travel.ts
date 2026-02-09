@@ -15,6 +15,13 @@ import { isPrototypeSafe } from "./utils.js";
 // Time-Travel Manager
 // ============================================================================
 
+/** A changeset groups multiple snapshots into a single undo/redo unit. */
+export interface Changeset {
+	label: string;
+	startIndex: number;
+	endIndex: number;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface TimeTravelManager<_S extends Schema> extends TimeTravelAPI {
 	/** Take a snapshot of current state */
@@ -23,6 +30,8 @@ export interface TimeTravelManager<_S extends Schema> extends TimeTravelAPI {
 	restore(snapshot: Snapshot): void;
 	/** Check if time-travel is enabled */
 	readonly isEnabled: boolean;
+	/** True while restoring a snapshot (engine should skip reconciliation) */
+	readonly isRestoring: boolean;
 	/** Pause snapshot taking */
 	pause(): void;
 	/** Resume snapshot taking */
@@ -56,6 +65,12 @@ export function createTimeTravelManager<S extends Schema>(
 	let currentIndex = -1;
 	let nextId = 1;
 	let paused = false;
+	let restoring = false;
+
+	// Changeset tracking
+	const changesets: Changeset[] = [];
+	let pendingChangesetLabel: string | null = null;
+	let pendingChangesetStart = -1;
 
 	/** Get current facts as a plain object */
 	function getCurrentFacts(): Record<string, unknown> {
@@ -67,7 +82,7 @@ export function createTimeTravelManager<S extends Schema>(
 		const factsObj = getCurrentFacts();
 
 		// Deep clone to prevent mutation
-		return JSON.parse(JSON.stringify(factsObj));
+		return structuredClone(factsObj);
 	}
 
 	/** Deserialize and restore facts from a snapshot */
@@ -94,6 +109,10 @@ export function createTimeTravelManager<S extends Schema>(
 	const manager: TimeTravelManager<S> = {
 		get isEnabled() {
 			return isEnabled;
+		},
+
+		get isRestoring() {
+			return restoring;
 		},
 
 		get snapshots() {
@@ -138,13 +157,18 @@ export function createTimeTravelManager<S extends Schema>(
 		restore(snapshot: Snapshot): void {
 			if (!isEnabled) return;
 
-			// Pause to prevent taking a snapshot during restore
+			// Set restoring flag so the engine skips reconciliation scheduling.
+			// The restored state is already "reconciled" — it was captured after
+			// a complete reconcile cycle. Re-reconciling would create spurious
+			// snapshots that break undo/redo navigation.
 			paused = true;
+			restoring = true;
 
 			try {
 				deserializeFacts(snapshot.facts);
 			} finally {
 				paused = false;
+				restoring = false;
 			}
 		},
 
@@ -152,7 +176,23 @@ export function createTimeTravelManager<S extends Schema>(
 			if (!isEnabled || snapshots.length === 0) return;
 
 			const fromIndex = currentIndex;
-			const toIndex = Math.max(0, currentIndex - steps);
+
+			// Check if we're inside a changeset — jump to its start
+			let toIndex = currentIndex;
+			const cs = changesets.find((c) => currentIndex > c.startIndex && currentIndex <= c.endIndex);
+			if (cs) {
+				toIndex = cs.startIndex;
+			} else {
+				// Check if we're at the end of a changeset — jump past its start
+				const prevCs = changesets.find((c) => currentIndex === c.startIndex);
+				if (prevCs) {
+					// We're at the boundary. Look for the changeset before this one.
+					const earlierCs = changesets.find((c) => c.endIndex < currentIndex && currentIndex - c.endIndex <= steps);
+					toIndex = earlierCs ? earlierCs.startIndex : Math.max(0, currentIndex - steps);
+				} else {
+					toIndex = Math.max(0, currentIndex - steps);
+				}
+			}
 
 			if (fromIndex === toIndex) return;
 
@@ -168,7 +208,15 @@ export function createTimeTravelManager<S extends Schema>(
 			if (!isEnabled || snapshots.length === 0) return;
 
 			const fromIndex = currentIndex;
-			const toIndex = Math.min(snapshots.length - 1, currentIndex + steps);
+
+			// Check if we're inside or at the start of a changeset — jump to its end
+			let toIndex = currentIndex;
+			const cs = changesets.find((c) => currentIndex >= c.startIndex && currentIndex < c.endIndex);
+			if (cs) {
+				toIndex = cs.endIndex;
+			} else {
+				toIndex = Math.min(snapshots.length - 1, currentIndex + steps);
+			}
 
 			if (fromIndex === toIndex) return;
 
@@ -266,6 +314,25 @@ export function createTimeTravelManager<S extends Schema>(
 			}
 		},
 
+		beginChangeset(label: string): void {
+			if (!isEnabled) return;
+			pendingChangesetLabel = label;
+			pendingChangesetStart = currentIndex;
+		},
+
+		endChangeset(): void {
+			if (!isEnabled || pendingChangesetLabel === null) return;
+			if (currentIndex > pendingChangesetStart) {
+				changesets.push({
+					label: pendingChangesetLabel,
+					startIndex: pendingChangesetStart,
+					endIndex: currentIndex,
+				});
+			}
+			pendingChangesetLabel = null;
+			pendingChangesetStart = -1;
+		},
+
 		pause(): void {
 			paused = true;
 		},
@@ -286,6 +353,7 @@ export function createDisabledTimeTravel<S extends Schema>(): TimeTravelManager<
 
 	return {
 		isEnabled: false,
+		isRestoring: false,
 		snapshots: [],
 		currentIndex: -1,
 		takeSnapshot: () => noopSnapshot,
@@ -296,6 +364,8 @@ export function createDisabledTimeTravel<S extends Schema>(): TimeTravelManager<
 		replay: () => {},
 		export: () => "{}",
 		import: () => {},
+		beginChangeset: () => {},
+		endChangeset: () => {},
 		pause: () => {},
 		resume: () => {},
 	};

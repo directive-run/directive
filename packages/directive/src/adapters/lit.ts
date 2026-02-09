@@ -1,30 +1,53 @@
 /**
- * Lit Adapter - Web Components integration for Directive
+ * Lit Adapter - Consolidated Web Components integration for Directive
  *
- * Features:
- * - Reactive Controllers for derivations and facts
- * - Context protocol integration via @lit/context
- * - Automatic cleanup on disconnect
- * - RequirementStatusController for loading/error states
- * - createTypedHooks for schema-specific hooks
+ * Active Controllers: DerivationController, DerivationsController, FactController,
+ * InspectController (with throttle), RequirementStatusController,
+ * FactSelectorController, DerivedSelectorController, DirectiveSelectorController,
+ * WatchController (with fact mode), SystemController,
+ * ExplainController, ConstraintStatusController, OptimisticUpdateController, ModuleController
+ *
+ * Active Factories: createDerivation, createDerivations, createFact, createInspect,
+ * createRequirementStatus, createWatch, createFactSelector, createDerivedSelector,
+ * createDirectiveSelector, useFacts, useDispatch, useEvents, useTimeTravel,
+ * getDerivation, getFact, createTypedHooks, shallowEqual
+ *
+ * 7 deprecated controllers + 7 deprecated factories for backward compatibility.
  */
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { createSystem } from "../core/system.js";
-import type { CreateSystemOptionsSingle, ModuleSchema, InferFacts, InferDerivations, InferEvents } from "../core/types.js";
-import type { ModuleDef, System, SystemInspection } from "../core/types.js";
+import { withTracking } from "../core/tracking.js";
+import type {
+	CreateSystemOptionsSingle,
+	ModuleSchema,
+	ModuleDef,
+	Plugin,
+	DebugConfig,
+	ErrorBoundaryConfig,
+	InferFacts,
+	InferDerivations,
+	InferEvents,
+	System,
+	SystemInspection,
+	SystemSnapshot,
+} from "../core/types.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
 } from "../utils/requirement-status.js";
 import {
 	type RequirementsState,
+	type InspectState,
+	type ConstraintInfo,
 	computeRequirementsState,
+	computeInspectState,
 	createThrottle,
 } from "./shared.js";
 
 // Re-export for convenience
-export type { RequirementTypeStatus, RequirementsState };
+export type { RequirementTypeStatus, RequirementsState, InspectState, ConstraintInfo };
+export { shallowEqual } from "../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
 type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
@@ -36,25 +59,11 @@ type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 /**
  * Context key for Directive system.
  * Use with @lit/context for dependency injection across shadow DOM boundaries.
- *
- * @example
- * ```ts
- * import { createContext, provide, consume } from '@lit/context';
- * import { directiveContext } from 'directive/lit';
- *
- * // In parent component
- * @provide({ context: directiveContext })
- * system = createSystem({ modules: [myModule] });
- *
- * // In child component
- * @consume({ context: directiveContext })
- * system!: System<MySchema>;
- * ```
  */
 export const directiveContext = Symbol("directive");
 
 // ============================================================================
-// Reactive Controllers
+// Base Controller
 // ============================================================================
 
 /**
@@ -89,23 +98,12 @@ abstract class DirectiveController implements ReactiveController {
 	}
 }
 
+// ============================================================================
+// Core Controllers (active, not deprecated)
+// ============================================================================
+
 /**
  * Reactive controller for a single derivation.
- * Automatically updates the host element when the derivation value changes.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { DerivationController } from 'directive/lit';
- *
- * class StatusDisplay extends LitElement {
- *   private isRed = new DerivationController<boolean>(this, system, 'isRed');
- *
- *   render() {
- *     return html`<div>${this.isRed.value ? 'Red' : 'Not Red'}</div>`;
- *   }
- * }
- * ```
  */
 export class DerivationController<T> extends DirectiveController {
 	private derivationId: string;
@@ -121,12 +119,11 @@ export class DerivationController<T> extends DirectiveController {
 		this.derivationId = derivationId;
 		this.value = system.read(derivationId) as T;
 
-		// Dev warning for invalid derivation IDs
 		if (process.env.NODE_ENV !== "production") {
 			if (this.value === undefined) {
 				console.warn(
 					`[Directive] DerivationController("${derivationId}") returned undefined. ` +
-						`Check that "${derivationId}" is defined in your module's derive property.`,
+					`Check that "${derivationId}" is defined in your module's derive property.`,
 				);
 			}
 		}
@@ -143,24 +140,6 @@ export class DerivationController<T> extends DirectiveController {
 
 /**
  * Reactive controller for multiple derivations.
- * Returns an object with all requested derivation values.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { DerivationsController } from 'directive/lit';
- *
- * class StatusDisplay extends LitElement {
- *   private state = new DerivationsController<{ isRed: boolean; elapsed: number }>(
- *     this, system, ['isRed', 'elapsed']
- *   );
- *
- *   render() {
- *     const { isRed, elapsed } = this.state.value;
- *     return html`<div>${isRed ? `Red for ${elapsed}s` : 'Not Red'}</div>`;
- *   }
- * }
- * ```
  */
 export class DerivationsController<
 	T extends Record<string, unknown>,
@@ -177,18 +156,6 @@ export class DerivationsController<
 		super(host, system);
 		this.derivationIds = derivationIds;
 		this.value = this.getValues();
-
-		// Dev warning for invalid derivation IDs
-		if (process.env.NODE_ENV !== "production") {
-			for (const id of derivationIds) {
-				if (this.value[id as keyof T] === undefined) {
-					console.warn(
-						`[Directive] DerivationsController("${id}") returned undefined. ` +
-							`Check that "${id}" is defined in your module's derive property.`,
-					);
-				}
-			}
-		}
 	}
 
 	private getValues(): T {
@@ -210,21 +177,6 @@ export class DerivationsController<
 
 /**
  * Reactive controller for a single fact value.
- * Automatically updates when the fact changes.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { FactController } from 'directive/lit';
- *
- * class PhaseDisplay extends LitElement {
- *   private phase = new FactController<string>(this, system, 'phase');
- *
- *   render() {
- *     return html`<div>Current phase: ${this.phase.value}</div>`;
- *   }
- * }
- * ```
  */
 export class FactController<T> extends DirectiveController {
 	private factKey: string;
@@ -254,227 +206,51 @@ export class FactController<T> extends DirectiveController {
 }
 
 /**
- * Reactive controller for system inspection data.
- * Updates on every fact change - use sparingly in production.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { InspectController } from 'directive/lit';
- *
- * class Inspector extends LitElement {
- *   private inspection = new InspectController(this, system);
- *
- *   render() {
- *     return html`<div>Unmet: ${this.inspection.value.unmet.length}</div>`;
- *   }
- * }
- * ```
+ * Consolidated inspection controller.
+ * Returns InspectState with optional throttling.
+ * Replaces: InspectThrottledController, RequirementsController, RequirementsThrottledController, IsSettledController
  */
 export class InspectController extends DirectiveController {
-	value: SystemInspection;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>) {
-		super(host, system);
-		this.value = system.inspect();
-	}
-
-	protected subscribe(): void {
-		this.value = this.system.inspect();
-		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-			this.value = this.system.inspect();
-			this.requestUpdate();
-		});
-	}
-}
-
-/**
- * Reactive controller for current requirements state.
- * Provides a focused view of just requirements without full inspection overhead.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { RequirementsController } from 'directive/lit';
- *
- * class LoadingIndicator extends LitElement {
- *   private requirements = new RequirementsController(this, system);
- *
- *   render() {
- *     if (!this.requirements.value.isWorking) return html``;
- *     return html`<spinner-element></spinner-element>`;
- *   }
- * }
- * ```
- */
-export class RequirementsController extends DirectiveController {
-	value: RequirementsState;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>) {
-		super(host, system);
-		this.value = computeRequirementsState(system.inspect());
-	}
-
-	protected subscribe(): void {
-		this.value = computeRequirementsState(this.system.inspect());
-		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-			this.value = computeRequirementsState(this.system.inspect());
-			this.requestUpdate();
-		});
-	}
-}
-
-/**
- * Throttled version of InspectController.
- * Limits update frequency to prevent performance issues with high-frequency changes.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { InspectThrottledController } from 'directive/lit';
- *
- * class Inspector extends LitElement {
- *   private inspection = new InspectThrottledController(this, system, 100);
- *
- *   render() {
- *     return html`<div>Unmet: ${this.inspection.value.unmet.length}</div>`;
- *   }
- * }
- * ```
- */
-export class InspectThrottledController extends DirectiveController {
-	value: SystemInspection;
+	value: InspectState;
 	private throttleMs: number;
 	private throttleCleanup?: () => void;
+	private unsubSettled?: () => void;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, throttleMs = 100) {
+	constructor(host: ReactiveControllerHost, system: System<any>, options?: { throttleMs?: number }) {
 		super(host, system);
-		this.throttleMs = throttleMs;
-		this.value = system.inspect();
+		this.throttleMs = options?.throttleMs ?? 0;
+		this.value = computeInspectState(system);
 	}
 
 	protected subscribe(): void {
-		this.value = this.system.inspect();
-		const { throttled, cleanup } = createThrottle(() => {
-			this.value = this.system.inspect();
+		this.value = computeInspectState(this.system);
+
+		const update = () => {
+			this.value = computeInspectState(this.system);
 			this.requestUpdate();
-		}, this.throttleMs);
-		this.throttleCleanup = cleanup;
-		this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
+		};
+
+		if (this.throttleMs > 0) {
+			const { throttled, cleanup } = createThrottle(update, this.throttleMs);
+			this.throttleCleanup = cleanup;
+			this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
+			this.unsubSettled = this.system.onSettledChange(throttled);
+		} else {
+			this.unsubscribe = this.system.facts.$store.subscribeAll(update);
+			this.unsubSettled = this.system.onSettledChange(update);
+		}
 	}
 
 	hostDisconnected(): void {
 		this.throttleCleanup?.();
+		this.unsubSettled?.();
 		super.hostDisconnected();
-	}
-}
-
-/**
- * Throttled version of RequirementsController.
- * Limits update frequency to prevent performance issues with high-frequency changes.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { RequirementsThrottledController } from 'directive/lit';
- *
- * class LoadingIndicator extends LitElement {
- *   private requirements = new RequirementsThrottledController(this, system, 100);
- *
- *   render() {
- *     if (!this.requirements.value.isWorking) return html``;
- *     return html`<spinner-element></spinner-element>`;
- *   }
- * }
- * ```
- */
-export class RequirementsThrottledController extends DirectiveController {
-	value: RequirementsState;
-	private throttleMs: number;
-	private throttleCleanup?: () => void;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, throttleMs = 100) {
-		super(host, system);
-		this.throttleMs = throttleMs;
-		this.value = computeRequirementsState(system.inspect());
-	}
-
-	protected subscribe(): void {
-		this.value = computeRequirementsState(this.system.inspect());
-		const { throttled, cleanup } = createThrottle(() => {
-			this.value = computeRequirementsState(this.system.inspect());
-			this.requestUpdate();
-		}, this.throttleMs);
-		this.throttleCleanup = cleanup;
-		this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
-	}
-
-	hostDisconnected(): void {
-		this.throttleCleanup?.();
-		super.hostDisconnected();
-	}
-}
-
-/**
- * Reactive controller for checking if the system has settled.
- * Automatically updates when the settled state changes.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { IsSettledController } from 'directive/lit';
- *
- * class LoadingIndicator extends LitElement {
- *   private settled = new IsSettledController(this, system);
- *
- *   render() {
- *     if (!this.settled.value) return html`<spinner-el></spinner-el>`;
- *     return html`<content-el></content-el>`;
- *   }
- * }
- * ```
- */
-export class IsSettledController extends DirectiveController {
-	value: boolean;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>) {
-		super(host, system);
-		this.value = system.isSettled;
-	}
-
-	protected subscribe(): void {
-		this.value = this.system.isSettled;
-		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-			this.value = this.system.isSettled;
-			this.requestUpdate();
-		});
 	}
 }
 
 /**
  * Reactive controller for requirement status.
- * Tracks loading/error states for requirement types.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { RequirementStatusController } from 'directive/lit';
- *
- * class UserLoader extends LitElement {
- *   private status = new RequirementStatusController(this, statusPlugin, 'FETCH_USER');
- *
- *   render() {
- *     if (this.status.value.isLoading) return html`<spinner-el></spinner-el>`;
- *     if (this.status.value.hasError) return html`<error-el .message=${this.status.value.lastError?.message}></error-el>`;
- *     return html`<user-content></user-content>`;
- *   }
- * }
- * ```
  */
 export class RequirementStatusController implements ReactiveController {
 	private host: ReactiveControllerHost;
@@ -509,198 +285,17 @@ export class RequirementStatusController implements ReactiveController {
 	}
 }
 
-/**
- * Reactive controller for checking if a requirement type is being resolved.
- * Simplified version of RequirementStatusController.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { IsResolvingController } from 'directive/lit';
- *
- * class SaveButton extends LitElement {
- *   private isSaving = new IsResolvingController(this, statusPlugin, 'SAVE_DATA');
- *
- *   render() {
- *     return html`
- *       <button ?disabled=${this.isSaving.value}>
- *         ${this.isSaving.value ? 'Saving...' : 'Save'}
- *       </button>
- *     `;
- *   }
- * }
- * ```
- */
-export class IsResolvingController implements ReactiveController {
-	private host: ReactiveControllerHost;
-	private statusPlugin: StatusPlugin;
-	private type: string;
-	private unsubscribe?: () => void;
-	value: boolean;
-
-	constructor(
-		host: ReactiveControllerHost,
-		statusPlugin: StatusPlugin,
-		type: string,
-	) {
-		this.host = host;
-		this.statusPlugin = statusPlugin;
-		this.type = type;
-		this.value = statusPlugin.getStatus(type).inflight > 0;
-		host.addController(this);
-	}
-
-	hostConnected(): void {
-		this.value = this.statusPlugin.getStatus(this.type).inflight > 0;
-		this.unsubscribe = this.statusPlugin.subscribe(() => {
-			this.value = this.statusPlugin.getStatus(this.type).inflight > 0;
-			this.host.requestUpdate();
-		});
-	}
-
-	hostDisconnected(): void {
-		this.unsubscribe?.();
-		this.unsubscribe = undefined;
-	}
-}
-
-/**
- * Reactive controller for getting the last error for a requirement type.
- * Simplified version of RequirementStatusController.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { LatestErrorController } from 'directive/lit';
- *
- * class ErrorDisplay extends LitElement {
- *   private error = new LatestErrorController(this, statusPlugin, 'FETCH_USER');
- *
- *   render() {
- *     if (!this.error.value) return html``;
- *     return html`<div class="error">${this.error.value.message}</div>`;
- *   }
- * }
- * ```
- */
-export class LatestErrorController implements ReactiveController {
-	private host: ReactiveControllerHost;
-	private statusPlugin: StatusPlugin;
-	private type: string;
-	private unsubscribe?: () => void;
-	value: Error | null;
-
-	constructor(
-		host: ReactiveControllerHost,
-		statusPlugin: StatusPlugin,
-		type: string,
-	) {
-		this.host = host;
-		this.statusPlugin = statusPlugin;
-		this.type = type;
-		this.value = statusPlugin.getStatus(type).lastError;
-		host.addController(this);
-	}
-
-	hostConnected(): void {
-		this.value = this.statusPlugin.getStatus(this.type).lastError;
-		this.unsubscribe = this.statusPlugin.subscribe(() => {
-			this.value = this.statusPlugin.getStatus(this.type).lastError;
-			this.host.requestUpdate();
-		});
-	}
-
-	hostDisconnected(): void {
-		this.unsubscribe?.();
-		this.unsubscribe = undefined;
-	}
-}
-
-/**
- * Reactive controller for getting status of all tracked requirement types.
- * Useful for dashboard/admin UIs that need to show all requirement states.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { RequirementStatusesController } from 'directive/lit';
- *
- * class RequirementsDashboard extends LitElement {
- *   private allStatuses = new RequirementStatusesController(this, statusPlugin);
- *
- *   render() {
- *     return html`
- *       <ul>
- *         ${Array.from(this.allStatuses.value.entries()).map(([type, status]) => html`
- *           <li>${type}: ${status.isLoading ? 'Loading' : status.hasError ? 'Error' : 'Ready'}</li>
- *         `)}
- *       </ul>
- *     `;
- *   }
- * }
- * ```
- */
-export class RequirementStatusesController implements ReactiveController {
-	private host: ReactiveControllerHost;
-	private statusPlugin: StatusPlugin;
-	private unsubscribe?: () => void;
-	value: Map<string, RequirementTypeStatus>;
-
-	constructor(
-		host: ReactiveControllerHost,
-		statusPlugin: StatusPlugin,
-	) {
-		this.host = host;
-		this.statusPlugin = statusPlugin;
-		this.value = statusPlugin.getAllStatus();
-		host.addController(this);
-	}
-
-	hostConnected(): void {
-		this.value = this.statusPlugin.getAllStatus();
-		this.unsubscribe = this.statusPlugin.subscribe(() => {
-			this.value = this.statusPlugin.getAllStatus();
-			this.host.requestUpdate();
-		});
-	}
-
-	hostDisconnected(): void {
-		this.unsubscribe?.();
-		this.unsubscribe = undefined;
-	}
-}
-
 // ============================================================================
-// Selector Controllers (like XState's useSelector)
+// Selector Controllers
 // ============================================================================
 
 /** Default equality function for selectors */
 function defaultEquality<T>(a: T, b: T): boolean {
-	return a === b;
+	return Object.is(a, b);
 }
 
 /**
  * Reactive controller for a fact with selector function.
- *
- * This allows fine-grained subscriptions - the host only re-renders when
- * the selected value changes (according to the equality function).
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { FactSelectorController } from 'directive/lit';
- *
- * class UserName extends LitElement {
- *   // Only re-render when user's name changes, not other user properties
- *   private userName = new FactSelectorController<User, string>(
- *     this, system, 'user', (u) => u?.name ?? 'Guest'
- *   );
- *
- *   render() {
- *     return html`<span>${this.userName.value}</span>`;
- *   }
- * }
- * ```
  */
 export class FactSelectorController<T, R> extends DirectiveController {
 	private factKey: string;
@@ -740,26 +335,6 @@ export class FactSelectorController<T, R> extends DirectiveController {
 
 /**
  * Reactive controller for a derivation with selector function.
- *
- * This allows fine-grained subscriptions - the host only re-renders when
- * the selected value changes (according to the equality function).
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { DerivedSelectorController } from 'directive/lit';
- *
- * class StatusLabel extends LitElement {
- *   // Only re-render when status text changes
- *   private statusText = new DerivedSelectorController<Status, string>(
- *     this, system, 'status', (s) => s?.label ?? 'Unknown'
- *   );
- *
- *   render() {
- *     return html`<span>${this.statusText.value}</span>`;
- *   }
- * }
- * ```
  */
 export class DerivedSelectorController<T, R> extends DirectiveController {
 	private derivationId: string;
@@ -799,31 +374,12 @@ export class DerivedSelectorController<T, R> extends DirectiveController {
 
 /**
  * Reactive controller for selecting across all facts.
- *
- * This allows selecting derived values across multiple facts with fine-grained
- * re-rendering control.
- *
- * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { DirectiveSelectorController } from 'directive/lit';
- *
- * class Summary extends LitElement {
- *   private summary = new DirectiveSelectorController(
- *     this, system,
- *     (facts) => ({ count: facts.items?.length ?? 0, loading: facts.loading ?? false }),
- *     (a, b) => a.count === b.count && a.loading === b.loading
- *   );
- *
- *   render() {
- *     return html`<div>${this.summary.value.count} items</div>`;
- *   }
- * }
- * ```
+ * Uses `withTracking()` for auto-tracking when constructed with `autoTrack: true`.
  */
 export class DirectiveSelectorController<R> extends DirectiveController {
 	private selector: (facts: Record<string, unknown>) => R;
 	private equalityFn: (a: R, b: R) => boolean;
+	private autoTrack: boolean;
 	value: R;
 
 	constructor(
@@ -832,81 +388,424 @@ export class DirectiveSelectorController<R> extends DirectiveController {
 		system: System<any>,
 		selector: (facts: Record<string, unknown>) => R,
 		equalityFn: (a: R, b: R) => boolean = defaultEquality,
+		options?: { autoTrack?: boolean },
 	) {
 		super(host, system);
 		this.selector = selector;
 		this.equalityFn = equalityFn;
+		this.autoTrack = options?.autoTrack ?? false;
 		this.value = selector(system.facts.$store.toObject());
 	}
 
 	protected subscribe(): void {
 		this.value = this.selector(this.system.facts.$store.toObject());
-		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-			const newSelected = this.selector(this.system.facts.$store.toObject());
-			if (!this.equalityFn(this.value, newSelected)) {
-				this.value = newSelected;
-				this.requestUpdate();
-			}
-		});
+
+		const getFacts = () => this.system.facts.$store.toObject();
+
+		if (this.autoTrack) {
+			const { deps } = withTracking(() => this.selector(getFacts()));
+			const keys = Array.from(deps) as string[];
+
+			const subscribeFn = keys.length === 0
+				? (cb: () => void) => this.system.facts.$store.subscribeAll(cb)
+				: (cb: () => void) => this.system.facts.$store.subscribe(keys, cb);
+
+			this.unsubscribe = subscribeFn(() => {
+				const newSelected = this.selector(getFacts());
+				if (!this.equalityFn(this.value, newSelected)) {
+					this.value = newSelected;
+					this.requestUpdate();
+				}
+			});
+		} else {
+			this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
+				const newSelected = this.selector(getFacts());
+				if (!this.equalityFn(this.value, newSelected)) {
+					this.value = newSelected;
+					this.requestUpdate();
+				}
+			});
+		}
 	}
 }
 
 /**
- * Reactive controller that watches a derivation and calls a callback on change.
- *
- * @example
- * ```ts
- * import { LitElement } from 'lit';
- * import { WatchController } from 'directive/lit';
- *
- * class PhaseWatcher extends LitElement {
- *   private watcher = new WatchController<string>(
- *     this,
- *     system,
- *     'phase',
- *     (newPhase, oldPhase) => {
- *       console.log(`Phase changed from ${oldPhase} to ${newPhase}`);
- *     }
- *   );
- * }
- * ```
+ * Reactive controller that watches a derivation or fact and calls a callback on change.
  */
 export class WatchController<T> extends DirectiveController {
-	private derivationId: string;
+	private derivationId?: string;
+	private factKey?: string;
 	private callback: (newValue: T, previousValue: T | undefined) => void;
 
+	/** Watch a derivation */
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
 		system: System<any>,
 		derivationId: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
+	);
+	/** Watch a fact */
+	constructor(
+		host: ReactiveControllerHost,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
+		options: { kind: "fact"; factKey: string },
+		callback: (newValue: T, previousValue: T | undefined) => void,
+	);
+	constructor(
+		host: ReactiveControllerHost,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
+		derivationIdOrOptions: string | { kind: "fact"; factKey: string },
+		callback?: (newValue: T, previousValue: T | undefined) => void,
 	) {
 		super(host, system);
-		this.derivationId = derivationId;
-		this.callback = callback;
+		if (typeof derivationIdOrOptions === "string") {
+			this.derivationId = derivationIdOrOptions;
+			this.callback = callback!;
+		} else {
+			this.factKey = derivationIdOrOptions.factKey;
+			this.callback = callback!;
+		}
 	}
 
 	protected subscribe(): void {
-		this.unsubscribe = this.system.watch<T>(this.derivationId, this.callback);
+		if (this.factKey) {
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+			let prev = (this.system.facts as any)[this.factKey] as T | undefined;
+			const factKey = this.factKey;
+			this.unsubscribe = this.system.facts.$store.subscribe([factKey], () => {
+				// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+				const next = (this.system.facts as any)[factKey] as T;
+				if (!Object.is(next, prev)) {
+					this.callback(next, prev);
+					prev = next;
+				}
+			});
+		} else if (this.derivationId) {
+			this.unsubscribe = this.system.watch<T>(this.derivationId, this.callback);
+		}
 	}
 }
 
 // ============================================================================
-// Factory Functions (for consistency with other adapters)
+// New Controllers
 // ============================================================================
 
 /**
- * Create a derivation controller.
- * Factory function alternative to `new DerivationController()`.
- *
- * @example
- * ```ts
- * class MyElement extends LitElement {
- *   private isRed = createDerivation<boolean>(this, system, 'isRed');
- * }
- * ```
+ * Reactive controller for requirement explanations.
  */
+export class ExplainController extends DirectiveController {
+	private requirementId: string;
+	value: string | null;
+	private unsubSettled?: () => void;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>, requirementId: string) {
+		super(host, system);
+		this.requirementId = requirementId;
+		this.value = system.explain(requirementId);
+	}
+
+	protected subscribe(): void {
+		this.value = this.system.explain(this.requirementId);
+
+		const update = () => {
+			this.value = this.system.explain(this.requirementId);
+			this.requestUpdate();
+		};
+
+		this.unsubscribe = this.system.facts.$store.subscribeAll(update);
+		this.unsubSettled = this.system.onSettledChange(update);
+	}
+
+	hostDisconnected(): void {
+		this.unsubSettled?.();
+		super.hostDisconnected();
+	}
+}
+
+/**
+ * Reactive controller for constraint status.
+ */
+export class ConstraintStatusController extends DirectiveController {
+	private constraintId?: string;
+	value: ConstraintInfo[] | ConstraintInfo | null;
+	private unsubSettled?: () => void;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>, constraintId?: string) {
+		super(host, system);
+		this.constraintId = constraintId;
+		this.value = this.getVal();
+	}
+
+	private getVal(): ConstraintInfo[] | ConstraintInfo | null {
+		const inspection = this.system.inspect();
+		if (!this.constraintId) return inspection.constraints;
+		return inspection.constraints.find((c: ConstraintInfo) => c.id === this.constraintId) ?? null;
+	}
+
+	protected subscribe(): void {
+		this.value = this.getVal();
+
+		const update = () => {
+			this.value = this.getVal();
+			this.requestUpdate();
+		};
+
+		this.unsubscribe = this.system.facts.$store.subscribeAll(update);
+		this.unsubSettled = this.system.onSettledChange(update);
+	}
+
+	hostDisconnected(): void {
+		this.unsubSettled?.();
+		super.hostDisconnected();
+	}
+}
+
+/**
+ * Reactive controller for optimistic updates.
+ */
+export class OptimisticUpdateController implements ReactiveController {
+	private host: ReactiveControllerHost;
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	private system: System<any>;
+	private statusPlugin?: StatusPlugin;
+	private requirementType?: string;
+	private snapshot: SystemSnapshot | null = null;
+	private statusUnsub: (() => void) | null = null;
+
+	isPending = false;
+	error: Error | null = null;
+
+	constructor(
+		host: ReactiveControllerHost,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		system: System<any>,
+		statusPlugin?: StatusPlugin,
+		requirementType?: string,
+	) {
+		this.host = host;
+		this.system = system;
+		this.statusPlugin = statusPlugin;
+		this.requirementType = requirementType;
+		host.addController(this);
+	}
+
+	hostConnected(): void {}
+
+	hostDisconnected(): void {
+		this.statusUnsub?.();
+		this.statusUnsub = null;
+	}
+
+	rollback(): void {
+		if (this.snapshot) {
+			this.system.restore(this.snapshot);
+			this.snapshot = null;
+		}
+		this.isPending = false;
+		this.error = null;
+		this.statusUnsub?.();
+		this.statusUnsub = null;
+		this.host.requestUpdate();
+	}
+
+	mutate(updateFn: () => void): void {
+		this.snapshot = this.system.getSnapshot();
+		this.isPending = true;
+		this.error = null;
+		this.system.batch(updateFn);
+		this.host.requestUpdate();
+
+		if (this.statusPlugin && this.requirementType) {
+			this.statusUnsub?.();
+			this.statusUnsub = this.statusPlugin.subscribe(() => {
+				const status = this.statusPlugin!.getStatus(this.requirementType!);
+				if (!status.isLoading && !status.hasError) {
+					this.snapshot = null;
+					this.isPending = false;
+					this.statusUnsub?.();
+					this.statusUnsub = null;
+					this.host.requestUpdate();
+				} else if (status.hasError) {
+					this.error = status.lastError;
+					this.rollback();
+				}
+			});
+		}
+	}
+}
+
+/**
+ * Reactive controller that creates and manages a Directive system.
+ * The system is automatically started when the host connects and destroyed when it disconnects.
+ */
+export class SystemController<M extends ModuleSchema> implements ReactiveController {
+	private options: ModuleDef<M> | CreateSystemOptionsSingle<M>;
+	private _system: System<M> | null = null;
+
+	constructor(host: ReactiveControllerHost, options: ModuleDef<M> | CreateSystemOptionsSingle<M>) {
+		this.options = options;
+		host.addController(this);
+	}
+
+	get system(): System<M> {
+		if (!this._system) {
+			throw new Error(
+				"[Directive] SystemController.system is not available. " +
+				"This can happen if:\n" +
+				"  1. Accessed before hostConnected (e.g., in a class field initializer)\n" +
+				"  2. Accessed after hostDisconnected (system was destroyed)\n" +
+				"Solution: Access system only in lifecycle methods (connectedCallback, render) " +
+				"or after the element is connected to the DOM.",
+			);
+		}
+		return this._system;
+	}
+
+	hostConnected(): void {
+		const isModule = "id" in this.options && "schema" in this.options;
+		const system = isModule
+			? createSystem({ module: this.options as ModuleDef<M> })
+			: createSystem(this.options as CreateSystemOptionsSingle<M>);
+		this._system = system as unknown as System<M>;
+		this._system.start();
+	}
+
+	hostDisconnected(): void {
+		this._system?.destroy();
+		this._system = null;
+	}
+}
+
+/**
+ * Module controller — zero-config all-in-one.
+ * Creates system, starts it, subscribes to all facts/derivations.
+ */
+export class ModuleController<M extends ModuleSchema> implements ReactiveController {
+	private host: ReactiveControllerHost;
+	private moduleDef: ModuleDef<M>;
+	private config?: {
+		// biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
+		plugins?: Plugin<any>[];
+		debug?: DebugConfig;
+		errorBoundary?: ErrorBoundaryConfig;
+		tickMs?: number;
+		zeroConfig?: boolean;
+		// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+		initialFacts?: Record<string, any>;
+		status?: boolean;
+	};
+
+	private _system: System<M> | null = null;
+	private unsubFacts?: () => void;
+	private unsubDerived?: () => void;
+
+	facts: InferFacts<M> = {} as InferFacts<M>;
+	derived: InferDerivations<M> = {} as InferDerivations<M>;
+	statusPlugin?: StatusPlugin;
+
+	get system(): System<M> {
+		if (!this._system) {
+			throw new Error("[Directive] ModuleController.system is not available before hostConnected.");
+		}
+		return this._system;
+	}
+
+	get events(): System<M>["events"] {
+		return this.system.events;
+	}
+
+	constructor(
+		host: ReactiveControllerHost,
+		moduleDef: ModuleDef<M>,
+		config?: {
+			// biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
+			plugins?: Plugin<any>[];
+			debug?: DebugConfig;
+			errorBoundary?: ErrorBoundaryConfig;
+			tickMs?: number;
+			zeroConfig?: boolean;
+			// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+			initialFacts?: Record<string, any>;
+			status?: boolean;
+		},
+	) {
+		this.host = host;
+		this.moduleDef = moduleDef;
+		this.config = config;
+		host.addController(this);
+	}
+
+	hostConnected(): void {
+		const allPlugins = [...(this.config?.plugins ?? [])];
+
+		if (this.config?.status) {
+			const sp = createRequirementStatusPlugin();
+			this.statusPlugin = sp;
+			// biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
+			allPlugins.push(sp.plugin as Plugin<any>);
+		}
+
+		// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+		const system = createSystem({
+			module: this.moduleDef,
+			plugins: allPlugins.length > 0 ? allPlugins : undefined,
+			debug: this.config?.debug,
+			errorBoundary: this.config?.errorBoundary,
+			tickMs: this.config?.tickMs,
+			zeroConfig: this.config?.zeroConfig,
+			initialFacts: this.config?.initialFacts,
+		} as any) as unknown as System<M>;
+
+		this._system = system;
+		system.start();
+
+		// Subscribe to all facts
+		this.facts = system.facts.$store.toObject() as InferFacts<M>;
+		this.unsubFacts = system.facts.$store.subscribeAll(() => {
+			this.facts = system.facts.$store.toObject() as InferFacts<M>;
+			this.host.requestUpdate();
+		});
+
+		// Subscribe to all derivations
+		const derivationKeys = Object.keys(system.derive ?? {});
+		const getDerived = (): InferDerivations<M> => {
+			const result: Record<string, unknown> = {};
+			for (const key of derivationKeys) {
+				result[key] = system.read(key);
+			}
+			return result as InferDerivations<M>;
+		};
+		this.derived = getDerived();
+
+		if (derivationKeys.length > 0) {
+			this.unsubDerived = system.subscribe(derivationKeys, () => {
+				this.derived = getDerived();
+				this.host.requestUpdate();
+			});
+		}
+	}
+
+	hostDisconnected(): void {
+		this.unsubFacts?.();
+		this.unsubDerived?.();
+		this._system?.destroy();
+		this._system = null;
+	}
+
+	dispatch(event: InferEvents<M>): void {
+		this.system.dispatch(event);
+	}
+}
+
+// ============================================================================
+// Factory Functions (active)
+// ============================================================================
+
 export function createDerivation<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -916,18 +815,6 @@ export function createDerivation<T>(
 	return new DerivationController<T>(host, system, derivationId);
 }
 
-/**
- * Create a derivations controller for multiple values.
- *
- * @example
- * ```ts
- * class MyElement extends LitElement {
- *   private state = createDerivations<{ isRed: boolean; elapsed: number }>(
- *     this, system, ['isRed', 'elapsed']
- *   );
- * }
- * ```
- */
 export function createDerivations<T extends Record<string, unknown>>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -937,16 +824,6 @@ export function createDerivations<T extends Record<string, unknown>>(
 	return new DerivationsController<T>(host, system, derivationIds);
 }
 
-/**
- * Create a fact controller.
- *
- * @example
- * ```ts
- * class MyElement extends LitElement {
- *   private phase = createFact<string>(this, system, 'phase');
- * }
- * ```
- */
 export function createFact<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -957,199 +834,18 @@ export function createFact<T>(
 }
 
 /**
- * Get direct access to facts for mutations.
- *
- * WARNING: The returned facts object is NOT reactive. Use this for event handlers
- * and imperative code, not for rendering. Use `DerivationController` or `FactController`
- * for reactive values. Changes to facts will trigger updates in controllers that
- * subscribe to the affected derivations.
- *
- * @example
- * ```ts
- * class Controls extends LitElement {
- *   private facts = useFacts<MySchema>(system);
- *
- *   handleClick() {
- *     this.facts.count = (this.facts.count ?? 0) + 1;
- *   }
- * }
- * ```
- */
-export function useFacts<M extends ModuleSchema>(system: System<M>): System<M>["facts"] {
-	return system.facts;
-}
-
-/**
- * Get dispatch function for sending events.
- *
- * @returns A dispatch function typed to the system's event schema
- *
- * @example
- * ```ts
- * class Controls extends LitElement {
- *   private dispatch = useDispatch(system);
- *
- *   handleClick() {
- *     this.dispatch({ type: 'tick' });
- *   }
- * }
- * ```
- */
-export function useDispatch<M extends ModuleSchema = ModuleSchema>(
-	system: System<M>,
-): (event: InferEvents<M>) => void {
-	return (event: InferEvents<M>) => {
-		system.dispatch(event);
-	};
-}
-
-/**
- * Get time-travel debug API (if enabled).
- */
-// biome-ignore lint/suspicious/noExplicitAny: System type varies
-export function useTimeTravel(system: System<any>) {
-	return system.debug;
-}
-
-/**
  * Create an inspect controller.
- *
- * @example
- * ```ts
- * class Inspector extends LitElement {
- *   private inspection = createInspect(this, system);
- * }
- * ```
+ * Returns InspectState; pass `{ throttleMs }` for throttled updates.
  */
 export function createInspect(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
+	options?: { throttleMs?: number },
 ): InspectController {
-	return new InspectController(host, system);
+	return new InspectController(host, system, options);
 }
 
-/**
- * Create a requirements controller.
- *
- * Provides a focused view of just requirements without full inspection overhead.
- *
- * @example
- * ```ts
- * class LoadingIndicator extends LitElement {
- *   private requirements = createRequirements(this, system);
- *
- *   render() {
- *     if (!this.requirements.value.isWorking) return html``;
- *     return html`<spinner-element></spinner-element>`;
- *   }
- * }
- * ```
- */
-export function createRequirements(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-): RequirementsController {
-	return new RequirementsController(host, system);
-}
-
-/**
- * Create a throttled inspect controller.
- *
- * Limits update frequency to prevent performance issues with high-frequency changes.
- *
- * @param host - The reactive controller host (LitElement)
- * @param system - The Directive system
- * @param throttleMs - Minimum time between updates in milliseconds (default: 100)
- * @returns A throttled inspect controller
- *
- * @example
- * ```ts
- * class Inspector extends LitElement {
- *   private inspection = createInspectThrottled(this, system, 100);
- *
- *   render() {
- *     return html`<div>Unmet: ${this.inspection.value.unmet.length}</div>`;
- *   }
- * }
- * ```
- */
-export function createInspectThrottled(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	throttleMs = 100,
-): InspectThrottledController {
-	return new InspectThrottledController(host, system, throttleMs);
-}
-
-/**
- * Create a throttled requirements controller.
- *
- * Limits update frequency to prevent performance issues with high-frequency changes.
- *
- * @param host - The reactive controller host (LitElement)
- * @param system - The Directive system
- * @param throttleMs - Minimum time between updates in milliseconds (default: 100)
- * @returns A throttled requirements controller
- *
- * @example
- * ```ts
- * class LoadingIndicator extends LitElement {
- *   private requirements = createRequirementsThrottled(this, system, 100);
- *
- *   render() {
- *     if (!this.requirements.value.isWorking) return html``;
- *     return html`<spinner-element></spinner-element>`;
- *   }
- * }
- * ```
- */
-export function createRequirementsThrottled(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	throttleMs = 100,
-): RequirementsThrottledController {
-	return new RequirementsThrottledController(host, system, throttleMs);
-}
-
-/**
- * Create an is-settled controller.
- *
- * Tracks whether the system has settled (no pending operations).
- *
- * @example
- * ```ts
- * class LoadingIndicator extends LitElement {
- *   private settled = createIsSettled(this, system);
- *
- *   render() {
- *     if (!this.settled.value) return html`<spinner-el></spinner-el>`;
- *     return html`<content-el></content-el>`;
- *   }
- * }
- * ```
- */
-export function createIsSettled(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-): IsSettledController {
-	return new IsSettledController(host, system);
-}
-
-/**
- * Create a requirement status controller.
- *
- * @example
- * ```ts
- * class UserLoader extends LitElement {
- *   private status = createRequirementStatus(this, statusPlugin, 'FETCH_USER');
- * }
- * ```
- */
 export function createRequirementStatus(
 	host: ReactiveControllerHost,
 	statusPlugin: StatusPlugin,
@@ -1158,101 +854,6 @@ export function createRequirementStatus(
 	return new RequirementStatusController(host, statusPlugin, type);
 }
 
-/**
- * Create an is-resolving controller.
- *
- * Simplified version of createRequirementStatus that only tracks resolving state.
- *
- * @example
- * ```ts
- * class SaveButton extends LitElement {
- *   private isSaving = createIsResolving(this, statusPlugin, 'SAVE_DATA');
- *
- *   render() {
- *     return html`
- *       <button ?disabled=${this.isSaving.value}>
- *         ${this.isSaving.value ? 'Saving...' : 'Save'}
- *       </button>
- *     `;
- *   }
- * }
- * ```
- */
-export function createIsResolving(
-	host: ReactiveControllerHost,
-	statusPlugin: StatusPlugin,
-	type: string,
-): IsResolvingController {
-	return new IsResolvingController(host, statusPlugin, type);
-}
-
-/**
- * Create a latest-error controller.
- *
- * Simplified version of createRequirementStatus that only tracks the last error.
- *
- * @example
- * ```ts
- * class ErrorDisplay extends LitElement {
- *   private error = createLatestError(this, statusPlugin, 'FETCH_USER');
- *
- *   render() {
- *     if (!this.error.value) return html``;
- *     return html`<div class="error">${this.error.value.message}</div>`;
- *   }
- * }
- * ```
- */
-export function createLatestError(
-	host: ReactiveControllerHost,
-	statusPlugin: StatusPlugin,
-	type: string,
-): LatestErrorController {
-	return new LatestErrorController(host, statusPlugin, type);
-}
-
-/**
- * Create an all-requirement-statuses controller.
- *
- * Returns a controller that tracks all requirement types with their current status.
- * Useful for dashboard/admin UIs that need to show all requirement states.
- *
- * @example
- * ```ts
- * class RequirementsDashboard extends LitElement {
- *   private allStatuses = createRequirementStatuses(this, statusPlugin);
- *
- *   render() {
- *     return html`
- *       <ul>
- *         ${Array.from(this.allStatuses.value.entries()).map(([type, status]) => html`
- *           <li>${type}: ${status.isLoading ? 'Loading' : status.hasError ? 'Error' : 'Ready'}</li>
- *         `)}
- *       </ul>
- *     `;
- *   }
- * }
- * ```
- */
-export function createRequirementStatuses(
-	host: ReactiveControllerHost,
-	statusPlugin: StatusPlugin,
-): RequirementStatusesController {
-	return new RequirementStatusesController(host, statusPlugin);
-}
-
-/**
- * Create a watch controller.
- *
- * @example
- * ```ts
- * class MyElement extends LitElement {
- *   private watcher = createWatch<string>(this, system, 'phase', (newVal, oldVal) => {
- *     console.log('Phase changed:', newVal);
- *   });
- * }
- * ```
- */
 export function createWatch<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -1263,24 +864,6 @@ export function createWatch<T>(
 	return new WatchController<T>(host, system, derivationId, callback);
 }
 
-/**
- * Create a fact selector controller.
- *
- * Only re-renders when the selected value changes.
- *
- * @example
- * ```ts
- * class UserName extends LitElement {
- *   private userName = createFactSelector<User, string>(
- *     this, system, 'user', (u) => u?.name ?? 'Guest'
- *   );
- *
- *   render() {
- *     return html`<span>${this.userName.value}</span>`;
- *   }
- * }
- * ```
- */
 export function createFactSelector<T, R>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -1292,24 +875,6 @@ export function createFactSelector<T, R>(
 	return new FactSelectorController<T, R>(host, system, factKey, selector, equalityFn);
 }
 
-/**
- * Create a derivation selector controller.
- *
- * Only re-renders when the selected value changes.
- *
- * @example
- * ```ts
- * class StatusLabel extends LitElement {
- *   private statusText = createDerivedSelector<Status, string>(
- *     this, system, 'status', (s) => s?.label ?? 'Unknown'
- *   );
- *
- *   render() {
- *     return html`<span>${this.statusText.value}</span>`;
- *   }
- * }
- * ```
- */
 export function createDerivedSelector<T, R>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -1321,134 +886,153 @@ export function createDerivedSelector<T, R>(
 	return new DerivedSelectorController<T, R>(host, system, derivationId, selector, equalityFn);
 }
 
-/**
- * Create a directive selector controller.
- *
- * Selects across all facts with fine-grained re-rendering.
- *
- * @example
- * ```ts
- * class Summary extends LitElement {
- *   private summary = createDirectiveSelector(
- *     this, system,
- *     (facts) => ({ count: facts.items?.length ?? 0 }),
- *     (a, b) => a.count === b.count
- *   );
- *
- *   render() {
- *     return html`<div>${this.summary.value.count} items</div>`;
- *   }
- * }
- * ```
- */
 export function createDirectiveSelector<R>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
 	selector: (facts: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
+	options?: { autoTrack?: boolean },
 ): DirectiveSelectorController<R> {
-	return new DirectiveSelectorController<R>(host, system, selector, equalityFn);
+	return new DirectiveSelectorController<R>(host, system, selector, equalityFn, options);
+}
+
+export function createExplain(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+	requirementId: string,
+): ExplainController {
+	return new ExplainController(host, system, requirementId);
+}
+
+export function createConstraintStatus(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+	constraintId?: string,
+): ConstraintStatusController {
+	return new ConstraintStatusController(host, system, constraintId);
+}
+
+export function createOptimisticUpdate(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+	statusPlugin?: StatusPlugin,
+	requirementType?: string,
+): OptimisticUpdateController {
+	return new OptimisticUpdateController(host, system, statusPlugin, requirementType);
+}
+
+export function createModule<M extends ModuleSchema>(
+	host: ReactiveControllerHost,
+	moduleDef: ModuleDef<M>,
+	config?: {
+		// biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
+		plugins?: Plugin<any>[];
+		debug?: DebugConfig;
+		errorBoundary?: ErrorBoundaryConfig;
+		tickMs?: number;
+		zeroConfig?: boolean;
+		// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+		initialFacts?: Record<string, any>;
+		status?: boolean;
+	},
+): ModuleController<M> {
+	return new ModuleController<M>(host, moduleDef, config);
 }
 
 // ============================================================================
-// System Controller (like XState's useActorRef)
+// Functional Helpers
 // ============================================================================
 
-/** Options for SystemController */
-export type SystemControllerOptions<M extends ModuleSchema> =
-	| ModuleDef<M>
-	| CreateSystemOptionsSingle<M>;
+export function useFacts<M extends ModuleSchema>(system: System<M>): System<M>["facts"] {
+	return system.facts;
+}
+
+export function useDispatch<M extends ModuleSchema = ModuleSchema>(
+	system: System<M>,
+): (event: InferEvents<M>) => void {
+	return (event: InferEvents<M>) => {
+		system.dispatch(event);
+	};
+}
 
 /**
- * Reactive controller that creates and manages a Directive system.
- * The system is automatically started when the host connects and destroyed when it disconnects.
- *
- * @see {@link DerivationController} for reading derived values
- * @see {@link FactController} for reactive fact access
+ * Returns the system's events dispatcher.
+ */
+export function useEvents<M extends ModuleSchema = ModuleSchema>(
+	system: System<M>,
+): System<M>["events"] {
+	return system.events;
+}
+
+import type { TimeTravelState } from "../core/types.js";
+
+function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
+	const debug = system.debug;
+	if (!debug) return null;
+	return {
+		canUndo: debug.currentIndex > 0,
+		canRedo: debug.currentIndex < debug.snapshots.length - 1,
+		undo: () => debug.goBack(),
+		redo: () => debug.goForward(),
+		currentIndex: debug.currentIndex,
+		totalSnapshots: debug.snapshots.length,
+	};
+}
+
+/**
+ * Reactive controller for time-travel state.
+ * Triggers host updates when snapshots change or navigation occurs.
  *
  * @example
- * ```ts
- * import { LitElement, html } from 'lit';
- * import { SystemController, DerivationController } from 'directive/lit';
- *
- * class CounterElement extends LitElement {
- *   private directive = new SystemController(this, counterModule);
- *
- *   // Access the system
- *   private count = new DerivationController(this, this.directive.system, 'count');
- *
+ * ```typescript
+ * class MyElement extends LitElement {
+ *   private tt = new TimeTravelController(this, system);
  *   render() {
- *     return html`
- *       <button @click=${() => this.directive.system.facts.count++}>
- *         Count: ${this.count.value}
- *       </button>
- *     `;
+ *     const { canUndo, undo } = this.tt.value ?? {};
+ *     return html`<button ?disabled=${!canUndo} @click=${undo}>Undo</button>`;
  *   }
  * }
  * ```
  */
-export class SystemController<M extends ModuleSchema> implements ReactiveController {
-	private options: SystemControllerOptions<M>;
-	private _system: System<M> | null = null;
+export class TimeTravelController implements ReactiveController {
+	value: TimeTravelState | null = null;
+	private _unsub?: () => void;
 
-	constructor(host: ReactiveControllerHost, options: SystemControllerOptions<M>) {
-		this.options = options;
-		host.addController(this);
-	}
-
-	get system(): System<M> {
-		if (!this._system) {
-			throw new Error(
-				"[Directive] SystemController.system is not available. " +
-					"This can happen if:\n" +
-					"  1. Accessed before hostConnected (e.g., in a class field initializer)\n" +
-					"  2. Accessed after hostDisconnected (system was destroyed)\n" +
-					"Solution: Access system only in lifecycle methods (connectedCallback, render) " +
-					"or after the element is connected to the DOM.",
-			);
-		}
-		return this._system;
+	constructor(
+		private _host: ReactiveControllerHost,
+		// biome-ignore lint/suspicious/noExplicitAny: System type varies
+		private _system: System<any>,
+	) {
+		this._host.addController(this);
 	}
 
 	hostConnected(): void {
-		// Check if options is a module or system options
-		const isModule = "id" in this.options && "schema" in this.options;
-
-		const system = isModule
-			? createSystem({ module: this.options as ModuleDef<M> })
-			: createSystem(this.options as CreateSystemOptionsSingle<M>);
-
-		// Cast to System<M> - the underlying type matches
-		this._system = system as unknown as System<M>;
-		this._system.start();
+		this.value = _buildTTState(this._system);
+		this._unsub = this._system.onTimeTravelChange(() => {
+			this.value = _buildTTState(this._system);
+			this._host.requestUpdate();
+		});
 	}
 
 	hostDisconnected(): void {
-		this._system?.destroy();
-		this._system = null;
+		this._unsub?.();
+		this._unsub = undefined;
 	}
 }
 
-// ============================================================================
-// Functional Helpers (for parity with other adapters)
-// ============================================================================
-
 /**
- * Create a derivation value getter (non-reactive).
- *
- * WARNING: This returns a getter function that reads the current value on each call.
- * It does NOT trigger re-renders when the value changes. For reactive updates in
- * LitElement, use {@link DerivationController} instead.
- *
- * @see {@link DerivationController} for reactive class-based usage
- *
- * @example
- * ```ts
- * const getIsRed = getDerivation<boolean>(system, 'isRed');
- * console.log(getIsRed()); // Get current value (non-reactive)
- * ```
+ * Functional helper for time-travel state (non-reactive, snapshot).
+ * For reactive updates, use TimeTravelController.
  */
+// biome-ignore lint/suspicious/noExplicitAny: System type varies
+export function useTimeTravel(system: System<any>): TimeTravelState | null {
+	return _buildTTState(system);
+}
+
 export function getDerivation<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
@@ -1457,23 +1041,6 @@ export function getDerivation<T>(
 	return () => system.read(derivationId) as T;
 }
 
-/**
- * Create a fact value getter (non-reactive).
- *
- * WARNING: This returns a getter function that reads the current value on each call.
- * It does NOT trigger re-renders when the value changes. For reactive updates in
- * LitElement, use {@link FactController} instead.
- *
- * @see {@link FactController} for reactive class-based usage
- *
- * @returns A getter function that returns the current fact value, or undefined if not set
- *
- * @example
- * ```ts
- * const getPhase = getFact<string>(system, 'phase');
- * console.log(getPhase()); // Get current value (non-reactive)
- * ```
- */
 export function getFact<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
@@ -1486,32 +1053,6 @@ export function getFact<T>(
 // Typed Hooks Factory
 // ============================================================================
 
-/**
- * Create typed controllers and helpers for a specific system schema.
- *
- * This provides better type inference than the generic controllers.
- *
- * @example
- * ```ts
- * import { createTypedHooks } from 'directive/lit';
- *
- * // Define your schema
- * const schema = {
- *   facts: { count: t.number(), user: t.any<User | null>() },
- *   derivations: { doubled: t.number() },
- *   events: { increment: {}, setUser: { user: t.any<User>() } },
- *   requirements: {},
- * } satisfies ModuleSchema;
- *
- * // Create typed hooks
- * const { createDerivation, createFact, useDispatch } = createTypedHooks<typeof schema>();
- *
- * class Counter extends LitElement {
- *   private count = createFact(this, system, "count"); // Type: FactController<number>
- *   private doubled = createDerivation(this, system, "doubled"); // Type: DerivationController<number>
- * }
- * ```
- */
 export function createTypedHooks<M extends ModuleSchema>(): {
 	createDerivation: <K extends keyof InferDerivations<M>>(
 		host: ReactiveControllerHost,
@@ -1525,6 +1066,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	) => FactController<InferFacts<M>[K]>;
 	useDispatch: (system: System<M>) => (event: InferEvents<M>) => void;
 	useFacts: (system: System<M>) => System<M>["facts"];
+	useEvents: (system: System<M>) => System<M>["events"];
 } {
 	return {
 		createDerivation: <K extends keyof InferDerivations<M>>(
@@ -1543,5 +1085,290 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			};
 		},
 		useFacts: (system: System<M>) => system.facts,
+		useEvents: (system: System<M>) => system.events,
 	};
+}
+
+// ============================================================================
+// Deprecated Controllers (one release cycle)
+// ============================================================================
+
+/**
+ * @deprecated Use `InspectController` with `{ throttleMs }` option instead.
+ */
+export class InspectThrottledController extends DirectiveController {
+	value: SystemInspection;
+	private throttleMs: number;
+	private throttleCleanup?: () => void;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>, throttleMs = 100) {
+		super(host, system);
+		this.throttleMs = throttleMs;
+		this.value = system.inspect();
+	}
+
+	protected subscribe(): void {
+		this.value = this.system.inspect();
+		const { throttled, cleanup } = createThrottle(() => {
+			this.value = this.system.inspect();
+			this.requestUpdate();
+		}, this.throttleMs);
+		this.throttleCleanup = cleanup;
+		this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
+	}
+
+	hostDisconnected(): void {
+		this.throttleCleanup?.();
+		super.hostDisconnected();
+	}
+}
+
+/**
+ * @deprecated Use `InspectController` instead.
+ */
+export class RequirementsController extends DirectiveController {
+	value: RequirementsState;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>) {
+		super(host, system);
+		this.value = computeRequirementsState(system.inspect());
+	}
+
+	protected subscribe(): void {
+		this.value = computeRequirementsState(this.system.inspect());
+		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
+			this.value = computeRequirementsState(this.system.inspect());
+			this.requestUpdate();
+		});
+	}
+}
+
+/**
+ * @deprecated Use `InspectController` with `{ throttleMs }` option instead.
+ */
+export class RequirementsThrottledController extends DirectiveController {
+	value: RequirementsState;
+	private throttleMs: number;
+	private throttleCleanup?: () => void;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>, throttleMs = 100) {
+		super(host, system);
+		this.throttleMs = throttleMs;
+		this.value = computeRequirementsState(system.inspect());
+	}
+
+	protected subscribe(): void {
+		this.value = computeRequirementsState(this.system.inspect());
+		const { throttled, cleanup } = createThrottle(() => {
+			this.value = computeRequirementsState(this.system.inspect());
+			this.requestUpdate();
+		}, this.throttleMs);
+		this.throttleCleanup = cleanup;
+		this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
+	}
+
+	hostDisconnected(): void {
+		this.throttleCleanup?.();
+		super.hostDisconnected();
+	}
+}
+
+/**
+ * @deprecated Use `InspectController` and check `.value.isSettled` instead.
+ */
+export class IsSettledController extends DirectiveController {
+	value: boolean;
+
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	constructor(host: ReactiveControllerHost, system: System<any>) {
+		super(host, system);
+		this.value = system.isSettled;
+	}
+
+	protected subscribe(): void {
+		this.value = this.system.isSettled;
+		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
+			this.value = this.system.isSettled;
+			this.requestUpdate();
+		});
+	}
+}
+
+/**
+ * @deprecated Use `RequirementStatusController` and check `.value.inflight > 0` instead.
+ */
+export class IsResolvingController implements ReactiveController {
+	private host: ReactiveControllerHost;
+	private statusPlugin: StatusPlugin;
+	private type: string;
+	private unsubscribe?: () => void;
+	value: boolean;
+
+	constructor(host: ReactiveControllerHost, statusPlugin: StatusPlugin, type: string) {
+		this.host = host;
+		this.statusPlugin = statusPlugin;
+		this.type = type;
+		this.value = statusPlugin.getStatus(type).inflight > 0;
+		host.addController(this);
+	}
+
+	hostConnected(): void {
+		this.value = this.statusPlugin.getStatus(this.type).inflight > 0;
+		this.unsubscribe = this.statusPlugin.subscribe(() => {
+			this.value = this.statusPlugin.getStatus(this.type).inflight > 0;
+			this.host.requestUpdate();
+		});
+	}
+
+	hostDisconnected(): void {
+		this.unsubscribe?.();
+		this.unsubscribe = undefined;
+	}
+}
+
+/**
+ * @deprecated Use `RequirementStatusController` and check `.value.lastError` instead.
+ */
+export class LatestErrorController implements ReactiveController {
+	private host: ReactiveControllerHost;
+	private statusPlugin: StatusPlugin;
+	private type: string;
+	private unsubscribe?: () => void;
+	value: Error | null;
+
+	constructor(host: ReactiveControllerHost, statusPlugin: StatusPlugin, type: string) {
+		this.host = host;
+		this.statusPlugin = statusPlugin;
+		this.type = type;
+		this.value = statusPlugin.getStatus(type).lastError;
+		host.addController(this);
+	}
+
+	hostConnected(): void {
+		this.value = this.statusPlugin.getStatus(this.type).lastError;
+		this.unsubscribe = this.statusPlugin.subscribe(() => {
+			this.value = this.statusPlugin.getStatus(this.type).lastError;
+			this.host.requestUpdate();
+		});
+	}
+
+	hostDisconnected(): void {
+		this.unsubscribe?.();
+		this.unsubscribe = undefined;
+	}
+}
+
+/**
+ * @deprecated Use `RequirementStatusController` for individual types or keep for dashboard use.
+ */
+export class RequirementStatusesController implements ReactiveController {
+	private host: ReactiveControllerHost;
+	private statusPlugin: StatusPlugin;
+	private unsubscribe?: () => void;
+	value: Map<string, RequirementTypeStatus>;
+
+	constructor(host: ReactiveControllerHost, statusPlugin: StatusPlugin) {
+		this.host = host;
+		this.statusPlugin = statusPlugin;
+		this.value = statusPlugin.getAllStatus();
+		host.addController(this);
+	}
+
+	hostConnected(): void {
+		this.value = this.statusPlugin.getAllStatus();
+		this.unsubscribe = this.statusPlugin.subscribe(() => {
+			this.value = this.statusPlugin.getAllStatus();
+			this.host.requestUpdate();
+		});
+	}
+
+	hostDisconnected(): void {
+		this.unsubscribe?.();
+		this.unsubscribe = undefined;
+	}
+}
+
+// ============================================================================
+// Deprecated Factory Functions
+// ============================================================================
+
+/**
+ * @deprecated Use `createInspect(host, system, { throttleMs })` instead.
+ */
+export function createInspectThrottled(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+	throttleMs = 100,
+): InspectThrottledController {
+	return new InspectThrottledController(host, system, throttleMs);
+}
+
+/**
+ * @deprecated Use `createInspect(host, system)` instead.
+ */
+export function createRequirements(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+): RequirementsController {
+	return new RequirementsController(host, system);
+}
+
+/**
+ * @deprecated Use `createInspect(host, system, { throttleMs })` instead.
+ */
+export function createRequirementsThrottled(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+	throttleMs = 100,
+): RequirementsThrottledController {
+	return new RequirementsThrottledController(host, system, throttleMs);
+}
+
+/**
+ * @deprecated Use `createInspect(host, system)` and check `.value.isSettled`.
+ */
+export function createIsSettled(
+	host: ReactiveControllerHost,
+	// biome-ignore lint/suspicious/noExplicitAny: System type varies
+	system: System<any>,
+): IsSettledController {
+	return new IsSettledController(host, system);
+}
+
+/**
+ * @deprecated Use `createRequirementStatus(host, plugin, type)` and check `.value.inflight > 0`.
+ */
+export function createIsResolving(
+	host: ReactiveControllerHost,
+	statusPlugin: StatusPlugin,
+	type: string,
+): IsResolvingController {
+	return new IsResolvingController(host, statusPlugin, type);
+}
+
+/**
+ * @deprecated Use `createRequirementStatus(host, plugin, type)` and check `.value.lastError`.
+ */
+export function createLatestError(
+	host: ReactiveControllerHost,
+	statusPlugin: StatusPlugin,
+	type: string,
+): LatestErrorController {
+	return new LatestErrorController(host, statusPlugin, type);
+}
+
+/**
+ * @deprecated Keep for dashboard use or use individual `RequirementStatusController` instances.
+ */
+export function createRequirementStatuses(
+	host: ReactiveControllerHost,
+	statusPlugin: StatusPlugin,
+): RequirementStatusesController {
+	return new RequirementStatusesController(host, statusPlugin);
 }

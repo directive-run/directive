@@ -136,25 +136,37 @@ export function createEngine<S extends Schema>(
 	let invalidateDerivation: (key: string) => void = () => {};
 	let invalidateManyDerivations: (keys: string[]) => void = () => {};
 
+	// Forward-declared so onChange/onBatch closures can check isRestoring.
+	// Assigned after createTimeTravelManager() below.
+	let timeTravelRef: TimeTravelManager<S> | null = null;
+
 	const { store, facts } = createFacts<S>({
 		schema: mergedSchema,
 		onChange: (key, value, prev) => {
 			pluginManager.emitFactSet(key, value, prev);
-			state.changedKeys.add(key);
-			// Immediately invalidate derivations when facts change
+			// Invalidate derivations so they recompute on read
 			invalidateDerivation(key);
+			// During time-travel restore, skip change tracking and reconciliation.
+			// The restored state is already reconciled; re-reconciling would create
+			// spurious snapshots that break undo/redo.
+			if (timeTravelRef?.isRestoring) return;
+			state.changedKeys.add(key);
 			scheduleReconcile();
 		},
 		onBatch: (changes) => {
 			pluginManager.emitFactsBatch(changes);
 			const keys: string[] = [];
 			for (const change of changes) {
-				state.changedKeys.add(change.key);
 				keys.push(change.key);
 			}
 			// Invalidate all affected derivations at once — listeners fire only
 			// after ALL keys are invalidated, so they see consistent state.
 			invalidateManyDerivations(keys);
+			// During time-travel restore, skip change tracking and reconciliation.
+			if (timeTravelRef?.isRestoring) return;
+			for (const change of changes) {
+				state.changedKeys.add(change.key);
+			}
 			scheduleReconcile();
 		},
 	});
@@ -221,9 +233,19 @@ export function createEngine<S extends Schema>(
 		},
 		onResolutionComplete: () => {
 			// After a resolver completes, schedule another reconcile
+			notifySettlementChange();
 			scheduleReconcile();
 		},
 	});
+
+	// Time-travel listeners — notified when snapshot state changes
+	const timeTravelListeners = new Set<() => void>();
+
+	function notifyTimeTravelChange(): void {
+		for (const listener of timeTravelListeners) {
+			listener();
+		}
+	}
 
 	// Create time-travel manager
 	const timeTravelManager: TimeTravelManager<S> = config.debug?.timeTravel
@@ -231,10 +253,26 @@ export function createEngine<S extends Schema>(
 				config: config.debug,
 				facts,
 				store,
-				onSnapshot: (snapshot) => pluginManager.emitSnapshot(snapshot),
-				onTimeTravel: (from, to) => pluginManager.emitTimeTravel(from, to),
+				onSnapshot: (snapshot) => {
+					pluginManager.emitSnapshot(snapshot);
+					notifyTimeTravelChange();
+				},
+				onTimeTravel: (from, to) => {
+					pluginManager.emitTimeTravel(from, to);
+					notifyTimeTravelChange();
+				},
 			})
 		: createDisabledTimeTravel();
+	timeTravelRef = timeTravelManager;
+
+	// Settlement listeners — notified when isSettled may have changed
+	const settlementListeners = new Set<() => void>();
+
+	function notifySettlementChange(): void {
+		for (const listener of settlementListeners) {
+			listener();
+		}
+	}
 
 	// Engine state
 	const state: EngineState<S> = {
@@ -256,6 +294,7 @@ export function createEngine<S extends Schema>(
 		if (!state.isRunning || state.reconcileScheduled || state.isInitializing) return;
 
 		state.reconcileScheduled = true;
+		notifySettlementChange();
 		queueMicrotask(() => {
 			state.reconcileScheduled = false;
 			if (state.isRunning && !state.isInitializing) {
@@ -275,11 +314,12 @@ export function createEngine<S extends Schema>(
 	async function reconcile(): Promise<void> {
 		if (state.isReconciling) return;
 		state.isReconciling = true;
+		notifySettlementChange();
 
 		try {
 			// Take snapshot before reconciliation
 			if (state.changedKeys.size > 0) {
-				timeTravelManager.takeSnapshot("facts-changed");
+				timeTravelManager.takeSnapshot(`facts-changed:${[...state.changedKeys].join(",")}`);
 			}
 
 			// Get snapshot for plugins
@@ -346,6 +386,7 @@ export function createEngine<S extends Schema>(
 			}
 		} finally {
 			state.isReconciling = false;
+			notifySettlementChange();
 		}
 
 		// If more changes came in during reconciliation, run again
@@ -500,6 +541,8 @@ export function createEngine<S extends Schema>(
 
 		destroy(): void {
 			this.stop();
+			settlementListeners.clear();
+			timeTravelListeners.clear();
 			pluginManager.emitDestroy(system);
 		},
 
@@ -894,6 +937,20 @@ export function createEngine<S extends Schema>(
 					store.set(key as keyof InferSchema<S>, value as InferSchema<S>[keyof InferSchema<S>]);
 				}
 			});
+		},
+
+		onSettledChange(listener: () => void): () => void {
+			settlementListeners.add(listener);
+			return () => {
+				settlementListeners.delete(listener);
+			};
+		},
+
+		onTimeTravelChange(listener: () => void): () => void {
+			timeTravelListeners.add(listener);
+			return () => {
+				timeTravelListeners.delete(listener);
+			};
 		},
 
 		batch(fn: () => void): void {

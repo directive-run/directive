@@ -88,6 +88,16 @@
       "require": "./dist/redux.cjs",
       "import": "./dist/redux.js"
     },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "require": "./dist/worker.cjs",
+      "import": "./dist/worker.js"
+    },
+    "./ai": {
+      "types": "./dist/ai.d.ts",
+      "require": "./dist/ai.cjs",
+      "import": "./dist/ai.js"
+    },
     "./openai-agents": {
       "types": "./dist/openai-agents.d.ts",
       "require": "./dist/openai-agents.cjs",

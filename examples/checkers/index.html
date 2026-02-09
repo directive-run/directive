@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkers - Directive Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    /* Layout */
+    .app-container {
+      display: flex;
+      gap: 1.5rem;
+      max-width: 960px;
+      width: 100%;
+      align-items: flex-start;
+    }
+    .game-side {
+      text-align: center;
+      max-width: 560px;
+      width: 100%;
+      flex-shrink: 0;
+    }
+
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; color: #e2e8f0; }
+    .subtitle { color: #64748b; margin-bottom: 1.25rem; font-size: 0.875rem; }
+
+    /* Game info */
+    .game-info {
+      display: flex; gap: 0.75rem; justify-content: center; align-items: center;
+      margin-bottom: 1rem; flex-wrap: wrap;
+    }
+    .info-item {
+      background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 8px;
+      border: 1px solid #334155; font-size: 0.8rem; display: flex;
+      align-items: center; gap: 0.4rem;
+    }
+    .info-label { color: #64748b; text-transform: uppercase; font-size: 0.65rem; }
+    .info-value { font-weight: 600; }
+    .player-dot {
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    }
+    .player-dot.red { background: #CC3333; }
+    .player-dot.black { background: #555; }
+    .circuit-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 0.3rem;
+    }
+    .circuit-dot.closed { background: #22c55e; }
+    .circuit-dot.open { background: #ef4444; }
+    .circuit-dot.half_open { background: #eab308; }
+
+    /* Message bar */
+    .message {
+      background: #1e293b; padding: 0.6rem; border-radius: 8px;
+      border: 1px solid #334155; font-size: 0.85rem; color: #94a3b8;
+      margin-bottom: 1rem; min-height: 2.2rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Board */
+    .board {
+      display: grid; grid-template-columns: repeat(8, 1fr);
+      max-width: 480px; margin: 0 auto 1.25rem; aspect-ratio: 1;
+      border: 3px solid #475569; border-radius: 4px; overflow: hidden;
+    }
+    .square {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .square.light { background: #F0D9B5; }
+    .square.dark { background: #B58863; cursor: pointer; }
+    .square.dark:hover { background: #a07753; }
+    .square.selected { box-shadow: inset 0 0 0 3px #FFD700; background: #9a7a4a; }
+    .square.selectable::before {
+      content: "";
+      position: absolute; inset: 2px; border-radius: 50%;
+      box-shadow: inset 0 0 8px rgba(255, 215, 0, 0.3);
+      pointer-events: none;
+    }
+    .square.highlight::after {
+      content: "";
+      position: absolute; width: 30%; height: 30%; border-radius: 50%;
+      background: rgba(76, 175, 80, 0.6);
+      pointer-events: none;
+    }
+
+    /* Pieces */
+    .piece {
+      width: 75%; height: 75%; border-radius: 50%;
+      position: relative; pointer-events: none;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    .piece.red {
+      background: radial-gradient(circle at 35% 35%, #e05555, #CC3333 50%, #991f1f);
+      border: 2px solid #991f1f;
+    }
+    .piece.black {
+      background: radial-gradient(circle at 35% 35%, #666, #333 50%, #1a1a1a);
+      border: 2px solid #1a1a1a;
+    }
+    .piece.king::after {
+      content: "\265B";
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(0.7rem, 2.5vw, 1.2rem);
+      color: #FFD700;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex; justify-content: center; margin-bottom: 0.75rem;
+    }
+    .mode-btn {
+      background: #1e293b; border: 1px solid #334155; color: #94a3b8;
+      padding: 0.45rem 1rem; font-size: 0.8rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mode-btn:first-child { border-radius: 6px 0 0 6px; }
+    .mode-btn:last-child { border-radius: 0 6px 6px 0; }
+    .mode-btn:not(:first-child):not(:last-child) { border-left: none; border-right: none; }
+    .mode-btn:first-child + .mode-btn { border-left: none; }
+    .mode-btn.active {
+      background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600;
+    }
+    .mode-btn:hover:not(.active) { background: #334155; }
+
+    /* Controls */
+    .controls {
+      display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 1.25rem;
+    }
+    button {
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      padding: 0.6rem 1.25rem; border-radius: 8px; cursor: pointer;
+      font-size: 0.9rem; transition: all 0.15s;
+    }
+    button:hover:not(:disabled) { background: #334155; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background: #3b82f6; border-color: #3b82f6; }
+    button.primary:hover { background: #2563eb; }
+
+    /* API Key Section */
+    .api-key-section {
+      margin-bottom: 1rem;
+    }
+    .api-key-section.hidden { display: none; }
+    .api-key-row {
+      display: flex; gap: 0.5rem; justify-content: center; align-items: center;
+    }
+    .api-key-row input {
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem;
+      width: 240px; outline: none;
+    }
+    .api-key-row input::placeholder { color: #475569; }
+    .api-key-row input:focus { border-color: #3b82f6; }
+    .api-key-row button {
+      padding: 0.45rem 0.75rem; font-size: 0.8rem; border-radius: 6px;
+    }
+
+    /* Rules summary */
+    .rules {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 1rem; text-align: left; font-size: 0.75rem; color: #64748b;
+    }
+    .rules h3 { color: #94a3b8; font-size: 0.8rem; margin-bottom: 0.5rem; }
+    .rules ul { padding-left: 1.2rem; }
+    .rules li { margin-bottom: 0.25rem; }
+    .rules .directive-note {
+      margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #334155;
+      font-style: italic; color: #475569;
+    }
+
+    /* Game over modal */
+    .modal {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7); display: flex;
+      align-items: center; justify-content: center; z-index: 10;
+    }
+    .modal.hidden { display: none; }
+    .modal-content {
+      background: #1e293b; border: 1px solid #475569; border-radius: 12px;
+      padding: 2rem; text-align: center; max-width: 320px;
+    }
+    .modal-content h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .modal-content p { color: #94a3b8; margin-bottom: 1.25rem; }
+
+    /* ============================================================ */
+    /* Chat Panel */
+    /* ============================================================ */
+
+    .chat-panel {
+      width: 320px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow: hidden;
+      max-height: 640px;
+    }
+    .chat-panel.hidden { display: none; }
+
+    .chat-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #334155;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #94a3b8;
+      background: #1a2332;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 400px;
+    }
+
+    /* Chat bubbles */
+    .chat-bubble {
+      padding: 0.6rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      max-width: 90%;
+      word-wrap: break-word;
+    }
+    .chat-bubble.claude {
+      background: #1e3a5f;
+      border: 1px solid #2563eb33;
+      color: #bfdbfe;
+      align-self: flex-start;
+    }
+    .chat-bubble.system {
+      background: #334155;
+      color: #94a3b8;
+      align-self: center;
+      font-size: 0.75rem;
+      font-style: italic;
+      text-align: center;
+    }
+    .chat-bubble.user {
+      background: #1e40af;
+      border: 1px solid #3b82f633;
+      color: #e2e8f0;
+      align-self: flex-end;
+    }
+
+    .chat-reasoning {
+      margin-top: 0.35rem;
+      padding-top: 0.35rem;
+      border-top: 1px solid #2563eb22;
+      font-size: 0.72rem;
+      font-style: italic;
+      color: #64748b;
+    }
+
+    /* Thinking dots animation */
+    .thinking-bubble {
+      padding: 0.6rem 1rem;
+    }
+    .thinking-dots span {
+      display: inline-block;
+      font-size: 1.4rem;
+      line-height: 1;
+      animation: thinkDot 1.4s infinite;
+      color: #60a5fa;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes thinkDot {
+      0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+      40% { opacity: 1; transform: translateY(-4px); }
+    }
+
+    /* Scrollbar */
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    .chat-input-bar {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-top: 1px solid #1e293b;
+      background: #0f172a;
+    }
+    .chat-input-bar input {
+      flex: 1;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .chat-input-bar input:focus { border-color: #3b82f6; }
+    .chat-input-bar button {
+      padding: 0.4rem 0.75rem;
+      border: none;
+      border-radius: 6px;
+      background: #3b82f6;
+      color: white;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .chat-input-bar button:hover { background: #2563eb; }
+
+    /* Streaming cursor */
+    .streaming-cursor::after {
+      content: "▋";
+      animation: blink 0.7s step-end infinite;
+      color: #60a5fa;
+      margin-left: 1px;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Analysis section */
+    .analysis-section {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid #2563eb22;
+    }
+    .analysis-toggle {
+      font-size: 0.7rem;
+      color: #60a5fa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .analysis-toggle:hover { color: #93c5fd; }
+    .analysis-toggle .arrow {
+      font-size: 0.55rem;
+      transition: transform 0.15s;
+    }
+    .analysis-toggle .arrow.open { transform: rotate(90deg); }
+    .analysis-content {
+      margin-top: 0.3rem;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      line-height: 1.4;
+      display: none;
+    }
+    .analysis-content.open { display: block; }
+
+    /* Dashboard panel */
+    .dashboard-panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-top: 0.75rem;
+      text-align: left;
+    }
+    .dashboard-panel.hidden { display: none; }
+    .dashboard-panel h3 {
+      color: #94a3b8;
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .dashboard-panel h3 .toggle-arrow {
+      font-size: 0.6rem;
+      transition: transform 0.15s;
+    }
+    .dashboard-panel h3 .toggle-arrow.open { transform: rotate(90deg); }
+    .dashboard-content { display: none; }
+    .dashboard-content.open { display: block; }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .metric-card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    .metric-card .metric-label {
+      font-size: 0.6rem;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 0.2rem;
+    }
+    .metric-card .metric-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .metric-card .metric-value.success { color: #22c55e; }
+    .metric-card .metric-value.warning { color: #eab308; }
+    .metric-card .metric-value.error { color: #ef4444; }
+    .trace-list {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .trace-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.2rem 0;
+      border-bottom: 1px solid #1e293b;
+    }
+    .trace-item .trace-name { color: #60a5fa; }
+    .trace-item .trace-latency { color: #64748b; }
+    .trace-item .trace-status.ok { color: #22c55e; }
+    .trace-item .trace-status.error { color: #ef4444; }
+    .alert-list { margin-top: 0.35rem; }
+    .alert-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      margin-right: 0.25rem;
+      margin-bottom: 0.2rem;
+    }
+    .alert-badge.warn { background: #422006; color: #fbbf24; border: 1px solid #854d0e; }
+    .alert-badge.error { background: #450a0a; color: #fca5a5; border: 1px solid #991b1b; }
+    .otlp-status {
+      font-size: 0.65rem;
+      color: #475569;
+      margin-top: 0.35rem;
+      text-align: right;
+    }
+    .otlp-dot {
+      width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+      margin-right: 0.2rem;
+    }
+    .otlp-dot.active { background: #22c55e; }
+    .otlp-dot.inactive { background: #64748b; }
+
+    /* Dashboard renderer output styles */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+    .health-badge {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+    }
+    .health-badge.healthy { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+    .health-badge.unhealthy { background: #450a0a; color: #fca5a5; border: 1px solid #991b1b; }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .traces-section, .alerts-section { margin-top: 0.4rem; }
+    .traces-title {
+      font-size: 0.7rem;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 0.25rem;
+    }
+    .trace-op { color: #60a5fa; }
+    .trace-duration { color: #64748b; margin-left: auto; margin-right: 0.5rem; }
+    .trace-status { font-size: 0.65rem; }
+    .trace-status.ok { color: #22c55e; }
+    .trace-status.error { color: #ef4444; }
+    .alert-item {
+      font-size: 0.7rem;
+      color: #fbbf24;
+      padding: 0.15rem 0;
+    }
+
+    /* Responsive: stack on smaller screens */
+    @media (max-width: 800px) {
+      .app-container {
+        flex-direction: column;
+        align-items: center;
+      }
+      .chat-panel {
+        width: 100%;
+        max-width: 560px;
+        max-height: 360px;
+      }
+      .chat-messages {
+        min-height: 200px;
+      }
+      .metric-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="game-side">
+      <h1>Checkers</h1>
+      <p class="subtitle">Constraint-driven game logic with Directive</p>
+
+      <div class="game-info">
+        <div class="info-item">
+          <span id="player-dot" class="player-dot red"></span>
+          <span id="current-player" class="info-value">red</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Score</span>
+          <span id="score" class="info-value">Red 12 — Black 12</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Moves</span>
+          <span id="moves" class="info-value">0</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Captured</span>
+          <span id="captured-red" class="info-value" style="color: #CC3333;">0</span>
+          <span style="color: #64748b;">/</span>
+          <span id="captured-black" class="info-value" style="color: #999;">0</span>
+        </div>
+        <div class="info-item ai-info" id="ai-info" style="display: none;">
+          <span class="info-label">Tokens</span>
+          <span id="token-count" class="info-value">0</span>
+          <span id="circuit-dot" class="circuit-dot closed" title="Circuit: CLOSED"></span>
+        </div>
+      </div>
+
+      <div id="message" class="message">Red's turn. Select a piece to move.</div>
+
+      <div id="board" class="board"></div>
+
+      <div class="mode-toggle">
+        <button id="mode-2p" class="mode-btn active">2 Player</button>
+        <button id="mode-computer" class="mode-btn">Computer</button>
+        <button id="mode-ai" class="mode-btn">vs Claude</button>
+      </div>
+
+      <div id="api-key-section" class="api-key-section hidden">
+        <div class="api-key-row">
+          <input id="api-key-input" type="password" placeholder="Anthropic API key" autocomplete="off" />
+          <button id="api-key-save">Save</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="undo-btn" disabled aria-label="Undo last move (Cmd+Z)">Undo</button>
+        <button id="redo-btn" disabled aria-label="Redo last move (Cmd+Shift+Z)">Redo</button>
+        <button id="new-game" class="primary">New Game</button>
+      </div>
+
+      <div class="rules">
+        <h3>How It Works (Directive Flow)</h3>
+        <ul>
+          <li><strong>Facts</strong> — Board state, current player, selection</li>
+          <li><strong>Derivations</strong> — Valid moves, highlight squares, score (auto-tracked)</li>
+          <li><strong>Events</strong> — clickSquare sets selection + target</li>
+          <li><strong>Constraints</strong> — executeMove fires when selection is valid, kingPiece when on back row, gameOver when no moves left</li>
+          <li><strong>Resolvers</strong> — Apply move, handle multi-jump chains, switch turns</li>
+          <li><strong>Effects</strong> — Log moves and game results to console</li>
+        </ul>
+        <h3 style="margin-top: 0.75rem;">AI Adapter Features (all 12)</h3>
+        <ul>
+          <li><strong>Agent Orchestrator</strong> — Manages Claude API via generic RunFn + guardrails</li>
+          <li><strong>Memory</strong> — Sliding window (30 messages) with auto-summarization</li>
+          <li><strong>Output Guardrail</strong> — Validates move JSON schema before accepting</li>
+          <li><strong>Rate Limiter</strong> — 10 requests/min to prevent runaway API calls</li>
+          <li><strong>Circuit Breaker</strong> — After 3 failures, falls back to local minimax for 30s</li>
+          <li><strong>Cost Tracking</strong> — Token count + estimated cost at Haiku rates</li>
+          <li><strong>Streaming</strong> — Token-by-token chat delivery with length guardrail</li>
+          <li><strong>Multi-Agent</strong> — Parallel move + analysis agents</li>
+          <li><strong>Communication Bus</strong> — Agent-to-agent INFORM messages</li>
+          <li><strong>Semantic Cache</strong> — Hash-based position caching (0.98 threshold)</li>
+          <li><strong>Observability</strong> — Metrics, tracing, alerting dashboard</li>
+          <li><strong>OTLP Exporter</strong> — Periodic export to OpenTelemetry collector</li>
+        </ul>
+        <p class="directive-note">Multi-module: game + chat modules composed in one system. Claude mode uses directive/openai-agents adapters.</p>
+      </div>
+
+      <div id="ai-dashboard" class="dashboard-panel hidden">
+        <h3 id="dashboard-toggle">
+          <span class="toggle-arrow" id="dashboard-arrow">▶</span>
+          AI Dashboard
+        </h3>
+        <div id="dashboard-content" class="dashboard-content"></div>
+      </div>
+    </div>
+
+    <div id="chat-panel" class="chat-panel hidden">
+      <div class="chat-header">Claude Opponent</div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-input-bar">
+        <input id="chat-input" type="text" placeholder="Ask Claude something..." autocomplete="off" />
+        <button id="chat-send">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="game-over-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="modal-message">Red wins!</h2>
+      <p>Game over</p>
+      <button id="modal-new-game" class="primary">Play Again</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

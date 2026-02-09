@@ -227,7 +227,7 @@ function convertZustandResolvers<T>(
  * Wraps setState to trigger constraint evaluation after each state change.
  * Bi-directional sync: Zustand changes → Directive facts, Directive resolutions → Zustand state.
  */
-export function directiveMiddleware<T extends object>(
+export function createDirectiveMiddleware<T extends object>(
 	initializer: StateCreator<T>,
 	options: DirectiveMiddlewareOptions<T> = {}
 	// biome-ignore lint/suspicious/noExplicitAny: Return type is complex
@@ -324,6 +324,9 @@ export function directiveMiddleware<T extends object>(
 		return initialState;
 	};
 }
+
+/** @deprecated Use `createDirectiveMiddleware` instead. */
+export const directiveMiddleware = createDirectiveMiddleware;
 
 // ============================================================================
 // Helper Functions
