@@ -1,10 +1,10 @@
 /**
- * Helper functions for AI adapter — createRunFn, estimateCost, state queries.
+ * Helper functions for AI adapter — createRunner, estimateCost, state queries.
  */
 
 import type {
   AgentLike,
-  RunFn,
+  AgentRunner,
   RunResult,
   RunOptions,
   Message,
@@ -45,11 +45,11 @@ export function estimateCost(
 }
 
 // ============================================================================
-// createRunFn Helper
+// createRunner Helper
 // ============================================================================
 
-/** Options for creating a RunFn from buildRequest/parseResponse */
-export interface CreateRunFnOptions {
+/** Options for creating a AgentRunner from buildRequest/parseResponse */
+export interface CreateRunnerOptions {
   fetch?: typeof globalThis.fetch;
   buildRequest: (
     agent: AgentLike,
@@ -64,12 +64,12 @@ export interface CreateRunFnOptions {
 }
 
 /**
- * Create a RunFn from buildRequest/parseResponse helpers.
+ * Create a AgentRunner from buildRequest/parseResponse helpers.
  * Reduces ~50 lines of fetch boilerplate to ~20 lines of configuration.
  *
  * @example
  * ```typescript
- * const runClaude = createRunFn({
+ * const runClaude = createRunner({
  *   buildRequest: (agent, input) => ({
  *     url: "/api/claude",
  *     init: {
@@ -92,7 +92,7 @@ export interface CreateRunFnOptions {
  * });
  * ```
  */
-export function createRunFn(options: CreateRunFnOptions): RunFn {
+export function createRunner(options: CreateRunnerOptions): AgentRunner {
   const {
     fetch: fetchFn = globalThis.fetch,
     buildRequest,
@@ -125,7 +125,7 @@ export function createRunFn(options: CreateRunFnOptions): RunFn {
     const response = await fetchFn(url, fetchInit);
 
     if (!response.ok) {
-      throw new Error(`[Directive] RunFn request failed: ${response.status} ${response.statusText}`);
+      throw new Error(`[Directive] AgentRunner request failed: ${response.status} ${response.statusText}`);
     }
 
     const { text, totalTokens } = await parseResponse(response, messages);
@@ -145,11 +145,11 @@ export function createRunFn(options: CreateRunFnOptions): RunFn {
 }
 
 // ============================================================================
-// Pre-built RunFn Factories
+// Pre-built AgentRunner Factories
 // ============================================================================
 
-/** Options for createOpenAIRunFn */
-export interface OpenAIRunFnOptions {
+/** Options for createOpenAIRunner */
+export interface OpenAIRunnerOptions {
   apiKey: string;
   model?: string;
   baseURL?: string;
@@ -157,17 +157,17 @@ export interface OpenAIRunFnOptions {
 }
 
 /**
- * Create a RunFn for OpenAI-compatible APIs (OpenAI, Azure, Together, etc.)
+ * Create a AgentRunner for OpenAI-compatible APIs (OpenAI, Azure, Together, etc.)
  *
  * @example
  * ```typescript
- * const run = createOpenAIRunFn({ apiKey: process.env.OPENAI_API_KEY! });
- * const stack = createAgentStack({ run, agents: { ... } });
+ * const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+ * const stack = createAgentStack({ runner, agents: { ... } });
  * ```
  */
-export function createOpenAIRunFn(options: OpenAIRunFnOptions): RunFn {
+export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
   const { apiKey, model = "gpt-4o", baseURL = "https://api.openai.com/v1", fetch: fetchFn } = options;
-  return createRunFn({
+  return createRunner({
     fetch: fetchFn,
     buildRequest: (agent, _input, messages) => ({
       url: `${baseURL}/chat/completions`,
@@ -192,8 +192,8 @@ export function createOpenAIRunFn(options: OpenAIRunFnOptions): RunFn {
   });
 }
 
-/** Options for createAnthropicRunFn */
-export interface AnthropicRunFnOptions {
+/** Options for createAnthropicRunner */
+export interface AnthropicRunnerOptions {
   apiKey: string;
   model?: string;
   /** @default 4096 */
@@ -203,17 +203,17 @@ export interface AnthropicRunFnOptions {
 }
 
 /**
- * Create a RunFn for the Anthropic Messages API.
+ * Create a AgentRunner for the Anthropic Messages API.
  *
  * @example
  * ```typescript
- * const run = createAnthropicRunFn({ apiKey: process.env.ANTHROPIC_API_KEY! });
- * const stack = createAgentStack({ run, agents: { ... } });
+ * const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
+ * const stack = createAgentStack({ runner, agents: { ... } });
  * ```
  */
-export function createAnthropicRunFn(options: AnthropicRunFnOptions): RunFn {
+export function createAnthropicRunner(options: AnthropicRunnerOptions): AgentRunner {
   const { apiKey, model = "claude-sonnet-4-5-20250929", maxTokens = 4096, baseURL = "https://api.anthropic.com/v1", fetch: fetchFn } = options;
-  return createRunFn({
+  return createRunner({
     fetch: fetchFn,
     buildRequest: (agent, _input, messages) => ({
       url: `${baseURL}/messages`,
@@ -241,25 +241,25 @@ export function createAnthropicRunFn(options: AnthropicRunFnOptions): RunFn {
   });
 }
 
-/** Options for createOllamaRunFn */
-export interface OllamaRunFnOptions {
+/** Options for createOllamaRunner */
+export interface OllamaRunnerOptions {
   model?: string;
   baseURL?: string;
   fetch?: typeof globalThis.fetch;
 }
 
 /**
- * Create a RunFn for local Ollama inference.
+ * Create a AgentRunner for local Ollama inference.
  *
  * @example
  * ```typescript
- * const run = createOllamaRunFn({ model: "llama3" });
- * const stack = createAgentStack({ run, agents: { ... } });
+ * const runner = createOllamaRunner({ model: "llama3" });
+ * const stack = createAgentStack({ runner, agents: { ... } });
  * ```
  */
-export function createOllamaRunFn(options: OllamaRunFnOptions = {}): RunFn {
+export function createOllamaRunner(options: OllamaRunnerOptions = {}): AgentRunner {
   const { model = "llama3", baseURL = "http://localhost:11434", fetch: fetchFn } = options;
-  return createRunFn({
+  return createRunner({
     fetch: fetchFn,
     buildRequest: (agent, _input, messages) => ({
       url: `${baseURL}/api/chat`,

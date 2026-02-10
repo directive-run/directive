@@ -10,7 +10,7 @@
  * import { createAgentStack, parallel } from 'directive/openai-agents';
  *
  * const stack = createAgentStack({
- *   run: myRunFn,
+ *   runner: myAgentRunner,
  *   agents: { move: { agent: moveAgent, capabilities: ["move"] } },
  *   memory: { maxMessages: 30 },
  *   circuitBreaker: { failureThreshold: 3 },
@@ -24,8 +24,8 @@
  * @example Streaming
  * ```typescript
  * const stack = createAgentStack({
- *   run: myRunFn,
- *   streaming: { run: myStreamingRunFn },
+ *   runner: myAgentRunner,
+ *   streaming: { runner: myStreamingAgentRunner },
  *   agents: { chat: { agent: chatAgent, capabilities: ["chat"] } },
  * });
  *
@@ -36,7 +36,7 @@
  */
 
 import type {
-  RunFn,
+  AgentRunner,
   RunResult,
   AgentLike,
   Message,
@@ -52,7 +52,7 @@ import type {
 } from "./openai-agents-types.js";
 import type { RunCallOptions, AgentOrchestrator } from "./openai-agents.js";
 import type { Requirement } from "../core/types.js";
-import type { StreamingGuardrail, StreamChunk, StreamRunFn } from "./openai-agents-streaming.js";
+import type { StreamingGuardrail, StreamChunk, StreamRunner } from "./openai-agents-streaming.js";
 import type { AgentMemory, MemoryStrategyConfig } from "./openai-agents-memory.js";
 import type { CircuitBreaker, CircuitState, CircuitBreakerConfig } from "./plugins/circuit-breaker.js";
 import type { ObservabilityInstance, AlertConfig, TraceSpan, AggregatedMetric } from "./plugins/observability.js";
@@ -80,7 +80,7 @@ import { createStreamChannel, pipeThrough } from "./openai-agents-stream-channel
 // ============================================================================
 
 /** Callback-based streaming run function (e.g. for SSE-based LLM APIs) */
-export type StreamingCallbackRunFn = (
+export type StreamingCallbackRunner = (
 	agent: AgentLike,
 	input: string,
 	callbacks: {
@@ -93,10 +93,10 @@ export type StreamingCallbackRunFn = (
 ) => Promise<RunResult<unknown>>;
 
 export interface AgentStackConfig {
-	/** Required: base run function for agent execution */
-	run: RunFn;
+	/** Required: base runner for agent execution */
+	runner: AgentRunner;
 	/** Enables stack.stream() when provided */
-	streaming?: { run: StreamingCallbackRunFn };
+	streaming?: { runner: StreamingCallbackRunner };
 	/** Agent registry — required for multi-agent patterns */
 	agents?: AgentRegistry;
 	/** Named execution patterns (parallel, sequential, supervisor) */
@@ -372,13 +372,13 @@ class TokenStreamImpl<T = string> implements TokenStream<T> {
 /**
  * Create an agent stack that composes all AI adapter features.
  *
- * Only `run` is required. Every other feature activates when its config key
+ * Only `runner` is required. Every other feature activates when its config key
  * is present. Pass a pre-built instance to reuse existing objects, or pass
  * shorthand config to let the stack create them.
  */
 export function createAgentStack(config: AgentStackConfig): AgentStack {
 	const {
-		run: runFn,
+		runner,
 		streaming: streamingConfig,
 		agents: agentRegistry,
 		patterns,
@@ -441,7 +441,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 
 	// --- Core orchestrator ---
 	const orchestrator = createAgentOrchestrator({
-		run: runFn,
+		runner,
 		maxTokenBudget,
 		memory: memory ?? undefined,
 		circuitBreaker: circuitBreaker ?? undefined,
@@ -463,7 +463,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 	let multi: MultiAgentOrchestrator | null = null;
 	if (agentRegistry) {
 		multi = createMultiAgentOrchestrator({
-			runAgent: runFn,
+			runner,
 			agents: agentRegistry,
 			patterns,
 			debug,
@@ -471,9 +471,9 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 	}
 
 	// --- Streaming runner (only when streaming config is provided) ---
-	let streamingRunFn: StreamRunFn | null = null;
+	let streamingAgentRunner: StreamRunner | null = null;
 	if (streamingConfig) {
-		streamingRunFn = createStreamingRunner(streamingConfig.run, {
+		streamingAgentRunner = createStreamingRunner(streamingConfig.runner, {
 			streamingGuardrails: guardrails.streaming,
 		});
 	}
@@ -791,7 +791,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 		input: string,
 		options: StackStreamOptions = {},
 	): TokenStream<T> {
-		if (!streamingRunFn) {
+		if (!streamingAgentRunner) {
 			throw new Error("[AgentStack] Streaming not configured. Provide 'streaming' config.");
 		}
 
@@ -814,7 +814,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 		const span = obsInstance?.startSpan(`stream.${agentId}`);
 		const startTime = Date.now();
 
-		const { stream: chunkStream, result, abort: streamAbort } = streamingRunFn<T>(agent, input, {
+		const { stream: chunkStream, result, abort: streamAbort } = streamingAgentRunner<T>(agent, input, {
 			signal: abortController.signal,
 		});
 

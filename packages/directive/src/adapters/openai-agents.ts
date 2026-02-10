@@ -10,7 +10,7 @@
  * import { createAgentOrchestrator } from 'directive/ai'
  *
  * const orchestrator = createAgentOrchestrator({
- *   run: myRunFn,
+ *   runner: myAgentRunner,
  *   constraints: {
  *     needsExpertReview: {
  *       when: (facts) => facts.decision.confidence < 0.7,
@@ -56,7 +56,7 @@ export type {
   RunResult,
   Message,
   ToolCall,
-  RunFn,
+  AgentRunner,
   RunOptions,
   GuardrailFn,
   GuardrailContext,
@@ -89,7 +89,7 @@ import type {
   RunResult,
   Message,
   ToolCall,
-  RunFn,
+  AgentRunner,
   RunOptions,
   GuardrailFn,
   GuardrailContext,
@@ -137,14 +137,14 @@ export {
   isAgentRunning,
   hasPendingApprovals,
   estimateCost,
-  createRunFn,
-  createOpenAIRunFn,
-  createAnthropicRunFn,
-  createOllamaRunFn,
-  type CreateRunFnOptions,
-  type OpenAIRunFnOptions,
-  type AnthropicRunFnOptions,
-  type OllamaRunFnOptions,
+  createRunner,
+  createOpenAIRunner,
+  createAnthropicRunner,
+  createOllamaRunner,
+  type CreateRunnerOptions,
+  type OpenAIRunnerOptions,
+  type AnthropicRunnerOptions,
+  type OllamaRunnerOptions,
 } from "./openai-agents-helpers.js";
 
 // ============================================================================
@@ -294,9 +294,7 @@ interface PauseBudgetExceededReq extends Requirement {
 /** Orchestrator options */
 export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Function to run an agent */
-  run?: RunFn;
-  /** @deprecated Use `run` instead */
-  runAgent?: RunFn;
+  runner?: AgentRunner;
   /** Additional facts schema */
   factsSchema?: Record<string, { _type: unknown; _validators: [] }>;
   /** Initialize additional facts */
@@ -530,7 +528,7 @@ function calculateAgentRetryDelay(
 
 /** Execute an agent run with retry support */
 async function executeAgentWithRetry<T>(
-  runAgent: RunFn,
+  runner: AgentRunner,
   agent: AgentLike,
   input: string,
   options: RunOptions | undefined,
@@ -543,7 +541,7 @@ async function executeAgentWithRetry<T>(
   let lastError: Error | undefined;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await runAgent<T>(agent, input, options);
+      return await runner<T>(agent, input, options);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -567,10 +565,10 @@ async function executeAgentWithRetry<T>(
  *
  * @example
  * ```typescript
- * import { run } from '@openai/agents'
+ * import { run as runner } from '@openai/agents'
  *
  * const orchestrator = createAgentOrchestrator({
- *   runAgent: run,
+ *   runner,
  *   constraints: {
  *     escalateToExpert: {
  *       when: (facts) => facts.agent.output?.confidence < 0.7,
@@ -610,8 +608,7 @@ export function createAgentOrchestrator<
   F extends Record<string, unknown> = Record<string, never>
 >(options: OrchestratorOptions<F>): AgentOrchestrator<F> {
   const {
-    run: runOption,
-    runAgent: runAgentOption,
+    runner,
     factsSchema = {},
     init,
     constraints = {},
@@ -629,11 +626,9 @@ export function createAgentOrchestrator<
     circuitBreaker,
   } = options;
 
-  const runAgentResolved = runOption ?? runAgentOption;
-  if (!runAgentResolved) {
-    throw new Error("[Directive] createAgentOrchestrator requires a 'run' function.");
+  if (!runner) {
+    throw new Error("[Directive] createAgentOrchestrator requires a 'runner' function.");
   }
-  const runAgent: RunFn = runAgentResolved;
 
   // Enforce approval workflow configuration - require either auto-approve or callback
   if (!autoApproveToolCalls && !onApprovalRequest) {
@@ -864,7 +859,7 @@ export function createAgentOrchestrator<
     });
 
     // Run the agent with retry support
-    const result = await executeAgentWithRetry<T>(runAgent, agent, input, {
+    const result = await executeAgentWithRetry<T>(runner, agent, input, {
       ...opts,
       signal: opts?.signal,
       onMessage: (message) => {
@@ -1202,7 +1197,7 @@ export function createAgentOrchestrator<
           });
 
           // Run agent with streaming callbacks and retry support
-          const result = await executeAgentWithRetry<T>(runAgent, agent, processedInput, {
+          const result = await executeAgentWithRetry<T>(runner, agent, processedInput, {
             signal: abortController.signal,
             onMessage: (message) => {
               const currentConversation = getConversation(system.facts);
@@ -1546,7 +1541,7 @@ export interface OrchestratorBuilder<F extends Record<string, unknown>> {
 
   /** Build the orchestrator */
   build(options: {
-    runAgent: RunFn;
+    runner: AgentRunner;
     autoApproveToolCalls?: boolean;
     onApprovalRequest?: (request: ApprovalRequest) => void;
   }): AgentOrchestrator<F>;
@@ -1566,7 +1561,7 @@ export interface OrchestratorBuilder<F extends Record<string, unknown>> {
  *   .withOutputGuardrail('toxicity', createModerationGuardrail({ ... }))
  *   .withBudget(10000)
  *   .withDebug()
- *   .build({ runAgent: run });
+ *   .build({ runner });
  * ```
  */
 export function createOrchestratorBuilder<
@@ -1648,7 +1643,7 @@ export function createOrchestratorBuilder<
 
     build(options) {
       return createAgentOrchestrator<F>({
-        runAgent: options.runAgent,
+        runner: options.runner,
         autoApproveToolCalls: options.autoApproveToolCalls,
         onApprovalRequest: options.onApprovalRequest,
         constraints,
@@ -1670,7 +1665,7 @@ export function createOrchestratorBuilder<
   return builder;
 }
 
-// (createRunFn moved to openai-agents-helpers.ts)
+// (createRunner moved to openai-agents-helpers.ts)
 
 // ============================================================================
 // Re-exports from Sub-modules
@@ -1717,7 +1712,7 @@ export {
   type DoneChunk,
   type ErrorChunk,
   type StreamRunOptions,
-  type StreamRunFn,
+  type StreamRunner,
   type StreamingRunResult,
   type StreamingGuardrail,
   type StreamingGuardrailResult,
@@ -1860,7 +1855,7 @@ export {
   type StackStreamOptions,
   type StructuredRunOptions,
   type TokenStream,
-  type StreamingCallbackRunFn,
+  type StreamingCallbackRunner,
 } from "./openai-agents-stack.js";
 
 // AI Bridge — Sync AgentStack state into Directive system

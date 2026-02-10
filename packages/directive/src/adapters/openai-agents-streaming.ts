@@ -151,7 +151,7 @@ export interface StreamRunOptions {
 }
 
 /** Stream run function type (mirrors OpenAI Agents streaming API) */
-export type StreamRunFn = <T = unknown>(
+export type StreamRunner = <T = unknown>(
   agent: AgentLike,
   input: string,
   options?: StreamRunOptions
@@ -291,11 +291,11 @@ class StreamBuffer<T> {
  * Create a streaming runner that wraps a base run function.
  * This is used internally by the orchestrator but can be used standalone.
  *
- * @param baseRunFn - The underlying non-streaming run function
+ * @param baseRunner - The underlying non-streaming runner
  * @param options - Configuration options
  */
 export function createStreamingRunner(
-  baseRunFn: (
+  baseRunner: (
     agent: AgentLike,
     input: string,
     callbacks: {
@@ -309,7 +309,7 @@ export function createStreamingRunner(
   options: {
     streamingGuardrails?: StreamingGuardrail[];
   } = {}
-): StreamRunFn {
+): StreamRunner {
   const { streamingGuardrails = [] } = options;
 
   return <T>(
@@ -395,7 +395,7 @@ export function createStreamingRunner(
       await buffer.push({ type: "progress", phase: "starting", message: "Starting agent" });
 
       try {
-        const result = await baseRunFn(agent, input, {
+        const result = await baseRunner(agent, input, {
           signal: abortController.signal,
           onToken: async (token) => {
             if (stopped) return;
