@@ -3,6 +3,7 @@ export const navigation = [
     title: 'Introduction',
     links: [
       { title: 'Why Directive', href: '/docs/why-directive' },
+      { title: 'Philosophy', href: '/docs/philosophy' },
       { title: 'Quick Start', href: '/docs/quick-start' },
       { title: 'Installation', href: '/docs/installation' },
       { title: 'Core Concepts', href: '/docs/core-concepts' },
@@ -64,11 +65,13 @@ export const navigation = [
   {
     title: 'AI & Agents',
     links: [
-      { title: 'OpenAI Agents', href: '/docs/ai/openai-agents' },
+      { title: 'Orchestrator', href: '/docs/ai/orchestrator' },
+      { title: 'Agent Stack', href: '/docs/ai/agent-stack' },
       { title: 'Streaming', href: '/docs/ai/streaming' },
       { title: 'Multi-Agent', href: '/docs/ai/multi-agent' },
       { title: 'MCP Integration', href: '/docs/ai/mcp' },
       { title: 'Guardrails', href: '/docs/ai/guardrails' },
+      { title: 'OpenAI Agents', href: '/docs/ai/openai-agents' },
     ],
   },
   {
