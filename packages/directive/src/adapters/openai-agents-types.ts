@@ -43,7 +43,7 @@ export interface ToolCall {
 }
 
 /** Run function type */
-export type RunFn = <T = unknown>(
+export type AgentRunner = <T = unknown>(
   agent: AgentLike,
   input: string,
   options?: RunOptions

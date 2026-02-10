@@ -20,10 +20,10 @@ import {
 	createToolGuardrail,
 	createOutputSchemaGuardrail,
 	createOutputTypeGuardrail,
-	createRunFn,
+	createRunner,
 	GuardrailError,
 	type AgentLike,
-	type RunFn,
+	type AgentRunner,
 	type RunResult,
 	type OutputGuardrailData,
 } from "../adapters/openai-agents.js";
@@ -42,13 +42,13 @@ function makeRunResult<T>(finalOutput: T, totalTokens = 10): RunResult<T> {
 	return { finalOutput, messages: [], toolCalls: [], totalTokens };
 }
 
-function createMockRunFn(
+function createMockRunner(
 	handler?: (agent: AgentLike, input: string) => unknown,
-): RunFn {
+): AgentRunner {
 	return vi.fn(async <T = unknown>(agent: AgentLike, input: string) => {
 		const output = handler ? handler(agent, input) : `response from ${agent.name}`;
 		return makeRunResult<T>(output as T);
-	}) as unknown as RunFn;
+	}) as unknown as AgentRunner;
 }
 
 // ============================================================================
@@ -58,9 +58,9 @@ function createMockRunFn(
 describe("createAgentOrchestrator", () => {
 	describe("basic execution", () => {
 		it("should run an agent and return result", async () => {
-			const mockRun = createMockRunFn();
+			const mockRun = createMockRunner();
 			const orchestrator = createAgentOrchestrator({
-				runAgent: mockRun,
+				runner: mockRun,
 				autoApproveToolCalls: true,
 			});
 
@@ -73,7 +73,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should update agent state during run", async () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: true,
 			});
 
@@ -89,7 +89,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should track token usage", async () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: true,
 			});
 
@@ -102,7 +102,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should reset state correctly", async () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: true,
 			});
 
@@ -120,7 +120,7 @@ describe("createAgentOrchestrator", () => {
 		it("should default autoApproveToolCalls to true (no throw without callback)", () => {
 			expect(() =>
 				createAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 				}),
 			).not.toThrow();
 		});
@@ -128,7 +128,7 @@ describe("createAgentOrchestrator", () => {
 		it("should throw when autoApproveToolCalls is explicitly false and no callback", () => {
 			expect(() =>
 				createAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					autoApproveToolCalls: false,
 				}),
 			).toThrow("autoApproveToolCalls is false but no onApprovalRequest callback provided");
@@ -137,7 +137,7 @@ describe("createAgentOrchestrator", () => {
 		it("should accept when autoApproveToolCalls is true without callback", () => {
 			expect(() =>
 				createAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					autoApproveToolCalls: true,
 				}),
 			).not.toThrow();
@@ -146,7 +146,7 @@ describe("createAgentOrchestrator", () => {
 		it("should accept when callback is provided", () => {
 			expect(() =>
 				createAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					autoApproveToolCalls: false,
 					onApprovalRequest: () => {},
 				}),
@@ -155,7 +155,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should track rejection with reason and timestamp", () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: false,
 				onApprovalRequest: () => {},
 			});
@@ -183,7 +183,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should track rejection without reason", () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: false,
 				onApprovalRequest: () => {},
 			});
@@ -208,7 +208,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should ignore approve/reject for non-pending IDs", () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: false,
 				onApprovalRequest: () => {},
 			});
@@ -226,7 +226,7 @@ describe("createAgentOrchestrator", () => {
 		it("should track token usage and trigger constraint when budget exceeded", async () => {
 			let pauseResolverCalled = false;
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(() => "response"),
+				runner: createMockRunner(() => "response"),
 				autoApproveToolCalls: true,
 				maxTokenBudget: 15,
 				// Add a custom resolver to verify constraint triggers
@@ -254,7 +254,7 @@ describe("createAgentOrchestrator", () => {
 
 		it("should allow runs when under budget", async () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(() => "response"),
+				runner: createMockRunner(() => "response"),
 				autoApproveToolCalls: true,
 				maxTokenBudget: 100,
 			});
@@ -270,7 +270,7 @@ describe("createAgentOrchestrator", () => {
 	describe("pause and resume", () => {
 		it("should pause and resume correctly", () => {
 			const orchestrator = createAgentOrchestrator({
-				runAgent: createMockRunFn(),
+				runner: createMockRunner(),
 				autoApproveToolCalls: true,
 			});
 
@@ -293,7 +293,7 @@ describe("input guardrails", () => {
 	it("should pass valid input through guardrails", async () => {
 		const guardrail = vi.fn(async () => ({ passed: true }));
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 			guardrails: {
 				input: [guardrail],
@@ -322,7 +322,7 @@ describe("input guardrails", () => {
 			reason: "Contains bad content",
 		}));
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 			guardrails: {
 				input: [guardrail],
@@ -350,7 +350,7 @@ describe("input guardrails", () => {
 		});
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 			guardrails: {
 				input: [guardrail1, guardrail2, guardrail3],
@@ -365,7 +365,7 @@ describe("input guardrails", () => {
 
 	it("should support named guardrails", async () => {
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 			guardrails: {
 				input: [
@@ -398,7 +398,7 @@ describe("output guardrails", () => {
 		});
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(() => "good output"),
+			runner: createMockRunner(() => "good output"),
 			autoApproveToolCalls: true,
 			guardrails: {
 				output: [outputGuardrail],
@@ -429,7 +429,7 @@ describe("output guardrails", () => {
 		}));
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(() => "SSN: 123-45-6789"),
+			runner: createMockRunner(() => "SSN: 123-45-6789"),
 			autoApproveToolCalls: true,
 			guardrails: {
 				output: [outputGuardrail],
@@ -760,14 +760,14 @@ describe("GuardrailError", () => {
 
 describe("createOrchestratorBuilder", () => {
 	it("should build orchestrator with fluent API", () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 		const inputGuardrail = vi.fn(async () => ({ passed: true }));
 
 		// Builder creates orchestrator with auto-approve by default
 		const orchestrator = createOrchestratorBuilder()
 			.withInputGuardrail("check", inputGuardrail)
 			.build({
-				runAgent: mockRun,
+				runner: mockRun,
 				autoApproveToolCalls: true,
 			});
 
@@ -776,7 +776,7 @@ describe("createOrchestratorBuilder", () => {
 	});
 
 	it("should accumulate multiple guardrails", async () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 		const guard1 = vi.fn(async () => ({ passed: true }));
 		const guard2 = vi.fn(async () => ({ passed: true }));
 
@@ -784,7 +784,7 @@ describe("createOrchestratorBuilder", () => {
 			.withInputGuardrail("first", guard1)
 			.withInputGuardrail("second", guard2)
 			.build({
-				runAgent: mockRun,
+				runner: mockRun,
 				autoApproveToolCalls: true,
 			});
 
@@ -795,7 +795,7 @@ describe("createOrchestratorBuilder", () => {
 	});
 
 	it("should support constraints via builder", async () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 
 		// Create orchestrator with a budget constraint
 		const orchestrator = createOrchestratorBuilder()
@@ -805,7 +805,7 @@ describe("createOrchestratorBuilder", () => {
 			})
 			.withBudget(100)
 			.build({
-				runAgent: mockRun,
+				runner: mockRun,
 				autoApproveToolCalls: true,
 			});
 
@@ -826,10 +826,10 @@ describe("error handling", () => {
 	it("should throw when agent fails", async () => {
 		const failingRun = vi.fn(async () => {
 			throw new Error("Agent crashed");
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: failingRun,
+			runner: failingRun,
 			autoApproveToolCalls: true,
 		});
 
@@ -846,11 +846,11 @@ describe("error handling", () => {
 				throw new Error("Transient failure");
 			}
 			return makeRunResult("success after retry");
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const onRetry = vi.fn();
 		const orchestrator = createAgentOrchestrator({
-			runAgent: transientFailRun,
+			runner: transientFailRun,
 			autoApproveToolCalls: true,
 			agentRetry: {
 				attempts: 3,
@@ -871,10 +871,10 @@ describe("error handling", () => {
 		const nonRetryableRun = vi.fn(async () => {
 			attempts++;
 			throw new Error("Non-retryable error");
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: nonRetryableRun,
+			runner: nonRetryableRun,
 			autoApproveToolCalls: true,
 			agentRetry: {
 				attempts: 3,
@@ -893,7 +893,7 @@ describe("error handling", () => {
 		});
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 			guardrails: {
 				input: [throwingGuardrail],
@@ -912,7 +912,7 @@ describe("error handling", () => {
 describe("dispose", () => {
 	it("should clean up orchestrator", () => {
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 		});
 
@@ -931,7 +931,7 @@ describe("lifecycle hooks", () => {
 		const onAgentComplete = vi.fn();
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(() => "test output"),
+			runner: createMockRunner(() => "test output"),
 			autoApproveToolCalls: true,
 			hooks: {
 				onAgentStart,
@@ -967,7 +967,7 @@ describe("lifecycle hooks", () => {
 		const onGuardrailCheck = vi.fn();
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			autoApproveToolCalls: true,
 			guardrails: {
 				input: [
@@ -1007,13 +1007,13 @@ describe("lifecycle hooks", () => {
 		const onAgentRetry = vi.fn();
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: vi.fn(async () => {
+			runner: vi.fn(async () => {
 				attempts++;
 				if (attempts < 2) {
 					throw new Error("Transient error");
 				}
 				return makeRunResult("success");
-			}) as unknown as RunFn,
+			}) as unknown as AgentRunner,
 			autoApproveToolCalls: true,
 			agentRetry: {
 				attempts: 2,
@@ -1054,13 +1054,13 @@ describe("memory integration", () => {
 		memory.addMessage({ role: "assistant", content: "previous answer" });
 
 		let capturedAgent: AgentLike | undefined;
-		const mockRun: RunFn = vi.fn(async <T = unknown>(agent: AgentLike, _input: string) => {
+		const mockRun: AgentRunner = vi.fn(async <T = unknown>(agent: AgentLike, _input: string) => {
 			capturedAgent = agent;
 			return makeRunResult<T>("response" as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			memory,
 		});
 
@@ -1078,7 +1078,7 @@ describe("memory integration", () => {
 			strategyConfig: { maxMessages: 50 },
 		});
 
-		const mockRun: RunFn = vi.fn(async <T = unknown>(_agent: AgentLike, _input: string) => {
+		const mockRun: AgentRunner = vi.fn(async <T = unknown>(_agent: AgentLike, _input: string) => {
 			return {
 				finalOutput: "response" as T,
 				messages: [
@@ -1088,10 +1088,10 @@ describe("memory integration", () => {
 				toolCalls: [],
 				totalTokens: 10,
 			};
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			memory,
 		});
 
@@ -1115,7 +1115,7 @@ describe("memory integration", () => {
 		originalAgent.instructions = "Be helpful";
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			memory,
 		});
 
@@ -1139,7 +1139,7 @@ describe("circuit breaker integration", () => {
 		});
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			circuitBreaker: cb,
 		});
 
@@ -1160,10 +1160,10 @@ describe("circuit breaker integration", () => {
 
 		const failingRun = vi.fn(async () => {
 			throw new Error("API down");
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: failingRun,
+			runner: failingRun,
 			circuitBreaker: cb,
 		});
 
@@ -1187,7 +1187,7 @@ describe("per-call guardrail overrides", () => {
 		}));
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			guardrails: {
 				output: [outputGuardrail],
 			},
@@ -1210,7 +1210,7 @@ describe("per-call guardrail overrides", () => {
 		const perCallGuardrail = vi.fn(async () => ({ passed: true }));
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			guardrails: {
 				output: [defaultGuardrail],
 			},
@@ -1231,7 +1231,7 @@ describe("per-call guardrail overrides", () => {
 		}));
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			guardrails: {
 				input: [inputGuardrail],
 			},
@@ -1249,7 +1249,7 @@ describe("per-call guardrail overrides", () => {
 		const outputGuardrail = vi.fn(async () => ({ passed: true }));
 
 		const orchestrator = createAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			guardrails: {
 				output: [outputGuardrail],
 			},
@@ -1261,11 +1261,11 @@ describe("per-call guardrail overrides", () => {
 });
 
 // ============================================================================
-// createRunFn
+// createRunner
 // ============================================================================
 
-describe("createRunFn", () => {
-	it("should create a working RunFn from buildRequest/parseResponse", async () => {
+describe("createRunner", () => {
+	it("should create a working AgentRunner from buildRequest/parseResponse", async () => {
 		const mockFetch = vi.fn(async () => ({
 			ok: true,
 			json: async () => ({ text: "hello world", tokens: 42 }),
@@ -1273,7 +1273,7 @@ describe("createRunFn", () => {
 			statusText: "OK",
 		})) as unknown as typeof fetch;
 
-		const runFn = createRunFn({
+		const runner = createRunner({
 			fetch: mockFetch,
 			buildRequest: (agent, input) => ({
 				url: "https://api.example.com/chat",
@@ -1288,7 +1288,7 @@ describe("createRunFn", () => {
 			},
 		});
 
-		const result = await runFn(makeAgent("test"), "hello");
+		const result = await runner(makeAgent("test"), "hello");
 
 		expect(result.finalOutput).toBe("hello world");
 		expect(result.totalTokens).toBe(42);
@@ -1305,13 +1305,13 @@ describe("createRunFn", () => {
 			statusText: "Internal Server Error",
 		})) as unknown as typeof fetch;
 
-		const runFn = createRunFn({
+		const runner = createRunner({
 			fetch: mockFetch,
 			buildRequest: () => ({ url: "https://api.example.com/chat", init: {} }),
 			parseResponse: async () => ({ text: "", totalTokens: 0 }),
 		});
 
-		await expect(runFn(makeAgent("test"), "hello")).rejects.toThrow("500");
+		await expect(runner(makeAgent("test"), "hello")).rejects.toThrow("500");
 	});
 
 	it("should parse JSON output by default", async () => {
@@ -1322,7 +1322,7 @@ describe("createRunFn", () => {
 			statusText: "OK",
 		})) as unknown as typeof fetch;
 
-		const runFn = createRunFn({
+		const runner = createRunner({
 			fetch: mockFetch,
 			buildRequest: () => ({ url: "/api/chat", init: {} }),
 			parseResponse: async (res) => {
@@ -1331,7 +1331,7 @@ describe("createRunFn", () => {
 			},
 		});
 
-		const result = await runFn<{ answer: string }>(makeAgent("test"), "hello");
+		const result = await runner<{ answer: string }>(makeAgent("test"), "hello");
 		expect(result.finalOutput).toEqual({ answer: "42" });
 	});
 
@@ -1343,7 +1343,7 @@ describe("createRunFn", () => {
 			statusText: "OK",
 		})) as unknown as typeof fetch;
 
-		const runFn = createRunFn({
+		const runner = createRunner({
 			fetch: mockFetch,
 			buildRequest: () => ({ url: "/api/chat", init: {} }),
 			parseResponse: async (res) => {
@@ -1356,7 +1356,7 @@ describe("createRunFn", () => {
 			},
 		});
 
-		const result = await runFn(makeAgent("test"), "hello");
+		const result = await runner(makeAgent("test"), "hello");
 		expect(result.finalOutput).toEqual({ format: "custom-format", value: 42 });
 	});
 });

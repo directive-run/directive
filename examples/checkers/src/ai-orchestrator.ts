@@ -3,7 +3,7 @@
  *
  * Composes ALL 12 directive AI adapter features via createAgentStack():
  *
- * 1.  Agent Orchestrator      — Manages Claude API via generic RunFn + guardrails
+ * 1.  Agent Orchestrator      — Manages Claude API via generic AgentRunner + guardrails
  * 2.  Memory                  — Sliding window (30 messages) with auto-summarization
  * 3.  Output Guardrail        — Validates move JSON schema before accepting
  * 4.  Rate Limiter            — 10 requests/min to prevent runaway API calls

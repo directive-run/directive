@@ -16,7 +16,7 @@ import {
 	createAgentStack,
 	type AgentStackConfig,
 } from "../adapters/openai-agents-stack.js";
-import type { AgentLike, RunFn, RunResult } from "../adapters/openai-agents.js";
+import type { AgentLike, AgentRunner, RunResult } from "../adapters/openai-agents.js";
 import type { AgentRegistry } from "../adapters/openai-agents-multi.js";
 import { createCircuitBreaker } from "../adapters/plugins/circuit-breaker.js";
 import { createObservability } from "../adapters/plugins/observability.js";
@@ -35,13 +35,13 @@ function makeRunResult<T>(finalOutput: T, totalTokens = 10): RunResult<T> {
 	return { finalOutput, messages: [], toolCalls: [], totalTokens };
 }
 
-function createMockRunFn(
+function createMockRunner(
 	handler?: (agent: AgentLike, input: string) => unknown,
-): RunFn {
+): AgentRunner {
 	return vi.fn(async <T = unknown>(agent: AgentLike, input: string) => {
 		const output = handler ? handler(agent, input) : `response from ${agent.name}`;
 		return makeRunResult<T>(output as T);
-	}) as unknown as RunFn;
+	}) as unknown as AgentRunner;
 }
 
 const testAgents: AgentRegistry = {
@@ -60,7 +60,7 @@ describe("createAgentStack", () => {
 
 	describe("minimal config", () => {
 		it("should create stack with only run function", () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 
 			expect(stack.orchestrator).toBeDefined();
 			expect(stack.multi).toBeNull();
@@ -70,14 +70,14 @@ describe("createAgentStack", () => {
 		});
 
 		it("should throw when calling run without agents", async () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 
 			await expect(stack.run("move", "hello")).rejects.toThrow("No agents registered");
 		});
 
 		it("should throw when calling stream without streaming config", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 			});
 
@@ -87,9 +87,9 @@ describe("createAgentStack", () => {
 
 	describe("run()", () => {
 		it("should run agent by ID and return result", async () => {
-			const mockRun = createMockRunFn();
+			const mockRun = createMockRunner();
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 			});
 
@@ -101,7 +101,7 @@ describe("createAgentStack", () => {
 
 		it("should throw for unknown agent ID", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 			});
 
@@ -110,7 +110,7 @@ describe("createAgentStack", () => {
 
 		it("should track total tokens across runs", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 			});
 
@@ -124,9 +124,9 @@ describe("createAgentStack", () => {
 
 	describe("cache integration", () => {
 		it("should cache results and return cached on second call", async () => {
-			const mockRun = createMockRunFn(() => ({ answer: 42 }));
+			const mockRun = createMockRunner(() => ({ answer: 42 }));
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 				cache: { threshold: 0.98, maxSize: 100, ttlMs: 60_000 },
 			});
@@ -144,9 +144,9 @@ describe("createAgentStack", () => {
 		});
 
 		it("should skip cache when cache: false is passed", async () => {
-			const mockRun = createMockRunFn(() => "fresh");
+			const mockRun = createMockRunner(() => "fresh");
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 				cache: { threshold: 0.98, maxSize: 100, ttlMs: 60_000 },
 			});
@@ -162,7 +162,7 @@ describe("createAgentStack", () => {
 	describe("observability integration", () => {
 		it("should auto-wire observability when config is provided", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				observability: { serviceName: "test-service" },
 			});
@@ -183,7 +183,7 @@ describe("createAgentStack", () => {
 			});
 
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				observability: preBuiltObs,
 			});
@@ -195,7 +195,7 @@ describe("createAgentStack", () => {
 	describe("circuit breaker integration", () => {
 		it("should auto-wire circuit breaker from shorthand config", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 5000 },
 			});
@@ -211,7 +211,7 @@ describe("createAgentStack", () => {
 			});
 
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				circuitBreaker: preBuiltCB,
 			});
@@ -224,7 +224,7 @@ describe("createAgentStack", () => {
 	describe("bus integration", () => {
 		it("should auto-wire message bus and publish on run", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				bus: { maxHistory: 50 },
 			});
@@ -240,7 +240,7 @@ describe("createAgentStack", () => {
 		it("should accept pre-built message bus", async () => {
 			const preBuiltBus = createMessageBus({ maxHistory: 100 });
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				bus: preBuiltBus,
 			});
@@ -252,7 +252,7 @@ describe("createAgentStack", () => {
 	describe("memory integration", () => {
 		it("should auto-wire memory from shorthand config", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				memory: { maxMessages: 20 },
 			});
@@ -265,7 +265,7 @@ describe("createAgentStack", () => {
 	describe("rate limiting", () => {
 		it("should reject when rate limit exceeded", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				rateLimit: { maxPerMinute: 2 },
 			});
@@ -281,7 +281,7 @@ describe("createAgentStack", () => {
 	describe("getState()", () => {
 		it("should aggregate state from all features", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				cache: { threshold: 0.98, maxSize: 100, ttlMs: 60_000 },
 				circuitBreaker: { failureThreshold: 3 },
@@ -302,7 +302,7 @@ describe("createAgentStack", () => {
 		});
 
 		it("should return defaults for disabled features", () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 
 			const state = stack.getState();
 			expect(state.circuitState).toBe("CLOSED");
@@ -319,7 +319,7 @@ describe("createAgentStack", () => {
 	describe("reset()", () => {
 		it("should reset token count and all features", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				cache: { threshold: 0.98, maxSize: 100, ttlMs: 60_000 },
 				bus: { maxHistory: 100 },
@@ -338,7 +338,7 @@ describe("createAgentStack", () => {
 	describe("dispose()", () => {
 		it("should dispose without errors", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				observability: { serviceName: "test" },
 			});
@@ -349,7 +349,7 @@ describe("createAgentStack", () => {
 
 	describe("runPattern()", () => {
 		it("should throw without agents/patterns configured", async () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 
 			await expect(stack.runPattern("test", "input")).rejects.toThrow(
 				"No agents/patterns configured",
@@ -359,9 +359,9 @@ describe("createAgentStack", () => {
 
 	describe("all features enabled", () => {
 		it("should create stack with every feature", async () => {
-			const mockRun = createMockRunFn();
+			const mockRun = createMockRunner();
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 				memory: { maxMessages: 30 },
 				circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30000 },
@@ -391,7 +391,7 @@ describe("createAgentStack", () => {
 
 	describe("cache error recovery", () => {
 		it("should treat cache lookup error as miss and continue", async () => {
-			const mockRun = createMockRunFn(() => "fresh-result");
+			const mockRun = createMockRunner(() => "fresh-result");
 			const brokenCache = createSemanticCache({
 				embedder: createTestEmbedder(),
 				similarityThreshold: 0.98,
@@ -402,7 +402,7 @@ describe("createAgentStack", () => {
 			brokenCache.lookup = async () => { throw new Error("embedder exploded"); };
 
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 				cache: brokenCache,
 			});
@@ -413,7 +413,7 @@ describe("createAgentStack", () => {
 		});
 
 		it("should survive cache store failure and still return result", async () => {
-			const mockRun = createMockRunFn(() => "good-result");
+			const mockRun = createMockRunner(() => "good-result");
 			const brokenCache = createSemanticCache({
 				embedder: createTestEmbedder(),
 				similarityThreshold: 0.98,
@@ -424,7 +424,7 @@ describe("createAgentStack", () => {
 			brokenCache.store = async () => { throw new Error("store failed"); };
 
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 				cache: brokenCache,
 			});
@@ -437,28 +437,28 @@ describe("createAgentStack", () => {
 	describe("config validation", () => {
 		it("should reject invalid cache.threshold", () => {
 			expect(() => createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				cache: { threshold: 1.5 },
 			})).toThrow("cache.threshold must be between 0 and 1");
 		});
 
 		it("should reject invalid cache.maxSize", () => {
 			expect(() => createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				cache: { maxSize: 0 },
 			})).toThrow("cache.maxSize must be at least 1");
 		});
 
 		it("should reject invalid circuitBreaker.failureThreshold", () => {
 			expect(() => createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				circuitBreaker: { failureThreshold: 0 },
 			})).toThrow("circuitBreaker.failureThreshold must be at least 1");
 		});
 
 		it("should reject invalid rateLimit.maxPerMinute", () => {
 			expect(() => createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				rateLimit: { maxPerMinute: 0 },
 			})).toThrow("rateLimit.maxPerMinute must be a positive finite number");
 		});
@@ -467,7 +467,7 @@ describe("createAgentStack", () => {
 	describe("error messages", () => {
 		it("should show available agents when agent not found", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 			});
 
@@ -478,7 +478,7 @@ describe("createAgentStack", () => {
 	describe("rate limit state", () => {
 		it("should expose remaining rate limit in getState", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				rateLimit: { maxPerMinute: 5 },
 			});
@@ -493,7 +493,7 @@ describe("createAgentStack", () => {
 		});
 
 		it("should return null for rateLimitRemaining when not configured", () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 			expect(stack.getState().rateLimitRemaining).toBeNull();
 		});
 	});
@@ -524,7 +524,7 @@ describe("createAgentStack", () => {
 			};
 
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: agentsWithGuardrails,
 			});
 
@@ -558,7 +558,7 @@ describe("createAgentStack", () => {
 			};
 
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: agentsWithGuardrails,
 			});
 
@@ -571,13 +571,13 @@ describe("createAgentStack", () => {
 	describe("concurrent runs", () => {
 		it("should handle parallel runs without corruption", async () => {
 			let callCount = 0;
-			const mockRun = createMockRunFn(() => {
+			const mockRun = createMockRunner(() => {
 				callCount++;
 				return `result-${callCount}`;
 			});
 
 			const stack = createAgentStack({
-				run: mockRun,
+				runner: mockRun,
 				agents: testAgents,
 			});
 
@@ -594,7 +594,7 @@ describe("createAgentStack", () => {
 	describe("double dispose", () => {
 		it("should handle double dispose without errors", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				observability: { serviceName: "test" },
 			});
@@ -607,7 +607,7 @@ describe("createAgentStack", () => {
 	describe("approve/reject", () => {
 		it("should expose approve and reject methods", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 			});
 
@@ -617,7 +617,7 @@ describe("createAgentStack", () => {
 
 		it("should delegate approve/reject to orchestrator", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 			});
 
@@ -631,7 +631,7 @@ describe("createAgentStack", () => {
 	describe("naming aliases", () => {
 		it("should expose observability, messageBus, coordinator aliases", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				observability: { serviceName: "test" },
 				bus: { maxHistory: 10 },
@@ -650,7 +650,7 @@ describe("createAgentStack", () => {
 
 		it("should have coordinator=null when no agents registered", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 			});
 
 			expect(stack.coordinator).toBeNull();
@@ -664,7 +664,7 @@ describe("createAgentStack", () => {
 			const onAgentComplete = vi.fn();
 
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				hooks: {
 					onAgentStart,
@@ -695,14 +695,14 @@ describe("createAgentStack", () => {
 	describe("retry forwarding", () => {
 		it("should forward retry config to orchestrator", async () => {
 			let callCount = 0;
-			const failOnceRun = createMockRunFn((agent) => {
+			const failOnceRun = createMockRunner((agent) => {
 				callCount++;
 				if (callCount === 1) throw new Error("transient failure");
 				return `recovered from ${agent.name}`;
 			});
 
 			const stack = createAgentStack({
-				run: failOnceRun,
+				runner: failOnceRun,
 				agents: testAgents,
 				retry: {
 					attempts: 2,
@@ -720,7 +720,7 @@ describe("createAgentStack", () => {
 	describe("rate limit reset", () => {
 		it("should reset rate limiter on stack.reset()", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				rateLimit: { maxPerMinute: 2 },
 			});
@@ -739,7 +739,7 @@ describe("createAgentStack", () => {
 	describe("messageBus config alias", () => {
 		it("should accept messageBus as alias for bus config", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				messageBus: { maxHistory: 50 },
 			});
@@ -753,7 +753,7 @@ describe("createAgentStack", () => {
 	describe("escape hatches", () => {
 		it("should expose memory escape hatch", () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				memory: { maxMessages: 20 },
 			});
 
@@ -761,13 +761,13 @@ describe("createAgentStack", () => {
 		});
 
 		it("should have memory=null when not configured", () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 			expect(stack.memory).toBeNull();
 		});
 
 		it("should expose getTimeline", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				observability: { serviceName: "test" },
 			});
@@ -778,7 +778,7 @@ describe("createAgentStack", () => {
 		});
 
 		it("should return empty timeline when observability is disabled", () => {
-			const stack = createAgentStack({ run: createMockRunFn() });
+			const stack = createAgentStack({ runner: createMockRunner() });
 			const timeline = stack.getTimeline();
 			expect(timeline.spans).toEqual([]);
 			expect(timeline.metrics).toEqual({});
@@ -788,7 +788,7 @@ describe("createAgentStack", () => {
 	describe("runStructured()", () => {
 		it("should return result when validation passes", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(() => ({ name: "Alice", age: 30 })),
+				runner: createMockRunner(() => ({ name: "Alice", age: 30 })),
 				agents: testAgents,
 			});
 
@@ -801,7 +801,7 @@ describe("createAgentStack", () => {
 
 		it("should throw when validation fails after retries", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(() => "not-an-object"),
+				runner: createMockRunner(() => "not-an-object"),
 				agents: testAgents,
 			});
 
@@ -816,7 +816,7 @@ describe("createAgentStack", () => {
 		it("should retry and succeed on second attempt", async () => {
 			let attempt = 0;
 			const stack = createAgentStack({
-				run: createMockRunFn(() => {
+				runner: createMockRunner(() => {
 					attempt++;
 					return attempt === 1 ? "bad" : { valid: true };
 				}),
@@ -836,7 +836,7 @@ describe("createAgentStack", () => {
 	describe("runPattern guardrails", () => {
 		it("should reject when input guardrails fail for runPattern", async () => {
 			const stack = createAgentStack({
-				run: createMockRunFn(),
+				runner: createMockRunner(),
 				agents: testAgents,
 				patterns: {},
 				guardrails: {
