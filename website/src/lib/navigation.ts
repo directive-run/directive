@@ -14,6 +14,7 @@ export const navigation = [
   {
     title: 'Core API',
     links: [
+      { title: 'Core API Overview', href: '/docs/core-api' },
       { title: 'Module & System', href: '/docs/module-system' },
       { title: 'Facts', href: '/docs/facts' },
       { title: 'Derivations', href: '/docs/derivations' },
@@ -35,6 +36,7 @@ export const navigation = [
   {
     title: 'Framework Adapters',
     links: [
+      { title: 'Adapter Overview', href: '/docs/adapters/overview' },
       { title: 'React', href: '/docs/adapters/react' },
       { title: 'Vue', href: '/docs/adapters/vue' },
       { title: 'Svelte', href: '/docs/adapters/svelte' },
@@ -45,6 +47,7 @@ export const navigation = [
   {
     title: 'State Bridges',
     links: [
+      { title: 'Bridge Overview', href: '/docs/bridges/overview' },
       { title: 'Zustand', href: '/docs/bridges/zustand' },
       { title: 'React Query', href: '/docs/bridges/react-query' },
       { title: 'Redux', href: '/docs/bridges/redux' },
@@ -65,17 +68,20 @@ export const navigation = [
   {
     title: 'AI & Agents',
     links: [
+      { title: 'AI Overview', href: '/docs/ai/overview' },
       { title: 'Orchestrator', href: '/docs/ai/orchestrator' },
       { title: 'Agent Stack', href: '/docs/ai/agent-stack' },
       { title: 'Streaming', href: '/docs/ai/streaming' },
       { title: 'Multi-Agent', href: '/docs/ai/multi-agent' },
       { title: 'MCP Integration', href: '/docs/ai/mcp' },
       { title: 'Guardrails', href: '/docs/ai/guardrails' },
+      { title: 'Running Agents', href: '/docs/ai/running-agents' },
     ],
   },
   {
     title: 'Security & Compliance',
     links: [
+      { title: 'Security Overview', href: '/docs/security/overview' },
       { title: 'PII Detection', href: '/docs/security/pii' },
       { title: 'Prompt Injection', href: '/docs/security/prompt-injection' },
       { title: 'Audit Trail', href: '/docs/security/audit' },
@@ -85,6 +91,7 @@ export const navigation = [
   {
     title: 'Advanced',
     links: [
+      { title: 'Advanced Overview', href: '/docs/advanced/overview' },
       { title: 'Multi-Module', href: '/docs/advanced/multi-module' },
       { title: 'Time-Travel', href: '/docs/advanced/time-travel' },
       { title: 'Snapshots', href: '/docs/advanced/snapshots' },
@@ -104,6 +111,7 @@ export const navigation = [
   {
     title: 'Migration',
     links: [
+      { title: 'Migration Overview', href: '/docs/migration/overview' },
       { title: 'From Redux', href: '/docs/migration/from-redux' },
       { title: 'From Zustand', href: '/docs/migration/from-zustand' },
       { title: 'From XState', href: '/docs/migration/from-xstate' },
@@ -112,6 +120,7 @@ export const navigation = [
   {
     title: 'Examples',
     links: [
+      { title: 'Examples Overview', href: '/docs/examples/overview' },
       { title: 'Counter', href: '/docs/examples/counter' },
       { title: 'Data Fetching', href: '/docs/examples/data-fetching' },
       { title: 'Form Validation', href: '/docs/examples/form-validation' },
@@ -122,6 +131,7 @@ export const navigation = [
   {
     title: 'API Reference',
     links: [
+      { title: 'API Overview', href: '/docs/api/overview' },
       { title: 'Core API', href: '/docs/api/core' },
       { title: 'Types', href: '/docs/api/types' },
       { title: 'React Hooks', href: '/docs/api/react' },

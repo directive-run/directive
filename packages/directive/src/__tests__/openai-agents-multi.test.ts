@@ -24,8 +24,8 @@ function makeAgent(name: string): AgentLike {
 	return { name };
 }
 
-function makeRunResult<T>(finalOutput: T, totalTokens = 10): RunResult<T> {
-	return { finalOutput, messages: [], toolCalls: [], totalTokens };
+function makeRunResult<T>(output: T, totalTokens = 10): RunResult<T> {
+	return { output, messages: [], toolCalls: [], totalTokens };
 }
 
 function createMockRunner(
@@ -186,7 +186,7 @@ describe("createMultiAgentOrchestrator", () => {
 	describe("single agent execution", () => {
 		it("should run a registered agent and return the result", async () => {
 			const result = await orchestrator.runAgent("alpha", "hello");
-			expect(result.finalOutput).toBe("response from alpha");
+			expect(result.output).toBe("response from alpha");
 			expect(result.totalTokens).toBe(10);
 		});
 
@@ -258,7 +258,7 @@ describe("createMultiAgentOrchestrator", () => {
 			await expect(orch.runAgent("solo", "a")).rejects.toThrow("first call fails");
 			// Should not deadlock - slot was released
 			const result = await orch.runAgent("solo", "b");
-			expect(result.finalOutput).toBe("ok-2");
+			expect(result.output).toBe("ok-2");
 		});
 	});
 });
@@ -288,7 +288,7 @@ describe("parallel execution", () => {
 		const merged = await orch.runParallel(
 			["a", "b"],
 			["input-a", "input-b"],
-			(results) => results.map((r) => r.finalOutput),
+			(results) => results.map((r) => r.output),
 		);
 
 		expect(merged).toEqual(["result-a", "result-b"]);
@@ -304,7 +304,7 @@ describe("parallel execution", () => {
 		const merged = await orch.runParallel(
 			["x", "y"],
 			"shared-input",
-			(results) => results.map((r) => r.finalOutput),
+			(results) => results.map((r) => r.output),
 		);
 
 		expect(merged).toEqual(["x:shared-input", "y:shared-input"]);
@@ -329,7 +329,7 @@ describe("parallel execution", () => {
 			patterns: {
 				research: parallel(
 					["r1", "r2"],
-					(results) => results.map((r) => r.finalOutput).join("|"),
+					(results) => results.map((r) => r.output).join("|"),
 				),
 			},
 		});
@@ -364,7 +364,7 @@ describe("parallel execution", () => {
 				tolerant: {
 					type: "parallel" as const,
 					agents: ["a", "b"],
-					merge: (results) => results.map((r) => r.finalOutput),
+					merge: (results) => results.map((r) => r.output),
 					minSuccess: 1,
 				},
 			},
@@ -426,7 +426,7 @@ describe("sequential execution", () => {
 		});
 
 		expect(results).toHaveLength(2);
-		expect((results[1].finalOutput as { text: string }).text).toBe("b:a:init");
+		expect((results[1].output as { text: string }).text).toBe("b:a:init");
 	});
 
 	it("should run a named sequential pattern via runPattern", async () => {
@@ -516,7 +516,7 @@ describe("supervisor execution", () => {
 				// Second call: complete after receiving worker result
 				return makeRunResult<T>({
 					action: "complete",
-					finalOutput: "all done",
+					output: "all done",
 				} as T);
 			}
 			// Worker
@@ -532,7 +532,7 @@ describe("supervisor execution", () => {
 		});
 
 		const result = await orch.runPattern("managed", "start");
-		expect(result).toEqual({ action: "complete", finalOutput: "all done" });
+		expect(result).toEqual({ action: "complete", output: "all done" });
 		expect(supervisorCallCount).toBe(2);
 	});
 
@@ -705,7 +705,7 @@ describe("handoffs", () => {
 		});
 
 		const result = await orch.handoff("sender", "receiver", "handoff-input", { key: "val" });
-		expect(result.finalOutput).toBe("receiver-result");
+		expect(result.output).toBe("receiver-result");
 		expect(onHandoff).toHaveBeenCalledOnce();
 		expect(onHandoffComplete).toHaveBeenCalledOnce();
 		expect(orch.getPendingHandoffs()).toHaveLength(0);
@@ -779,7 +779,7 @@ describe("reset and dispose", () => {
 		await orch.runAgent("a", "before");
 		orch.reset();
 		const result = await orch.runAgent("a", "after");
-		expect(result.finalOutput).toBe("response from a");
+		expect(result.output).toBe("response from a");
 		expect(orch.getAgentState("a")?.runCount).toBe(1);
 	});
 
@@ -1028,7 +1028,7 @@ describe("helper utilities", () => {
 				makeRunResult("mid", 10),
 			];
 			const best = pickBestResult(results, (r) => r.totalTokens);
-			expect(best.finalOutput).toBe("high");
+			expect(best.output).toBe("high");
 		});
 
 		it("should throw for empty results", () => {
@@ -1037,7 +1037,7 @@ describe("helper utilities", () => {
 	});
 
 	describe("collectOutputs", () => {
-		it("should collect finalOutput from all results", () => {
+		it("should collect output from all results", () => {
 			const results = [makeRunResult("a"), makeRunResult("b"), makeRunResult("c")];
 			expect(collectOutputs(results)).toEqual(["a", "b", "c"]);
 		});

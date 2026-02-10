@@ -189,7 +189,7 @@ export interface SequentialPattern<T = unknown> {
   /** Transform output to next input (default: stringify) */
   transform?: (output: unknown, agentId: string, index: number) => string;
   /** Final result extractor */
-  extract?: (finalOutput: unknown) => T;
+  extract?: (output: unknown) => T;
   /** Continue on error (default: false) */
   continueOnError?: boolean;
 }
@@ -341,7 +341,7 @@ export interface MultiAgentOrchestrator {
  *     research: {
  *       type: 'parallel',
  *       agents: ['researcher', 'researcher'],
- *       merge: (results) => results.map(r => r.finalOutput).join('\n\n'),
+ *       merge: (results) => results.map(r => r.output).join('\n\n'),
  *     },
  *     write: {
  *       type: 'sequential',
@@ -357,7 +357,7 @@ export interface MultiAgentOrchestrator {
  * const results = await orchestrator.runParallel(
  *   ['researcher', 'researcher'],
  *   ['Question 1', 'Question 2'],
- *   (results) => results.map(r => r.finalOutput)
+ *   (results) => results.map(r => r.output)
  * );
  *
  * // Handoff
@@ -493,7 +493,7 @@ export function createMultiAgentOrchestrator(
       });
 
       state.status = "completed";
-      state.lastOutput = result.finalOutput;
+      state.lastOutput = result.output;
       state.runCount++;
       state.totalTokens += result.totalTokens;
 
@@ -566,12 +566,12 @@ export function createMultiAgentOrchestrator(
         // Transform for next agent
         if (i < pattern.agents.length - 1) {
           if (pattern.transform) {
-            currentInput = pattern.transform(lastResult.finalOutput, agentId, i);
+            currentInput = pattern.transform(lastResult.output, agentId, i);
           } else {
             currentInput =
-              typeof lastResult.finalOutput === "string"
-                ? lastResult.finalOutput
-                : JSON.stringify(lastResult.finalOutput);
+              typeof lastResult.output === "string"
+                ? lastResult.output
+                : JSON.stringify(lastResult.output);
           }
         }
       } catch (error) {
@@ -584,8 +584,8 @@ export function createMultiAgentOrchestrator(
     }
 
     return pattern.extract
-      ? pattern.extract(lastResult.finalOutput)
-      : (lastResult.finalOutput as T);
+      ? pattern.extract(lastResult.output)
+      : (lastResult.output as T);
   }
 
   // Run supervisor pattern
@@ -601,11 +601,11 @@ export function createMultiAgentOrchestrator(
       action: "delegate" | "complete";
       worker?: string;
       workerInput?: string;
-      finalOutput?: unknown;
+      output?: unknown;
     }>(pattern.supervisor, input);
 
     for (let round = 0; round < maxRounds; round++) {
-      const action = supervisorResult.finalOutput;
+      const action = supervisorResult.output;
 
       if (action.action === "complete" || !action.worker) {
         break;
@@ -626,13 +626,13 @@ export function createMultiAgentOrchestrator(
       // Report back to supervisor
       supervisorResult = await runSingleAgent(
         pattern.supervisor,
-        `Worker ${action.worker} completed with result: ${JSON.stringify(workerResult.finalOutput)}`
+        `Worker ${action.worker} completed with result: ${JSON.stringify(workerResult.output)}`
       );
     }
 
     return pattern.extract
-      ? pattern.extract(supervisorResult.finalOutput, workerResults)
-      : (supervisorResult.finalOutput as T);
+      ? pattern.extract(supervisorResult.output, workerResults)
+      : (supervisorResult.output as T);
   }
 
   const orchestrator: MultiAgentOrchestrator = {
@@ -692,12 +692,12 @@ export function createMultiAgentOrchestrator(
 
         if (i < agentIds.length - 1) {
           if (opts?.transform) {
-            currentInput = opts.transform(result.finalOutput, agentId, i);
+            currentInput = opts.transform(result.output, agentId, i);
           } else {
             currentInput =
-              typeof result.finalOutput === "string"
-                ? result.finalOutput
-                : JSON.stringify(result.finalOutput);
+              typeof result.output === "string"
+                ? result.output
+                : JSON.stringify(result.output);
           }
         }
       }
@@ -798,7 +798,7 @@ export function createMultiAgentOrchestrator(
  * ```typescript
  * const researchPattern = parallel(
  *   ['researcher', 'researcher', 'researcher'],
- *   (results) => results.map(r => r.finalOutput).join('\n')
+ *   (results) => results.map(r => r.output).join('\n')
  * );
  * ```
  */
@@ -830,7 +830,7 @@ export function sequential<T>(
   agents: string[],
   options?: {
     transform?: (output: unknown, agentId: string, index: number) => string;
-    extract?: (finalOutput: unknown) => T;
+    extract?: (output: unknown) => T;
     continueOnError?: boolean;
   }
 ): SequentialPattern<T> {
@@ -935,9 +935,9 @@ export function concatResults(
 ): string {
   return results
     .map((r) =>
-      typeof r.finalOutput === "string"
-        ? r.finalOutput
-        : JSON.stringify(r.finalOutput)
+      typeof r.output === "string"
+        ? r.output
+        : JSON.stringify(r.output)
     )
     .join(separator);
 }
@@ -962,7 +962,7 @@ export function pickBestResult<T>(
  * Merge results into an array of outputs.
  */
 export function collectOutputs<T>(results: RunResult<T>[]): T[] {
-  return results.map((r) => r.finalOutput);
+  return results.map((r) => r.output);
 }
 
 /**

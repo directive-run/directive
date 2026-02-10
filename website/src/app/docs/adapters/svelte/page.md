@@ -383,9 +383,10 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```svelte
 <script>
-  import { useOptimisticUpdate } from 'directive/svelte';
+  import { useOptimisticUpdate, useFacts } from 'directive/svelte';
 
-  const { mutate, isPending, error, rollback } = useOptimisticUpdate("SAVE_DATA");
+  const facts = useFacts();
+  const { mutate, isPending, error, rollback } = useOptimisticUpdate(undefined, "SAVE_DATA");
 
   function handleSave() {
     mutate(() => {

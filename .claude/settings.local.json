@@ -50,7 +50,8 @@
       "Bash(timeout 15 /opt/homebrew/bin/node ./node_modules/.bin/next dev:*)",
       "Bash(xargs cat:*)",
       "WebFetch(domain:xstate.js.org)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(npx next dev:*)"
     ]
   }
 }

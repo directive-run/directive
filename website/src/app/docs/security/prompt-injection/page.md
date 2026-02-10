@@ -23,10 +23,12 @@ const injectionGuardrail = createPromptInjectionGuardrail({
 Use with an orchestrator:
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/openai-agents';
+import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
+
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   guardrails: {
     input: [{ name: 'injection', fn: injectionGuardrail }],
   },
@@ -148,6 +150,7 @@ const untrustedGuardrail = createUntrustedContentGuardrail({
 
 ```typescript
 import { composeGuardrails } from 'directive';
+import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
 
 const combined = composeGuardrails(
   injectionGuardrail,
@@ -155,8 +158,10 @@ const combined = composeGuardrails(
   moderationGuardrail,
 );
 
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   guardrails: {
     input: [{ name: 'security', fn: combined }],
   },

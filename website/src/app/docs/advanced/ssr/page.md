@@ -50,7 +50,7 @@ import { createSystem } from 'directive';
 const system = createSystem({ module: pageModule });
 
 // Hydrate from server state
-system.hydrate(window.__DIRECTIVE_STATE__);
+system.hydrate(() => window.__DIRECTIVE_STATE__);
 
 // React hydration — hooks take system directly, no provider needed
 hydrateRoot(

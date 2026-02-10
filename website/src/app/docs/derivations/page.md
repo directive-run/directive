@@ -345,3 +345,4 @@ Derivations recompute whenever their dependencies change. For expensive operatio
 - **[Facts](/docs/facts)** — The source data for derivations
 - **[Constraints](/docs/constraints)** — Use facts in rules (constraints don't access derivations)
 - **[Effects](/docs/effects)** — Side effects that run after stabilization
+- **[Events](/docs/events)** — Dispatch typed events to mutate facts

@@ -372,7 +372,7 @@ import { useOptimisticUpdate } from 'directive/vue';
 import { useFacts } from 'directive/vue';
 
 const facts = useFacts();
-const { mutate, isPending, error, rollback } = useOptimisticUpdate('SAVE_DATA');
+const { mutate, isPending, error, rollback } = useOptimisticUpdate(undefined, 'SAVE_DATA');
 
 function handleSave() {
   mutate(() => {

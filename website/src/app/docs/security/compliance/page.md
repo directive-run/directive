@@ -10,7 +10,7 @@ Handle data export requests, right-to-erasure, consent management, and retention
 ## Basic Setup
 
 ```typescript
-import { createCompliance, createInMemoryComplianceStorage } from 'directive/openai-agents';
+import { createCompliance, createInMemoryComplianceStorage } from 'directive/ai';
 
 const compliance = createCompliance({
   storage: createInMemoryComplianceStorage(),
@@ -110,10 +110,14 @@ const marketingUsers = await compliance.consent.getForPurpose('marketing');
 Block AI processing when consent is missing:
 
 ```typescript
+import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
+
 const consentGuardrail = compliance.createConsentGuardrail('ai_processing');
 
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   guardrails: {
     input: [{ name: 'consent', fn: consentGuardrail }],
   },

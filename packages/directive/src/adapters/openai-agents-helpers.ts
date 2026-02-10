@@ -136,7 +136,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     runOptions?.onMessage?.(assistantMessage);
 
     return {
-      finalOutput: parse<T>(text),
+      output: parse<T>(text),
       messages: allMessages,
       toolCalls: [],
       totalTokens,

@@ -22,7 +22,7 @@
  *   guardrails: {
  *     input: [cacheGuardrail],
  *   },
- *   runAgent: run,
+ *   runner: run,
  * });
  * ```
  */
@@ -541,7 +541,7 @@ export interface SemanticCacheGuardrailResult {
  *       },
  *     ],
  *   },
- *   runAgent: run,
+ *   runner: run,
  * });
  *
  * // In your orchestrator wrapper, check for cache hits:

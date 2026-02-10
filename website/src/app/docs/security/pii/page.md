@@ -22,10 +22,12 @@ const piiGuardrail = createEnhancedPIIGuardrail({
 Use with an orchestrator:
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/openai-agents';
+import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
+
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   guardrails: {
     input: [{ name: 'pii', fn: piiGuardrail }],
   },
@@ -88,14 +90,17 @@ Scan agent outputs for PII leakage:
 
 ```typescript
 import { createOutputPIIGuardrail } from 'directive';
+import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
 
 const outputGuardrail = createOutputPIIGuardrail({
   types: ['ssn', 'credit_card'],
   redact: true,
 });
 
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   guardrails: {
     output: [{ name: 'output-pii', fn: outputGuardrail }],
   },
@@ -166,7 +171,7 @@ const guardrail = createEnhancedPIIGuardrail({
 For basic use with the orchestrator, a simpler guardrail is available:
 
 ```typescript
-import { createPIIGuardrail } from 'directive/openai-agents';
+import { createPIIGuardrail } from 'directive/ai';
 
 const guardrail = createPIIGuardrail({
   patterns: [/\b\d{3}-\d{2}-\d{4}\b/, /\b\d{16}\b/],

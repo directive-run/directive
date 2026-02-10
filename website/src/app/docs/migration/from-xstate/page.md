@@ -286,17 +286,17 @@ const formModule = createModule("form", {
   },
   effects: {
     onEditing: {
-      watch: (facts) => facts.status,
-      run: (status) => {
-        if (status === 'editing') {
+      deps: ['status'],
+      run: (facts) => {
+        if (facts.status === 'editing') {
           document.getElementById('input')?.focus();
         }
       },
     },
     onSubmit: {
-      watch: (facts) => facts.status,
-      run: (status, prev) => {
-        if (prev === 'editing' && status === 'submitting') {
+      deps: ['status'],
+      run: (facts, prev) => {
+        if (prev?.status === 'editing' && facts.status === 'submitting') {
           console.log('Validating...');
         }
       },

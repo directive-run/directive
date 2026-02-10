@@ -16,7 +16,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import type { AgentLike } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
 });
 
@@ -101,6 +101,37 @@ controller.abort();
 
 ---
 
+## Stack Streaming
+
+The `AgentStack` offers two streaming methods. `stack.stream()` yields raw token strings, while `stack.streamChunks()` yields the same rich `StreamChunk` types as the orchestrator:
+
+```typescript
+import { createAgentStack } from 'directive/ai';
+
+const stack = createAgentStack({
+  runner,
+  streaming: { runner: myStreamingRunner },
+  agents: { chat: { agent: chatAgent, capabilities: ['chat'] } },
+});
+
+// Token-only stream
+const tokenStream = stack.stream('chat', 'Hello!');
+for await (const token of tokenStream) {
+  process.stdout.write(token);
+}
+
+// Rich chunk stream (tokens, tool calls, guardrails, progress)
+const { stream, result, abort } = stack.streamChunks('chat', 'Hello!');
+for await (const chunk of stream) {
+  if (chunk.type === 'token') process.stdout.write(chunk.data);
+}
+const finalResult = await result;
+```
+
+Both methods automatically track tokens, record observability spans, and publish to the message bus.
+
+---
+
 ## Standalone Streaming
 
 For streaming outside the orchestrator (e.g., direct agent runs without guardrails/approvals), use `createStreamingRunner`:
@@ -135,7 +166,7 @@ const streamRunner = createStreamingRunner(
     }
 
     return {
-      finalOutput: fullContent,
+      output: fullContent,
       messages,
       toolCalls: [],
       totalTokens: Math.ceil(fullContent.length / 4),
@@ -191,7 +222,7 @@ import {
   combineStreamingGuardrails,
 } from 'directive/ai';
 
-const streamRunner = createStreamingRunner(baseRunFn, {
+const streamRunner = createStreamingRunner(baseRunner, {
   streamingGuardrails: [
     // Stop if output exceeds token limit
     createLengthStreamingGuardrail({
@@ -234,7 +265,7 @@ const combined = combineStreamingGuardrails([
   createPatternStreamingGuardrail({ patterns: [...] }),
 ]);
 
-const streamRunner = createStreamingRunner(baseRunFn, {
+const streamRunner = createStreamingRunner(baseRunner, {
   streamingGuardrails: [combined],
 });
 ```
@@ -336,7 +367,7 @@ import { useState, useCallback } from 'react';
 import { useAgentOrchestrator, useFact } from 'directive/react';
 
 function ChatStream() {
-  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
   const agent = useFact(orchestrator.system, '__agent');
   const [output, setOutput] = useState('');
 
@@ -366,7 +397,7 @@ import { ref, onUnmounted } from 'vue';
 import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/vue';
 
-const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onUnmounted(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -395,7 +426,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/svelte';
 import { onDestroy } from 'svelte';
 
-const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onDestroy(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -423,7 +454,7 @@ import { useFact } from 'directive/solid';
 import { onCleanup } from 'solid-js';
 
 function ChatStream() {
-  const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
   onCleanup(() => orchestrator.dispose());
 
   const agent = useFact(orchestrator.system, '__agent');
@@ -454,7 +485,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { FactController } from 'directive/lit';
 
 class ChatStream extends LitElement {
-  private orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
   private agent = new FactController(this, this.orchestrator.system, '__agent');
   private output = '';
 
