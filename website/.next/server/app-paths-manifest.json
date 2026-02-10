@@ -1,7 +1,0 @@
-{
-  "/docs/adapters/react/page": "app/docs/adapters/react/page.js",
-  "/docs/module-system/page": "app/docs/module-system/page.js",
-  "/docs/facts/page": "app/docs/facts/page.js",
-  "/docs/derivations/page": "app/docs/derivations/page.js",
-  "/docs/constraints/page": "app/docs/constraints/page.js"
-}
