@@ -29,7 +29,7 @@ import type {
   Message,
   ToolCall,
   RunOptions,
-  RunFn,
+  AgentRunner,
   GuardrailFn,
   InputGuardrailData,
   OutputGuardrailData,
@@ -87,7 +87,7 @@ export interface RecordedCall {
 /** Mock agent runner instance */
 export interface MockAgentRunner {
   /** The run function to pass to orchestrator */
-  run: RunFn;
+  run: AgentRunner;
   /** Get all recorded calls */
   getCalls(): RecordedCall[];
   /** Get calls for a specific agent */
@@ -135,7 +135,7 @@ export function createMockAgentRunner(
   const responseMap = new Map<string, MockAgentConfig>(Object.entries(responses));
   let currentDefault = defaultResponse;
 
-  const run: RunFn = async <T>(
+  const run: AgentRunner = async <T>(
     agent: AgentLike,
     input: string,
     runOptions?: RunOptions

@@ -132,6 +132,7 @@ export const navigation = [
     links: [
       { title: 'FAQ', href: '/docs/faq' },
       { title: 'Troubleshooting', href: '/docs/troubleshooting' },
+      { title: 'Brand Guide', href: '/docs/branding' },
     ],
   },
   {

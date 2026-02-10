@@ -9,15 +9,15 @@ Wire together all AI adapter features with a single factory. {% .lead %}
 
 ## Setup
 
-`createAgentStack` is the main composition API. Only `run` is required — every other feature activates when its config key is present:
+`createAgentStack` is the main composition API. Only `runner` is required — every other feature activates when its config key is present:
 
 ```typescript
-import { createAgentStack, createOpenAIRunFn } from 'directive/ai';
+import { createAgentStack, createOpenAIRunner } from 'directive/ai';
 
-const run = createOpenAIRunFn({ apiKey: process.env.OPENAI_API_KEY! });
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
 const stack = createAgentStack({
-  run,
+  runner,
   agents: {
     assistant: {
       agent: { name: 'assistant', instructions: 'You are helpful.', model: 'gpt-4o' },
@@ -39,8 +39,8 @@ const stack = createAgentStack({
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `run` | `RunFn` | *required* | Base run function for agent execution |
-| `streaming` | `{ run: StreamingCallbackRunFn }` | — | Enables `stack.stream()` |
+| `runner` | `AgentRunner` | *required* | Base runner for agent execution |
+| `streaming` | `{ runner: StreamingCallbackRunner }` | — | Enables `stack.stream()` |
 | `agents` | `AgentRegistry` | — | Agent registry for multi-agent patterns |
 | `patterns` | `Record<string, ExecutionPattern>` | — | Named execution patterns (parallel, sequential, supervisor) |
 | `memory` | `{ maxMessages?, preserveRecentCount? }` | — | Sliding window memory (default: 50 messages) |
@@ -76,7 +76,7 @@ import {
 
 // Shorthand — stack creates the instance for you
 const stack = createAgentStack({
-  run,
+  runner,
   memory: { maxMessages: 30 },
 });
 
@@ -85,7 +85,7 @@ const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 30 }),
   autoManage: true,
 });
-const stack = createAgentStack({ run, memory });
+const stack = createAgentStack({ runner, memory });
 ```
 
 ---
@@ -111,12 +111,12 @@ const result = await stack.runPattern('research-and-write', 'AI safety');
 
 ## Streaming
 
-Requires `streaming.run` in config:
+Requires `streaming.runner` in config:
 
 ```typescript
 const stack = createAgentStack({
-  run,
-  streaming: { run: myStreamingRunFn },
+  runner,
+  streaming: { runner: myStreamingRunner },
   agents: { chat: { agent: chatAgent, capabilities: ['chat'] } },
 });
 
@@ -135,7 +135,7 @@ const finalResult = await tokenStream.result;
 
 ```typescript
 const stack = createAgentStack({
-  run,
+  runner,
   approvals: {
     autoApproveToolCalls: false,
     onRequest: (req) => notifyApprover(req),
@@ -272,7 +272,7 @@ Pass a plain object and the stack builds the memory instance for you:
 
 ```typescript
 const stack = createAgentStack({
-  run,
+  runner,
   memory: { maxMessages: 50 },
 });
 ```
@@ -408,7 +408,7 @@ Both circuit breaker and rate limiting can be configured via stack shorthand:
 
 ```typescript
 const stack = createAgentStack({
-  run,
+  runner,
   circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 15000 },
   rateLimit: { maxPerMinute: 60 },
 });
@@ -487,7 +487,7 @@ const testCache = createSemanticCache({
 
 ```typescript
 const stack = createAgentStack({
-  run,
+  runner,
   cache: { threshold: 0.95, maxSize: 500, ttlMs: 300000, embedder: myEmbedderFn },
 });
 ```

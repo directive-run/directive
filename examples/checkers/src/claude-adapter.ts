@@ -1,9 +1,9 @@
 /**
  * Claude Adapter for Directive AI
  *
- * Bridges directive's generic RunFn with the Anthropic Messages API.
+ * Bridges directive's generic AgentRunner with the Anthropic Messages API.
  * Provides agent definitions for move selection, chat, and strategic analysis.
- * Includes a streaming-capable RunFn for token-by-token delivery.
+ * Includes a streaming-capable runner for token-by-token delivery.
  */
 
 import type {
@@ -11,7 +11,7 @@ import type {
   AgentLike,
   Message,
 } from "directive/ai";
-import { createRunFn } from "directive/ai";
+import { createRunner } from "directive/ai";
 import type { Board, Piece, Move } from "./rules.js";
 import { toRowCol } from "./rules.js";
 
@@ -123,7 +123,7 @@ export const analysisAgent: AgentLike = {
 };
 
 // ============================================================================
-// RunFn Implementation (Anthropic Messages API via createRunFn)
+// Runner Implementation (Anthropic Messages API via createRunner)
 // ============================================================================
 
 function stripCodeFences(text: string): string {
@@ -134,10 +134,10 @@ function stripCodeFences(text: string): string {
 }
 
 /**
- * Generic RunFn that wraps the Anthropic Messages API via /api/claude proxy.
+ * Generic runner that wraps the Anthropic Messages API via /api/claude proxy.
  * Compatible with directive's agent orchestrator.
  */
-export const runClaude = createRunFn({
+export const runClaude = createRunner({
   buildRequest: (agent, _input, messages) => ({
     url: "/api/claude",
     init: {
@@ -171,11 +171,11 @@ export const runClaude = createRunFn({
 });
 
 // ============================================================================
-// Streaming RunFn (SSE via Anthropic Messages API)
+// Streaming Runner (SSE via Anthropic Messages API)
 // ============================================================================
 
 /**
- * Streaming-capable RunFn with callbacks for token-by-token delivery.
+ * Streaming-capable runner with callbacks for token-by-token delivery.
  * Used by createStreamingRunner to produce async iterable streams.
  *
  * Falls back to simulated token emission if SSE parsing fails.
