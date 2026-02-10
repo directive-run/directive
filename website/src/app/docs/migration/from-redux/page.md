@@ -101,6 +101,9 @@ const cartModule = createModule("cart", {
       items: t.array(t.object<CartItem>()),
     },
   },
+  init: (facts) => {
+    facts.items = [];
+  },
   derive: {
     total: (facts) =>
       facts.items.reduce((sum, item) => sum + item.price, 0),
@@ -259,8 +262,8 @@ const reduxStore = configureStore({ reducer: rootReducer });
 const directiveSystem = createSystem({ module: newFeatureModule });
 
 // Sync if needed
-directiveSystem.subscribe((facts) => {
-  reduxStore.dispatch(syncFromDirective(facts));
+directiveSystem.facts.$store.subscribeAll((key, value) => {
+  reduxStore.dispatch(syncFromDirective({ [key]: value }));
 });
 ```
 

@@ -11,6 +11,10 @@ Bridge MCP servers into Directive with constraint-driven tool access control. {%
 
 The `createMCPAdapter` function connects to MCP servers and provides a Directive plugin for tool constraints, resource syncing, and approval workflows:
 
+{% callout type="note" title="Import Path" %}
+The `directive/mcp` entry point must be configured in your project. See the [installation docs](/docs/installation) for subpath setup.
+{% /callout %}
+
 ```typescript
 import { createMCPAdapter } from 'directive/mcp';
 import { createModule, createSystem, t } from 'directive';
@@ -268,7 +272,7 @@ MCP is primarily server-side, but you can display tool status and approval reque
 import { useAgentOrchestrator, useFact } from 'directive/react';
 
 function MCPToolPanel() {
-  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+  const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: false });
   const { system } = orchestrator;
 
   const agent = useFact(system, '__agent');
@@ -295,7 +299,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/vue';
 import { onUnmounted } from 'vue';
 
-const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
 onUnmounted(() => orchestrator.dispose());
 
 const approval = useFact(orchestrator.system, '__approval');
@@ -318,7 +322,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/svelte';
 import { onDestroy } from 'svelte';
 
-const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
 onDestroy(() => orchestrator.dispose());
 
 const approval = useFact(orchestrator.system, '__approval');
@@ -341,7 +345,7 @@ import { useFact } from 'directive/solid';
 import { onCleanup, For } from 'solid-js';
 
 function MCPToolPanel() {
-  const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+  const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
   onCleanup(() => orchestrator.dispose());
 
   const approval = useFact(orchestrator.system, '__approval');
@@ -366,7 +370,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { FactController } from 'directive/lit';
 
 class MCPToolPanel extends LitElement {
-  private orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+  private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
   private approval = new FactController(this, this.orchestrator.system, '__approval');
   private toolCalls = new FactController(this, this.orchestrator.system, '__toolCalls');
 

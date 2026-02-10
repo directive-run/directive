@@ -124,8 +124,6 @@ function App() {
 Or use a single namespaced system and pass it to hooks:
 
 ```typescript
-import { useFact } from 'directive/react';
-
 const system = createSystem({
   modules: { auth: authModule, cart: cartModule },
 });

@@ -22,7 +22,7 @@ import {
 } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     input: [
@@ -52,7 +52,7 @@ Block harmful content using your moderation API:
 import { createModerationGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     // Works on both input and output
@@ -85,7 +85,7 @@ Allow or deny specific tools:
 import { createToolGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     toolCall: [
@@ -112,7 +112,7 @@ Ensure agent output matches an expected type:
 import { createOutputTypeGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     output: [
@@ -145,7 +145,7 @@ import { createOutputSchemaGuardrail } from 'directive/ai';
 
 // Custom validation function
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     output: [
@@ -174,7 +174,7 @@ const OutputSchema = z.object({
 });
 
 const zodOrchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     output: [
@@ -193,6 +193,61 @@ const zodOrchestrator = createAgentOrchestrator({
 });
 ```
 
+### Output Length Limit
+
+Limit output by character count or estimated token count:
+
+```typescript
+import { createLengthGuardrail } from 'directive/ai';
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  autoApproveToolCalls: true,
+  guardrails: {
+    output: [
+      // Limit by characters
+      createLengthGuardrail({ maxCharacters: 5000 }),
+
+      // Limit by tokens (default estimator: chars / 4)
+      createLengthGuardrail({ maxTokens: 1000 }),
+
+      // Custom token estimator
+      createLengthGuardrail({
+        maxTokens: 1000,
+        estimateTokens: (text) => text.split(' ').length,
+      }),
+    ],
+  },
+});
+```
+
+### Content Filter
+
+Block output matching specific keywords or patterns:
+
+```typescript
+import { createContentFilterGuardrail } from 'directive/ai';
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  autoApproveToolCalls: true,
+  guardrails: {
+    output: [
+      createContentFilterGuardrail({
+        blockedPatterns: [
+          'internal-only',              // String (case-insensitive by default)
+          /\bpassword\b/i,              // RegExp
+          /api[_-]key/i,                // RegExp with alternation
+        ],
+        caseSensitive: false,           // Default: false (for string patterns)
+      }),
+    ],
+  },
+});
+```
+
+String patterns are automatically regex-escaped, so special characters like `.` match literally.
+
 ### Rate Limiting
 
 Limit request frequency based on token usage and request count:
@@ -206,7 +261,7 @@ const rateLimiter = createRateLimitGuardrail({
 });
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     input: [rateLimiter],
@@ -251,7 +306,7 @@ const noEmptyResponse: GuardrailFn<OutputGuardrailData> = (data) => {
 };
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     input: [maxLengthGuardrail, normalizeWhitespace],
@@ -285,7 +340,7 @@ const piiCheck: NamedGuardrail<InputGuardrailData> = {
 };
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     input: [piiCheck],  // Named guardrails work alongside plain functions
@@ -354,7 +409,7 @@ const patternGuard = createPatternStreamingGuardrail({
 const combined = combineStreamingGuardrails([lengthGuard, patternGuard]);
 
 // Use with createStreamingRunner for standalone streaming
-const streamRunner = createStreamingRunner(baseRunFn, {
+const streamRunner = createStreamingRunner(baseRunner, {
   streamingGuardrails: [combined],
 });
 ```
@@ -382,7 +437,7 @@ const orchestrator = createOrchestratorBuilder()
   .withToolCallGuardrail('tools', createToolGuardrail({ denylist: ['shell'] }))
   .withOutputGuardrail('type', createOutputTypeGuardrail({ type: 'string' }))
   .build({
-    runAgent: run,
+    runner,
     autoApproveToolCalls: true,
   });
 ```
@@ -401,7 +456,7 @@ import { useAgentOrchestrator, useFact } from 'directive/react';
 import { isGuardrailError } from 'directive/ai';
 
 function GuardedChat() {
-  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
   const agent = useFact(orchestrator.system, '__agent');
   const [error, setError] = useState<string | null>(null);
 
@@ -433,7 +488,7 @@ import { ref, onUnmounted } from 'vue';
 import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
 import { useFact } from 'directive/vue';
 
-const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onUnmounted(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -463,7 +518,7 @@ import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
 import { useFact } from 'directive/svelte';
 import { onDestroy } from 'svelte';
 
-const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onDestroy(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -492,7 +547,7 @@ import { useFact } from 'directive/solid';
 import { onCleanup } from 'solid-js';
 
 function GuardedChat() {
-  const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
   onCleanup(() => orchestrator.dispose());
 
   const agent = useFact(orchestrator.system, '__agent');
@@ -524,7 +579,7 @@ import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
 import { FactController } from 'directive/lit';
 
 class GuardedChat extends LitElement {
-  private orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
   private agent = new FactController(this, this.orchestrator.system, '__agent');
   private error: string | null = null;
 

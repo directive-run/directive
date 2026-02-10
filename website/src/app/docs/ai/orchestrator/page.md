@@ -49,7 +49,7 @@ Run an agent through the orchestrator. All guardrails, approval checks, and stat
 ```typescript
 const result = await orchestrator.run<string>(agent, 'What is WebAssembly?');
 
-console.log(result.finalOutput);   // The agent's response
+console.log(result.output);   // The agent's response
 console.log(result.totalTokens);   // Token usage
 console.log(result.messages);      // Full conversation
 console.log(result.toolCalls);     // Any tools called
@@ -216,6 +216,40 @@ const orchestrator = createAgentOrchestrator<{}, MyOutput>({
 ```
 
 Resolvers receive a context with `facts` (the combined orchestrator state), `runAgent` (to run additional agents), and `signal` (for cancellation).
+
+### Constraint Helpers
+
+Use `constraint()` and `when()` for ergonomic constraint construction:
+
+```typescript
+import { constraint, when } from 'directive/ai';
+
+interface MyFacts { confidence: number; errors: number }
+
+const orchestrator = createAgentOrchestrator<MyFacts>({
+  runner,
+  autoApproveToolCalls: true,
+  constraints: {
+    // Fluent builder — .when().require().priority().build()
+    escalate: constraint<MyFacts>()
+      .when((f) => f.confidence < 0.7)
+      .require({ type: 'ESCALATE' })
+      .priority(50)
+      .build(),
+
+    // Quick shorthand — returns a valid constraint directly
+    pause: when<MyFacts>((f) => f.errors > 3)
+      .require({ type: 'PAUSE' }),
+
+    // Shorthand with priority
+    halt: when<MyFacts>((f) => f.errors > 10)
+      .require({ type: 'HALT' })
+      .withPriority(100),
+  },
+});
+```
+
+Both produce plain `OrchestratorConstraint` objects — zero runtime overhead, just ergonomic sugar. The `when()` shorthand returns a constraint directly (no `.build()` needed), and `.withPriority()` returns a new constraint with the priority set.
 
 ---
 

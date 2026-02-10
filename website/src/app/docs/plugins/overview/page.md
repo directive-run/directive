@@ -42,9 +42,9 @@ Plugins execute in registration order. Put logging first to capture all events:
 
 ```typescript
 plugins: [
-  loggingPlugin(),        // Logs everything
-  persistencePlugin(),    // Restores state
-  devtoolsPlugin(),       // DevTools last
+  loggingPlugin(),                                    // Logs everything
+  persistencePlugin({ storage: localStorage, key: 'my-app' }),  // Restores state
+  devtoolsPlugin(),                                   // DevTools last
 ]
 ```
 

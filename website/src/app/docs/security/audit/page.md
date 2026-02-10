@@ -10,7 +10,7 @@ Maintain an immutable, tamper-evident audit trail of every operation in your sys
 ## Basic Setup
 
 ```typescript
-import { createAuditTrail } from 'directive/openai-agents';
+import { createAuditTrail } from 'directive/ai';
 
 const audit = createAuditTrail({
   maxEntries: 10000,

@@ -34,12 +34,12 @@ function Counter() {
 
 ---
 
-## useFactSelector
+## useFact (with selector)
 
 Subscribe to a derived value from a fact using a selector. Only re-renders when the selected value changes.
 
 ```typescript
-function useFactSelector<S extends ModuleSchema, K extends keyof InferFacts<S> & string, R>(
+function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string, R>(
   system: SingleModuleSystem<S>,
   factKey: K,
   selector: (value: InferFacts<S>[K] | undefined) => R,
@@ -53,12 +53,12 @@ function useFactSelector<S extends ModuleSchema, K extends keyof InferFacts<S> &
 const selectUserName = (user) => user?.name ?? "Guest";
 
 function UserName() {
-  const name = useFactSelector(system, "user", selectUserName);
+  const name = useFact(system, "user", selectUserName);
   return <p>Hello, {name}</p>;
 }
 
 // With custom equality
-const ids = useFactSelector(
+const ids = useFact(
   system, "users",
   (users) => users?.map(u => u.id) ?? [],
   (a, b) => a.length === b.length && a.every((v, i) => v === b[i])

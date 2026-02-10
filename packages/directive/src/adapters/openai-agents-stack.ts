@@ -52,7 +52,7 @@ import type {
 } from "./openai-agents-types.js";
 import type { RunCallOptions, AgentOrchestrator } from "./openai-agents.js";
 import type { Requirement } from "../core/types.js";
-import type { StreamingGuardrail, StreamChunk, StreamRunner } from "./openai-agents-streaming.js";
+import type { StreamingGuardrail, StreamChunk, StreamRunner, StreamingRunResult } from "./openai-agents-streaming.js";
 import type { AgentMemory, MemoryStrategyConfig } from "./openai-agents-memory.js";
 import type { CircuitBreaker, CircuitState, CircuitBreakerConfig } from "./plugins/circuit-breaker.js";
 import type { ObservabilityInstance, AlertConfig, TraceSpan, AggregatedMetric } from "./plugins/observability.js";
@@ -205,6 +205,8 @@ export interface AgentStack {
 	runPattern<T = unknown>(patternId: string, input: string, options?: StackRunOptions): Promise<T>;
 	/** Stream tokens from a single agent */
 	stream<T = string>(agentId: string, input: string, options?: StackStreamOptions): TokenStream<T>;
+	/** Stream full rich chunks (token, tool_start, tool_end, etc.) from a single agent */
+	streamChunks<T = unknown>(agentId: string, input: string, options?: StackStreamOptions): StreamingRunResult<T>;
 	/** Approve a pending approval request */
 	approve(requestId: string): void;
 	/** Reject a pending approval request */
@@ -513,7 +515,10 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 	// --- Resolve agent from registry ---
 	function resolveAgent(agentId: string): AgentLike {
 		if (!agentRegistry) {
-			throw new Error(`[AgentStack] No agents registered. Provide 'agents' config to use run().`);
+			throw new Error(
+			`[AgentStack] No agents registered.\n` +
+			`Add to config: agents: { myAgent: { agent: myAgentDef, description: '...' } }`,
+		);
 		}
 		const reg = agentRegistry[agentId];
 		if (!reg) {
@@ -544,7 +549,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 					try {
 						const parsed = JSON.parse(cached.entry.response) as T;
 						return {
-							finalOutput: parsed,
+							output: parsed,
 							messages: [],
 							toolCalls: [],
 							totalTokens: 0,
@@ -587,11 +592,11 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 			totalTokens += result.totalTokens;
 
 			// 4. Cache store
-			if (cacheInstance && !skipCache && result.finalOutput != null) {
+			if (cacheInstance && !skipCache && result.output != null) {
 				try {
-					const serialized = typeof result.finalOutput === "string"
-						? result.finalOutput
-						: JSON.stringify(result.finalOutput);
+					const serialized = typeof result.output === "string"
+						? result.output
+						: JSON.stringify(result.output);
 					await cacheInstance.store(input, serialized, agentId);
 				} catch {
 					// Cache store failed (e.g., circular ref in JSON) — non-fatal
@@ -647,7 +652,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 			// Skip cache on retries to get a fresh result
 			const attemptOpts = attempt > 0 ? { ...runOpts, cache: false as const } : runOpts;
 			const result = await run<T>(agentId, input, attemptOpts);
-			const validation = validate(result.finalOutput);
+			const validation = validate(result.output);
 			const isValid = typeof validation === "boolean" ? validation : validation.valid;
 
 			if (isValid) return result;
@@ -662,7 +667,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 				guardrailType: "output",
 				agentName: agentId,
 				input,
-				data: result.finalOutput,
+				data: result.output,
 			});
 
 			if (debug) console.debug(`[AgentStack] runStructured validation failed (attempt ${attempt + 1}):`, errors);
@@ -792,7 +797,10 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 		options: StackStreamOptions = {},
 	): TokenStream<T> {
 		if (!streamingAgentRunner) {
-			throw new Error("[AgentStack] Streaming not configured. Provide 'streaming' config.");
+			throw new Error(
+			`[AgentStack] Streaming not configured.\n` +
+			`Add to config: streaming: { runner: createStreamingCallbackRunner(...) }`,
+		);
 		}
 
 		// Circuit breaker check
@@ -882,6 +890,87 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 	}
 
 	// ============================================================================
+	// streamChunks()
+	// ============================================================================
+
+	function streamChunks<T = unknown>(
+		agentId: string,
+		input: string,
+		options: StackStreamOptions = {},
+	): StreamingRunResult<T> {
+		if (!streamingAgentRunner) {
+			throw new Error(
+				`[AgentStack] Streaming not configured.\n` +
+				`Add to config: streaming: { runner: createStreamingCallbackRunner(...) }`,
+			);
+		}
+
+		if (circuitBreaker?.getState() === "OPEN") {
+			throw new Error("[AgentStack] Circuit breaker is OPEN. Streaming call rejected.");
+		}
+
+		const agent = resolveAgent(agentId);
+		const abortController = new AbortController();
+
+		const onAbort = () => abortController.abort();
+		if (options.signal) {
+			options.signal.addEventListener("abort", onAbort, { once: true });
+		}
+
+		const span = obsInstance?.startSpan(`streamChunks.${agentId}`);
+		const startTime = Date.now();
+
+		const { stream: chunkStream, result, abort: streamAbort } = streamingAgentRunner<T>(agent, input, {
+			signal: abortController.signal,
+		});
+
+		// Track result for observability, metrics, and bus
+		const trackedResult = result.then((r) => {
+			const latencyMs = Date.now() - startTime;
+			totalTokens += r.totalTokens;
+
+			options.signal?.removeEventListener("abort", onAbort);
+			if (span) obsInstance?.endSpan(span.spanId, "ok");
+			if (busInstance) {
+				busInstance.publish({
+					type: "INFORM",
+					from: agentId,
+					to: "*",
+					topic: `${agentId}.streamChunks.completed`,
+					content: { tokenCount: r.totalTokens },
+				} as Omit<TypedAgentMessage, "id" | "timestamp">);
+			}
+			if (metrics) {
+				metrics.trackRun(agentId, {
+					success: true,
+					latencyMs,
+					cost: costRatePerMillion > 0 ? estimateCost(r.totalTokens, costRatePerMillion) : undefined,
+				});
+			}
+			return r;
+		}).catch((err) => {
+			const latencyMs = Date.now() - startTime;
+			options.signal?.removeEventListener("abort", onAbort);
+			if (span) obsInstance?.endSpan(span.spanId, "error");
+			if (metrics) metrics.trackRun(agentId, { success: false, latencyMs });
+			throw err;
+		});
+
+		let aborted = false;
+		return {
+			stream: chunkStream,
+			result: trackedResult,
+			abort: () => {
+				if (aborted) return;
+				aborted = true;
+				streamAbort();
+				abortController.abort();
+				options.signal?.removeEventListener("abort", onAbort);
+			},
+		};
+	}
+
+	// ============================================================================
 	// Lifecycle
 	// ============================================================================
 
@@ -954,6 +1043,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 		runStructured,
 		runPattern,
 		stream,
+		streamChunks,
 		approve: (requestId: string) => orchestrator.approve(requestId),
 		reject: (requestId: string, reason?: string) => orchestrator.reject(requestId, reason),
 		getState,

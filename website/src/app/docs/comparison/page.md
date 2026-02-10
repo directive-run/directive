@@ -214,6 +214,16 @@ const userMachine = createMachine({
 **Directive:**
 ```typescript
 const userModule = createModule("user", {
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.object<User>().nullable(),
+    },
+  },
+  init: (facts) => {
+    facts.userId = 0;
+    facts.user = null;
+  },
   constraints: {
     needsUser: {
       when: (f) => f.userId > 0 && !f.user,

@@ -12,6 +12,8 @@ Effects run side effects without blocking the reconciliation loop. {% .lead %}
 Define effects in your module to react to fact changes:
 
 ```typescript
+import { createModule, t } from 'directive';
+
 const analyticsModule = createModule("analytics", {
   schema: {
     facts: {
@@ -187,8 +189,6 @@ effects: {
   },
 }
 ```
-
----
 
 ---
 

@@ -108,6 +108,7 @@ const formModule = createModule("signup-form", {
 ## React Component
 
 ```typescript
+import { createSystem } from 'directive';
 import { useFact, useDerived } from 'directive/react';
 
 const system = createSystem({ module: formModule });

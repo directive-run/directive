@@ -32,7 +32,6 @@ import type {
 	InferDerivations,
 	InferEvents,
 	System,
-	SystemInspection,
 	SystemSnapshot,
 } from "../core/types.js";
 import {

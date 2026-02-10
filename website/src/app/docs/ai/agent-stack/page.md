@@ -95,7 +95,7 @@ const stack = createAgentStack({ runner, memory });
 ```typescript
 // Run a registered agent by ID
 const result = await stack.run('assistant', 'What is WebAssembly?');
-console.log(result.finalOutput);
+console.log(result.output);
 
 // Run with structured output validation
 const result = await stack.runStructured('assistant', 'List 3 facts about Rust', {
@@ -111,7 +111,11 @@ const result = await stack.runPattern('research-and-write', 'AI safety');
 
 ## Streaming
 
-Requires `streaming.runner` in config:
+Requires `streaming.runner` in config. Two streaming methods are available:
+
+### Token Stream
+
+`stack.stream()` yields raw token strings — ideal for simple text output:
 
 ```typescript
 const stack = createAgentStack({
@@ -128,6 +132,41 @@ for await (const token of tokenStream) {
 
 const finalResult = await tokenStream.result;
 ```
+
+### Rich Chunk Stream
+
+`stack.streamChunks()` yields full `StreamChunk` events (tokens, tool calls, guardrails, progress, errors) — use this when you need visibility into the full streaming lifecycle:
+
+```typescript
+const { stream, result, abort } = stack.streamChunks<string>('chat', 'Hello!');
+
+for await (const chunk of stream) {
+  switch (chunk.type) {
+    case 'token':
+      process.stdout.write(chunk.data);
+      break;
+    case 'tool_start':
+      console.log(`Calling: ${chunk.tool}`);
+      break;
+    case 'tool_end':
+      console.log(`Result: ${chunk.result}`);
+      break;
+    case 'guardrail_triggered':
+      console.warn(`${chunk.guardrailName}: ${chunk.reason}`);
+      break;
+    case 'done':
+      console.log(`Done: ${chunk.totalTokens} tokens`);
+      break;
+    case 'error':
+      console.error(chunk.error);
+      break;
+  }
+}
+
+const finalResult = await result;
+```
+
+Both methods track tokens, publish to the message bus, and record observability spans automatically. The `abort()` function is idempotent — safe to call multiple times.
 
 ---
 
@@ -448,7 +487,7 @@ if (result.hit) {
   console.log(result.entry!.response);
 } else {
   const response = await runAgent(agent, 'What is WebAssembly?');
-  await cache.store('What is WebAssembly?', response.finalOutput);
+  await cache.store('What is WebAssembly?', response.output);
 }
 ```
 
@@ -505,7 +544,7 @@ import { useAgentStack, useFact, useSelector, useWatch, useInspect } from 'direc
 
 function AgentDashboard() {
   const stack = useAgentStack({
-    run,
+    runner,
     agents: { assistant: { agent, capabilities: ['chat'] } },
   });
   const system = stack.orchestrator.system;
@@ -536,7 +575,7 @@ import { createAgentStack } from 'directive/ai';
 import { useFact, useInspect } from 'directive/vue';
 import { onUnmounted } from 'vue';
 
-const stack = createAgentStack({ run, agents: { /* ... */ } });
+const stack = createAgentStack({ runner, agents: { /* ... */ } });
 onUnmounted(() => stack.dispose());
 
 const system = stack.orchestrator.system;
@@ -560,7 +599,7 @@ import { createAgentStack } from 'directive/ai';
 import { useFact, useInspect } from 'directive/svelte';
 import { onDestroy } from 'svelte';
 
-const stack = createAgentStack({ run, agents: { /* ... */ } });
+const stack = createAgentStack({ runner, agents: { /* ... */ } });
 onDestroy(() => stack.dispose());
 
 const system = stack.orchestrator.system;
@@ -582,7 +621,7 @@ import { useFact, useInspect } from 'directive/solid';
 import { onCleanup } from 'solid-js';
 
 function AgentDashboard() {
-  const stack = createAgentStack({ run, agents: { /* ... */ } });
+  const stack = createAgentStack({ runner, agents: { /* ... */ } });
   onCleanup(() => stack.dispose());
 
   const system = stack.orchestrator.system;
@@ -608,7 +647,7 @@ import { createAgentStack } from 'directive/ai';
 import { FactController, InspectController } from 'directive/lit';
 
 class AgentDashboard extends LitElement {
-  private stack = createAgentStack({ run, agents: { /* ... */ } });
+  private stack = createAgentStack({ runner, agents: { /* ... */ } });
   private agent = new FactController(this, this.stack.orchestrator.system, '__agent');
   private conversation = new FactController(this, this.stack.orchestrator.system, '__conversation');
   private inspect = new InspectController(this, this.stack.orchestrator.system);

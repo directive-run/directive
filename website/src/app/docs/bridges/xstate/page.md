@@ -258,6 +258,8 @@ const coordinator = createActorCoordinator({
   },
 });
 
+coordinator.start();
+
 // Send events to specific actors
 coordinator.send('elevator-1', { type: 'GO_TO_FLOOR', floor: 3 });
 
@@ -311,6 +313,7 @@ All helpers return `false` if the actor state is `undefined`, so they are safe t
 
 ## Next Steps
 
+- See [Migrating from XState](/docs/migration/from-xstate) for a step-by-step migration guide
 - See [Resolvers](/docs/resolvers) for resolver patterns (retry, batching, cancellation)
 - See [Constraints](/docs/constraints) for declarative logic
 - See [Module and System](/docs/module-system) for setup

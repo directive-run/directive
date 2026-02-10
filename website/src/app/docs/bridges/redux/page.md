@@ -12,7 +12,7 @@ Redux continues to own predictable state (reducers, actions, selectors). Directi
 ## Installation
 
 ```bash
-npm install directive
+npm install directive @reduxjs/toolkit
 ```
 
 Import from the `directive/redux` subpath:
@@ -107,16 +107,16 @@ const store = configureStore({
 
 ### Options Reference
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `constraints` | `Record<string, ReduxConstraint<S>>` | Constraints that evaluate against Redux state |
-| `resolvers` | `Record<string, ReduxResolver<S>>` | Resolvers that fulfill requirements |
-| `interceptors` | `ActionInterceptor<S>[]` | Convert Redux actions into Directive requirements |
-| `syncActions` | `boolean \| ((action) => boolean)` | Sync dispatched actions to Directive facts |
-| `onRequirementCreated` | `(req: Requirement) => void` | Callback when a requirement is produced |
-| `onRequirementResolved` | `(req: Requirement) => void` | Callback when a requirement is fulfilled |
-| `plugins` | `Plugin[]` | Directive plugins (logging, persistence, etc.) |
-| `debug` | `boolean` | Enable time-travel debugging |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `constraints` | `Record<string, ReduxConstraint<S>>` | `{}` | Constraints that evaluate against Redux state |
+| `resolvers` | `Record<string, ReduxResolver<S>>` | `{}` | Resolvers that fulfill requirements |
+| `interceptors` | `ActionInterceptor<S>[]` | `[]` | Convert Redux actions into Directive requirements |
+| `syncActions` | `boolean \| ((action) => boolean)` | `false` | Sync dispatched actions to Directive facts |
+| `onRequirementCreated` | `(req: Requirement) => void` | — | Callback when a requirement is produced |
+| `onRequirementResolved` | `(req: Requirement) => void` | — | Callback when a requirement is fulfilled |
+| `plugins` | `Plugin[]` | `[]` | Directive plugins (logging, persistence, etc.) |
+| `debug` | `boolean` | `false` | Enable time-travel debugging |
 
 ---
 

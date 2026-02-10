@@ -274,8 +274,8 @@ function UserProfile() {
 // Bad: subscribing to the whole user fact when you only need the name
 const user = useFact(system, "user");
 
-// Good: use useFactSelector to select only what you need
-const userName = useFactSelector(system, "user", (u) => u?.name);
+// Good: use useFact with a selector to select only what you need
+const userName = useFact(system, "user", (u) => u?.name);
 ```
 
 2. **Reading from stale closure**:

@@ -49,8 +49,8 @@ A system runs one or more modules:
 ```typescript
 import { createSystem } from 'directive';
 
-// Single module
-const system = createSystem({ module: counterModule });
+// Single module (minimal)
+// const system = createSystem({ module: counterModule });
 
 // With plugins
 const system = createSystem({
@@ -213,3 +213,6 @@ When facts change, the reconciliation loop runs until all constraints are satisf
 - **[Facts](/docs/facts)** - State management
 - **[Constraints](/docs/constraints)** - Declarative rules
 - **[Resolvers](/docs/resolvers)** - Async handling
+- **[Derivations](/docs/derivations)** - Computed values
+- **[Effects](/docs/effects)** - Side effects
+- **[Events](/docs/events)** - Typed event dispatching

@@ -35,7 +35,6 @@ import type {
 	InferDerivations,
 	InferEvents,
 	System,
-	SystemInspection,
 	SystemSnapshot,
 } from "../core/types.js";
 import {
@@ -546,8 +545,8 @@ export function useConstraintStatus(
 	const inspectState = useInspect();
 
 	return computed(() => {
-		const inspection = inspectState.value;
-		// We need the raw constraint list from inspect()
+		// Track reactivity via inspectState, but use full inspect() for constraint list
+		void inspectState.value;
 		const system = _useSystem();
 		const fullInspection = system.inspect();
 		if (!constraintId) return fullInspection.constraints;

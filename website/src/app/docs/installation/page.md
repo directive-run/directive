@@ -114,12 +114,12 @@ function App() {
 ```vue
 <script setup>
 import { createSystem } from 'directive';
-import { provideDirective } from 'directive/vue';
+import { provideSystem } from 'directive/vue';
 import { userModule } from './modules/user';
 
 const system = createSystem({ module: userModule });
 system.start();
-provideDirective(system);
+provideSystem(system);
 </script>
 ```
 

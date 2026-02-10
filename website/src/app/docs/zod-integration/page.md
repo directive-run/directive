@@ -24,7 +24,7 @@ const UserSchema = z.object({
 const myModule = createModule("users", {
   schema: {
     facts: {
-      user: UserSchema,              // Zod schema used directly
+      user: UserSchema.nullable(),   // Zod schema, nullable for initial state
       users: z.array(UserSchema),    // Zod arrays work too
       count: t.number(),             // Mix with t.* builders
     },
