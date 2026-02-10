@@ -51,6 +51,7 @@ import type {
 	InferDerivations,
 	InferEvents,
 	SingleModuleSystem,
+	System,
 	SystemSnapshot,
 	DistributableSnapshot,
 } from "../core/types.js";
@@ -638,7 +639,7 @@ function _buildInspectState(
 	// biome-ignore lint/suspicious/noExplicitAny: Internal
 	system: SingleModuleSystem<any>,
 ): InspectState {
-	return computeInspectState(system);
+	return computeInspectState(system as unknown as System<any>);
 }
 
 function _useInspectSync(

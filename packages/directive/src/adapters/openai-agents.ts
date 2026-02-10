@@ -38,6 +38,7 @@ import type {
 } from "../core/types.js";
 import type { AgentMemory } from "./openai-agents-memory.js";
 import type { CircuitBreaker } from "./plugins/circuit-breaker.js";
+import type { StreamChunk as StreamChunkBase } from "./openai-agents-streaming.js";
 import {
   setBridgeFact,
   getBridgeFact,
@@ -129,6 +130,8 @@ export {
   createToolGuardrail,
   createOutputSchemaGuardrail,
   createOutputTypeGuardrail,
+  createLengthGuardrail,
+  createContentFilterGuardrail,
   type RateLimitGuardrail,
 } from "./openai-agents-builtin-guardrails.js";
 
@@ -146,6 +149,14 @@ export {
   type AnthropicRunnerOptions,
   type OllamaRunnerOptions,
 } from "./openai-agents-helpers.js";
+
+// Re-export constraint helpers
+export {
+  constraint,
+  when,
+  type ConstraintBuilder,
+  type WhenWithRequire,
+} from "./openai-agents-constraint-helpers.js";
 
 // ============================================================================
 // Bridge Accessors
@@ -294,7 +305,7 @@ interface PauseBudgetExceededReq extends Requirement {
 /** Orchestrator options */
 export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Function to run an agent */
-  runner?: AgentRunner;
+  runner: AgentRunner;
   /** Additional facts schema */
   factsSchema?: Record<string, { _type: unknown; _validators: [] }>;
   /** Initialize additional facts */
@@ -372,18 +383,11 @@ export interface OrchestratorStreamResult<T = unknown> {
   abort: () => void;
 }
 
-/** Stream chunk types for orchestrator */
+/** Stream chunk types for orchestrator — extends StreamChunk with approval events */
 export type OrchestratorStreamChunk =
-  | { type: "token"; data: string; tokenCount: number }
-  | { type: "tool_start"; tool: string; toolCallId: string }
-  | { type: "tool_end"; tool: string; toolCallId: string; result: string }
-  | { type: "message"; message: Message }
-  | { type: "guardrail_triggered"; guardrailName: string; reason: string; stopped: boolean }
+  | StreamChunkBase
   | { type: "approval_required"; requestId: string; toolName: string }
-  | { type: "approval_resolved"; requestId: string; approved: boolean }
-  | { type: "progress"; phase: string; message?: string }
-  | { type: "done"; totalTokens: number; duration: number }
-  | { type: "error"; error: Error };
+  | { type: "approval_resolved"; requestId: string; approved: boolean };
 
 /** Per-call options for run() */
 export interface RunCallOptions {
@@ -625,10 +629,6 @@ export function createAgentOrchestrator<
     memory,
     circuitBreaker,
   } = options;
-
-  if (!runner) {
-    throw new Error("[Directive] createAgentOrchestrator requires a 'runner' function.");
-  }
 
   // Enforce approval workflow configuration - require either auto-approve or callback
   if (!autoApproveToolCalls && !onApprovalRequest) {
@@ -967,7 +967,7 @@ export function createAgentOrchestrator<
       const guardResult = await executeGuardrailWithRetry(
         guardrail,
         {
-          output: result.finalOutput,
+          output: result.output,
           agentName: agent.name,
           input,
           messages: result.messages,
@@ -994,7 +994,7 @@ export function createAgentOrchestrator<
         });
       }
       if (guardResult.transformed !== undefined) {
-        (result as { finalOutput: unknown }).finalOutput = guardResult.transformed;
+        (result as { output: unknown }).output = guardResult.transformed;
       }
     }
 
@@ -1004,7 +1004,7 @@ export function createAgentOrchestrator<
       setAgentState(system.facts, {
         ...currentAgent,
         status: "completed",
-        output: result.finalOutput,
+        output: result.output,
         tokenUsage: currentAgent.tokenUsage + result.totalTokens,
         turnCount: currentAgent.turnCount + result.messages.length,
         completedAt: Date.now(),
@@ -1020,7 +1020,7 @@ export function createAgentOrchestrator<
     hooks.onAgentComplete?.({
       agentName: agent.name,
       input,
-      output: result.finalOutput,
+      output: result.output,
       tokenUsage: result.totalTokens,
       durationMs: Date.now() - startTime,
       timestamp: Date.now(),
@@ -1068,9 +1068,12 @@ export function createAgentOrchestrator<
         unsubscribe();
         const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
         reject(new Error(
-          `[Directive] Approval timeout: Request ${requestId} was not approved or rejected within ${timeoutSeconds}s (${approvalTimeoutMs}ms). ` +
-          `Call orchestrator.approve("${requestId}") or orchestrator.reject("${requestId}") to resolve. ` +
-          `Current timeout: ${approvalTimeoutMs}ms. Configure via 'approvalTimeoutMs' option.`
+          `[Directive] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
+          `Solutions:\n` +
+          `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
+          `  2. Set autoApproveToolCalls: true to auto-approve\n` +
+          `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
+          `See: https://directive.run/docs/ai/running-agents`
         ));
       }, approvalTimeoutMs);
     });
@@ -1103,6 +1106,7 @@ export function createAgentOrchestrator<
       let closed = false;
       const startTime = Date.now();
       let tokenCount = 0;
+      let accumulatedOutput = "";
 
       // Combine external abort signal
       let abortHandler: (() => void) | undefined;
@@ -1165,6 +1169,7 @@ export function createAgentOrchestrator<
                 type: "guardrail_triggered",
                 guardrailName: name,
                 reason: result.reason ?? "Input validation failed",
+                partialOutput: accumulatedOutput,
                 stopped: true,
               });
               throw new GuardrailError({
@@ -1208,11 +1213,12 @@ export function createAgentOrchestrator<
               if (message.role === "assistant" && message.content) {
                 const newTokens = Math.ceil(message.content.length / 4);
                 tokenCount += newTokens;
+                accumulatedOutput += message.content;
                 pushChunk({ type: "token", data: message.content, tokenCount });
               }
             },
             onToolCall: async (toolCall) => {
-              pushChunk({ type: "tool_start", tool: toolCall.name, toolCallId: toolCall.id });
+              pushChunk({ type: "tool_start", tool: toolCall.name, toolCallId: toolCall.id, arguments: toolCall.arguments });
 
               // Run tool call guardrails with retry support
               const toolCallGuardrails = (guardrails.toolCall ?? []).map((g, i) =>
@@ -1235,6 +1241,7 @@ export function createAgentOrchestrator<
                     type: "guardrail_triggered",
                     guardrailName: name,
                     reason: guardResult.reason ?? "Tool call blocked",
+                    partialOutput: accumulatedOutput,
                     stopped: true,
                   });
                   throw new GuardrailError({
@@ -1302,7 +1309,7 @@ export function createAgentOrchestrator<
             const guardResult = await executeGuardrailWithRetry(
               guardrail,
               {
-                output: result.finalOutput,
+                output: result.output,
                 agentName: agent.name,
                 input: processedInput,
                 messages: result.messages,
@@ -1314,6 +1321,7 @@ export function createAgentOrchestrator<
                 type: "guardrail_triggered",
                 guardrailName: name,
                 reason: guardResult.reason ?? "Output validation failed",
+                partialOutput: typeof result.output === "string" ? result.output : "",
                 stopped: true,
               });
               throw new GuardrailError({
@@ -1327,7 +1335,7 @@ export function createAgentOrchestrator<
               });
             }
             if (guardResult.transformed !== undefined) {
-              (result as { finalOutput: unknown }).finalOutput = guardResult.transformed;
+              (result as { output: unknown }).output = guardResult.transformed;
             }
           }
 
@@ -1337,7 +1345,7 @@ export function createAgentOrchestrator<
             setAgentState(system.facts, {
               ...currentAgent,
               status: "completed",
-              output: result.finalOutput,
+              output: result.output,
               tokenUsage: currentAgent.tokenUsage + result.totalTokens,
               turnCount: currentAgent.turnCount + result.messages.length,
               completedAt: Date.now(),
@@ -1345,7 +1353,7 @@ export function createAgentOrchestrator<
           });
 
           const duration = Date.now() - startTime;
-          pushChunk({ type: "done", totalTokens: result.totalTokens, duration });
+          pushChunk({ type: "done", totalTokens: result.totalTokens, duration, droppedTokens: 0 });
           closeStream();
 
           return result;
@@ -1702,7 +1710,6 @@ export {
   tapStream,
   filterStream,
   mapStream,
-  type StreamChunk,
   type TokenChunk,
   type ToolStartChunk,
   type ToolEndChunk,
@@ -1711,6 +1718,7 @@ export {
   type ProgressChunk,
   type DoneChunk,
   type ErrorChunk,
+  type StreamChunk,
   type StreamRunOptions,
   type StreamRunner,
   type StreamingRunResult,

@@ -106,8 +106,8 @@ function validateMoveOutput(value: unknown): { valid: boolean; errors?: string[]
 // ============================================================================
 
 function mergeResults(results: RunResult<unknown>[]): MoveWithAnalysis {
-  const moveResult = results[0]?.finalOutput as { from: number; to: number; reasoning: string; chat: string } | undefined;
-  const analysisResult = results[1]?.finalOutput as string | undefined;
+  const moveResult = results[0]?.output as { from: number; to: number; reasoning: string; chat: string } | undefined;
+  const analysisResult = results[1]?.output as string | undefined;
   return {
     move: moveResult ?? { from: -1, to: -1, reasoning: "No result", chat: "Something went wrong" },
     analysis: analysisResult ?? null,
@@ -128,8 +128,8 @@ export function createCheckersAI(): CheckersAI {
 
   // --- One stack wires everything ---
   const stack = createAgentStack({
-    run: runClaude,
-    streaming: { run: runClaudeWithCallbacks },
+    runner: runClaude,
+    streaming: { runner: runClaudeWithCallbacks },
     agents: {
       move:     { agent: moveAgent,     description: "Selects the best move", capabilities: ["move"] },
       chat:     { agent: chatAgent,     description: "Free-form chat",        capabilities: ["chat"] },
@@ -262,15 +262,15 @@ export function createCheckersAI(): CheckersAI {
           if (token) onToken(token);
         }
         const finalResult = await tokenStream.result;
-        reply = typeof finalResult.finalOutput === "string"
-          ? finalResult.finalOutput
-          : String(finalResult.finalOutput);
+        reply = typeof finalResult.output === "string"
+          ? finalResult.output
+          : String(finalResult.output);
       } else {
         // Non-streaming: skip output guardrails for chat
         const result = await stack.run<string>("chat", message, {
           guardrails: { output: [] },
         });
-        reply = result.finalOutput;
+        reply = result.output;
       }
 
       return reply;

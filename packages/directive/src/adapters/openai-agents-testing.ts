@@ -49,7 +49,7 @@ import { createAgentOrchestrator } from "./openai-agents.js";
 /** Configuration for mock agent responses */
 export interface MockAgentConfig<T = unknown> {
   /** Final output to return */
-  finalOutput: T;
+  output: T;
   /** Messages to emit during run */
   messages?: Message[];
   /** Tool calls to emit during run */
@@ -108,16 +108,16 @@ export interface MockAgentRunner {
  * const mock = createMockAgentRunner({
  *   responses: {
  *     'my-agent': {
- *       finalOutput: 'Hello, world!',
+ *       output: 'Hello, world!',
  *       totalTokens: 100,
  *     },
  *   },
  * });
  *
- * const orchestrator = createAgentOrchestrator({ runAgent: mock.run });
+ * const orchestrator = createAgentOrchestrator({ runner: mock.run });
  * const result = await orchestrator.run(myAgent, 'Hi');
  *
- * expect(result.finalOutput).toBe('Hello, world!');
+ * expect(result.output).toBe('Hello, world!');
  * expect(mock.getCalls()).toHaveLength(1);
  * ```
  */
@@ -125,7 +125,7 @@ export function createMockAgentRunner(
   options: MockAgentRunnerOptions = {}
 ): MockAgentRunner {
   const {
-    defaultResponse = { finalOutput: "mock response", totalTokens: 10 },
+    defaultResponse = { output: "mock response", totalTokens: 10 },
     responses = {},
     recordCalls = true,
     onRun,
@@ -183,7 +183,7 @@ export function createMockAgentRunner(
     }
 
     return {
-      finalOutput: config.finalOutput as T,
+      output: config.output as T,
       messages,
       toolCalls,
       totalTokens: config.totalTokens ?? 10,
@@ -501,7 +501,7 @@ export function createApprovalSimulator(
 // ============================================================================
 
 /** Options for test orchestrator */
-export interface TestOrchestratorOptions<F extends Record<string, unknown>> extends Omit<OrchestratorOptions<F>, "runAgent"> {
+export interface TestOrchestratorOptions<F extends Record<string, unknown>> extends Omit<OrchestratorOptions<F>, "runner"> {
   /** Mock responses for agents */
   mockResponses?: Record<string, MockAgentConfig>;
   /** Default mock response */
@@ -529,7 +529,7 @@ export interface TestOrchestrator<F extends Record<string, unknown>> extends Age
  * ```typescript
  * const test = createTestOrchestrator({
  *   mockResponses: {
- *     'my-agent': { finalOutput: 'test response' },
+ *     'my-agent': { output: 'test response' },
  *   },
  *   constraints: {
  *     needsApproval: {
@@ -561,7 +561,7 @@ export function createTestOrchestrator<F extends Record<string, unknown> = Recor
 
   const orchestrator = createAgentOrchestrator<F>({
     ...orchestratorOptions,
-    runAgent: mockRunner.run,
+    runner: mockRunner.run,
     onApprovalRequest: (req) => {
       approvalSimulator.handle(req);
       orchestratorOptions.onApprovalRequest?.(req);

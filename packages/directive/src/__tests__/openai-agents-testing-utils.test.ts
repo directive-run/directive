@@ -41,7 +41,7 @@ describe("createMockAgentRunner", () => {
 		const mock = createMockAgentRunner({
 			responses: {
 				"my-agent": {
-					finalOutput: "hello from mock",
+					output: "hello from mock",
 					totalTokens: 42,
 				},
 			},
@@ -49,7 +49,7 @@ describe("createMockAgentRunner", () => {
 
 		const result = await mock.run(makeAgent("my-agent"), "test input");
 
-		expect(result.finalOutput).toBe("hello from mock");
+		expect(result.output).toBe("hello from mock");
 		expect(result.totalTokens).toBe(42);
 		expect(result.messages).toEqual([]);
 		expect(result.toolCalls).toEqual([]);
@@ -58,24 +58,24 @@ describe("createMockAgentRunner", () => {
 	it("should fall back to default response for unknown agents", async () => {
 		const mock = createMockAgentRunner({
 			responses: {
-				"known-agent": { finalOutput: "known" },
+				"known-agent": { output: "known" },
 			},
 		});
 
 		const result = await mock.run(makeAgent("unknown-agent"), "hi");
 
-		expect(result.finalOutput).toBe("mock response");
+		expect(result.output).toBe("mock response");
 		expect(result.totalTokens).toBe(10);
 	});
 
 	it("should use a custom default response", async () => {
 		const mock = createMockAgentRunner({
-			defaultResponse: { finalOutput: "custom default", totalTokens: 99 },
+			defaultResponse: { output: "custom default", totalTokens: 99 },
 		});
 
 		const result = await mock.run(makeAgent("any"), "test");
 
-		expect(result.finalOutput).toBe("custom default");
+		expect(result.output).toBe("custom default");
 		expect(result.totalTokens).toBe(99);
 	});
 
@@ -143,7 +143,7 @@ describe("createMockAgentRunner", () => {
 		const mock = createMockAgentRunner({
 			responses: {
 				"my-agent": {
-					finalOutput: "result",
+					output: "result",
 					messages,
 					toolCalls,
 				},
@@ -167,7 +167,7 @@ describe("createMockAgentRunner", () => {
 		const mock = createMockAgentRunner({
 			responses: {
 				"error-agent": {
-					finalOutput: null,
+					output: null,
 					error: new Error("agent failed"),
 				},
 			},
@@ -182,9 +182,9 @@ describe("createMockAgentRunner", () => {
 		const mock = createMockAgentRunner({
 			responses: {
 				"dynamic-agent": {
-					finalOutput: "default",
+					output: "default",
 					generate: (input, agent) => ({
-						finalOutput: `${agent.name} received: ${input}`,
+						output: `${agent.name} received: ${input}`,
 						totalTokens: input.length,
 					}),
 				},
@@ -193,27 +193,27 @@ describe("createMockAgentRunner", () => {
 
 		const result = await mock.run(makeAgent("dynamic-agent"), "hello");
 
-		expect(result.finalOutput).toBe("dynamic-agent received: hello");
+		expect(result.output).toBe("dynamic-agent received: hello");
 		expect(result.totalTokens).toBe(5);
 	});
 
 	it("should allow updating responses after creation via setResponse", async () => {
 		const mock = createMockAgentRunner();
 
-		mock.setResponse("my-agent", { finalOutput: "updated", totalTokens: 50 });
+		mock.setResponse("my-agent", { output: "updated", totalTokens: 50 });
 
 		const result = await mock.run(makeAgent("my-agent"), "test");
-		expect(result.finalOutput).toBe("updated");
+		expect(result.output).toBe("updated");
 		expect(result.totalTokens).toBe(50);
 	});
 
 	it("should allow updating default response via setDefaultResponse", async () => {
 		const mock = createMockAgentRunner();
 
-		mock.setDefaultResponse({ finalOutput: "new default", totalTokens: 1 });
+		mock.setDefaultResponse({ output: "new default", totalTokens: 1 });
 
 		const result = await mock.run(makeAgent("anything"), "test");
-		expect(result.finalOutput).toBe("new default");
+		expect(result.output).toBe("new default");
 		expect(result.totalTokens).toBe(1);
 	});
 

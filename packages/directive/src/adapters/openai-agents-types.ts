@@ -19,7 +19,7 @@ export interface AgentLike {
 
 /** Agent run result */
 export interface RunResult<T = unknown> {
-  finalOutput: T;
+  output: T;
   messages: Message[];
   toolCalls: ToolCall[];
   totalTokens: number;

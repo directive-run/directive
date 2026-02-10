@@ -278,19 +278,19 @@ export async function runClaudeWithCallbacks(
   callbacks.onMessage?.(assistantMessage);
 
   // Parse output
-  let finalOutput: unknown;
+  let output: unknown;
   try {
     const jsonText = fullText
       .replace(/^```(?:json)?\s*\n?/i, "")
       .replace(/\n?```\s*$/i, "")
       .trim();
-    finalOutput = JSON.parse(jsonText);
+    output = JSON.parse(jsonText);
   } catch {
-    finalOutput = fullText;
+    output = fullText;
   }
 
   return {
-    finalOutput,
+    output,
     messages: [...messages, assistantMessage],
     toolCalls: [],
     totalTokens,

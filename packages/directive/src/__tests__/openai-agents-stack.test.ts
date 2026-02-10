@@ -31,8 +31,8 @@ function makeAgent(name: string): AgentLike {
 	return { name };
 }
 
-function makeRunResult<T>(finalOutput: T, totalTokens = 10): RunResult<T> {
-	return { finalOutput, messages: [], toolCalls: [], totalTokens };
+function makeRunResult<T>(output: T, totalTokens = 10): RunResult<T> {
+	return { output, messages: [], toolCalls: [], totalTokens };
 }
 
 function createMockRunner(
@@ -95,7 +95,7 @@ describe("createAgentStack", () => {
 
 			const result = await stack.run("move", "pick a move");
 
-			expect(result.finalOutput).toBe("response from move-agent");
+			expect(result.output).toBe("response from move-agent");
 			expect(result.totalTokens).toBe(10);
 		});
 
@@ -135,11 +135,11 @@ describe("createAgentStack", () => {
 
 			// First call — cache miss
 			const result1 = await stack.run("move", "test-input");
-			expect(result1.finalOutput).toEqual({ answer: 42 });
+			expect(result1.output).toEqual({ answer: 42 });
 
 			// Second call with same input — cache hit
 			const result2 = await stack.run("move", "test-input");
-			expect(result2.finalOutput).toEqual({ answer: 42 });
+			expect(result2.output).toEqual({ answer: 42 });
 			expect(result2.totalTokens).toBe(0); // cached, no tokens used
 		});
 
@@ -380,7 +380,7 @@ describe("createAgentStack", () => {
 			expect(stack.bus).not.toBeNull();
 
 			const result = await stack.run("move", "test input");
-			expect(result.finalOutput).toBe("response from move-agent");
+			expect(result.output).toBe("response from move-agent");
 
 			const state = stack.getState();
 			expect(state.totalTokens).toBe(10);
@@ -409,7 +409,7 @@ describe("createAgentStack", () => {
 
 			// Should not throw — falls through to fresh run
 			const result = await stack.run("move", "input");
-			expect(result.finalOutput).toBe("fresh-result");
+			expect(result.output).toBe("fresh-result");
 		});
 
 		it("should survive cache store failure and still return result", async () => {
@@ -430,7 +430,7 @@ describe("createAgentStack", () => {
 			});
 
 			const result = await stack.run("move", "input");
-			expect(result.finalOutput).toBe("good-result");
+			expect(result.output).toBe("good-result");
 		});
 	});
 
@@ -712,7 +712,7 @@ describe("createAgentStack", () => {
 			});
 
 			const result = await stack.run("move", "test");
-			expect(result.finalOutput).toBe("recovered from move-agent");
+			expect(result.output).toBe("recovered from move-agent");
 			expect(callCount).toBe(2);
 		});
 	});
@@ -796,7 +796,7 @@ describe("createAgentStack", () => {
 				validate: (v) => typeof v === "object" && v !== null && "name" in v,
 			});
 
-			expect(result.finalOutput).toEqual({ name: "Alice", age: 30 });
+			expect(result.output).toEqual({ name: "Alice", age: 30 });
 		});
 
 		it("should throw when validation fails after retries", async () => {
@@ -828,7 +828,7 @@ describe("createAgentStack", () => {
 				retries: 1,
 			});
 
-			expect(result.finalOutput).toEqual({ valid: true });
+			expect(result.output).toEqual({ valid: true });
 			expect(attempt).toBe(2);
 		});
 	});
