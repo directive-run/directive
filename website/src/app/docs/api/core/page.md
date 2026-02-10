@@ -12,10 +12,10 @@ Core functions and types for Directive. {% .lead %}
 Create a module definition.
 
 ```typescript
-function createModule<T>(
+function createModule<M extends ModuleSchema>(
   name: string,
-  config: ModuleConfig<T>
-): Module<T>
+  config: ModuleConfig<M>
+): ModuleDef<M>
 ```
 
 ### Parameters
@@ -43,9 +43,9 @@ function createModule<T>(
 Create a runtime system.
 
 ```typescript
-function createSystem<T>(
-  config: SystemConfig<T>
-): System<T>
+function createSystem<M extends ModuleSchema>(
+  config: SystemConfig<M>
+): SingleModuleSystem<M>
 ```
 
 ### Parameters

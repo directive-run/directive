@@ -193,14 +193,14 @@ Higher-level hook that creates a scoped system and subscribes to selected facts 
 import { useDirective } from 'directive/react';
 
 function Counter() {
-  const { dispatch, snapshot } = useDirective(counterModule, {
+  const { dispatch, facts, derived } = useDirective(counterModule, {
     facts: ["count"],
-    derivations: ["doubled"],
+    derived: ["doubled"],
   });
 
   return (
     <div>
-      <p>Count: {snapshot.facts.count}, Doubled: {snapshot.derived.doubled}</p>
+      <p>Count: {facts.count}, Doubled: {derived.doubled}</p>
       <button onClick={() => dispatch({ type: "increment" })}>+</button>
     </div>
   );
@@ -543,7 +543,6 @@ test('displays user name', async () => {
 | `DirectiveDevTools` | Component | Floating debug panel |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
-| `useSystem` | Hook | Access the full system instance |
 | `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 

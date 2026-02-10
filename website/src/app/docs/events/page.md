@@ -12,6 +12,8 @@ Events are type-safe state mutation handlers — named operations that modify fa
 Events are defined in two places: the **schema** declares the payload shape, and the **events** object defines the handler:
 
 ```typescript
+import { createModule, t } from 'directive';
+
 const counterModule = createModule("counter", {
   schema: {
     facts: {
@@ -305,3 +307,5 @@ constraints: {
 - See [Facts](/docs/facts) for the state store
 - See [Constraints](/docs/constraints) for declarative rules
 - See [Derivations](/docs/derivations) for computed values
+- See [Resolvers](/docs/resolvers) for handling requirements
+- See [Effects](/docs/effects) for side effects on fact changes

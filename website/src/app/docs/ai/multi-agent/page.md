@@ -21,7 +21,7 @@ import {
   collectOutputs,
   aggregateTokens,
 } from 'directive/ai';
-import type { AgentLike, RunFn, RunResult } from 'directive/ai';
+import type { AgentLike, AgentRunner, RunResult } from 'directive/ai';
 
 // Define your agents (compatible with OpenAI Agents SDK)
 const researcher: AgentLike = {
@@ -42,8 +42,8 @@ const reviewer: AgentLike = {
   model: 'gpt-4',
 };
 
-// Your run function (wraps the OpenAI Agents SDK `run` call)
-const run: RunFn = async (agent, input, options) => {
+// Your runner (wraps the OpenAI Agents SDK call)
+const runner: AgentRunner = async (agent, input, options) => {
   // Replace with your actual OpenAI Agents SDK call
   const result = await openaiAgentsRun(agent, input, options);
   return result;
@@ -58,7 +58,7 @@ Register agents with concurrency limits, timeouts, and capabilities. Optionally 
 
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
-  runAgent: run,
+  runner,
 
   // Agent registry — each agent gets concurrency control and metadata
   agents: {
@@ -112,7 +112,7 @@ The simplest operation — run one registered agent with concurrency control and
 ```typescript
 const result = await orchestrator.runAgent<string>('researcher', 'What is WebAssembly?');
 
-console.log(result.finalOutput);   // The agent's response
+console.log(result.output);   // The agent's response
 console.log(result.totalTokens);   // Token usage
 ```
 
@@ -193,7 +193,7 @@ const results = await orchestrator.runSequential<string>(
 );
 
 // results is an array of RunResult for each step
-const finalReview = results[results.length - 1].finalOutput;
+const finalReview = results[results.length - 1].output;
 const totalTokens = aggregateTokens(results);
 ```
 
@@ -210,12 +210,12 @@ const manager: AgentLike = {
   name: 'manager',
   instructions: `You are a project manager. Analyze the request and delegate to workers.
     Respond with JSON: { "action": "delegate", "worker": "researcher"|"writer", "workerInput": "..." }
-    Or when done: { "action": "complete", "finalOutput": "..." }`,
+    Or when done: { "action": "complete", "output": "..." }`,
   model: 'gpt-4',
 };
 
 const orchestrator = createMultiAgentOrchestrator({
-  runAgent: run,
+  runner,
   agents: {
     manager: { agent: manager, maxConcurrent: 1 },
     researcher: { agent: researcher, maxConcurrent: 3 },
@@ -250,7 +250,7 @@ Transfer work from one agent to another with tracking:
 
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
-  runAgent: run,
+  runner,
   agents: {
     researcher: { agent: researcher, maxConcurrent: 3 },
     writer: { agent: writer, maxConcurrent: 1 },
@@ -270,11 +270,11 @@ const orchestrator = createMultiAgentOrchestrator({
 const research = await orchestrator.runAgent('researcher', 'What is Directive?');
 const draft = await orchestrator.handoff(
   'researcher', 'writer',
-  `Write an article based on this research:\n\n${research.finalOutput}`
+  `Write an article based on this research:\n\n${research.output}`
 );
 const review = await orchestrator.handoff(
   'writer', 'reviewer',
-  `Review this article:\n\n${draft.finalOutput}`
+  `Review this article:\n\n${draft.output}`
 );
 ```
 
@@ -303,7 +303,7 @@ const outputs = collectOutputs(results);  // T[]
 // Pick the best result using a scoring function
 const best = pickBestResult(results, (r) => {
   // Score by output length (or confidence, quality, etc.)
-  return typeof r.finalOutput === 'string' ? r.finalOutput.length : 0;
+  return typeof r.output === 'string' ? r.output.length : 0;
 });
 
 // Sum up token usage across all results
@@ -345,7 +345,7 @@ Track multi-agent state through the orchestrator's `.system`. The `__agent` brid
 import { useAgentOrchestrator, useFact, useSelector } from 'directive/react';
 
 function MultiAgentPanel() {
-  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
   const { system } = orchestrator;
 
   const agent = useFact(system, '__agent');
@@ -371,7 +371,7 @@ import { createMultiAgentOrchestrator } from 'directive/ai';
 import { useFact, useInspect } from 'directive/vue';
 import { onUnmounted } from 'vue';
 
-const orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
 onUnmounted(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -392,7 +392,7 @@ import { createMultiAgentOrchestrator } from 'directive/ai';
 import { useFact, useInspect } from 'directive/svelte';
 import { onDestroy } from 'svelte';
 
-const orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
 onDestroy(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -411,7 +411,7 @@ import { useFact, useInspect } from 'directive/solid';
 import { onCleanup } from 'solid-js';
 
 function MultiAgentPanel() {
-  const orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+  const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
   onCleanup(() => orchestrator.dispose());
 
   const agent = useFact(orchestrator.system, '__agent');
@@ -434,7 +434,7 @@ import { createMultiAgentOrchestrator } from 'directive/ai';
 import { FactController, InspectController } from 'directive/lit';
 
 class MultiAgentPanel extends LitElement {
-  private orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+  private orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
   private agent = new FactController(this, this.orchestrator.system, '__agent');
   private inspect = new InspectController(this, this.orchestrator.system);
 

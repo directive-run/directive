@@ -399,6 +399,7 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```tsx
 function SaveButton() {
+  const facts = useFacts();
   const { mutate, isPending, error, rollback } = useOptimisticUpdate(
     statusPlugin,    // optional — enables auto-rollback on resolver failure
     "SAVE_DATA"      // requirement type to watch
@@ -407,8 +408,8 @@ function SaveButton() {
   const handleSave = () => {
     mutate(() => {
       // Optimistic update — applied immediately
-      system.facts.savedAt = Date.now();
-      system.facts.status = "saved";
+      facts.savedAt = Date.now();
+      facts.status = "saved";
     });
     // If "SAVE_DATA" resolver fails, facts are rolled back automatically
   };

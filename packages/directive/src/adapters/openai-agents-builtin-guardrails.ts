@@ -13,6 +13,32 @@ import type {
 import { AGENT_KEY } from "./openai-agents-types.js";
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+const MAX_STRINGIFY_LENGTH = 100_000;
+
+/** Safely stringify output, handling circular references and truncating large values */
+function safeStringify(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    const seen = new WeakSet();
+    const json = JSON.stringify(value, (_key, val) => {
+      if (typeof val === "object" && val !== null) {
+        if (seen.has(val)) return "[Circular]";
+        seen.add(val);
+      }
+      return val;
+    });
+    return json.length > MAX_STRINGIFY_LENGTH
+      ? json.slice(0, MAX_STRINGIFY_LENGTH) + "...[truncated]"
+      : json;
+  } catch {
+    return String(value);
+  }
+}
+
+// ============================================================================
 // PII Guardrail
 // ============================================================================
 
@@ -335,5 +361,110 @@ export function createOutputTypeGuardrail(options: {
       default:
         return { passed: false, reason: `Unknown type: ${type}` };
     }
+  };
+}
+
+// ============================================================================
+// Length Guardrail
+// ============================================================================
+
+/**
+ * Create a length guardrail that limits output size.
+ *
+ * @example
+ * ```typescript
+ * const lengthGuardrail = createLengthGuardrail({
+ *   maxCharacters: 5000,
+ * });
+ * ```
+ */
+export function createLengthGuardrail(options: {
+  /** Maximum characters in output */
+  maxCharacters?: number;
+  /** Maximum estimated tokens in output */
+  maxTokens?: number;
+  /** Custom token estimator (default: chars / 4) */
+  estimateTokens?: (text: string) => number;
+}): GuardrailFn<OutputGuardrailData> {
+  const {
+    maxCharacters,
+    maxTokens,
+    estimateTokens = (text: string) => Math.ceil(text.length / 4),
+  } = options;
+
+  return (data) => {
+    const text = safeStringify(data.output);
+
+    if (maxCharacters !== undefined && text.length > maxCharacters) {
+      return {
+        passed: false,
+        reason: `Output too long: ${text.length} characters (max: ${maxCharacters})`,
+      };
+    }
+
+    if (maxTokens !== undefined) {
+      const tokens = estimateTokens(text);
+      if (tokens > maxTokens) {
+        return {
+          passed: false,
+          reason: `Output too long: ~${tokens} tokens (max: ${maxTokens})`,
+        };
+      }
+    }
+
+    return { passed: true };
+  };
+}
+
+// ============================================================================
+// Content Filter Guardrail
+// ============================================================================
+
+/**
+ * Create a content filter guardrail that blocks output matching specific patterns.
+ *
+ * @example
+ * ```typescript
+ * const contentFilter = createContentFilterGuardrail({
+ *   blockedPatterns: [
+ *     /\bpassword\b/i,
+ *     /\bsecret\b/i,
+ *     'internal-only',
+ *   ],
+ * });
+ * ```
+ */
+export function createContentFilterGuardrail(options: {
+  /** Patterns to block — strings or RegExp */
+  blockedPatterns: Array<string | RegExp>;
+  /** Case-sensitive matching for string patterns (default: false) */
+  caseSensitive?: boolean;
+}): GuardrailFn<OutputGuardrailData> {
+  const { blockedPatterns, caseSensitive = false } = options;
+
+  if (blockedPatterns.length === 0) {
+    console.warn("[Directive] createContentFilterGuardrail: blockedPatterns is empty — no content will be filtered");
+  }
+
+  const compiledPatterns = blockedPatterns.map((p) => {
+    if (p instanceof RegExp) return p;
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(escaped, caseSensitive ? "g" : "gi");
+  });
+
+  return (data) => {
+    const text = safeStringify(data.output);
+
+    for (const pattern of compiledPatterns) {
+      pattern.lastIndex = 0; // Reset required for global flags across iterations
+      if (pattern.test(text)) {
+        return {
+          passed: false,
+          reason: `Output contains blocked content matching: ${pattern.source}`,
+        };
+      }
+    }
+
+    return { passed: true };
   };
 }

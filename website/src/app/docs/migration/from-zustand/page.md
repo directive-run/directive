@@ -202,6 +202,9 @@ const cartModule = createModule("cart", {
       items: t.array(t.object<CartItem>()),
     },
   },
+  init: (facts) => {
+    facts.items = [];
+  },
   derive: {
     // Only recomputes when items change
     total: (facts) =>
@@ -312,6 +315,9 @@ const todoModule = createModule("todos", {
     pendingCount: (facts) => facts.todos.filter(t => !t.done).length,
   },
 });
+
+const system = createSystem({ module: todoModule });
+system.start();
 
 // Actions are just mutations
 function addTodo(text: string) {

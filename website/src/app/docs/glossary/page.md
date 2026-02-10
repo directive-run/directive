@@ -194,6 +194,8 @@ const system = createSystem({
 ```
 
 Key APIs:
+- `system.start()` - Start the system
+- `system.destroy()` - Stop and clean up the system
 - `system.facts` - Access facts
 - `system.derive` - Access derivations
 - `system.events` - Dispatch events (e.g., `system.events.increment()`)
@@ -249,10 +251,12 @@ const myPlugin = {
   onInit: (system) => { /* Called when system is created */ },
   onStart: (system) => { /* Called on system.start() */ },
   onStop: (system) => { /* Called on system.stop() */ },
+  onDestroy: (system) => { /* Called on system.destroy() */ },
   onFactSet: (key, value, prev) => { /* Called when a fact changes */ },
   onResolverStart: (resolver, req) => { /* Called when resolver starts */ },
   onResolverComplete: (resolver, req, duration) => { /* Called on completion */ },
-  onError: (error) => { /* Called on errors */ },
+  onResolverError: (resolver, req, error) => { /* Called on resolver error */ },
+  onError: (error) => { /* Called on system errors */ },
 };
 ```
 
@@ -297,10 +301,10 @@ const userId = useFact(system, "userId");    // inferred: number
 const user = useFact(system, "user");        // inferred: User | null
 ```
 
-For selecting part of a fact, use `useFactSelector`:
+For selecting part of a fact, use `useFact` with a selector:
 
 ```tsx
-const userName = useFactSelector(system, "user", (user) => user?.name ?? "Guest");
+const userName = useFact(system, "user", (user) => user?.name ?? "Guest");
 ```
 
 ---
@@ -314,10 +318,10 @@ const displayName = useDerived(system, "displayName");   // inferred: string
 const isLoggedIn = useDerived(system, "isLoggedIn");     // inferred: boolean
 ```
 
-For multiple derivations, use `useDerivations`:
+For multiple derivations, pass an array to `useDerived`:
 
 ```tsx
-const state = useDerivations(system, ["isLoggedIn", "canEdit"]);
+const state = useDerived(system, ["isLoggedIn", "canEdit"]);
 ```
 
 ---

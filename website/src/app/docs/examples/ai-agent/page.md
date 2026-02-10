@@ -9,6 +9,10 @@ Create an AI agent with constraint-driven orchestration. {% .lead %}
 
 ## The Agent Module
 
+{% callout type="note" %}
+This example requires the `openai` package: `npm install openai`
+{% /callout %}
+
 ```typescript
 import { createModule, createSystem, t } from 'directive';
 import { OpenAI } from 'openai';
@@ -144,6 +148,7 @@ const agentModule = createModule("agent", {
 ## React Chat Interface
 
 ```typescript
+import { useState } from 'react';
 import { useFact } from 'directive/react';
 
 const system = createSystem({ module: agentModule });
@@ -188,6 +193,6 @@ function ChatInterface() {
 
 ## Next Steps
 
-- See [OpenAI Agents](/docs/ai/openai-agents) for more patterns
+- See [OpenAI Agents](/docs/ai/orchestrator) for more patterns
 - See [Guardrails](/docs/ai/guardrails) for safety
 - See [Streaming](/docs/ai/streaming) for real-time responses

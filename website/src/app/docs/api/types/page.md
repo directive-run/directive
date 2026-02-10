@@ -9,17 +9,17 @@ Complete type definitions for Directive. {% .lead %}
 
 ## Core Types
 
-### Module
+### ModuleDef
 
 ```typescript
-interface Module<T extends ModuleSchema> {
+interface ModuleDef<M extends ModuleSchema> {
   name: string;
-  schema: T;
-  init?: (facts: Facts<T>) => void;
-  derive?: Derivations<T>;
-  effects?: Effects<T>;
-  constraints?: Constraints<T>;
-  resolvers?: Resolvers<T>;
+  schema: M;
+  init?: (facts: Facts<M>) => void;
+  derive?: Derivations<M>;
+  effects?: Effects<M>;
+  constraints?: Constraints<M>;
+  resolvers?: Resolvers<M>;
 }
 ```
 
@@ -103,10 +103,10 @@ interface TimeTravelAPI {
 
 ```typescript
 interface ModuleSchema {
-  facts?: Record<string, TypeBuilder>;
-  derivations?: Record<string, TypeBuilder>;
-  events?: Record<string, TypeBuilder>;
-  requirements?: Record<string, TypeBuilder>;
+  facts: Record<string, SchemaType>;
+  derivations?: Record<string, SchemaType>;
+  events?: Record<string, Record<string, SchemaType>>;
+  requirements?: Record<string, Record<string, SchemaType>>;
 }
 ```
 
@@ -194,14 +194,9 @@ interface RetryPolicy {
 ### Effect
 
 ```typescript
-interface Effect<T> {
-  watch?: (facts: Facts<T>) => unknown;
-  debounce?: number;
-  run: (
-    value: unknown,
-    prev: unknown,
-    ctx: { facts: Facts<T> }
-  ) => void | (() => void);
+interface EffectDef<S extends ModuleSchema> {
+  deps?: Array<keyof InferFacts<S> & string>;
+  run: (facts: InferFacts<S>, prev: InferFacts<S> | null) => void;
 }
 ```
 

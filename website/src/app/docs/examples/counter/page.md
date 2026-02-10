@@ -120,7 +120,7 @@ console.log(system.facts.count); // 0 (clamped to min)
 
 ## Counter with Effects
 
-Track counter changes:
+Log counter changes:
 
 ```typescript
 const counterWithEffectsModule = createModule("counter-effects", {
@@ -137,7 +137,7 @@ const counterWithEffectsModule = createModule("counter-effects", {
   },
 
   effects: {
-    trackHistory: {
+    logChanges: {
       deps: ['count'],
       run: (facts, prev) => {
         if (prev && prev.count !== facts.count) {
@@ -343,7 +343,7 @@ This simple counter demonstrates:
 2. **Derivations** - Computed values (`doubled`, `isEven`, `canIncrement`)
 3. **Constraints** - Rules that generate requirements (`enforceMax`, `enforceMin`)
 4. **Resolvers** - Actions that fulfill requirements (`clampToMax`)
-5. **Effects** - Side effects on state changes (`trackHistory`)
+5. **Effects** - Side effects on state changes (`logChanges`)
 
 ---
 

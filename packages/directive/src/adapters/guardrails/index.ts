@@ -105,6 +105,8 @@ export {
   createModerationGuardrail,
   createRateLimitGuardrail,
   createToolGuardrail,
+  createLengthGuardrail,
+  createContentFilterGuardrail,
 } from "../openai-agents.js";
 
 // ============================================================================

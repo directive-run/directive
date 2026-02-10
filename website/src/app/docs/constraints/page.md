@@ -12,6 +12,8 @@ Constraints are the heart of Directive — they declare what must be true. {% .l
 Define constraints in your module to declare conditions and their requirements:
 
 ```typescript
+import { createModule, t } from 'directive';
+
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -262,15 +264,13 @@ const cartModule = createModule("cart", {
 
 ---
 
----
-
 ## Constraint Evaluation
 
 Constraints are evaluated:
 
 1. When facts change (only affected constraints, thanks to auto-tracking)
 2. After a resolver completes
-3. When `system.reconcile()` is called
+3. During reconciliation (triggered by `system.start()` and fact changes)
 
 The engine continuously evaluates until no more constraints are active.
 
@@ -365,3 +365,4 @@ This is useful for feature flags, A/B testing, or temporarily suppressing constr
 - See [Resolvers](/docs/resolvers) for handling requirements
 - See [Derivations](/docs/derivations) for computed values
 - See [Effects](/docs/effects) for side effects
+- See [Events](/docs/events) for typed event dispatching

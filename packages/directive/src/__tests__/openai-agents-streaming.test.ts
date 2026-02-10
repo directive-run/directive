@@ -38,7 +38,7 @@ async function drain(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]>
 	return chunks;
 }
 
-/** Create a simple baseRunFn that emits the given tokens one-by-one.
+/** Create a simple baseRunner that emits the given tokens one-by-one.
  *  Awaits each callback to simulate realistic async streaming behavior. */
 function makeBaseRun(tokens: string[], result?: Partial<RunResult>) {
 	return async (
@@ -58,7 +58,7 @@ function makeBaseRun(tokens: string[], result?: Partial<RunResult>) {
 			await (callbacks.onToken as ((t: string) => Promise<void>) | undefined)?.(token);
 		}
 		return {
-			finalOutput: result?.finalOutput ?? tokens.join(""),
+			output: result?.output ?? tokens.join(""),
 			messages: result?.messages ?? [],
 			toolCalls: result?.toolCalls ?? [],
 			totalTokens: result?.totalTokens ?? tokens.length,
@@ -224,7 +224,7 @@ describe("createStreamingRunner", () => {
 			callbacks.onToken?.("Hello");
 			callbacks.onToken?.(" ");
 			callbacks.onToken?.("World");
-			return { finalOutput: "Hello World", messages: [], toolCalls: [], totalTokens: 3 };
+			return { output: "Hello World", messages: [], toolCalls: [], totalTokens: 3 };
 		};
 
 		const runner = createStreamingRunner(baseRun);
@@ -254,7 +254,7 @@ describe("createStreamingRunner", () => {
 			callbacks.onToolStart?.("search", "call-1", '{"q":"test"}');
 			callbacks.onToolEnd?.("search", "call-1", "results here");
 			callbacks.onToken?.("done");
-			return { finalOutput: "done", messages: [], toolCalls: [], totalTokens: 1 };
+			return { output: "done", messages: [], toolCalls: [], totalTokens: 1 };
 		};
 
 		const runner = createStreamingRunner(baseRun);
@@ -287,7 +287,7 @@ describe("createStreamingRunner", () => {
 			callbacks: { onMessage?: (message: Message) => void; signal?: AbortSignal },
 		): Promise<RunResult<unknown>> => {
 			callbacks.onMessage?.(msg);
-			return { finalOutput: "hi", messages: [msg], toolCalls: [], totalTokens: 0 };
+			return { output: "hi", messages: [msg], toolCalls: [], totalTokens: 0 };
 		};
 
 		const runner = createStreamingRunner(baseRun);
@@ -301,13 +301,13 @@ describe("createStreamingRunner", () => {
 
 	it("should resolve the result promise with the run result", async () => {
 		const runner = createStreamingRunner(
-			makeBaseRun(["a", "b"], { finalOutput: "ab", totalTokens: 2 }),
+			makeBaseRun(["a", "b"], { output: "ab", totalTokens: 2 }),
 		);
 		const { stream, result } = runner(fakeAgent, "test");
 		await drain(stream);
 
 		const res = await result;
-		expect(res.finalOutput).toBe("ab");
+		expect(res.output).toBe("ab");
 		expect(res.totalTokens).toBe(2);
 	});
 
@@ -875,7 +875,7 @@ describe("StreamChunk type handling", () => {
 			callbacks.onToolEnd?.("calc", "id-1", "42");
 			callbacks.onToken?.("The answer is 42");
 			callbacks.onMessage?.(msg);
-			return { finalOutput: "The answer is 42", messages: [msg], toolCalls: [], totalTokens: 1 };
+			return { output: "The answer is 42", messages: [msg], toolCalls: [], totalTokens: 1 };
 		};
 
 		const runner = createStreamingRunner(baseRun);

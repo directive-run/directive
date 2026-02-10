@@ -19,6 +19,12 @@ const authModule = createModule("auth", {
     },
   },
 
+  init: (facts) => {
+    facts.user = null;
+    facts.token = null;
+    facts.loading = false;
+  },
+
   derive: {
     isAuthenticated: (facts) => facts.user !== null,
   },
@@ -62,6 +68,12 @@ const cartModule = createModule("cart", {
     },
   },
 
+  init: (facts) => {
+    facts.items = [];
+    facts.couponCode = null;
+    facts.discount = 0;
+  },
+
   derive: {
     subtotal: (facts) =>
       facts.items.reduce((sum, item) => sum + item.price * item.qty, 0),
@@ -103,6 +115,13 @@ const checkoutModule = createModule("checkout", {
       paymentMethod: t.object<PaymentMethod>().nullable(),
       processing: t.boolean(),
     },
+  },
+
+  init: (facts) => {
+    facts.step = "shipping";
+    facts.shippingAddress = null;
+    facts.paymentMethod = null;
+    facts.processing = false;
   },
 
   constraints: {

@@ -19,7 +19,7 @@
  * // Use with orchestrator
  * const orchestrator = createAgentOrchestrator({
  *   memory,
- *   runAgent: run,
+ *   runner: run,
  * });
  * ```
  */

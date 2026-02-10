@@ -38,8 +38,8 @@ function makeAgent(name: string): AgentLike {
 	return { name };
 }
 
-function makeRunResult<T>(finalOutput: T, totalTokens = 10): RunResult<T> {
-	return { finalOutput, messages: [], toolCalls: [], totalTokens };
+function makeRunResult<T>(output: T, totalTokens = 10): RunResult<T> {
+	return { output, messages: [], toolCalls: [], totalTokens };
 }
 
 function createMockRunner(
@@ -66,7 +66,7 @@ describe("createAgentOrchestrator", () => {
 
 			const result = await orchestrator.run(makeAgent("test"), "hello");
 
-			expect(result.finalOutput).toBe("response from test");
+			expect(result.output).toBe("response from test");
 			expect(result.totalTokens).toBe(10);
 			expect(mockRun).toHaveBeenCalledOnce();
 		});
@@ -861,7 +861,7 @@ describe("error handling", () => {
 
 		const result = await orchestrator.run(makeAgent("test"), "input");
 
-		expect(result.finalOutput).toBe("success after retry");
+		expect(result.output).toBe("success after retry");
 		expect(attempts).toBe(3);
 		expect(onRetry).toHaveBeenCalledTimes(2); // Called before each retry
 	});
@@ -1080,7 +1080,7 @@ describe("memory integration", () => {
 
 		const mockRun: AgentRunner = vi.fn(async <T = unknown>(_agent: AgentLike, _input: string) => {
 			return {
-				finalOutput: "response" as T,
+				output: "response" as T,
 				messages: [
 					{ role: "user" as const, content: "hello" },
 					{ role: "assistant" as const, content: "hi back" },
@@ -1144,7 +1144,7 @@ describe("circuit breaker integration", () => {
 		});
 
 		const result = await orchestrator.run(makeAgent("test"), "hello");
-		expect(result.finalOutput).toBe("response from test");
+		expect(result.output).toBe("response from test");
 
 		// Circuit should still be closed after success
 		expect(cb.getState()).toBe("CLOSED");
@@ -1200,7 +1200,7 @@ describe("per-call guardrail overrides", () => {
 		const result = await orchestrator.run(makeAgent("test"), "input", {
 			outputGuardrails: [],
 		});
-		expect(result.finalOutput).toBe("response from test");
+		expect(result.output).toBe("response from test");
 		// The output guardrail was called once (first run), not in the second
 		expect(outputGuardrail).toHaveBeenCalledTimes(1);
 	});
@@ -1241,7 +1241,7 @@ describe("per-call guardrail overrides", () => {
 		const result = await orchestrator.run(makeAgent("test"), "input", {
 			inputGuardrails: [],
 		});
-		expect(result.finalOutput).toBe("response from test");
+		expect(result.output).toBe("response from test");
 		expect(inputGuardrail).not.toHaveBeenCalled();
 	});
 
@@ -1290,7 +1290,7 @@ describe("createRunner", () => {
 
 		const result = await runner(makeAgent("test"), "hello");
 
-		expect(result.finalOutput).toBe("hello world");
+		expect(result.output).toBe("hello world");
 		expect(result.totalTokens).toBe(42);
 		expect(result.messages).toHaveLength(2);
 		expect(result.messages[0]!.role).toBe("user");
@@ -1332,7 +1332,7 @@ describe("createRunner", () => {
 		});
 
 		const result = await runner<{ answer: string }>(makeAgent("test"), "hello");
-		expect(result.finalOutput).toEqual({ answer: "42" });
+		expect(result.output).toEqual({ answer: "42" });
 	});
 
 	it("should use custom parseOutput when provided", async () => {
@@ -1357,6 +1357,6 @@ describe("createRunner", () => {
 		});
 
 		const result = await runner(makeAgent("test"), "hello");
-		expect(result.finalOutput).toEqual({ format: "custom-format", value: 42 });
+		expect(result.output).toEqual({ format: "custom-format", value: 42 });
 	});
 });
