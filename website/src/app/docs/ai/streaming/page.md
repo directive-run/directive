@@ -12,8 +12,8 @@ Process agent responses token-by-token with real-time guardrails. {% .lead %}
 The simplest way to stream — use `orchestrator.runStream()` which wraps the agent run with guardrails, approval checks, and state tracking:
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/openai-agents';
-import type { AgentLike } from 'directive/openai-agents';
+import { createAgentOrchestrator } from 'directive/ai';
+import type { AgentLike } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
   runAgent: run,
@@ -106,8 +106,8 @@ controller.abort();
 For streaming outside the orchestrator (e.g., direct agent runs without guardrails/approvals), use `createStreamingRunner`:
 
 ```typescript
-import { createStreamingRunner } from 'directive/openai-agents';
-import type { StreamRunOptions } from 'directive/openai-agents';
+import { createStreamingRunner } from 'directive/ai';
+import type { StreamRunOptions } from 'directive/ai';
 
 const streamRunner = createStreamingRunner(
   // Your base run function with streaming callbacks
@@ -189,7 +189,7 @@ import {
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
   combineStreamingGuardrails,
-} from 'directive/openai-agents';
+} from 'directive/ai';
 
 const streamRunner = createStreamingRunner(baseRunFn, {
   streamingGuardrails: [
@@ -227,7 +227,7 @@ for await (const chunk of stream) {
 Merge multiple streaming guardrails into one:
 
 ```typescript
-import { combineStreamingGuardrails } from 'directive/openai-agents';
+import { combineStreamingGuardrails } from 'directive/ai';
 
 const combined = combineStreamingGuardrails([
   createLengthStreamingGuardrail({ maxTokens: 2000 }),
@@ -244,7 +244,7 @@ const streamRunner = createStreamingRunner(baseRunFn, {
 Reuse existing output guardrails as streaming guardrails:
 
 ```typescript
-import { adaptOutputGuardrail } from 'directive/openai-agents';
+import { adaptOutputGuardrail } from 'directive/ai';
 
 const streamingVersion = adaptOutputGuardrail(
   'pii-streaming',        // name
@@ -264,7 +264,7 @@ Transform, filter, and inspect streams with composable operators:
 Consume an entire stream and return the concatenated text:
 
 ```typescript
-import { collectTokens } from 'directive/openai-agents';
+import { collectTokens } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 const fullOutput = await collectTokens(stream);
@@ -275,7 +275,7 @@ const fullOutput = await collectTokens(stream);
 Observe chunks without modifying the stream (logging, metrics):
 
 ```typescript
-import { tapStream } from 'directive/openai-agents';
+import { tapStream } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
@@ -294,7 +294,7 @@ for await (const chunk of logged) {
 Keep only specific chunk types:
 
 ```typescript
-import { filterStream } from 'directive/openai-agents';
+import { filterStream } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
@@ -311,7 +311,7 @@ for await (const chunk of tokensOnly) {
 Transform chunks:
 
 ```typescript
-import { mapStream } from 'directive/openai-agents';
+import { mapStream } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
@@ -325,39 +325,162 @@ const uppercased = mapStream(stream, (chunk) => {
 
 ---
 
-## React Integration
+## Framework Integration
 
-Use streaming with the orchestrator in a React component:
+The streaming API is framework-agnostic — `orchestrator.runStream()` works the same everywhere. The framework layer handles reactive UI updates as chunks arrive.
 
-```typescript
+### React
+
+```tsx
 import { useState, useCallback } from 'react';
+import { useAgentOrchestrator, useFact } from 'directive/react';
 
-function ChatStream({ orchestrator, agent }) {
+function ChatStream() {
+  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const agent = useFact(orchestrator.system, '__agent');
   const [output, setOutput] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
 
   const send = useCallback(async (input: string) => {
     setOutput('');
-    setIsStreaming(true);
-
-    const { stream } = orchestrator.runStream(agent, input);
+    const { stream } = orchestrator.runStream(myAgent, input);
 
     for await (const chunk of stream) {
-      if (chunk.type === 'token') {
-        setOutput((prev) => prev + chunk.data);
-      }
-      if (chunk.type === 'done' || chunk.type === 'error') {
-        setIsStreaming(false);
-      }
+      if (chunk.type === 'token') setOutput((prev) => prev + chunk.data);
     }
-  }, [orchestrator, agent]);
+  }, [orchestrator]);
 
   return (
     <div>
       <p>{output}</p>
-      {isStreaming && <span className="cursor" />}
+      {agent?.status === 'running' && <span className="cursor" />}
     </div>
   );
+}
+```
+
+### Vue
+
+```vue
+<script setup>
+import { ref, onUnmounted } from 'vue';
+import { createAgentOrchestrator } from 'directive/ai';
+import { useFact } from 'directive/vue';
+
+const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+onUnmounted(() => orchestrator.dispose());
+
+const agent = useFact(orchestrator.system, '__agent');
+const output = ref('');
+
+async function send(input: string) {
+  output.value = '';
+  const { stream } = orchestrator.runStream(myAgent, input);
+  for await (const chunk of stream) {
+    if (chunk.type === 'token') output.value += chunk.data;
+  }
+}
+</script>
+
+<template>
+  <p>{{ output }}</p>
+  <span v-if="agent?.status === 'running'" class="cursor" />
+</template>
+```
+
+### Svelte
+
+```svelte
+<script>
+import { createAgentOrchestrator } from 'directive/ai';
+import { useFact } from 'directive/svelte';
+import { onDestroy } from 'svelte';
+
+const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+onDestroy(() => orchestrator.dispose());
+
+const agent = useFact(orchestrator.system, '__agent');
+let output = '';
+
+async function send(input) {
+  output = '';
+  const { stream } = orchestrator.runStream(myAgent, input);
+  for await (const chunk of stream) {
+    if (chunk.type === 'token') output += chunk.data;
+  }
+}
+</script>
+
+<p>{output}</p>
+{#if $agent?.status === 'running'}<span class="cursor" />{/if}
+```
+
+### Solid
+
+```tsx
+import { createSignal } from 'solid-js';
+import { createAgentOrchestrator } from 'directive/ai';
+import { useFact } from 'directive/solid';
+import { onCleanup } from 'solid-js';
+
+function ChatStream() {
+  const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  onCleanup(() => orchestrator.dispose());
+
+  const agent = useFact(orchestrator.system, '__agent');
+  const [output, setOutput] = createSignal('');
+
+  async function send(input: string) {
+    setOutput('');
+    const { stream } = orchestrator.runStream(myAgent, input);
+    for await (const chunk of stream) {
+      if (chunk.type === 'token') setOutput((prev) => prev + chunk.data);
+    }
+  }
+
+  return (
+    <div>
+      <p>{output()}</p>
+      {agent()?.status === 'running' && <span class="cursor" />}
+    </div>
+  );
+}
+```
+
+### Lit
+
+```typescript
+import { LitElement, html } from 'lit';
+import { createAgentOrchestrator } from 'directive/ai';
+import { FactController } from 'directive/lit';
+
+class ChatStream extends LitElement {
+  private orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  private agent = new FactController(this, this.orchestrator.system, '__agent');
+  private output = '';
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.orchestrator.dispose();
+  }
+
+  async send(input: string) {
+    this.output = '';
+    this.requestUpdate();
+    const { stream } = this.orchestrator.runStream(myAgent, input);
+    for await (const chunk of stream) {
+      if (chunk.type === 'token') {
+        this.output += chunk.data;
+        this.requestUpdate();
+      }
+    }
+  }
+
+  render() {
+    return html`
+      <p>${this.output}</p>
+      ${this.agent.value?.status === 'running' ? html`<span class="cursor"></span>` : ''}
+    `;
+  }
 }
 ```
 
@@ -365,6 +488,6 @@ function ChatStream({ orchestrator, agent }) {
 
 ## Next Steps
 
-- See [OpenAI Agents](/docs/ai/openai-agents) for the full orchestrator API
+- See [Agent Orchestrator](/docs/ai/orchestrator) for the full orchestrator API
 - See [Guardrails](/docs/ai/guardrails) for input/output validation
 - See [Multi-Agent](/docs/ai/multi-agent) for parallel and sequential patterns

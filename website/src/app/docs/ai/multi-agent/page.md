@@ -9,7 +9,7 @@ Coordinate multiple agents with execution patterns, handoffs, and result merging
 
 ## Setup
 
-Multi-agent orchestration builds on the [OpenAI Agents](/docs/ai/openai-agents) adapter. Start by defining your agents and a run function, then register them in an orchestrator:
+Multi-agent orchestration builds on the [Agent Orchestrator](/docs/ai/orchestrator) adapter. Start by defining your agents and a run function, then register them in an orchestrator:
 
 ```typescript
 import {
@@ -20,8 +20,8 @@ import {
   concatResults,
   collectOutputs,
   aggregateTokens,
-} from 'directive/openai-agents';
-import type { AgentLike, RunFn, RunResult } from 'directive/openai-agents';
+} from 'directive/ai';
+import type { AgentLike, RunFn, RunResult } from 'directive/ai';
 
 // Define your agents (compatible with OpenAI Agents SDK)
 const researcher: AgentLike = {
@@ -292,7 +292,7 @@ import {
   collectOutputs,
   pickBestResult,
   aggregateTokens,
-} from 'directive/openai-agents';
+} from 'directive/ai';
 
 // Concatenate string outputs with a separator
 const merged = concatResults(results, '\n\n');
@@ -335,8 +335,127 @@ orchestrator.reset();
 
 ---
 
+## Framework Integration
+
+Track multi-agent state through the orchestrator's `.system`. The `__agent` bridge key holds the active agent status.
+
+### React
+
+```tsx
+import { useAgentOrchestrator, useFact, useSelector } from 'directive/react';
+
+function MultiAgentPanel() {
+  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const { system } = orchestrator;
+
+  const agent = useFact(system, '__agent');
+  const summary = useSelector(system, (facts) => ({
+    status: facts.__agent?.status,
+    tokens: facts.__agent?.tokenUsage,
+  }));
+
+  return (
+    <div>
+      <p>Status: {agent?.status}</p>
+      <p>Tokens: {summary.tokens}</p>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<script setup>
+import { createMultiAgentOrchestrator } from 'directive/ai';
+import { useFact, useInspect } from 'directive/vue';
+import { onUnmounted } from 'vue';
+
+const orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+onUnmounted(() => orchestrator.dispose());
+
+const agent = useFact(orchestrator.system, '__agent');
+const { isSettled } = useInspect(orchestrator.system);
+</script>
+
+<template>
+  <p>Status: {{ agent?.status }}</p>
+  <p>{{ isSettled ? 'Idle' : 'Working...' }}</p>
+</template>
+```
+
+### Svelte
+
+```svelte
+<script>
+import { createMultiAgentOrchestrator } from 'directive/ai';
+import { useFact, useInspect } from 'directive/svelte';
+import { onDestroy } from 'svelte';
+
+const orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+onDestroy(() => orchestrator.dispose());
+
+const agent = useFact(orchestrator.system, '__agent');
+const inspect = useInspect(orchestrator.system);
+</script>
+
+<p>Status: {$agent?.status}</p>
+<p>{$inspect.isSettled ? 'Idle' : 'Working...'}</p>
+```
+
+### Solid
+
+```tsx
+import { createMultiAgentOrchestrator } from 'directive/ai';
+import { useFact, useInspect } from 'directive/solid';
+import { onCleanup } from 'solid-js';
+
+function MultiAgentPanel() {
+  const orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+  onCleanup(() => orchestrator.dispose());
+
+  const agent = useFact(orchestrator.system, '__agent');
+  const inspect = useInspect(orchestrator.system);
+
+  return (
+    <div>
+      <p>Status: {agent()?.status}</p>
+      <p>{inspect().isSettled ? 'Idle' : 'Working...'}</p>
+    </div>
+  );
+}
+```
+
+### Lit
+
+```typescript
+import { LitElement, html } from 'lit';
+import { createMultiAgentOrchestrator } from 'directive/ai';
+import { FactController, InspectController } from 'directive/lit';
+
+class MultiAgentPanel extends LitElement {
+  private orchestrator = createMultiAgentOrchestrator({ runAgent: run, agents: { /* ... */ } });
+  private agent = new FactController(this, this.orchestrator.system, '__agent');
+  private inspect = new InspectController(this, this.orchestrator.system);
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.orchestrator.dispose();
+  }
+
+  render() {
+    return html`
+      <p>Status: ${this.agent.value?.status}</p>
+      <p>${this.inspect.value?.isSettled ? 'Idle' : 'Working...'}</p>
+    `;
+  }
+}
+```
+
+---
+
 ## Next Steps
 
-- See [OpenAI Agents](/docs/ai/openai-agents) for single agent patterns and constraints
+- See [Agent Orchestrator](/docs/ai/orchestrator) for single agent patterns and constraints
 - See [Guardrails](/docs/ai/guardrails) for input/output validation
 - See [Streaming](/docs/ai/streaming) for real-time updates
