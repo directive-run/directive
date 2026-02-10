@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST="{\"components/Search.tsx -> @/markdoc/search.mjs\":{\"id\":\"components/Search.tsx -> @/markdoc/search.mjs\",\"files\":[\"static/chunks/_app-pages-browser_src_markdoc_search_mjs.js\"]}}"
