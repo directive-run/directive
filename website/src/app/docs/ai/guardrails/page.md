@@ -19,7 +19,7 @@ Detect and optionally redact personal information before it reaches the agent:
 import {
   createAgentOrchestrator,
   createPIIGuardrail,
-} from 'directive/openai-agents';
+} from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
   runAgent: run,
@@ -49,7 +49,7 @@ const orchestrator = createAgentOrchestrator({
 Block harmful content using your moderation API:
 
 ```typescript
-import { createModerationGuardrail } from 'directive/openai-agents';
+import { createModerationGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
   runAgent: run,
@@ -82,7 +82,7 @@ const orchestrator = createAgentOrchestrator({
 Allow or deny specific tools:
 
 ```typescript
-import { createToolGuardrail } from 'directive/openai-agents';
+import { createToolGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
   runAgent: run,
@@ -109,7 +109,7 @@ const orchestrator = createAgentOrchestrator({
 Ensure agent output matches an expected type:
 
 ```typescript
-import { createOutputTypeGuardrail } from 'directive/openai-agents';
+import { createOutputTypeGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
   runAgent: run,
@@ -141,7 +141,7 @@ const orchestrator = createAgentOrchestrator({
 For complex output validation, use `createOutputSchemaGuardrail` with a custom validator — or plug in Zod:
 
 ```typescript
-import { createOutputSchemaGuardrail } from 'directive/openai-agents';
+import { createOutputSchemaGuardrail } from 'directive/ai';
 
 // Custom validation function
 const orchestrator = createAgentOrchestrator({
@@ -198,7 +198,7 @@ const zodOrchestrator = createAgentOrchestrator({
 Limit request frequency based on token usage and request count:
 
 ```typescript
-import { createRateLimitGuardrail } from 'directive/openai-agents';
+import { createRateLimitGuardrail } from 'directive/ai';
 
 const rateLimiter = createRateLimitGuardrail({
   maxTokensPerMinute: 10000,
@@ -224,8 +224,8 @@ rateLimiter.reset();
 Write your own guardrail as a function that returns `{ passed, reason?, transformed? }`. The function receives `(data, context)` — you can omit `context` if you don't need it:
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/openai-agents';
-import type { GuardrailFn, InputGuardrailData, OutputGuardrailData } from 'directive/openai-agents';
+import { createAgentOrchestrator } from 'directive/ai';
+import type { GuardrailFn, InputGuardrailData, OutputGuardrailData } from 'directive/ai';
 
 // Custom input guardrail
 const maxLengthGuardrail: GuardrailFn<InputGuardrailData> = (data) => {
@@ -267,7 +267,7 @@ const orchestrator = createAgentOrchestrator({
 Give guardrails a name for better error messages, and optionally add retry support:
 
 ```typescript
-import type { NamedGuardrail, InputGuardrailData } from 'directive/openai-agents';
+import type { NamedGuardrail, InputGuardrailData } from 'directive/ai';
 
 const piiCheck: NamedGuardrail<InputGuardrailData> = {
   name: 'pii-detector',
@@ -300,7 +300,7 @@ const orchestrator = createAgentOrchestrator({
 When a guardrail fails, a structured `GuardrailError` is thrown:
 
 ```typescript
-import { isGuardrailError } from 'directive/openai-agents';
+import { isGuardrailError } from 'directive/ai';
 
 try {
   await orchestrator.run(agent, userInput);
@@ -334,7 +334,7 @@ import {
   createPatternStreamingGuardrail,
   createToxicityStreamingGuardrail,
   combineStreamingGuardrails,
-} from 'directive/openai-agents';
+} from 'directive/ai';
 
 // Length limit — stop if output gets too long
 const lengthGuard = createLengthStreamingGuardrail({
@@ -371,7 +371,7 @@ import {
   createPIIGuardrail,
   createToolGuardrail,
   createOutputTypeGuardrail,
-} from 'directive/openai-agents';
+} from 'directive/ai';
 
 const orchestrator = createOrchestratorBuilder()
   .withInputGuardrail('pii', createPIIGuardrail({ redact: true }))
@@ -389,8 +389,175 @@ const orchestrator = createOrchestratorBuilder()
 
 ---
 
+## Framework Integration
+
+Handle guardrail errors in your UI by catching `GuardrailError` from `orchestrator.run()` and displaying the `userMessage`.
+
+### React
+
+```tsx
+import { useState, useCallback } from 'react';
+import { useAgentOrchestrator, useFact } from 'directive/react';
+import { isGuardrailError } from 'directive/ai';
+
+function GuardedChat() {
+  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  const agent = useFact(orchestrator.system, '__agent');
+  const [error, setError] = useState<string | null>(null);
+
+  const send = useCallback(async (input: string) => {
+    setError(null);
+    try {
+      await orchestrator.run(myAgent, input);
+    } catch (err) {
+      if (isGuardrailError(err)) {
+        setError(err.userMessage);
+      }
+    }
+  }, [orchestrator]);
+
+  return (
+    <div>
+      <p>Status: {agent?.status}</p>
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<script setup>
+import { ref, onUnmounted } from 'vue';
+import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
+import { useFact } from 'directive/vue';
+
+const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+onUnmounted(() => orchestrator.dispose());
+
+const agent = useFact(orchestrator.system, '__agent');
+const error = ref<string | null>(null);
+
+async function send(input: string) {
+  error.value = null;
+  try {
+    await orchestrator.run(myAgent, input);
+  } catch (err) {
+    if (isGuardrailError(err)) error.value = err.userMessage;
+  }
+}
+</script>
+
+<template>
+  <p>Status: {{ agent?.status }}</p>
+  <p v-if="error" class="error">{{ error }}</p>
+</template>
+```
+
+### Svelte
+
+```svelte
+<script>
+import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
+import { useFact } from 'directive/svelte';
+import { onDestroy } from 'svelte';
+
+const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+onDestroy(() => orchestrator.dispose());
+
+const agent = useFact(orchestrator.system, '__agent');
+let error = null;
+
+async function send(input) {
+  error = null;
+  try {
+    await orchestrator.run(myAgent, input);
+  } catch (err) {
+    if (isGuardrailError(err)) error = err.userMessage;
+  }
+}
+</script>
+
+<p>Status: {$agent?.status}</p>
+{#if error}<p class="error">{error}</p>{/if}
+```
+
+### Solid
+
+```tsx
+import { createSignal } from 'solid-js';
+import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
+import { useFact } from 'directive/solid';
+import { onCleanup } from 'solid-js';
+
+function GuardedChat() {
+  const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  onCleanup(() => orchestrator.dispose());
+
+  const agent = useFact(orchestrator.system, '__agent');
+  const [error, setError] = createSignal<string | null>(null);
+
+  async function send(input: string) {
+    setError(null);
+    try {
+      await orchestrator.run(myAgent, input);
+    } catch (err) {
+      if (isGuardrailError(err)) setError(err.userMessage);
+    }
+  }
+
+  return (
+    <div>
+      <p>Status: {agent()?.status}</p>
+      {error() && <p class="error">{error()}</p>}
+    </div>
+  );
+}
+```
+
+### Lit
+
+```typescript
+import { LitElement, html } from 'lit';
+import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
+import { FactController } from 'directive/lit';
+
+class GuardedChat extends LitElement {
+  private orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: true });
+  private agent = new FactController(this, this.orchestrator.system, '__agent');
+  private error: string | null = null;
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.orchestrator.dispose();
+  }
+
+  async send(input: string) {
+    this.error = null;
+    try {
+      await this.orchestrator.run(myAgent, input);
+    } catch (err) {
+      if (isGuardrailError(err)) {
+        this.error = err.userMessage;
+        this.requestUpdate();
+      }
+    }
+  }
+
+  render() {
+    return html`
+      <p>Status: ${this.agent.value?.status}</p>
+      ${this.error ? html`<p class="error">${this.error}</p>` : ''}
+    `;
+  }
+}
+```
+
+---
+
 ## Next Steps
 
-- See [OpenAI Agents](/docs/ai/openai-agents) for the full orchestrator API
+- See [Agent Orchestrator](/docs/ai/orchestrator) for the full orchestrator API
 - See [Streaming](/docs/ai/streaming) for real-time response processing
 - See [PII Detection](/docs/security/pii) for privacy compliance

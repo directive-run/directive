@@ -258,8 +258,138 @@ const adapter = createMCPAdapter({
 
 ---
 
+## Framework Integration
+
+MCP is primarily server-side, but you can display tool status and approval requests through the orchestrator's `.system` bridge keys.
+
+### React
+
+```tsx
+import { useAgentOrchestrator, useFact } from 'directive/react';
+
+function MCPToolPanel() {
+  const orchestrator = useAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+  const { system } = orchestrator;
+
+  const agent = useFact(system, '__agent');
+  const approval = useFact(system, '__approval');
+  const toolCalls = useFact(system, '__toolCalls');
+
+  return (
+    <div>
+      <p>Status: {agent?.status}</p>
+      <p>Pending approvals: {approval?.pending?.length ?? 0}</p>
+      <ul>
+        {toolCalls?.map((tc) => <li key={tc.id}>{tc.tool}: {tc.status}</li>)}
+      </ul>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<script setup>
+import { createAgentOrchestrator } from 'directive/ai';
+import { useFact } from 'directive/vue';
+import { onUnmounted } from 'vue';
+
+const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+onUnmounted(() => orchestrator.dispose());
+
+const approval = useFact(orchestrator.system, '__approval');
+const toolCalls = useFact(orchestrator.system, '__toolCalls');
+</script>
+
+<template>
+  <p>Pending approvals: {{ approval?.pending?.length ?? 0 }}</p>
+  <ul>
+    <li v-for="tc in toolCalls" :key="tc.id">{{ tc.tool }}: {{ tc.status }}</li>
+  </ul>
+</template>
+```
+
+### Svelte
+
+```svelte
+<script>
+import { createAgentOrchestrator } from 'directive/ai';
+import { useFact } from 'directive/svelte';
+import { onDestroy } from 'svelte';
+
+const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+onDestroy(() => orchestrator.dispose());
+
+const approval = useFact(orchestrator.system, '__approval');
+const toolCalls = useFact(orchestrator.system, '__toolCalls');
+</script>
+
+<p>Pending approvals: {$approval?.pending?.length ?? 0}</p>
+<ul>
+  {#each $toolCalls ?? [] as tc (tc.id)}
+    <li>{tc.tool}: {tc.status}</li>
+  {/each}
+</ul>
+```
+
+### Solid
+
+```tsx
+import { createAgentOrchestrator } from 'directive/ai';
+import { useFact } from 'directive/solid';
+import { onCleanup, For } from 'solid-js';
+
+function MCPToolPanel() {
+  const orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+  onCleanup(() => orchestrator.dispose());
+
+  const approval = useFact(orchestrator.system, '__approval');
+  const toolCalls = useFact(orchestrator.system, '__toolCalls');
+
+  return (
+    <div>
+      <p>Pending approvals: {approval()?.pending?.length ?? 0}</p>
+      <ul>
+        <For each={toolCalls() ?? []}>{(tc) => <li>{tc.tool}: {tc.status}</li>}</For>
+      </ul>
+    </div>
+  );
+}
+```
+
+### Lit
+
+```typescript
+import { LitElement, html } from 'lit';
+import { createAgentOrchestrator } from 'directive/ai';
+import { FactController } from 'directive/lit';
+
+class MCPToolPanel extends LitElement {
+  private orchestrator = createAgentOrchestrator({ runAgent: run, autoApproveToolCalls: false });
+  private approval = new FactController(this, this.orchestrator.system, '__approval');
+  private toolCalls = new FactController(this, this.orchestrator.system, '__toolCalls');
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.orchestrator.dispose();
+  }
+
+  render() {
+    return html`
+      <p>Pending approvals: ${this.approval.value?.pending?.length ?? 0}</p>
+      <ul>
+        ${(this.toolCalls.value ?? []).map((tc) => html`<li>${tc.tool}: ${tc.status}</li>`)}
+      </ul>
+    `;
+  }
+}
+```
+
+---
+
 ## Next Steps
 
-- See [OpenAI Agents](/docs/ai/openai-agents) for AI agent orchestration
+- See [Agent Orchestrator](/docs/ai/orchestrator) for AI agent orchestration
 - See [Guardrails](/docs/ai/guardrails) for input/output validation
 - See [Multi-Agent](/docs/ai/multi-agent) for coordinating multiple agents
