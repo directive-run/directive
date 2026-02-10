@@ -71,7 +71,6 @@ export const navigation = [
       { title: 'Multi-Agent', href: '/docs/ai/multi-agent' },
       { title: 'MCP Integration', href: '/docs/ai/mcp' },
       { title: 'Guardrails', href: '/docs/ai/guardrails' },
-      { title: 'OpenAI Agents', href: '/docs/ai/openai-agents' },
     ],
   },
   {
