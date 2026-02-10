@@ -32,7 +32,7 @@ import type {
   AgentLike,
   RunResult,
   RunOptions,
-  RunFn,
+  AgentRunner,
   GuardrailFn,
   OutputGuardrailData,
   NamedGuardrail,
@@ -257,7 +257,7 @@ export interface RunAgentRequirement extends Requirement {
 /** Multi-agent orchestrator options */
 export interface MultiAgentOrchestratorOptions {
   /** Base run function */
-  runAgent: RunFn;
+  runner: AgentRunner;
   /** Registered agents */
   agents: AgentRegistry;
   /** Execution patterns */
@@ -331,7 +331,7 @@ export interface MultiAgentOrchestrator {
  * @example
  * ```typescript
  * const orchestrator = createMultiAgentOrchestrator({
- *   runAgent: run,
+ *   runner,
  *   agents: {
  *     researcher: { agent: researchAgent, maxConcurrent: 3 },
  *     writer: { agent: writerAgent },
@@ -370,7 +370,7 @@ export function createMultiAgentOrchestrator(
   options: MultiAgentOrchestratorOptions
 ): MultiAgentOrchestrator {
   const {
-    runAgent,
+    runner,
     agents,
     patterns = {},
     onHandoff,
@@ -486,7 +486,7 @@ export function createMultiAgentOrchestrator(
         opts.signal.addEventListener("abort", abortHandler);
       }
 
-      const result = await runAgent<T>(registration.agent, input, {
+      const result = await runner<T>(registration.agent, input, {
         ...registration.runOptions,
         ...opts,
         signal: controller.signal,

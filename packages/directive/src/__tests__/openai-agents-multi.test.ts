@@ -14,7 +14,7 @@ import {
 	type MultiAgentOrchestrator,
 	type AgentRegistry,
 } from "../adapters/openai-agents-multi.js";
-import type { AgentLike, RunFn, RunResult } from "../adapters/openai-agents.js";
+import type { AgentLike, AgentRunner, RunResult } from "../adapters/openai-agents.js";
 
 // ============================================================================
 // Helpers
@@ -28,13 +28,13 @@ function makeRunResult<T>(finalOutput: T, totalTokens = 10): RunResult<T> {
 	return { finalOutput, messages: [], toolCalls: [], totalTokens };
 }
 
-function createMockRunFn(
+function createMockRunner(
 	handler?: (agent: AgentLike, input: string) => unknown,
-): RunFn {
+): AgentRunner {
 	return vi.fn(async <T = unknown>(agent: AgentLike, input: string) => {
 		const output = handler ? handler(agent, input) : `response from ${agent.name}`;
 		return makeRunResult<T>(output as T);
-	}) as unknown as RunFn;
+	}) as unknown as AgentRunner;
 }
 
 function makeRegistry(...names: string[]): AgentRegistry {
@@ -156,13 +156,13 @@ describe("Semaphore", () => {
 // ============================================================================
 
 describe("createMultiAgentOrchestrator", () => {
-	let mockRun: RunFn;
+	let mockRun: AgentRunner;
 	let orchestrator: MultiAgentOrchestrator;
 
 	beforeEach(() => {
-		mockRun = createMockRunFn();
+		mockRun = createMockRunner();
 		orchestrator = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("alpha", "beta", "gamma"),
 		});
 	});
@@ -228,11 +228,11 @@ describe("createMultiAgentOrchestrator", () => {
 
 	describe("error handling", () => {
 		it("should set agent state to error when run fails", async () => {
-			const failRun = createMockRunFn(() => {
+			const failRun = createMockRunner(() => {
 				throw new Error("agent failed");
 			});
 			const orch = createMultiAgentOrchestrator({
-				runAgent: failRun,
+				runner: failRun,
 				agents: makeRegistry("failing"),
 			});
 
@@ -244,14 +244,14 @@ describe("createMultiAgentOrchestrator", () => {
 
 		it("should release the semaphore slot after an error", async () => {
 			let callCount = 0;
-			const sometimesFail: RunFn = vi.fn(async <T>(agent: AgentLike, input: string) => {
+			const sometimesFail: AgentRunner = vi.fn(async <T>(agent: AgentLike, input: string) => {
 				callCount++;
 				if (callCount === 1) throw new Error("first call fails");
 				return makeRunResult<T>(`ok-${callCount}` as T);
-			}) as unknown as RunFn;
+			}) as unknown as AgentRunner;
 
 			const orch = createMultiAgentOrchestrator({
-				runAgent: sometimesFail,
+				runner: sometimesFail,
 				agents: { solo: { agent: makeAgent("solo"), maxConcurrent: 1 } },
 			});
 
@@ -279,9 +279,9 @@ describe("parallel execution", () => {
 	});
 
 	it("should run agents in parallel via runParallel", async () => {
-		const mockRun = createMockRunFn((agent) => `result-${agent.name}`);
+		const mockRun = createMockRunner((agent) => `result-${agent.name}`);
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a", "b"),
 		});
 
@@ -295,9 +295,9 @@ describe("parallel execution", () => {
 	});
 
 	it("should broadcast a single input string to all agents", async () => {
-		const mockRun = createMockRunFn((agent, input) => `${agent.name}:${input}`);
+		const mockRun = createMockRunner((agent, input) => `${agent.name}:${input}`);
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("x", "y"),
 		});
 
@@ -312,7 +312,7 @@ describe("parallel execution", () => {
 
 	it("should throw when input count does not match agent count", async () => {
 		const orch = createMultiAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			agents: makeRegistry("a", "b"),
 		});
 
@@ -322,9 +322,9 @@ describe("parallel execution", () => {
 	});
 
 	it("should run a named parallel pattern via runPattern", async () => {
-		const mockRun = createMockRunFn((agent) => `out-${agent.name}`);
+		const mockRun = createMockRunner((agent) => `out-${agent.name}`);
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("r1", "r2"),
 			patterns: {
 				research: parallel(
@@ -340,7 +340,7 @@ describe("parallel execution", () => {
 
 	it("should throw for unknown pattern", async () => {
 		const orch = createMultiAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			agents: makeRegistry("a"),
 		});
 
@@ -351,14 +351,14 @@ describe("parallel execution", () => {
 
 	it("should tolerate partial failures with minSuccess", async () => {
 		let callIdx = 0;
-		const sometimesFail: RunFn = vi.fn(async <T>(agent: AgentLike) => {
+		const sometimesFail: AgentRunner = vi.fn(async <T>(agent: AgentLike) => {
 			callIdx++;
 			if (callIdx === 1) throw new Error("fail");
 			return makeRunResult<T>(`ok-${agent.name}` as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: sometimesFail,
+			runner: sometimesFail,
 			agents: makeRegistry("a", "b"),
 			patterns: {
 				tolerant: {
@@ -393,13 +393,13 @@ describe("sequential execution", () => {
 
 	it("should pipe output from one agent as input to the next", async () => {
 		const calls: Array<{ agent: string; input: string }> = [];
-		const mockRun: RunFn = vi.fn(async <T>(agent: AgentLike, input: string) => {
+		const mockRun: AgentRunner = vi.fn(async <T>(agent: AgentLike, input: string) => {
 			calls.push({ agent: agent.name, input });
 			return makeRunResult<T>(`${agent.name}-processed-${input}` as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("step1", "step2", "step3"),
 		});
 
@@ -415,9 +415,9 @@ describe("sequential execution", () => {
 	});
 
 	it("should use a custom transform between steps", async () => {
-		const mockRun = createMockRunFn((agent, input) => ({ text: `${agent.name}:${input}` }));
+		const mockRun = createMockRunner((agent, input) => ({ text: `${agent.name}:${input}` }));
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a", "b"),
 		});
 
@@ -430,9 +430,9 @@ describe("sequential execution", () => {
 	});
 
 	it("should run a named sequential pattern via runPattern", async () => {
-		const mockRun = createMockRunFn((agent, input) => `${agent.name}(${input})`);
+		const mockRun = createMockRunner((agent, input) => `${agent.name}(${input})`);
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("writer", "reviewer"),
 			patterns: {
 				writeReview: sequential<string>(["writer", "reviewer"], {
@@ -446,12 +446,12 @@ describe("sequential execution", () => {
 	});
 
 	it("should throw when sequential pattern produces no results", async () => {
-		const failRun: RunFn = vi.fn(async () => {
+		const failRun: AgentRunner = vi.fn(async () => {
 			throw new Error("fail");
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: failRun,
+			runner: failRun,
 			agents: makeRegistry("a"),
 			patterns: {
 				failing: sequential(["a"], { continueOnError: true }),
@@ -465,14 +465,14 @@ describe("sequential execution", () => {
 
 	it("should propagate errors by default", async () => {
 		let callCount = 0;
-		const failSecond: RunFn = vi.fn(async <T>(agent: AgentLike) => {
+		const failSecond: AgentRunner = vi.fn(async <T>(agent: AgentLike) => {
 			callCount++;
 			if (callCount === 2) throw new Error("second fails");
 			return makeRunResult<T>("ok" as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: failSecond,
+			runner: failSecond,
 			agents: makeRegistry("a", "b", "c"),
 			patterns: {
 				pipeline: sequential(["a", "b", "c"]),
@@ -502,7 +502,7 @@ describe("supervisor execution", () => {
 
 	it("should delegate work to workers and gather results", async () => {
 		let supervisorCallCount = 0;
-		const mockRun: RunFn = vi.fn(async <T>(agent: AgentLike, input: string) => {
+		const mockRun: AgentRunner = vi.fn(async <T>(agent: AgentLike, input: string) => {
 			if (agent.name === "boss") {
 				supervisorCallCount++;
 				if (supervisorCallCount === 1) {
@@ -521,10 +521,10 @@ describe("supervisor execution", () => {
 			}
 			// Worker
 			return makeRunResult<T>(`worker-result: ${input}` as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("boss", "worker1"),
 			patterns: {
 				managed: supervisor("boss", ["worker1"], { maxRounds: 5 }),
@@ -537,16 +537,16 @@ describe("supervisor execution", () => {
 	});
 
 	it("should throw for invalid worker delegation", async () => {
-		const mockRun: RunFn = vi.fn(async <T>() => {
+		const mockRun: AgentRunner = vi.fn(async <T>() => {
 			return makeRunResult<T>({
 				action: "delegate",
 				worker: "nonexistent-worker",
 				workerInput: "task",
 			} as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("boss", "worker1"),
 			patterns: {
 				managed: supervisor("boss", ["worker1"]),
@@ -560,7 +560,7 @@ describe("supervisor execution", () => {
 
 	it("should respect maxRounds limit", async () => {
 		let callCount = 0;
-		const alwaysDelegate: RunFn = vi.fn(async <T>(agent: AgentLike) => {
+		const alwaysDelegate: AgentRunner = vi.fn(async <T>(agent: AgentLike) => {
 			callCount++;
 			if (agent.name === "boss") {
 				return makeRunResult<T>({
@@ -570,10 +570,10 @@ describe("supervisor execution", () => {
 				} as T);
 			}
 			return makeRunResult<T>("done" as T);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: alwaysDelegate,
+			runner: alwaysDelegate,
 			agents: makeRegistry("boss", "w"),
 			patterns: {
 				loop: supervisor("boss", ["w"], { maxRounds: 2 }),
@@ -588,7 +588,7 @@ describe("supervisor execution", () => {
 
 	it("should use extract function for final result", async () => {
 		let supervisorCallCount = 0;
-		const mockRun: RunFn = vi.fn(async <T>(agent: AgentLike) => {
+		const mockRun: AgentRunner = vi.fn(async <T>(agent: AgentLike) => {
 			if (agent.name === "boss") {
 				supervisorCallCount++;
 				if (supervisorCallCount === 1) {
@@ -601,10 +601,10 @@ describe("supervisor execution", () => {
 				return makeRunResult<T>({ action: "complete" } as T);
 			}
 			return makeRunResult<T>("worker-output" as T, 25);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("boss", "w"),
 			patterns: {
 				extracted: supervisor("boss", ["w"], {
@@ -631,12 +631,12 @@ describe("supervisor execution", () => {
 describe("agent state tracking", () => {
 	it("should track status transitions through a run lifecycle", async () => {
 		let resolveRun!: (value: RunResult<unknown>) => void;
-		const blockingRun: RunFn = vi.fn(
+		const blockingRun: AgentRunner = vi.fn(
 			() => new Promise((resolve) => { resolveRun = resolve; }),
-		) as unknown as RunFn;
+		) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: blockingRun,
+			runner: blockingRun,
 			agents: makeRegistry("agent"),
 		});
 
@@ -654,14 +654,14 @@ describe("agent state tracking", () => {
 
 	it("should track totalTokens and runCount correctly", async () => {
 		let tokens = 5;
-		const mockRun: RunFn = vi.fn(async <T>() => {
+		const mockRun: AgentRunner = vi.fn(async <T>() => {
 			const t = tokens;
 			tokens += 5;
 			return makeRunResult<T>("ok" as T, t);
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a"),
 		});
 
@@ -676,7 +676,7 @@ describe("agent state tracking", () => {
 
 	it("should return a copy from getAllAgentStates", () => {
 		const orch = createMultiAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			agents: makeRegistry("a"),
 		});
 
@@ -695,10 +695,10 @@ describe("handoffs", () => {
 	it("should execute a handoff and track it", async () => {
 		const onHandoff = vi.fn();
 		const onHandoffComplete = vi.fn();
-		const mockRun = createMockRunFn((agent) => `${agent.name}-result`);
+		const mockRun = createMockRunner((agent) => `${agent.name}-result`);
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("sender", "receiver"),
 			onHandoff,
 			onHandoffComplete,
@@ -712,12 +712,12 @@ describe("handoffs", () => {
 	});
 
 	it("should clean up pending handoffs on error", async () => {
-		const failRun: RunFn = vi.fn(async () => {
+		const failRun: AgentRunner = vi.fn(async () => {
 			throw new Error("handoff failed");
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: failRun,
+			runner: failRun,
 			agents: makeRegistry("a", "b"),
 		});
 
@@ -732,9 +732,9 @@ describe("handoffs", () => {
 
 describe("reset and dispose", () => {
 	it("should reset all agent states to idle", async () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a", "b"),
 		});
 
@@ -758,9 +758,9 @@ describe("reset and dispose", () => {
 	});
 
 	it("should clear pending handoffs and handoff history on reset", async () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a", "b"),
 		});
 
@@ -770,9 +770,9 @@ describe("reset and dispose", () => {
 	});
 
 	it("should allow running agents again after reset", async () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a"),
 		});
 
@@ -784,9 +784,9 @@ describe("reset and dispose", () => {
 	});
 
 	it("dispose should reset everything", async () => {
-		const mockRun = createMockRunFn();
+		const mockRun = createMockRunner();
 		const orch = createMultiAgentOrchestrator({
-			runAgent: mockRun,
+			runner: mockRun,
 			agents: makeRegistry("a"),
 		});
 
@@ -808,7 +808,7 @@ describe("config validation", () => {
 		it("should throw when parallel pattern references unknown agent", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("a"),
 					patterns: {
 						myPattern: parallel(["a", "unknown"], (r) => r),
@@ -820,7 +820,7 @@ describe("config validation", () => {
 		it("should throw when sequential pattern references unknown agent", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("first"),
 					patterns: {
 						pipeline: sequential(["first", "second", "third"]),
@@ -832,7 +832,7 @@ describe("config validation", () => {
 		it("should throw when supervisor pattern references unknown supervisor", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("worker1", "worker2"),
 					patterns: {
 						managed: supervisor("boss", ["worker1", "worker2"]),
@@ -844,7 +844,7 @@ describe("config validation", () => {
 		it("should throw when supervisor pattern references unknown worker", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("boss", "worker1"),
 					patterns: {
 						managed: supervisor("boss", ["worker1", "worker2"]),
@@ -856,7 +856,7 @@ describe("config validation", () => {
 		it("should list all missing agents in error message", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("a"),
 					patterns: {
 						p1: parallel(["missing1", "a"], (r) => r),
@@ -869,7 +869,7 @@ describe("config validation", () => {
 		it("should include registered agents in error message", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("alpha", "beta"),
 					patterns: {
 						broken: parallel(["unknown"], (r) => r),
@@ -881,7 +881,7 @@ describe("config validation", () => {
 		it("should pass validation when all pattern agents are registered", () => {
 			expect(() =>
 				createMultiAgentOrchestrator({
-					runAgent: createMockRunFn(),
+					runner: createMockRunner(),
 					agents: makeRegistry("a", "b", "c", "supervisor"),
 					patterns: {
 						par: parallel(["a", "b"], (r) => r),
@@ -897,15 +897,15 @@ describe("config validation", () => {
 		const calls: string[] = [];
 		let resolvers: Array<(v: RunResult<unknown>) => void> = [];
 
-		const blockingRun: RunFn = vi.fn(<T>(_agent: AgentLike, input: string) => {
+		const blockingRun: AgentRunner = vi.fn(<T>(_agent: AgentLike, input: string) => {
 			calls.push(input);
 			return new Promise<RunResult<T>>((resolve) => {
 				resolvers.push(resolve as (v: RunResult<unknown>) => void);
 			});
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: blockingRun,
+			runner: blockingRun,
 			agents: makeRegistry("solo"), // no maxConcurrent specified
 		});
 
@@ -931,15 +931,15 @@ describe("config validation", () => {
 		const calls: string[] = [];
 		let resolvers: Array<(v: RunResult<unknown>) => void> = [];
 
-		const blockingRun: RunFn = vi.fn(<T>(_agent: AgentLike, input: string) => {
+		const blockingRun: AgentRunner = vi.fn(<T>(_agent: AgentLike, input: string) => {
 			calls.push(input);
 			return new Promise<RunResult<T>>((resolve) => {
 				resolvers.push(resolve as (v: RunResult<unknown>) => void);
 			});
-		}) as unknown as RunFn;
+		}) as unknown as AgentRunner;
 
 		const orch = createMultiAgentOrchestrator({
-			runAgent: blockingRun,
+			runner: blockingRun,
 			agents: {
 				multi: { agent: makeAgent("multi"), maxConcurrent: 2 },
 			},
@@ -965,7 +965,7 @@ describe("config validation", () => {
 	it("should use default maxHandoffHistory of 1000", () => {
 		// Just verify the orchestrator accepts defaults without error
 		const orch = createMultiAgentOrchestrator({
-			runAgent: createMockRunFn(),
+			runner: createMockRunner(),
 			agents: makeRegistry("a"),
 		});
 		expect(orch).toBeDefined();

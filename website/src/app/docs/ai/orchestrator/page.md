@@ -5,7 +5,7 @@ description: Build AI agents with constraint-driven orchestration, guardrails, a
 
 Orchestrate AI agents with guardrails, approvals, and budget control. {% .lead %}
 
-The orchestrator is **LLM-agnostic** — provide any `run` function that accepts an agent and input, and Directive handles safety, approvals, and state tracking. Works with OpenAI, Anthropic, Ollama, or your own backend.
+The orchestrator is **LLM-agnostic** — provide any `runner` function that accepts an agent and input, and Directive handles safety, approvals, and state tracking. Works with OpenAI, Anthropic, Ollama, or your own backend.
 
 ---
 
@@ -18,7 +18,7 @@ import {
   createAgentOrchestrator,
   createPIIGuardrail,
 } from 'directive/ai';
-import type { AgentLike, RunFn } from 'directive/ai';
+import type { AgentLike, AgentRunner } from 'directive/ai';
 
 // Define your agent
 const agent: AgentLike = {
@@ -27,15 +27,15 @@ const agent: AgentLike = {
   model: 'gpt-4',
 };
 
-// Your run function (wraps any LLM SDK)
-const run: RunFn = async (agent, input, options) => {
+// Your runner (wraps any LLM SDK)
+const runner: AgentRunner = async (agent, input, options) => {
   const result = await myLLMCall(agent, input, options);
   return result;
 };
 
 // Create the orchestrator
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
 });
 ```
@@ -78,7 +78,7 @@ import {
 } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   guardrails: {
     input: [createPIIGuardrail({ redact: true })],
@@ -95,7 +95,7 @@ Require human approval before tool calls execute. Set `autoApproveToolCalls: fal
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: false,
   approvalTimeoutMs: 60000,  // 60s timeout (default: 5 minutes)
 
@@ -137,7 +137,7 @@ Set a token budget that automatically pauses agents when exceeded:
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   maxTokenBudget: 10000,
 });
@@ -156,7 +156,7 @@ For more granular cost control, use custom constraints:
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   constraints: {
     costWarning: {
@@ -187,7 +187,7 @@ Add custom orchestrator-level constraints that react to agent state. Constraints
 interface MyOutput { confidence?: number }
 
 const orchestrator = createAgentOrchestrator<{}, MyOutput>({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   constraints: {
     escalateToExpert: {
@@ -225,7 +225,7 @@ Observe agent runs, guardrail checks, and retries without modifying behavior:
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   hooks: {
     onAgentStart: ({ agentName, input, timestamp }) => {
@@ -257,7 +257,7 @@ Configure automatic retries with backoff for transient failures:
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
-  runAgent: run,
+  runner,
   autoApproveToolCalls: true,
   agentRetry: {
     attempts: 3,
@@ -327,7 +327,7 @@ const orchestrator = createOrchestratorBuilder()
   .withBudget(10000)
   .withDebug()
   .build({
-    runAgent: run,
+    runner,
     autoApproveToolCalls: true,
   });
 ```
@@ -345,7 +345,7 @@ import { useAgentOrchestrator, useFact, useSelector, useWatch, useInspect } from
 
 function AgentPanel() {
   const orchestrator = useAgentOrchestrator({
-    runAgent: run,
+    runner,
     autoApproveToolCalls: true,
   });
   const { system } = orchestrator;
@@ -392,7 +392,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { useFact, useSelector, useInspect } from 'directive/vue';
 import { onUnmounted } from 'vue';
 
-const orchestrator = createAgentOrchestrator({ run, autoApproveToolCalls: true });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onUnmounted(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -416,7 +416,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { useFact, useInspect } from 'directive/svelte';
 import { onDestroy } from 'svelte';
 
-const orchestrator = createAgentOrchestrator({ run, autoApproveToolCalls: true });
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onDestroy(() => orchestrator.dispose());
 
 const agent = useFact(orchestrator.system, '__agent');
@@ -438,7 +438,7 @@ import { useFact, useInspect } from 'directive/solid';
 import { onCleanup } from 'solid-js';
 
 function AgentPanel() {
-  const orchestrator = createAgentOrchestrator({ run, autoApproveToolCalls: true });
+  const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
   onCleanup(() => orchestrator.dispose());
 
   const agent = useFact(orchestrator.system, '__agent');
@@ -464,7 +464,7 @@ import { createAgentOrchestrator } from 'directive/ai';
 import { FactController, InspectController } from 'directive/lit';
 
 class AgentPanel extends LitElement {
-  private orchestrator = createAgentOrchestrator({ run, autoApproveToolCalls: true });
+  private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
   private agent = new FactController(this, this.orchestrator.system, '__agent');
   private conversation = new FactController(this, this.orchestrator.system, '__conversation');
   private inspect = new InspectController(this, this.orchestrator.system);

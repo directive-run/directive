@@ -30,7 +30,7 @@
  * ```
  */
 
-import type { StreamChunk, StreamRunFn, StreamingRunResult } from "../openai-agents-streaming.js";
+import type { StreamChunk, StreamRunner, StreamingRunResult } from "../openai-agents-streaming.js";
 import type { PIIType } from "./pii-enhanced.js";
 import { detectPII } from "./pii-enhanced.js";
 
@@ -216,7 +216,7 @@ export function createStreamingConstraintRunner(config: StreamingConstraintRunne
 }
 
 // ============================================================================
-// Wrapper for StreamRunFn
+// Wrapper for StreamRunner
 // ============================================================================
 
 /**
@@ -236,10 +236,10 @@ export function createStreamingConstraintRunner(config: StreamingConstraintRunne
  * ```
  */
 export function withStreamingConstraints(
-	runner: StreamRunFn,
+	runner: StreamRunner,
 	constraintRunner: ReturnType<typeof createStreamingConstraintRunner>
-): StreamRunFn {
-	return <T>(agent: Parameters<StreamRunFn>[0], input: string, options?: Parameters<StreamRunFn>[2]): StreamingRunResult<T> => {
+): StreamRunner {
+	return <T>(agent: Parameters<StreamRunner>[0], input: string, options?: Parameters<StreamRunner>[2]): StreamingRunResult<T> => {
 		const baseResult = runner<T>(agent, input, options);
 		const abortController = new AbortController();
 
