@@ -146,7 +146,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   let isHomePage = pathname === '/'
   let isStandalonePage =
     pathname.startsWith('/blog') ||
-    pathname.startsWith('/support')
+    pathname.startsWith('/support') ||
+    pathname.startsWith('/about')
 
   return (
     <div className="flex w-full flex-col">
@@ -156,7 +157,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {isHomePage && <Hero />}
 
       {isStandalonePage ? (
-        <div id="main-content" className="relative mx-auto flex w-full max-w-7xl flex-auto px-4 sm:px-6 lg:px-8">
+        <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto px-4 sm:px-6 lg:px-8 xl:px-12">
           {children}
         </div>
       ) : (

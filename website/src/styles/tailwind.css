@@ -44,12 +44,12 @@
   --brand-font-body: var(--font-inter);
   --brand-font-code: ui-monospace, monospace;
 
-  /* Brand Surface — derived from primary palette */
-  --brand-surface: color-mix(in srgb, var(--brand-primary-50) 50%, white);
+  /* Brand Surface — subtle tint derived from primary palette */
+  --brand-surface: color-mix(in oklab, white 95%, var(--brand-primary-200));
 }
 
 .dark {
-  --brand-surface: color-mix(in srgb, var(--brand-primary-950) 40%, #0f172a);
+  --brand-surface: color-mix(in oklab, #0f172a 95%, var(--brand-primary-400));
 }
 
 @theme {

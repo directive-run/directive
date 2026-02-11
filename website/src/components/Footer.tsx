@@ -16,9 +16,9 @@ function GitHubIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
 
 export function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <footer className="border-t border-slate-200 bg-brand-surface dark:border-slate-800">
       <div className="mx-auto max-w-8xl px-4 py-12 sm:px-6 lg:px-8 xl:px-12">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-12 sm:grid-cols-3 sm:gap-16">
           {/* Col 1: Brand */}
           <div>
             <div className="flex items-center gap-2">
@@ -27,20 +27,8 @@ export function Footer() {
                 Directive
               </span>
             </div>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
               Declare requirements. Let the runtime resolve them.
-            </p>
-            <p className="mt-2 text-sm text-slate-400 dark:text-slate-500">
-              Born from building a game engine. Created by{' '}
-              <a
-                href="https://www.linkedin.com/in/jasonwcomes/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-              >
-                Jason Comes
-              </a>
-              .
             </p>
           </div>
 
@@ -53,6 +41,7 @@ export function Footer() {
               {[
                 { href: '/docs/quick-start', label: 'Docs' },
                 { href: '/blog', label: 'Blog' },
+                { href: '/about', label: 'About' },
                 { href: 'https://github.com/sizls/directive', label: 'GitHub', external: true },
               ].map(({ href, label, external }) => (
                 <li key={href}>
@@ -78,7 +67,7 @@ export function Footer() {
             </p>
             <Link
               href="/support"
-              className="mt-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+              className="mt-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
             >
               <Heart weight="fill" className="h-3.5 w-3.5" />
               Support the project

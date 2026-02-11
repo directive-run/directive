@@ -1,4 +1,6 @@
-import { Fragment } from 'react'
+'use client'
+
+import { Fragment, useState } from 'react'
 import Image from 'next/image'
 import clsx from 'clsx'
 import { Highlight } from 'prism-react-renderer'
@@ -8,39 +10,51 @@ import { HeroBackground } from '@/components/HeroBackground'
 import blurCyanImage from '@/images/blur-cyan.png'
 import blurIndigoImage from '@/images/blur-indigo.png'
 
-const codeLanguage = 'typescript'
-const code = `import { createModule, createSystem } from 'directive';
+const moduleCode = `import { createModule } from 'directive';
 
-const userModule = createModule("user", {
-  schema: {
-    facts: { userId: t.number(), user: t.object<User>().nullable() },
-  },
-  // Declare what must be true
+export default createModule("publish", {
   constraints: {
-    needsUser: {
-      when: (f) => f.userId > 0 && !f.user,
-      require: { type: "FETCH_USER" },
+    validate: {
+      when: (f) => f.action === "publish" && !f.validated,
+      require: { type: "VALIDATE" },
+    },
+    upload: {
+      when: (f) => f.validated && f.images.length && !f.uploaded,
+      require: { type: "UPLOAD" },
+    },
+    save: {
+      when: (f) => f.validated && f.uploaded && !f.saved,
+      require: { type: "SAVE" },
     },
   },
-  // Define how to make it true
-  resolvers: {
-    fetchUser: {
-      requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
-      },
-    },
-  },
-});
 
-// Set userId - Directive handles the rest
-system.facts.userId = 123;
-await system.settle();`
+  resolvers: {
+    validate: { requirement: "VALIDATE", resolve: validateDraft },
+    upload:   { requirement: "UPLOAD",   resolve: uploadImages },
+    save:     { requirement: "SAVE",     resolve: createPost },
+  },
+});`
+
+const reactCode = `import { useFact } from 'directive/react';
+
+function PublishButton() {
+  const saved = useFact(system, "saved");
+
+  return (
+    <button onClick={() => system.facts.action = "publish"}>
+      {saved ? "Published \\u2713" : "Publish"}
+    </button>
+  );
+}
+
+// One assignment. Directive validates, uploads, and saves.`
 
 const tabs = [
-  { name: 'user.module.ts', isActive: true },
-  { name: 'package.json', isActive: false },
+  { name: 'publish.module.ts', language: 'typescript' },
+  { name: 'Editor.tsx', language: 'tsx' },
 ]
+
+const codeBlocks = [moduleCode, reactCode]
 
 function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
@@ -53,10 +67,14 @@ function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
 }
 
 export function Hero() {
+  const [activeTab, setActiveTab] = useState(0)
+  const activeCode = codeBlocks[activeTab]
+  const activeLanguage = tabs[activeTab].language
+
   return (
-    <div className="overflow-hidden bg-slate-900 dark:-mt-19 dark:-mb-32 dark:pt-19 dark:pb-32">
+    <div className="overflow-hidden bg-slate-900 dark:bg-brand-surface dark:-mt-19 dark:-mb-32 dark:pt-19 dark:pb-32">
       <div className="py-16 sm:px-2 lg:relative lg:px-0 lg:py-20">
-        <div className="mx-auto grid max-w-2xl grid-cols-1 items-center gap-x-8 gap-y-16 px-4 lg:max-w-8xl lg:grid-cols-2 lg:px-8 xl:gap-x-16 xl:px-12">
+        <div className="mx-auto grid max-w-2xl grid-cols-1 items-center gap-x-8 gap-y-16 px-4 lg:max-w-8xl lg:grid-cols-[5fr_7fr] lg:px-8 xl:gap-x-16 xl:px-12">
           <div className="relative z-10 md:text-center lg:text-left">
             <Image
               className="absolute right-full bottom-full -mr-72 -mb-56 opacity-50"
@@ -86,7 +104,7 @@ export function Hero() {
               </div>
             </div>
           </div>
-          <div className="relative lg:static xl:pl-10">
+          <div className="relative lg:static">
             <div className="absolute inset-x-[-50vw] -top-32 -bottom-48 mask-[linear-gradient(transparent,white,white)] lg:-top-32 lg:right-0 lg:-bottom-32 lg:left-[calc(50%+14rem)] lg:mask-none dark:mask-[linear-gradient(transparent,white,transparent)] lg:dark:mask-[linear-gradient(white,white,transparent)]">
               <HeroBackground className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-0 lg:translate-x-0 lg:translate-y-[-60%]" />
             </div>
@@ -117,20 +135,21 @@ export function Hero() {
                 <div className="pt-4 pl-4">
                   <TrafficLightsIcon className="h-2.5 w-auto stroke-slate-500/30" />
                   <div className="mt-4 flex space-x-2 text-xs">
-                    {tabs.map((tab) => (
+                    {tabs.map((tab, index) => (
                       <div
                         key={tab.name}
                         className={clsx(
-                          'flex h-6 rounded-full',
-                          tab.isActive
+                          'flex h-6 cursor-pointer rounded-full',
+                          index === activeTab
                             ? 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium text-brand-primary-300'
-                            : 'text-slate-500',
+                            : 'text-slate-500 hover:text-slate-400',
                         )}
+                        onClick={() => setActiveTab(index)}
                       >
                         <div
                           className={clsx(
                             'flex items-center rounded-full px-2.5',
-                            tab.isActive && 'bg-slate-800',
+                            index === activeTab && 'bg-slate-800',
                           )}
                         >
                           {tab.name}
@@ -144,7 +163,7 @@ export function Hero() {
                       className="border-r border-slate-300/5 pr-4 font-mono text-slate-600 select-none"
                     >
                       {Array.from({
-                        length: code.split('\n').length,
+                        length: activeCode.split('\n').length,
                       }).map((_, index) => (
                         <Fragment key={index}>
                           {(index + 1).toString().padStart(2, '0')}
@@ -153,8 +172,8 @@ export function Hero() {
                       ))}
                     </div>
                     <Highlight
-                      code={code}
-                      language={codeLanguage}
+                      code={activeCode}
+                      language={activeLanguage}
                       theme={{ plain: {}, styles: [] }}
                     >
                       {({

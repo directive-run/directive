@@ -36,21 +36,20 @@ function App() {
 | Export | Type | Description |
 |---|---|---|
 | `DirectiveProvider` | Component | Provides system context to child components |
-| `useFact` | Hook | Read single/multi facts or apply selector |
-| `useDerived` | Hook | Read single/multi derivations or apply selector |
+| `useFact` | Hook | Read single/multi facts |
+| `useDerived` | Hook | Read single/multi derivations |
 | `useSelector` | Hook | Select across all facts |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useWatch` | Hook | Side-effect watcher for facts or derivations |
 | `useSystem` | Hook | Access full system instance |
-| `useModule` | Hook | Zero-config scoped system |
 | `useInspect` | Hook | System inspection with optional throttle |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useRequirementStatus` | Hook | Single/multi requirement status |
 | `useSuspenseRequirement` | Hook | Suspense integration for requirements |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
-| `useDirective` | Hook | Scoped system tied to reactive lifecycle |
+| `useDirective` | Hook | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createDerivedSignal` | Factory | Create a derivation signal outside components |
 | `createFactSignal` | Factory | Create a fact signal outside components |
@@ -88,12 +87,11 @@ function App() {
 
 ## useFact
 
-Subscribe to fact values reactively. Supports single key, multiple keys, or a selector.
+Subscribe to fact values reactively. Supports single key or multiple keys.
 
 ```typescript
 useFact<T>(factKey: string): Accessor<T | undefined>
 useFact<T extends Record<string, unknown>>(factKeys: string[]): Accessor<T>
-useFact<T, R>(factKey: string, selector: (value: T | undefined) => R, equalityFn?: (a: R, b: R) => boolean): Accessor<R>
 ```
 
 ```tsx
@@ -112,25 +110,21 @@ function Status() {
 
   return <p>{state().count} – {state().phase}</p>;
 }
-
-function UserName() {
-  // Derive a value from a fact with a selector
-  const name = useFact('user', (u) => u?.name ?? 'Guest');
-
-  return <p>Hello, {name()}</p>;
-}
 ```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
 ## useDerived
 
-Subscribe to derivation values reactively. Supports single key, multiple keys, or a selector.
+Subscribe to derivation values reactively. Supports single key or multiple keys.
 
 ```typescript
 useDerived<T>(derivationId: string): Accessor<T>
 useDerived<T extends Record<string, unknown>>(derivationIds: string[]): Accessor<T>
-useDerived<T, R>(derivationId: string, selector: (value: T) => R, equalityFn?: (a: R, b: R) => boolean): Accessor<R>
 ```
 
 ```tsx
@@ -149,14 +143,11 @@ function Stats() {
 
   return <p>{stats().isRed ? `Red for ${stats().elapsed}s` : 'Not red'}</p>;
 }
-
-function ItemCount() {
-  // Derive a value from a derivation with a selector
-  const count = useDerived('stats', (s) => s.itemCount);
-
-  return <p>Items: {count()}</p>;
-}
 ```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
@@ -281,47 +272,6 @@ function DebugInfo() {
   const system = useSystem();
 
   return <pre>{JSON.stringify(system.inspect(), null, 2)}</pre>;
-}
-```
-
----
-
-## useModule
-
-Zero-config hook that creates a scoped system from a module definition, subscribes to all facts and derivations, and returns everything. The system is started on creation and destroyed on cleanup.
-
-```typescript
-useModule<M extends ModuleSchema>(moduleDef: ModuleDef<M>, config?: {
-  plugins?: Plugin[];
-  debug?: DebugConfig;
-  errorBoundary?: ErrorBoundaryConfig;
-  tickMs?: number;
-  zeroConfig?: boolean;
-  initialFacts?: Record<string, any>;
-  status?: boolean;
-}): {
-  system: System<M>;
-  facts: Accessor<InferFacts<M>>;
-  derived: Accessor<InferDerivations<M>>;
-  events: System<M>["events"];
-  dispatch: (event: InferEvents<M>) => void;
-  statusPlugin?: StatusPlugin;
-}
-```
-
-```tsx
-import { useModule } from 'directive/solid';
-
-function Counter() {
-  // Get everything in one call – facts, derivations, and events
-  const { facts, events } = useModule(counterModule);
-
-  return (
-    <div>
-      <p>{facts().count}</p>
-      <button onClick={() => events.increment()}>+</button>
-    </div>
-  );
 }
 ```
 
@@ -523,20 +473,55 @@ function LikeButton() {
 
 ## useDirective
 
-Create a scoped Directive system tied to the component lifecycle. The system is started on creation and destroyed on cleanup. Uses a WeakMap cache to avoid re-creation on re-render.
+Create a scoped Directive system tied to the component lifecycle. Two modes:
+
+- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** — omit keys to subscribe to all facts and derivations
 
 ```typescript
-useDirective<M extends ModuleSchema>(options: ModuleDef<M> | CreateSystemOptionsSingle<M>): System<M>
+useDirective<M extends ModuleSchema>(moduleDef: ModuleDef<M>, config?: {
+  facts?: string[];
+  derived?: string[];
+  plugins?: Plugin[];
+  debug?: DebugConfig;
+  errorBoundary?: ErrorBoundaryConfig;
+  tickMs?: number;
+  zeroConfig?: boolean;
+  initialFacts?: Record<string, any>;
+  status?: boolean;
+}): {
+  system: System<M>;
+  facts: Accessor<InferFacts<M>>;
+  derived: Accessor<InferDerivations<M>>;
+  events: System<M>["events"];
+  dispatch: (event: InferEvents<M>) => void;
+  statusPlugin?: StatusPlugin;
+}
 ```
 
 ```tsx
-import { useDirective, useFact } from 'directive/solid';
+import { useDirective } from 'directive/solid';
 
+// Subscribe all: omit keys for everything
 function Counter() {
-  // Create a scoped system tied to this component's lifecycle
-  const system = useDirective(counterModule);
+  const { facts, events } = useDirective(counterModule);
 
-  return <p>System running: {system.isSettled}</p>;
+  return (
+    <div>
+      <p>{facts().count}</p>
+      <button onClick={() => events.increment()}>+</button>
+    </div>
+  );
+}
+
+// Selective: subscribe to specific keys only
+function CounterSelective() {
+  const { facts, derived, dispatch } = useDirective(counterModule, {
+    facts: ['count'],
+    derived: ['doubled'],
+  });
+
+  return <p>{facts().count} (doubled: {derived().doubled})</p>;
 }
 ```
 
@@ -664,11 +649,11 @@ shallowEqual(a: unknown, b: unknown): boolean
 ```
 
 ```tsx
-import { useFact, shallowEqual } from 'directive/solid';
+import { useSelector, shallowEqual } from 'directive/solid';
 
 function UserInfo() {
   // Use shallowEqual to prevent updates when name/age haven't changed
-  const info = useFact('user', (u) => ({ name: u?.name, age: u?.age }), shallowEqual);
+  const info = useSelector((facts) => ({ name: facts.user?.name, age: facts.user?.age }), shallowEqual);
 
   return <p>{info().name}, {info().age}</p>;
 }

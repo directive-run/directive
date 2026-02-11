@@ -90,11 +90,100 @@ provideSystem(system);
 
 ---
 
+## Creating Systems
+
+Every composable below requires a `system`. There are two ways to create one:
+
+- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
+- **`useDirective`** — creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
+
+For most Vue apps, use the global system with the plugin. Use `useDirective` when you need per-component system isolation.
+
+### useDirective
+
+Creates a scoped system **and** subscribes to facts and derivations. Two modes:
+
+- **Selective** — specify `facts` and/or `derived` keys to subscribe only to those
+- **Subscribe all** — omit keys to subscribe to everything (good for prototyping or small modules)
+
+```vue
+<script setup>
+import { useDirective, provideSystem } from 'directive/vue';
+import { counterModule } from './counterModule';
+
+// Subscribe all: omit keys for everything
+const { system, facts, derived, events, dispatch } = useDirective(counterModule);
+
+// Provide the system to child components
+provideSystem(system);
+</script>
+
+<template>
+  <div>
+    <p>Count: {{ facts.count }}, Doubled: {{ derived.doubled }}</p>
+    <button @click="events.increment()">+</button>
+  </div>
+</template>
+```
+
+With system config and selective subscriptions:
+
+```vue
+<script setup>
+import { useDirective } from 'directive/vue';
+import { counterModule } from './counterModule';
+
+// Selective: subscribe to specific keys only
+const { facts, derived, dispatch } = useDirective(counterModule, {
+  facts: ['count'],
+  derived: ['doubled'],
+  plugins: [loggingPlugin()],
+});
+</script>
+```
+
+---
+
 ## Core Composables
+
+### useSelector
+
+The go-to composable for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those:
+
+```vue
+<script setup>
+import { useSelector, shallowEqual } from 'directive/vue';
+
+// Transform a single fact value
+const upperName = useSelector((facts) => facts.user?.name?.toUpperCase() ?? 'GUEST');
+
+// Extract a slice from a fact
+const itemCount = useSelector((facts) => facts.items?.length ?? 0);
+
+// Combine values from multiple facts
+const summary = useSelector(
+  (facts) => ({
+    userName: facts.user?.name,
+    itemCount: facts.items?.length ?? 0,
+  }),
+  (a, b) => a.userName === b.userName && a.itemCount === b.itemCount
+);
+
+// Custom equality to prevent unnecessary updates on array/object results
+const ids = useSelector(
+  (facts) => facts.users?.map(u => u.id) ?? [],
+  shallowEqual,
+);
+</script>
+
+<template>
+  <p>{{ summary.userName }} has {{ summary.itemCount }} items</p>
+</template>
+```
 
 ### useFact
 
-Read a single fact, multiple facts, or a selected slice of a fact:
+Read a single fact or multiple facts:
 
 ```vue
 <script setup lang="ts">
@@ -107,18 +196,16 @@ const userId = useFact<number>('userId');
 const { name, email, avatar } = useFact<{ name: string; email: string; avatar: string }>(
   ['name', 'email', 'avatar']
 );
-
-// Derive a value with a selector – only updates when the result changes
-const upperName = useFact('user', (u) => u?.name?.toUpperCase() ?? 'GUEST');
-
-// Selector with custom equality to prevent unnecessary updates
-const ids = useFact('users', (users) => users?.map(u => u.id) ?? [], shallowEqual);
 </script>
 ```
 
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
+
 ### useDerived
 
-Read a single derivation, multiple derivations, or a selected slice:
+Read a single derivation or multiple derivations:
 
 ```vue
 <script setup lang="ts">
@@ -131,34 +218,12 @@ const displayName = useDerived<string>('displayName');
 const { isLoggedIn, isAdmin } = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
   ['isLoggedIn', 'isAdmin']
 );
-
-// Derive a value with a selector – only updates when the count changes
-const itemCount = useDerived('stats', (stats) => stats.itemCount);
 </script>
 ```
 
-### useSelector
-
-Select from all facts (like Zustand's `useStore`):
-
-```vue
-<script setup>
-import { useSelector } from 'directive/vue';
-
-// Select and combine values from multiple facts with custom equality
-const summary = useSelector(
-  (facts) => ({
-    userName: facts.user?.name,
-    itemCount: facts.items?.length ?? 0,
-  }),
-  (a, b) => a.userName === b.userName && a.itemCount === b.itemCount
-);
-</script>
-
-<template>
-  <p>{{ summary.userName }} has {{ summary.itemCount }} items</p>
-</template>
-```
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts with auto-tracking and custom equality support.
+{% /callout %}
 
 ### useEvents
 
@@ -399,61 +464,6 @@ function handleSave() {
 
 ---
 
-## Scoped Systems
-
-### useDirective
-
-Create a system scoped to a component's lifecycle. The system is automatically started on mount and destroyed on unmount:
-
-```vue
-<script setup>
-import { useDirective, provideSystem, useDerived } from 'directive/vue';
-import { counterModule } from './counterModule';
-
-// Create a scoped system tied to this component's lifecycle
-const system = useDirective(counterModule);
-
-// Provide the system to child components
-provideSystem(system);
-</script>
-```
-
-You can also pass full system options:
-
-```typescript
-// Define options outside the component for stability
-const systemOptions = {
-  module: counterModule,
-  plugins: [loggingPlugin()],
-};
-
-// Inside <script setup>
-const system = useDirective(systemOptions);
-```
-
-### useModule
-
-Zero-config composable that creates a scoped system and subscribes to all facts and derivations:
-
-```vue
-<script setup>
-import { useModule } from 'directive/vue';
-import { counterModule } from './counterModule';
-
-// Get everything in one call – system, facts, derivations, and events
-const { system, facts, derived, events, dispatch } = useModule(counterModule);
-</script>
-
-<template>
-  <div>
-    <p>Count: {{ facts.count }}, Doubled: {{ derived.doubled }}</p>
-    <button @click="events.increment()">+</button>
-  </div>
-</template>
-```
-
----
-
 ## Typed Composables
 
 Create fully typed composables for your module schema:
@@ -600,13 +610,13 @@ test('displays user name', async () => {
 
 ### shallowEqual
 
-Re-exported from the core package for use with selector-based composables:
+Re-exported from the core package for use with `useSelector`:
 
 ```typescript
-import { shallowEqual } from 'directive/vue';
+import { useSelector, shallowEqual } from 'directive/vue';
 
 // Use shallowEqual to prevent updates when x/y values haven't changed
-const coords = useFact('position', (p) => ({ x: p?.x, y: p?.y }), shallowEqual);
+const coords = useSelector((facts) => ({ x: facts.position?.x, y: facts.position?.y }), shallowEqual);
 ```
 
 ---
@@ -617,8 +627,8 @@ const coords = useFact('position', (p) => ({ x: p?.x, y: p?.y }), shallowEqual);
 |---|---|---|
 | `createDirectivePlugin` | Plugin | Vue plugin for providing the system |
 | `provideSystem` | Composable | Provide system via Vue's inject/provide |
-| `useFact` | Composable | Read single/multi facts or apply selector |
-| `useDerived` | Composable | Read single/multi derivations or apply selector |
+| `useFact` | Composable | Read single/multi facts |
+| `useDerived` | Composable | Read single/multi derivations |
 | `useSelector` | Composable | Select from all facts with custom equality |
 | `useEvents` | Composable | Typed event dispatchers |
 | `useDispatch` | Composable | Low-level event dispatch |
@@ -629,8 +639,7 @@ const coords = useFact('position', (p) => ({ x: p?.x, y: p?.y }), shallowEqual);
 | `useRequirementStatus` | Composable | Single/multi requirement status |
 | `useOptimisticUpdate` | Composable | Optimistic mutations with rollback |
 | `useSystem` | Composable | Access full system instance |
-| `useDirective` | Composable | Scoped system tied to component lifecycle |
-| `useModule` | Composable | Zero-config scoped system |
+| `useDirective` | Composable | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create typed composables for a schema |
 | `useTimeTravel` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |

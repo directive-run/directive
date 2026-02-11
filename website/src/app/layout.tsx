@@ -183,7 +183,7 @@ export default function RootLayout({
         <WebsiteJsonLd />
         <SoftwareJsonLd />
       </head>
-      <body className="flex min-h-full bg-white dark:bg-slate-900">
+      <body className="flex min-h-full bg-brand-surface">
         <Providers>
           <Layout>{children}</Layout>
         </Providers>

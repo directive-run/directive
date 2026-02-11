@@ -34,20 +34,19 @@ Set the context at the root component:
 
 | Export | Type | Description |
 |---|---|---|
-| `useFact` | Hook | Read single/multi facts or apply selector |
-| `useDerived` | Hook | Read single/multi derivations or apply selector |
+| `useFact` | Hook | Read single/multi facts |
+| `useDerived` | Hook | Read single/multi derivations |
 | `useSelector` | Hook | Select from all facts with custom equality |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useSystem` | Hook | Access full system instance |
 | `useWatch` | Hook | Side-effect watcher for facts or derivations (auto-detects kind) |
-| `useModule` | Hook | Zero-config scoped system |
 | `useInspect` | Hook | System inspection with optional throttle |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useRequirementStatus` | Hook | Single/multi requirement status |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
-| `useDirective` | Hook | Scoped system tied to component lifecycle |
+| `useDirective` | Hook | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createFactStore` | Factory | Fact store outside components |
 | `createDerivedStore` | Factory | Derivation store outside components |
@@ -60,16 +59,11 @@ Set the context at the root component:
 
 ## useFact
 
-Subscribe to a single fact, multiple facts, or apply a selector. Returns a Svelte `Readable` store.
+Subscribe to a single fact or multiple facts. Returns a Svelte `Readable` store.
 
 ```typescript
 function useFact<K extends string>(key: K): Readable<InferFacts<S>[K]>
 function useFact<K extends string[]>(keys: K): Readable<Record<K[number], unknown>>
-function useFact<K extends string, R>(
-  key: K,
-  selector: (value: InferFacts<S>[K]) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-): Readable<R>
 ```
 
 ### Usage
@@ -83,30 +77,25 @@ function useFact<K extends string, R>(
 
   // Subscribe to multiple facts at once
   const multi = useFact(['count', 'name']);
-
-  // Derive a value from a fact with a selector
-  const doubled = useFact('count', (c) => c * 2);
 </script>
 
 <p>Count: {$count}</p>
 <p>Name: {$multi.name}, Count: {$multi.count}</p>
-<p>Doubled: {$doubled}</p>
 ```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
 ## useDerived
 
-Subscribe to a single derivation, multiple derivations, or apply a selector. Returns a Svelte `Readable` store.
+Subscribe to a single derivation or multiple derivations. Returns a Svelte `Readable` store.
 
 ```typescript
 function useDerived<K extends string>(key: K): Readable<InferDerivations<S>[K]>
 function useDerived<K extends string[]>(keys: K): Readable<Record<K[number], unknown>>
-function useDerived<K extends string, R>(
-  key: K,
-  selector: (value: InferDerivations<S>[K]) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-): Readable<R>
 ```
 
 ### Usage
@@ -120,15 +109,15 @@ function useDerived<K extends string, R>(
 
   // Subscribe to multiple derivations at once
   const stats = useDerived(['isRed', 'elapsed']);
-
-  // Derive a value from a derivation with a selector
-  const label = useDerived('status', (s) => s.label);
 </script>
 
 <p>Total: ${$total}</p>
 <p>{$stats.isRed ? `Red for ${$stats.elapsed}s` : 'Not red'}</p>
-<p>Label: {$label}</p>
 ```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
@@ -281,39 +270,6 @@ The three-argument form `useWatch("fact", "key", cb)` still works but is depreca
 
 ---
 
-## useModule
-
-Create a zero-config scoped system from a module definition. The system is tied to the component lifecycle – started on mount, stopped on destroy.
-
-```typescript
-function useModule<M>(module: ModuleDef<M>): {
-  system: SingleModuleSystem<M>;
-  facts: FactsProxy;
-  events: TypedEventDispatchers;
-  derive: DerivedAccessors;
-}
-```
-
-### Usage
-
-```svelte
-<script>
-  import { useModule } from 'directive/svelte';
-  import { counterModule } from './modules/counter';
-
-  // Get everything in one call – system, facts, derivations, and events
-  const { facts, events, derive } = useModule(counterModule);
-
-  // Subscribe to a derived value
-  const count = derive.count;
-</script>
-
-<p>Count: {$count}</p>
-<button on:click={() => events.increment()}>+</button>
-```
-
----
-
 ## useInspect
 
 Get system inspection data reactively. Supports an optional throttle to limit update frequency.
@@ -427,14 +383,18 @@ function useRequirementStatus(types: string[]): Readable<Map<string, Requirement
 Perform optimistic mutations with automatic rollback on failure. Returns a dispatch function and status.
 
 ```typescript
-function useOptimisticUpdate(requirementType: string): OptimisticUpdateResult
+function useOptimisticUpdate(
+  statusPlugin?: StatusPlugin,
+  requirementType?: string,
+): OptimisticUpdateResult
 ```
 
 ```typescript
 interface OptimisticUpdateResult {
-  dispatch: (mutation: (facts: FactsProxy) => void) => void;
+  mutate: (updateFn: () => void) => void;
   isPending: Readable<boolean>;
   error: Readable<Error | null>;
+  rollback: () => void;
 }
 ```
 
@@ -445,12 +405,12 @@ interface OptimisticUpdateResult {
   import { useOptimisticUpdate } from 'directive/svelte';
 
   // Set up optimistic mutations with automatic rollback
-  const { dispatch, isPending, error } = useOptimisticUpdate('UPDATE_ITEM');
+  const { mutate, isPending, error, rollback } = useOptimisticUpdate(statusPlugin, 'UPDATE_ITEM');
 
   function updateName(name) {
-    // Optimistically update the UI before the server responds
-    dispatch((facts) => {
-      facts.item = { ...facts.item, name };
+    // Optimistically update facts; rolls back automatically on resolver failure
+    mutate(() => {
+      system.facts.item = { ...system.facts.item, name };
     });
   }
 </script>
@@ -464,19 +424,32 @@ interface OptimisticUpdateResult {
 
 ## useDirective
 
-Create a scoped system tied to the component lifecycle. Started on mount, stopped on destroy. Returns the system and all subscription helpers.
+Create a scoped system tied to the component lifecycle. Two modes:
+
+- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** — omit keys to subscribe to all facts and derivations
 
 ```typescript
-function useDirective<M>(
-  module: ModuleDef<M>,
-  opts?: { plugins?; debug?; initialFacts? },
+function useDirective<M extends ModuleSchema>(
+  moduleDef: ModuleDef<M>,
+  config?: {
+    facts?: string[];
+    derived?: string[];
+    plugins?: Plugin[];
+    debug?: DebugConfig;
+    errorBoundary?: ErrorBoundaryConfig;
+    tickMs?: number;
+    zeroConfig?: boolean;
+    initialFacts?: Record<string, any>;
+    status?: boolean;
+  },
 ): {
-  system: SingleModuleSystem<M>;
-  fact: typeof useFact;
-  derived: typeof useDerived;
-  events: TypedEventDispatchers;
-  dispatch: (event: SystemEvent) => void;
-  inspect: Readable<SystemInspection>;
+  system: System<M>;
+  facts: Readable<InferFacts<M>>;
+  derived: Readable<InferDerivations<M>>;
+  events: System<M>["events"];
+  dispatch: (event: InferEvents<M>) => void;
+  statusPlugin?: StatusPlugin;
 }
 ```
 
@@ -487,15 +460,31 @@ function useDirective<M>(
   import { useDirective } from 'directive/svelte';
   import { counterModule } from './modules/counter';
 
-  // Create a scoped system tied to this component's lifecycle
-  const { fact, events } = useDirective(counterModule);
-
-  // Subscribe to the current count
-  const count = fact('count');
+  // Subscribe all: omit keys for everything
+  const { facts, derived, events, dispatch } = useDirective(counterModule);
 </script>
 
-<p>Count: {$count}</p>
+<p>Count: {$facts.count}</p>
+<p>Doubled: {$derived.doubled}</p>
 <button on:click={() => events.increment()}>+</button>
+```
+
+Selective subscriptions:
+
+```svelte
+<script>
+  import { useDirective } from 'directive/svelte';
+  import { counterModule } from './modules/counter';
+
+  // Selective: subscribe to specific keys only
+  const { facts, derived, dispatch } = useDirective(counterModule, {
+    facts: ['count'],
+    derived: ['doubled'],
+  });
+</script>
+
+<p>Count: {$facts.count}</p>
+<button on:click={() => dispatch({ type: 'increment' })}>+</button>
 ```
 
 ---
@@ -505,14 +494,12 @@ function useDirective<M>(
 Factory that creates fully typed hooks for a specific module schema. Useful when you want autocomplete without passing the system every time.
 
 ```typescript
-function createTypedHooks<S extends ModuleSchema>(): {
-  useFact: TypedUseFact<S>;
-  useDerived: TypedUseDerived<S>;
-  useSelector: TypedUseSelector<S>;
-  useEvents: TypedUseEvents<S>;
-  useDispatch: TypedUseDispatch<S>;
-  useWatch: TypedUseWatch<S>;
-  useRequirementStatus: TypedUseRequirementStatus<S>;
+function createTypedHooks<M extends ModuleSchema>(): {
+  useFact: <K extends keyof InferFacts<M>>(factKey: K) => Readable<InferFacts<M>[K] | undefined>;
+  useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) => Readable<InferDerivations<M>[K]>;
+  useDispatch: () => (event: InferEvents<M>) => void;
+  useSystem: () => System<M>;
+  useEvents: () => System<M>["events"];
 }
 ```
 

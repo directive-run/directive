@@ -332,47 +332,9 @@ class AppElement extends LitElement {
 
 ---
 
-## Selector Controllers
+## Selector Controller
 
-Selectors provide fine-grained re-rendering. The host only updates when the selected value changes according to the equality function.
-
-### FactSelectorController
-
-Select part of a fact:
-
-```typescript
-import { FactSelectorController } from 'directive/lit';
-
-class UserName extends LitElement {
-  // Derive the user's display name – only re-renders when the name changes
-  private userName = new FactSelectorController<User, string>(
-    this, system, 'user', (u) => u?.name ?? 'Guest'
-  );
-
-  render() {
-    return html`<span>${this.userName.value}</span>`;
-  }
-}
-```
-
-### DerivedSelectorController
-
-Select part of a derivation:
-
-```typescript
-import { DerivedSelectorController } from 'directive/lit';
-
-class StatusLabel extends LitElement {
-  // Derive the status label – only re-renders when the label changes
-  private statusText = new DerivedSelectorController<Status, string>(
-    this, system, 'status', (s) => s?.label ?? 'Unknown'
-  );
-
-  render() {
-    return html`<span>${this.statusText.value}</span>`;
-  }
-}
-```
+Use `DirectiveSelectorController` for all transforms and derived values from facts. It auto-tracks which fact keys your selector reads and subscribes only to those.
 
 ### DirectiveSelectorController
 
@@ -391,6 +353,22 @@ class Summary extends LitElement {
 
   render() {
     return html`<div>${this.summary.value.count} items</div>`;
+  }
+}
+```
+
+Transform a single fact:
+
+```typescript
+class UserName extends LitElement {
+  // Derive the user's display name – only re-renders when the name changes
+  private userName = new DirectiveSelectorController<string>(
+    this, system,
+    (facts) => facts.user?.name ?? 'Guest',
+  );
+
+  render() {
+    return html`<span>${this.userName.value}</span>`;
   }
 }
 ```
@@ -448,8 +426,6 @@ import {
   createInspect,
   createRequirementStatus,
   createWatch,
-  createFactSelector,
-  createDerivedSelector,
   createDirectiveSelector,
   createExplain,
   createConstraintStatus,
@@ -546,14 +522,14 @@ class Controls extends LitElement {
 Re-exported utility for custom equality in selectors:
 
 ```typescript
-import { shallowEqual } from 'directive/lit';
+import { shallowEqual, DirectiveSelectorController } from 'directive/lit';
 
 class UserIds extends LitElement {
   // Use shallowEqual to prevent re-renders when IDs haven't changed
-  private ids = new FactSelectorController<User[], number[]>(
-    this, system, 'users',
-    (users) => users?.map(u => u.id) ?? [],
-    shallowEqual
+  private ids = new DirectiveSelectorController<number[]>(
+    this, system,
+    (facts) => facts.users?.map(u => u.id) ?? [],
+    shallowEqual,
   );
 }
 ```

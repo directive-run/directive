@@ -45,8 +45,8 @@ provideSystem(system, statusPlugin);
 |---|---|---|
 | `createDirectivePlugin` | Plugin | Vue plugin for providing the system |
 | `provideSystem` | Composable | Provide system via Vue's inject/provide |
-| `useFact` | Composable | Read single/multi facts or apply selector |
-| `useDerived` | Composable | Read single/multi derivations or apply selector |
+| `useFact` | Composable | Read single/multi facts |
+| `useDerived` | Composable | Read single/multi derivations |
 | `useSelector` | Composable | Select from all facts with custom equality |
 | `useEvents` | Composable | Typed event dispatchers |
 | `useDispatch` | Composable | Low-level event dispatch |
@@ -57,8 +57,7 @@ provideSystem(system, statusPlugin);
 | `useRequirementStatus` | Composable | Single/multi requirement status |
 | `useOptimisticUpdate` | Composable | Optimistic mutations with rollback |
 | `useSystem` | Composable | Access full system instance |
-| `useDirective` | Composable | Scoped system tied to component lifecycle |
-| `useModule` | Composable | Zero-config scoped system |
+| `useDirective` | Composable | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create typed composables for a schema |
 | `useTimeTravel` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
@@ -116,7 +115,7 @@ provideSystem(system, statusPlugin);
 
 ## useFact
 
-Subscribe to a single fact, multiple facts, or a derived value from a fact via selector. Returns a reactive `Ref`.
+Subscribe to a single fact or multiple facts. Returns a reactive `Ref`.
 
 ```typescript
 // Single key
@@ -124,13 +123,6 @@ function useFact<T>(factKey: string): Ref<T | undefined>
 
 // Multi-key
 function useFact<T extends Record<string, unknown>>(factKeys: string[]): ShallowRef<T>
-
-// Selector
-function useFact<T, R>(
-  factKey: string,
-  selector: (value: T | undefined) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-): Ref<R>
 ```
 
 ### Usage
@@ -144,23 +136,23 @@ const count = useFact('count');
 
 // Subscribe to multiple facts – returns ShallowRef<{ userId, loading }>
 const multi = useFact(['userId', 'loading']);
-
-// Derive a value with a selector – only updates when the name changes
-const name = useFact('user', (u) => u?.name ?? 'Guest');
 </script>
 
 <template>
   <p>Count: {{ count }}</p>
   <p>User: {{ multi.userId }}</p>
-  <p>Name: {{ name }}</p>
 </template>
 ```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
 ## useDerived
 
-Subscribe to a single derivation, multiple derivations, or a derived value from a derivation via selector.
+Subscribe to a single derivation or multiple derivations.
 
 ```typescript
 // Single key
@@ -168,13 +160,6 @@ function useDerived<T>(derivationId: string): Ref<T>
 
 // Multi-key
 function useDerived<T extends Record<string, unknown>>(derivationIds: string[]): ShallowRef<T>
-
-// Selector
-function useDerived<T, R>(
-  derivationId: string,
-  selector: (value: T) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-): Ref<R>
 ```
 
 ### Usage
@@ -188,9 +173,6 @@ const total = useDerived('cartTotal');
 
 // Subscribe to multiple derivations at once
 const state = useDerived(['isRed', 'elapsed']);
-
-// Derive a value from a derivation with a selector
-const itemCount = useDerived('stats', (s) => s.itemCount);
 </script>
 
 <template>
@@ -198,6 +180,10 @@ const itemCount = useDerived('stats', (s) => s.itemCount);
   <p>{{ state.isRed ? 'Red' : 'Not red' }}</p>
 </template>
 ```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
@@ -560,50 +546,17 @@ function doSomething() {
 
 ## useDirective
 
-Create a scoped Directive system tied to the component lifecycle. The system is created on mount, started automatically, and destroyed on unmount. Results are cached by options reference.
+Create a scoped Directive system tied to the component lifecycle. The system is created on mount, started automatically, and destroyed on unmount. Two modes:
+
+- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** — omit keys to subscribe to all facts and derivations
 
 ```typescript
 function useDirective<M extends ModuleSchema>(
-  options: ModuleDef<M> | CreateSystemOptionsSingle<M>,
-): System<M>
-```
-
-### Usage
-
-```vue
-<script setup>
-import { useDirective, useFact, useDispatch } from 'directive/vue';
-import { counterModule } from './counter-module';
-
-// Create a scoped system tied to this component's lifecycle
-const system = useDirective(counterModule);
-
-// Provide the system to child components
-provideSystem(system);
-
-// Subscribe to the current count
-const count = useFact('count');
-
-// Get the dispatch function for sending events
-const dispatch = useDispatch();
-</script>
-
-<template>
-  <p>{{ count }}</p>
-  <button @click="dispatch({ type: 'increment' })">+1</button>
-</template>
-```
-
----
-
-## useModule
-
-Zero-config composable that creates a scoped system from a module definition. Subscribes to all facts and derivations automatically. The system is destroyed on unmount.
-
-```typescript
-function useModule<M extends ModuleSchema>(
   moduleDef: ModuleDef<M>,
   config?: {
+    facts?: string[];
+    derived?: string[];
     plugins?: Plugin[];
     debug?: DebugConfig;
     errorBoundary?: ErrorBoundaryConfig;
@@ -626,11 +579,11 @@ function useModule<M extends ModuleSchema>(
 
 ```vue
 <script setup>
-import { useModule } from 'directive/vue';
+import { useDirective } from 'directive/vue';
 import { counterModule } from './counter-module';
 
-// Get everything in one call – system, facts, derivations, and events
-const { facts, derived, events, dispatch } = useModule(counterModule, {
+// Subscribe all: omit keys for everything
+const { facts, derived, events, dispatch } = useDirective(counterModule, {
   debug: { timeTravel: true },
   status: true,
 });
@@ -640,6 +593,26 @@ const { facts, derived, events, dispatch } = useModule(counterModule, {
   <p>Count: {{ facts.count }}</p>
   <p>Double: {{ derived.double }}</p>
   <button @click="events.increment()">+1</button>
+</template>
+```
+
+Selective subscriptions:
+
+```vue
+<script setup>
+import { useDirective } from 'directive/vue';
+import { counterModule } from './counter-module';
+
+// Selective: subscribe to specific keys only
+const { facts, derived, dispatch } = useDirective(counterModule, {
+  facts: ['count'],
+  derived: ['doubled'],
+});
+</script>
+
+<template>
+  <p>{{ facts.count }}</p>
+  <button @click="dispatch({ type: 'increment' })">+1</button>
 </template>
 ```
 
@@ -739,7 +712,7 @@ const system = createSystem({
 
 ## shallowEqual
 
-Utility function for shallow equality comparison. Useful as the `equalityFn` parameter for `useFact`, `useDerived`, and `useSelector`.
+Utility function for shallow equality comparison. Useful as the `equalityFn` parameter for `useSelector`.
 
 ```typescript
 function shallowEqual(a: unknown, b: unknown): boolean
