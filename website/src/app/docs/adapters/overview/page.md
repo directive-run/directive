@@ -25,16 +25,16 @@ All adapters share the same core hook names and signatures (adapted to each fram
 
 | Hook | Purpose |
 |------|---------|
+| `useSelector(fn)` | Auto-tracking cross-fact selector |
 | `useFact(key)` | Subscribe to a single fact |
 | `useFact([keys])` | Subscribe to multiple facts |
-| `useFact(key, selector)` | Derived value from a single fact |
 | `useDerived(key)` | Subscribe to a derivation |
-| `useSelector(fn)` | Auto-tracking cross-fact selector |
+| `useDerived([keys])` | Subscribe to multiple derivations |
 | `useEvents()` | Typed event dispatchers |
 | `useDispatch()` | Low-level event dispatch |
 | `useWatch(key, callback)` | Side-effect watcher (no re-render) |
 | `useInspect()` | System inspection (settled, unmet, inflight) |
-| `useModule(moduleDef)` | Zero-config scoped system |
+| `useDirective(moduleDef)` | Scoped system with selected or all subscriptions |
 
 ---
 

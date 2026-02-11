@@ -322,11 +322,11 @@ const userId = useFact(system, "userId");    // inferred: number
 const user = useFact(system, "user");        // inferred: User | null
 ```
 
-For selecting part of a fact, use `useFact` with a selector:
+For selecting part of a fact, use `useSelector`:
 
 ```tsx
 // Narrow to a specific property to avoid unnecessary re-renders
-const userName = useFact(system, "user", (user) => user?.name ?? "Guest");
+const userName = useSelector(system, (facts) => facts.user?.name ?? "Guest");
 ```
 
 ---

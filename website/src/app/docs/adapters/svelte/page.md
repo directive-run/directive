@@ -76,13 +76,102 @@ Then use it in your app:
 
 ---
 
+## Creating Systems
+
+Every hook below requires a `system`. There are two ways to create one:
+
+- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
+- **`useDirective`** — creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
+
+For most Svelte apps, use the global system with `setDirectiveContext`. Use `useDirective` when you need per-component system isolation.
+
+### useDirective
+
+Creates a scoped system **and** subscribes to facts and derivations. Two modes:
+
+- **Selective** — specify `facts` and/or `derived` keys to subscribe only to those
+- **Subscribe all** — omit keys to subscribe to everything (good for prototyping or small modules)
+
+```svelte
+<script>
+  import { useDirective, setDirectiveContext } from 'directive/svelte';
+  import { counterModule } from './counterModule';
+
+  // Subscribe all: omit keys for everything
+  const { system, facts, derived, events, dispatch } = useDirective(counterModule);
+
+  // Make the system available to child components
+  setDirectiveContext(system);
+</script>
+
+<div>
+  <p>Count: {$facts.count}, Doubled: {$derived.doubled}</p>
+  <button on:click={() => events.increment()}>+</button>
+</div>
+```
+
+With selective subscriptions and config:
+
+```svelte
+<script>
+  import { useDirective, setDirectiveContext } from 'directive/svelte';
+  import { loggingPlugin } from 'directive/plugins';
+  import { counterModule } from './counterModule';
+
+  // Selective: subscribe to specific keys only
+  const { system, facts, derived, dispatch } = useDirective(counterModule, {
+    facts: ['count'],
+    derived: ['doubled'],
+    plugins: [loggingPlugin()],
+  });
+
+  // Make the system available to child components
+  setDirectiveContext(system);
+</script>
+```
+
+---
+
 ## Core Hooks
 
 All hooks below require context to be set via `setDirectiveContext` in a parent component. They return Svelte `Readable` stores – use the `$` prefix for auto-subscription in templates.
 
+### useSelector
+
+The go-to hook for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those:
+
+```svelte
+<script>
+  import { useSelector, shallowEqual } from 'directive/svelte';
+
+  // Transform a single fact value
+  const upperName = useSelector((facts) => facts.user?.name?.toUpperCase() ?? "GUEST");
+
+  // Extract a slice from a fact
+  const itemCount = useSelector((facts) => facts.items?.length ?? 0);
+
+  // Combine values from multiple facts
+  const summary = useSelector(
+    (facts) => ({
+      userName: facts.user?.name,
+      itemCount: facts.items?.length ?? 0,
+    }),
+    (a, b) => a.userName === b.userName && a.itemCount === b.itemCount
+  );
+
+  // Custom equality to prevent unnecessary updates on array/object results
+  const ids = useSelector(
+    (facts) => facts.users?.map(u => u.id) ?? [],
+    shallowEqual,
+  );
+</script>
+
+<p>{$summary.userName} has {$summary.itemCount} items</p>
+```
+
 ### useFact
 
-Read a single fact, multiple facts, or a selected slice of a fact:
+Read a single fact or multiple facts:
 
 ```svelte
 <script>
@@ -95,24 +184,21 @@ Read a single fact, multiple facts, or a selected slice of a fact:
   const profile = useFact<{ name: string; email: string; avatar: string }>(
     ["name", "email", "avatar"]
   );
-
-  // Derive a value with a selector – only updates when the result changes
-  const upperName = useFact("user", (user) => user?.name?.toUpperCase() ?? "GUEST");
-
-  // Selector with custom equality to prevent unnecessary updates
-  const ids = useFact("users", (users) => users?.map(u => u.id) ?? [], shallowEqual);
 </script>
 
 <div>
   <p>ID: {$userId}</p>
   <p>Name: {$profile.name}, Email: {$profile.email}</p>
-  <p>Upper: {$upperName}</p>
 </div>
 ```
 
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
+
 ### useDerived
 
-Read a single derivation, multiple derivations, or a selected slice:
+Read a single derivation or multiple derivations:
 
 ```svelte
 <script>
@@ -125,36 +211,15 @@ Read a single derivation, multiple derivations, or a selected slice:
   const auth = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
     ["isLoggedIn", "isAdmin"]
   );
-
-  // Derive a value with a selector – only updates when the count changes
-  const itemCount = useDerived("stats", (stats) => stats.itemCount);
 </script>
 
 <h1>Hello, {$displayName}!</h1>
 <span>{$auth.isLoggedIn ? ($auth.isAdmin ? "Admin" : "User") : "Guest"}</span>
-<p>Items: {$itemCount}</p>
 ```
 
-### useSelector
-
-Select from all facts (like Zustand's `useStore`):
-
-```svelte
-<script>
-  import { useSelector } from 'directive/svelte';
-
-  // Select and combine values from multiple facts with custom equality
-  const summary = useSelector(
-    (facts) => ({
-      userName: facts.user?.name,
-      itemCount: facts.items?.length ?? 0,
-    }),
-    (a, b) => a.userName === b.userName && a.itemCount === b.itemCount
-  );
-</script>
-
-<p>{$summary.userName} has {$summary.itemCount} items</p>
-```
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts with auto-tracking and custom equality support.
+{% /callout %}
 
 ### useEvents
 
@@ -230,25 +295,6 @@ Watch a fact or derivation for changes. `useWatch` auto-detects whether the key 
 {% callout type="warning" title="Deprecated pattern" %}
 The three-argument form `useWatch("fact", "key", cb)` still works but is deprecated. Use the two-argument form `useWatch("key", cb)` instead -- `useWatch` now auto-detects whether the key is a fact or derivation.
 {% /callout %}
-
-### useModule
-
-Zero-config hook that creates a scoped system and subscribes to all facts and derivations:
-
-```svelte
-<script>
-  import { useModule } from 'directive/svelte';
-  import { counterModule } from './counterModule';
-
-  // Get everything in one call – system, facts, derivations, and events
-  const { system, facts, derived, events, dispatch } = useModule(counterModule);
-</script>
-
-<div>
-  <p>Count: {$facts.count}, Doubled: {$derived.doubled}</p>
-  <button on:click={() => events.increment()}>+</button>
-</div>
-```
 
 ---
 
@@ -473,47 +519,6 @@ All factories return `Readable` stores that work with `$` auto-subscription:
 
 ---
 
-## Scoped Systems
-
-### useDirective
-
-Create a system scoped to a component's lifecycle. The system starts automatically and is destroyed when the component unmounts:
-
-```svelte
-<script>
-  import { useDirective, setDirectiveContext } from 'directive/svelte';
-  import { counterModule } from './counterModule';
-
-  // Create a scoped system tied to this component's lifecycle
-  // Module must be a stable reference (defined outside component)
-  const system = useDirective(counterModule);
-
-  // Make the system available to child components
-  setDirectiveContext(system);
-</script>
-
-<CounterDisplay />
-```
-
-With full system options:
-
-```svelte
-<script>
-  import { useDirective, setDirectiveContext } from 'directive/svelte';
-  import { loggingPlugin } from 'directive/plugins';
-  import { counterModule } from './counterModule';
-
-  // Options must be a stable reference
-  const options = { module: counterModule, plugins: [loggingPlugin()] };
-  const system = useDirective(options);
-
-  // Make the system available to child components
-  setDirectiveContext(system);
-</script>
-```
-
----
-
 ## Typed Hooks
 
 Create fully typed hooks for your module schema. `createTypedHooks` returns all core hooks including `useEvents`:
@@ -733,14 +738,14 @@ test('displays user name', async () => {
 
 ### shallowEqual
 
-Re-exported utility for use with selector overloads:
+Re-exported utility for use with `useSelector`:
 
 ```svelte
 <script>
-  import { useFact, shallowEqual } from 'directive/svelte';
+  import { useSelector, shallowEqual } from 'directive/svelte';
 
   // Use shallowEqual to prevent updates when values haven't changed
-  const ids = useFact("users", (users) => users?.map(u => u.id) ?? [], shallowEqual);
+  const ids = useSelector((facts) => facts.users?.map(u => u.id) ?? [], shallowEqual);
 </script>
 ```
 
@@ -773,20 +778,19 @@ Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/ti
 
 | Export | Type | Description |
 |---|---|---|
-| `useFact` | Hook | Read single/multi facts or apply selector |
-| `useDerived` | Hook | Read single/multi derivations or apply selector |
+| `useFact` | Hook | Read single/multi facts |
+| `useDerived` | Hook | Read single/multi derivations |
 | `useSelector` | Hook | Select from all facts with custom equality |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useSystem` | Hook | Access full system instance |
 | `useWatch` | Hook | Side-effect watcher for facts or derivations (auto-detects kind) |
-| `useModule` | Hook | Zero-config scoped system |
 | `useInspect` | Hook | System inspection (unmet, inflight, settled) with optional throttle |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useRequirementStatus` | Hook | Single/multi requirement status |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
-| `useDirective` | Hook | Scoped system tied to component lifecycle |
+| `useDirective` | Hook | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createFactStore` | Factory | Fact store outside components |
 | `createDerivedStore` | Factory | Derivation store outside components |

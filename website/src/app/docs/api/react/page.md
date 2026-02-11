@@ -11,9 +11,9 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `useFact` | Hook | Read single/multi facts or apply selector |
-| `useDerived` | Hook | Read single/multi derivations or apply selector |
 | `useSelector` | Hook | Auto-tracking selector over all facts |
+| `useFact` | Hook | Read single/multi facts |
+| `useDerived` | Hook | Read single/multi derivations |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useWatch` | Hook | Side-effect watcher for facts or derivations |
@@ -21,8 +21,7 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 | `useRequirementStatus` | Hook | Single/multi requirement status |
 | `useSuspenseRequirement` | Hook | Suspense integration for requirements |
 | `useDirectiveRef` | Hook | Scoped system tied to component lifecycle |
-| `useDirective` | Hook | Scoped system with selected subscriptions |
-| `useModule` | Hook | Zero-config scoped system |
+| `useDirective` | Hook | Scoped system with selected or all subscriptions |
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
@@ -31,102 +30,6 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 | `useHydratedSystem` | Hook | Create system from hydration context |
 | `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
-
----
-
-## useFact
-
-Subscribe to facts from the system. Three overloads: single key, multiple keys, or selector on a single key.
-
-```typescript
-// Single fact
-function useFact<S, K extends keyof InferFacts<S>>(
-  system: SingleModuleSystem<S>,
-  key: K,
-): InferFacts<S>[K] | undefined
-
-// Multiple facts
-function useFact<S, K extends keyof InferFacts<S>>(
-  system: SingleModuleSystem<S>,
-  keys: K[],
-): Pick<InferFacts<S>, K>
-
-// Selector on a single fact
-function useFact<S, K extends keyof InferFacts<S>, R>(
-  system: SingleModuleSystem<S>,
-  key: K,
-  selector: (value: InferFacts<S>[K] | undefined) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-): R
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `system` | `SingleModuleSystem<S>` | The Directive system |
-| `key` / `keys` | `string` or `string[]` | Fact key(s) to subscribe to |
-| `selector` | `(value) => R` | Optional transform function |
-| `equalityFn` | `(a, b) => boolean` | Optional custom equality check |
-
-```tsx
-import { useFact } from 'directive/react';
-
-// Subscribe to a single fact value
-const count = useFact(system, "count");
-
-// Subscribe to multiple facts at once
-const { userId, loading } = useFact(system, ["userId", "loading"]);
-
-// Derive a value from a fact with a selector
-const name = useFact(system, "user", (u) => u?.name ?? "Guest");
-```
-
----
-
-## useDerived
-
-Subscribe to derivations from the system. Three overloads: single key, multiple keys, or selector on a single key.
-
-```typescript
-// Single derivation
-function useDerived<S, K extends keyof InferDerivations<S>>(
-  system: SingleModuleSystem<S>,
-  key: K,
-): InferDerivations<S>[K]
-
-// Multiple derivations
-function useDerived<S, K extends keyof InferDerivations<S>>(
-  system: SingleModuleSystem<S>,
-  keys: K[],
-): Pick<InferDerivations<S>, K>
-
-// Selector on a single derivation
-function useDerived<S, K extends keyof InferDerivations<S>, R>(
-  system: SingleModuleSystem<S>,
-  key: K,
-  selector: (value: InferDerivations<S>[K]) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-): R
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `system` | `SingleModuleSystem<S>` | The Directive system |
-| `key` / `keys` | `string` or `string[]` | Derivation key(s) to subscribe to |
-| `selector` | `(value) => R` | Optional transform function |
-| `equalityFn` | `(a, b) => boolean` | Optional custom equality check |
-
-```tsx
-import { useDerived } from 'directive/react';
-
-// Subscribe to a single computed derivation
-const total = useDerived(system, "cartTotal");
-
-// Subscribe to multiple derivations at once
-const { isRed, elapsed } = useDerived(system, ["isRed", "elapsed"]);
-
-// Derive a value from a derivation with a selector
-const count = useDerived(system, "stats", (s) => s.itemCount);
-```
 
 ---
 
@@ -157,6 +60,84 @@ const summary = useSelector(system, (facts) => ({
   itemCount: facts.items?.length ?? 0,
 }));
 ```
+
+---
+
+## useFact
+
+Subscribe to facts from the system. Two overloads: single key or multiple keys.
+
+```typescript
+// Single fact
+function useFact<S, K extends keyof InferFacts<S>>(
+  system: SingleModuleSystem<S>,
+  key: K,
+): InferFacts<S>[K] | undefined
+
+// Multiple facts
+function useFact<S, K extends keyof InferFacts<S>>(
+  system: SingleModuleSystem<S>,
+  keys: K[],
+): Pick<InferFacts<S>, K>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `system` | `SingleModuleSystem<S>` | The Directive system |
+| `key` / `keys` | `string` or `string[]` | Fact key(s) to subscribe to |
+
+```tsx
+import { useFact } from 'directive/react';
+
+// Subscribe to a single fact value
+const count = useFact(system, "count");
+
+// Subscribe to multiple facts at once
+const { userId, loading } = useFact(system, ["userId", "loading"]);
+```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
+
+---
+
+## useDerived
+
+Subscribe to derivations from the system. Two overloads: single key or multiple keys.
+
+```typescript
+// Single derivation
+function useDerived<S, K extends keyof InferDerivations<S>>(
+  system: SingleModuleSystem<S>,
+  key: K,
+): InferDerivations<S>[K]
+
+// Multiple derivations
+function useDerived<S, K extends keyof InferDerivations<S>>(
+  system: SingleModuleSystem<S>,
+  keys: K[],
+): Pick<InferDerivations<S>, K>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `system` | `SingleModuleSystem<S>` | The Directive system |
+| `key` / `keys` | `string` or `string[]` | Derivation key(s) to subscribe to |
+
+```tsx
+import { useDerived } from 'directive/react';
+
+// Subscribe to a single computed derivation
+const total = useDerived(system, "cartTotal");
+
+// Subscribe to multiple derivations at once
+const { isRed, elapsed } = useDerived(system, ["isRed", "elapsed"]);
+```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
 
 ---
 
@@ -446,21 +427,19 @@ function useOptimisticUpdate(
 
 ### Returns
 
-`OptimisticUpdateResult` with `mutate`, `isPending`, and `error`.
+`OptimisticUpdateResult` with `mutate`, `isPending`, `error`, and `rollback`.
 
 ```tsx
 import { useOptimisticUpdate } from 'directive/react';
 
 // Set up optimistic mutations for the save operation
-const { mutate, isPending, error } = useOptimisticUpdate(
+const { mutate, isPending, error, rollback } = useOptimisticUpdate(
   system, statusPlugin, "SAVE_DATA"
 );
 
-async function handleSave() {
-  await mutate(
-    () => { system.facts.name = "New Name"; },       // optimistic update
-    async () => { await api.saveName("New Name"); }   // actual async operation
-  );
+function handleSave() {
+  // Optimistically update facts; rolls back automatically on resolver failure
+  mutate(() => { system.facts.name = "New Name"; });
 }
 ```
 
@@ -508,68 +487,58 @@ function Counter() {
 
 ## useDirective
 
-Higher-level scoped system with selected subscriptions baked in.
+Higher-level scoped system with subscriptions baked in. Two modes:
+
+- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** — omit keys to subscribe to all facts and derivations
 
 ```typescript
-function useDirective<M>(
-  module: ModuleDef<M>,
-  opts?: {
-    facts?: string[];
-    derived?: string[];
+function useDirective<M, FK, DK>(
+  module: ModuleDef<M> | UseDirectiveRefOptions<M>,
+  selections?: {
+    facts?: FK[];
+    derived?: DK[];
     status?: boolean;
     plugins?: Plugin[];
     debug?: DebugConfig;
     initialFacts?: Partial<InferFacts<M>>;
   },
-): { system: SingleModuleSystem<M>; [key: string]: any }
+): {
+  system: SingleModuleSystem<M>;
+  dispatch: (event: InferEvents<M>) => void;
+  events: SingleModuleSystem<M>["events"];
+  facts: Pick<InferFacts<M>, FK>;
+  derived: Pick<InferDerivations<M>, DK>;
+  statusPlugin?: StatusPlugin;
+}
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `module` | `ModuleDef<M>` | The module definition |
-| `opts.facts` | `string[]` | Fact keys to auto-subscribe to |
-| `opts.derived` | `string[]` | Derivation keys to auto-subscribe to |
+| `selections.facts` | `string[]` | Fact keys to subscribe to (omit for all) |
+| `selections.derived` | `string[]` | Derivation keys to subscribe to (omit for all) |
 
 ```tsx
 import { useDirective } from 'directive/react';
 
+// Selective: subscribe to specific keys
 function Counter() {
-  // Create a scoped system with automatic fact subscriptions
-  const { system, count } = useDirective(counterModule, {
+  const { dispatch, facts: { count }, derived: { doubled } } = useDirective(counterModule, {
     facts: ["count"],
+    derived: ["doubled"],
   });
 
-  return <p>{count}</p>;
+  return <p>{count} (doubled: {doubled})</p>;
 }
-```
 
----
-
-## useModule
-
-Zero-config scoped system. Returns everything in one call: `system`, `facts`, `events`, and `derive`.
-
-```typescript
-function useModule<M>(
-  module: ModuleDef<M>,
-): {
-  system: SingleModuleSystem<M>;
-  facts: InferFacts<M>;
-  events: TypedEventDispatchers<M>;
-  derive: InferDerivations<M>;
-}
-```
-
-```tsx
-import { useModule } from 'directive/react';
-
-function Counter() {
-  // Get everything in one call – facts, derivations, and events
-  const { facts, events, derive } = useModule(counterModule);
+// Subscribe all: omit keys for everything
+function CounterFull() {
+  const { facts, derived, events, dispatch } = useDirective(counterModule);
 
   return (
     <div>
-      <p>{derive.doubled}</p>
+      <p>{derived.doubled}</p>
       <button onClick={events.increment}>+</button>
     </div>
   );
@@ -706,13 +675,12 @@ function shallowEqual(a: unknown, b: unknown): boolean
 ```
 
 ```tsx
-import { useFact, shallowEqual } from 'directive/react';
+import { useSelector, shallowEqual } from 'directive/react';
 
 // Use shallowEqual to prevent re-renders when x/y values haven't changed
-const coords = useFact(
+const coords = useSelector(
   system,
-  "position",
-  (p) => ({ x: p?.x, y: p?.y }),
+  (facts) => ({ x: facts.position?.x, y: facts.position?.y }),
   shallowEqual,
 );
 ```

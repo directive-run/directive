@@ -53,7 +53,12 @@
       "Bash(python3:*)",
       "Bash(npx next dev:*)",
       "Bash(perl -pi -e:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "WebFetch(domain:www.radix-ui.com)",
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:m3.material.io)",
+      "WebFetch(domain:zustand-demo.pmnd.rs)",
+      "WebFetch(domain:tanstack.com)"
     ]
   }
 }

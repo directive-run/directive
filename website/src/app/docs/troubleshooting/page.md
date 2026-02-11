@@ -285,8 +285,8 @@ function UserProfile() {
 // BAD: any change to the user object triggers a re-render
 const user = useFact(system, "user");
 
-// GOOD: selector narrows the subscription to just the name property
-const userName = useFact(system, "user", (u) => u?.name);
+// GOOD: useSelector narrows the subscription to just the name property
+const userName = useSelector(system, (facts) => facts.user?.name);
 ```
 
 2. **Reading from stale closure**:
