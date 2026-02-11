@@ -25,12 +25,10 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 | `SystemController` | Controller | Create system scoped to element lifecycle |
 | `TimeTravelController` | Controller | Reactive time-travel state |
 
-### Selector Controllers
+### Selector Controller
 
 | Export | Type | Description |
 |---|---|---|
-| `FactSelectorController` | Controller | Fact value with selector transform |
-| `DerivedSelectorController` | Controller | Derivation value with selector transform |
 | `DirectiveSelectorController` | Controller | Select across all facts |
 
 ### Factory Functions
@@ -46,8 +44,6 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 | `createRequirementStatus` | Factory | Shorthand for `new RequirementStatusController` |
 | `createOptimisticUpdate` | Factory | Shorthand for `new OptimisticUpdateController` |
 | `createModule` | Factory | Shorthand for `new ModuleController` |
-| `createFactSelector` | Factory | Shorthand for `new FactSelectorController` |
-| `createDerivedSelector` | Factory | Shorthand for `new DerivedSelectorController` |
 | `createDirectiveSelector` | Factory | Shorthand for `new DirectiveSelectorController` |
 
 ### Non-Reactive Utilities
@@ -143,92 +139,6 @@ class StatusElement extends LitElement {
 
   render() {
     return html`<span>Phase: ${this.phase.value}</span>`;
-  }
-}
-```
-
----
-
-## FactSelectorController
-
-Subscribe to a fact with a selector transform. The host element re-renders only when the selected value changes (controlled by the equality function).
-
-```typescript
-import { FactSelectorController } from 'directive/lit';
-
-new FactSelectorController<T, R>(
-  host: ReactiveControllerHost,
-  system: System,
-  key: string,
-  selector: (value: T | undefined) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-)
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `host` | `ReactiveControllerHost` | The Lit element (`this`) |
-| `system` | `System` | The Directive system |
-| `key` | `string` | Fact key to subscribe to |
-| `selector` | `(value: T \| undefined) => R` | Transform function |
-| `equalityFn` | `(a: R, b: R) => boolean` | Optional custom equality check (defaults to `===`) |
-
-| Property | Type | Description |
-|---|---|---|
-| `.value` | `R` | Current selected value |
-
-```typescript
-class UserNameElement extends LitElement {
-  // Derive the user's display name – only re-renders when the name changes
-  private name = new FactSelectorController(
-    this, system, "user", (u) => u?.name ?? "Guest"
-  );
-
-  render() {
-    return html`<span>${this.name.value}</span>`;
-  }
-}
-```
-
----
-
-## DerivedSelectorController
-
-Subscribe to a derivation with a selector transform. The host element re-renders only when the selected value changes.
-
-```typescript
-import { DerivedSelectorController } from 'directive/lit';
-
-new DerivedSelectorController<T, R>(
-  host: ReactiveControllerHost,
-  system: System,
-  key: string,
-  selector: (value: T) => R,
-  equalityFn?: (a: R, b: R) => boolean,
-)
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `host` | `ReactiveControllerHost` | The Lit element (`this`) |
-| `system` | `System` | The Directive system |
-| `key` | `string` | Derivation key to subscribe to |
-| `selector` | `(value: T) => R` | Transform function |
-| `equalityFn` | `(a: R, b: R) => boolean` | Optional custom equality check (defaults to `===`) |
-
-| Property | Type | Description |
-|---|---|---|
-| `.value` | `R` | Current selected value |
-
-```typescript
-class ItemCountElement extends LitElement {
-  // Derive the item count from the items derivation
-  private count = new DerivedSelectorController(
-    this, system, "items", (items) => items.length
-  );
-
-  render() {
-    return html`<span>${this.count.value} items</span>`;
   }
 }
 ```
@@ -661,8 +571,6 @@ import {
   createRequirementStatus,
   createOptimisticUpdate,
   createModule,
-  createFactSelector,
-  createDerivedSelector,
   createDirectiveSelector,
 } from 'directive/lit';
 
@@ -695,9 +603,7 @@ class MyElement extends LitElement {
   // Create a scoped system tied to this element
   private mod = createModule(this, counterModule, { status: true });
 
-  // Selector factories – derive values from facts
-  private name = createFactSelector(this, system, "user", (u) => u?.name ?? "Guest");
-  private count = createDerivedSelector(this, system, "items", (items) => items.length);
+  // Selector factory – derive values from facts
   private summary = createDirectiveSelector(this, system, (facts) => `${facts.count}`);
 }
 ```
@@ -807,12 +713,17 @@ console.log(getCount());
 Creates a set of typed controller factories and utilities pre-bound to a specific schema. This eliminates the need for manual type annotations on every controller.
 
 ```typescript
-createTypedHooks<S>(system: System): TypedHooks<S>
+createTypedHooks<M extends ModuleSchema>(): {
+  createDerived: <K>(host, system, derivationId: K) => DerivedController<InferDerivations<M>[K]>;
+  createFact: <K>(host, system, factKey: K) => FactController<InferFacts<M>[K]>;
+  useDispatch: (system) => (event: InferEvents<M>) => void;
+  useEvents: (system) => System<M>["events"];
+}
 ```
 
 ```typescript
-// Create typed controller factories pre-bound to your schema
-const hooks = createTypedHooks<typeof appModule>(system);
+// Create typed controller factories for your schema
+const hooks = createTypedHooks<typeof appModule>();
 
 class MyElement extends LitElement {
   // Fully typed – fact key autocompletes, return type inferred
@@ -833,8 +744,8 @@ shallowEqual(a: unknown, b: unknown): boolean
 
 ```typescript
 // Use shallowEqual to prevent re-renders when name/age haven't changed
-const selected = new FactSelectorController(
-  this, system, "user", (u) => ({ name: u?.name, age: u?.age }), shallowEqual
+const selected = new DirectiveSelectorController(
+  this, system, (facts) => ({ name: facts.user?.name, age: facts.user?.age }), shallowEqual
 );
 ```
 

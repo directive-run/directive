@@ -18,11 +18,6 @@ const nextConfig = {
         destination: '/blog/:slug',
         permanent: true,
       },
-      {
-        source: '/about',
-        destination: '/docs/why-directive',
-        permanent: true,
-      },
     ]
   },
 

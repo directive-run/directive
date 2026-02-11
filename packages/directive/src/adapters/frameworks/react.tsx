@@ -1,9 +1,9 @@
 /**
  * React Adapter - Consolidated hooks for React integration
  *
- * 20 public exports: useFact, useDerived, useDispatch, useDirective,
+ * 19 public exports: useFact, useDerived, useDispatch, useDirective,
  * useDirectiveRef, useSelector, useWatch, useInspect, useRequirementStatus,
- * useSuspenseRequirement, useEvents, useModule, useExplain, useConstraintStatus,
+ * useSuspenseRequirement, useEvents, useExplain, useConstraintStatus,
  * useOptimisticUpdate, DirectiveDevTools, DirectiveHydrator, useHydratedSystem,
  * useTimeTravel, shallowEqual
  *
@@ -87,7 +87,7 @@ function defaultEquality<T>(a: T, b: T): boolean {
 const UNINITIALIZED = Symbol("directive.uninitialized");
 
 // ============================================================================
-// useFact — single key, multi key, or selector
+// useFact — single key or multi key
 // ============================================================================
 
 /** Single key overload */
@@ -102,37 +102,26 @@ export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & 
 	factKeys: K[],
 ): Pick<InferFacts<S>, K>;
 
-/** Selector overload: useFact(system, factKey, selector, eq?) */
-export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string, R>(
-	system: SingleModuleSystem<S>,
-	factKey: K,
-	selector: (value: InferFacts<S>[K] | undefined) => R,
-	equalityFn?: (a: R, b: R) => boolean,
-): R;
-
 /** Implementation */
 export function useFact(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	system: SingleModuleSystem<any>,
-	keyOrKeysOrSelector: string | string[],
-	selectorOrUndefined?: ((value: unknown) => unknown),
-	equalityFn?: (a: unknown, b: unknown) => boolean,
+	keyOrKeys: string | string[],
 ): unknown {
-	// Selector path: useFact(system, factKey, selector, eq?)
-	if (typeof keyOrKeysOrSelector === "string" && typeof selectorOrUndefined === "function") {
-		if (process.env.NODE_ENV !== "production" && keyOrKeysOrSelector === undefined) {
-			throw new Error("[Directive] useFact selector overload requires a factKey argument.");
-		}
-		return _useFactSelector(system, keyOrKeysOrSelector, selectorOrUndefined, equalityFn);
+	if (process.env.NODE_ENV !== "production" && typeof keyOrKeys === "function") {
+		console.error(
+			"[Directive] useFact() received a function. Did you mean useSelector()? " +
+				"useFact() takes a string key or array of keys, not a selector function.",
+		);
 	}
 
 	// Multi-key path: useFact(system, [keys])
-	if (Array.isArray(keyOrKeysOrSelector)) {
-		return _useFacts(system, keyOrKeysOrSelector);
+	if (Array.isArray(keyOrKeys)) {
+		return _useFacts(system, keyOrKeys);
 	}
 
 	// Single key path: useFact(system, key)
-	return _useSingleFact(system, keyOrKeysOrSelector);
+	return _useSingleFact(system, keyOrKeys);
 }
 
 function _useSingleFact(
@@ -205,50 +194,8 @@ function _useFacts(
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-function _useFactSelector(
-	// biome-ignore lint/suspicious/noExplicitAny: Internal
-	system: SingleModuleSystem<any>,
-	factKey: string,
-	selector: (value: unknown) => unknown,
-	equalityFn: ((a: unknown, b: unknown) => boolean) | undefined,
-): unknown {
-	// Store selector/eq in refs to avoid resubscription churn with inline fns (Zustand pattern)
-	const selectorRef = useRef(selector);
-	const eqRef = useRef(equalityFn ?? defaultEquality);
-	selectorRef.current = selector;
-	eqRef.current = equalityFn ?? defaultEquality;
-	const cachedValue = useRef<unknown>(UNINITIALIZED);
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.facts.$store.subscribe([factKey], onStoreChange);
-		},
-		[system, factKey],
-	);
-
-	const getSnapshot = useCallback(() => {
-		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-		const fact = (system.facts as any)[factKey];
-		const newValue = selectorRef.current(fact);
-
-		if (cachedValue.current === UNINITIALIZED) {
-			cachedValue.current = newValue;
-			return newValue;
-		}
-
-		if (eqRef.current(cachedValue.current, newValue)) {
-			return cachedValue.current;
-		}
-
-		cachedValue.current = newValue;
-		return newValue;
-	}, [system, factKey]);
-
-	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
 // ============================================================================
-// useDerived — single key, multi key, or selector
+// useDerived — single key or multi key
 // ============================================================================
 
 /** Single key overload */
@@ -266,41 +213,26 @@ export function useDerived<
 	derivationIds: K[],
 ): Pick<InferDerivations<S>, K>;
 
-/** Selector overload: useDerived(system, derivationId, selector, eq?) */
-export function useDerived<
-	S extends ModuleSchema,
-	K extends keyof InferDerivations<S> & string,
-	R,
->(
-	system: SingleModuleSystem<S>,
-	derivationId: K,
-	selector: (value: InferDerivations<S>[K]) => R,
-	equalityFn?: (a: R, b: R) => boolean,
-): R;
-
 /** Implementation */
 export function useDerived(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	system: SingleModuleSystem<any>,
-	keyOrKeysOrSelector: string | string[],
-	selectorOrUndefined?: ((value: unknown) => unknown),
-	equalityFn?: (a: unknown, b: unknown) => boolean,
+	keyOrKeys: string | string[],
 ): unknown {
-	// Selector path: useDerived(system, derivationId, selector, eq?)
-	if (typeof keyOrKeysOrSelector === "string" && typeof selectorOrUndefined === "function") {
-		if (process.env.NODE_ENV !== "production" && keyOrKeysOrSelector === undefined) {
-			throw new Error("[Directive] useDerived selector overload requires a derivationId argument.");
-		}
-		return _useDerivedSelector(system, keyOrKeysOrSelector, selectorOrUndefined, equalityFn);
+	if (process.env.NODE_ENV !== "production" && typeof keyOrKeys === "function") {
+		console.error(
+			"[Directive] useDerived() received a function. Did you mean useSelector()? " +
+				"useDerived() takes a string key or array of keys, not a selector function.",
+		);
 	}
 
 	// Multi-key path
-	if (Array.isArray(keyOrKeysOrSelector)) {
-		return _useDerivedMulti(system, keyOrKeysOrSelector);
+	if (Array.isArray(keyOrKeys)) {
+		return _useDerivedMulti(system, keyOrKeys);
 	}
 
 	// Single key path
-	return _useSingleDerived(system, keyOrKeysOrSelector);
+	return _useSingleDerived(system, keyOrKeys);
 }
 
 function _useSingleDerived(
@@ -371,47 +303,6 @@ function _useDerivedMulti(
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-function _useDerivedSelector(
-	// biome-ignore lint/suspicious/noExplicitAny: Internal
-	system: SingleModuleSystem<any>,
-	derivationId: string,
-	selector: (value: unknown) => unknown,
-	equalityFn: ((a: unknown, b: unknown) => boolean) | undefined,
-): unknown {
-	// Store selector/eq in refs to avoid resubscription churn (Zustand pattern)
-	const selectorRef = useRef(selector);
-	const eqRef = useRef(equalityFn ?? defaultEquality);
-	selectorRef.current = selector;
-	eqRef.current = equalityFn ?? defaultEquality;
-	const cachedValue = useRef<unknown>(UNINITIALIZED);
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.subscribe([derivationId], onStoreChange);
-		},
-		[system, derivationId],
-	);
-
-	const getSnapshot = useCallback(() => {
-		const derivation = system.read(derivationId);
-		const newValue = selectorRef.current(derivation);
-
-		if (cachedValue.current === UNINITIALIZED) {
-			cachedValue.current = newValue;
-			return newValue;
-		}
-
-		if (eqRef.current(cachedValue.current, newValue)) {
-			return cachedValue.current;
-		}
-
-		cachedValue.current = newValue;
-		return newValue;
-	}, [system, derivationId]);
-
-	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
 // ============================================================================
 // useSelector — cross-fact Zustand-style selector
 // ============================================================================
@@ -438,7 +329,7 @@ export function useSelector(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	system: SingleModuleSystem<any>,
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
-	selector: (facts: any) => unknown,
+	selector: (state: any) => unknown,
 	equalityFn?: (a: unknown, b: unknown) => boolean,
 ): unknown {
 	// Store selector/eq in refs to avoid resubscription churn
@@ -447,29 +338,125 @@ export function useSelector(
 	selectorRef.current = selector;
 	eqRef.current = equalityFn ?? defaultEquality;
 
-	const trackedKeysRef = useRef<string[]>([]);
+	const trackedFactKeysRef = useRef<string[]>([]);
+	const trackedDeriveKeysRef = useRef<string[]>([]);
 	const cachedValue = useRef<unknown>(UNINITIALIZED);
+	const unsubsRef = useRef<Array<() => void>>([]);
+
+	// Build a tracking-aware state proxy that exposes both facts and derivations
+	const deriveKeys = useMemo(() => new Set(Object.keys(system.derive)), [system]);
+
+	const runWithTracking = useCallback(() => {
+		const accessedDeriveKeys: string[] = [];
+
+		// Create a proxy that intercepts property access for both facts and derivations
+		const stateProxy = new Proxy(
+			{},
+			{
+				get(_, prop: string | symbol) {
+					if (typeof prop !== "string") return undefined;
+					// Derivation keys take priority to avoid collisions
+					if (deriveKeys.has(prop)) {
+						accessedDeriveKeys.push(prop);
+						return system.read(prop);
+					}
+					// Falls through to fact access via store.get() which calls trackAccess()
+					return system.facts.$store.get(prop);
+				},
+				has(_, prop: string | symbol) {
+					if (typeof prop !== "string") return false;
+					return deriveKeys.has(prop) || system.facts.$store.has(prop);
+				},
+				ownKeys() {
+					return [
+						...Object.keys(system.facts.$store.toObject()),
+						...deriveKeys,
+					];
+				},
+				getOwnPropertyDescriptor() {
+					return { configurable: true, enumerable: true, writable: true };
+				},
+			},
+		);
+
+		const { value, deps } = withTracking(() => selectorRef.current(stateProxy));
+		const factKeys = Array.from(deps) as string[];
+
+		return { value, factKeys, deriveKeys: accessedDeriveKeys };
+	}, [system, deriveKeys]);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
-			// Run selector with tracking to detect accessed keys
-			const facts = system.facts.$store.toObject();
-			const { deps } = withTracking(() => selectorRef.current(facts));
-			const keys = Array.from(deps) as string[];
-			trackedKeysRef.current = keys;
+			const resubscribe = () => {
+				// Cleanup previous subscriptions
+				for (const unsub of unsubsRef.current) unsub();
+				unsubsRef.current = [];
 
-			// Subscribe only to accessed keys (not all facts)
-			if (keys.length === 0) {
-				return system.facts.$store.subscribeAll(onStoreChange);
-			}
-			return system.facts.$store.subscribe(keys, onStoreChange);
+				// Run selector with tracking to detect accessed keys
+				const { factKeys, deriveKeys: derivedKeys } = runWithTracking();
+				trackedFactKeysRef.current = factKeys;
+				trackedDeriveKeysRef.current = derivedKeys;
+
+				// Subscribe to accessed fact keys
+				if (factKeys.length > 0) {
+					unsubsRef.current.push(
+						system.facts.$store.subscribe(factKeys, () => {
+							// Re-track on notification for dynamic deps
+							const updated = runWithTracking();
+							const factsChanged =
+								updated.factKeys.length !== trackedFactKeysRef.current.length ||
+								updated.factKeys.some((k, i) => k !== trackedFactKeysRef.current[i]);
+							const derivedChanged =
+								updated.deriveKeys.length !== trackedDeriveKeysRef.current.length ||
+								updated.deriveKeys.some((k, i) => k !== trackedDeriveKeysRef.current[i]);
+
+							if (factsChanged || derivedChanged) {
+								resubscribe();
+							}
+							onStoreChange();
+						}),
+					);
+				} else if (derivedKeys.length === 0) {
+					// No deps at all — subscribe to everything
+					unsubsRef.current.push(
+						system.facts.$store.subscribeAll(onStoreChange),
+					);
+				}
+
+				// Subscribe to accessed derivation keys
+				if (derivedKeys.length > 0) {
+					unsubsRef.current.push(
+						system.subscribe(derivedKeys, () => {
+							// Re-track on notification for dynamic deps
+							const updated = runWithTracking();
+							const factsChanged =
+								updated.factKeys.length !== trackedFactKeysRef.current.length ||
+								updated.factKeys.some((k, i) => k !== trackedFactKeysRef.current[i]);
+							const derivedChanged =
+								updated.deriveKeys.length !== trackedDeriveKeysRef.current.length ||
+								updated.deriveKeys.some((k, i) => k !== trackedDeriveKeysRef.current[i]);
+
+							if (factsChanged || derivedChanged) {
+								resubscribe();
+							}
+							onStoreChange();
+						}),
+					);
+				}
+			};
+
+			resubscribe();
+
+			return () => {
+				for (const unsub of unsubsRef.current) unsub();
+				unsubsRef.current = [];
+			};
 		},
-		[system],
+		[system, runWithTracking],
 	);
 
 	const getSnapshot = useCallback(() => {
-		const facts = system.facts.$store.toObject();
-		const newValue = selectorRef.current(facts);
+		const { value: newValue } = runWithTracking();
 
 		if (
 			cachedValue.current !== UNINITIALIZED &&
@@ -479,7 +466,7 @@ export function useSelector(
 		}
 		cachedValue.current = newValue;
 		return newValue;
-	}, [system]);
+	}, [runWithTracking]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
@@ -1092,6 +1079,7 @@ export type UseDirectiveReturn<
 > = {
 	system: SingleModuleSystem<S>;
 	dispatch: (event: InferEvents<S>) => void;
+	events: SingleModuleSystem<S>["events"];
 	facts: Pick<InferFacts<S>, FK>;
 	derived: Pick<InferDerivations<S>, DK>;
 };
@@ -1107,14 +1095,19 @@ export type UseDirectiveReturnWithStatus<
 
 /**
  * Convenience hook that creates a scoped system and reads selected facts/derivations
- * into container objects.
+ * into container objects. When no `facts` or `derived` keys are specified, subscribes
+ * to ALL facts and derivations (replacing the former `useModule` hook).
  *
  * @example
  * ```tsx
+ * // Selective subscription
  * const { dispatch, facts: { count }, derived: { doubled } } = useDirective(counterModule, {
  *   facts: ["count"],
  *   derived: ["doubled"],
  * });
+ *
+ * // Subscribe to everything (no keys = all facts + all derivations)
+ * const { facts, derived, events, dispatch } = useDirective(counterModule);
  * ```
  */
 export function useDirective<
@@ -1128,6 +1121,9 @@ export function useDirective<
 	const { facts: factKeysOpt, derived: derivedKeysOpt, status, ...configRest } = selections;
 	const factKeys = (factKeysOpt ?? []) as FK[];
 	const derivedKeys = (derivedKeysOpt ?? []) as DK[];
+
+	// When no keys are specified, subscribe to everything
+	const subscribeAll = factKeys.length === 0 && derivedKeys.length === 0;
 
 	// Create system via useDirectiveRef (handles lifecycle)
 	// biome-ignore lint/suspicious/noExplicitAny: Conditional overload dispatch
@@ -1143,21 +1139,35 @@ export function useDirective<
 		? (refResult as { system: SingleModuleSystem<S>; statusPlugin: StatusPlugin }).statusPlugin
 		: undefined;
 
+	// For subscribe-all mode, get all derivation keys
+	const allDerivationKeys = useMemo(
+		() => (subscribeAll ? Object.keys(system.derive) : []),
+		[system, subscribeAll],
+	);
+
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
 			const unsubs: Array<() => void> = [];
-			if (factKeys.length > 0) {
-				unsubs.push(system.facts.$store.subscribe(factKeys, onStoreChange));
-			}
-			if (derivedKeys.length > 0) {
-				unsubs.push(system.subscribe(derivedKeys, onStoreChange));
+			if (subscribeAll) {
+				// Subscribe to ALL facts and ALL derivations
+				unsubs.push(system.facts.$store.subscribeAll(onStoreChange));
+				if (allDerivationKeys.length > 0) {
+					unsubs.push(system.subscribe(allDerivationKeys, onStoreChange));
+				}
+			} else {
+				if (factKeys.length > 0) {
+					unsubs.push(system.facts.$store.subscribe(factKeys, onStoreChange));
+				}
+				if (derivedKeys.length > 0) {
+					unsubs.push(system.subscribe(derivedKeys, onStoreChange));
+				}
 			}
 			return () => {
 				for (const unsub of unsubs) unsub();
 			};
 		},
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[system, ...factKeys, ...derivedKeys],
+		[system, subscribeAll, ...factKeys, ...derivedKeys, ...allDerivationKeys],
 	);
 
 	const cachedFacts = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
@@ -1165,25 +1175,48 @@ export function useDirective<
 	const cachedWrapper = useRef<{ facts: Record<string, unknown>; derived: Record<string, unknown> } | null>(null);
 
 	const getSnapshot = useCallback(() => {
-		// Build facts container
-		const factsResult: Record<string, unknown> = {};
-		for (const key of factKeys) {
-			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-			factsResult[key] = (system.facts as any)[key];
-		}
-		// Build derived container
-		const derivedResult: Record<string, unknown> = {};
-		for (const key of derivedKeys) {
-			derivedResult[key] = system.read(key);
+		let factsResult: Record<string, unknown>;
+		let derivedResult: Record<string, unknown>;
+		let effectiveFactKeys: readonly string[];
+		let effectiveDerivedKeys: readonly string[];
+
+		if (subscribeAll) {
+			// Read ALL facts and ALL derivations
+			factsResult = system.facts.$store.toObject();
+			effectiveFactKeys = Object.keys(factsResult);
+			derivedResult = {};
+			for (const key of allDerivationKeys) {
+				derivedResult[key] = system.read(key);
+			}
+			effectiveDerivedKeys = allDerivationKeys;
+		} else {
+			// Read selected keys only
+			factsResult = {};
+			for (const key of factKeys) {
+				// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
+				factsResult[key] = (system.facts as any)[key];
+			}
+			effectiveFactKeys = factKeys;
+			derivedResult = {};
+			for (const key of derivedKeys) {
+				derivedResult[key] = system.read(key);
+			}
+			effectiveDerivedKeys = derivedKeys;
 		}
 
 		// Check facts stability
 		let factsSame = cachedFacts.current !== UNINITIALIZED;
 		if (factsSame) {
-			for (const key of factKeys) {
-				if (!Object.is((cachedFacts.current as Record<string, unknown>)[key], factsResult[key])) {
-					factsSame = false;
-					break;
+			const prev = cachedFacts.current as Record<string, unknown>;
+			const prevKeys = Object.keys(prev);
+			if (prevKeys.length !== effectiveFactKeys.length) {
+				factsSame = false;
+			} else {
+				for (const key of effectiveFactKeys) {
+					if (!Object.is(prev[key], factsResult[key])) {
+						factsSame = false;
+						break;
+					}
 				}
 			}
 		}
@@ -1191,10 +1224,16 @@ export function useDirective<
 		// Check derived stability
 		let derivedSame = cachedDerived.current !== UNINITIALIZED;
 		if (derivedSame) {
-			for (const key of derivedKeys) {
-				if (!Object.is((cachedDerived.current as Record<string, unknown>)[key], derivedResult[key])) {
-					derivedSame = false;
-					break;
+			const prev = cachedDerived.current as Record<string, unknown>;
+			const prevKeys = Object.keys(prev);
+			if (prevKeys.length !== effectiveDerivedKeys.length) {
+				derivedSame = false;
+			} else {
+				for (const key of effectiveDerivedKeys) {
+					if (!Object.is(prev[key], derivedResult[key])) {
+						derivedSame = false;
+						break;
+					}
 				}
 			}
 		}
@@ -1213,7 +1252,7 @@ export function useDirective<
 		cachedWrapper.current = { facts: stableFacts, derived: stableDerived };
 		return cachedWrapper.current;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [system, ...factKeys, ...derivedKeys]);
+	}, [system, subscribeAll, ...factKeys, ...derivedKeys, ...allDerivationKeys]);
 
 	const values = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
@@ -1222,9 +1261,12 @@ export function useDirective<
 		[system],
 	);
 
+	const events = useEvents(system);
+
 	const base = {
 		system,
 		dispatch,
+		events,
 		facts: values.facts as Pick<InferFacts<S>, FK>,
 		derived: values.derived as Pick<InferDerivations<S>, DK>,
 	};
@@ -1495,97 +1537,6 @@ export function useEvents<S extends ModuleSchema>(
 	system: SingleModuleSystem<S>,
 ): SingleModuleSystem<S>["events"] {
 	return useMemo(() => system.events, [system]);
-}
-
-// ============================================================================
-// useModule — zero-config all-in-one hook
-// ============================================================================
-
-/**
- * Zero-config hook that creates a scoped system from a module definition,
- * subscribes to ALL facts and derivations, and returns everything.
- *
- * @example
- * ```tsx
- * function Counter() {
- *   const { facts, derived, events } = useModule(counterModule);
- *   return <div>{facts.count} (doubled: {derived.doubled})</div>;
- * }
- * ```
- */
-export function useModule<S extends ModuleSchema>(
-	moduleDef: ModuleDef<S>,
-	config?: DirectiveRefBaseConfig & { status?: boolean },
-) {
-	// biome-ignore lint/suspicious/noExplicitAny: Conditional overload dispatch
-	const refResult: any = config?.status
-		? useDirectiveRef(moduleDef, { status: true as const, ...config })
-		: useDirectiveRef(moduleDef, config ?? {});
-
-	const system: SingleModuleSystem<S> = config?.status
-		? refResult.system
-		: refResult;
-
-	const statusPlugin = config?.status ? refResult.statusPlugin as StatusPlugin : undefined;
-
-	// Subscribe to ALL facts
-	const factsSubscribe = useCallback(
-		(onStoreChange: () => void) => system.facts.$store.subscribeAll(onStoreChange),
-		[system],
-	);
-	const cachedFacts = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
-	const getFactsSnapshot = useCallback(() => {
-		const current = system.facts.$store.toObject();
-		if (cachedFacts.current !== UNINITIALIZED) {
-			const prev = cachedFacts.current as Record<string, unknown>;
-			const currKeys = Object.keys(current);
-			if (Object.keys(prev).length === currKeys.length) {
-				let same = true;
-				for (const key of currKeys) {
-					if (!Object.is(prev[key], current[key])) { same = false; break; }
-				}
-				if (same) return prev;
-			}
-		}
-		cachedFacts.current = current;
-		return current;
-	}, [system]);
-	const facts = useSyncExternalStore(factsSubscribe, getFactsSnapshot, getFactsSnapshot) as InferFacts<S>;
-
-	// Subscribe to ALL derivations
-	const derivationKeys = useMemo(() => Object.keys(system.derive), [system]);
-	const derivedSubscribe = useCallback(
-		(onStoreChange: () => void) => {
-			if (derivationKeys.length === 0) return () => {};
-			return system.subscribe(derivationKeys, onStoreChange);
-		},
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[system, ...derivationKeys],
-	);
-	const cachedDerived = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
-	const getDerivedSnapshot = useCallback(() => {
-		const result: Record<string, unknown> = {};
-		for (const key of derivationKeys) {
-			result[key] = system.read(key);
-		}
-		if (cachedDerived.current !== UNINITIALIZED) {
-			const prev = cachedDerived.current as Record<string, unknown>;
-			let same = true;
-			for (const key of derivationKeys) {
-				if (!Object.is(prev[key], result[key])) { same = false; break; }
-			}
-			if (same) return prev;
-		}
-		cachedDerived.current = result;
-		return result;
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [system, ...derivationKeys]);
-	const derived = useSyncExternalStore(derivedSubscribe, getDerivedSnapshot, getDerivedSnapshot) as InferDerivations<S>;
-
-	const events = useEvents(system);
-	const dispatch = useDispatch(system);
-
-	return { system, facts, derived, events, dispatch, statusPlugin };
 }
 
 // ============================================================================

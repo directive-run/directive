@@ -5,7 +5,7 @@
  * @internal
  */
 
-import type { SystemInspection, System } from "../core/types.js";
+import type { System } from "../core/types.js";
 
 // ============================================================================
 // Requirements State
@@ -30,20 +30,6 @@ export interface RequirementsState {
 	hasInflight: boolean;
 	/** Whether the system is actively working (has unmet or inflight requirements) */
 	isWorking: boolean;
-}
-
-/**
- * Compute requirements state from system inspection.
- * @internal
- */
-export function computeRequirementsState(inspection: SystemInspection): RequirementsState {
-	return {
-		unmet: inspection.unmet,
-		inflight: inspection.inflight,
-		hasUnmet: inspection.unmet.length > 0,
-		hasInflight: inspection.inflight.length > 0,
-		isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
-	};
 }
 
 // ============================================================================

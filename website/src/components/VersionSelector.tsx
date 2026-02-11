@@ -59,7 +59,7 @@ export const VersionSelector = memo(function VersionSelector({
   return (
     <Listbox value={selectedVersion} onChange={handleVersionChange}>
       <div className={clsx('relative', className)}>
-        <ListboxButton className="relative w-full cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left text-sm shadow-md ring-1 ring-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary dark:bg-slate-800 dark:ring-slate-700">
+        <ListboxButton className="relative w-full cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left text-sm ring-1 ring-slate-200 transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary dark:bg-slate-800 dark:ring-slate-700">
           <span className="flex items-center gap-2">
             <span className="block truncate font-medium text-slate-900 dark:text-white">
               {selectedVersion.label}

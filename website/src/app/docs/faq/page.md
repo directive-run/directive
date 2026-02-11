@@ -177,7 +177,7 @@ function MyComponent() {
 ### Why is my component re-rendering too often?
 
 1. **Reading too broadly** - Select only the specific facts you need
-2. **Missing selector memoization** - Use `useFact` with a stable selector
+2. **Missing selector** - Use `useSelector` for fine-grained subscriptions
 3. **Derivation recreating** - Check derivation dependencies
 
 ```tsx
@@ -185,7 +185,7 @@ function MyComponent() {
 const user = useFact(system, "user");
 
 // Good: re-renders only when the name changes
-const userName = useFact(system, "user", (u) => u?.name);
+const userName = useSelector(system, (facts) => facts.user?.name);
 ```
 
 ---

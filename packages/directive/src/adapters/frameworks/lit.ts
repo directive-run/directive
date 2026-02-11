@@ -3,12 +3,12 @@
  *
  * Controllers: DerivedController, FactController,
  * InspectController (with throttle), RequirementStatusController,
- * FactSelectorController, DerivedSelectorController, DirectiveSelectorController,
+ * DirectiveSelectorController,
  * WatchController (with fact mode), SystemController,
  * ExplainController, ConstraintStatusController, OptimisticUpdateController, ModuleController
  *
  * Factories: createDerived, createFact, createInspect,
- * createRequirementStatus, createWatch, createFactSelector, createDerivedSelector,
+ * createRequirementStatus, createWatch,
  * createDirectiveSelector, useDispatch, useEvents, useTimeTravel,
  * getDerived, getFact, createTypedHooks, shallowEqual
  */
@@ -34,7 +34,6 @@ import {
 	type RequirementTypeStatus,
 } from "../../utils/requirement-status.js";
 import {
-	type RequirementsState,
 	type InspectState,
 	type ConstraintInfo,
 	computeInspectState,
@@ -42,11 +41,11 @@ import {
 } from "../shared.js";
 
 // Re-export for convenience
-export type { RequirementTypeStatus, RequirementsState, InspectState, ConstraintInfo };
+export type { RequirementTypeStatus, InspectState, ConstraintInfo };
 export { shallowEqual } from "../../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
-type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
+export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
 // Context
@@ -166,6 +165,15 @@ export class FactController<T> extends DirectiveController {
 		super(host, system);
 		this.factKey = factKey;
 		this.value = system.facts.$store.get(factKey) as T | undefined;
+
+		if (process.env.NODE_ENV !== "production") {
+			if (!system.facts.$store.has(factKey)) {
+				console.warn(
+					`[Directive] FactController("${factKey}") — fact not found in store. ` +
+					`Check that "${factKey}" is defined in your module's schema.`,
+				);
+			}
+		}
 	}
 
 	protected subscribe(): void {
@@ -269,137 +277,122 @@ function defaultEquality<T>(a: T, b: T): boolean {
 }
 
 /**
- * Reactive controller for a fact with selector function.
- */
-export class FactSelectorController<T, R> extends DirectiveController {
-	private factKey: string;
-	private selector: (value: T | undefined) => R;
-	private equalityFn: (a: R, b: R) => boolean;
-	value: R;
-
-	constructor(
-		host: ReactiveControllerHost,
-		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
-		factKey: string,
-		selector: (value: T | undefined) => R,
-		equalityFn: (a: R, b: R) => boolean = defaultEquality,
-	) {
-		super(host, system);
-		this.factKey = factKey;
-		this.selector = selector;
-		this.equalityFn = equalityFn;
-		const initialValue = system.facts.$store.get(factKey) as T | undefined;
-		this.value = selector(initialValue);
-	}
-
-	protected subscribe(): void {
-		const initialValue = this.system.facts.$store.get(this.factKey) as T | undefined;
-		this.value = this.selector(initialValue);
-		this.unsubscribe = this.system.facts.$store.subscribe([this.factKey], () => {
-			const newValue = this.system.facts.$store.get(this.factKey) as T | undefined;
-			const newSelected = this.selector(newValue);
-			if (!this.equalityFn(this.value, newSelected)) {
-				this.value = newSelected;
-				this.requestUpdate();
-			}
-		});
-	}
-}
-
-/**
- * Reactive controller for a derivation with selector function.
- */
-export class DerivedSelectorController<T, R> extends DirectiveController {
-	private derivationId: string;
-	private selector: (value: T) => R;
-	private equalityFn: (a: R, b: R) => boolean;
-	value: R;
-
-	constructor(
-		host: ReactiveControllerHost,
-		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
-		derivationId: string,
-		selector: (value: T) => R,
-		equalityFn: (a: R, b: R) => boolean = defaultEquality,
-	) {
-		super(host, system);
-		this.derivationId = derivationId;
-		this.selector = selector;
-		this.equalityFn = equalityFn;
-		const initialValue = system.read(derivationId) as T;
-		this.value = selector(initialValue);
-	}
-
-	protected subscribe(): void {
-		const initialValue = this.system.read(this.derivationId) as T;
-		this.value = this.selector(initialValue);
-		this.unsubscribe = this.system.subscribe([this.derivationId], () => {
-			const newValue = this.system.read(this.derivationId) as T;
-			const newSelected = this.selector(newValue);
-			if (!this.equalityFn(this.value, newSelected)) {
-				this.value = newSelected;
-				this.requestUpdate();
-			}
-		});
-	}
-}
-
-/**
  * Reactive controller for selecting across all facts.
  * Uses `withTracking()` for auto-tracking when constructed with `autoTrack: true`.
  */
 export class DirectiveSelectorController<R> extends DirectiveController {
-	private selector: (facts: Record<string, unknown>) => R;
+	private selector: (state: Record<string, unknown>) => R;
 	private equalityFn: (a: R, b: R) => boolean;
 	private autoTrack: boolean;
+	private deriveKeySet: Set<string>;
+	private trackedFactKeys: string[] = [];
+	private trackedDeriveKeys: string[] = [];
+	private unsubs: Array<() => void> = [];
 	value: R;
 
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
 		system: System<any>,
-		selector: (facts: Record<string, unknown>) => R,
+		selector: (state: Record<string, unknown>) => R,
 		equalityFn: (a: R, b: R) => boolean = defaultEquality,
 		options?: { autoTrack?: boolean },
 	) {
 		super(host, system);
 		this.selector = selector;
 		this.equalityFn = equalityFn;
-		this.autoTrack = options?.autoTrack ?? false;
-		this.value = selector(system.facts.$store.toObject());
+		this.autoTrack = options?.autoTrack ?? true;
+		this.deriveKeySet = new Set(Object.keys(system.derive ?? {}));
+
+		const initial = this.runWithTracking();
+		this.value = initial.value;
+		this.trackedFactKeys = initial.factKeys;
+		this.trackedDeriveKeys = initial.deriveKeys;
+	}
+
+	private runWithTracking(): { value: R; factKeys: string[]; deriveKeys: string[] } {
+		const accessedDeriveKeys: string[] = [];
+
+		const stateProxy = new Proxy(
+			{},
+			{
+				get: (_, prop: string | symbol) => {
+					if (typeof prop !== "string") return undefined;
+					if (this.deriveKeySet.has(prop)) {
+						accessedDeriveKeys.push(prop);
+						return this.system.read(prop);
+					}
+					return this.system.facts.$store.get(prop);
+				},
+				has: (_, prop: string | symbol) => {
+					if (typeof prop !== "string") return false;
+					return this.deriveKeySet.has(prop) || this.system.facts.$store.has(prop);
+				},
+				ownKeys: () => {
+					return [...Object.keys(this.system.facts.$store.toObject()), ...this.deriveKeySet];
+				},
+				getOwnPropertyDescriptor() {
+					return { configurable: true, enumerable: true, writable: true };
+				},
+			},
+		);
+
+		const { value, deps } = withTracking(() => this.selector(stateProxy as Record<string, unknown>));
+		return { value, factKeys: Array.from(deps) as string[], deriveKeys: accessedDeriveKeys };
+	}
+
+	private resubscribe(): void {
+		for (const unsub of this.unsubs) unsub();
+		this.unsubs = [];
+
+		const onUpdate = () => {
+			const result = this.runWithTracking();
+			if (!this.equalityFn(this.value, result.value)) {
+				this.value = result.value;
+				this.requestUpdate();
+			}
+			if (this.autoTrack) {
+				// Re-track: check if deps changed
+				const factsChanged =
+					result.factKeys.length !== this.trackedFactKeys.length ||
+					result.factKeys.some((k, i) => k !== this.trackedFactKeys[i]);
+				const derivedChanged =
+					result.deriveKeys.length !== this.trackedDeriveKeys.length ||
+					result.deriveKeys.some((k, i) => k !== this.trackedDeriveKeys[i]);
+				if (factsChanged || derivedChanged) {
+					this.trackedFactKeys = result.factKeys;
+					this.trackedDeriveKeys = result.deriveKeys;
+					this.resubscribe();
+				}
+			}
+		};
+
+		if (this.autoTrack) {
+			if (this.trackedFactKeys.length > 0) {
+				this.unsubs.push(this.system.facts.$store.subscribe(this.trackedFactKeys, onUpdate));
+			} else if (this.trackedDeriveKeys.length === 0) {
+				this.unsubs.push(this.system.facts.$store.subscribeAll(onUpdate));
+			}
+			if (this.trackedDeriveKeys.length > 0) {
+				this.unsubs.push(this.system.subscribe(this.trackedDeriveKeys, onUpdate));
+			}
+		} else {
+			this.unsubs.push(this.system.facts.$store.subscribeAll(onUpdate));
+		}
 	}
 
 	protected subscribe(): void {
-		this.value = this.selector(this.system.facts.$store.toObject());
+		const result = this.runWithTracking();
+		this.value = result.value;
+		this.trackedFactKeys = result.factKeys;
+		this.trackedDeriveKeys = result.deriveKeys;
+		this.resubscribe();
+	}
 
-		const getFacts = () => this.system.facts.$store.toObject();
-
-		if (this.autoTrack) {
-			const { deps } = withTracking(() => this.selector(getFacts()));
-			const keys = Array.from(deps) as string[];
-
-			const subscribeFn = keys.length === 0
-				? (cb: () => void) => this.system.facts.$store.subscribeAll(cb)
-				: (cb: () => void) => this.system.facts.$store.subscribe(keys, cb);
-
-			this.unsubscribe = subscribeFn(() => {
-				const newSelected = this.selector(getFacts());
-				if (!this.equalityFn(this.value, newSelected)) {
-					this.value = newSelected;
-					this.requestUpdate();
-				}
-			});
-		} else {
-			this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-				const newSelected = this.selector(getFacts());
-				if (!this.equalityFn(this.value, newSelected)) {
-					this.value = newSelected;
-					this.requestUpdate();
-				}
-			});
-		}
+	hostDisconnected(): void {
+		for (const unsub of this.unsubs) unsub();
+		this.unsubs = [];
+		super.hostDisconnected();
 	}
 }
 
@@ -815,28 +808,6 @@ export function createWatch<T>(
 	callback: (newValue: T, previousValue: T | undefined) => void,
 ): WatchController<T> {
 	return new WatchController<T>(host, system, derivationId, callback);
-}
-
-export function createFactSelector<T, R>(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	factKey: string,
-	selector: (value: T | undefined) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): FactSelectorController<T, R> {
-	return new FactSelectorController<T, R>(host, system, factKey, selector, equalityFn);
-}
-
-export function createDerivedSelector<T, R>(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	derivationId: string,
-	selector: (value: T) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): DerivedSelectorController<T, R> {
-	return new DerivedSelectorController<T, R>(host, system, derivationId, selector, equalityFn);
 }
 
 export function createDirectiveSelector<R>(

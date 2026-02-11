@@ -51,117 +51,21 @@ Every hook takes the system as its first parameter. TypeScript infers the fact k
 
 ---
 
-## Core Hooks
+## Creating Systems
 
-### useFact
+Every hook below requires a `system` reference. There are two ways to create one:
 
-Read a single fact, multiple facts, or a selected slice of a fact:
+- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Quick Start](#quick-start) above)
+- **`useDirectiveRef`** (recommended) — creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
 
-```tsx
-// Subscribe to a single fact – re-renders when "userId" changes
-const userId = useFact(system, "userId");
+For most React apps, prefer `useDirectiveRef` so each component owns its own system lifecycle. Use a global system when multiple components need to share the same state.
 
-// Subscribe to multiple facts at once
-const { name, email, avatar } = useFact(system, ["name", "email", "avatar"]);
+The two hooks below are progressive shortcuts — each adds more automatic behavior:
 
-// Derive a value with a selector – only re-renders when the result changes
-const upperName = useFact(system, "user", (user) => user?.name?.toUpperCase() ?? "GUEST");
-
-// Selector with custom equality to prevent unnecessary re-renders
-const ids = useFact(system, "users", (users) => users?.map(u => u.id) ?? [], shallowEqual);
-```
-
-### useDerived
-
-Read a single derivation, multiple derivations, or a selected slice:
-
-```tsx
-// Subscribe to a single derivation
-const displayName = useDerived(system, "displayName");
-
-// Subscribe to multiple derivations at once
-const { isLoggedIn, isAdmin } = useDerived(system, ["isLoggedIn", "isAdmin"]);
-
-// Derive a value with a selector – only re-renders when the count changes
-const itemCount = useDerived(system, "stats", (stats) => stats.itemCount);
-```
-
-### useSelector
-
-Select from all facts with **auto-tracking**. Directive detects which fact keys your selector reads and subscribes only to those – no manual dependency lists:
-
-```tsx
-// Select and combine values from multiple facts with auto-tracking
-const summary = useSelector(system, (facts) => ({
-  userName: facts.user?.name,
-  itemCount: facts.items?.length ?? 0,
-}));
-```
-
-{% callout type="note" title="Auto-tracking" %}
-`useSelector` uses Directive's tracking system to detect accessed fact keys at subscription time. Inline selectors work without `useCallback` – the hook stores the selector in a ref internally (Zustand pattern).
-{% /callout %}
-
-### useEvents
-
-Get a typed reference to the system's event dispatchers:
-
-```tsx
-function Counter() {
-  // Get typed event dispatchers for the system
-  const events = useEvents(system);
-
-  return (
-    <div>
-      <button onClick={() => events.increment()}>+</button>
-      <button onClick={() => events.setCount({ count: 0 })}>Reset</button>
-    </div>
-  );
-}
-```
-
-The returned reference is stable across renders (memoized on the system instance).
-
-### useDispatch
-
-Low-level event dispatch for untyped or system events:
-
-```tsx
-// Get the low-level dispatch function
-const dispatch = useDispatch(system);
-
-// Send an event object directly
-dispatch({ type: "increment" });
-```
-
-### useWatch
-
-Watch a fact or derivation for changes without causing re-renders -- auto-detects whether the key is a fact or derivation:
-
-```tsx
-// Watch a fact (auto-detected)
-useWatch(system, "userId", (newValue, prevValue) => {
-  analytics.track("userId_changed", { from: prevValue, to: newValue });
-});
-
-// Watch a derivation (auto-detected)
-useWatch(system, "pageViews", (newValue, prevValue) => {
-  analytics.track("pageViews", { from: prevValue, to: newValue });
-});
-
-// With custom equality function (4th parameter)
-useWatch(system, "position", (newVal, oldVal) => {
-  canvas.moveTo(newVal.x, newVal.y);
-}, { equalityFn: (a, b) => a?.x === b?.x && a?.y === b?.y });
-```
-
-{% callout type="warning" title="Deprecated pattern" %}
-The old `useWatch(system, "fact", "key", callback)` pattern still works for backward compatibility but is no longer needed. The unified `useWatch(system, "key", callback)` auto-detects facts vs derivations.
-{% /callout %}
-
----
-
-## Scoped Systems
+| Hook | Creates system | Subscribes to state | You choose what to subscribe to |
+|---|---|---|---|
+| `useDirectiveRef` | Yes | No — use `useFact`, `useDerived`, etc. separately | Full control |
+| `useDirective` | Yes | Yes — selected keys, or **everything** if none specified | You pick the keys (or omit for all) |
 
 ### useDirectiveRef
 
@@ -218,13 +122,16 @@ const system = useDirectiveRef(myModule, {
 
 ### useDirective
 
-Higher-level hook that creates a scoped system and subscribes to selected facts and derivations in one call:
+Creates a scoped system **and** subscribes to facts and derivations. Two modes:
+
+- **Selective** — specify `facts` and/or `derived` keys to subscribe only to those (component re-renders only when selected keys change)
+- **Subscribe all** — omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```tsx
 import { useDirective } from 'directive/react';
 
+// Selective: subscribe to specific keys only
 function Counter() {
-  // Create a scoped system with automatic fact and derivation subscriptions
   const { dispatch, facts, derived } = useDirective(counterModule, {
     facts: ["count"],
     derived: ["doubled"],
@@ -237,18 +144,10 @@ function Counter() {
     </div>
   );
 }
-```
 
-### useModule
-
-Zero-config hook that creates a scoped system and subscribes to all facts and derivations:
-
-```tsx
-import { useModule } from 'directive/react';
-
-function Counter() {
-  // Get everything in one call – system, facts, derivations, and events
-  const { system, facts, derived, events, dispatch } = useModule(counterModule);
+// Subscribe all: omit keys to get everything
+function CounterFull() {
+  const { system, facts, derived, events, dispatch } = useDirective(counterModule);
 
   return (
     <div>
@@ -259,13 +158,133 @@ function Counter() {
 }
 ```
 
-With status plugin:
+System config (`plugins`, `initialFacts`, `debug`, etc.) goes in the same options object:
 
 ```tsx
-// Enable the status plugin for requirement tracking
-const { system, facts, derived, events, dispatch, statusPlugin } = useModule(counterModule, {
-  status: true,
+const { facts, derived, events, dispatch } = useDirective(counterModule, {
+  initialFacts: { count: 10 },
+  plugins: [loggingPlugin()],
+  debug: { timeTravel: true },
+  status: true, // adds statusPlugin to return value
 });
+```
+
+---
+
+## Core Hooks
+
+### useSelector
+
+The go-to hook for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those – no manual dependency lists:
+
+```tsx
+// Transform a single fact value
+const upperName = useSelector(system, (facts) => facts.user?.name?.toUpperCase() ?? "GUEST");
+
+// Extract a slice from a fact
+const itemCount = useSelector(system, (facts) => facts.items?.length ?? 0);
+
+// Combine values from multiple facts
+const summary = useSelector(system, (facts) => ({
+  userName: facts.user?.name,
+  itemCount: facts.items?.length ?? 0,
+}));
+
+// Custom equality to prevent unnecessary re-renders on array/object results
+const ids = useSelector(
+  system,
+  (facts) => facts.users?.map(u => u.id) ?? [],
+  shallowEqual,
+);
+```
+
+{% callout type="note" title="Auto-tracking" %}
+`useSelector` uses Directive's tracking system to detect accessed fact keys at subscription time. Inline selectors work without `useCallback` – the hook stores the selector in a ref internally (Zustand pattern).
+{% /callout %}
+
+### useFact
+
+Read a single fact or multiple facts:
+
+```tsx
+// Subscribe to a single fact – re-renders when "userId" changes
+const userId = useFact(system, "userId");
+
+// Subscribe to multiple facts at once
+const { name, email, avatar } = useFact(system, ["name", "email", "avatar"]);
+```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks dependencies and supports custom equality.
+{% /callout %}
+
+### useDerived
+
+Read a single derivation or multiple derivations:
+
+```tsx
+// Subscribe to a single derivation
+const displayName = useDerived(system, "displayName");
+
+// Subscribe to multiple derivations at once
+const { isLoggedIn, isAdmin } = useDerived(system, ["isLoggedIn", "isAdmin"]);
+```
+
+{% callout type="note" title="Need a transform?" %}
+Use [`useSelector`](#useselector) to derive values from facts with auto-tracking and custom equality support.
+{% /callout %}
+
+### useEvents
+
+Get a typed reference to the system's event dispatchers:
+
+```tsx
+function Counter() {
+  // Get typed event dispatchers for the system
+  const events = useEvents(system);
+
+  return (
+    <div>
+      <button onClick={() => events.increment()}>+</button>
+      <button onClick={() => events.setCount({ count: 0 })}>Reset</button>
+    </div>
+  );
+}
+```
+
+The returned reference is stable across renders (memoized on the system instance).
+
+### useDispatch
+
+Low-level event dispatch for untyped or system events:
+
+```tsx
+// Get the low-level dispatch function
+const dispatch = useDispatch(system);
+
+// Send an event object directly
+dispatch({ type: "increment" });
+```
+
+### useWatch
+
+Watch a fact or derivation for changes without causing re-renders -- auto-detects whether the key is a fact or derivation:
+
+```tsx
+// Watch a fact (auto-detected)
+useWatch(system, "userId", (newValue, prevValue) => {
+  analytics.track("userId_changed", { from: prevValue, to: newValue });
+});
+
+// Watch a derivation (auto-detected)
+useWatch(system, "pageViews", (newValue, prevValue) => {
+  analytics.track("pageViews", { from: prevValue, to: newValue });
+});
+
+// With custom equality function (4th parameter)
+useWatch(system, "position", (newVal, oldVal) => {
+  canvas.moveTo(newVal.x, newVal.y);
+}, { equalityFn: (a, b) => a?.x === b?.x && a?.y === b?.y });
 ```
 
 ---
@@ -551,8 +570,8 @@ test('displays user name', async () => {
 
 | Export | Type | Description |
 |---|---|---|
-| `useFact` | Hook | Read single/multi facts or apply selector |
-| `useDerived` | Hook | Read single/multi derivations or apply selector |
+| `useFact` | Hook | Read single/multi facts |
+| `useDerived` | Hook | Read single/multi derivations |
 | `useSelector` | Hook | Auto-tracking selector over all facts |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
@@ -561,8 +580,7 @@ test('displays user name', async () => {
 | `useRequirementStatus` | Hook | Single/multi requirement status |
 | `useSuspenseRequirement` | Hook | Suspense integration for requirements |
 | `useDirectiveRef` | Hook | Scoped system tied to component lifecycle |
-| `useDirective` | Hook | Scoped system with selected subscriptions |
-| `useModule` | Hook | Zero-config scoped system |
+| `useDirective` | Hook | Scoped system with selected or all subscriptions |
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
