@@ -1,6 +1,6 @@
 ---
 title: Framework Adapters
-description: Use Directive with React, Vue, Svelte, Solid, or Lit — reactive hooks and bindings for every major framework.
+description: Use Directive with React, Vue, Svelte, Solid, or Lit – reactive hooks and bindings for every major framework.
 ---
 
 Directive provides first-class adapters for five UI frameworks. Each adapter gives you reactive hooks (or stores/controllers) that subscribe to facts, derivations, and system state with zero boilerplate. {% .lead %}
@@ -40,16 +40,16 @@ All adapters share the same core hook names and signatures (adapted to each fram
 
 ## How to Choose
 
-- **React** — Most comprehensive adapter. Use if you're building a React app.
-- **Vue** — Full composable API with `ref`-based reactivity. Context via `provide`/`inject`.
-- **Svelte** — Returns Svelte `Readable` stores. Use `$` prefix for auto-subscription.
-- **Solid** — Signal-based reactivity. Fine-grained updates without VDOM overhead.
-- **Lit** — Controller-based pattern for Web Components. Works with any Lit element.
+- **React** – Most comprehensive adapter. Use if you're building a React app.
+- **Vue** – Full composable API with `ref`-based reactivity. Context via `provide`/`inject`.
+- **Svelte** – Returns Svelte `Readable` stores. Use `$` prefix for auto-subscription.
+- **Solid** – Signal-based reactivity. Fine-grained updates without VDOM overhead.
+- **Lit** – Controller-based pattern for Web Components. Works with any Lit element.
 
 ---
 
 ## Next Steps
 
-- **[React Adapter](/docs/adapters/react)** — The most popular starting point
-- **[Quick Start](/docs/quick-start)** — Build your first module
-- **[Core Concepts](/docs/core-concepts)** — Understand facts, derivations, and constraints
+- **[React Adapter](/docs/adapters/react)** – The most popular starting point
+- **[Quick Start](/docs/quick-start)** – Build your first module
+- **[Core Concepts](/docs/core-concepts)** – Understand facts, derivations, and constraints

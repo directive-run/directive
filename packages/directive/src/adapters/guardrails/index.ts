@@ -107,13 +107,13 @@ export {
   createToolGuardrail,
   createLengthGuardrail,
   createContentFilterGuardrail,
-} from "../openai-agents.js";
+} from "../ai/index.js";
 
 // ============================================================================
 // Output Sanitization
 // ============================================================================
 
-import type { GuardrailFn, OutputGuardrailData, GuardrailResult } from "../openai-agents.js";
+import type { GuardrailFn, OutputGuardrailData, GuardrailResult } from "../ai/index.js";
 import { detectPromptInjection, STRICT_INJECTION_PATTERNS } from "./prompt-injection.js";
 
 /** Options for output sanitizer */

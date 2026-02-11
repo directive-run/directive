@@ -55,6 +55,7 @@ Debug with the devtools plugin:
 ```typescript
 import { devtoolsPlugin } from 'directive/plugins';
 
+// Attach devtools to see constraint evaluations and resolver activity
 const system = createSystem({
   module: myModule,
   plugins: [devtoolsPlugin()],
@@ -71,8 +72,10 @@ const system = createSystem({
 resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
-    // Dedupe by user ID
+
+    // Dedupe by user ID so concurrent requests for the same user collapse
     key: (req) => `fetch-user-${req.payload.userId}`,
+
     resolve: async (req, context) => {
       // ...
     },
@@ -109,15 +112,17 @@ There's no hard limit. Constraint evaluation is O(n) where n is the number of co
 Yes! Directive is SSR-ready:
 
 ```typescript
-// Server: create system and serialize
+// Server: run the system and capture its state as a serializable snapshot
 const system = createSystem({ module: myModule });
+system.start();
 const snapshot = system.getSnapshot();
 
-// Client: hydrate from snapshot
-const system = createSystem({
+// Client: restore from the server snapshot – no duplicate fetches
+const clientSystem = createSystem({
   module: myModule,
   initialFacts: snapshot.facts,
 });
+clientSystem.start();
 ```
 
 ---
@@ -136,10 +141,10 @@ const myModule = createModule("app", {
     facts: {
       userId: t.number(),
       user: t.object<User>().nullable(),
-      status: t.literal("idle", "loading", "error"),
+      status: t.literal("idle", "loading", "error"),  // Union of string literals
     },
   },
-  // Types flow automatically to constraints, resolvers, etc.
+  // Types flow automatically to constraints, resolvers, and hooks
 });
 ```
 
@@ -162,6 +167,7 @@ No. Directive uses a system-first pattern where hooks take the system as their f
 ```tsx
 import { useFact } from 'directive/react';
 
+// No Provider wrapper needed – pass the system directly
 function MyComponent() {
   const count = useFact(system, "count");
   return <p>{count}</p>;
@@ -175,10 +181,10 @@ function MyComponent() {
 3. **Derivation recreating** - Check derivation dependencies
 
 ```tsx
-// Bad: subscribe to a whole fact when you only need one property
+// Bad: re-renders on ANY change to the user object
 const user = useFact(system, "user");
 
-// Good: select only the property you need
+// Good: re-renders only when the name changes
 const userName = useFact(system, "user", (u) => u?.name);
 ```
 

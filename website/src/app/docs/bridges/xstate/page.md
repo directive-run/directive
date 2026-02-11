@@ -31,6 +31,7 @@ import { createModule, createSystem, t } from 'directive';
 import { createMachine, createActor } from 'xstate';
 import { xstateResolver } from 'directive/xstate';
 
+// Define the XState machine for payment processing
 const paymentMachine = createMachine({
   id: 'payment',
   initial: 'processing',
@@ -66,6 +67,7 @@ const checkout = createModule('checkout', {
   },
 
   constraints: {
+    // Start payment when there's an amount and payment hasn't completed
     startPayment: {
       when: (facts) => facts.amount > 0 && !facts.paymentComplete,
       require: (facts) => ({ type: 'START_PAYMENT', amount: facts.amount }),
@@ -73,13 +75,20 @@ const checkout = createModule('checkout', {
   },
 
   resolvers: {
+    // Wrap the XState machine as a Directive resolver
     payment: xstateResolver({
       machine: paymentMachine,
       createActor,
       requirement: (req): req is { type: 'START_PAYMENT'; amount: number } =>
         req.type === 'START_PAYMENT',
+
+      // Deduplicate by amount to prevent duplicate payment flows
       key: (req) => `payment-${req.amount}`,
+
+      // Pass requirement data as machine input
       input: (req) => ({ amount: req.amount }),
+
+      // Handle final states
       onDone: (output, ctx) => {
         ctx.facts.paymentComplete = true;
         ctx.facts.orderId = output?.transactionId ?? null;
@@ -87,6 +96,8 @@ const checkout = createModule('checkout', {
       onError: (error, ctx) => {
         ctx.facts.paymentError = String(error);
       },
+
+      // Log each state transition
       onTransition: (snapshot, ctx) => {
         console.log('Payment state:', snapshot.value);
       },
@@ -137,20 +148,20 @@ const bridge = createActorBridge({
   createActor,
 });
 
-// Facts are synced from the actor
+// Actor state is automatically synced to Directive facts
 console.log(bridge.facts.actorStatus); // "active"
 console.log(bridge.facts.actorValue);  // "red"
 
-// Send events to the machine
+// Send events to the underlying XState actor
 bridge.send({ type: 'TIMER' });
 // bridge.facts.actorValue is now "green"
 
-// Watch for state changes via the Directive system
+// Subscribe to state changes through the Directive system
 bridge.system.watch('actorValue', (value) => {
   console.log('Transitioned to:', value);
 });
 
-// Cleanup
+// Clean up the bridge, actor, and system
 bridge.destroy();
 ```
 
@@ -186,9 +197,9 @@ const bridge = createActorBridge({
   autoStart: false, // Don't start immediately
 });
 
-bridge.start();   // Start the actor + system + sync
-bridge.stop();    // Stop the system + sync + actor
-bridge.destroy(); // Stop everything and destroy the system
+bridge.start();   // Start the actor, system, and sync
+bridge.stop();    // Stop sync, system, and actor
+bridge.destroy(); // Stop everything and release resources
 ```
 
 ---
@@ -212,6 +223,7 @@ const elevatorMachine = createMachine({
 });
 
 const coordinator = createActorCoordinator({
+  // Register multiple actors of the same machine type
   actors: [
     { id: 'elevator-1', machine: elevatorMachine, input: { floor: 1 } },
     { id: 'elevator-2', machine: elevatorMachine, input: { floor: 5 } },
@@ -228,6 +240,7 @@ const coordinator = createActorCoordinator({
 
   // Constraints see facts.actors (Record<string, ActorStateInfo>)
   constraints: {
+    // Dispatch an elevator when there are pending floor requests
     dispatchElevator: {
       when: (facts) => facts.pendingFloors.length > 0,
       require: (facts) => ({
@@ -239,18 +252,20 @@ const coordinator = createActorCoordinator({
   },
 
   // Resolvers get { facts, actors, signal }
-  // actors here are the actual ActorLike instances you can send events to
   resolvers: {
     dispatch: {
       requirement: (req) => req.type === 'DISPATCH_ELEVATOR',
       resolve: (req, { actors, facts }) => {
-        // Find an idle elevator
+        // Find an idle elevator to handle the request
         const idleId = Object.keys(facts.actors).find(
           (id) => isInState(facts.actors[id], 'idle')
         );
 
         if (idleId) {
+          // Send the floor request to the idle elevator
           actors[idleId].send({ type: 'GO_TO_FLOOR', floor: req.floor });
+
+          // Remove the handled floor from the queue
           facts.pendingFloors = facts.pendingFloors.slice(1);
         }
       },
@@ -260,17 +275,17 @@ const coordinator = createActorCoordinator({
 
 coordinator.start();
 
-// Send events to specific actors
+// Send events to a specific actor by ID
 coordinator.send('elevator-1', { type: 'GO_TO_FLOOR', floor: 3 });
 
-// Access individual actors
+// Access individual actor instances
 coordinator.actors['elevator-1'];
 
-// Access coordinated facts
+// Read coordinated actor state through Directive facts
 coordinator.facts.actors['elevator-1'].status; // "active"
 coordinator.facts.actors['elevator-1'].value;  // "idle"
 
-// Cleanup
+// Clean up all actors and the coordinator
 coordinator.destroy();
 ```
 
@@ -297,11 +312,11 @@ Utility functions for checking actor state inside constraints and resolvers:
 ```typescript
 import { isInState, isDone, hasError, isActive } from 'directive/xstate';
 
-// Check if an actor is in a specific state value
-isInState(facts.actors['elevator-1'], 'idle');       // true/false
-isInState(facts.actors['elevator-1'], ['idle', 'moving']); // true if in any
+// Check if an actor is in a specific state
+isInState(facts.actors['elevator-1'], 'idle');              // true/false
+isInState(facts.actors['elevator-1'], ['idle', 'moving']);  // true if in any listed state
 
-// Lifecycle checks
+// Lifecycle status checks
 isDone(facts.actors['elevator-1']);     // status === "done"
 hasError(facts.actors['elevator-1']);   // status === "error"
 isActive(facts.actors['elevator-1']);   // status === "active"

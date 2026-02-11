@@ -27,7 +27,7 @@ import { createDirectiveMiddleware } from 'directive/zustand';
 
 ## Middleware Pattern
 
-The primary integration is `createDirectiveMiddleware` — a standard Zustand middleware that wraps your store with Directive's constraint engine. Every `setState` call triggers constraint evaluation automatically.
+The primary integration is `createDirectiveMiddleware` – a standard Zustand middleware that wraps your store with Directive's constraint engine. Every `setState` call triggers constraint evaluation automatically.
 
 ```typescript
 import { create } from 'zustand';
@@ -62,37 +62,47 @@ const useTodoStore = create(
     }),
     {
       constraints: {
+        // Sync todos to server whenever local changes are unsynced
         needsSync: {
           when: (state) => !state.synced && state.todos.length > 0,
           require: { type: 'SYNC_TODOS' },
         },
+
+        // Warn when too many todos are left incomplete
         tooManyOpen: {
           when: (state) => state.todos.filter((t) => !t.done).length > 50,
           require: { type: 'WARN_OVERLOAD' },
           priority: 100,
         },
       },
+
       resolvers: {
+        // Push unsynced todos to the server
         syncTodos: {
           requirement: (req): req is { type: 'SYNC_TODOS' } =>
             req.type === 'SYNC_TODOS',
           resolve: async (req, { getState, setState, signal }) => {
+            // Push current todos to the server
             const response = await fetch('/api/todos', {
               method: 'POST',
               body: JSON.stringify(getState().todos),
               signal,
             });
+
+            // Mark as synced on success
             if (response.ok) {
               setState({ synced: true });
             }
           },
         },
+
+        // Log a warning when open todos exceed the threshold
         warnOverload: {
           requirement: (req): req is { type: 'WARN_OVERLOAD' } =>
             req.type === 'WARN_OVERLOAD',
           resolve: (req, { getState }) => {
             const open = getState().todos.filter((t) => !t.done).length;
-            console.warn(`${open} open todos — consider completing some`);
+            console.warn(`${open} open todos – consider completing some`);
           },
         },
       },
@@ -111,8 +121,8 @@ The store works exactly like any Zustand store. Call `addTodo()` or `toggleTodo(
 |--------|------|---------|-------------|
 | `constraints` | `Record<string, ZustandConstraint<T>>` | `{}` | Constraints evaluated against store state |
 | `resolvers` | `Record<string, ZustandResolver<T, R>>` | `{}` | Resolvers that fulfill requirements |
-| `onRequirementCreated` | `(req: Requirement) => void` | — | Called when a constraint produces a requirement |
-| `onRequirementResolved` | `(req: Requirement) => void` | — | Called when a resolver completes |
+| `onRequirementCreated` | `(req: Requirement) => void` | – | Called when a constraint produces a requirement |
+| `onRequirementResolved` | `(req: Requirement) => void` | – | Called when a resolver completes |
 | `autoStart` | `boolean` | `true` | Start the Directive engine immediately |
 | `plugins` | `Plugin[]` | `[]` | Directive plugins (logging, devtools, etc.) |
 | `debug` | `boolean` | `false` | Enable time-travel debugging |
@@ -135,13 +145,13 @@ The `require` field can be a static object or a function that derives the requir
 
 ```typescript
 constraints: {
-  // Static requirement
+  // Static requirement – always the same shape
   needsAuth: {
     when: (state) => !state.token,
     require: { type: 'AUTHENTICATE' },
   },
 
-  // Dynamic requirement derived from state
+  // Dynamic requirement – derives payload from current state
   needsFetch: {
     when: (state) => state.userId > 0 && !state.profile,
     require: (state) => ({ type: 'FETCH_PROFILE', userId: state.userId }),
@@ -160,10 +170,10 @@ Resolvers receive a `ZustandResolverContext<T>` with full control over the store
 
 ```typescript
 interface ZustandResolverContext<T> {
-  getState: () => T;                                        // Read current state
-  setState: (partial: Partial<T> | ((s: T) => Partial<T>)) => void;  // Merge state
-  replaceState: (state: T) => void;                         // Replace entire state
-  signal: AbortSignal;                                      // Cancellation signal
+  getState: () => T;                                        // Read current store state
+  setState: (partial: Partial<T> | ((s: T) => Partial<T>)) => void;  // Merge partial state
+  replaceState: (state: T) => void;                         // Replace the entire store
+  signal: AbortSignal;                                      // Cancel on store destroy or superseding resolution
 }
 ```
 
@@ -174,10 +184,13 @@ resolvers: {
   fetchData: {
     requirement: (req): req is { type: 'FETCH_DATA' } =>
       req.type === 'FETCH_DATA',
-    key: (req) => `fetch-data`,  // Deduplicate concurrent requests
+    // Deduplicate concurrent requests with a static key
+    key: (req) => `fetch-data`,
     resolve: async (req, { setState, signal }) => {
       const res = await fetch('/api/data', { signal });
       const data = await res.json();
+
+      // Update the store with fetched data
       setState({ data, loading: false });
     },
   },
@@ -197,14 +210,14 @@ import { create } from 'zustand';
 import { createModule, createSystem, t } from 'directive';
 import { bindZustandToDirective } from 'directive/zustand';
 
-// Existing Zustand store
+// Existing Zustand store (unchanged)
 const useAppStore = create((set) => ({
   count: 0,
   userName: 'guest',
   increment: () => set((s) => ({ count: s.count + 1 })),
 }));
 
-// Existing Directive system
+// Existing Directive system (unchanged)
 const analyticsModule = createModule('analytics', {
   schema: {
     facts: {
@@ -236,15 +249,21 @@ const analyticsModule = createModule('analytics', {
 });
 
 const system = createSystem({ module: analyticsModule });
+system.start();
 
-// Bind them together
+// Create a two-way sync between Zustand and Directive
 const { sync, unsync } = bindZustandToDirective(useAppStore, system, {
+  // Map Zustand state to Directive facts
   toFacts: (state) => ({ count: state.count, userName: state.userName }),
+
+  // Map Directive facts back to Zustand state
   fromFacts: (facts) => ({ count: facts.count as number }),
+
+  // Only watch these facts for Directive -> Zustand sync
   watchFacts: ['count'],
 });
 
-// Start syncing — initial Zustand state is pushed to Directive
+// Start syncing – initial Zustand state is pushed to Directive
 sync();
 
 // Later, stop syncing
@@ -272,22 +291,24 @@ Extract the underlying Directive system from a middleware-enhanced store for ins
 ```typescript
 import { getDirectiveSystem } from 'directive/zustand';
 
+// Extract the underlying Directive system for inspection
 const system = getDirectiveSystem(useTodoStore);
 
-// Inspect current state
+// Inspect the current constraint and resolver state
 console.log(system?.inspect());
 
-// Manually trigger evaluation
+// Manually trigger constraint evaluation
 await (useTodoStore as any).evaluate();
 ```
 
 ### subscribeToRequirements
 
-Subscribe to the requirement lifecycle — useful for analytics, logging, or coordinating external systems:
+Subscribe to the requirement lifecycle – useful for analytics, logging, or coordinating external systems:
 
 ```typescript
 import { subscribeToRequirements } from 'directive/zustand';
 
+// Listen to the full requirement lifecycle
 const unsubscribe = subscribeToRequirements(useTodoStore, (req, event) => {
   if (event === 'created') {
     console.log('Requirement created:', req.type);
@@ -320,11 +341,13 @@ interface SyncReq extends Requirement {
   items: string[];
 }
 
+// Define a constraint outside the middleware for reuse or readability
 const syncConstraint = createConstraint<AppState>({
   when: (state) => !state.synced && state.items.length > 0,
   require: (state) => ({ type: 'SYNC_ITEMS', items: state.items }),
 });
 
+// Define a resolver separately – typed with the requirement shape
 const syncResolver = createResolver<AppState, SyncReq>({
   requirement: (req): req is SyncReq => req.type === 'SYNC_ITEMS',
   key: () => 'sync-items',
@@ -338,7 +361,7 @@ const syncResolver = createResolver<AppState, SyncReq>({
   },
 });
 
-// Use them in middleware
+// Plug them into the middleware
 const useStore = create(
   createDirectiveMiddleware<AppState>(
     (set) => ({ items: [], synced: true }),
@@ -354,13 +377,13 @@ const useStore = create(
 
 ## Migration Strategy
 
-Moving from plain Zustand to Directive-enhanced Zustand is incremental — you never need to rewrite your store.
+Moving from plain Zustand to Directive-enhanced Zustand is incremental – you never need to rewrite your store.
 
-1. **Add middleware** — Wrap your existing `create()` call with `createDirectiveMiddleware`. Your store keeps working unchanged.
-2. **Identify implicit rules** — Find the scattered `if` checks and manual orchestration logic in your components or actions.
-3. **Extract constraints** — Move those conditions into `constraints`. Each constraint declares one condition and one requirement.
-4. **Add resolvers** — Implement the fulfillment logic that was previously buried in event handlers or effects.
-5. **Remove manual orchestration** — Delete the `useEffect` chains, manual state checks, and orchestration code from your components.
+1. **Add middleware** – Wrap your existing `create()` call with `createDirectiveMiddleware`. Your store keeps working unchanged.
+2. **Identify implicit rules** – Find the scattered `if` checks and manual orchestration logic in your components or actions.
+3. **Extract constraints** – Move those conditions into `constraints`. Each constraint declares one condition and one requirement.
+4. **Add resolvers** – Implement the fulfillment logic that was previously buried in event handlers or effects.
+5. **Remove manual orchestration** – Delete the `useEffect` chains, manual state checks, and orchestration code from your components.
 
 The middleware approach means you can adopt Directive one constraint at a time. Existing actions, selectors, and component bindings are unaffected.
 

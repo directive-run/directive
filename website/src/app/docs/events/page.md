@@ -3,7 +3,7 @@ title: Events
 description: Events are type-safe state mutation handlers. Define named operations that modify facts with typed payloads.
 ---
 
-Events are type-safe state mutation handlers — named operations that modify facts. {% .lead %}
+Events are type-safe state mutation handlers – named operations that modify facts. {% .lead %}
 
 ---
 
@@ -16,30 +16,39 @@ import { createModule, t } from 'directive';
 
 const counterModule = createModule("counter", {
   schema: {
+    // Define the state shape for this module
     facts: {
       count: t.number(),
       items: t.array<string>(),
     },
+
+    // Declare event names and their payload types
     events: {
-      increment: {},                        // No payload
-      addAmount: { amount: t.number() },    // Typed payload
-      addItem: { item: t.string() },
+      increment: {},                        // No payload needed
+      addAmount: { amount: t.number() },    // Requires a numeric amount
+      addItem: { item: t.string() },        // Requires a string item
     },
   },
 
+  // Set initial state when the system starts
   init: (facts) => {
     facts.count = 0;
     facts.items = [];
   },
 
-  // Event handlers receive facts and the payload, then mutate facts
+  // Event handlers mutate facts synchronously
   events: {
+    // Simple mutation – no payload required
     increment: (facts) => {
       facts.count += 1;
     },
+
+    // Destructure the typed payload from the schema
     addAmount: (facts, { amount }) => {
       facts.count += amount;
     },
+
+    // Immutable update – replace the array, don't push
     addItem: (facts, { item }) => {
       facts.items = [...facts.items, item];
     },
@@ -54,12 +63,12 @@ const counterModule = createModule("counter", {
 Event handlers are functions that receive facts and an optional typed payload:
 
 ```typescript
-// No payload — simple mutation
+// No payload – simple mutation
 eventName: (facts) => {
   facts.someValue = newValue;
 }
 
-// With payload — typed from schema.events
+// With payload – typed from schema.events
 eventName: (facts, { field1, field2 }) => {
   facts.someValue = field1;
 }
@@ -67,9 +76,9 @@ eventName: (facts, { field1, field2 }) => {
 
 | Part | Description |
 |------|-------------|
-| `facts` | Writable facts proxy — mutate directly |
+| `facts` | Writable facts proxy – mutate directly |
 | `payload` | Typed from schema.events definition (optional) |
-| Return | `void` — events are synchronous |
+| Return | `void` – events are synchronous |
 
 ---
 
@@ -85,9 +94,10 @@ The typed proxy provides autocomplete and type checking:
 const system = createSystem({ module: counterModule });
 system.start();
 
-system.events.increment();                  // No payload
-system.events.addAmount({ amount: 5 });     // Typed payload
-system.events.addItem({ item: "hello" });   // TypeScript enforces shape
+// Call events as typed methods – TypeScript enforces payload shapes
+system.events.increment();                  // No payload needed
+system.events.addAmount({ amount: 5 });     // Typed payload with autocomplete
+system.events.addItem({ item: "hello" });   // Compile-time type checking
 ```
 
 ### `system.dispatch()` object syntax
@@ -95,6 +105,7 @@ system.events.addItem({ item: "hello" });   // TypeScript enforces shape
 Pass a full event object with `type`:
 
 ```typescript
+// Object syntax with explicit type field
 system.dispatch({ type: "increment" });
 system.dispatch({ type: "addAmount", amount: 5 });
 system.dispatch({ type: "addItem", item: "hello" });
@@ -106,12 +117,12 @@ Both approaches are equivalent. The `events` accessor is more ergonomic with bet
 
 ## Batched Mutations
 
-Event handlers run inside `store.batch()` — all fact mutations within a handler are coalesced into a single notification. This means constraints and derivations are only re-evaluated once after the handler completes, not after each individual mutation:
+Event handlers run inside `store.batch()` – all fact mutations within a handler are coalesced into a single notification. This means constraints and derivations are only re-evaluated once after the handler completes, not after each individual mutation:
 
 ```typescript
 events: {
   resetAll: (facts) => {
-    // These three mutations trigger ONE reconciliation, not three
+    // All three mutations trigger ONE reconciliation, not three
     facts.count = 0;
     facts.items = [];
     facts.error = null;
@@ -132,6 +143,7 @@ const cartModule = createModule("cart", {
       items: t.array<CartItem>(),
       subtotal: t.number(),
     },
+
     events: {
       addToCart: { productId: t.string(), price: t.number(), quantity: t.number() },
       removeFromCart: { productId: t.string() },
@@ -141,6 +153,7 @@ const cartModule = createModule("cart", {
 
   events: {
     addToCart: (facts, { productId, price, quantity }) => {
+      // Update quantity if item already exists, otherwise add new
       const existing = facts.items.find(i => i.productId === productId);
       if (existing) {
         facts.items = facts.items.map(i =>
@@ -151,12 +164,16 @@ const cartModule = createModule("cart", {
       } else {
         facts.items = [...facts.items, { productId, price, quantity }];
       }
+
+      // Recalculate subtotal after modification
       facts.subtotal = facts.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     },
+
     removeFromCart: (facts, { productId }) => {
       facts.items = facts.items.filter(i => i.productId !== productId);
       facts.subtotal = facts.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     },
+
     clearCart: (facts) => {
       facts.items = [];
       facts.subtotal = 0;
@@ -179,11 +196,11 @@ const system = createSystem({
   },
 });
 
-// Events are accessed via namespace
+// Access events through the module namespace
 system.events.auth.login({ token: "abc" });
 system.events.cart.addToCart({ productId: "123", price: 999, quantity: 1 });
 
-// Or dispatch with prefixed type
+// Or use dispatch with prefixed type names
 system.dispatch({ type: "auth_login", token: "abc" });
 system.dispatch({ type: "cart_addToCart", productId: "123", price: 999, quantity: 1 });
 ```
@@ -204,17 +221,19 @@ const timerModule = createModule("timer", {
   init: (facts) => { facts.elapsed = 0; },
 
   events: {
+    // Called automatically at the configured interval
     tick: (facts) => {
       facts.elapsed += 1;
     },
   },
 });
 
+// Dispatch "tick" every 1000ms while the system is running
 const system = createSystem({
   module: timerModule,
-  tickMs: 1000,  // Dispatch "tick" every 1000ms while running
+  tickMs: 1000,
 });
-system.start();  // Starts the tick interval
+system.start();
 ```
 
 The system automatically dispatches the `tick` event at the configured interval. A dev warning is shown if `tickMs` is set but no module defines a `tick` event handler.
@@ -226,6 +245,7 @@ The system automatically dispatches the `tick` event at the configured interval.
 In development, dispatching an unknown event type logs a warning:
 
 ```typescript
+// Dispatching an unknown event type logs a helpful warning
 system.dispatch({ type: "typo_event" });
 // [Directive] Unknown event type "typo_event".
 // No handler is registered for this event.

@@ -59,7 +59,7 @@ export const userModule = createModule("user", {
 });
 ```
 
-This creates a module with typed facts. The `init` function sets initial values. The schema sections for `derivations`, `events`, and `requirements` start empty — we'll fill them in as we go.
+This creates a module with typed facts. The `init` function sets initial values. The schema sections for `derivations`, `events`, and `requirements` start empty – we'll fill them in as we go.
 
 ---
 
@@ -284,6 +284,7 @@ import { useFact, useDerived } from 'directive/react';
 import { createSystem } from 'directive';
 import { userModule } from './user.module';
 
+// Create and start the system
 const system = createSystem({ module: userModule });
 system.start();
 
@@ -292,7 +293,10 @@ function App() {
 }
 
 function UserProfile() {
+  // Subscribe to the current userId
   const userId = useFact(system, "userId");
+
+  // Subscribe to computed derivations
   const displayName = useDerived(system, "displayName");
   const isLoggedIn = useDerived(system, "isLoggedIn");
 

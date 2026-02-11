@@ -1,6 +1,6 @@
 ---
 title: AI & Agents Overview
-description: Constraint-driven AI agent orchestration — guardrails, streaming, multi-agent patterns, and memory.
+description: Constraint-driven AI agent orchestration – guardrails, streaming, multi-agent patterns, and memory.
 ---
 
 The AI adapter brings Directive's constraint system to AI agent orchestration. Wrap any LLM framework with safety guardrails, approval workflows, token budgets, and state persistence. {% .lead %}
@@ -9,7 +9,7 @@ The AI adapter brings Directive's constraint system to AI agent orchestration. W
 
 ## Architecture
 
-Directive doesn't replace your agent framework — it wraps it:
+Directive doesn't replace your agent framework – it wraps it:
 
 ```
 Your Agent Framework (OpenAI, Anthropic, LangChain, etc.)
@@ -57,18 +57,24 @@ import { createAgentOrchestrator, createPIIGuardrail } from 'directive/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner: myAgentRunner,
+
+  // Block any user input that contains personal information
   guardrails: {
     input: [createPIIGuardrail({ action: 'block' })],
   },
+
+  // Pause agents automatically when token spend exceeds the budget
   constraints: {
     budgetLimit: {
       when: (facts) => facts.agent.tokenUsage > 10000,
       require: { type: 'PAUSE_AGENTS' },
     },
   },
+
   maxTokenBudget: 10000,
 });
 
+// Run the agent – guardrails and constraints are applied automatically
 const result = await orchestrator.run(myAgent, 'Hello!');
 ```
 

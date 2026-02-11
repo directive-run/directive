@@ -1,6 +1,6 @@
 ---
 title: Core API Overview
-description: Facts, derivations, constraints, resolvers, effects, and events — the building blocks of every Directive module.
+description: Facts, derivations, constraints, resolvers, effects, and events – the building blocks of every Directive module.
 ---
 
 The Core API is the foundation of every Directive application. Six primitives work together to express complex behavior declaratively. {% .lead %}
@@ -31,10 +31,10 @@ Events → mutate Facts → trigger Derivations
 ```
 
 1. **Facts** hold state. When facts change, everything downstream re-evaluates.
-2. **Derivations** are auto-tracked computed values — they re-run only when their dependencies change.
+2. **Derivations** are auto-tracked computed values – they re-run only when their dependencies change.
 3. **Constraints** declare what _must_ be true. When a constraint's `when` condition is met, it emits a requirement.
 4. **Resolvers** match requirements by type and execute async work to fulfill them.
-5. **Effects** run whenever their dependencies change — for logging, analytics, or other side effects.
+5. **Effects** run whenever their dependencies change – for logging, analytics, or other side effects.
 6. **Events** are typed dispatchers that mutate facts from the outside (UI, network, etc.).
 
 ---
@@ -44,26 +44,36 @@ Events → mutate Facts → trigger Derivations
 ```typescript
 import { createModule, createSystem, t } from 'directive';
 
+// Define a counter module with typed schema, computed values, and events
 const counter = createModule('counter', {
+  // Declare the shape of all state and computed values up front
   schema: {
     facts: { count: t.number().default(0) },
     derivations: { doubled: t.number() },
     events: { increment: {}, decrement: {} },
     requirements: {},
   },
+
+  // Set the initial state when the system starts
   init: (facts) => { facts.count = 0; },
+
+  // Derivations auto-track their dependencies – no manual subscriptions
   derive: {
     doubled: (facts) => facts.count * 2,
   },
+
+  // Events are typed dispatchers that mutate facts from the outside
   events: {
     increment: (facts) => { facts.count += 1; },
     decrement: (facts) => { facts.count -= 1; },
   },
 });
 
+// Wrap the module in a system to start the reconciliation loop
 const system = createSystem({ module: counter });
 system.start();
 
+// Dispatch an event to increment, then read the derived value
 system.events.increment();
 console.log(system.read('doubled')); // 2
 ```

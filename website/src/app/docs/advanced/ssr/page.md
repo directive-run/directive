@@ -16,21 +16,23 @@ Create a system on the server and wait for it to settle:
 import { createSystem } from 'directive';
 
 export async function renderPage(req) {
+  // Create a fresh system per request to avoid shared state
   const system = createSystem({ module: pageModule });
+  system.start();
 
-  // Set initial facts from request
+  // Seed the system with data from the incoming request
   system.facts.userId = req.user?.id;
   system.facts.path = req.path;
 
-  // Wait for all constraints and resolvers to complete
+  // Block until all constraints evaluate and resolvers finish
   await system.settle();
 
-  // Serialize state for the client
+  // Capture the fully resolved state for client hydration
   const snapshot = system.getSnapshot();
 
   return {
     html: renderToString(<App system={system} />),
-    state: snapshot,
+    state: snapshot, // Embed this in the HTML for the client to pick up
   };
 }
 ```
@@ -47,12 +49,14 @@ Hydrate the system on the client using the server snapshot:
 // client.ts
 import { createSystem } from 'directive';
 
+// Create the same module structure as the server
 const system = createSystem({ module: pageModule });
 
-// Hydrate from server state
+// Restore facts from the server snapshot – skips a full reconciliation
 system.hydrate(() => window.__DIRECTIVE_STATE__);
+system.start();
 
-// React hydration — hooks take system directly, no provider needed
+// Hydrate React using the pre-populated system – no provider needed
 hydrateRoot(
   document.getElementById('root'),
   <App system={system} />
@@ -70,10 +74,12 @@ hydrateRoot(
 import { createSystem } from 'directive';
 
 export default async function Page() {
+  // Server Component: create, start, and settle before rendering
   const system = createSystem({ module: pageModule });
+  system.start();
   await system.settle();
 
-  // No provider needed — pass system to components, hooks take it directly
+  // Pass the settled system to child components – no provider needed
   return <PageContent system={system} />;
 }
 ```
@@ -82,13 +88,13 @@ export default async function Page() {
 
 ## Avoiding Singletons
 
-Never use module-level systems in SSR — they would be shared across requests:
+Never use module-level systems in SSR – they would be shared across requests:
 
 ```typescript
-// Bad - shared across requests
+// Bad – module-level singletons are shared across all server requests
 const system = createSystem({ module });
 
-// Good - per-request system
+// Good – factory function creates an isolated system per request
 export function getSystem() {
   return createSystem({ module });
 }

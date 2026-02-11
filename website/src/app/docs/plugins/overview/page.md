@@ -15,6 +15,7 @@ Add plugins when creating a system:
 import { createSystem } from 'directive';
 import { loggingPlugin, devtoolsPlugin } from 'directive/plugins';
 
+// Pass plugins as an array –they hook into the system's lifecycle automatically
 const system = createSystem({
   module: myModule,
   plugins: [
@@ -22,6 +23,9 @@ const system = createSystem({
     devtoolsPlugin(),
   ],
 });
+
+// Plugins are active as soon as the system starts
+system.start();
 ```
 
 ---
@@ -42,9 +46,14 @@ Plugins execute in registration order. Put logging first to capture all events:
 
 ```typescript
 plugins: [
-  loggingPlugin(),                                    // Logs everything
-  persistencePlugin({ storage: localStorage, key: 'my-app' }),  // Restores state
-  devtoolsPlugin(),                                   // DevTools last
+  // Logging first so it captures events from every plugin that follows
+  loggingPlugin(),
+
+  // Persistence restores saved state during init, before the engine runs
+  persistencePlugin({ storage: localStorage, key: 'my-app' }),
+
+  // DevTools last –it can inspect the fully initialized system
+  devtoolsPlugin(),
 ]
 ```
 
@@ -57,11 +66,14 @@ If two plugins with the same `name` are registered, the second replaces the firs
 Enable plugins based on environment:
 
 ```typescript
+// Start with the plugins you always want
 const plugins = [
   persistencePlugin({ key: 'my-app' }),
 ];
 
+// Add dev-only plugins conditionally so they're tree-shaken from production
 if (process.env.NODE_ENV === 'development') {
+  // unshift puts logging first so it captures everything
   plugins.unshift(loggingPlugin());
   plugins.push(devtoolsPlugin());
 }
@@ -70,6 +82,8 @@ const system = createSystem({
   module: myModule,
   plugins,
 });
+
+system.start();
 ```
 
 ---
@@ -164,9 +178,11 @@ Errors thrown inside plugin hooks are caught and logged. A failing plugin never 
 ```typescript
 const flakyPlugin: Plugin = {
   name: 'flaky',
+
+  // Even if a hook throws, the system catches it and keeps running
   onFactSet: (key, value) => {
     throw new Error('Plugin crash');
-    // Caught internally -- other plugins and the system continue normally
+    // Caught internally –other plugins and the system continue normally
   },
 };
 ```

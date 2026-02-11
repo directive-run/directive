@@ -12,7 +12,33 @@ import { MobileNavigation } from '@/components/MobileNavigation'
 import { Navigation } from '@/components/Navigation'
 import { Search } from '@/components/Search'
 import { ThemeSelector } from '@/components/ThemeSelector'
+import { BrandPresetSwitcher } from '@/components/BrandPresetSwitcher'
 import { VersionSelector } from '@/components/VersionSelector'
+
+function HeaderLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  let pathname = usePathname()
+  let isActive = pathname.startsWith(href)
+
+  return (
+    <Link
+      href={href}
+      className={clsx(
+        'hidden items-center text-sm font-medium md:flex',
+        isActive
+          ? 'text-brand-primary'
+          : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
+      )}
+    >
+      {children}
+    </Link>
+  )
+}
 
 function GitHubIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
@@ -26,7 +52,7 @@ function SkipLink() {
   return (
     <a
       href="#main-content"
-      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-sky-500 focus:px-4 focus:py-2 focus:text-white focus:outline-none"
+      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-brand-primary focus:px-4 focus:py-2 focus:text-white focus:outline-none"
     >
       Skip to main content
     </a>
@@ -62,13 +88,17 @@ function Header() {
       <div className="relative flex grow basis-0 items-center">
         <Link href="/" aria-label="Home page">
           <Logomark className="h-9 w-9 lg:hidden" />
-          <Logo className="hidden h-9 w-auto fill-slate-700 lg:block dark:fill-sky-100" />
+          <Logo className="hidden h-9 w-auto fill-slate-700 lg:block dark:fill-brand-primary-100" />
         </Link>
       </div>
       <div className="-my-5 mr-6 sm:mr-8 md:mr-0">
         <Search />
       </div>
-      <div className="relative flex basis-0 justify-end gap-6 sm:gap-8 md:grow">
+      <div className="relative flex basis-0 items-center justify-end gap-6 sm:gap-8 md:grow">
+        <HeaderLink href="/blog">Blog</HeaderLink>
+        <HeaderLink href="/about">About</HeaderLink>
+        <HeaderLink href="/support">Support</HeaderLink>
+        <BrandPresetSwitcher className="relative z-10" />
         <ThemeSelector className="relative z-10" />
         <Link href="https://github.com/sizls/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
           <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
@@ -81,6 +111,10 @@ function Header() {
 export function Layout({ children }: { children: React.ReactNode }) {
   let pathname = usePathname()
   let isHomePage = pathname === '/'
+  let isStandalonePage =
+    pathname.startsWith('/blog') ||
+    pathname.startsWith('/about') ||
+    pathname.startsWith('/support')
 
   return (
     <div className="flex w-full flex-col">
@@ -89,20 +123,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {isHomePage && <Hero />}
 
-      <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto justify-center sm:px-2 lg:px-8 xl:px-12">
-        <div className="hidden lg:relative lg:block lg:flex-none">
-          <div className="absolute inset-y-0 right-0 w-[50vw] bg-slate-50 dark:hidden" />
-          <div className="absolute top-16 right-0 bottom-0 hidden h-12 w-px bg-linear-to-t from-slate-800 dark:block" />
-          <div className="absolute top-28 right-0 bottom-0 hidden w-px bg-slate-800 dark:block" />
-          <div className="sticky top-19 -ml-0.5 h-[calc(100vh-4.75rem)] w-64 overflow-x-hidden overflow-y-auto py-16 pr-8 pl-0.5 xl:w-72 xl:pr-16">
-            <div className="mb-6">
-              <VersionSelector className="w-full" />
-            </div>
-            <Navigation />
-          </div>
+      {isStandalonePage ? (
+        <div id="main-content" className="relative mx-auto flex w-full max-w-7xl flex-auto px-4 sm:px-6 lg:px-8">
+          {children}
         </div>
-        {children}
-      </div>
+      ) : (
+        <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto justify-center sm:px-2 lg:px-8 xl:px-12">
+          <div className="hidden lg:relative lg:block lg:flex-none">
+            <div className="absolute inset-y-0 right-0 w-[50vw] bg-slate-50 dark:hidden" />
+            <div className="absolute top-16 right-0 bottom-0 hidden h-12 w-px bg-linear-to-t from-slate-800 dark:block" />
+            <div className="absolute top-28 right-0 bottom-0 hidden w-px bg-slate-800 dark:block" />
+            <div className="sticky top-19 -ml-0.5 h-[calc(100vh-4.75rem)] w-64 overflow-x-hidden overflow-y-auto py-16 pr-8 pl-0.5 xl:w-72 xl:pr-16">
+              <div className="mb-6">
+                <VersionSelector className="w-full" />
+              </div>
+              <Navigation />
+            </div>
+          </div>
+          {children}
+        </div>
+      )}
       <AIChatWidget />
     </div>
   )

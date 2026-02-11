@@ -16,19 +16,26 @@ import { createModule } from 'directive';
 
 const myModule = createModule("example", {
   schema: {
+    // Declare fact shapes with plain TypeScript – no runtime cost
     facts: {} as {
       userId: number;
       user: User | null;
       items: CartItem[];
     },
+
+    // Derived values get the same treatment
     derivations: {} as {
       displayName: string;
       total: number;
     },
+
+    // Events carry typed payloads
     events: {} as {
       addItem: { item: CartItem };
       clear: {};
     },
+
+    // Requirements describe what the system needs fulfilled
     requirements: {} as {
       FETCH_USER: { userId: number };
     },
@@ -55,8 +62,11 @@ import { t } from 'directive';
 
 schema: {
   facts: {
+    // Custom validator – rejects zero or negative quantities
     quantity: t.number().validate(v => v > 0),
-    price: t.number().min(0),  // Built-in min/max for numbers
+
+    // Built-in min/max for common numeric bounds
+    price: t.number().min(0),
   },
 }
 ```
@@ -68,10 +78,13 @@ schema: {
 ```typescript
 schema: {
   facts: {
+    // Validate format with a regex, show a human-readable message on failure
     email: t.string().refine(
       s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s),
       "Must be a valid email address"
     ),
+
+    // Enforce minimum length for security requirements
     password: t.string().refine(
       s => s.length >= 8,
       "Must be at least 8 characters"
@@ -85,6 +98,7 @@ Or use the built-in `t.email()` type:
 ```typescript
 schema: {
   facts: {
+    // Built-in email type handles validation for you
     userEmail: t.email().nullable(),
   },
 }
@@ -95,6 +109,7 @@ schema: {
 ```typescript
 schema: {
   facts: {
+    // Chain min/max to define an allowed range
     rating: t.number().min(1).max(5),
     percentage: t.number().min(0).max(100),
   },
@@ -110,12 +125,13 @@ Create nominal types that prevent accidental mixing of values:
 ```typescript
 schema: {
   facts: {
+    // Brand prevents accidentally swapping a UserId for an OrderId
     currentUserId: t.string().brand<"UserId">().nullable(),
     selectedOrderId: t.string().brand<"OrderId">().nullable(),
   },
 }
 
-// Type-safe — can't assign a UserId where OrderId is expected
+// Type-safe – can't assign a UserId where OrderId is expected
 ```
 
 Add validation to branded types:
@@ -123,6 +139,7 @@ Add validation to branded types:
 ```typescript
 schema: {
   facts: {
+    // Combine validation and branding – validate the format, then brand the result
     userId: t.string()
       .refine(v => v.startsWith("user_"), "Must start with user_")
       .brand<"UserId">()
@@ -140,7 +157,10 @@ Transform values on assignment:
 ```typescript
 schema: {
   facts: {
+    // Strip whitespace automatically on every assignment
     name: t.string().transform(s => s.trim()),
+
+    // Normalize tags to lowercase for consistent storage
     tags: t.string().transform(s => s.toLowerCase()),
   },
 }
@@ -153,12 +173,15 @@ schema: {
 For validation that requires async work (API calls, database lookups), use constraints and resolvers instead:
 
 ```typescript
+// Constraint fires when an email is present but hasn't been validated yet
 constraints: {
   validateEmail: {
     when: (facts) => facts.email && !facts.emailValidated,
     require: { type: "VALIDATE_EMAIL" },
   },
 },
+
+// Resolver performs the async verification and stores the result
 resolvers: {
   validateEmail: {
     requirement: "VALIDATE_EMAIL",
@@ -174,6 +197,6 @@ resolvers: {
 
 ## Next Steps
 
-- **[Type Builders](/docs/type-builders)** — Full `t.*` API reference
-- **[Zod Integration](/docs/zod-integration)** — Zod schemas for validation
-- **[Constraints](/docs/constraints)** — Runtime validation via constraints
+- **[Type Builders](/docs/type-builders)** – Full `t.*` API reference
+- **[Zod Integration](/docs/zod-integration)** – Zod schemas for validation
+- **[Constraints](/docs/constraints)** – Runtime validation via constraints

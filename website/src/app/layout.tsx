@@ -1,5 +1,16 @@
 import { type Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import {
+  Inter,
+  Space_Grotesk,
+  IBM_Plex_Sans,
+  IBM_Plex_Mono,
+  Manrope,
+  JetBrains_Mono,
+  Outfit,
+  DM_Sans,
+} from 'next/font/google'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
 import localFont from 'next/font/local'
 import clsx from 'clsx'
 
@@ -19,6 +30,50 @@ const lexend = localFont({
   src: '../fonts/lexend.woff2',
   display: 'swap',
   variable: '--font-lexend',
+})
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-space-grotesk',
+})
+
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-ibm-plex-sans',
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+  variable: '--font-ibm-plex-mono',
+})
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-manrope',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-jetbrains-mono',
+})
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-outfit',
+})
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-dm-sans',
 })
 
 export const metadata: Metadata = {
@@ -92,7 +147,20 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={clsx('h-full antialiased', inter.variable, lexend.variable)}
+      className={clsx(
+        'h-full antialiased',
+        inter.variable,
+        lexend.variable,
+        spaceGrotesk.variable,
+        ibmPlexSans.variable,
+        ibmPlexMono.variable,
+        manrope.variable,
+        jetbrainsMono.variable,
+        outfit.variable,
+        dmSans.variable,
+        GeistSans.variable,
+        GeistMono.variable,
+      )}
       suppressHydrationWarning
     >
       <head>
@@ -100,6 +168,18 @@ export default function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
+        {/* Satoshi font from Fontshare CDN (for typography option 5) */}
+        <link
+          href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap"
+          rel="stylesheet"
+        />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              :root { --font-satoshi: 'Satoshi', system-ui, -apple-system, sans-serif; }
+            `,
+          }}
+        />
         <WebsiteJsonLd />
         <SoftwareJsonLd />
       </head>

@@ -3,7 +3,7 @@ title: Constraints
 description: Constraints declare what must be true in your system. When conditions are met, they raise requirements for resolvers to fulfill.
 ---
 
-Constraints are the heart of Directive — they declare what must be true. {% .lead %}
+Constraints are the heart of Directive – they declare what must be true. {% .lead %}
 
 ---
 
@@ -28,7 +28,10 @@ const userModule = createModule("user", {
 
   constraints: {
     needsUser: {
+      // When we have a userId but no user data and aren't loading
       when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
+
+      // Dynamically build the requirement with the current userId
       require: (facts) => ({ type: "FETCH_USER", userId: facts.userId }),
     },
   },
@@ -41,7 +44,7 @@ const userModule = createModule("user", {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `when` | `(facts) => boolean \| Promise<boolean>` | Condition — returns true when the constraint is active |
+| `when` | `(facts) => boolean \| Promise<boolean>` | Condition – returns true when the constraint is active |
 | `require` | `Requirement \| Requirement[] \| (facts) => Requirement \| Requirement[] \| null` | What to produce when `when` is true |
 | `priority` | `number` | Evaluation order (higher runs first, default: 0) |
 | `after` | `string[]` | Constraint IDs that must resolve before this one evaluates |
@@ -52,13 +55,13 @@ const userModule = createModule("user", {
 
 ## Auto-Tracking
 
-Constraint `when()` functions are auto-tracked — Directive records which facts are read during evaluation. On subsequent reconciliation cycles, only constraints affected by changed facts are re-evaluated. This means you don't need to declare dependencies manually.
+Constraint `when()` functions are auto-tracked – Directive records which facts are read during evaluation. On subsequent reconciliation cycles, only constraints affected by changed facts are re-evaluated. This means you don't need to declare dependencies manually.
 
 ```typescript
 constraints: {
   needsUser: {
-    // Directive knows this depends on userId and user
-    // It will only re-evaluate when those facts change
+    // Directive auto-tracks which facts are read here
+    // Only re-evaluates when userId or user changes
     when: (facts) => facts.userId > 0 && facts.user === null,
     require: { type: "FETCH_USER" },
   },
@@ -73,13 +76,13 @@ The `require` field supports multiple forms:
 
 ```typescript
 constraints: {
-  // Static object — always produces the same requirement
+  // Static – always produces the same requirement
   simple: {
     when: (facts) => !facts.data,
     require: { type: "FETCH_DATA" },
   },
 
-  // Function — dynamic requirement based on current facts
+  // Dynamic – builds requirement from current facts
   dynamic: {
     when: (facts) => facts.userId > 0 && !facts.user,
     require: (facts) => ({
@@ -89,7 +92,7 @@ constraints: {
     }),
   },
 
-  // Array — produce multiple requirements at once
+  // Multiple – produce several requirements at once
   multiple: {
     when: (facts) => facts.isNewUser,
     require: [
@@ -98,12 +101,12 @@ constraints: {
     ],
   },
 
-  // Conditional — function returning null to skip
+  // Conditional – return null to skip producing a requirement
   conditional: {
     when: (facts) => facts.needsSync,
     require: (facts) => facts.isCritical
       ? [{ type: "SYNC_NOW" }, { type: "NOTIFY_ADMIN" }]
-      : null,  // No requirement produced
+      : null,
   },
 },
 ```
@@ -116,16 +119,21 @@ When multiple constraints are active, priority determines evaluation order:
 
 ```typescript
 constraints: {
+  // Low priority – runs after higher-priority constraints
   lowPriority: {
     priority: 10,
     when: (facts) => facts.needsData,
     require: { type: "FETCH_DATA" },
   },
+
+  // High priority – evaluated before lower numbers
   highPriority: {
     priority: 100,
     when: (facts) => facts.needsAuth,
     require: { type: "AUTHENTICATE" },
   },
+
+  // Emergency – always evaluated first
   emergency: {
     priority: 1000,
     when: (facts) => facts.securityBreach,
@@ -144,15 +152,20 @@ Use `after` to ensure one constraint's resolver completes before another constra
 
 ```typescript
 constraints: {
+  // Step 1: Authenticate first
   authenticate: {
     when: (facts) => !facts.isAuthenticated,
     require: { type: "AUTH" },
   },
+
+  // Step 2: Fetch user data after authentication completes
   fetchUserData: {
     after: ["authenticate"],
     when: (facts) => facts.isAuthenticated && !facts.userData,
     require: { type: "FETCH_USER_DATA" },
   },
+
+  // Step 3: Fetch preferences after user data is loaded
   fetchPreferences: {
     after: ["fetchUserData"],
     when: (facts) => facts.userData && !facts.preferences,
@@ -163,12 +176,12 @@ constraints: {
 
 **Behavior:**
 - If constraint B has `after: ["A"]`, B's `when()` is not called until A's resolver completes
-- If A's `when()` returns false (no requirement), B proceeds immediately — nothing to wait for
+- If A's `when()` returns false (no requirement), B proceeds immediately – nothing to wait for
 - If A's resolver fails, B remains blocked until A succeeds (retries apply)
 - Cycles are detected at startup: `"[Directive] Constraint cycle detected: A → B → A"`
 
 **Priority vs `after`:**
-- `after` always takes precedence — a constraint with `after: ["A"]` will always wait for A, regardless of priority
+- `after` always takes precedence – a constraint with `after: ["A"]` will always wait for A, regardless of priority
 - `priority` only affects ordering among constraints that have no `after` dependencies on each other
 - Constraints with the same priority and no mutual `after` dependencies may run in parallel
 
@@ -186,6 +199,7 @@ constraints: {
     async: true,
     timeout: 3000,  // Override default 5s timeout
     when: async (facts) => {
+      // Check external permission service before proceeding
       const allowed = await checkPermissions(facts.userId);
       return allowed && !facts.hasData;
     },
@@ -206,6 +220,7 @@ Combine multiple conditions for precise control:
 constraints: {
   canCheckout: {
     when: (facts) => {
+      // All conditions must be met before checkout can proceed
       const hasItems = facts.cart.items.length > 0;
       const hasPayment = facts.paymentMethod !== null;
       const isAuthenticated = facts.user !== null;
@@ -227,7 +242,7 @@ Organize related constraints logically:
 ```typescript
 const cartModule = createModule("cart", {
   constraints: {
-    // Validation constraints
+    // --- Validation constraints (highest priority) ---
     validateStock: {
       priority: 100,
       when: (facts) => facts.needsStockCheck,
@@ -239,7 +254,7 @@ const cartModule = createModule("cart", {
       require: { type: "CHECK_PRICES" },
     },
 
-    // Action constraints
+    // --- Action constraints (medium priority) ---
     applyDiscount: {
       priority: 50,
       when: (facts) => facts.discountCode && !facts.discountApplied,
@@ -251,7 +266,7 @@ const cartModule = createModule("cart", {
       require: { type: "CALCULATE_TAX" },
     },
 
-    // Final constraints
+    // --- Final constraints (run after validations complete) ---
     checkout: {
       priority: 10,
       after: ["validateStock", "validatePricing", "calculateTax"],
@@ -284,7 +299,8 @@ Guard against infinite loops by checking for existing data:
 constraints: {
   fetchUser: {
     when: (facts) => {
-      // Only fetch if we don't have the user and aren't already loading
+      // Guard against re-triggering: only fetch if we don't have
+      // the user AND aren't already loading
       return facts.userId > 0
         && facts.user === null
         && !facts.loading;
@@ -349,14 +365,14 @@ constraints: {
 Disable or enable constraints at runtime without removing them from the module definition:
 
 ```typescript
-// Disable a constraint — it won't be evaluated during reconciliation
+// Disable a constraint – its when() function won't be called
 system.constraints.disable("expensiveCheck");
 
-// Re-enable it
+// Re-enable it for future reconciliation cycles
 system.constraints.enable("expensiveCheck");
 ```
 
-This is useful for feature flags, A/B testing, or temporarily suppressing constraints during maintenance windows. Disabled constraints are skipped entirely — their `when()` function is never called.
+This is useful for feature flags, A/B testing, or temporarily suppressing constraints during maintenance windows. Disabled constraints are skipped entirely – their `when()` function is never called.
 
 ---
 

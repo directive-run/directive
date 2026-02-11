@@ -12,6 +12,8 @@ Navigate through state history for debugging. {% .lead %}
 ```typescript
 const system = createSystem({
   module: myModule,
+
+  // Enable time-travel and cap history at 100 snapshots
   debug: {
     timeTravel: true,
     maxSnapshots: 100,
@@ -26,23 +28,24 @@ When enabled, `system.debug` exposes the time-travel API. When disabled, `system
 ## Basic Navigation
 
 ```typescript
+// system.debug is null when time-travel is disabled
 const tt = system.debug; // TimeTravelAPI | null
 
 if (tt) {
-  // View snapshot history
+  // Inspect the current snapshot history
   console.log(`${tt.snapshots.length} snapshots`);
   console.log(`Currently at index ${tt.currentIndex}`);
 
-  // Go back one snapshot
+  // Step backward through history (one step by default)
   tt.goBack();
 
-  // Go back multiple steps
+  // Jump back multiple steps at once
   tt.goBack(3);
 
-  // Go forward
+  // Step forward (redo)
   tt.goForward();
 
-  // Jump to a specific snapshot by ID
+  // Jump directly to a specific snapshot by its index
   tt.goTo(5);
 }
 ```
@@ -55,10 +58,10 @@ Each snapshot contains:
 
 ```typescript
 interface Snapshot {
-  id: number;
-  timestamp: number;
-  facts: Record<string, unknown>;
-  trigger: string;
+  id: number;                       // Auto-incrementing snapshot identifier
+  timestamp: number;                // When the snapshot was captured (Date.now())
+  facts: Record<string, unknown>;   // Complete copy of all fact values
+  trigger: string;                  // What caused this snapshot (e.g., "fact:count")
 }
 ```
 
@@ -74,11 +77,11 @@ Save and restore an entire debugging session:
 const tt = system.debug;
 
 if (tt) {
-  // Export returns a JSON string
+  // Serialize the entire snapshot history to a JSON string
   const exported = tt.export();
   localStorage.setItem('debug-session', exported);
 
-  // Import from a JSON string
+  // Restore a previously saved session (e.g., after a page refresh)
   const saved = localStorage.getItem('debug-session');
   if (saved) {
     tt.import(saved);
@@ -96,7 +99,7 @@ Replay from the current snapshot forward:
 const tt = system.debug;
 
 if (tt) {
-  // Jump back, then replay
+  // Rewind to snapshot 5, then replay all subsequent snapshots forward
   tt.goTo(5);
   tt.replay();
 }
@@ -106,7 +109,7 @@ if (tt) {
 
 ## Undo Groups (Changesets)
 
-A single user action often produces multiple snapshots (e.g., moving a piece changes the board, clears selection, and switches turns). Without grouping, undo goes back one snapshot — not one logical action.
+A single user action often produces multiple snapshots (e.g., moving a piece changes the board, clears selection, and switches turns). Without grouping, undo goes back one snapshot – not one logical action.
 
 Use `beginChangeset` / `endChangeset` to group snapshots into a single undo/redo unit:
 
@@ -114,12 +117,13 @@ Use `beginChangeset` / `endChangeset` to group snapshots into a single undo/redo
 const tt = system.debug;
 
 if (tt) {
+  // Group multiple snapshots into one logical "undo" unit
   tt.beginChangeset("Move piece from A to B");
   // ... multiple fact mutations happen here ...
   tt.endChangeset();
 
-  // Now goBack() jumps past all snapshots in the changeset
-  tt.goBack();  // Undoes the entire move, not just one fact change
+  // Undo reverts the entire changeset, not individual snapshots
+  tt.goBack();
 }
 ```
 
@@ -131,12 +135,12 @@ Each framework adapter provides a reactive `useTimeTravel` that re-renders when 
 
 ```typescript
 interface TimeTravelState {
-  canUndo: boolean;
-  canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
-  currentIndex: number;
-  totalSnapshots: number;
+  canUndo: boolean;          // True when there are earlier snapshots to go back to
+  canRedo: boolean;          // True when there are later snapshots to go forward to
+  undo: () => void;          // Navigate one step backward in history
+  redo: () => void;          // Navigate one step forward in history
+  currentIndex: number;      // Position in the snapshot array
+  totalSnapshots: number;    // Total number of recorded snapshots
 }
 ```
 
@@ -146,6 +150,7 @@ interface TimeTravelState {
 import { useTimeTravel } from 'directive/react';
 
 function UndoControls() {
+  // Returns null when time-travel is disabled, so the UI can hide itself
   const tt = useTimeTravel(system);
   if (!tt) return null;
 
@@ -165,10 +170,12 @@ function UndoControls() {
 <script setup>
 import { useTimeTravel } from 'directive/vue';
 
+// Reactive ref – re-renders when snapshot state changes
 const tt = useTimeTravel();
 </script>
 
 <template>
+  <!-- Only show controls when time-travel is enabled -->
   <div v-if="tt">
     <button @click="tt.undo" :disabled="!tt.canUndo">Undo</button>
     <button @click="tt.redo" :disabled="!tt.canRedo">Redo</button>
@@ -182,6 +189,7 @@ const tt = useTimeTravel();
 <script>
 import { useTimeTravel } from 'directive/svelte';
 
+// Svelte store – use $tt to auto-subscribe in the template
 const tt = useTimeTravel();
 </script>
 
@@ -197,6 +205,7 @@ const tt = useTimeTravel();
 import { useTimeTravel } from 'directive/solid';
 
 function UndoControls() {
+  // Solid signal – call tt() to read the current value
   const tt = useTimeTravel();
 
   return (
@@ -218,6 +227,7 @@ function UndoControls() {
 import { TimeTravelController } from 'directive/lit';
 
 class UndoControls extends LitElement {
+  // Lit reactive controller – triggers re-render on snapshot changes
   private _tt = new TimeTravelController(this, system);
 
   render() {
@@ -239,9 +249,11 @@ class UndoControls extends LitElement {
 Common keyboard shortcuts for time-travel:
 
 ```typescript
+// Wire up standard undo/redo keyboard shortcuts
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "z") {
     e.preventDefault();
+
     if (e.shiftKey) {
       system.debug?.goForward();  // Cmd+Shift+Z = Redo
     } else {

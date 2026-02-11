@@ -14,6 +14,7 @@ A module is created with `createModule`:
 ```typescript
 import { createModule, t } from 'directive';
 
+// Define a module with its schema and initial values
 const counterModule = createModule("counter", {
   schema: {
     facts: {
@@ -23,6 +24,7 @@ const counterModule = createModule("counter", {
     events: {},
     requirements: {},
   },
+
   init: (facts) => {
     facts.count = 0;
   },
@@ -49,10 +51,10 @@ A system runs one or more modules:
 ```typescript
 import { createSystem } from 'directive';
 
-// Single module (minimal)
+// Single module – facts and derivations are accessed directly
 // const system = createSystem({ module: counterModule });
 
-// With plugins
+// With plugins and debug options
 const system = createSystem({
   module: counterModule,
   plugins: [loggingPlugin(), devtoolsPlugin()],
@@ -81,13 +83,13 @@ const system = createSystem({
 Read and write facts directly:
 
 ```typescript
-// Read
+// Read a fact value
 const count = system.facts.count;
 
-// Write (triggers reconciliation)
+// Write a fact (triggers reconciliation)
 system.facts.count = 10;
 
-// Batch updates
+// Batch multiple updates into a single reconciliation
 system.batch(() => {
   system.facts.count = 10;
   system.facts.loading = true;
@@ -99,6 +101,7 @@ system.batch(() => {
 Access computed values:
 
 ```typescript
+// Read a computed derivation (auto-tracked, lazy, cached)
 const doubled = system.derive.doubled;
 ```
 
@@ -107,9 +110,11 @@ const doubled = system.derive.doubled;
 Wait for all resolvers to complete:
 
 ```typescript
+// Trigger async work by setting a fact
 system.facts.userId = 123;
+
+// Wait for all resolvers to finish before continuing
 await system.settle();
-// All async work is done
 ```
 
 ### Subscribe
@@ -117,17 +122,17 @@ await system.settle();
 React to derivation changes:
 
 ```typescript
-// Subscribe to specific derivations
+// Subscribe to specific derivation changes
 const unsubscribe = system.subscribe(["displayName", "isLoggedIn"], () => {
   console.log('Derivation changed:', system.derive.displayName);
 });
 
-// Watch a single derivation with values
+// Watch a single derivation with old and new values
 const unsub2 = system.watch("displayName", (newValue, prevValue) => {
   console.log(`Changed from "${prevValue}" to "${newValue}"`);
 });
 
-// Later
+// Clean up subscriptions when no longer needed
 unsubscribe();
 unsub2();
 ```
@@ -137,11 +142,11 @@ unsub2();
 Dispatch events to update facts:
 
 ```typescript
-// Via typed accessor (preferred)
+// Dispatch via typed accessor (preferred – autocomplete + type checking)
 system.events.increment();
 system.events.setUser({ user: newUser });
 
-// Via dispatch
+// Dispatch via object syntax
 system.dispatch({ type: "increment" });
 system.dispatch({ type: "setUser", user: newUser });
 ```
@@ -150,25 +155,24 @@ Events are defined in the module and handler functions update facts:
 
 ```typescript
 events: {
+  // Simple mutation – increment the count
   increment: (facts) => { facts.count += 1; },
+
+  // Mutation with payload
   setUser: (facts, { user }) => { facts.user = user; },
 },
 ```
 
-### Snapshot
+### Snapshot / Restore
 
-Get a snapshot of current state:
+Capture and restore system state:
 
 ```typescript
+// Capture the current state
 const snapshot = system.getSnapshot();
 // { facts: { userId: 123, user: {...} }, version: 1 }
-```
 
-### Restore
-
-Restore from a snapshot:
-
-```typescript
+// Restore to a previous snapshot
 system.restore(snapshot);
 ```
 
@@ -179,6 +183,7 @@ system.restore(snapshot);
 For larger apps, compose multiple modules:
 
 ```typescript
+// Compose multiple modules into one system
 const system = createSystem({
   modules: {
     user: userModule,
@@ -187,7 +192,7 @@ const system = createSystem({
   },
 });
 
-// Access with namespace
+// Facts are namespaced by module name
 system.facts.user.userId = 123;
 system.facts.cart.items = [...system.facts.cart.items, item];
 ```

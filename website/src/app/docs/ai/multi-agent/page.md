@@ -23,7 +23,7 @@ import {
 } from 'directive/ai';
 import type { AgentLike, AgentRunner, RunResult } from 'directive/ai';
 
-// Define your agents (compatible with OpenAI Agents SDK)
+// Define specialized agents – each has a distinct role in the pipeline
 const researcher: AgentLike = {
   name: 'researcher',
   instructions: 'You are a research assistant. Find relevant information on the given topic.',
@@ -42,9 +42,8 @@ const reviewer: AgentLike = {
   model: 'gpt-4',
 };
 
-// Your runner (wraps the OpenAI Agents SDK call)
+// Wrap your LLM SDK in a standard runner function
 const runner: AgentRunner = async (agent, input, options) => {
-  // Replace with your actual OpenAI Agents SDK call
   const result = await openaiAgentsRun(agent, input, options);
   return result;
 };
@@ -60,17 +59,17 @@ Register agents with concurrency limits, timeouts, and capabilities. Optionally 
 const orchestrator = createMultiAgentOrchestrator({
   runner,
 
-  // Agent registry — each agent gets concurrency control and metadata
+  // Register each agent with concurrency limits and timeouts
   agents: {
     researcher: {
       agent: researcher,
-      maxConcurrent: 3,    // Allow 3 parallel research runs
-      timeout: 30000,       // 30s timeout per run
+      maxConcurrent: 3,               // Allow 3 parallel research runs
+      timeout: 30000,                  // 30s timeout per run
       capabilities: ['search', 'summarize'],
     },
     writer: {
       agent: writer,
-      maxConcurrent: 1,     // Only one writer at a time
+      maxConcurrent: 1,               // Only one writer at a time
       timeout: 60000,
     },
     reviewer: {
@@ -80,14 +79,16 @@ const orchestrator = createMultiAgentOrchestrator({
     },
   },
 
-  // Reusable execution patterns (optional)
+  // Define reusable execution patterns
   patterns: {
+    // Fan out to 3 researchers, merge their outputs with a separator
     research: parallel(
       ['researcher', 'researcher', 'researcher'],
       (results) => concatResults(results, '\n\n---\n\n'),
-      { minSuccess: 2 }  // Need at least 2 of 3 to succeed
+      { minSuccess: 2 }               // Succeed if at least 2 of 3 complete
     ),
 
+    // Writer drafts, then reviewer checks – output flows from one to the next
     writeAndReview: sequential(
       ['writer', 'reviewer'],
       {
@@ -107,16 +108,17 @@ The orchestrator validates that all patterns reference registered agents. If a p
 
 ## Running a Single Agent
 
-The simplest operation — run one registered agent with concurrency control and timeouts handled automatically:
+The simplest operation – run one registered agent with concurrency control and timeouts handled automatically:
 
 ```typescript
+// Run a single registered agent – concurrency and timeouts are handled automatically
 const result = await orchestrator.runAgent<string>('researcher', 'What is WebAssembly?');
 
-console.log(result.output);   // The agent's response
-console.log(result.totalTokens);   // Token usage
+console.log(result.output);       // The agent's response
+console.log(result.totalTokens);  // Token usage
 ```
 
-If the researcher's `maxConcurrent: 3` slots are all occupied, the call waits until a slot opens (no polling — uses an async semaphore internally).
+If the researcher's `maxConcurrent: 3` slots are all occupied, the call waits until a slot opens (no polling – uses an async semaphore internally).
 
 ---
 
@@ -127,13 +129,12 @@ Run multiple agents at the same time and merge their results. Two ways to do thi
 ### Using a named pattern
 
 ```typescript
-// Runs 3 researchers in parallel, merges their outputs
+// Execute the named "research" pattern – fans out to 3 researchers
 const research = await orchestrator.runPattern<string>(
   'research',
   'Explain the benefits of constraint-driven architecture'
 );
-
-// research = concatenated outputs from all 3, separated by ---
+// Result is the concatenated outputs from all 3, separated by ---
 ```
 
 ### Using `runParallel` directly
@@ -141,18 +142,18 @@ const research = await orchestrator.runPattern<string>(
 For one-off parallel runs without defining a pattern:
 
 ```typescript
-// Same input to all agents
+// Broadcast the same input to multiple agents
 const combined = await orchestrator.runParallel(
   ['researcher', 'researcher'],
-  'What are WebSockets?',  // broadcast to both
+  'What are WebSockets?',
   (results) => concatResults(results)
 );
 
-// Different inputs per agent
+// Send different inputs to each agent in parallel
 const answers = await orchestrator.runParallel(
   ['researcher', 'researcher', 'researcher'],
   ['Explain REST', 'Explain GraphQL', 'Explain gRPC'],
-  (results) => collectOutputs(results)  // returns string[]
+  (results) => collectOutputs(results)  // Returns string[]
 );
 ```
 
@@ -165,7 +166,7 @@ Chain agents so each one's output feeds into the next:
 ### Using a named pattern
 
 ```typescript
-// Writer drafts, then reviewer reviews the draft
+// Execute the named pipeline – writer drafts, reviewer checks the draft
 const results = await orchestrator.runPattern<string>(
   'writeAndReview',
   'Write a guide to Directive multi-agent orchestration'
@@ -179,7 +180,7 @@ const results = await orchestrator.runSequential<string>(
   ['researcher', 'writer', 'reviewer'],
   'Create a blog post about AI safety',
   {
-    // Customize how each agent's output becomes the next agent's input
+    // Shape how each agent's output becomes the next agent's input
     transform: (output, agentId, index) => {
       if (agentId === 'researcher') {
         return `Write a blog post based on this research:\n\n${output}`;
@@ -192,9 +193,9 @@ const results = await orchestrator.runSequential<string>(
   }
 );
 
-// results is an array of RunResult for each step
+// Each step's RunResult is available in the array
 const finalReview = results[results.length - 1].output;
-const totalTokens = aggregateTokens(results);
+const totalTokens = aggregateTokens(results);  // Sum tokens across the pipeline
 ```
 
 By default, if any agent in the sequence fails the entire pipeline throws. The `continueOnError` option on a `sequential()` pattern lets you skip failures.
@@ -206,6 +207,7 @@ By default, if any agent in the sequence fails the entire pipeline throws. The `
 A supervisor agent delegates work to workers in a loop. The supervisor decides what to do next based on worker results:
 
 ```typescript
+// The supervisor decides which workers to call and when the task is complete
 const manager: AgentLike = {
   name: 'manager',
   instructions: `You are a project manager. Analyze the request and delegate to workers.
@@ -221,9 +223,11 @@ const orchestrator = createMultiAgentOrchestrator({
     researcher: { agent: researcher, maxConcurrent: 3 },
     writer: { agent: writer, maxConcurrent: 1 },
   },
+
   patterns: {
+    // Supervisor loop – manager delegates, workers execute, results feed back
     managed: supervisor('manager', ['researcher', 'writer'], {
-      maxRounds: 5,
+      maxRounds: 5,    // Safety limit to prevent infinite delegation loops
       extract: (supervisorOutput, workerResults) => ({
         answer: supervisorOutput,
         sources: collectOutputs(workerResults),
@@ -233,6 +237,7 @@ const orchestrator = createMultiAgentOrchestrator({
   },
 });
 
+// Kick off the supervised workflow
 const result = await orchestrator.runPattern('managed', 'Research and write about WASM');
 ```
 
@@ -257,7 +262,7 @@ const orchestrator = createMultiAgentOrchestrator({
     reviewer: { agent: reviewer, maxConcurrent: 1 },
   },
 
-  // Observe handoffs
+  // Observe each handoff for logging or metrics
   onHandoff: (request) => {
     console.log(`Handoff: ${request.fromAgent} → ${request.toAgent}`);
   },
@@ -266,12 +271,14 @@ const orchestrator = createMultiAgentOrchestrator({
   },
 });
 
-// Research, then hand off to writer, then to reviewer
+// Chain agents together with explicit handoffs
 const research = await orchestrator.runAgent('researcher', 'What is Directive?');
+
 const draft = await orchestrator.handoff(
   'researcher', 'writer',
   `Write an article based on this research:\n\n${research.output}`
 );
+
 const review = await orchestrator.handoff(
   'writer', 'reviewer',
   `Review this article:\n\n${draft.output}`
@@ -294,19 +301,18 @@ import {
   aggregateTokens,
 } from 'directive/ai';
 
-// Concatenate string outputs with a separator
+// Join all string outputs with a separator
 const merged = concatResults(results, '\n\n');
 
-// Collect all outputs into an array
+// Gather every output into an array
 const outputs = collectOutputs(results);  // T[]
 
-// Pick the best result using a scoring function
+// Select the single best result using a custom scoring function
 const best = pickBestResult(results, (r) => {
-  // Score by output length (or confidence, quality, etc.)
   return typeof r.output === 'string' ? r.output.length : 0;
 });
 
-// Sum up token usage across all results
+// Sum token usage across every result in the batch
 const totalTokens = aggregateTokens(results);
 ```
 
@@ -317,19 +323,19 @@ const totalTokens = aggregateTokens(results);
 Track what each agent is doing:
 
 ```typescript
-// Single agent state
+// Inspect a single agent's current state
 const state = orchestrator.getAgentState('researcher');
 console.log(state.status);      // 'idle' | 'running' | 'completed' | 'error'
 console.log(state.runCount);    // How many times this agent has run
 console.log(state.totalTokens); // Cumulative token usage
 
-// All agent states
+// Iterate over all registered agents
 const allStates = orchestrator.getAllAgentStates();
 for (const [id, s] of Object.entries(allStates)) {
   console.log(`${id}: ${s.status} (${s.runCount} runs, ${s.totalTokens} tokens)`);
 }
 
-// Reset everything
+// Clear all state for every agent
 orchestrator.reset();
 ```
 

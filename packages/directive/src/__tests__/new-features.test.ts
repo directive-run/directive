@@ -16,8 +16,8 @@ import {
 	constraint,
 	when,
 	type WhenWithRequire,
-} from "../adapters/openai-agents-constraint-helpers.js";
-import type { OrchestratorConstraint, OrchestratorState } from "../adapters/openai-agents-types.js";
+} from "../adapters/ai/constraint-helpers.js";
+import type { OrchestratorConstraint, OrchestratorState } from "../adapters/ai/types.js";
 
 type TestFacts = { confidence: number; errors: number; critical: boolean };
 
@@ -163,8 +163,8 @@ describe("constraint helpers", () => {
 import {
 	createLengthGuardrail,
 	createContentFilterGuardrail,
-} from "../adapters/openai-agents-builtin-guardrails.js";
-import type { OutputGuardrailData, GuardrailContext } from "../adapters/openai-agents-types.js";
+} from "../adapters/ai/builtin-guardrails.js";
+import type { OutputGuardrailData, GuardrailContext } from "../adapters/ai/types.js";
 
 function makeOutputData(output: unknown): OutputGuardrailData {
 	return {
@@ -384,10 +384,10 @@ describe("createContentFilterGuardrail", () => {
 // streamChunks() on AgentStack
 // ============================================================================
 
-import { createAgentStack, type StreamingCallbackRunner } from "../adapters/openai-agents-stack.js";
-import type { AgentLike, RunResult } from "../adapters/openai-agents-types.js";
-import type { AgentRegistry } from "../adapters/openai-agents-multi.js";
-import type { StreamChunk, StreamingRunResult } from "../adapters/openai-agents-streaming.js";
+import { createAgentStack, type StreamingCallbackRunner } from "../adapters/ai/stack.js";
+import type { AgentLike, RunResult } from "../adapters/ai/types.js";
+import type { AgentRegistry } from "../adapters/ai/multi.js";
+import type { StreamChunk, StreamingRunResult } from "../adapters/ai/streaming.js";
 
 function makeAgent(name: string): AgentLike { return { name }; }
 
@@ -401,7 +401,7 @@ function createMockRunner(): AgentRunner {
 	}) as unknown as AgentRunner;
 }
 
-import type { AgentRunner } from "../adapters/openai-agents-types.js";
+import type { AgentRunner } from "../adapters/ai/types.js";
 
 const testAgents: AgentRegistry = {
 	chat: { agent: makeAgent("chat-agent"), description: "Chat agent", capabilities: ["chat"] },

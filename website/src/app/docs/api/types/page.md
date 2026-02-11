@@ -13,13 +13,14 @@ Complete type definitions for Directive. {% .lead %}
 
 ```typescript
 interface ModuleDef<M extends ModuleSchema> {
-  name: string;
-  schema: M;
-  init?: (facts: Facts<M>) => void;
-  derive?: Derivations<M>;
-  effects?: Effects<M>;
-  constraints?: Constraints<M>;
-  resolvers?: Resolvers<M>;
+  name: string;                        // unique module identifier
+  schema: M;                           // type definitions for facts, events, requirements
+
+  init?: (facts: Facts<M>) => void;    // set default fact values
+  derive?: Derivations<M>;             // computed values (auto-tracked)
+  effects?: Effects<M>;                // fire-and-forget side effects
+  constraints?: Constraints<M>;        // declarative rules that emit requirements
+  resolvers?: Resolvers<M>;            // handlers that fulfill requirements
 }
 ```
 
@@ -27,30 +28,36 @@ interface ModuleDef<M extends ModuleSchema> {
 
 ```typescript
 interface System<M extends ModuleSchema> {
-  readonly facts: Facts<M["facts"]>;
-  readonly debug: TimeTravelAPI | null;
-  readonly derive: InferDerivations<M>;
-  readonly events: EventsAccessor<M>;
-  readonly constraints: ConstraintsControl;
-  readonly effects: EffectsControl;
+  // State access
+  readonly facts: Facts<M["facts"]>;           // read/write proxy for facts
+  readonly derive: InferDerivations<M>;        // read-only computed values
+  readonly events: EventsAccessor<M>;          // typed event definitions
+  readonly constraints: ConstraintsControl;    // enable/disable constraints
+  readonly effects: EffectsControl;            // enable/disable effects
+  readonly debug: TimeTravelAPI | null;        // time-travel (null if disabled)
 
+  // Lifecycle
   start(): void;
   stop(): void;
   destroy(): void;
 
+  // Status flags
   readonly isRunning: boolean;
   readonly isSettled: boolean;
   readonly isInitialized: boolean;
   readonly isReady: boolean;
   whenReady(): Promise<void>;
 
+  // Mutations and events
   dispatch(event: SystemEvent): void;
   batch(fn: () => void): void;
 
+  // Subscriptions
   read(derivationId: string): unknown;
   subscribe(derivationIds: string[], listener: () => void): () => void;
   watch(derivationId: string, callback: (newValue, previousValue) => void): () => void;
 
+  // Debugging and persistence
   inspect(): SystemInspection;
   settle(maxWait?: number): Promise<void>;
   explain(requirementId: string): string | null;
@@ -84,14 +91,16 @@ interface EffectsControl {
 
 ```typescript
 interface TimeTravelAPI {
-  readonly snapshots: Snapshot[];
-  readonly currentIndex: number;
-  goBack(steps?: number): void;
-  goForward(steps?: number): void;
-  goTo(snapshotId: number): void;
-  replay(): void;
-  export(): string;
-  import(json: string): void;
+  readonly snapshots: Snapshot[];    // all captured state snapshots
+  readonly currentIndex: number;     // position in the snapshot timeline
+
+  goBack(steps?: number): void;     // undo state changes
+  goForward(steps?: number): void;  // redo state changes
+  goTo(snapshotId: number): void;   // jump to a specific snapshot
+
+  replay(): void;                   // replay all snapshots from the beginning
+  export(): string;                 // serialize timeline to JSON
+  import(json: string): void;       // restore a previously exported timeline
 }
 ```
 
@@ -103,20 +112,21 @@ interface TimeTravelAPI {
 
 ```typescript
 interface ModuleSchema {
-  facts: Record<string, SchemaType>;
-  derivations?: Record<string, SchemaType>;
-  events?: Record<string, Record<string, SchemaType>>;
-  requirements?: Record<string, Record<string, SchemaType>>;
+  facts: Record<string, SchemaType>;                    // mutable state
+  derivations?: Record<string, SchemaType>;             // computed values
+  events?: Record<string, Record<string, SchemaType>>;  // event payloads
+  requirements?: Record<string, Record<string, SchemaType>>; // requirement payloads
 }
 ```
 
 ### TypeBuilder
 
 ```typescript
+// Fluent API for defining schema types with modifiers
 interface TypeBuilder<T> {
-  nullable(): TypeBuilder<T | null>;
-  optional(): TypeBuilder<T | undefined>;
-  default(value: T): TypeBuilder<T>;
+  nullable(): TypeBuilder<T | null>;       // allow null values
+  optional(): TypeBuilder<T | undefined>;  // allow undefined values
+  default(value: T): TypeBuilder<T>;       // set a default when omitted
 }
 ```
 
@@ -128,21 +138,26 @@ interface TypeBuilder<T> {
 
 ```typescript
 interface ConstraintDef<S, R extends Requirement> {
-  priority?: number;
-  async?: boolean;
+  priority?: number;    // higher = evaluated first (for conflict resolution)
+  async?: boolean;      // enable async precondition evaluation
+  timeout?: number;     // max time for async constraints (ms)
+  after?: string[];     // constraint IDs that must evaluate before this one
+
+  // Precondition: when should this constraint fire?
   when: (facts: Facts<S>) => boolean | Promise<boolean>;
+
+  // What requirement does it emit when the condition is met?
   require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
-  timeout?: number;
-  after?: string[];
 }
 ```
 
 ### Requirement
 
 ```typescript
+// The unit of work passed from constraints to resolvers
 interface Requirement {
-  type: string;
-  [key: string]: unknown;
+  type: string;              // matches a resolver's requirement field
+  [key: string]: unknown;    // arbitrary payload for the resolver
 }
 ```
 
@@ -154,11 +169,20 @@ interface Requirement {
 
 ```typescript
 interface ResolverDef<S, R extends Requirement> {
+  // Which requirement type this resolver handles
   requirement: string | ((req: Requirement) => req is R);
+
+  // Dedupe key: identical keys share a single in-flight resolution
   key?: (req: R) => string;
+
+  // Resilience
   retry?: RetryPolicy;
   timeout?: number;
+
+  // Batching: group multiple requirements into one call
   batch?: BatchConfig;
+
+  // Resolution strategies (provide one)
   resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
   resolveBatch?: (reqs: R[], ctx: ResolverContext<S>) => Promise<void>;
   resolveBatchWithResults?: (reqs: R[], ctx: ResolverContext<S>) => Promise<BatchItemResult[]>;
@@ -168,10 +192,11 @@ interface ResolverDef<S, R extends Requirement> {
 ### ResolverContext
 
 ```typescript
+// Provided to every resolver during execution
 interface ResolverContext<S> {
-  readonly facts: Facts<S>;
-  readonly signal: AbortSignal;
-  readonly snapshot: () => FactsSnapshot<S>;
+  readonly facts: Facts<S>;              // read/write access to module state
+  readonly signal: AbortSignal;          // cancelled when resolver times out or system stops
+  readonly snapshot: () => FactsSnapshot<S>; // capture a point-in-time copy of facts
 }
 ```
 
@@ -179,10 +204,13 @@ interface ResolverContext<S> {
 
 ```typescript
 interface RetryPolicy {
-  attempts: number;
-  backoff: "none" | "linear" | "exponential";
-  initialDelay?: number;
-  maxDelay?: number;
+  attempts: number;                    // max number of retries
+  backoff: "none" | "linear" | "exponential"; // delay strategy between attempts
+
+  initialDelay?: number;               // base delay in ms
+  maxDelay?: number;                   // cap on backoff growth
+
+  // Return false to stop retrying early (e.g., for non-transient errors)
   shouldRetry?: (error: Error, attempt: number) => boolean;
 }
 ```
@@ -195,7 +223,10 @@ interface RetryPolicy {
 
 ```typescript
 interface EffectDef<S extends ModuleSchema> {
+  // Optional: only run when these specific facts change
   deps?: Array<keyof InferFacts<S> & string>;
+
+  // Side effect function (receives current and previous fact values)
   run: (facts: InferFacts<S>, prev: InferFacts<S> | null) => void;
 }
 ```
@@ -208,11 +239,16 @@ interface EffectDef<S extends ModuleSchema> {
 
 ```typescript
 interface ErrorBoundaryConfig {
+  // Per-component error handlers (use a string strategy or custom function)
   onConstraintError?: RecoveryStrategy | ((error: Error, constraint: string) => void);
   onResolverError?: RecoveryStrategy | ((error: Error, resolver: string) => void);
   onEffectError?: RecoveryStrategy | ((error: Error, effect: string) => void);
   onDerivationError?: RecoveryStrategy | ((error: Error, derivation: string) => void);
+
+  // Catch-all for any error in the system
   onError?: (error: DirectiveError) => void;
+
+  // Automatic retry and circuit breaker for transient failures
   retryLater?: RetryLaterConfig;
   circuitBreaker?: CircuitBreakerConfig;
 }
@@ -225,20 +261,22 @@ interface ErrorBoundaryConfig {
 ### SystemSnapshot
 
 ```typescript
+// Serializable state for persistence, hydration, or time-travel
 interface SystemSnapshot {
-  facts: Record<string, unknown>;
-  version?: number;
+  facts: Record<string, unknown>;  // all current fact values
+  version?: number;                // schema version for migration support
 }
 ```
 
 ### SystemInspection
 
 ```typescript
+// Returned by system.inspect() for debugging the current runtime state
 interface SystemInspection {
-  unmet: RequirementWithId[];
-  inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
-  constraints: Array<{ id: string; active: boolean; priority: number }>;
-  resolvers: Record<string, ResolverStatus>;
+  unmet: RequirementWithId[];        // requirements waiting for a resolver
+  inflight: Array<{ id: string; resolverId: string; startedAt: number }>; // actively resolving
+  constraints: Array<{ id: string; active: boolean; priority: number }>;  // all constraints
+  resolvers: Record<string, ResolverStatus>;  // resolver health and stats
 }
 ```
 

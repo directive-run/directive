@@ -76,7 +76,7 @@ function MessageBubble({ message }: { message: Message }) {
       <div
         className={clsx(
           'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-sky-500' : 'bg-gradient-to-br from-violet-500 to-purple-600'
+          isUser ? 'bg-brand-primary' : 'bg-gradient-to-br from-violet-500 to-purple-600'
         )}
       >
         {isUser ? (
@@ -89,7 +89,7 @@ function MessageBubble({ message }: { message: Message }) {
         className={clsx(
           'max-w-[80%] rounded-2xl px-4 py-2 text-sm',
           isUser
-            ? 'bg-sky-500 text-white'
+            ? 'bg-brand-primary text-white'
             : 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-slate-100'
         )}
       >
@@ -272,7 +272,7 @@ What would you like to know?`,
                         <button
                           key={question}
                           onClick={() => handleExampleClick(question)}
-                          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-600 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:bg-sky-900/20 dark:hover:text-sky-400"
+                          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition hover:border-brand-primary-300 hover:bg-brand-primary-50 hover:text-brand-primary-700 dark:border-slate-600 dark:text-slate-300 dark:hover:border-brand-primary dark:hover:bg-brand-primary-900/20 dark:hover:text-brand-primary-400"
                         >
                           {question}
                         </button>
@@ -309,12 +309,12 @@ What would you like to know?`,
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Ask about Directive..."
-                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
+                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
                   />
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || isLoading}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500 text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white transition hover:bg-brand-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <SendIcon className="h-5 w-5" />
                   </button>

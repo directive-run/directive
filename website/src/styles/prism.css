@@ -27,7 +27,7 @@ pre[class*='language-'] {
 .token.class,
 .token.string,
 .token.property {
-  color: var(--color-sky-300);
+  color: var(--brand-primary-300);
 }
 
 .token.punctuation,

@@ -59,7 +59,7 @@ export const VersionSelector = memo(function VersionSelector({
   return (
     <Listbox value={selectedVersion} onChange={handleVersionChange}>
       <div className={clsx('relative', className)}>
-        <ListboxButton className="relative w-full cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left text-sm shadow-md ring-1 ring-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:bg-slate-800 dark:ring-slate-700">
+        <ListboxButton className="relative w-full cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left text-sm shadow-md ring-1 ring-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary dark:bg-slate-800 dark:ring-slate-700">
           <span className="flex items-center gap-2">
             <span className="block truncate font-medium text-slate-900 dark:text-white">
               {selectedVersion.label}
@@ -93,7 +93,7 @@ export const VersionSelector = memo(function VersionSelector({
                 className={({ focus }) =>
                   clsx(
                     'relative cursor-pointer select-none py-2 pl-10 pr-4',
-                    focus ? 'bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100' : 'text-slate-900 dark:text-slate-100'
+                    focus ? 'bg-brand-primary-100 text-brand-primary-900 dark:bg-brand-primary-900 dark:text-brand-primary-100' : 'text-slate-900 dark:text-slate-100'
                   )
                 }
               >
@@ -113,7 +113,7 @@ export const VersionSelector = memo(function VersionSelector({
                       )}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-brand-primary-600 dark:text-brand-primary-400">
                         <CheckIcon className="h-5 w-5" />
                       </span>
                     )}
@@ -146,14 +146,14 @@ export const VersionBanner = memo(function VersionBanner({
         'mb-6 rounded-lg border p-4',
         isDeprecated
           ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
-          : 'border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-900/20'
+          : 'border-brand-primary-200 bg-brand-primary-50 dark:border-brand-primary-800 dark:bg-brand-primary-900/20'
       )}
     >
       <div className="flex items-start gap-3">
         <svg
           className={clsx(
             'mt-0.5 h-5 w-5 flex-shrink-0',
-            isDeprecated ? 'text-amber-500' : 'text-sky-500'
+            isDeprecated ? 'text-amber-500' : 'text-brand-primary'
           )}
           fill="none"
           viewBox="0 0 24 24"
@@ -170,7 +170,7 @@ export const VersionBanner = memo(function VersionBanner({
           <h4
             className={clsx(
               'text-sm font-semibold',
-              isDeprecated ? 'text-amber-800 dark:text-amber-200' : 'text-sky-800 dark:text-sky-200'
+              isDeprecated ? 'text-amber-800 dark:text-amber-200' : 'text-brand-primary-800 dark:text-brand-primary-200'
             )}
           >
             {isDeprecated ? 'Deprecated Version' : 'Older Version'}
@@ -178,7 +178,7 @@ export const VersionBanner = memo(function VersionBanner({
           <p
             className={clsx(
               'mt-1 text-sm',
-              isDeprecated ? 'text-amber-700 dark:text-amber-300' : 'text-sky-700 dark:text-sky-300'
+              isDeprecated ? 'text-amber-700 dark:text-amber-300' : 'text-brand-primary-700 dark:text-brand-primary-300'
             )}
           >
             You are viewing documentation for {version}.{' '}
@@ -191,7 +191,7 @@ export const VersionBanner = memo(function VersionBanner({
                 'font-medium underline',
                 isDeprecated
                   ? 'text-amber-800 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100'
-                  : 'text-sky-800 hover:text-sky-900 dark:text-sky-200 dark:hover:text-sky-100'
+                  : 'text-brand-primary-800 hover:text-brand-primary-900 dark:text-brand-primary-200 dark:hover:text-brand-primary-100'
               )}
             >
               View {latestVersion} documentation

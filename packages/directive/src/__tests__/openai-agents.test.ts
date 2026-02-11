@@ -26,8 +26,8 @@ import {
 	type AgentRunner,
 	type RunResult,
 	type OutputGuardrailData,
-} from "../adapters/openai-agents.js";
-import { createAgentMemory, createSlidingWindowStrategy } from "../adapters/openai-agents-memory.js";
+} from "../adapters/ai/index.js";
+import { createAgentMemory, createSlidingWindowStrategy } from "../adapters/ai/memory.js";
 import { createCircuitBreaker, CircuitBreakerOpenError } from "../adapters/plugins/circuit-breaker.js";
 
 // ============================================================================

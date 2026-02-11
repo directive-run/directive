@@ -2,7 +2,7 @@ import { nodes as defaultNodes, Tag } from '@markdoc/markdoc'
 import { slugifyWithCounter } from '@sindresorhus/slugify'
 import yaml from 'js-yaml'
 
-import { DocsLayout } from '@/components/DocsLayout'
+import { DocumentLayout } from '@/components/DocumentLayout'
 import { Fence } from '@/components/Fence'
 
 let documentSlugifyMap = new Map()
@@ -33,7 +33,7 @@ function validateFrontmatter(frontmatter, filePath) {
 const nodes = {
   document: {
     ...defaultNodes.document,
-    render: DocsLayout,
+    render: DocumentLayout,
     transform(node, config) {
       documentSlugifyMap.set(config, slugifyWithCounter())
 

@@ -10,7 +10,7 @@ import {
 	createKeyPointsSummarizer,
 	createLLMSummarizer,
 	type Message,
-} from "../adapters/openai-agents-memory.js";
+} from "../adapters/ai/memory.js";
 
 // ============================================================================
 // Token Estimation
