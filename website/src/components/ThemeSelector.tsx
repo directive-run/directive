@@ -53,6 +53,52 @@ function SystemIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   )
 }
 
+const themeToggleOptions = [
+  { value: 'system', icon: SystemIcon, label: 'System' },
+  { value: 'light', icon: LightIcon, label: 'Light' },
+  { value: 'dark', icon: DarkIcon, label: 'Dark' },
+]
+
+export function ThemeToggle() {
+  let { theme, setTheme } = useTheme()
+  let [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <div className="h-8 w-24" />
+  }
+
+  return (
+    <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+      {themeToggleOptions.map((option) => (
+        <button
+          key={option.value}
+          onClick={() => setTheme(option.value)}
+          aria-label={option.label}
+          className={clsx(
+            'cursor-pointer rounded-full p-1.5 transition-colors',
+            theme === option.value
+              ? 'bg-white shadow-sm dark:bg-slate-700'
+              : 'text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400',
+          )}
+        >
+          <option.icon
+            className={clsx(
+              'h-4 w-4',
+              theme === option.value
+                ? 'fill-brand-primary dark:fill-brand-primary-400'
+                : 'fill-current',
+            )}
+          />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function ThemeSelector(
   props: React.ComponentPropsWithoutRef<typeof Listbox<'div'>>,
 ) {

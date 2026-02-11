@@ -14,7 +14,7 @@ import { Logo, Logomark } from '@/components/Logo'
 import { MobileNavigation } from '@/components/MobileNavigation'
 import { Navigation } from '@/components/Navigation'
 import { Search } from '@/components/Search'
-import { ThemeSelector } from '@/components/ThemeSelector'
+import { ThemeToggle } from '@/components/ThemeSelector'
 import { BrandPresetSwitcher } from '@/components/BrandPresetSwitcher'
 import { VersionSelector } from '@/components/VersionSelector'
 
@@ -131,7 +131,7 @@ function Header() {
         <SupportLink />
         <div className="flex items-center gap-4">
           <BrandPresetSwitcher className="relative z-10" />
-          <ThemeSelector className="relative z-10" />
+          <ThemeToggle />
           <Link href="https://github.com/sizls/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
             <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
           </Link>
