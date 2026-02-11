@@ -54,8 +54,9 @@ interface System<M extends ModuleSchema> {
 
   // Subscriptions
   read(derivationId: string): unknown;
-  subscribe(derivationIds: string[], listener: () => void): () => void;
-  watch(derivationId: string, callback: (newValue, previousValue) => void): () => void;
+  subscribe(ids: Array<ObservableKeys<M>>, listener: () => void): () => void;
+  watch(id: ObservableKeys<M>, callback: (newValue, previousValue) => void, options?: { equalityFn?: (a, b) => boolean }): () => void;
+  when(predicate: (facts: Facts<M>) => boolean, options?: { timeout?: number }): Promise<void>;
 
   // Debugging and persistence
   inspect(): SystemInspection;
@@ -128,6 +129,47 @@ interface TypeBuilder<T> {
   optional(): TypeBuilder<T | undefined>;  // allow undefined values
   default(value: T): TypeBuilder<T>;       // set a default when omitted
 }
+```
+
+---
+
+## Utility Types
+
+Type helpers for extracting keys and return types from a module schema.
+
+### FactKeys
+
+```typescript
+// Extract fact key names from a module schema
+type FactKeys<M extends ModuleSchema> = keyof M["facts"] & string;
+```
+
+### FactReturnType
+
+```typescript
+// Get the return type of a specific fact from a module schema
+type FactReturnType<M extends ModuleSchema, K extends FactKeys<M>> = InferFacts<M>[K];
+```
+
+### DerivationKeys
+
+```typescript
+// Extract derivation key names from a module schema
+type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] & string;
+```
+
+### DerivationReturnType
+
+```typescript
+// Get the return type of a specific derivation from a module schema
+type DerivationReturnType<M extends ModuleSchema, K extends DerivationKeys<M>> = InferDerivations<M>[K];
+```
+
+### ObservableKeys
+
+```typescript
+// Union of all fact and derivation keys — used in subscribe() and watch()
+type ObservableKeys<M extends ModuleSchema> = FactKeys<M> | DerivationKeys<M>;
 ```
 
 ---

@@ -199,7 +199,7 @@ const dispatch = useDispatch();
 
 ### useWatch
 
-Watch a derivation or fact for changes without causing re-renders – runs a callback as a side effect:
+Watch a fact or derivation for changes without causing re-renders -- runs a callback as a side effect. `useWatch` auto-detects whether the key refers to a fact or a derivation, so there is no need to pass a discriminator:
 
 ```vue
 <script setup>
@@ -210,12 +210,16 @@ useWatch<string>('phase', (newPhase, oldPhase) => {
   analytics.track('phaseChange', { from: oldPhase, to: newPhase });
 });
 
-// Watch a fact for tracking user changes
-useWatch('fact', 'userId', (newId, oldId) => {
+// Watch a fact – auto-detected, no "fact" discriminator needed
+useWatch('userId', (newId, oldId) => {
   analytics.track('userId_changed', { from: oldId, to: newId });
 });
 </script>
 ```
+
+{% callout type="warning" title="Deprecated pattern" %}
+The three-argument form `useWatch("fact", "key", cb)` still works but is deprecated. Use the two-argument form `useWatch("key", cb)` instead -- `useWatch` now auto-detects whether the key is a fact or derivation.
+{% /callout %}
 
 ### useSystem
 
@@ -618,7 +622,7 @@ const coords = useFact('position', (p) => ({ x: p?.x, y: p?.y }), shallowEqual);
 | `useSelector` | Composable | Select from all facts with custom equality |
 | `useEvents` | Composable | Typed event dispatchers |
 | `useDispatch` | Composable | Low-level event dispatch |
-| `useWatch` | Composable | Side-effect watcher for facts or derivations |
+| `useWatch` | Composable | Side-effect watcher for facts or derivations (auto-detects kind) |
 | `useInspect` | Composable | System inspection (unmet, inflight, settled) |
 | `useConstraintStatus` | Composable | Reactive constraint inspection |
 | `useExplain` | Composable | Reactive requirement explanation |

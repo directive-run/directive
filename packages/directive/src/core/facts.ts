@@ -918,7 +918,13 @@ export function createFactsStore<S extends Schema>(
 
 			return () => {
 				for (const key of keys) {
-					keyListeners.get(key as string)?.delete(listener);
+					const set = keyListeners.get(key as string);
+					if (set) {
+						set.delete(listener);
+						if (set.size === 0) {
+							keyListeners.delete(key as string);
+						}
+					}
 				}
 			};
 		},

@@ -98,8 +98,11 @@ export type {
 	// Accessors
 	DeriveAccessor,
 	EventsAccessor,
+	FactKeys,
+	FactReturnType,
 	DerivationKeys,
 	DerivationReturnType,
+	ObservableKeys,
 	// Typed Helper Utilities
 	TypedConstraint,
 	TypedResolver,

@@ -698,9 +698,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		 * @example Wildcard
 		 * system.subscribe(["game.*", "chat.*"], () => render());
 		 */
-		subscribe(derivationIds: string[], listener: () => void): () => void {
+		subscribe(ids: string[], listener: () => void): () => void {
 			const internalIds: string[] = [];
-			for (const id of derivationIds) {
+			for (const id of ids) {
 				if (id.endsWith(".*")) {
 					const ns = id.slice(0, -2);
 					const keys = namespaceKeysMap.get(ns);
@@ -738,19 +738,35 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		},
 
 		/**
-		 * Watch a derivation for changes using namespaced syntax.
+		 * Watch a fact or derivation for changes using namespaced syntax.
+		 * The key is auto-detected -- works with both fact keys and derivation keys.
 		 * Accepts either "namespace.key" or "namespace_key" format.
 		 *
 		 * @example
-		 * system.watch("auth.status", (newVal, oldVal) => {
-		 *   console.log(`Status changed from ${oldVal} to ${newVal}`);
-		 * });
+		 * system.watch("auth.token", (newVal, oldVal) => { ... })   // fact
+		 * system.watch("auth.status", (newVal, oldVal) => { ... })  // derivation
 		 */
 		watch<T = unknown>(
-			derivationId: string,
+			id: string,
 			callback: (newValue: T, previousValue: T | undefined) => void,
+			options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
 		): () => void {
-			return engine.watch(toInternalKey(derivationId), callback);
+			return engine.watch(toInternalKey(id), callback, options);
+		},
+
+		/**
+		 * Returns a promise that resolves when the predicate becomes true.
+		 * The predicate receives namespaced facts (e.g., facts.auth.token).
+		 */
+		when(
+			predicate: (facts: Record<string, unknown>) => boolean,
+			options?: { timeout?: number },
+		): Promise<void> {
+			// Wrap predicate to provide namespaced facts view
+			return engine.when(
+				() => predicate(namespacedFactsProxy as unknown as Record<string, unknown>),
+				options,
+			);
 		},
 
 		onSettledChange: engine.onSettledChange.bind(engine),
@@ -1474,15 +1490,23 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 			return engine.read(derivationId);
 		},
 
-		subscribe(derivationIds: string[], listener: () => void): () => void {
-			return engine.subscribe(derivationIds, listener);
+		subscribe(ids: string[], listener: () => void): () => void {
+			return engine.subscribe(ids, listener);
 		},
 
 		watch<T = unknown>(
-			derivationId: string,
+			id: string,
 			callback: (newValue: T, previousValue: T | undefined) => void,
+			options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
 		): () => void {
-			return engine.watch(derivationId, callback);
+			return engine.watch(id, callback, options);
+		},
+
+		when(
+			predicate: (facts: Record<string, unknown>) => boolean,
+			options?: { timeout?: number },
+		): Promise<void> {
+			return engine.when(predicate, options);
 		},
 
 		onSettledChange: engine.onSettledChange.bind(engine),

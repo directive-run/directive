@@ -136,19 +136,28 @@ dispatch({ type: "increment" });
 
 ### useWatch
 
-Watch a derivation or fact for changes without causing re-renders – runs a callback as a side effect:
+Watch a fact or derivation for changes without causing re-renders -- auto-detects whether the key is a fact or derivation:
 
 ```tsx
-// Watch a derivation for analytics tracking
+// Watch a fact (auto-detected)
+useWatch(system, "userId", (newValue, prevValue) => {
+  analytics.track("userId_changed", { from: prevValue, to: newValue });
+});
+
+// Watch a derivation (auto-detected)
 useWatch(system, "pageViews", (newValue, prevValue) => {
   analytics.track("pageViews", { from: prevValue, to: newValue });
 });
 
-// Watch a fact for tracking user changes
-useWatch(system, "fact", "userId", (newValue, prevValue) => {
-  analytics.track("userId_changed", { from: prevValue, to: newValue });
-});
+// With custom equality function (4th parameter)
+useWatch(system, "position", (newVal, oldVal) => {
+  canvas.moveTo(newVal.x, newVal.y);
+}, { equalityFn: (a, b) => a?.x === b?.x && a?.y === b?.y });
 ```
+
+{% callout type="warning" title="Deprecated pattern" %}
+The old `useWatch(system, "fact", "key", callback)` pattern still works for backward compatibility but is no longer needed. The unified `useWatch(system, "key", callback)` auto-detects facts vs derivations.
+{% /callout %}
 
 ---
 
