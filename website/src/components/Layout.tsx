@@ -5,7 +5,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
 
+import { Heart } from '@phosphor-icons/react'
+
 import { AIChatWidget } from '@/components/AIChatWidget'
+import { Footer } from '@/components/Footer'
 import { Hero } from '@/components/Hero'
 import { Logo, Logomark } from '@/components/Logo'
 import { MobileNavigation } from '@/components/MobileNavigation'
@@ -36,6 +39,34 @@ function HeaderLink({
       )}
     >
       {children}
+    </Link>
+  )
+}
+
+function SupportLink() {
+  let pathname = usePathname()
+  let isActive = pathname.startsWith('/support')
+
+  return (
+    <Link
+      href="/support"
+      className={clsx(
+        'group hidden items-center gap-1 text-sm font-medium md:flex',
+        isActive
+          ? 'text-brand-primary'
+          : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
+      )}
+    >
+      <Heart
+        weight="fill"
+        className={clsx(
+          'h-3.5 w-3.5 transition-colors',
+          isActive
+            ? 'text-brand-primary'
+            : 'text-slate-400 group-hover:text-brand-primary',
+        )}
+      />
+      Support
     </Link>
   )
 }
@@ -95,14 +126,16 @@ function Header() {
         <Search />
       </div>
       <div className="relative flex basis-0 items-center justify-end gap-6 sm:gap-8 md:grow">
+        <HeaderLink href="/docs/quick-start">Docs</HeaderLink>
         <HeaderLink href="/blog">Blog</HeaderLink>
-        <HeaderLink href="/about">About</HeaderLink>
-        <HeaderLink href="/support">Support</HeaderLink>
-        <BrandPresetSwitcher className="relative z-10" />
-        <ThemeSelector className="relative z-10" />
-        <Link href="https://github.com/sizls/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
-          <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
-        </Link>
+        <SupportLink />
+        <div className="flex items-center gap-4">
+          <BrandPresetSwitcher className="relative z-10" />
+          <ThemeSelector className="relative z-10" />
+          <Link href="https://github.com/sizls/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
+            <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
+          </Link>
+        </div>
       </div>
     </header>
   )
@@ -113,7 +146,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   let isHomePage = pathname === '/'
   let isStandalonePage =
     pathname.startsWith('/blog') ||
-    pathname.startsWith('/about') ||
     pathname.startsWith('/support')
 
   return (
@@ -138,11 +170,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <VersionSelector className="w-full" />
               </div>
               <Navigation />
+              <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Directive is community-sustained.
+                </p>
+                <Link
+                  href="/support"
+                  className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-brand-primary dark:text-slate-500 dark:hover:text-brand-primary-400"
+                >
+                  <Heart weight="fill" className="h-3 w-3" />
+                  Support the project
+                </Link>
+              </div>
             </div>
           </div>
           {children}
         </div>
       )}
+      <Footer />
       <AIChatWidget />
     </div>
   )

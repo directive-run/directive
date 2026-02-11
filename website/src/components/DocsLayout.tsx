@@ -1,5 +1,6 @@
 import { type Node } from '@markdoc/markdoc'
 
+import { DocsEndNudge } from '@/components/DocsEndNudge'
 import { DocsHeader } from '@/components/DocsHeader'
 import { PrevNextLinks } from '@/components/PrevNextLinks'
 import { Prose } from '@/components/Prose'
@@ -26,6 +27,7 @@ export function DocsLayout({
           <DocsHeader title={title} readingTime={readingTime} />
           <Prose>{children}</Prose>
         </article>
+        <DocsEndNudge />
         <PrevNextLinks />
       </div>
       <TableOfContents tableOfContents={tableOfContents} />
