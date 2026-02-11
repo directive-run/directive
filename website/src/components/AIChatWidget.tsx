@@ -220,7 +220,7 @@ What would you like to know?`,
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
         </TransitionChild>
 
-        <div className="fixed inset-0 flex items-end justify-end p-4 sm:items-center sm:p-6">
+        <div className="fixed inset-0 flex items-end justify-end p-6">
           <TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
