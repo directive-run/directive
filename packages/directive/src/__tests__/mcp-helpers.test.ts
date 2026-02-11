@@ -5,7 +5,7 @@ import {
 	mcpReadResource,
 	mcpGetPrompt,
 	mcpSyncResources,
-} from "../adapters/mcp.js";
+} from "../adapters/ai/mcp.js";
 
 // ============================================================================
 // Requirement Factory Functions

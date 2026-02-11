@@ -22,8 +22,8 @@ export function QuickLink({
   icon: React.ComponentProps<typeof Icon>['icon']
 }) {
   return (
-    <div className="group relative rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2 dark:border-slate-800 dark:focus-within:ring-offset-slate-900">
-      <div className="absolute -inset-px rounded-xl border-2 border-transparent opacity-0 [background:linear-gradient(var(--quick-links-hover-bg,var(--color-sky-50)),var(--quick-links-hover-bg,var(--color-sky-50)))_padding-box,linear-gradient(to_top,var(--color-indigo-400),var(--color-cyan-400),var(--color-sky-500))_border-box] group-hover:opacity-100 group-focus-within:opacity-100 dark:[--quick-links-hover-bg:var(--color-slate-800)]" />
+    <div className="group relative rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-brand-primary focus-within:ring-offset-2 dark:border-slate-800 dark:focus-within:ring-offset-slate-900">
+      <div className="absolute -inset-px rounded-xl border-2 border-transparent opacity-0 [background:linear-gradient(var(--quick-links-hover-bg,var(--brand-primary-50)),var(--quick-links-hover-bg,var(--brand-primary-50)))_padding-box,linear-gradient(to_top,var(--brand-accent-400),var(--brand-primary-400),var(--brand-primary-500))_border-box] group-hover:opacity-100 group-focus-within:opacity-100 dark:[--quick-links-hover-bg:var(--color-slate-800)]" />
       <div className="relative overflow-hidden rounded-xl p-6">
         <Icon icon={icon} className="h-8 w-8" />
         <h2 className="mt-4 font-display text-base text-slate-900 dark:text-white">

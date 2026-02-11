@@ -95,6 +95,29 @@ export function MobileNavigation() {
               <Logomark className="h-9 w-9" />
             </Link>
           </div>
+          <div className="mt-5 flex flex-col gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
+            <Link
+              href="/blog"
+              onClick={onLinkClick}
+              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+            >
+              Blog
+            </Link>
+            <Link
+              href="/about"
+              onClick={onLinkClick}
+              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+            >
+              About
+            </Link>
+            <Link
+              href="/support"
+              onClick={onLinkClick}
+              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+            >
+              Support
+            </Link>
+          </div>
           <Navigation className="mt-5 px-1" onLinkClick={onLinkClick} />
         </DialogPanel>
       </Dialog>

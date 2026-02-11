@@ -33,10 +33,11 @@ test('constraint creates requirement', async () => {
   const system = createTestSystem({ modules: { user: userModule } });
   system.start();
 
+  // Satisfy the constraint's `when` condition
   system.facts.user.userId = 123;
   await system.waitForIdle();
 
-  // Throws if no FETCH_USER requirement was created
+  // Throws a descriptive error if no FETCH_USER requirement was created
   system.assertRequirement('FETCH_USER');
 });
 ```
@@ -51,6 +52,7 @@ test('requirement has correct payload', async () => {
   system.facts.user.userId = 123;
   await system.waitForIdle();
 
+  // Dig into the full requirements array for detailed payload checks
   expect(system.allRequirements).toContainEqual(
     expect.objectContaining({
       requirement: expect.objectContaining({
@@ -84,13 +86,14 @@ test('resolver was called', async () => {
   });
   system.start();
 
+  // Trigger the constraint -> requirement -> resolver chain
   system.facts.app.dataId = 1;
   await system.waitForIdle();
 
-  // Assert it was called at least once
+  // Was the resolver invoked at all?
   system.assertResolverCalled('FETCH_DATA');
 
-  // Assert exact call count
+  // Was it called exactly once? (catches accidental duplicates)
   system.assertResolverCalled('FETCH_DATA', 1);
 });
 ```
@@ -98,6 +101,7 @@ test('resolver was called', async () => {
 You can also inspect the raw call history via `resolverCalls`:
 
 ```typescript
+// Access the raw call history for fine-grained inspection
 const calls = system.resolverCalls.get('FETCH_DATA');
 expect(calls).toHaveLength(1);
 expect(calls[0]).toMatchObject({ type: 'FETCH_DATA', dataId: 1 });
@@ -114,12 +118,13 @@ test('fact was set', async () => {
   const system = createTestSystem({ modules: { app: myModule } });
   system.start();
 
+  // Mutate a fact
   system.facts.app.count = 5;
 
-  // Assert the fact was set (any value)
+  // Verify the fact was written to (regardless of value)
   system.assertFactSet('count');
 
-  // Assert the fact was set to a specific value
+  // Verify it was set to a specific value
   system.assertFactSet('count', 5);
 });
 ```
@@ -135,10 +140,12 @@ test('fact changed exactly 3 times', () => {
   const system = createTestSystem({ modules: { app: myModule } });
   system.start();
 
+  // Mutate the same fact three times
   system.facts.app.count = 1;
   system.facts.app.count = 2;
   system.facts.app.count = 3;
 
+  // Confirm the exact number of mutations (catches extra writes)
   system.assertFactChanges('count', 3);
 });
 ```
@@ -154,20 +161,22 @@ test('inspect fact change history', () => {
   const system = createTestSystem({ modules: { test: myModule } });
   system.start();
 
+  // Make several fact changes across different keys
   system.facts.test.value = 10;
   system.facts.test.name = 'hello';
   system.facts.test.value = 20;
 
+  // Every mutation is recorded in order
   const history = system.getFactsHistory();
   expect(history).toHaveLength(3);
 
-  // Each record contains:
+  // Each record captures the full context of the change
   expect(history[0]).toMatchObject({
     key: 'value',           // Fact name (without namespace)
     fullKey: 'test_value',  // Full key with namespace prefix
     namespace: 'test',      // Module namespace
-    previousValue: 0,       // Value before change
-    newValue: 10,           // Value after change
+    previousValue: 0,       // Value before the change
+    newValue: 10,           // Value after the change
   });
 });
 ```
@@ -183,16 +192,17 @@ test('track changes after setup', () => {
   const system = createTestSystem({ modules: { app: myModule } });
   system.start();
 
-  // Setup phase
+  // Setup phase – these changes are not what we want to test
   system.facts.app.count = 0;
   system.facts.app.name = 'initial';
 
-  // Clear setup changes
+  // Discard setup noise so only the action under test is tracked
   system.resetFactsHistory();
 
-  // Action under test
+  // This is the mutation we actually care about
   system.facts.app.count = 42;
 
+  // History now only contains the post-reset change
   const history = system.getFactsHistory();
   expect(history).toHaveLength(1);
   expect(history[0].newValue).toBe(42);
@@ -210,9 +220,11 @@ test('events are tracked', async () => {
   const system = createTestSystem({ modules: { app: myModule } });
   system.start();
 
+  // Dispatch two events into the system
   system.dispatch({ type: 'INCREMENT' });
   system.dispatch({ type: 'INCREMENT' });
 
+  // eventHistory records every dispatched event in order
   expect(system.eventHistory).toHaveLength(2);
   expect(system.eventHistory[0]).toMatchObject({ type: 'INCREMENT' });
 });
@@ -240,13 +252,21 @@ test('full resolver lifecycle', async () => {
   });
   system.start();
 
+  // Kick off the full lifecycle by changing a fact
   system.facts.user.userId = 123;
   await system.waitForIdle();
 
-  // Verify the full chain: constraint -> requirement -> resolver -> fact
+  // Verify every link in the chain:
+  // 1. Constraint produced a requirement
   system.assertRequirement('FETCH_USER');
+
+  // 2. Resolver ran exactly once
   system.assertResolverCalled('FETCH_USER', 1);
+
+  // 3. Resolver wrote the expected fact
   system.assertFactSet('name', 'John');
+
+  // 4. The triggering fact was only set once
   system.assertFactChanges('userId', 1);
 });
 ```

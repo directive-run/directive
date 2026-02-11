@@ -47,7 +47,7 @@ function Tooltip({ step, position }: { step: string; position: { x: number; y: n
         transform: 'translateX(-50%)',
       }}
     >
-      <div className="font-semibold text-sky-400">{info.title}</div>
+      <div className="font-semibold" style={{ color: 'var(--brand-primary-400)' }}>{info.title}</div>
       <div className="mt-1 text-slate-300">{info.description}</div>
       <code className="mt-2 block rounded bg-slate-800 px-2 py-1 text-xs text-emerald-400 dark:bg-slate-600">
         {info.example}
@@ -123,7 +123,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
           className={clsx(
             'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition',
             isAnimating
-              ? 'bg-sky-500 text-white hover:bg-sky-600'
+              ? 'bg-brand-primary text-white hover:bg-brand-primary-600'
               : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'
           )}
         >
@@ -166,13 +166,13 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
           {/* Animated gradient for data flow */}
           <defs>
             <linearGradient id="flowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0">
+              <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity="0">
                 <animate attributeName="offset" values="-0.5;1" dur="1.5s" repeatCount="indefinite" />
               </stop>
-              <stop offset="50%" stopColor="#0ea5e9" stopOpacity="1">
+              <stop offset="50%" stopColor="var(--brand-primary)" stopOpacity="1">
                 <animate attributeName="offset" values="0;1.5" dur="1.5s" repeatCount="indefinite" />
               </stop>
-              <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0">
+              <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity="0">
                 <animate attributeName="offset" values="0.5;2" dur="1.5s" repeatCount="indefinite" />
               </stop>
             </linearGradient>
@@ -201,7 +201,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
             >
               <polygon
                 points="0 0, 10 3.5, 0 7"
-                className="fill-sky-500"
+                className="fill-brand-primary"
               />
             </marker>
           </defs>
@@ -220,8 +220,8 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               className={clsx(
                 'transition-all duration-300',
                 getStepClass('facts')
-                  ? 'fill-sky-200 stroke-sky-600 dark:fill-sky-800 dark:stroke-sky-300'
-                  : 'fill-sky-100 stroke-sky-500 dark:fill-sky-900/50 dark:stroke-sky-400'
+                  ? 'fill-brand-primary-200 stroke-brand-primary-600 dark:fill-brand-primary-800 dark:stroke-brand-primary-300'
+                  : 'fill-brand-primary-100 stroke-brand-primary dark:fill-brand-primary-900/50 dark:stroke-brand-primary-400'
               )}
               strokeWidth={getStepClass('facts') ? 3 : 2}
             />
@@ -231,7 +231,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
                 height="60"
                 rx="8"
                 fill="none"
-                stroke="#0ea5e9"
+                stroke="var(--brand-primary)"
                 strokeWidth="2"
                 opacity="0.5"
               >
@@ -242,7 +242,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               x="60"
               y="35"
               textAnchor="middle"
-              className="pointer-events-none fill-sky-700 text-sm font-semibold dark:fill-sky-300"
+              className="pointer-events-none fill-brand-primary-700 text-sm font-semibold dark:fill-brand-primary-300"
             >
               Facts
             </text>
@@ -250,7 +250,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               x="60"
               y="50"
               textAnchor="middle"
-              className="pointer-events-none fill-sky-600 text-xs dark:fill-sky-400"
+              className="pointer-events-none fill-brand-primary-600 text-xs dark:fill-brand-primary-400"
             >
               (state)
             </text>
@@ -265,13 +265,13 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               y2="0"
               className={clsx(
                 'transition-all duration-300',
-                getArrowClass('arrow1') ? 'stroke-sky-500' : 'stroke-slate-400 dark:stroke-slate-500'
+                getArrowClass('arrow1') ? 'stroke-brand-primary' : 'stroke-slate-400 dark:stroke-slate-500'
               )}
               strokeWidth={getArrowClass('arrow1') ? 3 : 2}
               markerEnd={getArrowClass('arrow1') ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
             />
             {getArrowClass('arrow1') && (
-              <circle r="4" fill="#0ea5e9">
+              <circle r="4" fill="var(--brand-primary)">
                 <animate attributeName="cx" values="0;60" dur="0.5s" fill="freeze" />
               </circle>
             )}
@@ -344,13 +344,13 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               y2="0"
               className={clsx(
                 'transition-all duration-300',
-                getArrowClass('arrow2') ? 'stroke-sky-500' : 'stroke-slate-400 dark:stroke-slate-500'
+                getArrowClass('arrow2') ? 'stroke-brand-primary' : 'stroke-slate-400 dark:stroke-slate-500'
               )}
               strokeWidth={getArrowClass('arrow2') ? 3 : 2}
               markerEnd={getArrowClass('arrow2') ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
             />
             {getArrowClass('arrow2') && (
-              <circle r="4" fill="#0ea5e9">
+              <circle r="4" fill="var(--brand-primary)">
                 <animate attributeName="cx" values="0;60" dur="0.5s" fill="freeze" />
               </circle>
             )}
@@ -423,13 +423,13 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               y2="0"
               className={clsx(
                 'transition-all duration-300',
-                getArrowClass('arrow3') ? 'stroke-sky-500' : 'stroke-slate-400 dark:stroke-slate-500'
+                getArrowClass('arrow3') ? 'stroke-brand-primary' : 'stroke-slate-400 dark:stroke-slate-500'
               )}
               strokeWidth={getArrowClass('arrow3') ? 3 : 2}
               markerEnd={getArrowClass('arrow3') ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
             />
             {getArrowClass('arrow3') && (
-              <circle r="4" fill="#0ea5e9">
+              <circle r="4" fill="var(--brand-primary)">
                 <animate attributeName="cx" values="0;60" dur="0.5s" fill="freeze" />
               </circle>
             )}
@@ -499,7 +499,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
             fill="none"
             className={clsx(
               'transition-all duration-300',
-              getArrowClass('return') ? 'stroke-sky-500' : 'stroke-slate-400 dark:stroke-slate-500'
+              getArrowClass('return') ? 'stroke-brand-primary' : 'stroke-slate-400 dark:stroke-slate-500'
             )}
             strokeWidth={getArrowClass('return') ? 3 : 2}
             strokeDasharray={getArrowClass('return') ? 'none' : '4 4'}
@@ -524,7 +524,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
             className={clsx(
               'flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-all',
               [0, 2, 4, 6].includes(currentStep) && Math.floor(currentStep / 2) === i
-                ? 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300'
+                ? 'bg-brand-primary-100 text-brand-primary-700 dark:bg-brand-primary-900 dark:text-brand-primary-300'
                 : 'text-slate-400 dark:text-slate-500'
             )}
           >
@@ -532,7 +532,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               className={clsx(
                 'h-2 w-2 rounded-full transition-all',
                 [0, 2, 4, 6].includes(currentStep) && Math.floor(currentStep / 2) === i
-                  ? 'bg-sky-500'
+                  ? 'bg-brand-primary'
                   : 'bg-slate-300 dark:bg-slate-600'
               )}
             />

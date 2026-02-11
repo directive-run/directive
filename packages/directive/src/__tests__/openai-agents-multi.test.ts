@@ -13,8 +13,8 @@ import {
 	aggregateTokens,
 	type MultiAgentOrchestrator,
 	type AgentRegistry,
-} from "../adapters/openai-agents-multi.js";
-import type { AgentLike, AgentRunner, RunResult } from "../adapters/openai-agents.js";
+} from "../adapters/ai/multi.js";
+import type { AgentLike, AgentRunner, RunResult } from "../adapters/ai/index.js";
 
 // ============================================================================
 // Helpers

@@ -3,7 +3,7 @@ title: Advanced Features
 description: Multi-module composition, time-travel debugging, snapshots, SSR hydration, and error handling strategies.
 ---
 
-Advanced features for production Directive applications — composition patterns, debugging tools, server rendering, and fault tolerance. {% .lead %}
+Advanced features for production Directive applications – composition patterns, debugging tools, server rendering, and fault tolerance. {% .lead %}
 
 ---
 
@@ -26,11 +26,13 @@ Combine modules with namespaced access:
 ```typescript
 import { createSystem } from 'directive';
 
+// Compose multiple modules into a single system
 const system = createSystem({
   modules: { auth: authModule, cart: cartModule },
 });
 
-system.facts.auth.user;  // Namespaced access
+// Each module's facts live under its namespace
+system.facts.auth.user;
 system.facts.cart.items;
 ```
 
@@ -41,11 +43,13 @@ system.facts.cart.items;
 Enable snapshots and navigate state history:
 
 ```typescript
+// Enable time-travel with a snapshot history limit
 const system = createSystem({
   module: myModule,
   debug: { timeTravel: true, maxSnapshots: 100 },
 });
 
+// Navigate backward and forward through state history
 system.debug.goBack();    // Undo
 system.debug.goForward(); // Redo
 ```

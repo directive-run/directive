@@ -1,6 +1,6 @@
 ---
 title: Derivations
-description: Derivations are auto-tracked computed values. No dependency arrays — they automatically know what they depend on.
+description: Derivations are auto-tracked computed values. No dependency arrays – they automatically know what they depend on.
 ---
 
 Derivations compute values from facts with automatic dependency tracking. {% .lead %}
@@ -29,9 +29,15 @@ const userModule = createModule("user", {
     facts.age = 0;
   },
 
+  // Derivations auto-track which facts they read
   derive: {
+    // Combine two facts into a display string
     fullName: (facts) => `${facts.firstName} ${facts.lastName}`,
+
+    // Boolean derivation from a numeric fact
     isAdult: (facts) => facts.age >= 18,
+
+    // Multi-branch logic for categorization
     ageGroup: (facts) => {
       if (facts.age < 13) return "child";
       if (facts.age < 20) return "teen";
@@ -45,10 +51,11 @@ const userModule = createModule("user", {
 
 ## Auto-Tracking
 
-Derivations automatically track which facts they access — no dependency arrays needed:
+Derivations automatically track which facts they access – no dependency arrays needed:
 
 ```typescript
 derive: {
+  // Automatically tracks firstName and lastName – ignores age
   fullName: (facts) => `${facts.firstName} ${facts.lastName}`,
 }
 ```
@@ -64,15 +71,17 @@ This derivation:
 
 ### Via `system.derive`
 
-The most common way — access derivations as properties on `system.derive`:
+The most common way – access derivations as properties on `system.derive`:
 
 ```typescript
 const system = createSystem({ module: userModule });
 system.start();
 
+// Set some fact values
 system.facts.firstName = "Jane";
 system.facts.lastName = "Doe";
 
+// Read derivations – recomputed automatically when facts change
 system.derive.fullName;   // "Jane Doe"
 system.derive.isAdult;    // false
 system.derive.ageGroup;   // "child"
@@ -85,6 +94,7 @@ const system = createSystem({
   modules: { user: userModule, cart: cartModule },
 });
 
+// Derivations are namespaced by module
 system.derive.user.fullName;      // "Jane Doe"
 system.derive.cart.totalPrice;    // 42.99
 ```
@@ -94,10 +104,10 @@ system.derive.cart.totalPrice;    // 42.99
 Read a derivation value by its string ID. This is the same value as `system.derive.X`, but useful when the derivation name is dynamic or when passing to framework adapters:
 
 ```typescript
-// Single module
+// Read by string ID (useful when name is dynamic)
 system.read("fullName");          // "Jane Doe"
 
-// Namespaced — use dot or underscore syntax
+// Namespaced – dot or underscore syntax
 system.read("user.fullName");     // "Jane Doe"
 system.read("user_fullName");     // Same thing
 ```
@@ -111,22 +121,22 @@ system.read("user_fullName");     // Same thing
 Subscribe to one or more derivations. The listener fires whenever any of the listed derivations are invalidated (i.e., when their fact dependencies change):
 
 ```typescript
-// Subscribe to one derivation
+// Subscribe to a single derivation
 const unsub = system.subscribe(["fullName"], () => {
   console.log("Name changed:", system.derive.fullName);
 });
 
-// Subscribe to multiple derivations
+// Subscribe to multiple derivations at once
 const unsub2 = system.subscribe(["fullName", "isAdult"], () => {
   console.log("Name or age status changed");
 });
 
-// Namespaced system
+// Namespaced derivation subscriptions
 const unsub3 = system.subscribe(["user.fullName", "cart.totalPrice"], () => {
   console.log("User or cart changed");
 });
 
-// Unsubscribe
+// Clean up when no longer needed
 unsub();
 ```
 
@@ -135,11 +145,12 @@ unsub();
 Watch a single derivation with old and new values:
 
 ```typescript
+// Watch a single derivation with old and new values
 const unsub = system.watch("fullName", (newValue, previousValue) => {
   console.log(`Name changed from "${previousValue}" to "${newValue}"`);
 });
 
-// Namespaced
+// Namespaced watch
 const unsub2 = system.watch("user.ageGroup", (newVal, oldVal) => {
   console.log(`Age group: ${oldVal} → ${newVal}`);
 });
@@ -155,14 +166,15 @@ Derivations can depend on other derivations via the second parameter (`derive`):
 
 ```typescript
 derive: {
+  // Base derivations from facts
   firstName: (facts) => facts.user?.name.split(' ')[0] ?? "",
   lastName: (facts) => facts.user?.name.split(' ')[1] ?? "",
 
-  // Depends on firstName and lastName derivations
+  // Composed – depends on firstName and lastName derivations
   initials: (facts, derive) =>
     `${derive.firstName[0] ?? ""}${derive.lastName[0] ?? ""}`.toUpperCase(),
 
-  // Depends on firstName derivation
+  // Composed – depends on firstName derivation
   greeting: (facts, derive) =>
     `Hello, ${derive.firstName}!`,
 }
@@ -178,17 +190,17 @@ A derivation cannot depend on itself (directly or indirectly). Directive detects
 
 ## Lazy Evaluation
 
-Derivations are lazy — they only compute when accessed:
+Derivations are lazy – they only compute when accessed:
 
 ```typescript
 derive: {
   expensiveCalculation: (facts) => {
-    // This only runs when someone reads the derivation
+    // Only runs when someone reads the derivation
     return heavyComputation(facts.data);
   },
 }
 
-// Not computed yet — just marked as stale
+// Changing the fact just marks the derivation as stale
 system.facts.data = largeDataset;
 
 // Now it computes (and caches the result)
@@ -206,16 +218,16 @@ derive: {
   filtered: (facts) => facts.items.filter(item => item.active),
 }
 
-// First access: computes and caches
+// First access: computes and caches the result
 const result1 = system.derive.filtered;
 
 // Second access: returns cached value (no recomputation)
 const result2 = system.derive.filtered;
 
-// After dependency change: marked stale
+// Changing a dependency marks the derivation as stale
 system.facts.items = [...items, newItem];
 
-// Next access: recomputes
+// Next access: recomputes with updated data
 const result3 = system.derive.filtered;
 ```
 
@@ -229,7 +241,8 @@ Derivations only track facts they actually access in a given run:
 derive: {
   display: (facts) => {
     if (facts.showDetails) {
-      return facts.details;   // Only tracked when showDetails is true
+      // Only tracked when showDetails is true
+      return facts.details;
     }
     return facts.summary;
   },
@@ -252,8 +265,13 @@ When `showDetails` becomes true:
 
 ```typescript
 derive: {
+  // Filter to active items only
   activeItems: (facts) => facts.items.filter(i => i.active),
+
+  // Sum all item prices
   totalPrice: (facts) => facts.items.reduce((sum, i) => sum + i.price, 0),
+
+  // Sort by name (spread to avoid mutating the original)
   sortedItems: (facts) => [...facts.items].sort((a, b) => a.name.localeCompare(b.name)),
 }
 ```
@@ -262,6 +280,7 @@ derive: {
 
 ```typescript
 derive: {
+  // Combine multiple facts into a boolean check
   canCheckout: (facts) =>
     facts.cart.length > 0 &&
     facts.user !== null &&
@@ -273,9 +292,14 @@ derive: {
 
 ```typescript
 derive: {
+  // Base: filter active users
   activeUsers: (facts) => facts.users.filter(u => u.active),
+
+  // Composed: filter admins from active users
   activeAdmins: (facts, derive) =>
     derive.activeUsers.filter(u => u.role === 'admin'),
+
+  // Composed: count from activeAdmins
   activeAdminCount: (facts, derive) => derive.activeAdmins.length,
 }
 ```
@@ -293,7 +317,7 @@ derive: {
   isReady: (facts) => facts.loaded && !facts.error, // boolean
 }
 
-// TypeScript knows the types
+// TypeScript infers the return types automatically
 const count: number = system.derive.count;
 const names: string[] = system.derive.names;
 ```
@@ -307,10 +331,10 @@ const names: string[] = system.derive.names;
 Derivations should be pure functions with no side effects:
 
 ```typescript
-// Good — pure computation
+// Good – pure computation
 fullName: (facts) => `${facts.firstName} ${facts.lastName}`
 
-// Bad — side effect in a derivation
+// Bad – side effect in a derivation
 fullName: (facts) => {
   console.log("Computing name");  // Don't do this
   return `${facts.firstName} ${facts.lastName}`;
@@ -325,11 +349,11 @@ Break complex derivations into smaller ones:
 
 ```typescript
 derive: {
-  // Good — composed, each piece is reusable
+  // Good – composed, each piece is reusable
   activeUsers: (facts) => facts.users.filter(u => u.active),
   activeAdmins: (facts, derive) => derive.activeUsers.filter(u => u.admin),
 
-  // Not as good — duplicated filter logic
+  // Not as good – duplicated filter logic
   activeAdmins: (facts) => facts.users.filter(u => u.active && u.admin),
 }
 ```
@@ -342,7 +366,7 @@ Derivations recompute whenever their dependencies change. For expensive operatio
 
 ## Next Steps
 
-- **[Facts](/docs/facts)** — The source data for derivations
-- **[Constraints](/docs/constraints)** — Use facts in rules (constraints don't access derivations)
-- **[Effects](/docs/effects)** — Side effects that run after stabilization
-- **[Events](/docs/events)** — Dispatch typed events to mutate facts
+- **[Facts](/docs/facts)** – The source data for derivations
+- **[Constraints](/docs/constraints)** – Use facts in rules (constraints don't access derivations)
+- **[Effects](/docs/effects)** – Side effects that run after stabilization
+- **[Events](/docs/events)** – Dispatch typed events to mutate facts

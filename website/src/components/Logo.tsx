@@ -4,13 +4,13 @@ function LogomarkPaths() {
       {/* Arrow chevron - represents direction/flow */}
       <path
         d="M6 8 L16 18 L6 28"
-        stroke="#38BDF8"
+        stroke="var(--brand-primary)"
         strokeWidth={3}
       />
       {/* Vertical constraint bar */}
       <path
         d="M24 8 L24 28"
-        stroke="#818CF8"
+        stroke="var(--brand-accent)"
         strokeWidth={3}
       />
     </g>

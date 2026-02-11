@@ -12,10 +12,13 @@ The devtools plugin exposes your system to the browser console via `window.__DIR
 ```typescript
 import { devtoolsPlugin } from 'directive/plugins';
 
+// Attaches your system to window.__DIRECTIVE__ for browser console access
 const system = createSystem({
   module: myModule,
   plugins: [devtoolsPlugin()],
 });
+
+system.start();
 ```
 
 When the system initializes, you'll see a styled console message:
@@ -32,8 +35,11 @@ The plugin accepts two options:
 
 ```typescript
 devtoolsPlugin({
-  name: 'my-app',  // Name for this system in devtools (default: "default")
-  trace: true,     // Enable event recording (default: false)
+  // Identify this system when multiple systems share the same page
+  name: 'my-app',
+
+  // Record timestamped events for every lifecycle hook (off by default for performance)
+  trace: true,
 })
 ```
 
@@ -59,6 +65,8 @@ Returns the system instance by name. If no name is provided, returns the first r
 ```javascript
 // Browser console
 const system = __DIRECTIVE__.getSystem('my-app');
+
+// You get back the real system instance –full API access
 system.read('count');        // Read a fact
 system.start();              // Start the engine
 ```
@@ -68,15 +76,17 @@ system.start();              // Start the engine
 Returns an array of all registered system names.
 
 ```javascript
+// List all systems registered on this page
 __DIRECTIVE__.getSystems();
 // ["my-app", "auth-module"]
 ```
 
 ### `__DIRECTIVE__.inspect(name?)`
 
-Returns the full inspection data for a system -- facts, derivations, constraints, requirements, and resolver status. If no name is provided, inspects the first registered system.
+Returns the full inspection data for a system –facts, derivations, constraints, requirements, and resolver status. If no name is provided, inspects the first registered system.
 
 ```javascript
+// Get a full snapshot of facts, derivations, constraints, and resolver status
 __DIRECTIVE__.inspect('my-app');
 // { facts: { count: 0 }, derivations: { doubled: 0 }, constraints: [...], ... }
 ```
@@ -86,6 +96,7 @@ __DIRECTIVE__.inspect('my-app');
 Returns the recorded event array for a system. Requires `trace: true` to have data.
 
 ```javascript
+// Retrieve the recorded event timeline (only populated when trace: true)
 __DIRECTIVE__.getEvents('my-app');
 // [{ timestamp: 1707300000000, type: "fact.set", data: { key: "count", value: 1, prev: 0 } }, ...]
 ```
@@ -131,19 +142,23 @@ Each event has the shape:
 Use the `name` option to distinguish systems when running more than one:
 
 ```typescript
+// Give each system a unique name so they don't collide in the devtools registry
 const auth = createSystem({
   module: authModule,
   plugins: [devtoolsPlugin({ name: 'auth' })],
 });
+auth.start();
 
+// Enable tracing only on the system you're actively debugging
 const dashboard = createSystem({
   module: dashboardModule,
   plugins: [devtoolsPlugin({ name: 'dashboard', trace: true })],
 });
+dashboard.start();
 ```
 
 ```javascript
-// Browser console
+// Browser console –both systems are accessible by name
 __DIRECTIVE__.getSystems();
 // ["auth", "dashboard"]
 
@@ -164,6 +179,7 @@ Strip devtools from production builds:
 ```typescript
 const plugins = [];
 
+// Devtools add a global object and event recording –exclude from production
 if (process.env.NODE_ENV === 'development') {
   plugins.push(devtoolsPlugin({ name: 'my-app', trace: true }));
 }
@@ -172,11 +188,13 @@ const system = createSystem({
   module: myModule,
   plugins,
 });
+
+system.start();
 ```
 
 ### SSR Safety
 
-The plugin is safe to use in server-side rendering. When `typeof window === "undefined"`, all devtools methods return no-op values -- no errors, no global mutations. You don't need to conditionally import it for SSR.
+The plugin is safe to use in server-side rendering. When `typeof window === "undefined"`, all devtools methods return no-op values –no errors, no global mutations. You don't need to conditionally import it for SSR.
 
 ---
 

@@ -35,7 +35,7 @@ const CopyButton = memo(function CopyButton({ code }: { code: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute right-2 top-2 rounded-md bg-white/5 px-2 py-1 text-xs text-slate-400 opacity-50 transition hover:bg-white/10 hover:text-slate-300 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+      className="absolute right-2 top-2 z-10 rounded-md bg-white/5 px-2 py-1 text-xs text-slate-400 opacity-50 transition hover:bg-white/10 hover:text-slate-300 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
       aria-label={copied ? 'Copied!' : 'Copy code'}
     >
       {copied ? (
@@ -67,7 +67,7 @@ export const Fence = memo(function Fence({
       <CopyButton code={code} />
       <Highlight
         code={code}
-        language={language}
+        language={language || 'text'}
         theme={{ plain: {}, styles: [] }}
       >
         {({ className, style, tokens, getTokenProps }) => (

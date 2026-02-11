@@ -4,7 +4,7 @@ import {
 	createBidirectionalStream,
 	pipeThrough,
 	mergeStreams,
-} from "../adapters/openai-agents-stream-channel.js";
+} from "../adapters/ai/stream-channel.js";
 
 describe("StreamChannel", () => {
 	it("should send and receive values", async () => {

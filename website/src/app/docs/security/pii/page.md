@@ -3,7 +3,7 @@ title: PII Detection
 description: Detect and redact personally identifiable information in AI agent inputs and outputs.
 ---
 
-Detect SSNs, credit cards, emails, phone numbers, and more -- then block, redact, or mask them before they reach your AI agents. {% .lead %}
+Detect SSNs, credit cards, emails, phone numbers, and more – then block, redact, or mask them before they reach your AI agents. {% .lead %}
 
 ---
 
@@ -12,6 +12,7 @@ Detect SSNs, credit cards, emails, phone numbers, and more -- then block, redact
 ```typescript
 import { createEnhancedPIIGuardrail } from 'directive';
 
+// Define which PII types to scan for and how to handle matches
 const piiGuardrail = createEnhancedPIIGuardrail({
   types: ['ssn', 'credit_card', 'email'],
   redact: true,
@@ -24,8 +25,10 @@ Use with an orchestrator:
 ```typescript
 import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
 
+// Connect to OpenAI (or any compatible provider)
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
+// Attach the PII guardrail to the orchestrator's input pipeline
 const orchestrator = createAgentOrchestrator({
   runner,
   guardrails: {
@@ -60,14 +63,21 @@ const orchestrator = createAgentOrchestrator({
 
 ```typescript
 const guardrail = createEnhancedPIIGuardrail({
+  // What to look for
   types: ['ssn', 'credit_card', 'email', 'phone'],
   detector: 'regex',         // 'regex' or a custom PIIDetector
+
+  // How to handle matches
   redact: true,              // redact instead of blocking
   redactionStyle: 'typed',   // 'typed' | 'masked' | 'hash'
+
+  // Tuning and thresholds
   minConfidence: 0.7,        // confidence threshold (0-1)
   allowlist: ['test@example.com'],  // values to skip
   minItemsToBlock: 1,        // minimum PII items to trigger
   detectorTimeout: 5000,     // timeout for custom detectors (ms)
+
+  // Called whenever PII is found, useful for metrics
   onDetected: (items) => {
     console.log(`Found ${items.length} PII items`);
   },
@@ -92,6 +102,7 @@ Scan agent outputs for PII leakage:
 import { createOutputPIIGuardrail } from 'directive';
 import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
 
+// Scan agent responses for accidentally leaked PII
 const outputGuardrail = createOutputPIIGuardrail({
   types: ['ssn', 'credit_card'],
   redact: true,
@@ -99,6 +110,7 @@ const outputGuardrail = createOutputPIIGuardrail({
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
+// Output guardrails run after the agent responds, before the user sees it
 const orchestrator = createAgentOrchestrator({
   runner,
   guardrails: {
@@ -116,7 +128,7 @@ Use PII detection outside of guardrails:
 ```typescript
 import { detectPII, redactPII } from 'directive';
 
-// Detect PII in text
+// Step 1: Scan text for PII matches
 const result = await detectPII('My SSN is 123-45-6789', {
   types: ['ssn', 'email'],
   minConfidence: 0.7,
@@ -125,7 +137,7 @@ const result = await detectPII('My SSN is 123-45-6789', {
 console.log(result.detected);  // true
 console.log(result.items);     // [{ type: 'ssn', value: '123-45-6789', confidence: 0.95, ... }]
 
-// Redact PII from text
+// Step 2: Replace detected items with type-safe placeholders
 const redacted = redactPII(
   'My SSN is 123-45-6789',
   result.items,
@@ -141,13 +153,17 @@ console.log(redacted); // 'My SSN is [SSN]'
 Plug in an external detection service (like Microsoft Presidio):
 
 ```typescript
+// Wrap an external PII detection service as a Directive detector
 const customDetector = {
   name: 'presidio',
   detect: async (text, types) => {
+    // Send text to your Presidio (or similar) endpoint
     const response = await fetch('https://presidio.internal/analyze', {
       method: 'POST',
       body: JSON.stringify({ text, entities: types }),
     });
+
+    // Map the external format to Directive's expected shape
     const results = await response.json();
     return results.map(r => ({
       type: r.entity_type,
@@ -158,6 +174,7 @@ const customDetector = {
   },
 };
 
+// Plug the custom detector into the guardrail
 const guardrail = createEnhancedPIIGuardrail({
   detector: customDetector,
   detectorTimeout: 5000, // timeout prevents DoS from slow services
@@ -173,8 +190,9 @@ For basic use with the orchestrator, a simpler guardrail is available:
 ```typescript
 import { createPIIGuardrail } from 'directive/ai';
 
+// Lightweight alternative using raw regex patterns (no detection pipeline)
 const guardrail = createPIIGuardrail({
-  patterns: [/\b\d{3}-\d{2}-\d{4}\b/, /\b\d{16}\b/],
+  patterns: [/\b\d{3}-\d{2}-\d{4}\b/, /\b\d{16}\b/], // SSN and 16-digit card formats
   redact: true,
   redactReplacement: '[REDACTED]',
 });
@@ -186,6 +204,6 @@ This version uses regex patterns directly without the full detection pipeline.
 
 ## Next Steps
 
-- [Prompt Injection](/docs/security/prompt-injection) -- block injection attacks
-- [Audit Trail](/docs/security/audit) -- audit logging with PII masking
-- [Compliance](/docs/security/compliance) -- GDPR/CCPA data subject rights
+- [Prompt Injection](/docs/security/prompt-injection) – block injection attacks
+- [Audit Trail](/docs/security/audit) – audit logging with PII masking
+- [Compliance](/docs/security/compliance) – GDPR/CCPA data subject rights

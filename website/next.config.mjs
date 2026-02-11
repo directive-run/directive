@@ -6,6 +6,21 @@ import withSearch from './src/markdoc/search.mjs'
 const nextConfig = {
   pageExtensions: ['js', 'jsx', 'md', 'ts', 'tsx'],
 
+  async redirects() {
+    return [
+      {
+        source: '/articles',
+        destination: '/blog',
+        permanent: true,
+      },
+      {
+        source: '/articles/:slug',
+        destination: '/blog/:slug',
+        permanent: true,
+      },
+    ]
+  },
+
   async headers() {
     return [
       {

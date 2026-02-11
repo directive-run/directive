@@ -37,7 +37,7 @@
  * ```
  */
 
-import type { GuardrailFn, InputGuardrailData, GuardrailResult } from "../openai-agents.js";
+import type { GuardrailFn, InputGuardrailData, GuardrailResult } from "../ai/index.js";
 
 // ============================================================================
 // Types

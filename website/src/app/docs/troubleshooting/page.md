@@ -17,12 +17,15 @@ Solutions to common problems you might encounter when using Directive. {% .lead 
 
 1. **Check the condition logic**:
 ```typescript
-// Debug: log the condition result
 constraints: {
   needsUser: {
     when: (facts) => {
+      // Temporarily log to see why the constraint isn't activating
       const result = facts.userId > 0 && !facts.user;
-      console.log('needsUser condition:', result, { userId: facts.userId, user: facts.user });
+      console.log('needsUser condition:', result, {
+        userId: facts.userId,
+        user: facts.user,
+      });
       return result;
     },
     require: { type: "FETCH_USER" },
@@ -32,15 +35,15 @@ constraints: {
 
 2. **Check priority conflicts**:
 ```typescript
-// Higher priority constraints run first
 constraints: {
   critical: {
-    priority: 100,  // Runs first
+    priority: 100,  // Higher number = evaluated first
     when: (facts) => true,
     require: { type: "CRITICAL_ACTION" },
   },
+
   normal: {
-    priority: 50,  // May be blocked
+    priority: 50,  // Lower priority – may be blocked by the critical constraint
     when: (facts) => true,
     require: { type: "NORMAL_ACTION" },
   },
@@ -49,11 +52,13 @@ constraints: {
 
 3. **Requirement already resolved**:
 ```typescript
-// Check if resolver is deduping
 resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
-    key: (req) => `fetch-${req.payload?.id}`, // Unique key prevents deduping
+
+    // A unique key per payload ensures each request runs independently
+    key: (req) => `fetch-${req.payload?.id}`,
+
     resolve: async (req, context) => { /* ... */ },
   },
 },
@@ -68,10 +73,10 @@ resolvers: {
 **Solution**: Update facts to break the condition:
 
 ```typescript
-// Bad: constraint keeps firing
+// BAD: constraint keeps firing because shouldLoad is never cleared
 constraints: {
   loadData: {
-    when: (facts) => facts.shouldLoad,  // Never becomes false
+    when: (facts) => facts.shouldLoad,
     require: { type: "LOAD_DATA" },
   },
 },
@@ -81,17 +86,17 @@ resolvers: {
     resolve: async (req, context) => {
       const data = await fetchData();
       context.facts.data = data;
-      // Forgot to set shouldLoad = false!
+      // Forgot to set shouldLoad = false – infinite loop!
     },
   },
 },
 
-// Good: break the condition
+// GOOD: clear the flag first to break the constraint cycle
 resolvers: {
   loadData: {
     requirement: "LOAD_DATA",
     resolve: async (req, context) => {
-      context.facts.shouldLoad = false;  // Break the condition first
+      context.facts.shouldLoad = false;  // Disarm the constraint immediately
       const data = await fetchData();
       context.facts.data = data;
     },
@@ -113,13 +118,15 @@ resolvers: {
 resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
-    retry: { attempts: 3, backoff: "exponential" },
+    retry: { attempts: 3, backoff: "exponential" },  // Retry up to 3 times
+
     resolve: async (req, context) => {
       try {
         context.facts.user = await api.getUser(context.facts.userId);
       } catch (error) {
+        // Store the error in facts so the UI can display it
         context.facts.error = error instanceof Error ? error.message : 'Unknown error';
-        // Don't re-throw - the error is handled
+        // Don't re-throw – swallowing the error marks it as handled
       }
     },
   },
@@ -129,16 +136,19 @@ resolvers: {
 Or use the error boundary configuration:
 
 ```typescript
+// Centralized error handling – catches errors from any resolver or constraint
 const system = createSystem({
   module: myModule,
   errorBoundary: {
     onResolverError: (error, resolver) => {
       console.error('Resolver error:', error, resolver);
-      // Report to error tracking service
     },
+
     onConstraintError: (error, constraint) => {
       console.error('Constraint error:', error, constraint);
     },
+
+    // Catch-all for anything else
     onError: (error) => {
       console.error('System error:', error);
     },
@@ -154,16 +164,16 @@ const system = createSystem({
 
 1. **Not using context.facts**:
 ```typescript
-// Bad: modifying wrong object
+// BAD: mutating a local variable has no effect on the store
 resolve: async (req, context) => {
   const facts = context.facts;
-  facts.user = await api.getUser(); // This works
+  facts.user = await api.getUser(); // This works – writing through the proxy
 
   const user = await api.getUser();
-  user.name = "John"; // This doesn't update facts!
+  user.name = "John"; // This does NOT update facts – it's a detached object
 },
 
-// Good: assign to context.facts directly
+// GOOD: always assign through context.facts to trigger reactivity
 resolve: async (req, context) => {
   context.facts.user = await api.getUser();
 },
@@ -171,10 +181,10 @@ resolve: async (req, context) => {
 
 2. **Mutating nested objects**:
 ```typescript
-// Bad: mutation isn't tracked
+// BAD: nested mutation bypasses the proxy – no listeners fire
 context.facts.user.name = "John";
 
-// Good: replace the entire object
+// GOOD: replace the entire object so the proxy detects the change
 context.facts.user = { ...context.facts.user, name: "John" };
 ```
 
@@ -188,7 +198,8 @@ context.facts.user = { ...context.facts.user, name: "John" };
 resolvers: {
   fetchLargeData: {
     requirement: "FETCH_LARGE_DATA",
-    timeout: 30000, // 30 seconds
+    timeout: 30000,  // Extend from the default to allow 30 seconds
+
     resolve: async (req, context) => {
       // Long-running operation
     },
@@ -207,13 +218,13 @@ resolvers: {
 **Cause**: Derivation isn't reading from facts correctly.
 
 ```typescript
-// Bad: value captured at definition time
+// BAD: closes over a constant – never recomputes when state changes
 const userId = 123;
 derive: {
   userDisplay: () => `User ${userId}`,  // Always shows "User 123"
 },
 
-// Good: read from facts
+// GOOD: read from facts so the derivation tracks the dependency
 derive: {
   userDisplay: (facts) => `User ${facts.userId}`,
 },
@@ -226,13 +237,13 @@ derive: {
 **Cause**: Derivation A depends on B, B depends on A.
 
 ```typescript
-// Bad: circular dependency
+// BAD: a reads b, and b reads a – stack overflow
 derive: {
   a: (facts, derive) => derive.b + 1,
   b: (facts, derive) => derive.a + 1,  // Circular!
 },
 
-// Good: break the cycle
+// GOOD: root at least one derivation in facts to break the cycle
 derive: {
   a: (facts) => facts.value + 1,
   b: (facts, derive) => derive.a + 1,
@@ -250,12 +261,12 @@ derive: {
 **Cause**: The system reference passed to the hook is undefined or not yet created.
 
 ```tsx
-// Bad: system not created or not imported
+// BAD: passing undefined instead of a system crashes at runtime
 function UserProfile() {
   const name = useFact(undefined, "name");  // Error!
 }
 
-// Good: pass a valid system reference
+// GOOD: import and pass a valid system reference
 import { system } from './system';
 
 function UserProfile() {
@@ -271,24 +282,24 @@ function UserProfile() {
 
 1. **Subscribing too broadly**:
 ```tsx
-// Bad: subscribing to the whole user fact when you only need the name
+// BAD: any change to the user object triggers a re-render
 const user = useFact(system, "user");
 
-// Good: use useFact with a selector to select only what you need
+// GOOD: selector narrows the subscription to just the name property
 const userName = useFact(system, "user", (u) => u?.name);
 ```
 
 2. **Reading from stale closure**:
 ```tsx
-// Bad: stale closure
+// BAD: empty deps array captures the initial count forever
 useEffect(() => {
   const interval = setInterval(() => {
-    console.log(count); // Always logs initial value
+    console.log(count); // Always logs the initial value
   }, 1000);
   return () => clearInterval(interval);
 }, []);
 
-// Good: read from facts via hook
+// GOOD: let the hook manage the subscription – always fresh
 const count = useFact(system, "count");
 ```
 
@@ -301,12 +312,13 @@ const count = useFact(system, "count");
 **Symptoms**: TypeScript error when setting facts.
 
 ```typescript
-// Error: Type 'string' is not assignable to type 'number'
-context.facts.userId = "123";
+// TypeScript catches the mismatch at compile time
+context.facts.userId = "123";  // Error: Type 'string' is not assignable to type 'number'
 
-// Fix: use correct type
+// Fix: assign the correct type directly
 context.facts.userId = 123;
-// Or parse the string
+
+// Or parse the string into a number first
 context.facts.userId = parseInt(userId, 10);
 ```
 
@@ -317,16 +329,16 @@ context.facts.userId = parseInt(userId, 10);
 **Cause**: Typo or missing schema definition.
 
 ```typescript
-// Check your schema
+// The schema defines the exact property names TypeScript will enforce
 schema: {
   facts: {
-    userId: t.number(),  // Note: userId, not user_id
+    userId: t.number(),  // camelCase – this is the canonical name
   },
 },
 
-// Access with correct name
-context.facts.userId  // Correct
-context.facts.user_id // Error: property does not exist
+// Access must match the schema key exactly
+context.facts.userId   // Correct
+context.facts.user_id  // Error: property does not exist
 ```
 
 ---
@@ -354,11 +366,9 @@ yarn add directive
 **Solution**: Ensure you're importing from subpaths:
 
 ```typescript
-// Good: tree-shakeable imports
+// Import from subpaths so the bundler can tree-shake unused exports
 import { createModule, createSystem } from 'directive';
 import { loggingPlugin } from 'directive/plugins';
-
-// Also good
 import { useFact } from 'directive/react';
 ```
 
@@ -368,9 +378,10 @@ import { useFact } from 'directive/react';
 
 1. **Enable debug mode**:
 ```typescript
+// Time-travel mode records every state transition for inspection
 const system = createSystem({
   module: myModule,
-  debug: { timeTravel: true },  // Enables verbose logging
+  debug: { timeTravel: true },
 });
 ```
 
@@ -378,6 +389,7 @@ const system = createSystem({
 ```typescript
 import { devtoolsPlugin } from 'directive/plugins';
 
+// DevTools shows live constraint evaluations, resolver activity, and facts
 const system = createSystem({
   module: myModule,
   plugins: [devtoolsPlugin()],

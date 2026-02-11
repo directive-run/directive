@@ -19,7 +19,7 @@
  * ```
  */
 
-import type { GuardrailFn, InputGuardrailData, OutputGuardrailData, GuardrailResult } from "../openai-agents.js";
+import type { GuardrailFn, InputGuardrailData, OutputGuardrailData, GuardrailResult } from "../ai/index.js";
 
 // ============================================================================
 // PII Types

@@ -15,13 +15,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
 	createAgentStack,
 	type AgentStackConfig,
-} from "../adapters/openai-agents-stack.js";
-import type { AgentLike, AgentRunner, RunResult } from "../adapters/openai-agents.js";
-import type { AgentRegistry } from "../adapters/openai-agents-multi.js";
+} from "../adapters/ai/stack.js";
+import type { AgentLike, AgentRunner, RunResult } from "../adapters/ai/index.js";
+import type { AgentRegistry } from "../adapters/ai/multi.js";
 import { createCircuitBreaker } from "../adapters/plugins/circuit-breaker.js";
 import { createObservability } from "../adapters/plugins/observability.js";
 import { createSemanticCache, createTestEmbedder } from "../adapters/guardrails/semantic-cache.js";
-import { createMessageBus } from "../adapters/openai-agents-communication.js";
+import { createMessageBus } from "../adapters/ai/communication.js";
 
 // ============================================================================
 // Helpers

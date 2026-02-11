@@ -12,11 +12,13 @@ Maintain an immutable, tamper-evident audit trail of every operation in your sys
 ```typescript
 import { createAuditTrail } from 'directive/ai';
 
+// Create a hash-chained audit trail with size and time limits
 const audit = createAuditTrail({
   maxEntries: 10000,
   retentionMs: 7 * 24 * 60 * 60 * 1000, // 7 days
 });
 
+// Attach as a plugin to automatically log all system operations
 const system = createSystem({
   module: myModule,
   plugins: [audit.createPlugin()],
@@ -46,16 +48,21 @@ The plugin automatically records fact changes, requirement lifecycle, resolver o
 
 ```typescript
 const audit = createAuditTrail({
+  // Storage limits
   maxEntries: 10000,          // Max entries before FIFO eviction
   retentionMs: 7 * 24 * 60 * 60 * 1000, // Retention period
-  exportInterval: 60000,      // Export flush interval (ms)
-  sessionId: 'session-abc',   // Correlate entries to a session
-  actorId: 'user-123',        // Identify the actor
 
+  // External shipping (e.g., to a SIEM like Splunk or Datadog)
+  exportInterval: 60000,      // Export flush interval (ms)
   exporter: async (entries) => {
     await sendToSIEM(entries);
   },
 
+  // Identity context attached to every entry
+  sessionId: 'session-abc',   // Correlate entries to a session
+  actorId: 'user-123',        // Identify the actor
+
+  // Lifecycle callbacks for monitoring the audit system itself
   events: {
     onEntryAdded: (entry) => console.log('Audit:', entry.eventType),
     onChainBroken: (result) => alertOps('Chain integrity broken!'),
@@ -69,12 +76,12 @@ const audit = createAuditTrail({
 | `maxEntries` | `number` | `10000` | Max entries before oldest are evicted |
 | `retentionMs` | `number` | `7 days` | Retention period for entries |
 | `exportInterval` | `number` | `60000` | How often to flush to exporter (ms) |
-| `exporter` | `(entries) => Promise<void>` | — | Async function to ship entries externally |
-| `piiMasking` | `PIIMaskingConfig` | — | PII detection and redaction config |
-| `signing` | `SigningConfig` | — | Cryptographic signing for non-repudiation |
-| `sessionId` | `string` | — | Session ID attached to all entries |
-| `actorId` | `string` | — | Actor ID attached to all entries |
-| `events` | `object` | — | Callbacks for entry, chain, and export events |
+| `exporter` | `(entries) => Promise<void>` | – | Async function to ship entries externally |
+| `piiMasking` | `PIIMaskingConfig` | – | PII detection and redaction config |
+| `signing` | `SigningConfig` | – | Cryptographic signing for non-repudiation |
+| `sessionId` | `string` | – | Session ID attached to all entries |
+| `actorId` | `string` | – | Actor ID attached to all entries |
+| `events` | `object` | – | Callbacks for entry, chain, and export events |
 
 ---
 
@@ -84,11 +91,12 @@ Automatically detect and redact PII in audit payloads:
 
 ```typescript
 const audit = createAuditTrail({
+  // Scan audit payloads for PII before storing them
   piiMasking: {
     enabled: true,
     types: ['ssn', 'credit_card', 'email', 'phone'],
     redactionStyle: 'typed', // '[SSN]', '[CREDIT_CARD]', etc.
-    minConfidence: 0.7,
+    minConfidence: 0.7,      // only redact high-confidence matches
   },
 });
 ```
@@ -103,11 +111,12 @@ Sign entries for non-repudiation:
 
 ```typescript
 const audit = createAuditTrail({
+  // Cryptographic signing for non-repudiation (proves who wrote each entry)
   signing: {
     signFn: async (hash) => {
-      // Sign the hash with your private key
       return await crypto.sign(hash, privateKey);
     },
+
     verifyFn: async (hash, signature) => {
       return await crypto.verify(hash, signature, publicKey);
     },
@@ -124,11 +133,13 @@ When signing is configured, each entry includes a `signature` field containing t
 Every entry links to the previous via SHA-256 hashes, forming a tamper-evident chain:
 
 ```typescript
+// Verify that no entries have been tampered with since creation
 const result = await audit.verifyChain();
 
 console.log(result.valid);            // true if chain is intact
 console.log(result.entriesVerified);  // number of entries checked
 
+// If tampered, pinpoints exactly where the chain broke
 if (!result.valid) {
   console.log(result.brokenAt);
   // { index: 42, entryId: 'abc', expectedHash: '...', actualHash: '...' }
@@ -140,17 +151,17 @@ if (!result.valid) {
 ## Querying Entries
 
 ```typescript
-// Get all entries
+// Retrieve the full audit log
 const all = audit.getEntries();
 
-// Filter by event type and time range
+// Find errors from the last hour (useful for incident investigation)
 const recent = audit.getEntries({
   eventTypes: ['resolver.error', 'error.occurred'],
   since: Date.now() - 3600000, // last hour
   limit: 50,
 });
 
-// Filter by actor
+// Trace all actions by a specific user in a specific session
 const userActions = audit.getEntries({
   actorId: 'user-123',
   sessionId: 'session-abc',
@@ -164,6 +175,7 @@ const userActions = audit.getEntries({
 Add custom audit entries:
 
 ```typescript
+// Record custom events alongside the automatic system entries
 await audit.addEntry('agent.run.start', {
   agentName: 'researcher',
   input: 'Find recent papers on AI safety',
@@ -175,11 +187,12 @@ await audit.addEntry('agent.run.start', {
 ## Statistics
 
 ```typescript
+// Get a summary of audit trail health and usage
 const stats = audit.getStats();
 
 console.log(stats.totalEntries);    // 1523
 console.log(stats.byEventType);    // { 'fact.set': 890, 'resolver.complete': 312, ... }
-console.log(stats.chainIntegrity); // true
+console.log(stats.chainIntegrity); // true (no tampering detected)
 console.log(stats.entriesPruned);  // 0
 console.log(stats.entriesExported); // 1200
 ```
@@ -189,11 +202,11 @@ console.log(stats.entriesExported); // 1200
 ## Cleanup
 
 ```typescript
-// Prune entries older than retentionMs
+// Remove entries that have exceeded their retention period
 const pruned = audit.prune();
 console.log(`Pruned ${pruned} entries`);
 
-// Dispose (clears timers, flushes pending exports)
+// Shut down gracefully (flushes pending exports, clears timers)
 await audit.dispose();
 ```
 
@@ -201,6 +214,6 @@ await audit.dispose();
 
 ## Next Steps
 
-- [PII Detection](/docs/security/pii) -- detect and redact sensitive data
-- [Compliance](/docs/security/compliance) -- GDPR/CCPA data subject rights
-- [Guardrails](/docs/ai/guardrails) -- AI safety guardrails
+- [PII Detection](/docs/security/pii) –detect and redact sensitive data
+- [Compliance](/docs/security/compliance) –GDPR/CCPA data subject rights
+- [Guardrails](/docs/ai/guardrails) –AI safety guardrails

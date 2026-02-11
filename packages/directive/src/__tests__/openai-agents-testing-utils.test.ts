@@ -15,14 +15,14 @@ import {
 	createConstraintRecorder,
 	createTimeController,
 	assertOrchestratorState,
-} from "../adapters/openai-agents-testing.js";
+} from "../adapters/ai/testing.js";
 import type {
 	GuardrailFn,
 	InputGuardrailData,
 	AgentLike,
 	AgentOrchestrator,
 	OrchestratorState,
-} from "../adapters/openai-agents.js";
+} from "../adapters/ai/index.js";
 
 // ============================================================================
 // Helpers

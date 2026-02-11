@@ -16,11 +16,16 @@ const system = createSystem({
   module: myModule,
   plugins: [
     persistencePlugin({
+      // Where to store the data (any Storage-compatible backend)
       storage: localStorage,
+
+      // The key used for getItem/setItem – pick something unique per app
       key: 'my-app-state',
     }),
   ],
 });
+
+system.start();
 ```
 
 Both `storage` and `key` are required. On init the plugin reads from `storage.getItem(key)`, parses the JSON, and restores matching facts. On every subsequent fact change it debounces a save back to `storage.setItem(key, ...)`.
@@ -31,14 +36,14 @@ Both `storage` and `key` are required. On init the plugin reads from `storage.ge
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `storage` | `Storage` | — (required) | Storage backend. Must implement `getItem`, `setItem`, and `removeItem`. |
-| `key` | `string` | — (required) | The key used to read and write in the storage backend. |
+| `storage` | `Storage` | – (required) | Storage backend. Must implement `getItem`, `setItem`, and `removeItem`. |
+| `key` | `string` | – (required) | The key used to read and write in the storage backend. |
 | `include` | `string[]` | all keys | Only persist these fact keys. |
 | `exclude` | `string[]` | `[]` | Exclude these fact keys from persistence. |
 | `debounce` | `number` | `100` | Milliseconds to debounce saves. |
-| `onRestore` | `(data: Record<string, unknown>) => void` | — | Called after state is restored from storage. |
-| `onSave` | `(data: Record<string, unknown>) => void` | — | Called after state is saved to storage. |
-| `onError` | `(error: Error) => void` | — | Called on parse errors, storage failures, or security rejections. |
+| `onRestore` | `(data: Record<string, unknown>) => void` | – | Called after state is restored from storage. |
+| `onSave` | `(data: Record<string, unknown>) => void` | – | Called after state is saved to storage. |
+| `onError` | `(error: Error) => void` | – | Called on parse errors, storage failures, or security rejections. |
 
 ---
 
@@ -51,6 +56,7 @@ Any object implementing the `Storage` interface (`getItem`, `setItem`, `removeIt
 Persists across tabs and browser restarts:
 
 ```typescript
+// Data survives browser restarts and is shared across tabs
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
@@ -62,6 +68,7 @@ persistencePlugin({
 Cleared when the tab closes:
 
 ```typescript
+// Data lives only for this tab session – gone when the user closes the tab
 persistencePlugin({
   storage: sessionStorage,
   key: 'my-app',
@@ -73,6 +80,7 @@ persistencePlugin({
 Implement the three required methods to back persistence with any store:
 
 ```typescript
+// Wrap any data store with the three required Storage methods
 persistencePlugin({
   storage: {
     getItem: (key) => redis.get(key),
@@ -93,6 +101,8 @@ Use `include` to persist only specific keys:
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
+
+  // Allowlist: only these facts are saved – everything else is ignored
   include: ['user', 'preferences', 'cart'],
 })
 ```
@@ -103,6 +113,8 @@ Or use `exclude` to skip sensitive or transient data:
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
+
+  // Blocklist: persist everything except secrets and ephemeral state
   exclude: ['token', 'tempData'],
 })
 ```
@@ -119,6 +131,8 @@ Saves are debounced to avoid hammering storage on rapid updates. The default is 
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
+
+  // Increase the debounce window to reduce write frequency on busy systems
   debounce: 500, // wait 500ms after the last change
 })
 ```
@@ -137,6 +151,8 @@ Called once during init after facts are restored from storage. Receives the pars
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
+
+  // Fires once during init after saved facts are loaded back into the store
   onRestore: (data) => {
     console.log('Restored state:', Object.keys(data));
   },
@@ -151,6 +167,8 @@ Called after every successful save. Receives the data object that was written:
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
+
+  // Fires after each debounced write completes successfully
   onSave: (data) => {
     console.log('Saved', Object.keys(data).length, 'keys');
   },
@@ -165,6 +183,8 @@ Called on JSON parse failures, storage quota errors, or security rejections. Wit
 persistencePlugin({
   storage: localStorage,
   key: 'my-app',
+
+  // Catches JSON parse failures, quota exceeded, or prototype pollution rejections
   onError: (error) => {
     console.error('Persistence error:', error.message);
   },
@@ -181,6 +201,6 @@ The plugin includes built-in prototype pollution protection. Before restoring an
 
 ## Next Steps
 
-- [Logging Plugin](/docs/plugins/logging) -- console logging for lifecycle events
-- [DevTools Plugin](/docs/plugins/devtools) -- browser integration
-- [Plugin Overview](/docs/plugins/overview) -- all built-in plugins
+- [Logging Plugin](/docs/plugins/logging) – console logging for lifecycle events
+- [DevTools Plugin](/docs/plugins/devtools) – browser integration
+- [Plugin Overview](/docs/plugins/overview) – all built-in plugins

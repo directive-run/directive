@@ -26,11 +26,13 @@ import { createSystem } from 'directive';
 import { DirectiveProvider } from 'directive/solid';
 import { userModule } from './modules/user';
 
+// Create and start the system
 const system = createSystem({ module: userModule });
 system.start();
 
 function App() {
   return (
+    // Provide the system to all child components
     <DirectiveProvider system={system}>
       <YourApp />
     </DirectiveProvider>
@@ -49,19 +51,19 @@ All hooks below must be called inside a `DirectiveProvider`.
 Read a single fact, multiple facts, or a selected slice of a fact. Returns a reactive `Accessor`:
 
 ```tsx
-// Single fact — signal updates when "userId" changes
+// Subscribe to a single fact – signal updates when "userId" changes
 const userId = useFact<number>("userId");
 // userId() => number | undefined
 
-// Multiple facts — signal updates when any listed fact changes
+// Subscribe to multiple facts at once
 const data = useFact<{ name: string; email: string }>(["name", "email"]);
 // data() => { name: string; email: string }
 
-// Selector — signal updates only when the selected value changes
+// Derive a value with a selector – only updates when the result changes
 const upperName = useFact("user", (user) => user?.name?.toUpperCase() ?? "GUEST");
 // upperName() => string
 
-// Selector with custom equality
+// Selector with custom equality to prevent unnecessary updates
 import { shallowEqual } from 'directive/solid';
 const ids = useFact("users", (users) => users?.map(u => u.id) ?? [], shallowEqual);
 ```
@@ -70,7 +72,10 @@ Usage in a component:
 
 ```tsx
 function UserProfile() {
+  // Subscribe to the userId
   const userId = useFact<number>("userId");
+
+  // Subscribe to the user object
   const user = useFact<User | null>("user");
 
   return (
@@ -82,42 +87,26 @@ function UserProfile() {
 }
 ```
 
-### useFacts
-
-Get direct access to the facts proxy for mutations. The returned object is **not** reactive -- use it in event handlers, not for rendering:
-
-```tsx
-function Controls() {
-  const facts = useFacts();
-
-  function increment() {
-    facts.count = (facts.count ?? 0) + 1;
-  }
-
-  return <button onClick={increment}>Increment</button>;
-}
-```
-
 ### useDerived
 
 Read a single derivation, multiple derivations, or a selected slice. Returns a reactive `Accessor`:
 
 ```tsx
-// Single derivation
+// Subscribe to a single derivation
 const displayName = useDerived<string>("displayName");
 // displayName() => string
 
-// Multiple derivations
+// Subscribe to multiple derivations at once
 const state = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
   ["isLoggedIn", "isAdmin"]
 );
 // state() => { isLoggedIn: boolean; isAdmin: boolean }
 
-// Selector — only updates when selected value changes
+// Derive a value with a selector – only updates when the count changes
 const itemCount = useDerived("stats", (stats) => stats.itemCount);
 // itemCount() => number
 
-// Selector with custom equality
+// Selector with custom equality to prevent unnecessary updates
 const sortedIds = useDerived("items", (items) => items.map(i => i.id), shallowEqual);
 ```
 
@@ -125,6 +114,7 @@ Usage in a component:
 
 ```tsx
 function Greeting() {
+  // Subscribe to the display name derivation
   const displayName = useDerived<string>("displayName");
   return <h1>Hello, {displayName()}!</h1>;
 }
@@ -136,6 +126,7 @@ Select across all facts (like Zustand's `useStore`):
 
 ```tsx
 function Summary() {
+  // Select and combine values from multiple facts with custom equality
   const summary = useSelector(
     (facts) => ({
       userName: facts.user?.name,
@@ -154,6 +145,7 @@ Get a typed reference to the system's event dispatchers:
 
 ```tsx
 function Counter() {
+  // Get typed event dispatchers for the module
   const events = useEvents();
 
   return (
@@ -173,6 +165,7 @@ Low-level event dispatch for untyped or system events:
 
 ```tsx
 function IncrementButton() {
+  // Get the low-level dispatch function
   const dispatch = useDispatch();
 
   return (
@@ -185,15 +178,15 @@ function IncrementButton() {
 
 ### useWatch
 
-Watch a derivation or fact for changes -- runs a callback as a side effect without creating a signal for rendering:
+Watch a derivation or fact for changes – runs a callback as a side effect without creating a signal for rendering:
 
 ```tsx
-// Watch a derivation
+// Watch a derivation for analytics tracking
 useWatch<number>("pageViews", (newValue, prevValue) => {
   analytics.track("pageViews", { from: prevValue, to: newValue });
 });
 
-// Watch a fact (use "fact" discriminator)
+// Watch a fact for tracking count changes
 useWatch("fact", "userId", (newValue, prevValue) => {
   analytics.track("userId_changed", { from: prevValue, to: newValue });
 });
@@ -205,6 +198,7 @@ Access the full system instance:
 
 ```tsx
 function DebugPanel() {
+  // Access the full system instance for advanced operations
   const system = useSystem();
 
   return (
@@ -224,6 +218,7 @@ Zero-config hook that creates a scoped system and subscribes to all facts and de
 import { useModule } from 'directive/solid';
 
 function Counter() {
+  // Get everything in one call – system, facts, derivations, and events
   const { system, facts, derived, events, dispatch } = useModule(counterModule);
 
   return (
@@ -245,6 +240,7 @@ Get system inspection data as a signal. Accepts an optional `{ throttleMs }` par
 
 ```tsx
 function Inspector() {
+  // Get reactive system inspection data
   const inspection = useInspect();
 
   return (
@@ -261,6 +257,7 @@ function Inspector() {
 With throttling:
 
 ```tsx
+// Throttle inspection updates to limit render frequency
 const inspection = useInspect({ throttleMs: 200 });
 ```
 
@@ -280,11 +277,11 @@ const inspection = useInspect({ throttleMs: 200 });
 Read constraint status reactively:
 
 ```tsx
-// All constraints
+// Get all constraints for the debug panel
 const constraints = useConstraintStatus();
 // constraints(): Array<{ id: string; active: boolean; priority: number }>
 
-// Single constraint
+// Check a specific constraint by ID
 const auth = useConstraintStatus("requireAuth");
 // auth(): { id: "requireAuth", active: true, priority: 50 } | null
 ```
@@ -295,6 +292,7 @@ Get a reactive explanation of why a requirement exists:
 
 ```tsx
 function RequirementDebug(props) {
+  // Get a detailed explanation of why a requirement was generated
   const explanation = useExplain(props.requirementId);
 
   return (
@@ -315,7 +313,10 @@ These hooks require passing a `statusPlugin` to `DirectiveProvider`:
 import { createRequirementStatusPlugin } from 'directive';
 import { DirectiveProvider, useRequirementStatus } from 'directive/solid';
 
+// Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
+
+// Pass the plugin when creating the system
 const system = createSystem({
   module: myModule,
   plugins: [statusPlugin.plugin],
@@ -338,7 +339,7 @@ Get full status for a single requirement type or multiple types:
 ```tsx
 import { Show } from 'solid-js';
 
-// Single requirement type
+// Track the loading state of a specific requirement type
 function UserLoader() {
   const status = useRequirementStatus("FETCH_USER");
 
@@ -351,7 +352,7 @@ function UserLoader() {
   );
 }
 
-// Multiple requirement types
+// Track multiple requirement types at once
 function DashboardLoader() {
   const statuses = useRequirementStatus(["FETCH_USER", "FETCH_SETTINGS"]);
   // statuses(): Record<string, RequirementTypeStatus>
@@ -366,12 +367,13 @@ function DashboardLoader() {
 
 ### useSuspenseRequirement
 
-Integrates with Solid's `Suspense` -- throws a promise while the requirement is pending:
+Integrates with Solid's `Suspense` – throws a promise while the requirement is pending:
 
 ```tsx
 import { Suspense } from 'solid-js';
 
 function UserProfile() {
+  // Suspends rendering until the requirement resolves
   useSuspenseRequirement("FETCH_USER");
   // Only renders after FETCH_USER resolves
   return <div>User loaded!</div>;
@@ -386,6 +388,7 @@ function Dashboard() {
 
 function App() {
   return (
+    // Show a fallback while the requirement is being resolved
     <Suspense fallback={<Spinner />}>
       <UserProfile />
     </Suspense>
@@ -399,15 +402,18 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```tsx
 function SaveButton() {
-  const facts = useFacts();
+  // Access the system's facts proxy
+  const { facts } = useSystem();
+
+  // Set up optimistic mutations with automatic rollback
   const { mutate, isPending, error, rollback } = useOptimisticUpdate(
-    statusPlugin,    // optional — enables auto-rollback on resolver failure
+    statusPlugin,    // optional – enables auto-rollback on resolver failure
     "SAVE_DATA"      // requirement type to watch
   );
 
   const handleSave = () => {
     mutate(() => {
-      // Optimistic update — applied immediately
+      // Optimistically update the UI before the server responds
       facts.savedAt = Date.now();
       facts.status = "saved";
     });
@@ -438,6 +444,7 @@ import { createDerivedSignal } from 'directive/solid';
 const system = createSystem({ module: myModule });
 system.start();
 
+// Create a derivation signal outside of components
 const [isRed, cleanup] = createDerivedSignal<boolean>(system, "isRed");
 
 // Use isRed() anywhere
@@ -455,6 +462,7 @@ import { createFactSignal } from 'directive/solid';
 const system = createSystem({ module: myModule });
 system.start();
 
+// Create a fact signal outside of components
 const [phase, cleanup] = createFactSignal<string>(system, "phase");
 
 console.log(phase());
@@ -466,16 +474,17 @@ cleanup();
 
 ## Scoped Systems
 
-### createDirective / useDirective
+### useDirective
 
 Create a system scoped to a reactive lifecycle. The system is automatically started and cleaned up:
 
 ```tsx
-import { createDirective, DirectiveProvider } from 'directive/solid';
+import { useDirective, DirectiveProvider } from 'directive/solid';
 import { counterModule } from './modules/counter';
 
 function Counter() {
-  const system = createDirective(counterModule);
+  // Create a scoped system tied to this component's lifecycle
+  const system = useDirective(counterModule);
 
   return (
     <DirectiveProvider system={system}>
@@ -492,18 +501,16 @@ The options parameter must be a stable reference (defined outside the component)
 import { counterModule } from './modules/counter';
 
 function Counter() {
-  const system = createDirective(counterModule);
+  const system = useDirective(counterModule);
   // ...
 }
 
 // INCORRECT: Inline options create a new system each time
 function Counter() {
-  const system = createDirective({ module: counterModule }); // Don't do this!
+  const system = useDirective({ module: counterModule }); // Don't do this!
   // ...
 }
 ```
-
-`useDirective` is an alias for `createDirective`.
 
 ---
 
@@ -514,11 +521,13 @@ Create fully typed hooks for your module schema:
 ```typescript
 import { createTypedHooks } from 'directive/solid';
 
+// Create typed hooks – full autocomplete for keys and events
 const {
   useDerived, useFact, useDispatch, useSystem, useEvents
 } = createTypedHooks<typeof myModule.schema>();
 
 function Profile() {
+  // Fully typed – fact key autocompletes, return type inferred
   const count = useFact("count");       // Type: Accessor<number>
   const doubled = useDerived("doubled"); // Type: Accessor<number>
   const dispatch = useDispatch();
@@ -540,6 +549,7 @@ import { useTimeTravel } from 'directive/solid';
 import { Show } from 'solid-js';
 
 function UndoControls() {
+  // Get reactive time-travel controls (null when disabled)
   const tt = useTimeTravel();
 
   return (
@@ -568,6 +578,7 @@ Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/ti
 import { Show } from 'solid-js';
 
 function UserCard() {
+  // Subscribe to loading, error, and user states
   const loading = useFact<boolean>("loading");
   const error = useFact<string | null>("error");
   const user = useFact<User | null>("user");
@@ -590,7 +601,10 @@ Write facts through the system directly:
 
 ```tsx
 function UserIdInput() {
+  // Access the full system for direct fact writes
   const system = useSystem();
+
+  // Subscribe to the current userId
   const userId = useFact<number>("userId");
 
   return (
@@ -624,6 +638,7 @@ import { userModule } from './modules/user';
 import { UserProfile } from './UserProfile';
 
 test('displays user name', async () => {
+  // Create a test system with mock data
   const system = createTestSystem({ module: userModule });
   system.facts.user = { id: 1, name: 'Test User' };
 
@@ -645,7 +660,6 @@ test('displays user name', async () => {
 |---|---|---|
 | `DirectiveProvider` | Component | Provides system context to child components |
 | `useFact` | Hook | Read single/multi facts or apply selector |
-| `useFacts` | Hook | Direct access to facts proxy for mutations |
 | `useDerived` | Hook | Read single/multi derivations or apply selector |
 | `useSelector` | Hook | Select across all facts |
 | `useEvents` | Hook | Typed event dispatchers |
@@ -659,8 +673,7 @@ test('displays user name', async () => {
 | `useRequirementStatus` | Hook | Single/multi requirement status |
 | `useSuspenseRequirement` | Hook | Suspense integration for requirements |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
-| `createDirective` | Hook | Scoped system tied to reactive lifecycle |
-| `useDirective` | Hook | Alias for `createDirective` |
+| `useDirective` | Hook | Scoped system tied to reactive lifecycle |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createDerivedSignal` | Factory | Create a derivation signal outside components |
 | `createFactSignal` | Factory | Create a fact signal outside components |
@@ -669,27 +682,8 @@ test('displays user name', async () => {
 
 ---
 
-## Deprecated
-
-The following hooks are deprecated but still work. They delegate to the consolidated API:
-
-| Deprecated | Use Instead |
-|---|---|
-| `useDeriveds(ids)` | `useDerived(ids)` |
-| `useFactSelector(key, fn)` | `useFact(key, fn)` |
-| `useDerivedSelector(key, fn)` | `useDerived(key, fn)` |
-| `useInspectThrottled(opts)` | `useInspect(opts)` |
-| `useRequirements()` | `useInspect()` |
-| `useRequirementsThrottled(opts)` | `useInspect(opts)` |
-| `useIsSettled()` | `useInspect().isSettled` |
-| `useIsResolving(type)` | `useRequirementStatus(type).isLoading` |
-| `useLatestError(type)` | `useRequirementStatus(type).lastError` |
-| `useRequirementStatuses()` | `useRequirementStatus(types)` |
-
----
-
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** -- Build your first module
-- **[Facts](/docs/facts)** -- State management deep dive
-- **[Testing](/docs/testing/overview)** -- Testing Solid components
+- **[Quick Start](/docs/quick-start)** – Build your first module
+- **[Facts](/docs/facts)** – State management deep dive
+- **[Testing](/docs/testing/overview)** – Testing Solid components

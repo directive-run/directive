@@ -3,7 +3,7 @@ title: Redux Bridge
 description: Replace thunks and sagas with constraint-driven orchestration while keeping your Redux store.
 ---
 
-Directive integrates directly into Redux as middleware, replacing thunks and sagas with constraint-driven async orchestration — without rewriting your reducers. {% .lead %}
+Directive integrates directly into Redux as middleware, replacing thunks and sagas with constraint-driven async orchestration – without rewriting your reducers. {% .lead %}
 
 Redux continues to own predictable state (reducers, actions, selectors). Directive takes over the messy parts: async side effects, cross-cutting constraints, and requirement resolution. The bridge syncs Redux state into Directive facts so constraints can evaluate against your store, and resolvers can dispatch actions back.
 
@@ -51,10 +51,13 @@ interface RootState {
 
 const directiveMiddleware = createDirectiveMiddleware<RootState>({
   constraints: {
+    // Fetch user profile when they log in
     fetchUserOnLogin: {
       when: (state) => state.auth.isLoggedIn && !state.user.data && !state.user.loading,
       require: { type: 'FETCH_USER' },
     },
+
+    // Load notifications once authenticated
     loadNotifications: {
       when: (state) => state.auth.isLoggedIn && state.notifications.items.length === 0,
       require: { type: 'FETCH_NOTIFICATIONS' },
@@ -66,19 +69,25 @@ const directiveMiddleware = createDirectiveMiddleware<RootState>({
     fetchUser: {
       requirement: (req): req is { type: 'FETCH_USER' } => req.type === 'FETCH_USER',
       resolve: async (req, { dispatch, getState, signal }) => {
+        // Read the auth token from Redux state
         const { token } = getState().auth;
+
+        // Fetch user data from the API
         const res = await fetch('/api/user', {
           headers: { Authorization: `Bearer ${token}` },
           signal,
         });
         const user = await res.json();
+
+        // Dispatch a Redux action to update the store
         dispatch({ type: 'user/setUser', payload: user });
       },
     },
+
     fetchNotifications: {
       requirement: (req): req is { type: 'FETCH_NOTIFICATIONS' } =>
         req.type === 'FETCH_NOTIFICATIONS',
-      key: () => 'notifications', // Dedupe concurrent calls
+      key: () => 'notifications', // Deduplicate concurrent calls
       resolve: async (req, { dispatch, signal }) => {
         const res = await fetch('/api/notifications', { signal });
         const items = await res.json();
@@ -90,6 +99,7 @@ const directiveMiddleware = createDirectiveMiddleware<RootState>({
   debug: true,
 });
 
+// Add Directive middleware to the Redux store
 const store = configureStore({
   reducer: rootReducer,
   middleware: (getDefault) => getDefault().concat(directiveMiddleware),
@@ -113,8 +123,8 @@ const store = configureStore({
 | `resolvers` | `Record<string, ReduxResolver<S>>` | `{}` | Resolvers that fulfill requirements |
 | `interceptors` | `ActionInterceptor<S>[]` | `[]` | Convert Redux actions into Directive requirements |
 | `syncActions` | `boolean \| ((action) => boolean)` | `false` | Sync dispatched actions to Directive facts |
-| `onRequirementCreated` | `(req: Requirement) => void` | — | Callback when a requirement is produced |
-| `onRequirementResolved` | `(req: Requirement) => void` | — | Callback when a requirement is fulfilled |
+| `onRequirementCreated` | `(req: Requirement) => void` | – | Callback when a requirement is produced |
+| `onRequirementResolved` | `(req: Requirement) => void` | – | Callback when a requirement is fulfilled |
 | `plugins` | `Plugin[]` | `[]` | Directive plugins (logging, persistence, etc.) |
 | `debug` | `boolean` | `false` | Enable time-travel debugging |
 
@@ -139,6 +149,7 @@ const store = configureStore({
             require: { type: 'FETCH_USER' },
           },
         },
+
         resolvers: {
           fetchUser: {
             requirement: (req): req is { type: 'FETCH_USER' } => req.type === 'FETCH_USER',
@@ -152,11 +163,11 @@ const store = configureStore({
     ),
 });
 
-// Access the Directive system from the store
+// Access the Directive system directly from the store
 const system = store.directive;
 console.log(system.inspect());
 
-// Wait for all requirements to settle (useful in tests)
+// Wait for all pending requirements to settle (useful in tests)
 await store.settleDirective();
 ```
 
@@ -177,21 +188,23 @@ Interceptors convert Redux actions into Directive requirements before (or instea
 const directiveMiddleware = createDirectiveMiddleware<RootState>({
   interceptors: [
     {
+      // Convert checkout actions into Directive requirements
       match: (action) => action.type === 'cart/checkout',
       toRequirement: (action, state) => ({
         type: 'PROCESS_CHECKOUT',
         items: state.cart.items,
         total: state.cart.total,
       }),
-      blockAction: true, // Don't pass to reducer, Directive owns this
+      blockAction: true, // Don't pass to reducer – Directive owns this flow
     },
     {
+      // Convert search actions but let the reducer update optimistically
       match: (action) => action.type === 'search/query',
       toRequirement: (action) => ({
         type: 'DEBOUNCED_SEARCH',
         query: action.payload,
       }),
-      blockAction: false, // Let reducer update optimistically
+      blockAction: false, // Let reducer update the UI immediately
     },
   ],
 
@@ -200,8 +213,13 @@ const directiveMiddleware = createDirectiveMiddleware<RootState>({
       requirement: (req): req is { type: 'PROCESS_CHECKOUT'; items: any[]; total: number } =>
         req.type === 'PROCESS_CHECKOUT',
       resolve: async (req, { dispatch, signal }) => {
+        // Signal that checkout is in progress
         dispatch({ type: 'cart/setProcessing', payload: true });
+
+        // Process the order
         const order = await api.checkout(req.items, req.total, signal);
+
+        // Update with the completed order
         dispatch({ type: 'cart/checkoutComplete', payload: order });
       },
     },
@@ -230,24 +248,25 @@ import { bindReduxToDirective } from 'directive/redux';
 const directiveSystem = createSystem({ module: myModule });
 const reduxStore = createStore(rootReducer);
 
+// Create a two-way sync between Redux and Directive
 const { sync, unsync } = bindReduxToDirective(reduxStore, directiveSystem, {
-  // Redux state -> Directive facts
+  // Map Redux state to Directive facts
   toFacts: (state) => ({
     userId: state.user?.id,
     isLoggedIn: state.auth.isLoggedIn,
     cartTotal: state.cart.total,
   }),
 
-  // Directive facts -> Redux actions (optional)
+  // Map Directive facts back to Redux actions
   fromFacts: (facts) => ({
     action: { type: 'directive/sync', payload: { isLoggedIn: facts.isLoggedIn } },
   }),
 
-  // Only watch these fact keys for Directive -> Redux sync
+  // Only watch these Directive facts for reverse sync
   watchFacts: ['isLoggedIn', 'cartTotal'],
 });
 
-// Start synchronization
+// Start two-way synchronization
 sync();
 
 // Later, tear down
@@ -268,6 +287,7 @@ import { createDirectiveDevToolsEnhancer } from 'directive/redux';
 
 const directiveSystem = createSystem({ module: myModule });
 
+// Pipe Directive state changes into Redux DevTools
 const store = configureStore({
   reducer: rootReducer,
   enhancers: (getDefault) =>
@@ -288,19 +308,18 @@ Dispatch Directive events and requirements through Redux:
 ```typescript
 import { directiveEvent, directiveRequire, isDirectiveAction } from 'directive/redux';
 
-// Dispatch a Directive event via Redux
+// Dispatch a Directive event through the Redux action stream
 store.dispatch(directiveEvent({ type: 'USER_ACTION', data: { clicked: true } }));
 
-// Inject a requirement via Redux
+// Inject a Directive requirement through Redux
 store.dispatch(directiveRequire({ type: 'FETCH_USER', userId: 42 }));
 
-// Type guard in reducers or middleware
+// Type guard for filtering Directive actions in reducers
 function myReducer(state, action) {
   if (isDirectiveAction(action)) {
-    // action is DirectiveEventAction | DirectiveRequireAction
-    return state; // Let Directive handle it
+    return state; // Let Directive handle it – don't reduce
   }
-  // ...
+  // ... normal reducer logic
 }
 ```
 
@@ -308,7 +327,7 @@ function myReducer(state, action) {
 |----------|-------------|-------------|
 | `directiveEvent(event)` | `@@directive/EVENT` | Dispatch a Directive system event |
 | `directiveRequire(requirement)` | `@@directive/REQUIRE` | Inject a requirement into Directive |
-| `isDirectiveAction(action)` | -- | Type guard for either Directive action |
+| `isDirectiveAction(action)` | – | Type guard for either Directive action |
 
 ### Selectors
 
@@ -317,11 +336,11 @@ Read Directive derivations inside Redux selectors and React components:
 ```typescript
 import { createDirectiveSelector } from 'directive/redux';
 
-// Store must have DirectiveStoreExtension (use createDirectiveEnhancer)
+// Create selectors that read Directive derivations from the enhanced store
 const selectIsLoading = createDirectiveSelector<RootState, boolean>(store, 'isLoading');
 const selectUserStatus = createDirectiveSelector<RootState, string>(store, 'userStatus');
 
-// In a React component
+// Use in React components with useSelector
 const isLoading = useSelector(selectIsLoading);
 ```
 
@@ -336,11 +355,13 @@ import {
   createActionInterceptor,
 } from 'directive/redux';
 
+// Type-safe constraint definition (reusable across stores)
 const myConstraint = createReduxConstraint<RootState>({
   when: (state) => state.auth.isLoggedIn && !state.user.data,
   require: { type: 'FETCH_USER' },
 });
 
+// Type-safe resolver definition
 const myResolver = createReduxResolver<RootState, { type: 'FETCH_USER' }>({
   requirement: (req): req is { type: 'FETCH_USER' } => req.type === 'FETCH_USER',
   resolve: async (req, { dispatch }) => {
@@ -349,6 +370,7 @@ const myResolver = createReduxResolver<RootState, { type: 'FETCH_USER' }>({
   },
 });
 
+// Type-safe interceptor definition
 const myInterceptor = createActionInterceptor<RootState>({
   match: (action) => action.type === 'cart/checkout',
   toRequirement: (action, state) => ({ type: 'CHECKOUT', items: state.cart.items }),
@@ -365,6 +387,7 @@ Replace thunks and sagas incrementally. Redux keeps working the entire time.
 **Step 1: Add the middleware to your existing store.**
 
 ```typescript
+// Step 1: Add empty middleware – your store keeps working unchanged
 const store = configureStore({
   reducer: rootReducer,
   middleware: (getDefault) =>

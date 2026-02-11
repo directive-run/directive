@@ -21,11 +21,11 @@ Migrate your existing state management to Directive with concept-by-concept guid
 
 All three guides follow the same pattern:
 
-1. **Analyze** — Map your existing concepts to Directive equivalents
-2. **Create module** — Define schema, init, events, derive, constraints, resolvers
-3. **Bridge** — Run both systems side-by-side using a [state bridge](/docs/bridges/overview)
-4. **Migrate UI** — Replace store hooks with Directive hooks
-5. **Remove bridge** — Once fully migrated, remove the old store
+1. **Analyze** – Map your existing concepts to Directive equivalents
+2. **Create module** – Define schema, init, events, derive, constraints, resolvers
+3. **Bridge** – Run both systems side-by-side using a [state bridge](/docs/bridges/overview)
+4. **Migrate UI** – Replace store hooks with Directive hooks
+5. **Remove bridge** – Once fully migrated, remove the old store
 
 ---
 
@@ -36,12 +36,14 @@ Directive provides analysis utilities that inspect your existing store and gener
 ```typescript
 import { analyzeReduxSlice, generateMigrationChecklist } from 'directive';
 
+// Point the analyzer at your existing Redux slice
 const analysis = analyzeReduxSlice({
   name: 'todos',
   reducers: todosSlice.reducer,
   actions: todosSlice.actions,
 });
 
+// Generate a step-by-step checklist mapping Redux concepts to Directive equivalents
 const checklist = generateMigrationChecklist(analysis);
 ```
 

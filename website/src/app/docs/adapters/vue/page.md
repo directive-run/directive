@@ -65,10 +65,13 @@ const userModule = createModule("user", {
   },
 });
 
+// Create and start the system
 const system = createSystem({ module: userModule });
 system.start();
 
 const app = createApp(App);
+
+// Install the plugin to make the system available to all components
 app.use(createDirectivePlugin(system));
 app.mount('#app');
 ```
@@ -80,6 +83,7 @@ Or use `provideSystem` in a parent component instead of the plugin:
 import { provideSystem } from 'directive/vue';
 import { system } from './system';
 
+// Provide the system to child components from within setup()
 provideSystem(system);
 </script>
 ```
@@ -96,35 +100,19 @@ Read a single fact, multiple facts, or a selected slice of a fact:
 <script setup lang="ts">
 import { useFact } from 'directive/vue';
 
-// Single fact — Ref that re-renders when "userId" changes
+// Subscribe to a single fact – re-renders when "userId" changes
 const userId = useFact<number>('userId');
 
-// Multiple facts — ShallowRef that re-renders when any listed fact changes
+// Subscribe to multiple facts at once
 const { name, email, avatar } = useFact<{ name: string; email: string; avatar: string }>(
   ['name', 'email', 'avatar']
 );
 
-// Selector — re-renders only when the selected value changes
+// Derive a value with a selector – only updates when the result changes
 const upperName = useFact('user', (u) => u?.name?.toUpperCase() ?? 'GUEST');
 
-// Selector with custom equality
+// Selector with custom equality to prevent unnecessary updates
 const ids = useFact('users', (users) => users?.map(u => u.id) ?? [], shallowEqual);
-</script>
-```
-
-### useFacts
-
-Get direct access to the facts proxy for mutations. The returned object is NOT reactive -- use it for event handlers and imperative code, not for template rendering:
-
-```vue
-<script setup>
-import { useFacts } from 'directive/vue';
-
-const facts = useFacts();
-
-function setUser(id: number) {
-  facts.userId = id;
-}
 </script>
 ```
 
@@ -136,15 +124,15 @@ Read a single derivation, multiple derivations, or a selected slice:
 <script setup lang="ts">
 import { useDerived } from 'directive/vue';
 
-// Single derivation — Ref
+// Subscribe to a single derivation
 const displayName = useDerived<string>('displayName');
 
-// Multiple derivations — ShallowRef
+// Subscribe to multiple derivations at once
 const { isLoggedIn, isAdmin } = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
   ['isLoggedIn', 'isAdmin']
 );
 
-// Selector — only re-renders when selected value changes
+// Derive a value with a selector – only updates when the count changes
 const itemCount = useDerived('stats', (stats) => stats.itemCount);
 </script>
 ```
@@ -157,6 +145,7 @@ Select from all facts (like Zustand's `useStore`):
 <script setup>
 import { useSelector } from 'directive/vue';
 
+// Select and combine values from multiple facts with custom equality
 const summary = useSelector(
   (facts) => ({
     userName: facts.user?.name,
@@ -179,6 +168,7 @@ Get a typed reference to the system's event dispatchers:
 <script setup>
 import { useEvents } from 'directive/vue';
 
+// Get typed event dispatchers for the module
 const events = useEvents();
 </script>
 
@@ -196,6 +186,7 @@ Low-level event dispatch for untyped or system events:
 <script setup>
 import { useDispatch } from 'directive/vue';
 
+// Get the low-level dispatch function
 const dispatch = useDispatch();
 </script>
 
@@ -208,18 +199,18 @@ const dispatch = useDispatch();
 
 ### useWatch
 
-Watch a derivation or fact for changes without causing re-renders -- runs a callback as a side effect:
+Watch a derivation or fact for changes without causing re-renders – runs a callback as a side effect:
 
 ```vue
 <script setup>
 import { useWatch } from 'directive/vue';
 
-// Watch a derivation
+// Watch a derivation for analytics tracking
 useWatch<string>('phase', (newPhase, oldPhase) => {
   analytics.track('phaseChange', { from: oldPhase, to: newPhase });
 });
 
-// Watch a fact (use the "fact" discriminator)
+// Watch a fact for tracking user changes
 useWatch('fact', 'userId', (newId, oldId) => {
   analytics.track('userId_changed', { from: oldId, to: newId });
 });
@@ -234,6 +225,7 @@ Access the full system instance:
 <script setup>
 import { useSystem } from 'directive/vue';
 
+// Access the full system instance for advanced operations
 const system = useSystem();
 </script>
 
@@ -257,6 +249,7 @@ Get system inspection data (unmet requirements, inflight resolvers, constraint s
 <script setup>
 import { useInspect } from 'directive/vue';
 
+// Get reactive system inspection data
 const inspection = useInspect();
 // InspectState: { isSettled, unmet, inflight, isWorking, hasUnmet, hasInflight }
 </script>
@@ -277,6 +270,7 @@ With throttling for high-frequency updates:
 <script setup>
 import { useInspect } from 'directive/vue';
 
+// Throttle updates to limit render frequency
 const inspection = useInspect({ throttleMs: 200 });
 </script>
 ```
@@ -289,11 +283,11 @@ Read constraint status reactively:
 <script setup>
 import { useConstraintStatus } from 'directive/vue';
 
-// All constraints
+// Get all constraints for the debug panel
 const constraints = useConstraintStatus();
 // Array<{ id: string; active: boolean; priority: number }>
 
-// Single constraint
+// Check a specific constraint by ID
 const auth = useConstraintStatus('requireAuth');
 // { id: "requireAuth", active: true, priority: 50 } | null
 </script>
@@ -307,6 +301,7 @@ Get a reactive explanation of why a requirement exists:
 <script setup>
 import { useExplain } from 'directive/vue';
 
+// Get a detailed explanation of why a requirement was generated
 const explanation = useExplain('FETCH_USER');
 </script>
 
@@ -328,7 +323,10 @@ import { createSystem } from 'directive';
 import { createRequirementStatusPlugin } from 'directive';
 import { createDirectivePlugin, useRequirementStatus } from 'directive/vue';
 
+// Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
+
+// Pass the plugin when creating the system
 const system = createSystem({
   module: myModule,
   plugins: [statusPlugin.plugin],
@@ -336,6 +334,8 @@ const system = createSystem({
 system.start();
 
 const app = createApp(App);
+
+// Install the plugin with the status plugin for injection
 app.use(createDirectivePlugin(system, statusPlugin));
 app.mount('#app');
 ```
@@ -346,11 +346,11 @@ app.mount('#app');
 <script setup>
 import { useRequirementStatus } from 'directive/vue';
 
-// Single requirement type
+// Track a single requirement type
 const status = useRequirementStatus('FETCH_USER');
 // status: { isLoading, hasError, pending, inflight, failed, lastError }
 
-// Multiple requirement types
+// Track multiple requirement types at once
 const statuses = useRequirementStatus(['FETCH_USER', 'FETCH_SETTINGS']);
 // statuses: Record<string, RequirementTypeStatus>
 </script>
@@ -368,14 +368,17 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```vue
 <script setup>
-import { useOptimisticUpdate } from 'directive/vue';
-import { useFacts } from 'directive/vue';
+import { useOptimisticUpdate, useSystem } from 'directive/vue';
 
-const facts = useFacts();
+// Access the system's facts proxy
+const { facts } = useSystem();
+
+// Set up optimistic mutations with automatic rollback
 const { mutate, isPending, error, rollback } = useOptimisticUpdate(undefined, 'SAVE_DATA');
 
 function handleSave() {
   mutate(() => {
+    // Optimistically update the UI before the server responds
     facts.savedAt = Date.now();
     facts.status = 'saved';
   });
@@ -403,9 +406,11 @@ Create a system scoped to a component's lifecycle. The system is automatically s
 import { useDirective, provideSystem, useDerived } from 'directive/vue';
 import { counterModule } from './counterModule';
 
-// Define module outside component for a stable reference
+// Create a scoped system tied to this component's lifecycle
 const system = useDirective(counterModule);
-provideSystem(system); // Make available to children
+
+// Provide the system to child components
+provideSystem(system);
 </script>
 ```
 
@@ -431,6 +436,7 @@ Zero-config composable that creates a scoped system and subscribes to all facts 
 import { useModule } from 'directive/vue';
 import { counterModule } from './counterModule';
 
+// Get everything in one call – system, facts, derivations, and events
 const { system, facts, derived, events, dispatch } = useModule(counterModule);
 </script>
 
@@ -451,12 +457,14 @@ Create fully typed composables for your module schema:
 ```typescript
 import { createTypedHooks } from 'directive/vue';
 
-const { useDerived, useFact, useFacts, useDispatch, useSystem, useEvents } =
+// Create typed composables – full autocomplete for keys and events
+const { useDerived, useFact, useDispatch, useSystem, useEvents } =
   createTypedHooks<typeof myModule.schema>();
 ```
 
 ```vue
 <script setup>
+// Fully typed – return types are inferred from the schema
 const count = useFact('count');       // Type: Ref<number | undefined>
 const doubled = useDerived('doubled'); // Type: Ref<number>
 const dispatch = useDispatch();
@@ -477,6 +485,7 @@ Use `useTimeTravel` for reactive undo/redo controls. Returns a `ShallowRef<TimeT
 <script setup>
 import { useTimeTravel } from 'directive/vue';
 
+// Get reactive time-travel controls (null when disabled)
 const tt = useTimeTravel();
 </script>
 
@@ -501,7 +510,10 @@ Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/ti
 <script setup>
 import { useFact, useDerived } from 'directive/vue';
 
+// Subscribe to the user fact
 const user = useFact<User | null>('user');
+
+// Subscribe to the display name derivation
 const displayName = useDerived<string>('displayName');
 </script>
 
@@ -520,10 +532,13 @@ Write facts through the system directly:
 
 ```vue
 <script setup>
-import { useFact, useFacts } from 'directive/vue';
+import { useFact, useSystem } from 'directive/vue';
 
+// Subscribe to the current userId
 const userId = useFact<number>('userId');
-const facts = useFacts();
+
+// Access the system's facts proxy for direct writes
+const { facts } = useSystem();
 </script>
 
 <template>
@@ -561,6 +576,7 @@ import { userModule } from './modules/user';
 import UserProfile from './UserProfile.vue';
 
 test('displays user name', async () => {
+  // Create a test system with mock data
   const system = createTestSystem({ module: userModule });
   system.facts.user = { id: 1, name: 'Test User' };
 
@@ -585,27 +601,9 @@ Re-exported from the core package for use with selector-based composables:
 ```typescript
 import { shallowEqual } from 'directive/vue';
 
+// Use shallowEqual to prevent updates when x/y values haven't changed
 const coords = useFact('position', (p) => ({ x: p?.x, y: p?.y }), shallowEqual);
 ```
-
----
-
-## Deprecated Composables
-
-The following composables are deprecated but still work. They delegate to the consolidated API internally:
-
-| Deprecated | Use Instead |
-|---|---|
-| `useFactSelector(key, fn, eq?)` | `useFact(key, fn, eq?)` |
-| `useDeriveds(keys)` | `useDerived(keys)` |
-| `useDerivedSelector(key, fn, eq?)` | `useDerived(key, fn, eq?)` |
-| `useInspectThrottled(opts)` | `useInspect(opts)` |
-| `useRequirements()` | `useInspect()` |
-| `useRequirementsThrottled(opts)` | `useInspect(opts)` |
-| `useIsSettled()` | `useInspect().isSettled` |
-| `useIsResolving(type)` | `useRequirementStatus(type).isLoading` |
-| `useLatestError(type)` | `useRequirementStatus(type).lastError` |
-| `useRequirementStatuses()` | `useRequirementStatus(types)` |
 
 ---
 
@@ -616,7 +614,6 @@ The following composables are deprecated but still work. They delegate to the co
 | `createDirectivePlugin` | Plugin | Vue plugin for providing the system |
 | `provideSystem` | Composable | Provide system via Vue's inject/provide |
 | `useFact` | Composable | Read single/multi facts or apply selector |
-| `useFacts` | Composable | Direct access to facts proxy (non-reactive) |
 | `useDerived` | Composable | Read single/multi derivations or apply selector |
 | `useSelector` | Composable | Select from all facts with custom equality |
 | `useEvents` | Composable | Typed event dispatchers |
@@ -638,6 +635,6 @@ The following composables are deprecated but still work. They delegate to the co
 
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** -- Build your first module
-- **[Facts](/docs/facts)** -- State management deep dive
-- **[Testing](/docs/testing/overview)** -- Testing Vue components
+- **[Quick Start](/docs/quick-start)** – Build your first module
+- **[Facts](/docs/facts)** – State management deep dive
+- **[Testing](/docs/testing/overview)** – Testing Vue components

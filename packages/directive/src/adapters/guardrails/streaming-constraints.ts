@@ -30,7 +30,7 @@
  * ```
  */
 
-import type { StreamChunk, StreamRunner, StreamingRunResult } from "../openai-agents-streaming.js";
+import type { StreamChunk, StreamRunner, StreamingRunResult } from "../ai/streaming.js";
 import type { PIIType } from "./pii-enhanced.js";
 import { detectPII } from "./pii-enhanced.js";
 

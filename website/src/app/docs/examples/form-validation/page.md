@@ -13,6 +13,7 @@ Validate forms declaratively with constraints. {% .lead %}
 import { createModule, createSystem, t } from 'directive';
 
 const formModule = createModule("signup-form", {
+  // Every field and its validation state lives in typed facts
   schema: {
     facts: {
       email: t.string(),
@@ -24,6 +25,7 @@ const formModule = createModule("signup-form", {
     },
   },
 
+  // All fields start empty, no validation has run yet
   init: (facts) => {
     facts.email = "";
     facts.password = "";
@@ -34,6 +36,7 @@ const formModule = createModule("signup-form", {
   },
 
   derive: {
+    // Collect all password rule violations into a single array
     passwordErrors: (facts) => {
       const errors: string[] = [];
       if (facts.password.length < 8) {
@@ -47,8 +50,12 @@ const formModule = createModule("signup-form", {
       }
       return errors;
     },
+
+    // Simple equality check between the two password fields
     passwordsMatch: (facts) =>
       facts.password === facts.confirmPassword,
+
+    // Composed derivation – depends on other derivations and facts
     isValid: (facts, derive) =>
       facts.emailValid === true &&
       derive.passwordErrors.length === 0 &&
@@ -56,6 +63,7 @@ const formModule = createModule("signup-form", {
   },
 
   constraints: {
+    // Auto-check email availability once the user types a valid-looking address
     checkEmail: {
       when: (facts) =>
         facts.email.length > 0 &&
@@ -64,6 +72,8 @@ const formModule = createModule("signup-form", {
         !facts.emailChecking,
       require: { type: "CHECK_EMAIL" },
     },
+
+    // Only allow submission when every validation rule passes
     canSubmit: {
       when: (facts) =>
         facts.submitted &&
@@ -77,6 +87,7 @@ const formModule = createModule("signup-form", {
   },
 
   resolvers: {
+    // Hit the server to see if the email is already taken
     checkEmail: {
       requirement: "CHECK_EMAIL",
       resolve: async (req, context) => {
@@ -89,6 +100,8 @@ const formModule = createModule("signup-form", {
         }
       },
     },
+
+    // Submit the form payload and reset the submitted flag
     submitForm: {
       requirement: "SUBMIT_FORM",
       resolve: async (req, context) => {
@@ -111,21 +124,28 @@ const formModule = createModule("signup-form", {
 import { createSystem } from 'directive';
 import { useFact, useDerived } from 'directive/react';
 
+// Boot the form system once at module scope
 const system = createSystem({ module: formModule });
 system.start();
 
 function SignupForm() {
+  // Subscribe to raw field values (facts)
   const email = useFact(system, 'email');
   const password = useFact(system, 'password');
   const confirmPassword = useFact(system, 'confirmPassword');
   const emailValid = useFact(system, 'emailValid');
   const emailChecking = useFact(system, 'emailChecking');
+
+  // Subscribe to computed validation state (derivations)
   const passwordErrors = useDerived(system, 'passwordErrors');
   const passwordsMatch = useDerived(system, 'passwordsMatch');
   const isValid = useDerived(system, 'isValid');
 
   return (
+    // Setting submitted = true triggers the canSubmit constraint
     <form onSubmit={(e) => { e.preventDefault(); system.facts.submitted = true; }}>
+
+      {/* Email field – resets validation on every keystroke */}
       <div>
         <input
           type="email"
@@ -140,6 +160,7 @@ function SignupForm() {
         {emailValid === true && <span>Available</span>}
       </div>
 
+      {/* Password field – errors auto-update via the passwordErrors derivation */}
       <div>
         <input
           type="password"
@@ -149,6 +170,7 @@ function SignupForm() {
         {passwordErrors.map((err) => <p key={err}>{err}</p>)}
       </div>
 
+      {/* Confirm password – passwordsMatch derivation drives the inline error */}
       <div>
         <input
           type="password"
@@ -158,6 +180,7 @@ function SignupForm() {
         {!passwordsMatch && <span>Passwords must match</span>}
       </div>
 
+      {/* Button stays disabled until every validation derivation passes */}
       <button disabled={!isValid}>Sign Up</button>
     </form>
   );

@@ -24,6 +24,7 @@ const analyticsModule = createModule("analytics", {
 
   effects: {
     trackPageView: {
+      // Fires whenever page or userId changes
       run: (facts) => {
         analytics.track("page_view", {
           page: facts.page,
@@ -45,8 +46,8 @@ const analyticsModule = createModule("analytics", {
 | `deps` | `string[]` | Optional explicit dependencies for optimization |
 
 The `run` function receives:
-- `facts` — the current facts (read-only access recommended)
-- `prev` — a snapshot of all facts from before the last change, or `null` on first run
+- `facts` – the current facts (read-only access recommended)
+- `prev` – a snapshot of all facts from before the last change, or `null` on first run
 
 ---
 
@@ -57,8 +58,8 @@ By default, effects auto-track which facts are read during `run()`. On subsequen
 ```typescript
 effects: {
   logUser: {
-    // Directive tracks that this reads facts.userId and facts.userName
-    // It will only re-run when those specific facts change
+    // Auto-tracks facts.userId and facts.userName
+    // Only re-runs when those specific facts change
     run: (facts) => {
       console.log(`User: ${facts.userId} - ${facts.userName}`);
     },
@@ -76,10 +77,12 @@ Access the previous facts snapshot to detect transitions:
 effects: {
   onStatusChange: {
     run: (facts, prev) => {
+      // Detect specific transitions using previous values
       if (prev && prev.status === "pending" && facts.status === "complete") {
         confetti.launch();
         notifyUser("Order complete!");
       }
+
       if (prev && prev.status === "processing" && facts.status === "failed") {
         errorReporter.capture("Order failed");
       }
@@ -98,21 +101,19 @@ Use `deps` to declare which facts an effect depends on. This is required for asy
 
 ```typescript
 effects: {
-  // Auto-tracking works for sync effects
+  // Sync effects use auto-tracking (no deps needed)
   syncEffect: {
     run: (facts) => {
       console.log(facts.userId);  // Tracked automatically
     },
   },
 
-  // For async effects, use explicit deps
+  // Async effects need explicit deps – reads after await aren't tracked
   asyncEffect: {
     deps: ["userId", "userName"],
     run: async (facts) => {
       await someAsyncOp();
-      // facts.userId read here would NOT be tracked by auto-tracking
-      // but explicit deps ensure this effect runs when userId changes
-      console.log(facts.userId);
+      console.log(facts.userId);  // Safe – dep is declared explicitly
     },
   },
 }
@@ -128,6 +129,7 @@ Effects are perfect for DOM manipulation:
 
 ```typescript
 effects: {
+  // Update the browser tab title when page changes
   updateTitle: {
     deps: ["pageTitle"],
     run: (facts) => {
@@ -136,6 +138,8 @@ effects: {
         : "MyApp";
     },
   },
+
+  // Show a badge favicon when there are unread items
   updateFavicon: {
     deps: ["unreadCount"],
     run: (facts) => {
@@ -147,6 +151,8 @@ effects: {
       }
     },
   },
+
+  // Scroll to top on route changes
   scrollToTop: {
     run: (facts, prev) => {
       if (prev && facts.currentRoute !== prev.currentRoute) {
@@ -165,6 +171,7 @@ Connect to external services reactively:
 
 ```typescript
 effects: {
+  // Sync user profile changes to Firebase in real time
   syncToFirebase: {
     deps: ["userProfile"],
     run: (facts) => {
@@ -175,6 +182,8 @@ effects: {
       }
     },
   },
+
+  // Keep Intercom in sync with user data
   sendToIntercom: {
     deps: ["user"],
     run: (facts) => {
@@ -194,14 +203,14 @@ effects: {
 
 ## Error Isolation
 
-Effects are fire-and-forget — errors are logged but never break the reconciliation loop:
+Effects are fire-and-forget – errors are logged but never break the reconciliation loop:
 
 ```typescript
 effects: {
   riskyEffect: {
     run: (facts) => {
-      // If this throws, reconciliation continues normally
-      // The error is logged to console and reported via the onError callback
+      // If this throws, the reconciliation loop continues normally
+      // Errors are logged and reported via the onError callback
       externalService.send(facts.data);
     },
   },
@@ -218,6 +227,7 @@ effects: {
       try {
         await api.save(facts.data);
       } catch (error) {
+        // Handle errors explicitly to avoid unhandled promise rejections
         errorReporter.capture(error);
       }
     },
@@ -233,7 +243,7 @@ Effects run in parallel, not sequentially. They are independent side effects and
 
 ```typescript
 effects: {
-  // These all run at the same time
+  // All three effects run in parallel – they don't wait for each other
   logEvent: {
     run: (facts) => console.log("Action:", facts.action),
   },
@@ -323,13 +333,13 @@ effects: {
 Disable or enable effects at runtime:
 
 ```typescript
-// Disable an effect — it won't run during reconciliation
+// Disable an effect – it won't run during reconciliation
 system.effects.disable("expensiveAnalytics");
 
-// Re-enable it
+// Re-enable it later
 system.effects.enable("expensiveAnalytics");
 
-// Check if an effect is currently enabled
+// Check whether an effect is currently enabled
 system.effects.isEnabled("expensiveAnalytics"); // false
 ```
 

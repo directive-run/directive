@@ -57,7 +57,7 @@ function MobileTableOfContents({
                   className={clsx(
                     'block py-1',
                     isActive(section)
-                      ? 'text-sky-500'
+                      ? 'text-brand-primary'
                       : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
                   )}
                 >
@@ -73,7 +73,7 @@ function MobileTableOfContents({
                           className={clsx(
                             'block py-1 text-xs',
                             isActive(subSection)
-                              ? 'text-sky-500'
+                              ? 'text-brand-primary'
                               : 'text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-400',
                           )}
                         >
@@ -118,7 +118,7 @@ function DesktopTableOfContents({
                       href={`#${section.id}`}
                       className={clsx(
                         isActive(section)
-                          ? 'text-sky-500'
+                          ? 'text-brand-primary'
                           : 'font-normal text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300',
                       )}
                     >
@@ -136,7 +136,7 @@ function DesktopTableOfContents({
                             href={`#${subSection.id}`}
                             className={
                               isActive(subSection)
-                                ? 'text-sky-500'
+                                ? 'text-brand-primary'
                                 : 'hover:text-slate-600 dark:hover:text-slate-300'
                             }
                           >

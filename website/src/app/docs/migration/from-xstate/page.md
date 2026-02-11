@@ -37,40 +37,44 @@ Migrate your XState state machines to Directive. {% .lead %}
 ## Before: XState Traffic Light
 
 ```typescript
-// XState
+// Before: XState approach – define states, transitions, and timed events
 import { createMachine, interpret } from 'xstate';
 
 const trafficLightMachine = createMachine({
   id: 'trafficLight',
   initial: 'red',
   context: { elapsed: 0 },
+
+  // Each state defines its own transitions and timing
   states: {
     red: {
-      after: { 30000: 'green' },
-      entry: 'resetTimer',
+      after: { 30000: 'green' },   // Auto-transition after 30s
+      entry: 'resetTimer',          // Run action on state entry
     },
     green: {
-      after: { 25000: 'yellow' },
+      after: { 25000: 'yellow' },  // Auto-transition after 25s
       entry: 'resetTimer',
     },
     yellow: {
-      after: { 5000: 'red' },
+      after: { 5000: 'red' },      // Auto-transition after 5s
       entry: 'resetTimer',
     },
   },
 }, {
+  // Actions are defined separately and referenced by name
   actions: {
     resetTimer: (context) => { context.elapsed = 0 },
   },
 });
 
+// Interpret the machine to create a running service
 const service = interpret(trafficLightMachine).start();
 ```
 
 ## After: Directive Traffic Light
 
 ```typescript
-// Directive
+// After: Directive approach – constraints declare when transitions should happen
 import { createModule, createSystem, t } from 'directive';
 
 const trafficLightModule = createModule("traffic-light", {
@@ -80,24 +84,31 @@ const trafficLightModule = createModule("traffic-light", {
       elapsed: t.number(),
     },
   },
+
   init: (facts) => {
     facts.phase = 'red';
     facts.elapsed = 0;
   },
+
+  // Each constraint declares a condition that triggers a transition
   constraints: {
     redToGreen: {
       when: (facts) => facts.phase === 'red' && facts.elapsed >= 30,
       require: { type: 'TRANSITION', to: 'green' },
     },
+
     greenToYellow: {
       when: (facts) => facts.phase === 'green' && facts.elapsed >= 25,
       require: { type: 'TRANSITION', to: 'yellow' },
     },
+
     yellowToRed: {
       when: (facts) => facts.phase === 'yellow' && facts.elapsed >= 5,
       require: { type: 'TRANSITION', to: 'red' },
     },
   },
+
+  // One resolver handles all transitions – the requirement carries the data
   resolvers: {
     transition: {
       requirement: 'TRANSITION',
@@ -117,18 +128,20 @@ const trafficLightModule = createModule("traffic-light", {
 ### XState Guards
 
 ```typescript
-// XState with guards
+// Before: XState guards – conditions that gate transitions between states
 const paymentMachine = createMachine({
   states: {
     idle: {
       on: {
         SUBMIT: {
           target: 'processing',
-          cond: 'isValidAmount',
+          cond: 'isValidAmount',   // Guard blocks transition if false
         },
       },
     },
+
     processing: {
+      // Invoke an async service, route to success or failure state
       invoke: {
         src: 'processPayment',
         onDone: 'success',
@@ -137,6 +150,7 @@ const paymentMachine = createMachine({
     },
   },
 }, {
+  // Guards are defined separately and referenced by string name
   guards: {
     isValidAmount: (context) => context.amount > 0,
   },
@@ -146,7 +160,7 @@ const paymentMachine = createMachine({
 ### Directive Constraints
 
 ```typescript
-// Directive constraints
+// After: Directive constraints – guard logic and trigger logic live together
 const paymentModule = createModule("payment", {
   schema: {
     facts: {
@@ -155,9 +169,10 @@ const paymentModule = createModule("payment", {
       shouldSubmit: t.boolean(),
     },
   },
+
   constraints: {
     processPayment: {
-      // Guard logic in constraint condition
+      // All conditions inline – combines guard + trigger in one place
       when: (facts) =>
         facts.shouldSubmit &&
         facts.amount > 0 &&
@@ -165,17 +180,21 @@ const paymentModule = createModule("payment", {
       require: { type: 'PROCESS_PAYMENT' },
     },
   },
+
   resolvers: {
     processPayment: {
       requirement: 'PROCESS_PAYMENT',
       resolve: async (req, context) => {
         context.facts.status = 'processing';
+
         try {
           await api.processPayment(context.facts.amount);
           context.facts.status = 'success';
         } catch {
           context.facts.status = 'failed';
         }
+
+        // Reset the trigger flag after processing
         context.facts.shouldSubmit = false;
       },
     },
@@ -190,13 +209,16 @@ const paymentModule = createModule("payment", {
 ### XState Services
 
 ```typescript
-// XState invoked service
+// Before: XState invoked service – async work tied to a specific state
 const userMachine = createMachine({
   states: {
     loading: {
+      // Invoke runs when entering this state
       invoke: {
         id: 'fetchUser',
         src: (context) => fetchUser(context.userId),
+
+        // Route to different states based on outcome
         onDone: {
           target: 'loaded',
           actions: assign({ user: (_, event) => event.data }),
@@ -214,7 +236,7 @@ const userMachine = createMachine({
 ### Directive Resolvers
 
 ```typescript
-// Directive resolver
+// After: Directive resolver – constraint triggers fetch, resolver handles async + retry
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -224,18 +246,24 @@ const userModule = createModule("user", {
       loading: t.boolean(),
     },
   },
+
+  // Constraint declares when user data is needed
   constraints: {
     needsUser: {
       when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
       require: { type: 'FETCH_USER' },
     },
   },
+
+  // Resolver fulfills the requirement with built-in retry support
   resolvers: {
     fetchUser: {
       requirement: 'FETCH_USER',
-      retry: { attempts: 3, backoff: 'exponential' },
+      retry: { attempts: 3, backoff: 'exponential' }, // Automatic retry on failure
+
       resolve: async (req, context) => {
         context.facts.loading = true;
+
         try {
           context.facts.user = await fetchUser(context.facts.userId);
           context.facts.error = null;
@@ -257,16 +285,17 @@ const userModule = createModule("user", {
 ### XState Actions
 
 ```typescript
-// XState entry/exit actions
+// Before: XState entry/exit actions – side effects tied to state transitions
 const formMachine = createMachine({
   states: {
     editing: {
-      entry: 'focusInput',
-      exit: 'validateForm',
+      entry: 'focusInput',     // Run when entering this state
+      exit: 'validateForm',    // Run when leaving this state
       on: { SUBMIT: 'submitting' },
     },
   },
 }, {
+  // Actions defined separately and referenced by name
   actions: {
     focusInput: () => document.getElementById('input')?.focus(),
     validateForm: (context) => console.log('Validating...'),
@@ -277,14 +306,16 @@ const formMachine = createMachine({
 ### Directive Effects
 
 ```typescript
-// Directive effects
+// After: Directive effects – react to fact changes, not state transitions
 const formModule = createModule("form", {
   schema: {
     facts: {
       status: t.string<'editing' | 'submitting'>(),
     },
   },
+
   effects: {
+    // Fires whenever `status` changes – replaces XState's entry action
     onEditing: {
       deps: ['status'],
       run: (facts) => {
@@ -293,6 +324,8 @@ const formModule = createModule("form", {
         }
       },
     },
+
+    // Compare previous and current values – replaces XState's exit action
     onSubmit: {
       deps: ['status'],
       run: (facts, prev) => {
@@ -312,17 +345,19 @@ const formModule = createModule("form", {
 ### XState Nested States
 
 ```typescript
-// XState hierarchical states
+// Before: XState hierarchical states – nested state trees model compound conditions
 const machine = createMachine({
   states: {
     authenticated: {
       initial: 'idle',
+      // Child states only accessible when authenticated
       states: {
         idle: {},
         loading: {},
         error: {},
       },
     },
+
     unauthenticated: {},
   },
 });
@@ -331,16 +366,18 @@ const machine = createMachine({
 ### Directive Flat Facts
 
 ```typescript
-// Directive - flat facts with derivations
+// After: Directive – flat independent facts, derive compound state when needed
 const authModule = createModule("auth", {
   schema: {
     facts: {
+      // Two independent facts instead of a nested state tree
       isAuthenticated: t.boolean(),
       dataStatus: t.string<'idle' | 'loading' | 'error'>(),
     },
   },
+
   derive: {
-    // Compose state from facts
+    // Reconstruct the compound state from flat facts if needed
     currentState: (facts) => {
       if (!facts.isAuthenticated) return 'unauthenticated';
       return `authenticated.${facts.dataStatus}`;
@@ -356,14 +393,18 @@ const authModule = createModule("auth", {
 ### XState Parallel States
 
 ```typescript
-// XState parallel
+// Before: XState parallel states – two independent state machines running simultaneously
 const machine = createMachine({
-  type: 'parallel',
+  type: 'parallel',  // Both regions active at the same time
+
   states: {
+    // Upload region with its own state flow
     upload: {
       initial: 'idle',
       states: { idle: {}, uploading: {}, complete: {} },
     },
+
+    // Validation region runs independently of upload
     validation: {
       initial: 'pending',
       states: { pending: {}, valid: {}, invalid: {} },
@@ -375,20 +416,23 @@ const machine = createMachine({
 ### Directive Independent Facts
 
 ```typescript
-// Directive - naturally parallel
+// After: Directive – facts are naturally independent, no parallel config needed
 const fileModule = createModule("file", {
   schema: {
     facts: {
+      // Each fact is independent – no need for parallel state regions
       uploadStatus: t.string<'idle' | 'uploading' | 'complete'>(),
       validationStatus: t.string<'pending' | 'valid' | 'invalid'>(),
     },
   },
-  // Both can be constrained independently
+
+  // Each constraint operates on its own facts – they resolve independently
   constraints: {
     needsUpload: {
       when: (facts) => facts.uploadStatus === 'idle',
       require: { type: 'UPLOAD' },
     },
+
     needsValidation: {
       when: (facts) => facts.validationStatus === 'pending',
       require: { type: 'VALIDATE' },

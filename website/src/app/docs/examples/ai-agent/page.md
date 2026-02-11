@@ -17,11 +17,13 @@ This example requires the `openai` package: `npm install openai`
 import { createModule, createSystem, t } from 'directive';
 import { OpenAI } from 'openai';
 
+// Shape of each message in the conversation history
 interface Message {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
+// Describes a tool the LLM wants to invoke
 interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
@@ -37,6 +39,7 @@ const agentModule = createModule("agent", {
     },
   },
 
+  // Seed the conversation with a system prompt
   init: (facts) => {
     facts.messages = [
       { role: "system", content: "You are a helpful assistant." }
@@ -47,6 +50,7 @@ const agentModule = createModule("agent", {
   },
 
   constraints: {
+    // When the user sends a message, trigger a response generation
     needsResponse: {
       priority: 50,
       when: (facts) => {
@@ -55,6 +59,8 @@ const agentModule = createModule("agent", {
       },
       require: { type: "GENERATE_RESPONSE" },
     },
+
+    // Tool calls take priority over normal responses
     executeToolCall: {
       priority: 100,
       when: (facts) => facts.pendingToolCall !== null,
@@ -63,6 +69,7 @@ const agentModule = createModule("agent", {
   },
 
   resolvers: {
+    // Call the LLM and handle either a text reply or a tool call request
     generateResponse: {
       requirement: "GENERATE_RESPONSE",
       timeout: 30000,
@@ -72,6 +79,8 @@ const agentModule = createModule("agent", {
 
         try {
           const openai = new OpenAI();
+
+          // Send the full conversation history with available tools
           const completion = await openai.chat.completions.create({
             model: "gpt-4",
             messages: context.facts.messages,
@@ -95,12 +104,14 @@ const agentModule = createModule("agent", {
           const choice = completion.choices[0];
 
           if (choice.message.tool_calls?.length) {
+            // LLM wants to call a tool – park it for the executeToolCall constraint
             const call = choice.message.tool_calls[0];
             context.facts.pendingToolCall = {
               name: call.function.name,
               arguments: JSON.parse(call.function.arguments),
             };
           } else {
+            // Normal text reply – append to conversation
             context.facts.messages = [
               ...context.facts.messages,
               { role: "assistant", content: choice.message.content },
@@ -114,11 +125,13 @@ const agentModule = createModule("agent", {
       },
     },
 
+    // Execute the pending tool call and feed the result back into the conversation
     executeTool: {
       requirement: "EXECUTE_TOOL",
       resolve: async (req, context) => {
         const { name, arguments: args } = context.facts.pendingToolCall;
 
+        // Dispatch to the appropriate tool handler
         let result;
         switch (name) {
           case "search":
@@ -128,6 +141,7 @@ const agentModule = createModule("agent", {
             result = { error: "Unknown tool" };
         }
 
+        // Append the tool result so the LLM can see it on the next turn
         context.facts.messages = [
           ...context.facts.messages,
           {
@@ -136,6 +150,7 @@ const agentModule = createModule("agent", {
           },
         ];
 
+        // Clear the pending call so the constraint stops firing
         context.facts.pendingToolCall = null;
       },
     },
@@ -151,14 +166,17 @@ const agentModule = createModule("agent", {
 import { useState } from 'react';
 import { useFact } from 'directive/react';
 
+// Boot the agent system once at module scope
 const system = createSystem({ module: agentModule });
 system.start();
 
 function ChatInterface() {
+  // Subscribe to reactive facts – component re-renders when these change
   const messages = useFact(system, 'messages');
   const isThinking = useFact(system, 'isThinking');
   const [input, setInput] = useState('');
 
+  // Append a user message to facts – this triggers the needsResponse constraint
   const sendMessage = () => {
     system.facts.messages = [
       ...system.facts.messages,
@@ -169,6 +187,7 @@ function ChatInterface() {
 
   return (
     <div>
+      {/* Render visible messages, hiding the system prompt */}
       <div className="messages">
         {messages.filter(m => m.role !== 'system').map((m, i) => (
           <div key={i} className={m.role}>
@@ -178,6 +197,7 @@ function ChatInterface() {
         {isThinking && <div>Thinking...</div>}
       </div>
 
+      {/* Send on Enter or button click */}
       <input
         value={input}
         onChange={(e) => setInput(e.target.value)}

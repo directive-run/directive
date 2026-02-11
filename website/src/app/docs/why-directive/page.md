@@ -17,11 +17,15 @@ Most state management follows an imperative pattern: when X happens, do Y, then 
 // Traditional approach - race condition prone
 async function loadUser(userId: number) {
   setLoading(true);
+
   try {
     const user = await fetchUser(userId);
-    setUser(user); // What if userId changed while fetching?
+
+    // What if userId changed while this request was in flight?
+    setUser(user);
     setLoading(false);
   } catch (error) {
+    // Every caller must remember to handle errors consistently
     setError(error);
     setLoading(false);
   }
@@ -39,13 +43,16 @@ State transitions end up spread across event handlers, effects, and middleware. 
 Every async operation needs its own retry handling:
 
 ```typescript
-// This gets repeated everywhere
+// This same boilerplate gets copy-pasted into every async operation
 async function fetchWithRetry(fn, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
     try {
       return await fn();
     } catch (e) {
+      // Give up on the last attempt
       if (i === attempts - 1) throw e;
+
+      // Exponential backoff: 1s, 2s, 4s...
       await sleep(Math.pow(2, i) * 1000);
     }
   }
@@ -61,9 +68,10 @@ Directive inverts the model. Instead of "when X happens, do Y", you declare "Y m
 ### Constraints Replace Event Handlers
 
 ```typescript
-// Directive approach - declarative
+// Directive approach - declare the rule, not the steps
 constraints: {
   needsUser: {
+    // "When we have a userId but no user data, we need to fetch one"
     when: (facts) => facts.userId > 0 && !facts.user,
     require: { type: "FETCH_USER" },
   },
@@ -77,8 +85,13 @@ The constraint says: "When we have a userId but no user, we need to fetch one." 
 ```typescript
 resolvers: {
   fetchUser: {
+    // Match this resolver to FETCH_USER requirements
     requirement: "FETCH_USER",
+
+    // Retry logic is declarative – no boilerplate needed
     retry: { attempts: 3, backoff: "exponential" },
+
+    // The resolver only runs when its requirement is active
     resolve: async (req, context) => {
       context.facts.user = await api.getUser(context.facts.userId);
     },
@@ -92,8 +105,10 @@ Retry logic is declarative. The resolver only runs when its requirement is activ
 
 ```typescript
 derive: {
-  // No dependency array - automatically tracked
+  // No dependency arrays needed – Directive tracks access automatically
   displayName: (facts) => facts.user?.name ?? "Guest",
+
+  // Recomputes only when facts.user changes
   isLoggedIn: (facts) => facts.user !== null,
 }
 ```

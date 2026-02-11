@@ -51,7 +51,7 @@ class SearchErrorBoundary extends Component<
       return (
         <button
           type="button"
-          className="group flex h-10 w-10 items-center justify-center text-slate-400 sm:justify-start md:h-auto md:w-80 md:flex-none md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200"
+          className="group flex h-10 w-10 items-center justify-center text-slate-400 sm:justify-start md:h-auto md:w-96 md:flex-none md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 lg:w-[32rem]"
           onClick={() => this.setState({ hasError: false })}
         >
           <span className="text-xs">Search unavailable - click to retry</span>
@@ -190,7 +190,7 @@ function LoadingIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
 function HighlightQuery({ text, query }: { text: string; query: string }) {
   return (
     <Highlighter
-      highlightClassName="group-aria-selected:underline bg-transparent text-sky-600 dark:text-sky-400"
+      highlightClassName="group-aria-selected:underline bg-transparent text-brand-primary-600 dark:text-brand-primary-400"
       searchWords={[query]}
       autoEscape={true}
       textToHighlight={text}
@@ -230,7 +230,7 @@ function SearchResult({
       <div
         id={`${id}-title`}
         aria-hidden="true"
-        className="text-sm font-medium text-slate-700 group-aria-selected:text-sky-600 dark:text-slate-300 dark:group-aria-selected:text-sky-400"
+        className="text-sm font-medium text-slate-700 group-aria-selected:text-brand-primary-600 dark:text-slate-300 dark:group-aria-selected:text-brand-primary-400"
       >
         <HighlightQuery text={result.title} query={query} />
       </div>
@@ -508,7 +508,7 @@ function SearchInner() {
     <>
       <button
         type="button"
-        className="group flex h-10 w-10 items-center justify-center sm:justify-start md:h-auto md:w-80 md:flex-none md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 md:hover:ring-slate-300 lg:w-96 dark:md:bg-slate-800/75 dark:md:ring-white/5 dark:md:ring-inset dark:md:hover:bg-slate-700/40 dark:md:hover:ring-slate-500"
+        className="group flex h-10 w-10 items-center justify-center sm:justify-start md:h-auto md:w-96 md:flex-none md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 md:hover:ring-slate-300 lg:w-[32rem] dark:md:bg-slate-800/75 dark:md:ring-white/5 dark:md:ring-inset dark:md:hover:bg-slate-700/40 dark:md:hover:ring-slate-500"
         {...buttonProps}
       >
         <SearchIcon className="h-5 w-5 flex-none fill-slate-400 group-hover:fill-slate-500 md:group-hover:fill-slate-400 dark:fill-slate-500" />

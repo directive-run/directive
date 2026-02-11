@@ -21,12 +21,15 @@ import { createModule, createSystem, t } from 'directive';
 
 const adapter = createMCPAdapter({
   servers: [
+    // Local server via stdin/stdout
     {
       name: 'filesystem',
       transport: 'stdio',
       command: 'mcp-server-filesystem',
       args: ['--root', '/workspace'],
     },
+
+    // Remote server via Server-Sent Events
     {
       name: 'github',
       transport: 'sse',
@@ -36,13 +39,13 @@ const adapter = createMCPAdapter({
   ],
 });
 
-// Add to your Directive system as a plugin
+// Register the adapter as a Directive plugin for constraint integration
 const system = createSystem({
   module: myModule,
   plugins: [adapter.plugin],
 });
 
-// Connect to all servers
+// Open connections to all configured servers
 await adapter.connect();
 ```
 
@@ -51,6 +54,7 @@ In production, provide a real MCP client via `clientFactory`. Without it, a stub
 ```typescript
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
+// Provide a real MCP client for production (without this, a stub is used)
 const adapter = createMCPAdapter({
   servers: [...],
   clientFactory: (config) => new Client(config),
@@ -64,19 +68,19 @@ const adapter = createMCPAdapter({
 Call MCP tools with automatic constraint checking (rate limits, approval, argument size limits):
 
 ```typescript
-// With constraints applied
+// Call a tool with constraint checking (rate limits, approval, size limits)
 const result = await adapter.callTool('filesystem', 'read_file', {
   path: '/workspace/config.json',
 }, system.facts.$store.toObject());
 
-// result.content is an array of MCPContent (text, image, or resource)
+// Iterate over the response – content can be text, image, or resource
 for (const content of result.content) {
   if (content.type === 'text') {
     console.log(content.text);
   }
 }
 
-// Direct call (bypasses all constraints — for trusted internal use)
+// Bypass all constraints for trusted internal calls
 const raw = await adapter.callToolDirect('filesystem', 'read_file', {
   path: '/workspace/config.json',
 });
@@ -93,20 +97,22 @@ const adapter = createMCPAdapter({
   servers: [
     { name: 'fs', transport: 'stdio', command: 'mcp-server-filesystem' },
   ],
+
+  // Define per-tool access rules
   toolConstraints: {
-    // Require approval before writing files
+    // Require human approval before any write operation
     'fs.write_file': {
       requireApproval: true,
-      maxArgSize: 10000,     // Max 10KB arguments
-      timeout: 30000,        // 30s timeout
+      maxArgSize: 10000,     // Reject arguments larger than 10KB
+      timeout: 30000,        // 30s timeout per call
     },
 
-    // Rate limit read operations
+    // Throttle read operations to prevent abuse
     'fs.read_file': {
-      rateLimit: 60,  // 60 calls per minute
+      rateLimit: 60,         // Max 60 calls per minute
     },
 
-    // Conditional access based on system state
+    // Only allow deletes for admin users
     'fs.delete_file': {
       requireApproval: true,
       when: (facts, args) => facts.userRole === 'admin',
@@ -127,27 +133,27 @@ const adapter = createMCPAdapter({
   toolConstraints: {
     'fs.write_file': { requireApproval: true },
   },
-  approvalTimeoutMs: 60000,  // 60s timeout (default: 5 minutes)
+  approvalTimeoutMs: 60000,  // Fail after 60s with no decision (default: 5 minutes)
+
   events: {
+    // Fires when a constrained tool call needs human approval
     onApprovalRequest: (request) => {
       console.log(`Approval needed: ${request.server}.${request.tool}`);
       console.log('Arguments:', request.args);
-
-      // Show in your UI
-      notifyApprover(request);
+      notifyApprover(request);  // Push to your approval UI
     },
+
     onApprovalResolved: (requestId, approved) => {
       console.log(`${requestId}: ${approved ? 'approved' : 'rejected'}`);
     },
   },
 });
 
-// In your approval handler:
+// Wire these into your approval UI handler
 adapter.approve(requestId);
-// or
 adapter.reject(requestId, 'Not authorized');
 
-// Check pending approvals
+// Query all pending approvals at any time
 const pending = adapter.getPendingApprovals();
 ```
 
@@ -162,31 +168,33 @@ const adapter = createMCPAdapter({
   servers: [
     { name: 'fs', transport: 'stdio', command: 'mcp-server-filesystem' },
   ],
+
+  // Map MCP resources to Directive facts
   resourceMappings: [
     {
       pattern: 'file://*.json',
       factKey: 'jsonFiles',
-      mode: 'poll',
-      pollInterval: 5000,  // Sync every 5 seconds
-      transform: (content) => JSON.parse(content),
+      mode: 'poll',                                       // Check for changes on a timer
+      pollInterval: 5000,                                  // Sync every 5 seconds
+      transform: (content) => JSON.parse(content),         // Parse raw content into objects
     },
     {
       pattern: /^file:\/\/.*\.md$/,
       factKey: 'markdownFiles',
-      mode: 'subscribe',  // Real-time updates via MCP subscription
+      mode: 'subscribe',                                   // Receive real-time push updates
     },
     {
       pattern: 'file:///workspace/config.yaml',
       factKey: 'config',
-      mode: 'manual',  // Only sync when you call adapter.syncResources()
+      mode: 'manual',                                      // Only sync on explicit call
     },
   ],
 });
 
-// Manual sync
+// Trigger a manual sync for resources with mode: 'manual'
 await adapter.syncResources(system.facts.$store.toObject());
 
-// Read a resource directly
+// Read a single resource directly by URI
 const resource = await adapter.readResource('fs', 'file:///workspace/README.md');
 ```
 
@@ -197,19 +205,17 @@ const resource = await adapter.readResource('fs', 'file:///workspace/README.md')
 Connect, disconnect, and monitor individual servers:
 
 ```typescript
-// Connect to a specific server
+// Manage individual server connections
 await adapter.connectServer('github');
-
-// Disconnect a specific server
 await adapter.disconnectServer('github');
 
-// Check server status
+// Inspect a single server
 const status = adapter.getServerStatus('filesystem');
-console.log(status?.status);  // 'disconnected' | 'connecting' | 'connected' | 'error'
-console.log(status?.tools);   // Available tools
-console.log(status?.resources); // Available resources
+console.log(status?.status);     // 'disconnected' | 'connecting' | 'connected' | 'error'
+console.log(status?.tools);      // Tools exposed by this server
+console.log(status?.resources);  // Resources exposed by this server
 
-// Get all statuses
+// Enumerate all server statuses at once
 const all = adapter.getAllServerStatuses();
 for (const [name, s] of all) {
   console.log(`${name}: ${s.status}`);
@@ -223,7 +229,7 @@ for (const [name, s] of all) {
 List available tools and resources across all connected servers:
 
 ```typescript
-// Tools grouped by server
+// List all tools exposed by connected servers
 const tools = adapter.getTools();
 for (const [server, serverTools] of tools) {
   for (const tool of serverTools) {
@@ -231,7 +237,7 @@ for (const [server, serverTools] of tools) {
   }
 }
 
-// Resources grouped by server
+// List all resources exposed by connected servers
 const resources = adapter.getResources();
 for (const [server, serverResources] of resources) {
   for (const resource of serverResources) {
@@ -249,6 +255,8 @@ Observe all MCP activity:
 ```typescript
 const adapter = createMCPAdapter({
   servers: [...],
+
+  // Hook into every MCP lifecycle event for logging or metrics
   events: {
     onConnect: (server) => console.log(`Connected: ${server}`),
     onDisconnect: (server) => console.log(`Disconnected: ${server}`),
@@ -272,9 +280,11 @@ MCP is primarily server-side, but you can display tool status and approval reque
 import { useAgentOrchestrator, useFact } from 'directive/react';
 
 function MCPToolPanel() {
+  // Approval mode – tool calls require explicit sign-off
   const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: false });
   const { system } = orchestrator;
 
+  // Subscribe to agent status, pending approvals, and tool call history
   const agent = useFact(system, '__agent');
   const approval = useFact(system, '__approval');
   const toolCalls = useFact(system, '__toolCalls');
@@ -302,6 +312,7 @@ import { onUnmounted } from 'vue';
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
 onUnmounted(() => orchestrator.dispose());
 
+// Reactive refs for approval queue and tool call history
 const approval = useFact(orchestrator.system, '__approval');
 const toolCalls = useFact(orchestrator.system, '__toolCalls');
 </script>
@@ -325,6 +336,7 @@ import { onDestroy } from 'svelte';
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
 onDestroy(() => orchestrator.dispose());
 
+// Svelte stores for approval queue and tool calls
 const approval = useFact(orchestrator.system, '__approval');
 const toolCalls = useFact(orchestrator.system, '__toolCalls');
 </script>
@@ -348,6 +360,7 @@ function MCPToolPanel() {
   const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
   onCleanup(() => orchestrator.dispose());
 
+  // Solid signals – call approval() and toolCalls() to read current values
   const approval = useFact(orchestrator.system, '__approval');
   const toolCalls = useFact(orchestrator.system, '__toolCalls');
 
@@ -371,6 +384,8 @@ import { FactController } from 'directive/lit';
 
 class MCPToolPanel extends LitElement {
   private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
+
+  // Reactive controllers – trigger re-render when approval or tool state changes
   private approval = new FactController(this, this.orchestrator.system, '__approval');
   private toolCalls = new FactController(this, this.orchestrator.system, '__toolCalls');
 
