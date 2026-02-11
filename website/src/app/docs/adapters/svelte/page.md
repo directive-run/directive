@@ -209,7 +209,7 @@ Access the full system instance:
 
 ### useWatch
 
-Watch a derivation or fact for changes. Automatically cleans up on component destroy:
+Watch a fact or derivation for changes. `useWatch` auto-detects whether the key refers to a fact or a derivation, so there is no need to pass a discriminator. Automatically cleans up on component destroy:
 
 ```svelte
 <script>
@@ -220,12 +220,16 @@ Watch a derivation or fact for changes. Automatically cleans up on component des
     analytics.track("pageViews", { from: prevValue, to: newValue });
   });
 
-  // Watch a fact for tracking user changes
-  useWatch("fact", "userId", (newValue, prevValue) => {
+  // Watch a fact – auto-detected, no "fact" discriminator needed
+  useWatch("userId", (newValue, prevValue) => {
     analytics.track("userId_changed", { from: prevValue, to: newValue });
   });
 </script>
 ```
+
+{% callout type="warning" title="Deprecated pattern" %}
+The three-argument form `useWatch("fact", "key", cb)` still works but is deprecated. Use the two-argument form `useWatch("key", cb)` instead -- `useWatch` now auto-detects whether the key is a fact or derivation.
+{% /callout %}
 
 ### useModule
 
@@ -775,7 +779,7 @@ Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/ti
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useSystem` | Hook | Access full system instance |
-| `useWatch` | Hook | Side-effect watcher for facts or derivations |
+| `useWatch` | Hook | Side-effect watcher for facts or derivations (auto-detects kind) |
 | `useModule` | Hook | Zero-config scoped system |
 | `useInspect` | Hook | System inspection (unmet, inflight, settled) with optional throttle |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |

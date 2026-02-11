@@ -232,10 +232,12 @@ function IncrementButton() {
 
 ## useWatch
 
-Side-effect watcher for derivations or facts. Does not cause re-renders.
+Side-effect watcher for facts or derivations. The key is auto-detected, so no discriminator is needed. Does not cause re-renders.
 
 ```typescript
-useWatch<T>(derivationId: string, callback: (newValue: T, previousValue: T | undefined) => void): void
+useWatch<T>(key: string, callback: (newValue: T, previousValue: T | undefined) => void): void
+
+// Deprecated: "fact" discriminator overload (still works)
 useWatch<T>(kind: "fact", factKey: string, callback: (newValue: T | undefined, previousValue: T | undefined) => void): void
 ```
 
@@ -243,23 +245,23 @@ useWatch<T>(kind: "fact", factKey: string, callback: (newValue: T | undefined, p
 import { useWatch } from 'directive/solid';
 
 function Analytics() {
-  // Watch a derivation for analytics tracking
+  // Watch a derivation -- auto-detected
   useWatch('pageViews', (newValue, prevValue) => {
     analytics.track('pageViews', { from: prevValue, to: newValue });
   });
 
-  return null;
-}
-
-function Logger() {
-  // Watch a fact for logging changes
-  useWatch('fact', 'count', (next, prev) => {
+  // Watch a fact -- auto-detected, no "fact" discriminator needed
+  useWatch('count', (next, prev) => {
     console.log(`count changed: ${prev} → ${next}`);
   });
 
   return null;
 }
 ```
+
+{% callout type="warning" title="Deprecated" %}
+The three-argument `useWatch("fact", key, callback)` overload still works but is deprecated. Use `useWatch(key, callback)` instead.
+{% /callout %}
 
 ---
 

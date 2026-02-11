@@ -4,6 +4,7 @@
 
 import type {
 	ModuleSchema,
+	InferFacts,
 	InferDerivations,
 	InferEvents,
 	InferSchemaType,
@@ -29,6 +30,17 @@ import type { ModuleDef } from "./module.js";
 export type DeriveAccessor<M extends ModuleSchema> = InferDerivations<M>;
 
 /**
+ * Fact keys from module schema.
+ */
+export type FactKeys<M extends ModuleSchema> = keyof M["facts"] & string;
+
+/**
+ * Get fact return type from module schema.
+ */
+export type FactReturnType<M extends ModuleSchema, K extends keyof M["facts"]> =
+	InferSchemaType<M["facts"][K]>;
+
+/**
  * Derivation keys from module schema.
  */
 export type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] & string;
@@ -38,6 +50,11 @@ export type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] & st
  */
 export type DerivationReturnType<M extends ModuleSchema, K extends keyof M["derivations"]> =
 	InferSchemaType<M["derivations"][K]>;
+
+/**
+ * All observable keys (facts + derivations) from module schema.
+ */
+export type ObservableKeys<M extends ModuleSchema> = FactKeys<M> | DerivationKeys<M>;
 
 // ============================================================================
 // Events Accessor Types
@@ -238,24 +255,48 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	read<T = unknown>(derivationId: string): T;
 	/**
 	 * Subscribe to fact or derivation changes.
-	 * Keys are auto-detected — pass any mix of fact keys and derivation keys.
+	 * Keys are auto-detected -- pass any mix of fact keys and derivation keys.
 	 * @example system.subscribe(["count", "doubled"], () => { ... })
 	 */
-	subscribe(ids: string[], listener: () => void): () => void;
+	subscribe(ids: Array<ObservableKeys<M>>, listener: () => void): () => void;
 
 	/**
 	 * Watch a fact or derivation for value changes.
-	 * The key is auto-detected — works with both fact keys and derivation keys.
+	 * The key is auto-detected -- works with both fact keys and derivation keys.
+	 * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
 	 * @example system.watch("count", (newVal, oldVal) => { ... })
+	 * @example system.watch("derived", cb, { equalityFn: shallowEqual })
 	 */
 	watch<K extends DerivationKeys<M>>(
 		id: K,
 		callback: (newValue: DerivationReturnType<M, K>, previousValue: DerivationReturnType<M, K> | undefined) => void,
+		options?: { equalityFn?: (a: DerivationReturnType<M, K>, b: DerivationReturnType<M, K> | undefined) => boolean },
+	): () => void;
+	watch<K extends FactKeys<M>>(
+		id: K,
+		callback: (newValue: FactReturnType<M, K>, previousValue: FactReturnType<M, K> | undefined) => void,
+		options?: { equalityFn?: (a: FactReturnType<M, K>, b: FactReturnType<M, K> | undefined) => boolean },
 	): () => void;
 	watch<T = unknown>(
 		id: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
+		options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
 	): () => void;
+
+	/**
+	 * Returns a promise that resolves when the predicate becomes true.
+	 * The predicate is evaluated against current facts and re-evaluated on every change.
+	 * Optionally pass a timeout in ms -- rejects with an error if exceeded.
+	 *
+	 * @example
+	 * await system.when((facts) => facts.phase === "ready");
+	 * @example
+	 * await system.when((facts) => facts.count > 10, { timeout: 5000 });
+	 */
+	when(
+		predicate: (facts: Readonly<InferFacts<M>>) => boolean,
+		options?: { timeout?: number },
+	): Promise<void>;
 
 	inspect(): SystemInspection;
 	settle(maxWait?: number): Promise<void>;

@@ -195,25 +195,80 @@ const total = system.read("cartTotal");
 
 ### subscribe
 
-Subscribe to derivation changes. Returns an unsubscribe function.
+Subscribe to fact or derivation changes. Accepts any combination of fact and derivation keys (auto-detected). Returns an unsubscribe function.
 
 ```typescript
-// Re-render or react whenever any of these derivations change
-const unsubscribe = system.subscribe(["cartTotal", "itemCount"], () => {
-  console.log("Derivation changed");
-});
+// Subscribe to fact changes
+system.subscribe(["count"], () => console.log("count changed"));
+
+// Subscribe to derivation changes
+system.subscribe(["doubled"], () => console.log("doubled changed"));
+
+// Subscribe to mix of facts and derivations
+system.subscribe(["count", "doubled"], () => console.log("something changed"));
+```
+
+**Signature:**
+
+```typescript
+subscribe(ids: Array<ObservableKeys<M>>, listener: () => void): () => void
 ```
 
 ### watch
 
-Watch a derivation and receive old/new values. Returns an unsubscribe function.
+Watch a fact or derivation and receive old/new values. Accepts both fact and derivation keys (auto-detected). Returns an unsubscribe function.
+
+Has three typed overloads: derivation-specific, fact-specific, and a generic fallback.
 
 ```typescript
-// Like subscribe, but also provides the old and new values
-const unsubscribe = system.watch("cartTotal", (newValue, previousValue) => {
-  console.log(`Changed from ${previousValue} to ${newValue}`);
+// Watch a fact
+system.watch("count", (newVal, oldVal) => {
+  console.log(`count: ${oldVal} -> ${newVal}`);
+});
+
+// Watch a derivation
+system.watch("doubled", (newVal, oldVal) => {
+  console.log(`doubled: ${oldVal} -> ${newVal}`);
+});
+
+// With custom equality
+system.watch("config", callback, {
+  equalityFn: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 });
 ```
+
+**Options:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `equalityFn` | `(a: T, b: T) => boolean` | Custom equality function to control when the callback fires. Defaults to `===`. |
+
+### when
+
+Wait for a predicate to become true. Returns a promise that resolves when the condition is met. Useful for awaiting state transitions.
+
+```typescript
+// Wait for a condition to become true
+await system.when((facts) => facts.phase === "ready");
+
+// With timeout
+await system.when(
+  (facts) => facts.count > 10,
+  { timeout: 5000 }
+);
+```
+
+**Signature:**
+
+```typescript
+when(predicate: (facts: Facts<M>) => boolean, options?: { timeout?: number }): Promise<void>
+```
+
+**Options:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `timeout` | `number` | Maximum time in ms to wait before rejecting. If omitted, waits indefinitely. |
 
 ### whenReady
 

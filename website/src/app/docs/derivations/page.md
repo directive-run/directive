@@ -118,7 +118,7 @@ system.read("user_fullName");     // Same thing
 
 ### `system.subscribe()`
 
-Subscribe to one or more derivations. The listener fires whenever any of the listed derivations are invalidated (i.e., when their fact dependencies change):
+Subscribe to one or more keys. The listener fires whenever any of the listed keys change. `subscribe()` auto-detects whether each key is a fact or derivation — you can mix both in a single call.
 
 ```typescript
 // Subscribe to a single derivation
@@ -131,8 +131,13 @@ const unsub2 = system.subscribe(["fullName", "isAdult"], () => {
   console.log("Name or age status changed");
 });
 
-// Namespaced derivation subscriptions
-const unsub3 = system.subscribe(["user.fullName", "cart.totalPrice"], () => {
+// Mix facts and derivations in one subscription
+const unsub3 = system.subscribe(["age", "fullName"], () => {
+  console.log("Age fact or fullName derivation changed");
+});
+
+// Namespaced subscriptions
+const unsub4 = system.subscribe(["user.fullName", "cart.totalPrice"], () => {
   console.log("User or cart changed");
 });
 
@@ -142,7 +147,9 @@ unsub();
 
 ### `system.watch()`
 
-Watch a single derivation with old and new values:
+Watch a single key (fact or derivation) with old and new values. Like `subscribe()`, `watch()` auto-detects the key type.
+
+You can pass an optional `equalityFn` to control when the listener fires. By default, values are compared with `===`. Provide a custom function to suppress notifications when the value is semantically unchanged (useful for object or array values):
 
 ```typescript
 // Watch a single derivation with old and new values
@@ -154,6 +161,11 @@ const unsub = system.watch("fullName", (newValue, previousValue) => {
 const unsub2 = system.watch("user.ageGroup", (newVal, oldVal) => {
   console.log(`Age group: ${oldVal} → ${newVal}`);
 });
+
+// Custom equality – only fire when the array length changes
+const unsub3 = system.watch("activeUsers", (newVal, oldVal) => {
+  console.log(`Active user count: ${newVal.length}`);
+}, { equalityFn: (a, b) => a.length === b.length });
 
 unsub();
 ```

@@ -178,7 +178,7 @@ function IncrementButton() {
 
 ### useWatch
 
-Watch a derivation or fact for changes – runs a callback as a side effect without creating a signal for rendering:
+Watch a fact or derivation for changes -- runs a callback as a side effect without creating a signal for rendering. The key is auto-detected as either a fact or derivation, so no discriminator is needed:
 
 ```tsx
 // Watch a derivation for analytics tracking
@@ -186,11 +186,23 @@ useWatch<number>("pageViews", (newValue, prevValue) => {
   analytics.track("pageViews", { from: prevValue, to: newValue });
 });
 
-// Watch a fact for tracking count changes
-useWatch("fact", "userId", (newValue, prevValue) => {
+// Watch a fact -- auto-detected, no "fact" discriminator needed
+useWatch<number>("userId", (newValue, prevValue) => {
   analytics.track("userId_changed", { from: prevValue, to: newValue });
 });
 ```
+
+{% callout type="warning" title="Deprecated: \"fact\" discriminator" %}
+The old `useWatch("fact", key, callback)` three-argument pattern still works but is deprecated. Use `useWatch(key, callback)` instead -- the runtime auto-detects whether the key is a fact or derivation.
+
+```tsx
+// Deprecated -- still works but not recommended
+useWatch("fact", "userId", (newValue, prevValue) => { /* ... */ });
+
+// Preferred -- auto-detects fact vs derivation
+useWatch("userId", (newValue, prevValue) => { /* ... */ });
+```
+{% /callout %}
 
 ### useSystem
 

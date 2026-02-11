@@ -111,38 +111,48 @@ class PhaseDisplay extends LitElement {
 
 ### WatchController
 
-Watch a derivation or fact and fire a callback on change (no re-render).
-
-Watch a derivation:
+Watch a fact or derivation and fire a callback on change (no re-render). The key is auto-detected as either a fact or derivation, so no discriminator is needed:
 
 ```typescript
 import { WatchController } from 'directive/lit';
 
 class PhaseWatcher extends LitElement {
-  // Watch the phase derivation for logging
+  // Watch the phase derivation for logging -- auto-detected
   private watcher = new WatchController<string>(
     this, system, 'phase',
     (newPhase, oldPhase) => {
       console.log(`Phase changed from ${oldPhase} to ${newPhase}`);
     }
   );
-}
-```
 
-Watch a fact (use the `{ kind: "fact", factKey }` overload):
-
-```typescript
-class FactWatcher extends LitElement {
-  // Watch the count fact for logging
-  private watcher = new WatchController<number>(
-    this, system,
-    { kind: "fact", factKey: "count" },
+  // Watch the count fact for logging -- auto-detected, no discriminator needed
+  private countWatcher = new WatchController<number>(
+    this, system, 'count',
     (newCount, oldCount) => {
       console.log(`Count changed from ${oldCount} to ${newCount}`);
     }
   );
 }
 ```
+
+{% callout type="warning" title="Deprecated: fact discriminator object" %}
+The old `{ kind: "fact", factKey: "key" }` options pattern still works but is deprecated. Use the string key directly instead -- the runtime auto-detects whether the key is a fact or derivation.
+
+```typescript
+// Deprecated -- still works but not recommended
+private watcher = new WatchController<number>(
+  this, system,
+  { kind: "fact", factKey: "count" },
+  (newCount, oldCount) => { /* ... */ }
+);
+
+// Preferred -- auto-detects fact vs derivation
+private watcher = new WatchController<number>(
+  this, system, 'count',
+  (newCount, oldCount) => { /* ... */ }
+);
+```
+{% /callout %}
 
 ---
 

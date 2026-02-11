@@ -600,7 +600,12 @@ export function createEngine<S extends Schema>(
 		watch<T = unknown>(
 			id: string,
 			callback: (newValue: T, previousValue: T | undefined) => void,
+			options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
 		): () => void {
+			const isEqual = options?.equalityFn
+				? (a: T, b: T | undefined) => options.equalityFn!(a, b)
+				: (a: T, b: T | undefined) => Object.is(a, b);
+
 			if (id in mergedDerive) {
 				// Derivation path
 				let previousValue: T | undefined = derivationsManager.get(
@@ -611,7 +616,7 @@ export function createEngine<S extends Schema>(
 					[id as keyof DerivationsDef<S>],
 					() => {
 						const newValue = derivationsManager.get(id as keyof DerivationsDef<S>) as T;
-						if (newValue !== previousValue) {
+						if (!isEqual(newValue, previousValue)) {
 							const oldValue = previousValue;
 							previousValue = newValue;
 							callback(newValue, oldValue);
@@ -621,13 +626,57 @@ export function createEngine<S extends Schema>(
 			}
 
 			// Fact path
+			if (process.env.NODE_ENV !== "production") {
+				if (!(id in mergedSchema)) {
+					console.warn(`[Directive] watch: unknown key "${id}"`);
+				}
+			}
 			let prev = store.get(id as keyof InferSchema<S>) as T | undefined;
 			return store.subscribe([id as keyof InferSchema<S>], () => {
 				const next = store.get(id as keyof InferSchema<S>) as T;
-				if (!Object.is(next, prev)) {
+				if (!isEqual(next, prev)) {
 					const old = prev;
 					prev = next;
 					callback(next, old);
+				}
+			});
+		},
+
+		when(
+			predicate: (facts: Record<string, unknown>) => boolean,
+			options?: { timeout?: number },
+		): Promise<void> {
+			return new Promise<void>((resolve, reject) => {
+				// Check immediately
+				const factsObj = store.toObject();
+				if (predicate(factsObj)) {
+					resolve();
+					return;
+				}
+
+				let unsub: (() => void) | undefined;
+				let timer: ReturnType<typeof setTimeout> | undefined;
+
+				const cleanup = () => {
+					unsub?.();
+					if (timer !== undefined) clearTimeout(timer);
+				};
+
+				// Subscribe to all fact changes
+				unsub = store.subscribeAll(() => {
+					const current = store.toObject();
+					if (predicate(current)) {
+						cleanup();
+						resolve();
+					}
+				});
+
+				// Timeout
+				if (options?.timeout !== undefined && options.timeout > 0) {
+					timer = setTimeout(() => {
+						cleanup();
+						reject(new Error(`[Directive] when: timed out after ${options.timeout}ms`));
+					}, options.timeout);
 				}
 			});
 		},

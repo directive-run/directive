@@ -358,8 +358,9 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 
 	/**
 	 * Watch a fact or derivation for changes using namespaced key.
-	 * The key is auto-detected — works with both fact keys and derivation keys.
+	 * The key is auto-detected -- works with both fact keys and derivation keys.
 	 * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
+	 * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
 	 *
 	 * @example
 	 * system.watch("auth.token", (newVal, oldVal) => {
@@ -369,7 +370,23 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	watch<T = unknown>(
 		id: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
+		options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
 	): () => void;
+
+	/**
+	 * Returns a promise that resolves when the predicate becomes true.
+	 * The predicate is evaluated against current facts and re-evaluated on every change.
+	 * Uses namespaced facts: `facts.auth.token`, `facts.data.count`, etc.
+	 * Optionally pass a timeout in ms -- rejects with an error if exceeded.
+	 *
+	 * @example
+	 * await system.when((facts) => facts.auth.token !== null);
+	 * await system.when((facts) => facts.auth.token !== null, { timeout: 5000 });
+	 */
+	when(
+		predicate: (facts: Readonly<MutableNamespacedFacts<Modules>>) => boolean,
+		options?: { timeout?: number },
+	): Promise<void>;
 
 	/** Inspect system state */
 	inspect(): SystemInspection;
@@ -595,20 +612,37 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 
 	/**
 	 * Subscribe to fact or derivation changes.
-	 * Keys are auto-detected — pass any mix of fact keys and derivation keys.
+	 * Keys are auto-detected -- pass any mix of fact keys and derivation keys.
 	 * @example system.subscribe(["count", "doubled"], () => { ... })
 	 */
 	subscribe(ids: string[], listener: () => void): () => void;
 
 	/**
 	 * Watch a fact or derivation for value changes.
-	 * The key is auto-detected — works with both fact keys and derivation keys.
+	 * The key is auto-detected -- works with both fact keys and derivation keys.
+	 * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
 	 * @example system.watch("count", (newVal, oldVal) => { ... })
+	 * @example system.watch("derived", cb, { equalityFn: shallowEqual })
 	 */
 	watch<T = unknown>(
 		id: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
+		options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
 	): () => void;
+
+	/**
+	 * Returns a promise that resolves when the predicate becomes true.
+	 * The predicate is evaluated against current facts and re-evaluated on every change.
+	 * Optionally pass a timeout in ms -- rejects with an error if exceeded.
+	 *
+	 * @example
+	 * await system.when((facts) => facts.count > 10);
+	 * await system.when((facts) => facts.count > 10, { timeout: 5000 });
+	 */
+	when(
+		predicate: (facts: Readonly<InferFacts<S>>) => boolean,
+		options?: { timeout?: number },
+	): Promise<void>;
 
 	/** Inspect system state */
 	inspect(): SystemInspection;

@@ -207,17 +207,18 @@ dispatch({ type: "increment" });
 
 ## useWatch
 
-Side-effect watcher for derivations or facts. Does not cause re-renders.
+Side-effect watcher for facts or derivations. Auto-detects whether the key is a fact or derivation. Does not cause re-renders.
 
 ```typescript
-// Watch a derivation
+// Watch a fact or derivation (auto-detected)
 function useWatch<T>(
   system: SingleModuleSystem<any>,
-  derivationKey: string,
+  key: string,
   callback: (newValue: T, prevValue: T | undefined) => void,
+  opts?: { equalityFn?: (a: T, b: T) => boolean },
 ): void
 
-// Watch a fact
+// @deprecated -- still works for backward compatibility
 function useWatch<T>(
   system: SingleModuleSystem<any>,
   kind: "fact",
@@ -229,21 +230,31 @@ function useWatch<T>(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `system` | `SingleModuleSystem` | The Directive system |
-| `kind` | `"fact"` | Literal string to indicate fact watching (second overload only) |
-| `derivationKey` / `factKey` | `string` | The key to watch |
+| `key` | `string` | The fact or derivation key to watch (auto-detected) |
 | `callback` | `(newVal, prevVal) => void` | Called when the value changes |
+| `opts.equalityFn` | `(a, b) => boolean` | Optional custom equality check to control when the callback fires |
 
 ```tsx
 import { useWatch } from 'directive/react';
 
-// Watch a derivation for analytics tracking
-useWatch(system, "pageViews", (newVal, prevVal) => {
-  analytics.track("pageViews", { from: prevVal, to: newVal });
+// Watch a fact (auto-detected)
+useWatch(system, "count", (newVal, oldVal) => {
+  console.log(`count: ${oldVal} -> ${newVal}`);
 });
 
-// Watch a fact for logging changes
-useWatch(system, "fact", "userId", (newVal, prevVal) => {
-  console.log(`userId changed: ${prevVal} -> ${newVal}`);
+// Watch a derivation (auto-detected)
+useWatch(system, "doubled", (newVal, oldVal) => {
+  console.log(`doubled: ${oldVal} -> ${newVal}`);
+});
+
+// With custom equality function
+useWatch(system, "position", (newVal, oldVal) => {
+  canvas.moveTo(newVal.x, newVal.y);
+}, { equalityFn: (a, b) => a?.x === b?.x && a?.y === b?.y });
+
+// @deprecated -- old pattern still works but is no longer needed
+useWatch(system, "fact", "userId", (newVal, oldVal) => {
+  console.log(`userId changed: ${oldVal} -> ${newVal}`);
 });
 ```
 

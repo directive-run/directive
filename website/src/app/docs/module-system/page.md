@@ -119,22 +119,44 @@ await system.settle();
 
 ### Subscribe
 
-React to derivation changes:
+React to changes in facts or derivations. Both `subscribe()` and `watch()` auto-detect whether each key is a fact or derivation — you can freely mix them:
 
 ```typescript
-// Subscribe to specific derivation changes
+// Subscribe to specific keys (facts or derivations)
 const unsubscribe = system.subscribe(["displayName", "isLoggedIn"], () => {
-  console.log('Derivation changed:', system.derive.displayName);
+  console.log('Value changed:', system.derive.displayName);
 });
 
-// Watch a single derivation with old and new values
-const unsub2 = system.watch("displayName", (newValue, prevValue) => {
+// Mix facts and derivations in one call
+const unsub2 = system.subscribe(["userId", "displayName"], () => {
+  console.log("userId fact or displayName derivation changed");
+});
+
+// Watch a single key with old and new values
+const unsub3 = system.watch("displayName", (newValue, prevValue) => {
   console.log(`Changed from "${prevValue}" to "${newValue}"`);
 });
 
+// Watch with a custom equality function
+const unsub4 = system.watch("items", (newVal, oldVal) => {
+  console.log(`Items updated: ${newVal.length} items`);
+}, { equalityFn: (a, b) => a.length === b.length });
+
 // Clean up subscriptions when no longer needed
 unsubscribe();
-unsub2();
+unsub3();
+```
+
+### When
+
+Wait for a condition to become true. `system.when()` returns a promise that resolves once the predicate passes:
+
+```typescript
+// Wait until the system reaches a specific state
+await system.when(() => system.facts.status === "ready");
+
+// With a timeout (rejects if condition isn't met in time)
+await system.when(() => system.derive.isLoggedIn, { timeout: 5000 });
 ```
 
 ### Events
