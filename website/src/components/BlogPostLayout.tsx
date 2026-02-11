@@ -144,6 +144,17 @@ export function BlogPostLayout({
         <div className="hidden xl:block" />
       </div>
 
+      <p className="mt-12 text-sm text-slate-400">
+        Directive is free and open source. If this was useful, consider{' '}
+        <Link
+          href="/support"
+          className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+        >
+          supporting the project
+        </Link>
+        .
+      </p>
+
       <div className="mt-16 border-t border-slate-200 pt-8 dark:border-slate-800">
         <Link
           href="/blog"

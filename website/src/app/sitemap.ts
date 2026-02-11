@@ -43,7 +43,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // TSX pages aren't auto-discovered by the .md glob
   const tsxPages = [
     { path: '/blog', priority: 0.8, changeFrequency: 'weekly' as const },
-    { path: '/about', priority: 0.7, changeFrequency: 'monthly' as const },
     { path: '/support', priority: 0.6, changeFrequency: 'monthly' as const },
   ]
 

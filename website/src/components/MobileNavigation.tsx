@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Dialog, DialogPanel } from '@headlessui/react'
 
+import { Heart } from '@phosphor-icons/react'
+
 import { Logomark } from '@/components/Logo'
 import { Navigation } from '@/components/Navigation'
 
@@ -97,6 +99,13 @@ export function MobileNavigation() {
           </div>
           <div className="mt-5 flex flex-col gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
             <Link
+              href="/docs/quick-start"
+              onClick={onLinkClick}
+              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+            >
+              Docs
+            </Link>
+            <Link
               href="/blog"
               onClick={onLinkClick}
               className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
@@ -104,17 +113,11 @@ export function MobileNavigation() {
               Blog
             </Link>
             <Link
-              href="/about"
-              onClick={onLinkClick}
-              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
-            >
-              About
-            </Link>
-            <Link
               href="/support"
               onClick={onLinkClick}
-              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+              className="flex items-center gap-1.5 text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
             >
+              <Heart weight="fill" className="h-3.5 w-3.5 text-slate-400" />
               Support
             </Link>
           </div>
