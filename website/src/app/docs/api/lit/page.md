@@ -278,12 +278,12 @@ class SummaryElement extends LitElement {
 
 ## WatchController
 
-Side-effect watcher for derivations or facts. Fires a callback when the watched value changes. Does not expose a `.value` property.
+Side-effect watcher for facts or derivations. The key is auto-detected, so no discriminator is needed. Fires a callback when the watched value changes. Does not expose a `.value` property.
 
 ```typescript
 import { WatchController } from 'directive/lit';
 
-// Watch a derivation
+// Unified API -- auto-detects fact vs derivation
 new WatchController(
   host: ReactiveControllerHost,
   system: System,
@@ -291,12 +291,11 @@ new WatchController(
   callback: (value: unknown, prev: unknown) => void,
 )
 
-// Watch a fact
+// Deprecated: "fact" discriminator overload (still works)
 new WatchController(
   host: ReactiveControllerHost,
   system: System,
-  "fact",
-  key: string,
+  { kind: "fact", factKey: string },
   callback: (value: unknown, prev: unknown) => void,
 )
 ```
@@ -305,27 +304,30 @@ new WatchController(
 |---|---|---|
 | `host` | `ReactiveControllerHost` | The Lit element (`this`) |
 | `system` | `System` | The Directive system |
-| `"fact"` | `string` | Literal `"fact"` to watch a fact instead of a derivation |
-| `key` | `string` | Key to watch |
+| `key` | `string` | Key to watch (auto-detected as fact or derivation) |
 | `callback` | `(value, prev) => void` | Called when the value changes |
 
 ```typescript
 class LoggerElement extends LitElement {
-  // Watch the phase derivation for logging
+  // Watch the phase derivation -- auto-detected
   private _watcher = new WatchController(
     this, system, "phase", (value, prev) => {
       console.log(`Phase changed: ${prev} -> ${value}`);
     }
   );
 
-  // Watch the count fact for logging
+  // Watch the count fact -- auto-detected, no discriminator needed
   private _factWatcher = new WatchController(
-    this, system, "fact", "count", (value, prev) => {
+    this, system, "count", (value, prev) => {
       console.log(`Count changed: ${prev} -> ${value}`);
     }
   );
 }
 ```
+
+{% callout type="warning" title="Deprecated" %}
+The `{ kind: "fact", factKey: "key" }` options object is deprecated. Pass the key as a plain string instead -- the runtime auto-detects whether it is a fact or derivation.
+{% /callout %}
 
 ---
 

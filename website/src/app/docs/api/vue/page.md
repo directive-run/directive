@@ -50,7 +50,7 @@ provideSystem(system, statusPlugin);
 | `useSelector` | Composable | Select from all facts with custom equality |
 | `useEvents` | Composable | Typed event dispatchers |
 | `useDispatch` | Composable | Low-level event dispatch |
-| `useWatch` | Composable | Side-effect watcher for facts or derivations |
+| `useWatch` | Composable | Side-effect watcher for facts or derivations (auto-detects kind) |
 | `useInspect` | Composable | System inspection (unmet, inflight, settled) |
 | `useConstraintStatus` | Composable | Reactive constraint inspection |
 | `useExplain` | Composable | Reactive requirement explanation |
@@ -288,16 +288,16 @@ const dispatch = useDispatch();
 
 ## useWatch
 
-Watch a derivation or fact and execute a callback when it changes. Does not cause re-renders – use for side effects only.
+Watch a fact or derivation and execute a callback when it changes. Auto-detects whether the key refers to a fact or a derivation -- no discriminator needed. Does not cause re-renders; use for side effects only.
 
 ```typescript
-// Watch a derivation
+// Unified API – auto-detects fact vs derivation
 function useWatch<T>(
-  derivationId: string,
+  key: string,
   callback: (newValue: T, previousValue: T | undefined) => void,
 ): void
 
-// Watch a fact
+// Deprecated – still works but prefer the unified form above
 function useWatch<T>(
   kind: "fact",
   factKey: string,
@@ -311,17 +311,21 @@ function useWatch<T>(
 <script setup>
 import { useWatch } from 'directive/vue';
 
-// Watch a derivation for analytics tracking
+// Watch a derivation – auto-detected
 useWatch('pageViews', (newVal, prevVal) => {
   analytics.track('pageViews', { from: prevVal, to: newVal });
 });
 
-// Watch a fact for logging changes
-useWatch('fact', 'userId', (newId, prevId) => {
+// Watch a fact – also auto-detected, no "fact" discriminator needed
+useWatch('userId', (newId, prevId) => {
   console.log(`User changed from ${prevId} to ${newId}`);
 });
 </script>
 ```
+
+{% callout type="warning" title="Deprecated pattern" %}
+The three-argument form `useWatch("fact", "key", cb)` still works but is deprecated. Use the two-argument form `useWatch("key", cb)` instead.
+{% /callout %}
 
 ---
 
