@@ -41,16 +41,16 @@ yarn add directive
 Directive uses subpath exports for tree-shaking and smaller bundles:
 
 ```typescript
-// Core API
+// Core API – modules, systems, and type builders
 import { createModule, createSystem, t } from 'directive';
 
-// React adapter
+// React adapter – reactive hooks for facts and derivations
 import { useFact, useDerived, useDispatch } from 'directive/react';
 
-// Plugins
+// Plugins – extend the system with logging, devtools, or persistence
 import { loggingPlugin, devtoolsPlugin, persistencePlugin } from 'directive/plugins';
 
-// Testing utilities
+// Testing utilities – mock resolvers and control async timing
 import { createTestSystem, createMockResolver, flushMicrotasks } from 'directive/testing';
 ```
 
@@ -63,9 +63,9 @@ Directive is written in TypeScript and provides full type inference. For the bes
 ```json
 {
   "compilerOptions": {
-    "strict": true,
-    "moduleResolution": "bundler",
-    "target": "ES2022"
+    "strict": true,                  // Required for full type inference
+    "moduleResolution": "bundler",   // Enables subpath exports like directive/react
+    "target": "ES2022"               // Proxy and WeakRef support
   }
 }
 ```
@@ -99,10 +99,11 @@ import { createSystem } from 'directive';
 import { useFact, useDerived } from 'directive/react';
 import { userModule } from './modules/user';
 
+// Create and start the system at module scope
 const system = createSystem({ module: userModule });
 system.start();
 
-// No provider needed — pass system directly to hooks
+// No provider needed – pass the system directly to hooks
 function App() {
   const displayName = useDerived(system, "displayName");
   return <div>Hello, {displayName}</div>;
@@ -117,6 +118,7 @@ import { createSystem } from 'directive';
 import { provideSystem } from 'directive/vue';
 import { userModule } from './modules/user';
 
+// Create the system and make it available to child components
 const system = createSystem({ module: userModule });
 system.start();
 provideSystem(system);
@@ -131,6 +133,7 @@ provideSystem(system);
   import { setDirectiveContext } from 'directive/svelte';
   import { userModule } from './modules/user';
 
+  // Create the system and inject it via Svelte's context API
   const system = createSystem({ module: userModule });
   system.start();
   setDirectiveContext(system);
@@ -146,13 +149,15 @@ import { userModule } from './modules/user';
 const system = createSystem({ module: userModule });
 system.start();
 
-// Watch a derivation for changes
+// Subscribe to derivation changes with a callback
 system.watch("displayName", (newValue, prevValue) => {
   console.log('Display name changed:', newValue);
 });
 
-// Update facts — constraints trigger automatically
+// Setting a fact triggers constraints and resolvers automatically
 system.facts.userId = 123;
+
+// Wait for all async resolvers to finish before reading results
 await system.settle();
 ```
 
@@ -169,15 +174,20 @@ import { userModule } from './modules/user';
 
 const system = createSystem({
   module: userModule,
+
+  // Stack plugins for visibility into every state change
   plugins: [
     loggingPlugin({ level: 'debug' }),
     devtoolsPlugin(),
   ],
+
+  // Enable time-travel to step through state history
   debug: {
     timeTravel: true,
     maxSnapshots: 100,
   },
 });
+
 system.start();
 ```
 
@@ -189,8 +199,10 @@ For quick prototyping, you can use Directive from a CDN:
 
 ```html
 <script type="module">
+  // Import directly from a CDN – no build step needed
   import { createModule, createSystem, t } from 'https://esm.sh/directive';
 
+  // Define a minimal counter module
   const counterModule = createModule("counter", {
     schema: {
       facts: { count: t.number() },
@@ -201,8 +213,11 @@ For quick prototyping, you can use Directive from a CDN:
     init: (facts) => { facts.count = 0; },
   });
 
+  // Wire it up and start
   const system = createSystem({ module: counterModule });
   system.start();
+
+  // Mutate facts directly – the proxy tracks the change
   system.facts.count++;
   console.log(system.facts.count); // 1
 </script>
@@ -233,12 +248,14 @@ Make sure you've initialized all facts in the `init` function. Uninitialized fac
 Check that you're only importing what you need. Avoid:
 
 ```typescript
+// Pulls in everything, defeating tree-shaking
 import * as Directive from 'directive'; // Don't do this
 ```
 
 Instead:
 
 ```typescript
+// Import only what you need – unused exports are removed at build time
 import { createModule, createSystem } from 'directive';
 ```
 

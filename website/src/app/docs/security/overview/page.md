@@ -24,11 +24,11 @@ Apply multiple layers of protection:
 
 ```
 User Input
-  → Prompt Injection Detection (block attacks)
-  → PII Detection (redact sensitive data)
-  → Agent Execution
-  → Output PII Scan (prevent data leaks)
-  → Audit Trail (log everything)
+  → Prompt Injection Detection  (block attacks before they reach agents)
+  → PII Detection               (redact sensitive data from input)
+  → Agent Execution              (safe to process after filtering)
+  → Output PII Scan             (catch any data leaks in responses)
+  → Audit Trail                 (log every operation for compliance)
 ```
 
 ---
@@ -41,9 +41,14 @@ import { createEnhancedPIIGuardrail, createPromptInjectionGuardrail } from 'dire
 
 const orchestrator = createAgentOrchestrator({
   runner: myRunner,
+
+  // Input guardrails run in order before each agent invocation
   guardrails: {
     input: [
+      // First line of defense: block injection attacks
       createPromptInjectionGuardrail({ strictMode: true }),
+
+      // Second pass: redact any PII that slipped through
       createEnhancedPIIGuardrail({ redact: true }),
     ],
   },
@@ -65,6 +70,6 @@ const orchestrator = createAgentOrchestrator({
 
 ## Next Steps
 
-- **Start with safety** — [PII Detection](/docs/security/pii) is the most common first step
-- **Add attack prevention** — [Prompt Injection](/docs/security/prompt-injection) for user-facing apps
-- **Compliance requirements?** — [GDPR/CCPA](/docs/security/compliance) for regulated industries
+- **Start with safety** – [PII Detection](/docs/security/pii) is the most common first step
+- **Add attack prevention** – [Prompt Injection](/docs/security/prompt-injection) for user-facing apps
+- **Compliance requirements?** – [GDPR/CCPA](/docs/security/compliance) for regulated industries

@@ -50,9 +50,9 @@ export function Icon({
 
 const gradients = {
   blue: [
-    { stopColor: '#0EA5E9' },
-    { stopColor: '#22D3EE', offset: '.527' },
-    { stopColor: '#818CF8', offset: 1 },
+    { stopColor: 'var(--brand-primary)' },
+    { stopColor: 'var(--brand-primary-300)', offset: '.527' },
+    { stopColor: 'var(--brand-accent)', offset: 1 },
   ],
   amber: [
     { stopColor: '#FDE68A', offset: '.08' },

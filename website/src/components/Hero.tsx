@@ -68,7 +68,7 @@ export function Hero() {
               priority
             />
             <div className="relative">
-              <p className="inline bg-linear-to-r from-indigo-200 via-sky-400 to-indigo-200 bg-clip-text font-display text-5xl tracking-tight text-transparent">
+              <p className="inline bg-clip-text font-display text-5xl tracking-tight text-transparent" style={{ backgroundImage: 'linear-gradient(to right, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))' }}>
                 State that resolves itself.
               </p>
               <p className="mt-3 text-2xl tracking-tight text-slate-400">
@@ -109,11 +109,11 @@ export function Hero() {
                 unoptimized
                 priority
               />
-              <div className="absolute inset-0 rounded-2xl bg-linear-to-tr from-sky-300 via-sky-300/70 to-blue-300 opacity-10 blur-lg" />
-              <div className="absolute inset-0 rounded-2xl bg-linear-to-tr from-sky-300 via-sky-300/70 to-blue-300 opacity-10" />
+              <div className="absolute inset-0 rounded-2xl bg-linear-to-tr from-brand-primary-300 via-brand-primary-300/70 to-brand-primary-200 opacity-10 blur-lg" />
+              <div className="absolute inset-0 rounded-2xl bg-linear-to-tr from-brand-primary-300 via-brand-primary-300/70 to-brand-primary-200 opacity-10" />
               <div className="relative rounded-2xl bg-[#0A101F]/80 ring-1 ring-white/10 backdrop-blur-sm">
-                <div className="absolute -top-px right-11 left-20 h-px bg-linear-to-r from-sky-300/0 via-sky-300/70 to-sky-300/0" />
-                <div className="absolute right-20 -bottom-px left-11 h-px bg-linear-to-r from-blue-400/0 via-blue-400 to-blue-400/0" />
+                <div className="absolute -top-px right-11 left-20 h-px bg-linear-to-r from-brand-primary-300/0 via-brand-primary-300/70 to-brand-primary-300/0" />
+                <div className="absolute right-20 -bottom-px left-11 h-px bg-linear-to-r from-brand-accent-400/0 via-brand-accent-400 to-brand-accent-400/0" />
                 <div className="pt-4 pl-4">
                   <TrafficLightsIcon className="h-2.5 w-auto stroke-slate-500/30" />
                   <div className="mt-4 flex space-x-2 text-xs">
@@ -123,7 +123,7 @@ export function Hero() {
                         className={clsx(
                           'flex h-6 rounded-full',
                           tab.isActive
-                            ? 'bg-linear-to-r from-sky-400/30 via-sky-400 to-sky-400/30 p-px font-medium text-sky-300'
+                            ? 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium text-brand-primary-300'
                             : 'text-slate-500',
                         )}
                       >

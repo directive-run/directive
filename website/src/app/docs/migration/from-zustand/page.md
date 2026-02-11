@@ -21,24 +21,29 @@ Migrate your Zustand application to Directive. {% .lead %}
 ## Before: Zustand Store
 
 ```typescript
-// Zustand
+// Before: Zustand approach – state and actions live together in a store
 import { create } from 'zustand';
 
+// Define the shape: state + action methods bundled in one interface
 interface CounterState {
   count: number;
   increment: () => void;
   decrement: () => void;
 }
 
+// Create a store with set() for immutable updates
 const useCounter = create<CounterState>((set) => ({
   count: 0,
+
+  // Each action must call set() and return a new state slice
   increment: () => set((state) => ({ count: state.count + 1 })),
   decrement: () => set((state) => ({ count: state.count - 1 })),
 }));
 
-// Usage
+// Usage – destructure state and actions from the hook
 function Counter() {
   const { count, increment, decrement } = useCounter();
+
   return (
     <div>
       <p>{count}</p>
@@ -52,22 +57,27 @@ function Counter() {
 ## After: Directive
 
 ```typescript
-// Directive
+// After: Directive approach – declare facts, mutate directly
 import { createModule, createSystem, t } from 'directive';
 import { useFact } from 'directive/react';
 
+// Define a module with typed schema – no action methods needed
 const counterModule = createModule("counter", {
   schema: {
     facts: { count: t.number() },
   },
+
+  // Set initial values for all facts
   init: (facts) => {
     facts.count = 0;
   },
 });
 
+// Wire up the system and start the runtime
 const system = createSystem({ module: counterModule });
+system.start();
 
-// Usage
+// Usage – subscribe to individual facts, mutate directly on system.facts
 function Counter() {
   const count = useFact(system, "count");
 
@@ -88,20 +98,25 @@ function Counter() {
 ### Zustand Async
 
 ```typescript
-// Zustand async pattern
+// Before: Zustand async pattern – you manage loading/error states and trigger fetches manually
 const useUser = create((set, get) => ({
+  // State
   userId: 0,
   user: null,
   loading: false,
   error: null,
 
+  // Action to update the userId
   setUserId: (id) => set({ userId: id }),
 
+  // Async action – caller is responsible for invoking this at the right time
   fetchUser: async () => {
     const { userId } = get();
     if (!userId) return;
 
+    // Manually toggle loading state before the request
     set({ loading: true, error: null });
+
     try {
       const user = await api.getUser(userId);
       set({ user, loading: false });
@@ -111,7 +126,7 @@ const useUser = create((set, get) => ({
   },
 }));
 
-// Usage - must call fetchUser manually
+// Usage – must wire up useEffect to call fetchUser whenever userId changes
 function UserProfile() {
   const { userId, user, loading, setUserId, fetchUser } = useUser();
 
@@ -124,7 +139,7 @@ function UserProfile() {
 ### Directive Constraints
 
 ```typescript
-// Directive - automatic data fetching
+// After: Directive approach – declare when data is needed, let the runtime fetch it
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -134,18 +149,23 @@ const userModule = createModule("user", {
       error: t.string().nullable(),
     },
   },
-  // Constraint handles the "when to fetch" logic
+
+  // Constraint declares WHAT must be true – no useEffect needed
   constraints: {
     needsUser: {
+      // Fires automatically whenever this condition becomes true
       when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
       require: { type: "FETCH_USER" },
     },
   },
+
+  // Resolver defines HOW to fulfill the requirement
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
       resolve: async (req, context) => {
         context.facts.loading = true;
+
         try {
           context.facts.user = await api.getUser(context.facts.userId);
         } catch (error) {
@@ -158,12 +178,12 @@ const userModule = createModule("user", {
   },
 });
 
-// Usage - just set userId, fetching is automatic
+// Usage – just set userId, the constraint triggers fetching automatically
 function UserProfile() {
   const userId = useFact(system, "userId");
   const user = useFact(system, "user");
 
-  // Setting userId triggers constraint automatically
+  // No useEffect, no manual fetch call – just mutate the fact
   const handleUserChange = (id) => {
     system.facts.userId = id;
   };
@@ -177,17 +197,18 @@ function UserProfile() {
 ### Zustand Selectors
 
 ```typescript
-// Zustand - manual subscription optimization
+// Before: Zustand selectors – computed values recalculate on every render
 const useCart = create((set) => ({
   items: [],
   addItem: (item) => set((s) => ({ items: [...s.items, item] })),
 }));
 
-// Computed via selector (runs on every render)
+// Selector runs the reduce on every render, even if items haven't changed
 function CartTotal() {
   const total = useCart((state) =>
     state.items.reduce((sum, item) => sum + item.price, 0)
   );
+
   return <p>Total: ${total}</p>;
 }
 ```
@@ -195,24 +216,29 @@ function CartTotal() {
 ### Directive Derivations
 
 ```typescript
-// Directive - auto-tracked, cached
+// After: Directive derivations – auto-tracked and cached, only recompute when deps change
 const cartModule = createModule("cart", {
   schema: {
     facts: {
       items: t.array(t.object<CartItem>()),
     },
   },
+
   init: (facts) => {
     facts.items = [];
   },
+
+  // Derivations automatically track which facts they read
   derive: {
-    // Only recomputes when items change
+    // Recomputes only when `items` changes – no manual memoization
     total: (facts) =>
       facts.items.reduce((sum, item) => sum + item.price, 0),
+
     itemCount: (facts) => facts.items.length,
   },
 });
 
+// Subscribe to a derived value – re-renders only when `total` changes
 function CartTotal() {
   const total = useDerived(system, "total");
   return <p>Total: ${total}</p>;
@@ -226,16 +252,17 @@ function CartTotal() {
 ### Zustand Middleware
 
 ```typescript
-// Zustand persist middleware
+// Before: Zustand persist middleware – wrap the store creator in a HOF
 import { persist } from 'zustand/middleware';
 
 const useStore = create(
+  // Middleware wraps the entire store definition
   persist(
     (set) => ({
       count: 0,
       increment: () => set((s) => ({ count: s.count + 1 })),
     }),
-    { name: 'my-storage' }
+    { name: 'my-storage' }  // Storage key for localStorage
   )
 );
 ```
@@ -243,15 +270,17 @@ const useStore = create(
 ### Directive Plugin
 
 ```typescript
-// Directive persistence plugin
+// After: Directive plugin – pass plugins as config, no wrapping needed
 import { persistencePlugin } from 'directive/plugins';
 
 const system = createSystem({
   module: myModule,
+
+  // Plugins are composable and declarative
   plugins: [
     persistencePlugin({
-      key: 'my-storage',
-      storage: localStorage,
+      key: 'my-storage',    // Same storage key concept
+      storage: localStorage, // Choose your storage backend
     }),
   ],
 });
@@ -264,12 +293,13 @@ const system = createSystem({
 ### Zustand
 
 ```typescript
+// Before: Zustand – state, actions, and computed values in one store object
 const useStore = create((set, get) => ({
-  // State
+  // State – plain values
   todos: [],
   filter: 'all',
 
-  // Actions
+  // Actions – each must call set() with new state
   addTodo: (text) => set((s) => ({
     todos: [...s.todos, { id: Date.now(), text, done: false }]
   })),
@@ -280,7 +310,7 @@ const useStore = create((set, get) => ({
     )
   })),
 
-  // Computed (not reactive)
+  // Computed – not reactive, recalculates on every call via get()
   getFilteredTodos: () => {
     const { todos, filter } = get();
     if (filter === 'done') return todos.filter(t => t.done);
@@ -293,24 +323,29 @@ const useStore = create((set, get) => ({
 ### Directive
 
 ```typescript
+// After: Directive – facts for state, derivations for computed, plain functions for actions
 const todoModule = createModule("todos", {
+  // Typed schema defines the shape of your facts
   schema: {
     facts: {
       todos: t.array(t.object<Todo>()),
       filter: t.string<'all' | 'done' | 'pending'>(),
     },
   },
+
   init: (facts) => {
     facts.todos = [];
     facts.filter = 'all';
   },
-  // Reactive derivations
+
+  // Reactive derivations – auto-tracked, cached, recompute only when deps change
   derive: {
     filteredTodos: (facts) => {
       if (facts.filter === 'done') return facts.todos.filter(t => t.done);
       if (facts.filter === 'pending') return facts.todos.filter(t => !t.done);
       return facts.todos;
     },
+
     doneCount: (facts) => facts.todos.filter(t => t.done).length,
     pendingCount: (facts) => facts.todos.filter(t => !t.done).length,
   },
@@ -319,7 +354,7 @@ const todoModule = createModule("todos", {
 const system = createSystem({ module: todoModule });
 system.start();
 
-// Actions are just mutations
+// Actions are just plain functions that mutate facts – no dispatch, no set()
 function addTodo(text: string) {
   system.facts.todos = [
     ...system.facts.todos,

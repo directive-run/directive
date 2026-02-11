@@ -22,9 +22,10 @@ Migrate your Redux application to Directive incrementally. {% .lead %}
 ## Before: Redux Counter
 
 ```typescript
-// Redux
+// Before: Redux approach – slices, actions, reducers, dispatch
 import { createSlice, configureStore } from '@reduxjs/toolkit';
 
+// Define a slice with name, initial state, and reducer functions
 const counterSlice = createSlice({
   name: 'counter',
   initialState: { value: 0 },
@@ -37,13 +38,15 @@ const counterSlice = createSlice({
   },
 });
 
+// Export auto-generated action creators
 export const { increment, decrement, incrementByAmount } = counterSlice.actions;
 
+// Wire up the store with all slice reducers
 const store = configureStore({
   reducer: { counter: counterSlice.reducer },
 });
 
-// Usage
+// Usage – dispatch action objects, read via getState()
 store.dispatch(increment());
 const value = store.getState().counter.value;
 ```
@@ -51,24 +54,28 @@ const value = store.getState().counter.value;
 ## After: Directive Counter
 
 ```typescript
-// Directive
+// After: Directive approach – no actions, no reducers, no dispatch
 import { createModule, createSystem, t } from 'directive';
 
+// Define a module with typed schema
 const counterModule = createModule("counter", {
   schema: {
     facts: { value: t.number() },
   },
+
   init: (facts) => {
     facts.value = 0;
   },
 });
 
+// Create and start the system
 const system = createSystem({ module: counterModule });
+system.start();
 
-// Usage - direct mutation
+// Usage – mutate facts directly, no action creators needed
 system.facts.value++;                    // increment
 system.facts.value--;                    // decrement
-system.facts.value += 10;                // incrementByAmount
+system.facts.value += 10;               // incrementByAmount
 const value = system.facts.value;        // read
 ```
 
@@ -79,12 +86,13 @@ const value = system.facts.value;        // read
 ### Redux Selectors
 
 ```typescript
-// Redux selectors
+// Before: Redux selectors – manual dependency declarations with createSelector
 const selectTotal = (state) =>
   state.cart.items.reduce((sum, item) => sum + item.price, 0);
 
 const selectItemCount = (state) => state.cart.items.length;
 
+// Must explicitly list input selectors for memoization
 const selectCartSummary = createSelector(
   [selectTotal, selectItemCount],
   (total, count) => ({ total, count })
@@ -94,21 +102,26 @@ const selectCartSummary = createSelector(
 ### Directive Derivations
 
 ```typescript
-// Directive - no manual dependency tracking
+// After: Directive derivations – dependencies are auto-tracked, no manual wiring
 const cartModule = createModule("cart", {
   schema: {
     facts: {
       items: t.array(t.object<CartItem>()),
     },
   },
+
   init: (facts) => {
     facts.items = [];
   },
+
   derive: {
+    // Reads `items` automatically – recomputes only when items change
     total: (facts) =>
       facts.items.reduce((sum, item) => sum + item.price, 0),
+
     itemCount: (facts) => facts.items.length,
-    // Composition just works
+
+    // Derivations can compose other derivations – no createSelector needed
     summary: (facts, derive) => ({
       total: derive.total,
       count: derive.itemCount,
@@ -124,27 +137,30 @@ const cartModule = createModule("cart", {
 ### Redux Thunk
 
 ```typescript
-// Redux thunk
+// Before: Redux thunk – async logic dispatches multiple actions to update state
 export const fetchUser = (userId) => async (dispatch) => {
-  dispatch(fetchUserStart());
+  dispatch(fetchUserStart());          // Signal loading started
+
   try {
     const user = await api.getUser(userId);
-    dispatch(fetchUserSuccess(user));
+    dispatch(fetchUserSuccess(user));   // Signal success with data
   } catch (error) {
-    dispatch(fetchUserFailure(error.message));
+    dispatch(fetchUserFailure(error.message)); // Signal failure
   }
 };
 
-// Slice reducers
+// Slice reducers – one for each loading state transition
 const userSlice = createSlice({
   name: 'user',
   initialState: { user: null, loading: false, error: null },
   reducers: {
     fetchUserStart: (state) => { state.loading = true },
+
     fetchUserSuccess: (state, action) => {
       state.loading = false;
       state.user = action.payload;
     },
+
     fetchUserFailure: (state, action) => {
       state.loading = false;
       state.error = action.payload;
@@ -152,14 +168,14 @@ const userSlice = createSlice({
   },
 });
 
-// Usage
+// Usage – caller must dispatch the thunk manually
 dispatch(fetchUser(123));
 ```
 
 ### Directive Constraints + Resolvers
 
 ```typescript
-// Directive - declarative data fetching
+// After: Directive – declarative data fetching, no thunks or dispatch
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -169,25 +185,30 @@ const userModule = createModule("user", {
       error: t.string().nullable(),
     },
   },
+
   init: (facts) => {
     facts.userId = 0;
     facts.user = null;
     facts.loading = false;
     facts.error = null;
   },
-  // Declare WHAT must be true
+
+  // Declare WHAT must be true – replaces the thunk trigger logic
   constraints: {
     needsUser: {
+      // Automatically fires when userId is set and no user data exists
       when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
       require: { type: "FETCH_USER" },
     },
   },
-  // Define HOW to make it true
+
+  // Define HOW to fulfill the requirement – replaces the thunk body
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
       resolve: async (req, context) => {
         context.facts.loading = true;
+
         try {
           context.facts.user = await api.getUser(context.facts.userId);
           context.facts.error = null;
@@ -201,7 +222,7 @@ const userModule = createModule("user", {
   },
 });
 
-// Usage - just set the userId, fetching happens automatically
+// Usage – just set the fact, the constraint handles the rest
 system.facts.userId = 123;
 ```
 
@@ -212,11 +233,11 @@ system.facts.userId = 123;
 ### Redux Middleware
 
 ```typescript
-// Redux logging middleware
+// Before: Redux logging middleware – triple-nested function signature
 const logger = (store) => (next) => (action) => {
-  console.log('dispatching', action);
-  const result = next(action);
-  console.log('next state', store.getState());
+  console.log('dispatching', action);   // Log before reducer runs
+  const result = next(action);           // Pass action down the chain
+  console.log('next state', store.getState()); // Log after reducer runs
   return result;
 };
 
@@ -229,19 +250,23 @@ const store = configureStore({
 ### Directive Plugin
 
 ```typescript
-// Directive logging plugin
+// After: Directive plugin – use the built-in or write a simple object
 import { loggingPlugin } from 'directive/plugins';
 
+// Built-in plugin handles common logging needs
 const system = createSystem({
   module: myModule,
   plugins: [loggingPlugin()],
 });
 
-// Or custom plugin
+// Or define a custom plugin – plain object with lifecycle hooks
 const myPlugin = {
+  // Called whenever a fact value changes
   onFactChange: (key, value, prev) => {
     console.log(`Fact ${key}: ${prev} -> ${value}`);
   },
+
+  // Called whenever a requirement is generated by a constraint
   onRequirement: (req) => {
     console.log('Requirement:', req);
   },
@@ -255,13 +280,13 @@ const myPlugin = {
 ### Step 1: Add Directive alongside Redux
 
 ```typescript
-// Keep Redux for existing features
+// Step 1: Run both side by side – Redux for existing code, Directive for new features
 const reduxStore = configureStore({ reducer: rootReducer });
 
-// Add Directive for new features
 const directiveSystem = createSystem({ module: newFeatureModule });
+directiveSystem.start();
 
-// Sync if needed
+// Optional: sync Directive fact changes back into Redux during migration
 directiveSystem.facts.$store.subscribeAll((key, value) => {
   reduxStore.dispatch(syncFromDirective({ [key]: value }));
 });
@@ -289,16 +314,19 @@ npm uninstall @reduxjs/toolkit react-redux
 ### Redux Component
 
 ```typescript
+// Before: Redux component – useSelector to read, useDispatch to write
 import { useSelector, useDispatch } from 'react-redux';
 import { increment, decrement } from './counterSlice';
 
 function Counter() {
+  // Read state through a selector function
   const count = useSelector((state) => state.counter.value);
   const dispatch = useDispatch();
 
   return (
     <div>
       <p>{count}</p>
+      {/* Dispatch action creators to update state */}
       <button onClick={() => dispatch(decrement())}>-</button>
       <button onClick={() => dispatch(increment())}>+</button>
     </div>
@@ -309,15 +337,18 @@ function Counter() {
 ### Directive Component
 
 ```typescript
+// After: Directive component – useFact to read, direct mutation to write
 import { useFact } from 'directive/react';
 import { system } from './system';
 
 function Counter() {
+  // Subscribe to a single fact – re-renders only when this value changes
   const count = useFact(system, "value");
 
   return (
     <div>
       <p>{count}</p>
+      {/* Mutate facts directly – no dispatch, no action creators */}
       <button onClick={() => system.facts.value--}>-</button>
       <button onClick={() => system.facts.value++}>+</button>
     </div>

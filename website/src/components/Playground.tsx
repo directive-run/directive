@@ -47,7 +47,7 @@ function PlaygroundTabs({
           className={clsx(
             'rounded-md px-3 py-1.5 text-sm font-medium transition',
             activeExample === key
-              ? 'bg-sky-500 text-white'
+              ? 'bg-brand-primary text-white'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
           )}
         >
@@ -123,7 +123,7 @@ function FallbackEditor({
             href="https://stackblitz.com/fork/directive-starter"
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md bg-sky-500 px-3 py-1 text-xs text-white transition hover:bg-sky-600"
+            className="rounded-md bg-brand-primary px-3 py-1 text-xs text-white transition hover:bg-brand-primary-600"
           >
             Open in StackBlitz
           </a>
@@ -212,7 +212,7 @@ export const Playground = memo(function Playground({
             type="checkbox"
             checked={useStackBlitz}
             onChange={(e) => setUseStackBlitz(e.target.checked)}
-            className="rounded border-slate-300 text-sky-500 focus:ring-sky-500"
+            className="rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
           />
           Use StackBlitz
         </label>
@@ -253,7 +253,7 @@ export const StackBlitzButton = memo(function StackBlitzButton({
       href={`https://stackblitz.com/fork/${projectId}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-600"
+      className="inline-flex items-center gap-2 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-primary-600"
     >
       <svg className="h-4 w-4" viewBox="0 0 28 28" fill="currentColor">
         <path d="M12.747 16.273h-7.46L18.925 1.5l-3.671 10.227h7.46L9.075 26.5l3.672-10.227z" />

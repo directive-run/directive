@@ -14,6 +14,7 @@ Pass a `modules` map to create a namespaced system:
 ```typescript
 import { createSystem } from 'directive';
 
+// Each key becomes a namespace for accessing that module's state
 const system = createSystem({
   modules: {
     auth: authModule,
@@ -30,15 +31,15 @@ const system = createSystem({
 Facts, derivations, and events are accessed by namespace:
 
 ```typescript
-// Access auth facts
+// Read authentication state from the auth namespace
 system.facts.auth.isAuthenticated;
 system.facts.auth.token;
 
-// Access cart facts
+// Read shopping cart state from the cart namespace
 system.facts.cart.items;
 system.facts.cart.total;
 
-// Dispatch module events
+// Dispatch events – the system routes them to the right module
 system.dispatch({ type: "ADD_ITEM", item: product });
 ```
 
@@ -50,6 +51,7 @@ Each module defines its own schema, constraints, resolvers, and effects:
 
 ```typescript
 const cartModule = createModule("cart", {
+  // Define the shape of cart state with typed schema fields
   schema: {
     facts: {
       items: t.array(t.object<CartItem>()),
@@ -58,19 +60,24 @@ const cartModule = createModule("cart", {
     },
   },
 
+  // Set default values when the module initializes
   init: (facts) => {
     facts.items = [];
     facts.couponCode = null;
     facts.discount = 0;
   },
 
+  // Auto-tracked derivations recompute when their dependencies change
   derive: {
     subtotal: (facts) =>
       facts.items.reduce((sum, item) => sum + item.price * item.qty, 0),
+
+    // Derivations can reference other derivations via the second argument
     total: (facts, derive) =>
       derive.subtotal - facts.discount,
   },
 
+  // Constraints declare "when X is true, require Y"
   constraints: {
     applyCoupon: {
       when: (facts) => facts.couponCode !== null && facts.discount === 0,
@@ -78,6 +85,7 @@ const cartModule = createModule("cart", {
     },
   },
 
+  // Resolvers fulfill requirements emitted by constraints
   resolvers: {
     applyCoupon: {
       requirement: "APPLY_COUPON",
@@ -97,13 +105,17 @@ const cartModule = createModule("cart", {
 You can also run modules as separate systems and coordinate through your application layer:
 
 ```typescript
+// Create separate systems – each module runs independently
 const authSystem = createSystem({ module: authModule });
 const cartSystem = createSystem({ module: cartModule });
 
-// Coordinate at the application level
+authSystem.start();
+cartSystem.start();
+
+// Coordinate across systems in your application logic
 function handleLogout() {
-  authSystem.facts.token = null;
-  cartSystem.facts.items = [];
+  authSystem.facts.token = null;  // Clear the session
+  cartSystem.facts.items = [];    // Empty the cart on logout
 }
 ```
 
@@ -111,9 +123,10 @@ function handleLogout() {
 
 ## React with Multiple Modules
 
-With independent systems, pass each system directly to the components that need it -- no provider needed:
+With independent systems, pass each system directly to the components that need it –no provider needed:
 
 ```typescript
+// Pass each independent system to the components that need it
 function App() {
   return (
     <Layout authSystem={authSystem} cartSystem={cartSystem} />
@@ -124,13 +137,16 @@ function App() {
 Or use a single namespaced system and pass it to hooks:
 
 ```typescript
+// Combine modules into a single namespaced system
 const system = createSystem({
   modules: { auth: authModule, cart: cartModule },
 });
+system.start();
 
 function App() {
-  // Access namespaced facts directly
+  // Read facts through the module namespace
   const isAuthenticated = system.facts.auth.isAuthenticated;
+
   return <Layout system={system} />;
 }
 ```

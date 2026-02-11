@@ -44,12 +44,12 @@ Redux pioneered predictable state management with actions and reducers.
 
 **Redux:**
 ```typescript
-// actions.ts
+// actions.ts – define a constant for every state transition
 const FETCH_USER = 'FETCH_USER';
 const FETCH_USER_SUCCESS = 'FETCH_USER_SUCCESS';
 const FETCH_USER_FAILURE = 'FETCH_USER_FAILURE';
 
-// reducer.ts
+// reducer.ts – manually handle each action type
 function userReducer(state, action) {
   switch (action.type) {
     case FETCH_USER:
@@ -63,9 +63,10 @@ function userReducer(state, action) {
   }
 }
 
-// thunk.ts
+// thunk.ts – orchestrate async flow with dispatches
 const fetchUser = (userId) => async (dispatch) => {
   dispatch({ type: FETCH_USER });
+
   try {
     const user = await api.getUser(userId);
     dispatch({ type: FETCH_USER_SUCCESS, payload: user });
@@ -77,6 +78,7 @@ const fetchUser = (userId) => async (dispatch) => {
 
 **Directive:**
 ```typescript
+// One module replaces actions + reducer + thunk
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -86,12 +88,16 @@ const userModule = createModule("user", {
       error: t.string().nullable(),
     },
   },
+
+  // Declare the rule – no manual dispatch wiring
   constraints: {
     needsUser: {
       when: (f) => f.userId > 0 && !f.user && !f.loading,
       require: { type: "FETCH_USER" },
     },
   },
+
+  // Retry is declarative – no boilerplate retry wrapper
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
@@ -136,9 +142,12 @@ const useUserStore = create((set, get) => ({
   userId: 0,
   user: null,
   loading: false,
+
+  // Must define the fetch logic inline with guard clauses
   fetchUser: async () => {
     if (get().loading || !get().userId) return;
     set({ loading: true });
+
     try {
       const user = await api.getUser(get().userId);
       set({ user, loading: false });
@@ -148,16 +157,18 @@ const useUserStore = create((set, get) => ({
   },
 }));
 
-// Manual trigger
+// Caller must remember to trigger the fetch manually
 useUserStore.getState().fetchUser();
 ```
 
 **Directive:**
 ```typescript
-// Constraint triggers automatically
+// Just set the fact – constraints detect the need automatically
 system.facts.userId = 123;
+
+// Wait for the system to settle (all resolvers complete)
 await system.settle();
-// User is fetched automatically
+// User is fetched, loaded, and ready – no manual trigger needed
 ```
 
 ---
@@ -182,6 +193,7 @@ XState is a state machine library with full statechart support.
 
 **XState:**
 ```typescript
+// Define every possible state and transition explicitly
 const userMachine = createMachine({
   id: 'user',
   initial: 'idle',
@@ -189,6 +201,7 @@ const userMachine = createMachine({
   states: {
     idle: {
       on: {
+        // Must wire each event to a target state
         SET_USER_ID: {
           target: 'loading',
           actions: assign({ userId: (_, e) => e.userId }),
@@ -197,6 +210,7 @@ const userMachine = createMachine({
       },
     },
     loading: {
+      // Invoke an async service for this state
       invoke: {
         src: (context) => api.getUser(context.userId),
         onDone: { target: 'success', actions: assign({ user: (_, e) => e.data }) },
@@ -205,6 +219,7 @@ const userMachine = createMachine({
     },
     success: {},
     error: {
+      // Manual retry requires sending another event
       on: { RETRY: 'loading' },
     },
   },
@@ -213,6 +228,7 @@ const userMachine = createMachine({
 
 **Directive:**
 ```typescript
+// No explicit state machine – constraints handle transitions
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -220,16 +236,21 @@ const userModule = createModule("user", {
       user: t.object<User>().nullable(),
     },
   },
+
   init: (facts) => {
     facts.userId = 0;
     facts.user = null;
   },
+
+  // One rule replaces idle/loading/success/error states
   constraints: {
     needsUser: {
       when: (f) => f.userId > 0 && !f.user,
       require: { type: "FETCH_USER" },
     },
   },
+
+  // Retry is built in – no manual RETRY event needed
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
@@ -269,11 +290,13 @@ resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
     resolve: async (req, context) => {
-      // Use React Query's queryClient
+      // Delegate caching and deduplication to React Query
       const user = await queryClient.fetchQuery({
         queryKey: ['user', context.facts.userId],
         queryFn: () => api.getUser(context.facts.userId),
       });
+
+      // Directive handles the constraint logic, React Query handles caching
       context.facts.user = user;
     },
   },

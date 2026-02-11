@@ -12,10 +12,13 @@ The logging plugin hooks into every lifecycle event in a Directive system and lo
 ```typescript
 import { loggingPlugin } from 'directive/plugins';
 
+// Zero-config: logs info-level events and above with the [Directive] prefix
 const system = createSystem({
   module: myModule,
   plugins: [loggingPlugin()],
 });
+
+system.start();
 ```
 
 With defaults, this logs `info`-level events and above using `console`, prefixed with `[Directive]`.
@@ -71,6 +74,7 @@ Log only fact-related events:
 
 ```typescript
 loggingPlugin({
+  // Show all events, then narrow down to just fact mutations
   level: 'debug',
   filter: (event) => event.startsWith('fact.'),
 })
@@ -80,6 +84,7 @@ Log everything except derivation noise:
 
 ```typescript
 loggingPlugin({
+  // Derivations recompute frequently –filter them out to reduce clutter
   level: 'debug',
   filter: (event) => !event.startsWith('derivation.'),
 })
@@ -89,6 +94,7 @@ Log only resolver lifecycle:
 
 ```typescript
 loggingPlugin({
+  // Focus on async work: starts, completions, retries, errors
   level: 'debug',
   filter: (event) => event.startsWith('resolver.'),
 })
@@ -105,12 +111,15 @@ import pino from 'pino';
 
 const log = pino();
 
+// Redirect Directive logs through pino instead of the browser console
 loggingPlugin({
   logger: {
     debug: (...args) => log.debug(args),
     info: (...args) => log.info(args),
     warn: (...args) => log.warn(args),
     error: (...args) => log.error(args),
+
+    // pino doesn't support console grouping, so these are no-ops
     group: () => {},
     groupEnd: () => {},
   },
@@ -126,6 +135,7 @@ The logging plugin has no side effects beyond console output, but you should exc
 ```typescript
 const plugins = [];
 
+// Only add logging in dev –avoids console noise and minor overhead in prod
 if (process.env.NODE_ENV !== 'production') {
   plugins.push(loggingPlugin({ level: 'debug' }));
 }
@@ -134,6 +144,8 @@ const system = createSystem({
   module: myModule,
   plugins,
 });
+
+system.start();
 ```
 
 ---
@@ -160,6 +172,6 @@ Events with no associated data log just the prefix and event name (e.g. `[Direct
 
 ## Next Steps
 
-- [DevTools Plugin](/docs/plugins/devtools) -- browser integration
-- [Persistence Plugin](/docs/plugins/persistence) -- save and restore state
-- [Plugin Overview](/docs/plugins/overview) -- all built-in plugins
+- [DevTools Plugin](/docs/plugins/devtools) –browser integration
+- [Persistence Plugin](/docs/plugins/persistence) –save and restore state
+- [Plugin Overview](/docs/plugins/overview) –all built-in plugins

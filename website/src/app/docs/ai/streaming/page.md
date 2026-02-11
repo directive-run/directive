@@ -9,7 +9,7 @@ Process agent responses token-by-token with real-time guardrails. {% .lead %}
 
 ## Orchestrator Streaming
 
-The simplest way to stream — use `orchestrator.runStream()` which wraps the agent run with guardrails, approval checks, and state tracking:
+The simplest way to stream – use `orchestrator.runStream()` which wraps the agent run with guardrails, approval checks, and state tracking:
 
 ```typescript
 import { createAgentOrchestrator } from 'directive/ai';
@@ -26,24 +26,25 @@ const agent: AgentLike = {
   model: 'gpt-4',
 };
 
+// Start a streaming run – returns the stream, a result promise, and an abort handle
 const { stream, result, abort } = orchestrator.runStream<string>(agent, 'Explain WebAssembly');
 
 for await (const chunk of stream) {
   switch (chunk.type) {
     case 'token':
-      process.stdout.write(chunk.data);
+      process.stdout.write(chunk.data);                // Append each token as it arrives
       break;
     case 'tool_start':
-      console.log(`\nCalling tool: ${chunk.tool}`);
+      console.log(`\nCalling tool: ${chunk.tool}`);    // Agent is invoking a tool
       break;
     case 'tool_end':
-      console.log(`Tool done: ${chunk.result}`);
+      console.log(`Tool done: ${chunk.result}`);       // Tool returned a result
       break;
     case 'guardrail_triggered':
-      console.warn(`Guardrail ${chunk.guardrailName}: ${chunk.reason}`);
+      console.warn(`Guardrail ${chunk.guardrailName}: ${chunk.reason}`);  // Safety check fired
       break;
     case 'approval_required':
-      // Show UI for approval — call orchestrator.approve(chunk.requestId)
+      // Pause and show UI – call orchestrator.approve(chunk.requestId) to continue
       break;
     case 'done':
       console.log(`\n\nDone: ${chunk.totalTokens} tokens in ${chunk.duration}ms`);
@@ -54,7 +55,7 @@ for await (const chunk of stream) {
   }
 }
 
-// Get the final result after stream completes
+// Await the completed result after the stream closes
 const finalResult = await result;
 ```
 
@@ -86,16 +87,16 @@ Abort a stream at any time:
 ```typescript
 const { stream, result, abort } = orchestrator.runStream(agent, input);
 
-// Cancel after 5 seconds
+// Cancel after a timeout using the abort handle
 setTimeout(() => abort(), 5000);
 
-// Or pass an AbortSignal
+// Or pass an AbortSignal for external cancellation control
 const controller = new AbortController();
 const { stream: s2 } = orchestrator.runStream(agent, input, {
   signal: controller.signal,
 });
 
-// Cancel from elsewhere
+// Trigger cancellation from anywhere that holds the controller
 controller.abort();
 ```
 
@@ -114,13 +115,13 @@ const stack = createAgentStack({
   agents: { chat: { agent: chatAgent, capabilities: ['chat'] } },
 });
 
-// Token-only stream
+// Simple stream – yields one raw token string at a time
 const tokenStream = stack.stream('chat', 'Hello!');
 for await (const token of tokenStream) {
   process.stdout.write(token);
 }
 
-// Rich chunk stream (tokens, tool calls, guardrails, progress)
+// Rich stream – yields typed chunks (tokens, tool calls, guardrails, progress)
 const { stream, result, abort } = stack.streamChunks('chat', 'Hello!');
 for await (const chunk of stream) {
   if (chunk.type === 'token') process.stdout.write(chunk.data);
@@ -140,9 +141,10 @@ For streaming outside the orchestrator (e.g., direct agent runs without guardrai
 import { createStreamingRunner } from 'directive/ai';
 import type { StreamRunOptions } from 'directive/ai';
 
+// Build a streaming runner by wrapping your LLM SDK's streaming API
 const streamRunner = createStreamingRunner(
-  // Your base run function with streaming callbacks
   async (agent, input, callbacks) => {
+    // Start a streaming completion request
     const stream = await openai.chat.completions.create({
       model: agent.model ?? 'gpt-4',
       messages: [
@@ -156,15 +158,16 @@ const streamRunner = createStreamingRunner(
     let fullContent = '';
 
     for await (const chunk of stream) {
-      if (callbacks.signal?.aborted) break;
+      if (callbacks.signal?.aborted) break;    // Stop if the caller cancelled
 
       const token = chunk.choices[0]?.delta?.content ?? '';
       if (token) {
-        callbacks.onToken?.(token);
+        callbacks.onToken?.(token);            // Push each token to the stream
         fullContent += token;
       }
     }
 
+    // Return the final assembled result
     return {
       output: fullContent,
       messages,
@@ -174,7 +177,7 @@ const streamRunner = createStreamingRunner(
   }
 );
 
-// Use the runner
+// Use the runner with backpressure and guardrail options
 const { stream, result, abort } = streamRunner(agent, 'Hello', {
   backpressure: 'buffer',
   guardrailCheckInterval: 50,
@@ -188,18 +191,18 @@ const { stream, result, abort } = streamRunner(agent, 'Hello', {
 Control what happens when the consumer is slower than the producer:
 
 ```typescript
-// Buffer all tokens (default — lossless, uses memory)
+// Buffer – keeps all tokens in memory (lossless, default)
 const { stream } = streamRunner(agent, input, {
   backpressure: 'buffer',
 });
 
-// Drop tokens when buffer is full (lossy, fast)
+// Drop – discards tokens when the buffer fills up (lossy, but fast)
 const { stream: s2 } = streamRunner(agent, input, {
   backpressure: 'drop',
   bufferSize: 100,
 });
 
-// Block producer when buffer is full (lossless, may slow response)
+// Block – pauses the producer until the consumer catches up (lossless, may slow response)
 const { stream: s3 } = streamRunner(agent, input, {
   backpressure: 'block',
   bufferSize: 500,
@@ -224,13 +227,13 @@ import {
 
 const streamRunner = createStreamingRunner(baseRunner, {
   streamingGuardrails: [
-    // Stop if output exceeds token limit
+    // Halt the stream if the output grows too long
     createLengthStreamingGuardrail({
       maxTokens: 2000,
-      warnAt: 1500,
+      warnAt: 1500,               // Emit a warning chunk at 75%
     }),
 
-    // Stop on forbidden patterns
+    // Halt the stream when sensitive data patterns appear
     createPatternStreamingGuardrail({
       patterns: [
         { regex: /\b\d{3}-\d{2}-\d{4}\b/, name: 'SSN' },
@@ -241,14 +244,14 @@ const streamRunner = createStreamingRunner(baseRunner, {
 });
 
 const { stream } = streamRunner(agent, input, {
-  guardrailCheckInterval: 50,     // Check every 50 tokens
-  stopOnGuardrail: true,          // Stop stream on guardrail failure
+  guardrailCheckInterval: 50,     // Evaluate guardrails every 50 tokens
+  stopOnGuardrail: true,          // Terminate the stream on any guardrail failure
 });
 
 for await (const chunk of stream) {
   if (chunk.type === 'guardrail_triggered') {
     console.warn(`${chunk.guardrailName}: ${chunk.reason}`);
-    if (chunk.stopped) break;
+    if (chunk.stopped) break;     // Stream was halted by the guardrail
   }
 }
 ```
@@ -260,6 +263,7 @@ Merge multiple streaming guardrails into one:
 ```typescript
 import { combineStreamingGuardrails } from 'directive/ai';
 
+// Merge multiple streaming guardrails into a single checker
 const combined = combineStreamingGuardrails([
   createLengthStreamingGuardrail({ maxTokens: 2000 }),
   createPatternStreamingGuardrail({ patterns: [...] }),
@@ -277,10 +281,11 @@ Reuse existing output guardrails as streaming guardrails:
 ```typescript
 import { adaptOutputGuardrail } from 'directive/ai';
 
+// Reuse an existing output guardrail as a streaming guardrail
 const streamingVersion = adaptOutputGuardrail(
-  'pii-streaming',        // name
-  myOutputGuardrail,       // existing guardrail function
-  { minTokens: 100 },     // options (optional)
+  'pii-streaming',        // Name for logging and error messages
+  myOutputGuardrail,       // Your existing guardrail function
+  { minTokens: 100 },     // Wait for 100 tokens before first check
 );
 ```
 
@@ -297,6 +302,7 @@ Consume an entire stream and return the concatenated text:
 ```typescript
 import { collectTokens } from 'directive/ai';
 
+// Consume the entire stream and return the concatenated text
 const { stream } = orchestrator.runStream(agent, input);
 const fullOutput = await collectTokens(stream);
 ```
@@ -310,13 +316,14 @@ import { tapStream } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
+// Observe each chunk for side effects (logging, metrics) without modifying it
 const logged = tapStream(stream, (chunk) => {
   if (chunk.type === 'token') tokenCount++;
   if (chunk.type === 'error') reportError(chunk.error);
 });
 
 for await (const chunk of logged) {
-  // Same chunks, but tap ran first
+  // Chunks are unchanged – tap only inspects them
 }
 ```
 
@@ -329,11 +336,11 @@ import { filterStream } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
-// Only get token and done chunks
+// Keep only the chunk types you care about
 const tokensOnly = filterStream(stream, ['token', 'done']);
 
 for await (const chunk of tokensOnly) {
-  // chunk.type is narrowed to 'token' | 'done'
+  // TypeScript narrows chunk.type to 'token' | 'done'
 }
 ```
 
@@ -346,11 +353,12 @@ import { mapStream } from 'directive/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
+// Transform each chunk as it flows through the stream
 const uppercased = mapStream(stream, (chunk) => {
   if (chunk.type === 'token') {
     return { ...chunk, data: chunk.data.toUpperCase() };
   }
-  return chunk;
+  return chunk;  // Pass non-token chunks through unchanged
 });
 ```
 
@@ -358,7 +366,7 @@ const uppercased = mapStream(stream, (chunk) => {
 
 ## Framework Integration
 
-The streaming API is framework-agnostic — `orchestrator.runStream()` works the same everywhere. The framework layer handles reactive UI updates as chunks arrive.
+The streaming API is framework-agnostic – `orchestrator.runStream()` works the same everywhere. The framework layer handles reactive UI updates as chunks arrive.
 
 ### React
 
@@ -372,9 +380,11 @@ function ChatStream() {
   const [output, setOutput] = useState('');
 
   const send = useCallback(async (input: string) => {
-    setOutput('');
+    setOutput('');  // Clear previous output before starting a new stream
+
     const { stream } = orchestrator.runStream(myAgent, input);
 
+    // Append each token to state as it arrives
     for await (const chunk of stream) {
       if (chunk.type === 'token') setOutput((prev) => prev + chunk.data);
     }
@@ -404,10 +414,11 @@ const agent = useFact(orchestrator.system, '__agent');
 const output = ref('');
 
 async function send(input: string) {
-  output.value = '';
+  output.value = '';  // Reset before each new stream
+
   const { stream } = orchestrator.runStream(myAgent, input);
   for await (const chunk of stream) {
-    if (chunk.type === 'token') output.value += chunk.data;
+    if (chunk.type === 'token') output.value += chunk.data;  // Append tokens reactively
   }
 }
 </script>
@@ -433,10 +444,11 @@ const agent = useFact(orchestrator.system, '__agent');
 let output = '';
 
 async function send(input) {
-  output = '';
+  output = '';  // Clear previous response
+
   const { stream } = orchestrator.runStream(myAgent, input);
   for await (const chunk of stream) {
-    if (chunk.type === 'token') output += chunk.data;
+    if (chunk.type === 'token') output += chunk.data;  // Svelte reactively updates the template
   }
 }
 </script>
@@ -461,7 +473,8 @@ function ChatStream() {
   const [output, setOutput] = createSignal('');
 
   async function send(input: string) {
-    setOutput('');
+    setOutput('');  // Reset signal before streaming
+
     const { stream } = orchestrator.runStream(myAgent, input);
     for await (const chunk of stream) {
       if (chunk.type === 'token') setOutput((prev) => prev + chunk.data);
@@ -496,12 +509,13 @@ class ChatStream extends LitElement {
 
   async send(input: string) {
     this.output = '';
-    this.requestUpdate();
+    this.requestUpdate();  // Clear the display immediately
+
     const { stream } = this.orchestrator.runStream(myAgent, input);
     for await (const chunk of stream) {
       if (chunk.type === 'token') {
         this.output += chunk.data;
-        this.requestUpdate();
+        this.requestUpdate();  // Re-render after each token
       }
     }
   }

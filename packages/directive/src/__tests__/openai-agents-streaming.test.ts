@@ -14,14 +14,14 @@ import {
 	type StreamingGuardrail,
 	type StreamingRunResult,
 	type BackpressureStrategy,
-} from "../adapters/openai-agents-streaming.js";
+} from "../adapters/ai/streaming.js";
 import type {
 	AgentLike,
 	RunResult,
 	Message,
 	GuardrailFn,
 	OutputGuardrailData,
-} from "../adapters/openai-agents.js";
+} from "../adapters/ai/index.js";
 
 // ============================================================================
 // Helpers

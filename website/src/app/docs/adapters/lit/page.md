@@ -1,6 +1,6 @@
 ---
 title: Lit Adapter
-description: Use Directive with Lit web components using reactive controllers. DerivationController, FactController, InspectController, ExplainController, ModuleController, and more.
+description: Use Directive with Lit web components using reactive controllers. DerivedController, FactController, InspectController, ExplainController, ModuleController, and more.
 ---
 
 Directive provides native Lit integration using the Reactive Controller pattern. Controllers automatically subscribe on connect and clean up on disconnect. {% .lead %}
@@ -12,7 +12,7 @@ Directive provides native Lit integration using the Reactive Controller pattern.
 The Lit adapter is included in the main package:
 
 ```typescript
-import { DerivationController, FactController, createDerivation } from 'directive/lit';
+import { DerivedController, FactController, createDerived } from 'directive/lit';
 ```
 
 ---
@@ -25,23 +25,24 @@ Create your system and start it in `connectedCallback`:
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { createSystem } from 'directive';
-import { DerivationController, FactController, useFacts } from 'directive/lit';
+import { DerivedController, FactController } from 'directive/lit';
 import { counterModule } from './modules/counter';
 
+// Create and start the system
 const system = createSystem({ module: counterModule });
 system.start();
 
 @customElement('my-counter')
 class MyCounter extends LitElement {
-  private count = new DerivationController<number>(this, system, 'count');
-  private facts = useFacts(system);
+  // Subscribe to the count derivation – re-renders when it changes
+  private count = new DerivedController<number>(this, system, 'count');
 
   render() {
     return html`
       <div>
         <p>Count: ${this.count.value}</p>
-        <button @click=${() => this.facts.count--}>-</button>
-        <button @click=${() => this.facts.count++}>+</button>
+        <button @click=${() => system.facts.count--}>-</button>
+        <button @click=${() => system.facts.count++}>+</button>
       </div>
     `;
   }
@@ -54,15 +55,18 @@ Each controller calls `host.addController(this)` in its constructor, subscribes 
 
 ## Core Controllers
 
-### DerivationController
+### DerivedController
 
-Subscribe to a single derivation. The host re-renders when the value changes:
+Subscribe to one or more derivations. The host re-renders when any value changes.
+
+Single key:
 
 ```typescript
-import { DerivationController } from 'directive/lit';
+import { DerivedController } from 'directive/lit';
 
 class StatusDisplay extends LitElement {
-  private isRed = new DerivationController<boolean>(this, system, 'isRed');
+  // Subscribe to the isRed derivation – re-renders when it changes
+  private isRed = new DerivedController<boolean>(this, system, 'isRed');
 
   render() {
     return html`<div>${this.isRed.value ? 'Red' : 'Not Red'}</div>`;
@@ -70,15 +74,14 @@ class StatusDisplay extends LitElement {
 }
 ```
 
-### DerivationsController
-
-Subscribe to multiple derivations at once:
+Array of keys:
 
 ```typescript
-import { DerivationsController } from 'directive/lit';
+import { DerivedController } from 'directive/lit';
 
 class StatusBar extends LitElement {
-  private state = new DerivationsController<{ isRed: boolean; elapsed: number }>(
+  // Subscribe to multiple derivations at once
+  private state = new DerivedController<{ isRed: boolean; elapsed: number }>(
     this, system, ['isRed', 'elapsed']
   );
 
@@ -97,6 +100,7 @@ Subscribe to a single fact:
 import { FactController } from 'directive/lit';
 
 class PhaseDisplay extends LitElement {
+  // Subscribe to the current phase – re-renders when it changes
   private phase = new FactController<string>(this, system, 'phase');
 
   render() {
@@ -115,6 +119,7 @@ Watch a derivation:
 import { WatchController } from 'directive/lit';
 
 class PhaseWatcher extends LitElement {
+  // Watch the phase derivation for logging
   private watcher = new WatchController<string>(
     this, system, 'phase',
     (newPhase, oldPhase) => {
@@ -128,6 +133,7 @@ Watch a fact (use the `{ kind: "fact", factKey }` overload):
 
 ```typescript
 class FactWatcher extends LitElement {
+  // Watch the count fact for logging
   private watcher = new WatchController<number>(
     this, system,
     { kind: "fact", factKey: "count" },
@@ -150,6 +156,7 @@ Get system inspection data with optional throttling. Returns `InspectState` with
 import { InspectController } from 'directive/lit';
 
 class Inspector extends LitElement {
+  // Get reactive system inspection data
   private inspection = new InspectController(this, system);
 
   render() {
@@ -167,7 +174,7 @@ For high-frequency updates, pass `{ throttleMs }`:
 
 ```typescript
 class ThrottledInspector extends LitElement {
-  // Updates at most every 200ms
+  // Throttle inspection updates to limit render frequency
   private inspection = new InspectController(this, system, { throttleMs: 200 });
 
   render() {
@@ -185,6 +192,7 @@ Get a reactive explanation of why a requirement exists:
 import { ExplainController } from 'directive/lit';
 
 class RequirementDebug extends LitElement {
+  // Get a detailed explanation of why the FETCH_USER requirement exists
   private explanation = new ExplainController(this, system, 'FETCH_USER');
 
   render() {
@@ -203,6 +211,7 @@ import { ConstraintStatusController } from 'directive/lit';
 
 // All constraints
 class ConstraintDashboard extends LitElement {
+  // Get all constraints for the debug panel
   private constraints = new ConstraintStatusController(this, system);
 
   render() {
@@ -219,6 +228,7 @@ class ConstraintDashboard extends LitElement {
 
 // Single constraint
 class AuthConstraint extends LitElement {
+  // Check a specific constraint by ID
   private auth = new ConstraintStatusController(this, system, 'requireAuth');
 
   render() {
@@ -237,13 +247,14 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 import { OptimisticUpdateController } from 'directive/lit';
 
 class SaveButton extends LitElement {
+  // Set up optimistic mutations with automatic rollback
   private optimistic = new OptimisticUpdateController(
     this, system, statusPlugin, 'SAVE_DATA'
   );
 
   handleSave() {
     this.optimistic.mutate(() => {
-      // Optimistic update — applied immediately via system.batch()
+      // Optimistically update the UI before the server responds
       system.facts.savedAt = Date.now();
       system.facts.status = 'saved';
     });
@@ -263,7 +274,7 @@ class SaveButton extends LitElement {
 }
 ```
 
-Manual rollback is also available via `rollback()`. The `statusPlugin` and `requirementType` parameters are optional -- without them, you get manual-only rollback.
+Manual rollback is also available via `rollback()`. The `statusPlugin` and `requirementType` parameters are optional – without them, you get manual-only rollback.
 
 ### ModuleController
 
@@ -274,6 +285,7 @@ import { ModuleController } from 'directive/lit';
 import { counterModule } from './modules/counter';
 
 class CounterApp extends LitElement {
+  // Create a zero-config scoped system tied to this element's lifecycle
   private mod = new ModuleController(this, counterModule);
 
   render() {
@@ -291,6 +303,7 @@ With plugins and status tracking:
 
 ```typescript
 class AppElement extends LitElement {
+  // Create a scoped system with plugins, time-travel, and status tracking
   private mod = new ModuleController(this, myModule, {
     plugins: [loggingPlugin()],
     debug: { timeTravel: true },
@@ -321,6 +334,7 @@ Select part of a fact:
 import { FactSelectorController } from 'directive/lit';
 
 class UserName extends LitElement {
+  // Derive the user's display name – only re-renders when the name changes
   private userName = new FactSelectorController<User, string>(
     this, system, 'user', (u) => u?.name ?? 'Guest'
   );
@@ -339,6 +353,7 @@ Select part of a derivation:
 import { DerivedSelectorController } from 'directive/lit';
 
 class StatusLabel extends LitElement {
+  // Derive the status label – only re-renders when the label changes
   private statusText = new DerivedSelectorController<Status, string>(
     this, system, 'status', (s) => s?.label ?? 'Unknown'
   );
@@ -357,6 +372,7 @@ Select across all facts:
 import { DirectiveSelectorController } from 'directive/lit';
 
 class Summary extends LitElement {
+  // Select across all facts with custom equality
   private summary = new DirectiveSelectorController(
     this, system,
     (facts) => ({ count: facts.items?.length ?? 0, loading: facts.loading ?? false }),
@@ -380,7 +396,10 @@ import { createSystem } from 'directive';
 import { createRequirementStatusPlugin } from 'directive';
 import { RequirementStatusController } from 'directive/lit';
 
+// Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
+
+// Pass the plugin when creating the system
 const system = createSystem({
   module: myModule,
   plugins: [statusPlugin.plugin],
@@ -394,6 +413,7 @@ Full status for a requirement type:
 
 ```typescript
 class UserLoader extends LitElement {
+  // Track the loading state of the FETCH_USER requirement
   private status = new RequirementStatusController(this, statusPlugin, 'FETCH_USER');
 
   render() {
@@ -413,8 +433,7 @@ Every controller has a factory function shorthand. These are functionally identi
 
 ```typescript
 import {
-  createDerivation,
-  createDerivations,
+  createDerived,
   createFact,
   createInspect,
   createRequirementStatus,
@@ -430,16 +449,28 @@ import {
 
 class MyElement extends LitElement {
   // These two are equivalent:
-  private isRed = new DerivationController<boolean>(this, system, 'isRed');
-  private isRed2 = createDerivation<boolean>(this, system, 'isRed');
+  private isRed = new DerivedController<boolean>(this, system, 'isRed');
+  private isRed2 = createDerived<boolean>(this, system, 'isRed');
 
-  // Factory functions for other controllers
+  // Subscribe to a single fact
   private phase = createFact<string>(this, system, 'phase');
-  private state = createDerivations<{ isRed: boolean }>(this, system, ['isRed']);
+
+  // Subscribe to multiple derivations as a single object
+  private state = createDerived<{ isRed: boolean }>(this, system, ['isRed']);
+
+  // Get system inspection with throttling
   private inspection = createInspect(this, system, { throttleMs: 100 });
+
+  // Get a requirement explanation
   private explanation = createExplain(this, system, 'FETCH_USER');
+
+  // Get all constraint statuses
   private constraints = createConstraintStatus(this, system);
+
+  // Get a single constraint by ID
   private authConstraint = createConstraintStatus(this, system, 'requireAuth');
+
+  // Set up optimistic mutations with rollback
   private optimistic = createOptimisticUpdate(this, system, statusPlugin, 'SAVE_DATA');
 }
 ```
@@ -448,6 +479,7 @@ The `createModule` factory creates a `ModuleController`:
 
 ```typescript
 class CounterApp extends LitElement {
+  // Create a scoped system with the module factory
   private mod = createModule(this, counterModule, {
     status: true,
     debug: { timeTravel: true },
@@ -465,22 +497,6 @@ class CounterApp extends LitElement {
 
 For event handlers and imperative code where you do not need reactivity:
 
-### useFacts
-
-Direct access to the facts proxy for mutations:
-
-```typescript
-import { useFacts } from 'directive/lit';
-
-class Controls extends LitElement {
-  private facts = useFacts(system);
-
-  handleClick() {
-    this.facts.count = (this.facts.count ?? 0) + 1;
-  }
-}
-```
-
 ### useDispatch
 
 Get a typed dispatch function:
@@ -489,6 +505,7 @@ Get a typed dispatch function:
 import { useDispatch } from 'directive/lit';
 
 class Controls extends LitElement {
+  // Get a typed dispatch function for sending events
   private dispatch = useDispatch(system);
 
   handleClick() {
@@ -505,6 +522,7 @@ Get a typed reference to the system's event dispatchers:
 import { useEvents } from 'directive/lit';
 
 class Controls extends LitElement {
+  // Get typed event dispatchers for the system
   private events = useEvents(system);
 
   handleClick() {
@@ -521,6 +539,7 @@ Re-exported utility for custom equality in selectors:
 import { shallowEqual } from 'directive/lit';
 
 class UserIds extends LitElement {
+  // Use shallowEqual to prevent re-renders when IDs haven't changed
   private ids = new FactSelectorController<User[], number[]>(
     this, system, 'users',
     (users) => users?.map(u => u.id) ?? [],
@@ -537,6 +556,7 @@ Reactive controller for time-travel state. Updates the host element when snapsho
 import { TimeTravelController } from 'directive/lit';
 
 class UndoControls extends LitElement {
+  // Get reactive time-travel controls (null when not enabled)
   private _tt = new TimeTravelController(this, system);
 
   render() {
@@ -559,6 +579,7 @@ Non-reactive shorthand to read time-travel state (useful outside Lit elements):
 ```typescript
 import { useTimeTravel } from 'directive/lit';
 
+// Get time-travel state (non-reactive, useful for imperative code)
 const tt = useTimeTravel(system);
 tt?.undo();
 tt?.redo();
@@ -566,14 +587,15 @@ tt?.redo();
 
 Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
 
-### getDerivation / getFact
+### getDerived / getFact
 
 Non-reactive getter functions (return a function you call to read the current value):
 
 ```typescript
-import { getDerivation, getFact } from 'directive/lit';
+import { getDerived, getFact } from 'directive/lit';
 
-const getIsRed = getDerivation<boolean>(system, 'isRed');
+// Create non-reactive getters for reading values on demand
+const getIsRed = getDerived<boolean>(system, 'isRed');
 const getPhase = getFact<string>(system, 'phase');
 
 console.log(getIsRed()); // Current value, non-reactive
@@ -589,18 +611,19 @@ console.log(getPhase()); // Current value, non-reactive
 Create a system scoped to a component's lifecycle. The system starts on connect and is destroyed on disconnect:
 
 ```typescript
-import { SystemController, DerivationController } from 'directive/lit';
+import { SystemController, DerivedController } from 'directive/lit';
 import { counterModule } from './modules/counter';
 
 class CounterElement extends LitElement {
+  // Create a system scoped to this element's lifecycle
   private directive = new SystemController(this, counterModule);
 
-  // Access the system for other controllers in connectedCallback
-  private count?: DerivationController<number>;
+  // Access the scoped system for other controllers
+  private count?: DerivedController<number>;
 
   connectedCallback() {
     super.connectedCallback();
-    this.count = new DerivationController<number>(
+    this.count = new DerivedController<number>(
       this, this.directive.system, 'count'
     );
   }
@@ -619,6 +642,7 @@ You can also pass full system options:
 
 ```typescript
 class AppElement extends LitElement {
+  // Create a system with plugins and time-travel debugging
   private directive = new SystemController(this, {
     module: myModule,
     plugins: [loggingPlugin()],
@@ -637,17 +661,18 @@ Create typed controllers for your module schema. The factory also returns `useEv
 import { createTypedHooks } from 'directive/lit';
 import type { ModuleSchema } from 'directive';
 
+// Create typed controller factories pre-bound to your schema
 const {
-  createDerivation,
+  createDerived,
   createFact,
   useDispatch,
-  useFacts,
   useEvents,
 } = createTypedHooks<typeof myModule.schema>();
 
 class Counter extends LitElement {
+  // Fully typed – key autocompletes, return type inferred
   private count = createFact(this, system, 'count');       // Type: FactController<number>
-  private doubled = createDerivation(this, system, 'doubled'); // Type: DerivationController<number>
+  private doubled = createDerived(this, system, 'doubled'); // Type: DerivedController<number>
   private dispatch = useDispatch(system);
   private events = useEvents(system);                       // Typed event dispatchers
 
@@ -667,6 +692,7 @@ Use `@lit/context` to share a system across shadow DOM boundaries:
 import { provide, consume } from '@lit/context';
 import { directiveContext } from 'directive/lit';
 
+// Share the system with all descendant elements via Lit context
 @customElement('app-root')
 class AppRoot extends LitElement {
   @provide({ context: directiveContext })
@@ -678,12 +704,13 @@ class AppRoot extends LitElement {
   }
 }
 
+// Consume the system from an ancestor provider
 @customElement('child-widget')
 class ChildWidget extends LitElement {
   @consume({ context: directiveContext })
   system!: System<typeof myModule.schema>;
 
-  private count = new DerivationController<number>(this, this.system, 'count');
+  private count = new DerivedController<number>(this, this.system, 'count');
 
   render() {
     return html`<span>Count: ${this.count.value}</span>`;
@@ -699,8 +726,11 @@ class ChildWidget extends LitElement {
 
 ```typescript
 class UserCard extends LitElement {
+  // Subscribe to loading and user state
   private loading = new FactController<boolean>(this, system, 'loading');
   private user = new FactController<User | null>(this, system, 'user');
+
+  // Track the loading state of the fetch requirement
   private status = new RequirementStatusController(this, statusPlugin, 'FETCH_USER');
 
   render() {
@@ -719,8 +749,9 @@ Use separate controllers for different systems:
 
 ```typescript
 class Dashboard extends LitElement {
-  private userName = new DerivationController<string>(this, authSystem, 'displayName');
-  private cartCount = new DerivationController<number>(this, cartSystem, 'itemCount');
+  // Subscribe to derivations from different systems
+  private userName = new DerivedController<string>(this, authSystem, 'displayName');
+  private cartCount = new DerivedController<number>(this, cartSystem, 'itemCount');
 
   render() {
     return html`
@@ -742,6 +773,7 @@ import { counterModule } from './modules/counter';
 import './my-counter';
 
 it('displays the count', async () => {
+  // Create a test system with mock data
   const system = createTestSystem({ module: counterModule });
   system.facts.count = 5;
 
@@ -752,38 +784,8 @@ it('displays the count', async () => {
 
 ---
 
-## Deprecated
-
-The following controllers and factories still work but will be removed in a future release. They delegate to the consolidated API internally.
-
-### Deprecated Controllers
-
-| Deprecated | Use Instead |
-|---|---|
-| `InspectThrottledController(host, system, ms)` | `InspectController(host, system, { throttleMs: ms })` |
-| `RequirementsController(host, system)` | `InspectController(host, system)` |
-| `RequirementsThrottledController(host, system, ms)` | `InspectController(host, system, { throttleMs: ms })` |
-| `IsSettledController(host, system)` | `InspectController(host, system)` then `.value.isSettled` |
-| `IsResolvingController(host, plugin, type)` | `RequirementStatusController(host, plugin, type)` then `.value.inflight > 0` |
-| `LatestErrorController(host, plugin, type)` | `RequirementStatusController(host, plugin, type)` then `.value.lastError` |
-| `RequirementStatusesController(host, plugin)` | Individual `RequirementStatusController` instances |
-
-### Deprecated Factories
-
-| Deprecated | Use Instead |
-|---|---|
-| `createInspectThrottled(host, system, ms)` | `createInspect(host, system, { throttleMs: ms })` |
-| `createRequirements(host, system)` | `createInspect(host, system)` |
-| `createRequirementsThrottled(host, system, ms)` | `createInspect(host, system, { throttleMs: ms })` |
-| `createIsSettled(host, system)` | `createInspect(host, system)` then `.value.isSettled` |
-| `createIsResolving(host, plugin, type)` | `createRequirementStatus(host, plugin, type)` then `.value.inflight > 0` |
-| `createLatestError(host, plugin, type)` | `createRequirementStatus(host, plugin, type)` then `.value.lastError` |
-| `createRequirementStatuses(host, plugin)` | Individual `createRequirementStatus` calls |
-
----
-
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** -- Build your first module
-- **[Facts](/docs/facts)** -- State management deep dive
-- **[Testing](/docs/testing/overview)** -- Testing components with Directive
+- **[Quick Start](/docs/quick-start)** – Build your first module
+- **[Facts](/docs/facts)** – State management deep dive
+- **[Testing](/docs/testing/overview)** – Testing components with Directive

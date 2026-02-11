@@ -15,16 +15,20 @@ A plugin is a plain object with a `name` and any combination of hooks:
 import type { Plugin } from 'directive';
 
 const myPlugin: Plugin = {
+  // Every plugin needs a unique name for deduplication and debugging
   name: 'my-plugin',
 
+  // Lifecycle hooks receive the system instance
   onStart: (system) => {
     console.log('System started');
   },
 
+  // Fact hooks fire on every state change – useful for logging or syncing
   onFactSet: (key, value, prev) => {
     console.log(`${key}: ${prev} → ${value}`);
   },
 
+  // Resolver hooks help you measure async work performance
   onResolverComplete: (resolver, req, duration) => {
     console.log(`${resolver} resolved ${req.type} in ${duration}ms`);
   },
@@ -34,10 +38,13 @@ const myPlugin: Plugin = {
 Register plugins when creating a system:
 
 ```typescript
+// Pass your plugin in the plugins array – it starts receiving hooks immediately
 const system = createSystem({
   module: myModule,
   plugins: [myPlugin],
 });
+
+system.start();
 ```
 
 ---
@@ -52,18 +59,22 @@ interface AnalyticsOptions {
   sampleRate?: number;
 }
 
+// Factory functions let callers configure the plugin at creation time
 function analyticsPlugin(options: AnalyticsOptions = {}): Plugin {
+  // Destructure with sensible defaults so zero-config works out of the box
   const { trackFacts = true, sampleRate = 1.0 } = options;
 
   return {
     name: 'analytics',
 
+    // Sample fact changes to avoid flooding the analytics pipeline
     onFactSet: (key, value, prev) => {
       if (trackFacts && Math.random() < sampleRate) {
         analytics.track('fact_change', { key, value, prev });
       }
     },
 
+    // Track every resolver completion to measure async work duration
     onResolverComplete: (resolver, req, duration) => {
       analytics.track('resolver_complete', {
         resolver,
@@ -74,13 +85,15 @@ function analyticsPlugin(options: AnalyticsOptions = {}): Plugin {
   };
 }
 
-// Usage
+// Usage – disable fact tracking and sample only 50% of events
 const system = createSystem({
   module: myModule,
   plugins: [
     analyticsPlugin({ trackFacts: false, sampleRate: 0.5 }),
   ],
 });
+
+system.start();
 ```
 
 ---
@@ -179,10 +192,12 @@ function analyticsPlugin(tracker: AnalyticsTracker): Plugin {
   return {
     name: 'analytics',
 
+    // Record every fact mutation with its before/after values
     onFactSet: (key, value, prev) => {
       tracker.track('fact_changed', { key, from: prev, to: value });
     },
 
+    // Measure how long each resolver takes to fulfill its requirement
     onResolverComplete: (resolver, req, duration) => {
       tracker.track('resolver_completed', {
         resolver,
@@ -203,6 +218,7 @@ function errorMonitorPlugin(reporter: ErrorReporter): Plugin {
   return {
     name: 'error-monitor',
 
+    // Capture resolver failures with enough context to reproduce the issue
     onResolverError: (resolver, req, error) => {
       reporter.capture(error, {
         context: 'resolver',
@@ -212,6 +228,7 @@ function errorMonitorPlugin(reporter: ErrorReporter): Plugin {
       });
     },
 
+    // Catch any system-level error (constraint failures, effect crashes, etc.)
     onError: (error) => {
       reporter.capture(error, {
         context: 'system',
@@ -231,19 +248,23 @@ function metricsPlugin(metrics: MetricsClient): Plugin {
   return {
     name: 'metrics',
 
+    // duration is provided automatically – no need to track start times
     onResolverComplete: (resolver, req, duration) => {
       metrics.histogram(`resolver.${resolver}.duration`, duration);
       metrics.increment(`resolver.${resolver}.success`);
     },
 
+    // Track failure rates to detect degraded resolvers
     onResolverError: (resolver, req, error) => {
       metrics.increment(`resolver.${resolver}.error`);
     },
 
+    // Monitor retry frequency to spot flaky dependencies
     onResolverRetry: (resolver, req, attempt) => {
       metrics.increment(`resolver.${resolver}.retry`);
     },
 
+    // Gauge the system's health after each reconciliation pass
     onReconcileEnd: (result) => {
       metrics.gauge('requirements.unmet', result.unmet);
       metrics.gauge('requirements.inflight', result.inflight);
@@ -261,6 +282,7 @@ function auditPlugin(log: AuditLog): Plugin {
   return {
     name: 'audit',
 
+    // Record when a constraint raises a new requirement
     onRequirementCreated: (req) => {
       log.append({
         event: 'requirement_created',
@@ -270,6 +292,7 @@ function auditPlugin(log: AuditLog): Plugin {
       });
     },
 
+    // Record which resolver fulfilled the requirement
     onRequirementMet: (req, byResolver) => {
       log.append({
         event: 'requirement_met',
@@ -280,6 +303,7 @@ function auditPlugin(log: AuditLog): Plugin {
       });
     },
 
+    // Record when a requirement is dropped because its constraint deactivated
     onRequirementCanceled: (req) => {
       log.append({
         event: 'requirement_canceled',
@@ -301,9 +325,11 @@ Plugin hooks are wrapped in a `safeCall` function internally. If your plugin thr
 ```typescript
 const flakyPlugin: Plugin = {
   name: 'flaky',
+
+  // safeCall wraps every hook – a throw here won't break the system
   onFactSet: (key, value) => {
     throw new Error('Plugin crash');
-    // Caught internally -- system continues, other plugins still fire
+    // Caught internally – system continues, other plugins still fire
   },
 };
 ```
@@ -318,32 +344,35 @@ This means plugins can never break your application. However, you should still h
 
 ```typescript
 function remoteConfigPlugin(endpoint: string): Plugin {
+  // Closed-over state persists across hooks for the lifetime of the plugin
   let config: Record<string, unknown> = {};
 
   return {
     name: 'remote-config',
 
+    // onInit is the only async hook – the system waits for it before calling onStart
     onInit: async (system) => {
       const res = await fetch(endpoint);
       config = await res.json();
     },
 
+    // By the time onStart fires, onInit has resolved and config is populated
     onStart: (system) => {
-      // config is guaranteed to be loaded by the time onStart fires
       console.log('Loaded remote config:', config);
     },
   };
 }
 ```
 
-All other hooks are synchronous. If you need to perform async work inside a non-lifecycle hook, fire it off without awaiting -- the return value is ignored:
+All other hooks are synchronous. If you need to perform async work inside a non-lifecycle hook, fire it off without awaiting – the return value is ignored:
 
 ```typescript
 const asyncSafe: Plugin = {
   name: 'async-safe',
 
+  // Non-lifecycle hooks are synchronous, but you can fire off async work safely
   onFactSet: (key, value) => {
-    // Fire-and-forget -- the system doesn't await this
+    // Fire-and-forget – the system doesn't await this and ignores the return value
     fetch('/api/track', {
       method: 'POST',
       body: JSON.stringify({ key, value }),
@@ -362,7 +391,7 @@ If two plugins share the same `name`, the second replaces the first and a warnin
 
 ## Next Steps
 
-- [Plugin Overview](/docs/plugins/overview) -- all built-in plugins
-- [Logging Plugin](/docs/plugins/logging) -- logging configuration
-- [DevTools Plugin](/docs/plugins/devtools) -- browser integration
-- [Persistence Plugin](/docs/plugins/persistence) -- save and restore state
+- [Plugin Overview](/docs/plugins/overview) – all built-in plugins
+- [Logging Plugin](/docs/plugins/logging) – logging configuration
+- [DevTools Plugin](/docs/plugins/devtools) – browser integration
+- [Persistence Plugin](/docs/plugins/persistence) – save and restore state

@@ -20,17 +20,20 @@ interface User {
 
 const userModule = createModule("user", {
   schema: {
+    // Facts hold the current state of the module
     facts: {
       userId: t.number(),
       user: t.object<User>().nullable(),
       loading: t.boolean(),
       error: t.string().nullable(),
     },
+    // Typed requirement payloads –ensures resolvers receive the right shape
     requirements: {
       FETCH_USER: t.object<{ userId: number }>(),
     },
   },
 
+  // Nothing loaded yet –userId of 0 means "no selection"
   init: (facts) => {
     facts.userId = 0;
     facts.user = null;
@@ -39,12 +42,14 @@ const userModule = createModule("user", {
   },
 
   constraints: {
+    // Fires when we have a userId but no user data and nothing in-flight
     needsUser: {
       when: (facts) =>
         facts.userId > 0 &&
         facts.user === null &&
         !facts.loading &&
         facts.error === null,
+      // Dynamic requirement –passes the current userId to the resolver
       require: (facts) => ({
         type: "FETCH_USER",
         userId: facts.userId,
@@ -55,9 +60,12 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
+      // Automatically retry failed requests with exponential backoff
       retry: { attempts: 3, backoff: "exponential" },
+      // Abort if the request takes longer than 10 seconds
       timeout: 10000,
       resolve: async (req, context) => {
+        // Signal loading state so the constraint won't re-fire
         context.facts.loading = true;
         context.facts.error = null;
 
@@ -75,7 +83,9 @@ const userModule = createModule("user", {
   },
 });
 
+// Create and start –the constraint is now watching for userId changes
 const system = createSystem({ module: userModule });
+system.start();
 ```
 
 ---
@@ -86,15 +96,18 @@ const system = createSystem({ module: userModule });
 import { useFact } from 'directive/react';
 
 function UserProfile() {
+  // Subscribe to each fact individually –only re-renders when that fact changes
   const userId = useFact(system, 'userId');
   const user = useFact(system, 'user');
   const loading = useFact(system, 'loading');
   const error = useFact(system, 'error');
 
+  // --- Loading state ---
   if (loading) {
     return <div>Loading...</div>;
   }
 
+  // --- Error state: clearing the error re-activates the constraint to retry ---
   if (error) {
     return (
       <div>
@@ -106,6 +119,7 @@ function UserProfile() {
     );
   }
 
+  // --- Empty state: setting userId triggers the fetch automatically ---
   if (!user) {
     return (
       <div>
@@ -118,6 +132,7 @@ function UserProfile() {
     );
   }
 
+  // --- Success state: user data has been fetched and is available ---
   return (
     <div>
       <h1>{user.name}</h1>

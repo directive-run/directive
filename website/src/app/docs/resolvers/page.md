@@ -3,7 +3,7 @@ title: Resolvers
 description: Resolvers fulfill requirements raised by constraints. They handle async operations, retries, timeouts, cancellation, and batching.
 ---
 
-Resolvers do the actual work — they fulfill requirements raised by constraints. {% .lead %}
+Resolvers do the actual work – they fulfill requirements raised by constraints. {% .lead %}
 
 ---
 
@@ -21,6 +21,7 @@ const userModule = createModule("user", {
       error: t.string().nullable(),
     },
     requirements: {
+      // Define the shape of requirements this module can raise
       FETCH_USER: { userId: t.number() },
     },
   },
@@ -29,8 +30,11 @@ const userModule = createModule("user", {
     fetchUser: {
       requirement: "FETCH_USER",
       resolve: async (req, context) => {
+        // Signal loading state
         context.facts.loading = true;
+
         try {
+          // Fetch the user using the requirement payload
           context.facts.user = await api.getUser(req.userId);
           context.facts.error = null;
         } catch (error) {
@@ -67,26 +71,26 @@ The `requirement` field accepts a string or a function:
 
 ```typescript
 resolvers: {
-  // String: exact match on req.type (most common)
+  // String match – handles exactly "FETCH_USER" requirements
   fetchUser: {
     requirement: "FETCH_USER",
     resolve: async (req, context) => { /* ... */ },
   },
 
-  // Function: prefix match — handles any "API_*" requirement
+  // Prefix match – handles any requirement starting with "API_"
   apiHandler: {
     requirement: (req): req is Requirement => req.type.startsWith("API_"),
     resolve: async (req, context) => { /* ... */ },
   },
 
-  // Function: match on payload fields
+  // Payload match – only handles high-priority FETCH requirements
   highPriorityFetch: {
     requirement: (req): req is Requirement =>
       req.type === "FETCH" && req.priority === "high",
     resolve: async (req, context) => { /* ... */ },
   },
 
-  // Function: catch-all wildcard
+  // Catch-all – logs unhandled requirements (place last)
   fallback: {
     requirement: (req): req is Requirement => true,
     resolve: async (req, context) => {
@@ -106,13 +110,18 @@ The context object provides:
 
 ```typescript
 resolve: async (req, context) => {
-  context.facts;        // Read/write facts (mutations are auto-batched)
-  context.signal;       // AbortSignal — check context.signal.aborted or pass to fetch()
-  context.snapshot();   // Get a read-only snapshot of current facts
+  // Read and write facts (mutations are auto-batched)
+  context.facts;
+
+  // Pass to fetch() or check for cancellation
+  context.signal;
+
+  // Get a read-only snapshot of current facts
+  context.snapshot();
 }
 ```
 
-Fact mutations inside `resolve` are automatically batched — all synchronous writes are coalesced into a single notification.
+Fact mutations inside `resolve` are automatically batched – all synchronous writes are coalesced into a single notification.
 
 ---
 
@@ -124,12 +133,15 @@ Configure automatic retries for transient failures:
 resolvers: {
   fetchData: {
     requirement: "FETCH_DATA",
+
+    // Retry up to 3 times with exponential backoff
     retry: {
       attempts: 3,
       backoff: "exponential",
       initialDelay: 100,
       maxDelay: 5000,
     },
+
     resolve: async (req, context) => {
       context.facts.data = await api.getData(req.id);
     },
@@ -145,7 +157,7 @@ resolvers: {
 | `backoff` | `"none" \| "linear" \| "exponential"` | `"none"` | Delay growth strategy |
 | `initialDelay` | `number` | `100` | First retry delay in ms |
 | `maxDelay` | `number` | `30000` | Maximum delay between retries |
-| `shouldRetry` | `(error, attempt) => boolean` | — | Predicate to control whether to retry |
+| `shouldRetry` | `(error, attempt) => boolean` | – | Predicate to control whether to retry |
 
 ### Conditional Retries
 
@@ -159,15 +171,16 @@ resolvers: {
       attempts: 5,
       backoff: "exponential",
       initialDelay: 200,
+
+      // Only retry server errors, not client errors
       shouldRetry: (error, attempt) => {
-        // Don't retry client errors (4xx)
         if (error.message.includes("404") || error.message.includes("403")) {
-          return false;
+          return false;  // Don't retry – client error
         }
-        // Retry server errors (5xx) and network failures
-        return true;
+        return true;  // Retry server errors and network failures
       },
     },
+
     resolve: async (req, context) => {
       context.facts.data = await api.getData(req.id);
     },
@@ -179,11 +192,11 @@ If `shouldRetry` is omitted, all errors are retried up to `attempts`.
 
 ### Backoff Calculation
 
-- `"none"` — constant delay (`initialDelay` every time)
-- `"linear"` — `initialDelay * attempt` (100ms, 200ms, 300ms...)
-- `"exponential"` — `initialDelay * 2^(attempt-1)` (100ms, 200ms, 400ms...)
+- `"none"` – constant delay (`initialDelay` every time)
+- `"linear"` – `initialDelay * attempt` (100ms, 200ms, 300ms...)
+- `"exponential"` – `initialDelay * 2^(attempt-1)` (100ms, 200ms, 400ms...)
 
-Retries are AbortSignal-aware — cancelling a resolver immediately interrupts retry sleep.
+Retries are AbortSignal-aware – cancelling a resolver immediately interrupts retry sleep.
 
 ---
 
@@ -195,7 +208,8 @@ Set timeouts to prevent hanging operations:
 resolvers: {
   fetchData: {
     requirement: "FETCH_DATA",
-    timeout: 10000, // 10 seconds
+    timeout: 10000, // Abort after 10 seconds
+
     resolve: async (req, context) => {
       context.facts.data = await api.getData(req.id);
     },
@@ -215,8 +229,10 @@ Control requirement deduplication with custom keys:
 resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
-    // Custom key prevents duplicate requests for same user
+
+    // Deduplicate by userId – prevents parallel requests for the same user
     key: (req) => `fetch-user-${req.userId}`,
+
     resolve: async (req, context) => {
       context.facts.user = await api.getUser(req.userId);
     },
@@ -227,16 +243,16 @@ resolvers: {
 ### Key Strategies
 
 ```typescript
-// Default - uses constraintName:type
+// Default – uses constraintName:type
 key: undefined
 
-// Entity-based - one request per entity
+// Entity-based – one active request per entity
 key: (req) => `user-${req.userId}`
 
-// Time-based - refresh every minute
+// Time-based – allows refresh every minute
 key: (req) => `data-${req.id}-${Math.floor(Date.now() / 60000)}`
 
-// Session-based - one per session
+// Session-based – one request per session
 key: (req) => `${req.type}-${sessionId}`
 ```
 
@@ -251,10 +267,12 @@ resolvers: {
   search: {
     requirement: "SEARCH",
     resolve: async (req, context) => {
+      // Pass the AbortSignal to fetch for automatic cancellation
       const results = await fetch(`/api/search?q=${req.query}`, {
-        signal: context.signal, // Automatically cancelled if requirement no longer needed
+        signal: context.signal,
       });
 
+      // Guard against processing stale results
       if (context.signal.aborted) return;
 
       context.facts.searchResults = await results.json();
@@ -277,12 +295,14 @@ resolvers: {
     requirement: "FETCH_USER",
     batch: {
       enabled: true,
-      windowMs: 50,       // Collect for 50ms before processing
-      maxSize: 100,       // Max batch size (default: unlimited)
-      timeoutMs: 10000,   // Per-batch timeout (overrides resolver timeout)
+      windowMs: 50,       // Collect requirements for 50ms
+      maxSize: 100,       // Process up to 100 at a time
+      timeoutMs: 10000,   // Per-batch timeout
     },
+
     // All-or-nothing: if this throws, all requirements in the batch fail
     resolveBatch: async (reqs, context) => {
+      // Collect all userIds and fetch in one API call
       const ids = reqs.map(r => r.userId);
       const users = await api.getUsersBatch(ids);
       users.forEach(user => { context.facts[`user_${user.id}`] = user; });
@@ -298,7 +318,7 @@ resolvers: {
 | `enabled` | `boolean` | `false` | Enable batching for this resolver |
 | `windowMs` | `number` | `50` | Time window to collect requirements (ms) |
 | `maxSize` | `number` | unlimited | Maximum batch size |
-| `timeoutMs` | `number` | — | Per-batch timeout (overrides resolver `timeout`) |
+| `timeoutMs` | `number` | – | Per-batch timeout (overrides resolver `timeout`) |
 
 ### Partial Failure Handling
 
@@ -309,6 +329,7 @@ resolvers: {
   fetchUsers: {
     requirement: "FETCH_USER",
     batch: { enabled: true, windowMs: 50 },
+
     // Per-item results: some can succeed while others fail
     resolveBatchWithResults: async (reqs, context) => {
       return Promise.all(reqs.map(async (req) => {
@@ -317,6 +338,7 @@ resolvers: {
           context.facts[`user_${user.id}`] = user;
           return { success: true };
         } catch (error) {
+          // Individual failures don't affect other items
           return { success: false, error };
         }
       }));
@@ -335,11 +357,14 @@ By default, resolvers run in parallel. Use `after` on constraints for ordering:
 
 ```typescript
 constraints: {
+  // Step 1: Authenticate (high priority)
   authenticate: {
     priority: 100,
     when: (facts) => !facts.token,
     require: { type: "AUTH" },
   },
+
+  // Step 2: Fetch data after auth completes
   fetchData: {
     priority: 50,
     after: ["authenticate"],
@@ -355,10 +380,11 @@ resolvers: {
       context.facts.token = await getToken();
     },
   },
+
   fetchData: {
     requirement: "FETCH_DATA",
     resolve: async (req, context) => {
-      // This runs after auth completes
+      // Runs after auth – token is guaranteed to exist
       context.facts.data = await api.getData(context.facts.token);
     },
   },
@@ -376,18 +402,20 @@ resolvers: {
   updateTodo: {
     requirement: "UPDATE_TODO",
     resolve: async (req, context) => {
+      // Save a snapshot for rollback
       const snapshot = context.snapshot();
       const original = snapshot.todos.find((t) => t.id === req.id);
 
-      // Optimistic update
+      // Apply the update optimistically (UI reflects immediately)
       context.facts.todos = context.facts.todos.map((t) =>
         t.id === req.id ? { ...t, ...req.updates } : t
       );
 
       try {
+        // Persist to the server
         await api.updateTodo(req.id, req.updates);
       } catch (error) {
-        // Rollback on failure
+        // Rollback to the original value on failure
         context.facts.todos = context.facts.todos.map((t) =>
           t.id === req.id ? original : t
         );
@@ -408,6 +436,7 @@ Mock resolvers in tests:
 import { createTestSystem, mockResolver } from "directive/testing";
 
 test("fetches user data", async () => {
+  // Create a test system with a mocked resolver
   const system = createTestSystem({
     module: userModule,
     mocks: {
@@ -418,9 +447,11 @@ test("fetches user data", async () => {
     },
   });
 
+  // Trigger the constraint by setting userId
   system.facts.userId = 123;
   await system.settle();
 
+  // Verify the resolver populated the fact
   expect(system.facts.user.name).toBe("Test User");
 });
 ```

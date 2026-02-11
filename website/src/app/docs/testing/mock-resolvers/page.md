@@ -11,8 +11,8 @@ Control resolver behavior in tests with mocks. {% .lead %}
 
 Directive provides two mock resolver utilities:
 
-- **`createMockResolver`** -- Auto-resolves requirements with configurable behavior (delays, errors, custom resolve functions).
-- **`mockResolver`** -- Captures requirements for manual resolution, giving you fine-grained control over timing.
+- **`createMockResolver`** – Auto-resolves requirements with configurable behavior (delays, errors, custom resolve functions).
+- **`mockResolver`** – Captures requirements for manual resolution, giving you fine-grained control over timing.
 
 ---
 
@@ -28,6 +28,7 @@ test('user is fetched', async () => {
     modules: { user: userModule },
     mocks: {
       resolvers: {
+        // Replace the real FETCH_USER resolver with a synchronous stub
         FETCH_USER: {
           resolve: (req, ctx) => {
             ctx.facts.user_name = 'Test User';
@@ -39,9 +40,11 @@ test('user is fetched', async () => {
   });
   system.start();
 
+  // Setting userId triggers the constraint that emits FETCH_USER
   system.facts.user.userId = 123;
   await system.waitForIdle();
 
+  // The mock resolver populated the facts without a real network call
   expect(system.facts.user.name).toBe('Test User');
 });
 ```
@@ -58,6 +61,7 @@ test('handles fetch error', async () => {
     modules: { user: userModule },
     mocks: {
       resolvers: {
+        // Simulate a network failure – the resolver always throws
         FETCH_USER: {
           error: 'Network error',
         },
@@ -66,9 +70,11 @@ test('handles fetch error', async () => {
   });
   system.start();
 
+  // Trigger the resolver
   system.facts.user.userId = 123;
   await system.waitForIdle();
 
+  // The module's error-handling logic should store the message
   expect(system.facts.user.error).toBe('Network error');
 });
 ```
@@ -87,6 +93,7 @@ const system = createTestSystem({
   mocks: {
     resolvers: {
       FETCH_USER: {
+        // Wait 500ms before resolving – useful for testing loading states
         delay: 500,
         resolve: (req, ctx) => {
           ctx.facts.user_name = 'Test User';
@@ -107,8 +114,10 @@ For fine-grained control over when requirements resolve, use `mockResolver`. It 
 import { createTestSystem, mockResolver, flushMicrotasks } from 'directive/testing';
 
 test('manual resolve control', async () => {
+  // Create a mock that holds requirements in a queue instead of auto-resolving
   const fetchMock = mockResolver<{ type: 'FETCH_USER'; userId: string }>('FETCH_USER');
 
+  // Wire the mock handler into the test system
   const system = createTestSystem({
     modules: { user: userModule },
     mocks: {
@@ -119,18 +128,20 @@ test('manual resolve control', async () => {
   });
   system.start();
 
+  // Trigger the constraint
   system.facts.user.userId = '123';
   await flushMicrotasks();
 
-  // Requirement is captured but pending
+  // The requirement was captured – verify its payload
   expect(fetchMock.calls).toHaveLength(1);
   expect(fetchMock.calls[0].userId).toBe('123');
   expect(fetchMock.pending).toHaveLength(1);
 
-  // Manually resolve
+  // Resolve on our own schedule
   fetchMock.resolve();
   await flushMicrotasks();
 
+  // Nothing left in the queue
   expect(fetchMock.pending).toHaveLength(0);
 });
 ```
@@ -172,13 +183,15 @@ test('handles rejection', async () => {
   });
   system.start();
 
+  // Trigger the requirement
   system.facts.app.dataId = 1;
   await flushMicrotasks();
 
+  // Simulate a server-side failure
   fetchMock.reject(new Error('Server error'));
   await flushMicrotasks();
 
-  // Verify error handling in your module
+  // Verify your module's error-handling logic ran correctly
 });
 ```
 
@@ -202,18 +215,21 @@ test('resolve all pending', async () => {
   });
   system.start();
 
-  // Trigger multiple requirements
+  // Queue up two separate requirements
   system.facts.app.taskId = 1;
   await flushMicrotasks();
+
   system.facts.app.taskId = 2;
   await flushMicrotasks();
 
+  // Both requirements are waiting in the queue
   expect(workMock.pending).toHaveLength(2);
 
-  // Resolve all at once
+  // Drain the entire queue in one call
   workMock.resolveAll();
   await flushMicrotasks();
 
+  // All requirements have been resolved
   expect(workMock.pending).toHaveLength(0);
 });
 ```
@@ -240,14 +256,17 @@ test('resolver was called', async () => {
   });
   system.start();
 
+  // Trigger the constraint -> requirement -> resolver chain
   system.facts.user.userId = 123;
   await system.waitForIdle();
 
-  // Built-in assertion
+  // Quick check: was the resolver invoked at all?
   system.assertResolverCalled('FETCH_USER');
-  system.assertResolverCalled('FETCH_USER', 1); // exactly once
 
-  // Or check the raw call history
+  // Stricter check: was it called exactly once?
+  system.assertResolverCalled('FETCH_USER', 1);
+
+  // For full inspection, access the raw call history map
   const calls = system.resolverCalls.get('FETCH_USER');
   expect(calls).toHaveLength(1);
 });

@@ -135,6 +135,10 @@ export const navigation = [
       { title: 'Core API', href: '/docs/api/core' },
       { title: 'Types', href: '/docs/api/types' },
       { title: 'React Hooks', href: '/docs/api/react' },
+      { title: 'Vue Composables', href: '/docs/api/vue' },
+      { title: 'Svelte Hooks', href: '/docs/api/svelte' },
+      { title: 'Solid Hooks', href: '/docs/api/solid' },
+      { title: 'Lit Controllers', href: '/docs/api/lit' },
     ],
   },
   {
@@ -143,24 +147,6 @@ export const navigation = [
       { title: 'FAQ', href: '/docs/faq' },
       { title: 'Troubleshooting', href: '/docs/troubleshooting' },
       { title: 'Brand Guide', href: '/docs/branding' },
-    ],
-  },
-  {
-    title: 'Articles',
-    links: [
-      { title: 'All Articles', href: '/articles' },
-      {
-        title: 'Constraint-Driven Architecture',
-        href: '/articles/constraint-driven-architecture',
-      },
-      {
-        title: 'Why State Machines Aren\'t Enough',
-        href: '/articles/why-state-machines-arent-enough',
-      },
-      {
-        title: 'Building AI Agents with Directive',
-        href: '/articles/building-ai-agents',
-      },
     ],
   },
 ]

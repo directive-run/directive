@@ -12,8 +12,9 @@ Core functions and types for Directive. {% .lead %}
 Create a module definition.
 
 ```typescript
+// Define a module's schema, constraints, resolvers, and effects
 function createModule<M extends ModuleSchema>(
-  name: string,
+  name: string,       // unique identifier for this module
   config: ModuleConfig<M>
 ): ModuleDef<M>
 ```
@@ -43,6 +44,7 @@ function createModule<M extends ModuleSchema>(
 Create a runtime system.
 
 ```typescript
+// Create a live runtime from a module definition
 function createSystem<M extends ModuleSchema>(
   config: SystemConfig<M>
 ): SingleModuleSystem<M>
@@ -67,7 +69,10 @@ function createSystem<M extends ModuleSchema>(
 Proxy object for reading and writing facts.
 
 ```typescript
+// Write a fact (triggers constraint evaluation and effects)
 system.facts.count = 10;
+
+// Read a fact (fully typed from your schema)
 const count = system.facts.count;
 ```
 
@@ -76,6 +81,7 @@ const count = system.facts.count;
 Read-only proxy for derivations.
 
 ```typescript
+// Derivations recompute automatically when their tracked facts change
 const total = system.derive.cartTotal;
 ```
 
@@ -88,7 +94,10 @@ Accessor for the system's event definitions.
 Runtime control for constraints.
 
 ```typescript
+// Temporarily suppress a constraint (e.g., during maintenance)
 system.constraints.disable("myConstraint");
+
+// Re-enable it to resume normal evaluation
 system.constraints.enable("myConstraint");
 ```
 
@@ -97,9 +106,9 @@ system.constraints.enable("myConstraint");
 Runtime control for effects.
 
 ```typescript
-system.effects.disable("myEffect");
-system.effects.enable("myEffect");
-system.effects.isEnabled("myEffect"); // boolean
+system.effects.disable("myEffect");     // pause a side effect
+system.effects.enable("myEffect");      // resume it
+system.effects.isEnabled("myEffect");   // check current state
 ```
 
 ### debug
@@ -107,10 +116,11 @@ system.effects.isEnabled("myEffect"); // boolean
 Access the time-travel API (or `null` if not enabled).
 
 ```typescript
+// Time-travel is only available when debug.timeTravel is enabled
 if (system.debug) {
-  system.debug.goBack();
-  system.debug.goForward();
-  console.log(system.debug.snapshots);
+  system.debug.goBack();               // undo last state change
+  system.debug.goForward();            // redo
+  console.log(system.debug.snapshots); // all captured snapshots
 }
 ```
 
@@ -119,10 +129,10 @@ if (system.debug) {
 Boolean status properties for the system lifecycle.
 
 ```typescript
-system.isRunning;      // true after start()
-system.isSettled;      // true when no pending operations
-system.isInitialized;  // true after module init completes
-system.isReady;        // true after first reconciliation
+system.isRunning;      // true after start() is called
+system.isSettled;      // true when all constraints and resolvers finish
+system.isInitialized;  // true after module init() completes
+system.isReady;        // true after the first reconciliation pass
 ```
 
 ---
@@ -158,6 +168,7 @@ system.destroy();
 Dispatch an event.
 
 ```typescript
+// Send a typed event into the system for constraints and effects to react to
 system.dispatch({ type: "EVENT_NAME", payload: data });
 ```
 
@@ -166,6 +177,7 @@ system.dispatch({ type: "EVENT_NAME", payload: data });
 Batch multiple fact mutations into a single reconciliation cycle.
 
 ```typescript
+// Group multiple writes so constraints evaluate once (not per write)
 system.batch(() => {
   system.facts.a = 1;
   system.facts.b = 2;
@@ -177,6 +189,7 @@ system.batch(() => {
 Read a derivation value by ID.
 
 ```typescript
+// Read a specific derivation by its string ID
 const total = system.read("cartTotal");
 ```
 
@@ -185,6 +198,7 @@ const total = system.read("cartTotal");
 Subscribe to derivation changes. Returns an unsubscribe function.
 
 ```typescript
+// Re-render or react whenever any of these derivations change
 const unsubscribe = system.subscribe(["cartTotal", "itemCount"], () => {
   console.log("Derivation changed");
 });
@@ -195,6 +209,7 @@ const unsubscribe = system.subscribe(["cartTotal", "itemCount"], () => {
 Watch a derivation and receive old/new values. Returns an unsubscribe function.
 
 ```typescript
+// Like subscribe, but also provides the old and new values
 const unsubscribe = system.watch("cartTotal", (newValue, previousValue) => {
   console.log(`Changed from ${previousValue} to ${newValue}`);
 });
@@ -205,6 +220,7 @@ const unsubscribe = system.watch("cartTotal", (newValue, previousValue) => {
 Wait for the system to be fully ready (after first reconciliation).
 
 ```typescript
+// Block until init + first reconciliation completes (useful in tests/SSR)
 await system.whenReady();
 ```
 
@@ -213,6 +229,7 @@ await system.whenReady();
 Wait for all constraints and resolvers to complete.
 
 ```typescript
+// Wait for all in-flight constraints and resolvers to finish
 await system.settle();
 ```
 
@@ -221,6 +238,7 @@ await system.settle();
 Get current system state for debugging.
 
 ```typescript
+// See what's pending, running, and resolved at this moment
 const inspection = system.inspect();
 // { unmet, inflight, constraints, resolvers }
 ```
@@ -230,6 +248,7 @@ const inspection = system.inspect();
 Get an explanation of why a requirement exists.
 
 ```typescript
+// Trace which constraint generated a requirement and why
 const explanation = system.explain("requirement-id");
 ```
 
@@ -238,6 +257,7 @@ const explanation = system.explain("requirement-id");
 Capture current state as a serializable snapshot.
 
 ```typescript
+// Serialize current state for persistence or transfer
 const snapshot = system.getSnapshot();
 ```
 
@@ -246,6 +266,7 @@ const snapshot = system.getSnapshot();
 Restore from a snapshot.
 
 ```typescript
+// Rehydrate state from a previously captured snapshot
 system.restore(snapshot);
 ```
 
@@ -254,9 +275,10 @@ system.restore(snapshot);
 Get a distributable snapshot of computed derivations for use outside the runtime.
 
 ```typescript
+// Export selected derivations for use outside the runtime (e.g., edge cache)
 const snapshot = system.getDistributableSnapshot({
   includeDerivations: ["effectivePlan", "canUseFeature"],
-  ttlSeconds: 3600,
+  ttlSeconds: 3600, // snapshot expires after 1 hour
 });
 ```
 
@@ -265,6 +287,7 @@ const snapshot = system.getDistributableSnapshot({
 Watch for changes to distributable snapshot derivations.
 
 ```typescript
+// Automatically push updated snapshots whenever derivations change
 const unsubscribe = system.watchDistributableSnapshot(
   { includeDerivations: ["effectivePlan"] },
   (snapshot) => {

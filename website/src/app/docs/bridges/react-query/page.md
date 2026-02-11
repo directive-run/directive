@@ -32,16 +32,22 @@ import { t } from 'directive';
 
 const queryClient = new QueryClient();
 
+// Create a bridge between Directive facts and React Query cache
 const bridge = createQueryBridge(queryClient, {
+  // Define your application-specific facts
   factsSchema: {
     userId: t.string(),
     profileOpen: t.boolean(),
   },
+
+  // Set initial values for each fact
   init: (facts) => {
     facts.userId = '';
     facts.profileOpen = false;
   },
+
   constraints: {
+    // Prefetch user data when the profile panel is opened
     prefetchUser: {
       when: (facts) => facts.profileOpen && facts.userId !== '',
       require: (facts) => prefetch(['user', facts.userId]),
@@ -59,7 +65,7 @@ The bridge auto-starts by default. It creates an underlying Directive system, be
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `factsSchema` | `Record<string, ...>` | `{}` | Additional facts beyond `queryStates` |
-| `init` | `(facts) => void` | — | Initialize fact values |
+| `init` | `(facts) => void` | – | Initialize fact values |
 | `constraints` | `Record<string, QueryConstraint>` | `{}` | Constraints that produce requirements |
 | `resolvers` | `Record<string, QueryResolver>` | `{}` | Custom resolvers (built-ins handle PREFETCH/INVALIDATE) |
 | `plugins` | `Plugin[]` | `[]` | Directive plugins |
@@ -76,13 +82,21 @@ The bridge auto-starts by default. It creates an underlying Directive system, be
 ```typescript
 const bridge = createQueryBridge(queryClient, { ... });
 
-bridge.system;      // The underlying Directive system
-bridge.facts;       // Typed as F & { queryStates: Record<string, QueryStateInfo> }
+// Access the underlying Directive system
+bridge.system;
 
-bridge.startSync(); // Begin syncing cache events to facts
-bridge.stopSync();  // Pause cache syncing
-bridge.settle();    // Wait for all constraints/resolvers to finish
-bridge.destroy();   // Stop sync and destroy the system
+// Read current fact values (typed)
+bridge.facts;
+
+// Control the cache sync lifecycle
+bridge.startSync();
+bridge.stopSync();
+
+// Wait for all constraints and resolvers to finish
+bridge.settle();
+
+// Tear down the bridge completely
+bridge.destroy();
 ```
 
 ---
@@ -100,14 +114,19 @@ const bridge = createQueryBridge(queryClient, {
     currentRoute: t.string(),
     userId: t.string(),
   },
+
   init: (facts) => {
     facts.currentRoute = '/';
     facts.userId = '';
   },
+
   constraints: {
     prefetchDashboard: {
       when: (facts) => {
+        // Only prefetch on the dashboard route
         if (facts.currentRoute !== '/dashboard') return false;
+
+        // Skip if the query was fetched less than 60 seconds ago
         const state = facts.queryStates[JSON.stringify(['dashboard', facts.userId])];
         return !isQueryFresh(state, 60_000);
       },
@@ -120,7 +139,7 @@ const bridge = createQueryBridge(queryClient, {
   },
 });
 
-// Navigate to dashboard -> constraint fires -> React Query prefetches
+// Navigate to dashboard – constraint fires, React Query prefetches
 bridge.facts.currentRoute = '/dashboard';
 bridge.facts.userId = 'user-42';
 ```
@@ -138,10 +157,10 @@ Calls `queryClient.prefetchQuery()`:
 ```typescript
 import { prefetch } from 'directive/react-query';
 
-// Minimal
+// Prefetch with just a query key (uses default queryFn)
 prefetch(['user', userId]);
 
-// With options
+// Prefetch with explicit options
 prefetch(['user', userId], {
   queryFn: () => fetchUser(userId),
   staleTime: 5 * 60 * 1000,
@@ -166,13 +185,13 @@ Calls `queryClient.invalidateQueries()`:
 ```typescript
 import { invalidate } from 'directive/react-query';
 
-// Invalidate specific query
+// Invalidate all queries matching this key prefix
 invalidate(['user', userId]);
 
-// Exact match only
+// Invalidate only the exact query key
 invalidate(['user', userId], { exact: true });
 
-// Invalidate all queries (no key)
+// Invalidate all queries in the cache
 invalidate();
 ```
 
@@ -200,7 +219,9 @@ import { whenThenPrefetch } from 'directive/react-query';
 const bridge = createQueryBridge(queryClient, {
   factsSchema: { userId: t.string(), profileOpen: t.boolean() },
   init: (facts) => { facts.userId = ''; facts.profileOpen = false; },
+
   constraints: {
+    // Shorthand: when condition is true, prefetch this query key
     userProfile: whenThenPrefetch(
       (facts) => facts.profileOpen && facts.userId !== '',
       (facts) => ['user', facts.userId],
@@ -228,7 +249,9 @@ import { whenThenInvalidate } from 'directive/react-query';
 const bridge = createQueryBridge(queryClient, {
   factsSchema: { justLoggedOut: t.boolean() },
   init: (facts) => { facts.justLoggedOut = false; },
+
   constraints: {
+    // Shorthand: invalidate user queries when logout occurs
     clearOnLogout: whenThenInvalidate(
       (facts) => facts.justLoggedOut,
       () => ['user'],
@@ -271,8 +294,10 @@ Three helper functions inspect query state:
 ```typescript
 import { isQueryLoading, isQueryFresh, isQueryError } from 'directive/react-query';
 
+// Look up the cache state for a specific query key
 const state = bridge.facts.queryStates[JSON.stringify(['user', userId])];
 
+// Check loading, freshness, and error status
 isQueryLoading(state);          // true if pending or fetching
 isQueryFresh(state, 60_000);    // true if data exists and is less than 60s old
 isQueryError(state);            // true if status is 'error'
@@ -284,6 +309,7 @@ Use these inside constraints to avoid redundant fetches:
 constraints: {
   smartPrefetch: {
     when: (facts) => {
+      // Only prefetch if not already loading and data is stale
       const state = facts.queryStates[JSON.stringify(['posts'])];
       return facts.currentRoute === '/blog' && !isQueryLoading(state) && !isQueryFresh(state, 30_000);
     },
@@ -302,10 +328,15 @@ constraints: {
 import { createQueryBridge, createQueryBridgeHooks } from 'directive/react-query';
 
 const bridge = createQueryBridge(queryClient, { ... });
+
+// Create typed React hooks from the bridge
 const { useFacts, useQueryState } = createQueryBridgeHooks(bridge);
 
 function UserProfile({ userId }: { userId: string }) {
+  // Read bridge facts (re-renders on change)
   const { profileOpen } = useFacts();
+
+  // Read cache state for a specific query
   const userState = useQueryState(['user', userId]);
 
   if (!profileOpen) return null;
@@ -330,16 +361,21 @@ For requirements beyond PREFETCH and INVALIDATE, add custom resolvers:
 ```typescript
 const bridge = createQueryBridge(queryClient, {
   constraints: {
+    // Custom requirement beyond PREFETCH/INVALIDATE
     refreshAll: {
       when: (facts) => facts.forceRefresh,
       require: { type: 'REFRESH_ALL' },
     },
   },
+
   resolvers: {
     refreshAll: {
       requirement: (req): req is Requirement => req.type === 'REFRESH_ALL',
       resolve: async (req, ctx) => {
+        // Invalidate the entire cache
         await ctx.queryClient.invalidateQueries();
+
+        // Reset the trigger flag
         ctx.facts.forceRefresh = false;
       },
     },
@@ -349,9 +385,9 @@ const bridge = createQueryBridge(queryClient, {
 
 The resolver context (`QueryResolverContext`) provides:
 
-- `facts` — Current application facts
-- `queryClient` — The React Query client
-- `signal` — An `AbortSignal` for cancellation
+- `facts` – Current application facts
+- `queryClient` – The React Query client
+- `signal` – An `AbortSignal` for cancellation
 
 ---
 

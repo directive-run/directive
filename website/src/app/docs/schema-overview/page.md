@@ -14,10 +14,10 @@ Every module can define a schema with four sections:
 ```typescript
 const myModule = createModule("my-module", {
   schema: {
-    facts: { ... },        // State values
-    derivations: { ... },  // Computed values (optional)
-    events: { ... },       // Typed events (optional)
-    requirements: { ... }, // Requirement payloads (optional)
+    facts: { ... },        // Your observable state – required
+    derivations: { ... },  // Computed value return types (optional)
+    events: { ... },       // Typed event payloads (optional)
+    requirements: { ... }, // Requirement payloads for constraints (optional)
   },
 });
 ```
@@ -33,11 +33,11 @@ Define the shape of your module's state using `t` type builders:
 ```typescript
 schema: {
   facts: {
-    userId: t.number(),
-    user: t.object<User>().nullable(),
-    items: t.array<CartItem>().of(t.object<CartItem>()),
-    preferences: t.object<Preferences>().optional(),
-    status: t.string<"idle" | "loading" | "error">(),
+    userId: t.number(),                                    // Simple primitive
+    user: t.object<User>().nullable(),                     // null until loaded
+    items: t.array<CartItem>().of(t.object<CartItem>()),   // Typed array with element validation
+    preferences: t.object<Preferences>().optional(),       // May not exist yet
+    status: t.string<"idle" | "loading" | "error">(),     // Narrowed string literal union
   },
 }
 ```
@@ -51,9 +51,9 @@ Declare the return types for computed values:
 ```typescript
 schema: {
   derivations: {
-    displayName: t.string(),
-    isLoggedIn: t.boolean(),
-    itemCount: t.number(),
+    displayName: t.string(),    // Computed from user facts
+    isLoggedIn: t.boolean(),    // Derived from whether user exists
+    itemCount: t.number(),      // Derived from items array length
   },
 }
 ```
@@ -67,8 +67,13 @@ Define event names and their payload shapes. Each event maps to an object descri
 ```typescript
 schema: {
   events: {
+    // Event with a typed payload – who logged in and how
     USER_LOGGED_IN: { userId: t.string(), method: t.string() },
-    USER_LOGGED_OUT: {},  // No payload
+
+    // Empty object means this event carries no data
+    USER_LOGGED_OUT: {},
+
+    // Structured error information
     ERROR_OCCURRED: { code: t.string(), message: t.string() },
   },
 }
@@ -83,6 +88,7 @@ Define requirement names and their payload shapes. Each requirement maps to an o
 ```typescript
 schema: {
   requirements: {
+    // Each requirement defines the data its resolver needs
     FETCH_USER: { userId: t.number() },
     UPDATE_SETTINGS: { key: t.string() },
     SEND_NOTIFICATION: { title: t.string(), body: t.string() },
@@ -97,19 +103,21 @@ schema: {
 Schemas enable full TypeScript inference throughout the system:
 
 ```typescript
-// Facts are typed
+// Facts are typed – assignment is checked at compile time
 system.facts.userId = 123;        // OK
-system.facts.userId = "invalid";  // Type error
+system.facts.userId = "invalid";  // Type error: string not assignable to number
 
 // Events are typed via system.events accessor
 system.events.USER_LOGGED_IN({ userId: "abc", method: "email" }); // OK
-system.events.USER_LOGGED_OUT();  // OK — no payload
+system.events.USER_LOGGED_OUT();  // OK – no payload required
 
-// Requirements are typed in constraints
+// Requirement payloads are typed in constraints
 constraints: {
   needsUser: {
     when: (facts) => facts.userId > 0 && !facts.user,
-    require: { type: "FETCH_USER", userId: 123 },  // Typed payload
+
+    // TypeScript ensures the payload matches the schema
+    require: { type: "FETCH_USER", userId: 123 },
   },
 },
 ```
@@ -121,6 +129,7 @@ constraints: {
 For maximum TypeScript control with no runtime validation, use type assertions:
 
 ```typescript
+// Use type assertions for zero-cost type safety (no runtime validation)
 const myModule = createModule("my-module", {
   schema: {
     facts: {} as { userId: number; user: User | null },
@@ -129,6 +138,7 @@ const myModule = createModule("my-module", {
     requirements: {} as { FETCH: { id: string } },
   },
 });
+// Full TypeScript inference, but nothing is validated at runtime
 ```
 
 This provides full type inference without any runtime overhead.
@@ -137,6 +147,6 @@ This provides full type inference without any runtime overhead.
 
 ## Next Steps
 
-- **[Type Builders](/docs/type-builders)** — Complete `t.*` API reference
-- **[Facts](/docs/facts)** — Working with state
-- **[Events](/docs/events)** — Dispatching events
+- **[Type Builders](/docs/type-builders)** – Complete `t.*` API reference
+- **[Facts](/docs/facts)** – Working with state
+- **[Events](/docs/events)** – Dispatching events

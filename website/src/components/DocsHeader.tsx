@@ -24,7 +24,7 @@ export function DocsHeader({
     <header className="mb-9 space-y-1">
       <div className="flex items-center gap-3">
         {section && (
-          <p className="font-display text-sm font-medium text-sky-500">
+          <p className="font-display text-sm font-medium text-brand-primary">
             {section.title}
           </p>
         )}

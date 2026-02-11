@@ -5,6 +5,46 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+:root {
+  /* Brand Colors — Primary (default: Sky) */
+  --brand-primary-50: #f0f9ff;
+  --brand-primary-100: #e0f2fe;
+  --brand-primary-200: #bae6fd;
+  --brand-primary-300: #7dd3fc;
+  --brand-primary-400: #38bdf8;
+  --brand-primary-500: #0ea5e9;
+  --brand-primary-600: #0284c7;
+  --brand-primary-700: #0369a1;
+  --brand-primary-800: #075985;
+  --brand-primary-900: #0c4a6e;
+  --brand-primary-950: #082f49;
+  --brand-primary: var(--brand-primary-500);
+
+  /* Brand Colors — Accent (default: Indigo) */
+  --brand-accent-50: #eef2ff;
+  --brand-accent-100: #e0e7ff;
+  --brand-accent-200: #c7d2fe;
+  --brand-accent-300: #a5b4fc;
+  --brand-accent-400: #818cf8;
+  --brand-accent-500: #6366f1;
+  --brand-accent-600: #4f46e5;
+  --brand-accent-700: #4338ca;
+  --brand-accent-800: #3730a3;
+  --brand-accent-900: #312e81;
+  --brand-accent-950: #1e1b4b;
+  --brand-accent: var(--brand-accent-500);
+
+  /* Brand gradient (default: sky → indigo) */
+  --brand-gradient-from: #bae6fd;
+  --brand-gradient-via: #818cf8;
+  --brand-gradient-to: #bae6fd;
+
+  /* Brand Fonts (default: current Lexend + Inter) */
+  --brand-font-display: var(--font-lexend);
+  --brand-font-body: var(--font-inter);
+  --brand-font-code: ui-monospace, monospace;
+}
+
 @theme {
   --text-*: initial;
   --text-xs: 0.75rem;
@@ -39,6 +79,33 @@
   --font-display--font-feature-settings: 'ss01';
 
   --container-8xl: 88rem;
+
+  /* Brand color tokens for Tailwind utility classes */
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-50: var(--brand-primary-50);
+  --color-brand-primary-100: var(--brand-primary-100);
+  --color-brand-primary-200: var(--brand-primary-200);
+  --color-brand-primary-300: var(--brand-primary-300);
+  --color-brand-primary-400: var(--brand-primary-400);
+  --color-brand-primary-500: var(--brand-primary-500);
+  --color-brand-primary-600: var(--brand-primary-600);
+  --color-brand-primary-700: var(--brand-primary-700);
+  --color-brand-primary-800: var(--brand-primary-800);
+  --color-brand-primary-900: var(--brand-primary-900);
+  --color-brand-primary-950: var(--brand-primary-950);
+
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-50: var(--brand-accent-50);
+  --color-brand-accent-100: var(--brand-accent-100);
+  --color-brand-accent-200: var(--brand-accent-200);
+  --color-brand-accent-300: var(--brand-accent-300);
+  --color-brand-accent-400: var(--brand-accent-400);
+  --color-brand-accent-500: var(--brand-accent-500);
+  --color-brand-accent-600: var(--brand-accent-600);
+  --color-brand-accent-700: var(--brand-accent-700);
+  --color-brand-accent-800: var(--brand-accent-800);
+  --color-brand-accent-900: var(--brand-accent-900);
+  --color-brand-accent-950: var(--brand-accent-950);
 }
 
 @layer base {

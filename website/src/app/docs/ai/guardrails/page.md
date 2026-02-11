@@ -26,17 +26,17 @@ const orchestrator = createAgentOrchestrator({
   autoApproveToolCalls: true,
   guardrails: {
     input: [
-      // Block inputs containing PII
+      // Block any input that contains personal information
       createPIIGuardrail({}),
 
-      // Or redact PII and continue
+      // Or scrub PII in-place and allow the request to continue
       createPIIGuardrail({
         redact: true,
         redactReplacement: '[REDACTED]',
         patterns: [
-          /\b\d{3}-\d{2}-\d{4}\b/,                    // SSN
-          /\b\d{16}\b/,                                  // Credit card
-          /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, // Email
+          /\b\d{3}-\d{2}-\d{4}\b/,                       // SSN
+          /\b\d{16}\b/,                                    // Credit card
+          /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,  // Email
         ],
       }),
     ],
@@ -55,7 +55,7 @@ const orchestrator = createAgentOrchestrator({
   runner,
   autoApproveToolCalls: true,
   guardrails: {
-    // Works on both input and output
+    // Check user input before it reaches the agent
     input: [
       createModerationGuardrail({
         checkFn: async (text) => {
@@ -65,6 +65,8 @@ const orchestrator = createAgentOrchestrator({
         message: 'Content flagged by moderation',
       }),
     ],
+
+    // Check agent output before it reaches the user
     output: [
       createModerationGuardrail({
         checkFn: async (text) => {
@@ -89,15 +91,15 @@ const orchestrator = createAgentOrchestrator({
   autoApproveToolCalls: true,
   guardrails: {
     toolCall: [
-      // Allowlist: only these tools can be called
+      // Allowlist – only these tools are permitted
       createToolGuardrail({
         allowlist: ['search', 'calculator', 'weather'],
       }),
 
-      // Or denylist: block dangerous tools
+      // Denylist – block dangerous tools by name
       createToolGuardrail({
         denylist: ['shell', 'filesystem', 'eval'],
-        caseSensitive: false,  // Default: case-insensitive matching
+        caseSensitive: false,  // Match regardless of casing
       }),
     ],
   },
@@ -116,16 +118,16 @@ const orchestrator = createAgentOrchestrator({
   autoApproveToolCalls: true,
   guardrails: {
     output: [
-      // Ensure output is a string
+      // Require a non-empty string response
       createOutputTypeGuardrail({ type: 'string', minStringLength: 1 }),
 
-      // Or ensure output is an object with required fields
+      // Require an object with specific keys present
       createOutputTypeGuardrail({
         type: 'object',
         requiredFields: ['answer', 'sources'],
       }),
 
-      // Or ensure output is an array within bounds
+      // Require an array within a size range
       createOutputTypeGuardrail({
         type: 'array',
         minLength: 1,
@@ -138,12 +140,12 @@ const orchestrator = createAgentOrchestrator({
 
 ### Output Schema Validation
 
-For complex output validation, use `createOutputSchemaGuardrail` with a custom validator — or plug in Zod:
+For complex output validation, use `createOutputSchemaGuardrail` with a custom validator – or plug in Zod:
 
 ```typescript
 import { createOutputSchemaGuardrail } from 'directive/ai';
 
-// Custom validation function
+// Validate output with a custom function
 const orchestrator = createAgentOrchestrator({
   runner,
   autoApproveToolCalls: true,
@@ -164,7 +166,7 @@ const orchestrator = createAgentOrchestrator({
   },
 });
 
-// With Zod (if installed)
+// Or plug in Zod for schema-level validation
 import { z } from 'zod';
 
 const OutputSchema = z.object({
@@ -179,6 +181,7 @@ const zodOrchestrator = createAgentOrchestrator({
   guardrails: {
     output: [
       createOutputSchemaGuardrail({
+        // Delegate validation to Zod's safeParse
         validate: (output) => {
           const result = OutputSchema.safeParse(output);
           if (result.success) return { valid: true };
@@ -205,13 +208,13 @@ const orchestrator = createAgentOrchestrator({
   autoApproveToolCalls: true,
   guardrails: {
     output: [
-      // Limit by characters
+      // Cap output by raw character count
       createLengthGuardrail({ maxCharacters: 5000 }),
 
-      // Limit by tokens (default estimator: chars / 4)
+      // Cap output by estimated token count (default: chars / 4)
       createLengthGuardrail({ maxTokens: 1000 }),
 
-      // Custom token estimator
+      // Provide your own token estimator
       createLengthGuardrail({
         maxTokens: 1000,
         estimateTokens: (text) => text.split(' ').length,
@@ -233,13 +236,14 @@ const orchestrator = createAgentOrchestrator({
   autoApproveToolCalls: true,
   guardrails: {
     output: [
+      // Block output containing sensitive keywords or patterns
       createContentFilterGuardrail({
         blockedPatterns: [
-          'internal-only',              // String (case-insensitive by default)
-          /\bpassword\b/i,              // RegExp
+          'internal-only',              // Plain string (auto-escaped for regex safety)
+          /\bpassword\b/i,              // RegExp for exact word match
           /api[_-]key/i,                // RegExp with alternation
         ],
-        caseSensitive: false,           // Default: false (for string patterns)
+        caseSensitive: false,           // String patterns match case-insensitively
       }),
     ],
   },
@@ -255,6 +259,7 @@ Limit request frequency based on token usage and request count:
 ```typescript
 import { createRateLimitGuardrail } from 'directive/ai';
 
+// Enforce both token-based and request-based rate limits
 const rateLimiter = createRateLimitGuardrail({
   maxTokensPerMinute: 10000,
   maxRequestsPerMinute: 60,
@@ -264,11 +269,11 @@ const orchestrator = createAgentOrchestrator({
   runner,
   autoApproveToolCalls: true,
   guardrails: {
-    input: [rateLimiter],
+    input: [rateLimiter],   // Checked before every agent run
   },
 });
 
-// Reset rate limiter state (useful in tests)
+// Clear the rate limiter's sliding window (useful in tests)
 rateLimiter.reset();
 ```
 
@@ -276,13 +281,13 @@ rateLimiter.reset();
 
 ## Custom Guardrails
 
-Write your own guardrail as a function that returns `{ passed, reason?, transformed? }`. The function receives `(data, context)` — you can omit `context` if you don't need it:
+Write your own guardrail as a function that returns `{ passed, reason?, transformed? }`. The function receives `(data, context)` – you can omit `context` if you don't need it:
 
 ```typescript
 import { createAgentOrchestrator } from 'directive/ai';
 import type { GuardrailFn, InputGuardrailData, OutputGuardrailData } from 'directive/ai';
 
-// Custom input guardrail
+// Block inputs that are too long
 const maxLengthGuardrail: GuardrailFn<InputGuardrailData> = (data) => {
   if (data.input.length > 10000) {
     return { passed: false, reason: 'Input exceeds 10,000 characters' };
@@ -290,13 +295,13 @@ const maxLengthGuardrail: GuardrailFn<InputGuardrailData> = (data) => {
   return { passed: true };
 };
 
-// Custom guardrail that transforms input
+// Clean up whitespace and pass the transformed input downstream
 const normalizeWhitespace: GuardrailFn<InputGuardrailData> = (data) => {
   const cleaned = data.input.replace(/\s+/g, ' ').trim();
   return { passed: true, transformed: cleaned };
 };
 
-// Custom output guardrail
+// Reject empty agent responses
 const noEmptyResponse: GuardrailFn<OutputGuardrailData> = (data) => {
   const output = typeof data.output === 'string' ? data.output : JSON.stringify(data.output);
   if (!output || output.trim().length === 0) {
@@ -309,7 +314,7 @@ const orchestrator = createAgentOrchestrator({
   runner,
   autoApproveToolCalls: true,
   guardrails: {
-    input: [maxLengthGuardrail, normalizeWhitespace],
+    input: [maxLengthGuardrail, normalizeWhitespace],   // Run in order
     output: [noEmptyResponse],
   },
 });
@@ -325,12 +330,16 @@ Give guardrails a name for better error messages, and optionally add retry suppo
 import type { NamedGuardrail, InputGuardrailData } from 'directive/ai';
 
 const piiCheck: NamedGuardrail<InputGuardrailData> = {
-  name: 'pii-detector',
+  name: 'pii-detector',                // Shows up in error messages and hooks
+
   fn: async (data, context) => {
     const hasPII = await externalPIIService.check(data.input);
     return { passed: !hasPII, reason: hasPII ? 'Contains PII' : undefined };
   },
-  critical: true,   // Block on failure (default: true)
+
+  critical: true,   // Block the run on failure (default: true)
+
+  // Retry transient failures with exponential backoff
   retry: {
     attempts: 3,
     backoff: 'exponential',
@@ -343,7 +352,7 @@ const orchestrator = createAgentOrchestrator({
   runner,
   autoApproveToolCalls: true,
   guardrails: {
-    input: [piiCheck],  // Named guardrails work alongside plain functions
+    input: [piiCheck],  // Named guardrails mix freely with plain functions
   },
 });
 ```
@@ -360,18 +369,17 @@ import { isGuardrailError } from 'directive/ai';
 try {
   await orchestrator.run(agent, userInput);
 } catch (error) {
+  // Type-narrow to a structured GuardrailError
   if (isGuardrailError(error)) {
     console.log(error.code);           // 'INPUT_GUARDRAIL_FAILED' | 'OUTPUT_GUARDRAIL_FAILED' | 'TOOL_CALL_GUARDRAIL_FAILED'
-    console.log(error.guardrailName);  // Name of the guardrail
+    console.log(error.guardrailName);  // Which guardrail fired
     console.log(error.guardrailType);  // 'input' | 'output' | 'toolCall'
-    console.log(error.userMessage);    // Safe to show to users
+    console.log(error.userMessage);    // Safe to display in your UI
     console.log(error.agentName);      // Which agent was running
 
-    // Sensitive fields (input, data) are non-enumerable
-    // They won't appear in JSON.stringify or console.log of the error object
-    // Access them explicitly when needed:
-    console.log(error.input);  // The input that triggered the error
-    console.log(error.data);   // Additional guardrail data
+    // Sensitive fields are non-enumerable (hidden from JSON.stringify / console.log)
+    console.log(error.input);  // The raw input that triggered the error
+    console.log(error.data);   // Additional guardrail context
   }
 }
 ```
@@ -391,13 +399,13 @@ import {
   combineStreamingGuardrails,
 } from 'directive/ai';
 
-// Length limit — stop if output gets too long
+// Halt the stream if the output grows too long
 const lengthGuard = createLengthStreamingGuardrail({
   maxTokens: 2000,
-  warnAt: 1500,  // Emit warning at 75%
+  warnAt: 1500,  // Emit a warning chunk at 75% capacity
 });
 
-// Pattern detection — stop on forbidden patterns
+// Halt the stream when sensitive data patterns appear
 const patternGuard = createPatternStreamingGuardrail({
   patterns: [
     { regex: /\b(SSN|social security)\b/i, name: 'PII' },
@@ -405,10 +413,10 @@ const patternGuard = createPatternStreamingGuardrail({
   ],
 });
 
-// Combine multiple streaming guardrails
+// Merge both guardrails into a single checker
 const combined = combineStreamingGuardrails([lengthGuard, patternGuard]);
 
-// Use with createStreamingRunner for standalone streaming
+// Attach to a standalone streaming runner
 const streamRunner = createStreamingRunner(baseRunner, {
   streamingGuardrails: [combined],
 });
@@ -429,13 +437,18 @@ import {
 } from 'directive/ai';
 
 const orchestrator = createOrchestratorBuilder()
+  // Input guardrails run in the order they are added
   .withInputGuardrail('pii', createPIIGuardrail({ redact: true }))
   .withInputGuardrail('length', (data) => ({
     passed: data.input.length <= 10000,
     reason: data.input.length > 10000 ? 'Input too long' : undefined,
   }))
+
+  // Tool call and output guardrails
   .withToolCallGuardrail('tools', createToolGuardrail({ denylist: ['shell'] }))
   .withOutputGuardrail('type', createOutputTypeGuardrail({ type: 'string' }))
+
+  // Finalize with the runner
   .build({
     runner,
     autoApproveToolCalls: true,
@@ -461,10 +474,12 @@ function GuardedChat() {
   const [error, setError] = useState<string | null>(null);
 
   const send = useCallback(async (input: string) => {
-    setError(null);
+    setError(null);  // Clear any previous guardrail error
+
     try {
       await orchestrator.run(myAgent, input);
     } catch (err) {
+      // Show the user-safe message if a guardrail blocked the request
       if (isGuardrailError(err)) {
         setError(err.userMessage);
       }
@@ -495,10 +510,12 @@ const agent = useFact(orchestrator.system, '__agent');
 const error = ref<string | null>(null);
 
 async function send(input: string) {
-  error.value = null;
+  error.value = null;  // Clear previous error
+
   try {
     await orchestrator.run(myAgent, input);
   } catch (err) {
+    // Surface guardrail errors to the user
     if (isGuardrailError(err)) error.value = err.userMessage;
   }
 }
@@ -525,7 +542,8 @@ const agent = useFact(orchestrator.system, '__agent');
 let error = null;
 
 async function send(input) {
-  error = null;
+  error = null;  // Reset before each attempt
+
   try {
     await orchestrator.run(myAgent, input);
   } catch (err) {
@@ -554,7 +572,8 @@ function GuardedChat() {
   const [error, setError] = createSignal<string | null>(null);
 
   async function send(input: string) {
-    setError(null);
+    setError(null);  // Clear previous error signal
+
     try {
       await orchestrator.run(myAgent, input);
     } catch (err) {
@@ -590,9 +609,11 @@ class GuardedChat extends LitElement {
 
   async send(input: string) {
     this.error = null;
+
     try {
       await this.orchestrator.run(myAgent, input);
     } catch (err) {
+      // Show the user-safe message and trigger a re-render
       if (isGuardrailError(err)) {
         this.error = err.userMessage;
         this.requestUpdate();

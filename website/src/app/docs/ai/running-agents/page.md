@@ -1,11 +1,11 @@
 ---
 title: Running Agents
-description: The fastest way to run a single AI agent with Directive — pick a provider, define an agent, call run.
+description: The fastest way to run a single AI agent with Directive – pick a provider, define an agent, call run.
 ---
 
 Run a single AI agent in three lines. {% .lead %}
 
-This is the minimal path. No orchestrator, no guardrails, no memory — just a runner function, an agent, and an input. When you need more, layer in the [orchestrator](/docs/ai/orchestrator) or the full [agent stack](/docs/ai/agent-stack).
+This is the minimal path. No orchestrator, no guardrails, no memory – just a runner function, an agent, and an input. When you need more, layer in the [orchestrator](/docs/ai/orchestrator) or the full [agent stack](/docs/ai/agent-stack).
 
 ---
 
@@ -14,18 +14,20 @@ This is the minimal path. No orchestrator, no guardrails, no memory — just a r
 ```typescript
 import { createOpenAIRunner } from 'directive/ai';
 
+// Create a runner for OpenAI (just needs an API key)
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
+// Run an agent – pass the agent definition and the user input
 const result = await runner(
   { name: 'assistant', instructions: 'You are helpful.', model: 'gpt-4o' },
   'What is WebAssembly?'
 );
 
-console.log(result.output);  // "WebAssembly is..."
-console.log(result.totalTokens);  // 142
+console.log(result.output);      // "WebAssembly is..."
+console.log(result.totalTokens); // 142
 ```
 
-That's it. `runner` is a plain async function — no framework, no state, no setup.
+That's it. `runner` is a plain async function – no framework, no state, no setup.
 
 ---
 
@@ -40,8 +42,8 @@ import { createOpenAIRunner } from 'directive/ai';
 
 const runner = createOpenAIRunner({
   apiKey: process.env.OPENAI_API_KEY!,
-  model: 'gpt-4o',            // default model (agent can override)
-  baseURL: 'https://api.openai.com/v1',  // works with Azure, Together, etc.
+  model: 'gpt-4o',                               // Default model (agent can override)
+  baseURL: 'https://api.openai.com/v1',           // Works with Azure, Together, etc.
 });
 ```
 
@@ -52,8 +54,8 @@ import { createAnthropicRunner } from 'directive/ai';
 
 const runner = createAnthropicRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
-  model: 'claude-sonnet-4-5-20250929',
-  maxTokens: 4096,
+  model: 'claude-sonnet-4-5-20250929',     // Default Claude model
+  maxTokens: 4096,                         // Max output tokens per request
 });
 ```
 
@@ -62,9 +64,10 @@ const runner = createAnthropicRunner({
 ```typescript
 import { createOllamaRunner } from 'directive/ai';
 
+// Connect to a locally running Ollama instance
 const runner = createOllamaRunner({
   model: 'llama3',
-  baseURL: 'http://localhost:11434',  // default
+  baseURL: 'http://localhost:11434',  // Default Ollama address
 });
 ```
 
@@ -77,14 +80,15 @@ An agent is a plain object with `name`, `instructions`, and `model`:
 ```typescript
 import type { AgentLike } from 'directive/ai';
 
+// An agent is a plain object – name, instructions, and optional model
 const agent: AgentLike = {
   name: 'code-reviewer',
   instructions: 'You review code for bugs, security issues, and style.',
-  model: 'gpt-4o',
+  model: 'gpt-4o',  // Optional – falls back to the runner's default model
 };
 ```
 
-The `model` field is optional — if omitted, the runner function's default model is used.
+The `model` field is optional – if omitted, the runner function's default model is used.
 
 ---
 
@@ -95,10 +99,11 @@ Every `runner()` call returns a `RunResult`:
 ```typescript
 const result = await runner(agent, 'Review this function: function add(a, b) { return a + b; }');
 
-result.output;   // string — the agent's response
-result.messages;      // Message[] — full conversation (user + assistant)
-result.toolCalls;     // ToolCall[] — any tool calls made (empty for basic runs)
-result.totalTokens;   // number — total tokens consumed
+// Every RunResult includes these fields
+result.output;        // string – the agent's response
+result.messages;      // Message[] – full conversation (user + assistant turns)
+result.toolCalls;     // ToolCall[] – any tool calls made (empty for basic runs)
+result.totalTokens;   // number – total tokens consumed
 ```
 
 ---
@@ -111,6 +116,7 @@ For providers without a pre-built helper, use `createRunner`:
 import { createRunner } from 'directive/ai';
 
 const runner = createRunner({
+  // Build the HTTP request from the agent definition and user input
   buildRequest: (agent, input) => ({
     url: 'https://my-llm.example.com/chat',
     init: {
@@ -123,6 +129,8 @@ const runner = createRunner({
       }),
     },
   }),
+
+  // Extract the text and token count from the raw HTTP response
   parseResponse: async (res) => {
     const data = await res.json();
     return {
@@ -138,13 +146,16 @@ Or write an `AgentRunner` from scratch:
 ```typescript
 import type { AgentRunner } from 'directive/ai';
 
+// Implement the AgentRunner interface from scratch
 const runner: AgentRunner = async (agent, input, options) => {
   const response = await fetch('/api/chat', {
     method: 'POST',
-    signal: options?.signal,
+    signal: options?.signal,         // Support cancellation via AbortSignal
     body: JSON.stringify({ model: agent.model, prompt: input }),
   });
   const data = await response.json();
+
+  // Return a standard RunResult so it works with the orchestrator and stack
   return {
     output: data.text,
     messages: [
@@ -177,7 +188,7 @@ The raw runner is perfect for scripts, one-off calls, and simple integrations. R
 
 ## Next Steps
 
-- [Orchestrator](/docs/ai/orchestrator) — add guardrails, approvals, and state tracking
-- [Agent Stack](/docs/ai/agent-stack) — all-in-one factory with memory, caching, and resilience
-- [Streaming](/docs/ai/streaming) — real-time token streaming
-- [Guardrails](/docs/ai/guardrails) — input validation and output safety
+- [Orchestrator](/docs/ai/orchestrator) – add guardrails, approvals, and state tracking
+- [Agent Stack](/docs/ai/agent-stack) – all-in-one factory with memory, caching, and resilience
+- [Streaming](/docs/ai/streaming) – real-time token streaming
+- [Guardrails](/docs/ai/guardrails) – input validation and output safety

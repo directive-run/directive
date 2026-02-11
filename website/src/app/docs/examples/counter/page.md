@@ -15,16 +15,19 @@ Let's start with a simple counter that increments and decrements:
 import { createModule, createSystem, t } from 'directive';
 
 const counterModule = createModule("counter", {
+  // Define the shape of our state
   schema: {
     facts: {
       count: t.number(),
     },
   },
 
+  // Set starting values when the module initializes
   init: (facts) => {
     facts.count = 0;
   },
 
+  // Derivations auto-track which facts they read –no manual deps needed
   derive: {
     isPositive: (facts) => facts.count > 0,
     isNegative: (facts) => facts.count < 0,
@@ -32,14 +35,16 @@ const counterModule = createModule("counter", {
   },
 });
 
+// Wire up and start the runtime
 const system = createSystem({ module: counterModule });
+system.start();
 
-// Increment
+// Mutate facts directly –derivations recompute automatically
 system.facts.count++;
 console.log(system.facts.count); // 1
 console.log(system.derive.isPositive); // true
 
-// Decrement
+// Derivations stay in sync no matter how facts change
 system.facts.count -= 2;
 console.log(system.facts.count); // -1
 console.log(system.derive.isNegative); // true
@@ -61,12 +66,14 @@ const boundedCounterModule = createModule("bounded-counter", {
     },
   },
 
+  // Configure the allowed range alongside the count
   init: (facts) => {
     facts.count = 0;
     facts.min = 0;
     facts.max = 10;
   },
 
+  // UI helpers –disable buttons when limits are reached
   derive: {
     canIncrement: (facts) => facts.count < facts.max,
     canDecrement: (facts) => facts.count > facts.min,
@@ -74,6 +81,7 @@ const boundedCounterModule = createModule("bounded-counter", {
       ((facts.count - facts.min) / (facts.max - facts.min)) * 100,
   },
 
+  // Constraints declare *what must be true* –they fire when violated
   constraints: {
     enforceMax: {
       when: (facts) => facts.count > facts.max,
@@ -85,6 +93,7 @@ const boundedCounterModule = createModule("bounded-counter", {
     },
   },
 
+  // Resolvers describe *how to fix it* when a constraint raises a requirement
   resolvers: {
     clampToMax: {
       requirement: "CLAMP_TO_MAX",
@@ -106,11 +115,15 @@ Now the counter automatically clamps to bounds:
 
 ```typescript
 const system = createSystem({ module: boundedCounterModule });
+system.start();
 
+// Set count beyond the upper bound
 system.facts.count = 15;
+// settle() waits for all constraints and resolvers to finish
 await system.settle();
 console.log(system.facts.count); // 10 (clamped to max)
 
+// Same thing on the lower end –the runtime enforces the floor
 system.facts.count = -5;
 await system.settle();
 console.log(system.facts.count); // 0 (clamped to min)
@@ -136,7 +149,9 @@ const counterWithEffectsModule = createModule("counter-effects", {
     facts.history = [];
   },
 
+  // Effects are fire-and-forget side effects –they never mutate facts
   effects: {
+    // Log every change by comparing current and previous values
     logChanges: {
       deps: ['count'],
       run: (facts, prev) => {
@@ -145,6 +160,8 @@ const counterWithEffectsModule = createModule("counter-effects", {
         }
       },
     },
+
+    // Celebrate round numbers (10, 20, 30...)
     notifyMilestone: {
       deps: ['count'],
       run: (facts) => {
@@ -167,7 +184,8 @@ Here's a complete React implementation:
 import { createModule, createSystem, t } from 'directive';
 import { useFact, useDerived } from 'directive/react';
 
-// Module
+// --- Module definition ---
+
 const counterModule = createModule("counter", {
   schema: {
     facts: {
@@ -183,12 +201,18 @@ const counterModule = createModule("counter", {
   },
 });
 
-// System
-const system = createSystem({ module: counterModule });
+// --- System initialization (happens once, outside components) ---
 
-// Components
+const system = createSystem({ module: counterModule });
+system.start();
+
+// --- React component wired to the Directive system ---
+
 function Counter() {
+  // useFact subscribes to a single fact –re-renders only when it changes
   const count = useFact(system, 'count');
+
+  // useDerived subscribes to computed values
   const doubled = useDerived(system, 'doubled');
   const isEven = useDerived(system, 'isEven');
 
@@ -197,6 +221,8 @@ function Counter() {
       <h1>{count}</h1>
       <p>Doubled: {doubled}</p>
       <p>Is even: {isEven ? 'Yes' : 'No'}</p>
+
+      {/* Mutate facts directly from event handlers */}
       <div className="buttons">
         <button onClick={() => { system.facts.count = count - 1 }}>-</button>
         <button onClick={() => { system.facts.count = count + 1 }}>+</button>
@@ -227,12 +253,14 @@ const asyncCounterModule = createModule("async-counter", {
     },
   },
 
+  // Start with null count –the constraint below will trigger a fetch
   init: (facts) => {
     facts.count = null;
     facts.loading = false;
     facts.error = null;
   },
 
+  // When count is missing and nothing is in-flight, fetch it automatically
   constraints: {
     needsInitialValue: {
       when: (facts) => facts.count === null && !facts.loading,
@@ -243,6 +271,7 @@ const asyncCounterModule = createModule("async-counter", {
   resolvers: {
     fetchInitialCount: {
       requirement: "FETCH_INITIAL_COUNT",
+      // Retry up to 3 times with exponential backoff on failure
       retry: { attempts: 3, backoff: "exponential" },
       resolve: async (_, context) => {
         context.facts.loading = true;
@@ -259,6 +288,7 @@ const asyncCounterModule = createModule("async-counter", {
     },
   },
 
+  // Derive a single status string from the three loading/error/count facts
   derive: {
     status: (facts) => {
       if (facts.loading) return 'loading';
@@ -282,6 +312,7 @@ const stepCounterModule = createModule("step-counter", {
     facts: {
       count: t.number(),
       step: t.number(),
+      // A command-style fact: set it to trigger the matching constraint
       action: t.literal("increment", "decrement", "reset").nullable(),
     },
   },
@@ -292,6 +323,7 @@ const stepCounterModule = createModule("step-counter", {
     facts.action = null;
   },
 
+  // Each action value maps to a distinct requirement
   constraints: {
     handleIncrement: {
       when: (facts) => facts.action === "increment",
@@ -307,6 +339,7 @@ const stepCounterModule = createModule("step-counter", {
     },
   },
 
+  // Each resolver applies the step size, then clears the action to reset the constraint
   resolvers: {
     increment: {
       requirement: "INCREMENT",

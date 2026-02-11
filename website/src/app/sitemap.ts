@@ -1,5 +1,4 @@
 import { MetadataRoute } from 'next'
-import * as fs from 'fs'
 import * as path from 'path'
 import glob from 'fast-glob'
 
@@ -21,11 +20,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // Filter out sitemap.xml and robots.txt paths if they exist
   const validPages = pages.filter(p => !p.includes('sitemap') && !p.includes('robots'))
 
-  return validPages.map((pagePath) => {
+  const entries: MetadataRoute.Sitemap = validPages.map((pagePath) => {
     // Determine priority based on path
     let priority = 0.8
     if (pagePath === '') priority = 1
     else if (pagePath.includes('/quick-start')) priority = 0.9
+    else if (pagePath.includes('/blog/')) priority = 0.7
     else if (pagePath.includes('/docs/') && !pagePath.includes('/docs/advanced/')) priority = 0.85
 
     // Determine change frequency
@@ -39,4 +39,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority,
     }
   })
+
+  // TSX pages aren't auto-discovered by the .md glob
+  const tsxPages = [
+    { path: '/blog', priority: 0.8, changeFrequency: 'weekly' as const },
+    { path: '/about', priority: 0.7, changeFrequency: 'monthly' as const },
+    { path: '/support', priority: 0.6, changeFrequency: 'monthly' as const },
+  ]
+
+  for (const page of tsxPages) {
+    entries.push({
+      url: `${baseUrl}${page.path}`,
+      lastModified: new Date(),
+      changeFrequency: page.changeFrequency,
+      priority: page.priority,
+    })
+  }
+
+  return entries
 }

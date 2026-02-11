@@ -14,9 +14,9 @@ import { t } from 'directive';
 
 schema: {
   facts: {
-    name: t.string(),
-    age: t.number(),
-    active: t.boolean(),
+    name: t.string(),      // Text values
+    age: t.number(),       // Numeric values
+    active: t.boolean(),   // True/false flags
   },
 }
 ```
@@ -30,6 +30,7 @@ Narrow string types with generics:
 ```typescript
 schema: {
   facts: {
+    // Generic parameter narrows the type to specific allowed values
     status: t.string<"idle" | "loading" | "success" | "error">(),
     theme: t.string<"light" | "dark" | "system">(),
     role: t.string<"admin" | "user" | "guest">(),
@@ -52,7 +53,10 @@ interface User {
 
 schema: {
   facts: {
+    // Pass your interface as the generic to get full type safety
     user: t.object<User>(),
+
+    // Inline types work too
     settings: t.object<{ theme: string; locale: string }>(),
   },
 }
@@ -61,12 +65,17 @@ schema: {
 ### Object Modifiers
 
 ```typescript
-t.object<User>().shape({            // Validate specific properties
+// Validate specific properties at runtime (dev mode)
+t.object<User>().shape({
   name: t.string(),
   age: t.number(),
 })
-t.object<User>().nonNull()          // Must not be null or undefined
-t.object<User>().hasKeys("id", "name")  // Must contain these keys
+
+// Ensure the value is never null or undefined
+t.object<User>().nonNull()
+
+// Require certain keys to be present
+t.object<User>().hasKeys("id", "name")
 ```
 
 ---
@@ -78,6 +87,7 @@ Arrays use a generic type parameter. Use `.of()` for element validation:
 ```typescript
 schema: {
   facts: {
+    // Generic sets the array type; .of() adds element validation
     ids: t.array<number>().of(t.number()),
     users: t.array<User>().of(t.object<User>()),
     tags: t.array<string>().of(t.string()),
@@ -88,9 +98,9 @@ schema: {
 ### Array Modifiers
 
 ```typescript
-t.array<string>().nonEmpty()        // Must have at least 1 element
-t.array<string>().minLength(2)      // Minimum length
-t.array<string>().maxLength(50)     // Maximum length
+t.array<string>().nonEmpty()        // Reject empty arrays
+t.array<string>().minLength(2)      // At least 2 elements
+t.array<string>().maxLength(50)     // No more than 50 elements
 ```
 
 ---
@@ -102,8 +112,9 @@ String literal unions with runtime validation:
 ```typescript
 schema: {
   facts: {
+    // Pass allowed values as arguments – validated at runtime
     status: t.enum("idle", "loading", "success", "error"),
-    // Type is inferred as "idle" | "loading" | "success" | "error"
+    // TypeScript infers: "idle" | "loading" | "success" | "error"
   },
 }
 ```
@@ -117,9 +128,9 @@ Exact value matching:
 ```typescript
 schema: {
   facts: {
-    type: t.literal("user"),     // Exact string
-    version: t.literal(1),       // Exact number
-    enabled: t.literal(true),    // Exact boolean
+    type: t.literal("user"),     // Only the string "user" is valid
+    version: t.literal(1),       // Only the number 1 is valid
+    enabled: t.literal(true),    // Only true is valid
   },
 }
 ```
@@ -133,7 +144,10 @@ Combine multiple types:
 ```typescript
 schema: {
   facts: {
+    // Accept either a string or a number
     value: t.union(t.string(), t.number()),
+
+    // Three-way union
     data: t.union(t.string(), t.number(), t.boolean()),
   },
 }
@@ -148,7 +162,10 @@ Dynamic key-value maps:
 ```typescript
 schema: {
   facts: {
+    // String keys with string values – like a dictionary
     metadata: t.record(t.string()),     // Record<string, string>
+
+    // String keys with numeric values – like a scoreboard
     scores: t.record(t.number()),       // Record<string, number>
   },
 }
@@ -163,7 +180,10 @@ Fixed-length arrays with specific types per position:
 ```typescript
 schema: {
   facts: {
+    // Each position has a specific type – like a labeled pair
     coord: t.tuple(t.string(), t.number()),        // [string, number]
+
+    // 3D coordinates: x, y, z
     position: t.tuple(t.number(), t.number(), t.number()),  // [number, number, number]
   },
 }
@@ -176,11 +196,12 @@ schema: {
 ```typescript
 schema: {
   facts: {
-    id: t.uuid(),              // UUID string validation
-    email: t.email(),          // Email format validation
-    website: t.url(),          // URL format validation
-    createdAt: t.date(),       // Date instance validation
-    largeNum: t.bigint(),      // BigInt validation
+    // Built-in format validators for common patterns
+    id: t.uuid(),              // "550e8400-e29b-41d4-a716-446655440000"
+    email: t.email(),          // "user@example.com"
+    website: t.url(),          // "https://example.com"
+    createdAt: t.date(),       // Date instance
+    largeNum: t.bigint(),      // BigInt for large numbers
   },
 }
 ```
@@ -194,6 +215,7 @@ Bypass all validation (use sparingly):
 ```typescript
 schema: {
   facts: {
+    // Typed but not validated – use for external data you can't control
     externalResponse: t.any<ExternalAPIResponse>(),
   },
 }
@@ -210,6 +232,7 @@ Allow null values:
 ```typescript
 schema: {
   facts: {
+    // .nullable() adds null to the type – common for "not yet loaded" state
     user: t.object<User>().nullable(),     // User | null
     error: t.string().nullable(),           // string | null
   },
@@ -223,6 +246,7 @@ Allow undefined values:
 ```typescript
 schema: {
   facts: {
+    // .optional() adds undefined – for values that may not exist
     preference: t.string().optional(),     // string | undefined
     metadata: t.object<Meta>().optional(), // Meta | undefined
   },
@@ -236,6 +260,7 @@ Provide default values:
 ```typescript
 schema: {
   facts: {
+    // .default() sets the initial value – no need to set it in init()
     count: t.number().default(0),
     theme: t.string<"light" | "dark">().default("light"),
     items: t.array<string>().default([]),
@@ -246,9 +271,10 @@ schema: {
 ### Number Constraints
 
 ```typescript
-t.number().min(0)             // Must be >= 0
-t.number().max(100)           // Must be <= 100
-t.number().min(0).max(100)    // Range
+// Enforce numeric boundaries (validated in dev mode)
+t.number().min(0)             // No negative numbers
+t.number().max(100)           // Cap at 100
+t.number().min(0).max(100)    // Valid range: 0 to 100
 ```
 
 ---
@@ -258,19 +284,19 @@ t.number().min(0).max(100)    // Range
 Add validation and refinements to any type:
 
 ```typescript
-// Custom validator (dev-mode only)
+// Custom validator – runs in dev mode, tree-shaken in production
 t.string().validate(s => s.length > 0)
 
-// Refinement with error message
+// Refinement – like validate, but with a descriptive error message
 t.string().refine(s => s.includes("@"), "Must be an email")
 
-// Transform values on set
+// Transform – automatically modify values when they're set
 t.string().transform(s => s.trim())
 
-// Branded types (nominal typing)
+// Branded types – prevent mixing up strings that mean different things
 t.string().brand<"UserId">()  // Branded<string, "UserId">
 
-// Description (for devtools / introspection)
+// Description – shows up in devtools and introspection output
 t.string().describe("The user's display name")
 ```
 
@@ -283,9 +309,16 @@ Modifiers can be chained:
 ```typescript
 schema: {
   facts: {
+    // Nullable + default: starts as null, can be set to User later
     user: t.object<User>().nullable().default(null),
+
+    // Array + element validation + default: starts empty, validates items
     items: t.array<Item>().of(t.object<Item>()).default([]),
+
+    // Numeric range + default: bounded counter starting at 0
     count: t.number().min(0).max(100).default(0),
+
+    // Refinement + nullable: validated when present, allowed to be null
     email: t.string().refine(s => s.includes("@"), "Must be email").nullable(),
   },
 }
@@ -295,6 +328,6 @@ schema: {
 
 ## Next Steps
 
-- **[Schema Overview](/docs/schema-overview)** — Schema structure
-- **[Facts](/docs/facts)** — Working with state
-- **[Derivations](/docs/derivations)** — Computed values
+- **[Schema Overview](/docs/schema-overview)** – Schema structure
+- **[Facts](/docs/facts)** – Working with state
+- **[Derivations](/docs/derivations)** – Computed values

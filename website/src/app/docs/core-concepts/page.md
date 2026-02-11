@@ -16,13 +16,16 @@ Traditional state management is **imperative**: you tell the system exactly what
 ```typescript
 // Imperative: "When the button is clicked, fetch the user, then update state"
 async function handleClick() {
+  // Developer manually orchestrates every step
   setLoading(true);
+
   try {
     const user = await fetchUser(userId);
     setUser(user);
   } catch (e) {
     setError(e.message);
   } finally {
+    // Must remember to reset loading in every code path
     setLoading(false);
   }
 }
@@ -34,7 +37,10 @@ Directive is **declarative**: you describe what should be true, and the system f
 // Declarative: "When we have a userId but no user, we need to fetch"
 constraints: {
   needsUser: {
+    // The system evaluates this rule continuously
     when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
+
+    // When the condition is true, generate this requirement
     require: { type: "FETCH_USER" },
   },
 },
@@ -64,9 +70,9 @@ Facts are your observable state. They're reactive values that the system tracks 
 schema: {
   facts: {
     userId: t.number(),
-    user: t.object<User>().nullable(),
+    user: t.object<User>().nullable(),   // null until loaded
     loading: t.boolean(),
-    error: t.string().nullable(),
+    error: t.string().nullable(),         // null when no error
   },
 },
 ```
@@ -78,13 +84,13 @@ Facts are:
 - **Tracked** - Dependencies are automatic
 
 ```typescript
-// Reading facts
+// Reading facts – simple property access
 const id = system.facts.userId;
 
-// Writing facts
+// Writing facts – assignment triggers the reconciliation loop
 system.facts.userId = 123;
 
-// In resolvers, use context.facts
+// Inside resolvers, read and write through context.facts
 resolve: async (req, context) => {
   context.facts.loading = true;
   context.facts.user = await api.getUser(context.facts.userId);
@@ -112,7 +118,10 @@ Constraints declare what must be true. They're the rules that drive your applica
 ```typescript
 constraints: {
   needsUser: {
+    // Activates when we have an ID but haven't loaded the user yet
     when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
+
+    // Tell the system what we need – a resolver will handle the rest
     require: { type: "FETCH_USER" },
   },
 },
@@ -130,16 +139,16 @@ Constraints can be composed for complex logic:
 
 ```typescript
 constraints: {
-  // Base constraints
+  // Step 1: Validate the user ID first
   hasUserId: {
     when: (facts) => facts.userId > 0,
     require: { type: "VALIDATE_USER_ID" },
   },
 
-  // Dependent constraint
+  // Step 2: Only fetch after validation succeeds
   needsUserData: {
     when: (facts) => facts.userId > 0 && facts.userIdValid && !facts.user,
-    after: ["hasUserId"],  // Wait for validation
+    after: ["hasUserId"],  // Ensures validation runs before fetching
     require: { type: "FETCH_USER" },
   },
 },
@@ -152,12 +161,13 @@ When multiple constraints are active, priority determines order:
 ```typescript
 constraints: {
   critical: {
-    priority: 100,  // Runs first
+    priority: 100,  // Higher priority – resolved first
     when: (facts) => facts.emergency,
     require: { type: "HANDLE_EMERGENCY" },
   },
+
   normal: {
-    priority: 50,
+    priority: 50,   // Lower priority – waits for critical constraints
     when: (facts) => facts.needsUpdate,
     require: { type: "UPDATE_DATA" },
   },
@@ -173,12 +183,18 @@ Resolvers fulfill requirements. They're async functions that make constraints tr
 ```typescript
 resolvers: {
   fetchUser: {
+    // This resolver handles FETCH_USER requirements
     requirement: "FETCH_USER",
+
+    // Built-in resilience – no manual retry loops
     retry: { attempts: 3, backoff: "exponential" },
     timeout: 5000,
+
     resolve: async (req, context) => {
+      // Signal loading state
       context.facts.loading = true;
       context.facts.error = null;
+
       try {
         context.facts.user = await api.getUser(context.facts.userId);
       } catch (error) {
@@ -197,30 +213,33 @@ Resolvers have powerful built-in features:
 
 ```typescript
 retry: {
-  attempts: 3,
-  backoff: "exponential",  // or "linear" or "none"
-  initialDelay: 1000,  // Base delay in ms
+  attempts: 3,                // Try up to 3 times before failing
+  backoff: "exponential",     // or "linear" or "none"
+  initialDelay: 1000,         // First retry waits 1s, then 2s, then 4s...
 }
 ```
 
 #### Timeout
 
 ```typescript
-timeout: 5000,  // Fail after 5 seconds
+// Automatically fail if the resolver takes too long
+timeout: 5000,  // 5 second deadline
 ```
 
 #### Deduplication
 
 ```typescript
+// Prevent duplicate work – same key means same resolution
 key: (req) => `fetch-user-${req.userId}`,
-// Same key = same resolution, won't run twice simultaneously
+// Two constraints requesting the same user won't trigger two API calls
 ```
 
 #### Predicate Matching
 
 ```typescript
+// Match multiple requirement types with a type guard
 requirement: (req): req is FetchRequirement => req.type.startsWith("FETCH_"),
-// Handle multiple requirement types with a type guard
+// One resolver can handle FETCH_USER, FETCH_POSTS, FETCH_SETTINGS, etc.
 ```
 
 ---
@@ -231,8 +250,13 @@ Derivations are computed values that automatically track dependencies.
 
 ```typescript
 derive: {
+  // Show user's name, or "Guest" if not logged in
   displayName: (facts) => facts.user?.name ?? "Guest",
+
+  // Simple boolean derived from whether user data exists
   isLoggedIn: (facts) => facts.user !== null,
+
+  // Combine multiple facts into a single status value
   status: (facts) => {
     if (facts.loading) return "loading";
     if (facts.error) return "error";
@@ -249,8 +273,13 @@ Derivations are:
 
 ```typescript
 derive: {
+  // Base derivation – checks a single fact
   isAdmin: (facts) => facts.user?.role === "admin",
+
+  // Composed – builds on other derivations via the second argument
   canEdit: (facts, derive) => derive.isLoggedIn && derive.isAdmin,
+
+  // Deeper composition – mixes derivations with facts
   canDelete: (facts, derive) => derive.canEdit && facts.user?.permissions.delete,
 },
 ```
@@ -280,9 +309,14 @@ Facts updated <------------------------ Resolvers execute
 The system "settles" when all requirements are fulfilled:
 
 ```typescript
-system.facts.userId = 123;  // Triggers constraint
-await system.settle();       // Wait for resolver to complete
-console.log(system.facts.user);  // User is now loaded
+// Set a fact – this triggers the reconciliation loop
+system.facts.userId = 123;
+
+// Wait until all constraints are satisfied and resolvers finish
+await system.settle();
+
+// The system is now "settled" – all requirements fulfilled
+console.log(system.facts.user);  // User is loaded
 ```
 
 ---
@@ -303,8 +337,10 @@ Directive has two ways to run side effects:
 ```typescript
 effects: {
   trackPageView: {
+    // Fires whenever facts change – compare with previous values
     run: (facts, prev) => {
       if (prev?.page !== facts.page) {
+        // Fire-and-forget: no retries, no requirements
         analytics.pageView(facts.page);
       }
     },
@@ -317,7 +353,9 @@ effects: {
 ```typescript
 resolvers: {
   fetchData: {
+    // Tied to a requirement – only runs when a constraint activates it
     requirement: "FETCH_DATA",
+
     resolve: async (req, context) => {
       context.facts.data = await api.getData();
     },
@@ -341,6 +379,7 @@ interface User {
 }
 
 const userModule = createModule("user", {
+  // Define the shape of all state, computed values, and requirements
   schema: {
     facts: {
       userId: t.number(),
@@ -359,6 +398,7 @@ const userModule = createModule("user", {
     },
   },
 
+  // Set initial values when the system starts
   init: (facts) => {
     facts.userId = 0;
     facts.user = null;
@@ -366,29 +406,32 @@ const userModule = createModule("user", {
     facts.error = null;
   },
 
-  // Computed values
+  // Computed values – auto-tracked, no dependency arrays
   derive: {
     displayName: (facts) => facts.user?.name ?? "Guest",
     isLoggedIn: (facts) => facts.user !== null,
     isAdmin: (facts) => facts.user?.role === 'admin',
   },
 
-  // Rules
+  // Rules – declare what must be true
   constraints: {
     needsUser: {
+      // When we have an ID but no user, we need to fetch
       when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
       require: { type: "FETCH_USER" },
     },
   },
 
-  // Fulfillment
+  // Fulfillment – how to make constraints true
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
       retry: { attempts: 3, backoff: "exponential" },
+
       resolve: async (req, context) => {
         context.facts.loading = true;
         context.facts.error = null;
+
         try {
           const response = await fetch(`/api/users/${context.facts.userId}`);
           context.facts.user = await response.json();
@@ -401,7 +444,7 @@ const userModule = createModule("user", {
     },
   },
 
-  // Side effects
+  // Side effects – observe changes without generating requirements
   effects: {
     logUserChange: {
       run: (facts, prev) => {
@@ -413,14 +456,15 @@ const userModule = createModule("user", {
   },
 });
 
-// Create and use the system
+// Create and start the system
 const system = createSystem({ module: userModule });
 system.start();
 
-// Just set userId - everything else happens automatically
+// Set userId – constraints, resolvers, and effects run automatically
 system.facts.userId = 123;
 await system.settle();
 
+// After settling, all derived values reflect the loaded user
 console.log(system.derive.displayName);  // "John"
 console.log(system.derive.isLoggedIn);   // true
 console.log(system.derive.isAdmin);      // false

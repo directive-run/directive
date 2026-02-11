@@ -565,33 +565,71 @@ export function createEngine<S extends Schema>(
 			return derivationsManager.get(derivationId as keyof DerivationsDef<S>) as T;
 		},
 
-		subscribe(derivationIds: string[], listener: () => void): () => void {
-			return derivationsManager.subscribe(
-				derivationIds as Array<keyof DerivationsDef<S>>,
-				listener,
-			);
+		subscribe(ids: string[], listener: () => void): () => void {
+			const derivationIds: string[] = [];
+			const factKeys: string[] = [];
+
+			for (const id of ids) {
+				if (id in mergedDerive) {
+					derivationIds.push(id);
+				} else if (id in mergedSchema) {
+					factKeys.push(id);
+				} else if (process.env.NODE_ENV !== "production") {
+					console.warn(`[Directive] subscribe: unknown key "${id}"`);
+				}
+			}
+
+			const unsubs: Array<() => void> = [];
+			if (derivationIds.length > 0) {
+				unsubs.push(
+					derivationsManager.subscribe(
+						derivationIds as Array<keyof DerivationsDef<S>>,
+						listener,
+					),
+				);
+			}
+			if (factKeys.length > 0) {
+				unsubs.push(store.subscribe(factKeys as Array<keyof InferSchema<S>>, listener));
+			}
+
+			return () => {
+				for (const u of unsubs) u();
+			};
 		},
 
 		watch<T = unknown>(
-			derivationId: string,
+			id: string,
 			callback: (newValue: T, previousValue: T | undefined) => void,
 		): () => void {
-			let previousValue: T | undefined = derivationsManager.get(
-				derivationId as keyof DerivationsDef<S>,
-			) as T | undefined;
+			if (id in mergedDerive) {
+				// Derivation path
+				let previousValue: T | undefined = derivationsManager.get(
+					id as keyof DerivationsDef<S>,
+				) as T | undefined;
 
-			return derivationsManager.subscribe(
-				[derivationId as keyof DerivationsDef<S>],
-				() => {
-					const newValue = derivationsManager.get(derivationId as keyof DerivationsDef<S>) as T;
-					// Only call callback if value actually changed
-					if (newValue !== previousValue) {
-						const oldValue = previousValue;
-						previousValue = newValue;
-						callback(newValue, oldValue);
-					}
-				},
-			);
+				return derivationsManager.subscribe(
+					[id as keyof DerivationsDef<S>],
+					() => {
+						const newValue = derivationsManager.get(id as keyof DerivationsDef<S>) as T;
+						if (newValue !== previousValue) {
+							const oldValue = previousValue;
+							previousValue = newValue;
+							callback(newValue, oldValue);
+						}
+					},
+				);
+			}
+
+			// Fact path
+			let prev = store.get(id as keyof InferSchema<S>) as T | undefined;
+			return store.subscribe([id as keyof InferSchema<S>], () => {
+				const next = store.get(id as keyof InferSchema<S>) as T;
+				if (!Object.is(next, prev)) {
+					const old = prev;
+					prev = next;
+					callback(next, old);
+				}
+			});
 		},
 
 		inspect(): SystemInspection {
