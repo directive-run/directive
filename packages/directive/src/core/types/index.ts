@@ -122,8 +122,11 @@ export type {
 	// Accessors
 	DeriveAccessor,
 	EventsAccessor,
+	FactKeys,
+	FactReturnType,
 	DerivationKeys,
 	DerivationReturnType,
+	ObservableKeys,
 	// Debug & time-travel
 	DebugConfig,
 	TimeTravelAPI,

@@ -90,7 +90,9 @@ describe("Unified Subscribe/Watch API", () => {
 	describe("subscribe() with derivation keys", () => {
 		it("fires listener when a derivation changes", async () => {
 			const system = createTestSystem();
-			system.read("doubled"); // Establish tracking
+			// Derivations are lazy -- must be read once to establish dependency tracking
+			// before subscribe() can detect invalidation notifications.
+			system.read("doubled");
 
 			const listener = vi.fn();
 			system.subscribe(["doubled"], listener);
@@ -284,13 +286,174 @@ describe("Unified Subscribe/Watch API", () => {
 			const system = createTestSystem();
 			const callback = vi.fn();
 
-			// "doubled" is a derivation — should route to derivation path
+			// "doubled" is a derivation -- should route to derivation path
 			system.watch("doubled", callback);
 			system.events.increment();
 			await new Promise((r) => setTimeout(r, 10));
 
 			// Should get derivation value (2), not a fact
 			expect(callback).toHaveBeenCalledWith(2, 0);
+			system.destroy();
+		});
+	});
+
+	// ============================================================================
+	// Unknown key warnings
+	// ============================================================================
+
+	describe("unknown key warnings", () => {
+		it("subscribe() warns for unknown keys in dev mode", () => {
+			const system = createTestSystem();
+			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+			system.subscribe(["nonexistent" as any], () => {});
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.stringContaining('unknown key "nonexistent"'),
+			);
+			warnSpy.mockRestore();
+			system.destroy();
+		});
+
+		it("watch() warns for unknown keys in dev mode", () => {
+			const system = createTestSystem();
+			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+			system.watch("nonexistent" as any, () => {});
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.stringContaining('unknown key "nonexistent"'),
+			);
+			warnSpy.mockRestore();
+			system.destroy();
+		});
+
+		it("watch() with unknown key returns a working unsubscribe", () => {
+			const system = createTestSystem();
+			vi.spyOn(console, "warn").mockImplementation(() => {});
+
+			const unsub = system.watch("nonexistent" as any, () => {});
+			expect(() => unsub()).not.toThrow();
+
+			vi.restoreAllMocks();
+			system.destroy();
+		});
+	});
+
+	// ============================================================================
+	// equalityFn option
+	// ============================================================================
+
+	describe("watch() with equalityFn", () => {
+		it("uses custom equality function to suppress callbacks", () => {
+			const system = createTestSystem();
+			const callback = vi.fn();
+
+			// Custom equality: treat all numbers as equal (suppress all changes)
+			system.watch("count", callback, {
+				equalityFn: () => true,
+			});
+			system.events.increment();
+
+			expect(callback).not.toHaveBeenCalled();
+			system.destroy();
+		});
+
+		it("uses custom equality function to allow callbacks", () => {
+			const system = createTestSystem();
+			const callback = vi.fn();
+
+			// Custom equality: treat nothing as equal (fire on every notification)
+			system.watch("count", callback, {
+				equalityFn: () => false,
+			});
+			system.events.increment();
+
+			expect(callback).toHaveBeenCalledWith(1, 0);
+			system.destroy();
+		});
+
+		it("works with derivation path too", async () => {
+			const system = createTestSystem();
+			const callback = vi.fn();
+
+			system.watch("doubled", callback, {
+				equalityFn: () => true, // suppress
+			});
+			system.events.increment();
+			await new Promise((r) => setTimeout(r, 10));
+
+			expect(callback).not.toHaveBeenCalled();
+			system.destroy();
+		});
+	});
+
+	// ============================================================================
+	// system.when() promise API
+	// ============================================================================
+
+	describe("when()", () => {
+		it("resolves immediately if predicate is already true", async () => {
+			const system = createTestSystem();
+			// count starts at 0
+			await expect(system.when((facts: any) => facts.count === 0)).resolves.toBeUndefined();
+			system.destroy();
+		});
+
+		it("resolves when predicate becomes true after fact change", async () => {
+			const system = createTestSystem();
+			const promise = system.when((facts: any) => facts.count >= 3);
+
+			system.events.increment();
+			system.events.increment();
+			system.events.increment();
+
+			await expect(promise).resolves.toBeUndefined();
+			system.destroy();
+		});
+
+		it("rejects on timeout if predicate never becomes true", async () => {
+			const system = createTestSystem();
+			const promise = system.when(
+				(facts: any) => facts.count >= 100,
+				{ timeout: 50 },
+			);
+
+			await expect(promise).rejects.toThrow("timed out");
+			system.destroy();
+		});
+
+		it("works with namespaced system", async () => {
+			const authSchema = {
+				facts: { token: t.string().nullable() },
+				derivations: {},
+				events: { login: { token: t.string() } },
+				requirements: {},
+			} satisfies ModuleSchema;
+
+			const authModule = createModule("auth", {
+				schema: authSchema,
+				init: (facts) => { facts.token = null; },
+				events: {
+					login: (facts, { token }) => { facts.token = token; },
+				},
+			});
+
+			const system = createSystem({ modules: { auth: authModule } });
+			system.start();
+
+			const promise = system.when((facts: any) => facts.auth.token !== null);
+			system.events.auth.login({ token: "abc" });
+
+			await expect(promise).resolves.toBeUndefined();
+			system.destroy();
+		});
+
+		it("cleans up subscription after resolving", async () => {
+			const system = createTestSystem();
+			await system.when((facts: any) => facts.count === 0);
+			// No dangling subscriptions -- increment should not throw
+			system.events.increment();
 			system.destroy();
 		});
 	});
