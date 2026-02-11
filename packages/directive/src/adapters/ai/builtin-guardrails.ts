@@ -9,8 +9,8 @@ import type {
   ToolCallGuardrailData,
   SchemaValidator,
   AgentState,
-} from "./openai-agents-types.js";
-import { AGENT_KEY } from "./openai-agents-types.js";
+} from "./types.js";
+import { AGENT_KEY } from "./types.js";
 
 // ============================================================================
 // Helpers

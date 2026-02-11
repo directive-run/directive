@@ -7,7 +7,7 @@ import {
 	createPubSub,
 	type MessageBus,
 	type AgentNetwork,
-} from "../adapters/openai-agents-communication.js";
+} from "../adapters/ai/communication.js";
 
 // ============================================================================
 // MessageBus

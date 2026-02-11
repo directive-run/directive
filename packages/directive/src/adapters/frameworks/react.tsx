@@ -1,11 +1,11 @@
 /**
  * React Adapter - Consolidated hooks for React integration
  *
- * 19 public exports: useFact, useDerived, useDispatch, useDirective,
+ * 20 public exports: useFact, useDerived, useDispatch, useDirective,
  * useDirectiveRef, useSelector, useWatch, useInspect, useRequirementStatus,
  * useSuspenseRequirement, useEvents, useModule, useExplain, useConstraintStatus,
  * useOptimisticUpdate, DirectiveDevTools, DirectiveHydrator, useHydratedSystem,
- * shallowEqual
+ * useTimeTravel, shallowEqual
  *
  * @example
  * ```tsx
@@ -54,24 +54,22 @@ import type {
 	System,
 	SystemSnapshot,
 	DistributableSnapshot,
-} from "../core/types.js";
-import { createSystem } from "../core/system.js";
-import { withTracking } from "../core/tracking.js";
+} from "../../core/types.js";
+import { createSystem } from "../../core/system.js";
+import { withTracking } from "../../core/tracking.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
-} from "../utils/requirement-status.js";
+} from "../../utils/requirement-status.js";
 import {
-	type RequirementsState,
-	type ThrottledHookOptions,
 	type InspectState,
 	type ConstraintInfo,
 	computeInspectState,
-} from "./shared.js";
+} from "../shared.js";
 
 // Re-export for convenience
-export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions, InspectState, ConstraintInfo };
-export { shallowEqual } from "../utils/utils.js";
+export type { RequirementTypeStatus, InspectState, ConstraintInfo };
+export { shallowEqual } from "../../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
 export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
@@ -505,20 +503,23 @@ export function useDispatch<S extends ModuleSchema>(
 // useWatch — derivation or fact side-effect (no re-render)
 // ============================================================================
 
-/** Watch a derivation */
+/** Watch a fact or derivation (auto-detected) */
 export function useWatch<
 	S extends ModuleSchema,
 	K extends keyof InferDerivations<S> & string,
 >(
 	system: SingleModuleSystem<S>,
-	derivationId: K,
+	key: K,
 	callback: (
 		newValue: InferDerivations<S>[K],
 		prevValue: InferDerivations<S>[K] | undefined,
 	) => void,
 ): void;
 
-/** Watch a fact */
+/**
+ * Watch a fact by explicit "fact" discriminator.
+ * @deprecated Use `useWatch(system, key, callback)` instead — facts are now auto-detected.
+ */
 export function useWatch<
 	S extends ModuleSchema,
 	K extends keyof InferFacts<S> & string,
@@ -532,11 +533,11 @@ export function useWatch<
 	) => void,
 ): void;
 
-/** Watch derivation (generic fallback) */
+/** Watch a fact or derivation (generic fallback) */
 export function useWatch<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
 	system: SingleModuleSystem<any>,
-	derivationId: string,
+	key: string,
 	callback: (newValue: T, prevValue: T | undefined) => void,
 ): void;
 
@@ -550,42 +551,26 @@ export function useWatch(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
 	maybeCallback?: (newValue: any, prevValue: any) => void,
 ): void {
-	// Determine if this is the fact-watching overload: useWatch(system, "fact", factKey, callback)
+	// Backward compat: useWatch(system, "fact", factKey, callback)
 	const isFact =
 		derivationIdOrKind === "fact" &&
 		typeof callbackOrFactKey === "string" &&
 		typeof maybeCallback === "function";
-	const factKey = isFact ? (callbackOrFactKey as string) : undefined;
+	const key = isFact ? (callbackOrFactKey as string) : derivationIdOrKind;
 	const callback = isFact
 		// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
 		? (maybeCallback as (newValue: any, prevValue: any) => void)
 		// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
 		: (callbackOrFactKey as (newValue: any, prevValue: any) => void);
-	const derivationId = isFact ? undefined : derivationIdOrKind;
 
-	// Assign callbackRef directly in render (React-recommended pattern)
 	const callbackRef = useRef(callback);
 	callbackRef.current = callback;
 
 	useEffect(() => {
-		if (factKey) {
-			// Fact-watching path: subscribe to fact store changes
-			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-			let prev = (system.facts as any)[factKey];
-			return system.facts.$store.subscribe([factKey], () => {
-				// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-				const next = (system.facts as any)[factKey];
-				if (!Object.is(next, prev)) {
-					callbackRef.current(next, prev);
-					prev = next;
-				}
-			});
-		}
-		// Derivation-watching path
-		return system.watch(derivationId!, (newValue, prevValue) => {
+		return system.watch(key, (newValue, prevValue) => {
 			callbackRef.current(newValue, prevValue);
 		});
-	}, [system, derivationId, factKey]);
+	}, [system, key]);
 }
 
 // ============================================================================
@@ -694,7 +679,7 @@ function _useInspectSync(
 // useTimeTravel — reactive time-travel state
 // ============================================================================
 
-import type { TimeTravelState } from "../core/types.js";
+import type { TimeTravelState } from "../../core/types.js";
 
 /**
  * Reactive time-travel hook. Returns null when time-travel is disabled.
@@ -1808,284 +1793,3 @@ export function useHydratedSystem<S extends ModuleSchema>(
 	return useDirectiveRef(moduleDef, mergedConfig) as SingleModuleSystem<S>;
 }
 
-// ============================================================================
-// Deprecated Re-exports (one release cycle)
-// ============================================================================
-
-/**
- * @deprecated Use `useFact(system, [keys])` instead.
- */
-export function useFacts<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(
-	system: SingleModuleSystem<S>,
-	factKeys: K[],
-): Pick<InferFacts<S>, K> {
-	return useFact(system, factKeys);
-}
-
-/**
- * @deprecated Use `useFact(system, factKey, selector)` instead.
- */
-export function useFactSelector<S extends ModuleSchema, K extends keyof InferFacts<S> & string, R>(
-	system: SingleModuleSystem<S>,
-	factKey: K,
-	selector: (value: InferFacts<S>[K] | undefined) => R,
-	equalityFn?: (a: R, b: R) => boolean,
-): R {
-	// Direct pass-through: deprecated API has same (system, factKey, selector) order as new useFact selector overload
-	return useFact(system, factKey, selector, equalityFn);
-}
-
-/**
- * @deprecated Use `useDerived(system, [keys])` instead.
- */
-export function useDerivations<
-	S extends ModuleSchema,
-	K extends keyof InferDerivations<S> & string,
->(
-	system: SingleModuleSystem<S>,
-	derivationIds: K[],
-): Pick<InferDerivations<S>, K>;
-export function useDerivations<T extends Record<string, unknown>>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
-	system: SingleModuleSystem<any>,
-	derivationIds: string[],
-): T;
-export function useDerivations(
-	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
-	system: SingleModuleSystem<any>,
-	derivationIds: string[],
-): Record<string, unknown> {
-	return useDerived(system, derivationIds) as Record<string, unknown>;
-}
-
-/**
- * @deprecated Use `useDerived(system, derivationId, selector)` instead.
- */
-export function useDerivedSelector<
-	S extends ModuleSchema,
-	K extends keyof InferDerivations<S> & string,
-	R,
->(
-	system: SingleModuleSystem<S>,
-	derivationId: K,
-	selector: (value: InferDerivations<S>[K]) => R,
-	equalityFn?: (a: R, b: R) => boolean,
-): R;
-export function useDerivedSelector<T, R>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
-	system: SingleModuleSystem<any>,
-	derivationId: string,
-	selector: (value: T) => R,
-	equalityFn?: (a: R, b: R) => boolean,
-): R;
-export function useDerivedSelector(
-	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
-	system: SingleModuleSystem<any>,
-	derivationId: string,
-	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
-	selector: (value: any) => unknown,
-	equalityFn?: (a: unknown, b: unknown) => boolean,
-): unknown {
-	return useDerived(system, derivationId, selector, equalityFn);
-}
-
-/**
- * @deprecated Use `useDirectiveRef(mod, { status: true })` instead.
- */
-export function useDirectiveRefWithStatus<M extends ModuleSchema>(
-	options: UseDirectiveRefOptions<M>,
-): { system: SingleModuleSystem<M>; statusPlugin: StatusPlugin } {
-	return useDirectiveRef(options, { status: true }) as {
-		system: SingleModuleSystem<M>;
-		statusPlugin: StatusPlugin;
-	};
-}
-
-/** @deprecated Use `useInspect(system).isSettled` instead. */
-export function useIsSettled(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	system: SingleModuleSystem<any>,
-): boolean {
-	return useInspect(system).isSettled;
-}
-
-/** @deprecated Use `useInspect(system)` instead. */
-export function useRequirements(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	system: SingleModuleSystem<any>,
-): RequirementsState {
-	const { unmet, inflight, isWorking, hasUnmet, hasInflight } = useInspect(system);
-	return { unmet, inflight, isWorking, hasUnmet, hasInflight };
-}
-
-/** @deprecated Use `useInspect(system, { throttleMs })` instead. */
-export function useRequirementsThrottled(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	system: SingleModuleSystem<any>,
-	options: ThrottledHookOptions = {},
-): RequirementsState {
-	const { unmet, inflight, isWorking, hasUnmet, hasInflight } = useInspect(system, { throttleMs: options.throttleMs });
-	return { unmet, inflight, isWorking, hasUnmet, hasInflight };
-}
-
-/** @deprecated Use `useInspect(system, { throttleMs })` instead. */
-export function useInspectThrottled(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	system: SingleModuleSystem<any>,
-	options: ThrottledHookOptions = {},
-) {
-	return useInspect(system, { throttleMs: options.throttleMs ?? 100 });
-}
-
-/** @deprecated Use `useRequirementStatus(plugin, type).isLoading` instead. */
-export function useIsResolving(
-	statusPlugin: StatusPlugin,
-	type: string,
-): boolean {
-	const status = useRequirementStatus(statusPlugin, type);
-	return status.inflight > 0;
-}
-
-/** @deprecated Use `useRequirementStatus(plugin, type).lastError` instead. */
-export function useLatestError(
-	statusPlugin: StatusPlugin,
-	type: string,
-): Error | null {
-	const status = useRequirementStatus(statusPlugin, type);
-	return status.lastError;
-}
-
-/** @deprecated Use `useRequirementStatus(plugin, [types])` instead. */
-export function useRequirementStatuses(
-	statusPlugin: StatusPlugin,
-): Map<string, RequirementTypeStatus> {
-	const cachedRef = useRef<Map<string, RequirementTypeStatus> | null>(null);
-	const cachedKey = useRef<string>("");
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return statusPlugin.subscribe(onStoreChange);
-		},
-		[statusPlugin],
-	);
-
-	const getSnapshot = useCallback(() => {
-		const current = statusPlugin.getAllStatus();
-		const parts: string[] = [];
-		for (const [type, status] of current) {
-			parts.push(`${type}:${status.pending}:${status.inflight}:${status.failed}:${status.hasError}:${status.lastError?.message ?? ""}`);
-		}
-		const key = parts.join("|");
-
-		if (key !== cachedKey.current) {
-			cachedKey.current = key;
-			cachedRef.current = current;
-		}
-
-		return cachedRef.current ?? current;
-	}, [statusPlugin]);
-
-	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/** @deprecated Use `useSuspenseRequirement(plugin, [types])` instead. */
-export function useSuspenseRequirements(
-	statusPlugin: StatusPlugin,
-	types: string[],
-): Record<string, RequirementTypeStatus> {
-	return useSuspenseRequirement(statusPlugin, types);
-}
-
-/**
- * @deprecated Use `useDirective` instead.
- * Note: The old API used `derivations` key; the new API uses `derived`.
- */
-export function useSystem<
-	S extends ModuleSchema,
-	FK extends keyof InferFacts<S> & string = never,
-	DK extends keyof InferDerivations<S> & string = never,
->(
-	moduleOrOptions: UseDirectiveRefOptions<S>,
-	selections: { facts?: FK[]; derivations?: DK[] } = {},
-): {
-	system: SingleModuleSystem<S>;
-	dispatch: (event: InferEvents<S>) => void;
-} & Pick<InferFacts<S>, FK> & Pick<InferDerivations<S>, DK> {
-	// Map old 'derivations' key to new 'derived' key
-	const result = useDirective(moduleOrOptions, {
-		facts: selections.facts,
-		derived: selections.derivations,
-	});
-
-	// Flatten facts and derived into top level for backward compat
-	return {
-		system: result.system,
-		dispatch: result.dispatch,
-		...result.facts,
-		...result.derived,
-	} as {
-		system: SingleModuleSystem<S>;
-		dispatch: (event: InferEvents<S>) => void;
-	} & Pick<InferFacts<S>, FK> & Pick<InferDerivations<S>, DK>;
-}
-
-/** @deprecated Internal to DirectiveDevTools. Use DirectiveDevTools component instead. */
-export function useDirectiveDevTools(
-	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-	system: SingleModuleSystem<any>,
-): {
-	inspection: ReturnType<typeof system.inspect>;
-	isSettled: boolean;
-	facts: Record<string, unknown>;
-} {
-	const inspectState = useInspect(system);
-
-	const subscribe = useCallback(
-		(onStoreChange: () => void) => {
-			return system.facts.$store.subscribeAll(onStoreChange);
-		},
-		[system],
-	);
-
-	const factsRef = useRef<Record<string, unknown> | typeof UNINITIALIZED>(UNINITIALIZED);
-	const getFactsSnapshot = useCallback(() => {
-		const current = system.facts.$store.toObject();
-
-		if (factsRef.current !== UNINITIALIZED) {
-			const prevKeys = Object.keys(factsRef.current as Record<string, unknown>);
-			const currKeys = Object.keys(current);
-			if (prevKeys.length === currKeys.length) {
-				let same = true;
-				for (const key of currKeys) {
-					if (!Object.is((factsRef.current as Record<string, unknown>)[key], current[key])) {
-						same = false;
-						break;
-					}
-				}
-				if (same) return factsRef.current as Record<string, unknown>;
-			}
-		}
-
-		factsRef.current = current;
-		return current;
-	}, [system]);
-
-	const facts = useSyncExternalStore(subscribe, getFactsSnapshot, getFactsSnapshot);
-
-	return { inspection: system.inspect(), isSettled: inspectState.isSettled, facts };
-}
-
-/**
- * @deprecated Use `useWatch(system, "fact", factKey, callback)` instead.
- */
-export function useWatchFact<
-	S extends ModuleSchema,
-	K extends keyof InferFacts<S> & string,
->(
-	system: SingleModuleSystem<S>,
-	factKey: K,
-	callback: (newValue: InferFacts<S>[K] | undefined, prevValue: InferFacts<S>[K] | undefined) => void,
-): void {
-	// Delegate to new useWatch fact overload
-	useWatch(system, "fact", factKey, callback);
-}

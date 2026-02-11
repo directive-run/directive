@@ -49,31 +49,31 @@ import type {
   OrchestratorLifecycleHooks,
   AgentRetryConfig,
   ApprovalRequest,
-} from "./openai-agents-types.js";
-import type { RunCallOptions, AgentOrchestrator } from "./openai-agents.js";
-import type { Requirement } from "../core/types.js";
-import type { StreamingGuardrail, StreamChunk, StreamRunner, StreamingRunResult } from "./openai-agents-streaming.js";
-import type { AgentMemory, MemoryStrategyConfig } from "./openai-agents-memory.js";
-import type { CircuitBreaker, CircuitState, CircuitBreakerConfig } from "./plugins/circuit-breaker.js";
-import type { ObservabilityInstance, AlertConfig, TraceSpan, AggregatedMetric } from "./plugins/observability.js";
-import type { OTLPExporter } from "./plugins/otlp-exporter.js";
-import type { SemanticCache, CacheStats, EmbedderFn } from "./guardrails/semantic-cache.js";
-import type { MessageBus, TypedAgentMessage } from "./openai-agents-communication.js";
-import type { AgentRegistry, ExecutionPattern, MultiAgentOrchestrator } from "./openai-agents-multi.js";
-import type { StreamChannel } from "./openai-agents-stream-channel.js";
+} from "./types.js";
+import type { RunCallOptions, AgentOrchestrator } from "./index.js";
+import type { Requirement } from "../../core/types.js";
+import type { StreamingGuardrail, StreamChunk, StreamRunner, StreamingRunResult } from "./streaming.js";
+import type { AgentMemory, MemoryStrategyConfig } from "./memory.js";
+import type { CircuitBreaker, CircuitState, CircuitBreakerConfig } from "../plugins/circuit-breaker.js";
+import type { ObservabilityInstance, AlertConfig, TraceSpan, AggregatedMetric } from "../plugins/observability.js";
+import type { OTLPExporter } from "../plugins/otlp-exporter.js";
+import type { SemanticCache, CacheStats, EmbedderFn } from "../guardrails/semantic-cache.js";
+import type { MessageBus, TypedAgentMessage } from "./communication.js";
+import type { AgentRegistry, ExecutionPattern, MultiAgentOrchestrator } from "./multi.js";
+import type { StreamChannel } from "./stream-channel.js";
 
-import { createAgentOrchestrator } from "./openai-agents.js";
-import { estimateCost } from "./openai-agents-helpers.js";
-import { GuardrailError } from "./openai-agents-types.js";
-import { createAgentMemory, createSlidingWindowStrategy } from "./openai-agents-memory.js";
-import { createCircuitBreaker as createCB } from "./plugins/circuit-breaker.js";
-import { createObservability as createObs, createAgentMetrics } from "./plugins/observability.js";
-import { createOTLPExporter } from "./plugins/otlp-exporter.js";
-import { createSemanticCache, createTestEmbedder } from "./guardrails/semantic-cache.js";
-import { createMessageBus as createBus } from "./openai-agents-communication.js";
-import { createMultiAgentOrchestrator } from "./openai-agents-multi.js";
-import { createStreamingRunner } from "./openai-agents-streaming.js";
-import { createStreamChannel, pipeThrough } from "./openai-agents-stream-channel.js";
+import { createAgentOrchestrator } from "./index.js";
+import { estimateCost } from "./helpers.js";
+import { GuardrailError } from "./types.js";
+import { createAgentMemory, createSlidingWindowStrategy } from "./memory.js";
+import { createCircuitBreaker as createCB } from "../plugins/circuit-breaker.js";
+import { createObservability as createObs, createAgentMetrics } from "../plugins/observability.js";
+import { createOTLPExporter } from "../plugins/otlp-exporter.js";
+import { createSemanticCache, createTestEmbedder } from "../guardrails/semantic-cache.js";
+import { createMessageBus as createBus } from "./communication.js";
+import { createMultiAgentOrchestrator } from "./multi.js";
+import { createStreamingRunner } from "./streaming.js";
+import { createStreamChannel, pipeThrough } from "./stream-channel.js";
 
 // ============================================================================
 // Config Types

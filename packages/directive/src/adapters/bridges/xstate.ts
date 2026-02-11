@@ -32,14 +32,14 @@ import type {
 	ModuleSchema,
 	Plugin,
 	System,
-} from "../core/types.js";
+} from "../../core/types.js";
 import {
 	setBridgeFact,
 	getBridgeFact,
-} from "../core/types/adapter-utils.js";
-import { createModule } from "../core/module.js";
-import { createSystem } from "../core/system.js";
-import { t } from "../core/facts.js";
+} from "../../core/types/adapter-utils.js";
+import { createModule } from "../../core/module.js";
+import { createSystem } from "../../core/system.js";
+import { t } from "../../core/facts.js";
 
 // ============================================================================
 // Types (XState compatible, without direct dependency)

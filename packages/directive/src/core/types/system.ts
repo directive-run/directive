@@ -236,14 +236,24 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 
 	read<K extends DerivationKeys<M>>(derivationId: K): DerivationReturnType<M, K>;
 	read<T = unknown>(derivationId: string): T;
-	subscribe(derivationIds: string[], listener: () => void): () => void;
+	/**
+	 * Subscribe to fact or derivation changes.
+	 * Keys are auto-detected — pass any mix of fact keys and derivation keys.
+	 * @example system.subscribe(["count", "doubled"], () => { ... })
+	 */
+	subscribe(ids: string[], listener: () => void): () => void;
 
+	/**
+	 * Watch a fact or derivation for value changes.
+	 * The key is auto-detected — works with both fact keys and derivation keys.
+	 * @example system.watch("count", (newVal, oldVal) => { ... })
+	 */
 	watch<K extends DerivationKeys<M>>(
-		derivationId: K,
+		id: K,
 		callback: (newValue: DerivationReturnType<M, K>, previousValue: DerivationReturnType<M, K> | undefined) => void,
 	): () => void;
 	watch<T = unknown>(
-		derivationId: string,
+		id: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	): () => void;
 

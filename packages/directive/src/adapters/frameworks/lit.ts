@@ -1,23 +1,21 @@
 /**
  * Lit Adapter - Consolidated Web Components integration for Directive
  *
- * Active Controllers: DerivationController, DerivationsController, FactController,
+ * Controllers: DerivedController, FactController,
  * InspectController (with throttle), RequirementStatusController,
  * FactSelectorController, DerivedSelectorController, DirectiveSelectorController,
  * WatchController (with fact mode), SystemController,
  * ExplainController, ConstraintStatusController, OptimisticUpdateController, ModuleController
  *
- * Active Factories: createDerivation, createDerivations, createFact, createInspect,
+ * Factories: createDerived, createFact, createInspect,
  * createRequirementStatus, createWatch, createFactSelector, createDerivedSelector,
- * createDirectiveSelector, useFacts, useDispatch, useEvents, useTimeTravel,
- * getDerivation, getFact, createTypedHooks, shallowEqual
- *
- * 7 deprecated controllers + 7 deprecated factories for backward compatibility.
+ * createDirectiveSelector, useDispatch, useEvents, useTimeTravel,
+ * getDerived, getFact, createTypedHooks, shallowEqual
  */
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import { createSystem } from "../core/system.js";
-import { withTracking } from "../core/tracking.js";
+import { createSystem } from "../../core/system.js";
+import { withTracking } from "../../core/tracking.js";
 import type {
 	CreateSystemOptionsSingle,
 	ModuleSchema,
@@ -29,25 +27,23 @@ import type {
 	InferDerivations,
 	InferEvents,
 	System,
-	SystemInspection,
 	SystemSnapshot,
-} from "../core/types.js";
+} from "../../core/types.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
-} from "../utils/requirement-status.js";
+} from "../../utils/requirement-status.js";
 import {
 	type RequirementsState,
 	type InspectState,
 	type ConstraintInfo,
-	computeRequirementsState,
 	computeInspectState,
 	createThrottle,
-} from "./shared.js";
+} from "../shared.js";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, RequirementsState, InspectState, ConstraintInfo };
-export { shallowEqual } from "../utils/utils.js";
+export { shallowEqual } from "../../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
 type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
@@ -99,76 +95,55 @@ abstract class DirectiveController implements ReactiveController {
 }
 
 // ============================================================================
-// Core Controllers (active, not deprecated)
+// Core Controllers
 // ============================================================================
 
 /**
- * Reactive controller for a single derivation.
+ * Reactive controller for derivations.
+ * Accepts a single key (string) or an array of keys (string[]).
+ * - Single key: `.value` returns `T`
+ * - Array of keys: `.value` returns `Record<string, unknown>`
  */
-export class DerivationController<T> extends DirectiveController {
-	private derivationId: string;
+export class DerivedController<T> extends DirectiveController {
+	private keys: string[];
+	private isMulti: boolean;
 	value: T;
 
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
 		system: System<any>,
-		derivationId: string,
+		key: string | string[],
 	) {
 		super(host, system);
-		this.derivationId = derivationId;
-		this.value = system.read(derivationId) as T;
+		this.isMulti = Array.isArray(key);
+		this.keys = this.isMulti ? (key as string[]) : [key as string];
+		this.value = this.getValues();
 
 		if (process.env.NODE_ENV !== "production") {
-			if (this.value === undefined) {
+			if (!this.isMulti && this.value === undefined) {
 				console.warn(
-					`[Directive] DerivationController("${derivationId}") returned undefined. ` +
-					`Check that "${derivationId}" is defined in your module's derive property.`,
+					`[Directive] DerivedController("${this.keys[0]}") returned undefined. ` +
+					`Check that "${this.keys[0]}" is defined in your module's derive property.`,
 				);
 			}
 		}
 	}
 
-	protected subscribe(): void {
-		this.value = this.system.read(this.derivationId) as T;
-		this.unsubscribe = this.system.subscribe([this.derivationId], () => {
-			this.value = this.system.read(this.derivationId) as T;
-			this.requestUpdate();
-		});
-	}
-}
-
-/**
- * Reactive controller for multiple derivations.
- */
-export class DerivationsController<
-	T extends Record<string, unknown>,
-> extends DirectiveController {
-	private derivationIds: string[];
-	value: T;
-
-	constructor(
-		host: ReactiveControllerHost,
-		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
-		derivationIds: string[],
-	) {
-		super(host, system);
-		this.derivationIds = derivationIds;
-		this.value = this.getValues();
-	}
-
 	private getValues(): T {
-		const result: Record<string, unknown> = {};
-		for (const id of this.derivationIds) {
-			result[id] = this.system.read(id);
+		if (this.isMulti) {
+			const result: Record<string, unknown> = {};
+			for (const id of this.keys) {
+				result[id] = this.system.read(id);
+			}
+			return result as T;
 		}
-		return result as T;
+		return this.system.read(this.keys[0]!) as T;
 	}
 
 	protected subscribe(): void {
 		this.value = this.getValues();
-		this.unsubscribe = this.system.subscribe(this.derivationIds, () => {
+		this.unsubscribe = this.system.subscribe(this.keys, () => {
 			this.value = this.getValues();
 			this.requestUpdate();
 		});
@@ -208,7 +183,6 @@ export class FactController<T> extends DirectiveController {
 /**
  * Consolidated inspection controller.
  * Returns InspectState with optional throttling.
- * Replaces: InspectThrottledController, RequirementsController, RequirementsThrottledController, IsSettledController
  */
 export class InspectController extends DirectiveController {
 	value: InspectState;
@@ -430,22 +404,25 @@ export class DirectiveSelectorController<R> extends DirectiveController {
 }
 
 /**
- * Reactive controller that watches a derivation or fact and calls a callback on change.
+ * Reactive controller that watches a fact or derivation and calls a callback on change.
+ * The key is auto-detected — works with both fact keys and derivation keys.
  */
 export class WatchController<T> extends DirectiveController {
-	private derivationId?: string;
-	private factKey?: string;
+	private key: string;
 	private callback: (newValue: T, previousValue: T | undefined) => void;
 
-	/** Watch a derivation */
+	/** Watch a fact or derivation by key (auto-detected) */
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
 		system: System<any>,
-		derivationId: string,
+		key: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	);
-	/** Watch a fact */
+	/**
+	 * Watch a fact by explicit options.
+	 * @deprecated Use `new WatchController(host, system, factKey, callback)` instead — facts are now auto-detected.
+	 */
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
@@ -457,35 +434,20 @@ export class WatchController<T> extends DirectiveController {
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
 		system: System<any>,
-		derivationIdOrOptions: string | { kind: "fact"; factKey: string },
+		keyOrOptions: string | { kind: "fact"; factKey: string },
 		callback?: (newValue: T, previousValue: T | undefined) => void,
 	) {
 		super(host, system);
-		if (typeof derivationIdOrOptions === "string") {
-			this.derivationId = derivationIdOrOptions;
-			this.callback = callback!;
+		if (typeof keyOrOptions === "string") {
+			this.key = keyOrOptions;
 		} else {
-			this.factKey = derivationIdOrOptions.factKey;
-			this.callback = callback!;
+			this.key = keyOrOptions.factKey;
 		}
+		this.callback = callback!;
 	}
 
 	protected subscribe(): void {
-		if (this.factKey) {
-			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-			let prev = (this.system.facts as any)[this.factKey] as T | undefined;
-			const factKey = this.factKey;
-			this.unsubscribe = this.system.facts.$store.subscribe([factKey], () => {
-				// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-				const next = (this.system.facts as any)[factKey] as T;
-				if (!Object.is(next, prev)) {
-					this.callback(next, prev);
-					prev = next;
-				}
-			});
-		} else if (this.derivationId) {
-			this.unsubscribe = this.system.watch<T>(this.derivationId, this.callback);
-		}
+		this.unsubscribe = this.system.watch<T>(this.key, this.callback);
 	}
 }
 
@@ -806,22 +768,13 @@ export class ModuleController<M extends ModuleSchema> implements ReactiveControl
 // Factory Functions (active)
 // ============================================================================
 
-export function createDerivation<T>(
+export function createDerived<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
-	derivationId: string,
-): DerivationController<T> {
-	return new DerivationController<T>(host, system, derivationId);
-}
-
-export function createDerivations<T extends Record<string, unknown>>(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	derivationIds: string[],
-): DerivationsController<T> {
-	return new DerivationsController<T>(host, system, derivationIds);
+	key: string | string[],
+): DerivedController<T> {
+	return new DerivedController<T>(host, system, key);
 }
 
 export function createFact<T>(
@@ -947,10 +900,6 @@ export function createModule<M extends ModuleSchema>(
 // Functional Helpers
 // ============================================================================
 
-export function useFacts<M extends ModuleSchema>(system: System<M>): System<M>["facts"] {
-	return system.facts;
-}
-
 export function useDispatch<M extends ModuleSchema = ModuleSchema>(
 	system: System<M>,
 ): (event: InferEvents<M>) => void {
@@ -968,7 +917,7 @@ export function useEvents<M extends ModuleSchema = ModuleSchema>(
 	return system.events;
 }
 
-import type { TimeTravelState } from "../core/types.js";
+import type { TimeTravelState } from "../../core/types.js";
 
 function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
 	const debug = system.debug;
@@ -1033,7 +982,7 @@ export function useTimeTravel(system: System<any>): TimeTravelState | null {
 	return _buildTTState(system);
 }
 
-export function getDerivation<T>(
+export function getDerived<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: System<any>,
 	derivationId: string,
@@ -1054,26 +1003,25 @@ export function getFact<T>(
 // ============================================================================
 
 export function createTypedHooks<M extends ModuleSchema>(): {
-	createDerivation: <K extends keyof InferDerivations<M>>(
+	createDerived: <K extends keyof InferDerivations<M>>(
 		host: ReactiveControllerHost,
 		system: System<M>,
 		derivationId: K,
-	) => DerivationController<InferDerivations<M>[K]>;
+	) => DerivedController<InferDerivations<M>[K]>;
 	createFact: <K extends keyof InferFacts<M>>(
 		host: ReactiveControllerHost,
 		system: System<M>,
 		factKey: K,
 	) => FactController<InferFacts<M>[K]>;
 	useDispatch: (system: System<M>) => (event: InferEvents<M>) => void;
-	useFacts: (system: System<M>) => System<M>["facts"];
 	useEvents: (system: System<M>) => System<M>["events"];
 } {
 	return {
-		createDerivation: <K extends keyof InferDerivations<M>>(
+		createDerived: <K extends keyof InferDerivations<M>>(
 			host: ReactiveControllerHost,
 			system: System<M>,
 			derivationId: K,
-		) => createDerivation<InferDerivations<M>[K]>(host, system, derivationId as string),
+		) => createDerived<InferDerivations<M>[K]>(host, system, derivationId as string),
 		createFact: <K extends keyof InferFacts<M>>(
 			host: ReactiveControllerHost,
 			system: System<M>,
@@ -1084,291 +1032,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 				system.dispatch(event);
 			};
 		},
-		useFacts: (system: System<M>) => system.facts,
 		useEvents: (system: System<M>) => system.events,
 	};
 }
 
-// ============================================================================
-// Deprecated Controllers (one release cycle)
-// ============================================================================
-
-/**
- * @deprecated Use `InspectController` with `{ throttleMs }` option instead.
- */
-export class InspectThrottledController extends DirectiveController {
-	value: SystemInspection;
-	private throttleMs: number;
-	private throttleCleanup?: () => void;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, throttleMs = 100) {
-		super(host, system);
-		this.throttleMs = throttleMs;
-		this.value = system.inspect();
-	}
-
-	protected subscribe(): void {
-		this.value = this.system.inspect();
-		const { throttled, cleanup } = createThrottle(() => {
-			this.value = this.system.inspect();
-			this.requestUpdate();
-		}, this.throttleMs);
-		this.throttleCleanup = cleanup;
-		this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
-	}
-
-	hostDisconnected(): void {
-		this.throttleCleanup?.();
-		super.hostDisconnected();
-	}
-}
-
-/**
- * @deprecated Use `InspectController` instead.
- */
-export class RequirementsController extends DirectiveController {
-	value: RequirementsState;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>) {
-		super(host, system);
-		this.value = computeRequirementsState(system.inspect());
-	}
-
-	protected subscribe(): void {
-		this.value = computeRequirementsState(this.system.inspect());
-		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-			this.value = computeRequirementsState(this.system.inspect());
-			this.requestUpdate();
-		});
-	}
-}
-
-/**
- * @deprecated Use `InspectController` with `{ throttleMs }` option instead.
- */
-export class RequirementsThrottledController extends DirectiveController {
-	value: RequirementsState;
-	private throttleMs: number;
-	private throttleCleanup?: () => void;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, throttleMs = 100) {
-		super(host, system);
-		this.throttleMs = throttleMs;
-		this.value = computeRequirementsState(system.inspect());
-	}
-
-	protected subscribe(): void {
-		this.value = computeRequirementsState(this.system.inspect());
-		const { throttled, cleanup } = createThrottle(() => {
-			this.value = computeRequirementsState(this.system.inspect());
-			this.requestUpdate();
-		}, this.throttleMs);
-		this.throttleCleanup = cleanup;
-		this.unsubscribe = this.system.facts.$store.subscribeAll(throttled);
-	}
-
-	hostDisconnected(): void {
-		this.throttleCleanup?.();
-		super.hostDisconnected();
-	}
-}
-
-/**
- * @deprecated Use `InspectController` and check `.value.isSettled` instead.
- */
-export class IsSettledController extends DirectiveController {
-	value: boolean;
-
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>) {
-		super(host, system);
-		this.value = system.isSettled;
-	}
-
-	protected subscribe(): void {
-		this.value = this.system.isSettled;
-		this.unsubscribe = this.system.facts.$store.subscribeAll(() => {
-			this.value = this.system.isSettled;
-			this.requestUpdate();
-		});
-	}
-}
-
-/**
- * @deprecated Use `RequirementStatusController` and check `.value.inflight > 0` instead.
- */
-export class IsResolvingController implements ReactiveController {
-	private host: ReactiveControllerHost;
-	private statusPlugin: StatusPlugin;
-	private type: string;
-	private unsubscribe?: () => void;
-	value: boolean;
-
-	constructor(host: ReactiveControllerHost, statusPlugin: StatusPlugin, type: string) {
-		this.host = host;
-		this.statusPlugin = statusPlugin;
-		this.type = type;
-		this.value = statusPlugin.getStatus(type).inflight > 0;
-		host.addController(this);
-	}
-
-	hostConnected(): void {
-		this.value = this.statusPlugin.getStatus(this.type).inflight > 0;
-		this.unsubscribe = this.statusPlugin.subscribe(() => {
-			this.value = this.statusPlugin.getStatus(this.type).inflight > 0;
-			this.host.requestUpdate();
-		});
-	}
-
-	hostDisconnected(): void {
-		this.unsubscribe?.();
-		this.unsubscribe = undefined;
-	}
-}
-
-/**
- * @deprecated Use `RequirementStatusController` and check `.value.lastError` instead.
- */
-export class LatestErrorController implements ReactiveController {
-	private host: ReactiveControllerHost;
-	private statusPlugin: StatusPlugin;
-	private type: string;
-	private unsubscribe?: () => void;
-	value: Error | null;
-
-	constructor(host: ReactiveControllerHost, statusPlugin: StatusPlugin, type: string) {
-		this.host = host;
-		this.statusPlugin = statusPlugin;
-		this.type = type;
-		this.value = statusPlugin.getStatus(type).lastError;
-		host.addController(this);
-	}
-
-	hostConnected(): void {
-		this.value = this.statusPlugin.getStatus(this.type).lastError;
-		this.unsubscribe = this.statusPlugin.subscribe(() => {
-			this.value = this.statusPlugin.getStatus(this.type).lastError;
-			this.host.requestUpdate();
-		});
-	}
-
-	hostDisconnected(): void {
-		this.unsubscribe?.();
-		this.unsubscribe = undefined;
-	}
-}
-
-/**
- * @deprecated Use `RequirementStatusController` for individual types or keep for dashboard use.
- */
-export class RequirementStatusesController implements ReactiveController {
-	private host: ReactiveControllerHost;
-	private statusPlugin: StatusPlugin;
-	private unsubscribe?: () => void;
-	value: Map<string, RequirementTypeStatus>;
-
-	constructor(host: ReactiveControllerHost, statusPlugin: StatusPlugin) {
-		this.host = host;
-		this.statusPlugin = statusPlugin;
-		this.value = statusPlugin.getAllStatus();
-		host.addController(this);
-	}
-
-	hostConnected(): void {
-		this.value = this.statusPlugin.getAllStatus();
-		this.unsubscribe = this.statusPlugin.subscribe(() => {
-			this.value = this.statusPlugin.getAllStatus();
-			this.host.requestUpdate();
-		});
-	}
-
-	hostDisconnected(): void {
-		this.unsubscribe?.();
-		this.unsubscribe = undefined;
-	}
-}
-
-// ============================================================================
-// Deprecated Factory Functions
-// ============================================================================
-
-/**
- * @deprecated Use `createInspect(host, system, { throttleMs })` instead.
- */
-export function createInspectThrottled(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	throttleMs = 100,
-): InspectThrottledController {
-	return new InspectThrottledController(host, system, throttleMs);
-}
-
-/**
- * @deprecated Use `createInspect(host, system)` instead.
- */
-export function createRequirements(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-): RequirementsController {
-	return new RequirementsController(host, system);
-}
-
-/**
- * @deprecated Use `createInspect(host, system, { throttleMs })` instead.
- */
-export function createRequirementsThrottled(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-	throttleMs = 100,
-): RequirementsThrottledController {
-	return new RequirementsThrottledController(host, system, throttleMs);
-}
-
-/**
- * @deprecated Use `createInspect(host, system)` and check `.value.isSettled`.
- */
-export function createIsSettled(
-	host: ReactiveControllerHost,
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
-): IsSettledController {
-	return new IsSettledController(host, system);
-}
-
-/**
- * @deprecated Use `createRequirementStatus(host, plugin, type)` and check `.value.inflight > 0`.
- */
-export function createIsResolving(
-	host: ReactiveControllerHost,
-	statusPlugin: StatusPlugin,
-	type: string,
-): IsResolvingController {
-	return new IsResolvingController(host, statusPlugin, type);
-}
-
-/**
- * @deprecated Use `createRequirementStatus(host, plugin, type)` and check `.value.lastError`.
- */
-export function createLatestError(
-	host: ReactiveControllerHost,
-	statusPlugin: StatusPlugin,
-	type: string,
-): LatestErrorController {
-	return new LatestErrorController(host, statusPlugin, type);
-}
-
-/**
- * @deprecated Keep for dashboard use or use individual `RequirementStatusController` instances.
- */
-export function createRequirementStatuses(
-	host: ReactiveControllerHost,
-	statusPlugin: StatusPlugin,
-): RequirementStatusesController {
-	return new RequirementStatusesController(host, statusPlugin);
-}

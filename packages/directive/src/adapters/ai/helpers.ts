@@ -10,7 +10,7 @@ import type {
   Message,
   AgentState,
   ApprovalState,
-} from "./openai-agents-types.js";
+} from "./types.js";
 
 // ============================================================================
 // State Query Helpers

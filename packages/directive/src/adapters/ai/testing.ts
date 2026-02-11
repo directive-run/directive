@@ -39,8 +39,8 @@ import type {
   ApprovalRequest,
   OrchestratorOptions,
   AgentOrchestrator,
-} from "./openai-agents.js";
-import { createAgentOrchestrator } from "./openai-agents.js";
+} from "./index.js";
+import { createAgentOrchestrator } from "./index.js";
 
 // ============================================================================
 // Mock Agent Runner

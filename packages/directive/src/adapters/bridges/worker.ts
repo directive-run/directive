@@ -14,7 +14,7 @@ import type {
 	ModuleSchema,
 	Requirement,
 	SystemInspection,
-} from "../core/types.js";
+} from "../../core/types.js";
 
 // ============================================================================
 // Message Types
@@ -494,7 +494,7 @@ export function handleWorkerMessages(): void {
  */
 async function createWorkerSystem(config: WorkerSystemConfig) {
 	// Dynamically import createSystem to avoid circular dependencies
-	const { createSystem } = await import("../core/system.js");
+	const { createSystem } = await import("../../core/system.js");
 
 	const registry = getWorkerModuleRegistry();
 	const modules: Record<string, unknown> = {};

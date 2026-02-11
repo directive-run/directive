@@ -35,18 +35,18 @@ import type {
   Plugin,
   SingleModuleSystem,
   System,
-} from "../core/types.js";
-import type { AgentMemory } from "./openai-agents-memory.js";
-import type { CircuitBreaker } from "./plugins/circuit-breaker.js";
-import type { StreamChunk as StreamChunkBase } from "./openai-agents-streaming.js";
+} from "../../core/types.js";
+import type { AgentMemory } from "./memory.js";
+import type { CircuitBreaker } from "../plugins/circuit-breaker.js";
+import type { StreamChunk as StreamChunkBase } from "./streaming.js";
 import {
   setBridgeFact,
   getBridgeFact,
   createCallbackPlugin,
   requirementGuard,
-} from "../core/types/adapter-utils.js";
-import { createModule } from "../core/module.js";
-import { createSystem } from "../core/system.js";
+} from "../../core/types/adapter-utils.js";
+import { createModule } from "../../core/module.js";
+import { createSystem } from "../../core/system.js";
 
 // ============================================================================
 // Re-export all types from dedicated module
@@ -81,9 +81,9 @@ export type {
   GuardrailErrorCode,
   SchemaValidationResult,
   SchemaValidator,
-} from "./openai-agents-types.js";
+} from "./types.js";
 
-export { GuardrailError, isGuardrailError } from "./openai-agents-types.js";
+export { GuardrailError, isGuardrailError } from "./types.js";
 
 import type {
   AgentLike,
@@ -111,7 +111,7 @@ import type {
   OrchestratorResolver,
   OrchestratorState,
   OrchestratorLifecycleHooks,
-} from "./openai-agents-types.js";
+} from "./types.js";
 
 import {
   GuardrailError,
@@ -120,7 +120,7 @@ import {
   CONVERSATION_KEY,
   TOOL_CALLS_KEY,
   orchestratorBridgeSchema,
-} from "./openai-agents-types.js";
+} from "./types.js";
 
 // Re-export built-in guardrails
 export {
@@ -133,7 +133,7 @@ export {
   createLengthGuardrail,
   createContentFilterGuardrail,
   type RateLimitGuardrail,
-} from "./openai-agents-builtin-guardrails.js";
+} from "./builtin-guardrails.js";
 
 // Re-export helpers
 export {
@@ -148,7 +148,7 @@ export {
   type OpenAIRunnerOptions,
   type AnthropicRunnerOptions,
   type OllamaRunnerOptions,
-} from "./openai-agents-helpers.js";
+} from "./helpers.js";
 
 // Re-export constraint helpers
 export {
@@ -156,7 +156,7 @@ export {
   when,
   type ConstraintBuilder,
   type WhenWithRequire,
-} from "./openai-agents-constraint-helpers.js";
+} from "./constraint-helpers.js";
 
 // ============================================================================
 // Bridge Accessors
@@ -1696,7 +1696,7 @@ export {
   type MemoryStrategyConfig,
   type MemoryStrategyResult,
   type MessageSummarizer,
-} from "./openai-agents-memory.js";
+} from "./memory.js";
 
 // Streaming utilities
 export {
@@ -1725,7 +1725,7 @@ export {
   type StreamingGuardrail,
   type StreamingGuardrailResult,
   type BackpressureStrategy,
-} from "./openai-agents-streaming.js";
+} from "./streaming.js";
 
 // Multi-agent orchestration
 export {
@@ -1754,7 +1754,7 @@ export {
   type HandoffResult,
   type AgentSelectionConstraint,
   type RunAgentRequirement,
-} from "./openai-agents-multi.js";
+} from "./multi.js";
 
 // Agent communication
 export {
@@ -1781,7 +1781,7 @@ export {
   type MessageHandler,
   type Subscription,
   type MessageFilter,
-} from "./openai-agents-communication.js";
+} from "./communication.js";
 
 // Observability
 export {
@@ -1796,14 +1796,14 @@ export {
   type AlertConfig,
   type AlertEvent,
   type DashboardData,
-} from "./plugins/observability.js";
+} from "../plugins/observability.js";
 
 // OTLP Exporter
 export {
   createOTLPExporter,
   type OTLPExporterConfig,
   type OTLPExporter,
-} from "./plugins/otlp-exporter.js";
+} from "../plugins/otlp-exporter.js";
 
 // Circuit Breaker
 export {
@@ -1813,7 +1813,7 @@ export {
   type CircuitBreakerConfig,
   type CircuitBreakerStats,
   type CircuitState,
-} from "./plugins/circuit-breaker.js";
+} from "../plugins/circuit-breaker.js";
 
 // ANN Index
 export {
@@ -1822,7 +1822,7 @@ export {
   type ANNIndex,
   type ANNSearchResult,
   type VPTreeIndexConfig,
-} from "./guardrails/ann-index.js";
+} from "../guardrails/ann-index.js";
 
 export {
   createSemanticCache,
@@ -1839,7 +1839,7 @@ export {
   type SemanticCacheStorage,
   type BatchedEmbedder,
   type EmbedderFn,
-} from "./guardrails/semantic-cache.js";
+} from "../guardrails/semantic-cache.js";
 
 // Stream Channels
 export {
@@ -1851,7 +1851,7 @@ export {
   type StreamChannelConfig,
   type StreamChannelState,
   type BidirectionalStream,
-} from "./openai-agents-stream-channel.js";
+} from "./stream-channel.js";
 
 // Agent Stack — Composition API
 export {
@@ -1864,7 +1864,7 @@ export {
   type StructuredRunOptions,
   type TokenStream,
   type StreamingCallbackRunner,
-} from "./openai-agents-stack.js";
+} from "./stack.js";
 
 // AI Bridge — Sync AgentStack state into Directive system
-export { createAISyncer } from "./ai-bridge.js";
+export { createAISyncer } from "./bridge.js";

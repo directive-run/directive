@@ -36,8 +36,8 @@ import type {
   GuardrailFn,
   OutputGuardrailData,
   NamedGuardrail,
-} from "./openai-agents.js";
-import type { Requirement } from "../core/types.js";
+} from "./index.js";
+import type { Requirement } from "../../core/types.js";
 
 // ============================================================================
 // Async Semaphore (for slot acquisition without polling)

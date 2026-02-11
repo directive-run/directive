@@ -28,7 +28,7 @@
  * ```
  */
 
-import type { Plugin } from "../core/types.js";
+import type { Plugin } from "../../core/types.js";
 import type {
   MCPAdapterConfig,
   MCPClient,

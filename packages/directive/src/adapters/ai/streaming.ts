@@ -20,7 +20,7 @@
  * ```
  */
 
-import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData } from "./openai-agents.js";
+import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData } from "./index.js";
 
 // ============================================================================
 // Constants

@@ -331,19 +331,20 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	read<T = unknown>(derivationId: string): T;
 
 	/**
-	 * Subscribe to derivation changes using namespaced keys.
-	 * Accepts "namespace.key" format (e.g., "auth.status").
+	 * Subscribe to fact or derivation changes using namespaced keys.
+	 * Keys are auto-detected — pass any mix of fact keys and derivation keys.
+	 * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
 	 * Supports wildcard "namespace.*" to subscribe to all keys in a module.
 	 *
 	 * @example
-	 * system.subscribe(["auth.status", "data.count"], () => {
+	 * system.subscribe(["auth.token", "data.count"], () => {
 	 *   console.log("Auth or data changed");
 	 * });
 	 *
 	 * @example Wildcard
 	 * system.subscribe(["game.*"], () => render());
 	 */
-	subscribe(derivationIds: string[], listener: () => void): () => void;
+	subscribe(ids: string[], listener: () => void): () => void;
 
 	/**
 	 * Subscribe to ALL fact and derivation changes in a module namespace.
@@ -356,16 +357,17 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	subscribeModule(namespace: keyof Modules & string, listener: () => void): () => void;
 
 	/**
-	 * Watch a derivation for changes using namespaced key.
-	 * Accepts "namespace.key" format (e.g., "auth.status").
+	 * Watch a fact or derivation for changes using namespaced key.
+	 * The key is auto-detected — works with both fact keys and derivation keys.
+	 * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
 	 *
 	 * @example
-	 * system.watch("auth.status", (newVal, oldVal) => {
-	 *   console.log(`Status changed from ${oldVal} to ${newVal}`);
+	 * system.watch("auth.token", (newVal, oldVal) => {
+	 *   console.log(`Token changed from ${oldVal} to ${newVal}`);
 	 * });
 	 */
 	watch<T = unknown>(
-		derivationId: string,
+		id: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	): () => void;
 
@@ -592,17 +594,19 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	read<T = unknown>(derivationId: string): T;
 
 	/**
-	 * Subscribe to derivation changes.
-	 * @example system.subscribe(["doubled", "isPositive"], () => { ... })
+	 * Subscribe to fact or derivation changes.
+	 * Keys are auto-detected — pass any mix of fact keys and derivation keys.
+	 * @example system.subscribe(["count", "doubled"], () => { ... })
 	 */
-	subscribe(derivationIds: string[], listener: () => void): () => void;
+	subscribe(ids: string[], listener: () => void): () => void;
 
 	/**
-	 * Watch a derivation for changes.
-	 * @example system.watch("doubled", (newVal, oldVal) => { ... })
+	 * Watch a fact or derivation for value changes.
+	 * The key is auto-detected — works with both fact keys and derivation keys.
+	 * @example system.watch("count", (newVal, oldVal) => { ... })
 	 */
 	watch<T = unknown>(
-		derivationId: string,
+		id: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	): () => void;
 

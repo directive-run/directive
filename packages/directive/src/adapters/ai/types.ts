@@ -2,8 +2,8 @@
  * Shared types for AI adapter — used by orchestrator, guardrails, helpers, and stack.
  */
 
-import type { Requirement, ModuleSchema } from "../core/types.js";
-import { t } from "../core/facts.js";
+import type { Requirement, ModuleSchema } from "../../core/types.js";
+import { t } from "../../core/facts.js";
 
 // ============================================================================
 // Agent Types (LLM-agnostic)

@@ -20,8 +20,8 @@
  * ```
  */
 
-import type { Requirement } from "../core/types.js";
-import type { OrchestratorConstraint, OrchestratorState } from "./openai-agents-types.js";
+import type { Requirement } from "../../core/types.js";
+import type { OrchestratorConstraint, OrchestratorState } from "./types.js";
 
 // ============================================================================
 // Builder Pattern

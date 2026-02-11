@@ -1,20 +1,18 @@
 /**
  * Svelte Adapter - Consolidated Svelte stores for Directive
  *
- * 19 active exports: useFact, useDerived, useFacts, useDispatch, useSelector,
+ * 18 active exports: useFact, useDerived, useDispatch, useSelector,
  * useWatch, useInspect, useRequirementStatus, useEvents, useModule, useExplain,
  * useConstraintStatus, useOptimisticUpdate, useDirective, useTimeTravel,
  * useSystem, setDirectiveContext, getDirectiveContext, createTypedHooks, shallowEqual
  *
  * Store factories: createDerivedStore, createDerivedsStore, createFactStore, createInspectStore
- *
- * 10 deprecated shims for backward compatibility.
  */
 
 import { getContext, setContext, onDestroy } from "svelte";
 import { readable, type Readable } from "svelte/store";
-import { createSystem } from "../core/system.js";
-import { withTracking } from "../core/tracking.js";
+import { createSystem } from "../../core/system.js";
+import { withTracking } from "../../core/tracking.js";
 import type {
 	CreateSystemOptionsSingle,
 	ModuleSchema,
@@ -28,24 +26,21 @@ import type {
 	System,
 	SystemInspection,
 	SystemSnapshot,
-} from "../core/types.js";
+} from "../../core/types.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
-} from "../utils/requirement-status.js";
+} from "../../utils/requirement-status.js";
 import {
-	type RequirementsState,
-	type ThrottledHookOptions,
 	type InspectState,
 	type ConstraintInfo,
-	computeRequirementsState,
 	computeInspectState,
 	createThrottle,
-} from "./shared.js";
+} from "../shared.js";
 
 // Re-export for convenience
-export type { RequirementTypeStatus, RequirementsState, ThrottledHookOptions, InspectState, ConstraintInfo };
-export { shallowEqual } from "../utils/utils.js";
+export type { RequirementTypeStatus, InspectState, ConstraintInfo };
+export { shallowEqual } from "../../utils/utils.js";
 
 /** Type for the requirement status plugin return value */
 export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
@@ -386,19 +381,6 @@ export function useSelector<R>(
 }
 
 // ============================================================================
-// useFacts — mutation accessor
-// ============================================================================
-
-/**
- * Get direct access to facts for mutations.
- * WARNING: NOT reactive. Use for event handlers and imperative code only.
- */
-export function useFacts<M extends ModuleSchema>(): System<M>["facts"] {
-	const system = _useSystem<M>();
-	return system.facts;
-}
-
-// ============================================================================
 // useDispatch
 // ============================================================================
 
@@ -427,12 +409,15 @@ export function useEvents<M extends ModuleSchema = ModuleSchema>(): System<M>["e
 // useWatch — derivation or fact side-effect
 // ============================================================================
 
-/** Watch a derivation */
+/** Watch a fact or derivation (auto-detected) */
 export function useWatch<T>(
-	derivationId: string,
+	key: string,
 	callback: (newValue: T, previousValue: T | undefined) => void,
 ): void;
-/** Watch a fact */
+/**
+ * Watch a fact by explicit "fact" discriminator.
+ * @deprecated Use `useWatch(key, callback)` instead — facts are now auto-detected.
+ */
 export function useWatch<T>(
 	kind: "fact",
 	factKey: string,
@@ -446,31 +431,19 @@ export function useWatch(
 ): void {
 	const system = _useSystem();
 
+	// Backward compat: useWatch("fact", factKey, callback)
 	const isFact =
 		derivationIdOrKind === "fact" &&
 		typeof callbackOrFactKey === "string" &&
 		typeof maybeCallback === "function";
 
-	if (isFact) {
-		const factKey = callbackOrFactKey as string;
-		const callback = maybeCallback!;
-		// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-		let prev = (system.facts as any)[factKey];
-		const unsubscribe = system.facts.$store.subscribe([factKey], () => {
-			// biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-			const next = (system.facts as any)[factKey];
-			if (!Object.is(next, prev)) {
-				callback(next, prev);
-				prev = next;
-			}
-		});
-		onDestroy(unsubscribe);
-	} else {
-		const derivationId = derivationIdOrKind;
-		const callback = callbackOrFactKey as (newValue: unknown, prevValue: unknown) => void;
-		const unsubscribe = system.watch(derivationId, callback);
-		onDestroy(unsubscribe);
-	}
+	const key = isFact ? (callbackOrFactKey as string) : derivationIdOrKind;
+	const callback = isFact
+		? maybeCallback!
+		: (callbackOrFactKey as (newValue: unknown, prevValue: unknown) => void);
+
+	const unsubscribe = system.watch(key, callback);
+	onDestroy(unsubscribe);
 }
 
 // ============================================================================
@@ -817,7 +790,7 @@ export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
 // useTimeTravel — reactive time-travel store
 // ============================================================================
 
-import type { TimeTravelState } from "../core/types.js";
+import type { TimeTravelState } from "../../core/types.js";
 
 function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
 	const debug = system.debug;
@@ -903,9 +876,6 @@ export function useDirective<M extends ModuleSchema>(
 	return system as unknown as System<M>;
 }
 
-/** @deprecated Alias for useDirective */
-export const createDirective = useDirective;
-
 // ============================================================================
 // Typed Hooks Factory
 // ============================================================================
@@ -915,7 +885,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 		derivationId: K,
 	) => Readable<InferDerivations<M>[K]>;
 	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Readable<InferFacts<M>[K] | undefined>;
-	useFacts: () => System<M>["facts"];
 	useDispatch: () => (event: InferEvents<M>) => void;
 	useSystem: () => System<M>;
 	useEvents: () => System<M>["events"];
@@ -925,7 +894,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			useDerived<InferDerivations<M>[K]>(derivationId as string),
 		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
 			useFact<InferFacts<M>[K]>(factKey as string),
-		useFacts: () => useFacts<M>(),
 		useDispatch: () => {
 			const system = _useSystem<M>();
 			return (event: InferEvents<M>) => {
@@ -937,134 +905,3 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 	};
 }
 
-// ============================================================================
-// Deprecated Re-exports (one release cycle)
-// ============================================================================
-
-/**
- * @deprecated Use `useDerived(ids)` instead.
- */
-export function useDeriveds<T extends Record<string, unknown>>(
-	derivationIds: string[],
-): Readable<T> {
-	return useDerived<T>(derivationIds);
-}
-
-/**
- * @deprecated Use `useFact(key, selector, eq?)` instead.
- */
-export function useFactSelector<T, R>(
-	factKey: string,
-	selector: (value: T | undefined) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): Readable<R> {
-	return useFact<T, R>(factKey, selector, equalityFn);
-}
-
-/**
- * @deprecated Use `useDerived(id, selector, eq?)` instead.
- */
-export function useDerivedSelector<T, R>(
-	derivationId: string,
-	selector: (value: T) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): Readable<R> {
-	return useDerived<T, R>(derivationId, selector, equalityFn);
-}
-
-/**
- * @deprecated Use `useInspect({ throttleMs })` instead.
- */
-export function useInspectThrottled(
-	options: ThrottledHookOptions = {},
-): Readable<InspectState> {
-	return useInspect({ throttleMs: options.throttleMs ?? 100 });
-}
-
-/**
- * @deprecated Use `useInspect()` instead.
- */
-export function useRequirements(): Readable<RequirementsState> {
-	const system = _useSystem();
-	return readable<RequirementsState>(
-		computeRequirementsState(system.inspect()),
-		(set) => {
-			const unsubscribe = system.facts.$store.subscribeAll(() => {
-				set(computeRequirementsState(system.inspect()));
-			});
-			return unsubscribe;
-		},
-	);
-}
-
-/**
- * @deprecated Use `useInspect({ throttleMs })` instead.
- */
-export function useRequirementsThrottled(
-	options: ThrottledHookOptions = {},
-): Readable<RequirementsState> {
-	const { throttleMs = 100 } = options;
-	const system = _useSystem();
-	return readable<RequirementsState>(
-		computeRequirementsState(system.inspect()),
-		(set) => {
-			const { throttled, cleanup } = createThrottle(() => {
-				set(computeRequirementsState(system.inspect()));
-			}, throttleMs);
-			const unsubscribe = system.facts.$store.subscribeAll(throttled);
-			return () => { cleanup(); unsubscribe(); };
-		},
-	);
-}
-
-/**
- * @deprecated Use `useInspect().isSettled` instead.
- */
-export function useIsSettled(): Readable<boolean> {
-	const system = _useSystem();
-	return readable<boolean>(system.isSettled, (set) => {
-		const unsubscribe = system.facts.$store.subscribeAll(() => {
-			set(system.isSettled);
-		});
-		return unsubscribe;
-	});
-}
-
-/**
- * @deprecated Use `useRequirementStatus(type)` and check `.inflight > 0` instead.
- */
-export function useIsResolving(type: string): Readable<boolean> {
-	const statusPlugin = _getStatusPlugin();
-	return readable<boolean>(statusPlugin.getStatus(type).inflight > 0, (set) => {
-		const unsubscribe = statusPlugin.subscribe(() => {
-			set(statusPlugin.getStatus(type).inflight > 0);
-		});
-		return unsubscribe;
-	});
-}
-
-/**
- * @deprecated Use `useRequirementStatus(type)` and check `.lastError` instead.
- */
-export function useLatestError(type: string): Readable<Error | null> {
-	const statusPlugin = _getStatusPlugin();
-	return readable<Error | null>(statusPlugin.getStatus(type).lastError, (set) => {
-		const unsubscribe = statusPlugin.subscribe(() => {
-			set(statusPlugin.getStatus(type).lastError);
-		});
-		return unsubscribe;
-	});
-}
-
-/**
- * @deprecated Use `useRequirementStatus(types)` instead.
- */
-export function useRequirementStatuses(): Readable<Map<string, RequirementTypeStatus>> {
-	const statusPlugin = _getStatusPlugin();
-	return readable<Map<string, RequirementTypeStatus>>(statusPlugin.getAllStatus(), (set) => {
-		const unsubscribe = statusPlugin.subscribe(() => {
-			set(statusPlugin.getAllStatus());
-		});
-		return unsubscribe;
-	});
-}
