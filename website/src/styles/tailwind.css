@@ -43,6 +43,13 @@
   --brand-font-display: var(--font-lexend);
   --brand-font-body: var(--font-inter);
   --brand-font-code: ui-monospace, monospace;
+
+  /* Brand Surface — derived from primary palette */
+  --brand-surface: color-mix(in srgb, var(--brand-primary-50) 50%, white);
+}
+
+.dark {
+  --brand-surface: color-mix(in srgb, var(--brand-primary-950) 40%, #0f172a);
 }
 
 @theme {
@@ -106,6 +113,8 @@
   --color-brand-accent-800: var(--brand-accent-800);
   --color-brand-accent-900: var(--brand-accent-900);
   --color-brand-accent-950: var(--brand-accent-950);
+
+  --color-brand-surface: var(--brand-surface);
 }
 
 @layer base {

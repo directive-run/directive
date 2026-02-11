@@ -76,7 +76,7 @@ function MessageBubble({ message }: { message: Message }) {
       <div
         className={clsx(
           'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-brand-primary' : 'bg-gradient-to-br from-violet-500 to-purple-600'
+          isUser ? 'bg-brand-primary' : '[background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]'
         )}
       >
         {isUser ? (
@@ -234,7 +234,7 @@ What would you like to know?`,
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
                     <SparklesIcon className="h-4 w-4 text-white" />
                   </div>
                   <div>
@@ -258,7 +258,7 @@ What would you like to know?`,
               <div className="flex-1 overflow-y-auto p-4">
                 {messages.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
                       <SparklesIcon className="h-8 w-8 text-white" />
                     </div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
@@ -286,7 +286,7 @@ What would you like to know?`,
                     ))}
                     {isLoading && (
                       <div className="flex gap-3">
-                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
                           <SparklesIcon className="h-4 w-4 text-white" />
                         </div>
                         <div className="flex items-center rounded-2xl bg-slate-100 px-4 py-3 dark:bg-slate-700">
@@ -339,7 +339,7 @@ export const AIChatWidget = memo(function AIChatWidget() {
       {/* Floating button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg transition hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))] text-white shadow-lg transition hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
         aria-label="Open AI Chat"
       >
         <ChatIcon className="h-6 w-6" />

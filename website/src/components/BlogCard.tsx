@@ -18,7 +18,7 @@ export function BlogCard({ post }: { post: BlogPost }) {
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="group rounded-3xl bg-white p-2 shadow-md shadow-slate-900/5 ring-1 ring-slate-900/5 transition-shadow hover:shadow-lg dark:bg-slate-800 dark:ring-slate-700/50"
+      className="group rounded-3xl bg-white p-2 shadow-sm ring-1 ring-slate-900/[0.04] transition-shadow hover:shadow-lg dark:bg-slate-800/80 dark:ring-brand-primary-400/[0.08]"
     >
       <div className="relative aspect-[16/9] overflow-hidden rounded-2xl [background:linear-gradient(to_bottom_right,var(--brand-primary-200),var(--brand-accent-200),var(--brand-primary-300))] dark:[background:linear-gradient(to_bottom_right,var(--brand-primary-900),var(--brand-accent-900),var(--brand-primary-800))]">
         <div className="absolute inset-0 flex items-center justify-center">
