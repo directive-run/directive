@@ -275,47 +275,6 @@ console.log(system.derive.displayName); // "John"
 
 ---
 
-## Using with React
-
-Directive has first-class React support:
-
-```tsx
-import { useFact, useDerived } from 'directive/react';
-import { createSystem } from 'directive';
-import { userModule } from './user.module';
-
-// Create and start the system
-const system = createSystem({ module: userModule });
-system.start();
-
-function App() {
-  return <UserProfile />;
-}
-
-function UserProfile() {
-  // Subscribe to the current userId
-  const userId = useFact(system, "userId");
-
-  // Subscribe to computed derivations
-  const displayName = useDerived(system, "displayName");
-  const isLoggedIn = useDerived(system, "isLoggedIn");
-
-  return (
-    <div>
-      <input
-        type="number"
-        value={userId ?? 0}
-        onChange={(e) => { system.facts.userId = parseInt(e.target.value); }}
-      />
-      <p>Welcome, {displayName}!</p>
-      <p>Logged in: {isLoggedIn ? 'Yes' : 'No'}</p>
-    </div>
-  );
-}
-```
-
----
-
 ## Try It Yourself
 
 {% playground /%}

@@ -131,16 +131,46 @@ if (tt) {
 
 ## Reactive `useTimeTravel` Hook
 
-Each framework adapter provides a reactive `useTimeTravel` that re-renders when snapshot state changes. Returns a `TimeTravelState` object:
+Each framework adapter provides a reactive `useTimeTravel` that re-renders when snapshot state changes. Returns `null` when time-travel is disabled, otherwise a `TimeTravelState` object:
 
 ```typescript
+interface SnapshotMeta {
+  id: number;                // Snapshot identifier
+  timestamp: number;         // When captured (Date.now())
+  trigger: string;           // What caused this snapshot (e.g., "fact:count")
+}
+
 interface TimeTravelState {
-  canUndo: boolean;          // True when there are earlier snapshots to go back to
-  canRedo: boolean;          // True when there are later snapshots to go forward to
-  undo: () => void;          // Navigate one step backward in history
-  redo: () => void;          // Navigate one step forward in history
+  // Undo / Redo
+  canUndo: boolean;          // True when there are earlier snapshots
+  canRedo: boolean;          // True when there are later snapshots
+  undo: () => void;          // One step backward (changeset-aware)
+  redo: () => void;          // One step forward (changeset-aware)
   currentIndex: number;      // Position in the snapshot array
   totalSnapshots: number;    // Total number of recorded snapshots
+
+  // Snapshot access (metadata only — keeps re-renders cheap)
+  snapshots: SnapshotMeta[];
+  getSnapshotFacts: (id: number) => Record<string, unknown> | null;
+
+  // Navigation
+  goTo: (snapshotId: number) => void;   // Jump to a specific snapshot
+  goBack: (steps: number) => void;      // Go back N steps
+  goForward: (steps: number) => void;   // Go forward N steps
+  replay: () => void;                   // Rewind to first snapshot
+
+  // Session persistence
+  exportSession: () => string;          // Serialize history to JSON
+  importSession: (json: string) => void; // Restore from JSON
+
+  // Changesets (group multiple snapshots into one undo unit)
+  beginChangeset: (label: string) => void;
+  endChangeset: () => void;
+
+  // Recording control
+  isPaused: boolean;         // Whether snapshot recording is paused
+  pause: () => void;         // Pause recording
+  resume: () => void;        // Resume recording
 }
 ```
 
@@ -149,16 +179,37 @@ interface TimeTravelState {
 ```tsx
 import { useTimeTravel } from 'directive/react';
 
-function UndoControls() {
-  // Returns null when time-travel is disabled, so the UI can hide itself
+function TimeTravelToolbar() {
   const tt = useTimeTravel(system);
   if (!tt) return null;
 
   return (
     <div>
+      {/* Basic undo / redo */}
       <button onClick={tt.undo} disabled={!tt.canUndo}>Undo</button>
       <button onClick={tt.redo} disabled={!tt.canRedo}>Redo</button>
       <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+
+      {/* Snapshot timeline */}
+      <ul>
+        {tt.snapshots.map((snap) => (
+          <li key={snap.id}>
+            <button onClick={() => tt.goTo(snap.id)}>
+              {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {/* Session persistence */}
+      <button onClick={() => navigator.clipboard.writeText(tt.exportSession())}>
+        Copy Session
+      </button>
+
+      {/* Recording control */}
+      <button onClick={tt.isPaused ? tt.resume : tt.pause}>
+        {tt.isPaused ? 'Resume' : 'Pause'} Recording
+      </button>
     </div>
   );
 }
@@ -166,36 +217,79 @@ function UndoControls() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { useTimeTravel } from 'directive/vue';
+import { system } from './system';
 
-// Reactive ref – re-renders when snapshot state changes
-const tt = useTimeTravel();
+const tt = useTimeTravel(system);
 </script>
 
 <template>
-  <!-- Only show controls when time-travel is enabled -->
   <div v-if="tt">
+    <!-- Basic undo / redo -->
     <button @click="tt.undo" :disabled="!tt.canUndo">Undo</button>
     <button @click="tt.redo" :disabled="!tt.canRedo">Redo</button>
+    <span>{{ tt.currentIndex + 1 }} / {{ tt.totalSnapshots }}</span>
+
+    <!-- Snapshot timeline -->
+    <ul>
+      <li v-for="snap in tt.snapshots" :key="snap.id">
+        <button @click="tt.goTo(snap.id)">
+          {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
+        </button>
+      </li>
+    </ul>
+
+    <!-- Session persistence -->
+    <button @click="navigator.clipboard.writeText(tt.exportSession())">
+      Copy Session
+    </button>
+
+    <!-- Recording control -->
+    <button @click="tt.isPaused ? tt.resume() : tt.pause()">
+      {{ tt.isPaused ? 'Resume' : 'Pause' }} Recording
+    </button>
   </div>
 </template>
 ```
 
 ### Svelte
 
-```svelte
+```html
 <script>
 import { useTimeTravel } from 'directive/svelte';
+import { system } from '$lib/directive';
 
-// Svelte store – use $tt to auto-subscribe in the template
-const tt = useTimeTravel();
+const tt = useTimeTravel(system);
 </script>
 
 {#if $tt}
+  <!-- Basic undo / redo -->
   <button on:click={$tt.undo} disabled={!$tt.canUndo}>Undo</button>
   <button on:click={$tt.redo} disabled={!$tt.canRedo}>Redo</button>
+  <span>{$tt.currentIndex + 1} / {$tt.totalSnapshots}</span>
+
+  <!-- Snapshot timeline -->
+  <ul>
+    {#each $tt.snapshots as snap (snap.id)}
+      <li>
+        <button on:click={() => $tt.goTo(snap.id)}>
+          {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+        </button>
+      </li>
+    {/each}
+  </ul>
+
+  <!-- Session persistence -->
+  <button on:click={() => navigator.clipboard.writeText($tt.exportSession())}>
+    Copy Session
+  </button>
+
+  <!-- Recording control -->
+  <button on:click={$tt.isPaused ? $tt.resume : $tt.pause}>
+    {$tt.isPaused ? 'Resume' : 'Pause'} Recording
+  </button>
 {/if}
 ```
 
@@ -203,18 +297,43 @@ const tt = useTimeTravel();
 
 ```tsx
 import { useTimeTravel } from 'directive/solid';
+import { Show, For } from 'solid-js';
 
-function UndoControls() {
-  // Solid signal – call tt() to read the current value
-  const tt = useTimeTravel();
+function TimeTravelToolbar() {
+  const tt = useTimeTravel(system);
 
   return (
     <Show when={tt()}>
       {(state) => (
-        <>
+        <div>
+          {/* Basic undo / redo */}
           <button onClick={state().undo} disabled={!state().canUndo}>Undo</button>
           <button onClick={state().redo} disabled={!state().canRedo}>Redo</button>
-        </>
+          <span>{state().currentIndex + 1} / {state().totalSnapshots}</span>
+
+          {/* Snapshot timeline */}
+          <ul>
+            <For each={state().snapshots}>
+              {(snap) => (
+                <li>
+                  <button onClick={() => state().goTo(snap.id)}>
+                    {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+
+          {/* Session persistence */}
+          <button onClick={() => navigator.clipboard.writeText(state().exportSession())}>
+            Copy Session
+          </button>
+
+          {/* Recording control */}
+          <button onClick={state().isPaused ? state().resume : state().pause}>
+            {state().isPaused ? 'Resume' : 'Pause'} Recording
+          </button>
+        </div>
       )}
     </Show>
   );
@@ -226,8 +345,7 @@ function UndoControls() {
 ```typescript
 import { TimeTravelController } from 'directive/lit';
 
-class UndoControls extends LitElement {
-  // Lit reactive controller – triggers re-render on snapshot changes
+class TimeTravelToolbar extends LitElement {
   private _tt = new TimeTravelController(this, system);
 
   render() {
@@ -235,8 +353,31 @@ class UndoControls extends LitElement {
     if (!tt) return html``;
 
     return html`
+      <!-- Basic undo / redo -->
       <button @click=${tt.undo} ?disabled=${!tt.canUndo}>Undo</button>
       <button @click=${tt.redo} ?disabled=${!tt.canRedo}>Redo</button>
+      <span>${tt.currentIndex + 1} / ${tt.totalSnapshots}</span>
+
+      <!-- Snapshot timeline -->
+      <ul>
+        ${tt.snapshots.map((snap) => html`
+          <li>
+            <button @click=${() => tt.goTo(snap.id)}>
+              ${snap.trigger} — ${new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+          </li>
+        `)}
+      </ul>
+
+      <!-- Session persistence -->
+      <button @click=${() => navigator.clipboard.writeText(tt.exportSession())}>
+        Copy Session
+      </button>
+
+      <!-- Recording control -->
+      <button @click=${tt.isPaused ? tt.resume : tt.pause}>
+        ${tt.isPaused ? 'Resume' : 'Pause'} Recording
+      </button>
     `;
   }
 }

@@ -691,7 +691,8 @@ export function useTimeTravel(
 			cachedRef.current.canUndo === state.canUndo &&
 			cachedRef.current.canRedo === state.canRedo &&
 			cachedRef.current.currentIndex === state.currentIndex &&
-			cachedRef.current.totalSnapshots === state.totalSnapshots
+			cachedRef.current.totalSnapshots === state.totalSnapshots &&
+			cachedRef.current.isPaused === state.isPaused
 		) {
 			return cachedRef.current;
 		}

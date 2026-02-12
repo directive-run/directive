@@ -310,46 +310,6 @@ system.debug?.goTo(5);  // Jump to a specific snapshot index
 
 ---
 
-## React Integration
-
-### useFact
-
-A hook to read a single fact reactively. Takes the system as its first parameter. Components re-render when the fact changes.
-
-```tsx
-// Read a single fact – TypeScript infers the return type automatically
-const userId = useFact(system, "userId");    // inferred: number
-const user = useFact(system, "user");        // inferred: User | null
-```
-
-For selecting part of a fact, use `useSelector`:
-
-```tsx
-// Narrow to a specific property to avoid unnecessary re-renders
-const userName = useSelector(system, (facts) => facts.user?.name ?? "Guest");
-```
-
----
-
-### useDerived
-
-A hook to read a single derivation reactively. Takes the system as its first parameter.
-
-```tsx
-// Subscribe to a single derivation – re-renders only when it changes
-const displayName = useDerived(system, "displayName");   // inferred: string
-const isLoggedIn = useDerived(system, "isLoggedIn");     // inferred: boolean
-```
-
-For multiple derivations, pass an array to `useDerived`:
-
-```tsx
-// Read several derivations at once into a single object
-const state = useDerived(system, ["isLoggedIn", "canEdit"]);
-```
-
----
-
 ## Related Terms
 
 ### Proxy

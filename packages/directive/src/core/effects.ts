@@ -67,7 +67,8 @@ export interface EffectsManager<_S extends Schema = Schema> {
 interface EffectState {
 	id: string;
 	enabled: boolean;
-	dependencies: Set<string> | null; // null = track dynamically
+	hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
+	dependencies: Set<string> | null; // null = not yet tracked
 	lastSnapshot: FactsSnapshot<Schema> | null;
 }
 
@@ -88,7 +89,7 @@ export interface CreateEffectsOptions<S extends Schema> {
 export function createEffectsManager<S extends Schema>(
 	options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
-	const { definitions, facts, onRun, onError } = options;
+	const { definitions, facts, store, onRun, onError } = options;
 
 	// Internal state for each effect
 	const states = new Map<string, EffectState>();
@@ -106,6 +107,7 @@ export function createEffectsManager<S extends Schema>(
 		const state: EffectState = {
 			id,
 			enabled: true,
+			hasExplicitDeps: !!def.deps,
 			dependencies: def.deps ? new Set(def.deps as string[]) : null,
 			lastSnapshot: null,
 		};
@@ -129,7 +131,7 @@ export function createEffectsManager<S extends Schema>(
 		const state = getState(id);
 		if (!state.enabled) return false;
 
-		// If effect has explicit deps, check if any changed
+		// If effect has tracked deps (explicit or auto-tracked), check if any changed
 		if (state.dependencies) {
 			for (const dep of state.dependencies) {
 				if (changedKeys.has(dep)) return true;
@@ -137,7 +139,7 @@ export function createEffectsManager<S extends Schema>(
 			return false;
 		}
 
-		// No explicit deps = run on any change (first time only, then track)
+		// No deps yet (first run or auto-tracked with no reads) = run on any change
 		return true;
 	}
 
@@ -151,14 +153,16 @@ export function createEffectsManager<S extends Schema>(
 		onRun?.(id);
 
 		try {
-			// If no explicit deps, track what facts are accessed during execution
-			if (!state.dependencies) {
-				// Track dependencies during actual run
+			if (!state.hasExplicitDeps) {
+				// Auto-tracked: re-track dependencies on EVERY run so conditional
+				// reads are picked up (fixes frozen deps after first run)
 				let trackedDeps: Set<string> | null = null;
+				let effectPromise: unknown;
 				const trackingResult = withTracking(() => {
-					// We need to handle the async case carefully
-					// Run synchronous portion with tracking
-					return def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
+					store.batch(() => {
+						effectPromise = def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
+					});
+					return effectPromise;
 				});
 				trackedDeps = trackingResult.deps;
 
@@ -168,13 +172,17 @@ export function createEffectsManager<S extends Schema>(
 					await result;
 				}
 
-				// Update tracked dependencies
-				if (trackedDeps.size > 0) {
-					state.dependencies = trackedDeps;
-				}
+				// Update tracked dependencies (always replace to catch new conditional reads)
+				state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
 			} else {
-				// Has explicit deps, just run without tracking
-				await def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
+				// Has explicit deps, batch synchronous mutations and run
+				let effectPromise: unknown;
+				store.batch(() => {
+					effectPromise = def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
+				});
+				if (effectPromise instanceof Promise) {
+					await effectPromise;
+				}
 			}
 		} catch (error) {
 			// Effects are fire-and-forget - errors are reported but don't propagate

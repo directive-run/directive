@@ -17,31 +17,80 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/react';
 
 ---
 
-## Quick Start
+## Setup
 
-```tsx
-import { createSystem } from 'directive';
-import { useFact, useDerived, useEvents } from 'directive/react';
-import { counterModule } from './modules/counter';
+Create a system at module level and pass it explicitly to hooks:
+
+```typescript
+import { createModule, createSystem, t } from 'directive';
+
+const userModule = createModule("user", {
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.any<User | null>(),
+    },
+    derivations: {
+      displayName: t.string(),
+    },
+    events: {
+      setUserId: { userId: t.number() },
+    },
+    requirements: {
+      FETCH_USER: {},
+    },
+  },
+  init: (facts) => {
+    facts.userId = 0;
+    facts.user = null;
+  },
+  derive: {
+    displayName: (facts) => facts.user?.name ?? "Guest",
+  },
+  constraints: {
+    needsUser: {
+      when: (facts) => facts.userId > 0 && !facts.user,
+      require: { type: "FETCH_USER" },
+    },
+  },
+  resolvers: {
+    fetchUser: {
+      requirement: "FETCH_USER",
+      resolve: async (req, ctx) => {
+        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      },
+    },
+  },
+});
 
 // Create and start the system
-const system = createSystem({ module: counterModule });
+const system = createSystem({ module: userModule });
 system.start();
 
-function Counter() {
-  // Subscribe to the current count
-  const count = useFact(system, "count");
+// Export for use in components
+export { system };
+```
 
-  // Subscribe to the computed doubled value
-  const doubled = useDerived(system, "doubled");
+Then pass the system to hooks in your components:
+
+```tsx
+import { useFact, useDerived, useEvents } from 'directive/react';
+import { system } from './system';
+
+function UserProfile() {
+  // Subscribe to the user fact
+  const user = useFact(system, "user");
+
+  // Subscribe to the display name derivation
+  const displayName = useDerived(system, "displayName");
 
   // Get typed event dispatchers
   const events = useEvents(system);
 
   return (
     <div>
-      <p>Count: {count}, Doubled: {doubled}</p>
-      <button onClick={() => events.increment()}>+</button>
+      <h1>{displayName}</h1>
+      <button onClick={() => events.setUserId({ userId: 42 })}>Load User</button>
     </div>
   );
 }
@@ -53,10 +102,11 @@ Every hook takes the system as its first parameter. TypeScript infers the fact k
 
 ## Creating Systems
 
-Every hook below requires a `system` reference. There are two ways to create one:
+Every hook below requires a `system` reference. There are three ways to create one:
 
-- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Quick Start](#quick-start) above)
+- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
 - **`useDirectiveRef`** (recommended) — creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
+- **`useDirective`** — creates a scoped system **and** subscribes to facts and derivations in one call
 
 For most React apps, prefer `useDirectiveRef` so each component owns its own system lifecycle. Use a global system when multiple components need to share the same state.
 
@@ -594,28 +644,48 @@ test('displays user name', async () => {
 
 ## Time-Travel Debugging
 
-Use `useTimeTravel` for reactive undo/redo controls that re-render when snapshot state changes:
+Use `useTimeTravel` for reactive time-travel controls. Returns `null` when disabled, otherwise a `TimeTravelState` with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
 
 ```tsx
 import { useTimeTravel } from 'directive/react';
 
-function UndoControls() {
-  // Get reactive time-travel controls (null when disabled)
+function TimeTravelToolbar() {
   const tt = useTimeTravel(system);
-
   if (!tt) return null;
 
   return (
     <div>
+      {/* Undo / Redo */}
       <button onClick={tt.undo} disabled={!tt.canUndo}>Undo</button>
       <button onClick={tt.redo} disabled={!tt.canRedo}>Redo</button>
       <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+
+      {/* Snapshot timeline — metadata only, no facts (keeps re-renders cheap) */}
+      <ul>
+        {tt.snapshots.map((snap) => (
+          <li key={snap.id}>
+            <button onClick={() => tt.goTo(snap.id)}>
+              {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {/* Session persistence */}
+      <button onClick={() => navigator.clipboard.writeText(tt.exportSession())}>
+        Copy Session
+      </button>
+
+      {/* Recording control */}
+      <button onClick={tt.isPaused ? tt.resume : tt.pause}>
+        {tt.isPaused ? 'Resume' : 'Pause'} Recording
+      </button>
     </div>
   );
 }
 ```
 
-Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
 
 ---
 

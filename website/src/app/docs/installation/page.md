@@ -84,6 +84,10 @@ Directive is designed to be lightweight:
 |--------|----------|---------|
 | `directive` (core) | ~8 KB | ~3 KB |
 | `directive/react` | ~2 KB | ~1 KB |
+| `directive/vue` | ~2 KB | ~1 KB |
+| `directive/svelte` | ~2 KB | ~1 KB |
+| `directive/solid` | ~2 KB | ~1 KB |
+| `directive/lit` | ~2 KB | ~1 KB |
 | `directive/plugins` | ~4 KB | ~1.5 KB |
 
 All exports are tree-shakeable. Import only what you use.
@@ -112,7 +116,7 @@ function App() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { createSystem } from 'directive';
 import { useFact } from 'directive/vue';
@@ -129,7 +133,7 @@ const name = useFact(system, 'name');
 
 ### Svelte
 
-```svelte
+```html
 <script>
   import { createSystem } from 'directive';
   import { useFact } from 'directive/svelte';

@@ -79,6 +79,7 @@ export interface DebugConfig {
 export interface TimeTravelAPI {
 	readonly snapshots: Snapshot[];
 	readonly currentIndex: number;
+	readonly isPaused: boolean;
 	goBack(steps?: number): void;
 	goForward(steps?: number): void;
 	goTo(snapshotId: number): void;
@@ -87,16 +88,49 @@ export interface TimeTravelAPI {
 	import(json: string): void;
 	beginChangeset(label: string): void;
 	endChangeset(): void;
+	pause(): void;
+	resume(): void;
+}
+
+/** Lightweight snapshot metadata (no facts data — keeps re-renders cheap) */
+export interface SnapshotMeta {
+	id: number;
+	timestamp: number;
+	trigger: string;
 }
 
 /** Reactive time-travel state for framework hooks */
 export interface TimeTravelState {
+	// Existing (unchanged)
 	canUndo: boolean;
 	canRedo: boolean;
 	undo: () => void;
 	redo: () => void;
 	currentIndex: number;
 	totalSnapshots: number;
+
+	// Snapshot access (metadata only — lightweight)
+	snapshots: SnapshotMeta[];
+	getSnapshotFacts: (id: number) => Record<string, unknown> | null;
+
+	// Navigation
+	goTo: (snapshotId: number) => void;
+	goBack: (steps: number) => void;
+	goForward: (steps: number) => void;
+	replay: () => void;
+
+	// Session persistence
+	exportSession: () => string;
+	importSession: (json: string) => void;
+
+	// Changesets
+	beginChangeset: (label: string) => void;
+	endChangeset: () => void;
+
+	// Recording control
+	isPaused: boolean;
+	pause: () => void;
+	resume: () => void;
 }
 
 // ============================================================================

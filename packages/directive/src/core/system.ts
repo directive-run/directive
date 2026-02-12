@@ -36,6 +36,9 @@ const BLOCKED_PROPS = Object.freeze(
 	new Set(["__proto__", "constructor", "prototype"]),
 );
 
+/** Namespace separator for internal key prefixing (e.g., "auth::token") */
+const SEPARATOR = "::";
+
 // ============================================================================
 // Topological Sort for Module Dependencies
 // ============================================================================
@@ -281,8 +284,29 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		};
 	}
 
+	// Validate module names and schema keys don't contain the separator
+	for (const namespace of Object.keys(modulesMap)) {
+		if (namespace.includes(SEPARATOR)) {
+			throw new Error(
+				`[Directive] Module name "${namespace}" contains the reserved separator "${SEPARATOR}". ` +
+				`Module names cannot contain "${SEPARATOR}".`,
+			);
+		}
+		const mod = modulesMap[namespace];
+		if (mod) {
+			for (const key of Object.keys(mod.schema.facts)) {
+				if (key.includes(SEPARATOR)) {
+					throw new Error(
+						`[Directive] Schema key "${key}" in module "${namespace}" contains the reserved separator "${SEPARATOR}". ` +
+						`Schema keys cannot contain "${SEPARATOR}".`,
+					);
+				}
+			}
+		}
+	}
+
 	// Transform modules to flat format with prefixed keys
-	// auth.token → auth_token internally
+	// auth.token → auth::token internally
 	// Process in dependency order (determined above)
 	const flatModules: Array<ModuleDef<ModuleSchema>> = [];
 
@@ -296,14 +320,14 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		// Prefix all fact keys with namespace
 		const prefixedFacts: Record<string, unknown> = {};
 		for (const [key, value] of Object.entries(mod.schema.facts)) {
-			prefixedFacts[`${namespace}_${key}`] = value;
+			prefixedFacts[`${namespace}${SEPARATOR}${key}`] = value;
 		}
 
 		// Prefix all derivation keys with namespace
 		const prefixedDerivations: Record<string, unknown> = {};
 		if (mod.schema.derivations) {
 			for (const [key, value] of Object.entries(mod.schema.derivations)) {
-				prefixedDerivations[`${namespace}_${key}`] = value;
+				prefixedDerivations[`${namespace}${SEPARATOR}${key}`] = value;
 			}
 		}
 
@@ -311,7 +335,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		const prefixedEvents: Record<string, unknown> = {};
 		if (mod.schema.events) {
 			for (const [key, value] of Object.entries(mod.schema.events)) {
-				prefixedEvents[`${namespace}_${key}`] = value;
+				prefixedEvents[`${namespace}${SEPARATOR}${key}`] = value;
 			}
 		}
 
@@ -330,7 +354,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		const prefixedDerive: Record<string, (facts: unknown, derive: unknown) => unknown> = {};
 		if (mod.derive) {
 			for (const [key, fn] of Object.entries(mod.derive)) {
-				prefixedDerive[`${namespace}_${key}`] = (facts: unknown, derive: unknown) => {
+				prefixedDerive[`${namespace}${SEPARATOR}${key}`] = (facts: unknown, derive: unknown) => {
 					// Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
 					// Otherwise use flat access to own module only
 					const factsProxy = hasCrossModuleDeps
@@ -348,7 +372,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		const prefixedEventHandlers: Record<string, (facts: unknown, event: unknown) => void> = {};
 		if (mod.events) {
 			for (const [key, handler] of Object.entries(mod.events)) {
-				prefixedEventHandlers[`${namespace}_${key}`] = (facts: unknown, event: unknown) => {
+				prefixedEventHandlers[`${namespace}${SEPARATOR}${key}`] = (facts: unknown, event: unknown) => {
 					const moduleFactsProxy = createModuleFactsProxy(facts as Record<string, unknown>, namespace);
 					// biome-ignore lint/suspicious/noExplicitAny: Event handler type coercion
 					(handler as any)(moduleFactsProxy, event);
@@ -366,10 +390,13 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					priority?: number;
 					async?: boolean;
 					timeout?: number;
+					deps?: string[];
 				};
 
-				prefixedConstraints[`${namespace}_${key}`] = {
+				prefixedConstraints[`${namespace}${SEPARATOR}${key}`] = {
 					...constraintDef,
+					// Transform deps to use prefixed keys
+					deps: constraintDef.deps?.map((dep) => `${namespace}${SEPARATOR}${dep}`),
 					when: (facts: unknown) => {
 						// Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
 						// Otherwise use module-scoped proxy for direct access (facts.key → namespace_key)
@@ -402,7 +429,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					timeout?: number;
 				};
 
-				prefixedResolvers[`${namespace}_${key}`] = {
+				prefixedResolvers[`${namespace}${SEPARATOR}${key}`] = {
 					...resolverDef,
 					resolve: async (req: unknown, ctx: { facts: unknown; signal: AbortSignal }) => {
 						const namespacedFacts = createNamespacedFactsProxy(ctx.facts as Record<string, unknown>, modulesMap);
@@ -425,7 +452,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					deps?: string[];
 				};
 
-				prefixedEffects[`${namespace}_${key}`] = {
+				prefixedEffects[`${namespace}${SEPARATOR}${key}`] = {
 					...effectDef,
 					// biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
 					run: (facts: any, prev: any) => {
@@ -442,7 +469,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 						return effectDef.run(factsProxy, prevProxy);
 					},
 					// Transform deps to use prefixed keys
-					deps: effectDef.deps?.map((dep) => `${namespace}_${dep}`),
+					deps: effectDef.deps?.map((dep) => `${namespace}${SEPARATOR}${dep}`),
 				};
 			}
 		}
@@ -469,7 +496,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 	// Dev-mode warning: tickMs set without tick event handler
 	if (process.env.NODE_ENV !== "production" && options.tickMs && options.tickMs > 0) {
 		const hasTickHandler = flatModules.some(
-			(m) => m.events && Object.keys(m.events).some((k) => k.endsWith("_tick")),
+			(m) => m.events && Object.keys(m.events).some((k) => k.endsWith(`${SEPARATOR}tick`)),
 		);
 		if (!hasTickHandler) {
 			console.warn(
@@ -487,7 +514,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
 	/**
 	 * Apply namespaced facts to the engine's flat store.
-	 * Converts { auth: { token: "x" } } to { auth_token: "x" }
+	 * Converts { auth: { token: "x" } } to { "auth::token": "x" }
 	 * Includes prototype pollution protection.
 	 */
 	function applyNamespacedFacts(
@@ -526,7 +553,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 			for (const [key, value] of Object.entries(facts)) {
 				// Skip blocked keys
 				if (BLOCKED_PROPS.has(key)) continue;
-				(engine.facts as Record<string, unknown>)[`${namespace}_${key}`] = value;
+				(engine.facts as Record<string, unknown>)[`${namespace}${SEPARATOR}${key}`] = value;
 			}
 		}
 	}
@@ -571,11 +598,11 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		if (!mod) continue;
 		const keys: string[] = [];
 		for (const key of Object.keys(mod.schema.facts)) {
-			keys.push(`${namespace}_${key}`);
+			keys.push(`${namespace}${SEPARATOR}${key}`);
 		}
 		if (mod.schema.derivations) {
 			for (const key of Object.keys(mod.schema.derivations)) {
-				keys.push(`${namespace}_${key}`);
+				keys.push(`${namespace}${SEPARATOR}${key}`);
 			}
 		}
 		namespaceKeysMap.set(namespace, keys);
@@ -641,7 +668,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
 			if (tickMs && tickMs > 0) {
 				// Find the first module with a tick event and dispatch to it
-				const tickEventKey = Object.keys(flatModules[0]?.events ?? {}).find((k) => k.endsWith("_tick"));
+				const tickEventKey = Object.keys(flatModules[0]?.events ?? {}).find((k) => k.endsWith(`${SEPARATOR}tick`));
 				if (tickEventKey) {
 					tickInterval = setInterval(() => {
 						engine.dispatch({ type: tickEventKey });
@@ -808,15 +835,15 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
 			const snapshot = engine.getDistributableSnapshot(internalOptions);
 
-			// Transform data keys from internal format (auth_status) to namespaced format (auth: { status })
+			// Transform data keys from internal format (auth::status) to namespaced format (auth: { status })
 			const namespacedData: Record<string, Record<string, unknown>> = {};
 
 			for (const [key, value] of Object.entries(snapshot.data as Record<string, unknown>)) {
-				// Find the namespace prefix (first underscore)
-				const underscoreIndex = key.indexOf("_");
-				if (underscoreIndex > 0) {
-					const namespace = key.slice(0, underscoreIndex);
-					const localKey = key.slice(underscoreIndex + 1);
+				// Find the namespace prefix (first separator)
+				const sepIndex = key.indexOf(SEPARATOR);
+				if (sepIndex > 0) {
+					const namespace = key.slice(0, sepIndex);
+					const localKey = key.slice(sepIndex + SEPARATOR.length);
 					if (!namespacedData[namespace]) {
 						namespacedData[namespace] = {};
 					}
@@ -873,10 +900,10 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					const namespacedData: Record<string, Record<string, unknown>> = {};
 
 					for (const [key, value] of Object.entries(snapshot.data)) {
-						const underscoreIndex = key.indexOf("_");
-						if (underscoreIndex > 0) {
-							const namespace = key.slice(0, underscoreIndex);
-							const localKey = key.slice(underscoreIndex + 1);
+						const sepIndex = key.indexOf(SEPARATOR);
+						if (sepIndex > 0) {
+							const namespace = key.slice(0, sepIndex);
+							const localKey = key.slice(sepIndex + SEPARATOR.length);
 							if (!namespacedData[namespace]) {
 								namespacedData[namespace] = {};
 							}
@@ -907,19 +934,19 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 // ============================================================================
 
 /**
- * Convert a namespaced key (e.g., "auth.status") to internal prefixed format ("auth_status").
+ * Convert a namespaced key (e.g., "auth.status") to internal prefixed format ("auth::status").
  * If the key is already in prefixed format, returns it unchanged.
  *
  * @example
- * toInternalKey("auth.status") // → "auth_status"
- * toInternalKey("auth_status") // → "auth_status" (unchanged)
+ * toInternalKey("auth.status") // → "auth::status"
+ * toInternalKey("auth::status") // → "auth::status" (unchanged)
  * toInternalKey("status")      // → "status" (unchanged)
  */
 function toInternalKey(key: string): string {
-	// If key contains a dot, convert to underscore format
+	// If key contains a dot, convert to separator format
 	if (key.includes(".")) {
 		const [namespace, ...rest] = key.split(".");
-		return `${namespace}_${rest.join("_")}`;
+		return `${namespace}${SEPARATOR}${rest.join(SEPARATOR)}`;
 	}
 	// Already in internal format or simple key
 	return key;
@@ -931,7 +958,7 @@ function toInternalKey(key: string): string {
 
 /**
  * Create a proxy for a single module's facts (used in init, event handlers).
- * Translates unprefixed keys to prefixed: `token` → `auth_token`
+ * Translates unprefixed keys to prefixed: `token` → `auth::token`
  *
  * Proxies are cached per facts store and namespace for performance.
  */
@@ -957,23 +984,23 @@ function createModuleFactsProxy(
 			if (prop === "$store" || prop === "$snapshot") {
 				return (facts as Record<string, unknown>)[prop];
 			}
-			return (facts as Record<string, unknown>)[`${namespace}_${prop}`];
+			return (facts as Record<string, unknown>)[`${namespace}${SEPARATOR}${prop}`];
 		},
 		set(_, prop: string | symbol, value: unknown) {
 			if (typeof prop === "symbol") return false;
 			if (BLOCKED_PROPS.has(prop)) return false;
-			(facts as Record<string, unknown>)[`${namespace}_${prop}`] = value;
+			(facts as Record<string, unknown>)[`${namespace}${SEPARATOR}${prop}`] = value;
 			return true;
 		},
 		has(_, prop: string | symbol) {
 			if (typeof prop === "symbol") return false;
 			if (BLOCKED_PROPS.has(prop)) return false;
-			return `${namespace}_${prop}` in facts;
+			return `${namespace}${SEPARATOR}${prop}` in facts;
 		},
 		deleteProperty(_, prop: string | symbol) {
 			if (typeof prop === "symbol") return false;
 			if (BLOCKED_PROPS.has(prop)) return false;
-			delete (facts as Record<string, unknown>)[`${namespace}_${prop}`];
+			delete (facts as Record<string, unknown>)[`${namespace}${SEPARATOR}${prop}`];
 			return true;
 		},
 	});
@@ -984,7 +1011,7 @@ function createModuleFactsProxy(
 
 /**
  * Create a nested proxy for namespaced facts access.
- * `facts.auth.token` → reads `auth_token` from flat store
+ * `facts.auth.token` → reads `auth::token` from flat store
  *
  * Uses Set for O(1) namespace lookups and caches the outer proxy.
  */
@@ -1114,7 +1141,7 @@ function createCrossModuleFactsProxy(
 
 /**
  * Create a proxy for a single module's derivations.
- * Translates unprefixed keys to prefixed: `status` → `auth_status`
+ * Translates unprefixed keys to prefixed: `status` → `auth::status`
  *
  * Proxies are cached per derive store and namespace for performance.
  */
@@ -1136,12 +1163,12 @@ function createModuleDeriveProxy(
 		get(_, prop: string | symbol) {
 			if (typeof prop === "symbol") return undefined;
 			if (BLOCKED_PROPS.has(prop)) return undefined;
-			return derive[`${namespace}_${prop}`];
+			return derive[`${namespace}${SEPARATOR}${prop}`];
 		},
 		has(_, prop: string | symbol) {
 			if (typeof prop === "symbol") return false;
 			if (BLOCKED_PROPS.has(prop)) return false;
-			return `${namespace}_${prop}` in derive;
+			return `${namespace}${SEPARATOR}${prop}` in derive;
 		},
 	});
 
@@ -1151,7 +1178,7 @@ function createModuleDeriveProxy(
 
 /**
  * Create a nested proxy for namespaced derivations access.
- * `derive.auth.status` → reads `auth_status` from flat derive
+ * `derive.auth.status` → reads `auth::status` from flat derive
  *
  * Uses Set for O(1) namespace lookups and caches the outer proxy.
  */
@@ -1207,7 +1234,7 @@ const moduleEventsProxyCache = new WeakMap<
 
 /**
  * Create a nested proxy for namespaced events access.
- * `events.auth.login({ token })` → dispatches `{ type: "auth_login", token }`
+ * `events.auth.login({ token })` → dispatches `{ type: "auth::login", token }`
  *
  * Uses Set for O(1) namespace lookups and caches proxies for performance.
  */
@@ -1244,7 +1271,7 @@ function createNamespacedEventsProxy(
 
 					// Return a function that dispatches the prefixed event
 					return (payload?: Record<string, unknown>) => {
-						engine.dispatch({ type: `${namespace}_${eventName}`, ...payload });
+						engine.dispatch({ type: `${namespace}${SEPARATOR}${eventName}`, ...payload });
 					};
 				},
 			});
