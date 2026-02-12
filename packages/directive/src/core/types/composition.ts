@@ -492,12 +492,12 @@ export type MergedModuleSchema<Modules extends ModulesMap> = {
 };
 
 type MergeFactsWithPrefix<Modules extends ModulesMap> = {
-	[K in keyof Modules as `${K & string}_${keyof ExtractSchema<Modules[K]>["facts"] & string}`]: ExtractSchema<Modules[K]>["facts"][keyof ExtractSchema<Modules[K]>["facts"]];
+	[K in keyof Modules as `${K & string}::${keyof ExtractSchema<Modules[K]>["facts"] & string}`]: ExtractSchema<Modules[K]>["facts"][keyof ExtractSchema<Modules[K]>["facts"]];
 };
 
 type MergeDerivationsWithPrefix<Modules extends ModulesMap> = {
 	[K in keyof Modules as ExtractSchema<Modules[K]>["derivations"] extends Record<string, unknown>
-		? `${K & string}_${keyof ExtractSchema<Modules[K]>["derivations"] & string}`
+		? `${K & string}::${keyof ExtractSchema<Modules[K]>["derivations"] & string}`
 		: never]: ExtractSchema<Modules[K]>["derivations"] extends Record<string, unknown>
 		? ExtractSchema<Modules[K]>["derivations"][keyof ExtractSchema<Modules[K]>["derivations"]]
 		: never;
@@ -505,7 +505,7 @@ type MergeDerivationsWithPrefix<Modules extends ModulesMap> = {
 
 type MergeEventsWithPrefix<Modules extends ModulesMap> = {
 	[K in keyof Modules as ExtractSchema<Modules[K]>["events"] extends Record<string, unknown>
-		? `${K & string}_${keyof ExtractSchema<Modules[K]>["events"] & string}`
+		? `${K & string}::${keyof ExtractSchema<Modules[K]>["events"] & string}`
 		: never]: ExtractSchema<Modules[K]>["events"] extends Record<string, unknown>
 		? ExtractSchema<Modules[K]>["events"][keyof ExtractSchema<Modules[K]>["events"]]
 		: never;

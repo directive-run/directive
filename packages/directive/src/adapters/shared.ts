@@ -5,7 +5,7 @@
  * @internal
  */
 
-import type { TimeTravelState, TimeTravelAPI, SystemInspection } from "../core/types.js";
+import type { TimeTravelState, TimeTravelAPI, SystemInspection, SnapshotMeta } from "../core/types.js";
 import { withTracking } from "../core/tracking.js";
 
 // ============================================================================
@@ -210,13 +210,48 @@ export function defaultEquality<T>(a: T, b: T): boolean {
 export function buildTimeTravelState(system: SystemLike): TimeTravelState | null {
 	const debug = system.debug;
 	if (!debug) return null;
+
+	// Build lightweight metadata array (no facts data)
+	const snapshots: SnapshotMeta[] = debug.snapshots.map((s) => ({
+		id: s.id,
+		timestamp: s.timestamp,
+		trigger: s.trigger,
+	}));
+
 	return {
+		// Existing
 		canUndo: debug.currentIndex > 0,
 		canRedo: debug.currentIndex < debug.snapshots.length - 1,
 		undo: () => debug.goBack(),
 		redo: () => debug.goForward(),
 		currentIndex: debug.currentIndex,
 		totalSnapshots: debug.snapshots.length,
+
+		// Snapshot access
+		snapshots,
+		getSnapshotFacts: (id: number): Record<string, unknown> | null => {
+			const snap = debug.snapshots.find((s) => s.id === id);
+			return snap ? snap.facts : null;
+		},
+
+		// Navigation
+		goTo: (snapshotId: number) => debug.goTo(snapshotId),
+		goBack: (steps: number) => debug.goBack(steps),
+		goForward: (steps: number) => debug.goForward(steps),
+		replay: () => debug.replay(),
+
+		// Session persistence
+		exportSession: () => debug.export(),
+		importSession: (json: string) => debug.import(json),
+
+		// Changesets
+		beginChangeset: (label: string) => debug.beginChangeset(label),
+		endChangeset: () => debug.endChangeset(),
+
+		// Recording control
+		isPaused: debug.isPaused,
+		pause: () => debug.pause(),
+		resume: () => debug.resume(),
 	};
 }
 

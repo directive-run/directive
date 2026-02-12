@@ -107,6 +107,13 @@ export interface ConstraintDef<S extends Schema, R extends Requirement = Require
 	 * Cross-module: use "moduleName.constraintName" format.
 	 */
 	after?: string[];
+	/**
+	 * Explicit fact dependencies for this constraint.
+	 * Required for async constraints to enable dependency tracking (auto-tracking
+	 * cannot work across async boundaries). Also works for sync constraints to
+	 * bypass auto-tracking overhead.
+	 */
+	deps?: string[];
 }
 
 /** Map of constraint definitions (generic) */

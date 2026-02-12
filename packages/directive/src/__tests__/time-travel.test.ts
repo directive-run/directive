@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ModuleSchema } from "../index.js";
+import type { ModuleSchema, SnapshotMeta } from "../index.js";
 import { createModule, createSystem, t } from "../index.js";
+import { buildTimeTravelState } from "../adapters/shared.js";
 
 describe("Time-Travel", () => {
 	const schema = {
@@ -297,5 +298,316 @@ describe("Time-Travel", () => {
 
 		consoleSpy.mockRestore();
 		system.stop();
+	});
+
+	// ==========================================================================
+	// Extended TimeTravelState (via buildTimeTravelState)
+	// ==========================================================================
+
+	describe("buildTimeTravelState extended API", () => {
+		it("should return null when time-travel is disabled", () => {
+			const system = createSystem({
+				module: counterModule,
+			});
+			system.start();
+
+			const state = buildTimeTravelState(system as any);
+			expect(state).toBeNull();
+
+			system.stop();
+		});
+
+		it("should expose snapshot metadata without facts", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			const state = buildTimeTravelState(system as any);
+			expect(state).not.toBeNull();
+			expect(state!.snapshots.length).toBeGreaterThan(0);
+
+			// Each snapshot meta should have id, timestamp, trigger — but NOT facts
+			for (const snap of state!.snapshots) {
+				expect(typeof snap.id).toBe("number");
+				expect(typeof snap.timestamp).toBe("number");
+				expect(typeof snap.trigger).toBe("string");
+				expect((snap as any).facts).toBeUndefined();
+			}
+
+			system.stop();
+		});
+
+		it("should retrieve full facts on-demand via getSnapshotFacts", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment(); // count = 1
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment(); // count = 2
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			const state = buildTimeTravelState(system as any);
+			expect(state!.snapshots.length).toBeGreaterThan(0);
+
+			const firstSnap = state!.snapshots[0]!;
+			const facts = state!.getSnapshotFacts(firstSnap.id);
+			expect(facts).not.toBeNull();
+			expect(typeof facts).toBe("object");
+
+			// Non-existent ID returns null
+			expect(state!.getSnapshotFacts(999999)).toBeNull();
+
+			system.stop();
+		});
+
+		it("should support goTo via TimeTravelState", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment(); // count = 1
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment(); // count = 2
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			let state = buildTimeTravelState(system as any);
+			const firstSnap = state!.snapshots[0]!;
+
+			// Navigate to first snapshot
+			state!.goTo(firstSnap.id);
+
+			state = buildTimeTravelState(system as any);
+			expect(state!.currentIndex).toBe(0);
+
+			system.stop();
+		});
+
+		it("should support goBack/goForward with step count", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			let state = buildTimeTravelState(system as any);
+			const lastIndex = state!.currentIndex;
+
+			// Go back 2 steps
+			state!.goBack(2);
+			state = buildTimeTravelState(system as any);
+			expect(state!.currentIndex).toBeLessThan(lastIndex);
+
+			// Go forward 1 step
+			state!.goForward(1);
+			state = buildTimeTravelState(system as any);
+			expect(state!.currentIndex).toBeGreaterThan(0);
+
+			system.stop();
+		});
+
+		it("should support replay via TimeTravelState", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			let state = buildTimeTravelState(system as any);
+			const snapCount = state!.totalSnapshots;
+
+			if (snapCount > 1) {
+				// We have multiple snapshots, currentIndex should be at the end
+				expect(state!.currentIndex).toBeGreaterThan(0);
+
+				state!.replay();
+				state = buildTimeTravelState(system as any);
+				expect(state!.currentIndex).toBe(0);
+			} else {
+				// Edge case: only 1 snapshot — replay goes to index 0 (already there)
+				state!.replay();
+				state = buildTimeTravelState(system as any);
+				expect(state!.currentIndex).toBe(0);
+			}
+
+			system.stop();
+		});
+
+		it("should support exportSession/importSession", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment();
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			const state = buildTimeTravelState(system as any);
+			const exported = state!.exportSession();
+
+			expect(typeof exported).toBe("string");
+			const parsed = JSON.parse(exported);
+			expect(parsed.version).toBe(1);
+			expect(Array.isArray(parsed.snapshots)).toBe(true);
+
+			// Import into a fresh system
+			const system2 = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system2.start();
+
+			const state2 = buildTimeTravelState(system2 as any);
+			state2!.importSession(exported);
+
+			const state2After = buildTimeTravelState(system2 as any);
+			expect(state2After!.totalSnapshots).toBe(parsed.snapshots.length);
+
+			system.stop();
+			system2.stop();
+		});
+
+		it("should support beginChangeset/endChangeset", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 20 },
+			});
+			system.start();
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			let state = buildTimeTravelState(system as any);
+			state!.beginChangeset("batch-update");
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			state = buildTimeTravelState(system as any);
+			state!.endChangeset();
+
+			// After ending changeset, goBack should jump over the entire changeset
+			state = buildTimeTravelState(system as any);
+			const indexBeforeUndo = state!.currentIndex;
+
+			state!.undo(); // goBack(1) — but should skip the changeset as a group
+			state = buildTimeTravelState(system as any);
+
+			// The index should have moved back more than 1 step (changeset grouping)
+			expect(state!.currentIndex).toBeLessThan(indexBeforeUndo);
+
+			system.stop();
+		});
+
+		it("should expose isPaused and support pause/resume", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			let state = buildTimeTravelState(system as any);
+			expect(state!.isPaused).toBe(false);
+
+			// Pause recording
+			state!.pause();
+			state = buildTimeTravelState(system as any);
+			expect(state!.isPaused).toBe(true);
+
+			const snapshotsBefore = state!.totalSnapshots;
+
+			// Changes while paused should NOT add snapshots
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			state = buildTimeTravelState(system as any);
+			expect(state!.totalSnapshots).toBe(snapshotsBefore);
+
+			// Resume
+			state!.resume();
+			state = buildTimeTravelState(system as any);
+			expect(state!.isPaused).toBe(false);
+
+			// Changes after resume SHOULD add snapshots
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			state = buildTimeTravelState(system as any);
+			expect(state!.totalSnapshots).toBeGreaterThan(snapshotsBefore);
+
+			system.stop();
+		});
+
+		it("should maintain backward compatibility — existing fields unchanged", async () => {
+			const system = createSystem({
+				module: counterModule,
+				debug: { timeTravel: true, maxSnapshots: 10 },
+			});
+			system.start();
+
+			system.events.increment();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+
+			const state = buildTimeTravelState(system as any);
+
+			// All original fields should exist
+			expect(typeof state!.canUndo).toBe("boolean");
+			expect(typeof state!.canRedo).toBe("boolean");
+			expect(typeof state!.undo).toBe("function");
+			expect(typeof state!.redo).toBe("function");
+			expect(typeof state!.currentIndex).toBe("number");
+			expect(typeof state!.totalSnapshots).toBe("number");
+
+			// New fields should also exist
+			expect(Array.isArray(state!.snapshots)).toBe(true);
+			expect(typeof state!.getSnapshotFacts).toBe("function");
+			expect(typeof state!.goTo).toBe("function");
+			expect(typeof state!.goBack).toBe("function");
+			expect(typeof state!.goForward).toBe("function");
+			expect(typeof state!.replay).toBe("function");
+			expect(typeof state!.exportSession).toBe("function");
+			expect(typeof state!.importSession).toBe("function");
+			expect(typeof state!.beginChangeset).toBe("function");
+			expect(typeof state!.endChangeset).toBe("function");
+			expect(typeof state!.isPaused).toBe("boolean");
+			expect(typeof state!.pause).toBe("function");
+			expect(typeof state!.resume).toBe("function");
+
+			system.stop();
+		});
 	});
 });

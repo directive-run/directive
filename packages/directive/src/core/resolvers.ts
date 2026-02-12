@@ -181,11 +181,9 @@ export function createResolversManager<S extends Schema>(
 	const batches = new Map<string, BatchState>();
 
 	// Resolver index by requirement type for O(1) lookup (populated lazily)
-	// Note: This cache is intentionally never invalidated because:
-	// 1. Modules are registered once at system creation and don't change at runtime
-	// 2. The cache only grows, never shrinks, which is safe for the expected use case
-	// 3. If dynamic module registration is added later, this cache should be cleared
+	// Capped to prevent unbounded growth with dynamic requirement types (e.g., FETCH_USER_${id})
 	const resolversByType = new Map<string, string[]>();
+	const MAX_RESOLVER_CACHE = 1000;
 
 	/** Cleanup old statuses to prevent memory leak */
 	function cleanupStatuses(): void {
@@ -262,8 +260,13 @@ export function createResolversManager<S extends Schema>(
 		// Fallback to full search and cache the result
 		for (const [id, def] of Object.entries(definitions)) {
 			if (resolverHandles(def, req)) {
-				// Cache this resolver for this type
+				// Cache this resolver for this type (with size cap)
 				if (!resolversByType.has(reqType)) {
+					// Evict oldest entry if cache is full
+					if (resolversByType.size >= MAX_RESOLVER_CACHE) {
+						const oldest = resolversByType.keys().next().value;
+						if (oldest !== undefined) resolversByType.delete(oldest);
+					}
 					resolversByType.set(reqType, []);
 				}
 				const typeResolvers = resolversByType.get(reqType)!;
@@ -399,6 +402,7 @@ export function createResolversManager<S extends Schema>(
 			failedAt: Date.now(),
 			attempts: retryPolicy.attempts,
 		});
+		cleanupStatuses();
 		onError?.(resolverId, req, lastError);
 	}
 
@@ -499,11 +503,13 @@ export function createResolversManager<S extends Schema>(
 						}
 					}
 
-					// If there were failures but some succeeded, don't retry (partial success)
-					// If ALL failed and we have retries left, continue to retry logic
-					if (!hasFailures || requirements.every((_, i) => !results[i]?.success)) {
-						return;
-					}
+					// No failures: all succeeded, done
+					if (!hasFailures) return;
+
+					// Partial success (some succeeded, some failed): don't retry the batch
+					if (requirements.some((_, i) => results[i]?.success)) return;
+
+					// ALL failed: fall through to retry logic below
 				} else {
 					// Use all-or-nothing resolveBatch
 					// Batch fact mutations for the synchronous portion of the resolver
@@ -586,6 +592,7 @@ export function createResolversManager<S extends Schema>(
 			});
 			onError?.(resolverId, req, lastError);
 		}
+		cleanupStatuses();
 	}
 
 	/** Add a requirement to a batch */
@@ -677,8 +684,13 @@ export function createResolversManager<S extends Schema>(
 			// Execute asynchronously
 			executeResolve(resolverId, req, controller)
 				.finally(() => {
-					inflight.delete(req.id);
-					onResolutionComplete?.();
+					// Only fire onResolutionComplete if we're the first to clean up.
+					// If cancel() already removed us from inflight, skip to avoid
+					// spurious double-notifications.
+					const wasInflight = inflight.delete(req.id);
+					if (wasInflight) {
+						onResolutionComplete?.();
+					}
 				});
 		},
 
@@ -694,6 +706,7 @@ export function createResolversManager<S extends Schema>(
 				requirementId,
 				canceledAt: Date.now(),
 			});
+			cleanupStatuses();
 
 			onCancel?.(state.resolverId, state.originalRequirement);
 		},

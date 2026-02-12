@@ -9,7 +9,7 @@
  * - Lazy evaluation
  */
 
-import { withTracking } from "./tracking.js";
+import { trackAccess, withTracking } from "./tracking.js";
 import type {
 	DerivationsDef,
 	DerivationState,
@@ -73,10 +73,15 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 	// Track which derivations depend on which other derivations
 	const derivedToDerivedDeps = new Map<string, Set<string>>();
 
+	// Prototype pollution guard (same pattern as engine.ts, facts.ts, system.ts)
+	const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+
 	// Deferred notification: during invalidation, collect IDs to notify.
 	// Listeners fire AFTER all invalidations complete so they see consistent state.
 	let invalidationDepth = 0;
 	const pendingNotifications = new Set<string>();
+	let isFlushing = false;
+	const MAX_FLUSH_ITERATIONS = 100;
 
 	// The proxy for composition (derivations accessing other derivations)
 	let derivedProxy: DerivedValues<S, D>;
@@ -193,14 +198,33 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 
 	/** Flush deferred notifications after all invalidations complete */
 	function flushNotifications(): void {
-		if (invalidationDepth > 0) return;
+		if (invalidationDepth > 0 || isFlushing) return;
 
-		// Snapshot and clear before firing — listeners may trigger new invalidations
-		const ids = [...pendingNotifications];
-		pendingNotifications.clear();
+		isFlushing = true;
+		try {
+			// Loop until no more pending — listeners may trigger new invalidations
+			// that add to pendingNotifications via re-entrant invalidate() calls.
+			let iterations = 0;
+			while (pendingNotifications.size > 0) {
+				if (++iterations > MAX_FLUSH_ITERATIONS) {
+					const remaining = [...pendingNotifications];
+					pendingNotifications.clear();
+					throw new Error(
+						`[Directive] Infinite derivation notification loop detected after ${MAX_FLUSH_ITERATIONS} iterations. ` +
+							`Remaining: ${remaining.join(", ")}. ` +
+							`This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+					);
+				}
 
-		for (const id of ids) {
-			listeners.get(id)?.forEach((listener) => listener());
+				const ids = [...pendingNotifications];
+				pendingNotifications.clear();
+
+				for (const id of ids) {
+					listeners.get(id)?.forEach((listener) => listener());
+				}
+			}
+		} finally {
+			isFlushing = false;
 		}
 	}
 
@@ -234,9 +258,12 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 	derivedProxy = new Proxy({} as DerivedValues<S, D>, {
 		get(_, prop: string | symbol) {
 			if (typeof prop === "symbol") return undefined;
+			if (BLOCKED_PROPS.has(prop)) return undefined;
 
-			// When a derivation accesses another derivation via the proxy,
-			// we need to track that dependency
+			// Track this derivation access so the consuming derivation
+			// records a dependency on it (enables composition invalidation)
+			trackAccess(prop);
+
 			const state = getState(prop);
 
 			// Recompute if stale

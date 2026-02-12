@@ -216,7 +216,11 @@ export function createErrorBoundaryManager(
 
 		// If handler is a function, call it and return skip
 		if (typeof handler === "function") {
-			handler(error, sourceId);
+			try {
+				handler(error, sourceId);
+			} catch (e) {
+				console.error("[Directive] Error in error handler callback:", e);
+			}
 			return "skip";
 		}
 
@@ -244,9 +248,9 @@ export function createErrorBoundaryManager(
 				errors.shift();
 			}
 
-			// Notify callback
-			onError?.(directiveError);
-			config.onError?.(directiveError);
+			// Notify callbacks (wrapped to prevent bypassing recovery)
+			try { onError?.(directiveError); } catch (e) { console.error("[Directive] Error in onError callback:", e); }
+			try { config.onError?.(directiveError); } catch (e) { console.error("[Directive] Error in config.onError callback:", e); }
 
 			// Get recovery strategy
 			let strategy = getStrategy(
@@ -281,7 +285,7 @@ export function createErrorBoundaryManager(
 			}
 
 			// Notify recovery callback
-			onRecovery?.(directiveError, strategy);
+			try { onRecovery?.(directiveError, strategy); } catch (e) { console.error("[Directive] Error in onRecovery callback:", e); }
 
 			// If strategy is throw, re-throw the error
 			if (strategy === "throw") {
