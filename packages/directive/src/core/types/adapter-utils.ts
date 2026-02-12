@@ -38,8 +38,8 @@ export type MergedSchema<
  *
  * @example
  * ```typescript
- * type ZustandBridgeSchema = BridgeSchema<{
- *   __zustandState: SchemaType<Record<string, unknown>>;
+ * type AdapterBridgeSchema = BridgeSchema<{
+ *   __adapterState: SchemaType<Record<string, unknown>>;
  * }>;
  * ```
  */
@@ -87,11 +87,11 @@ export function setFact<S extends Schema, K extends keyof InferSchema<S>>(
 
 /**
  * Set a bridge fact without strict typing.
- * Use for adapter-internal bridge fields like `__zustandState`.
+ * Use for adapter-internal bridge fields like `__adapterState`.
  *
  * @example
  * ```typescript
- * setBridgeFact(facts, "__zustandState", currentState);
+ * setBridgeFact(facts, "__adapterState", currentState);
  * ```
  */
 export function setBridgeFact<V>(
@@ -108,7 +108,7 @@ export function setBridgeFact<V>(
  *
  * @example
  * ```typescript
- * const state = getBridgeFact<MyState>(facts, "__zustandState");
+ * const state = getBridgeFact<MyState>(facts, "__adapterState");
  * ```
  */
 export function getBridgeFact<V>(
@@ -252,7 +252,7 @@ export interface AdapterCallbacks {
  *
  * @example
  * ```typescript
- * const callbackPlugin = createCallbackPlugin("zustand-callbacks", {
+ * const callbackPlugin = createCallbackPlugin("adapter-callbacks", {
  *   onRequirementCreated: (req) => console.log("Created:", req),
  *   onRequirementResolved: (req) => console.log("Resolved:", req),
  * });

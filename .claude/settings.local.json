@@ -58,7 +58,9 @@
       "WebFetch(domain:vercel.com)",
       "WebFetch(domain:m3.material.io)",
       "WebFetch(domain:zustand-demo.pmnd.rs)",
-      "WebFetch(domain:tanstack.com)"
+      "WebFetch(domain:tanstack.com)",
+      "Bash(for sdk in ai langchain langchainjs langgraph openai-agents-js query redux xstate zustand syntax-ts tailwind-plus-radiant)",
+      "Bash(do echo '=== $sdk ===' find /Users/jasonwcomes/Desktop/Sizls/projects/directive/.references/$sdk -type f \\\\\\(-name *.md -o -name *.ts -o -name *.tsx -o -name *.js -o -name *.json \\\\\\))"
     ]
   }
 }

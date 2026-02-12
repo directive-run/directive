@@ -115,13 +115,15 @@ function App() {
 ```vue
 <script setup>
 import { createSystem } from 'directive';
-import { provideSystem } from 'directive/vue';
+import { useFact } from 'directive/vue';
 import { userModule } from './modules/user';
 
-// Create the system and make it available to child components
+// Create the system
 const system = createSystem({ module: userModule });
 system.start();
-provideSystem(system);
+
+// Pass system explicitly to hooks
+const name = useFact(system, 'name');
 </script>
 ```
 
@@ -130,13 +132,15 @@ provideSystem(system);
 ```svelte
 <script>
   import { createSystem } from 'directive';
-  import { setDirectiveContext } from 'directive/svelte';
+  import { useFact } from 'directive/svelte';
   import { userModule } from './modules/user';
 
-  // Create the system and inject it via Svelte's context API
+  // Create the system
   const system = createSystem({ module: userModule });
   system.start();
-  setDirectiveContext(system);
+
+  // Pass system explicitly to hooks
+  const name = useFact(system, 'name');
 </script>
 ```
 

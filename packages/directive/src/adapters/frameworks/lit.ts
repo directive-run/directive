@@ -15,7 +15,6 @@
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { createSystem } from "../../core/system.js";
-import { withTracking } from "../../core/tracking.js";
 import type {
 	CreateSystemOptionsSingle,
 	ModuleSchema,
@@ -26,7 +25,7 @@ import type {
 	InferFacts,
 	InferDerivations,
 	InferEvents,
-	System,
+	SingleModuleSystem,
 	SystemSnapshot,
 } from "../../core/types.js";
 import {
@@ -36,8 +35,14 @@ import {
 import {
 	type InspectState,
 	type ConstraintInfo,
+	type TrackedSelectorResult,
 	computeInspectState,
 	createThrottle,
+	assertSystem,
+	defaultEquality,
+	buildTimeTravelState,
+	runTrackedSelector,
+	depsChanged,
 } from "../shared.js";
 
 // Re-export for convenience
@@ -67,11 +72,11 @@ export const directiveContext = Symbol("directive");
 abstract class DirectiveController implements ReactiveController {
 	protected host: ReactiveControllerHost;
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	protected system: System<any>;
+	protected system: SingleModuleSystem<any>;
 	protected unsubscribe?: () => void;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>) {
+	constructor(host: ReactiveControllerHost, system: SingleModuleSystem<any>) {
 		this.host = host;
 		this.system = system;
 		host.addController(this);
@@ -111,7 +116,7 @@ export class DerivedController<T> extends DirectiveController {
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		key: string | string[],
 	) {
 		super(host, system);
@@ -159,7 +164,7 @@ export class FactController<T> extends DirectiveController {
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		factKey: string,
 	) {
 		super(host, system);
@@ -199,7 +204,7 @@ export class InspectController extends DirectiveController {
 	private unsubSettled?: () => void;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, options?: { throttleMs?: number }) {
+	constructor(host: ReactiveControllerHost, system: SingleModuleSystem<any>, options?: { throttleMs?: number }) {
 		super(host, system);
 		this.throttleMs = options?.throttleMs ?? 0;
 		this.value = computeInspectState(system);
@@ -271,11 +276,6 @@ export class RequirementStatusController implements ReactiveController {
 // Selector Controllers
 // ============================================================================
 
-/** Default equality function for selectors */
-function defaultEquality<T>(a: T, b: T): boolean {
-	return Object.is(a, b);
-}
-
 /**
  * Reactive controller for selecting across all facts.
  * Uses `withTracking()` for auto-tracking when constructed with `autoTrack: true`.
@@ -293,7 +293,7 @@ export class DirectiveSelectorController<R> extends DirectiveController {
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		selector: (state: Record<string, unknown>) => R,
 		equalityFn: (a: R, b: R) => boolean = defaultEquality,
 		options?: { autoTrack?: boolean },
@@ -310,35 +310,8 @@ export class DirectiveSelectorController<R> extends DirectiveController {
 		this.trackedDeriveKeys = initial.deriveKeys;
 	}
 
-	private runWithTracking(): { value: R; factKeys: string[]; deriveKeys: string[] } {
-		const accessedDeriveKeys: string[] = [];
-
-		const stateProxy = new Proxy(
-			{},
-			{
-				get: (_, prop: string | symbol) => {
-					if (typeof prop !== "string") return undefined;
-					if (this.deriveKeySet.has(prop)) {
-						accessedDeriveKeys.push(prop);
-						return this.system.read(prop);
-					}
-					return this.system.facts.$store.get(prop);
-				},
-				has: (_, prop: string | symbol) => {
-					if (typeof prop !== "string") return false;
-					return this.deriveKeySet.has(prop) || this.system.facts.$store.has(prop);
-				},
-				ownKeys: () => {
-					return [...Object.keys(this.system.facts.$store.toObject()), ...this.deriveKeySet];
-				},
-				getOwnPropertyDescriptor() {
-					return { configurable: true, enumerable: true, writable: true };
-				},
-			},
-		);
-
-		const { value, deps } = withTracking(() => this.selector(stateProxy as Record<string, unknown>));
-		return { value, factKeys: Array.from(deps) as string[], deriveKeys: accessedDeriveKeys };
+	private runWithTracking(): TrackedSelectorResult<R> {
+		return runTrackedSelector(this.system, this.deriveKeySet, this.selector);
 	}
 
 	private resubscribe(): void {
@@ -353,13 +326,7 @@ export class DirectiveSelectorController<R> extends DirectiveController {
 			}
 			if (this.autoTrack) {
 				// Re-track: check if deps changed
-				const factsChanged =
-					result.factKeys.length !== this.trackedFactKeys.length ||
-					result.factKeys.some((k, i) => k !== this.trackedFactKeys[i]);
-				const derivedChanged =
-					result.deriveKeys.length !== this.trackedDeriveKeys.length ||
-					result.deriveKeys.some((k, i) => k !== this.trackedDeriveKeys[i]);
-				if (factsChanged || derivedChanged) {
+				if (depsChanged(this.trackedFactKeys, result.factKeys, this.trackedDeriveKeys, result.deriveKeys)) {
 					this.trackedFactKeys = result.factKeys;
 					this.trackedDeriveKeys = result.deriveKeys;
 					this.resubscribe();
@@ -404,11 +371,11 @@ export class WatchController<T> extends DirectiveController {
 	private key: string;
 	private callback: (newValue: T, previousValue: T | undefined) => void;
 
-	/** Watch a fact or derivation by key (auto-detected) */
+	/** Watch a derivation or fact by key (auto-detected). When a key exists in both facts and derivations, the derivation overload takes priority. */
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		key: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	);
@@ -419,14 +386,14 @@ export class WatchController<T> extends DirectiveController {
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		options: { kind: "fact"; factKey: string },
 		callback: (newValue: T, previousValue: T | undefined) => void,
 	);
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		keyOrOptions: string | { kind: "fact"; factKey: string },
 		callback?: (newValue: T, previousValue: T | undefined) => void,
 	) {
@@ -457,7 +424,7 @@ export class ExplainController extends DirectiveController {
 	private unsubSettled?: () => void;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, requirementId: string) {
+	constructor(host: ReactiveControllerHost, system: SingleModuleSystem<any>, requirementId: string) {
 		super(host, system);
 		this.requirementId = requirementId;
 		this.value = system.explain(requirementId);
@@ -490,7 +457,7 @@ export class ConstraintStatusController extends DirectiveController {
 	private unsubSettled?: () => void;
 
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	constructor(host: ReactiveControllerHost, system: System<any>, constraintId?: string) {
+	constructor(host: ReactiveControllerHost, system: SingleModuleSystem<any>, constraintId?: string) {
 		super(host, system);
 		this.constraintId = constraintId;
 		this.value = this.getVal();
@@ -526,7 +493,7 @@ export class ConstraintStatusController extends DirectiveController {
 export class OptimisticUpdateController implements ReactiveController {
 	private host: ReactiveControllerHost;
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	private system: System<any>;
+	private system: SingleModuleSystem<any>;
 	private statusPlugin?: StatusPlugin;
 	private requirementType?: string;
 	private snapshot: SystemSnapshot | null = null;
@@ -538,7 +505,7 @@ export class OptimisticUpdateController implements ReactiveController {
 	constructor(
 		host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: System<any>,
+		system: SingleModuleSystem<any>,
 		statusPlugin?: StatusPlugin,
 		requirementType?: string,
 	) {
@@ -600,14 +567,14 @@ export class OptimisticUpdateController implements ReactiveController {
  */
 export class SystemController<M extends ModuleSchema> implements ReactiveController {
 	private options: ModuleDef<M> | CreateSystemOptionsSingle<M>;
-	private _system: System<M> | null = null;
+	private _system: SingleModuleSystem<M> | null = null;
 
 	constructor(host: ReactiveControllerHost, options: ModuleDef<M> | CreateSystemOptionsSingle<M>) {
 		this.options = options;
 		host.addController(this);
 	}
 
-	get system(): System<M> {
+	get system(): SingleModuleSystem<M> {
 		if (!this._system) {
 			throw new Error(
 				"[Directive] SystemController.system is not available. " +
@@ -626,7 +593,7 @@ export class SystemController<M extends ModuleSchema> implements ReactiveControl
 		const system = isModule
 			? createSystem({ module: this.options as ModuleDef<M> })
 			: createSystem(this.options as CreateSystemOptionsSingle<M>);
-		this._system = system as unknown as System<M>;
+		this._system = system as unknown as SingleModuleSystem<M>;
 		this._system.start();
 	}
 
@@ -655,7 +622,7 @@ export class ModuleController<M extends ModuleSchema> implements ReactiveControl
 		status?: boolean;
 	};
 
-	private _system: System<M> | null = null;
+	private _system: SingleModuleSystem<M> | null = null;
 	private unsubFacts?: () => void;
 	private unsubDerived?: () => void;
 
@@ -663,14 +630,14 @@ export class ModuleController<M extends ModuleSchema> implements ReactiveControl
 	derived: InferDerivations<M> = {} as InferDerivations<M>;
 	statusPlugin?: StatusPlugin;
 
-	get system(): System<M> {
+	get system(): SingleModuleSystem<M> {
 		if (!this._system) {
 			throw new Error("[Directive] ModuleController.system is not available before hostConnected.");
 		}
 		return this._system;
 	}
 
-	get events(): System<M>["events"] {
+	get events(): SingleModuleSystem<M>["events"] {
 		return this.system.events;
 	}
 
@@ -714,7 +681,7 @@ export class ModuleController<M extends ModuleSchema> implements ReactiveControl
 			tickMs: this.config?.tickMs,
 			zeroConfig: this.config?.zeroConfig,
 			initialFacts: this.config?.initialFacts,
-		} as any) as unknown as System<M>;
+		} as any) as unknown as SingleModuleSystem<M>;
 
 		this._system = system;
 		system.start();
@@ -764,7 +731,7 @@ export class ModuleController<M extends ModuleSchema> implements ReactiveControl
 export function createDerived<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	key: string | string[],
 ): DerivedController<T> {
 	return new DerivedController<T>(host, system, key);
@@ -773,7 +740,7 @@ export function createDerived<T>(
 export function createFact<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	factKey: string,
 ): FactController<T> {
 	return new FactController<T>(host, system, factKey);
@@ -786,7 +753,7 @@ export function createFact<T>(
 export function createInspect(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	options?: { throttleMs?: number },
 ): InspectController {
 	return new InspectController(host, system, options);
@@ -803,7 +770,7 @@ export function createRequirementStatus(
 export function createWatch<T>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	derivationId: string,
 	callback: (newValue: T, previousValue: T | undefined) => void,
 ): WatchController<T> {
@@ -813,7 +780,7 @@ export function createWatch<T>(
 export function createDirectiveSelector<R>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	selector: (facts: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
 	options?: { autoTrack?: boolean },
@@ -824,7 +791,7 @@ export function createDirectiveSelector<R>(
 export function createExplain(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	requirementId: string,
 ): ExplainController {
 	return new ExplainController(host, system, requirementId);
@@ -833,7 +800,7 @@ export function createExplain(
 export function createConstraintStatus(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	constraintId?: string,
 ): ConstraintStatusController {
 	return new ConstraintStatusController(host, system, constraintId);
@@ -842,7 +809,7 @@ export function createConstraintStatus(
 export function createOptimisticUpdate(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	statusPlugin?: StatusPlugin,
 	requirementType?: string,
 ): OptimisticUpdateController {
@@ -872,8 +839,9 @@ export function createModule<M extends ModuleSchema>(
 // ============================================================================
 
 export function useDispatch<M extends ModuleSchema = ModuleSchema>(
-	system: System<M>,
+	system: SingleModuleSystem<M>,
 ): (event: InferEvents<M>) => void {
+	assertSystem("useDispatch", system);
 	return (event: InferEvents<M>) => {
 		system.dispatch(event);
 	};
@@ -883,25 +851,13 @@ export function useDispatch<M extends ModuleSchema = ModuleSchema>(
  * Returns the system's events dispatcher.
  */
 export function useEvents<M extends ModuleSchema = ModuleSchema>(
-	system: System<M>,
-): System<M>["events"] {
+	system: SingleModuleSystem<M>,
+): SingleModuleSystem<M>["events"] {
+	assertSystem("useEvents", system);
 	return system.events;
 }
 
 import type { TimeTravelState } from "../../core/types.js";
-
-function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
-	const debug = system.debug;
-	if (!debug) return null;
-	return {
-		canUndo: debug.currentIndex > 0,
-		canRedo: debug.currentIndex < debug.snapshots.length - 1,
-		undo: () => debug.goBack(),
-		redo: () => debug.goForward(),
-		currentIndex: debug.currentIndex,
-		totalSnapshots: debug.snapshots.length,
-	};
-}
 
 /**
  * Reactive controller for time-travel state.
@@ -925,15 +881,15 @@ export class TimeTravelController implements ReactiveController {
 	constructor(
 		private _host: ReactiveControllerHost,
 		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		private _system: System<any>,
+		private _system: SingleModuleSystem<any>,
 	) {
 		this._host.addController(this);
 	}
 
 	hostConnected(): void {
-		this.value = _buildTTState(this._system);
+		this.value = buildTimeTravelState(this._system);
 		this._unsub = this._system.onTimeTravelChange(() => {
-			this.value = _buildTTState(this._system);
+			this.value = buildTimeTravelState(this._system);
 			this._host.requestUpdate();
 		});
 	}
@@ -949,13 +905,14 @@ export class TimeTravelController implements ReactiveController {
  * For reactive updates, use TimeTravelController.
  */
 // biome-ignore lint/suspicious/noExplicitAny: System type varies
-export function useTimeTravel(system: System<any>): TimeTravelState | null {
-	return _buildTTState(system);
+export function useTimeTravel(system: SingleModuleSystem<any>): TimeTravelState | null {
+	assertSystem("useTimeTravel", system);
+	return buildTimeTravelState(system);
 }
 
 export function getDerived<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	derivationId: string,
 ): () => T {
 	return () => system.read(derivationId) as T;
@@ -963,7 +920,7 @@ export function getDerived<T>(
 
 export function getFact<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	system: SingleModuleSystem<any>,
 	factKey: string,
 ): () => T | undefined {
 	return () => system.facts.$store.get(factKey) as T | undefined;
@@ -976,34 +933,46 @@ export function getFact<T>(
 export function createTypedHooks<M extends ModuleSchema>(): {
 	createDerived: <K extends keyof InferDerivations<M>>(
 		host: ReactiveControllerHost,
-		system: System<M>,
+		system: SingleModuleSystem<M>,
 		derivationId: K,
 	) => DerivedController<InferDerivations<M>[K]>;
 	createFact: <K extends keyof InferFacts<M>>(
 		host: ReactiveControllerHost,
-		system: System<M>,
+		system: SingleModuleSystem<M>,
 		factKey: K,
 	) => FactController<InferFacts<M>[K]>;
-	useDispatch: (system: System<M>) => (event: InferEvents<M>) => void;
-	useEvents: (system: System<M>) => System<M>["events"];
+	useDispatch: (system: SingleModuleSystem<M>) => (event: InferEvents<M>) => void;
+	useEvents: (system: SingleModuleSystem<M>) => SingleModuleSystem<M>["events"];
+	createWatch: <K extends string>(
+		host: ReactiveControllerHost,
+		system: SingleModuleSystem<M>,
+		key: K,
+		callback: (newValue: unknown, previousValue: unknown) => void,
+	) => WatchController<unknown>;
 } {
 	return {
 		createDerived: <K extends keyof InferDerivations<M>>(
 			host: ReactiveControllerHost,
-			system: System<M>,
+			system: SingleModuleSystem<M>,
 			derivationId: K,
 		) => createDerived<InferDerivations<M>[K]>(host, system, derivationId as string),
 		createFact: <K extends keyof InferFacts<M>>(
 			host: ReactiveControllerHost,
-			system: System<M>,
+			system: SingleModuleSystem<M>,
 			factKey: K,
 		) => createFact<InferFacts<M>[K]>(host, system, factKey as string),
-		useDispatch: (system: System<M>) => {
+		useDispatch: (system: SingleModuleSystem<M>) => {
 			return (event: InferEvents<M>) => {
 				system.dispatch(event);
 			};
 		},
-		useEvents: (system: System<M>) => system.events,
+		useEvents: (system: SingleModuleSystem<M>) => system.events,
+		createWatch: <K extends string>(
+			host: ReactiveControllerHost,
+			system: SingleModuleSystem<M>,
+			key: K,
+			callback: (newValue: unknown, previousValue: unknown) => void,
+		) => createWatch<unknown>(host, system, key, callback),
 	};
 }
 

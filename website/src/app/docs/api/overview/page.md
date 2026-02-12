@@ -34,11 +34,7 @@ Comprehensive reference documentation for every public export in Directive. {% .
 | `directive/plugins` | Built-in plugins (logging, devtools, persistence) |
 | `directive/testing` | Test utilities (mock resolvers, fake timers, assertions) |
 | `directive/ai` | AI agent orchestration, guardrails, streaming |
-| `directive/zustand` | Zustand state bridge |
-| `directive/react-query` | React Query state bridge |
-| `directive/redux` | Redux state bridge |
-| `directive/xstate` | XState state bridge |
-| `directive/worker` | Web Worker bridge |
+| `directive/worker` | Web Worker adapter |
 
 ---
 

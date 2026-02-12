@@ -1,32 +1,24 @@
 ---
 title: Solid Hooks
-description: Complete API reference for all Solid hooks exported from directive/solid. Context injection – hooks access the system via DirectiveProvider.
+description: Complete API reference for all Solid hooks exported from directive/solid. Explicit system parameter -- hooks take the system directly, no provider needed.
 ---
 
-Solid hooks API reference. All hooks access the system via context injection – no system parameter needed. Values are returned as Solid `Accessor` functions. {% .lead %}
+Solid hooks API reference. All hooks take the system as an explicit first parameter -- no provider or context needed. Values are returned as Solid `Accessor` functions. {% .lead %}
 
 ---
 
 ## Setup
 
-Wrap your app with `DirectiveProvider`:
+Create a system and pass it directly to hooks:
 
 ```tsx
-import { DirectiveProvider } from 'directive/solid';
 import { createSystem } from 'directive';
 
 // Create and start the system
 const system = createSystem({ module: myModule });
 system.start();
 
-function App() {
-  return (
-    // Provide the system to all child components
-    <DirectiveProvider system={system}>
-      <MyApp />
-    </DirectiveProvider>
-  );
-}
+// Pass `system` to hooks in any component -- no provider needed
 ```
 
 ---
@@ -35,19 +27,17 @@ function App() {
 
 | Export | Type | Description |
 |---|---|---|
-| `DirectiveProvider` | Component | Provides system context to child components |
 | `useFact` | Hook | Read single/multi facts |
 | `useDerived` | Hook | Read single/multi derivations |
 | `useSelector` | Hook | Select across all facts |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useWatch` | Hook | Side-effect watcher for facts or derivations |
-| `useSystem` | Hook | Access full system instance |
 | `useInspect` | Hook | System inspection with optional throttle |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useExplain` | Hook | Reactive requirement explanation |
-| `useRequirementStatus` | Hook | Single/multi requirement status |
-| `useSuspenseRequirement` | Hook | Suspense integration for requirements |
+| `useRequirementStatus` | Hook | Single/multi requirement status (takes statusPlugin) |
+| `useSuspenseRequirement` | Hook | Suspense integration for requirements (takes statusPlugin) |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
 | `useDirective` | Hook | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
@@ -58,40 +48,13 @@ function App() {
 
 ---
 
-## DirectiveProvider
-
-Provides the Directive system to all child components via Solid context. Optionally accepts a `statusPlugin` for requirement status hooks.
-
-```typescript
-function DirectiveProvider<M extends ModuleSchema>(props: {
-  system: System<M>;
-  children: JSX.Element;
-  statusPlugin?: StatusPlugin;
-}): JSX.Element
-```
-
-```tsx
-import { DirectiveProvider } from 'directive/solid';
-
-function App() {
-  return (
-    // Provide the system and status plugin to all descendants
-    <DirectiveProvider system={system} statusPlugin={statusPlugin}>
-      <MyApp />
-    </DirectiveProvider>
-  );
-}
-```
-
----
-
 ## useFact
 
-Subscribe to fact values reactively. Supports single key or multiple keys.
+Subscribe to fact values reactively. Supports single key or multiple keys. Takes `system` as the first parameter.
 
 ```typescript
-useFact<T>(factKey: string): Accessor<T | undefined>
-useFact<T extends Record<string, unknown>>(factKeys: string[]): Accessor<T>
+useFact<T>(system: System, factKey: string): Accessor<T | undefined>
+useFact<T extends Record<string, unknown>>(system: System, factKeys: string[]): Accessor<T>
 ```
 
 ```tsx
@@ -99,14 +62,14 @@ import { useFact } from 'directive/solid';
 
 function Counter() {
   // Subscribe to a single fact value
-  const count = useFact('count');
+  const count = useFact(system, 'count');
 
   return <p>Count: {count()}</p>;
 }
 
 function Status() {
   // Subscribe to multiple facts at once
-  const state = useFact(['count', 'phase']);
+  const state = useFact(system, ['count', 'phase']);
 
   return <p>{state().count} – {state().phase}</p>;
 }
@@ -120,11 +83,11 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 ## useDerived
 
-Subscribe to derivation values reactively. Supports single key or multiple keys.
+Subscribe to derivation values reactively. Supports single key or multiple keys. Takes `system` as the first parameter.
 
 ```typescript
-useDerived<T>(derivationId: string): Accessor<T>
-useDerived<T extends Record<string, unknown>>(derivationIds: string[]): Accessor<T>
+useDerived<T>(system: System, derivationId: string): Accessor<T>
+useDerived<T extends Record<string, unknown>>(system: System, derivationIds: string[]): Accessor<T>
 ```
 
 ```tsx
@@ -132,14 +95,14 @@ import { useDerived } from 'directive/solid';
 
 function CartTotal() {
   // Subscribe to a single derivation
-  const total = useDerived('cartTotal');
+  const total = useDerived(system, 'cartTotal');
 
   return <p>Total: ${total()}</p>;
 }
 
 function Stats() {
   // Subscribe to multiple derivations at once
-  const stats = useDerived(['isRed', 'elapsed']);
+  const stats = useDerived(system, ['isRed', 'elapsed']);
 
   return <p>{stats().isRed ? `Red for ${stats().elapsed}s` : 'Not red'}</p>;
 }
@@ -153,10 +116,10 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 ## useSelector
 
-Auto-tracking cross-fact selector. Uses `withTracking()` to detect which facts are accessed, then subscribes only to those keys.
+Auto-tracking cross-fact selector. Uses `withTracking()` to detect which facts are accessed, then subscribes only to those keys. Takes `system` as the first parameter.
 
 ```typescript
-useSelector<R>(selector: (facts: Record<string, unknown>) => R, equalityFn?: (a: R, b: R) => boolean): Accessor<R>
+useSelector<R>(system: System, selector: (facts: Record<string, unknown>) => R, equalityFn?: (a: R, b: R) => boolean): Accessor<R>
 ```
 
 ```tsx
@@ -164,7 +127,7 @@ import { useSelector } from 'directive/solid';
 
 function Summary() {
   // Select and combine values from multiple facts
-  const summary = useSelector((facts) => ({
+  const summary = useSelector(system, (facts) => ({
     userName: facts.user?.name,
     itemCount: facts.items?.length ?? 0,
   }));
@@ -177,10 +140,10 @@ function Summary() {
 
 ## useEvents
 
-Returns the system's typed event dispatchers.
+Returns the system's typed event dispatchers. Takes `system` as the first parameter.
 
 ```typescript
-useEvents<M extends ModuleSchema>(): System<M>["events"]
+useEvents<M extends ModuleSchema>(system: System<M>): System<M>["events"]
 ```
 
 ```tsx
@@ -188,7 +151,7 @@ import { useEvents } from 'directive/solid';
 
 function Controls() {
   // Get typed event dispatchers for the module
-  const events = useEvents();
+  const events = useEvents(system);
 
   return <button onClick={() => events.increment()}>+1</button>;
 }
@@ -198,10 +161,10 @@ function Controls() {
 
 ## useDispatch
 
-Get a low-level dispatch function for sending events.
+Get a low-level dispatch function for sending events. Takes `system` as the first parameter.
 
 ```typescript
-useDispatch<M extends ModuleSchema>(): (event: InferEvents<M>) => void
+useDispatch<M extends ModuleSchema>(system: System<M>): (event: InferEvents<M>) => void
 ```
 
 ```tsx
@@ -209,7 +172,7 @@ import { useDispatch } from 'directive/solid';
 
 function IncrementButton() {
   // Get the low-level dispatch function
-  const dispatch = useDispatch();
+  const dispatch = useDispatch(system);
 
   return (
     <button onClick={() => dispatch({ type: 'increment' })}>
@@ -223,13 +186,13 @@ function IncrementButton() {
 
 ## useWatch
 
-Side-effect watcher for facts or derivations. The key is auto-detected, so no discriminator is needed. Does not cause re-renders.
+Side-effect watcher for facts or derivations. The key is auto-detected, so no discriminator is needed. Does not cause re-renders. Takes `system` as the first parameter.
 
 ```typescript
-useWatch<T>(key: string, callback: (newValue: T, previousValue: T | undefined) => void): void
+useWatch<T>(system: System, key: string, callback: (newValue: T, previousValue: T | undefined) => void): void
 
 // Deprecated: "fact" discriminator overload (still works)
-useWatch<T>(kind: "fact", factKey: string, callback: (newValue: T | undefined, previousValue: T | undefined) => void): void
+useWatch<T>(system: System, kind: "fact", factKey: string, callback: (newValue: T | undefined, previousValue: T | undefined) => void): void
 ```
 
 ```tsx
@@ -237,12 +200,12 @@ import { useWatch } from 'directive/solid';
 
 function Analytics() {
   // Watch a derivation -- auto-detected
-  useWatch('pageViews', (newValue, prevValue) => {
+  useWatch(system, 'pageViews', (newValue, prevValue) => {
     analytics.track('pageViews', { from: prevValue, to: newValue });
   });
 
   // Watch a fact -- auto-detected, no "fact" discriminator needed
-  useWatch('count', (next, prev) => {
+  useWatch(system, 'count', (next, prev) => {
     console.log(`count changed: ${prev} → ${next}`);
   });
 
@@ -251,38 +214,17 @@ function Analytics() {
 ```
 
 {% callout type="warning" title="Deprecated" %}
-The three-argument `useWatch("fact", key, callback)` overload still works but is deprecated. Use `useWatch(key, callback)` instead.
+The four-argument `useWatch(system, "fact", key, callback)` form still works but is deprecated. Use `useWatch(system, key, callback)` instead.
 {% /callout %}
-
----
-
-## useSystem
-
-Access the full system instance from context.
-
-```typescript
-useSystem<M extends ModuleSchema>(): System<M>
-```
-
-```tsx
-import { useSystem } from 'directive/solid';
-
-function DebugInfo() {
-  // Access the full system instance for advanced operations
-  const system = useSystem();
-
-  return <pre>{JSON.stringify(system.inspect(), null, 2)}</pre>;
-}
-```
 
 ---
 
 ## useInspect
 
-Consolidated system inspection hook with optional throttling.
+Consolidated system inspection hook with optional throttling. Takes `system` as the first parameter.
 
 ```typescript
-useInspect(options?: { throttleMs?: number }): Accessor<InspectState>
+useInspect(system: System, options?: { throttleMs?: number }): Accessor<InspectState>
 ```
 
 ```tsx
@@ -290,7 +232,7 @@ import { useInspect } from 'directive/solid';
 
 function DebugPanel() {
   // Get reactive system inspection data
-  const inspection = useInspect();
+  const inspection = useInspect(system);
 
   return (
     <pre>
@@ -302,7 +244,7 @@ function DebugPanel() {
 
 function ThrottledDebug() {
   // Throttle inspection updates to limit render frequency
-  const inspection = useInspect({ throttleMs: 200 });
+  const inspection = useInspect(system, { throttleMs: 200 });
 
   return <p>Settled: {String(inspection().isSettled)}</p>;
 }
@@ -312,11 +254,11 @@ function ThrottledDebug() {
 
 ## useConstraintStatus
 
-Reactive constraint inspection. Returns all constraints, or a single constraint by ID.
+Reactive constraint inspection. Returns all constraints, or a single constraint by ID. Takes `system` as the first parameter.
 
 ```typescript
-useConstraintStatus(): Accessor<ConstraintInfo[]>
-useConstraintStatus(constraintId: string): Accessor<ConstraintInfo | null>
+useConstraintStatus(system: System): Accessor<ConstraintInfo[]>
+useConstraintStatus(system: System, constraintId: string): Accessor<ConstraintInfo | null>
 ```
 
 ```tsx
@@ -324,12 +266,12 @@ import { useConstraintStatus } from 'directive/solid';
 
 function ConstraintList() {
   // Get all constraints for the debug panel
-  const constraints = useConstraintStatus();
+  const constraints = useConstraintStatus(system);
 
   return (
     <ul>
       <For each={constraints()}>{(c) =>
-        <li>{c.id}: {c.isMet ? 'met' : 'unmet'}</li>
+        <li>{c.id}: {c.active ? 'met' : 'unmet'}</li>
       }</For>
     </ul>
   );
@@ -337,9 +279,9 @@ function ConstraintList() {
 
 function TransitionStatus() {
   // Check a specific constraint by ID
-  const constraint = useConstraintStatus('transition');
+  const constraint = useConstraintStatus(system, 'transition');
 
-  return <p>{constraint()?.isMet ? 'Ready' : 'Waiting'}</p>;
+  return <p>{constraint()?.active ? 'Ready' : 'Waiting'}</p>;
 }
 ```
 
@@ -347,10 +289,10 @@ function TransitionStatus() {
 
 ## useExplain
 
-Reactively returns the explanation string for a requirement.
+Reactively returns the explanation string for a requirement. Takes `system` as the first parameter.
 
 ```typescript
-useExplain(requirementId: string): Accessor<string | null>
+useExplain(system: System, requirementId: string): Accessor<string | null>
 ```
 
 ```tsx
@@ -358,7 +300,7 @@ import { useExplain } from 'directive/solid';
 
 function WhyPanel() {
   // Get a detailed explanation of why a requirement was generated
-  const explanation = useExplain('FETCH_USER');
+  const explanation = useExplain(system, 'FETCH_USER');
 
   return <p>{explanation() ?? 'No explanation available'}</p>;
 }
@@ -368,11 +310,11 @@ function WhyPanel() {
 
 ## useRequirementStatus
 
-Reactive requirement status. Requires a `statusPlugin` on the provider. Supports single type or multiple types.
+Reactive requirement status. Takes `statusPlugin` as the first parameter (not system). Supports single type or multiple types.
 
 ```typescript
-useRequirementStatus(type: string): Accessor<RequirementTypeStatus>
-useRequirementStatus(types: string[]): Accessor<Record<string, RequirementTypeStatus>>
+useRequirementStatus(statusPlugin: StatusPlugin, type: string): Accessor<RequirementTypeStatus>
+useRequirementStatus(statusPlugin: StatusPlugin, types: string[]): Accessor<Record<string, RequirementTypeStatus>>
 ```
 
 ```tsx
@@ -380,7 +322,7 @@ import { useRequirementStatus } from 'directive/solid';
 
 function UserLoader() {
   // Track the loading state of a specific requirement type
-  const status = useRequirementStatus('FETCH_USER');
+  const status = useRequirementStatus(statusPlugin, 'FETCH_USER');
 
   return (
     <Switch>
@@ -393,7 +335,7 @@ function UserLoader() {
 
 function MultiStatus() {
   // Track multiple requirement types at once
-  const statuses = useRequirementStatus(['FETCH_USER', 'FETCH_POSTS']);
+  const statuses = useRequirementStatus(statusPlugin, ['FETCH_USER', 'FETCH_POSTS']);
 
   return <p>User loading: {String(statuses()['FETCH_USER'].isLoading)}</p>;
 }
@@ -403,11 +345,11 @@ function MultiStatus() {
 
 ## useSuspenseRequirement
 
-Throws a promise while the requirement is pending, integrating with Solid's `<Suspense>`. Requires a `statusPlugin` on the provider.
+Throws a promise while the requirement is pending, integrating with Solid's `<Suspense>`. Takes `statusPlugin` as the first parameter (not system).
 
 ```typescript
-useSuspenseRequirement(type: string): Accessor<RequirementTypeStatus>
-useSuspenseRequirement(types: string[]): Accessor<Record<string, RequirementTypeStatus>>
+useSuspenseRequirement(statusPlugin: StatusPlugin, type: string): Accessor<RequirementTypeStatus>
+useSuspenseRequirement(statusPlugin: StatusPlugin, types: string[]): Accessor<Record<string, RequirementTypeStatus>>
 ```
 
 ```tsx
@@ -416,7 +358,7 @@ import { Suspense } from 'solid-js';
 
 function UserProfile() {
   // Suspends rendering until the requirement resolves
-  const status = useSuspenseRequirement('FETCH_USER');
+  const status = useSuspenseRequirement(statusPlugin, 'FETCH_USER');
 
   return <div>User loaded!</div>;
 }
@@ -435,10 +377,10 @@ function App() {
 
 ## useOptimisticUpdate
 
-Optimistic mutation hook. Saves a snapshot before mutating, monitors a requirement type via statusPlugin, and rolls back on failure.
+Optimistic mutation hook. Saves a snapshot before mutating, monitors a requirement type via statusPlugin, and rolls back on failure. Takes `system` as the first parameter.
 
 ```typescript
-useOptimisticUpdate(statusPlugin?: StatusPlugin, requirementType?: string): {
+useOptimisticUpdate(system: System, statusPlugin?: StatusPlugin, requirementType?: string): {
   mutate: (updateFn: () => void) => void;
   isPending: Accessor<boolean>;
   error: Accessor<Error | null>;
@@ -447,18 +389,15 @@ useOptimisticUpdate(statusPlugin?: StatusPlugin, requirementType?: string): {
 ```
 
 ```tsx
-import { useOptimisticUpdate, useSystem } from 'directive/solid';
+import { useOptimisticUpdate } from 'directive/solid';
 
 function LikeButton() {
-  // Access the system's facts proxy
-  const { facts } = useSystem();
-
   // Set up optimistic mutations with automatic rollback
-  const { mutate, isPending } = useOptimisticUpdate(statusPlugin, 'LIKE_POST');
+  const { mutate, isPending } = useOptimisticUpdate(system, statusPlugin, 'LIKE_POST');
 
   const handleLike = () => {
     // Optimistically update the UI before the server responds
-    mutate(() => { facts.likes = (facts.likes ?? 0) + 1; });
+    mutate(() => { system.facts.likes = (system.facts.likes ?? 0) + 1; });
   };
 
   return (
@@ -475,8 +414,8 @@ function LikeButton() {
 
 Create a scoped Directive system tied to the component lifecycle. Two modes:
 
-- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
-- **Subscribe all** — omit keys to subscribe to all facts and derivations
+- **Selective** -- pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** -- omit keys to subscribe to all facts and derivations
 
 ```typescript
 useDirective<M extends ModuleSchema>(moduleDef: ModuleDef<M>, config?: {
@@ -529,15 +468,14 @@ function CounterSelective() {
 
 ## createTypedHooks
 
-Factory that returns fully typed versions of the core hooks for a specific schema. Useful for shared libraries or when you want narrower types without casting.
+Factory that returns fully typed versions of the core hooks for a specific schema. Returned hooks take `system` as their first parameter. Useful for shared libraries or when you want narrower types without casting.
 
 ```typescript
 createTypedHooks<M extends ModuleSchema>(): {
-  useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) => Accessor<InferDerivations<M>[K]>;
-  useFact: <K extends keyof InferFacts<M>>(factKey: K) => Accessor<InferFacts<M>[K] | undefined>;
-  useDispatch: () => (event: InferEvents<M>) => void;
-  useSystem: () => System<M>;
-  useEvents: () => System<M>["events"];
+  useDerived: <K extends keyof InferDerivations<M>>(system: System<M>, derivationId: K) => Accessor<InferDerivations<M>[K]>;
+  useFact: <K extends keyof InferFacts<M>>(system: System<M>, factKey: K) => Accessor<InferFacts<M>[K] | undefined>;
+  useDispatch: (system: System<M>) => (event: InferEvents<M>) => void;
+  useEvents: (system: System<M>) => System<M>["events"];
 }
 ```
 
@@ -545,12 +483,12 @@ createTypedHooks<M extends ModuleSchema>(): {
 import { createTypedHooks } from 'directive/solid';
 import type { MySchema } from './schema';
 
-// Create typed hooks – full autocomplete for fact keys and event types
+// Create typed hooks -- full autocomplete for fact keys and event types
 const { useFact, useDerived, useDispatch } = createTypedHooks<MySchema>();
 
 function Counter() {
-  // Fully typed – fact key autocompletes, return type inferred
-  const count = useFact('count');
+  // Fully typed -- fact key autocompletes, return type inferred
+  const count = useFact(system, 'count');
 
   return <p>{count()}</p>;
 }
@@ -598,10 +536,10 @@ const [count, unsub] = createFactSignal<number>(system, 'count');
 
 ## useTimeTravel
 
-Reactive time-travel state. Returns an Accessor that updates when snapshots are taken or navigation occurs. Returns `null` when time-travel is disabled.
+Reactive time-travel state. Returns an Accessor that updates when snapshots are taken or navigation occurs. Returns `null` when time-travel is disabled. Takes `system` as the first parameter.
 
 ```typescript
-useTimeTravel(): Accessor<TimeTravelState | null>
+useTimeTravel(system: System): Accessor<TimeTravelState | null>
 ```
 
 ### TimeTravelState
@@ -622,7 +560,7 @@ import { useTimeTravel } from 'directive/solid';
 
 function UndoControls() {
   // Get reactive time-travel controls (null when disabled)
-  const tt = useTimeTravel();
+  const tt = useTimeTravel(system);
 
   return (
     <Show when={tt()}>
@@ -653,7 +591,7 @@ import { useSelector, shallowEqual } from 'directive/solid';
 
 function UserInfo() {
   // Use shallowEqual to prevent updates when name/age haven't changed
-  const info = useSelector((facts) => ({ name: facts.user?.name, age: facts.user?.age }), shallowEqual);
+  const info = useSelector(system, (facts) => ({ name: facts.user?.name, age: facts.user?.age }), shallowEqual);
 
   return <p>{info().name}, {info().age}</p>;
 }
