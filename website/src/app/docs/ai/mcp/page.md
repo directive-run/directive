@@ -303,7 +303,7 @@ function MCPToolPanel() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/vue';
@@ -327,7 +327,7 @@ const toolCalls = useFact(orchestrator.system, '__toolCalls');
 
 ### Svelte
 
-```svelte
+```html
 <script>
 import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/svelte';

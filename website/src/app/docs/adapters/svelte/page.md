@@ -21,7 +21,7 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/svelte';
 
 Create a system and pass it directly to hooks — no context provider required:
 
-```svelte
+```html
 <script lang="ts">
   import { createSystem } from 'directive';
   import { useFact, useDerived, useEvents } from 'directive/svelte';
@@ -54,7 +54,7 @@ system.start();
 
 Then import and use it in any component:
 
-```svelte
+```html
 <script>
   import { system } from '$lib/directive';
   import { useFact, useEvents } from 'directive/svelte';
@@ -85,7 +85,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 - **Selective** — specify `facts` and/or `derived` keys to subscribe only to those
 - **Subscribe all** — omit keys to subscribe to everything (good for prototyping or small modules)
 
-```svelte
+```html
 <script>
   import { useDirective } from 'directive/svelte';
   import { counterModule } from './counterModule';
@@ -102,7 +102,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
 With selective subscriptions and config:
 
-```svelte
+```html
 <script>
   import { useDirective } from 'directive/svelte';
   import { loggingPlugin } from 'directive/plugins';
@@ -127,7 +127,7 @@ All hooks below take `system` as an explicit first parameter and return Svelte `
 
 The go-to hook for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those:
 
-```svelte
+```html
 <script>
   import { useSelector, shallowEqual } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -163,18 +163,16 @@ The go-to hook for **transforms and derived values** from facts. Directive auto-
 
 Read a single fact or multiple facts:
 
-```svelte
+```html
 <script>
   import { useFact } from 'directive/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to a single fact – Readable<number | undefined>
-  const userId = useFact<number>(system, "userId");
+  const userId = useFact(system, "userId");
 
   // Subscribe to multiple facts at once
-  const profile = useFact<{ name: string; email: string; avatar: string }>(
-    system, ["name", "email", "avatar"]
-  );
+  const profile = useFact(system, ["name", "email", "avatar"]);
 </script>
 
 <div>
@@ -191,18 +189,16 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 Read a single derivation or multiple derivations:
 
-```svelte
+```html
 <script>
   import { useDerived } from 'directive/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to a single derivation
-  const displayName = useDerived<string>(system, "displayName");
+  const displayName = useDerived(system, "displayName");
 
   // Subscribe to multiple derivations at once
-  const auth = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
-    system, ["isLoggedIn", "isAdmin"]
-  );
+  const auth = useDerived(system, ["isLoggedIn", "isAdmin"]);
 </script>
 
 <h1>Hello, {$displayName}!</h1>
@@ -217,7 +213,7 @@ Use [`useSelector`](#useselector) to derive values from facts with auto-tracking
 
 Get a typed reference to the system's event dispatchers:
 
-```svelte
+```html
 <script>
   import { useEvents } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -236,7 +232,7 @@ The returned reference is stable (memoized on the system instance).
 
 Low-level event dispatch for untyped or system events:
 
-```svelte
+```html
 <script>
   import { useDispatch } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -252,7 +248,7 @@ Low-level event dispatch for untyped or system events:
 
 Watch a fact or derivation for changes. `useWatch` auto-detects whether the key refers to a fact or a derivation, so there is no need to pass a discriminator. Automatically cleans up on component destroy:
 
-```svelte
+```html
 <script>
   import { useWatch } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -281,7 +277,7 @@ The four-argument form `useWatch(system, "fact", "key", cb)` still works but is 
 
 Get system inspection data (unmet requirements, inflight resolvers, constraint status). Returns `Readable<InspectState>` where `InspectState` includes: `isSettled`, `unmet`, `inflight`, `isWorking`, `hasUnmet`, `hasInflight`.
 
-```svelte
+```html
 <script>
   import { useInspect } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -299,7 +295,7 @@ Get system inspection data (unmet requirements, inflight resolvers, constraint s
 
 With throttling for high-frequency updates:
 
-```svelte
+```html
 <script>
   import { useInspect } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -313,7 +309,7 @@ With throttling for high-frequency updates:
 
 Read constraint status reactively:
 
-```svelte
+```html
 <script>
   import { useConstraintStatus } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -336,7 +332,7 @@ Read constraint status reactively:
 
 Get a reactive explanation of why a requirement exists:
 
-```svelte
+```html
 <script>
   import { useExplain } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -362,7 +358,7 @@ Get a reactive explanation of why a requirement exists:
 
 `useRequirementStatus` takes `statusPlugin` as its first parameter (not `system`):
 
-```svelte
+```html
 <script>
   import { createSystem, createRequirementStatusPlugin } from 'directive';
   import { useRequirementStatus } from 'directive/svelte';
@@ -400,7 +396,7 @@ Get a reactive explanation of why a requirement exists:
 
 Apply optimistic mutations with automatic rollback on resolver failure:
 
-```svelte
+```html
 <script>
   import { createSystem, createRequirementStatusPlugin } from 'directive';
   import { useOptimisticUpdate } from 'directive/svelte';
@@ -443,7 +439,7 @@ Store factories work outside components and accept a system instance directly. U
 import { createDerivedStore } from 'directive/svelte';
 
 // Create a single derivation store outside of components
-const isRed = createDerivedStore<boolean>(system, 'isRed');
+const isRed = createDerivedStore(system, 'isRed');
 ```
 
 ### createDerivedsStore
@@ -452,9 +448,7 @@ const isRed = createDerivedStore<boolean>(system, 'isRed');
 import { createDerivedsStore } from 'directive/svelte';
 
 // Create a multi-derivation store outside of components
-const state = createDerivedsStore<{ isRed: boolean; elapsed: number }>(
-  system, ['isRed', 'elapsed']
-);
+const state = createDerivedsStore(system, ['isRed', 'elapsed']);
 ```
 
 ### createFactStore
@@ -463,7 +457,7 @@ const state = createDerivedsStore<{ isRed: boolean; elapsed: number }>(
 import { createFactStore } from 'directive/svelte';
 
 // Create a single fact store outside of components
-const phase = createFactStore<string>(system, 'phase');
+const phase = createFactStore(system, 'phase');
 ```
 
 ### createInspectStore
@@ -477,14 +471,14 @@ const inspection = createInspectStore(system);
 
 All factories return `Readable` stores that work with `$` auto-subscription:
 
-```svelte
+```html
 <script>
   import { createDerivedStore, createFactStore } from 'directive/svelte';
   import { system } from './system';
 
   // Create stores from the shared system instance
-  const isRed = createDerivedStore<boolean>(system, 'isRed');
-  const phase = createFactStore<string>(system, 'phase');
+  const isRed = createDerivedStore(system, 'isRed');
+  const phase = createFactStore(system, 'phase');
 </script>
 
 <div>
@@ -515,7 +509,7 @@ const schema = {
 export const { useFact, useDerived, useDispatch, useEvents } = createTypedHooks<typeof schema>();
 ```
 
-```svelte
+```html
 <script>
   import { useFact, useDerived, useEvents } from './hooks';
   import { system } from '$lib/directive';
@@ -538,15 +532,15 @@ export const { useFact, useDerived, useDispatch, useEvents } = createTypedHooks<
 
 ### Loading States
 
-```svelte
+```html
 <script>
   import { useFact } from 'directive/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to loading and error states
-  const loading = useFact<boolean>(system, "loading");
-  const error = useFact<string | null>(system, "error");
-  const user = useFact<User | null>(system, "user");
+  const loading = useFact(system, "loading");
+  const error = useFact(system, "error");
+  const user = useFact(system, "user");
 </script>
 
 {#if $loading}
@@ -564,13 +558,13 @@ export const { useFact, useDerived, useDispatch, useEvents } = createTypedHooks<
 
 Write facts through the system directly:
 
-```svelte
+```html
 <script>
   import { useFact } from 'directive/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to the current userId
-  const userId = useFact<number>(system, "userId");
+  const userId = useFact(system, "userId");
 </script>
 
 <input
@@ -582,7 +576,7 @@ Write facts through the system directly:
 
 Or dispatch events:
 
-```svelte
+```html
 <script>
   import { useEvents } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -664,7 +658,7 @@ if (browser) {
 }
 ```
 
-```svelte
+```html
 <!-- src/routes/+layout.svelte -->
 <script>
   import { system } from '$lib/directive';
@@ -710,7 +704,7 @@ test('displays user name', async () => {
 
 Re-exported utility for use with `useSelector`:
 
-```svelte
+```html
 <script>
   import { useSelector, shallowEqual } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -724,25 +718,46 @@ Re-exported utility for use with `useSelector`:
 
 ## Time-Travel Debugging
 
-Use `useTimeTravel` for reactive undo/redo controls. Returns a `Readable<TimeTravelState | null>` store that updates when snapshot state changes:
+Use `useTimeTravel` for reactive time-travel controls. Returns a `Readable<TimeTravelState | null>` store with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
 
-```svelte
+```html
 <script>
   import { useTimeTravel } from 'directive/svelte';
   import { system } from '$lib/directive';
 
-  // Get reactive time-travel controls (null when disabled)
   const tt = useTimeTravel(system);
 </script>
 
 {#if $tt}
+  <!-- Undo / Redo -->
   <button on:click={$tt.undo} disabled={!$tt.canUndo}>Undo</button>
   <button on:click={$tt.redo} disabled={!$tt.canRedo}>Redo</button>
   <span>{$tt.currentIndex + 1} / {$tt.totalSnapshots}</span>
+
+  <!-- Snapshot timeline — metadata only, no facts (keeps re-renders cheap) -->
+  <ul>
+    {#each $tt.snapshots as snap (snap.id)}
+      <li>
+        <button on:click={() => $tt.goTo(snap.id)}>
+          {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+        </button>
+      </li>
+    {/each}
+  </ul>
+
+  <!-- Session persistence -->
+  <button on:click={() => navigator.clipboard.writeText($tt.exportSession())}>
+    Copy Session
+  </button>
+
+  <!-- Recording control -->
+  <button on:click={$tt.isPaused ? $tt.resume : $tt.pause}>
+    {$tt.isPaused ? 'Resume' : 'Pause'} Recording
+  </button>
 {/if}
 ```
 
-Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
 
 ---
 

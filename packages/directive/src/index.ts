@@ -94,6 +94,7 @@ export type {
 	DebugConfig,
 	TimeTravelAPI,
 	TimeTravelState,
+	SnapshotMeta,
 	RequirementExplanation,
 	// Accessors
 	DeriveAccessor,

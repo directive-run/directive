@@ -184,6 +184,6 @@ const orchestrator = createAgentOrchestrator({
 
 ## Next Steps
 
-- [PII Detection](/docs/security/pii) –detect and redact sensitive data
-- [Audit Trail](/docs/security/audit) –audit logging
-- [Guardrails](/docs/ai/guardrails) –all guardrail types
+- [PII Detection](/docs/security/pii) – detect and redact sensitive data
+- [Audit Trail](/docs/security/audit) – audit logging
+- [Guardrails](/docs/ai/guardrails) – all guardrail types

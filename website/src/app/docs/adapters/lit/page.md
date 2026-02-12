@@ -536,13 +536,12 @@ class UserIds extends LitElement {
 
 ### TimeTravelController
 
-Reactive controller for time-travel state. Updates the host element when snapshot state changes:
+Reactive controller for time-travel state. Returns the full `TimeTravelState` API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
 
 ```typescript
 import { TimeTravelController } from 'directive/lit';
 
-class UndoControls extends LitElement {
-  // Get reactive time-travel controls (null when not enabled)
+class TimeTravelToolbar extends LitElement {
   private _tt = new TimeTravelController(this, system);
 
   render() {
@@ -550,9 +549,31 @@ class UndoControls extends LitElement {
     if (!tt) return html``;
 
     return html`
+      <!-- Undo / Redo -->
       <button @click=${tt.undo} ?disabled=${!tt.canUndo}>Undo</button>
       <button @click=${tt.redo} ?disabled=${!tt.canRedo}>Redo</button>
       <span>${tt.currentIndex + 1} / ${tt.totalSnapshots}</span>
+
+      <!-- Snapshot timeline — metadata only, no facts (keeps re-renders cheap) -->
+      <ul>
+        ${tt.snapshots.map((snap) => html`
+          <li>
+            <button @click=${() => tt.goTo(snap.id)}>
+              ${snap.trigger} — ${new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+          </li>
+        `)}
+      </ul>
+
+      <!-- Session persistence -->
+      <button @click=${() => navigator.clipboard.writeText(tt.exportSession())}>
+        Copy Session
+      </button>
+
+      <!-- Recording control -->
+      <button @click=${tt.isPaused ? tt.resume : tt.pause}>
+        ${tt.isPaused ? 'Resume' : 'Pause'} Recording
+      </button>
     `;
   }
 }
@@ -567,11 +588,15 @@ import { useTimeTravel } from 'directive/lit';
 
 // Get time-travel state (non-reactive, useful for imperative code)
 const tt = useTimeTravel(system);
-tt?.undo();
-tt?.redo();
+if (tt) {
+  tt.undo();
+  tt.goTo(snap.id);
+  tt.exportSession();
+  tt.isPaused ? tt.resume() : tt.pause();
+}
 ```
 
-Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
 
 ### getDerived / getFact
 

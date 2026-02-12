@@ -315,9 +315,8 @@ const formModule = createModule("form", {
   },
 
   effects: {
-    // Fires whenever `status` changes – replaces XState's entry action
+    // Auto-tracks `status` – fires whenever it changes, replaces XState's entry action
     onEditing: {
-      deps: ['status'],
       run: (facts) => {
         if (facts.status === 'editing') {
           document.getElementById('input')?.focus();
@@ -327,7 +326,6 @@ const formModule = createModule("form", {
 
     // Compare previous and current values – replaces XState's exit action
     onSubmit: {
-      deps: ['status'],
       run: (facts, prev) => {
         if (prev?.status === 'editing' && facts.status === 'submitting') {
           console.log('Validating...');

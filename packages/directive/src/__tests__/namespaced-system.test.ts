@@ -406,8 +406,8 @@ describe("Namespaced System", () => {
       const snapshot = system.getSnapshot();
 
       // Verify snapshot contains prefixed keys
-      expect(snapshot.facts["auth_token"]).toBe("snapshot-token");
-      expect(snapshot.facts["data_items"]).toEqual(["x", "y"]);
+      expect(snapshot.facts["auth::token"]).toBe("snapshot-token");
+      expect(snapshot.facts["data::items"]).toEqual(["x", "y"]);
 
       // Modify state
       system.facts.auth.token = "modified";
@@ -556,8 +556,8 @@ describe("Namespaced System", () => {
       system.start();
 
       // Prefixed format should also work
-      expect(system.read("auth_status")).toBe("guest");
-      expect(system.read("data_count")).toBe(0);
+      expect(system.read("auth::status")).toBe("guest");
+      expect(system.read("data::count")).toBe(0);
 
       system.destroy();
     });
@@ -1467,6 +1467,189 @@ describe("Namespaced System", () => {
       expect(resolverValue).toBe(0);
       // And should have updated to 100
       expect(system.facts.test.value).toBe(100);
+
+      system.destroy();
+    });
+  });
+
+  describe("separator collision prevention", () => {
+    it("underscore in module name does not collide with another module", () => {
+      // "foo_bar" module + key "baz" should NOT collide with "foo" module + key "bar_baz"
+      const fooBarSchema = {
+        facts: { baz: t.number() },
+      } satisfies ModuleSchema;
+
+      const fooSchema = {
+        facts: { bar_baz: t.number() },
+      } satisfies ModuleSchema;
+
+      const fooBarModule = createModule("foo-bar-mod", {
+        schema: fooBarSchema,
+        init: (facts) => { facts.baz = 1; },
+      });
+
+      const fooModule = createModule("foo-mod", {
+        schema: fooSchema,
+        init: (facts) => { facts.bar_baz = 2; },
+      });
+
+      const system = createSystem({
+        modules: { foo_bar: fooBarModule, foo: fooModule },
+      });
+
+      system.start();
+
+      // With :: separator, these are "foo_bar::baz" and "foo::bar_baz" — no collision
+      expect(system.facts.foo_bar.baz).toBe(1);
+      expect(system.facts.foo.bar_baz).toBe(2);
+
+      // Mutating one should not affect the other
+      system.facts.foo_bar.baz = 10;
+      expect(system.facts.foo.bar_baz).toBe(2);
+
+      system.destroy();
+    });
+
+    it("rejects module names containing the :: separator", () => {
+      const schema = {
+        facts: { value: t.number() },
+      } satisfies ModuleSchema;
+
+      const mod = createModule("bad-mod", {
+        schema,
+        init: (facts) => { facts.value = 0; },
+      });
+
+      expect(() => {
+        createSystem({
+          modules: { "bad::name": mod },
+        });
+      }).toThrow('contains the reserved separator "::"');
+    });
+
+    it("rejects schema keys containing the :: separator", () => {
+      const schema = {
+        facts: { "bad::key": t.number() },
+      } satisfies ModuleSchema;
+
+      const mod = createModule("test-mod", {
+        schema,
+        init: () => {},
+      });
+
+      expect(() => {
+        createSystem({
+          modules: { test: mod },
+        });
+      }).toThrow('contains the reserved separator "::"');
+    });
+  });
+
+  describe("async constraint explicit deps", () => {
+    it("re-evaluates async constraint when declared dep changes", async () => {
+      const constraintSchema = {
+        facts: {
+          status: t.string(),
+          ready: t.boolean(),
+        },
+        requirements: {
+          ACTIVATE: {},
+        },
+      } satisfies ModuleSchema;
+
+      let whenCallCount = 0;
+
+      const mod = createModule("async-deps-test", {
+        schema: constraintSchema,
+        init: (facts) => {
+          facts.status = "idle";
+          facts.ready = false;
+        },
+        constraints: {
+          activate: {
+            async: true,
+            deps: ["status"],
+            when: async (facts) => {
+              whenCallCount++;
+              return facts.status === "active";
+            },
+            require: { type: "ACTIVATE" },
+          },
+        },
+        resolvers: {
+          activate: {
+            requirement: "ACTIVATE",
+            resolve: async (_req, ctx) => {
+              ctx.facts.ready = true;
+            },
+          },
+        },
+      });
+
+      const system = createSystem({
+        modules: { test: mod },
+      });
+
+      system.start();
+      await system.settle();
+
+      const initialCalls = whenCallCount;
+
+      // Change the dep — should trigger re-evaluation
+      system.facts.test.status = "active";
+      await system.settle();
+
+      expect(whenCallCount).toBeGreaterThan(initialCalls);
+      expect(system.facts.test.ready).toBe(true);
+
+      system.destroy();
+    });
+
+    it("sync constraint with explicit deps skips auto-tracking", async () => {
+      const schema = {
+        facts: {
+          value: t.number(),
+          other: t.number(),
+        },
+        requirements: {
+          DO_THING: {},
+        },
+      } satisfies ModuleSchema;
+
+      let resolverCalled = false;
+
+      const mod = createModule("sync-deps-test", {
+        schema,
+        init: (facts) => {
+          facts.value = 0;
+          facts.other = 0;
+        },
+        constraints: {
+          check: {
+            deps: ["value"],
+            when: (facts) => facts.value > 5,
+            require: { type: "DO_THING" },
+          },
+        },
+        resolvers: {
+          doThing: {
+            requirement: "DO_THING",
+            resolve: async (_req, ctx) => {
+              resolverCalled = true;
+              ctx.facts.value = 0;
+            },
+          },
+        },
+      });
+
+      const system = createSystem({ module: mod });
+      system.start();
+      await system.settle();
+
+      // Change declared dep — should trigger
+      system.facts.value = 10;
+      await system.settle();
+      expect(resolverCalled).toBe(true);
 
       system.destroy();
     });

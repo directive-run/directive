@@ -44,7 +44,7 @@ function useFact<K extends string[]>(system: System, keys: K): Readable<Record<K
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useFact } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -77,7 +77,7 @@ function useDerived<K extends string[]>(system: System, keys: K): Readable<Recor
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useDerived } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -113,7 +113,7 @@ function useSelector<R>(
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useSelector } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -140,7 +140,7 @@ function useEvents(system: System): TypedEventDispatchers
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useEvents } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -166,7 +166,7 @@ function useDispatch(system: System): (event: SystemEvent) => void
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useDispatch } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -205,7 +205,7 @@ function useWatch<T>(
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useWatch } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -238,7 +238,7 @@ function useInspect(system: System, opts?: { throttleMs?: number }): Readable<In
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useInspect } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -275,7 +275,7 @@ interface ConstraintInfo {
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useConstraintStatus } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -301,7 +301,7 @@ function useExplain(system: System, requirementType: string): Readable<string | 
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useExplain } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -328,7 +328,7 @@ function useRequirementStatus(statusPlugin: StatusPlugin, types: string[]): Read
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useRequirementStatus } from 'directive/svelte';
 
@@ -373,7 +373,7 @@ interface OptimisticUpdateResult {
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useOptimisticUpdate } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -429,7 +429,7 @@ function useDirective<M extends ModuleSchema>(
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useDirective } from 'directive/svelte';
   import { counterModule } from './modules/counter';
@@ -445,7 +445,7 @@ function useDirective<M extends ModuleSchema>(
 
 Selective subscriptions:
 
-```svelte
+```html
 <script>
   import { useDirective } from 'directive/svelte';
   import { counterModule } from './modules/counter';
@@ -491,7 +491,7 @@ export const {
 } = createTypedHooks<MyModuleSchema>();
 ```
 
-```svelte
+```html
 <script>
   import { useFact, useEvents } from './hooks';
   import { system } from '$lib/directive';
@@ -558,7 +558,7 @@ export const count$ = createFactStore(system, 'count');
 export const total$ = createDerivedStore(system, 'cartTotal');
 ```
 
-```svelte
+```html
 <script>
   import { count$, total$ } from './stores';
 </script>
@@ -589,7 +589,7 @@ interface TimeTravelState {
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useTimeTravel } from 'directive/svelte';
   import { system } from '$lib/directive';
@@ -627,7 +627,7 @@ function shallowEqual(a: unknown, b: unknown): boolean
 
 ### Usage
 
-```svelte
+```html
 <script>
   import { useSelector, shallowEqual } from 'directive/svelte';
   import { system } from '$lib/directive';

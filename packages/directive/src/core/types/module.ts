@@ -123,6 +123,11 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
 	 * Cross-module: use "moduleName.constraintName" format.
 	 */
 	after?: string[];
+	/**
+	 * Explicit fact dependencies for this constraint.
+	 * Required for async constraints to enable dependency tracking.
+	 */
+	deps?: string[];
 }
 
 /**
@@ -167,6 +172,11 @@ export interface CrossModuleConstraintDef<
 	 * Cross-module: use "moduleName.constraintName" format.
 	 */
 	after?: string[];
+	/**
+	 * Explicit fact dependencies for this constraint.
+	 * Required for async constraints to enable dependency tracking.
+	 */
+	deps?: string[];
 }
 
 /**

@@ -239,6 +239,6 @@ const storage: ComplianceStorage = {
 
 ## Next Steps
 
-- [Audit Trail](/docs/security/audit) –tamper-evident audit logging
-- [PII Detection](/docs/security/pii) –detect and redact sensitive data
-- [Guardrails](/docs/ai/guardrails) –AI safety guardrails
+- [Audit Trail](/docs/security/audit) – tamper-evident audit logging
+- [PII Detection](/docs/security/pii) – detect and redact sensitive data
+- [Guardrails](/docs/ai/guardrails) – AI safety guardrails
