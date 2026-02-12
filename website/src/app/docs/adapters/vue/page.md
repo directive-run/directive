@@ -73,13 +73,13 @@ export { system };
 
 Then pass the system to composables in your components:
 
-```vue
+```html
 <script setup>
 import { useFact, useDerived } from 'directive/vue';
 import { system } from './system';
 
-const user = useFact<User | null>(system, 'user');
-const displayName = useDerived<string>(system, 'displayName');
+const user = useFact(system, 'user');
+const displayName = useDerived(system, 'displayName');
 </script>
 
 <template>
@@ -105,7 +105,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 - **Selective** -- specify `facts` and/or `derived` keys to subscribe only to those
 - **Subscribe all** -- omit keys to subscribe to everything (good for prototyping or small modules)
 
-```vue
+```html
 <script setup>
 import { useDirective } from 'directive/vue';
 import { counterModule } from './counterModule';
@@ -124,7 +124,7 @@ const { system, facts, derived, events, dispatch } = useDirective(counterModule)
 
 With system config and selective subscriptions:
 
-```vue
+```html
 <script setup>
 import { useDirective } from 'directive/vue';
 import { counterModule } from './counterModule';
@@ -146,7 +146,7 @@ const { facts, derived, dispatch } = useDirective(counterModule, {
 
 The go-to composable for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those:
 
-```vue
+```html
 <script setup>
 import { useSelector, shallowEqual } from 'directive/vue';
 import { system } from './system';
@@ -184,18 +184,16 @@ const ids = useSelector(
 
 Read a single fact or multiple facts:
 
-```vue
-<script setup lang="ts">
+```html
+<script setup>
 import { useFact } from 'directive/vue';
 import { system } from './system';
 
 // Subscribe to a single fact – re-renders when "userId" changes
-const userId = useFact<number>(system, 'userId');
+const userId = useFact(system, 'userId');
 
 // Subscribe to multiple facts at once
-const { name, email, avatar } = useFact<{ name: string; email: string; avatar: string }>(
-  system, ['name', 'email', 'avatar']
-);
+const { name, email, avatar } = useFact(system, ['name', 'email', 'avatar']);
 </script>
 ```
 
@@ -207,18 +205,16 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 Read a single derivation or multiple derivations:
 
-```vue
-<script setup lang="ts">
+```html
+<script setup>
 import { useDerived } from 'directive/vue';
 import { system } from './system';
 
 // Subscribe to a single derivation
-const displayName = useDerived<string>(system, 'displayName');
+const displayName = useDerived(system, 'displayName');
 
 // Subscribe to multiple derivations at once
-const { isLoggedIn, isAdmin } = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
-  system, ['isLoggedIn', 'isAdmin']
-);
+const { isLoggedIn, isAdmin } = useDerived(system, ['isLoggedIn', 'isAdmin']);
 </script>
 ```
 
@@ -230,7 +226,7 @@ Use [`useSelector`](#useselector) to derive values from facts with auto-tracking
 
 Get a typed reference to the system's event dispatchers:
 
-```vue
+```html
 <script setup>
 import { useEvents } from 'directive/vue';
 import { system } from './system';
@@ -249,7 +245,7 @@ const events = useEvents(system);
 
 Low-level event dispatch for untyped or system events:
 
-```vue
+```html
 <script setup>
 import { useDispatch } from 'directive/vue';
 import { system } from './system';
@@ -269,13 +265,13 @@ const dispatch = useDispatch(system);
 
 Watch a fact or derivation for changes without causing re-renders -- runs a callback as a side effect. `useWatch` auto-detects whether the key refers to a fact or a derivation, so there is no need to pass a discriminator:
 
-```vue
+```html
 <script setup>
 import { useWatch } from 'directive/vue';
 import { system } from './system';
 
 // Watch a derivation for analytics tracking
-useWatch<string>(system, 'phase', (newPhase, oldPhase) => {
+useWatch(system, 'phase', (newPhase, oldPhase) => {
   analytics.track('phaseChange', { from: oldPhase, to: newPhase });
 });
 
@@ -298,7 +294,7 @@ The four-argument form `useWatch(system, "fact", "key", cb)` still works but is 
 
 Get system inspection data (unmet requirements, inflight resolvers, constraint status) as a reactive `ShallowRef<InspectState>`:
 
-```vue
+```html
 <script setup>
 import { useInspect } from 'directive/vue';
 import { system } from './system';
@@ -320,7 +316,7 @@ const inspection = useInspect(system);
 
 With throttling for high-frequency updates:
 
-```vue
+```html
 <script setup>
 import { useInspect } from 'directive/vue';
 import { system } from './system';
@@ -334,7 +330,7 @@ const inspection = useInspect(system, { throttleMs: 200 });
 
 Read constraint status reactively:
 
-```vue
+```html
 <script setup>
 import { useConstraintStatus } from 'directive/vue';
 import { system } from './system';
@@ -353,7 +349,7 @@ const auth = useConstraintStatus(system, 'requireAuth');
 
 Get a reactive explanation of why a requirement exists:
 
-```vue
+```html
 <script setup>
 import { useExplain } from 'directive/vue';
 import { system } from './system';
@@ -394,7 +390,7 @@ export { system, statusPlugin };
 
 Pass the `statusPlugin` as the first parameter:
 
-```vue
+```html
 <script setup>
 import { useRequirementStatus } from 'directive/vue';
 import { statusPlugin } from './system';
@@ -419,7 +415,7 @@ const statuses = useRequirementStatus(statusPlugin, ['FETCH_USER', 'FETCH_SETTIN
 
 Apply optimistic mutations with automatic rollback on resolver failure:
 
-```vue
+```html
 <script setup>
 import { useOptimisticUpdate } from 'directive/vue';
 import { system, statusPlugin } from './system';
@@ -458,7 +454,7 @@ const { useDerived, useFact, useDispatch, useEvents } =
   createTypedHooks<typeof myModule.schema>();
 ```
 
-```vue
+```html
 <script setup>
 import { useFact, useDerived, useDispatch, useEvents } from './typed-hooks';
 import { system } from './system';
@@ -478,27 +474,46 @@ events.increment();                    // Also typed!
 
 ## Time-Travel Debugging
 
-Use `useTimeTravel` for reactive undo/redo controls. Returns a `ShallowRef<TimeTravelState | null>` that updates when snapshot state changes:
+Use `useTimeTravel` for reactive time-travel controls. Returns a `ShallowRef<TimeTravelState | null>` with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
 
-```vue
+```html
 <script setup>
 import { useTimeTravel } from 'directive/vue';
 import { system } from './system';
 
-// Get reactive time-travel controls (null when disabled)
 const tt = useTimeTravel(system);
 </script>
 
 <template>
   <div v-if="tt">
+    <!-- Undo / Redo -->
     <button @click="tt.undo" :disabled="!tt.canUndo">Undo</button>
     <button @click="tt.redo" :disabled="!tt.canRedo">Redo</button>
     <span>{{ tt.currentIndex + 1 }} / {{ tt.totalSnapshots }}</span>
+
+    <!-- Snapshot timeline — metadata only, no facts (keeps re-renders cheap) -->
+    <ul>
+      <li v-for="snap in tt.snapshots" :key="snap.id">
+        <button @click="tt.goTo(snap.id)">
+          {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
+        </button>
+      </li>
+    </ul>
+
+    <!-- Session persistence -->
+    <button @click="navigator.clipboard.writeText(tt.exportSession())">
+      Copy Session
+    </button>
+
+    <!-- Recording control -->
+    <button @click="tt.isPaused ? tt.resume() : tt.pause()">
+      {{ tt.isPaused ? 'Resume' : 'Pause' }} Recording
+    </button>
   </div>
 </template>
 ```
 
-Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
 
 ---
 
@@ -506,16 +521,16 @@ Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/ti
 
 ### Loading States
 
-```vue
+```html
 <script setup>
 import { useFact, useDerived } from 'directive/vue';
 import { system } from './system';
 
 // Subscribe to the user fact
-const user = useFact<User | null>(system, 'user');
+const user = useFact(system, 'user');
 
 // Subscribe to the display name derivation
-const displayName = useDerived<string>(system, 'displayName');
+const displayName = useDerived(system, 'displayName');
 </script>
 
 <template>
@@ -531,13 +546,13 @@ const displayName = useDerived<string>(system, 'displayName');
 
 Write facts through the system directly:
 
-```vue
+```html
 <script setup>
 import { useFact } from 'directive/vue';
 import { system } from './system';
 
 // Subscribe to the current userId
-const userId = useFact<number>(system, 'userId');
+const userId = useFact(system, 'userId');
 </script>
 
 <template>
@@ -551,7 +566,7 @@ const userId = useFact<number>(system, 'userId');
 
 Or dispatch events:
 
-```vue
+```html
 <script setup>
 import { useDispatch } from 'directive/vue';
 import { system } from './system';

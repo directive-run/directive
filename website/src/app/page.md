@@ -11,7 +11,7 @@ description: Declare what must be true. Define how to make it true. Let Directiv
 
 {% quick-link title="Examples" icon="plugins" href="/docs/examples/counter" description="Real-world patterns: data fetching, forms, multi-module apps, and AI agents." /%}
 
-{% quick-link title="React Integration" icon="theming" href="/docs/adapters/react" description="Hooks and patterns for seamless React integration." /%}
+{% quick-link title="Framework Adapters" icon="theming" href="/docs/adapters/overview" description="First-class hooks for React, Vue, Svelte, Solid, and Lit." /%}
 
 {% /quick-links %}
 
@@ -47,7 +47,7 @@ No manual dependency arrays. Just access what you need - Directive tracks it aut
 ```typescript
 derive: {
   fullName: (facts) => `${facts.firstName} ${facts.lastName}`,
-  isAdmin: (facts, derive) => derive.role === 'admin' // Composition works too
+  greeting: (facts, derive) => `Hello, ${derive.fullName}!` // Composition works too
 }
 ```
 
@@ -74,8 +74,8 @@ const system = createSystem({
   debug: { timeTravel: true, maxSnapshots: 100 }
 });
 
-system.timeTravel.goBack();
-system.timeTravel.goForward();
+system.debug.goBack();
+system.debug.goForward();
 ```
 
 ### Framework Agnostic

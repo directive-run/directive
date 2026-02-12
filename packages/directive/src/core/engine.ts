@@ -64,37 +64,37 @@ export function createEngine<S extends Schema>(
 	config: SystemConfig<any>,
 ): System<any> {
 	// Merge all module definitions with collision detection
-	const mergedSchema = {} as S;
-	const mergedEvents: EventsDef<S> = {};
-	const mergedDerive: DerivationsDef<S> = {};
-	const mergedEffects: EffectsDef<S> = {};
-	const mergedConstraints: ConstraintsDef<S> = {};
-	const mergedResolvers: ResolversDef<S> = {};
+	// Use Object.create(null) to prevent prototype chain traversal (e.g., "toString" in mergedEvents)
+	const mergedSchema = Object.create(null) as S;
+	const mergedEvents: EventsDef<S> = Object.create(null);
+	const mergedDerive: DerivationsDef<S> = Object.create(null);
+	const mergedEffects: EffectsDef<S> = Object.create(null);
+	const mergedConstraints: ConstraintsDef<S> = Object.create(null);
+	const mergedResolvers: ResolversDef<S> = Object.create(null);
 
 	// Track which module defined each key for collision detection
 	const schemaOwners = new Map<string, string>();
 
 	for (const module of config.modules) {
 		// Security: Validate module definitions for dangerous keys
-		if (process.env.NODE_ENV !== "production") {
-			const validateKeys = (obj: object | undefined, section: string) => {
-				if (!obj) return;
-				for (const key of Object.keys(obj)) {
-					if (BLOCKED_PROPS.has(key)) {
-						throw new Error(
-							`[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. ` +
-								`This could indicate a prototype pollution attempt.`,
-						);
-					}
+		// Always run in all environments — this is a security boundary, not a dev convenience
+		const validateKeys = (obj: object | undefined, section: string) => {
+			if (!obj) return;
+			for (const key of Object.keys(obj)) {
+				if (BLOCKED_PROPS.has(key)) {
+					throw new Error(
+						`[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. ` +
+							`This could indicate a prototype pollution attempt.`,
+					);
 				}
-			};
-			validateKeys(module.schema, "schema");
-			validateKeys(module.events, "events");
-			validateKeys(module.derive, "derive");
-			validateKeys(module.effects, "effects");
-			validateKeys(module.constraints, "constraints");
-			validateKeys(module.resolvers, "resolvers");
-		}
+			}
+		};
+		validateKeys(module.schema, "schema");
+		validateKeys(module.events, "events");
+		validateKeys(module.derive, "derive");
+		validateKeys(module.effects, "effects");
+		validateKeys(module.constraints, "constraints");
+		validateKeys(module.resolvers, "resolvers");
 
 		// Check for schema collisions
 		if (process.env.NODE_ENV !== "production") {
@@ -103,7 +103,7 @@ export function createEngine<S extends Schema>(
 				if (existingOwner) {
 					throw new Error(
 						`[Directive] Schema collision: Fact "${key}" is defined in both module "${existingOwner}" and "${module.id}". ` +
-							`Use namespacing (e.g., "${module.id}_${key}") or merge into one module.`,
+							`Use namespacing (e.g., "${module.id}::${key}") or merge into one module.`,
 					);
 				}
 				schemaOwners.set(key, module.id);
@@ -116,6 +116,19 @@ export function createEngine<S extends Schema>(
 		if (module.effects) Object.assign(mergedEffects, module.effects);
 		if (module.constraints) Object.assign(mergedConstraints, module.constraints);
 		if (module.resolvers) Object.assign(mergedResolvers, module.resolvers);
+	}
+
+	// Dev-mode: Warn if a fact and derivation share the same name
+	if (process.env.NODE_ENV !== "production") {
+		const derivationNames = new Set(Object.keys(mergedDerive));
+		for (const key of Object.keys(mergedSchema)) {
+			if (derivationNames.has(key)) {
+				console.warn(
+					`[Directive] "${key}" exists as both a fact and a derivation. ` +
+					`This may cause unexpected dependency tracking behavior.`,
+				);
+			}
+		}
 	}
 
 	// Create plugin manager
@@ -274,6 +287,10 @@ export function createEngine<S extends Schema>(
 		}
 	}
 
+	// Reconcile depth guard — prevents runaway reconcile → scheduleReconcile chains
+	const MAX_RECONCILE_DEPTH = 50;
+	let reconcileDepth = 0;
+
 	// Engine state
 	const state: EngineState<S> = {
 		isRunning: false,
@@ -313,6 +330,20 @@ export function createEngine<S extends Schema>(
 	/** The main reconciliation loop */
 	async function reconcile(): Promise<void> {
 		if (state.isReconciling) return;
+
+		reconcileDepth++;
+		if (reconcileDepth > MAX_RECONCILE_DEPTH) {
+			if (process.env.NODE_ENV !== "production") {
+				console.warn(
+					`[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. ` +
+					`This usually means resolvers are creating circular requirement chains. ` +
+					`Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
+				);
+			}
+			reconcileDepth = 0;
+			return;
+		}
+
 		state.isReconciling = true;
 		notifySettlementChange();
 
@@ -386,12 +417,18 @@ export function createEngine<S extends Schema>(
 			}
 		} finally {
 			state.isReconciling = false;
-			notifySettlementChange();
-		}
 
-		// If more changes came in during reconciliation, run again
-		if (state.changedKeys.size > 0) {
-			scheduleReconcile();
+			// Schedule next reconcile BEFORE notifying settlement change,
+			// so listeners never see a brief isSettled=true flash when
+			// more changes are pending.
+			if (state.changedKeys.size > 0) {
+				scheduleReconcile();
+			} else if (!state.reconcileScheduled) {
+				// System has settled — reset depth counter
+				reconcileDepth = 0;
+			}
+
+			notifySettlementChange();
 		}
 	}
 
@@ -547,6 +584,7 @@ export function createEngine<S extends Schema>(
 		},
 
 		dispatch(event: SystemEvent): void {
+			if (BLOCKED_PROPS.has(event.type)) return;
 			const handler = mergedEvents[event.type];
 			if (handler) {
 				store.batch(() => {

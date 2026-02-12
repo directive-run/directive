@@ -86,14 +86,14 @@ describe("Persistence Plugin", () => {
 
 			expect(onSave).toHaveBeenCalled();
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.test_count).toBe(1);
+			expect(saved["test::count"]).toBe(1);
 
 			system.destroy();
 		});
 
 		it("restores facts from storage", () => {
 			// Pre-populate storage (using internal prefixed format)
-			storage.setItem("test-state", JSON.stringify({ test_count: 42, test_name: "restored" }));
+			storage.setItem("test-state", JSON.stringify({ "test::count": 42, "test::name": "restored" }));
 
 			const onRestore = vi.fn();
 			const system = createSystem({
@@ -109,7 +109,7 @@ describe("Persistence Plugin", () => {
 
 			system.start();
 
-			expect(onRestore).toHaveBeenCalledWith({ test_count: 42, test_name: "restored" });
+			expect(onRestore).toHaveBeenCalledWith({ "test::count": 42, "test::name": "restored" });
 			expect(system.facts.test.count).toBe(42);
 			expect(system.facts.test.name).toBe("restored");
 
@@ -125,7 +125,7 @@ describe("Persistence Plugin", () => {
 					persistencePlugin({
 						storage,
 						key: "test-state",
-						include: ["test_count"],
+						include: ["test::count"],
 					}),
 				],
 			});
@@ -138,8 +138,8 @@ describe("Persistence Plugin", () => {
 			await new Promise((resolve) => setTimeout(resolve, 150));
 
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.test_count).toBe(1);
-			expect(saved.test_name).toBeUndefined();
+			expect(saved["test::count"]).toBe(1);
+			expect(saved["test::name"]).toBeUndefined();
 
 			system.destroy();
 		});
@@ -151,7 +151,7 @@ describe("Persistence Plugin", () => {
 					persistencePlugin({
 						storage,
 						key: "test-state",
-						exclude: ["test_secret"],
+						exclude: ["test::secret"],
 					}),
 				],
 			});
@@ -163,8 +163,8 @@ describe("Persistence Plugin", () => {
 			await new Promise((resolve) => setTimeout(resolve, 150));
 
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.test_count).toBe(1);
-			expect(saved.test_secret).toBeUndefined();
+			expect(saved["test::count"]).toBe(1);
+			expect(saved["test::secret"]).toBeUndefined();
 
 			system.destroy();
 		});
@@ -201,7 +201,7 @@ describe("Persistence Plugin", () => {
 			// Should have saved once with final value
 			expect(onSave).toHaveBeenCalledTimes(1);
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.test_count).toBe(3);
+			expect(saved["test::count"]).toBe(3);
 
 			system.destroy();
 		});
@@ -269,7 +269,7 @@ describe("Persistence Plugin", () => {
 			// Store malicious data
 			storage.setItem(
 				"test-state",
-				'{"test_count": 1, "__proto__": {"polluted": true}}',
+				'{"test::count": 1, "__proto__": {"polluted": true}}',
 			);
 
 			const onError = vi.fn();
@@ -302,7 +302,7 @@ describe("Persistence Plugin", () => {
 		it("rejects nested prototype pollution", () => {
 			storage.setItem(
 				"test-state",
-				'{"test_count": 1, "nested": {"__proto__": {"evil": true}}}',
+				'{"test::count": 1, "nested": {"__proto__": {"evil": true}}}',
 			);
 
 			const onError = vi.fn();
@@ -373,7 +373,7 @@ describe("Persistence Plugin", () => {
 			// Should have saved immediately on destroy
 			expect(onSave).toHaveBeenCalled();
 			const saved = JSON.parse(storage.getItem("test-state")!);
-			expect(saved.test_count).toBe(1);
+			expect(saved["test::count"]).toBe(1);
 		});
 	});
 });

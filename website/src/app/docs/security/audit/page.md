@@ -214,6 +214,6 @@ await audit.dispose();
 
 ## Next Steps
 
-- [PII Detection](/docs/security/pii) –detect and redact sensitive data
-- [Compliance](/docs/security/compliance) –GDPR/CCPA data subject rights
-- [Guardrails](/docs/ai/guardrails) –AI safety guardrails
+- [PII Detection](/docs/security/pii) – detect and redact sensitive data
+- [Compliance](/docs/security/compliance) – GDPR/CCPA data subject rights
+- [Guardrails](/docs/ai/guardrails) – AI safety guardrails

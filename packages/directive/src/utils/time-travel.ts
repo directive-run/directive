@@ -115,6 +115,10 @@ export function createTimeTravelManager<S extends Schema>(
 			return restoring;
 		},
 
+		get isPaused() {
+			return paused;
+		},
+
 		get snapshots() {
 			return [...snapshots];
 		},
@@ -354,6 +358,7 @@ export function createDisabledTimeTravel<S extends Schema>(): TimeTravelManager<
 	return {
 		isEnabled: false,
 		isRestoring: false,
+		isPaused: false,
 		snapshots: [],
 		currentIndex: -1,
 		takeSnapshot: () => noopSnapshot,

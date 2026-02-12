@@ -401,7 +401,7 @@ function ChatStream() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { ref, onUnmounted } from 'vue';
 import { createAgentOrchestrator } from 'directive/ai';
@@ -431,7 +431,7 @@ async function send(input: string) {
 
 ### Svelte
 
-```svelte
+```html
 <script>
 import { createAgentOrchestrator } from 'directive/ai';
 import { useFact } from 'directive/svelte';

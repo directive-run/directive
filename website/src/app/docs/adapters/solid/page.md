@@ -129,11 +129,11 @@ Read a single fact or multiple facts. Returns a reactive `Accessor`:
 
 ```tsx
 // Subscribe to a single fact -- signal updates when "userId" changes
-const userId = useFact<number>(system, "userId");
+const userId = useFact(system, "userId");
 // userId() => number | undefined
 
 // Subscribe to multiple facts at once
-const data = useFact<{ name: string; email: string }>(system, ["name", "email"]);
+const data = useFact(system, ["name", "email"]);
 // data() => { name: string; email: string }
 ```
 
@@ -146,10 +146,10 @@ Usage in a component:
 ```tsx
 function UserProfile() {
   // Subscribe to the userId
-  const userId = useFact<number>(system, "userId");
+  const userId = useFact(system, "userId");
 
   // Subscribe to the user object
-  const user = useFact<User | null>(system, "user");
+  const user = useFact(system, "user");
 
   return (
     <div>
@@ -166,13 +166,11 @@ Read a single derivation or multiple derivations. Returns a reactive `Accessor`:
 
 ```tsx
 // Subscribe to a single derivation
-const displayName = useDerived<string>(system, "displayName");
+const displayName = useDerived(system, "displayName");
 // displayName() => string
 
 // Subscribe to multiple derivations at once
-const state = useDerived<{ isLoggedIn: boolean; isAdmin: boolean }>(
-  system, ["isLoggedIn", "isAdmin"]
-);
+const state = useDerived(system, ["isLoggedIn", "isAdmin"]);
 // state() => { isLoggedIn: boolean; isAdmin: boolean }
 ```
 
@@ -185,7 +183,7 @@ Usage in a component:
 ```tsx
 function Greeting() {
   // Subscribe to the display name derivation
-  const displayName = useDerived<string>(system, "displayName");
+  const displayName = useDerived(system, "displayName");
   return <h1>Hello, {displayName()}!</h1>;
 }
 ```
@@ -233,12 +231,12 @@ Watch a fact or derivation for changes -- runs a callback as a side effect witho
 
 ```tsx
 // Watch a derivation for analytics tracking
-useWatch<number>(system, "pageViews", (newValue, prevValue) => {
+useWatch(system, "pageViews", (newValue, prevValue) => {
   analytics.track("pageViews", { from: prevValue, to: newValue });
 });
 
 // Watch a fact -- auto-detected, no "fact" discriminator needed
-useWatch<number>(system, "userId", (newValue, prevValue) => {
+useWatch(system, "userId", (newValue, prevValue) => {
   analytics.track("userId_changed", { from: prevValue, to: newValue });
 });
 ```
@@ -521,23 +519,46 @@ function Profile() {
 
 ## Time Travel
 
-Use `useTimeTravel` for reactive undo/redo controls. Returns an `Accessor<TimeTravelState | null>` that updates when snapshot state changes:
+Use `useTimeTravel` for reactive time-travel controls. Returns an `Accessor<TimeTravelState | null>` with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
 
 ```tsx
 import { useTimeTravel } from 'directive/solid';
-import { Show } from 'solid-js';
+import { Show, For } from 'solid-js';
 
-function UndoControls() {
-  // Get reactive time-travel controls (null when disabled)
+function TimeTravelToolbar() {
   const tt = useTimeTravel(system);
 
   return (
     <Show when={tt()}>
       {(state) => (
         <div>
+          {/* Undo / Redo */}
           <button onClick={state().undo} disabled={!state().canUndo}>Undo</button>
           <button onClick={state().redo} disabled={!state().canRedo}>Redo</button>
           <span>{state().currentIndex + 1} / {state().totalSnapshots}</span>
+
+          {/* Snapshot timeline — metadata only, no facts (keeps re-renders cheap) */}
+          <ul>
+            <For each={state().snapshots}>
+              {(snap) => (
+                <li>
+                  <button onClick={() => state().goTo(snap.id)}>
+                    {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+
+          {/* Session persistence */}
+          <button onClick={() => navigator.clipboard.writeText(state().exportSession())}>
+            Copy Session
+          </button>
+
+          {/* Recording control */}
+          <button onClick={state().isPaused ? state().resume : state().pause}>
+            {state().isPaused ? 'Resume' : 'Pause'} Recording
+          </button>
         </div>
       )}
     </Show>
@@ -545,7 +566,7 @@ function UndoControls() {
 }
 ```
 
-Returns `null` when time-travel is disabled. See [Time-Travel](/docs/advanced/time-travel) for changesets and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
 
 ---
 
@@ -558,9 +579,9 @@ import { Show } from 'solid-js';
 
 function UserCard() {
   // Subscribe to loading, error, and user states
-  const loading = useFact<boolean>(system, "loading");
-  const error = useFact<string | null>(system, "error");
-  const user = useFact<User | null>(system, "user");
+  const loading = useFact(system, "loading");
+  const error = useFact(system, "error");
+  const user = useFact(system, "user");
 
   return (
     <Show when={!loading()} fallback={<Spinner />}>
@@ -581,7 +602,7 @@ Write facts through the system directly:
 ```tsx
 function UserIdInput() {
   // Subscribe to the current userId
-  const userId = useFact<number>(system, "userId");
+  const userId = useFact(system, "userId");
 
   return (
     <input

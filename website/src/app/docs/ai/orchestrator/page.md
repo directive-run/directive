@@ -458,7 +458,7 @@ function AgentPanel() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { createAgentOrchestrator } from 'directive/ai';
 import { useFact, useSelector, useInspect } from 'directive/vue';
@@ -483,7 +483,7 @@ const { isSettled } = useInspect(orchestrator.system);
 
 ### Svelte
 
-```svelte
+```html
 <script>
 import { createAgentOrchestrator } from 'directive/ai';
 import { useFact, useInspect } from 'directive/svelte';

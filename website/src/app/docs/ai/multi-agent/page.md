@@ -371,7 +371,7 @@ function MultiAgentPanel() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { createMultiAgentOrchestrator } from 'directive/ai';
 import { useFact, useInspect } from 'directive/vue';
@@ -392,7 +392,7 @@ const { isSettled } = useInspect(orchestrator.system);
 
 ### Svelte
 
-```svelte
+```html
 <script>
 import { createMultiAgentOrchestrator } from 'directive/ai';
 import { useFact, useInspect } from 'directive/svelte';

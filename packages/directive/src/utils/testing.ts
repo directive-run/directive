@@ -386,7 +386,7 @@ export function mockResolver<R extends Requirement = Requirement>(
 export interface FactChangeRecord {
 	/** The fact key that changed (without namespace prefix for namespaced systems) */
 	key: string;
-	/** The full key including namespace prefix (e.g., "test_value") */
+	/** The full key including namespace prefix (e.g., "test::value") */
 	fullKey: string;
 	/** The namespace (e.g., "test") - undefined for single-module systems */
 	namespace?: string;
@@ -492,16 +492,17 @@ export function createTestSystem<Modules extends ModulesMap>(
 	const trackingPlugin = {
 		name: "__test-tracking__",
 		onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
-			// Parse namespaced key (e.g., "test_value" -> namespace: "test", key: "value")
-			const underscoreIndex = fullKey.indexOf("_");
+			// Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
+			const SEPARATOR = "::";
+			const sepIndex = fullKey.indexOf(SEPARATOR);
 			let namespace: string | undefined;
 			let key: string;
 
-			if (underscoreIndex > 0) {
-				const possibleNamespace = fullKey.substring(0, underscoreIndex);
+			if (sepIndex > 0) {
+				const possibleNamespace = fullKey.substring(0, sepIndex);
 				if (moduleNamespaces.has(possibleNamespace)) {
 					namespace = possibleNamespace;
-					key = fullKey.substring(underscoreIndex + 1);
+					key = fullKey.substring(sepIndex + SEPARATOR.length);
 				} else {
 					key = fullKey;
 				}

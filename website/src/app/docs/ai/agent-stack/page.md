@@ -605,7 +605,7 @@ function AgentDashboard() {
 
 ### Vue
 
-```vue
+```html
 <script setup>
 import { createAgentStack } from 'directive/ai';
 import { useFact, useInspect } from 'directive/vue';
@@ -630,7 +630,7 @@ const { isSettled } = useInspect(system);
 
 ### Svelte
 
-```svelte
+```html
 <script>
 import { createAgentStack } from 'directive/ai';
 import { useFact, useInspect } from 'directive/svelte';

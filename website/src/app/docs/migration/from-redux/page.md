@@ -262,7 +262,7 @@ const system = createSystem({
 // Or define a custom plugin – plain object with lifecycle hooks
 const myPlugin = {
   // Called whenever a fact value changes
-  onFactChange: (key, value, prev) => {
+  onFactSet: (key, value, prev) => {
     console.log(`Fact ${key}: ${prev} -> ${value}`);
   },
 

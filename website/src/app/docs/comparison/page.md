@@ -9,18 +9,18 @@ Understand when to use Directive versus other popular state management solutions
 
 ## Feature Comparison
 
-| Feature | Redux | Zustand | XState | React Query | Directive |
-|---------|-------|---------|--------|-------------|-----------|
-| Declarative constraints | - | - | Partial | - | **Yes** |
-| Auto-tracking derivations | - | - | - | - | **Yes** |
-| Built-in retry/timeout | - | - | - | **Yes** | **Yes** |
-| Time-travel debugging | **Yes** | - | **Yes** | - | **Yes** |
-| Plugin architecture | Middleware | Middleware | - | - | **Yes** |
-| AI/Agent integration | - | - | - | - | **Yes** |
-| Framework agnostic | **Yes** | **Yes** | **Yes** | React-first | **Yes** |
-| TypeScript inference | Good | **Good** | Good | **Good** | **Excellent** |
-| Bundle size (gzip) | ~2KB | ~1KB | ~4KB | ~13KB | ~3KB |
-| Learning curve | Medium | Low | High | Low | Medium |
+| Feature | Redux | Zustand | MobX | XState | React Query | Directive |
+|---------|-------|---------|------|--------|-------------|-----------|
+| Declarative constraints | - | - | - | Partial | - | **Yes** |
+| Auto-tracking derivations | - | - | **Yes** | - | - | **Yes** |
+| Built-in retry/timeout | - | - | - | - | **Yes** | **Yes** |
+| Time-travel debugging | **Yes** | - | - | **Yes** | - | **Yes** |
+| Plugin architecture | Middleware | Middleware | - | - | - | **Yes** |
+| AI/Agent integration | - | - | - | - | - | **Yes** |
+| Framework agnostic | **Yes** | **Yes** | **Yes** | **Yes** | React-first | **Yes** |
+| TypeScript inference | Good | **Good** | Good | Good | **Good** | **Excellent** |
+| Bundle size (gzip) | ~2KB | ~1KB | ~5KB | ~4KB | ~13KB | ~3KB |
+| Learning curve | Medium | Low | Low | High | Low | Medium |
 
 ---
 
@@ -163,12 +163,44 @@ useUserStore.getState().fetchUser();
 
 **Directive:**
 ```typescript
-// Just set the fact – constraints detect the need automatically
-system.facts.userId = 123;
+// Constraints detect the need automatically – no fetchUser() to call
+const userModule = createModule("user", {
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.object<User>().nullable(),
+      loading: t.boolean(),
+      error: t.string().nullable(),
+    },
+  },
 
-// Wait for the system to settle (all resolvers complete)
+  constraints: {
+    needsUser: {
+      when: (f) => f.userId > 0 && !f.user && !f.loading,
+      require: { type: "FETCH_USER" },
+    },
+  },
+
+  resolvers: {
+    fetchUser: {
+      requirement: "FETCH_USER",
+      retry: { attempts: 3, backoff: "exponential" },
+      resolve: async (req, context) => {
+        context.facts.loading = true;
+        try {
+          context.facts.user = await api.getUser(context.facts.userId);
+        } catch (e) {
+          context.facts.error = e instanceof Error ? e.message : 'Failed';
+        }
+        context.facts.loading = false;
+      },
+    },
+  },
+});
+
+// Just set the fact – the constraint handles the rest
+system.facts.userId = 123;
 await system.settle();
-// User is fetched, loaded, and ready – no manual trigger needed
 ```
 
 ---
@@ -281,26 +313,179 @@ React Query excels at server state synchronization.
 - Multi-step async flows
 - Cross-cutting constraints
 
-### Using Together
+### Code Comparison
 
-Directive can wrap React Query:
-
+**React Query:**
 ```typescript
-resolvers: {
-  fetchUser: {
-    requirement: "FETCH_USER",
-    resolve: async (req, context) => {
-      // Delegate caching and deduplication to React Query
-      const user = await queryClient.fetchQuery({
-        queryKey: ['user', context.facts.userId],
-        queryFn: () => api.getUser(context.facts.userId),
-      });
+// Define a query hook – React Query handles caching and refetching
+function UserProfile({ userId }: { userId: number }) {
+  const { data: user, isLoading, error } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => api.getUser(userId),
+    retry: 3,
+    enabled: userId > 0,
+  });
 
-      // Directive handles the constraint logic, React Query handles caching
-      context.facts.user = user;
+  // Each additional dependency needs its own useQuery
+  const { data: posts } = useQuery({
+    queryKey: ['posts', userId],
+    queryFn: () => api.getPosts(userId),
+    enabled: !!user, // Manual dependency chain
+  });
+
+  // Business logic lives in the component
+  if (user && !user.verified) {
+    // Must handle this imperatively
+  }
+}
+```
+
+**Directive:**
+```typescript
+// Constraints express dependencies and business rules declaratively
+const userModule = createModule("user", {
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.object<User>().nullable(),
+      posts: t.array(t.object<Post>()),
     },
   },
-},
+
+  constraints: {
+    needsUser: {
+      when: (f) => f.userId > 0 && !f.user,
+      require: { type: "FETCH_USER" },
+    },
+    needsPosts: {
+      when: (f) => f.user !== null && !f.posts.length,
+      require: { type: "FETCH_POSTS" },
+    },
+    needsVerification: {
+      when: (f) => f.user !== null && !f.user.verified,
+      require: { type: "VERIFY_USER" },
+    },
+  },
+
+  resolvers: {
+    fetchUser: {
+      requirement: "FETCH_USER",
+      retry: { attempts: 3, backoff: "exponential" },
+      resolve: async (req, ctx) => {
+        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      },
+    },
+    fetchPosts: {
+      requirement: "FETCH_POSTS",
+      resolve: async (req, ctx) => {
+        ctx.facts.posts = await api.getPosts(ctx.facts.userId);
+      },
+    },
+    verifyUser: {
+      requirement: "VERIFY_USER",
+      resolve: async (req, ctx) => {
+        await api.sendVerification(ctx.facts.user!.email);
+      },
+    },
+  },
+});
+```
+
+---
+
+## MobX
+
+MobX uses observables and reactions for transparent reactive programming.
+
+### When MobX is Better
+
+- Simple reactive state with minimal structure
+- Familiar OOP class-based stores
+- Incremental adoption in existing apps
+
+### When Directive is Better
+
+- Declarative constraints over imperative reactions
+- Built-in async resolution with retry/timeout
+- Multi-module coordination and AI integration
+
+### Code Comparison
+
+**MobX:**
+```typescript
+// Define an observable store class with actions and reactions
+class UserStore {
+  userId = 0;
+  user: User | null = null;
+  loading = false;
+
+  constructor() {
+    makeAutoObservable(this);
+
+    // Reactions are imperative – you wire them up manually
+    autorun(() => {
+      if (this.userId > 0 && !this.user && !this.loading) {
+        this.fetchUser();
+      }
+    });
+  }
+
+  // Actions must be explicitly marked or wrapped
+  async fetchUser() {
+    this.loading = true;
+    try {
+      const user = await api.getUser(this.userId);
+      runInAction(() => {
+        this.user = user;
+        this.loading = false;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.loading = false;
+      });
+      // No built-in retry – must implement manually
+    }
+  }
+}
+```
+
+**Directive:**
+```typescript
+// Constraints replace autorun – declarative instead of imperative
+const userModule = createModule("user", {
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.object<User>().nullable(),
+      loading: t.boolean(),
+      error: t.string().nullable(),
+    },
+  },
+
+  // Same auto-tracking, but the "what" and "how" are separated
+  constraints: {
+    needsUser: {
+      when: (f) => f.userId > 0 && !f.user && !f.loading,
+      require: { type: "FETCH_USER" },
+    },
+  },
+
+  resolvers: {
+    fetchUser: {
+      requirement: "FETCH_USER",
+      retry: { attempts: 3, backoff: "exponential" },
+      resolve: async (req, ctx) => {
+        ctx.facts.loading = true;
+        try {
+          ctx.facts.user = await api.getUser(ctx.facts.userId);
+        } catch (e) {
+          ctx.facts.error = e instanceof Error ? e.message : 'Failed';
+        }
+        ctx.facts.loading = false;
+      },
+    },
+  },
+});
 ```
 
 ---
@@ -310,6 +495,7 @@ resolvers: {
 | If you need... | Use |
 |----------------|-----|
 | Simple global state | Zustand |
+| Reactive OOP stores | MobX |
 | Server state + caching | React Query |
 | Explicit state machines | XState |
 | Large team + conventions | Redux |

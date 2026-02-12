@@ -708,6 +708,12 @@ export function createFactsStore<S extends Schema>(
 	const batchChanges: Array<{ key: string; value: unknown; prev: unknown; type: "set" | "delete" }> = [];
 	const dirtyKeys = new Set<string>();
 
+	// Notification coalescing: when notifyKey/notifyAll fires a listener that
+	// calls store.set(), defer the new notification until the current cycle completes.
+	let isNotifying = false;
+	const pendingNonBatchedChanges: Array<{ key: string; value: unknown; prev: unknown }> = [];
+	const MAX_NOTIFY_ITERATIONS = 100;
+
 	/** Check if a value is a Zod schema (robust detection) */
 	function isZodSchema(v: unknown): v is { safeParse: (v: unknown) => { success: boolean; error?: { message?: string; issues?: Array<{ message: string }> } }; _def: unknown; parse: unknown } {
 		return (
@@ -819,6 +825,51 @@ export function createFactsStore<S extends Schema>(
 		allListeners.forEach((listener) => listener());
 	}
 
+	/**
+	 * Run non-batched notifications with coalescing.
+	 * If a listener calls store.set(), the change is deferred and processed
+	 * after the current notification cycle completes.
+	 */
+	function notifyNonBatched(key: string, value: unknown, prev: unknown): void {
+		if (isNotifying) {
+			// Re-entrant: defer to after current notification cycle
+			pendingNonBatchedChanges.push({ key, value, prev });
+			return;
+		}
+
+		isNotifying = true;
+		try {
+			// Fire onChange, notifyKey, notifyAll for the initial change
+			onChange?.(key, value, prev);
+			notifyKey(key);
+			notifyAll();
+
+			// Process any changes that were deferred during notification
+			let iterations = 0;
+			while (pendingNonBatchedChanges.length > 0) {
+				if (++iterations > MAX_NOTIFY_ITERATIONS) {
+					pendingNonBatchedChanges.length = 0;
+					throw new Error(
+						`[Directive] Infinite notification loop detected after ${MAX_NOTIFY_ITERATIONS} iterations. ` +
+							`A listener is repeatedly mutating facts that re-trigger notifications.`,
+					);
+				}
+
+				const deferred = [...pendingNonBatchedChanges];
+				pendingNonBatchedChanges.length = 0;
+
+				for (const change of deferred) {
+					onChange?.(change.key, change.value, change.prev);
+					notifyKey(change.key);
+				}
+				// Single notifyAll for all deferred changes in this iteration
+				notifyAll();
+			}
+		} finally {
+			isNotifying = false;
+		}
+	}
+
 	/** Flush batched changes and notify */
 	function flush(): void {
 		if (batching > 0) return;
@@ -828,14 +879,37 @@ export function createFactsStore<S extends Schema>(
 			onBatch([...batchChanges]);
 		}
 
-		// Notify key-specific listeners
-		for (const key of dirtyKeys) {
-			notifyKey(key);
-		}
-
-		// Notify all listeners once
+		// Notify key-specific listeners (within coalescing guard)
 		if (dirtyKeys.size > 0) {
-			notifyAll();
+			isNotifying = true;
+			try {
+				for (const key of dirtyKeys) {
+					notifyKey(key);
+				}
+				notifyAll();
+
+				// Process any changes deferred during flush notification
+				let iterations = 0;
+				while (pendingNonBatchedChanges.length > 0) {
+					if (++iterations > MAX_NOTIFY_ITERATIONS) {
+						pendingNonBatchedChanges.length = 0;
+						throw new Error(
+							`[Directive] Infinite notification loop detected during flush after ${MAX_NOTIFY_ITERATIONS} iterations.`,
+						);
+					}
+
+					const deferred = [...pendingNonBatchedChanges];
+					pendingNonBatchedChanges.length = 0;
+
+					for (const change of deferred) {
+						onChange?.(change.key, change.value, change.prev);
+						notifyKey(change.key);
+					}
+					notifyAll();
+				}
+			} finally {
+				isNotifying = false;
+			}
 		}
 
 		// Clear batch state
@@ -872,9 +946,7 @@ export function createFactsStore<S extends Schema>(
 				batchChanges.push({ key: key as string, value, prev, type: "set" });
 				dirtyKeys.add(key as string);
 			} else {
-				onChange?.(key as string, value, prev);
-				notifyKey(key as string);
-				notifyAll();
+				notifyNonBatched(key as string, value, prev);
 			}
 		},
 
@@ -888,9 +960,7 @@ export function createFactsStore<S extends Schema>(
 				batchChanges.push({ key: key as string, value: undefined, prev, type: "delete" });
 				dirtyKeys.add(key as string);
 			} else {
-				onChange?.(key as string, undefined, prev);
-				notifyKey(key as string);
-				notifyAll();
+				notifyNonBatched(key as string, undefined, prev);
 			}
 		},
 

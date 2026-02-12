@@ -151,9 +151,8 @@ const counterWithEffectsModule = createModule("counter-effects", {
 
   // Effects are fire-and-forget side effects –they never mutate facts
   effects: {
-    // Log every change by comparing current and previous values
+    // Auto-tracks `count` – logs every change by comparing current and previous values
     logChanges: {
-      deps: ['count'],
       run: (facts, prev) => {
         if (prev && prev.count !== facts.count) {
           console.log(`Count changed: ${prev.count} to ${facts.count}`);
@@ -161,9 +160,8 @@ const counterWithEffectsModule = createModule("counter-effects", {
       },
     },
 
-    // Celebrate round numbers (10, 20, 30...)
+    // Auto-tracks `count` – celebrates round numbers (10, 20, 30...)
     notifyMilestone: {
-      deps: ['count'],
       run: (facts) => {
         if (facts.count % 10 === 0 && facts.count !== 0) {
           console.log(`Milestone reached: ${facts.count}!`);

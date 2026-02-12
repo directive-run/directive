@@ -131,6 +131,7 @@ export type {
 	DebugConfig,
 	TimeTravelAPI,
 	TimeTravelState,
+	SnapshotMeta,
 	// Inspection
 	SystemInspection,
 	RequirementExplanation,

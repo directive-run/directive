@@ -43,7 +43,7 @@ function useFact<T extends Record<string, unknown>>(system: System, factKeys: st
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useFact } from 'directive/vue';
 import { system } from './system';
@@ -81,7 +81,7 @@ function useDerived<T extends Record<string, unknown>>(system: System, derivatio
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useDerived } from 'directive/vue';
 import { system } from './system';
@@ -119,7 +119,7 @@ function useSelector<R>(
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useSelector, shallowEqual } from 'directive/vue';
 import { system } from './system';
@@ -152,7 +152,7 @@ function useEvents<M extends ModuleSchema>(system: System<M>): System<M>["events
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useEvents } from 'directive/vue';
 import { system } from './system';
@@ -179,7 +179,7 @@ function useDispatch<M extends ModuleSchema>(system: System<M>): (event: InferEv
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useDispatch } from 'directive/vue';
 import { system } from './system';
@@ -218,7 +218,7 @@ function useWatch<T>(
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useWatch } from 'directive/vue';
 import { system } from './system';
@@ -264,7 +264,7 @@ interface InspectState {
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useInspect } from 'directive/vue';
 import { system } from './system';
@@ -300,7 +300,7 @@ function useConstraintStatus(system: System, constraintId: string): ComputedRef<
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useConstraintStatus } from 'directive/vue';
 import { system } from './system';
@@ -332,7 +332,7 @@ function useExplain(system: System, requirementId: string): Ref<string | null>
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useExplain } from 'directive/vue';
 import { system } from './system';
@@ -375,7 +375,7 @@ interface RequirementTypeStatus {
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useRequirementStatus } from 'directive/vue';
 import { statusPlugin } from './system';
@@ -421,7 +421,7 @@ interface OptimisticUpdateResult {
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useOptimisticUpdate } from 'directive/vue';
 import { system, statusPlugin } from './system';
@@ -481,7 +481,7 @@ function useDirective<M extends ModuleSchema>(
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useDirective } from 'directive/vue';
 import { counterModule } from './counter-module';
@@ -502,7 +502,7 @@ const { facts, derived, events, dispatch } = useDirective(counterModule, {
 
 Selective subscriptions:
 
-```vue
+```html
 <script setup>
 import { useDirective } from 'directive/vue';
 import { counterModule } from './counter-module';
@@ -547,7 +547,7 @@ export const { useFact, useDerived, useDispatch, useEvents } =
   createTypedHooks<MyModuleSchema>();
 ```
 
-```vue
+```html
 <script setup>
 import { useFact, useDerived } from './typed-hooks';
 import { system } from './system';
@@ -585,7 +585,7 @@ interface TimeTravelState {
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useTimeTravel } from 'directive/vue';
 import { system } from './system';
@@ -625,7 +625,7 @@ function shallowEqual(a: unknown, b: unknown): boolean
 
 ### Usage
 
-```vue
+```html
 <script setup>
 import { useSelector, shallowEqual } from 'directive/vue';
 import { system } from './system';
