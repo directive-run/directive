@@ -23,9 +23,9 @@ All three guides follow the same pattern:
 
 1. **Analyze** – Map your existing concepts to Directive equivalents
 2. **Create module** – Define schema, init, events, derive, constraints, resolvers
-3. **Bridge** – Run both systems side-by-side using a [state bridge](/docs/bridges/overview)
+3. **Coexist** – Run both systems side-by-side using [subscribe/watch interop](/docs/works-with/overview)
 4. **Migrate UI** – Replace store hooks with Directive hooks
-5. **Remove bridge** – Once fully migrated, remove the old store
+5. **Remove old store** – Once fully migrated, remove the old state library
 
 ---
 
@@ -52,4 +52,6 @@ const checklist = generateMigrationChecklist(analysis);
 ## Next Steps
 
 - **Coming from Redux?** Start with [From Redux](/docs/migration/from-redux)
-- **Prefer incremental adoption?** See [State Bridges](/docs/bridges/overview) to run both side-by-side
+- **Coming from Zustand?** Start with [From Zustand](/docs/migration/from-zustand)
+- **Coming from XState?** Start with [From XState](/docs/migration/from-xstate)
+- **Prefer incremental adoption?** See [Works With](/docs/works-with/overview) to run both side-by-side

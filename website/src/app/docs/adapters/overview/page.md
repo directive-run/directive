@@ -25,23 +25,29 @@ All adapters share the same core hook names and signatures (adapted to each fram
 
 | Hook | Purpose |
 |------|---------|
-| `useSelector(fn)` | Auto-tracking cross-fact selector |
-| `useFact(key)` | Subscribe to a single fact |
-| `useFact([keys])` | Subscribe to multiple facts |
-| `useDerived(key)` | Subscribe to a derivation |
-| `useDerived([keys])` | Subscribe to multiple derivations |
-| `useEvents()` | Typed event dispatchers |
-| `useDispatch()` | Low-level event dispatch |
-| `useWatch(key, callback)` | Side-effect watcher (no re-render) |
-| `useInspect()` | System inspection (settled, unmet, inflight) |
+| `useSelector(system, fn)` | Auto-tracking cross-fact selector |
+| `useFact(system, key)` | Subscribe to a single fact |
+| `useFact(system, [keys])` | Subscribe to multiple facts |
+| `useDerived(system, key)` | Subscribe to a derivation |
+| `useDerived(system, [keys])` | Subscribe to multiple derivations |
+| `useEvents(system)` | Typed event dispatchers |
+| `useDispatch(system)` | Low-level event dispatch |
+| `useWatch(system, key, callback)` | Side-effect watcher (no re-render) |
+| `useInspect(system)` | System inspection (settled, unmet, inflight) |
+| `useExplain(system, reqId)` | Requirement explanation |
+| `useConstraintStatus(system)` | Reactive constraint inspection |
+| `useRequirementStatus(statusPlugin, type)` | Requirement loading/error status (takes `statusPlugin`, not `system`) |
+| `useOptimisticUpdate(system, statusPlugin?, type?)` | Optimistic mutations with rollback |
+| `useTimeTravel(system)` | Time-travel controls (undo/redo) |
 | `useDirective(moduleDef)` | Scoped system with selected or all subscriptions |
+| `createTypedHooks<M>()` | Factory for fully typed hook variants |
 
 ---
 
 ## How to Choose
 
 - **React** – Most comprehensive adapter. Use if you're building a React app.
-- **Vue** – Full composable API with `ref`-based reactivity. Context via `provide`/`inject`.
+- **Vue** – Full composable API with `ref`-based reactivity. Pass `system` explicitly to composables.
 - **Svelte** – Returns Svelte `Readable` stores. Use `$` prefix for auto-subscription.
 - **Solid** – Signal-based reactivity. Fine-grained updates without VDOM overhead.
 - **Lit** – Controller-based pattern for Web Components. Works with any Lit element.

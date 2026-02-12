@@ -51,12 +51,10 @@ import type {
 	InferDerivations,
 	InferEvents,
 	SingleModuleSystem,
-	System,
 	SystemSnapshot,
 	DistributableSnapshot,
 } from "../../core/types.js";
 import { createSystem } from "../../core/system.js";
-import { withTracking } from "../../core/tracking.js";
 import {
 	createRequirementStatusPlugin,
 	type RequirementTypeStatus,
@@ -65,6 +63,12 @@ import {
 	type InspectState,
 	type ConstraintInfo,
 	computeInspectState,
+	createThrottle,
+	assertSystem,
+	defaultEquality,
+	buildTimeTravelState,
+	runTrackedSelector,
+	depsChanged,
 } from "../shared.js";
 
 // Re-export for convenience
@@ -77,11 +81,6 @@ export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 // ============================================================================
 // Internal Helpers
 // ============================================================================
-
-/** Default equality function using Object.is */
-function defaultEquality<T>(a: T, b: T): boolean {
-	return Object.is(a, b);
-}
 
 /** Sentinel value for uninitialized selector cache */
 const UNINITIALIZED = Symbol("directive.uninitialized");
@@ -108,6 +107,7 @@ export function useFact(
 	system: SingleModuleSystem<any>,
 	keyOrKeys: string | string[],
 ): unknown {
+	assertSystem("useFact", system);
 	if (process.env.NODE_ENV !== "production" && typeof keyOrKeys === "function") {
 		console.error(
 			"[Directive] useFact() received a function. Did you mean useSelector()? " +
@@ -219,6 +219,7 @@ export function useDerived(
 	system: SingleModuleSystem<any>,
 	keyOrKeys: string | string[],
 ): unknown {
+	assertSystem("useDerived", system);
 	if (process.env.NODE_ENV !== "production" && typeof keyOrKeys === "function") {
 		console.error(
 			"[Directive] useDerived() received a function. Did you mean useSelector()? " +
@@ -332,6 +333,7 @@ export function useSelector(
 	selector: (state: any) => unknown,
 	equalityFn?: (a: unknown, b: unknown) => boolean,
 ): unknown {
+	assertSystem("useSelector", system);
 	// Store selector/eq in refs to avoid resubscription churn
 	const selectorRef = useRef(selector);
 	const eqRef = useRef(equalityFn ?? defaultEquality);
@@ -347,42 +349,7 @@ export function useSelector(
 	const deriveKeys = useMemo(() => new Set(Object.keys(system.derive)), [system]);
 
 	const runWithTracking = useCallback(() => {
-		const accessedDeriveKeys: string[] = [];
-
-		// Create a proxy that intercepts property access for both facts and derivations
-		const stateProxy = new Proxy(
-			{},
-			{
-				get(_, prop: string | symbol) {
-					if (typeof prop !== "string") return undefined;
-					// Derivation keys take priority to avoid collisions
-					if (deriveKeys.has(prop)) {
-						accessedDeriveKeys.push(prop);
-						return system.read(prop);
-					}
-					// Falls through to fact access via store.get() which calls trackAccess()
-					return system.facts.$store.get(prop);
-				},
-				has(_, prop: string | symbol) {
-					if (typeof prop !== "string") return false;
-					return deriveKeys.has(prop) || system.facts.$store.has(prop);
-				},
-				ownKeys() {
-					return [
-						...Object.keys(system.facts.$store.toObject()),
-						...deriveKeys,
-					];
-				},
-				getOwnPropertyDescriptor() {
-					return { configurable: true, enumerable: true, writable: true };
-				},
-			},
-		);
-
-		const { value, deps } = withTracking(() => selectorRef.current(stateProxy));
-		const factKeys = Array.from(deps) as string[];
-
-		return { value, factKeys, deriveKeys: accessedDeriveKeys };
+		return runTrackedSelector(system, deriveKeys, selectorRef.current);
 	}, [system, deriveKeys]);
 
 	const subscribe = useCallback(
@@ -403,16 +370,7 @@ export function useSelector(
 						system.facts.$store.subscribe(factKeys, () => {
 							// Re-track on notification for dynamic deps
 							const updated = runWithTracking();
-							const factsChanged =
-								updated.factKeys.length !== trackedFactKeysRef.current.length ||
-								updated.factKeys.some((k, i) => k !== trackedFactKeysRef.current[i]);
-							const derivedChanged =
-								updated.deriveKeys.length !== trackedDeriveKeysRef.current.length ||
-								updated.deriveKeys.some((k, i) => k !== trackedDeriveKeysRef.current[i]);
-
-							if (factsChanged || derivedChanged) {
-								resubscribe();
-							}
+							if (depsChanged(trackedFactKeysRef.current, updated.factKeys, trackedDeriveKeysRef.current, updated.deriveKeys)) resubscribe();
 							onStoreChange();
 						}),
 					);
@@ -429,16 +387,7 @@ export function useSelector(
 						system.subscribe(derivedKeys, () => {
 							// Re-track on notification for dynamic deps
 							const updated = runWithTracking();
-							const factsChanged =
-								updated.factKeys.length !== trackedFactKeysRef.current.length ||
-								updated.factKeys.some((k, i) => k !== trackedFactKeysRef.current[i]);
-							const derivedChanged =
-								updated.deriveKeys.length !== trackedDeriveKeysRef.current.length ||
-								updated.deriveKeys.some((k, i) => k !== trackedDeriveKeysRef.current[i]);
-
-							if (factsChanged || derivedChanged) {
-								resubscribe();
-							}
+							if (depsChanged(trackedFactKeysRef.current, updated.factKeys, trackedDeriveKeysRef.current, updated.deriveKeys)) resubscribe();
 							onStoreChange();
 						}),
 					);
@@ -478,6 +427,7 @@ export function useSelector(
 export function useDispatch<S extends ModuleSchema>(
 	system: SingleModuleSystem<S>,
 ): (event: InferEvents<S>) => void {
+	assertSystem("useDispatch", system);
 	return useCallback(
 		(event: InferEvents<S>) => {
 			system.dispatch(event);
@@ -490,7 +440,7 @@ export function useDispatch<S extends ModuleSchema>(
 // useWatch — derivation or fact side-effect (no re-render)
 // ============================================================================
 
-/** Watch a fact or derivation (auto-detected) */
+/** Watch a derivation or fact by key (auto-detected). When a key exists in both facts and derivations, the derivation overload takes priority. */
 export function useWatch<
 	S extends ModuleSchema,
 	K extends keyof InferDerivations<S> & string,
@@ -500,6 +450,18 @@ export function useWatch<
 	callback: (
 		newValue: InferDerivations<S>[K],
 		prevValue: InferDerivations<S>[K] | undefined,
+	) => void,
+): void;
+/** Watch a fact key with auto-detection. */
+export function useWatch<
+	S extends ModuleSchema,
+	K extends keyof InferFacts<S> & string,
+>(
+	system: SingleModuleSystem<S>,
+	key: K,
+	callback: (
+		newValue: InferFacts<S>[K] | undefined,
+		prevValue: InferFacts<S>[K] | undefined,
 	) => void,
 ): void;
 
@@ -538,6 +500,7 @@ export function useWatch(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
 	maybeCallback?: (newValue: any, prevValue: any) => void,
 ): void {
+	assertSystem("useWatch", system);
 	// Backward compat: useWatch(system, "fact", factKey, callback)
 	const isFact =
 		derivationIdOrKind === "fact" &&
@@ -589,29 +552,49 @@ export function useInspect(
 	system: SingleModuleSystem<any>,
 	options?: UseInspectOptions,
 ): InspectState {
+	assertSystem("useInspect", system);
 	// Always call the sync version (useSyncExternalStore path) — no conditional hooks
 	const syncState = _useInspectSync(system);
 
-	// Throttle is a ref-based overlay, not a separate hook path
 	const throttleMs = options?.throttleMs;
-	const throttledState = useRef(syncState);
-	const lastUpdate = useRef(0);
+	const [deferredState, setDeferredState] = useState(syncState);
+	const throttleRef = useRef<{ throttled: (...args: unknown[]) => void; cleanup: () => void } | null>(null);
+
+	// Create/recreate throttle when throttleMs changes
+	useEffect(() => {
+		if (!throttleMs || throttleMs <= 0) {
+			throttleRef.current?.cleanup();
+			throttleRef.current = null;
+			return;
+		}
+		// Clean up old throttle before creating new one
+		throttleRef.current?.cleanup();
+		throttleRef.current = createThrottle(
+			(...args: unknown[]) => { setDeferredState(args[0] as InspectState); },
+			throttleMs,
+		);
+		return () => {
+			throttleRef.current?.cleanup();
+			throttleRef.current = null;
+		};
+	}, [throttleMs]);
+
+	// Feed sync state through throttle after each render
+	useEffect(() => {
+		if (throttleRef.current) {
+			throttleRef.current.throttled(syncState);
+		}
+	}, [syncState]);
 
 	if (!throttleMs || throttleMs <= 0) return syncState;
-
-	const now = Date.now();
-	if (now - lastUpdate.current >= throttleMs) {
-		throttledState.current = syncState;
-		lastUpdate.current = now;
-	}
-	return throttledState.current;
+	return deferredState;
 }
 
 function _buildInspectState(
 	// biome-ignore lint/suspicious/noExplicitAny: Internal
 	system: SingleModuleSystem<any>,
 ): InspectState {
-	return computeInspectState(system as unknown as System<any>);
+	return computeInspectState(system);
 }
 
 function _useInspectSync(
@@ -690,6 +673,7 @@ export function useTimeTravel(
 	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
 	system: SingleModuleSystem<any>,
 ): TimeTravelState | null {
+	assertSystem("useTimeTravel", system);
 	const cachedRef = useRef<TimeTravelState | null>(null);
 
 	const subscribe = useCallback(
@@ -698,33 +682,21 @@ export function useTimeTravel(
 	);
 
 	const getSnapshot = useCallback(() => {
-		const debug = system.debug;
-		if (!debug) return null;
-
-		const canUndo = debug.currentIndex > 0;
-		const canRedo = debug.currentIndex < debug.snapshots.length - 1;
-		const currentIndex = debug.currentIndex;
-		const totalSnapshots = debug.snapshots.length;
+		const state = buildTimeTravelState(system);
+		if (!state) return null;
 
 		// Return stable reference when values haven't changed
 		if (
 			cachedRef.current &&
-			cachedRef.current.canUndo === canUndo &&
-			cachedRef.current.canRedo === canRedo &&
-			cachedRef.current.currentIndex === currentIndex &&
-			cachedRef.current.totalSnapshots === totalSnapshots
+			cachedRef.current.canUndo === state.canUndo &&
+			cachedRef.current.canRedo === state.canRedo &&
+			cachedRef.current.currentIndex === state.currentIndex &&
+			cachedRef.current.totalSnapshots === state.totalSnapshots
 		) {
 			return cachedRef.current;
 		}
 
-		cachedRef.current = {
-			canUndo,
-			canRedo,
-			undo: () => debug.goBack(),
-			redo: () => debug.goForward(),
-			currentIndex,
-			totalSnapshots,
-		};
+		cachedRef.current = state;
 		return cachedRef.current;
 	}, [system]);
 
@@ -1536,6 +1508,7 @@ export function DirectiveDevTools({
 export function useEvents<S extends ModuleSchema>(
 	system: SingleModuleSystem<S>,
 ): SingleModuleSystem<S>["events"] {
+	assertSystem("useEvents", system);
 	return useMemo(() => system.events, [system]);
 }
 
@@ -1558,6 +1531,7 @@ export function useExplain(
 	system: SingleModuleSystem<any>,
 	requirementId: string,
 ): string | null {
+	assertSystem("useExplain", system);
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
 			const unsubFacts = system.facts.$store.subscribeAll(onStoreChange);
@@ -1583,12 +1557,22 @@ export function useExplain(
 
 // ConstraintInfo is imported from ./shared.js and re-exported above
 
-/** Get all constraints or a single constraint by ID */
+/** Get all constraints */
+export function useConstraintStatus(
+	system: SingleModuleSystem<any>,
+): ConstraintInfo[];
+/** Get a single constraint by ID */
+export function useConstraintStatus(
+	system: SingleModuleSystem<any>,
+	constraintId: string,
+): ConstraintInfo | null;
+/** Implementation */
 export function useConstraintStatus(
 	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
 	system: SingleModuleSystem<any>,
 	constraintId?: string,
 ): ConstraintInfo[] | ConstraintInfo | null {
+	assertSystem("useConstraintStatus", system);
 	const inspectState = useInspect(system);
 
 	return useMemo(() => {
@@ -1633,6 +1617,7 @@ export function useOptimisticUpdate(
 	statusPlugin?: StatusPlugin,
 	requirementType?: string,
 ): OptimisticUpdateResult {
+	assertSystem("useOptimisticUpdate", system);
 	const [isPending, setIsPending] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
 	const snapshotRef = useRef<SystemSnapshot | null>(null);

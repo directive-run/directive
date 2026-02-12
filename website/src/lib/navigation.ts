@@ -45,14 +45,14 @@ export const navigation = [
     ],
   },
   {
-    title: 'State Bridges',
+    title: 'Works With',
     links: [
-      { title: 'Bridge Overview', href: '/docs/bridges/overview' },
-      { title: 'Zustand', href: '/docs/bridges/zustand' },
-      { title: 'React Query', href: '/docs/bridges/react-query' },
-      { title: 'Redux', href: '/docs/bridges/redux' },
-      { title: 'XState', href: '/docs/bridges/xstate' },
-      { title: 'Web Worker', href: '/docs/bridges/worker' },
+      { title: 'Overview', href: '/docs/works-with/overview' },
+      { title: 'Redux', href: '/docs/works-with/redux' },
+      { title: 'Zustand', href: '/docs/works-with/zustand' },
+      { title: 'XState', href: '/docs/works-with/xstate' },
+      { title: 'React Query', href: '/docs/works-with/react-query' },
+      { title: 'Web Worker', href: '/docs/works-with/worker' },
     ],
   },
   {
