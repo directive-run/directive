@@ -5,7 +5,33 @@
  * @internal
  */
 
-import type { System } from "../core/types.js";
+import type { TimeTravelState, TimeTravelAPI, SystemInspection } from "../core/types.js";
+import { withTracking } from "../core/tracking.js";
+
+// ============================================================================
+// SystemLike — structural type satisfied by both System and SingleModuleSystem
+// ============================================================================
+
+/**
+ * Minimal structural type for shared adapter helpers.
+ * Both `System<any>` and `SingleModuleSystem<any>` satisfy this interface,
+ * eliminating the need for `as unknown as System<any>` casts in adapters.
+ * @internal
+ */
+export interface SystemLike {
+	readonly isSettled: boolean;
+	readonly debug: TimeTravelAPI | null;
+	readonly facts: {
+		$store: {
+			get(key: string): unknown;
+			has(key: string): boolean;
+			toObject(): Record<string, unknown>;
+		};
+	};
+	readonly derive?: Record<string, unknown>;
+	read(key: string): unknown;
+	inspect(): SystemInspection;
+}
 
 // ============================================================================
 // Requirements State
@@ -69,8 +95,7 @@ export interface ConstraintInfo {
  * Centralizes the logic currently duplicated across adapters.
  * @internal
  */
-// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
-export function computeInspectState(system: System<any>): InspectState {
+export function computeInspectState(system: SystemLike): InspectState {
 	const inspection = system.inspect();
 	return {
 		isSettled: system.isSettled,
@@ -153,4 +178,132 @@ export function createThrottle<T extends (...args: unknown[]) => void>(
 	};
 
 	return { throttled, cleanup };
+}
+
+// ============================================================================
+// Shared Adapter Helpers
+// ============================================================================
+
+/**
+ * Dev-mode assertion that the system parameter is non-null.
+ * Tree-shaken in production builds.
+ * @internal
+ */
+export function assertSystem(hookName: string, system: unknown): void {
+	if (process.env.NODE_ENV !== "production" && system == null) {
+		throw new Error(
+			`[Directive] ${hookName}() requires a system instance as the first argument. Received ${system}.`,
+		);
+	}
+}
+
+/** Default equality function using Object.is */
+export function defaultEquality<T>(a: T, b: T): boolean {
+	return Object.is(a, b);
+}
+
+/**
+ * Build a TimeTravelState object from a system's debug instance.
+ * Returns null when time-travel is disabled.
+ * @internal
+ */
+export function buildTimeTravelState(system: SystemLike): TimeTravelState | null {
+	const debug = system.debug;
+	if (!debug) return null;
+	return {
+		canUndo: debug.currentIndex > 0,
+		canRedo: debug.currentIndex < debug.snapshots.length - 1,
+		undo: () => debug.goBack(),
+		redo: () => debug.goForward(),
+		currentIndex: debug.currentIndex,
+		totalSnapshots: debug.snapshots.length,
+	};
+}
+
+/**
+ * Pick specific fact values from a system's store.
+ * @internal
+ */
+export function pickFacts(system: SystemLike, keys: string[]): Record<string, unknown> {
+	const result: Record<string, unknown> = {};
+	for (const key of keys) {
+		result[key] = system.facts.$store.get(key);
+	}
+	return result;
+}
+
+// ============================================================================
+// Tracked Selector
+// ============================================================================
+
+/** Result of running a selector with tracking. @internal */
+export interface TrackedSelectorResult<R> {
+	value: R;
+	factKeys: string[];
+	deriveKeys: string[];
+}
+
+/**
+ * Run a selector against a system with automatic dependency tracking.
+ * Creates a Proxy that intercepts property access to distinguish between
+ * fact reads (tracked via withTracking) and derivation reads (tracked manually).
+ *
+ * Used by useSelector in all framework adapters.
+ * @internal
+ */
+export function runTrackedSelector<R>(
+	system: SystemLike,
+	deriveKeySet: Set<string>,
+	selector: (state: Record<string, unknown>) => R,
+): TrackedSelectorResult<R> {
+	const accessedDeriveKeys: string[] = [];
+
+	const stateProxy = new Proxy(
+		{},
+		{
+			get(_, prop: string | symbol) {
+				if (typeof prop !== "string") return undefined;
+				if (deriveKeySet.has(prop)) {
+					accessedDeriveKeys.push(prop);
+					return system.read(prop);
+				}
+				return system.facts.$store.get(prop);
+			},
+			has(_, prop: string | symbol) {
+				if (typeof prop !== "string") return false;
+				return deriveKeySet.has(prop) || system.facts.$store.has(prop);
+			},
+			ownKeys() {
+				const factKeys = Object.keys(system.facts.$store.toObject());
+				const combined = new Set(factKeys);
+				for (const k of deriveKeySet) combined.add(k);
+				return [...combined];
+			},
+			getOwnPropertyDescriptor() {
+				return { configurable: true, enumerable: true, writable: true };
+			},
+		},
+	);
+
+	const { value, deps } = withTracking(() => selector(stateProxy as Record<string, unknown>));
+	return { value, factKeys: Array.from(deps) as string[], deriveKeys: accessedDeriveKeys };
+}
+
+/**
+ * Check if tracked dependency keys have changed.
+ * @internal
+ */
+export function depsChanged(
+	prevFacts: string[],
+	newFacts: string[],
+	prevDerived: string[],
+	newDerived: string[],
+): boolean {
+	const factsChanged =
+		newFacts.length !== prevFacts.length ||
+		newFacts.some((k, i) => k !== prevFacts[i]);
+	const derivedChanged =
+		newDerived.length !== prevDerived.length ||
+		newDerived.some((k, i) => k !== prevDerived[i]);
+	return factsChanged || derivedChanged;
 }
