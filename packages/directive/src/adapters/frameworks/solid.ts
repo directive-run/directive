@@ -1,24 +1,20 @@
 /**
  * Solid Adapter - Consolidated SolidJS primitives for Directive
  *
- * 18 active exports: useFact, useDerived, useDispatch, useSelector,
+ * 16 active exports: useFact, useDerived, useDispatch, useSelector,
  * useWatch, useInspect, useRequirementStatus, useEvents, useExplain,
  * useConstraintStatus, useOptimisticUpdate, useDirective, useTimeTravel,
- * useSystem, DirectiveProvider, createTypedHooks, useSuspenseRequirement, shallowEqual
+ * createTypedHooks, useSuspenseRequirement, shallowEqual
  *
  * Signal factories: createDerivedSignal, createFactSignal
  */
 
 import {
-	createContext,
-	useContext,
 	createSignal,
 	onCleanup,
 	type Accessor,
-	type JSX,
 } from "solid-js";
 import { createSystem } from "../../core/system.js";
-import { withTracking } from "../../core/tracking.js";
 import type {
 	ModuleSchema,
 	ModuleDef,
@@ -28,7 +24,7 @@ import type {
 	InferFacts,
 	InferDerivations,
 	InferEvents,
-	System,
+	SingleModuleSystem,
 	SystemSnapshot,
 } from "../../core/types.js";
 import {
@@ -40,6 +36,12 @@ import {
 	type ConstraintInfo,
 	computeInspectState,
 	createThrottle,
+	assertSystem,
+	defaultEquality,
+	buildTimeTravelState,
+	pickFacts,
+	runTrackedSelector,
+	depsChanged,
 } from "../shared.js";
 
 // Re-export for convenience
@@ -50,92 +52,26 @@ export { shallowEqual } from "../../utils/utils.js";
 export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 
 // ============================================================================
-// Context
-// ============================================================================
-
-// biome-ignore lint/suspicious/noExplicitAny: Context needs to work with any schema
-const DirectiveContext = createContext<System<any>>();
-
-/** Context for the requirement status plugin */
-const StatusPluginContext = createContext<StatusPlugin | null>();
-
-/**
- * Props for DirectiveProvider
- */
-export interface DirectiveProviderProps<M extends ModuleSchema> {
-	system: System<M>;
-	children: JSX.Element;
-	/** Optional requirement status plugin for useRequirementStatus hook */
-	statusPlugin?: StatusPlugin;
-}
-
-/**
- * Provider component for Directive system.
- */
-export function DirectiveProvider<M extends ModuleSchema>(
-	props: DirectiveProviderProps<M>,
-): JSX.Element {
-	return DirectiveContext.Provider({
-		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		value: props.system as System<any>,
-		children: StatusPluginContext.Provider({
-			value: props.statusPlugin ?? null,
-			children: props.children,
-		}),
-	});
-}
-
-// ============================================================================
-// Internal Helpers
-// ============================================================================
-
-/** Default equality function using Object.is */
-function defaultEquality<T>(a: T, b: T): boolean {
-	return Object.is(a, b);
-}
-
-function _useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
-	const system = useContext(DirectiveContext);
-	if (!system) {
-		throw new Error(
-			"[Directive] useSystem must be used within a DirectiveProvider. " +
-			"Wrap your component tree with <DirectiveProvider system={system}>.",
-		);
-	}
-	return system as System<M>;
-}
-
-function _getStatusPlugin(): StatusPlugin {
-	const statusPlugin = useContext(StatusPluginContext);
-	if (!statusPlugin) {
-		throw new Error(
-			"[Directive] This hook requires a statusPlugin. " +
-			"Pass statusPlugin to <DirectiveProvider statusPlugin={statusPlugin}>.",
-		);
-	}
-	return statusPlugin;
-}
-
-// ============================================================================
 // useFact — single key or multi key
 // ============================================================================
 
 /** Single key overload */
-export function useFact<T>(factKey: string): Accessor<T | undefined>;
+export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(system: SingleModuleSystem<S>, factKey: K): Accessor<InferFacts<S>[K] | undefined>;
 /** Multi-key overload */
-export function useFact<T extends Record<string, unknown>>(factKeys: string[]): Accessor<T>;
+export function useFact<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(system: SingleModuleSystem<S>, factKeys: K[]): Accessor<Pick<InferFacts<S>, K>>;
 /** Implementation */
 export function useFact(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
 	keyOrKeys: string | string[],
 ): Accessor<unknown> {
+	assertSystem("useFact", system);
 	if (process.env.NODE_ENV !== "production" && typeof keyOrKeys === "function") {
 		console.error(
 			"[Directive] useFact() received a function. Did you mean useSelector()? " +
 				"useFact() takes a string key or array of keys, not a selector function.",
 		);
 	}
-
-	const system = _useSystem();
 
 	// Multi-key path
 	if (Array.isArray(keyOrKeys)) {
@@ -147,7 +83,7 @@ export function useFact(
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Internal
-function _useFactSingle(system: System<any>, factKey: string): Accessor<unknown> {
+function _useFactSingle(system: SingleModuleSystem<any>, factKey: string): Accessor<unknown> {
 	if (process.env.NODE_ENV !== "production") {
 		if (!system.facts.$store.has(factKey)) {
 			console.warn(
@@ -166,7 +102,7 @@ function _useFactSingle(system: System<any>, factKey: string): Accessor<unknown>
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Internal
-function _useFactMulti(system: System<any>, factKeys: string[]): Accessor<Record<string, unknown>> {
+function _useFactMulti(system: SingleModuleSystem<any>, factKeys: string[]): Accessor<Record<string, unknown>> {
 	const getValues = (): Record<string, unknown> => {
 		const result: Record<string, unknown> = {};
 		for (const key of factKeys) {
@@ -187,21 +123,22 @@ function _useFactMulti(system: System<any>, factKeys: string[]): Accessor<Record
 // ============================================================================
 
 /** Single key overload */
-export function useDerived<T>(derivationId: string): Accessor<T>;
+export function useDerived<S extends ModuleSchema, K extends keyof InferDerivations<S> & string>(system: SingleModuleSystem<S>, derivationId: K): Accessor<InferDerivations<S>[K]>;
 /** Multi-key overload */
-export function useDerived<T extends Record<string, unknown>>(derivationIds: string[]): Accessor<T>;
+export function useDerived<S extends ModuleSchema, K extends keyof InferDerivations<S> & string>(system: SingleModuleSystem<S>, derivationIds: K[]): Accessor<Pick<InferDerivations<S>, K>>;
 /** Implementation */
 export function useDerived(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
 	idOrIds: string | string[],
 ): Accessor<unknown> {
+	assertSystem("useDerived", system);
 	if (process.env.NODE_ENV !== "production" && typeof idOrIds === "function") {
 		console.error(
 			"[Directive] useDerived() received a function. Did you mean useSelector()? " +
 				"useDerived() takes a string key or array of keys, not a selector function.",
 		);
 	}
-
-	const system = _useSystem();
 
 	// Multi-key path
 	if (Array.isArray(idOrIds)) {
@@ -213,7 +150,7 @@ export function useDerived(
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Internal
-function _useDerivedSingle(system: System<any>, derivationId: string): Accessor<unknown> {
+function _useDerivedSingle(system: SingleModuleSystem<any>, derivationId: string): Accessor<unknown> {
 	if (process.env.NODE_ENV !== "production") {
 		const initialValue = system.read(derivationId);
 		if (initialValue === undefined) {
@@ -232,7 +169,7 @@ function _useDerivedSingle(system: System<any>, derivationId: string): Accessor<
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Internal
-function _useDerivedMulti(system: System<any>, derivationIds: string[]): Accessor<Record<string, unknown>> {
+function _useDerivedMulti(system: SingleModuleSystem<any>, derivationIds: string[]): Accessor<Record<string, unknown>> {
 	const getValues = (): Record<string, unknown> => {
 		const result: Record<string, unknown> = {};
 		for (const id of derivationIds) {
@@ -257,49 +194,35 @@ function _useDerivedMulti(system: System<any>, derivationIds: string[]): Accesso
  * Uses `withTracking()` to detect which facts the selector accesses,
  * then subscribes only to those keys.
  */
+export function useSelector<S extends ModuleSchema, R>(
+	system: SingleModuleSystem<S>,
+	selector: (facts: InferFacts<S>) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): Accessor<R>;
 export function useSelector<R>(
-	selector: (state: Record<string, unknown>) => R,
-	equalityFn: (a: R, b: R) => boolean = defaultEquality,
-): Accessor<R> {
-	const system = _useSystem();
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any>,
+	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
+	selector: (facts: Record<string, any>) => R,
+	equalityFn?: (a: R, b: R) => boolean,
+): Accessor<R>;
+export function useSelector(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	selector: (state: any) => unknown,
+	equalityFn: (a: unknown, b: unknown) => boolean = defaultEquality,
+): Accessor<unknown> {
+	assertSystem("useSelector", system);
 	const deriveKeySet = new Set(Object.keys(system.derive ?? {}));
 
 	// Build a tracking-aware state proxy that exposes both facts and derivations
-	const runWithTracking = () => {
-		const accessedDeriveKeys: string[] = [];
-
-		const stateProxy = new Proxy(
-			{},
-			{
-				get(_, prop: string | symbol) {
-					if (typeof prop !== "string") return undefined;
-					if (deriveKeySet.has(prop)) {
-						accessedDeriveKeys.push(prop);
-						return system.read(prop);
-					}
-					return system.facts.$store.get(prop);
-				},
-				has(_, prop: string | symbol) {
-					if (typeof prop !== "string") return false;
-					return deriveKeySet.has(prop) || system.facts.$store.has(prop);
-				},
-				ownKeys() {
-					return [...Object.keys(system.facts.$store.toObject()), ...deriveKeySet];
-				},
-				getOwnPropertyDescriptor() {
-					return { configurable: true, enumerable: true, writable: true };
-				},
-			},
-		);
-
-		const { value, deps } = withTracking(() => selector(stateProxy as Record<string, unknown>));
-		return { value, factKeys: Array.from(deps) as string[], deriveKeys: accessedDeriveKeys };
-	};
+	const runWithTracking = () => runTrackedSelector(system, deriveKeySet, selector);
 
 	const initial = runWithTracking();
 	let trackedFactKeys = initial.factKeys;
 	let trackedDeriveKeys = initial.deriveKeys;
-	const [selected, setSelected] = createSignal<R>(initial.value);
+	const [selected, setSelected] = createSignal(initial.value);
 
 	const unsubs: Array<() => void> = [];
 
@@ -314,13 +237,7 @@ export function useSelector<R>(
 				return prev;
 			});
 			// Re-track: check if deps changed
-			const factsChanged =
-				result.factKeys.length !== trackedFactKeys.length ||
-				result.factKeys.some((k, i) => k !== trackedFactKeys[i]);
-			const derivedChanged =
-				result.deriveKeys.length !== trackedDeriveKeys.length ||
-				result.deriveKeys.some((k, i) => k !== trackedDeriveKeys[i]);
-			if (factsChanged || derivedChanged) {
+			if (depsChanged(trackedFactKeys, result.factKeys, trackedDeriveKeys, result.deriveKeys)) {
 				trackedFactKeys = result.factKeys;
 				trackedDeriveKeys = result.deriveKeys;
 				resubscribe();
@@ -350,11 +267,11 @@ export function useSelector<R>(
 // useDispatch
 // ============================================================================
 
-export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
-	event: InferEvents<M>,
-) => void {
-	const system = _useSystem<M>();
-	return (event: InferEvents<M>) => {
+export function useDispatch<S extends ModuleSchema>(
+	system: SingleModuleSystem<S>,
+): (event: InferEvents<S>) => void {
+	assertSystem("useDispatch", system);
+	return (event: InferEvents<S>) => {
 		system.dispatch(event);
 	};
 }
@@ -366,8 +283,10 @@ export function useDispatch<M extends ModuleSchema = ModuleSchema>(): (
 /**
  * Returns the system's events dispatcher.
  */
-export function useEvents<M extends ModuleSchema = ModuleSchema>(): System<M>["events"] {
-	const system = _useSystem<M>();
+export function useEvents<S extends ModuleSchema>(
+	system: SingleModuleSystem<S>,
+): SingleModuleSystem<S>["events"] {
+	assertSystem("useEvents", system);
 	return system.events;
 }
 
@@ -375,29 +294,45 @@ export function useEvents<M extends ModuleSchema = ModuleSchema>(): System<M>["e
 // useWatch — derivation or fact side-effect
 // ============================================================================
 
-/** Watch a fact or derivation (auto-detected) */
-export function useWatch<T>(
-	key: string,
-	callback: (newValue: T, previousValue: T | undefined) => void,
+/** Watch a derivation or fact by key (auto-detected). When a key exists in both facts and derivations, the derivation overload takes priority. */
+export function useWatch<S extends ModuleSchema, K extends keyof InferDerivations<S> & string>(
+	system: SingleModuleSystem<S>,
+	key: K,
+	callback: (newValue: InferDerivations<S>[K], previousValue: InferDerivations<S>[K] | undefined) => void,
+): void;
+/** Watch a fact key with auto-detection. */
+export function useWatch<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(
+	system: SingleModuleSystem<S>,
+	key: K,
+	callback: (newValue: InferFacts<S>[K] | undefined, previousValue: InferFacts<S>[K] | undefined) => void,
 ): void;
 /**
  * Watch a fact by explicit "fact" discriminator.
- * @deprecated Use `useWatch(key, callback)` instead — facts are now auto-detected.
+ * @deprecated Use `useWatch(system, key, callback)` instead — facts are now auto-detected.
  */
-export function useWatch<T>(
+export function useWatch<S extends ModuleSchema, K extends keyof InferFacts<S> & string>(
+	system: SingleModuleSystem<S>,
 	kind: "fact",
-	factKey: string,
-	callback: (newValue: T | undefined, previousValue: T | undefined) => void,
+	factKey: K,
+	callback: (newValue: InferFacts<S>[K] | undefined, previousValue: InferFacts<S>[K] | undefined) => void,
+): void;
+/** Watch a fact or derivation (generic fallback) */
+export function useWatch<T>(
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any>,
+	key: string,
+	callback: (newValue: T, previousValue: T | undefined) => void,
 ): void;
 /** Implementation */
 export function useWatch(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+	system: SingleModuleSystem<any>,
 	derivationIdOrKind: string,
 	callbackOrFactKey: string | ((newValue: unknown, prevValue: unknown) => void),
 	maybeCallback?: (newValue: unknown, prevValue: unknown) => void,
 ): void {
-	const system = _useSystem();
-
-	// Backward compat: useWatch("fact", factKey, callback)
+	assertSystem("useWatch", system);
+	// Backward compat: useWatch(system, "fact", factKey, callback)
 	const isFact =
 		derivationIdOrKind === "fact" &&
 		typeof callbackOrFactKey === "string" &&
@@ -425,8 +360,12 @@ export interface UseInspectOptions {
  * Consolidated system inspection hook.
  * Returns Accessor<InspectState> with optional throttling.
  */
-export function useInspect(options?: UseInspectOptions): Accessor<InspectState> {
-	const system = _useSystem();
+export function useInspect(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	options?: UseInspectOptions,
+): Accessor<InspectState> {
+	assertSystem("useInspect", system);
 	const [state, setState] = createSignal<InspectState>(computeInspectState(system));
 
 	const update = () => {
@@ -459,15 +398,14 @@ export function useInspect(options?: UseInspectOptions): Accessor<InspectState> 
 // ============================================================================
 
 /** Single type overload */
-export function useRequirementStatus(type: string): Accessor<RequirementTypeStatus>;
+export function useRequirementStatus(statusPlugin: StatusPlugin, type: string): Accessor<RequirementTypeStatus>;
 /** Multi-type overload */
-export function useRequirementStatus(types: string[]): Accessor<Record<string, RequirementTypeStatus>>;
+export function useRequirementStatus(statusPlugin: StatusPlugin, types: string[]): Accessor<Record<string, RequirementTypeStatus>>;
 /** Implementation */
 export function useRequirementStatus(
+	statusPlugin: StatusPlugin,
 	typeOrTypes: string | string[],
 ): Accessor<RequirementTypeStatus> | Accessor<Record<string, RequirementTypeStatus>> {
-	const statusPlugin = _getStatusPlugin();
-
 	if (Array.isArray(typeOrTypes)) {
 		const getValues = (): Record<string, RequirementTypeStatus> => {
 			const result: Record<string, RequirementTypeStatus> = {};
@@ -499,8 +437,12 @@ export function useRequirementStatus(
 /**
  * Reactively returns the explanation string for a requirement.
  */
-export function useExplain(requirementId: string): Accessor<string | null> {
-	const system = _useSystem();
+export function useExplain(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+	requirementId: string,
+): Accessor<string | null> {
+	assertSystem("useExplain", system);
 	const [explanation, setExplanation] = createSignal<string | null>(system.explain(requirementId));
 
 	const update = () => setExplanation(system.explain(requirementId));
@@ -518,14 +460,22 @@ export function useExplain(requirementId: string): Accessor<string | null> {
 // useConstraintStatus — reactive constraint inspection
 // ============================================================================
 
-/**
- * Get all constraints or a single constraint by ID.
- */
+/** Get all constraints */
 export function useConstraintStatus(
+	system: SingleModuleSystem<any>,
+): Accessor<ConstraintInfo[]>;
+/** Get a single constraint by ID */
+export function useConstraintStatus(
+	system: SingleModuleSystem<any>,
+	constraintId: string,
+): Accessor<ConstraintInfo | null>;
+/** Implementation */
+export function useConstraintStatus(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
 	constraintId?: string,
 ): Accessor<ConstraintInfo[] | ConstraintInfo | null> {
-	const system = _useSystem();
-
+	assertSystem("useConstraintStatus", system);
 	const getVal = () => {
 		const inspection = system.inspect();
 		if (!constraintId) return inspection.constraints;
@@ -561,10 +511,12 @@ export interface OptimisticUpdateResult {
  * a requirement type via statusPlugin, and rolls back on failure.
  */
 export function useOptimisticUpdate(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
 	statusPlugin?: StatusPlugin,
 	requirementType?: string,
 ): OptimisticUpdateResult {
-	const system = _useSystem();
+	assertSystem("useOptimisticUpdate", system);
 	const [isPending, setIsPending] = createSignal(false);
 	const [error, setError] = createSignal<Error | null>(null);
 	let snapshot: SystemSnapshot | null = null;
@@ -618,17 +570,16 @@ export function useOptimisticUpdate(
 /**
  * Single type: throws a promise while the requirement is pending (Suspense).
  */
-export function useSuspenseRequirement(type: string): Accessor<RequirementTypeStatus>;
+export function useSuspenseRequirement(statusPlugin: StatusPlugin, type: string): Accessor<RequirementTypeStatus>;
 /**
  * Multi-type: throws a promise while any of the requirements are pending.
  */
-export function useSuspenseRequirement(types: string[]): Accessor<Record<string, RequirementTypeStatus>>;
+export function useSuspenseRequirement(statusPlugin: StatusPlugin, types: string[]): Accessor<Record<string, RequirementTypeStatus>>;
 /** Implementation */
 export function useSuspenseRequirement(
+	statusPlugin: StatusPlugin,
 	typeOrTypes: string | string[],
 ): Accessor<RequirementTypeStatus> | Accessor<Record<string, RequirementTypeStatus>> {
-	const statusPlugin = _getStatusPlugin();
-
 	const types = Array.isArray(typeOrTypes) ? typeOrTypes : [typeOrTypes];
 
 	// Check if any are still loading — if so, throw a promise
@@ -647,37 +598,14 @@ export function useSuspenseRequirement(
 
 	// Once resolved, return normal accessor
 	if (Array.isArray(typeOrTypes)) {
-		return useRequirementStatus(typeOrTypes) as Accessor<Record<string, RequirementTypeStatus>>;
+		return useRequirementStatus(statusPlugin, typeOrTypes) as Accessor<Record<string, RequirementTypeStatus>>;
 	}
-	return useRequirementStatus(typeOrTypes) as Accessor<RequirementTypeStatus>;
-}
-
-// ============================================================================
-// useSystem — get system from context
-// ============================================================================
-
-export function useSystem<M extends ModuleSchema = ModuleSchema>(): System<M> {
-	return _useSystem<M>();
+	return useRequirementStatus(statusPlugin, typeOrTypes) as Accessor<RequirementTypeStatus>;
 }
 
 // ============================================================================
 // useTimeTravel — reactive time-travel signal
 // ============================================================================
-
-import type { TimeTravelState } from "../../core/types.js";
-
-function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
-	const debug = system.debug;
-	if (!debug) return null;
-	return {
-		canUndo: debug.currentIndex > 0,
-		canRedo: debug.currentIndex < debug.snapshots.length - 1,
-		undo: () => debug.goBack(),
-		redo: () => debug.goForward(),
-		currentIndex: debug.currentIndex,
-		totalSnapshots: debug.snapshots.length,
-	};
-}
 
 /**
  * Reactive time-travel signal. Returns an Accessor that updates
@@ -685,14 +613,17 @@ function _buildTTState(system: System<ModuleSchema>): TimeTravelState | null {
  *
  * @example
  * ```tsx
- * const tt = useTimeTravel();
+ * const tt = useTimeTravel(system);
  * <button disabled={!tt()?.canUndo} onClick={() => tt()?.undo()}>Undo</button>
  * ```
  */
-export function useTimeTravel(): Accessor<TimeTravelState | null> {
-	const system = _useSystem();
-	const [state, setState] = createSignal<TimeTravelState | null>(_buildTTState(system));
-	const unsub = system.onTimeTravelChange(() => setState(_buildTTState(system)));
+export function useTimeTravel(
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
+): Accessor<ReturnType<typeof buildTimeTravelState>> {
+	assertSystem("useTimeTravel", system);
+	const [state, setState] = createSignal<ReturnType<typeof buildTimeTravelState>>(buildTimeTravelState(system));
+	const unsub = system.onTimeTravelChange(() => setState(buildTimeTravelState(system)));
 	onCleanup(unsub);
 	return state;
 }
@@ -755,7 +686,7 @@ export function useDirective<M extends ModuleSchema>(
 		tickMs: config?.tickMs,
 		zeroConfig: config?.zeroConfig,
 		initialFacts: config?.initialFacts,
-	} as any) as unknown as System<M>;
+	} as any) as unknown as SingleModuleSystem<M>;
 
 	system.start();
 
@@ -771,7 +702,7 @@ export function useDirective<M extends ModuleSchema>(
 	const [factsState, setFactsState] = createSignal(
 		subscribeAll
 			? (system.facts.$store.toObject() as InferFacts<M>)
-			: (_pickFacts(system, factKeys ?? []) as InferFacts<M>),
+			: (pickFacts(system, factKeys ?? []) as InferFacts<M>),
 	);
 	const unsubFacts = subscribeAll
 		? system.facts.$store.subscribeAll(() => {
@@ -779,7 +710,7 @@ export function useDirective<M extends ModuleSchema>(
 		})
 		: factKeys && factKeys.length > 0
 			? system.facts.$store.subscribe(factKeys, () => {
-				setFactsState(() => _pickFacts(system, factKeys) as InferFacts<M>);
+				setFactsState(() => pickFacts(system, factKeys) as InferFacts<M>);
 			})
 			: null;
 
@@ -815,15 +746,6 @@ export function useDirective<M extends ModuleSchema>(
 	};
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal helper
-function _pickFacts(system: System<any>, keys: string[]): Record<string, unknown> {
-	const result: Record<string, unknown> = {};
-	for (const key of keys) {
-		result[key] = system.facts.$store.get(key);
-	}
-	return result;
-}
-
 // ============================================================================
 // Signal Factories (for use outside components)
 // ============================================================================
@@ -832,8 +754,8 @@ function _pickFacts(system: System<any>, keys: string[]): Record<string, unknown
  * Create a derivation signal outside of a component.
  */
 export function createDerivedSignal<T>(
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
 	derivationId: string,
 ): [Accessor<T>, () => void] {
 	const [value, setValue] = createSignal<T>(system.read(derivationId) as T);
@@ -847,8 +769,8 @@ export function createDerivedSignal<T>(
  * Create a fact signal outside of a component.
  */
 export function createFactSignal<T>(
-	// biome-ignore lint/suspicious/noExplicitAny: System type varies
-	system: System<any>,
+	// biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
+	system: SingleModuleSystem<any>,
 	factKey: string,
 ): [Accessor<T | undefined>, () => void] {
 	const [value, setValue] = createSignal<T | undefined>(
@@ -865,27 +787,41 @@ export function createFactSignal<T>(
 // ============================================================================
 
 export function createTypedHooks<M extends ModuleSchema>(): {
-	useDerived: <K extends keyof InferDerivations<M>>(
+	useFact: <K extends keyof InferFacts<M> & string>(
+		system: SingleModuleSystem<M>,
+		factKey: K,
+	) => Accessor<InferFacts<M>[K] | undefined>;
+	useDerived: <K extends keyof InferDerivations<M> & string>(
+		system: SingleModuleSystem<M>,
 		derivationId: K,
 	) => Accessor<InferDerivations<M>[K]>;
-	useFact: <K extends keyof InferFacts<M>>(factKey: K) => Accessor<InferFacts<M>[K] | undefined>;
-	useDispatch: () => (event: InferEvents<M>) => void;
-	useSystem: () => System<M>;
-	useEvents: () => System<M>["events"];
+	useDispatch: (system: SingleModuleSystem<M>) => (event: InferEvents<M>) => void;
+	useEvents: (system: SingleModuleSystem<M>) => SingleModuleSystem<M>["events"];
+	useWatch: <K extends string>(
+		system: SingleModuleSystem<M>,
+		key: K,
+		callback: (newValue: unknown, previousValue: unknown) => void,
+	) => void;
 } {
 	return {
-		useDerived: <K extends keyof InferDerivations<M>>(derivationId: K) =>
-			useDerived<InferDerivations<M>[K]>(derivationId as string),
-		useFact: <K extends keyof InferFacts<M>>(factKey: K) =>
-			useFact<InferFacts<M>[K]>(factKey as string),
-		useDispatch: () => {
-			const system = _useSystem<M>();
+		useFact: <K extends keyof InferFacts<M> & string>(system: SingleModuleSystem<M>, factKey: K) =>
+			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+			useFact(system as SingleModuleSystem<any>, factKey as string) as Accessor<InferFacts<M>[K] | undefined>,
+		useDerived: <K extends keyof InferDerivations<M> & string>(system: SingleModuleSystem<M>, derivationId: K) =>
+			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+			useDerived(system as SingleModuleSystem<any>, derivationId as string) as Accessor<InferDerivations<M>[K]>,
+		useDispatch: (system: SingleModuleSystem<M>) => {
 			return (event: InferEvents<M>) => {
 				system.dispatch(event);
 			};
 		},
-		useSystem: () => _useSystem<M>(),
-		useEvents: () => useEvents<M>(),
+		useEvents: (system: SingleModuleSystem<M>) => useEvents<M>(system),
+		useWatch: <K extends string>(
+			system: SingleModuleSystem<M>,
+			key: K,
+			callback: (newValue: unknown, previousValue: unknown) => void,
+		) =>
+			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+			useWatch(system as SingleModuleSystem<any>, key, callback),
 	};
 }
-

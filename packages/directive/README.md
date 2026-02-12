@@ -94,19 +94,11 @@ console.log(system.read("greeting")); // "Hello, John!"
 ## React Integration
 
 ```tsx
-import { DirectiveProvider, useDerived, useDispatch } from 'directive/react';
+import { useDerived, useDispatch } from 'directive/react';
 
-function App() {
-  return (
-    <DirectiveProvider system={system}>
-      <UserGreeting />
-    </DirectiveProvider>
-  );
-}
-
-function UserGreeting() {
-  const greeting = useDerived<string>("greeting");
-  const isLoggedIn = useDerived<boolean>("isLoggedIn");
+function UserGreeting({ system }) {
+  const greeting = useDerived<string>(system, "greeting");
+  const isLoggedIn = useDerived<boolean>(system, "isLoggedIn");
 
   return (
     <div>

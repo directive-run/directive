@@ -11,7 +11,7 @@ description: Declare what must be true. Define how to make it true. Let Directiv
 
 {% quick-link title="Examples" icon="plugins" href="/docs/examples/counter" description="Real-world patterns: data fetching, forms, multi-module apps, and AI agents." /%}
 
-{% quick-link title="React Integration" icon="theming" href="/docs/adapters/react" description="Hooks, providers, and patterns for seamless React integration." /%}
+{% quick-link title="React Integration" icon="theming" href="/docs/adapters/react" description="Hooks and patterns for seamless React integration." /%}
 
 {% /quick-links %}
 
@@ -82,11 +82,11 @@ system.timeTravel.goForward();
 First-class React support, with Vue, Svelte, Solid, and Lit adapters available.
 
 ```typescript
-import { useFact, useDerived, useSystem } from 'directive/react';
+import { useFact, useDerived } from 'directive/react';
 
-function UserProfile() {
-  const user = useFact('user');
-  const fullName = useDerived('fullName');
+function UserProfile({ system }) {
+  const user = useFact(system, 'user');
+  const fullName = useDerived(system, 'fullName');
   // ...
 }
 ```
