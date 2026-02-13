@@ -61,6 +61,10 @@ export interface EffectsManager<_S extends Schema = Schema> {
 	enable(id: string): void;
 	/** Check if an effect is enabled */
 	isEnabled(id: string): boolean;
+	/** Run all stored cleanup functions (called on system stop/destroy) */
+	cleanupAll(): void;
+	/** Register new effect definitions (for dynamic module registration) */
+	registerDefinitions(newDefs: EffectsDef<Schema>): void;
 }
 
 /** Internal effect state */
@@ -70,6 +74,7 @@ interface EffectState {
 	hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
 	dependencies: Set<string> | null; // null = not yet tracked
 	lastSnapshot: FactsSnapshot<Schema> | null;
+	cleanup: (() => void) | null; // cleanup function returned by last run()
 }
 
 /** Options for creating an effects manager */
@@ -97,6 +102,10 @@ export function createEffectsManager<S extends Schema>(
 	// Previous facts snapshot for comparison
 	let previousSnapshot: FactsSnapshot<Schema> | null = null;
 
+	// Track whether cleanupAll has been called (system stopped/destroyed).
+	// If an async effect resolves after stop, its cleanup is invoked immediately.
+	let stopped = false;
+
 	/** Initialize state for an effect */
 	function initState(id: string): EffectState {
 		const def = definitions[id];
@@ -110,6 +119,7 @@ export function createEffectsManager<S extends Schema>(
 			hasExplicitDeps: !!def.deps,
 			dependencies: def.deps ? new Set(def.deps as string[]) : null,
 			lastSnapshot: null,
+			cleanup: null,
 		};
 
 		states.set(id, state);
@@ -143,12 +153,45 @@ export function createEffectsManager<S extends Schema>(
 		return true;
 	}
 
+	/** Run cleanup for a single effect (safe — catches errors) */
+	function runCleanup(state: EffectState): void {
+		if (state.cleanup) {
+			try {
+				state.cleanup();
+			} catch (error) {
+				onError?.(state.id, error);
+				console.error(`[Directive] Effect "${state.id}" cleanup threw an error:`, error);
+			}
+			state.cleanup = null;
+		}
+	}
+
+	/** Store a cleanup function if the effect returned one */
+	function storeCleanup(state: EffectState, result: unknown): void {
+		if (typeof result === "function") {
+			if (stopped) {
+				// System already stopped — invoke cleanup immediately so it's not lost
+				try {
+					(result as () => void)();
+				} catch (error) {
+					onError?.(state.id, error);
+					console.error(`[Directive] Effect "${state.id}" cleanup threw an error:`, error);
+				}
+			} else {
+				state.cleanup = result as () => void;
+			}
+		}
+	}
+
 	/** Run a single effect */
 	async function runEffect(id: string): Promise<void> {
 		const state = getState(id);
 		const def = definitions[id];
 
 		if (!state.enabled || !def) return;
+
+		// Run previous cleanup before re-running
+		runCleanup(state);
 
 		onRun?.(id);
 
@@ -166,11 +209,12 @@ export function createEffectsManager<S extends Schema>(
 				});
 				trackedDeps = trackingResult.deps;
 
-				// If the effect is async, wait for it
-				const result = trackingResult.value;
+				// If the effect is async, wait for it and capture cleanup
+				let result = trackingResult.value;
 				if (result instanceof Promise) {
-					await result;
+					result = await result;
 				}
+				storeCleanup(state, result);
 
 				// Update tracked dependencies (always replace to catch new conditional reads)
 				state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
@@ -181,7 +225,10 @@ export function createEffectsManager<S extends Schema>(
 					effectPromise = def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
 				});
 				if (effectPromise instanceof Promise) {
-					await effectPromise;
+					const result = await effectPromise;
+					storeCleanup(state, result);
+				} else {
+					storeCleanup(state, effectPromise);
 				}
 			}
 		} catch (error) {
@@ -241,6 +288,20 @@ export function createEffectsManager<S extends Schema>(
 
 		isEnabled(id: string): boolean {
 			return getState(id).enabled;
+		},
+
+		cleanupAll(): void {
+			stopped = true;
+			for (const state of states.values()) {
+				runCleanup(state);
+			}
+		},
+
+		registerDefinitions(newDefs: EffectsDef<S>): void {
+			for (const [key, def] of Object.entries(newDefs)) {
+				(definitions as Record<string, unknown>)[key] = def;
+				initState(key);
+			}
 		},
 	};
 

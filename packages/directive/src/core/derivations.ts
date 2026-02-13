@@ -40,6 +40,8 @@ export interface DerivationsManager<S extends Schema, D extends DerivationsDef<S
 	getProxy(): DerivedValues<S, D>;
 	/** Get dependencies for a derivation */
 	getDependencies(id: keyof D): Set<string>;
+	/** Register new derivation definitions (for dynamic module registration) */
+	registerDefinitions(newDefs: DerivationsDef<S>): void;
 }
 
 /** Options for creating a derivations manager */
@@ -367,6 +369,13 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 
 		getDependencies(id: keyof D): Set<string> {
 			return getState(id as string).dependencies;
+		},
+
+		registerDefinitions(newDefs: DerivationsDef<S>): void {
+			for (const [key, fn] of Object.entries(newDefs)) {
+				(definitions as Record<string, unknown>)[key] = fn;
+				initState(key);
+			}
 		},
 	};
 

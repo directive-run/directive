@@ -40,6 +40,7 @@ export type {
 	TypedDerivationsDef,
 	// Effects
 	EffectsDef,
+	EffectCleanup,
 	// Requirements
 	Requirement,
 	RequirementWithId,
@@ -221,6 +222,7 @@ export { t, type Branded, type ExtendedSchemaType, type ChainableSchemaType } fr
 
 export {
 	createModule,
+	createModuleFactory,
 	type ModuleConfig,
 	type ModuleConfigWithDeps,
 } from "./core/module.js";
@@ -229,6 +231,21 @@ export {
 	module,
 	type ModuleBuilder,
 } from "./core/builder.js";
+export {
+	constraint,
+	when,
+	type ConstraintBuilderStart,
+	type ConstraintBuilderWithWhen,
+	type ConstraintBuilderComplete,
+	type WhenConstraint,
+	type WhenBuilder,
+} from "./core/constraint-builders.js";
+export {
+	system,
+	type SystemBuilderStart,
+	type SingleModuleSystemBuilder,
+	type NamespacedSystemBuilder,
+} from "./core/system-builder.js";
 
 // Convenience helper for status plugin setup
 export { createSystemWithStatus } from "./utils/system-with-status.js";

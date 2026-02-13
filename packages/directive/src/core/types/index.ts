@@ -43,7 +43,7 @@ export type {
 } from "./derivations.js";
 
 // Effect types
-export type { EffectDef, EffectsDef } from "./effects.js";
+export type { EffectDef, EffectsDef, EffectCleanup } from "./effects.js";
 
 // Event types
 export type {
