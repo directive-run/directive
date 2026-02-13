@@ -10,12 +10,13 @@ import {
   Scales,
   Sparkle,
   User,
+  UsersThree,
 } from '@phosphor-icons/react/dist/ssr'
 
 export const metadata: Metadata = {
   title: 'About — Directive',
   description:
-    'Learn about the Directive project, its constraint-driven philosophy, and the developer behind it.',
+    'Learn about the Directive project, its constraint-driven philosophy, and the team behind it.',
 }
 
 const projectStats = [
@@ -142,13 +143,24 @@ export default function AboutPage() {
           ))}
         </div>
 
-        {/* The Author */}
+        {/* The Team */}
         <div className="mt-20">
           <h2 className="font-display text-3xl font-semibold text-slate-900 dark:text-white">
-            The Author
+            The Team
           </h2>
 
-          <div className="mt-8 flex flex-col gap-8 sm:flex-row sm:items-start">
+          <p className="mt-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
+            Directive is built by a small, focused engineering team. Architecture
+            decisions, code reviews, security audits, and runtime hardening are
+            all handled in-house. We stay small by design &ndash; it keeps the
+            vision sharp and the iteration speed high.
+          </p>
+
+          <p className="mt-10 text-xs font-semibold uppercase tracking-widest text-brand-primary dark:text-brand-primary-400">
+            Creator &amp; Lead
+          </p>
+
+          <div className="mt-3 flex flex-col gap-8 sm:flex-row sm:items-start">
             {/* Avatar placeholder */}
             <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl bg-brand-primary-50/30 ring-1 ring-brand-primary-200/40 dark:bg-brand-primary-950/20 dark:ring-brand-primary-800/20">
               <User
@@ -166,30 +178,28 @@ export default function AboutPage() {
               </p>
               <div className="mt-1.5 flex items-center gap-1.5 text-base text-slate-400 dark:text-slate-500">
                 <MapPin weight="fill" className="h-4 w-4" />
-                Somewhere in the Great Plains, USA
+                Somewhere in the middle, building for everywhere
               </div>
             </div>
           </div>
 
           <div className="mt-8 space-y-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
             <p>
-              Jason is a full-stack engineer with over 20 years of experience
-              building for the web. From freelancing custom web applications
-              since 2006 to staff-level engineering roles at companies like Red
-              Ventures and Prismatic, his career has been shaped by a deep
-              curiosity for how systems work and a drive to make them better.
+              20+ years building for the web &ndash; from freelance roots to
+              Senior Web Developer at Vision Video Interactive, Engineering
+              Manager at Higher Education, and staff-level roles at Red
+              Ventures. Currently a Senior Application Engineer building
+              integration infrastructure for B2B platforms. The idea behind
+              Directive came from a hobby project &ndash; building Minglingo, a
+              real-time social app where wrangling complex, interconnected
+              systems demanded something better. Instead of reaching for
+              another library, the answer was to build one that met entirely new
+              constraints. So Directive was born!
             </p>
             <p>
-              Currently a Senior Application Engineer at Prismatic, he builds
-              integration infrastructure for B2B software companies. That
-              experience with complex, interconnected systems directly inspired
-              Directive&rsquo;s constraint-driven approach.
-            </p>
-            <p>
-              Beyond code, Jason is passionate about accessible web design,
-              typography, and art &amp; illustration &ndash; interests that
-              inform his attention to developer experience and the craft of
-              building tools people actually enjoy using.
+              Equal parts engineer and visionary. Obsessed with application
+              development, user experience, UI design, site performance, SEO,
+              typography, and building tools that actually feel good to use.
             </p>
           </div>
 
@@ -216,7 +226,52 @@ export default function AboutPage() {
               <ArrowRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5" />
             </a>
           </div>
+
+          {/* Application Engineers */}
+          <div className="mt-14 rounded-xl border border-slate-200/60 bg-slate-50/50 px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
+            <div className="flex items-center gap-3">
+              <UsersThree
+                weight="duotone"
+                className="h-7 w-7 text-brand-primary dark:text-brand-primary-400"
+              />
+              <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+                Application Engineers
+              </h3>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              Our application engineering team handles architecture analysis,
+              security auditing, and defense-in-depth hardening across the
+              constraint engine, resolver pipeline, and effects system.
+            </p>
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+                <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                  1,400+
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  tests passing
+                </p>
+              </div>
+              <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+                <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                  20+
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  hardening fixes shipped
+                </p>
+              </div>
+              <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+                <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                  100+
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  reviews completed
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   )

@@ -22,6 +22,7 @@ export const navigation = [
       { title: 'Resolvers', href: '/docs/resolvers' },
       { title: 'Effects', href: '/docs/effects' },
       { title: 'Events', href: '/docs/events' },
+      { title: 'Builders', href: '/docs/builders' },
     ],
   },
   {
@@ -62,6 +63,7 @@ export const navigation = [
       { title: 'Logging', href: '/docs/plugins/logging' },
       { title: 'DevTools', href: '/docs/plugins/devtools' },
       { title: 'Persistence', href: '/docs/plugins/persistence' },
+      { title: 'Performance', href: '/docs/plugins/performance' },
       { title: 'Custom Plugins', href: '/docs/plugins/custom' },
     ],
   },
@@ -97,6 +99,24 @@ export const navigation = [
       { title: 'Snapshots', href: '/docs/advanced/snapshots' },
       { title: 'SSR & Hydration', href: '/docs/advanced/ssr' },
       { title: 'Error Handling', href: '/docs/advanced/errors' },
+    ],
+  },
+  {
+    title: 'How-To Guides',
+    links: [
+      { title: 'Overview', href: '/docs/how-to/overview' },
+      { title: 'Loading & Error States', href: '/docs/how-to/loading-states' },
+      { title: 'Authentication Flow', href: '/docs/how-to/auth-flow' },
+      { title: 'WebSocket Connections', href: '/docs/how-to/websockets' },
+      { title: 'Optimistic Updates', href: '/docs/how-to/optimistic-updates' },
+      { title: 'Organize Modules', href: '/docs/how-to/organize-modules' },
+      { title: 'Optimize Re-Renders', href: '/docs/how-to/optimize-rerenders' },
+      { title: 'Debounce Constraints', href: '/docs/how-to/debounce-constraints' },
+      { title: 'Dynamic Modules', href: '/docs/how-to/dynamic-modules' },
+      { title: 'Persist State', href: '/docs/how-to/persist-state' },
+      { title: 'Batch Mutations', href: '/docs/how-to/batch-mutations' },
+      { title: 'Test Async Chains', href: '/docs/how-to/test-async-chains' },
+      { title: 'Debug with Time-Travel', href: '/docs/how-to/debug-time-travel' },
     ],
   },
   {
@@ -139,6 +159,12 @@ export const navigation = [
       { title: 'Svelte Hooks', href: '/docs/api/svelte' },
       { title: 'Solid Hooks', href: '/docs/api/solid' },
       { title: 'Lit Controllers', href: '/docs/api/lit' },
+    ],
+  },
+  {
+    title: 'Community',
+    links: [
+      { title: 'Theme Vote', href: '/docs/community/theme-vote' },
     ],
   },
   {

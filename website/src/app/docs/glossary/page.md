@@ -310,6 +310,114 @@ system.debug?.goTo(5);  // Jump to a specific snapshot index
 
 ---
 
+## Builders & Helpers
+
+Directive provides builder utilities for creating type-safe constraints and resolvers outside of `createModule()`. These are useful for reusable definitions, shared libraries, and orchestrator configuration.
+
+### Core Builders (`directive`)
+
+Directive provides two categories of core builders: **fluent builders** for ergonomic chaining, and **factory helpers** for typed one-offs.
+
+#### Fluent Builders
+
+```typescript
+import { constraint, when, system, module } from 'directive';
+```
+
+| Function | Description |
+|----------|-------------|
+| `constraint<Schema>()` | Fluent builder — chain `.when()`, `.require()`, optional fields, `.build()` |
+| `when<Schema>(condition)` | Quick shorthand — `.require()` returns a valid constraint directly |
+| `system()` | Fluent builder — chain `.module()` or `.modules()`, options, `.build()` |
+| `module(id)` | Fluent builder — chain `.schema()`, `.derive()`, `.events()`, `.build()` |
+
+```typescript
+// Full constraint builder
+const escalate = constraint<typeof schema>()
+  .when(f => f.confidence < 0.7)
+  .require({ type: 'ESCALATE' })
+  .priority(50)
+  .build();
+
+// Quick shorthand (no .build() needed)
+const pause = when<typeof schema>(f => f.errors > 3)
+  .require({ type: 'PAUSE' })
+  .withPriority(50);
+
+// System builder
+const sys = system()
+  .module(counterModule)
+  .plugins([loggingPlugin()])
+  .build();
+```
+
+#### Factory Helpers
+
+```typescript
+import {
+  constraintFactory,
+  resolverFactory,
+  typedConstraint,
+  typedResolver,
+} from 'directive';
+```
+
+| Function | Description |
+|----------|-------------|
+| `constraintFactory<Schema>()` | Returns a factory with `.create()` for building multiple typed constraints against a schema |
+| `resolverFactory<Schema>()` | Returns a factory with `.create()` for building multiple typed resolvers against a schema |
+| `typedConstraint<Schema, Req>(def)` | One-off typed constraint (no factory needed) |
+| `typedResolver<Schema, Req>(def)` | One-off typed resolver (no factory needed) |
+
+**See also**: [Builders documentation](/docs/builders) for full API reference and examples
+
+### AI Builders (`directive/ai`)
+
+For orchestrator-level constraints. The AI adapter has its own `constraint` and `when` typed against `OrchestratorConstraint` (simplified). For general use, prefer the core builders above.
+
+```typescript
+import { constraint, when, createOrchestratorBuilder } from 'directive/ai';
+```
+
+| Function | Description |
+|----------|-------------|
+| `constraint<Facts>()` | AI-scoped fluent builder (produces `OrchestratorConstraint`) |
+| `when<Facts>(condition)` | AI-scoped shorthand (produces `OrchestratorConstraint`) |
+| `createOrchestratorBuilder<Facts>()` | Fluent builder for the entire orchestrator config |
+
+```typescript
+// Fluent builder -- full control over every option
+const escalate = constraint<MyFacts>()
+  .when((f) => f.confidence < 0.7)
+  .require({ type: 'ESCALATE' })
+  .priority(50)
+  .build();
+
+// Quick shorthand -- returns a valid constraint directly
+const pause = when<MyFacts>((f) => f.errors > 3)
+  .require({ type: 'PAUSE' });
+
+// Shorthand with priority
+const halt = when<MyFacts>((f) => f.errors > 10)
+  .require({ type: 'HALT' })
+  .withPriority(100);
+```
+
+The orchestrator builder composes constraints, resolvers, guardrails, and plugins into a single chain:
+
+```typescript
+const orchestrator = createOrchestratorBuilder<MyFacts>()
+  .withConstraint('escalate', escalate)
+  .withResolver('escalate', { requirement: 'ESCALATE', resolve: async () => { /* ... */ } })
+  .withInputGuardrail('pii', createPIIGuardrail({ redact: true }))
+  .withBudget(10000)
+  .build({ runner, autoApproveToolCalls: true });
+```
+
+**See also**: [Orchestrator documentation](/docs/ai/orchestrator) for full builder examples
+
+---
+
 ## Related Terms
 
 ### Proxy

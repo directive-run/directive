@@ -474,46 +474,125 @@ events.increment();                    // Also typed!
 
 ## Time-Travel Debugging
 
-Use `useTimeTravel` for reactive time-travel controls. Returns a `ShallowRef<TimeTravelState | null>` with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
+`useTimeTravel` returns a `ShallowRef<TimeTravelState | null>` — `null` when disabled, otherwise the full reactive API. The ref auto-unwraps in templates, so you can access properties directly:
+
+### Undo / Redo Controls
 
 ```html
 <script setup>
 import { useTimeTravel } from 'directive/vue';
 import { system } from './system';
 
-const tt = useTimeTravel(system);
+const timeTravel = useTimeTravel(system);
 </script>
 
 <template>
-  <div v-if="tt">
-    <!-- Undo / Redo -->
-    <button @click="tt.undo" :disabled="!tt.canUndo">Undo</button>
-    <button @click="tt.redo" :disabled="!tt.canRedo">Redo</button>
-    <span>{{ tt.currentIndex + 1 }} / {{ tt.totalSnapshots }}</span>
-
-    <!-- Snapshot timeline — metadata only, no facts (keeps re-renders cheap) -->
-    <ul>
-      <li v-for="snap in tt.snapshots" :key="snap.id">
-        <button @click="tt.goTo(snap.id)">
-          {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
-        </button>
-      </li>
-    </ul>
-
-    <!-- Session persistence -->
-    <button @click="navigator.clipboard.writeText(tt.exportSession())">
-      Copy Session
-    </button>
-
-    <!-- Recording control -->
-    <button @click="tt.isPaused ? tt.resume() : tt.pause()">
-      {{ tt.isPaused ? 'Resume' : 'Pause' }} Recording
-    </button>
+  <div v-if="timeTravel">
+    <button @click="timeTravel.undo" :disabled="!timeTravel.canUndo">Undo</button>
+    <button @click="timeTravel.redo" :disabled="!timeTravel.canRedo">Redo</button>
+    <span>{{ timeTravel.currentIndex + 1 }} / {{ timeTravel.totalSnapshots }}</span>
   </div>
 </template>
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
+### Snapshot Timeline
+
+`snapshots` is lightweight metadata only (no facts data). Use `getSnapshotFacts(id)` to lazily load a snapshot's state on demand:
+
+```html
+<template>
+  <ul v-if="timeTravel">
+    <li v-for="snap in timeTravel.snapshots" :key="snap.id">
+      <button @click="timeTravel.goTo(snap.id)">
+        {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
+      </button>
+      <button @click="console.log(timeTravel.getSnapshotFacts(snap.id))">
+        Inspect
+      </button>
+    </li>
+  </ul>
+</template>
+```
+
+### Navigation
+
+```html
+<template>
+  <div v-if="timeTravel">
+    <button @click="timeTravel.goBack(5)">Back 5</button>
+    <button @click="timeTravel.goForward(5)">Forward 5</button>
+    <button @click="timeTravel.goTo(0)">Jump to Start</button>
+    <button @click="timeTravel.replay()">Replay All</button>
+  </div>
+</template>
+```
+
+### Session Persistence
+
+```html
+<script setup>
+import { useTimeTravel } from 'directive/vue';
+import { system } from './system';
+
+const timeTravel = useTimeTravel(system);
+
+function saveSession() {
+  if (timeTravel.value) {
+    localStorage.setItem('debug', timeTravel.value.exportSession());
+  }
+}
+
+function restoreSession() {
+  const saved = localStorage.getItem('debug');
+  if (saved && timeTravel.value) {
+    timeTravel.value.importSession(saved);
+  }
+}
+</script>
+
+<template>
+  <div v-if="timeTravel">
+    <button @click="saveSession">Save Session</button>
+    <button @click="restoreSession">Restore Session</button>
+  </div>
+</template>
+```
+
+### Changesets
+
+Group multiple fact mutations into a single undo/redo unit:
+
+```html
+<script setup>
+import { useTimeTravel } from 'directive/vue';
+import { system } from './system';
+
+const timeTravel = useTimeTravel(system);
+
+function handleComplexAction() {
+  timeTravel.value?.beginChangeset('Move piece A→B');
+  // ... multiple fact mutations ...
+  timeTravel.value?.endChangeset();
+  // Now undo/redo treats all mutations as one step
+}
+</script>
+
+<template>
+  <button @click="handleComplexAction">Move Piece</button>
+</template>
+```
+
+### Recording Control
+
+```html
+<template>
+  <button v-if="timeTravel" @click="timeTravel.isPaused ? timeTravel.resume() : timeTravel.pause()">
+    {{ timeTravel.isPaused ? 'Resume' : 'Pause' }} Recording
+  </button>
+</template>
+```
+
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
 
 ---
 

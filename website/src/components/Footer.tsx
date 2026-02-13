@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Heart } from '@phosphor-icons/react'
+import { Heart, Palette } from '@phosphor-icons/react'
 
 import { Logomark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeSelector'
@@ -28,7 +28,7 @@ export function Footer() {
               </span>
             </div>
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Declare requirements. Let the runtime resolve them.
+              Declare requirements. Let the runtime resolve them. A constraint-driven state management library for TypeScript that handles async resolution, dependency tracking, and side effects automatically.
             </p>
           </div>
 
@@ -63,15 +63,24 @@ export function Footer() {
               Community
             </h3>
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Directive is free and open source, sustained by the community.
+              Directive is free and open source, sustained by the community. Help shape the project by contributing, sponsoring, or voting on the default theme each month.
             </p>
-            <Link
-              href="/support"
-              className="mt-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
-            >
-              <Heart weight="fill" className="h-3.5 w-3.5" />
-              Support the project
-            </Link>
+            <div className="mt-4 flex flex-col gap-2">
+              <Link
+                href="/support"
+                className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+              >
+                <Heart weight="fill" className="h-3.5 w-3.5" />
+                Support the project
+              </Link>
+              <Link
+                href="/docs/community/theme-vote"
+                className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+              >
+                <Palette weight="fill" className="h-3.5 w-3.5" />
+                Vote on this month&apos;s theme
+              </Link>
+            </div>
           </div>
         </div>
 

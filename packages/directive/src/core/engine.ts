@@ -50,6 +50,7 @@ interface EngineState<_S extends Schema> {
 	isInitializing: boolean;
 	isInitialized: boolean;
 	isReady: boolean;
+	isDestroyed: boolean;
 	changedKeys: Set<string>;
 	previousRequirements: RequirementSet;
 	readyPromise: Promise<void> | null;
@@ -299,6 +300,7 @@ export function createEngine<S extends Schema>(
 		isInitializing: false,
 		isInitialized: false,
 		isReady: false,
+		isDestroyed: false,
 		changedKeys: new Set(),
 		previousRequirements: new RequirementSet(),
 		readyPromise: null,
@@ -567,6 +569,9 @@ export function createEngine<S extends Schema>(
 			// Cancel all resolvers
 			resolversManager.cancelAll();
 
+			// Run all effect cleanups
+			effectsManager.cleanupAll();
+
 			// Call module hooks
 			for (const module of config.modules) {
 				module.hooks?.onStop?.(system);
@@ -578,6 +583,7 @@ export function createEngine<S extends Schema>(
 
 		destroy(): void {
 			this.stop();
+			state.isDestroyed = true;
 			settlementListeners.clear();
 			timeTravelListeners.clear();
 			pluginManager.emitDestroy(system);
@@ -1129,6 +1135,124 @@ export function createEngine<S extends Schema>(
 			return state.readyPromise;
 		},
 	};
+
+	/**
+	 * Register a new module into a running (or stopped) engine.
+	 * Merges the module's schema, events, derive, effects, constraints, and resolvers
+	 * into the existing engine state, runs init, and triggers reconciliation.
+	 */
+	function registerModule(module: {
+		id: string;
+		schema: Record<string, unknown>;
+		requirements?: Record<string, unknown>;
+		init?: (facts: unknown) => void;
+		derive?: Record<string, (facts: unknown, derive: unknown) => unknown>;
+		events?: Record<string, (facts: unknown, event: unknown) => void>;
+		effects?: Record<string, unknown>;
+		constraints?: Record<string, unknown>;
+		resolvers?: Record<string, unknown>;
+		hooks?: { onInit?: (s: unknown) => void; onStart?: (s: unknown) => void; onStop?: (s: unknown) => void; onError?: (e: unknown, ctx: unknown) => void };
+	}): void {
+		// Guard: cannot register during reconciliation (would corrupt iteration state)
+		if (state.isReconciling) {
+			throw new Error(
+				`[Directive] Cannot register module "${module.id}" during reconciliation. ` +
+				`Wait for the current reconciliation cycle to complete.`,
+			);
+		}
+
+		// Guard: cannot register on a destroyed system
+		if (state.isDestroyed) {
+			throw new Error(
+				`[Directive] Cannot register module "${module.id}" on a destroyed system.`,
+			);
+		}
+
+		// Security: validate keys
+		const validateKeys = (obj: object | undefined, section: string) => {
+			if (!obj) return;
+			for (const key of Object.keys(obj)) {
+				if (BLOCKED_PROPS.has(key)) {
+					throw new Error(
+						`[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}.`,
+					);
+				}
+			}
+		};
+		validateKeys(module.schema, "schema");
+		validateKeys(module.events, "events");
+		validateKeys(module.derive, "derive");
+		validateKeys(module.effects, "effects");
+		validateKeys(module.constraints, "constraints");
+		validateKeys(module.resolvers, "resolvers");
+
+		// Schema collision detection (unconditional — production collision would cause data corruption)
+		for (const key of Object.keys(module.schema)) {
+			if (key in mergedSchema) {
+				throw new Error(
+					`[Directive] Schema collision: Fact "${key}" already exists. Cannot register module "${module.id}".`,
+				);
+			}
+		}
+		// Fact/derivation name collision check (dev-only warning)
+		if (process.env.NODE_ENV !== "production" && module.derive) {
+			const existingFactKeys = new Set(Object.keys(mergedSchema));
+			for (const key of Object.keys(module.derive)) {
+				if (existingFactKeys.has(key)) {
+					console.warn(
+						`[Directive] "${key}" exists as both a fact and a derivation after registering module "${module.id}".`,
+					);
+				}
+			}
+		}
+
+		// Merge into existing engine state
+		Object.assign(mergedSchema, module.schema);
+		if (module.events) Object.assign(mergedEvents, module.events);
+		if (module.derive) {
+			Object.assign(mergedDerive, module.derive);
+			// Register new derivations with the derivations manager
+			derivationsManager.registerDefinitions(module.derive as DerivationsDef<S>);
+		}
+		if (module.effects) {
+			Object.assign(mergedEffects, module.effects);
+			effectsManager.registerDefinitions(module.effects as EffectsDef<S>);
+		}
+		if (module.constraints) {
+			Object.assign(mergedConstraints, module.constraints);
+			constraintsManager.registerDefinitions(module.constraints as ConstraintsDef<S>);
+		}
+		if (module.resolvers) {
+			Object.assign(mergedResolvers, module.resolvers);
+			resolversManager.registerDefinitions(module.resolvers as ResolversDef<S>);
+		}
+
+		// Register new schema keys with the facts store
+		// biome-ignore lint/suspicious/noExplicitAny: Internal dynamic method
+		(store as any).registerKeys(module.schema as Record<string, unknown>);
+
+		// Track the new module in config.modules for hooks
+		config.modules.push(module as typeof config.modules[number]);
+
+		// Run init within a batch
+		if (module.init) {
+			store.batch(() => {
+				// biome-ignore lint/suspicious/noExplicitAny: Dynamic module init
+				module.init!(facts as any);
+			});
+		}
+
+		// Call lifecycle hooks
+		module.hooks?.onInit?.(system);
+		if (state.isRunning) {
+			module.hooks?.onStart?.(system);
+			// Trigger reconciliation to evaluate new constraints
+			scheduleReconcile();
+		}
+	}
+
+	// Attach registerModule to system
+	(system as Record<string, unknown>).registerModule = registerModule;
 
 	// Initialize plugins
 	pluginManager.emitInit(system);

@@ -400,6 +400,23 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	restore(snapshot: SystemSnapshot): void;
 
 	/**
+	 * Register a new module into a running system.
+	 * The module is initialized, wired into constraint/resolver/derivation graphs,
+	 * and reconciliation is triggered.
+	 *
+	 * @example
+	 * ```typescript
+	 * // Lazy-load a module
+	 * const chatModule = await import('./modules/chat');
+	 * system.registerModule("chat", chatModule.default);
+	 * ```
+	 */
+	registerModule<S extends ModuleSchema>(
+		namespace: string,
+		moduleDef: ModuleDef<S>,
+	): void;
+
+	/**
 	 * Get a distributable snapshot of computed derivations.
 	 * Use "namespace.key" format for derivation keys.
 	 *
@@ -654,6 +671,19 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	getSnapshot(): SystemSnapshot;
 	/** Restore system state from snapshot */
 	restore(snapshot: SystemSnapshot): void;
+
+	/**
+	 * Register a new module into a running system.
+	 * Module facts, derivations, effects, constraints, and resolvers are merged
+	 * into the existing engine and reconciliation is triggered.
+	 *
+	 * @example
+	 * ```typescript
+	 * const analyticsModule = await import('./modules/analytics');
+	 * system.registerModule(analyticsModule.default);
+	 * ```
+	 */
+	registerModule<S2 extends ModuleSchema>(moduleDef: ModuleDef<S2>): void;
 
 	/**
 	 * Get a distributable snapshot of computed derivations.
