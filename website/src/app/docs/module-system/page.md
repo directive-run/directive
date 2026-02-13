@@ -223,6 +223,34 @@ See **[Multi-Module](/docs/advanced/multi-module)** for more details.
 
 ---
 
+## Module Factory
+
+Use `createModuleFactory()` when you need multiple instances of the same module definition:
+
+```typescript
+import { createModuleFactory, t } from 'directive';
+
+const chatRoom = createModuleFactory({
+  schema: {
+    facts: { messages: t.array<string>(), users: t.array<string>() },
+    derivations: { count: t.number() },
+  },
+  init: (facts) => { facts.messages = []; facts.users = []; },
+  derive: { count: (facts) => facts.messages.length },
+});
+
+const system = createSystem({
+  modules: {
+    lobby: chatRoom("lobby"),
+    support: chatRoom("support"),
+  },
+});
+```
+
+See **[Multi-Module](/docs/advanced/multi-module)** for dynamic registration and factory patterns.
+
+---
+
 ## Module Lifecycle
 
 1. `createModule()` creates the module definition

@@ -54,6 +54,8 @@ export interface ResolversManager<_S extends Schema> {
 	isResolving(requirementId: string): boolean;
 	/** Process batched requirements (called periodically) */
 	processBatches(): void;
+	/** Register new resolver definitions (for dynamic module registration) */
+	registerDefinitions(newDefs: ResolversDef<Schema>): void;
 }
 
 /** Internal resolver state */
@@ -761,6 +763,14 @@ export function createResolversManager<S extends Schema>(
 			for (const resolverId of batches.keys()) {
 				processBatch(resolverId);
 			}
+		},
+
+		registerDefinitions(newDefs: ResolversDef<Schema>): void {
+			for (const [key, def] of Object.entries(newDefs)) {
+				(definitions as Record<string, unknown>)[key] = def;
+			}
+			// Clear the resolver-by-type cache so new resolvers are discovered
+			resolversByType.clear();
 		},
 	};
 

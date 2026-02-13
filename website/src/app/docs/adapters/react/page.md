@@ -644,48 +644,154 @@ test('displays user name', async () => {
 
 ## Time-Travel Debugging
 
-Use `useTimeTravel` for reactive time-travel controls. Returns `null` when disabled, otherwise a `TimeTravelState` with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
+`useTimeTravel` returns `null` when disabled, otherwise a reactive `TimeTravelState` with the full API. Destructure to pull out exactly what you need:
+
+### Undo / Redo Controls
 
 ```tsx
 import { useTimeTravel } from 'directive/react';
 
-function TimeTravelToolbar() {
-  const tt = useTimeTravel(system);
-  if (!tt) return null;
+function UndoRedo() {
+  const timeTravel = useTimeTravel(system);
+
+  if (!timeTravel) {
+    return null;
+  }
+
+  const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = timeTravel;
 
   return (
     <div>
-      {/* Undo / Redo */}
-      <button onClick={tt.undo} disabled={!tt.canUndo}>Undo</button>
-      <button onClick={tt.redo} disabled={!tt.canRedo}>Redo</button>
-      <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+      <button onClick={undo} disabled={!canUndo}>Undo</button>
+      <button onClick={redo} disabled={!canRedo}>Redo</button>
+      <span>{currentIndex + 1} / {totalSnapshots}</span>
+    </div>
+  );
+}
+```
 
-      {/* Snapshot timeline — metadata only, no facts (keeps re-renders cheap) */}
-      <ul>
-        {tt.snapshots.map((snap) => (
-          <li key={snap.id}>
-            <button onClick={() => tt.goTo(snap.id)}>
-              {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
-            </button>
-          </li>
-        ))}
-      </ul>
+### Snapshot Timeline
 
-      {/* Session persistence */}
-      <button onClick={() => navigator.clipboard.writeText(tt.exportSession())}>
-        Copy Session
+`snapshots` is lightweight metadata only (no facts data). Use `getSnapshotFacts(id)` to lazily load a snapshot's state on demand:
+
+```tsx
+function SnapshotTimeline() {
+  const timeTravel = useTimeTravel(system);
+
+  if (!timeTravel) {
+    return null;
+  }
+
+  const { snapshots, goTo, getSnapshotFacts } = timeTravel;
+
+  return (
+    <ul>
+      {snapshots.map((snap) => (
+        <li key={snap.id}>
+          <button onClick={() => goTo(snap.id)}>
+            {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+          </button>
+          <button onClick={() => console.log(getSnapshotFacts(snap.id))}>
+            Inspect
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Navigation
+
+```tsx
+function NavigationControls() {
+  const timeTravel = useTimeTravel(system);
+
+  if (!timeTravel) {
+    return null;
+  }
+
+  const { goBack, goForward, goTo, replay } = timeTravel;
+
+  return (
+    <div>
+      <button onClick={() => goBack(5)}>Back 5</button>
+      <button onClick={() => goForward(5)}>Forward 5</button>
+      <button onClick={() => goTo(0)}>Jump to Start</button>
+      <button onClick={replay}>Replay All</button>
+    </div>
+  );
+}
+```
+
+### Session Persistence
+
+```tsx
+function SessionControls() {
+  const timeTravel = useTimeTravel(system);
+
+  if (!timeTravel) {
+    return null;
+  }
+
+  const { exportSession, importSession } = timeTravel;
+
+  return (
+    <div>
+      <button onClick={() => localStorage.setItem('debug', exportSession())}>
+        Save Session
       </button>
-
-      {/* Recording control */}
-      <button onClick={tt.isPaused ? tt.resume : tt.pause}>
-        {tt.isPaused ? 'Resume' : 'Pause'} Recording
+      <button onClick={() => {
+        const saved = localStorage.getItem('debug');
+        if (saved) importSession(saved);
+      }}>
+        Restore Session
       </button>
     </div>
   );
 }
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
+### Changesets
+
+Group multiple fact mutations into a single undo/redo unit:
+
+```tsx
+function BatchedAction() {
+  const timeTravel = useTimeTravel(system);
+
+  function handleComplexAction() {
+    timeTravel?.beginChangeset('Move piece A→B');
+    // ... multiple fact mutations ...
+    timeTravel?.endChangeset();
+    // Now undo/redo treats all mutations as one step
+  }
+
+  return <button onClick={handleComplexAction}>Move Piece</button>;
+}
+```
+
+### Recording Control
+
+```tsx
+function RecordingToggle() {
+  const timeTravel = useTimeTravel(system);
+
+  if (!timeTravel) {
+    return null;
+  }
+
+  const { isPaused, pause, resume } = timeTravel;
+
+  return (
+    <button onClick={isPaused ? resume : pause}>
+      {isPaused ? 'Resume' : 'Pause'} Recording
+    </button>
+  );
+}
+```
+
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
 
 ---
 

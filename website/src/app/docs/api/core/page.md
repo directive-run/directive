@@ -39,6 +39,44 @@ function createModule<M extends ModuleSchema>(
 
 ---
 
+## createModuleFactory
+
+Create a factory that produces named module instances from a single definition.
+
+```typescript
+function createModuleFactory<M extends ModuleSchema>(
+  config: ModuleConfig<M>
+): (name: string) => ModuleDef<M>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `config` | `ModuleConfig` | Module configuration (same as `createModule`, without `name`) |
+
+### Returns
+
+A function `(name: string) => ModuleDef<M>` that creates named instances.
+
+### Example
+
+```typescript
+const chatRoom = createModuleFactory({
+  schema: { facts: { messages: t.array<string>() } },
+  init: (facts) => { facts.messages = []; },
+});
+
+const system = createSystem({
+  modules: {
+    lobby: chatRoom("lobby"),
+    support: chatRoom("support"),
+  },
+});
+```
+
+---
+
 ## createSystem
 
 Create a runtime system.
@@ -162,6 +200,16 @@ Clean up system resources.
 ```typescript
 system.destroy();
 ```
+
+### registerModule
+
+Register a module dynamically on a running namespaced system.
+
+```typescript
+system.registerModule(name: string, module: ModuleDef): void
+```
+
+The module is immediately wired into the constraint, resolver, effect, and derivation graphs. Throws if called during reconciliation or on a destroyed system.
 
 ### dispatch
 
@@ -353,8 +401,111 @@ const unsubscribe = system.watchDistributableSnapshot(
 
 ---
 
+## Builders & Helpers
+
+Type-safe utilities for defining constraints and resolvers outside of `createModule()`. Useful for shared libraries, reusable definitions, and composable module configurations.
+
+### constraintFactory
+
+Create a factory that produces typed constraints for a specific schema.
+
+```typescript
+function constraintFactory<S extends Schema>(): {
+  create<R extends Requirement>(constraint: TypedConstraint<S, R>): TypedConstraint<S, R>
+}
+```
+
+```typescript
+import { constraintFactory, t } from 'directive';
+
+const schema = { facts: { count: t.number(), threshold: t.number() } };
+const factory = constraintFactory<typeof schema>();
+
+const maxCount = factory.create({
+  when: (facts) => facts.count > facts.threshold,
+  require: { type: "RESET" },
+});
+
+// Use in any module with the same schema
+const module = createModule("counter", {
+  schema,
+  constraints: { maxCount },
+});
+```
+
+### resolverFactory
+
+Create a factory that produces typed resolvers for a specific schema.
+
+```typescript
+function resolverFactory<S extends Schema>(): {
+  create<R extends Requirement>(resolver: TypedResolver<S, R>): TypedResolver<S, R>
+}
+```
+
+```typescript
+import { resolverFactory } from 'directive';
+
+const factory = resolverFactory<typeof schema>();
+
+const fetchUser = factory.create<{ type: "FETCH_USER"; userId: string }>({
+  requirement: "FETCH_USER",
+  resolve: async (req, ctx) => {
+    ctx.facts.user = await api.getUser(req.userId);
+  },
+});
+```
+
+### typedConstraint
+
+One-off typed constraint creator. Simpler than `constraintFactory` when you only need a single definition.
+
+```typescript
+function typedConstraint<S extends Schema, R extends Requirement>(
+  constraint: TypedConstraint<S, R>
+): TypedConstraint<S, R>
+```
+
+```typescript
+import { typedConstraint } from 'directive';
+
+const lowStock = typedConstraint<typeof schema, { type: "REORDER" }>({
+  when: (facts) => facts.stock < 10,
+  require: { type: "REORDER" },
+  priority: 50,
+});
+```
+
+### typedResolver
+
+One-off typed resolver creator. Simpler than `resolverFactory` when you only need a single definition.
+
+```typescript
+function typedResolver<S extends Schema, R extends Requirement>(
+  resolver: TypedResolver<S, R>
+): TypedResolver<S, R>
+```
+
+```typescript
+import { typedResolver } from 'directive';
+
+const resetResolver = typedResolver<typeof schema, { type: "RESET" }>({
+  requirement: "RESET",
+  resolve: async (_req, ctx) => {
+    ctx.facts.count = 0;
+  },
+});
+```
+
+{% callout title="AI Orchestrator Builders" %}
+For AI agent orchestrators, `directive/ai` exports additional builders: `constraint()` (fluent builder), `when()` (quick shorthand), and `createOrchestratorBuilder()` (full orchestrator composition). See [Orchestrator](/docs/ai/orchestrator) and [Glossary](/docs/glossary#builders--helpers).
+{% /callout %}
+
+---
+
 ## Next Steps
 
 - See [Types](/docs/api/types) for type definitions
 - See [React Hooks](/docs/api/react) for React API
 - See [Module and System](/docs/module-system) for usage
+- See [Glossary](/docs/glossary#builders--helpers) for all builder patterns at a glance

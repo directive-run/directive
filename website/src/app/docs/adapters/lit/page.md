@@ -536,67 +536,172 @@ class UserIds extends LitElement {
 
 ### TimeTravelController
 
-Reactive controller for time-travel state. Returns the full `TimeTravelState` API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
+Reactive controller — returns `null` when disabled, otherwise the full `TimeTravelState`. Destructure in `render()` to pull out what you need:
+
+#### Undo / Redo Controls
 
 ```typescript
 import { TimeTravelController } from 'directive/lit';
 
-class TimeTravelToolbar extends LitElement {
-  private _tt = new TimeTravelController(this, system);
+class UndoRedo extends LitElement {
+  private _timeTravel = new TimeTravelController(this, system);
 
   render() {
-    const tt = this._tt.value;
-    if (!tt) return html``;
+    const timeTravel = this._timeTravel.value;
+
+    if (!timeTravel) {
+      return html``;
+    }
+
+    const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = timeTravel;
 
     return html`
-      <!-- Undo / Redo -->
-      <button @click=${tt.undo} ?disabled=${!tt.canUndo}>Undo</button>
-      <button @click=${tt.redo} ?disabled=${!tt.canRedo}>Redo</button>
-      <span>${tt.currentIndex + 1} / ${tt.totalSnapshots}</span>
+      <button @click=${undo} ?disabled=${!canUndo}>Undo</button>
+      <button @click=${redo} ?disabled=${!canRedo}>Redo</button>
+      <span>${currentIndex + 1} / ${totalSnapshots}</span>
+    `;
+  }
+}
+```
 
-      <!-- Snapshot timeline — metadata only, no facts (keeps re-renders cheap) -->
+#### Snapshot Timeline
+
+`snapshots` is lightweight metadata only (no facts data). Use `getSnapshotFacts(id)` to lazily load a snapshot's state on demand:
+
+```typescript
+class SnapshotTimeline extends LitElement {
+  private _timeTravel = new TimeTravelController(this, system);
+
+  render() {
+    const timeTravel = this._timeTravel.value;
+
+    if (!timeTravel) {
+      return html``;
+    }
+
+    const { snapshots, goTo, getSnapshotFacts } = timeTravel;
+
+    return html`
       <ul>
-        ${tt.snapshots.map((snap) => html`
+        ${snapshots.map((snap) => html`
           <li>
-            <button @click=${() => tt.goTo(snap.id)}>
+            <button @click=${() => goTo(snap.id)}>
               ${snap.trigger} — ${new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+            <button @click=${() => console.log(getSnapshotFacts(snap.id))}>
+              Inspect
             </button>
           </li>
         `)}
       </ul>
+    `;
+  }
+}
+```
+
+#### Navigation, Session Persistence & Recording
+
+```typescript
+class TimeTravelControls extends LitElement {
+  private _timeTravel = new TimeTravelController(this, system);
+
+  render() {
+    const timeTravel = this._timeTravel.value;
+
+    if (!timeTravel) {
+      return html``;
+    }
+
+    const {
+      goBack, goForward, goTo, replay,
+      exportSession, importSession,
+      isPaused, pause, resume,
+    } = timeTravel;
+
+    return html`
+      <!-- Navigation -->
+      <button @click=${() => goBack(5)}>Back 5</button>
+      <button @click=${() => goForward(5)}>Forward 5</button>
+      <button @click=${() => goTo(0)}>Jump to Start</button>
+      <button @click=${replay}>Replay All</button>
 
       <!-- Session persistence -->
-      <button @click=${() => navigator.clipboard.writeText(tt.exportSession())}>
-        Copy Session
+      <button @click=${() => localStorage.setItem('debug', exportSession())}>
+        Save Session
+      </button>
+      <button @click=${() => {
+        const saved = localStorage.getItem('debug');
+        if (saved) {
+          importSession(saved);
+        }
+      }}>
+        Restore Session
       </button>
 
       <!-- Recording control -->
-      <button @click=${tt.isPaused ? tt.resume : tt.pause}>
-        ${tt.isPaused ? 'Resume' : 'Pause'} Recording
+      <button @click=${isPaused ? resume : pause}>
+        ${isPaused ? 'Resume' : 'Pause'} Recording
       </button>
     `;
   }
 }
 ```
 
+#### Changesets
+
+Group multiple fact mutations into a single undo/redo unit:
+
+```typescript
+class BatchedAction extends LitElement {
+  private _timeTravel = new TimeTravelController(this, system);
+
+  private _handleComplexAction() {
+    this._timeTravel.value?.beginChangeset('Move piece A→B');
+    // ... multiple fact mutations ...
+    this._timeTravel.value?.endChangeset();
+    // Now undo/redo treats all mutations as one step
+  }
+
+  render() {
+    return html`<button @click=${this._handleComplexAction}>Move Piece</button>`;
+  }
+}
+```
+
 ### useTimeTravel
 
-Non-reactive shorthand to read time-travel state (useful outside Lit elements):
+Non-reactive shorthand (useful outside Lit elements for imperative code):
 
 ```typescript
 import { useTimeTravel } from 'directive/lit';
 
-// Get time-travel state (non-reactive, useful for imperative code)
-const tt = useTimeTravel(system);
-if (tt) {
-  tt.undo();
-  tt.goTo(snap.id);
-  tt.exportSession();
-  tt.isPaused ? tt.resume() : tt.pause();
+const timeTravel = useTimeTravel(system);
+
+if (timeTravel) {
+  const { undo, redo, goTo, goBack, goForward, replay } = timeTravel;
+  const { exportSession, importSession } = timeTravel;
+  const { beginChangeset, endChangeset } = timeTravel;
+  const { isPaused, pause, resume } = timeTravel;
+
+  // Navigate
+  undo();
+  goBack(3);
+  goTo(0);
+
+  // Persist
+  localStorage.setItem('debug', exportSession());
+
+  // Changesets
+  beginChangeset('batch edit');
+  // ... mutations ...
+  endChangeset();
+
+  // Recording
+  isPaused ? resume() : pause();
 }
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
 
 ### getDerived / getFact
 

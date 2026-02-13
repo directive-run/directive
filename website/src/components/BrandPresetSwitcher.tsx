@@ -11,12 +11,20 @@ import {
   applyColorPreset,
   applyTypoPreset,
   clearPresets,
+  findColorPreset,
+  findTypoPreset,
   type ColorPreset,
   type TypoPreset,
 } from '@/lib/brand-presets'
-
-const STORAGE_KEY_COLOR = 'directive-brand-color'
-const STORAGE_KEY_TYPO = 'directive-brand-typo'
+import { buildTwitterUrl, buildBlueskyUrl, buildClipboardText, castVote } from '@/lib/share'
+import {
+  STORAGE_KEYS,
+  safeGetItem,
+  safeSetItem,
+  safeRemoveItem,
+  hasVotedThisMonth,
+  markVotedThisMonth,
+} from '@/lib/storage-keys'
 
 export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   className,
@@ -27,33 +35,36 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   const [colorId, setColorId] = useState<string>('default')
   const [typoId, setTypoId] = useState<number>(0)
   const [mounted, setMounted] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [voted, setVoted] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const firstColorRef = useRef<HTMLButtonElement>(null)
+  const activeColorRef = useRef(colorId)
 
   useEffect(() => {
     setMounted(true)
-    const savedColor = localStorage.getItem(STORAGE_KEY_COLOR)
-    const savedTypo = localStorage.getItem(STORAGE_KEY_TYPO)
+    const savedColor = safeGetItem(STORAGE_KEYS.COLOR)
+    const savedTypo = safeGetItem(STORAGE_KEYS.TYPO)
 
     if (savedColor) {
-      const preset = savedColor === 'default'
-        ? DEFAULT_COLOR_PRESET
-        : COLOR_PRESETS.find((p) => p.id === savedColor)
+      const preset = findColorPreset(savedColor)
       if (preset) {
         setColorId(savedColor)
+        activeColorRef.current = savedColor
         applyColorPreset(preset)
       }
     }
 
     if (savedTypo) {
       const id = parseInt(savedTypo, 10)
-      const preset = id === 0
-        ? DEFAULT_TYPO_PRESET
-        : TYPO_PRESETS.find((p) => p.id === id)
+      const preset = findTypoPreset(id)
       if (preset) {
         setTypoId(id)
         applyTypoPreset(preset)
       }
     }
+
+    setVoted(hasVotedThisMonth())
   }, [])
 
   // Close on click outside
@@ -68,82 +79,268 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [isOpen])
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen])
+
+  // Focus first color button when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => firstColorRef.current?.focus())
+    }
+  }, [isOpen])
+
   const handleColorChange = useCallback((preset: ColorPreset) => {
+    activeColorRef.current = preset.id
     setColorId(preset.id)
     applyColorPreset(preset)
-    localStorage.setItem(STORAGE_KEY_COLOR, preset.id)
+    safeSetItem(STORAGE_KEYS.COLOR, preset.id)
   }, [])
 
   const handleTypoChange = useCallback((preset: TypoPreset) => {
     setTypoId(preset.id)
     applyTypoPreset(preset)
-    localStorage.setItem(STORAGE_KEY_TYPO, String(preset.id))
+    safeSetItem(STORAGE_KEYS.TYPO, String(preset.id))
   }, [])
 
   const handleReset = useCallback(() => {
+    activeColorRef.current = 'default'
     clearPresets()
     setColorId('default')
     setTypoId(0)
-    localStorage.removeItem(STORAGE_KEY_COLOR)
-    localStorage.removeItem(STORAGE_KEY_TYPO)
+    safeRemoveItem(STORAGE_KEYS.COLOR)
+    safeRemoveItem(STORAGE_KEYS.TYPO)
   }, [])
 
+  // Hover preview — temporarily apply preset, restore on leave
+  const handleColorHover = useCallback((preset: ColorPreset) => {
+    applyColorPreset(preset)
+  }, [])
+
+  const handleColorLeave = useCallback(() => {
+    const current = findColorPreset(activeColorRef.current)
+    if (current) applyColorPreset(current)
+  }, [])
+
+  const fireVote = useCallback(() => {
+    if (hasVotedThisMonth()) return
+    castVote({ colorId, typoId })
+    markVotedThisMonth()
+    setVoted(true)
+  }, [colorId, typoId])
+
+  const handleShareTwitter = useCallback(() => {
+    fireVote()
+    window.open(buildTwitterUrl({ colorId, typoId }), '_blank', 'noopener,noreferrer')
+  }, [colorId, typoId, fireVote])
+
+  const handleShareBluesky = useCallback(() => {
+    fireVote()
+    window.open(buildBlueskyUrl({ colorId, typoId }), '_blank', 'noopener,noreferrer')
+  }, [colorId, typoId, fireVote])
+
+  const handleCopyClipboard = useCallback(async () => {
+    fireVote()
+    try {
+      await navigator.clipboard.writeText(buildClipboardText({ colorId, typoId }))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = buildClipboardText({ colorId, typoId })
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }, [colorId, typoId, fireVote])
+
   if (!mounted) {
-    return <div className={clsx('h-10 w-10 sm:h-6 sm:w-6', className)} suppressHydrationWarning />
+    return <div className={clsx('h-10 w-10 sm:h-8 sm:w-8', className)} suppressHydrationWarning />
   }
 
   const allColors = [DEFAULT_COLOR_PRESET, ...COLOR_PRESETS]
   const allTypos = [DEFAULT_TYPO_PRESET, ...TYPO_PRESETS]
+  const currentColor = findColorPreset(colorId) ?? DEFAULT_COLOR_PRESET
+  const currentTypo = findTypoPreset(typoId) ?? DEFAULT_TYPO_PRESET
 
   return (
     <div className={clsx('relative', className)} ref={panelRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={clsx(
-          'flex h-10 w-10 items-center justify-center rounded-lg shadow-md ring-1 shadow-black/5 ring-black/5 sm:h-6 sm:w-6 dark:ring-brand-primary/50',
+          'flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors sm:h-8 sm:w-8',
           isOpen
-            ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-            : 'bg-white text-slate-500 dark:bg-slate-600 dark:text-slate-300'
+            ? 'bg-brand-primary text-white shadow-sm dark:bg-brand-primary-400 dark:text-slate-900'
+            : 'bg-slate-100 text-brand-primary hover:bg-slate-200 dark:bg-slate-800 dark:text-brand-primary-400 dark:hover:bg-slate-700',
         )}
         aria-label="Toggle brand preset switcher"
+        aria-expanded={isOpen}
         title="Brand Preset Switcher"
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+        <svg
+          className="h-5 w-5 sm:h-4 sm:w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42"
+          />
         </svg>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-3 w-80 rounded-xl bg-white p-4 shadow-md ring-1 shadow-black/5 ring-black/5 dark:bg-slate-800 dark:ring-white/5">
-          <div className="mb-3 flex items-center justify-between">
+        <div
+          className="absolute top-full right-0 mt-3 max-h-[calc(100vh-8rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-white p-4 shadow-md ring-1 shadow-black/5 ring-black/5 dark:bg-slate-800 dark:ring-white/5"
+          role="dialog"
+          aria-label="Brand presets"
+        >
+          <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
               Brand Presets
             </h3>
             <button
               onClick={handleReset}
-              className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              className="cursor-pointer text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
               Reset
             </button>
           </div>
 
-          {/* Color Combos */}
+          {/* Current selection info */}
           <div className="mb-4">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
+              {currentColor.name}
+            </p>
+            <p className="text-[10px] text-slate-400">
+              {currentColor.primary.name} + {currentColor.accent.name} / {currentTypo.name}
+            </p>
+            <p className="mt-0.5 text-[10px] italic text-slate-400">
+              {currentColor.tagline}
+            </p>
+          </div>
+
+          {/* Cast Your Vote */}
+          <div
+            id="cast-your-vote"
+            className="mb-4 border-b border-slate-200 pb-4 dark:border-slate-700"
+          >
+            <p className="text-xs font-semibold text-slate-900 dark:text-white">
+              Cast Your Vote
+            </p>
+            <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+              {voted
+                ? 'Thanks for voting this month!'
+                : 'Share your pick. Most-voted theme becomes the default each month.'}
+            </p>
+            <div className="mt-2 flex gap-2">
+              {/* X/Twitter */}
+              <button
+                onClick={handleShareTwitter}
+                className="flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-slate-900 text-xs font-medium text-white transition-colors hover:bg-slate-700 dark:bg-slate-600 dark:hover:bg-slate-500"
+                aria-label="Share on X"
+                title="Share on X"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+                X
+              </button>
+              {/* Bluesky */}
+              <button
+                onClick={handleShareBluesky}
+                className="flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#0085ff] text-xs font-medium text-white transition-colors hover:bg-[#0070d6]"
+                aria-label="Share on Bluesky"
+                title="Share on Bluesky"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 600 530" fill="currentColor">
+                  <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.714 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" />
+                </svg>
+                Bsky
+              </button>
+              {/* Copy */}
+              <button
+                onClick={handleCopyClipboard}
+                className={clsx(
+                  'flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors',
+                  copied
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
+                )}
+                aria-label="Copy to clipboard"
+                title="Copy to clipboard"
+              >
+                {copied ? (
+                  <>
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+                      />
+                    </svg>
+                    Copy
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Color Combos */}
+          <div>
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               Color Combo
             </p>
-            <div className="grid grid-cols-6 gap-1.5">
-              {allColors.map((preset) => (
+            <div className="grid grid-cols-4 gap-1.5" onMouseLeave={handleColorLeave}>
+              {allColors.map((preset, index) => (
                 <button
                   key={preset.id}
+                  ref={index === 0 ? firstColorRef : undefined}
                   onClick={() => handleColorChange(preset)}
+                  onMouseEnter={() => handleColorHover(preset)}
                   className={clsx(
-                    'group relative flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition',
+                    'group relative flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1.5 pt-4 pb-2 transition',
                     colorId === preset.id
                       ? 'bg-slate-100 ring-2 ring-slate-900 dark:bg-slate-700 dark:ring-white'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-700/50',
                   )}
-                  title={preset.id === 'default' ? 'Default (Sky + Indigo)' : `${preset.id}: ${preset.primary.name} + ${preset.accent.name}`}
+                  aria-label={`${preset.name}: ${preset.primary.name} + ${preset.accent.name}`}
+                  title={`${preset.name}: ${preset.primary.name} + ${preset.accent.name}`}
                 >
                   <div className="flex gap-0.5">
                     <span
@@ -155,7 +352,7 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                       style={{ backgroundColor: preset.accent.hex }}
                     />
                   </div>
-                  <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400">
+                  <span className="max-w-full truncate text-[9px] font-medium text-slate-500 dark:text-slate-400">
                     {preset.id === 'default' ? 'Def' : preset.id}
                   </span>
                 </button>
@@ -164,8 +361,8 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
           </div>
 
           {/* Typography */}
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <div className="mt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               Typography
             </p>
             <div className="space-y-1">
@@ -174,31 +371,26 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                   key={preset.id}
                   onClick={() => handleTypoChange(preset)}
                   className={clsx(
-                    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition',
+                    'flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition',
                     typoId === preset.id
                       ? 'bg-slate-100 font-medium text-slate-900 ring-1 ring-slate-300 dark:bg-slate-700 dark:text-white dark:ring-slate-500'
-                      : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'
+                      : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50',
                   )}
                 >
                   <span className="w-4 flex-none text-center font-mono text-[10px] text-slate-400">
                     {preset.id === 0 ? '-' : preset.id}
                   </span>
-                  <span className="truncate">
-                    {preset.display.name} + {preset.body.name}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{preset.name}</span>
+                    <span className="block truncate text-[10px] text-slate-400">
+                      {preset.display.name} + {preset.body.name}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Current selection info */}
-          <div className="mt-3 border-t border-slate-200 pt-2 dark:border-slate-700">
-            <p className="text-[10px] text-slate-400">
-              {colorId === 'default' ? 'Default colors' : `Combo ${colorId}`}
-              {' / '}
-              {typoId === 0 ? 'Default fonts' : `Type ${typoId}`}
-            </p>
-          </div>
         </div>
       )}
     </div>

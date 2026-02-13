@@ -60,7 +60,12 @@
       "WebFetch(domain:zustand-demo.pmnd.rs)",
       "WebFetch(domain:tanstack.com)",
       "Bash(for sdk in ai langchain langchainjs langgraph openai-agents-js query redux xstate zustand syntax-ts tailwind-plus-radiant)",
-      "Bash(do echo '=== $sdk ===' find /Users/jasonwcomes/Desktop/Sizls/projects/directive/.references/$sdk -type f \\\\\\(-name *.md -o -name *.ts -o -name *.tsx -o -name *.js -o -name *.json \\\\\\))"
+      "Bash(do echo '=== $sdk ===' find /Users/jasonwcomes/Desktop/Sizls/projects/directive/.references/$sdk -type f \\\\\\(-name *.md -o -name *.ts -o -name *.tsx -o -name *.js -o -name *.json \\\\\\))",
+      "Bash(pnpm -r --filter \"e2e-*\" build:*)",
+      "Bash(npx vite build)",
+      "Bash(npx playwright test:*)",
+      "Bash(node -e:*)",
+      "Bash(pnpm test:e2e:*)"
     ]
   }
 }

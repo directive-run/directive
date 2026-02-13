@@ -718,46 +718,123 @@ Re-exported utility for use with `useSelector`:
 
 ## Time-Travel Debugging
 
-Use `useTimeTravel` for reactive time-travel controls. Returns a `Readable<TimeTravelState | null>` store with the full API — undo/redo, snapshot timeline, session persistence, changesets, and recording control:
+`useTimeTravel` returns a `Readable<TimeTravelState | null>` store — `null` when disabled, otherwise the full reactive API. Use `$timeTravel` to auto-subscribe in templates:
+
+### Undo / Redo Controls
 
 ```html
 <script>
   import { useTimeTravel } from 'directive/svelte';
   import { system } from '$lib/directive';
 
-  const tt = useTimeTravel(system);
+  const timeTravel = useTimeTravel(system);
 </script>
 
-{#if $tt}
-  <!-- Undo / Redo -->
-  <button on:click={$tt.undo} disabled={!$tt.canUndo}>Undo</button>
-  <button on:click={$tt.redo} disabled={!$tt.canRedo}>Redo</button>
-  <span>{$tt.currentIndex + 1} / {$tt.totalSnapshots}</span>
+{#if $timeTravel}
+  {@const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = $timeTravel}
+  <button on:click={undo} disabled={!canUndo}>Undo</button>
+  <button on:click={redo} disabled={!canRedo}>Redo</button>
+  <span>{currentIndex + 1} / {totalSnapshots}</span>
+{/if}
+```
 
-  <!-- Snapshot timeline — metadata only, no facts (keeps re-renders cheap) -->
+### Snapshot Timeline
+
+`snapshots` is lightweight metadata only (no facts data). Use `getSnapshotFacts(id)` to lazily load a snapshot's state on demand:
+
+```html
+{#if $timeTravel}
+  {@const { snapshots, goTo, getSnapshotFacts } = $timeTravel}
   <ul>
-    {#each $tt.snapshots as snap (snap.id)}
+    {#each snapshots as snap (snap.id)}
       <li>
-        <button on:click={() => $tt.goTo(snap.id)}>
+        <button on:click={() => goTo(snap.id)}>
           {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+        </button>
+        <button on:click={() => console.log(getSnapshotFacts(snap.id))}>
+          Inspect
         </button>
       </li>
     {/each}
   </ul>
+{/if}
+```
 
-  <!-- Session persistence -->
-  <button on:click={() => navigator.clipboard.writeText($tt.exportSession())}>
-    Copy Session
-  </button>
+### Navigation
 
-  <!-- Recording control -->
-  <button on:click={$tt.isPaused ? $tt.resume : $tt.pause}>
-    {$tt.isPaused ? 'Resume' : 'Pause'} Recording
+```html
+{#if $timeTravel}
+  {@const { goBack, goForward, goTo, replay } = $timeTravel}
+  <button on:click={() => goBack(5)}>Back 5</button>
+  <button on:click={() => goForward(5)}>Forward 5</button>
+  <button on:click={() => goTo(0)}>Jump to Start</button>
+  <button on:click={replay}>Replay All</button>
+{/if}
+```
+
+### Session Persistence
+
+```html
+<script>
+  import { useTimeTravel } from 'directive/svelte';
+  import { system } from '$lib/directive';
+
+  const timeTravel = useTimeTravel(system);
+
+  function saveSession() {
+    if ($timeTravel) {
+      localStorage.setItem('debug', $timeTravel.exportSession());
+    }
+  }
+
+  function restoreSession() {
+    const saved = localStorage.getItem('debug');
+    if (saved && $timeTravel) {
+      $timeTravel.importSession(saved);
+    }
+  }
+</script>
+
+{#if $timeTravel}
+  <button on:click={saveSession}>Save Session</button>
+  <button on:click={restoreSession}>Restore Session</button>
+{/if}
+```
+
+### Changesets
+
+Group multiple fact mutations into a single undo/redo unit:
+
+```html
+<script>
+  import { useTimeTravel } from 'directive/svelte';
+  import { system } from '$lib/directive';
+
+  const timeTravel = useTimeTravel(system);
+
+  function handleComplexAction() {
+    $timeTravel?.beginChangeset('Move piece A→B');
+    // ... multiple fact mutations ...
+    $timeTravel?.endChangeset();
+    // Now undo/redo treats all mutations as one step
+  }
+</script>
+
+<button on:click={handleComplexAction}>Move Piece</button>
+```
+
+### Recording Control
+
+```html
+{#if $timeTravel}
+  {@const { isPaused, pause, resume } = $timeTravel}
+  <button on:click={isPaused ? resume : pause}>
+    {isPaused ? 'Resume' : 'Pause'} Recording
   </button>
 {/if}
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface, changesets, and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
 
 ---
 
