@@ -8,6 +8,11 @@ import {
   JetBrains_Mono,
   Outfit,
   DM_Sans,
+  Plus_Jakarta_Sans,
+  Bricolage_Grotesque,
+  Source_Sans_3,
+  Source_Code_Pro,
+  Fira_Code,
 } from 'next/font/google'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
@@ -17,6 +22,8 @@ import clsx from 'clsx'
 import { Providers } from '@/app/providers'
 import { Layout } from '@/components/Layout'
 import { WebsiteJsonLd, SoftwareJsonLd } from '@/components/JsonLd'
+import { ThemeOnboardingToast } from '@/components/ThemeOnboardingToast'
+import { buildPresetInlineScript } from '@/lib/preset-inline-script'
 
 import '@/styles/tailwind.css'
 
@@ -74,6 +81,36 @@ const dmSans = DM_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-dm-sans',
+})
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-plus-jakarta-sans',
+})
+
+const bricolageGrotesque = Bricolage_Grotesque({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-bricolage-grotesque',
+})
+
+const sourceSans3 = Source_Sans_3({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-source-sans-3',
+})
+
+const sourceCodePro = Source_Code_Pro({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-source-code-pro',
+})
+
+const firaCode = Fira_Code({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-fira-code',
 })
 
 export const metadata: Metadata = {
@@ -160,6 +197,11 @@ export default function RootLayout({
         dmSans.variable,
         GeistSans.variable,
         GeistMono.variable,
+        plusJakartaSans.variable,
+        bricolageGrotesque.variable,
+        sourceSans3.variable,
+        sourceCodePro.variable,
+        firaCode.variable,
       )}
       suppressHydrationWarning
     >
@@ -170,15 +212,23 @@ export default function RootLayout({
         <link rel="manifest" href="/site.webmanifest" />
         {/* Satoshi font from Fontshare CDN (for typography option 5) */}
         <link
-          href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap"
+          href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=general-sans@400,500,700&display=swap"
           rel="stylesheet"
         />
         <style
           dangerouslySetInnerHTML={{
             __html: `
-              :root { --font-satoshi: 'Satoshi', system-ui, -apple-system, sans-serif; }
+              :root {
+                --font-satoshi: 'Satoshi', system-ui, -apple-system, sans-serif;
+                --font-general-sans: 'General Sans', system-ui, sans-serif;
+                --font-berkeley-mono: ui-monospace, 'SFMono-Regular', monospace;
+              }
             `,
           }}
+        />
+        {/* Zero-flash preset application — runs before first paint */}
+        <script
+          dangerouslySetInnerHTML={{ __html: buildPresetInlineScript() }}
         />
         <WebsiteJsonLd />
         <SoftwareJsonLd />
@@ -186,6 +236,7 @@ export default function RootLayout({
       <body className="flex min-h-full bg-brand-surface">
         <Providers>
           <Layout>{children}</Layout>
+          <ThemeOnboardingToast />
         </Providers>
       </body>
     </html>

@@ -37,6 +37,7 @@ system.start();
 | `loggingPlugin(options?)` | `directive/plugins` | Console logging for state changes, resolvers, and events |
 | `devtoolsPlugin(options?)` | `directive/plugins` | Browser devtools integration via `window.__DIRECTIVE__` |
 | `persistencePlugin(options)` | `directive/plugins` | Save and restore facts to storage |
+| `performancePlugin(options?)` | `directive/plugins` | Track constraint, resolver, effect, and reconciliation metrics |
 
 ---
 
@@ -194,4 +195,5 @@ const flakyPlugin: Plugin = {
 - See [Logging](/docs/plugins/logging) for logging configuration
 - See [DevTools](/docs/plugins/devtools) for browser integration
 - See [Persistence](/docs/plugins/persistence) for state storage
+- See [Performance](/docs/plugins/performance) for runtime metrics
 - See [Custom Plugins](/docs/plugins/custom) for building your own

@@ -29,24 +29,24 @@ When enabled, `system.debug` exposes the time-travel API. When disabled, `system
 
 ```typescript
 // system.debug is null when time-travel is disabled
-const tt = system.debug; // TimeTravelAPI | null
+const timeTravel = system.debug; // TimeTravelAPI | null
 
-if (tt) {
+if (timeTravel) {
   // Inspect the current snapshot history
-  console.log(`${tt.snapshots.length} snapshots`);
-  console.log(`Currently at index ${tt.currentIndex}`);
+  console.log(`${timeTravel.snapshots.length} snapshots`);
+  console.log(`Currently at index ${timeTravel.currentIndex}`);
 
   // Step backward through history (one step by default)
-  tt.goBack();
+  timeTravel.goBack();
 
   // Jump back multiple steps at once
-  tt.goBack(3);
+  timeTravel.goBack(3);
 
   // Step forward (redo)
-  tt.goForward();
+  timeTravel.goForward();
 
   // Jump directly to a specific snapshot by its index
-  tt.goTo(5);
+  timeTravel.goTo(5);
 }
 ```
 
@@ -74,17 +74,17 @@ The `trigger` string describes what caused the snapshot (e.g., a fact change or 
 Save and restore an entire debugging session:
 
 ```typescript
-const tt = system.debug;
+const timeTravel = system.debug;
 
-if (tt) {
+if (timeTravel) {
   // Serialize the entire snapshot history to a JSON string
-  const exported = tt.export();
+  const exported = timeTravel.export();
   localStorage.setItem('debug-session', exported);
 
   // Restore a previously saved session (e.g., after a page refresh)
   const saved = localStorage.getItem('debug-session');
   if (saved) {
-    tt.import(saved);
+    timeTravel.import(saved);
   }
 }
 ```
@@ -96,12 +96,12 @@ if (tt) {
 Replay from the current snapshot forward:
 
 ```typescript
-const tt = system.debug;
+const timeTravel = system.debug;
 
-if (tt) {
+if (timeTravel) {
   // Rewind to snapshot 5, then replay all subsequent snapshots forward
-  tt.goTo(5);
-  tt.replay();
+  timeTravel.goTo(5);
+  timeTravel.replay();
 }
 ```
 
@@ -114,16 +114,16 @@ A single user action often produces multiple snapshots (e.g., moving a piece cha
 Use `beginChangeset` / `endChangeset` to group snapshots into a single undo/redo unit:
 
 ```typescript
-const tt = system.debug;
+const timeTravel = system.debug;
 
-if (tt) {
+if (timeTravel) {
   // Group multiple snapshots into one logical "undo" unit
-  tt.beginChangeset("Move piece from A to B");
+  timeTravel.beginChangeset("Move piece from A to B");
   // ... multiple fact mutations happen here ...
-  tt.endChangeset();
+  timeTravel.endChangeset();
 
   // Undo reverts the entire changeset, not individual snapshots
-  tt.goBack();
+  timeTravel.goBack();
 }
 ```
 
@@ -180,35 +180,61 @@ interface TimeTravelState {
 import { useTimeTravel } from 'directive/react';
 
 function TimeTravelToolbar() {
-  const tt = useTimeTravel(system);
-  if (!tt) return null;
+  const timeTravel = useTimeTravel(system);
+
+  if (!timeTravel) {
+    return null;
+  }
+
+  // Destructure exactly what you need
+  const {
+    canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+    snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
+    exportSession, importSession,
+    beginChangeset, endChangeset,
+    isPaused, pause, resume,
+  } = timeTravel;
 
   return (
     <div>
-      {/* Basic undo / redo */}
-      <button onClick={tt.undo} disabled={!tt.canUndo}>Undo</button>
-      <button onClick={tt.redo} disabled={!tt.canRedo}>Redo</button>
-      <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+      {/* Undo / Redo */}
+      <button onClick={undo} disabled={!canUndo}>Undo</button>
+      <button onClick={redo} disabled={!canRedo}>Redo</button>
+      <span>{currentIndex + 1} / {totalSnapshots}</span>
 
-      {/* Snapshot timeline */}
+      {/* Navigation */}
+      <button onClick={() => goBack(5)}>Back 5</button>
+      <button onClick={() => goForward(5)}>Forward 5</button>
+      <button onClick={replay}>Replay All</button>
+
+      {/* Snapshot timeline (metadata only — no facts, keeps re-renders cheap) */}
       <ul>
-        {tt.snapshots.map((snap) => (
+        {snapshots.map((snap) => (
           <li key={snap.id}>
-            <button onClick={() => tt.goTo(snap.id)}>
+            <button onClick={() => goTo(snap.id)}>
               {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+            <button onClick={() => console.log(getSnapshotFacts(snap.id))}>
+              Inspect
             </button>
           </li>
         ))}
       </ul>
 
       {/* Session persistence */}
-      <button onClick={() => navigator.clipboard.writeText(tt.exportSession())}>
-        Copy Session
+      <button onClick={() => localStorage.setItem('debug', exportSession())}>
+        Save Session
+      </button>
+      <button onClick={() => {
+        const saved = localStorage.getItem('debug');
+        if (saved) importSession(saved);
+      }}>
+        Restore Session
       </button>
 
       {/* Recording control */}
-      <button onClick={tt.isPaused ? tt.resume : tt.pause}>
-        {tt.isPaused ? 'Resume' : 'Pause'} Recording
+      <button onClick={isPaused ? resume : pause}>
+        {isPaused ? 'Resume' : 'Pause'} Recording
       </button>
     </div>
   );
@@ -222,33 +248,49 @@ function TimeTravelToolbar() {
 import { useTimeTravel } from 'directive/vue';
 import { system } from './system';
 
-const tt = useTimeTravel(system);
+const timeTravel = useTimeTravel(system);
+
+function saveSession() {
+  if (timeTravel.value) localStorage.setItem('debug', timeTravel.value.exportSession());
+}
+
+function restoreSession() {
+  const saved = localStorage.getItem('debug');
+  if (saved && timeTravel.value) timeTravel.value.importSession(saved);
+}
 </script>
 
 <template>
-  <div v-if="tt">
-    <!-- Basic undo / redo -->
-    <button @click="tt.undo" :disabled="!tt.canUndo">Undo</button>
-    <button @click="tt.redo" :disabled="!tt.canRedo">Redo</button>
-    <span>{{ tt.currentIndex + 1 }} / {{ tt.totalSnapshots }}</span>
+  <div v-if="timeTravel">
+    <!-- Undo / Redo -->
+    <button @click="timeTravel.undo" :disabled="!timeTravel.canUndo">Undo</button>
+    <button @click="timeTravel.redo" :disabled="!timeTravel.canRedo">Redo</button>
+    <span>{{ timeTravel.currentIndex + 1 }} / {{ timeTravel.totalSnapshots }}</span>
 
-    <!-- Snapshot timeline -->
+    <!-- Navigation -->
+    <button @click="timeTravel.goBack(5)">Back 5</button>
+    <button @click="timeTravel.goForward(5)">Forward 5</button>
+    <button @click="timeTravel.replay()">Replay All</button>
+
+    <!-- Snapshot timeline (metadata only — no facts, keeps re-renders cheap) -->
     <ul>
-      <li v-for="snap in tt.snapshots" :key="snap.id">
-        <button @click="tt.goTo(snap.id)">
+      <li v-for="snap in timeTravel.snapshots" :key="snap.id">
+        <button @click="timeTravel.goTo(snap.id)">
           {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
+        </button>
+        <button @click="console.log(timeTravel.getSnapshotFacts(snap.id))">
+          Inspect
         </button>
       </li>
     </ul>
 
     <!-- Session persistence -->
-    <button @click="navigator.clipboard.writeText(tt.exportSession())">
-      Copy Session
-    </button>
+    <button @click="saveSession">Save Session</button>
+    <button @click="restoreSession">Restore Session</button>
 
     <!-- Recording control -->
-    <button @click="tt.isPaused ? tt.resume() : tt.pause()">
-      {{ tt.isPaused ? 'Resume' : 'Pause' }} Recording
+    <button @click="timeTravel.isPaused ? timeTravel.resume() : timeTravel.pause()">
+      {{ timeTravel.isPaused ? 'Resume' : 'Pause' }} Recording
     </button>
   </div>
 </template>
@@ -261,34 +303,56 @@ const tt = useTimeTravel(system);
 import { useTimeTravel } from 'directive/svelte';
 import { system } from '$lib/directive';
 
-const tt = useTimeTravel(system);
+const timeTravel = useTimeTravel(system);
+
+function saveSession() {
+  if ($timeTravel) localStorage.setItem('debug', $timeTravel.exportSession());
+}
+
+function restoreSession() {
+  const saved = localStorage.getItem('debug');
+  if (saved && $timeTravel) $timeTravel.importSession(saved);
+}
 </script>
 
-{#if $tt}
-  <!-- Basic undo / redo -->
-  <button on:click={$tt.undo} disabled={!$tt.canUndo}>Undo</button>
-  <button on:click={$tt.redo} disabled={!$tt.canRedo}>Redo</button>
-  <span>{$tt.currentIndex + 1} / {$tt.totalSnapshots}</span>
+{#if $timeTravel}
+  {@const {
+    canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+    snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
+    isPaused, pause, resume,
+  } = $timeTravel}
 
-  <!-- Snapshot timeline -->
+  <!-- Undo / Redo -->
+  <button on:click={undo} disabled={!canUndo}>Undo</button>
+  <button on:click={redo} disabled={!canRedo}>Redo</button>
+  <span>{currentIndex + 1} / {totalSnapshots}</span>
+
+  <!-- Navigation -->
+  <button on:click={() => goBack(5)}>Back 5</button>
+  <button on:click={() => goForward(5)}>Forward 5</button>
+  <button on:click={replay}>Replay All</button>
+
+  <!-- Snapshot timeline (metadata only — no facts, keeps re-renders cheap) -->
   <ul>
-    {#each $tt.snapshots as snap (snap.id)}
+    {#each snapshots as snap (snap.id)}
       <li>
-        <button on:click={() => $tt.goTo(snap.id)}>
+        <button on:click={() => goTo(snap.id)}>
           {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+        </button>
+        <button on:click={() => console.log(getSnapshotFacts(snap.id))}>
+          Inspect
         </button>
       </li>
     {/each}
   </ul>
 
   <!-- Session persistence -->
-  <button on:click={() => navigator.clipboard.writeText($tt.exportSession())}>
-    Copy Session
-  </button>
+  <button on:click={saveSession}>Save Session</button>
+  <button on:click={restoreSession}>Restore Session</button>
 
   <!-- Recording control -->
-  <button on:click={$tt.isPaused ? $tt.resume : $tt.pause}>
-    {$tt.isPaused ? 'Resume' : 'Pause'} Recording
+  <button on:click={isPaused ? resume : pause}>
+    {isPaused ? 'Resume' : 'Pause'} Recording
   </button>
 {/if}
 ```
@@ -300,41 +364,64 @@ import { useTimeTravel } from 'directive/solid';
 import { Show, For } from 'solid-js';
 
 function TimeTravelToolbar() {
-  const tt = useTimeTravel(system);
+  const timeTravel = useTimeTravel(system);
 
   return (
-    <Show when={tt()}>
-      {(state) => (
-        <div>
-          {/* Basic undo / redo */}
-          <button onClick={state().undo} disabled={!state().canUndo}>Undo</button>
-          <button onClick={state().redo} disabled={!state().canRedo}>Redo</button>
-          <span>{state().currentIndex + 1} / {state().totalSnapshots}</span>
+    <Show when={timeTravel()}>
+      {(state) => {
+        const {
+          canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+          snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
+          exportSession, importSession,
+          isPaused, pause, resume,
+        } = state();
 
-          {/* Snapshot timeline */}
-          <ul>
-            <For each={state().snapshots}>
-              {(snap) => (
-                <li>
-                  <button onClick={() => state().goTo(snap.id)}>
-                    {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
+        return (
+          <div>
+            {/* Undo / Redo */}
+            <button onClick={undo} disabled={!canUndo}>Undo</button>
+            <button onClick={redo} disabled={!canRedo}>Redo</button>
+            <span>{currentIndex + 1} / {totalSnapshots}</span>
 
-          {/* Session persistence */}
-          <button onClick={() => navigator.clipboard.writeText(state().exportSession())}>
-            Copy Session
-          </button>
+            {/* Navigation */}
+            <button onClick={() => goBack(5)}>Back 5</button>
+            <button onClick={() => goForward(5)}>Forward 5</button>
+            <button onClick={replay}>Replay All</button>
 
-          {/* Recording control */}
-          <button onClick={state().isPaused ? state().resume : state().pause}>
-            {state().isPaused ? 'Resume' : 'Pause'} Recording
-          </button>
-        </div>
-      )}
+            {/* Snapshot timeline (metadata only — no facts, keeps re-renders cheap) */}
+            <ul>
+              <For each={snapshots}>
+                {(snap) => (
+                  <li>
+                    <button onClick={() => goTo(snap.id)}>
+                      {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+                    </button>
+                    <button onClick={() => console.log(getSnapshotFacts(snap.id))}>
+                      Inspect
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+
+            {/* Session persistence */}
+            <button onClick={() => localStorage.setItem('debug', exportSession())}>
+              Save Session
+            </button>
+            <button onClick={() => {
+              const saved = localStorage.getItem('debug');
+              if (saved) importSession(saved);
+            }}>
+              Restore Session
+            </button>
+
+            {/* Recording control */}
+            <button onClick={isPaused ? resume : pause}>
+              {isPaused ? 'Resume' : 'Pause'} Recording
+            </button>
+          </div>
+        );
+      }}
     </Show>
   );
 }
@@ -346,37 +433,61 @@ function TimeTravelToolbar() {
 import { TimeTravelController } from 'directive/lit';
 
 class TimeTravelToolbar extends LitElement {
-  private _tt = new TimeTravelController(this, system);
+  private _timeTravel = new TimeTravelController(this, system);
 
   render() {
-    const tt = this._tt.value;
-    if (!tt) return html``;
+    const timeTravel = this._timeTravel.value;
+
+    if (!timeTravel) {
+      return html``;
+    }
+
+    const {
+      canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+      snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
+      exportSession, importSession,
+      isPaused, pause, resume,
+    } = timeTravel;
 
     return html`
-      <!-- Basic undo / redo -->
-      <button @click=${tt.undo} ?disabled=${!tt.canUndo}>Undo</button>
-      <button @click=${tt.redo} ?disabled=${!tt.canRedo}>Redo</button>
-      <span>${tt.currentIndex + 1} / ${tt.totalSnapshots}</span>
+      <!-- Undo / Redo -->
+      <button @click=${undo} ?disabled=${!canUndo}>Undo</button>
+      <button @click=${redo} ?disabled=${!canRedo}>Redo</button>
+      <span>${currentIndex + 1} / ${totalSnapshots}</span>
 
-      <!-- Snapshot timeline -->
+      <!-- Navigation -->
+      <button @click=${() => goBack(5)}>Back 5</button>
+      <button @click=${() => goForward(5)}>Forward 5</button>
+      <button @click=${replay}>Replay All</button>
+
+      <!-- Snapshot timeline (metadata only — no facts, keeps re-renders cheap) -->
       <ul>
-        ${tt.snapshots.map((snap) => html`
+        ${snapshots.map((snap) => html`
           <li>
-            <button @click=${() => tt.goTo(snap.id)}>
+            <button @click=${() => goTo(snap.id)}>
               ${snap.trigger} — ${new Date(snap.timestamp).toLocaleTimeString()}
+            </button>
+            <button @click=${() => console.log(getSnapshotFacts(snap.id))}>
+              Inspect
             </button>
           </li>
         `)}
       </ul>
 
       <!-- Session persistence -->
-      <button @click=${() => navigator.clipboard.writeText(tt.exportSession())}>
-        Copy Session
+      <button @click=${() => localStorage.setItem('debug', exportSession())}>
+        Save Session
+      </button>
+      <button @click=${() => {
+        const saved = localStorage.getItem('debug');
+        if (saved) importSession(saved);
+      }}>
+        Restore Session
       </button>
 
       <!-- Recording control -->
-      <button @click=${tt.isPaused ? tt.resume : tt.pause}>
-        ${tt.isPaused ? 'Resume' : 'Pause'} Recording
+      <button @click=${isPaused ? resume : pause}>
+        ${isPaused ? 'Resume' : 'Pause'} Recording
       </button>
     `;
   }

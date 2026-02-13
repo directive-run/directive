@@ -42,7 +42,7 @@ const analyticsModule = createModule("analytics", {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `run` | `(facts, prev) => void \| Promise<void>` | The side effect to execute |
+| `run` | `(facts, prev) => void \| Promise<void> \| (() => void)` | The side effect to execute. May return a cleanup function. |
 | `deps` | `string[]` | Optional explicit dependencies for optimization |
 
 The `run` function receives:
@@ -201,6 +201,39 @@ effects: {
 
 ---
 
+## Cleanup
+
+Effects can return a cleanup function, similar to React's `useEffect`. The cleanup runs before the effect re-runs (when deps change) and when the system stops or is destroyed:
+
+```typescript
+effects: {
+  // Return a cleanup function to tear down resources
+  websocket: {
+    deps: ["roomId"],
+    run: (facts) => {
+      const ws = new WebSocket(`wss://chat.example.com/${facts.roomId}`);
+      ws.onmessage = (e) => handleMessage(e.data);
+
+      // Cleanup: close the connection when roomId changes or system stops
+      return () => ws.close();
+    },
+  },
+
+  // Works with intervals, event listeners, etc.
+  polling: {
+    deps: ["endpoint"],
+    run: (facts) => {
+      const id = setInterval(() => fetch(facts.endpoint), 5000);
+      return () => clearInterval(id);
+    },
+  },
+}
+```
+
+Cleanup functions are called safely — errors in cleanup are caught and logged without breaking the system. If an async effect returns a cleanup function after the system has already been stopped, the cleanup is invoked immediately so resources are never leaked.
+
+---
+
 ## Error Isolation
 
 Effects are fire-and-forget – errors are logged but never break the reconciliation loop:
@@ -354,6 +387,7 @@ This is useful for suppressing noisy effects during tests, pausing analytics, or
 | Purpose | Side effects (logging, DOM, analytics) | Fulfill requirements (API calls, data) |
 | Trigger | Fact changes | Constraint activation |
 | Can modify facts | No (read-only recommended) | Yes |
+| Cleanup support | Yes (return function from `run`) | Yes (via `AbortController`) |
 | Fire-and-forget | Yes | No (tracked, retried, cancelled) |
 | Error handling | Isolated (logged, never breaks engine) | Full lifecycle (retry, timeout, abort) |
 | Execution | Parallel | Parallel (sequential via `after`) |

@@ -25,7 +25,7 @@ Comprehensive reference documentation for every public export in Directive. {% .
 
 | Path | Contents |
 |------|----------|
-| `directive` | Core API – modules, systems, type builders, utilities |
+| `directive` | Core API – modules, systems, type builders, [constraint/resolver helpers](/docs/api/core#builders--helpers) |
 | `directive/react` | React hooks and components |
 | `directive/vue` | Vue composables |
 | `directive/svelte` | Svelte stores |
@@ -33,7 +33,7 @@ Comprehensive reference documentation for every public export in Directive. {% .
 | `directive/lit` | Lit controllers |
 | `directive/plugins` | Built-in plugins (logging, devtools, persistence) |
 | `directive/testing` | Test utilities (mock resolvers, fake timers, assertions) |
-| `directive/ai` | AI agent orchestration, guardrails, streaming |
+| `directive/ai` | AI agent orchestration, guardrails, streaming, [constraint builders](/docs/glossary#ai-builders-directiveai) |
 | `directive/worker` | Web Worker adapter |
 
 ---

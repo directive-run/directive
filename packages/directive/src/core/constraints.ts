@@ -46,6 +46,8 @@ export interface ConstraintsManager<_S extends Schema> {
 	markResolved(constraintId: string): void;
 	/** Check if a constraint has been resolved (for `after` ordering) */
 	isResolved(constraintId: string): boolean;
+	/** Register new constraint definitions (for dynamic module registration) */
+	registerDefinitions(newDefs: ConstraintsDef<Schema>): void;
 }
 
 /** Options for creating a constraints manager */
@@ -826,6 +828,20 @@ export function createConstraintsManager<S extends Schema>(
 
 		isResolved(constraintId: string): boolean {
 			return resolvedConstraints.has(constraintId);
+		},
+
+		registerDefinitions(newDefs: ConstraintsDef<Schema>): void {
+			for (const [key, def] of Object.entries(newDefs)) {
+				(definitions as Record<string, unknown>)[key] = def;
+				initState(key);
+				dirtyConstraints.add(key);
+			}
+			// Invalidate cached sort order
+			sortedConstraintIds = null;
+			// Rebuild topological order and reverse dependency map
+			// so new `after` deps are validated for cycles and indexed
+			detectCyclesAndComputeTopoOrder();
+			buildReverseDependencyMap();
 		},
 	};
 

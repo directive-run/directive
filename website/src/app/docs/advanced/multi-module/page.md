@@ -100,6 +100,82 @@ const cartModule = createModule("cart", {
 
 ---
 
+## Dynamic Module Registration
+
+Add modules to a running system with `system.registerModule()`. This is useful for code-split features that load on demand:
+
+```typescript
+const system = createSystem({
+  modules: {
+    auth: authModule,
+  },
+});
+system.start();
+
+// Later, after dynamic import
+const { chatModule } = await import('./features/chat');
+system.registerModule("chat", chatModule);
+
+// Immediately available through namespaced access
+system.facts.chat.messages;
+system.events.chat.sendMessage({ text: "Hello!" });
+```
+
+The registered module is fully wired into the system — its constraints, resolvers, effects, and derivations all activate immediately. Existing modules continue running uninterrupted.
+
+### Restrictions
+
+- Cannot register during reconciliation (throws an error)
+- Cannot register on a destroyed system (throws an error)
+- Module names must be unique (schema key collisions are caught at registration time)
+
+---
+
+## Module Factory
+
+Use `createModuleFactory()` to produce named instances from a single definition. This is useful for multi-instance UIs like tabs, panels, or multi-tenant layouts where you need isolated state from the same schema:
+
+```typescript
+import { createModuleFactory, t } from 'directive';
+
+const chatRoom = createModuleFactory({
+  schema: {
+    facts: {
+      messages: t.array<string>(),
+      users: t.array<string>(),
+    },
+    derivations: {
+      messageCount: t.number(),
+    },
+  },
+  init: (facts) => {
+    facts.messages = [];
+    facts.users = [];
+  },
+  derive: {
+    messageCount: (facts) => facts.messages.length,
+  },
+});
+
+// Create independent instances with different names
+const system = createSystem({
+  modules: {
+    lobby: chatRoom("lobby"),
+    support: chatRoom("support"),
+  },
+});
+
+system.start();
+
+// Each instance has isolated state
+system.facts.lobby.messages;   // []
+system.facts.support.messages; // []
+```
+
+`createModuleFactory` preserves `crossModuleDeps` when provided, so factory-produced modules work correctly with cross-module dependencies.
+
+---
+
 ## Independent Systems
 
 You can also run modules as separate systems and coordinate through your application layer:

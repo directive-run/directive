@@ -96,44 +96,94 @@ const orchestrator = createAgentOrchestrator({
 
 ## Approval Workflow
 
-Require human approval before tool calls execute. Set `autoApproveToolCalls: false` and provide an `onApprovalRequest` callback:
+Require human approval before tool calls execute. When the agent wants to call a tool, the orchestrator **pauses the run**, fires your callback, and waits for you to call `approve()` or `reject()` before continuing.
+
+Here's the flow:
+
+1. Agent run hits a tool call
+2. Orchestrator pauses and fires `onApprovalRequest` with a request object
+3. Your code forwards that request to a human (UI, Slack, email, etc.)
+4. The human decides -- your code calls `orchestrator.approve(id)` or `orchestrator.reject(id)`
+5. The agent run resumes (or fails if rejected/timed out)
+
+### Express API Example
+
+A common pattern is exposing approval over a REST API. The orchestrator fires the callback, you store the pending request, and a separate endpoint handles the human's decision:
 
 ```typescript
+import express from 'express';
+
+const app = express();
+app.use(express.json());
+
 const orchestrator = createAgentOrchestrator({
   runner,
-  autoApproveToolCalls: false,       // Require human sign-off for every tool call
-  approvalTimeoutMs: 60000,          // Fail after 60s if no decision (default: 5 minutes)
+  autoApproveToolCalls: false,
+  approvalTimeoutMs: 60000,
 
-  // Called each time the agent wants to use a tool
+  // Step 1: Orchestrator pauses here and fires this callback
   onApprovalRequest: (request) => {
-    console.log(`Approval needed: ${request.description}`);
-    console.log(`Agent: ${request.agentName}`);
-    console.log(`Tool call data:`, request.data);
+    // request.id    -- unique ID for this approval (pass it back to approve/reject)
+    // request.agentName -- which agent wants to act
+    // request.description -- human-readable summary of the tool call
+    // request.data -- the raw tool call payload
 
-    // Forward to your UI, Slack, email, etc.
-    notifyApprover(request);
+    // Step 2: Push to your frontend via WebSocket, SSE, polling, etc.
+    broadcastToAdminDashboard({
+      requestId: request.id,
+      agent: request.agentName,
+      action: request.description,
+      details: request.data,
+    });
   },
 });
 
-// Wire this into your approval UI
-function handleApproval(requestId: string, approved: boolean) {
+// Step 3: Human clicks "Approve" or "Reject" in the dashboard, which hits this endpoint
+app.post('/api/approvals/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  const { approved, reason } = req.body;
+
   if (approved) {
-    orchestrator.approve(requestId);
+    orchestrator.approve(requestId);      // Unpauses the agent run
   } else {
-    orchestrator.reject(requestId, 'Not authorized for this action');
+    orchestrator.reject(requestId, reason ?? 'Denied by reviewer');
   }
+
+  res.json({ ok: true });
+});
+```
+
+### React UI Example
+
+In a frontend app, use the orchestrator's reactive state to render pending approvals and wire the buttons directly:
+
+```tsx
+function ApprovalPanel({ orchestrator }) {
+  const approval = useFact(orchestrator.system, '__approval');
+
+  return (
+    <div>
+      {approval?.pending?.map((req) => (
+        <div key={req.id}>
+          <p><strong>{req.agentName}</strong> wants to: {req.description}</p>
+          <pre>{JSON.stringify(req.data, null, 2)}</pre>
+          <button onClick={() => orchestrator.approve(req.id)}>Approve</button>
+          <button onClick={() => orchestrator.reject(req.id, 'Denied')}>Reject</button>
+        </div>
+      ))}
+    </div>
+  );
 }
 ```
 
-The agent run pauses at each tool call until `approve()` or `reject()` is called. If the timeout expires, the run fails with an error.
+### Querying Approval State
 
 Check pending approvals anytime:
 
 ```typescript
-// Query the current approval state at any time
-const pending = orchestrator.facts.approval.pending;
-const approved = orchestrator.facts.approval.approved;
-const rejected = orchestrator.facts.approval.rejected;
+const pending = orchestrator.facts.approval.pending;    // Requests waiting for a decision
+const approved = orchestrator.facts.approval.approved;  // Requests that were approved
+const rejected = orchestrator.facts.approval.rejected;  // Requests that were rejected
 ```
 
 ---
@@ -265,7 +315,9 @@ const orchestrator = createAgentOrchestrator<MyFacts>({
 });
 ```
 
-Both produce plain `OrchestratorConstraint` objects – zero runtime overhead, just ergonomic sugar. The `when()` shorthand returns a constraint directly (no `.build()` needed), and `.withPriority()` returns a new constraint with the priority set.
+Both produce plain `OrchestratorConstraint` objects -- zero runtime overhead, just ergonomic sugar. The `when()` shorthand returns a constraint directly (no `.build()` needed), and `.withPriority()` returns a new constraint with the priority set.
+
+For the full list of all builder utilities (including core module helpers like `constraintFactory` and `typedConstraint`), see the [Glossary: Builders & Helpers](/docs/glossary#builders--helpers).
 
 ---
 

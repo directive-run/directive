@@ -14,7 +14,7 @@ import type {
 	InferRequirementPayloadFromSchema,
 } from "./schema.js";
 import type { Facts } from "./facts.js";
-import type { EffectsDef } from "./effects.js";
+import type { EffectsDef, EffectCleanup } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
 import type { System } from "./system.js";
 import type {
@@ -199,11 +199,11 @@ export interface CrossModuleEffectDef<
 	M extends ModuleSchema,
 	Deps extends CrossModuleDeps,
 > {
-	/** Effect function with cross-module facts access */
+	/** Effect function with cross-module facts access. Return a cleanup function for teardown. */
 	run: (
 		facts: CrossModuleFactsWithSelf<M, Deps>,
 		prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
-	) => void | Promise<void>;
+	) => void | EffectCleanup | Promise<void | EffectCleanup>;
 	/** Optional dependency keys to filter when effect runs */
 	deps?: string[];
 }
