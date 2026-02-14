@@ -1,0 +1,76 @@
+import { useCallback, useState } from "react";
+import { createSystem } from "@directive-run/core";
+import { persistencePlugin } from "@directive-run/core/plugins";
+import { featureFlagsModule } from "./module";
+import { FlagPanel } from "./FlagPanel";
+import { Preview } from "./Preview";
+
+// Create the system with persistence
+const system = createSystem({
+  module: featureFlagsModule,
+  plugins: [
+    persistencePlugin({ key: "directive-feature-flags-example" }),
+  ],
+});
+system.start();
+
+export function App() {
+  const [effectsDisabled, setEffectsDisabled] = useState<Set<string>>(new Set());
+  const [constraintsDisabled, setConstraintsDisabled] = useState<Set<string>>(new Set());
+
+  const handleDisableEffect = useCallback((effectId: string) => {
+    system.effects.disable(effectId);
+    setEffectsDisabled((prev) => new Set([...prev, effectId]));
+  }, []);
+
+  const handleEnableEffect = useCallback((effectId: string) => {
+    system.effects.enable(effectId);
+    setEffectsDisabled((prev) => {
+      const next = new Set(prev);
+      next.delete(effectId);
+
+      return next;
+    });
+  }, []);
+
+  const handleDisableConstraint = useCallback((constraintId: string) => {
+    system.constraints.disable(constraintId);
+    setConstraintsDisabled((prev) => new Set([...prev, constraintId]));
+  }, []);
+
+  const handleEnableConstraint = useCallback((constraintId: string) => {
+    system.constraints.enable(constraintId);
+    setConstraintsDisabled((prev) => {
+      const next = new Set(prev);
+      next.delete(constraintId);
+
+      return next;
+    });
+  }, []);
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>Feature Flags on directive.run</h1>
+        <p>
+          The same 8 flags that gate features on the real doc site. Constraints enforce dependencies automatically.
+        </p>
+      </header>
+
+      <div className="split-pane">
+        <FlagPanel
+          system={system}
+          onDisableEffect={handleDisableEffect}
+          onEnableEffect={handleEnableEffect}
+          onDisableConstraint={handleDisableConstraint}
+          onEnableConstraint={handleEnableConstraint}
+          effectsDisabled={effectsDisabled}
+          constraintsDisabled={constraintsDisabled}
+        />
+        <Preview system={system} />
+      </div>
+    </div>
+  );
+}
+
+export default App;
