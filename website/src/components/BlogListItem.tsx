@@ -27,6 +27,24 @@ export function BlogListItem({ post }: { post: BlogPost }) {
         <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-300">
           {author.name}
         </p>
+        {author.role && (
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            {author.role}
+          </p>
+        )}
+        {post.categories.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {post.categories.map((cat) => (
+              <Link
+                key={cat}
+                href={`/blog?category=${encodeURIComponent(cat)}`}
+                className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                {cat}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
       <div className="sm:col-span-2">
         <Link href={`/blog/${post.slug}`} className="group">

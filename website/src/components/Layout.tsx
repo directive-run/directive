@@ -32,7 +32,7 @@ function HeaderLink({
     <Link
       href={href}
       className={clsx(
-        'hidden items-center text-sm font-medium md:flex',
+        'flex items-center text-base font-medium',
         isActive
           ? 'text-brand-primary'
           : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
@@ -51,21 +51,12 @@ function SupportLink() {
     <Link
       href="/support"
       className={clsx(
-        'group hidden items-center gap-1 text-sm font-medium md:flex',
+        'text-base font-medium',
         isActive
           ? 'text-brand-primary'
           : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
       )}
     >
-      <Heart
-        weight="fill"
-        className={clsx(
-          'h-3.5 w-3.5 transition-colors',
-          isActive
-            ? 'text-brand-primary'
-            : 'text-slate-400 group-hover:text-brand-primary',
-        )}
-      />
       Support
     </Link>
   )
@@ -126,9 +117,11 @@ function Header() {
         <Search />
       </div>
       <div className="relative flex basis-0 items-center justify-end gap-6 sm:gap-8 md:grow">
-        <HeaderLink href="/docs/quick-start">Docs</HeaderLink>
-        <HeaderLink href="/blog">Blog</HeaderLink>
-        <SupportLink />
+        <div className="hidden items-center gap-8 sm:gap-10 md:flex">
+          <HeaderLink href="/docs/quick-start">Docs</HeaderLink>
+          <HeaderLink href="/blog">Blog</HeaderLink>
+          <SupportLink />
+        </div>
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <BrandPresetSwitcher className="relative z-10" />

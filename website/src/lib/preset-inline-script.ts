@@ -35,7 +35,7 @@ export function buildPresetInlineScript(): string {
 
   // The inline script -- must be self-contained, no imports
   return `(function(){try{
-var CK='${STORAGE_KEYS.COLOR}',TK='${STORAGE_KEYS.TYPO}',FK='${STORAGE_KEYS.FIRST_VISIT}';
+var CK='${STORAGE_KEYS.COLOR}',TK='${STORAGE_KEYS.TYPO}',FK='${STORAGE_KEYS.FIRST_VISIT}',FSK='${STORAGE_KEYS.FONT_SIZE}';
 var C=${JSON.stringify(colorLookup)};
 var T=${JSON.stringify(typoLookup)};
 var R=${rotationPool};
@@ -69,5 +69,7 @@ if(st&&T[Number(st)]){
   r.setProperty('--brand-font-body',t.b);
   r.setProperty('--brand-font-code',t.c);
 }
+var fs=localStorage.getItem(FSK);
+if(fs){var fv=parseFloat(fs);if(!isNaN(fv))document.documentElement.style.fontSize=fv+'%';}
 }catch(e){}})();`
 }
