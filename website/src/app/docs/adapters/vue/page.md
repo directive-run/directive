@@ -12,7 +12,7 @@ Directive provides first-class Vue 3 integration with composables that automatic
 The Vue adapter is included in the main package:
 
 ```typescript
-import { useFact, useDerived, useEvents, useDispatch } from 'directive/vue';
+import { useFact, useDerived, useEvents, useDispatch } from '@directive-run/vue';
 ```
 
 ---
@@ -22,7 +22,7 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/vue';
 Create a system at module level and pass it explicitly to composables:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const userModule = createModule("user", {
   schema: {
@@ -75,7 +75,7 @@ Then pass the system to composables in your components:
 
 ```html
 <script setup>
-import { useFact, useDerived } from 'directive/vue';
+import { useFact, useDerived } from '@directive-run/vue';
 import { system } from './system';
 
 const user = useFact(system, 'user');
@@ -107,7 +107,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
 ```html
 <script setup>
-import { useDirective } from 'directive/vue';
+import { useDirective } from '@directive-run/vue';
 import { counterModule } from './counterModule';
 
 // Subscribe all: omit keys for everything
@@ -126,7 +126,7 @@ With system config and selective subscriptions:
 
 ```html
 <script setup>
-import { useDirective } from 'directive/vue';
+import { useDirective } from '@directive-run/vue';
 import { counterModule } from './counterModule';
 
 // Selective: subscribe to specific keys only
@@ -148,7 +148,7 @@ The go-to composable for **transforms and derived values** from facts. Directive
 
 ```html
 <script setup>
-import { useSelector, shallowEqual } from 'directive/vue';
+import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Transform a single fact value
@@ -186,7 +186,7 @@ Read a single fact or multiple facts:
 
 ```html
 <script setup>
-import { useFact } from 'directive/vue';
+import { useFact } from '@directive-run/vue';
 import { system } from './system';
 
 // Subscribe to a single fact – re-renders when "userId" changes
@@ -207,7 +207,7 @@ Read a single derivation or multiple derivations:
 
 ```html
 <script setup>
-import { useDerived } from 'directive/vue';
+import { useDerived } from '@directive-run/vue';
 import { system } from './system';
 
 // Subscribe to a single derivation
@@ -228,7 +228,7 @@ Get a typed reference to the system's event dispatchers:
 
 ```html
 <script setup>
-import { useEvents } from 'directive/vue';
+import { useEvents } from '@directive-run/vue';
 import { system } from './system';
 
 // Get typed event dispatchers for the module
@@ -247,7 +247,7 @@ Low-level event dispatch for untyped or system events:
 
 ```html
 <script setup>
-import { useDispatch } from 'directive/vue';
+import { useDispatch } from '@directive-run/vue';
 import { system } from './system';
 
 // Get the low-level dispatch function
@@ -267,7 +267,7 @@ Watch a fact or derivation for changes without causing re-renders – runs a cal
 
 ```html
 <script setup>
-import { useWatch } from 'directive/vue';
+import { useWatch } from '@directive-run/vue';
 import { system } from './system';
 
 // Watch a derivation for analytics tracking
@@ -296,7 +296,7 @@ Get system inspection data (unmet requirements, inflight resolvers, constraint s
 
 ```html
 <script setup>
-import { useInspect } from 'directive/vue';
+import { useInspect } from '@directive-run/vue';
 import { system } from './system';
 
 // Get reactive system inspection data
@@ -318,7 +318,7 @@ With throttling for high-frequency updates:
 
 ```html
 <script setup>
-import { useInspect } from 'directive/vue';
+import { useInspect } from '@directive-run/vue';
 import { system } from './system';
 
 // Throttle updates to limit render frequency
@@ -332,7 +332,7 @@ Read constraint status reactively:
 
 ```html
 <script setup>
-import { useConstraintStatus } from 'directive/vue';
+import { useConstraintStatus } from '@directive-run/vue';
 import { system } from './system';
 
 // Get all constraints for the debug panel
@@ -351,7 +351,7 @@ Get a reactive explanation of why a requirement exists:
 
 ```html
 <script setup>
-import { useExplain } from 'directive/vue';
+import { useExplain } from '@directive-run/vue';
 import { system } from './system';
 
 // Get a detailed explanation of why a requirement was generated
@@ -371,7 +371,7 @@ const explanation = useExplain(system, 'FETCH_USER');
 These composables require a `statusPlugin` created via `createRequirementStatusPlugin`:
 
 ```typescript
-import { createSystem, createRequirementStatusPlugin } from 'directive';
+import { createSystem, createRequirementStatusPlugin } from '@directive-run/core';
 
 // Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
@@ -392,7 +392,7 @@ Pass the `statusPlugin` as the first parameter:
 
 ```html
 <script setup>
-import { useRequirementStatus } from 'directive/vue';
+import { useRequirementStatus } from '@directive-run/vue';
 import { statusPlugin } from './system';
 
 // Track a single requirement type
@@ -417,7 +417,7 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```html
 <script setup>
-import { useOptimisticUpdate } from 'directive/vue';
+import { useOptimisticUpdate } from '@directive-run/vue';
 import { system, statusPlugin } from './system';
 
 // Set up optimistic mutations with automatic rollback
@@ -447,7 +447,7 @@ function handleSave() {
 Create fully typed composables for your module schema. Returned hooks take `system` as the first parameter:
 
 ```typescript
-import { createTypedHooks } from 'directive/vue';
+import { createTypedHooks } from '@directive-run/vue';
 
 // Create typed composables – full autocomplete for keys and events
 const { useDerived, useFact, useDispatch, useEvents } =
@@ -480,7 +480,7 @@ events.increment();                    // Also typed!
 
 ```html
 <script setup>
-import { useTimeTravel } from 'directive/vue';
+import { useTimeTravel } from '@directive-run/vue';
 import { system } from './system';
 
 const timeTravel = useTimeTravel(system);
@@ -531,7 +531,7 @@ const timeTravel = useTimeTravel(system);
 
 ```html
 <script setup>
-import { useTimeTravel } from 'directive/vue';
+import { useTimeTravel } from '@directive-run/vue';
 import { system } from './system';
 
 const timeTravel = useTimeTravel(system);
@@ -564,7 +564,7 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```html
 <script setup>
-import { useTimeTravel } from 'directive/vue';
+import { useTimeTravel } from '@directive-run/vue';
 import { system } from './system';
 
 const timeTravel = useTimeTravel(system);
@@ -602,7 +602,7 @@ See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` int
 
 ```html
 <script setup>
-import { useFact, useDerived } from 'directive/vue';
+import { useFact, useDerived } from '@directive-run/vue';
 import { system } from './system';
 
 // Subscribe to the user fact
@@ -627,7 +627,7 @@ Write facts through the system directly:
 
 ```html
 <script setup>
-import { useFact } from 'directive/vue';
+import { useFact } from '@directive-run/vue';
 import { system } from './system';
 
 // Subscribe to the current userId
@@ -647,7 +647,7 @@ Or dispatch events:
 
 ```html
 <script setup>
-import { useDispatch } from 'directive/vue';
+import { useDispatch } from '@directive-run/vue';
 import { system } from './system';
 
 const dispatch = useDispatch(system);
@@ -664,8 +664,8 @@ const dispatch = useDispatch(system);
 
 ```typescript
 import { mount } from '@vue/test-utils';
-import { createTestSystem } from 'directive/testing';
-import { useFact, useDerived } from 'directive/vue';
+import { createTestSystem } from '@directive-run/core/testing';
+import { useFact, useDerived } from '@directive-run/vue';
 import { userModule } from './modules/user';
 import UserProfile from './UserProfile.vue';
 
@@ -692,7 +692,7 @@ test('displays user name', async () => {
 Re-exported from the core package for use with `useSelector`:
 
 ```typescript
-import { useSelector, shallowEqual } from 'directive/vue';
+import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Use shallowEqual to prevent updates when x/y values haven't changed

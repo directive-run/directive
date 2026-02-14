@@ -11,11 +11,11 @@ Directive provides first-class adapters for five UI frameworks. Each adapter giv
 
 | Framework | Import | Pattern | Reactivity Model |
 |-----------|--------|---------|-----------------|
-| [React](/docs/adapters/react) | `directive/react` | Hooks (`useFact`, `useDerived`, ...) | `useSyncExternalStore` |
-| [Vue](/docs/adapters/vue) | `directive/vue` | Composables (`useFact`, `useDerived`, ...) | `ref` / `shallowRef` |
-| [Svelte](/docs/adapters/svelte) | `directive/svelte` | Stores (`useFact`, `useDerived`, ...) | Svelte `Readable` stores |
-| [Solid](/docs/adapters/solid) | `directive/solid` | Signals (`useFact`, `useDerived`, ...) | `createSignal` / `createMemo` |
-| [Lit](/docs/adapters/lit) | `directive/lit` | Controllers (`FactController`, ...) | `ReactiveController` |
+| [React](/docs/adapters/react) | `@directive-run/react` | Hooks (`useFact`, `useDerived`, ...) | `useSyncExternalStore` |
+| [Vue](/docs/adapters/vue) | `@directive-run/vue` | Composables (`useFact`, `useDerived`, ...) | `ref` / `shallowRef` |
+| [Svelte](/docs/adapters/svelte) | `@directive-run/svelte` | Stores (`useFact`, `useDerived`, ...) | Svelte `Readable` stores |
+| [Solid](/docs/adapters/solid) | `@directive-run/solid` | Signals (`useFact`, `useDerived`, ...) | `createSignal` / `createMemo` |
+| [Lit](/docs/adapters/lit) | `@directive-run/lit` | Controllers (`FactController`, ...) | `ReactiveController` |
 
 ---
 

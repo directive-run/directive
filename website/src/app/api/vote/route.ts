@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ALL_COLOR_IDS, ALL_TYPO_IDS } from '@/lib/brand-presets'
+import { getFeatureFlagSystem } from '@/lib/feature-flags/config'
 
 const MAX_VOTES = 10000
 const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
@@ -39,6 +40,15 @@ const VALID_TYPO_IDS = new Set(ALL_TYPO_IDS)
 export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
+  // Feature flag check
+  const ffSystem = getFeatureFlagSystem()
+  if (ffSystem && !ffSystem.derive.canUseVoteApi) {
+    return NextResponse.json(
+      { error: 'Voting is currently disabled.' },
+      { status: 503 },
+    )
+  }
+
   // Origin validation
   const origin = request.headers.get('origin')
   if (origin && !origin.includes('directive.run') && !origin.includes('localhost')) {

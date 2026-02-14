@@ -34,13 +34,13 @@ Redux pioneered predictable state management with actions and reducers.
 - Extensive middleware ecosystem needed
 - Lots of existing Redux code
 
-### When Directive is Better
+### vs Redux: When Directive is Better
 
 - Complex async flows
 - Automatic dependency tracking
 - Less boilerplate for constraints
 
-### Code Comparison
+### vs Redux: Code Comparison
 
 **Redux:**
 ```typescript
@@ -128,13 +128,13 @@ Zustand is a minimal, hooks-first state manager.
 - Smallest possible bundle
 - Quick prototyping
 
-### When Directive is Better
+### vs Zustand: When Directive is Better
 
 - Complex constraints and business rules
 - Automatic retry/timeout
 - Multi-module coordination
 
-### Code Comparison
+### vs Zustand: Code Comparison
 
 **Zustand:**
 ```typescript
@@ -218,13 +218,13 @@ XState is a state machine library with full statechart support.
 - Need visual state machine editor
 - Formal verification requirements
 
-### When Directive is Better
+### vs XState: When Directive is Better
 
 - Data-driven constraints
 - Less ceremony for common patterns
 - AI agent orchestration
 
-### Code Comparison
+### vs XState: Code Comparison
 
 **XState:**
 ```typescript
@@ -310,13 +310,13 @@ React Query excels at server state synchronization.
 - Background refetching, stale-while-revalidate
 - Pagination, infinite scroll
 
-### When Directive is Better
+### vs React Query: When Directive is Better
 
 - Complex business logic beyond fetching
 - Multi-step async flows
 - Cross-cutting constraints
 
-### Code Comparison
+### vs React Query: Code Comparison
 
 **React Query:**
 ```typescript
@@ -406,13 +406,13 @@ MobX uses observables and reactions for transparent reactive programming.
 - Familiar OOP class-based stores
 - Incremental adoption in existing apps
 
-### When Directive is Better
+### vs MobX: When Directive is Better
 
 - Declarative constraints over imperative reactions
 - Built-in async resolution with retry/timeout
 - Multi-module coordination and AI integration
 
-### Code Comparison
+### vs MobX: Code Comparison
 
 **MobX:**
 ```typescript

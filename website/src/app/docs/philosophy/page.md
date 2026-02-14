@@ -108,8 +108,8 @@ These opinions exist because they eliminate real problems. Race conditions disap
 The framework adapters are thin – they connect Directive's reactive system to each framework's rendering cycle. The system itself can live wherever makes sense for your use case:
 
 ```tsx
-import { createSystem } from 'directive';
-import { useDirectiveRef, useFact, useDerived } from 'directive/react';
+import { createSystem } from '@directive-run/core';
+import { useDirectiveRef, useFact, useDerived } from '@directive-run/react';
 import { chatModule } from './modules/chat';
 
 // Option 1: Component-scoped system (tied to component lifecycle)

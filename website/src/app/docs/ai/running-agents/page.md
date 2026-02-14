@@ -12,7 +12,7 @@ This is the minimal path. No orchestrator, no guardrails, no memory – just a r
 ## Quick Start
 
 ```typescript
-import { createOpenAIRunner } from 'directive/ai';
+import { createOpenAIRunner } from '@directive-run/ai';
 
 // Create a runner for OpenAI (just needs an API key)
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
@@ -38,7 +38,7 @@ Directive ships pre-built runners for common providers. Each returns a standard 
 ### OpenAI
 
 ```typescript
-import { createOpenAIRunner } from 'directive/ai';
+import { createOpenAIRunner } from '@directive-run/ai';
 
 const runner = createOpenAIRunner({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -50,7 +50,7 @@ const runner = createOpenAIRunner({
 ### Anthropic (Claude)
 
 ```typescript
-import { createAnthropicRunner } from 'directive/ai';
+import { createAnthropicRunner } from '@directive-run/ai';
 
 const runner = createAnthropicRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -62,7 +62,7 @@ const runner = createAnthropicRunner({
 ### Ollama (Local)
 
 ```typescript
-import { createOllamaRunner } from 'directive/ai';
+import { createOllamaRunner } from '@directive-run/ai';
 
 // Connect to a locally running Ollama instance
 const runner = createOllamaRunner({
@@ -78,7 +78,7 @@ const runner = createOllamaRunner({
 An agent is a plain object with `name`, `instructions`, and `model`:
 
 ```typescript
-import type { AgentLike } from 'directive/ai';
+import type { AgentLike } from '@directive-run/ai';
 
 // An agent is a plain object – name, instructions, and optional model
 const agent: AgentLike = {
@@ -113,7 +113,7 @@ result.totalTokens;   // number – total tokens consumed
 For providers without a pre-built helper, use `createRunner`:
 
 ```typescript
-import { createRunner } from 'directive/ai';
+import { createRunner } from '@directive-run/ai';
 
 const runner = createRunner({
   // Build the HTTP request from the agent definition and user input
@@ -145,7 +145,7 @@ const runner = createRunner({
 Or write an `AgentRunner` from scratch:
 
 ```typescript
-import type { AgentRunner } from 'directive/ai';
+import type { AgentRunner } from '@directive-run/ai';
 
 // Implement the AgentRunner interface from scratch
 const runner: AgentRunner = async (agent, input, options) => {

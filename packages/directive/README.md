@@ -1,3 +1,15 @@
+> **This package has been replaced by scoped `@directive-run/*` packages.**
+>
+> | Old Import | New Package |
+> |------------|-------------|
+> | `directive` | `@directive-run/core` |
+> | `directive/react` | `@directive-run/react` |
+> | `directive/ai` | `@directive-run/ai` |
+> | `directive/plugins` | `@directive-run/core/plugins` |
+> | `directive/testing` | `@directive-run/core/testing` |
+>
+> See the [migration guide](https://directive.run/docs/migration/package-restructure) for step-by-step instructions.
+
 # Directive
 
 **Constraint-driven runtime for TypeScript.** Declare requirements. Let the runtime resolve them.

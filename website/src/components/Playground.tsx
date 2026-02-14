@@ -139,7 +139,7 @@ function FallbackEditor({
   )
 }
 
-const STARTER_CODE = `import { createModule, createSystem, t } from 'directive';
+const STARTER_CODE = `import { createModule, createSystem, t } from '@directive-run/core';
 
 // Define your module
 const counterModule = createModule("counter", {

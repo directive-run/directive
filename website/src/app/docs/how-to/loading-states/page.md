@@ -14,8 +14,8 @@ In a typical app, multiple async operations run concurrently – fetching a user
 ## The Solution
 
 ```typescript
-import { createModule, t } from 'directive';
-import { useDirective, useRequirementStatus } from 'directive/react';
+import { createModule, t } from '@directive-run/core';
+import { useDirective, useRequirementStatus } from '@directive-run/react';
 
 // Module with async data requirements
 const dashboard = createModule('dashboard', {
@@ -117,7 +117,7 @@ function Dashboard({ system }) {
 
 ```tsx
 // Throw a promise to integrate with React Suspense
-import { useSuspenseRequirement } from 'directive/react';
+import { useSuspenseRequirement } from '@directive-run/react';
 
 function Profile({ system }) {
   // Suspends until FETCH_PROFILE resolves
@@ -136,7 +136,7 @@ function Profile({ system }) {
 ### Constraint-level status
 
 ```tsx
-import { useConstraintStatus } from 'directive/react';
+import { useConstraintStatus } from '@directive-run/react';
 
 function StatusIndicator({ system }) {
   const status = useConstraintStatus(system, 'needsProfile');

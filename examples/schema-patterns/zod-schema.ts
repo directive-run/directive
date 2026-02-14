@@ -4,7 +4,7 @@
  * Uses Zod for type definitions with full runtime validation.
  */
 
-import { createModule, createSystem } from "directive";
+import { createModule, createSystem } from "@directive-run/core";
 import { z } from "zod";
 
 // ============================================================================

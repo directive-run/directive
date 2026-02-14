@@ -379,7 +379,7 @@ resolvers: {
 Here's a complete example showing all concepts working together:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 interface User {
   id: number;

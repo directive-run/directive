@@ -12,7 +12,7 @@ Directive's React hooks use a **system-first** pattern: pass the system as the f
 The React adapter is included in the main package:
 
 ```typescript
-import { useFact, useDerived, useEvents, useDispatch } from 'directive/react';
+import { useFact, useDerived, useEvents, useDispatch } from '@directive-run/react';
 ```
 
 ---
@@ -22,7 +22,7 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/react';
 Create a system at module level and pass it explicitly to hooks:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const userModule = createModule("user", {
   schema: {
@@ -74,7 +74,7 @@ export { system };
 Then pass the system to hooks in your components:
 
 ```tsx
-import { useFact, useDerived, useEvents } from 'directive/react';
+import { useFact, useDerived, useEvents } from '@directive-run/react';
 import { system } from './system';
 
 function UserProfile() {
@@ -122,7 +122,7 @@ The two hooks below are progressive shortcuts – each adds more automatic behav
 Create a system scoped to a component's lifecycle. The system starts in a `useEffect` and is destroyed on unmount:
 
 ```tsx
-import { useDirectiveRef, useFact, useEvents } from 'directive/react';
+import { useDirectiveRef, useFact, useEvents } from '@directive-run/react';
 
 function Counter() {
   // Create a scoped system tied to this component's lifecycle
@@ -178,7 +178,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 - **Subscribe all** – omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```tsx
-import { useDirective } from 'directive/react';
+import { useDirective } from '@directive-run/react';
 
 // Selective: subscribe to specific keys only
 function Counter() {
@@ -353,7 +353,7 @@ const snapshot = system.getDistributableSnapshot({
 });
 
 // Client: hydrate from the server snapshot
-import { DirectiveHydrator, useHydratedSystem } from 'directive/react';
+import { DirectiveHydrator, useHydratedSystem } from '@directive-run/react';
 
 function App({ serverSnapshot }) {
   return (
@@ -447,8 +447,8 @@ function RequirementDebug({ requirementId }) {
 These hooks require a `statusPlugin`:
 
 ```tsx
-import { createRequirementStatusPlugin, createSystem } from 'directive';
-import { useRequirementStatus, useSuspenseRequirement } from 'directive/react';
+import { createRequirementStatusPlugin, createSystem } from '@directive-run/core';
+import { useRequirementStatus, useSuspenseRequirement } from '@directive-run/react';
 
 // Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
@@ -549,7 +549,7 @@ Manual rollback is also available via `rollback()`.
 Dev-only floating panel (tree-shaken in production):
 
 ```tsx
-import { DirectiveDevTools } from 'directive/react';
+import { DirectiveDevTools } from '@directive-run/react';
 
 function App() {
   return (
@@ -595,8 +595,8 @@ function UserIdInput() {
 
 ```tsx
 import { render, screen } from '@testing-library/react';
-import { createTestSystem } from 'directive/testing';
-import { useFact } from 'directive/react';
+import { createTestSystem } from '@directive-run/core/testing';
+import { useFact } from '@directive-run/react';
 import { userModule } from './modules/user';
 
 function UserProfile({ system }) {
@@ -652,7 +652,7 @@ test('displays user name', async () => {
 ### Undo / Redo Controls
 
 ```tsx
-import { useTimeTravel } from 'directive/react';
+import { useTimeTravel } from '@directive-run/react';
 
 function UndoRedo() {
   const timeTravel = useTimeTravel(system);

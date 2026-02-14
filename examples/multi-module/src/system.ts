@@ -12,8 +12,8 @@
  * This example uses multiple modules with namespaced access.
  */
 
-import { createSystem } from "directive";
-import { loggingPlugin } from "directive/plugins";
+import { createSystem } from "@directive-run/core";
+import { loggingPlugin } from "@directive-run/core/plugins";
 import { authModule } from "./modules/auth";
 import { dataModule } from "./modules/data";
 import { uiModule } from "./modules/ui";

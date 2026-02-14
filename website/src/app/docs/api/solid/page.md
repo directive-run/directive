@@ -1,6 +1,6 @@
 ---
 title: Solid Hooks
-description: Complete API reference for all Solid hooks exported from directive/solid. Explicit system parameter – hooks take the system directly, no provider needed.
+description: Complete API reference for all Solid hooks exported from @directive-run/solid. Explicit system parameter – hooks take the system directly, no provider needed.
 ---
 
 Solid hooks API reference. All hooks take the system as an explicit first parameter – no provider or context needed. Values are returned as Solid `Accessor` functions. {% .lead %}
@@ -12,7 +12,7 @@ Solid hooks API reference. All hooks take the system as an explicit first parame
 Create a system and pass it directly to hooks:
 
 ```tsx
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 // Create and start the system
 const system = createSystem({ module: myModule });
@@ -58,7 +58,7 @@ useFact<T extends Record<string, unknown>>(system: System, factKeys: string[]): 
 ```
 
 ```tsx
-import { useFact } from 'directive/solid';
+import { useFact } from '@directive-run/solid';
 
 function Counter() {
   // Subscribe to a single fact value
@@ -91,7 +91,7 @@ useDerived<T extends Record<string, unknown>>(system: System, derivationIds: str
 ```
 
 ```tsx
-import { useDerived } from 'directive/solid';
+import { useDerived } from '@directive-run/solid';
 
 function CartTotal() {
   // Subscribe to a single derivation
@@ -123,7 +123,7 @@ useSelector<R>(system: System, selector: (facts: Record<string, unknown>) => R, 
 ```
 
 ```tsx
-import { useSelector } from 'directive/solid';
+import { useSelector } from '@directive-run/solid';
 
 function Summary() {
   // Select and combine values from multiple facts
@@ -147,7 +147,7 @@ useEvents<M extends ModuleSchema>(system: System<M>): System<M>["events"]
 ```
 
 ```tsx
-import { useEvents } from 'directive/solid';
+import { useEvents } from '@directive-run/solid';
 
 function Controls() {
   // Get typed event dispatchers for the module
@@ -168,7 +168,7 @@ useDispatch<M extends ModuleSchema>(system: System<M>): (event: InferEvents<M>) 
 ```
 
 ```tsx
-import { useDispatch } from 'directive/solid';
+import { useDispatch } from '@directive-run/solid';
 
 function IncrementButton() {
   // Get the low-level dispatch function
@@ -196,7 +196,7 @@ useWatch<T>(system: System, kind: "fact", factKey: string, callback: (newValue: 
 ```
 
 ```tsx
-import { useWatch } from 'directive/solid';
+import { useWatch } from '@directive-run/solid';
 
 function Analytics() {
   // Watch a derivation – auto-detected
@@ -228,7 +228,7 @@ useInspect(system: System, options?: { throttleMs?: number }): Accessor<InspectS
 ```
 
 ```tsx
-import { useInspect } from 'directive/solid';
+import { useInspect } from '@directive-run/solid';
 
 function DebugPanel() {
   // Get reactive system inspection data
@@ -262,7 +262,7 @@ useConstraintStatus(system: System, constraintId: string): Accessor<ConstraintIn
 ```
 
 ```tsx
-import { useConstraintStatus } from 'directive/solid';
+import { useConstraintStatus } from '@directive-run/solid';
 
 function ConstraintList() {
   // Get all constraints for the debug panel
@@ -296,7 +296,7 @@ useExplain(system: System, requirementId: string): Accessor<string | null>
 ```
 
 ```tsx
-import { useExplain } from 'directive/solid';
+import { useExplain } from '@directive-run/solid';
 
 function WhyPanel() {
   // Get a detailed explanation of why a requirement was generated
@@ -318,7 +318,7 @@ useRequirementStatus(statusPlugin: StatusPlugin, types: string[]): Accessor<Reco
 ```
 
 ```tsx
-import { useRequirementStatus } from 'directive/solid';
+import { useRequirementStatus } from '@directive-run/solid';
 
 function UserLoader() {
   // Track the loading state of a specific requirement type
@@ -353,7 +353,7 @@ useSuspenseRequirement(statusPlugin: StatusPlugin, types: string[]): Accessor<Re
 ```
 
 ```tsx
-import { useSuspenseRequirement } from 'directive/solid';
+import { useSuspenseRequirement } from '@directive-run/solid';
 import { Suspense } from 'solid-js';
 
 function UserProfile() {
@@ -389,7 +389,7 @@ useOptimisticUpdate(system: System, statusPlugin?: StatusPlugin, requirementType
 ```
 
 ```tsx
-import { useOptimisticUpdate } from 'directive/solid';
+import { useOptimisticUpdate } from '@directive-run/solid';
 
 function LikeButton() {
   // Set up optimistic mutations with automatic rollback
@@ -439,7 +439,7 @@ useDirective<M extends ModuleSchema>(moduleDef: ModuleDef<M>, config?: {
 ```
 
 ```tsx
-import { useDirective } from 'directive/solid';
+import { useDirective } from '@directive-run/solid';
 
 // Subscribe all: omit keys for everything
 function Counter() {
@@ -480,7 +480,7 @@ createTypedHooks<M extends ModuleSchema>(): {
 ```
 
 ```tsx
-import { createTypedHooks } from 'directive/solid';
+import { createTypedHooks } from '@directive-run/solid';
 import type { MySchema } from './schema';
 
 // Create typed hooks – full autocomplete for fact keys and event types
@@ -505,7 +505,7 @@ createDerivedSignal<T>(system: System<any>, derivationId: string): [Accessor<T>,
 ```
 
 ```tsx
-import { createDerivedSignal } from 'directive/solid';
+import { createDerivedSignal } from '@directive-run/solid';
 
 // Create a derivation signal outside of components
 const [total, unsub] = createDerivedSignal<number>(system, 'cartTotal');
@@ -524,7 +524,7 @@ createFactSignal<T>(system: System<any>, factKey: string): [Accessor<T | undefin
 ```
 
 ```tsx
-import { createFactSignal } from 'directive/solid';
+import { createFactSignal } from '@directive-run/solid';
 
 // Create a fact signal outside of components
 const [count, unsub] = createFactSignal<number>(system, 'count');
@@ -556,7 +556,7 @@ interface TimeTravelState {
 ```
 
 ```tsx
-import { useTimeTravel } from 'directive/solid';
+import { useTimeTravel } from '@directive-run/solid';
 
 function UndoControls() {
   // Get reactive time-travel controls (null when disabled)
@@ -587,7 +587,7 @@ shallowEqual(a: unknown, b: unknown): boolean
 ```
 
 ```tsx
-import { useSelector, shallowEqual } from 'directive/solid';
+import { useSelector, shallowEqual } from '@directive-run/solid';
 
 function UserInfo() {
   // Use shallowEqual to prevent updates when name/age haven't changed

@@ -16,7 +16,7 @@ Two ways to build typed constraints outside of `createModule()`.
 Chain `.when()`, `.require()`, optional fields, then `.build()`. All fields from `TypedConstraintDef` are supported.
 
 ```typescript
-import { constraint } from 'directive';
+import { constraint } from '@directive-run/core';
 
 const escalate = constraint<typeof schema>()
   .when(f => f.confidence < 0.7)
@@ -47,7 +47,7 @@ The chain enforces order: `.when()` first, `.require()` second, then any optiona
 Returns a valid constraint directly – no `.build()` needed. Optional chaining via `with*` methods returns a new immutable constraint each time.
 
 ```typescript
-import { when } from 'directive';
+import { when } from '@directive-run/core';
 
 // Minimal – ready to use immediately
 const pause = when<typeof schema>(f => f.errors > 3)
@@ -116,7 +116,7 @@ const myModule = createModule('example', {
 The `module()` builder provides a fluent alternative to `createModule()`.
 
 ```typescript
-import { module, t } from 'directive';
+import { module, t } from '@directive-run/core';
 
 const counter = module('counter')
   .schema({
@@ -150,7 +150,7 @@ The `system()` builder provides a fluent alternative to `createSystem()`.
 ### Single Module
 
 ```typescript
-import { system } from 'directive';
+import { system } from '@directive-run/core';
 
 const sys = system()
   .module(counterModule)
@@ -199,8 +199,8 @@ Calling `.module()` or `.modules()` narrows the builder type – you can't mix t
 A full module definition using `when()` and `constraint()` for reusable, composable constraints.
 
 ```typescript
-import { createModule, constraint, when, t } from 'directive';
-import type { ModuleSchema } from 'directive';
+import { createModule, constraint, when, t } from '@directive-run/core';
+import type { ModuleSchema } from '@directive-run/core';
 
 const schema = {
   facts: {
@@ -288,9 +288,9 @@ const itemsModule = createModule('items', {
 Wire up multiple modules, plugins, and configuration using the `system()` builder.
 
 ```typescript
-import { system, module, when, t } from 'directive';
-import { loggingPlugin } from 'directive/plugins';
-import type { ModuleSchema } from 'directive';
+import { system, module, when, t } from '@directive-run/core';
+import { loggingPlugin } from '@directive-run/core/plugins';
+import type { ModuleSchema } from '@directive-run/core';
 
 // Auth module (using module builder)
 const authModule = module('auth')

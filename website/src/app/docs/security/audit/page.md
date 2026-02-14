@@ -10,7 +10,7 @@ Maintain an immutable, tamper-evident audit trail of every operation in your sys
 ## Basic Setup
 
 ```typescript
-import { createAuditTrail } from 'directive/ai';
+import { createAuditTrail } from '@directive-run/ai';
 
 // Create a hash-chained audit trail with size and time limits
 const audit = createAuditTrail({

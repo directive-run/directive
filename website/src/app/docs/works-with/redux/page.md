@@ -149,7 +149,7 @@ events: {
 Replace thunks with Directive constraints. When Redux state (synced as facts) meets a condition, the constraint fires and a resolver handles the async work:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const cartModule = createModule('cart', {
   schema: {
@@ -213,7 +213,7 @@ The constraint fires automatically when `cartTotal > 100` and the user is premiu
 Use a plugin to dispatch Directive fact changes as Redux actions, making them visible in Redux DevTools:
 
 ```typescript
-import type { Plugin } from 'directive';
+import type { Plugin } from '@directive-run/core';
 
 const reduxDevtoolsPlugin: Plugin = {
   name: 'redux-devtools-mirror',
@@ -256,7 +256,7 @@ Wire both stores in a React component using `useEffect` for subscription lifecyc
 ```tsx
 import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { useDirectiveRef } from 'directive/react';
+import { useDirectiveRef } from '@directive-run/react';
 
 function CartPage() {
   // useDirectiveRef returns the system directly (useDirective returns reactive selections)
@@ -355,7 +355,7 @@ Test the integration using Directive's test utilities alongside a real or mock R
 
 ```typescript
 import { configureStore } from '@reduxjs/toolkit';
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 
 test('constraint fires when Redux state synced', async () => {
   const testSystem = createTestSystem(cartModule);

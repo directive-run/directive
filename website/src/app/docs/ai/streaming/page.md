@@ -12,8 +12,8 @@ Process agent responses token-by-token with real-time guardrails. {% .lead %}
 The simplest way to stream – use `orchestrator.runStream()` which wraps the agent run with guardrails, approval checks, and state tracking:
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/ai';
-import type { AgentLike } from 'directive/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import type { AgentLike } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -107,7 +107,7 @@ controller.abort();
 The `AgentStack` offers two streaming methods. `stack.stream()` yields raw token strings, while `stack.streamChunks()` yields the same rich `StreamChunk` types as the orchestrator:
 
 ```typescript
-import { createAgentStack } from 'directive/ai';
+import { createAgentStack } from '@directive-run/ai';
 
 const stack = createAgentStack({
   runner,
@@ -138,8 +138,8 @@ Both methods automatically track tokens, record observability spans, and publish
 For streaming outside the orchestrator (e.g., direct agent runs without guardrails/approvals), use `createStreamingRunner`:
 
 ```typescript
-import { createStreamingRunner } from 'directive/ai';
-import type { StreamRunOptions } from 'directive/ai';
+import { createStreamingRunner } from '@directive-run/ai';
+import type { StreamRunOptions } from '@directive-run/ai';
 
 // Build a streaming runner by wrapping your LLM SDK's streaming API
 const streamRunner = createStreamingRunner(
@@ -223,7 +223,7 @@ import {
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
   combineStreamingGuardrails,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const streamRunner = createStreamingRunner(baseRunner, {
   streamingGuardrails: [
@@ -261,7 +261,7 @@ for await (const chunk of stream) {
 Merge multiple streaming guardrails into one:
 
 ```typescript
-import { combineStreamingGuardrails } from 'directive/ai';
+import { combineStreamingGuardrails } from '@directive-run/ai';
 
 // Merge multiple streaming guardrails into a single checker
 const combined = combineStreamingGuardrails([
@@ -279,7 +279,7 @@ const streamRunner = createStreamingRunner(baseRunner, {
 Reuse existing output guardrails as streaming guardrails:
 
 ```typescript
-import { adaptOutputGuardrail } from 'directive/ai';
+import { adaptOutputGuardrail } from '@directive-run/ai';
 
 // Reuse an existing output guardrail as a streaming guardrail
 const streamingVersion = adaptOutputGuardrail(
@@ -300,7 +300,7 @@ Transform, filter, and inspect streams with composable operators:
 Consume an entire stream and return the concatenated text:
 
 ```typescript
-import { collectTokens } from 'directive/ai';
+import { collectTokens } from '@directive-run/ai';
 
 // Consume the entire stream and return the concatenated text
 const { stream } = orchestrator.runStream(agent, input);
@@ -312,7 +312,7 @@ const fullOutput = await collectTokens(stream);
 Observe chunks without modifying the stream (logging, metrics):
 
 ```typescript
-import { tapStream } from 'directive/ai';
+import { tapStream } from '@directive-run/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
@@ -332,7 +332,7 @@ for await (const chunk of logged) {
 Keep only specific chunk types:
 
 ```typescript
-import { filterStream } from 'directive/ai';
+import { filterStream } from '@directive-run/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
@@ -349,7 +349,7 @@ for await (const chunk of tokensOnly) {
 Transform chunks:
 
 ```typescript
-import { mapStream } from 'directive/ai';
+import { mapStream } from '@directive-run/ai';
 
 const { stream } = orchestrator.runStream(agent, input);
 
@@ -372,7 +372,7 @@ The streaming API is framework-agnostic – `orchestrator.runStream()` works the
 
 ```tsx
 import { useState, useCallback } from 'react';
-import { useAgentOrchestrator, useFact } from 'directive/react';
+import { useAgentOrchestrator, useFact } from '@directive-run/react';
 
 function ChatStream() {
   const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -404,8 +404,8 @@ function ChatStream() {
 ```html
 <script setup>
 import { ref, onUnmounted } from 'vue';
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact } from 'directive/vue';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact } from '@directive-run/vue';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onUnmounted(() => orchestrator.dispose());
@@ -433,8 +433,8 @@ async function send(input: string) {
 
 ```html
 <script>
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact } from 'directive/svelte';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact } from '@directive-run/svelte';
 import { onDestroy } from 'svelte';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -461,8 +461,8 @@ async function send(input) {
 
 ```tsx
 import { createSignal } from 'solid-js';
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact } from 'directive/solid';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact } from '@directive-run/solid';
 import { onCleanup } from 'solid-js';
 
 function ChatStream() {
@@ -494,8 +494,8 @@ function ChatStream() {
 
 ```typescript
 import { LitElement, html } from 'lit';
-import { createAgentOrchestrator } from 'directive/ai';
-import { FactController } from 'directive/lit';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { FactController } from '@directive-run/lit';
 
 class ChatStream extends LitElement {
   private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });

@@ -12,7 +12,7 @@ Wire together all AI adapter features with a single factory. {% .lead %}
 `createAgentStack` is the main composition API. Only `runner` is required – every other feature activates when its config key is present:
 
 ```typescript
-import { createAgentStack, createOpenAIRunner } from 'directive/ai';
+import { createAgentStack, createOpenAIRunner } from '@directive-run/ai';
 
 // Create a runner for your LLM provider
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
@@ -77,7 +77,7 @@ import {
   createAgentStack,
   createAgentMemory,
   createSlidingWindowStrategy,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 // Shorthand – pass an options object and the stack builds the instance
 const stack = createAgentStack({
@@ -241,10 +241,10 @@ stack.memory         // AgentMemory | null – conversation history management
 
 Conversation memory keeps context across turns by storing messages and trimming older ones according to a strategy.
 
-### Setup
+### Memory Setup
 
 ```typescript
-import { createAgentMemory, createSlidingWindowStrategy } from 'directive/ai';
+import { createAgentMemory, createSlidingWindowStrategy } from '@directive-run/ai';
 
 const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 50 }),  // Keep last 50 messages
@@ -266,7 +266,7 @@ const strategy = createSlidingWindowStrategy({
 **Token-Based** – caps context by token count instead of message count:
 
 ```typescript
-import { createTokenBasedStrategy } from 'directive/ai';
+import { createTokenBasedStrategy } from '@directive-run/ai';
 
 // Cap context window by estimated token count instead of message count
 const strategy = createTokenBasedStrategy({
@@ -301,7 +301,7 @@ const memory = createAgentMemory({
 });
 ```
 
-### Usage
+### Memory Usage
 
 ```typescript
 // Append messages to the conversation history
@@ -319,7 +319,7 @@ const saved = memory.export();
 memory.import(saved);
 ```
 
-### Shorthand with Stack
+### Memory Shorthand
 
 Pass a plain object and the stack builds the memory instance for you:
 
@@ -336,10 +336,10 @@ const stack = createAgentStack({
 
 Track metrics, traces, and alerts across every agent run.
 
-### Setup
+### Observability Setup
 
 ```typescript
-import { createObservability, createAgentMetrics } from 'directive/ai';
+import { createObservability, createAgentMetrics } from '@directive-run/ai';
 
 const obs = createObservability({
   serviceName: 'my-app',
@@ -408,7 +408,7 @@ Threshold-based alerting triggers when a metric crosses a configured limit. Conf
 Push metrics and traces to any OpenTelemetry-compatible collector:
 
 ```typescript
-import { createOTLPExporter } from 'directive/ai';
+import { createOTLPExporter } from '@directive-run/ai';
 
 // Connect to any OpenTelemetry-compatible collector
 const exporter = createOTLPExporter({
@@ -430,7 +430,7 @@ Protect your system from cascading failures with circuit breakers and rate limit
 ### Circuit Breaker
 
 ```typescript
-import { createCircuitBreaker } from 'directive/ai';
+import { createCircuitBreaker } from '@directive-run/ai';
 
 const breaker = createCircuitBreaker({
   failureThreshold: 5,          // Open after 5 consecutive failures
@@ -482,10 +482,10 @@ const stack = createAgentStack({
 
 Cache agent responses by semantic similarity so repeated or near-duplicate queries return instantly without an LLM call.
 
-### Setup
+### Cache Setup
 
 ```typescript
-import { createSemanticCache } from 'directive/ai';
+import { createSemanticCache } from '@directive-run/ai';
 
 const cache = createSemanticCache({
   // Convert text into a vector for similarity comparison
@@ -503,7 +503,7 @@ const cache = createSemanticCache({
 });
 ```
 
-### Usage
+### Cache Usage
 
 ```typescript
 // Check if a semantically similar query has been answered before
@@ -524,7 +524,7 @@ if (result.hit) {
 Plug the cache into the guardrail pipeline so cache hits short-circuit agent execution automatically:
 
 ```typescript
-import { createSemanticCacheGuardrail } from 'directive/ai';
+import { createSemanticCacheGuardrail } from '@directive-run/ai';
 
 // Plug the cache into the guardrail pipeline – hits short-circuit the agent call
 const cacheGuardrail = createSemanticCacheGuardrail({ cache });
@@ -544,7 +544,7 @@ console.log(stats.hitRate);       // Percentage of lookups that found a match
 Use the built-in test embedder to avoid real embedding calls in tests:
 
 ```typescript
-import { createTestEmbedder } from 'directive/ai';
+import { createTestEmbedder } from '@directive-run/ai';
 
 // Deterministic embedder for unit tests – no real API calls
 const testCache = createSemanticCache({
@@ -553,7 +553,7 @@ const testCache = createSemanticCache({
 });
 ```
 
-### Shorthand with Stack
+### Cache Shorthand
 
 ```typescript
 const stack = createAgentStack({
@@ -571,7 +571,7 @@ Access agent state reactively via `stack.orchestrator.system`. The same bridge k
 ### React
 
 ```tsx
-import { useAgentStack, useFact, useSelector, useWatch, useInspect } from 'directive/react';
+import { useAgentStack, useFact, useSelector, useWatch, useInspect } from '@directive-run/react';
 
 function AgentDashboard() {
   // Initialize the full stack as a React hook (auto-disposes on unmount)
@@ -605,8 +605,8 @@ function AgentDashboard() {
 
 ```html
 <script setup>
-import { createAgentStack } from 'directive/ai';
-import { useFact, useInspect } from 'directive/vue';
+import { createAgentStack } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/vue';
 import { onUnmounted } from 'vue';
 
 const stack = createAgentStack({ runner, agents: { /* ... */ } });
@@ -630,8 +630,8 @@ const { isSettled } = useInspect(system);
 
 ```html
 <script>
-import { createAgentStack } from 'directive/ai';
-import { useFact, useInspect } from 'directive/svelte';
+import { createAgentStack } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/svelte';
 import { onDestroy } from 'svelte';
 
 const stack = createAgentStack({ runner, agents: { /* ... */ } });
@@ -651,8 +651,8 @@ const inspect = useInspect(system);
 ### Solid
 
 ```tsx
-import { createAgentStack } from 'directive/ai';
-import { useFact, useInspect } from 'directive/solid';
+import { createAgentStack } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/solid';
 import { onCleanup } from 'solid-js';
 
 function AgentDashboard() {
@@ -678,8 +678,8 @@ function AgentDashboard() {
 
 ```typescript
 import { LitElement, html } from 'lit';
-import { createAgentStack } from 'directive/ai';
-import { FactController, InspectController } from 'directive/lit';
+import { createAgentStack } from '@directive-run/ai';
+import { FactController, InspectController } from '@directive-run/lit';
 
 class AgentDashboard extends LitElement {
   private stack = createAgentStack({ runner, agents: { /* ... */ } });

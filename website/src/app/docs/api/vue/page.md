@@ -1,6 +1,6 @@
 ---
 title: Vue Composables
-description: Complete API reference for all Vue composables exported from directive/vue. All composables take an explicit system parameter – no context injection needed.
+description: Complete API reference for all Vue composables exported from @directive-run/vue. All composables take an explicit system parameter – no context injection needed.
 ---
 
 Vue composables API reference. All composables take an explicit `system` parameter – no provide/inject needed. {% .lead %}
@@ -41,11 +41,11 @@ function useFact<T>(system: System, factKey: string): Ref<T | undefined>
 function useFact<T extends Record<string, unknown>>(system: System, factKeys: string[]): ShallowRef<T>
 ```
 
-### Usage
+### useFact Usage
 
 ```html
 <script setup>
-import { useFact } from 'directive/vue';
+import { useFact } from '@directive-run/vue';
 import { system } from './system';
 
 // Subscribe to a single fact – returns Ref<number | undefined>
@@ -79,11 +79,11 @@ function useDerived<T>(system: System, derivationId: string): Ref<T>
 function useDerived<T extends Record<string, unknown>>(system: System, derivationIds: string[]): ShallowRef<T>
 ```
 
-### Usage
+### useDerived Usage
 
 ```html
 <script setup>
-import { useDerived } from 'directive/vue';
+import { useDerived } from '@directive-run/vue';
 import { system } from './system';
 
 // Subscribe to a single derivation
@@ -117,11 +117,11 @@ function useSelector<R>(
 ): Ref<R>
 ```
 
-### Usage
+### useSelector Usage
 
 ```html
 <script setup>
-import { useSelector, shallowEqual } from 'directive/vue';
+import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Select and combine values from multiple facts with shallow equality
@@ -150,11 +150,11 @@ Returns the system's typed events dispatcher object.
 function useEvents<M extends ModuleSchema>(system: System<M>): System<M>["events"]
 ```
 
-### Usage
+### useEvents Usage
 
 ```html
 <script setup>
-import { useEvents } from 'directive/vue';
+import { useEvents } from '@directive-run/vue';
 import { system } from './system';
 
 // Get typed event dispatchers for the module
@@ -177,11 +177,11 @@ Get a low-level dispatch function for sending events.
 function useDispatch<M extends ModuleSchema>(system: System<M>): (event: InferEvents<M>) => void
 ```
 
-### Usage
+### useDispatch Usage
 
 ```html
 <script setup>
-import { useDispatch } from 'directive/vue';
+import { useDispatch } from '@directive-run/vue';
 import { system } from './system';
 
 // Get the low-level dispatch function
@@ -216,11 +216,11 @@ function useWatch<T>(
 ): void
 ```
 
-### Usage
+### useWatch Usage
 
 ```html
 <script setup>
-import { useWatch } from 'directive/vue';
+import { useWatch } from '@directive-run/vue';
 import { system } from './system';
 
 // Watch a derivation – auto-detected
@@ -249,7 +249,7 @@ Get system inspection data reactively. Supports optional throttling for high-fre
 function useInspect(system: System, options?: { throttleMs?: number }): ShallowRef<InspectState>
 ```
 
-### Returns
+### useInspect Returns
 
 ```typescript
 interface InspectState {
@@ -262,11 +262,11 @@ interface InspectState {
 }
 ```
 
-### Usage
+### useInspect Usage
 
 ```html
 <script setup>
-import { useInspect } from 'directive/vue';
+import { useInspect } from '@directive-run/vue';
 import { system } from './system';
 
 // Get reactive system inspection data
@@ -298,11 +298,11 @@ function useConstraintStatus(system: System): ComputedRef<ConstraintInfo[]>
 function useConstraintStatus(system: System, constraintId: string): ComputedRef<ConstraintInfo | null>
 ```
 
-### Usage
+### useConstraintStatus Usage
 
 ```html
 <script setup>
-import { useConstraintStatus } from 'directive/vue';
+import { useConstraintStatus } from '@directive-run/vue';
 import { system } from './system';
 
 // Get all constraints for the debug panel
@@ -330,11 +330,11 @@ Reactively returns the explanation string for a requirement type.
 function useExplain(system: System, requirementId: string): Ref<string | null>
 ```
 
-### Usage
+### useExplain Usage
 
 ```html
 <script setup>
-import { useExplain } from 'directive/vue';
+import { useExplain } from '@directive-run/vue';
 import { system } from './system';
 
 // Get a detailed explanation of why a requirement was generated
@@ -360,7 +360,7 @@ function useRequirementStatus(statusPlugin: StatusPlugin, type: string): Shallow
 function useRequirementStatus(statusPlugin: StatusPlugin, types: string[]): ShallowRef<Record<string, RequirementTypeStatus>>
 ```
 
-### Returns
+### useRequirementStatus Returns
 
 ```typescript
 interface RequirementTypeStatus {
@@ -373,11 +373,11 @@ interface RequirementTypeStatus {
 }
 ```
 
-### Usage
+### useRequirementStatus Usage
 
 ```html
 <script setup>
-import { useRequirementStatus } from 'directive/vue';
+import { useRequirementStatus } from '@directive-run/vue';
 import { statusPlugin } from './system';
 
 // Track a single requirement type
@@ -408,7 +408,7 @@ function useOptimisticUpdate(
 ): OptimisticUpdateResult
 ```
 
-### Returns
+### useOptimisticUpdate Returns
 
 ```typescript
 interface OptimisticUpdateResult {
@@ -419,11 +419,11 @@ interface OptimisticUpdateResult {
 }
 ```
 
-### Usage
+### useOptimisticUpdate Usage
 
 ```html
 <script setup>
-import { useOptimisticUpdate } from 'directive/vue';
+import { useOptimisticUpdate } from '@directive-run/vue';
 import { system, statusPlugin } from './system';
 
 // Set up optimistic mutations with automatic rollback
@@ -479,11 +479,11 @@ function useDirective<M extends ModuleSchema>(
 }
 ```
 
-### Usage
+### useDirective Usage
 
 ```html
 <script setup>
-import { useDirective } from 'directive/vue';
+import { useDirective } from '@directive-run/vue';
 import { counterModule } from './counter-module';
 
 // Subscribe all: omit keys for everything
@@ -504,7 +504,7 @@ Selective subscriptions:
 
 ```html
 <script setup>
-import { useDirective } from 'directive/vue';
+import { useDirective } from '@directive-run/vue';
 import { counterModule } from './counter-module';
 
 // Selective: subscribe to specific keys only
@@ -535,11 +535,11 @@ function createTypedHooks<M extends ModuleSchema>(): {
 }
 ```
 
-### Usage
+### createTypedHooks Usage
 
 ```typescript
 // typed-hooks.ts
-import { createTypedHooks } from 'directive/vue';
+import { createTypedHooks } from '@directive-run/vue';
 import type { MyModuleSchema } from './my-module';
 
 // Create typed composables – full autocomplete for fact keys and event types
@@ -570,7 +570,7 @@ Reactive time-travel composable. Returns a `ShallowRef` that updates when snapsh
 function useTimeTravel(system: System): ShallowRef<TimeTravelState | null>
 ```
 
-### Returns
+### useTimeTravel Returns
 
 ```typescript
 interface TimeTravelState {
@@ -583,11 +583,11 @@ interface TimeTravelState {
 }
 ```
 
-### Usage
+### useTimeTravel Usage
 
 ```html
 <script setup>
-import { useTimeTravel } from 'directive/vue';
+import { useTimeTravel } from '@directive-run/vue';
 import { system } from './system';
 
 // Get reactive time-travel controls (null when disabled)
@@ -623,11 +623,11 @@ Utility function for shallow equality comparison. Useful as the `equalityFn` par
 function shallowEqual(a: unknown, b: unknown): boolean
 ```
 
-### Usage
+### shallowEqual Usage
 
 ```html
 <script setup>
-import { useSelector, shallowEqual } from 'directive/vue';
+import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Use shallowEqual to prevent updates when x/y values haven't changed

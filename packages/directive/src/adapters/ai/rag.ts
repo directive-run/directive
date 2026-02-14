@@ -31,15 +31,26 @@ import type { Embedding, EmbedderFn } from "../guardrails/semantic-cache.js";
 // Types
 // ============================================================================
 
-/** A document chunk with embedding and metadata */
+/**
+ * A document chunk with its embedding vector and metadata.
+ * This is the atomic unit stored and retrieved by the RAG pipeline.
+ */
 export interface RAGChunk {
+  /** Unique identifier for this chunk (e.g., `"docs/constraints#when-clause"`) */
   id: string;
+  /** Plain-text content of the chunk */
   content: string;
+  /** Embedding vector (array of floats) for similarity search */
   embedding: Embedding;
+  /** Arbitrary metadata (title, section, url, sourceType, symbolName, etc.) */
   metadata: Record<string, unknown>;
 }
 
-/** Pluggable storage backend */
+/**
+ * Pluggable storage backend for RAG chunks.
+ * Implement `getChunks()` for brute-force search, or add an optimized
+ * `search()` method to bypass the full scan.
+ */
 export interface RAGStorage {
   getChunks(): Promise<RAGChunk[]>;
   size(): Promise<number>;
@@ -55,6 +66,10 @@ export interface RAGStorage {
   dispose?(): void;
 }
 
+/**
+ * Configuration for creating a RAG enricher.
+ * At minimum, provide an `embedder` function and a `storage` backend.
+ */
 export interface RAGEnricherConfig {
   /** Function to generate query embeddings */
   embedder: EmbedderFn;
@@ -72,6 +87,10 @@ export interface RAGEnricherConfig {
   onError?: (error: Error) => void;
 }
 
+/**
+ * Per-call options for `enricher.enrich()`.
+ * Override topK, add conversation history, or filter chunks.
+ */
 export interface RAGEnrichOptions {
   /** Prefix line (e.g. "User is viewing: /docs/constraints") */
   prefix?: string;
@@ -83,6 +102,10 @@ export interface RAGEnrichOptions {
   filter?: (chunk: RAGChunk) => boolean;
 }
 
+/**
+ * A RAG enricher that retrieves relevant document chunks by cosine
+ * similarity and assembles an enriched input string for an LLM agent.
+ */
 export interface RAGEnricher {
   /** Retrieve relevant chunks for a query */
   retrieve(
@@ -130,6 +153,9 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * Create a RAG enricher that retrieves relevant document chunks and
  * assembles enriched input for an agent.
+ *
+ * @param config - Embedder function, storage backend, topK, minSimilarity, and formatters.
+ * @returns A `RAGEnricher` with `retrieve()` and `enrich()` methods.
  */
 export function createRAGEnricher(config: RAGEnricherConfig): RAGEnricher {
   const {
@@ -222,6 +248,10 @@ export function createRAGEnricher(config: RAGEnricherConfig): RAGEnricher {
 // Built-in Storage: JSON File Store
 // ============================================================================
 
+/**
+ * Options for the built-in JSON file storage backend.
+ * Reads a JSON array of chunks from disk, caches in memory.
+ */
 export interface JSONFileStoreOptions {
   /** Absolute or relative path to the JSON embeddings file */
   filePath: string;
@@ -234,6 +264,17 @@ export interface JSONFileStoreOptions {
 /**
  * Create a RAGStorage backed by a JSON file (lazy-loaded, cached in memory).
  * Uses dynamic `import('node:fs')` for isomorphic safety.
+ *
+ * @param options - File path, optional entry mapper, and cache TTL.
+ * @returns A `RAGStorage` implementation.
+ *
+ * @example
+ * ```typescript
+ * const store = createJSONFileStore({
+ *   filePath: './public/embeddings.json',
+ *   ttlMs: 60_000, // re-read file every minute
+ * });
+ * ```
  */
 export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
   const { filePath, mapEntry, ttlMs = 0 } = options;
@@ -296,16 +337,27 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
 // Built-in Embedder: OpenAI
 // ============================================================================
 
+/**
+ * Options for the built-in OpenAI embedder.
+ */
 export interface OpenAIEmbedderOptions {
+  /** OpenAI API key */
   apiKey: string;
+  /** Embedding model (default: "text-embedding-3-small") */
   model?: string;
+  /** Output dimensions (default: 1536) */
   dimensions?: number;
+  /** API base URL (default: "https://api.openai.com/v1") */
   baseURL?: string;
+  /** Custom fetch implementation (default: globalThis.fetch) */
   fetch?: typeof globalThis.fetch;
 }
 
 /**
  * Create an EmbedderFn that calls the OpenAI embeddings API.
+ *
+ * @param options - API key, model, dimensions, base URL, and optional custom fetch.
+ * @returns An async function that converts a text string into an embedding vector.
  *
  * @example
  * ```typescript

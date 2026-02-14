@@ -96,7 +96,7 @@ This is one endpoint. A real board has six.
 Here's the Directive version. One module, one file:
 
 ```typescript
-import { createModule, t } from "directive";
+import { createModule, t } from "@directive-run/core";
 
 interface Column {
   id: string;
@@ -441,7 +441,7 @@ Setting `pendingMove` triggers the constraint, which emits the requirement, whic
 The React side uses `useOptimisticUpdate`:
 
 ```tsx
-import { useOptimisticUpdate } from "directive/react";
+import { useOptimisticUpdate } from "@directive-run/react";
 
 function BoardColumn({ column, statusPlugin, system }) {
   const { mutate, isPending, error, rollback } = useOptimisticUpdate(
@@ -549,13 +549,13 @@ Background tabs poll every two minutes. Foreground tabs poll every thirty second
 Bring it all together with `createSystemWithStatus` and Directive's React hooks:
 
 ```tsx
-import { createSystemWithStatus } from "directive";
+import { createSystemWithStatus } from "@directive-run/core";
 import {
   useFact,
   useDerived,
   useRequirementStatus,
   useInspect,
-} from "directive/react";
+} from "@directive-run/react";
 
 // Create system with requirement status tracking
 const { system, statusPlugin } = createSystemWithStatus({
@@ -619,7 +619,7 @@ The threshold: when your component has more than one async data source with *int
 ## Get started
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Explore the patterns used in this tutorial:

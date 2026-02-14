@@ -8,7 +8,7 @@
  * The namespace is applied automatically by the system.
  */
 
-import { createModule, t, type ModuleSchema } from "directive";
+import { createModule, t, type ModuleSchema } from "@directive-run/core";
 import type { User } from "../types";
 
 // Clean schema - no namespace prefix needed!

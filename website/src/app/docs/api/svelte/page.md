@@ -1,6 +1,6 @@
 ---
 title: Svelte Hooks
-description: Complete API reference for all Svelte hooks exported from directive/svelte. All hooks take system as an explicit first parameter.
+description: Complete API reference for all Svelte hooks exported from @directive-run/svelte. All hooks take system as an explicit first parameter.
 ---
 
 Svelte hooks API reference. All hooks take `system` as an explicit first parameter – no context injection needed. Values are returned as Svelte `Readable` stores. {% .lead %}
@@ -42,11 +42,11 @@ function useFact<K extends string>(system: System, key: K): Readable<InferFacts<
 function useFact<K extends string[]>(system: System, keys: K): Readable<Record<K[number], unknown>>
 ```
 
-### Usage
+### useFact Usage
 
 ```html
 <script>
-  import { useFact } from 'directive/svelte';
+  import { useFact } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to a single fact value
@@ -75,11 +75,11 @@ function useDerived<K extends string>(system: System, key: K): Readable<InferDer
 function useDerived<K extends string[]>(system: System, keys: K): Readable<Record<K[number], unknown>>
 ```
 
-### Usage
+### useDerived Usage
 
 ```html
 <script>
-  import { useDerived } from 'directive/svelte';
+  import { useDerived } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to a single derivation
@@ -111,11 +111,11 @@ function useSelector<R>(
 ): Readable<R>
 ```
 
-### Usage
+### useSelector Usage
 
 ```html
 <script>
-  import { useSelector } from 'directive/svelte';
+  import { useSelector } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Select and combine values from multiple facts
@@ -138,11 +138,11 @@ Get typed event dispatchers for all events defined in the module schema.
 function useEvents(system: System): TypedEventDispatchers
 ```
 
-### Usage
+### useEvents Usage
 
 ```html
 <script>
-  import { useEvents } from 'directive/svelte';
+  import { useEvents } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get typed event dispatchers for the module
@@ -164,11 +164,11 @@ Get the low-level dispatch function for sending events.
 function useDispatch(system: System): (event: SystemEvent) => void
 ```
 
-### Usage
+### useDispatch Usage
 
 ```html
 <script>
-  import { useDispatch } from 'directive/svelte';
+  import { useDispatch } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get the low-level dispatch function
@@ -203,11 +203,11 @@ function useWatch<T>(
 ): void
 ```
 
-### Usage
+### useWatch Usage
 
 ```html
 <script>
-  import { useWatch } from 'directive/svelte';
+  import { useWatch } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Watch a derivation – auto-detected
@@ -236,11 +236,11 @@ Get system inspection data reactively. Supports an optional throttle to limit up
 function useInspect(system: System, opts?: { throttleMs?: number }): Readable<InspectState>
 ```
 
-### Usage
+### useInspect Usage
 
 ```html
 <script>
-  import { useInspect } from 'directive/svelte';
+  import { useInspect } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get reactive system inspection data with throttled updates
@@ -273,11 +273,11 @@ interface ConstraintInfo {
 }
 ```
 
-### Usage
+### useConstraintStatus Usage
 
 ```html
 <script>
-  import { useConstraintStatus } from 'directive/svelte';
+  import { useConstraintStatus } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Check a specific constraint by ID
@@ -299,11 +299,11 @@ Get a reactive explanation of why a requirement was generated and how it was res
 function useExplain(system: System, requirementType: string): Readable<string | null>
 ```
 
-### Usage
+### useExplain Usage
 
 ```html
 <script>
-  import { useExplain } from 'directive/svelte';
+  import { useExplain } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get a reactive explanation string for a requirement
@@ -326,11 +326,11 @@ function useRequirementStatus(statusPlugin: StatusPlugin, type: string): Readabl
 function useRequirementStatus(statusPlugin: StatusPlugin, types: string[]): Readable<Record<string, RequirementTypeStatus>>
 ```
 
-### Usage
+### useRequirementStatus Usage
 
 ```html
 <script>
-  import { useRequirementStatus } from 'directive/svelte';
+  import { useRequirementStatus } from '@directive-run/svelte';
 
   // statusPlugin is created via createRequirementStatusPlugin()
   // and passed to createSystem({ plugins: [statusPlugin.plugin] })
@@ -371,11 +371,11 @@ interface OptimisticUpdateResult {
 }
 ```
 
-### Usage
+### useOptimisticUpdate Usage
 
 ```html
 <script>
-  import { useOptimisticUpdate } from 'directive/svelte';
+  import { useOptimisticUpdate } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Set up optimistic mutations with automatic rollback
@@ -427,11 +427,11 @@ function useDirective<M extends ModuleSchema>(
 }
 ```
 
-### Usage
+### useDirective Usage
 
 ```html
 <script>
-  import { useDirective } from 'directive/svelte';
+  import { useDirective } from '@directive-run/svelte';
   import { counterModule } from './modules/counter';
 
   // Subscribe all: omit keys for everything
@@ -447,7 +447,7 @@ Selective subscriptions:
 
 ```html
 <script>
-  import { useDirective } from 'directive/svelte';
+  import { useDirective } from '@directive-run/svelte';
   import { counterModule } from './modules/counter';
 
   // Selective: subscribe to specific keys only
@@ -476,11 +476,11 @@ function createTypedHooks<M extends ModuleSchema>(): {
 }
 ```
 
-### Usage
+### createTypedHooks Usage
 
 ```typescript
 // hooks.ts
-import { createTypedHooks } from 'directive/svelte';
+import { createTypedHooks } from '@directive-run/svelte';
 import type { MyModuleSchema } from './modules/my-module';
 
 // Create typed hooks – full autocomplete for fact keys and event types
@@ -545,11 +545,11 @@ function createInspectStore(
 ): Readable<SystemInspection>
 ```
 
-### Usage
+### Store Factories Usage
 
 ```typescript
 // stores.ts – create stores outside of components
-import { createFactStore, createDerivedStore } from 'directive/svelte';
+import { createFactStore, createDerivedStore } from '@directive-run/svelte';
 
 // Subscribe to a single fact as a Readable store
 export const count$ = createFactStore(system, 'count');
@@ -587,11 +587,11 @@ interface TimeTravelState {
 }
 ```
 
-### Usage
+### useTimeTravel Usage
 
 ```html
 <script>
-  import { useTimeTravel } from 'directive/svelte';
+  import { useTimeTravel } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get reactive time-travel controls (null when disabled)
@@ -625,11 +625,11 @@ Utility function for shallow equality comparison. Useful as an `equalityFn` for 
 function shallowEqual(a: unknown, b: unknown): boolean
 ```
 
-### Usage
+### shallowEqual Usage
 
 ```html
 <script>
-  import { useSelector, shallowEqual } from 'directive/svelte';
+  import { useSelector, shallowEqual } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Use shallowEqual to prevent updates when values haven't changed

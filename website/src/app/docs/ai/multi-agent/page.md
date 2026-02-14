@@ -23,14 +23,14 @@ import {
   collectOutputs,
   pickBestResult,
   aggregateTokens,
-} from 'directive/ai';
+} from '@directive-run/ai';
 import type {
   AgentLike,
   AgentRunner,
   RunResult,
   AgentRegistration,
   MultiAgentOrchestrator,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 // Define specialized agents &ndash; each has a distinct role in the pipeline
 const researcher: AgentLike = {
@@ -189,7 +189,7 @@ External signals are combined with the per-agent `timeout` &ndash; whichever fir
 
 Run multiple agents at the same time and merge their results.
 
-### Using a Named Pattern
+### Parallel Named Pattern
 
 ```typescript
 // Execute the named "research" pattern &ndash; fans out to 3 researchers
@@ -241,7 +241,7 @@ Not enough successful results: 1/2
 
 Chain agents so each one's output feeds into the next.
 
-### Using a Named Pattern
+### Sequential Named Pattern
 
 ```typescript
 const result = await orchestrator.runPattern<string>(
@@ -413,7 +413,7 @@ Use Directive constraints to automatically route work to the right agent based o
 ### `selectAgent` Helper
 
 ```typescript
-import { selectAgent } from 'directive/ai';
+import { selectAgent } from '@directive-run/ai';
 
 // Route complex queries to the expert agent
 const routeToExpert = selectAgent(
@@ -436,7 +436,7 @@ const dynamicRoute = selectAgent(
 Create `RUN_AGENT` requirements for use in Directive constraint definitions:
 
 ```typescript
-import { runAgentRequirement } from 'directive/ai';
+import { runAgentRequirement } from '@directive-run/ai';
 
 // Use in a Directive constraint definition
 const constraints = {
@@ -471,8 +471,8 @@ For decentralized agent coordination without a central orchestrator, use the mes
 The low-level pub/sub transport for agent-to-agent messaging:
 
 ```typescript
-import { createMessageBus } from 'directive/ai';
-import type { MessageBus, TypedAgentMessage } from 'directive/ai';
+import { createMessageBus } from '@directive-run/ai';
+import type { MessageBus, TypedAgentMessage } from '@directive-run/ai';
 
 const bus = createMessageBus({
   maxHistory: 1000,            // Messages to retain in history
@@ -556,8 +556,8 @@ const bus = createMessageBus({
 Higher-level coordination built on the message bus with structured patterns like request-response, delegation, and capability-based discovery:
 
 ```typescript
-import { createAgentNetwork, createMessageBus } from 'directive/ai';
-import type { AgentNetwork } from 'directive/ai';
+import { createAgentNetwork, createMessageBus } from '@directive-run/ai';
+import type { AgentNetwork } from '@directive-run/ai';
 
 const network = createAgentNetwork({
   bus: createMessageBus(),
@@ -632,7 +632,7 @@ Three pre-built patterns for common agent coordination strategies:
 Auto-handles incoming `REQUEST` messages and sends back `RESPONSE`:
 
 ```typescript
-import { createResponder } from 'directive/ai';
+import { createResponder } from '@directive-run/ai';
 
 const responder = createResponder(network, 'writer');
 
@@ -660,7 +660,7 @@ responder.dispose();
 Auto-handles incoming `DELEGATION` messages and sends back `DELEGATION_RESULT` with metrics:
 
 ```typescript
-import { createDelegator } from 'directive/ai';
+import { createDelegator } from '@directive-run/ai';
 
 const delegator = createDelegator(network, 'writer');
 
@@ -691,7 +691,7 @@ delegator.dispose();
 Topic-based publish/subscribe using `SUBSCRIBE` and `UPDATE` messages:
 
 ```typescript
-import { createPubSub } from 'directive/ai';
+import { createPubSub } from '@directive-run/ai';
 
 const pubsub = createPubSub(network, 'analyst');
 
@@ -725,7 +725,7 @@ import {
   collectOutputs,
   pickBestResult,
   aggregateTokens,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 // Join all string outputs with a separator (default: '\n\n')
 const merged = concatResults(results, '\n\n---\n\n');
@@ -756,7 +756,7 @@ const totalTokens = aggregateTokens(results);
 Each registered agent gets its own `Semaphore` instance based on `maxConcurrent`. The semaphore is queue-based (no polling):
 
 ```typescript
-import { Semaphore } from 'directive/ai';
+import { Semaphore } from '@directive-run/ai';
 
 const sem = new Semaphore(3);  // 3 concurrent permits
 
@@ -833,7 +833,7 @@ orchestrator.dispose();
 
 ## Error Handling
 
-### Parallel Patterns
+### Parallel Error Handling
 
 Without `minSuccess`, any single agent failure causes the entire parallel batch to reject. With `minSuccess`, individual failures are caught and the pattern succeeds if enough agents complete:
 
@@ -846,7 +846,7 @@ const research = parallel(
 );
 ```
 
-### Sequential Pipelines
+### Sequential Error Handling
 
 Without `continueOnError`, the first failure stops the pipeline. With `continueOnError: true`, failed agents are skipped and the pipeline continues with the last successful output. If no agent succeeds, the pipeline throws:
 
@@ -854,7 +854,7 @@ Without `continueOnError`, the first failure stops the pipeline. With `continueO
 No successful results in sequential pattern
 ```
 
-### Supervisor Pattern
+### Supervisor Error Handling
 
 If a worker fails, the error propagates immediately (no retry at the supervisor level). If the supervisor requests an invalid worker, the pattern throws:
 
@@ -885,7 +885,7 @@ import {
   parallel,
   sequential,
   concatResults,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const runner = createMockAgentRunner({
   responses: {
@@ -966,7 +966,7 @@ expect(result).toBe('OK');
 The [Agent Stack](/docs/ai/agent-stack) composes multi-agent patterns with memory, caching, observability, and guardrails in a single factory:
 
 ```typescript
-import { createAgentStack, parallel, sequential } from 'directive/ai';
+import { createAgentStack, parallel, sequential } from '@directive-run/ai';
 
 const stack = createAgentStack({
   runner,
@@ -1012,7 +1012,7 @@ Track multi-agent state through the [Agent Orchestrator](/docs/ai/orchestrator) 
 ### React
 
 ```tsx
-import { useAgentOrchestrator, useFact, useSelector } from 'directive/react';
+import { useAgentOrchestrator, useFact, useSelector } from '@directive-run/react';
 
 function MultiAgentPanel() {
   const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -1037,8 +1037,8 @@ function MultiAgentPanel() {
 
 ```html
 <script setup>
-import { createMultiAgentOrchestrator } from 'directive/ai';
-import { useFact, useInspect } from 'directive/vue';
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/vue';
 import { onUnmounted } from 'vue';
 
 const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
@@ -1058,8 +1058,8 @@ const { isSettled } = useInspect(orchestrator.system);
 
 ```html
 <script>
-import { createMultiAgentOrchestrator } from 'directive/ai';
-import { useFact, useInspect } from 'directive/svelte';
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/svelte';
 import { onDestroy } from 'svelte';
 
 const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
@@ -1076,8 +1076,8 @@ const inspect = useInspect(orchestrator.system);
 ### Solid
 
 ```tsx
-import { createMultiAgentOrchestrator } from 'directive/ai';
-import { useFact, useInspect } from 'directive/solid';
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/solid';
 import { onCleanup } from 'solid-js';
 
 function MultiAgentPanel() {
@@ -1100,8 +1100,8 @@ function MultiAgentPanel() {
 
 ```typescript
 import { LitElement, html } from 'lit';
-import { createMultiAgentOrchestrator } from 'directive/ai';
-import { FactController, InspectController } from 'directive/lit';
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
+import { FactController, InspectController } from '@directive-run/lit';
 
 class MultiAgentPanel extends LitElement {
   private orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });

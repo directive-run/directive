@@ -1,0 +1,63 @@
+{
+  "name": "@directive-run/solid",
+  "version": "0.1.0",
+  "description": "Solid.js signals adapter for Directive.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DirectiveRun/DirectiveJS",
+    "directory": "packages/solid"
+  },
+  "homepage": "https://directive.run",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "solid",
+    "solidjs",
+    "signals",
+    "state-management",
+    "reactive",
+    "constraint-driven"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@directive-run/core": "workspace:*",
+    "solid-js": ">=1"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@types/node": "^25.2.0",
+    "solid-js": "^1.8.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

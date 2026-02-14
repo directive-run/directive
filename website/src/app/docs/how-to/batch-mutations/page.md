@@ -14,7 +14,7 @@ When you update multiple related facts one at a time, constraints evaluate betwe
 ## The Solution
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const checkout = createModule('checkout', {
   schema: {

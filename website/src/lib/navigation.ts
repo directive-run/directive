@@ -97,6 +97,7 @@ export const navigation = [
       { title: 'From Redux', href: '/docs/migration/from-redux' },
       { title: 'From Zustand', href: '/docs/migration/from-zustand' },
       { title: 'From XState', href: '/docs/migration/from-xstate' },
+      { title: 'Package Restructure', href: '/docs/migration/package-restructure' },
     ],
   },
   {
@@ -121,6 +122,7 @@ export const navigation = [
       { title: 'Form Validation', href: '/docs/examples/form-validation' },
       { title: 'Multi-Module App', href: '/docs/examples/multi-module' },
       { title: 'AI Agent', href: '/docs/examples/ai-agent' },
+      { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
     ],
   },
   {

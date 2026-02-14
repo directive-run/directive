@@ -118,7 +118,7 @@ Start an actor inside a resolver and await its final state using XState's `toPro
 
 ```typescript
 import { createActor, toPromise } from 'xstate';
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const checkoutModule = createModule('checkout', {
   schema: {
@@ -203,7 +203,7 @@ Store multiple actor states as facts. Directive constraints evaluate across all 
 
 ```typescript
 import { createActor } from 'xstate';
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 // Each actor pushes its state into Directive facts
 const authActor = createActor(authMachine);
@@ -303,7 +303,7 @@ No machine knows about the others. Directive handles the cross-cutting coordinat
 Use a Directive plugin to track actor creation and cleanup:
 
 ```typescript
-import type { Plugin } from 'directive';
+import type { Plugin } from '@directive-run/core';
 import type { AnyActorRef } from 'xstate';
 
 function actorManagerPlugin(): Plugin {
@@ -417,7 +417,7 @@ Wire actors and Directive together in a React component:
 ```tsx
 import { useEffect, useRef } from 'react';
 import { createActor } from 'xstate';
-import { useDirectiveRef } from 'directive/react';
+import { useDirectiveRef } from '@directive-run/react';
 
 function CheckoutPage() {
   // useDirectiveRef returns the system directly (useDirective returns reactive selections)
@@ -475,7 +475,7 @@ Test machine-as-resolver patterns with Directive's test utilities:
 
 ```typescript
 import { createActor, toPromise } from 'xstate';
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 
 test('payment machine resolver completes', async () => {
   const testSystem = createTestSystem(checkoutModule);

@@ -55,7 +55,7 @@ Build up from simple to complex:
 ## Quick Example
 
 ```typescript
-import { createAgentOrchestrator, createPIIGuardrail } from 'directive/ai';
+import { createAgentOrchestrator, createPIIGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner: myAgentRunner,

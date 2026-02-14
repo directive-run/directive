@@ -1,5 +1,5 @@
 {
-  "name": "schema-patterns-example",
+  "name": "@directive-run/example-schema-patterns",
   "version": "1.0.0",
   "type": "module",
   "private": true,
@@ -12,7 +12,7 @@
     "test": "pnpm typecheck && pnpm test:builders && pnpm test:xstate && pnpm test:zod && pnpm test:mixed"
   },
   "dependencies": {
-    "directive": "workspace:*",
+    "@directive-run/core": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

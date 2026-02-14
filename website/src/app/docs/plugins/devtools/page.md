@@ -10,7 +10,7 @@ The devtools plugin exposes your system to the browser console via `window.__DIR
 ## Basic Usage
 
 ```typescript
-import { devtoolsPlugin } from 'directive/plugins';
+import { devtoolsPlugin } from '@directive-run/core/plugins';
 
 // Attaches your system to window.__DIRECTIVE__ for browser console access
 const system = createSystem({

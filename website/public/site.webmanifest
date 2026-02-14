@@ -1,0 +1,13 @@
+{
+  "name": "Directive",
+  "short_name": "Directive",
+  "description": "Constraint-driven state management for TypeScript",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

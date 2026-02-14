@@ -37,7 +37,7 @@ console.log(system.facts.count); // 5
 Create tamper-proof snapshots for secure transmission:
 
 ```typescript
-import { signSnapshot, verifySnapshotSignature } from 'directive';
+import { signSnapshot, verifySnapshotSignature } from '@directive-run/core';
 
 // Attach an HMAC signature to detect tampering
 const signed = signSnapshot(snapshot, process.env.SIGNING_SECRET);
@@ -59,7 +59,7 @@ Both functions use the secret string for HMAC-based signing and verification.
 Compare two snapshots to see what changed:
 
 ```typescript
-import { diffSnapshots } from 'directive';
+import { diffSnapshots } from '@directive-run/core';
 
 // Take a "before" snapshot, let state change, then take an "after"
 const before = system.getSnapshot();

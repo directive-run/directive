@@ -14,7 +14,7 @@ Directive integrates with React via `useSyncExternalStore`, which means every fa
 ## The Solution
 
 ```tsx
-import { useDirective, useSelector, useFact, useDerived } from 'directive/react';
+import { useDirective, useSelector, useFact, useDerived } from '@directive-run/react';
 
 // ❌ BAD: Re-renders on ANY fact change
 function BadProfile({ system }) {
@@ -81,7 +81,7 @@ const { facts, derived } = useDirective(system);
 ### Custom equality for objects
 
 ```tsx
-import { shallowEqual } from 'directive/react';
+import { shallowEqual } from '@directive-run/react';
 
 // Without custom equality: re-renders when any item in the array changes identity
 const items = useSelector(system, (facts) => facts.items);

@@ -10,7 +10,7 @@ Automatically persist facts to storage and restore them on init, with debounced 
 ## Basic Usage
 
 ```typescript
-import { persistencePlugin } from 'directive/plugins';
+import { persistencePlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
   module: myModule,

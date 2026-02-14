@@ -14,7 +14,7 @@ Users expect instant feedback when they toggle a setting, like a post, or reorde
 ## The Solution
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const todos = createModule('todos', {
   schema: {
@@ -79,7 +79,7 @@ const todos = createModule('todos', {
 ```
 
 ```tsx
-import { useDirective, useOptimisticUpdate } from 'directive/react';
+import { useDirective, useOptimisticUpdate } from '@directive-run/react';
 
 function TodoList({ system }) {
   const { facts } = useDirective(system);

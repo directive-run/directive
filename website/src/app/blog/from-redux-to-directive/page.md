@@ -164,7 +164,7 @@ This code works. It's type-safe, predictable, and debuggable. But count the conc
 Here's the same auth logic as a Directive module:
 
 ```typescript
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 
 const auth = createModule("auth", {
   schema: {
@@ -327,8 +327,8 @@ You don't have to rewrite your app in a weekend. Directive can run alongside Red
 
 ```typescript
 import { configureStore } from "@reduxjs/toolkit";
-import { createSystem } from "directive";
-import { useDirective } from "directive/react";
+import { createSystem } from "@directive-run/core";
+import { useDirective } from "@directive-run/react";
 import { useSelector } from "react-redux";
 import { authModule } from "./authModule"; // The Directive module from above
 
@@ -397,7 +397,7 @@ Redux testing involves creating a store, dispatching actions, and asserting on t
 Directive testing is more direct. Set facts, assert on derivations, or test constraints and resolvers in isolation:
 
 ```typescript
-import { createTestSystem } from "directive/testing";
+import { createTestSystem } from "@directive-run/core/testing";
 import { auth } from "./authModule";
 
 test("isAuthenticated derives from user and token", () => {
@@ -452,7 +452,7 @@ Redux tests exercise the dispatch pipeline – action creator, reducer, state sh
 Install Directive:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 For the full migration walkthrough with before/after examples for every Redux pattern – slices, thunks, selectors, middleware, RTK Query – see the **[Redux Migration Guide](/docs/migration/from-redux)**.

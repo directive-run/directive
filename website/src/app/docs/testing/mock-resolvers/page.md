@@ -21,7 +21,7 @@ Directive provides two mock resolver utilities:
 Pass mock resolver options to `createTestSystem` under `mocks.resolvers`. Each key is a requirement type:
 
 ```typescript
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 
 test('user is fetched', async () => {
   const system = createTestSystem({
@@ -111,7 +111,7 @@ const system = createTestSystem({
 For fine-grained control over when requirements resolve, use `mockResolver`. It captures requirements and lets you resolve or reject them manually:
 
 ```typescript
-import { createTestSystem, mockResolver, flushMicrotasks } from 'directive/testing';
+import { createTestSystem, mockResolver, flushMicrotasks } from '@directive-run/core/testing';
 
 test('manual resolve control', async () => {
   // Create a mock that holds requirements in a queue instead of auto-resolving

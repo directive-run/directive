@@ -95,7 +95,7 @@ Constraint-driven architecture inverts the model. Instead of writing a procedure
 Here's the same checkout logic expressed as Directive constraints:
 
 ```typescript
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 
 const checkout = createModule("checkout", {
   schema: {
@@ -297,7 +297,7 @@ Fourteen lines of setup to test one business rule. The test has implicit depende
 **Testing the constraint version:**
 
 ```typescript
-import { testConstraint } from "directive/testing";
+import { testConstraint } from "@directive-run/core/testing";
 
 test("hazmat items cannot ship by air", () => {
   const result = testConstraint(checkout, "hazmatAirRestriction", {
@@ -325,7 +325,7 @@ Two tests. Zero mocks. Zero unrelated setup. The constraint is a pure function o
 The resolver gets its own test:
 
 ```typescript
-import { testResolver } from "directive/testing";
+import { testResolver } from "@directive-run/core/testing";
 
 test("block checkout notifies user", async () => {
   const notifySpy = vi.fn();
@@ -402,7 +402,7 @@ Your checkout function doesn't need thirty-eight lines and eight branches. It ne
 Install Directive:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Explore the documentation:

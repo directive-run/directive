@@ -6,11 +6,11 @@
 
 import { useCallback } from "react";
 import type React from "react";
-import { createSystem } from "directive";
+import { createSystem } from "@directive-run/core";
 import {
   useFact,
   useDerived,
-} from "directive/react";
+} from "@directive-run/react";
 import {
   elevenUpGame,
   type Card,

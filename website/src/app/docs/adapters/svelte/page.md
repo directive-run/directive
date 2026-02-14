@@ -12,7 +12,7 @@ Directive provides first-class Svelte integration with stores that automatically
 The Svelte adapter is included in the main package:
 
 ```typescript
-import { useFact, useDerived, useEvents, useDispatch } from 'directive/svelte';
+import { useFact, useDerived, useEvents, useDispatch } from '@directive-run/svelte';
 ```
 
 ---
@@ -23,8 +23,8 @@ Create a system and pass it directly to hooks – no context provider required:
 
 ```html
 <script lang="ts">
-  import { createSystem } from 'directive';
-  import { useFact, useDerived, useEvents } from 'directive/svelte';
+  import { createSystem } from '@directive-run/core';
+  import { useFact, useDerived, useEvents } from '@directive-run/svelte';
   import { userModule } from './modules/user';
 
   // Create and start the system
@@ -45,7 +45,7 @@ For shared state across components, export the system from a module:
 
 ```typescript
 // src/lib/directive.ts
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { userModule } from './modules/user';
 
 export const system = createSystem({ module: userModule });
@@ -57,7 +57,7 @@ Then import and use it in any component:
 ```html
 <script>
   import { system } from '$lib/directive';
-  import { useFact, useEvents } from 'directive/svelte';
+  import { useFact, useEvents } from '@directive-run/svelte';
 
   const user = useFact(system, 'user');
   const events = useEvents(system);
@@ -87,7 +87,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
 ```html
 <script>
-  import { useDirective } from 'directive/svelte';
+  import { useDirective } from '@directive-run/svelte';
   import { counterModule } from './counterModule';
 
   // Subscribe all: omit keys for everything
@@ -104,8 +104,8 @@ With selective subscriptions and config:
 
 ```html
 <script>
-  import { useDirective } from 'directive/svelte';
-  import { loggingPlugin } from 'directive/plugins';
+  import { useDirective } from '@directive-run/svelte';
+  import { loggingPlugin } from '@directive-run/core/plugins';
   import { counterModule } from './counterModule';
 
   // Selective: subscribe to specific keys only
@@ -129,7 +129,7 @@ The go-to hook for **transforms and derived values** from facts. Directive auto-
 
 ```html
 <script>
-  import { useSelector, shallowEqual } from 'directive/svelte';
+  import { useSelector, shallowEqual } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Transform a single fact value
@@ -165,7 +165,7 @@ Read a single fact or multiple facts:
 
 ```html
 <script>
-  import { useFact } from 'directive/svelte';
+  import { useFact } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to a single fact – Readable<number | undefined>
@@ -191,7 +191,7 @@ Read a single derivation or multiple derivations:
 
 ```html
 <script>
-  import { useDerived } from 'directive/svelte';
+  import { useDerived } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to a single derivation
@@ -215,7 +215,7 @@ Get a typed reference to the system's event dispatchers:
 
 ```html
 <script>
-  import { useEvents } from 'directive/svelte';
+  import { useEvents } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get typed event dispatchers for the module
@@ -234,7 +234,7 @@ Low-level event dispatch for untyped or system events:
 
 ```html
 <script>
-  import { useDispatch } from 'directive/svelte';
+  import { useDispatch } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get the low-level dispatch function
@@ -250,7 +250,7 @@ Watch a fact or derivation for changes. `useWatch` auto-detects whether the key 
 
 ```html
 <script>
-  import { useWatch } from 'directive/svelte';
+  import { useWatch } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Watch a derivation for analytics tracking
@@ -279,7 +279,7 @@ Get system inspection data (unmet requirements, inflight resolvers, constraint s
 
 ```html
 <script>
-  import { useInspect } from 'directive/svelte';
+  import { useInspect } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get reactive system inspection data
@@ -297,7 +297,7 @@ With throttling for high-frequency updates:
 
 ```html
 <script>
-  import { useInspect } from 'directive/svelte';
+  import { useInspect } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Throttle updates to limit render frequency
@@ -311,7 +311,7 @@ Read constraint status reactively:
 
 ```html
 <script>
-  import { useConstraintStatus } from 'directive/svelte';
+  import { useConstraintStatus } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get all constraints for the debug panel
@@ -334,7 +334,7 @@ Get a reactive explanation of why a requirement exists:
 
 ```html
 <script>
-  import { useExplain } from 'directive/svelte';
+  import { useExplain } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   export let requirementId;
@@ -360,8 +360,8 @@ Get a reactive explanation of why a requirement exists:
 
 ```html
 <script>
-  import { createSystem, createRequirementStatusPlugin } from 'directive';
-  import { useRequirementStatus } from 'directive/svelte';
+  import { createSystem, createRequirementStatusPlugin } from '@directive-run/core';
+  import { useRequirementStatus } from '@directive-run/svelte';
   import { myModule } from './modules/myModule';
 
   // Create the status plugin for tracking requirement resolution
@@ -398,8 +398,8 @@ Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```html
 <script>
-  import { createSystem, createRequirementStatusPlugin } from 'directive';
-  import { useOptimisticUpdate } from 'directive/svelte';
+  import { createSystem, createRequirementStatusPlugin } from '@directive-run/core';
+  import { useOptimisticUpdate } from '@directive-run/svelte';
   import { myModule } from './modules/myModule';
 
   const statusPlugin = createRequirementStatusPlugin();
@@ -436,7 +436,7 @@ Store factories work outside components and accept a system instance directly. U
 ### createDerivedStore
 
 ```typescript
-import { createDerivedStore } from 'directive/svelte';
+import { createDerivedStore } from '@directive-run/svelte';
 
 // Create a single derivation store outside of components
 const isRed = createDerivedStore(system, 'isRed');
@@ -445,7 +445,7 @@ const isRed = createDerivedStore(system, 'isRed');
 ### createDerivedsStore
 
 ```typescript
-import { createDerivedsStore } from 'directive/svelte';
+import { createDerivedsStore } from '@directive-run/svelte';
 
 // Create a multi-derivation store outside of components
 const state = createDerivedsStore(system, ['isRed', 'elapsed']);
@@ -454,7 +454,7 @@ const state = createDerivedsStore(system, ['isRed', 'elapsed']);
 ### createFactStore
 
 ```typescript
-import { createFactStore } from 'directive/svelte';
+import { createFactStore } from '@directive-run/svelte';
 
 // Create a single fact store outside of components
 const phase = createFactStore(system, 'phase');
@@ -463,7 +463,7 @@ const phase = createFactStore(system, 'phase');
 ### createInspectStore
 
 ```typescript
-import { createInspectStore } from 'directive/svelte';
+import { createInspectStore } from '@directive-run/svelte';
 
 // Create an inspection store outside of components
 const inspection = createInspectStore(system);
@@ -473,7 +473,7 @@ All factories return `Readable` stores that work with `$` auto-subscription:
 
 ```html
 <script>
-  import { createDerivedStore, createFactStore } from 'directive/svelte';
+  import { createDerivedStore, createFactStore } from '@directive-run/svelte';
   import { system } from './system';
 
   // Create stores from the shared system instance
@@ -494,9 +494,9 @@ All factories return `Readable` stores that work with `$` auto-subscription:
 Create fully typed hooks for your module schema. `createTypedHooks` returns typed versions of all core hooks – the returned hooks still take `system` as the first parameter but provide full autocomplete for keys and events:
 
 ```typescript
-import { createTypedHooks } from 'directive/svelte';
-import type { ModuleSchema } from 'directive';
-import { t } from 'directive';
+import { createTypedHooks } from '@directive-run/svelte';
+import type { ModuleSchema } from '@directive-run/core';
+import { t } from '@directive-run/core';
 
 const schema = {
   facts: { count: t.number(), user: t.any<User | null>() },
@@ -534,7 +534,7 @@ export const { useFact, useDerived, useDispatch, useEvents } = createTypedHooks<
 
 ```html
 <script>
-  import { useFact } from 'directive/svelte';
+  import { useFact } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to loading and error states
@@ -560,7 +560,7 @@ Write facts through the system directly:
 
 ```html
 <script>
-  import { useFact } from 'directive/svelte';
+  import { useFact } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Subscribe to the current userId
@@ -578,7 +578,7 @@ Or dispatch events:
 
 ```html
 <script>
-  import { useEvents } from 'directive/svelte';
+  import { useEvents } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   const events = useEvents(system);
@@ -590,7 +590,7 @@ Or dispatch events:
 ### Complete Module Example
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const userModule = createModule("user", {
   schema: {
@@ -646,7 +646,7 @@ const userModule = createModule("user", {
 ```typescript
 // src/lib/directive.ts
 import { browser } from '$app/environment';
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { userModule } from './modules/user';
 
 // Create the system – export for use in components
@@ -662,7 +662,7 @@ if (browser) {
 <!-- src/routes/+layout.svelte -->
 <script>
   import { system } from '$lib/directive';
-  import { useFact, useDerived } from 'directive/svelte';
+  import { useFact, useDerived } from '@directive-run/svelte';
 
   // Use hooks directly with the imported system
   const user = useFact(system, 'user');
@@ -678,7 +678,7 @@ if (browser) {
 
 ```typescript
 import { render, screen } from '@testing-library/svelte';
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 import UserProfile from './UserProfile.svelte';
 import { userModule } from './modules/user';
 
@@ -706,7 +706,7 @@ Re-exported utility for use with `useSelector`:
 
 ```html
 <script>
-  import { useSelector, shallowEqual } from 'directive/svelte';
+  import { useSelector, shallowEqual } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Use shallowEqual to prevent updates when values haven't changed
@@ -724,7 +724,7 @@ Re-exported utility for use with `useSelector`:
 
 ```html
 <script>
-  import { useTimeTravel } from 'directive/svelte';
+  import { useTimeTravel } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   const timeTravel = useTimeTravel(system);
@@ -776,7 +776,7 @@ Re-exported utility for use with `useSelector`:
 
 ```html
 <script>
-  import { useTimeTravel } from 'directive/svelte';
+  import { useTimeTravel } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   const timeTravel = useTimeTravel(system);
@@ -807,7 +807,7 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```html
 <script>
-  import { useTimeTravel } from 'directive/svelte';
+  import { useTimeTravel } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   const timeTravel = useTimeTravel(system);

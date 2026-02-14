@@ -15,7 +15,7 @@ Large apps have features that most users never visit – admin panels, analytics
 
 ```typescript
 // system.ts – start with core modules only
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { authModule } from './modules/auth';
 import { uiModule } from './modules/ui';
 
@@ -29,7 +29,7 @@ export const system = createSystem({
 
 ```typescript
 // modules/admin/index.ts – lazy-loaded module
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 export const adminModule = createModule('admin', {
   schema: {

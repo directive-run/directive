@@ -12,7 +12,7 @@ Directive provides native Lit integration using the Reactive Controller pattern.
 The Lit adapter is included in the main package:
 
 ```typescript
-import { DerivedController, FactController, createDerived } from 'directive/lit';
+import { DerivedController, FactController, createDerived } from '@directive-run/lit';
 ```
 
 ---
@@ -24,8 +24,8 @@ Create your system and start it in `connectedCallback`:
 ```typescript
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
-import { createSystem } from 'directive';
-import { DerivedController, FactController } from 'directive/lit';
+import { createSystem } from '@directive-run/core';
+import { DerivedController, FactController } from '@directive-run/lit';
 import { counterModule } from './modules/counter';
 
 // Create and start the system
@@ -62,7 +62,7 @@ Subscribe to one or more derivations. The host re-renders when any value changes
 Single key:
 
 ```typescript
-import { DerivedController } from 'directive/lit';
+import { DerivedController } from '@directive-run/lit';
 
 class StatusDisplay extends LitElement {
   // Subscribe to the isRed derivation – re-renders when it changes
@@ -77,7 +77,7 @@ class StatusDisplay extends LitElement {
 Array of keys:
 
 ```typescript
-import { DerivedController } from 'directive/lit';
+import { DerivedController } from '@directive-run/lit';
 
 class StatusBar extends LitElement {
   // Subscribe to multiple derivations at once
@@ -98,7 +98,7 @@ class StatusBar extends LitElement {
 Subscribe to a single fact:
 
 ```typescript
-import { FactController } from 'directive/lit';
+import { FactController } from '@directive-run/lit';
 
 class PhaseDisplay extends LitElement {
   // Subscribe to the current phase – re-renders when it changes
@@ -115,7 +115,7 @@ class PhaseDisplay extends LitElement {
 Watch a fact or derivation and fire a callback on change (no re-render). The key is auto-detected as either a fact or derivation, so no discriminator is needed:
 
 ```typescript
-import { WatchController } from 'directive/lit';
+import { WatchController } from '@directive-run/lit';
 
 class PhaseWatcher extends LitElement {
   // Watch the phase derivation for logging – auto-detected
@@ -164,7 +164,7 @@ private watcher = new WatchController<number>(
 Get system inspection data with optional throttling. Returns `InspectState` with `isSettled`, `unmet`, `inflight`, `isWorking`, `hasUnmet`, and `hasInflight`:
 
 ```typescript
-import { InspectController } from 'directive/lit';
+import { InspectController } from '@directive-run/lit';
 
 class Inspector extends LitElement {
   // Get reactive system inspection data
@@ -203,7 +203,7 @@ class ThrottledInspector extends LitElement {
 Get a reactive explanation of why a requirement exists:
 
 ```typescript
-import { ExplainController } from 'directive/lit';
+import { ExplainController } from '@directive-run/lit';
 
 class RequirementDebug extends LitElement {
   // Get a detailed explanation of why the FETCH_USER requirement exists
@@ -224,7 +224,7 @@ class RequirementDebug extends LitElement {
 Read constraint status reactively. Without a constraint ID, returns all constraints. With an ID, returns a single constraint or `null`:
 
 ```typescript
-import { ConstraintStatusController } from 'directive/lit';
+import { ConstraintStatusController } from '@directive-run/lit';
 
 // All constraints
 class ConstraintDashboard extends LitElement {
@@ -265,7 +265,7 @@ class AuthConstraint extends LitElement {
 Apply optimistic mutations with automatic rollback on resolver failure:
 
 ```typescript
-import { OptimisticUpdateController } from 'directive/lit';
+import { OptimisticUpdateController } from '@directive-run/lit';
 
 class SaveButton extends LitElement {
   // Set up optimistic mutations with automatic rollback
@@ -302,7 +302,7 @@ Manual rollback is also available via `rollback()`. The `statusPlugin` and `requ
 Zero-config all-in-one controller. Creates a system scoped to the component lifecycle, starts it, and subscribes to all facts and derivations:
 
 ```typescript
-import { ModuleController } from 'directive/lit';
+import { ModuleController } from '@directive-run/lit';
 import { counterModule } from './modules/counter';
 
 class CounterApp extends LitElement {
@@ -353,7 +353,7 @@ Use `DirectiveSelectorController` for all transforms and derived values from fac
 Select across all facts:
 
 ```typescript
-import { DirectiveSelectorController } from 'directive/lit';
+import { DirectiveSelectorController } from '@directive-run/lit';
 
 class Summary extends LitElement {
   // Select across all facts with custom equality
@@ -392,9 +392,9 @@ class UserName extends LitElement {
 These controllers require a `statusPlugin` created with `createRequirementStatusPlugin`:
 
 ```typescript
-import { createSystem } from 'directive';
-import { createRequirementStatusPlugin } from 'directive';
-import { RequirementStatusController } from 'directive/lit';
+import { createSystem } from '@directive-run/core';
+import { createRequirementStatusPlugin } from '@directive-run/core';
+import { RequirementStatusController } from '@directive-run/lit';
 
 // Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
@@ -448,7 +448,7 @@ import {
   createConstraintStatus,
   createOptimisticUpdate,
   createModule,
-} from 'directive/lit';
+} from '@directive-run/lit';
 
 class MyElement extends LitElement {
   // These two are equivalent:
@@ -505,7 +505,7 @@ For event handlers and imperative code where you do not need reactivity:
 Get a typed dispatch function:
 
 ```typescript
-import { useDispatch } from 'directive/lit';
+import { useDispatch } from '@directive-run/lit';
 
 class Controls extends LitElement {
   // Get a typed dispatch function for sending events
@@ -522,7 +522,7 @@ class Controls extends LitElement {
 Get a typed reference to the system's event dispatchers:
 
 ```typescript
-import { useEvents } from 'directive/lit';
+import { useEvents } from '@directive-run/lit';
 
 class Controls extends LitElement {
   // Get typed event dispatchers for the system
@@ -539,7 +539,7 @@ class Controls extends LitElement {
 Re-exported utility for custom equality in selectors:
 
 ```typescript
-import { shallowEqual, DirectiveSelectorController } from 'directive/lit';
+import { shallowEqual, DirectiveSelectorController } from '@directive-run/lit';
 
 class UserIds extends LitElement {
   // Use shallowEqual to prevent re-renders when IDs haven't changed
@@ -558,7 +558,7 @@ Reactive controller – returns `null` when disabled, otherwise the full `TimeTr
 #### Undo / Redo Controls
 
 ```typescript
-import { TimeTravelController } from 'directive/lit';
+import { TimeTravelController } from '@directive-run/lit';
 
 class UndoRedo extends LitElement {
   private _timeTravel = new TimeTravelController(this, system);
@@ -690,7 +690,7 @@ class BatchedAction extends LitElement {
 Non-reactive shorthand (useful outside Lit elements for imperative code):
 
 ```typescript
-import { useTimeTravel } from 'directive/lit';
+import { useTimeTravel } from '@directive-run/lit';
 
 const timeTravel = useTimeTravel(system);
 
@@ -725,7 +725,7 @@ See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` int
 Non-reactive getter functions (return a function you call to read the current value):
 
 ```typescript
-import { getDerived, getFact } from 'directive/lit';
+import { getDerived, getFact } from '@directive-run/lit';
 
 // Create non-reactive getters for reading values on demand
 const getIsRed = getDerived<boolean>(system, 'isRed');
@@ -744,7 +744,7 @@ console.log(getPhase()); // Current value, non-reactive
 Create a system scoped to a component's lifecycle. The system starts on connect and is destroyed on disconnect:
 
 ```typescript
-import { SystemController, DerivedController } from 'directive/lit';
+import { SystemController, DerivedController } from '@directive-run/lit';
 import { counterModule } from './modules/counter';
 
 class CounterElement extends LitElement {
@@ -791,8 +791,8 @@ class AppElement extends LitElement {
 Create typed controllers for your module schema. The factory also returns `useEvents`:
 
 ```typescript
-import { createTypedHooks } from 'directive/lit';
-import type { ModuleSchema } from 'directive';
+import { createTypedHooks } from '@directive-run/lit';
+import type { ModuleSchema } from '@directive-run/core';
 
 // Create typed controller factories pre-bound to your schema
 const {
@@ -823,7 +823,7 @@ Use `@lit/context` to share a system across shadow DOM boundaries:
 
 ```typescript
 import { provide, consume } from '@lit/context';
-import { directiveContext } from 'directive/lit';
+import { directiveContext } from '@directive-run/lit';
 
 // Share the system with all descendant elements via Lit context
 @customElement('app-root')
@@ -909,7 +909,7 @@ class Dashboard extends LitElement {
 
 ```typescript
 import { fixture, html, expect } from '@open-wc/testing';
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 import { counterModule } from './modules/counter';
 import './my-counter';
 

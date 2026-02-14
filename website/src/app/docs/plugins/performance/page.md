@@ -10,7 +10,7 @@ The performance plugin measures runtime behavior using existing plugin hooks –
 ## Basic Usage
 
 ```typescript
-import { performancePlugin } from 'directive/plugins';
+import { performancePlugin } from '@directive-run/core/plugins';
 
 const perf = performancePlugin();
 

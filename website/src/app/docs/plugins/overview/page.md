@@ -12,8 +12,8 @@ Plugins extend Directive systems with cross-cutting functionality like logging, 
 Add plugins when creating a system:
 
 ```typescript
-import { createSystem } from 'directive';
-import { loggingPlugin, devtoolsPlugin } from 'directive/plugins';
+import { createSystem } from '@directive-run/core';
+import { loggingPlugin, devtoolsPlugin } from '@directive-run/core/plugins';
 
 // Pass plugins as an array –they hook into the system's lifecycle automatically
 const system = createSystem({
@@ -34,10 +34,10 @@ system.start();
 
 | Plugin | Import | Purpose |
 |--------|--------|---------|
-| `loggingPlugin(options?)` | `directive/plugins` | Console logging for state changes, resolvers, and events |
-| `devtoolsPlugin(options?)` | `directive/plugins` | Browser devtools integration via `window.__DIRECTIVE__` |
-| `persistencePlugin(options)` | `directive/plugins` | Save and restore facts to storage |
-| `performancePlugin(options?)` | `directive/plugins` | Track constraint, resolver, effect, and reconciliation metrics |
+| `loggingPlugin(options?)` | `@directive-run/core/plugins` | Console logging for state changes, resolvers, and events |
+| `devtoolsPlugin(options?)` | `@directive-run/core/plugins` | Browser devtools integration via `window.__DIRECTIVE__` |
+| `persistencePlugin(options)` | `@directive-run/core/plugins` | Save and restore facts to storage |
+| `performancePlugin(options?)` | `@directive-run/core/plugins` | Track constraint, resolver, effect, and reconciliation metrics |
 
 ---
 
