@@ -211,48 +211,13 @@ export function createModule<const M extends ModuleSchema>(
 	config: ModuleConfig<M>,
 ): ModuleDef<M>;
 
-/**
- * Create a module factory that produces named instances from a single definition.
- * Useful for multi-instance UIs (tabs, panels, multi-tenant) where you need
- * isolated state from the same schema.
- *
- * @example
- * ```typescript
- * const chatRoom = createModuleFactory({
- *   schema: {
- *     facts: { messages: t.array<string>(), users: t.array<string>() },
- *     derivations: { count: t.number() },
- *   },
- *   init: (facts) => { facts.messages = []; facts.users = []; },
- *   derive: { count: (facts) => facts.messages.length },
- * });
- *
- * const system = createSystem({
- *   modules: {
- *     lobby: chatRoom("lobby"),
- *     support: chatRoom("support"),
- *   },
- * });
- * ```
- */
-export function createModuleFactory<const M extends ModuleSchema>(
-	config: ModuleConfig<M>,
-): (name: string) => ModuleDef<M>;
-export function createModuleFactory<
-	const M extends ModuleSchema,
-	const Deps extends CrossModuleDeps,
->(
-	config: ModuleConfigWithDeps<M, Deps>,
-): (name: string) => ModuleDef<M>;
-export function createModuleFactory<const M extends ModuleSchema>(
-	config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
-): (name: string) => ModuleDef<M> {
-	// Pass config directly — createModule's implementation overload handles both types.
-	// Do NOT cast to ModuleConfig<M> which would strip crossModuleDeps.
-	return (name: string) => createModule(name, config);
-}
+// Overload 3: Union (used by createModuleFactory)
+export function createModule<const M extends ModuleSchema>(
+	id: string,
+	config: ModuleConfigWithDeps<M, CrossModuleDeps> | ModuleConfig<M>,
+): ModuleDef<M>;
 
-// Implementation
+// Implementation (must immediately follow overload declarations)
 export function createModule<const M extends ModuleSchema>(
 	id: string,
 	config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
@@ -345,4 +310,45 @@ export function createModule<const M extends ModuleSchema>(
 		// Store crossModuleDeps for runtime proxy creation
 		crossModuleDeps: crossModuleDeps as CrossModuleDeps | undefined,
 	};
+}
+
+/**
+ * Create a module factory that produces named instances from a single definition.
+ * Useful for multi-instance UIs (tabs, panels, multi-tenant) where you need
+ * isolated state from the same schema.
+ *
+ * @example
+ * ```typescript
+ * const chatRoom = createModuleFactory({
+ *   schema: {
+ *     facts: { messages: t.array<string>(), users: t.array<string>() },
+ *     derivations: { count: t.number() },
+ *   },
+ *   init: (facts) => { facts.messages = []; facts.users = []; },
+ *   derive: { count: (facts) => facts.messages.length },
+ * });
+ *
+ * const system = createSystem({
+ *   modules: {
+ *     lobby: chatRoom("lobby"),
+ *     support: chatRoom("support"),
+ *   },
+ * });
+ * ```
+ */
+export function createModuleFactory<const M extends ModuleSchema>(
+	config: ModuleConfig<M>,
+): (name: string) => ModuleDef<M>;
+export function createModuleFactory<
+	const M extends ModuleSchema,
+	const Deps extends CrossModuleDeps,
+>(
+	config: ModuleConfigWithDeps<M, Deps>,
+): (name: string) => ModuleDef<M>;
+export function createModuleFactory<const M extends ModuleSchema>(
+	config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): (name: string) => ModuleDef<M> {
+	// Pass config directly — createModule's implementation overload handles both types.
+	// Do NOT cast to ModuleConfig<M> which would strip crossModuleDeps.
+	return (name: string) => createModule(name, config);
 }

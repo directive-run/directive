@@ -1216,15 +1216,18 @@ export function createEngine<S extends Schema>(
 		}
 		if (module.effects) {
 			Object.assign(mergedEffects, module.effects);
-			effectsManager.registerDefinitions(module.effects as EffectsDef<S>);
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
+			effectsManager.registerDefinitions(module.effects as any);
 		}
 		if (module.constraints) {
 			Object.assign(mergedConstraints, module.constraints);
-			constraintsManager.registerDefinitions(module.constraints as ConstraintsDef<S>);
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
+			constraintsManager.registerDefinitions(module.constraints as any);
 		}
 		if (module.resolvers) {
 			Object.assign(mergedResolvers, module.resolvers);
-			resolversManager.registerDefinitions(module.resolvers as ResolversDef<S>);
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
+			resolversManager.registerDefinitions(module.resolvers as any);
 		}
 
 		// Register new schema keys with the facts store
@@ -1252,7 +1255,7 @@ export function createEngine<S extends Schema>(
 	}
 
 	// Attach registerModule to system
-	(system as Record<string, unknown>).registerModule = registerModule;
+	(system as unknown as Record<string, unknown>).registerModule = registerModule;
 
 	// Initialize plugins
 	pluginManager.emitInit(system);
