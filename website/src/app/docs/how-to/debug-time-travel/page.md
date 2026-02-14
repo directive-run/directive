@@ -9,7 +9,7 @@ Step-by-step debugging workflow when constraints aren't firing, resolvers are st
 
 ## The Problem
 
-Something's broken: a constraint that should fire isn't firing, a resolver runs but the UI doesn't update, or the system enters an unexpected state. Console logging every fact change floods the output. You need to see exactly what the engine did — which constraints evaluated, what requirements were produced, which resolvers ran, and how facts changed at each step.
+Something's broken: a constraint that should fire isn't firing, a resolver runs but the UI doesn't update, or the system enters an unexpected state. Console logging every fact change floods the output. You need to see exactly what the engine did – which constraints evaluated, what requirements were produced, which resolvers ran, and how facts changed at each step.
 
 ## The Solution
 
@@ -80,7 +80,7 @@ function DebugPanel({ system }) {
         <h3>In-Flight Resolvers</h3>
         <ul>
           {inspection.resolvers.active.map((r) => (
-            <li key={r.key}>{r.type} — {r.status}</li>
+            <li key={r.key}>{r.type} – {r.status}</li>
           ))}
         </ul>
       </section>
@@ -121,13 +121,13 @@ system.debug.goBack(); // See the state before that
 
 ## Step by Step
 
-1. **Enable time-travel in the system config** — `debug: { timeTravel: true }` tells the engine to snapshot state after every reconciliation cycle. Each snapshot captures facts, derived values, active constraints, and in-flight resolvers.
+1. **Enable time-travel in the system config** – `debug: { timeTravel: true }` tells the engine to snapshot state after every reconciliation cycle. Each snapshot captures facts, derived values, active constraints, and in-flight resolvers.
 
-2. **`useInspect` gives you the engine's internal state** — all constraints (with their `when` results), all resolvers (with their status), and the snapshot timeline. This is read-only and doesn't affect the system.
+2. **`useInspect` gives you the engine's internal state** – all constraints (with their `when` results), all resolvers (with their status), and the snapshot timeline. This is read-only and doesn't affect the system.
 
-3. **`useExplain` answers "why isn't X working?"** — select a constraint and see exactly why it's active or not: the `when()` result, which dependencies it tracks, what requirements it produced, and what's blocking it.
+3. **`useExplain` answers "why isn't X working?"** – select a constraint and see exactly why it's active or not: the `when()` result, which dependencies it tracks, what requirements it produced, and what's blocking it.
 
-4. **Time-travel lets you see state at each step** — `goBack()` and `goForward()` move through the snapshot timeline. The entire system state (facts, derived, constraints) updates to show what it looked like at that point.
+4. **Time-travel lets you see state at each step** – `goBack()` and `goForward()` move through the snapshot timeline. The entire system state (facts, derived, constraints) updates to show what it looked like at that point.
 
 ## Common Variations
 
@@ -180,7 +180,7 @@ loggingPlugin({
 
 ## Related
 
-- [Time-Travel](/docs/advanced/time-travel) — time-travel API reference
-- [Plugin Overview](/docs/plugins/overview) — logging and devtools plugins
-- [DevTools Plugin](/docs/plugins/devtools) — browser extension integration
-- [Testing](/docs/testing/overview) — debugging in test environments
+- [Time-Travel](/docs/advanced/time-travel) – time-travel API reference
+- [Plugin Overview](/docs/plugins/overview) – logging and devtools plugins
+- [DevTools Plugin](/docs/plugins/devtools) – browser extension integration
+- [Testing](/docs/testing/overview) – debugging in test environments

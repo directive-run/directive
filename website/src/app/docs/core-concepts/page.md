@@ -258,9 +258,18 @@ derive: {
 
   // Combine multiple facts into a single status value
   status: (facts) => {
-    if (facts.loading) return "loading";
-    if (facts.error) return "error";
-    if (facts.user) return "ready";
+    if (facts.loading) {
+      return "loading";
+    }
+
+    if (facts.error) {
+      return "error";
+    }
+
+    if (facts.user) {
+      return "ready";
+    }
+
     return "idle";
   },
 },

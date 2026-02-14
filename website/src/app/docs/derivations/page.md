@@ -39,8 +39,14 @@ const userModule = createModule("user", {
 
     // Multi-branch logic for categorization
     ageGroup: (facts) => {
-      if (facts.age < 13) return "child";
-      if (facts.age < 20) return "teen";
+      if (facts.age < 13) {
+        return "child";
+      }
+
+      if (facts.age < 20) {
+        return "teen";
+      }
+
       return "adult";
     },
   },
@@ -107,9 +113,8 @@ Read a derivation value by its string ID. This is the same value as `system.deri
 // Read by string ID (useful when name is dynamic)
 system.read("fullName");          // "Jane Doe"
 
-// Namespaced – dot or underscore syntax
+// Namespaced – dot syntax
 system.read("user.fullName");     // "Jane Doe"
-system.read("user_fullName");     // Same thing
 ```
 
 ---
@@ -118,7 +123,7 @@ system.read("user_fullName");     // Same thing
 
 ### `system.subscribe()`
 
-Subscribe to one or more keys. The listener fires whenever any of the listed keys change. `subscribe()` auto-detects whether each key is a fact or derivation — you can mix both in a single call.
+Subscribe to one or more keys. The listener fires whenever any of the listed keys change. `subscribe()` auto-detects whether each key is a fact or derivation – you can mix both in a single call.
 
 ```typescript
 // Subscribe to a single derivation
@@ -349,6 +354,7 @@ fullName: (facts) => `${facts.firstName} ${facts.lastName}`
 // Bad – side effect in a derivation
 fullName: (facts) => {
   console.log("Computing name");  // Don't do this
+
   return `${facts.firstName} ${facts.lastName}`;
 }
 ```

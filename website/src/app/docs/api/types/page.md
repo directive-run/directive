@@ -168,7 +168,7 @@ type DerivationReturnType<M extends ModuleSchema, K extends DerivationKeys<M>> =
 ### ObservableKeys
 
 ```typescript
-// Union of all fact and derivation keys — used in subscribe() and watch()
+// Union of all fact and derivation keys – used in subscribe() and watch()
 type ObservableKeys<M extends ModuleSchema> = FactKeys<M> | DerivationKeys<M>;
 ```
 
@@ -326,6 +326,6 @@ interface SystemInspection {
 
 ## Next Steps
 
-- See [Core API](/docs/api/core) for function reference
-- See [React Hooks](/docs/api/react) for React API
-- See [Type Builders](/docs/type-builders) for schema types
+- [Core API](/docs/api/core) – Function reference
+- [React Hooks](/docs/api/react) – React API
+- [Schema & Types](/docs/schema-overview) – Schema types

@@ -104,18 +104,18 @@ Every hook takes the system as its first parameter. TypeScript infers the fact k
 
 Every hook below requires a `system` reference. There are three ways to create one:
 
-- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
-- **`useDirectiveRef`** (recommended) — creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
-- **`useDirective`** — creates a scoped system **and** subscribes to facts and derivations in one call
+- **Global system** – call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
+- **`useDirectiveRef`** (recommended) – creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
+- **`useDirective`** – creates a scoped system **and** subscribes to facts and derivations in one call
 
 For most React apps, prefer `useDirectiveRef` so each component owns its own system lifecycle. Use a global system when multiple components need to share the same state.
 
-The two hooks below are progressive shortcuts — each adds more automatic behavior:
+The two hooks below are progressive shortcuts – each adds more automatic behavior:
 
 | Hook | Creates system | Subscribes to state | You choose what to subscribe to |
 |---|---|---|---|
-| `useDirectiveRef` | Yes | No — use `useFact`, `useDerived`, etc. separately | Full control |
-| `useDirective` | Yes | Yes — selected keys, or **everything** if none specified | You pick the keys (or omit for all) |
+| `useDirectiveRef` | Yes | No – use `useFact`, `useDerived`, etc. separately | Full control |
+| `useDirective` | Yes | Yes – selected keys, or **everything** if none specified | You pick the keys (or omit for all) |
 
 ### useDirectiveRef
 
@@ -174,8 +174,8 @@ const system = useDirectiveRef(myModule, {
 
 Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
-- **Selective** — specify `facts` and/or `derived` keys to subscribe only to those (component re-renders only when selected keys change)
-- **Subscribe all** — omit keys to subscribe to everything (good for prototyping or small modules)
+- **Selective** – specify `facts` and/or `derived` keys to subscribe only to those (component re-renders only when selected keys change)
+- **Subscribe all** – omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```tsx
 import { useDirective } from 'directive/react';
@@ -318,7 +318,7 @@ dispatch({ type: "increment" });
 
 ### useWatch
 
-Watch a fact or derivation for changes without causing re-renders -- auto-detects whether the key is a fact or derivation:
+Watch a fact or derivation for changes without causing re-renders – auto-detects whether the key is a fact or derivation:
 
 ```tsx
 // Watch a fact (auto-detected)
@@ -432,7 +432,10 @@ function RequirementDebug({ requirementId }) {
   // Get a detailed explanation of why a requirement exists
   const explanation = useExplain(system, requirementId);
 
-  if (!explanation) return <p>No active requirement</p>;
+  if (!explanation) {
+    return <p>No active requirement</p>;
+  }
+
   return <pre>{explanation}</pre>;
 }
 ```
@@ -689,7 +692,7 @@ function SnapshotTimeline() {
       {snapshots.map((snap) => (
         <li key={snap.id}>
           <button onClick={() => goTo(snap.id)}>
-            {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+            {snap.trigger} – {new Date(snap.timestamp).toLocaleTimeString()}
           </button>
           <button onClick={() => console.log(getSnapshotFacts(snap.id))}>
             Inspect

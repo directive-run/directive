@@ -200,6 +200,6 @@ The plugin is safe to use in server-side rendering. When `typeof window === "und
 
 ## Next Steps
 
-- See [Logging](/docs/plugins/logging) for console output
-- See [Time-Travel](/docs/advanced/time-travel) for snapshot debugging
-- See [Plugin Overview](/docs/plugins/overview) for all plugins
+- [Logging](/docs/plugins/logging) – Console output
+- [Time-Travel](/docs/advanced/time-travel) – Snapshot debugging
+- [Plugin Overview](/docs/plugins/overview) – All plugins

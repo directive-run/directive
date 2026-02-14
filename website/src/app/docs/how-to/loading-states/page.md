@@ -3,13 +3,13 @@ title: How to Manage Loading & Error States
 description: Track loading, error, and success states across concurrent async operations with Directive.
 ---
 
-Track loading, error, and success across concurrent async operations — without manual state juggling. {% .lead %}
+Track loading, error, and success across concurrent async operations – without manual state juggling. {% .lead %}
 
 ---
 
 ## The Problem
 
-In a typical app, multiple async operations run concurrently — fetching a user profile, loading preferences, checking permissions. Each one needs loading, error, and success states. Managing these manually leads to a maze of boolean flags, race conditions when requests overlap, and UI flicker when states update out of sync.
+In a typical app, multiple async operations run concurrently – fetching a user profile, loading preferences, checking permissions. Each one needs loading, error, and success states. Managing these manually leads to a maze of boolean flags, race conditions when requests overlap, and UI flicker when states update out of sync.
 
 ## The Solution
 
@@ -103,13 +103,13 @@ function Dashboard({ system }) {
 
 ## Step by Step
 
-1. **Constraints declare what's needed** — `needsProfile` fires when there's a `userId` but no profile data. The engine evaluates this automatically whenever facts change.
+1. **Constraints declare what's needed** – `needsProfile` fires when there's a `userId` but no profile data. The engine evaluates this automatically whenever facts change.
 
-2. **Resolvers handle the async work** — `fetchProfile` runs when `FETCH_PROFILE` requirements appear. The `retry` config handles transient failures automatically.
+2. **Resolvers handle the async work** – `fetchProfile` runs when `FETCH_PROFILE` requirements appear. The `retry` config handles transient failures automatically.
 
-3. **`useRequirementStatus` tracks each operation** — returns `{ isPending, isFulfilled, isRejected, error }` for any requirement type. Updates reactively as the resolver progresses.
+3. **`useRequirementStatus` tracks each operation** – returns `{ isPending, isFulfilled, isRejected, error }` for any requirement type. Updates reactively as the resolver progresses.
 
-4. **Derivations combine states** — `isFullyLoaded` gives you a single boolean for "everything is ready" without tracking individual operations.
+4. **Derivations combine states** – `isFullyLoaded` gives you a single boolean for "everything is ready" without tracking individual operations.
 
 ## Common Variations
 
@@ -123,6 +123,7 @@ function Profile({ system }) {
   // Suspends until FETCH_PROFILE resolves
   useSuspenseRequirement(system, 'FETCH_PROFILE');
   const { facts } = useDirective(system);
+
   return <h1>{facts.profile.name}</h1>;
 }
 
@@ -139,16 +140,16 @@ import { useConstraintStatus } from 'directive/react';
 
 function StatusIndicator({ system }) {
   const status = useConstraintStatus(system, 'needsProfile');
-  // status.isActive — constraint's `when` is true
-  // status.requirementsPending — resolver is working
-  // status.isSatisfied — requirements fulfilled
+  // status.isActive – constraint's `when` is true
+  // status.requirementsPending – resolver is working
+  // status.isSatisfied – requirements fulfilled
   return <Badge variant={status.isSatisfied ? 'success' : 'pending'} />;
 }
 ```
 
 ## Related
 
-- [Constraints](/docs/constraints) — how `when` and `require` work
-- [Resolvers](/docs/resolvers) — retry policies and execution model
-- [React Hooks](/docs/api/react) — full hook API reference
-- [Error Handling](/docs/advanced/errors) — error boundaries and recovery strategies
+- [Constraints](/docs/constraints) – how `when` and `require` work
+- [Resolvers](/docs/resolvers) – retry policies and execution model
+- [React Hooks](/docs/api/react) – full hook API reference
+- [Error Handling](/docs/advanced/errors) – error boundaries and recovery strategies

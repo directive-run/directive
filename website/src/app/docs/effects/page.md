@@ -224,13 +224,14 @@ effects: {
     deps: ["endpoint"],
     run: (facts) => {
       const id = setInterval(() => fetch(facts.endpoint), 5000);
+
       return () => clearInterval(id);
     },
   },
 }
 ```
 
-Cleanup functions are called safely — errors in cleanup are caught and logged without breaking the system. If an async effect returns a cleanup function after the system has already been stopped, the cleanup is invoked immediately so resources are never leaked.
+Cleanup functions are called safely – errors in cleanup are caught and logged without breaking the system. If an async effect returns a cleanup function after the system has already been stopped, the cleanup is invoked immediately so resources are never leaked.
 
 ---
 
@@ -396,6 +397,6 @@ This is useful for suppressing noisy effects during tests, pausing analytics, or
 
 ## Next Steps
 
-- See [Constraints](/docs/constraints) for declarative rules
-- See [Resolvers](/docs/resolvers) for handling requirements
-- See [Events](/docs/events) for state mutations
+- [Constraints](/docs/constraints) – Declarative rules
+- [Resolvers](/docs/resolvers) – Handling requirements
+- [Events](/docs/events) – State mutations

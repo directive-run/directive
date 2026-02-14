@@ -74,21 +74,22 @@ function App() {
 }
 
 function ThemeWrapper() {
-  // This reads the persisted theme — no manual localStorage.getItem needed
+  // This reads the persisted theme – no manual localStorage.getItem needed
   const theme = useDerived(system, 'settings.theme');
+
   return <div data-theme={theme}><Router /></div>;
 }
 ```
 
 ## Step by Step
 
-1. **`include` filters what's persisted** — only the listed fact paths are serialized. This keeps storage small and avoids persisting transient state like loading flags or connection status.
+1. **`include` filters what's persisted** – only the listed fact paths are serialized. This keeps storage small and avoids persisting transient state like loading flags or connection status.
 
-2. **`debounce` batches writes** — rapid fact changes (e.g., dragging a slider) only write to storage once every 500ms, preventing performance issues from synchronous localStorage writes.
+2. **`debounce` batches writes** – rapid fact changes (e.g., dragging a slider) only write to storage once every 500ms, preventing performance issues from synchronous localStorage writes.
 
-3. **`version` + `migrate` handle schema changes** — when you change your schema between releases, the `migrate` function transforms the old persisted data to match the new shape. Without this, stale data crashes on deserialize.
+3. **`version` + `migrate` handle schema changes** – when you change your schema between releases, the `migrate` function transforms the old persisted data to match the new shape. Without this, stale data crashes on deserialize.
 
-4. **Automatic restore on start** — when the system starts, the persistence plugin reads from storage, applies migrations, and sets the initial facts. This happens before the first render, so there's no flash of default state.
+4. **Automatic restore on start** – when the system starts, the persistence plugin reads from storage, applies migrations, and sets the initial facts. This happens before the first render, so there's no flash of default state.
 
 ## Common Variations
 
@@ -132,7 +133,7 @@ const system = createSystem({
       storage: localStorage,
       key: 'directive-state',
       include: ['settings.theme'],
-      // Don't restore during SSR — let hydration handle it
+      // Don't restore during SSR – let hydration handle it
       enabled: typeof window !== 'undefined',
     }),
   ],
@@ -145,7 +146,7 @@ const system = createSystem({
 
 ## Related
 
-- [Plugin Overview](/docs/plugins/overview) — plugin lifecycle hooks
-- [Persistence Plugin](/docs/plugins/persistence) — full API reference
-- [SSR & Hydration](/docs/advanced/ssr) — server rendering patterns
-- [Snapshots](/docs/advanced/snapshots) — manual state serialization
+- [Plugin Overview](/docs/plugins/overview) – plugin lifecycle hooks
+- [Persistence Plugin](/docs/plugins/persistence) – full API reference
+- [SSR & Hydration](/docs/advanced/ssr) – server rendering patterns
+- [Time-Travel & Snapshots](/docs/advanced/time-travel) – manual state serialization

@@ -173,7 +173,7 @@ test('inspect fact change history', () => {
   // Each record captures the full context of the change
   expect(history[0]).toMatchObject({
     key: 'value',           // Fact name (without namespace)
-    fullKey: 'test_value',  // Full key with namespace prefix
+    fullKey: 'test::value',  // Full key with namespace prefix
     namespace: 'test',      // Module namespace
     previousValue: 0,       // Value before the change
     newValue: 10,           // Value after the change
@@ -275,6 +275,6 @@ test('full resolver lifecycle', async () => {
 
 ## Next Steps
 
-- See [Testing Overview](/docs/testing/overview) for setup
-- See [Mock Resolvers](/docs/testing/mock-resolvers) for mocking
-- See [Fake Timers](/docs/testing/fake-timers) for time control
+- [Testing Overview](/docs/testing/overview) – Setup
+- [Mock Resolvers](/docs/testing/mock-resolvers) – Mocking
+- [Fake Timers](/docs/testing/fake-timers) – Time control

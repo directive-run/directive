@@ -165,6 +165,7 @@ const customDetector = {
 
     // Map the external format to Directive's expected shape
     const results = await response.json();
+
     return results.map(r => ({
       type: r.entity_type,
       value: r.text,

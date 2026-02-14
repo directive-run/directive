@@ -132,6 +132,6 @@ schema: {
 
 ## Next Steps
 
-- **[Type Builders](/docs/type-builders)** – Built-in `t.*` types
+- **[Schema & Types](/docs/schema-overview)** – Built-in `t.*` types
 - **[Schema Overview](/docs/schema-overview)** – Schema structure
 - **[Facts](/docs/facts)** – Working with state

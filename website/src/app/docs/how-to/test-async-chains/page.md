@@ -101,13 +101,13 @@ describe('auth flow', () => {
 
 ## Step by Step
 
-1. **`createTestSystem` creates an isolated system** — no shared state between tests. Accepts the same config as `createSystem` plus mock overrides.
+1. **`createTestSystem` creates an isolated system** – no shared state between tests. Accepts the same config as `createSystem` plus mock overrides.
 
-2. **`mockResolver` replaces real resolvers** — instead of hitting APIs, mock resolvers execute synchronously or with controlled async behavior. They're also Vitest spies, so you can assert calls.
+2. **`mockResolver` replaces real resolvers** – instead of hitting APIs, mock resolvers execute synchronously or with controlled async behavior. They're also Vitest spies, so you can assert calls.
 
-3. **`system.settle()` waits for the chain to complete** — returns a promise that resolves when all pending constraints have been evaluated, all resolvers have completed, and all effects have run. No `setTimeout` hacks needed.
+3. **`system.settle()` waits for the chain to complete** – returns a promise that resolves when all pending constraints have been evaluated, all resolvers have completed, and all effects have run. No `setTimeout` hacks needed.
 
-4. **`system.batch()` sets up preconditions atomically** — when testing a specific constraint, batch-set the facts that would trigger it without intermediate constraint evaluations.
+4. **`system.batch()` sets up preconditions atomically** – when testing a specific constraint, batch-set the facts that would trigger it without intermediate constraint evaluations.
 
 ## Common Variations
 
@@ -186,7 +186,7 @@ it('retries on transient failure', async () => {
 
 ## Related
 
-- [Testing Overview](/docs/testing/overview) — testing utilities reference
-- [Mock Resolvers](/docs/testing/mock-resolvers) — mock API details
-- [Fake Timers](/docs/testing/fake-timers) — controlling time in tests
-- [Loading & Error States](/docs/how-to/loading-states) — what you're testing
+- [Testing Overview](/docs/testing/overview) – testing utilities reference
+- [Mock Resolvers](/docs/testing/mock-resolvers) – mock API details
+- [Fake Timers](/docs/testing/fake-timers) – controlling time in tests
+- [Loading & Error States](/docs/how-to/loading-states) – what you're testing

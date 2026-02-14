@@ -112,7 +112,9 @@ const useUser = create((set, get) => ({
   // Async action – caller is responsible for invoking this at the right time
   fetchUser: async () => {
     const { userId } = get();
-    if (!userId) return;
+    if (!userId) {
+      return;
+    }
 
     // Manually toggle loading state before the request
     set({ loading: true, error: null });
@@ -241,6 +243,7 @@ const cartModule = createModule("cart", {
 // Subscribe to a derived value – re-renders only when `total` changes
 function CartTotal() {
   const total = useDerived(system, "total");
+
   return <p>Total: ${total}</p>;
 }
 ```
@@ -313,8 +316,14 @@ const useStore = create((set, get) => ({
   // Computed – not reactive, recalculates on every call via get()
   getFilteredTodos: () => {
     const { todos, filter } = get();
-    if (filter === 'done') return todos.filter(t => t.done);
-    if (filter === 'pending') return todos.filter(t => !t.done);
+    if (filter === 'done') {
+      return todos.filter(t => t.done);
+    }
+
+    if (filter === 'pending') {
+      return todos.filter(t => !t.done);
+    }
+
     return todos;
   },
 }));
@@ -341,8 +350,14 @@ const todoModule = createModule("todos", {
   // Reactive derivations – auto-tracked, cached, recompute only when deps change
   derive: {
     filteredTodos: (facts) => {
-      if (facts.filter === 'done') return facts.todos.filter(t => t.done);
-      if (facts.filter === 'pending') return facts.todos.filter(t => !t.done);
+      if (facts.filter === 'done') {
+        return facts.todos.filter(t => t.done);
+      }
+
+      if (facts.filter === 'pending') {
+        return facts.todos.filter(t => !t.done);
+      }
+
       return facts.todos;
     },
 
@@ -373,6 +388,6 @@ function toggleTodo(id: number) {
 
 ## Next Steps
 
-- See the [Quick Start](/docs/quick-start) for a complete tutorial
-- See [Derivations](/docs/derivations) for reactive computed values
-- See the [React Adapter](/docs/adapters/react) for hook patterns
+- [Quick Start](/docs/quick-start) – Complete tutorial
+- [Derivations](/docs/derivations) – Reactive computed values
+- [React Adapter](/docs/adapters/react) – Hook patterns

@@ -276,6 +276,6 @@ test('resolver was called', async () => {
 
 ## Next Steps
 
-- See [Testing Overview](/docs/testing/overview) for setup
-- See [Fake Timers](/docs/testing/fake-timers) for time control
-- See [Assertions](/docs/testing/assertions) for test helpers
+- [Testing Overview](/docs/testing/overview) – Setup
+- [Fake Timers](/docs/testing/fake-timers) – Time control
+- [Assertions](/docs/testing/assertions) – Test helpers

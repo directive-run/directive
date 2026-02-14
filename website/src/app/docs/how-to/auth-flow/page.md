@@ -3,7 +3,7 @@ title: How to Build an Auth Flow with Token Refresh
 description: Implement login, logout, session validation, and automatic token refresh with Directive.
 ---
 
-Login, logout, session validation, and automatic token refresh — all declarative. {% .lead %}
+Login, logout, session validation, and automatic token refresh – all declarative. {% .lead %}
 
 ---
 
@@ -36,7 +36,10 @@ const auth = createModule('auth', {
   derive: {
     isAuthenticated: (facts) => facts.status === 'authenticated',
     isExpiringSoon: (facts) => {
-      if (!facts.expiresAt) return false;
+      if (!facts.expiresAt) {
+        return false;
+      }
+
       return Date.now() > facts.expiresAt - 60_000; // 1 min buffer
     },
     canRefresh: (facts) => !!facts.refreshToken,
@@ -93,10 +96,11 @@ const auth = createModule('auth', {
           body: JSON.stringify({ refreshToken: req.refreshToken }),
         });
         if (!res.ok) {
-          // Refresh failed — force logout
+          // Refresh failed – force logout
           ctx.facts.token = undefined;
           ctx.facts.refreshToken = undefined;
           ctx.facts.status = 'expired';
+
           return;
         }
         const data = await res.json();
@@ -152,20 +156,23 @@ function LoginForm({ system }) {
 // Protected route
 function ProtectedRoute({ system, children }) {
   const { derived } = useDirective(system);
-  if (!derived.isAuthenticated) return <Navigate to="/login" />;
+  if (!derived.isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
   return children;
 }
 ```
 
 ## Step by Step
 
-1. **`refreshNeeded` constraint** watches `isExpiringSoon` — when the token is within 60 seconds of expiry and a refresh token exists, it emits `REFRESH_TOKEN`. No timers needed.
+1. **`refreshNeeded` constraint** watches `isExpiringSoon` – when the token is within 60 seconds of expiry and a refresh token exists, it emits `REFRESH_TOKEN`. No timers needed.
 
-2. **`needsUser` uses `after`** — it only evaluates after `refreshNeeded` is settled, ensuring the user profile is fetched with a fresh token.
+2. **`needsUser` uses `after`** – it only evaluates after `refreshNeeded` is settled, ensuring the user profile is fetched with a fresh token.
 
-3. **Resolver handles failure gracefully** — if refresh fails, the resolver clears tokens and sets status to `expired` rather than throwing, so the UI can redirect to login.
+3. **Resolver handles failure gracefully** – if refresh fails, the resolver clears tokens and sets status to `expired` rather than throwing, so the UI can redirect to login.
 
-4. **`system.dispatch` triggers login** — the login form dispatches a `LOGIN` requirement directly, and `useRequirementStatus` tracks it through pending → fulfilled/rejected.
+4. **`system.dispatch` triggers login** – the login form dispatches a `LOGIN` requirement directly, and `useRequirementStatus` tracks it through pending → fulfilled/rejected.
 
 ## Common Variations
 
@@ -213,7 +220,7 @@ const cart = createModule('cart', {
 
 ## Related
 
-- [Constraints](/docs/constraints) — `after`, priority, and cross-module deps
-- [Resolvers](/docs/resolvers) — retry policies
-- [Multi-Module](/docs/advanced/multi-module) — cross-module composition
-- [Loading & Error States](/docs/how-to/loading-states) — status tracking patterns
+- [Constraints](/docs/constraints) – `after`, priority, and cross-module deps
+- [Resolvers](/docs/resolvers) – retry policies
+- [Multi-Module](/docs/advanced/multi-module) – cross-module composition
+- [Loading & Error States](/docs/how-to/loading-states) – status tracking patterns

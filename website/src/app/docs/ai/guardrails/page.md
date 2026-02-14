@@ -60,6 +60,7 @@ const orchestrator = createAgentOrchestrator({
       createModerationGuardrail({
         checkFn: async (text) => {
           const result = await openai.moderations.create({ input: text });
+
           return result.results[0].flagged;
         },
         message: 'Content flagged by moderation',
@@ -71,6 +72,7 @@ const orchestrator = createAgentOrchestrator({
       createModerationGuardrail({
         checkFn: async (text) => {
           const result = await openai.moderations.create({ input: text });
+
           return result.results[0].flagged;
         },
       }),
@@ -184,7 +186,10 @@ const zodOrchestrator = createAgentOrchestrator({
         // Delegate validation to Zod's safeParse
         validate: (output) => {
           const result = OutputSchema.safeParse(output);
-          if (result.success) return { valid: true };
+          if (result.success) {
+            return { valid: true };
+          }
+
           return {
             valid: false,
             errors: result.error.errors.map((e) => e.message),
@@ -298,6 +303,7 @@ const maxLengthGuardrail: GuardrailFn<InputGuardrailData> = (data) => {
 // Clean up whitespace and pass the transformed input downstream
 const normalizeWhitespace: GuardrailFn<InputGuardrailData> = (data) => {
   const cleaned = data.input.replace(/\s+/g, ' ').trim();
+
   return { passed: true, transformed: cleaned };
 };
 
@@ -334,6 +340,7 @@ const piiCheck: NamedGuardrail<InputGuardrailData> = {
 
   fn: async (data, context) => {
     const hasPII = await externalPIIService.check(data.input);
+
     return { passed: !hasPII, reason: hasPII ? 'Contains PII' : undefined };
   },
 
@@ -634,6 +641,6 @@ class GuardedChat extends LitElement {
 
 ## Next Steps
 
-- See [Agent Orchestrator](/docs/ai/orchestrator) for the full orchestrator API
-- See [Streaming](/docs/ai/streaming) for real-time response processing
-- See [PII Detection](/docs/security/pii) for privacy compliance
+- [Agent Orchestrator](/docs/ai/orchestrator) – Full orchestrator API
+- [Streaming](/docs/ai/streaming) – Real-time response processing
+- [PII Detection](/docs/security/pii) – Privacy compliance

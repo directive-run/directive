@@ -326,6 +326,95 @@ schema: {
 
 ---
 
+## Type Assertions
+
+For zero-overhead typing without runtime validation, use the type assertion pattern. This gives full TypeScript inference with no runtime cost:
+
+```typescript
+import { createModule } from 'directive';
+
+const myModule = createModule("example", {
+  schema: {
+    // Declare fact shapes with plain TypeScript – no runtime cost
+    facts: {} as {
+      userId: number;
+      user: User | null;
+      items: CartItem[];
+    },
+
+    // Derived values get the same treatment
+    derivations: {} as {
+      displayName: string;
+      total: number;
+    },
+
+    // Events carry typed payloads
+    events: {} as {
+      addItem: { item: CartItem };
+      clear: {};
+    },
+
+    // Requirements describe what the system needs fulfilled
+    requirements: {} as {
+      FETCH_USER: { userId: number };
+    },
+  },
+  // ...
+});
+```
+
+Type assertions are ideal when:
+- You want maximum TypeScript control
+- Runtime validation isn't needed
+- You're working with complex or external types
+
+---
+
+## Transforms
+
+Transform values on assignment:
+
+```typescript
+schema: {
+  facts: {
+    // Strip whitespace automatically on every assignment
+    name: t.string().transform(s => s.trim()),
+
+    // Normalize tags to lowercase for consistent storage
+    tags: t.string().transform(s => s.toLowerCase()),
+  },
+}
+```
+
+---
+
+## Async Validation
+
+For validation that requires async work (API calls, database lookups), use constraints and resolvers instead:
+
+```typescript
+// Constraint fires when an email is present but hasn't been validated yet
+constraints: {
+  validateEmail: {
+    when: (facts) => facts.email && !facts.emailValidated,
+    require: { type: "VALIDATE_EMAIL" },
+  },
+},
+
+// Resolver performs the async verification and stores the result
+resolvers: {
+  validateEmail: {
+    requirement: "VALIDATE_EMAIL",
+    resolve: async (req, context) => {
+      const isValid = await emailService.verify(context.facts.email);
+      context.facts.emailValidated = isValid;
+    },
+  },
+}
+```
+
+---
+
 ## Next Steps
 
 - **[Schema Overview](/docs/schema-overview)** – Schema structure

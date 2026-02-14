@@ -147,6 +147,36 @@ Directive might be overkill for:
 
 ---
 
+## Design Principles
+
+### Constraints Over Actions
+
+Most state management is built around actions – named events that trigger state transitions. Directive starts from a different premise: **model the rules, not the steps.**
+
+A constraint says "when this condition holds, this requirement must be fulfilled." It doesn't care *when* or *how* the condition became true. Adding a new rule doesn't require tracing every code path that might trigger it. You add the constraint, and it activates whenever its condition is met.
+
+### The Runtime Knows More Than You
+
+When you declare a constraint and a resolver, you're expressing intent: "this must be true" and "here's how to make it true." The runtime handles the rest – when to execute, how to deduplicate concurrent requests, when to retry, and how to sequence dependent operations. This puts orchestration logic where it belongs: in a system designed to handle it consistently.
+
+### State as Ground Truth
+
+In Directive, facts are the single source of truth. Derivations recompute when dependencies change. Constraints evaluate against facts. Requirements are transient – they exist only as long as a constraint is active and unfulfilled. There's no separate "action log" to reconcile with actual state.
+
+### Separation of Detection and Execution
+
+Constraints detect what's needed. Resolvers handle how to fulfill it. You can swap a resolver's implementation without touching constraints, add new constraints that reuse existing resolvers, and test detection logic independently from execution logic.
+
+### Resilience by Default
+
+Retry policies are declared on resolvers, not implemented ad-hoc. Timeouts prevent resolvers from hanging indefinitely. Error boundaries catch failures and provide configurable recovery. When resilience is declarative and built into the resolution layer, every resolver gets the same quality of error handling.
+
+### Inspectability Over Magic
+
+Every decision the runtime makes is observable. `inspect()` shows current facts, active constraints, pending requirements, and running resolvers. `explain()` traces why a particular requirement was generated. Time-travel lets you step through state changes. Automatic doesn't mean opaque.
+
+---
+
 ## Next Steps
 
 - **[Quick Start](/docs/quick-start)** - Build your first module

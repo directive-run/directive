@@ -191,6 +191,6 @@ function SignupForm() {
 
 ## Next Steps
 
-- See [Data Fetching](/docs/examples/data-fetching) for input handling
-- See [Derivations](/docs/derivations) for computed values
-- See [Constraints](/docs/constraints) for validation logic
+- [Data Fetching](/docs/examples/data-fetching) – Input handling
+- [Derivations](/docs/derivations) – Computed values
+- [Constraints](/docs/constraints) – Validation logic

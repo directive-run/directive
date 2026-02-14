@@ -199,7 +199,7 @@ function useWatch<T>(
   opts?: { equalityFn?: (a: T, b: T) => boolean },
 ): void
 
-// @deprecated -- still works for backward compatibility
+// @deprecated – still works for backward compatibility
 function useWatch<T>(
   system: SingleModuleSystem<any>,
   kind: "fact",
@@ -233,7 +233,7 @@ useWatch(system, "position", (newVal, oldVal) => {
   canvas.moveTo(newVal.x, newVal.y);
 }, { equalityFn: (a, b) => a?.x === b?.x && a?.y === b?.y });
 
-// @deprecated -- old pattern still works but is no longer needed
+// @deprecated – old pattern still works but is no longer needed
 useWatch(system, "fact", "userId", (newVal, oldVal) => {
   console.log(`userId changed: ${oldVal} -> ${newVal}`);
 });
@@ -268,7 +268,9 @@ import { useInspect } from 'directive/react';
 const inspection = useInspect(system);
 
 // Show a spinner while the system is still resolving
-if (!inspection.isSettled) return <Spinner />;
+if (!inspection.isSettled) {
+  return <Spinner />;
+}
 ```
 
 ---
@@ -302,7 +304,9 @@ import { useConstraintStatus } from 'directive/react';
 const auth = useConstraintStatus(system, "requireAuth");
 
 // Redirect to login when the constraint fires
-if (auth.active) return <LoginPrompt />;
+if (auth.active) {
+  return <LoginPrompt />;
+}
 ```
 
 ---
@@ -368,8 +372,13 @@ import { useRequirementStatus } from 'directive/react';
 const status = useRequirementStatus(statusPlugin, "FETCH_USER");
 
 // Render loading, error, or content based on status
-if (status.isLoading) return <Spinner />;
-if (status.hasError) return <Error message={status.lastError?.message} />;
+if (status.isLoading) {
+  return <Spinner />;
+}
+
+if (status.hasError) {
+  return <Error message={status.lastError?.message} />;
+}
 ```
 
 ---
@@ -396,6 +405,7 @@ import { useSuspenseRequirement } from 'directive/react';
 function UserProfile() {
   // Suspends rendering until the requirement resolves
   const status = useSuspenseRequirement(statusPlugin, "FETCH_USER");
+
   return <div>User loaded!</div>;
 }
 
@@ -489,8 +499,8 @@ function Counter() {
 
 Higher-level scoped system with subscriptions baked in. Two modes:
 
-- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
-- **Subscribe all** — omit keys to subscribe to all facts and derivations
+- **Selective** – pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** – omit keys to subscribe to all facts and derivations
 
 ```typescript
 function useDirective<M, FK, DK>(
@@ -654,7 +664,9 @@ import { useTimeTravel } from 'directive/react';
 const tt = useTimeTravel(system);
 
 // Only render controls when time-travel is enabled
-if (!tt) return null;
+if (!tt) {
+  return null;
+}
 
 return (
   <div>
@@ -689,6 +701,6 @@ const coords = useSelector(
 
 ## Next Steps
 
-- See [Core API](/docs/api/core) for system functions
-- See [Types](/docs/api/types) for type definitions
-- See [React Adapter](/docs/adapters/react) for setup and patterns
+- [Core API](/docs/api/core) – System functions
+- [Types](/docs/api/types) – Type definitions
+- [React Adapter](/docs/adapters/react) – Setup and patterns

@@ -533,6 +533,6 @@ class ChatStream extends LitElement {
 
 ## Next Steps
 
-- See [Agent Orchestrator](/docs/ai/orchestrator) for the full orchestrator API
-- See [Guardrails](/docs/ai/guardrails) for input/output validation
-- See [Multi-Agent](/docs/ai/multi-agent) for parallel and sequential patterns
+- [Agent Orchestrator](/docs/ai/orchestrator) – Full orchestrator API
+- [Guardrails](/docs/ai/guardrails) – Input/output validation
+- [Multi-Agent](/docs/ai/multi-agent) – Parallel and sequential patterns

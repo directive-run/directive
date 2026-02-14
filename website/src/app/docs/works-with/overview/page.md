@@ -1,9 +1,9 @@
 ---
-title: Works With
-description: How Directive connects to other libraries using standard reactive primitives — no custom bridges needed.
+title: Integrations
+description: How Directive connects to other libraries, plus migration guides for switching from Redux, Zustand, or XState.
 ---
 
-Directive exposes standard reactive primitives that connect naturally to any state management library. No special adapters, no abstraction layers — just a few lines of subscribe/watch code. {% .lead %}
+Directive exposes standard reactive primitives that connect naturally to any state management library. Run side-by-side, or migrate fully with step-by-step guides. {% .lead %}
 
 ---
 
@@ -11,7 +11,7 @@ Directive exposes standard reactive primitives that connect naturally to any sta
 
 Directive doesn't replace your existing tools. It adds a **constraint layer** on top of them.
 
-Your existing library handles **what** your state looks like and **how** it changes. Directive adds **when** — constraints that evaluate across state and automatically trigger the right behavior.
+Your existing library handles **what** your state looks like and **how** it changes. Directive adds **when** – constraints that evaluate across state and automatically trigger the right behavior.
 
 - **Redux** dispatches actions → Directive decides when actions need dispatching
 - **Zustand** holds UI state → Directive evaluates rules across that state
@@ -151,7 +151,10 @@ let syncing = false;
 
 // External → Directive
 externalStore.subscribe((state) => {
-  if (syncing) return;
+  if (syncing) {
+    return;
+  }
+
   syncing = true;
   system.batch(() => {
     system.facts.count = state.count;
@@ -161,7 +164,10 @@ externalStore.subscribe((state) => {
 
 // Directive → External
 system.watch('count', (value) => {
-  if (syncing) return;
+  if (syncing) {
+    return;
+  }
+
   syncing = true;
   externalStore.setState({ count: value });
   syncing = false;
@@ -178,10 +184,10 @@ Using a library not listed below? The general pattern above works with any store
 
 | Library | What it adds | Key pattern |
 |---------|-------------|-------------|
-| [Redux](/docs/works-with/redux) | Predictable state + DevTools | `store.subscribe(() => { const s = store.getState(); ... })` — listener gets no args |
-| [Zustand](/docs/works-with/zustand) | Minimal UI state | `store.subscribe((state, prev) => ...)` — listener gets both current and previous state |
+| [Redux](/docs/works-with/redux) | Predictable state + DevTools | `store.subscribe(() => { const s = store.getState(); ... })` – listener gets no args |
+| [Zustand](/docs/works-with/zustand) | Minimal UI state | `store.subscribe((state, prev) => ...)` – listener gets both current and previous state |
 | [XState](/docs/works-with/xstate) | State machines + actors | `actor.subscribe(fn)` returns `{ unsubscribe }`, not a bare function |
-| [React Query](/docs/works-with/react-query) | Server cache + fetching | `queryCache.subscribe(event => ...)` — event-driven with typed event objects |
+| [React Query](/docs/works-with/react-query) | Server cache + fetching | `queryCache.subscribe(event => ...)` – event-driven with typed event objects |
 
 ### First-Party Adapters
 
@@ -193,10 +199,29 @@ These are built into Directive and don't use the subscribe patterns above:
 
 ---
 
+## Migration Guides
+
+Ready to go all-in? These guides walk through a full migration, concept by concept:
+
+| From | Key Mapping |
+|------|------------|
+| [Redux](/docs/migration/from-redux) | Slices → Modules, actions → events, selectors → derivations, thunks → resolvers |
+| [Zustand](/docs/migration/from-zustand) | Stores → Modules, set → events, get → derivations, middleware → plugins |
+| [XState](/docs/migration/from-xstate) | Machines → Modules, states → facts, transitions → events, services → resolvers |
+
+All three guides follow the same pattern:
+
+1. **Analyze** – Map your existing concepts to Directive equivalents
+2. **Create module** – Define schema, init, events, derive, constraints, resolvers
+3. **Coexist** – Run both systems side-by-side using the interop patterns above
+4. **Migrate UI** – Replace store hooks with Directive hooks
+5. **Remove old store** – Once fully migrated, remove the old state library
+
+---
+
 ## Next Steps
 
 - Pick the library you're using and follow its guide above
-- **[Installation](/docs/installation)** — Get Directive installed in your project
-- **[Core API](/docs/core-api)** — Full reference for subscribe, watch, batch, and dispatch
-- **[Plugins](/docs/plugins/overview)** — Use plugin hooks for cross-cutting interop logic
-- **[Migration Guides](/docs/migration/overview)** — Full migration walkthroughs for Redux, Zustand, and XState
+- **[Installation](/docs/installation)** – Get Directive installed in your project
+- **[Core API](/docs/core-api)** – Full reference for subscribe, watch, batch, and dispatch
+- **[Plugins](/docs/plugins/overview)** – Use plugin hooks for cross-cutting interop logic

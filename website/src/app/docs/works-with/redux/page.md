@@ -3,7 +3,7 @@ title: Directive + Redux
 description: Use Redux for predictable UI state and Directive for constraint-driven async orchestration.
 ---
 
-Redux handles predictable state with reducers, actions, and devtools. Directive adds constraint-driven async orchestration — requirements that evaluate automatically and resolvers that fulfill them. {% .lead %}
+Redux handles predictable state with reducers, actions, and devtools. Directive adds constraint-driven async orchestration – requirements that evaluate automatically and resolvers that fulfill them. {% .lead %}
 
 {% callout type="note" title="Prerequisites" %}
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
@@ -110,7 +110,7 @@ const directiveMiddleware: Middleware = (api) => (next) => (action) => {
     try {
       system.dispatch({ type: action.type, payload: (action as any).payload });
     } catch (err) {
-      // Directive may not have a handler for every Redux action — that's expected.
+      // Directive may not have a handler for every Redux action – that's expected.
       // Log in development so real errors aren't hidden.
       if (process.env.NODE_ENV === 'development') {
         console.warn(`[directive-middleware] Failed to dispatch ${action.type}:`, err);
@@ -204,7 +204,7 @@ const cartModule = createModule('cart', {
 });
 ```
 
-The constraint fires automatically when `cartTotal > 100` and the user is premium. The resolver handles the API call with retry. No thunk, no saga — just a declaration.
+The constraint fires automatically when `cartTotal > 100` and the user is premium. The resolver handles the API call with retry. No thunk, no saga – just a declaration.
 
 ---
 
@@ -313,7 +313,10 @@ let syncing = false;
 
 // Redux → Directive
 store.subscribe(() => {
-  if (syncing) return;
+  if (syncing) {
+    return;
+  }
+
   syncing = true;
   const state = store.getState();
   system.batch(() => {
@@ -324,7 +327,10 @@ store.subscribe(() => {
 
 // Directive → Redux
 system.watch('count', (value) => {
-  if (syncing) return;
+  if (syncing) {
+    return;
+  }
+
   syncing = true;
   store.dispatch(counterActions.set(value));
   syncing = false;
@@ -375,6 +381,7 @@ test('resolver dispatches back to Redux', async () => {
   const originalDispatch = reduxStore.dispatch;
   reduxStore.dispatch = ((action: any) => {
     dispatched.push(action);
+
     return originalDispatch(action);
   }) as typeof reduxStore.dispatch;
 
@@ -396,7 +403,7 @@ test('resolver dispatches back to Redux', async () => {
 
 ## Next Steps
 
-- **[Migration from Redux](/docs/migration/from-redux)** — Full migration guide if you want to move off Redux entirely
-- **[Constraints](/docs/constraints)** — How constraints evaluate and emit requirements
-- **[Resolvers](/docs/resolvers)** — How resolvers fulfill requirements with retry and batching
-- **[Plugins](/docs/plugins/overview)** — Build custom plugins for cross-cutting concerns
+- **[Migration from Redux](/docs/migration/from-redux)** – Full migration guide if you want to move off Redux entirely
+- **[Constraints](/docs/constraints)** – How constraints evaluate and emit requirements
+- **[Resolvers](/docs/resolvers)** – How resolvers fulfill requirements with retry and batching
+- **[Plugins](/docs/plugins/overview)** – Build custom plugins for cross-cutting concerns

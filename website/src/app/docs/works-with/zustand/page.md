@@ -3,7 +3,7 @@ title: Directive + Zustand
 description: Use Zustand for simple UI state and Directive for constraint evaluation and requirement resolution.
 ---
 
-Zustand is great for simple, fast UI state. Directive adds constraint evaluation, requirement resolution, and declarative orchestration alongside it. Both use subscribe patterns — they compose naturally. {% .lead %}
+Zustand is great for simple, fast UI state. Directive adds constraint evaluation, requirement resolution, and declarative orchestration alongside it. Both use subscribe patterns – they compose naturally. {% .lead %}
 
 {% callout type="note" title="Prerequisites" %}
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
@@ -20,7 +20,7 @@ This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Mo
 Together:
 - Zustand owns lightweight UI state: modals, form inputs, selections, UI toggles
 - Directive owns business logic: constraints that evaluate across state, resolvers that handle async flows with retry, effects that react to state transitions
-- Clean separation — Zustand stays simple, Directive handles complexity
+- Clean separation – Zustand stays simple, Directive handles complexity
 
 ---
 
@@ -56,7 +56,7 @@ const unsubscribe = store.subscribe((state, prevState) => {
 // Clean up when done: unsubscribe()
 ```
 
-Since Zustand gives you `prevState`, you can skip writes for unchanged values — avoiding unnecessary derivation recomputation. Alternatively, use `subscribeWithSelector` with `fireImmediately: true` (shown below) to sync initial state automatically.
+Since Zustand gives you `prevState`, you can skip writes for unchanged values – avoiding unnecessary derivation recomputation. Alternatively, use `subscribeWithSelector` with `fireImmediately: true` (shown below) to sync initial state automatically.
 
 ---
 
@@ -75,7 +75,7 @@ const store = createStore(
   }))
 );
 
-// Subscribe to just the plan — fires only when it changes
+// Subscribe to just the plan – fires only when it changes
 const unsubPlan = store.subscribe(
   (state) => state.selectedPlan,
   (selectedPlan, prevSelectedPlan) => {
@@ -102,7 +102,7 @@ const unsubImmediate = store.subscribe(
 );
 ```
 
-This avoids checking every field on every state change — the selector handles the filtering.
+This avoids checking every field on every state change – the selector handles the filtering.
 
 ---
 
@@ -134,7 +134,7 @@ system.watch('appliedDiscounts', (discounts) => {
 
 ## Shared Reactivity Example
 
-Zustand manages what the user selects. Directive decides what to do about it — with retry and error handling:
+Zustand manages what the user selects. Directive decides what to do about it – with retry and error handling:
 
 ```typescript
 import { createModule, t } from 'directive';
@@ -207,7 +207,7 @@ The user picks a plan in Zustand → synced as a Directive fact → constraint f
 
 ## Zustand Middleware Integration
 
-The `subscribe` approach above is simpler and works for most cases. A middleware approach auto-syncs on every `setState` call without manual subscription setup — useful when many components write to the store independently. The tradeoff is more complex TypeScript and tighter coupling to Zustand internals.
+The `subscribe` approach above is simpler and works for most cases. A middleware approach auto-syncs on every `setState` call without manual subscription setup – useful when many components write to the store independently. The tradeoff is more complex TypeScript and tighter coupling to Zustand internals.
 
 {% callout type="warning" title="Middleware limitation" %}
 This middleware intercepts `store.setState()` calls only. Internal `set()` calls from within the state creator function are also intercepted since Zustand's `set` calls `setState` internally. However, direct property mutations on `store.getState()` (an anti-pattern) will not be caught.
@@ -276,7 +276,10 @@ let syncing = false;
 
 // Zustand → Directive
 store.subscribe((state, prevState) => {
-  if (syncing) return;
+  if (syncing) {
+    return;
+  }
+
   syncing = true;
   system.batch(() => {
     if (state.count !== prevState.count) {
@@ -288,7 +291,10 @@ store.subscribe((state, prevState) => {
 
 // Directive → Zustand
 system.watch('count', (value) => {
-  if (syncing) return;
+  if (syncing) {
+    return;
+  }
+
   syncing = true;
   store.setState({ count: value });
   syncing = false;
@@ -391,7 +397,7 @@ test('pricing constraint fires when plan selected', async () => {
 
 ## Next Steps
 
-- **[Migration from Zustand](/docs/migration/from-zustand)** — Full migration guide if you want to move off Zustand entirely
-- **[Facts](/docs/facts)** — How Directive's proxy-based facts work
-- **[Constraints](/docs/constraints)** — How constraints evaluate and emit requirements
-- **[Plugins](/docs/plugins/overview)** — Build custom plugins for cross-cutting concerns
+- **[Migration from Zustand](/docs/migration/from-zustand)** – Full migration guide if you want to move off Zustand entirely
+- **[Facts](/docs/facts)** – How Directive's proxy-based facts work
+- **[Constraints](/docs/constraints)** – How constraints evaluate and emit requirements
+- **[Plugins](/docs/plugins/overview)** – Build custom plugins for cross-cutting concerns

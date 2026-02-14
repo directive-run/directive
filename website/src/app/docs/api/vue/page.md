@@ -3,7 +3,7 @@ title: Vue Composables
 description: Complete API reference for all Vue composables exported from directive/vue. All composables take an explicit system parameter – no context injection needed.
 ---
 
-Vue composables API reference. All composables take an explicit `system` parameter -- no provide/inject needed. {% .lead %}
+Vue composables API reference. All composables take an explicit `system` parameter – no provide/inject needed. {% .lead %}
 
 ---
 
@@ -197,7 +197,7 @@ const dispatch = useDispatch(system);
 
 ## useWatch
 
-Watch a fact or derivation and execute a callback when it changes. Auto-detects whether the key refers to a fact or a derivation -- no discriminator needed. Does not cause re-renders; use for side effects only.
+Watch a fact or derivation and execute a callback when it changes. Auto-detects whether the key refers to a fact or a derivation – no discriminator needed. Does not cause re-renders; use for side effects only.
 
 ```typescript
 // Unified API – auto-detects fact vs derivation
@@ -452,8 +452,8 @@ function toggleLike() {
 
 Create a scoped Directive system tied to the component lifecycle. The system is created on mount, started automatically, and destroyed on unmount. Two modes:
 
-- **Selective** -- pass `facts` and/or `derived` keys to subscribe to specific state
-- **Subscribe all** -- omit keys to subscribe to all facts and derivations
+- **Selective** – pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** – omit keys to subscribe to all facts and derivations
 
 ```typescript
 function useDirective<M extends ModuleSchema>(
@@ -643,6 +643,6 @@ const coords = useSelector(
 
 ## Next Steps
 
-- See [Core API](/docs/api/core) for system functions
-- See [Types](/docs/api/types) for type definitions
-- See [Vue Adapter](/docs/adapters/vue) for setup and patterns
+- [Core API](/docs/api/core) – System functions
+- [Types](/docs/api/types) – Type definitions
+- [Vue Adapter](/docs/adapters/vue) – Setup and patterns

@@ -289,9 +289,18 @@ const asyncCounterModule = createModule("async-counter", {
   // Derive a single status string from the three loading/error/count facts
   derive: {
     status: (facts) => {
-      if (facts.loading) return 'loading';
-      if (facts.error) return 'error';
-      if (facts.count !== null) return 'ready';
+      if (facts.loading) {
+        return 'loading';
+      }
+
+      if (facts.error) {
+        return 'error';
+      }
+
+      if (facts.count !== null) {
+        return 'ready';
+      }
+
       return 'idle';
     },
   },

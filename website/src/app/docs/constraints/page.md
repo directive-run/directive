@@ -185,7 +185,7 @@ constraints: {
 - `priority` only affects ordering among constraints that have no `after` dependencies on each other
 - Constraints with the same priority and no mutual `after` dependencies may run in parallel
 
-**Cross-module references:** Use `"moduleName.constraintName"` format for `after` dependencies across modules.
+**Cross-module references:** Use `"moduleName::constraintName"` format for `after` dependencies across modules. Note: unlike `deps`, constraint `after` references are not auto-prefixed in multi-module systems – you must use the full `"namespace::constraintName"` format.
 
 ---
 
@@ -201,6 +201,7 @@ constraints: {
     when: async (facts) => {
       // Check external permission service before proceeding
       const allowed = await checkPermissions(facts.userId);
+
       return allowed && !facts.hasData;
     },
     require: { type: "FETCH_DATA" },
@@ -323,6 +324,7 @@ when: (facts) => facts.count > 10
 // Bad - side effects in condition
 when: (facts) => {
   console.log("Checking...");  // Don't do this
+
   return facts.count > 10;
 }
 ```
@@ -378,7 +380,7 @@ This is useful for feature flags, A/B testing, or temporarily suppressing constr
 
 ## Next Steps
 
-- See [Resolvers](/docs/resolvers) for handling requirements
-- See [Derivations](/docs/derivations) for computed values
-- See [Effects](/docs/effects) for side effects
-- See [Events](/docs/events) for typed event dispatching
+- [Resolvers](/docs/resolvers) – Handling requirements
+- [Derivations](/docs/derivations) – Computed values
+- [Effects](/docs/effects) – Side effects
+- [Events](/docs/events) – Typed event dispatching

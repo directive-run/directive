@@ -11,7 +11,7 @@ Fluent builder APIs for creating constraints, modules, and systems. Builders pro
 
 Two ways to build typed constraints outside of `createModule()`.
 
-### `constraint()` — Full Builder
+### `constraint()` – Full Builder
 
 Chain `.when()`, `.require()`, optional fields, then `.build()`. All fields from `TypedConstraintDef` are supported.
 
@@ -33,7 +33,7 @@ The chain enforces order: `.when()` first, `.require()` second, then any optiona
 
 | Method | Required | Description |
 |--------|----------|-------------|
-| `.when(fn)` | Yes | Condition function — receives typed facts |
+| `.when(fn)` | Yes | Condition function – receives typed facts |
 | `.require(value)` | Yes | Requirement(s), function, array, or `null` |
 | `.priority(n)` | No | Higher runs first |
 | `.after(...ids)` | No | Wait for other constraints' resolvers |
@@ -42,18 +42,18 @@ The chain enforces order: `.when()` first, `.require()` second, then any optiona
 | `.async(bool)` | No | Mark as async constraint |
 | `.build()` | Yes | Returns `TypedConstraintDef<M>` |
 
-### `when()` — Quick Shorthand
+### `when()` – Quick Shorthand
 
-Returns a valid constraint directly — no `.build()` needed. Optional chaining via `with*` methods returns a new immutable constraint each time.
+Returns a valid constraint directly – no `.build()` needed. Optional chaining via `with*` methods returns a new immutable constraint each time.
 
 ```typescript
 import { when } from 'directive';
 
-// Minimal — ready to use immediately
+// Minimal – ready to use immediately
 const pause = when<typeof schema>(f => f.errors > 3)
   .require({ type: 'PAUSE' });
 
-// With options (immutable — each call returns a new constraint)
+// With options (immutable – each call returns a new constraint)
 const halt = when<typeof schema>(f => f.errors > 10)
   .require({ type: 'HALT' })
   .withPriority(100)
@@ -62,7 +62,7 @@ const halt = when<typeof schema>(f => f.errors > 10)
 
 | Method | Description |
 |--------|-------------|
-| `.require(value)` | Required — returns the constraint |
+| `.require(value)` | Required – returns the constraint |
 | `.withPriority(n)` | Returns new constraint with priority |
 | `.withAfter(...ids)` | Returns new constraint with after deps |
 | `.withDeps(...keys)` | Returns new constraint with explicit deps |
@@ -89,7 +89,7 @@ Both builders accept the same `require` values:
 
 ### Using Builder Output in Modules
 
-Builder output is a plain `TypedConstraintDef<M>` — drop it directly into `constraints`:
+Builder output is a plain `TypedConstraintDef<M>` – drop it directly into `constraints`:
 
 ```typescript
 const myConstraint = when<typeof schema>(f => f.errors > 3)
@@ -175,19 +175,19 @@ const sys = system()
 sys.start();
 ```
 
-Calling `.module()` or `.modules()` narrows the builder type — you can't mix them.
+Calling `.module()` or `.modules()` narrows the builder type – you can't mix them.
 
 | Method | Single | Namespaced | Description |
 |--------|--------|------------|-------------|
-| `.module(mod)` | Yes | — | Single module, direct access |
-| `.modules({ ... })` | — | Yes | Object of modules, namespaced access |
+| `.module(mod)` | Yes | – | Single module, direct access |
+| `.modules({ ... })` | – | Yes | Object of modules, namespaced access |
 | `.plugins([...])` | Yes | Yes | Register plugins |
 | `.debug({...})` | Yes | Yes | Debug/time-travel config |
 | `.errorBoundary({...})` | Yes | Yes | Error recovery strategies |
 | `.tickMs(n)` | Yes | Yes | Tick interval (ms) |
 | `.zeroConfig()` | Yes | Yes | Sensible defaults for dev |
 | `.initialFacts({...})` | Yes | Yes | Facts to set after init |
-| `.initOrder(order)` | — | Yes | Module initialization order |
+| `.initOrder(order)` | – | Yes | Module initialization order |
 | `.build()` | Yes | Yes | Creates the system |
 
 ---
@@ -386,12 +386,12 @@ app.events.auth.logout();       // dispatch logout event
 | Simple system setup | `createSystem()` |
 | System with many options | `system()` builder |
 
-Both approaches produce identical runtime output — builders are syntax sugar with type inference.
+Both approaches produce identical runtime output – builders are syntax sugar with type inference.
 
 ---
 
 ## Next Steps
 
-- **[Constraints](/docs/constraints)** — How constraints drive the reconciliation loop
-- **[Module & System](/docs/module-system)** — Full module and system API
-- **[Glossary](/docs/glossary)** — All Directive terms defined
+- **[Constraints](/docs/constraints)** – How constraints drive the reconciliation loop
+- **[Module & System](/docs/module-system)** – Full module and system API
+- **[Glossary](/docs/glossary)** – All Directive terms defined

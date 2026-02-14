@@ -203,14 +203,12 @@ stack.reject(requestId, 'Not authorized');
 // Snapshot of the entire stack's state
 const state = stack.getState();
 console.log(state.totalTokens);          // Combined input + output tokens
-console.log(state.inputTokens);          // Input token count
-console.log(state.outputTokens);         // Output token count
 console.log(state.estimatedCost);        // Blended cost estimate
-console.log(state.inputCost);            // Cost from input tokens
-console.log(state.outputCost);           // Cost from output tokens
 console.log(state.circuitState);         // 'CLOSED' | 'OPEN' | 'HALF_OPEN'
 console.log(state.cacheStats);           // { totalEntries, hitRate, ... }
-console.log(state.memoryMessageCount);
+console.log(state.memoryMessageCount);   // Messages in conversation memory
+console.log(state.busMessageCount);      // Messages on the inter-agent bus
+console.log(state.rateLimitRemaining);   // Remaining requests this minute (or null)
 
 // Fetch the most recent 50 observability spans and metrics
 const { spans, metrics } = stack.getTimeline(50);
@@ -710,7 +708,7 @@ See [Agent Orchestrator – Framework Integration](/docs/ai/orchestrator#framewo
 
 ## Next Steps
 
-- See [Agent Orchestrator](/docs/ai/orchestrator) for the core orchestrator API
-- See [Guardrails & Safety](/docs/ai/guardrails) for input validation and streaming constraints
-- See [Streaming](/docs/ai/streaming) for real-time response processing
-- See [Multi-Agent Patterns](/docs/ai/multi-agent) for parallel, sequential, and supervisor patterns
+- [Agent Orchestrator](/docs/ai/orchestrator) – Core orchestrator API
+- [Guardrails & Safety](/docs/ai/guardrails) – Input validation and streaming constraints
+- [Streaming](/docs/ai/streaming) – Real-time response processing
+- [Multi-Agent Patterns](/docs/ai/multi-agent) – Parallel, sequential, and supervisor patterns

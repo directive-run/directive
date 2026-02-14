@@ -110,6 +110,7 @@ system.start();
 // No provider needed – pass the system directly to hooks
 function App() {
   const displayName = useDerived(system, "displayName");
+
   return <div>Hello, {displayName}</div>;
 }
 ```

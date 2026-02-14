@@ -157,6 +157,6 @@ function UserProfile() {
 
 ## Next Steps
 
-- See [Form Validation](/docs/examples/form-validation) for input handling
-- See [Constraints](/docs/constraints) for more patterns
-- See [Resolvers](/docs/resolvers) for retry configuration
+- [Form Validation](/docs/examples/form-validation) – Input handling
+- [Constraints](/docs/constraints) – More patterns
+- [Resolvers](/docs/resolvers) – Retry configuration

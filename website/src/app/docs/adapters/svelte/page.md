@@ -1,9 +1,9 @@
 ---
 title: Svelte Adapter
-description: Integrate Directive with Svelte using reactive stores. useFact, useDerived, useEvents, useDispatch, and more — all hooks take system as an explicit first parameter.
+description: Integrate Directive with Svelte using reactive stores. useFact, useDerived, useEvents, useDispatch, and more – all hooks take system as an explicit first parameter.
 ---
 
-Directive provides first-class Svelte integration with stores that automatically update on state changes. All hooks take `system` as an explicit first parameter — no context injection needed. {% .lead %}
+Directive provides first-class Svelte integration with stores that automatically update on state changes. All hooks take `system` as an explicit first parameter – no context injection needed. {% .lead %}
 
 ---
 
@@ -19,7 +19,7 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/svelte';
 
 ## Setup
 
-Create a system and pass it directly to hooks — no context provider required:
+Create a system and pass it directly to hooks – no context provider required:
 
 ```html
 <script lang="ts">
@@ -73,8 +73,8 @@ Then import and use it in any component:
 
 Every hook below requires a `system` passed as the first argument. There are two ways to create one:
 
-- **Global system** — call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
-- **`useDirective`** — creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
+- **Global system** – call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
+- **`useDirective`** – creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
 
 For most Svelte apps, use a global system exported from a shared module. Use `useDirective` when you need per-component system isolation.
 
@@ -82,8 +82,8 @@ For most Svelte apps, use a global system exported from a shared module. Use `us
 
 Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
-- **Selective** — specify `facts` and/or `derived` keys to subscribe only to those
-- **Subscribe all** — omit keys to subscribe to everything (good for prototyping or small modules)
+- **Selective** – specify `facts` and/or `derived` keys to subscribe only to those
+- **Subscribe all** – omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```html
 <script>
@@ -121,7 +121,7 @@ With selective subscriptions and config:
 
 ## Core Hooks
 
-All hooks below take `system` as an explicit first parameter and return Svelte `Readable` stores — use the `$` prefix for auto-subscription in templates.
+All hooks below take `system` as an explicit first parameter and return Svelte `Readable` stores – use the `$` prefix for auto-subscription in templates.
 
 ### useSelector
 
@@ -266,7 +266,7 @@ Watch a fact or derivation for changes. `useWatch` auto-detects whether the key 
 ```
 
 {% callout type="warning" title="Deprecated pattern" %}
-The four-argument form `useWatch(system, "fact", "key", cb)` still works but is deprecated. Use `useWatch(system, "key", cb)` instead -- `useWatch` now auto-detects whether the key is a fact or derivation.
+The four-argument form `useWatch(system, "fact", "key", cb)` still works but is deprecated. Use `useWatch(system, "key", cb)` instead – `useWatch` now auto-detects whether the key is a fact or derivation.
 {% /callout %}
 
 ---
@@ -374,7 +374,7 @@ Get a reactive explanation of why a requirement exists:
   });
   system.start();
 
-  // Track a single requirement type — statusPlugin is the first param
+  // Track a single requirement type – statusPlugin is the first param
   const status = useRequirementStatus(statusPlugin, "FETCH_USER");
   // Readable<{ isLoading, hasError, pending, inflight, failed, lastError }>
 
@@ -491,7 +491,7 @@ All factories return `Readable` stores that work with `$` auto-subscription:
 
 ## Typed Hooks
 
-Create fully typed hooks for your module schema. `createTypedHooks` returns typed versions of all core hooks — the returned hooks still take `system` as the first parameter but provide full autocomplete for keys and events:
+Create fully typed hooks for your module schema. `createTypedHooks` returns typed versions of all core hooks – the returned hooks still take `system` as the first parameter but provide full autocomplete for keys and events:
 
 ```typescript
 import { createTypedHooks } from 'directive/svelte';
@@ -687,7 +687,7 @@ test('displays user name', async () => {
   const system = createTestSystem({ module: userModule });
   system.facts.user = { id: 1, name: 'Test User' };
 
-  // Pass system as a prop — component uses it with hooks directly
+  // Pass system as a prop – component uses it with hooks directly
   render(UserProfile, {
     props: { system },
   });
@@ -718,7 +718,7 @@ Re-exported utility for use with `useSelector`:
 
 ## Time-Travel Debugging
 
-`useTimeTravel` returns a `Readable<TimeTravelState | null>` store — `null` when disabled, otherwise the full reactive API. Use `$timeTravel` to auto-subscribe in templates:
+`useTimeTravel` returns a `Readable<TimeTravelState | null>` store – `null` when disabled, otherwise the full reactive API. Use `$timeTravel` to auto-subscribe in templates:
 
 ### Undo / Redo Controls
 
@@ -749,7 +749,7 @@ Re-exported utility for use with `useSelector`:
     {#each snapshots as snap (snap.id)}
       <li>
         <button on:click={() => goTo(snap.id)}>
-          {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+          {snap.trigger} – {new Date(snap.timestamp).toLocaleTimeString()}
         </button>
         <button on:click={() => console.log(getSnapshotFacts(snap.id))}>
           Inspect
@@ -842,19 +842,19 @@ See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` int
 
 | Export | Type | Description |
 |---|---|---|
-| `useFact` | Hook | Read single/multi facts — `useFact(system, key)` |
-| `useDerived` | Hook | Read single/multi derivations — `useDerived(system, id)` |
-| `useSelector` | Hook | Select from all facts with custom equality — `useSelector(system, selector, eq?)` |
-| `useEvents` | Hook | Typed event dispatchers — `useEvents(system)` |
-| `useDispatch` | Hook | Low-level event dispatch — `useDispatch(system)` |
-| `useWatch` | Hook | Side-effect watcher (auto-detects kind) — `useWatch(system, key, cb)` |
-| `useInspect` | Hook | System inspection with optional throttle — `useInspect(system, options?)` |
-| `useConstraintStatus` | Hook | Reactive constraint inspection — `useConstraintStatus(system, constraintId?)` |
-| `useExplain` | Hook | Reactive requirement explanation — `useExplain(system, reqId)` |
-| `useRequirementStatus` | Hook | Requirement status — `useRequirementStatus(statusPlugin, type)` |
-| `useOptimisticUpdate` | Hook | Optimistic mutations with rollback — `useOptimisticUpdate(system, statusPlugin?, type?)` |
+| `useFact` | Hook | Read single/multi facts – `useFact(system, key)` |
+| `useDerived` | Hook | Read single/multi derivations – `useDerived(system, id)` |
+| `useSelector` | Hook | Select from all facts with custom equality – `useSelector(system, selector, eq?)` |
+| `useEvents` | Hook | Typed event dispatchers – `useEvents(system)` |
+| `useDispatch` | Hook | Low-level event dispatch – `useDispatch(system)` |
+| `useWatch` | Hook | Side-effect watcher (auto-detects kind) – `useWatch(system, key, cb)` |
+| `useInspect` | Hook | System inspection with optional throttle – `useInspect(system, options?)` |
+| `useConstraintStatus` | Hook | Reactive constraint inspection – `useConstraintStatus(system, constraintId?)` |
+| `useExplain` | Hook | Reactive requirement explanation – `useExplain(system, reqId)` |
+| `useRequirementStatus` | Hook | Requirement status – `useRequirementStatus(statusPlugin, type)` |
+| `useOptimisticUpdate` | Hook | Optimistic mutations with rollback – `useOptimisticUpdate(system, statusPlugin?, type?)` |
 | `useDirective` | Hook | Scoped system with selected or all subscriptions |
-| `useTimeTravel` | Hook | Reactive time-travel state — `useTimeTravel(system)` |
+| `useTimeTravel` | Hook | Reactive time-travel state – `useTimeTravel(system)` |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createFactStore` | Factory | Fact store outside components |
 | `createDerivedStore` | Factory | Derivation store outside components |
