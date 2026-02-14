@@ -31,6 +31,9 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
+# Generated embeddings (rebuild with `pnpm build:embeddings`)
+website/public/embeddings.json
+
 # Temporary
 tmp/
 temp/

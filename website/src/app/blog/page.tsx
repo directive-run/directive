@@ -1,8 +1,33 @@
+import dynamic from 'next/dynamic'
 import type { Metadata } from 'next'
 
 import { BlogCard } from '@/components/BlogCard'
 import { BlogListItem } from '@/components/BlogListItem'
 import { getFeaturedPosts, posts } from '@/lib/blog'
+
+function BlogPostListFallback() {
+  return (
+    <section>
+      <div className="mb-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          All posts
+        </h2>
+      </div>
+      <div>
+        {posts.map((post) => (
+          <BlogListItem key={post.slug} post={post} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const BlogPostList = dynamic(
+  () => import('@/components/BlogPostList').then((m) => m.BlogPostList),
+  {
+    loading: () => <BlogPostListFallback />,
+  },
+)
 
 export const metadata: Metadata = {
   title: 'Blog - Directive',
@@ -38,16 +63,7 @@ export default function BlogPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          All posts
-        </h2>
-        <div>
-          {posts.map((post) => (
-            <BlogListItem key={post.slug} post={post} />
-          ))}
-        </div>
-      </section>
+      <BlogPostList />
     </div>
   )
 }
