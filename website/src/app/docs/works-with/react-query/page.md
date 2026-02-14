@@ -3,7 +3,7 @@ title: Directive + React Query
 description: Use React Query for data fetching and caching. Use Directive to decide when to fetch based on constraints.
 ---
 
-React Query handles data fetching, caching, and cache invalidation. Directive decides WHEN to fetch — constraints evaluate your application state and trigger prefetches or invalidations automatically. Together they eliminate manual useEffect data orchestration. {% .lead %}
+React Query handles data fetching, caching, and cache invalidation. Directive decides WHEN to fetch – constraints evaluate your application state and trigger prefetches or invalidations automatically. Together they eliminate manual useEffect data orchestration. {% .lead %}
 
 {% callout type="note" title="Prerequisites" %}
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
@@ -31,18 +31,22 @@ Subscribe to React Query's query cache events and write query status into Direct
 The `getQueryCache().subscribe(listener)` callback receives typed event objects with `type`, `query`, and additional context.
 
 {% callout type="warning" title="Use stable, schema-declared fact keys" %}
-Avoid dynamic fact keys like `` `query_${hash}_status` `` — they create untyped facts outside your schema that can't participate in constraints or derivations. Instead, map specific query keys to declared fact keys.
+Avoid dynamic fact keys like `` `query_${hash}_status` `` – they create untyped facts outside your schema that can't participate in constraints or derivations. Instead, map specific query keys to declared fact keys.
 {% /callout %}
 
 Map known query keys to specific, schema-declared facts:
 
 ```typescript
 const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-  if (event.type !== 'updated') return;
+  if (event.type !== 'updated') {
+    return;
+  }
 
   // Only sync user-related queries
   const queryKey = event.query.queryKey;
-  if (!Array.isArray(queryKey) || queryKey[0] !== 'user') return;
+  if (!Array.isArray(queryKey) || queryKey[0] !== 'user') {
+    return;
+  }
 
   system.batch(() => {
     system.facts.userData = event.query.state.data;
@@ -64,8 +68,13 @@ Subscribe to the mutation cache to react to mutation lifecycle events:
 
 ```typescript
 const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
-  if (event.type !== 'updated') return;
-  if (!event.mutation) return;
+  if (event.type !== 'updated') {
+    return;
+  }
+
+  if (!event.mutation) {
+    return;
+  }
 
   const { state } = event.mutation;
 
@@ -76,7 +85,7 @@ const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
 });
 ```
 
-This lets Directive constraints react to mutation completion — for example, triggering cache invalidation after a successful mutation.
+This lets Directive constraints react to mutation completion – for example, triggering cache invalidation after a successful mutation.
 
 ---
 
@@ -287,7 +296,9 @@ function queryCacheSyncPlugin(
 
     onInit: (system) => {
       unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-        if (event.type !== 'updated') return;
+        if (event.type !== 'updated') {
+          return;
+        }
 
         const { query } = event;
         const queryKey = query.queryKey;
@@ -296,7 +307,9 @@ function queryCacheSyncPlugin(
         const mapping = mappings.find((m) =>
           m.prefix.every((part, i) => queryKey[i] === part)
         );
-        if (!mapping) return;
+        if (!mapping) {
+          return;
+        }
 
         system.batch(() => {
           if (mapping.facts.data) {
@@ -319,7 +332,7 @@ function queryCacheSyncPlugin(
   };
 }
 
-// Usage — map query key prefixes to schema-declared fact keys
+// Usage – map query key prefixes to schema-declared fact keys
 const system = createSystem({
   module: dashboardModule,
   plugins: [
@@ -367,8 +380,13 @@ function UserDashboard({ userId }: { userId: string }) {
     });
   }, [system, userId, user, status]);
 
-  if (status === 'pending') return <p>Loading...</p>;
-  if (status === 'error') return <p>Error loading user</p>;
+  if (status === 'pending') {
+    return <p>Loading...</p>;
+  }
+
+  if (status === 'error') {
+    return <p>Error loading user</p>;
+  }
 
   return (
     <div>
@@ -390,9 +408,12 @@ For server-side rendering, see [Advanced: SSR & Hydration](/docs/advanced/ssr) f
 React to query errors through Directive constraints:
 
 ```typescript
-// Sync query errors as facts — store the queryKey array, not the hash string
+// Sync query errors as facts – store the queryKey array, not the hash string
 queryClient.getQueryCache().subscribe((event) => {
-  if (event.type !== 'updated') return;
+  if (event.type !== 'updated') {
+    return;
+  }
+
   if (event.query.state.status === 'error') {
     system.batch(() => {
       system.facts.queryError = {
@@ -421,7 +442,7 @@ resolvers: {
     requirement: 'RECOVER_QUERY',
     retry: { attempts: 2, backoff: 'exponential' },
     resolve: async (req, ctx) => {
-      // Pass the original queryKey array directly — not wrapped in another array
+      // Pass the original queryKey array directly – not wrapped in another array
       await queryClient.invalidateQueries({ queryKey: req.queryKey });
       ctx.facts.queryError = null;
     },
@@ -474,7 +495,7 @@ test('prefetch does not re-fire after completion', async () => {
 
 ## Avoiding Infinite Loops
 
-React Query integrations are typically unidirectional — cache events flow into Directive facts, and Directive constraints trigger query operations (prefetch, invalidate). This means infinite loops are less likely than with bidirectional state sync.
+React Query integrations are typically unidirectional – cache events flow into Directive facts, and Directive constraints trigger query operations (prefetch, invalidate). This means infinite loops are less likely than with bidirectional state sync.
 
 However, loops can occur if a constraint-triggered invalidation causes a query to refetch, which fires a cache update event, which updates a fact, which re-triggers the constraint. Prevent this with a guard fact:
 
@@ -503,7 +524,7 @@ resolvers: {
 
 ## Next Steps
 
-- **[Constraints](/docs/constraints)** — How constraints evaluate and emit requirements
-- **[Resolvers](/docs/resolvers)** — How resolvers handle async fulfillment
-- **[Effects](/docs/effects)** — Fire-and-forget side effects for lightweight reactions
-- **[Plugins](/docs/plugins/overview)** — Build custom plugins for cache sync and more
+- **[Constraints](/docs/constraints)** – How constraints evaluate and emit requirements
+- **[Resolvers](/docs/resolvers)** – How resolvers handle async fulfillment
+- **[Effects](/docs/effects)** – Fire-and-forget side effects for lightweight reactions
+- **[Plugins](/docs/plugins/overview)** – Build custom plugins for cache sync and more

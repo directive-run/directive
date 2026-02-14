@@ -313,6 +313,6 @@ const system = createSystem({
 
 ## Next Steps
 
-- See [Resolvers](/docs/resolvers) for retry configuration
-- See [Custom Plugins](/docs/plugins/custom) for monitoring hooks
-- See [Testing](/docs/testing/overview) for testing error scenarios
+- [Resolvers](/docs/resolvers) – Retry configuration
+- [Custom Plugins](/docs/plugins/custom) – Monitoring hooks
+- [Testing](/docs/testing/overview) – Testing error scenarios

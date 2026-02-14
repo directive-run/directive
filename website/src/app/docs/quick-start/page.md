@@ -175,9 +175,18 @@ export const userModule = createModule("user", {
     displayName: (facts) => facts.user?.name ?? "Guest",
     isLoggedIn: (facts) => facts.user !== null,
     status: (facts) => {
-      if (facts.loading) return "loading";
-      if (facts.error) return "error";
-      if (facts.user) return "ready";
+      if (facts.loading) {
+        return "loading";
+      }
+
+      if (facts.error) {
+        return "error";
+      }
+
+      if (facts.user) {
+        return "ready";
+      }
+
       return "idle";
     },
   },

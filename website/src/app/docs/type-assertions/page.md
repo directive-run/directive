@@ -197,6 +197,5 @@ resolvers: {
 
 ## Next Steps
 
-- **[Type Builders](/docs/type-builders)** – Full `t.*` API reference
-- **[Zod Integration](/docs/zod-integration)** – Zod schemas for validation
+- **[Schema & Types](/docs/schema-overview)** – Full `t.*` API reference and Zod integration
 - **[Constraints](/docs/constraints)** – Runtime validation via constraints

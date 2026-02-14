@@ -505,7 +505,7 @@ For AI agent orchestrators, `directive/ai` exports additional builders: `constra
 
 ## Next Steps
 
-- See [Types](/docs/api/types) for type definitions
-- See [React Hooks](/docs/api/react) for React API
-- See [Module and System](/docs/module-system) for usage
-- See [Glossary](/docs/glossary#builders--helpers) for all builder patterns at a glance
+- [Types](/docs/api/types) – Type definitions
+- [React Hooks](/docs/api/react) – React API
+- [Module and System](/docs/module-system) – Usage guide
+- [Glossary](/docs/glossary#builders--helpers) – All builder patterns at a glance

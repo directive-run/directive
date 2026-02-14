@@ -46,7 +46,9 @@ const ws = createModule('ws', {
     connection: {
       deps: ['url', 'status'],
       run: (facts, prev, ctx) => {
-        if (facts.url === '' || facts.status !== 'connecting') return;
+        if (facts.url === '' || facts.status !== 'connecting') {
+          return;
+        }
 
         const socket = new WebSocket(facts.url);
 
@@ -129,13 +131,13 @@ function Chat({ system }) {
 
 ## Step by Step
 
-1. **Effect manages the socket** — the `connection` effect runs when `url` or `status` changes. It only opens a socket when status is `'connecting'`, and the cleanup return closes it when the effect re-runs or the system stops.
+1. **Effect manages the socket** – the `connection` effect runs when `url` or `status` changes. It only opens a socket when status is `'connecting'`, and the cleanup return closes it when the effect re-runs or the system stops.
 
-2. **`system.batch()` prevents glitches** — when `onopen` fires, both `status` and `retryCount` update atomically. Without batch, constraints would evaluate between the two updates.
+2. **`system.batch()` prevents glitches** – when `onopen` fires, both `status` and `retryCount` update atomically. Without batch, constraints would evaluate between the two updates.
 
-3. **Constraint triggers reconnect** — `shouldReconnect` derivation checks if we're in error state and haven't exceeded retries. The constraint emits `RECONNECT` with exponential backoff delay.
+3. **Constraint triggers reconnect** – `shouldReconnect` derivation checks if we're in error state and haven't exceeded retries. The constraint emits `RECONNECT` with exponential backoff delay.
 
-4. **Resolver adds delay then reconnects** — waits the backoff period, increments retry count, and sets status back to `'connecting'`, which triggers the effect to open a new socket.
+4. **Resolver adds delay then reconnects** – waits the backoff period, increments retry count, and sets status back to `'connecting'`, which triggers the effect to open a new socket.
 
 ## Common Variations
 
@@ -183,7 +185,7 @@ const chat = createModule('chat', {
 
 ## Related
 
-- [Effects](/docs/effects) — cleanup functions and dependency tracking
-- [Batch Mutations](/docs/how-to/batch-mutations) — atomic multi-field updates
-- [Multi-Module](/docs/advanced/multi-module) — cross-module dependencies
-- [Error Handling](/docs/advanced/errors) — retry and circuit breaker patterns
+- [Effects](/docs/effects) – cleanup functions and dependency tracking
+- [Batch Mutations](/docs/how-to/batch-mutations) – atomic multi-field updates
+- [Multi-Module](/docs/advanced/multi-module) – cross-module dependencies
+- [Error Handling](/docs/advanced/errors) – retry and circuit breaker patterns

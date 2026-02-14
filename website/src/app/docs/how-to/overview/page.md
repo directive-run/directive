@@ -3,7 +3,7 @@ title: How-To Guides
 description: Task-oriented guides for solving real-world problems with Directive.
 ---
 
-Practical, copy-paste recipes for common patterns — loading states, auth flows, optimistic updates, and more. {% .lead %}
+Practical, copy-paste recipes for common patterns – loading states, auth flows, optimistic updates, and more. {% .lead %}
 
 ---
 
@@ -37,11 +37,11 @@ Practical, copy-paste recipes for common patterns — loading states, auth flows
 
 Each guide follows the same structure:
 
-1. **The Problem** — what goes wrong without the pattern
-2. **The Solution** — complete, working code you can copy
-3. **Step by Step** — what each piece does and why
-4. **Common Variations** — alternate approaches and edge cases
-5. **Related** — links to concept pages and API reference
+1. **The Problem** – what goes wrong without the pattern
+2. **The Solution** – complete, working code you can copy
+3. **Step by Step** – what each piece does and why
+4. **Common Variations** – alternate approaches and edge cases
+5. **Related** – links to concept pages and API reference
 
 ---
 

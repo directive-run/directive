@@ -133,6 +133,7 @@ const runner = createRunner({
   // Extract the text and token count from the raw HTTP response
   parseResponse: async (res) => {
     const data = await res.json();
+
     return {
       text: data.output ?? '',
       totalTokens: data.usage?.total ?? 0,

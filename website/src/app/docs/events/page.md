@@ -201,8 +201,8 @@ system.events.auth.login({ token: "abc" });
 system.events.cart.addToCart({ productId: "123", price: 999, quantity: 1 });
 
 // Or use dispatch with prefixed type names
-system.dispatch({ type: "auth_login", token: "abc" });
-system.dispatch({ type: "cart_addToCart", productId: "123", price: 999, quantity: 1 });
+system.dispatch({ type: "auth::login", token: "abc" });
+system.dispatch({ type: "cart::addToCart", productId: "123", price: 999, quantity: 1 });
 ```
 
 ---
@@ -324,8 +324,8 @@ constraints: {
 
 ## Next Steps
 
-- See [Facts](/docs/facts) for the state store
-- See [Constraints](/docs/constraints) for declarative rules
-- See [Derivations](/docs/derivations) for computed values
-- See [Resolvers](/docs/resolvers) for handling requirements
-- See [Effects](/docs/effects) for side effects on fact changes
+- [Facts](/docs/facts) – State store
+- [Constraints](/docs/constraints) – Declarative rules
+- [Derivations](/docs/derivations) – Computed values
+- [Resolvers](/docs/resolvers) – Handling requirements
+- [Effects](/docs/effects) – Side effects on fact changes

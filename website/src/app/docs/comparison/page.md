@@ -145,7 +145,10 @@ const useUserStore = create((set, get) => ({
 
   // Must define the fetch logic inline with guard clauses
   fetchUser: async () => {
-    if (get().loading || !get().userId) return;
+    if (get().loading || !get().userId) {
+      return;
+    }
+
     set({ loading: true });
 
     try {

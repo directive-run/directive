@@ -170,6 +170,7 @@ import { useFact } from 'directive/react';
 // No Provider wrapper needed – pass the system directly
 function MyComponent() {
   const count = useFact(system, "count");
+
   return <p>{count}</p>;
 }
 ```

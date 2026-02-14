@@ -409,6 +409,6 @@ class MCPToolPanel extends LitElement {
 
 ## Next Steps
 
-- See [Agent Orchestrator](/docs/ai/orchestrator) for AI agent orchestration
-- See [Guardrails](/docs/ai/guardrails) for input/output validation
-- See [Multi-Agent](/docs/ai/multi-agent) for coordinating multiple agents
+- [Agent Orchestrator](/docs/ai/orchestrator) – AI agent orchestration
+- [Guardrails](/docs/ai/guardrails) – Input/output validation
+- [Multi-Agent](/docs/ai/multi-agent) – Coordinating multiple agents

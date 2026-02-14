@@ -322,6 +322,6 @@ test('component with Directive', async () => {
 
 ## Next Steps
 
-- See [Mock Resolvers](/docs/testing/mock-resolvers) for detailed resolver mocking
-- See [Fake Timers](/docs/testing/fake-timers) for time control
-- See [Assertions](/docs/testing/assertions) for test helpers
+- [Mock Resolvers](/docs/testing/mock-resolvers) – Detailed resolver mocking
+- [Fake Timers](/docs/testing/fake-timers) – Time control
+- [Assertions](/docs/testing/assertions) – Test helpers

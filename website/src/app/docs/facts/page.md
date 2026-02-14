@@ -289,6 +289,7 @@ const system = createSystem({ module: userModule });
 // Restore persisted state before starting (highest precedence)
 await system.hydrate(async () => {
   const saved = await fetch('/api/state');
+
   return saved.json();
 });
 
@@ -328,4 +329,4 @@ system.facts.nonExistent;     // Type error: property doesn't exist
 - **[Derivations](/docs/derivations)** – Computed values from facts
 - **[Constraints](/docs/constraints)** – Rules that react to fact changes
 - **[Effects](/docs/effects)** – Side effects from state changes
-- **[Type Builders](/docs/type-builders)** – Full type builder reference
+- **[Schema & Types](/docs/schema-overview)** – Full type builder reference

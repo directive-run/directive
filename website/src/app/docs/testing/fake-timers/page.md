@@ -241,6 +241,6 @@ describe('Timer tests', () => {
 
 ## Next Steps
 
-- See [Mock Resolvers](/docs/testing/mock-resolvers) for resolver testing
-- See [Testing Overview](/docs/testing/overview) for setup
-- See [Assertions](/docs/testing/assertions) for test helpers
+- [Mock Resolvers](/docs/testing/mock-resolvers) – Resolver testing
+- [Testing Overview](/docs/testing/overview) – Setup
+- [Assertions](/docs/testing/assertions) – Test helpers

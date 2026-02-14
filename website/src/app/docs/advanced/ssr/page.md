@@ -104,6 +104,6 @@ export function getSystem() {
 
 ## Next Steps
 
-- See [Snapshots](/docs/advanced/snapshots) for serialization
-- See [React Adapter](/docs/adapters/react) for client setup
-- See [Module and System](/docs/module-system) for basics
+- [Time-Travel & Snapshots](/docs/advanced/time-travel) – Serialization
+- [React Adapter](/docs/adapters/react) – Client setup
+- [Module and System](/docs/module-system) – Basics

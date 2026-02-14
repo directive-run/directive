@@ -326,10 +326,10 @@ import { constraint, when, system, module } from 'directive';
 
 | Function | Description |
 |----------|-------------|
-| `constraint<Schema>()` | Fluent builder — chain `.when()`, `.require()`, optional fields, `.build()` |
-| `when<Schema>(condition)` | Quick shorthand — `.require()` returns a valid constraint directly |
-| `system()` | Fluent builder — chain `.module()` or `.modules()`, options, `.build()` |
-| `module(id)` | Fluent builder — chain `.schema()`, `.derive()`, `.events()`, `.build()` |
+| `constraint<Schema>()` | Fluent builder – chain `.when()`, `.require()`, optional fields, `.build()` |
+| `when<Schema>(condition)` | Quick shorthand – `.require()` returns a valid constraint directly |
+| `system()` | Fluent builder – chain `.module()` or `.modules()`, options, `.build()` |
+| `module(id)` | Fluent builder – chain `.schema()`, `.derive()`, `.events()`, `.build()` |
 
 ```typescript
 // Full constraint builder
@@ -386,14 +386,14 @@ import { constraint, when, createOrchestratorBuilder } from 'directive/ai';
 | `createOrchestratorBuilder<Facts>()` | Fluent builder for the entire orchestrator config |
 
 ```typescript
-// Fluent builder -- full control over every option
+// Fluent builder – full control over every option
 const escalate = constraint<MyFacts>()
   .when((f) => f.confidence < 0.7)
   .require({ type: 'ESCALATE' })
   .priority(50)
   .build();
 
-// Quick shorthand -- returns a valid constraint directly
+// Quick shorthand – returns a valid constraint directly
 const pause = when<MyFacts>((f) => f.errors > 3)
   .require({ type: 'PAUSE' });
 

@@ -121,7 +121,7 @@ system.facts.chat.messages;
 system.events.chat.sendMessage({ text: "Hello!" });
 ```
 
-The registered module is fully wired into the system — its constraints, resolvers, effects, and derivations all activate immediately. Existing modules continue running uninterrupted.
+The registered module is fully wired into the system – its constraints, resolvers, effects, and derivations all activate immediately. Existing modules continue running uninterrupted.
 
 ### Restrictions
 
@@ -231,6 +231,6 @@ function App() {
 
 ## Next Steps
 
-- See [Module and System](/docs/module-system) for basics
-- See [Time-Travel](/docs/advanced/time-travel) for debugging
-- See [Snapshots](/docs/advanced/snapshots) for state management
+- [Module and System](/docs/module-system) – Basics
+- [Time-Travel](/docs/advanced/time-travel) – Debugging
+- [Time-Travel & Snapshots](/docs/advanced/time-travel) – State management

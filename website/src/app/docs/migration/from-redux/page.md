@@ -238,6 +238,7 @@ const logger = (store) => (next) => (action) => {
   console.log('dispatching', action);   // Log before reducer runs
   const result = next(action);           // Pass action down the chain
   console.log('next state', store.getState()); // Log after reducer runs
+
   return result;
 };
 
@@ -360,6 +361,6 @@ function Counter() {
 
 ## Next Steps
 
-- See the [Quick Start](/docs/quick-start) for a complete tutorial
-- See [Constraints](/docs/constraints) for declarative logic
-- See the [React Adapter](/docs/adapters/react) for hook patterns
+- [Quick Start](/docs/quick-start) – Complete tutorial
+- [Constraints](/docs/constraints) – Declarative logic
+- [React Adapter](/docs/adapters/react) – Hook patterns

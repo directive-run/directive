@@ -105,6 +105,6 @@ const unsubscribe = system.watchDistributableSnapshot(
 
 ## Next Steps
 
-- See [Time-Travel](/docs/advanced/time-travel) for navigation
-- See [Persistence](/docs/plugins/persistence) for automatic saving
-- See [SSR](/docs/advanced/ssr) for server-side usage
+- [Time-Travel](/docs/advanced/time-travel) – Navigation
+- [Persistence](/docs/plugins/persistence) – Automatic saving
+- [SSR](/docs/advanced/ssr) – Server-side usage

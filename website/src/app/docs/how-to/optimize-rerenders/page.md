@@ -19,18 +19,21 @@ import { useDirective, useSelector, useFact, useDerived } from 'directive/react'
 // ❌ BAD: Re-renders on ANY fact change
 function BadProfile({ system }) {
   const { facts } = useDirective(system);
+
   return <span>{facts.user.name}</span>;
 }
 
 // ✅ GOOD: Re-renders only when user.name changes
 function GoodProfile({ system }) {
   const name = useSelector(system, (facts) => facts.user.name);
+
   return <span>{name}</span>;
 }
 
 // ✅ GOOD: Re-renders only when the `user` fact changes
 function UserCard({ system }) {
   const user = useFact(system, 'user');
+
   return (
     <div>
       <span>{user.name}</span>
@@ -42,6 +45,7 @@ function UserCard({ system }) {
 // ✅ GOOD: Re-renders only when the derived value changes
 function CartBadge({ system }) {
   const itemCount = useDerived(system, 'itemCount');
+
   return <Badge count={itemCount} />;
 }
 ```
@@ -64,13 +68,13 @@ const { facts, derived } = useDirective(system);
 
 ## Step by Step
 
-1. **`useSelector` is the default choice** — it accepts a selector function and only re-renders when the return value changes (via `Object.is`). Use it for any computed or plucked value.
+1. **`useSelector` is the default choice** – it accepts a selector function and only re-renders when the return value changes (via `Object.is`). Use it for any computed or plucked value.
 
-2. **`useFact` is shorthand for a single fact** — `useFact(system, 'user')` is equivalent to `useSelector(system, (f) => f.user)` but more readable when you just need one field.
+2. **`useFact` is shorthand for a single fact** – `useFact(system, 'user')` is equivalent to `useSelector(system, (f) => f.user)` but more readable when you just need one field.
 
-3. **`useDerived` subscribes to derivations** — derivations are cached and only recompute when their tracked dependencies change. Subscribing to a derivation is always cheaper than computing the same value in a selector.
+3. **`useDerived` subscribes to derivations** – derivations are cached and only recompute when their tracked dependencies change. Subscribing to a derivation is always cheaper than computing the same value in a selector.
 
-4. **`useDirective` subscribes to everything** — use it only in top-level containers that genuinely need multiple facts and derivations, not in leaf components.
+4. **`useDirective` subscribes to everything** – use it only in top-level containers that genuinely need multiple facts and derivations, not in leaf components.
 
 ## Common Variations
 
@@ -114,6 +118,7 @@ const activeTotal = useDerived(system, 'activeTotal');
 const TodoItem = memo(function TodoItem({ item, system }) {
   // Each item component only subscribes to what it needs
   const toggleStatus = useRequirementStatus(system, 'TOGGLE_TODO');
+
   return (
     <li style={{ opacity: toggleStatus.isPendingFor(item.id) ? 0.6 : 1 }}>
       {item.text}
@@ -123,6 +128,7 @@ const TodoItem = memo(function TodoItem({ item, system }) {
 
 function TodoList({ system }) {
   const items = useFact(system, 'items');
+
   return (
     <ul>
       {items.map((item) => (
@@ -135,7 +141,7 @@ function TodoList({ system }) {
 
 ## Related
 
-- [React Hooks](/docs/api/react) — full hook API reference
-- [Derivations](/docs/derivations) — auto-tracking and composition
-- [Facts](/docs/facts) — proxy-based access patterns
-- [Loading & Error States](/docs/how-to/loading-states) — `useRequirementStatus` patterns
+- [React Hooks](/docs/api/react) – full hook API reference
+- [Derivations](/docs/derivations) – auto-tracking and composition
+- [Facts](/docs/facts) – proxy-based access patterns
+- [Loading & Error States](/docs/how-to/loading-states) – `useRequirementStatus` patterns

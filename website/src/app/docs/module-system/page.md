@@ -119,7 +119,7 @@ await system.settle();
 
 ### Subscribe
 
-React to changes in facts or derivations. Both `subscribe()` and `watch()` auto-detect whether each key is a fact or derivation — you can freely mix them:
+React to changes in facts or derivations. Both `subscribe()` and `watch()` auto-detect whether each key is a fact or derivation – you can freely mix them:
 
 ```typescript
 // Subscribe to specific keys (facts or derivations)

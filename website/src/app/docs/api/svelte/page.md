@@ -3,7 +3,7 @@ title: Svelte Hooks
 description: Complete API reference for all Svelte hooks exported from directive/svelte. All hooks take system as an explicit first parameter.
 ---
 
-Svelte hooks API reference. All hooks take `system` as an explicit first parameter — no context injection needed. Values are returned as Svelte `Readable` stores. {% .lead %}
+Svelte hooks API reference. All hooks take `system` as an explicit first parameter – no context injection needed. Values are returned as Svelte `Readable` stores. {% .lead %}
 
 ---
 
@@ -11,19 +11,19 @@ Svelte hooks API reference. All hooks take `system` as an explicit first paramet
 
 | Export | Type | Description |
 |---|---|---|
-| `useFact` | Hook | Read single/multi facts — `useFact(system, key)` |
-| `useDerived` | Hook | Read single/multi derivations — `useDerived(system, id)` |
-| `useSelector` | Hook | Select from all facts with custom equality — `useSelector(system, selector, eq?)` |
-| `useEvents` | Hook | Typed event dispatchers — `useEvents(system)` |
-| `useDispatch` | Hook | Low-level event dispatch — `useDispatch(system)` |
-| `useWatch` | Hook | Side-effect watcher (auto-detects kind) — `useWatch(system, key, cb)` |
-| `useInspect` | Hook | System inspection with optional throttle — `useInspect(system, options?)` |
-| `useConstraintStatus` | Hook | Reactive constraint inspection — `useConstraintStatus(system, constraintId?)` |
-| `useExplain` | Hook | Reactive requirement explanation — `useExplain(system, reqId)` |
-| `useRequirementStatus` | Hook | Requirement status — `useRequirementStatus(statusPlugin, type)` |
-| `useOptimisticUpdate` | Hook | Optimistic mutations with rollback — `useOptimisticUpdate(system, statusPlugin?, type?)` |
+| `useFact` | Hook | Read single/multi facts – `useFact(system, key)` |
+| `useDerived` | Hook | Read single/multi derivations – `useDerived(system, id)` |
+| `useSelector` | Hook | Select from all facts with custom equality – `useSelector(system, selector, eq?)` |
+| `useEvents` | Hook | Typed event dispatchers – `useEvents(system)` |
+| `useDispatch` | Hook | Low-level event dispatch – `useDispatch(system)` |
+| `useWatch` | Hook | Side-effect watcher (auto-detects kind) – `useWatch(system, key, cb)` |
+| `useInspect` | Hook | System inspection with optional throttle – `useInspect(system, options?)` |
+| `useConstraintStatus` | Hook | Reactive constraint inspection – `useConstraintStatus(system, constraintId?)` |
+| `useExplain` | Hook | Reactive requirement explanation – `useExplain(system, reqId)` |
+| `useRequirementStatus` | Hook | Requirement status – `useRequirementStatus(statusPlugin, type)` |
+| `useOptimisticUpdate` | Hook | Optimistic mutations with rollback – `useOptimisticUpdate(system, statusPlugin?, type?)` |
 | `useDirective` | Hook | Scoped system with selected or all subscriptions |
-| `useTimeTravel` | Hook | Reactive time-travel state — `useTimeTravel(system)` |
+| `useTimeTravel` | Hook | Reactive time-travel state – `useTimeTravel(system)` |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createFactStore` | Factory | Fact store outside components |
 | `createDerivedStore` | Factory | Derivation store outside components |
@@ -184,7 +184,7 @@ function useDispatch(system: System): (event: SystemEvent) => void
 
 ## useWatch
 
-Execute a side-effect callback when a fact or derivation changes. Auto-detects whether the key refers to a fact or a derivation -- no discriminator needed. Does not return a store; used for effects only. Automatically cleaned up when the component is destroyed.
+Execute a side-effect callback when a fact or derivation changes. Auto-detects whether the key refers to a fact or a derivation – no discriminator needed. Does not return a store; used for effects only. Automatically cleaned up when the component is destroyed.
 
 ```typescript
 // Unified API – auto-detects fact vs derivation
@@ -400,8 +400,8 @@ interface OptimisticUpdateResult {
 
 Create a scoped system tied to the component lifecycle. Two modes:
 
-- **Selective** — pass `facts` and/or `derived` keys to subscribe to specific state
-- **Subscribe all** — omit keys to subscribe to all facts and derivations
+- **Selective** – pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** – omit keys to subscribe to all facts and derivations
 
 ```typescript
 function useDirective<M extends ModuleSchema>(
@@ -647,6 +647,6 @@ function shallowEqual(a: unknown, b: unknown): boolean
 
 ## Next Steps
 
-- See [Core API](/docs/api/core) for system functions
-- See [Types](/docs/api/types) for type definitions
-- See [Svelte Adapter](/docs/adapters/svelte) for setup and patterns
+- [Core API](/docs/api/core) – System functions
+- [Types](/docs/api/types) – Type definitions
+- [Svelte Adapter](/docs/adapters/svelte) – Setup and patterns

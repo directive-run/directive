@@ -27,13 +27,15 @@ Build up from simple to complex:
 
 | Level | Page | What You Learn |
 |-------|------|---------------|
-| 1 | [Orchestrator](/docs/ai/orchestrator) | Single-agent runs with guardrails and constraints |
-| 2 | [Agent Stack](/docs/ai/agent-stack) | Composable agent pipelines with `.run()` / `.stream()` / `.structured()` |
-| 3 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
-| 4 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, and supervisor execution patterns |
-| 5 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
-| 6 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
-| 7 | [Running Agents](/docs/ai/running-agents) | End-to-end examples and deployment patterns |
+| 1 | [Running Agents](/docs/ai/running-agents) | End-to-end examples and deployment patterns |
+| 2 | [Orchestrator](/docs/ai/orchestrator) | Single-agent runs with guardrails and constraints |
+| 3 | [Agent Stack](/docs/ai/agent-stack) | Composable agent pipelines with `.run()` / `.stream()` / `.structured()` |
+| 4 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
+| 5 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
+| 6 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, and supervisor execution patterns |
+| 7 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
+| 8 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
+| 9 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
 
 ---
 
@@ -80,8 +82,37 @@ const result = await orchestrator.run(myAgent, 'Hello!');
 
 ---
 
+## Safety & Compliance
+
+Directive provides security guardrails and compliance tooling for AI agent systems. Apply multiple layers of protection:
+
+```
+User Input
+  → Prompt Injection Detection  (block attacks before they reach agents)
+  → PII Detection               (redact sensitive data from input)
+  → Agent Execution              (safe to process after filtering)
+  → Output PII Scan             (catch any data leaks in responses)
+  → Audit Trail                 (log every operation for compliance)
+```
+
+| Feature | Page | Threat Addressed |
+|---------|------|-----------------|
+| [PII Detection](/docs/security/pii) | Input/output scanning | Personally identifiable information leaking to/from agents |
+| [Prompt Injection](/docs/security/prompt-injection) | Input validation | Jailbreaks, instruction overrides, encoding evasion |
+| [Audit Trail](/docs/security/audit) | Observability | Tamper-evident logging of every system operation |
+| [GDPR/CCPA](/docs/security/compliance) | Data governance | Right to erasure, data export, consent tracking, retention |
+
+| Scenario | Features |
+|----------|---------|
+| User-facing chatbot | PII detection + prompt injection + audit trail |
+| Internal tool | Audit trail + GDPR compliance |
+| Healthcare/finance | All four features |
+| Development/testing | Audit trail only |
+
+---
+
 ## Next Steps
 
-- **New to AI adapter?** Start with [Orchestrator](/docs/ai/orchestrator)
+- **New to AI adapter?** Start with [Running Agents](/docs/ai/running-agents)
 - **Want streaming?** See [Streaming](/docs/ai/streaming)
-- **Need safety?** See [Guardrails](/docs/ai/guardrails) and [Security](/docs/security/overview)
+- **Need safety?** See [Guardrails](/docs/ai/guardrails) and [PII Detection](/docs/security/pii)

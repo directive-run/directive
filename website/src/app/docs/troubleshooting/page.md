@@ -296,6 +296,7 @@ useEffect(() => {
   const interval = setInterval(() => {
     console.log(count); // Always logs the initial value
   }, 1000);
+
   return () => clearInterval(interval);
 }, []);
 

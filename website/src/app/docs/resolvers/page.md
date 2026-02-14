@@ -273,7 +273,9 @@ resolvers: {
       });
 
       // Guard against processing stale results
-      if (context.signal.aborted) return;
+      if (context.signal.aborted) {
+        return;
+      }
 
       context.facts.searchResults = await results.json();
     },
@@ -336,6 +338,7 @@ resolvers: {
         try {
           const user = await api.getUser(req.userId);
           context.facts[`user_${user.id}`] = user;
+
           return { success: true };
         } catch (error) {
           // Individual failures don't affect other items
@@ -505,6 +508,6 @@ resolve: async (req, context) => {
 
 ## Next Steps
 
-- See [Constraints](/docs/constraints) for raising requirements
-- See [Effects](/docs/effects) for side effects
-- See [Error Handling](/docs/advanced/errors) for comprehensive error strategies
+- [Constraints](/docs/constraints) – Raising requirements
+- [Effects](/docs/effects) – Side effects
+- [Error Handling](/docs/advanced/errors) – Comprehensive error strategies
