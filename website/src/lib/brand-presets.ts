@@ -374,6 +374,14 @@ export function applyTypoPreset(preset: TypoPreset) {
   root.setProperty('--brand-font-code', preset.code.cssVar ? `var(${preset.code.cssVar})` : preset.code.family)
 }
 
+export function applyFontSize(scale: number) {
+  document.documentElement.style.fontSize = `${scale}%`
+}
+
+export function clearFontSize() {
+  document.documentElement.style.removeProperty('font-size')
+}
+
 export function clearPresets() {
   const root = document.documentElement.style
   const props = [
@@ -387,5 +395,6 @@ export function clearPresets() {
   for (const prop of props) {
     root.removeProperty(prop)
   }
+  clearFontSize()
 }
 

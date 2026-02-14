@@ -18,6 +18,41 @@ const nextConfig = {
         destination: '/blog/:slug',
         permanent: true,
       },
+{
+        source: '/docs/type-assertions',
+        destination: '/docs/schema-overview',
+        permanent: true,
+      },
+      {
+        source: '/docs/type-builders',
+        destination: '/docs/schema-overview',
+        permanent: true,
+      },
+      {
+        source: '/docs/zod-integration',
+        destination: '/docs/schema-overview',
+        permanent: true,
+      },
+      {
+        source: '/docs/advanced/snapshots',
+        destination: '/docs/advanced/time-travel',
+        permanent: true,
+      },
+      {
+        source: '/docs/security/overview',
+        destination: '/docs/ai/overview',
+        permanent: true,
+      },
+      {
+        source: '/docs/how-to/overview',
+        destination: '/docs/how-to/loading-states',
+        permanent: false,
+      },
+      {
+        source: '/docs/migration/overview',
+        destination: '/docs/works-with/overview',
+        permanent: true,
+      },
     ]
   },
 
