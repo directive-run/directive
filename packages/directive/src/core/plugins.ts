@@ -5,6 +5,26 @@
  * - Lifecycle hooks for all engine events
  * - Multiple plugins can be composed
  * - Plugins execute in registration order
+ *
+ * @example
+ * ```typescript
+ * import type { Plugin } from 'directive';
+ *
+ * const metricsPlugin: Plugin = {
+ *   name: 'metrics',
+ *   onResolverComplete(resolver, request, duration) {
+ *     histogram.observe({ resolver }, duration);
+ *   },
+ *   onError(error) {
+ *     errorCounter.inc({ source: error.source });
+ *   },
+ * };
+ *
+ * const system = createSystem({
+ *   module: myModule,
+ *   plugins: [metricsPlugin],
+ * });
+ * ```
  */
 
 import type {
@@ -26,6 +46,11 @@ import { DirectiveError } from "./types.js";
 
 // Note: PluginManager uses Schema (flat) internally because the engine works with flat schemas.
 // The public API uses ModuleSchema (consolidated), and the conversion happens in createSystem.
+/**
+ * Internal manager that registers plugins and emits lifecycle events.
+ * Plugin hook calls are wrapped in try-catch — a failing plugin never
+ * crashes the engine.
+ */
 // biome-ignore lint/suspicious/noExplicitAny: Internal type - plugins are schema-agnostic at runtime
 export interface PluginManager<_S extends Schema = any> {
 	/** Register a plugin */
@@ -91,7 +116,13 @@ export interface PluginManager<_S extends Schema = any> {
 }
 
 /**
- * Create a plugin manager.
+ * Create a plugin manager that registers plugins and broadcasts
+ * lifecycle events to all registered plugins.
+ *
+ * All hook invocations are error-isolated — a throwing plugin
+ * logs a warning but never interrupts engine operation.
+ *
+ * @returns A `PluginManager` with register/unregister and emit methods.
  */
 // biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
 export function createPluginManager<S extends Schema = any>(): PluginManager<S> {

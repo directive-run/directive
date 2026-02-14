@@ -10,8 +10,8 @@ import type {
   RunResult,
   AgentLike,
   Message,
-} from "directive/ai";
-import { createRunner } from "directive/ai";
+} from "@directive-run/ai";
+import { createRunner } from "@directive-run/ai";
 import type { Board, Piece, Move } from "./rules.js";
 import { toRowCol } from "./rules.js";
 

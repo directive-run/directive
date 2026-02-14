@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/changelog-github",
+  "commit": false,
+  "fixed": [
+    [
+      "@directive-run/core",
+      "@directive-run/react",
+      "@directive-run/vue",
+      "@directive-run/svelte",
+      "@directive-run/solid",
+      "@directive-run/lit"
+    ],
+    [
+      "@directive-run/ai",
+      "@directive-run/adapter-openai",
+      "@directive-run/adapter-anthropic",
+      "@directive-run/adapter-ollama"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": ["directive", "vite-plugin-api-proxy"]
+}

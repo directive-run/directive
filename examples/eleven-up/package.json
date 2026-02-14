@@ -1,5 +1,5 @@
 {
-  "name": "eleven-up-example",
+  "name": "@directive-run/example-eleven-up",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "directive": "file:../../packages/directive",
+    "@directive-run/core": "workspace:*",
+    "@directive-run/react": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

@@ -10,7 +10,7 @@
  * This is a minimal repro to test whether the freeze bug occurs.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "directive";
+import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
 
 // ============================================================================
 // Types

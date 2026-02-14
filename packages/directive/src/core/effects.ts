@@ -49,6 +49,11 @@ import type {
 // Effects Manager
 // ============================================================================
 
+/**
+ * Manager for fire-and-forget side effects.
+ * Effects run after facts stabilize, support auto-tracked or explicit
+ * dependencies, and return optional cleanup functions (like React's `useEffect`).
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface EffectsManager<_S extends Schema = Schema> {
 	/** Run all effects that should trigger based on changes */
@@ -77,7 +82,10 @@ interface EffectState {
 	cleanup: (() => void) | null; // cleanup function returned by last run()
 }
 
-/** Options for creating an effects manager */
+/**
+ * Options for creating an effects manager.
+ * Passed internally by the engine – most users define effects in `createModule()`.
+ */
 export interface CreateEffectsOptions<S extends Schema> {
 	definitions: EffectsDef<S>;
 	facts: Facts<S>;
@@ -89,7 +97,37 @@ export interface CreateEffectsOptions<S extends Schema> {
 }
 
 /**
- * Create an effects manager.
+ * Create an effects manager that runs fire-and-forget side effects
+ * after facts stabilize.
+ *
+ * Effects support auto-tracked dependencies (synchronous reads only) or
+ * explicit `deps` arrays for async effects. Each effect can return a cleanup
+ * function that runs before the next invocation or on system stop.
+ *
+ * @param options - Configuration including effect definitions, facts proxy, store, and callbacks.
+ * @returns An `EffectsManager` with methods for running, enabling/disabling, and cleanup.
+ *
+ * @example
+ * ```typescript
+ * effects: {
+ *   // Auto-tracked: re-runs when `facts.count` changes
+ *   logCount: {
+ *     run: (facts) => {
+ *       console.log("Count:", facts.count);
+ *       return () => console.log("Cleanup logCount");
+ *     },
+ *   },
+ *   // Explicit deps: required for async effects
+ *   syncToServer: {
+ *     deps: ["user", "settings"],
+ *     run: async (facts, prev) => {
+ *       if (prev && facts.settings !== prev.settings) {
+ *         await api.updateSettings(facts.user.id, facts.settings);
+ *       }
+ *     },
+ *   },
+ * }
+ * ```
  */
 export function createEffectsManager<S extends Schema>(
 	options: CreateEffectsOptions<S>,

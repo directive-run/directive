@@ -1,5 +1,5 @@
 {
-  "name": "@directive/example-counter",
+  "name": "@directive-run/example-counter",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "directive": "workspace:*"
+    "@directive-run/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0",

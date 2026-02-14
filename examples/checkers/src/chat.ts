@@ -5,7 +5,7 @@
  * Includes streaming, analysis, and cache stats.
  */
 
-import { createModule, t, type ModuleSchema } from "directive";
+import { createModule, t, type ModuleSchema } from "@directive-run/core";
 
 // ============================================================================
 // Types
