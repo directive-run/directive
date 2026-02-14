@@ -377,7 +377,10 @@ const authModule = createModule("auth", {
   derive: {
     // Reconstruct the compound state from flat facts if needed
     currentState: (facts) => {
-      if (!facts.isAuthenticated) return 'unauthenticated';
+      if (!facts.isAuthenticated) {
+        return 'unauthenticated';
+      }
+
       return `authenticated.${facts.dataStatus}`;
     },
   },
@@ -443,6 +446,6 @@ const fileModule = createModule("file", {
 
 ## Next Steps
 
-- See the [Quick Start](/docs/quick-start) for a complete tutorial
-- See [Constraints](/docs/constraints) for declarative logic
-- See [Resolvers](/docs/resolvers) for async handling
+- [Quick Start](/docs/quick-start) – Complete tutorial
+- [Constraints](/docs/constraints) – Declarative logic
+- [Resolvers](/docs/resolvers) – Async handling

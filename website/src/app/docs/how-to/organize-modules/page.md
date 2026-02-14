@@ -9,7 +9,7 @@ When to split modules, naming conventions, cross-module deps, and file structure
 
 ## The Problem
 
-Small apps work fine with a single module. As features grow, that module becomes a dumping ground — 50 facts, 30 constraints, unrelated resolvers tangled together. Refactoring later is painful because everything depends on everything. Without a clear strategy for when to split and how to connect modules, teams either split too early (unnecessary indirection) or too late (monolith module).
+Small apps work fine with a single module. As features grow, that module becomes a dumping ground – 50 facts, 30 constraints, unrelated resolvers tangled together. Refactoring later is painful because everything depends on everything. Without a clear strategy for when to split and how to connect modules, teams either split too early (unnecessary indirection) or too late (monolith module).
 
 ## The Solution
 
@@ -28,7 +28,7 @@ src/
 │   │   └── resolvers.ts
 │   └── notifications/
 │       └── index.ts          # Small modules stay in one file
-├── system.ts                 # createSystem — composes all modules
+├── system.ts                 # createSystem – composes all modules
 └── app.tsx
 ```
 
@@ -130,13 +130,13 @@ system.facts.cart.items;
 
 ## Step by Step
 
-1. **One domain, one module** — auth, cart, notifications are separate concerns. Each module owns its schema, constraints, and resolvers.
+1. **One domain, one module** – auth, cart, notifications are separate concerns. Each module owns its schema, constraints, and resolvers.
 
-2. **Split files when a module grows** — small modules (< 100 lines) stay in a single `index.ts`. Larger modules split schema, constraints, and resolvers into separate files.
+2. **Split files when a module grows** – small modules (< 100 lines) stay in a single `index.ts`. Larger modules split schema, constraints, and resolvers into separate files.
 
-3. **`crossModuleDeps` for cross-cutting concerns** — the cart's `checkout` constraint reads `auth.isAuthenticated` without importing the auth module directly. The system wires this up at composition time.
+3. **`crossModuleDeps` for cross-cutting concerns** – the cart's `checkout` constraint reads `auth.isAuthenticated` without importing the auth module directly. The system wires this up at composition time.
 
-4. **`createSystem` composes modules** — each module's facts are namespaced (`system.facts.auth.user`), and cross-module dependencies are resolved automatically.
+4. **`createSystem` composes modules** – each module's facts are namespaced (`system.facts.auth.user`), and cross-module dependencies are resolved automatically.
 
 ## Common Variations
 
@@ -190,6 +190,6 @@ export const ordersModule = createCrudModule('orders', '/api/orders');
 
 ## Related
 
-- [Multi-Module](/docs/advanced/multi-module) — composition API details
-- [Module & System](/docs/module-system) — `createModule` and `createSystem` reference
-- [Dynamic Modules](/docs/how-to/dynamic-modules) — runtime module registration
+- [Multi-Module](/docs/advanced/multi-module) – composition API details
+- [Module & System](/docs/module-system) – `createModule` and `createSystem` reference
+- [Dynamic Modules](/docs/how-to/dynamic-modules) – runtime module registration

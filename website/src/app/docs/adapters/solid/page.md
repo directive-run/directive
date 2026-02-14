@@ -3,7 +3,7 @@ title: Solid Adapter
 description: Integrate Directive with SolidJS using signal-based hooks for reactive state management. useFact, useDerived, useEvents, useDispatch, and more.
 ---
 
-Directive provides first-class SolidJS integration with hooks that bridge Directive state into Solid signals for fine-grained reactivity. All hooks take the `system` as an explicit first parameter -- no provider or context needed. {% .lead %}
+Directive provides first-class SolidJS integration with hooks that bridge Directive state into Solid signals for fine-grained reactivity. All hooks take the `system` as an explicit first parameter – no provider or context needed. {% .lead %}
 
 ---
 
@@ -19,7 +19,7 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/solid';
 
 ## Setup
 
-Create a system and pass it directly to hooks -- no provider wrapper needed:
+Create a system and pass it directly to hooks – no provider wrapper needed:
 
 ```tsx
 import { createSystem } from 'directive';
@@ -41,8 +41,8 @@ function App() {
 
 Every hook below requires a `system` as its first parameter. There are two ways to create one:
 
-- **Global system** -- call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
-- **`useDirective`** -- creates a system scoped to a component's lifecycle, auto-starts on creation and destroys on cleanup
+- **Global system** – call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
+- **`useDirective`** – creates a system scoped to a component's lifecycle, auto-starts on creation and destroys on cleanup
 
 For most Solid apps, use a global system and pass it to hooks. Use `useDirective` when you need per-component system isolation.
 
@@ -50,8 +50,8 @@ For most Solid apps, use a global system and pass it to hooks. Use `useDirective
 
 Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
-- **Selective** -- specify `facts` and/or `derived` keys to subscribe only to those
-- **Subscribe all** -- omit keys to subscribe to everything (good for prototyping or small modules)
+- **Selective** – specify `facts` and/or `derived` keys to subscribe only to those
+- **Subscribe all** – omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```tsx
 import { useDirective } from 'directive/solid';
@@ -128,7 +128,7 @@ function Summary() {
 Read a single fact or multiple facts. Returns a reactive `Accessor`:
 
 ```tsx
-// Subscribe to a single fact -- signal updates when "userId" changes
+// Subscribe to a single fact – signal updates when "userId" changes
 const userId = useFact(system, "userId");
 // userId() => number | undefined
 
@@ -184,6 +184,7 @@ Usage in a component:
 function Greeting() {
   // Subscribe to the display name derivation
   const displayName = useDerived(system, "displayName");
+
   return <h1>Hello, {displayName()}!</h1>;
 }
 ```
@@ -227,7 +228,7 @@ function IncrementButton() {
 
 ### useWatch
 
-Watch a fact or derivation for changes -- runs a callback as a side effect without creating a signal for rendering. The key is auto-detected as either a fact or derivation, so no discriminator is needed:
+Watch a fact or derivation for changes – runs a callback as a side effect without creating a signal for rendering. The key is auto-detected as either a fact or derivation, so no discriminator is needed:
 
 ```tsx
 // Watch a derivation for analytics tracking
@@ -235,20 +236,20 @@ useWatch(system, "pageViews", (newValue, prevValue) => {
   analytics.track("pageViews", { from: prevValue, to: newValue });
 });
 
-// Watch a fact -- auto-detected, no "fact" discriminator needed
+// Watch a fact – auto-detected, no "fact" discriminator needed
 useWatch(system, "userId", (newValue, prevValue) => {
   analytics.track("userId_changed", { from: prevValue, to: newValue });
 });
 ```
 
 {% callout type="warning" title="Deprecated: \"fact\" discriminator" %}
-The old `useWatch("fact", key, callback)` three-argument pattern still works but is deprecated. Use `useWatch(system, key, callback)` instead -- the runtime auto-detects whether the key is a fact or derivation.
+The old `useWatch("fact", key, callback)` three-argument pattern still works but is deprecated. Use `useWatch(system, key, callback)` instead – the runtime auto-detects whether the key is a fact or derivation.
 
 ```tsx
-// Deprecated -- still works but not recommended
+// Deprecated – still works but not recommended
 useWatch("fact", "userId", (newValue, prevValue) => { /* ... */ });
 
-// Preferred -- auto-detects fact vs derivation
+// Preferred – auto-detects fact vs derivation
 useWatch(system, "userId", (newValue, prevValue) => { /* ... */ });
 ```
 {% /callout %}
@@ -388,7 +389,7 @@ function DashboardLoader() {
 
 ### useSuspenseRequirement
 
-Integrates with Solid's `Suspense` -- throws a promise while the requirement is pending. Takes `statusPlugin` as the first parameter:
+Integrates with Solid's `Suspense` – throws a promise while the requirement is pending. Takes `statusPlugin` as the first parameter:
 
 ```tsx
 import { Suspense } from 'solid-js';
@@ -426,7 +427,7 @@ function SaveButton() {
   // Set up optimistic mutations with automatic rollback
   const { mutate, isPending, error, rollback } = useOptimisticUpdate(
     system,
-    statusPlugin,    // optional -- enables auto-rollback on resolver failure
+    statusPlugin,    // optional – enables auto-rollback on resolver failure
     "SAVE_DATA"      // requirement type to watch
   );
 
@@ -498,13 +499,13 @@ Create fully typed hooks for your module schema. Returned hooks take `system` as
 ```typescript
 import { createTypedHooks } from 'directive/solid';
 
-// Create typed hooks -- full autocomplete for keys and events
+// Create typed hooks – full autocomplete for keys and events
 const {
   useDerived, useFact, useDispatch, useEvents
 } = createTypedHooks<typeof myModule.schema>();
 
 function Profile() {
-  // Fully typed -- fact key autocompletes, return type inferred
+  // Fully typed – fact key autocompletes, return type inferred
   const count = useFact(system, "count");       // Type: Accessor<number>
   const doubled = useDerived(system, "doubled"); // Type: Accessor<number>
   const dispatch = useDispatch(system);
@@ -519,7 +520,7 @@ function Profile() {
 
 ## Time Travel
 
-`useTimeTravel` returns an `Accessor<TimeTravelState | null>` — `null` when disabled, otherwise the full reactive API. Call `timeTravel()` to read, and destructure inside `<Show>` to access properties:
+`useTimeTravel` returns an `Accessor<TimeTravelState | null>` – `null` when disabled, otherwise the full reactive API. Call `timeTravel()` to read, and destructure inside `<Show>` to access properties:
 
 ### Undo / Redo Controls
 
@@ -534,6 +535,7 @@ function UndoRedo() {
     <Show when={timeTravel()}>
       {(state) => {
         const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = state();
+
         return (
           <div>
             <button onClick={undo} disabled={!canUndo}>Undo</button>
@@ -565,7 +567,7 @@ function SnapshotTimeline() {
             {(snap) => (
               <li>
                 <button onClick={() => state().goTo(snap.id)}>
-                  {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+                  {snap.trigger} – {new Date(snap.timestamp).toLocaleTimeString()}
                 </button>
                 <button onClick={() => console.log(state().getSnapshotFacts(snap.id))}>
                   Inspect
@@ -590,6 +592,7 @@ function NavigationControls() {
     <Show when={timeTravel()}>
       {(state) => {
         const { goBack, goForward, goTo, replay } = state();
+
         return (
           <div>
             <button onClick={() => goBack(5)}>Back 5</button>
@@ -614,6 +617,7 @@ function SessionControls() {
     <Show when={timeTravel()}>
       {(state) => {
         const { exportSession, importSession } = state();
+
         return (
           <div>
             <button onClick={() => localStorage.setItem('debug', exportSession())}>
@@ -664,6 +668,7 @@ function RecordingToggle() {
     <Show when={timeTravel()}>
       {(state) => {
         const { isPaused, pause, resume } = state();
+
         return (
           <button onClick={isPaused ? resume : pause}>
             {isPaused ? 'Resume' : 'Pause'} Recording
@@ -728,6 +733,7 @@ Or dispatch events:
 ```tsx
 function IncrementButton() {
   const dispatch = useDispatch(system);
+
   return <button onClick={() => dispatch({ type: "increment" })}>+</button>;
 }
 ```
@@ -748,7 +754,7 @@ test('displays user name', async () => {
   const system = createTestSystem({ module: userModule });
   system.facts.user = { id: 1, name: 'Test User' };
 
-  // Components receive system directly -- no provider needed
+  // Components receive system directly – no provider needed
   render(() => <UserProfile system={system} />);
 
   expect(screen.getByText('Test User')).toBeInTheDocument();
@@ -784,6 +790,6 @@ test('displays user name', async () => {
 
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** -- Build your first module
-- **[Facts](/docs/facts)** -- State management deep dive
-- **[Testing](/docs/testing/overview)** -- Testing Solid components
+- **[Quick Start](/docs/quick-start)** – Build your first module
+- **[Facts](/docs/facts)** – State management deep dive
+- **[Testing](/docs/testing/overview)** – Testing Solid components

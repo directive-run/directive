@@ -87,6 +87,7 @@ class StatusBar extends LitElement {
 
   render() {
     const { isRed, elapsed } = this.state.value;
+
     return html`<div>${isRed ? `Red for ${elapsed}s` : 'Not Red'}</div>`;
   }
 }
@@ -117,7 +118,7 @@ Watch a fact or derivation and fire a callback on change (no re-render). The key
 import { WatchController } from 'directive/lit';
 
 class PhaseWatcher extends LitElement {
-  // Watch the phase derivation for logging -- auto-detected
+  // Watch the phase derivation for logging – auto-detected
   private watcher = new WatchController<string>(
     this, system, 'phase',
     (newPhase, oldPhase) => {
@@ -125,7 +126,7 @@ class PhaseWatcher extends LitElement {
     }
   );
 
-  // Watch the count fact for logging -- auto-detected, no discriminator needed
+  // Watch the count fact for logging – auto-detected, no discriminator needed
   private countWatcher = new WatchController<number>(
     this, system, 'count',
     (newCount, oldCount) => {
@@ -136,17 +137,17 @@ class PhaseWatcher extends LitElement {
 ```
 
 {% callout type="warning" title="Deprecated: fact discriminator object" %}
-The old `{ kind: "fact", factKey: "key" }` options pattern still works but is deprecated. Use the string key directly instead -- the runtime auto-detects whether the key is a fact or derivation.
+The old `{ kind: "fact", factKey: "key" }` options pattern still works but is deprecated. Use the string key directly instead – the runtime auto-detects whether the key is a fact or derivation.
 
 ```typescript
-// Deprecated -- still works but not recommended
+// Deprecated – still works but not recommended
 private watcher = new WatchController<number>(
   this, system,
   { kind: "fact", factKey: "count" },
   (newCount, oldCount) => { /* ... */ }
 );
 
-// Preferred -- auto-detects fact vs derivation
+// Preferred – auto-detects fact vs derivation
 private watcher = new WatchController<number>(
   this, system, 'count',
   (newCount, oldCount) => { /* ... */ }
@@ -188,7 +189,10 @@ class ThrottledInspector extends LitElement {
   private inspection = new InspectController(this, system, { throttleMs: 200 });
 
   render() {
-    if (!this.inspection.value.isSettled) return html`<spinner-el></spinner-el>`;
+    if (!this.inspection.value.isSettled) {
+      return html`<spinner-el></spinner-el>`;
+    }
+
     return html`<content-el></content-el>`;
   }
 }
@@ -206,7 +210,10 @@ class RequirementDebug extends LitElement {
   private explanation = new ExplainController(this, system, 'FETCH_USER');
 
   render() {
-    if (!this.explanation.value) return html`<p>No active requirement</p>`;
+    if (!this.explanation.value) {
+      return html`<p>No active requirement</p>`;
+    }
+
     return html`<pre>${this.explanation.value}</pre>`;
   }
 }
@@ -226,6 +233,7 @@ class ConstraintDashboard extends LitElement {
 
   render() {
     const all = this.constraints.value as ConstraintInfo[];
+
     return html`
       <ul>
         ${all.map(c => html`
@@ -243,7 +251,10 @@ class AuthConstraint extends LitElement {
 
   render() {
     const info = this.auth.value as ConstraintInfo | null;
-    if (!info) return html`<p>Constraint not found</p>`;
+    if (!info) {
+      return html`<p>Constraint not found</p>`;
+    }
+
     return html`<p>Auth: ${info.active ? 'Active' : 'Inactive'}</p>`;
   }
 }
@@ -323,6 +334,7 @@ class AppElement extends LitElement {
 
   render() {
     const status = this.mod.statusPlugin?.getStatus('FETCH_DATA');
+
     return html`
       <div>${status?.isLoading ? 'Loading...' : 'Ready'}</div>
     `;
@@ -405,9 +417,14 @@ class UserLoader extends LitElement {
   private status = new RequirementStatusController(this, statusPlugin, 'FETCH_USER');
 
   render() {
-    if (this.status.value.isLoading) return html`<spinner-el></spinner-el>`;
-    if (this.status.value.hasError)
+    if (this.status.value.isLoading) {
+      return html`<spinner-el></spinner-el>`;
+    }
+
+    if (this.status.value.hasError) {
       return html`<error-el .message=${this.status.value.lastError?.message}></error-el>`;
+    }
+
     return html`<user-content></user-content>`;
   }
 }
@@ -536,7 +553,7 @@ class UserIds extends LitElement {
 
 ### TimeTravelController
 
-Reactive controller — returns `null` when disabled, otherwise the full `TimeTravelState`. Destructure in `render()` to pull out what you need:
+Reactive controller – returns `null` when disabled, otherwise the full `TimeTravelState`. Destructure in `render()` to pull out what you need:
 
 #### Undo / Redo Controls
 
@@ -586,7 +603,7 @@ class SnapshotTimeline extends LitElement {
         ${snapshots.map((snap) => html`
           <li>
             <button @click=${() => goTo(snap.id)}>
-              ${snap.trigger} — ${new Date(snap.timestamp).toLocaleTimeString()}
+              ${snap.trigger} – ${new Date(snap.timestamp).toLocaleTimeString()}
             </button>
             <button @click=${() => console.log(getSnapshotFacts(snap.id))}>
               Inspect
@@ -850,10 +867,18 @@ class UserCard extends LitElement {
   private status = new RequirementStatusController(this, statusPlugin, 'FETCH_USER');
 
   render() {
-    if (this.loading.value) return html`<spinner-el></spinner-el>`;
-    if (this.status.value.hasError)
+    if (this.loading.value) {
+      return html`<spinner-el></spinner-el>`;
+    }
+
+    if (this.status.value.hasError) {
       return html`<error-el .message=${this.status.value.lastError?.message}></error-el>`;
-    if (!this.user.value) return html`<empty-state></empty-state>`;
+    }
+
+    if (!this.user.value) {
+      return html`<empty-state></empty-state>`;
+    }
+
     return html`<user-details .user=${this.user.value}></user-details>`;
   }
 }

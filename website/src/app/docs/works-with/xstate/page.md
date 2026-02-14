@@ -3,7 +3,7 @@ title: Directive + XState
 description: Use XState for explicit state machine transitions and Directive for constraint-driven multi-machine orchestration.
 ---
 
-XState handles explicit state machine transitions with actors and guards. Directive coordinates multiple machines with constraint-driven orchestration — constraints evaluate across machine states, resolvers can start and await actors. {% .lead %}
+XState handles explicit state machine transitions with actors and guards. Directive coordinates multiple machines with constraint-driven orchestration – constraints evaluate across machine states, resolvers can start and await actors. {% .lead %}
 
 {% callout type="note" title="Prerequisites" %}
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
@@ -20,7 +20,7 @@ This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Mo
 Together:
 - XState owns individual state machines: clear transitions, visual state charts, actor lifecycle
 - Directive orchestrates across machines: constraints evaluate against multiple actor states, resolvers start actors and await results, effects react to cross-machine state changes
-- Machines stay decoupled — Directive handles the coordination
+- Machines stay decoupled – Directive handles the coordination
 
 ---
 
@@ -29,7 +29,7 @@ Together:
 Subscribe to an XState actor's snapshots and write state into Directive facts.
 
 {% callout type="warning" title="XState subscribe returns { unsubscribe }, not a function" %}
-Unlike Redux and Zustand, `actor.subscribe(fn)` returns a `Subscription` object with an `unsubscribe()` method — not a bare unsubscribe function.
+Unlike Redux and Zustand, `actor.subscribe(fn)` returns a `Subscription` object with an `unsubscribe()` method – not a bare unsubscribe function.
 {% /callout %}
 
 ```typescript
@@ -48,7 +48,7 @@ const subscription = actor.subscribe((snapshot) => {
 
 actor.start();
 
-// Clean up — note: .unsubscribe() is a method, not a function call
+// Clean up – note: .unsubscribe() is a method, not a function call
 // subscription.unsubscribe();
 // actor.stop();
 ```
@@ -79,7 +79,7 @@ const subscription = actor.subscribe({
 Watch Directive facts and send events to an XState actor when conditions change.
 
 {% callout type="warning" title="XState send requires object form" %}
-`actor.send({ type: 'EVENT' })` — must be an object with a `type` property. String-only events are not supported in XState v5.
+`actor.send({ type: 'EVENT' })` – must be an object with a `type` property. String-only events are not supported in XState v5.
 {% /callout %}
 
 ```typescript
@@ -401,7 +401,7 @@ resolve: async (req, ctx) => {
     const output = await toPromise(actor);
     ctx.facts.result = output;
   } catch (err) {
-    // Machine reached 'error' status — toPromise rejects
+    // Machine reached 'error' status – toPromise rejects
     ctx.facts.error = String(err);
     throw err; // Let Directive's retry policy handle it
   }
@@ -518,7 +518,7 @@ test('multi-machine constraint fires when all ready', async () => {
 
 ## Next Steps
 
-- **[Migration from XState](/docs/migration/from-xstate)** — Full migration guide if you want to move off XState entirely
-- **[Resolvers](/docs/resolvers)** — How resolvers handle async fulfillment with retry and batching
-- **[Constraints](/docs/constraints)** — How constraints evaluate and coordinate requirements
-- **[Plugins](/docs/plugins/overview)** — Build custom plugins for actor lifecycle management
+- **[Migration from XState](/docs/migration/from-xstate)** – Full migration guide if you want to move off XState entirely
+- **[Resolvers](/docs/resolvers)** – How resolvers handle async fulfillment with retry and batching
+- **[Constraints](/docs/constraints)** – How constraints evaluate and coordinate requirements
+- **[Plugins](/docs/plugins/overview)** – Build custom plugins for actor lifecycle management

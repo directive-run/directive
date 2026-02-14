@@ -9,7 +9,7 @@ Instant UI updates with automatic rollback when the server rejects the change. {
 
 ## The Problem
 
-Users expect instant feedback when they toggle a setting, like a post, or reorder a list. Without optimistic updates, the UI waits for the server round-trip, making the app feel sluggish. But naively updating local state before the server responds creates a harder problem: what happens when the server fails? You need to snapshot the previous state, apply the optimistic change, and roll back cleanly on failure — all without race conditions from concurrent operations.
+Users expect instant feedback when they toggle a setting, like a post, or reorder a list. Without optimistic updates, the UI waits for the server round-trip, making the app feel sluggish. But naively updating local state before the server responds creates a harder problem: what happens when the server fails? You need to snapshot the previous state, apply the optimistic change, and roll back cleanly on failure – all without race conditions from concurrent operations.
 
 ## The Solution
 
@@ -33,7 +33,9 @@ const todos = createModule('todos', {
         // 1. Snapshot current state for rollback
         const snapshot = ctx.snapshot();
         const item = ctx.facts.items.find((i) => i.id === req.id);
-        if (!item) return;
+        if (!item) {
+          return;
+        }
 
         // 2. Apply optimistic update immediately
         ctx.facts.items = ctx.facts.items.map((i) =>
@@ -112,11 +114,11 @@ function TodoList({ system }) {
 
 2. **Optimistic mutation** happens synchronously inside the resolver, before the `await`. The UI sees the change immediately because fact updates trigger re-renders.
 
-3. **Server sync** runs in the background. If it succeeds, the optimistic state becomes the real state — nothing more to do.
+3. **Server sync** runs in the background. If it succeeds, the optimistic state becomes the real state – nothing more to do.
 
 4. **`snapshot.restore()`** rolls back all facts to their pre-mutation values if the server rejects the change. The UI automatically reverts.
 
-5. **`key` deduplicates** concurrent operations — toggling the same todo twice doesn't create two in-flight requests. The second dispatch waits for or replaces the first.
+5. **`key` deduplicates** concurrent operations – toggling the same todo twice doesn't create two in-flight requests. The second dispatch waits for or replaces the first.
 
 ## Common Variations
 
@@ -157,7 +159,7 @@ resolve: async (req, ctx) => {
     await fetch(`/api/todos/${req.id}`, { method: 'DELETE' });
   } catch (error) {
     snapshot.restore();
-    ctx.facts.toastMessage = 'Failed to delete — change reverted';
+    ctx.facts.toastMessage = 'Failed to delete – change reverted';
     throw error;
   }
 },
@@ -165,7 +167,7 @@ resolve: async (req, ctx) => {
 
 ## Related
 
-- [Resolvers](/docs/resolvers) — `key`, retry policies, and `ctx.snapshot()`
-- [Loading & Error States](/docs/how-to/loading-states) — tracking pending operations
-- [Batch Mutations](/docs/how-to/batch-mutations) — atomic multi-field updates
-- [React Hooks](/docs/api/react) — `useOptimisticUpdate` reference
+- [Resolvers](/docs/resolvers) – `key`, retry policies, and `ctx.snapshot()`
+- [Loading & Error States](/docs/how-to/loading-states) – tracking pending operations
+- [Batch Mutations](/docs/how-to/batch-mutations) – atomic multi-field updates
+- [React Hooks](/docs/api/react) – `useOptimisticUpdate` reference

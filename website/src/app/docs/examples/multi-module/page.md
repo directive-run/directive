@@ -197,6 +197,6 @@ system.facts.checkout.step;
 
 ## Next Steps
 
-- See [Multi-Module](/docs/advanced/multi-module) for composition patterns
-- See [Data Fetching](/docs/examples/data-fetching) for async patterns
-- See [Module and System](/docs/module-system) for setup
+- [Multi-Module](/docs/advanced/multi-module) – Composition patterns
+- [Data Fetching](/docs/examples/data-fetching) – Async patterns
+- [Module and System](/docs/module-system) – Setup

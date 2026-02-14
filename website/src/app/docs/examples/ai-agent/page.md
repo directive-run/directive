@@ -55,6 +55,7 @@ const agentModule = createModule("agent", {
       priority: 50,
       when: (facts) => {
         const lastMessage = facts.messages[facts.messages.length - 1];
+
         return lastMessage?.role === "user" && !facts.isThinking;
       },
       require: { type: "GENERATE_RESPONSE" },
@@ -213,6 +214,6 @@ function ChatInterface() {
 
 ## Next Steps
 
-- See [OpenAI Agents](/docs/ai/orchestrator) for more patterns
-- See [Guardrails](/docs/ai/guardrails) for safety
-- See [Streaming](/docs/ai/streaming) for real-time responses
+- [OpenAI Agents](/docs/ai/orchestrator) – More patterns
+- [Guardrails](/docs/ai/guardrails) – Safety
+- [Streaming](/docs/ai/streaming) – Real-time responses

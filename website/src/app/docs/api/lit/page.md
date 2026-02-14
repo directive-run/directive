@@ -105,6 +105,7 @@ class DashboardElement extends LitElement {
 
   render() {
     const { total, average, count } = this.stats.value;
+
     return html`<div>${total} / ${average} / ${count}</div>`;
   }
 }
@@ -193,7 +194,7 @@ Side-effect watcher for facts or derivations. The key is auto-detected, so no di
 ```typescript
 import { WatchController } from 'directive/lit';
 
-// Unified API -- auto-detects fact vs derivation
+// Unified API – auto-detects fact vs derivation
 new WatchController(
   host: ReactiveControllerHost,
   system: System,
@@ -219,14 +220,14 @@ new WatchController(
 
 ```typescript
 class LoggerElement extends LitElement {
-  // Watch the phase derivation -- auto-detected
+  // Watch the phase derivation – auto-detected
   private _watcher = new WatchController(
     this, system, "phase", (value, prev) => {
       console.log(`Phase changed: ${prev} -> ${value}`);
     }
   );
 
-  // Watch the count fact -- auto-detected, no discriminator needed
+  // Watch the count fact – auto-detected, no discriminator needed
   private _factWatcher = new WatchController(
     this, system, "count", (value, prev) => {
       console.log(`Count changed: ${prev} -> ${value}`);
@@ -236,7 +237,7 @@ class LoggerElement extends LitElement {
 ```
 
 {% callout type="warning" title="Deprecated" %}
-The `{ kind: "fact", factKey: "key" }` options object is deprecated. Pass the key as a plain string instead -- the runtime auto-detects whether it is a fact or derivation.
+The `{ kind: "fact", factKey: "key" }` options object is deprecated. Pass the key as a plain string instead – the runtime auto-detects whether it is a fact or derivation.
 {% /callout %}
 
 ---
@@ -272,6 +273,7 @@ class DebugElement extends LitElement {
 
   render() {
     const { unmet, isSettled } = this.inspect.value;
+
     return html`
       <div>Settled: ${isSettled}</div>
       <div>Unmet: ${unmet.length}</div>
@@ -309,7 +311,10 @@ class ExplainElement extends LitElement {
 
   render() {
     const exp = this.explanation.value;
-    if (!exp) return html`<p>No active requirement</p>`;
+    if (!exp) {
+      return html`<p>No active requirement</p>`;
+    }
+
     return html`<pre>${JSON.stringify(exp, null, 2)}</pre>`;
   }
 }
@@ -382,8 +387,14 @@ class LoadingElement extends LitElement {
   private status = new RequirementStatusController(this, statusPlugin, "FETCH_USER");
 
   render() {
-    if (this.status.value.inflight > 0) return html`<spinner-el></spinner-el>`;
-    if (this.status.value.lastError) return html`<p>Error!</p>`;
+    if (this.status.value.inflight > 0) {
+      return html`<spinner-el></spinner-el>`;
+    }
+
+    if (this.status.value.lastError) {
+      return html`<p>Error!</p>`;
+    }
+
     return html`<p>Ready</p>`;
   }
 }
@@ -463,6 +474,7 @@ class CounterElement extends LitElement {
 
   render() {
     const count = this.mod.system.read("count");
+
     return html`<button @click=${() => this.mod.system.dispatch({ type: "INCREMENT" })}>
       ${count}
     </button>`;
@@ -545,7 +557,10 @@ class TimeTravelElement extends LitElement {
 
   render() {
     const state = this.tt.value;
-    if (!state) return html`<p>Time-travel not enabled</p>`;
+    if (!state) {
+      return html`<p>Time-travel not enabled</p>`;
+    }
+
     return html`
       <button ?disabled=${!state.canUndo} @click=${state.undo}>Undo</button>
       <button ?disabled=${!state.canRedo} @click=${state.redo}>Redo</button>
@@ -770,6 +785,6 @@ system!: System;
 
 ## Next Steps
 
-- See [Core API](/docs/api/core) for system functions
-- See [Types](/docs/api/types) for type definitions
-- See [Lit Adapter](/docs/adapters/lit) for setup and patterns
+- [Core API](/docs/api/core) – System functions
+- [Types](/docs/api/types) – Type definitions
+- [Lit Adapter](/docs/adapters/lit) – Setup and patterns

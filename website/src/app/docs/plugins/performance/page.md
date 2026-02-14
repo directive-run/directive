@@ -3,7 +3,7 @@ title: Performance Plugin
 description: Track constraint evaluation time, resolver latency, effect runs, and reconciliation cost with built-in metrics.
 ---
 
-The performance plugin measures runtime behavior using existing plugin hooks — no core modifications needed. {% .lead %}
+The performance plugin measures runtime behavior using existing plugin hooks – no core modifications needed. {% .lead %}
 
 ---
 
@@ -33,8 +33,8 @@ console.log(snapshot.reconcile);
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `onSlowConstraint` | `(id: string, durationMs: number) => void` | — | Callback when a constraint exceeds the slow threshold |
-| `onSlowResolver` | `(id: string, durationMs: number) => void` | — | Callback when a resolver exceeds the slow threshold |
+| `onSlowConstraint` | `(id: string, durationMs: number) => void` | – | Callback when a constraint exceeds the slow threshold |
+| `onSlowResolver` | `(id: string, durationMs: number) => void` | – | Callback when a resolver exceeds the slow threshold |
 | `slowConstraintThresholdMs` | `number` | `16` | Threshold in ms for slow constraint warnings (one frame) |
 | `slowResolverThresholdMs` | `number` | `1000` | Threshold in ms for slow resolver warnings |
 
@@ -167,6 +167,6 @@ if (process.env.NODE_ENV !== 'production') {
 
 ## Next Steps
 
-- [Logging Plugin](/docs/plugins/logging) -- console logging
-- [DevTools Plugin](/docs/plugins/devtools) -- browser integration
-- [Plugin Overview](/docs/plugins/overview) -- all built-in plugins
+- [Logging Plugin](/docs/plugins/logging) – console logging
+- [DevTools Plugin](/docs/plugins/devtools) – browser integration
+- [Plugin Overview](/docs/plugins/overview) – all built-in plugins

@@ -3,7 +3,7 @@ title: Vue Adapter
 description: Integrate Directive with Vue 3 using composables for reactive state management. useFact, useDerived, useEvents, useDispatch, useInspect, and more.
 ---
 
-Directive provides first-class Vue 3 integration with composables that automatically update on state changes. All composables take an explicit `system` parameter -- no context injection needed. {% .lead %}
+Directive provides first-class Vue 3 integration with composables that automatically update on state changes. All composables take an explicit `system` parameter – no context injection needed. {% .lead %}
 
 ---
 
@@ -93,8 +93,8 @@ const displayName = useDerived(system, 'displayName');
 
 Every composable below requires a `system` passed as the first parameter. There are two ways to create one:
 
-- **Global system** -- call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
-- **`useDirective`** -- creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
+- **Global system** – call `createSystem()` at module level for app-wide state shared across components (shown in [Setup](#setup) above)
+- **`useDirective`** – creates a system scoped to a component's lifecycle, auto-starts on mount and destroys on unmount
 
 For most Vue apps, use a global system. Use `useDirective` when you need per-component system isolation.
 
@@ -102,8 +102,8 @@ For most Vue apps, use a global system. Use `useDirective` when you need per-com
 
 Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 
-- **Selective** -- specify `facts` and/or `derived` keys to subscribe only to those
-- **Subscribe all** -- omit keys to subscribe to everything (good for prototyping or small modules)
+- **Selective** – specify `facts` and/or `derived` keys to subscribe only to those
+- **Subscribe all** – omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```html
 <script setup>
@@ -263,7 +263,7 @@ const dispatch = useDispatch(system);
 
 ### useWatch
 
-Watch a fact or derivation for changes without causing re-renders -- runs a callback as a side effect. `useWatch` auto-detects whether the key refers to a fact or a derivation, so there is no need to pass a discriminator:
+Watch a fact or derivation for changes without causing re-renders – runs a callback as a side effect. `useWatch` auto-detects whether the key refers to a fact or a derivation, so there is no need to pass a discriminator:
 
 ```html
 <script setup>
@@ -283,7 +283,7 @@ useWatch(system, 'userId', (newId, oldId) => {
 ```
 
 {% callout type="warning" title="Deprecated pattern" %}
-The four-argument form `useWatch(system, "fact", "key", cb)` still works but is deprecated. Use `useWatch(system, "key", cb)` instead -- `useWatch` now auto-detects whether the key is a fact or derivation.
+The four-argument form `useWatch(system, "fact", "key", cb)` still works but is deprecated. Use `useWatch(system, "key", cb)` instead – `useWatch` now auto-detects whether the key is a fact or derivation.
 {% /callout %}
 
 ---
@@ -474,7 +474,7 @@ events.increment();                    // Also typed!
 
 ## Time-Travel Debugging
 
-`useTimeTravel` returns a `ShallowRef<TimeTravelState | null>` — `null` when disabled, otherwise the full reactive API. The ref auto-unwraps in templates, so you can access properties directly:
+`useTimeTravel` returns a `ShallowRef<TimeTravelState | null>` – `null` when disabled, otherwise the full reactive API. The ref auto-unwraps in templates, so you can access properties directly:
 
 ### Undo / Redo Controls
 
@@ -504,7 +504,7 @@ const timeTravel = useTimeTravel(system);
   <ul v-if="timeTravel">
     <li v-for="snap in timeTravel.snapshots" :key="snap.id">
       <button @click="timeTravel.goTo(snap.id)">
-        {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
+        {{ snap.trigger }} – {{ new Date(snap.timestamp).toLocaleTimeString() }}
       </button>
       <button @click="console.log(timeTravel.getSnapshotFacts(snap.id))">
         Inspect
@@ -725,6 +725,6 @@ const coords = useSelector(system, (facts) => ({ x: facts.position?.x, y: facts.
 
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** -- Build your first module
-- **[Facts](/docs/facts)** -- State management deep dive
-- **[Testing](/docs/testing/overview)** -- Testing Vue components
+- **[Quick Start](/docs/quick-start)** – Build your first module
+- **[Facts](/docs/facts)** – State management deep dive
+- **[Testing](/docs/testing/overview)** – Testing Vue components

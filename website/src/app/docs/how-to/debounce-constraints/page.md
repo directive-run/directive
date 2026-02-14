@@ -62,7 +62,7 @@ const search = createModule('search', {
   resolvers: {
     search: {
       requirement: 'SEARCH',
-      // Key by query — if debouncedQuery changes while in-flight,
+      // Key by query – if debouncedQuery changes while in-flight,
       // the old request is superseded
       key: (req) => `search-${req.query}`,
       resolve: async (req, ctx) => {
@@ -107,13 +107,13 @@ function SearchBox({ system }) {
 
 ## Step by Step
 
-1. **`query` updates on every keystroke** — the input writes directly to `facts.query`, giving instant feedback in the text field.
+1. **`query` updates on every keystroke** – the input writes directly to `facts.query`, giving instant feedback in the text field.
 
-2. **Effect debounces** — `debounceQuery` sets a 300ms timer. Each new keystroke triggers cleanup (cancels the old timer) and starts a new one. Only when typing pauses for 300ms does `debouncedQuery` update.
+2. **Effect debounces** – `debounceQuery` sets a 300ms timer. Each new keystroke triggers cleanup (cancels the old timer) and starts a new one. Only when typing pauses for 300ms does `debouncedQuery` update.
 
-3. **Constraint watches `debouncedQuery`** — since `needsSearch` reads `debouncedQuery` (not `query`), it only evaluates after the debounce settles.
+3. **Constraint watches `debouncedQuery`** – since `needsSearch` reads `debouncedQuery` (not `query`), it only evaluates after the debounce settles.
 
-4. **Resolver key prevents stale results** — `key: (req) => \`search-${req.query}\`` ensures each unique query gets its own resolution. If the user types again before the previous search completes, the old result is ignored.
+4. **Resolver key prevents stale results** – `key: (req) => \`search-${req.query}\`` ensures each unique query gets its own resolution. If the user types again before the previous search completes, the old result is ignored.
 
 ## Common Variations
 
@@ -128,6 +128,7 @@ effects: {
       ctx.facts.debouncedQuery = facts.query;
       let blocked = true;
       const timer = setTimeout(() => { blocked = false; }, 500);
+
       return () => clearTimeout(timer);
     },
   },
@@ -152,7 +153,7 @@ constraints: {
 
 ## Related
 
-- [Effects](/docs/effects) — cleanup functions and dependency tracking
-- [Constraints](/docs/constraints) — evaluation lifecycle
-- [Resolvers](/docs/resolvers) — `key` for deduplication
-- [Batch Mutations](/docs/how-to/batch-mutations) — atomic updates
+- [Effects](/docs/effects) – cleanup functions and dependency tracking
+- [Constraints](/docs/constraints) – evaluation lifecycle
+- [Resolvers](/docs/resolvers) – `key` for deduplication
+- [Batch Mutations](/docs/how-to/batch-mutations) – atomic updates

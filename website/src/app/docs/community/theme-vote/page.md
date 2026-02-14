@@ -10,9 +10,9 @@ Every month, the Directive community votes on the default docs theme. Your choic
 ## How It Works
 
 1. **Browse presets** using the palette icon in the header
-2. **Pick your combo** — any of the 17 color presets and 9 typography options
+2. **Pick your combo** – any of the 17 color presets and 9 typography options
 3. **Cast your vote** via the share buttons (X, Bluesky, or clipboard)
-4. **Most-voted wins** — the top pick becomes the site default on the 1st of next month
+4. **Most-voted wins** – the top pick becomes the site default on the 1st of next month
 
 ## Current Default
 
@@ -58,7 +58,7 @@ The current default theme is set via environment variables and updated monthly b
 
 | Month | Theme | Typography | Votes |
 |-------|-------|------------|-------|
-| Jan 2026 | Blueprint (default) | Foundation (0) | -- |
+| Jan 2026 | Blueprint (default) | Foundation (0) | – |
 
 *Voting starts in February 2026. Check back for results!*
 

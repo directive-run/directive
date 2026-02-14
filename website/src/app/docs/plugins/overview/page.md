@@ -192,8 +192,8 @@ const flakyPlugin: Plugin = {
 
 ## Next Steps
 
-- See [Logging](/docs/plugins/logging) for logging configuration
-- See [DevTools](/docs/plugins/devtools) for browser integration
-- See [Persistence](/docs/plugins/persistence) for state storage
-- See [Performance](/docs/plugins/performance) for runtime metrics
-- See [Custom Plugins](/docs/plugins/custom) for building your own
+- [Logging](/docs/plugins/logging) – Logging configuration
+- [DevTools](/docs/plugins/devtools) – Browser integration
+- [Persistence](/docs/plugins/persistence) – State storage
+- [Performance](/docs/plugins/performance) – Runtime metrics
+- [Custom Plugins](/docs/plugins/custom) – Building your own

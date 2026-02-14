@@ -30,6 +30,7 @@ const agent: AgentLike = {
 // Wrap your LLM SDK in a standard runner function
 const runner: AgentRunner = async (agent, input, options) => {
   const result = await myLLMCall(agent, input, options);
+
   return result;
 };
 
@@ -103,7 +104,7 @@ Here's the flow:
 1. Agent run hits a tool call
 2. Orchestrator pauses and fires `onApprovalRequest` with a request object
 3. Your code forwards that request to a human (UI, Slack, email, etc.)
-4. The human decides -- your code calls `orchestrator.approve(id)` or `orchestrator.reject(id)`
+4. The human decides – your code calls `orchestrator.approve(id)` or `orchestrator.reject(id)`
 5. The agent run resumes (or fails if rejected/timed out)
 
 ### Express API Example
@@ -123,10 +124,10 @@ const orchestrator = createAgentOrchestrator({
 
   // Step 1: Orchestrator pauses here and fires this callback
   onApprovalRequest: (request) => {
-    // request.id    -- unique ID for this approval (pass it back to approve/reject)
-    // request.agentName -- which agent wants to act
-    // request.description -- human-readable summary of the tool call
-    // request.data -- the raw tool call payload
+    // request.id    – unique ID for this approval (pass it back to approve/reject)
+    // request.agentName – which agent wants to act
+    // request.description – human-readable summary of the tool call
+    // request.data – the raw tool call payload
 
     // Step 2: Push to your frontend via WebSocket, SSE, polling, etc.
     broadcastToAdminDashboard({
@@ -315,7 +316,7 @@ const orchestrator = createAgentOrchestrator<MyFacts>({
 });
 ```
 
-Both produce plain `OrchestratorConstraint` objects -- zero runtime overhead, just ergonomic sugar. The `when()` shorthand returns a constraint directly (no `.build()` needed), and `.withPriority()` returns a new constraint with the priority set.
+Both produce plain `OrchestratorConstraint` objects – zero runtime overhead, just ergonomic sugar. The `when()` shorthand returns a constraint directly (no `.build()` needed), and `.withPriority()` returns a new constraint with the priority set.
 
 For the full list of all builder utilities (including core module helpers like `constraintFactory` and `typedConstraint`), see the [Glossary: Builders & Helpers](/docs/glossary#builders--helpers).
 
@@ -618,7 +619,7 @@ class AgentPanel extends LitElement {
 
 ## Next Steps
 
-- See [Guardrails & Safety](/docs/ai/guardrails) for input validation, PII detection, and streaming constraints
-- See [Streaming](/docs/ai/streaming) for real-time response processing
-- See [Multi-Agent Patterns](/docs/ai/multi-agent) for parallel, sequential, and supervisor patterns
-- See [Agent Stack](/docs/ai/agent-stack) for the all-in-one composition API
+- [Guardrails & Safety](/docs/ai/guardrails) – Input validation, PII detection, and streaming constraints
+- [Streaming](/docs/ai/streaming) – Real-time response processing
+- [Multi-Agent Patterns](/docs/ai/multi-agent) – Parallel, sequential, and supervisor patterns
+- [Agent Stack](/docs/ai/agent-stack) – All-in-one composition API

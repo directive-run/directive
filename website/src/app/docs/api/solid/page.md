@@ -1,9 +1,9 @@
 ---
 title: Solid Hooks
-description: Complete API reference for all Solid hooks exported from directive/solid. Explicit system parameter -- hooks take the system directly, no provider needed.
+description: Complete API reference for all Solid hooks exported from directive/solid. Explicit system parameter – hooks take the system directly, no provider needed.
 ---
 
-Solid hooks API reference. All hooks take the system as an explicit first parameter -- no provider or context needed. Values are returned as Solid `Accessor` functions. {% .lead %}
+Solid hooks API reference. All hooks take the system as an explicit first parameter – no provider or context needed. Values are returned as Solid `Accessor` functions. {% .lead %}
 
 ---
 
@@ -18,7 +18,7 @@ import { createSystem } from 'directive';
 const system = createSystem({ module: myModule });
 system.start();
 
-// Pass `system` to hooks in any component -- no provider needed
+// Pass `system` to hooks in any component – no provider needed
 ```
 
 ---
@@ -199,12 +199,12 @@ useWatch<T>(system: System, kind: "fact", factKey: string, callback: (newValue: 
 import { useWatch } from 'directive/solid';
 
 function Analytics() {
-  // Watch a derivation -- auto-detected
+  // Watch a derivation – auto-detected
   useWatch(system, 'pageViews', (newValue, prevValue) => {
     analytics.track('pageViews', { from: prevValue, to: newValue });
   });
 
-  // Watch a fact -- auto-detected, no "fact" discriminator needed
+  // Watch a fact – auto-detected, no "fact" discriminator needed
   useWatch(system, 'count', (next, prev) => {
     console.log(`count changed: ${prev} → ${next}`);
   });
@@ -414,8 +414,8 @@ function LikeButton() {
 
 Create a scoped Directive system tied to the component lifecycle. Two modes:
 
-- **Selective** -- pass `facts` and/or `derived` keys to subscribe to specific state
-- **Subscribe all** -- omit keys to subscribe to all facts and derivations
+- **Selective** – pass `facts` and/or `derived` keys to subscribe to specific state
+- **Subscribe all** – omit keys to subscribe to all facts and derivations
 
 ```typescript
 useDirective<M extends ModuleSchema>(moduleDef: ModuleDef<M>, config?: {
@@ -483,11 +483,11 @@ createTypedHooks<M extends ModuleSchema>(): {
 import { createTypedHooks } from 'directive/solid';
 import type { MySchema } from './schema';
 
-// Create typed hooks -- full autocomplete for fact keys and event types
+// Create typed hooks – full autocomplete for fact keys and event types
 const { useFact, useDerived, useDispatch } = createTypedHooks<MySchema>();
 
 function Counter() {
-  // Fully typed -- fact key autocompletes, return type inferred
+  // Fully typed – fact key autocompletes, return type inferred
   const count = useFact(system, 'count');
 
   return <p>{count()}</p>;
@@ -601,6 +601,6 @@ function UserInfo() {
 
 ## Next Steps
 
-- See [Core API](/docs/api/core) for system functions
-- See [Types](/docs/api/types) for type definitions
-- See [Solid Adapter](/docs/adapters/solid) for setup and patterns
+- [Core API](/docs/api/core) – System functions
+- [Types](/docs/api/types) – Type definitions
+- [Solid Adapter](/docs/adapters/solid) – Setup and patterns

@@ -1,9 +1,9 @@
 ---
-title: Time-Travel
-description: Debug your application with time-travel state navigation.
+title: Time-Travel & Snapshots
+description: Debug your application with time-travel state navigation, and capture, restore, and diff system snapshots.
 ---
 
-Navigate through state history for debugging. {% .lead %}
+Navigate through state history for debugging, and save or restore complete system state with snapshots. {% .lead %}
 
 ---
 
@@ -149,7 +149,7 @@ interface TimeTravelState {
   currentIndex: number;      // Position in the snapshot array
   totalSnapshots: number;    // Total number of recorded snapshots
 
-  // Snapshot access (metadata only — keeps re-renders cheap)
+  // Snapshot access (metadata only – keeps re-renders cheap)
   snapshots: SnapshotMeta[];
   getSnapshotFacts: (id: number) => Record<string, unknown> | null;
 
@@ -207,12 +207,12 @@ function TimeTravelToolbar() {
       <button onClick={() => goForward(5)}>Forward 5</button>
       <button onClick={replay}>Replay All</button>
 
-      {/* Snapshot timeline (metadata only — no facts, keeps re-renders cheap) */}
+      {/* Snapshot timeline (metadata only – no facts, keeps re-renders cheap) */}
       <ul>
         {snapshots.map((snap) => (
           <li key={snap.id}>
             <button onClick={() => goTo(snap.id)}>
-              {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+              {snap.trigger} – {new Date(snap.timestamp).toLocaleTimeString()}
             </button>
             <button onClick={() => console.log(getSnapshotFacts(snap.id))}>
               Inspect
@@ -272,11 +272,11 @@ function restoreSession() {
     <button @click="timeTravel.goForward(5)">Forward 5</button>
     <button @click="timeTravel.replay()">Replay All</button>
 
-    <!-- Snapshot timeline (metadata only — no facts, keeps re-renders cheap) -->
+    <!-- Snapshot timeline (metadata only – no facts, keeps re-renders cheap) -->
     <ul>
       <li v-for="snap in timeTravel.snapshots" :key="snap.id">
         <button @click="timeTravel.goTo(snap.id)">
-          {{ snap.trigger }} — {{ new Date(snap.timestamp).toLocaleTimeString() }}
+          {{ snap.trigger }} – {{ new Date(snap.timestamp).toLocaleTimeString() }}
         </button>
         <button @click="console.log(timeTravel.getSnapshotFacts(snap.id))">
           Inspect
@@ -332,12 +332,12 @@ function restoreSession() {
   <button on:click={() => goForward(5)}>Forward 5</button>
   <button on:click={replay}>Replay All</button>
 
-  <!-- Snapshot timeline (metadata only — no facts, keeps re-renders cheap) -->
+  <!-- Snapshot timeline (metadata only – no facts, keeps re-renders cheap) -->
   <ul>
     {#each snapshots as snap (snap.id)}
       <li>
         <button on:click={() => goTo(snap.id)}>
-          {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+          {snap.trigger} – {new Date(snap.timestamp).toLocaleTimeString()}
         </button>
         <button on:click={() => console.log(getSnapshotFacts(snap.id))}>
           Inspect
@@ -388,13 +388,13 @@ function TimeTravelToolbar() {
             <button onClick={() => goForward(5)}>Forward 5</button>
             <button onClick={replay}>Replay All</button>
 
-            {/* Snapshot timeline (metadata only — no facts, keeps re-renders cheap) */}
+            {/* Snapshot timeline (metadata only – no facts, keeps re-renders cheap) */}
             <ul>
               <For each={snapshots}>
                 {(snap) => (
                   <li>
                     <button onClick={() => goTo(snap.id)}>
-                      {snap.trigger} — {new Date(snap.timestamp).toLocaleTimeString()}
+                      {snap.trigger} – {new Date(snap.timestamp).toLocaleTimeString()}
                     </button>
                     <button onClick={() => console.log(getSnapshotFacts(snap.id))}>
                       Inspect
@@ -460,12 +460,12 @@ class TimeTravelToolbar extends LitElement {
       <button @click=${() => goForward(5)}>Forward 5</button>
       <button @click=${replay}>Replay All</button>
 
-      <!-- Snapshot timeline (metadata only — no facts, keeps re-renders cheap) -->
+      <!-- Snapshot timeline (metadata only – no facts, keeps re-renders cheap) -->
       <ul>
         ${snapshots.map((snap) => html`
           <li>
             <button @click=${() => goTo(snap.id)}>
-              ${snap.trigger} — ${new Date(snap.timestamp).toLocaleTimeString()}
+              ${snap.trigger} – ${new Date(snap.timestamp).toLocaleTimeString()}
             </button>
             <button @click=${() => console.log(getSnapshotFacts(snap.id))}>
               Inspect
@@ -517,8 +517,95 @@ document.addEventListener("keydown", (e) => {
 
 ---
 
+## Snapshots
+
+### Creating Snapshots
+
+```typescript
+// Capture a complete copy of the current system state
+const snapshot = system.getSnapshot();
+
+// The snapshot contains all fact values as a plain object
+console.log(snapshot);
+// { facts: { count: 5, user: { name: "John" } }, ... }
+```
+
+### Restoring Snapshots
+
+```typescript
+// Overwrite the current system state with a saved snapshot
+system.restore(snapshot);
+
+// All facts now reflect the snapshot values
+console.log(system.facts.count); // 5
+```
+
+### Signed Snapshots
+
+Create tamper-proof snapshots for secure transmission:
+
+```typescript
+import { signSnapshot, verifySnapshotSignature } from 'directive';
+
+// Attach an HMAC signature to detect tampering
+const signed = signSnapshot(snapshot, process.env.SIGNING_SECRET);
+
+// Always verify the signature before restoring untrusted snapshots
+const isValid = verifySnapshotSignature(signed, process.env.SIGNING_SECRET);
+
+if (isValid) {
+  system.restore(signed);
+}
+```
+
+### Diff Snapshots
+
+Compare two snapshots to see what changed:
+
+```typescript
+import { diffSnapshots } from 'directive';
+
+// Take a "before" snapshot, let state change, then take an "after"
+const before = system.getSnapshot();
+// ... changes happen ...
+const after = system.getSnapshot();
+
+// Compare the two to see which facts were added, removed, or changed
+const diff = diffSnapshots(before, after);
+// { changed: ['count'], added: [], removed: [] }
+```
+
+### Distributable Snapshots
+
+Export computed derivations for use outside the Directive runtime (e.g., Redis, CDN edge caches):
+
+```typescript
+// Export selected derivations for use outside the Directive runtime
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan', 'canUseFeature'],
+  ttlSeconds: 3600, // Snapshot expires after 1 hour
+});
+
+// Cache the snapshot in Redis for fast edge reads
+await redis.setex(`state:${userId}`, 3600, JSON.stringify(snapshot));
+```
+
+Watch for changes and push updates:
+
+```typescript
+// Automatically push updated snapshots to Redis whenever derivations change
+const unsubscribe = system.watchDistributableSnapshot(
+  { includeDerivations: ['effectivePlan', 'canUseFeature'] },
+  (snapshot) => {
+    redis.setex(`state:${userId}`, 3600, JSON.stringify(snapshot));
+  },
+);
+```
+
+---
+
 ## Next Steps
 
-- See [Snapshots](/docs/advanced/snapshots) for state serialization
-- See [DevTools](/docs/plugins/devtools) for browser integration
-- See [Testing](/docs/testing/overview) for debugging tests
+- [DevTools](/docs/plugins/devtools) – Browser integration
+- [Persistence](/docs/plugins/persistence) – Automatic saving
+- [Testing](/docs/testing/overview) – Debugging tests
