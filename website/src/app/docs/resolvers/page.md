@@ -436,7 +436,7 @@ resolvers: {
 Mock resolvers in tests:
 
 ```typescript
-import { createTestSystem, mockResolver } from "directive/testing";
+import { createTestSystem, mockResolver } from "@directive-run/core/testing";
 
 test("fetches user data", async () => {
   // Create a test system with a mocked resolver

@@ -89,8 +89,8 @@ import {
   createAgentOrchestrator,
   createPIIGuardrail,
   createToolGuardrail,
-} from 'directive/ai';
-import type { AgentLike } from 'directive/ai';
+} from '@directive-run/ai';
+import type { AgentLike } from '@directive-run/ai';
 
 // 1. Create a runner for your LLM provider
 const runner = createOpenAIRunner({
@@ -227,8 +227,8 @@ import {
   concatResults,
   collectOutputs,
   aggregateTokens,
-} from 'directive/ai';
-import type { AgentLike, AgentRunner } from 'directive/ai';
+} from '@directive-run/ai';
+import type { AgentLike, AgentRunner } from '@directive-run/ai';
 
 const researcher: AgentLike = {
   name: 'researcher',
@@ -325,7 +325,7 @@ Directive ships built-in guardrails for input, tool calls, and output. Layer the
 **Custom guardrails** are plain functions:
 
 ```typescript
-import type { GuardrailFn, InputGuardrailData } from 'directive/ai';
+import type { GuardrailFn, InputGuardrailData } from '@directive-run/ai';
 
 const noCodeExecution: GuardrailFn<InputGuardrailData> = (data) => {
   if (data.input.includes('exec(') || data.input.includes('eval(')) {
@@ -338,7 +338,7 @@ const noCodeExecution: GuardrailFn<InputGuardrailData> = (data) => {
 When a guardrail blocks a request, a structured `GuardrailError` is thrown. Use `isGuardrailError(error)` to type-narrow and access `error.userMessage` (safe to display in your UI), `error.guardrailName`, and `error.code`.
 
 ```typescript
-import { isGuardrailError } from 'directive/ai';
+import { isGuardrailError } from '@directive-run/ai';
 
 try {
   await orchestrator.run(agent, userInput);
@@ -356,7 +356,7 @@ try {
 Install Directive and start building:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Explore the full AI documentation:

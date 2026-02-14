@@ -4,7 +4,7 @@
  * Uses {} as { ... } for type-only definitions without runtime validation.
  */
 
-import { createModule, createSystem } from "directive";
+import { createModule, createSystem } from "@directive-run/core";
 
 // ============================================================================
 // Types

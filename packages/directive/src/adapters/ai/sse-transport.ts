@@ -30,6 +30,10 @@ import type { AgentStack, TokenStream } from "./stack.js";
 // Types
 // ============================================================================
 
+/**
+ * Union of all SSE event types sent over the wire.
+ * Clients parse `data: {JSON}\n\n` frames and switch on `type`.
+ */
 export type SSEEvent =
   | { type: "text"; text: string }
   | { type: "truncated"; text: string }
@@ -37,6 +41,10 @@ export type SSEEvent =
   | { type: "error"; message: string }
   | { type: "heartbeat"; timestamp: number };
 
+/**
+ * Configuration for creating an SSE transport.
+ * Controls truncation, heartbeat, error messages, and extra headers.
+ */
 export interface SSETransportConfig {
   /** Truncate response after this many characters (default: Infinity) */
   maxResponseChars?: number;
@@ -50,6 +58,11 @@ export interface SSETransportConfig {
   headers?: Record<string, string>;
 }
 
+/**
+ * An SSE transport that converts a Directive AgentStack token stream
+ * into Server-Sent Events. Use `toResponse()` for framework handlers
+ * (Next.js, Deno) or `toStream()` for Express/Koa.
+ */
 export interface SSETransport {
   /** Create a full HTTP Response with SSE headers */
   toResponse(
@@ -77,6 +90,26 @@ const DEFAULT_ERROR_MESSAGE =
 /**
  * Create an SSE transport that converts a Directive AgentStack token stream
  * into Server-Sent Events.
+ *
+ * @param config - Truncation limit, heartbeat interval, error message map, and extra headers.
+ * @returns An `SSETransport` with `toResponse()` and `toStream()` methods.
+ *
+ * @example
+ * ```typescript
+ * const transport = createSSETransport({
+ *   maxResponseChars: 10_000,
+ *   heartbeatIntervalMs: 15_000,
+ *   errorMessages: {
+ *     INPUT_GUARDRAIL_FAILED: 'Message flagged by safety filter.',
+ *   },
+ * });
+ *
+ * // Next.js route handler
+ * export async function POST(req: Request) {
+ *   const { message } = await req.json();
+ *   return transport.toResponse(stack, 'docs-qa', message);
+ * }
+ * ```
  */
 export function createSSETransport(
   config: SSETransportConfig = {},

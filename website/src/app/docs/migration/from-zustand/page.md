@@ -58,8 +58,8 @@ function Counter() {
 
 ```typescript
 // After: Directive approach – declare facts, mutate directly
-import { createModule, createSystem, t } from 'directive';
-import { useFact } from 'directive/react';
+import { createModule, createSystem, t } from '@directive-run/core';
+import { useFact } from '@directive-run/react';
 
 // Define a module with typed schema – no action methods needed
 const counterModule = createModule("counter", {
@@ -274,7 +274,7 @@ const useStore = create(
 
 ```typescript
 // After: Directive plugin – pass plugins as config, no wrapping needed
-import { persistencePlugin } from 'directive/plugins';
+import { persistencePlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
   module: myModule,

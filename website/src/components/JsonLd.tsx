@@ -69,17 +69,20 @@ export function ArticleJsonLd({
   title: string
   description: string
   url: string
-  datePublished?: string
-  dateModified?: string
+  datePublished?: string | Date
+  dateModified?: string | Date
 }) {
+  const published = datePublished instanceof Date ? datePublished.toISOString() : datePublished
+  const modified = dateModified instanceof Date ? dateModified.toISOString() : dateModified
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: title,
     description: description,
     url: url,
-    datePublished: datePublished || new Date().toISOString(),
-    dateModified: dateModified || new Date().toISOString(),
+    datePublished: published || new Date().toISOString(),
+    dateModified: modified || new Date().toISOString(),
     author: {
       '@type': 'Organization',
       name: 'Sizls',

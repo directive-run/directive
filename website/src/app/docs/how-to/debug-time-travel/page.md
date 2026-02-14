@@ -14,8 +14,8 @@ Something's broken: a constraint that should fire isn't firing, a resolver runs 
 ## The Solution
 
 ```typescript
-import { createSystem } from 'directive';
-import { loggingPlugin, devtoolsPlugin } from 'directive/plugins';
+import { createSystem } from '@directive-run/core';
+import { loggingPlugin, devtoolsPlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
   module: myModule,
@@ -31,7 +31,7 @@ const system = createSystem({
 ```
 
 ```tsx
-import { useDirective, useExplain, useInspect, useConstraintStatus } from 'directive/react';
+import { useDirective, useExplain, useInspect, useConstraintStatus } from '@directive-run/react';
 
 // Debug panel you can add to any page
 function DebugPanel({ system }) {

@@ -26,7 +26,7 @@ import {
   type RunResult,
   type CircuitState,
   type CacheStats,
-} from "directive/ai";
+} from "@directive-run/ai";
 import type { Board, Player, Move } from "./rules.js";
 import { pickAiMove } from "./rules.js";
 import {

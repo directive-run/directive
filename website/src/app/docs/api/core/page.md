@@ -19,7 +19,7 @@ function createModule<M extends ModuleSchema>(
 ): ModuleDef<M>
 ```
 
-### Parameters
+### createModule Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -49,7 +49,7 @@ function createModuleFactory<M extends ModuleSchema>(
 ): (name: string) => ModuleDef<M>
 ```
 
-### Parameters
+### createModuleFactory Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -88,7 +88,7 @@ function createSystem<M extends ModuleSchema>(
 ): SingleModuleSystem<M>
 ```
 
-### Parameters
+### createSystem Parameters
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -416,7 +416,7 @@ function constraintFactory<S extends Schema>(): {
 ```
 
 ```typescript
-import { constraintFactory, t } from 'directive';
+import { constraintFactory, t } from '@directive-run/core';
 
 const schema = { facts: { count: t.number(), threshold: t.number() } };
 const factory = constraintFactory<typeof schema>();
@@ -444,7 +444,7 @@ function resolverFactory<S extends Schema>(): {
 ```
 
 ```typescript
-import { resolverFactory } from 'directive';
+import { resolverFactory } from '@directive-run/core';
 
 const factory = resolverFactory<typeof schema>();
 
@@ -467,7 +467,7 @@ function typedConstraint<S extends Schema, R extends Requirement>(
 ```
 
 ```typescript
-import { typedConstraint } from 'directive';
+import { typedConstraint } from '@directive-run/core';
 
 const lowStock = typedConstraint<typeof schema, { type: "REORDER" }>({
   when: (facts) => facts.stock < 10,
@@ -487,7 +487,7 @@ function typedResolver<S extends Schema, R extends Requirement>(
 ```
 
 ```typescript
-import { typedResolver } from 'directive';
+import { typedResolver } from '@directive-run/core';
 
 const resetResolver = typedResolver<typeof schema, { type: "RESET" }>({
   requirement: "RESET",
@@ -498,7 +498,7 @@ const resetResolver = typedResolver<typeof schema, { type: "RESET" }>({
 ```
 
 {% callout title="AI Orchestrator Builders" %}
-For AI agent orchestrators, `directive/ai` exports additional builders: `constraint()` (fluent builder), `when()` (quick shorthand), and `createOrchestratorBuilder()` (full orchestrator composition). See [Orchestrator](/docs/ai/orchestrator) and [Glossary](/docs/glossary#builders--helpers).
+For AI agent orchestrators, `@directive-run/ai` exports additional builders: `constraint()` (fluent builder), `when()` (quick shorthand), and `createOrchestratorBuilder()` (full orchestrator composition). See [Orchestrator](/docs/ai/orchestrator) and [Glossary](/docs/glossary#builders--helpers).
 {% /callout %}
 
 ---

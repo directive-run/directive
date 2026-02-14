@@ -12,7 +12,7 @@ Build complex applications with composable modules. {% .lead %}
 Pass a `modules` map to create a namespaced system:
 
 ```typescript
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 // Each key becomes a namespace for accessing that module's state
 const system = createSystem({
@@ -136,7 +136,7 @@ The registered module is fully wired into the system – its constraints, resolv
 Use `createModuleFactory()` to produce named instances from a single definition. This is useful for multi-instance UIs like tabs, panels, or multi-tenant layouts where you need isolated state from the same schema:
 
 ```typescript
-import { createModuleFactory, t } from 'directive';
+import { createModuleFactory, t } from '@directive-run/core';
 
 const chatRoom = createModuleFactory({
   schema: {

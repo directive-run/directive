@@ -27,7 +27,7 @@ All assertion methods throw descriptive errors on failure, making test output ea
 Verify that a constraint produced a specific requirement type:
 
 ```typescript
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 
 test('constraint creates requirement', async () => {
   const system = createTestSystem({ modules: { user: userModule } });

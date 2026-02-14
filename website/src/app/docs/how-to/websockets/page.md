@@ -14,7 +14,7 @@ WebSocket connections need careful lifecycle management: open on mount, close on
 ## The Solution
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const ws = createModule('ws', {
   schema: {

@@ -58,7 +58,14 @@ interface EngineState<_S extends Schema> {
 }
 
 /**
- * Create the Directive engine.
+ * Create the Directive engine – the core reconciliation loop that orchestrates
+ * fact changes, constraint evaluation, requirement resolution, and effects.
+ *
+ * This is an internal function used by `createSystem()`. Most users should use
+ * `createSystem()` directly instead.
+ *
+ * @param config - Merged system configuration containing modules, plugins, and debug settings.
+ * @returns A fully wired `System` instance ready for `start()`.
  */
 // biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
 export function createEngine<S extends Schema>(
@@ -522,6 +529,7 @@ export function createEngine<S extends Schema>(
 			isEnabled: (id: string) => effectsManager.isEnabled(id),
 		},
 
+		/** Start the engine – initializes modules, applies initial facts, and begins reconciliation. */
 		start(): void {
 			if (state.isRunning) return;
 			state.isRunning = true;
@@ -562,6 +570,7 @@ export function createEngine<S extends Schema>(
 			scheduleReconcile();
 		},
 
+		/** Stop the engine – cancels all resolvers, runs effect cleanups, and calls module onStop hooks. */
 		stop(): void {
 			if (!state.isRunning) return;
 			state.isRunning = false;
@@ -581,6 +590,7 @@ export function createEngine<S extends Schema>(
 			pluginManager.emitStop(system);
 		},
 
+		/** Permanently destroy the engine – stops it, clears all listeners, and emits the destroy event. */
 		destroy(): void {
 			this.stop();
 			state.isDestroyed = true;
@@ -589,6 +599,13 @@ export function createEngine<S extends Schema>(
 			pluginManager.emitDestroy(system);
 		},
 
+		/**
+		 * Dispatch an event to the matching handler.
+		 * Events are processed inside a batch, so multiple fact mutations in the
+		 * handler trigger a single reconciliation cycle.
+		 *
+		 * @param event - The event object with a `type` field matching a registered handler.
+		 */
 		dispatch(event: SystemEvent): void {
 			if (BLOCKED_PROPS.has(event.type)) return;
 			const handler = mergedEvents[event.type];
@@ -605,10 +622,25 @@ export function createEngine<S extends Schema>(
 			}
 		},
 
+		/**
+		 * Read a derivation value by ID. Forces recomputation if the derivation is stale.
+		 * Prefer `system.derive.myDerivation` for type-safe access.
+		 *
+		 * @param derivationId - The derivation key to read.
+		 * @returns The current (possibly recomputed) derivation value.
+		 */
 		read<T = unknown>(derivationId: string): T {
 			return derivationsManager.get(derivationId as keyof DerivationsDef<S>) as T;
 		},
 
+		/**
+		 * Subscribe to changes on one or more facts or derivations.
+		 * Keys are auto-detected – pass any mix of fact and derivation keys.
+		 *
+		 * @param ids - Array of fact or derivation keys to observe.
+		 * @param listener - Callback invoked (with no arguments) when any observed key changes.
+		 * @returns An unsubscribe function.
+		 */
 		subscribe(ids: string[], listener: () => void): () => void {
 			const derivationIds: string[] = [];
 			const factKeys: string[] = [];
@@ -641,6 +673,16 @@ export function createEngine<S extends Schema>(
 			};
 		},
 
+		/**
+		 * Watch a single fact or derivation for value changes.
+		 * Unlike `subscribe()`, the callback receives the new and previous values.
+		 * Comparison uses `Object.is` by default; pass `equalityFn` for custom logic.
+		 *
+		 * @param id - The fact or derivation key to watch.
+		 * @param callback - Called with `(newValue, previousValue)` when the value changes.
+		 * @param options - Optional equality function for custom comparison.
+		 * @returns An unsubscribe function.
+		 */
 		watch<T = unknown>(
 			id: string,
 			callback: (newValue: T, previousValue: T | undefined) => void,
@@ -686,6 +728,15 @@ export function createEngine<S extends Schema>(
 			});
 		},
 
+		/**
+		 * Returns a promise that resolves when the predicate becomes true.
+		 * The predicate is checked immediately, then re-evaluated on every fact change.
+		 *
+		 * @param predicate - A function that receives all facts and returns a boolean.
+		 * @param options - Optional timeout in ms. Rejects with an error if exceeded.
+		 * @returns A promise that resolves when the predicate is satisfied.
+		 * @throws Error if the timeout is exceeded.
+		 */
 		when(
 			predicate: (facts: Record<string, unknown>) => boolean,
 			options?: { timeout?: number },
@@ -725,6 +776,12 @@ export function createEngine<S extends Schema>(
 			});
 		},
 
+		/**
+		 * Return a point-in-time snapshot of the system's runtime state.
+		 *
+		 * @returns An object containing unmet requirements, inflight resolver info,
+		 * constraint states (active/inactive + priority), and resolver statuses.
+		 */
 		inspect(): SystemInspection {
 			return {
 				unmet: state.previousRequirements.all(),
@@ -740,6 +797,15 @@ export function createEngine<S extends Schema>(
 			};
 		},
 
+		/**
+		 * Produce a human-readable explanation of why a specific requirement exists.
+		 * Traces the requirement back to its originating constraint, priority,
+		 * payload, and current resolver status.
+		 *
+		 * @param requirementId - The unique ID of the requirement to explain.
+		 * @returns A multi-line tree-formatted string, or `null` if the requirement
+		 * is not found in the current requirement set.
+		 */
 		explain(requirementId: string): string | null {
 			// Find the requirement in current unmet requirements
 			const requirements = state.previousRequirements.all();
@@ -792,6 +858,15 @@ export function createEngine<S extends Schema>(
 			return lines.join("\n");
 		},
 
+		/**
+		 * Wait until all inflight resolvers complete and no reconciliation is pending.
+		 * Uses a polling loop (not recursion) with configurable timeout.
+		 *
+		 * @param maxWait - Maximum time to wait in milliseconds (default: 5000).
+		 * @throws Error if the timeout is exceeded while work is still pending.
+		 * The error message includes diagnostic details (inflight resolvers,
+		 * unmet requirements, reconciliation state).
+		 */
 		async settle(maxWait = 5000): Promise<void> {
 			const startTime = Date.now();
 
@@ -1070,6 +1145,14 @@ export function createEngine<S extends Schema>(
 			});
 		},
 
+		/**
+		 * Subscribe to settlement state changes.
+		 * Called whenever `isSettled` may have changed (resolver start/complete,
+		 * reconcile start/end). Use with `useSyncExternalStore` for React bindings.
+		 *
+		 * @param listener - Callback invoked when settlement state may have changed.
+		 * @returns An unsubscribe function.
+		 */
 		onSettledChange(listener: () => void): () => void {
 			settlementListeners.add(listener);
 			return () => {
@@ -1077,6 +1160,13 @@ export function createEngine<S extends Schema>(
 			};
 		},
 
+		/**
+		 * Subscribe to time-travel state changes.
+		 * Called when a snapshot is taken or time-travel navigation occurs.
+		 *
+		 * @param listener - Callback invoked on time-travel state change.
+		 * @returns An unsubscribe function.
+		 */
 		onTimeTravelChange(listener: () => void): () => void {
 			timeTravelListeners.add(listener);
 			return () => {
@@ -1084,6 +1174,12 @@ export function createEngine<S extends Schema>(
 			};
 		},
 
+		/**
+		 * Group multiple fact mutations into a single reconciliation cycle.
+		 * Nested batches are safe – only the outermost batch triggers reconciliation.
+		 *
+		 * @param fn - Synchronous function containing fact mutations.
+		 */
 		batch(fn: () => void): void {
 			store.batch(fn);
 		},
@@ -1140,6 +1236,10 @@ export function createEngine<S extends Schema>(
 	 * Register a new module into a running (or stopped) engine.
 	 * Merges the module's schema, events, derive, effects, constraints, and resolvers
 	 * into the existing engine state, runs init, and triggers reconciliation.
+	 *
+	 * @param module - The module definition to register.
+	 * @throws Error if called during reconciliation or on a destroyed system.
+	 * @throws Error if a schema key collision is detected.
 	 */
 	function registerModule(module: {
 		id: string;

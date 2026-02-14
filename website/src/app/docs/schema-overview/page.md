@@ -131,7 +131,7 @@ The `t` namespace provides chainable type builders for schema definitions.
 ### Primitive Types
 
 ```typescript
-import { t } from 'directive';
+import { t } from '@directive-run/core';
 
 schema: {
   facts: {
@@ -430,7 +430,7 @@ schema: {
 For zero-overhead typing without runtime validation, use the type assertion pattern:
 
 ```typescript
-import { createModule } from 'directive';
+import { createModule } from '@directive-run/core';
 
 const myModule = createModule("example", {
   schema: {
@@ -494,7 +494,7 @@ Pass Zod schemas directly as fact types – no wrapper needed:
 
 ```typescript
 import { z } from 'zod';
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const UserSchema = z.object({
   id: z.string(),

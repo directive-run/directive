@@ -10,7 +10,7 @@ Directive provides testing utilities for unit and integration testing. {% .lead 
 ## Test Setup
 
 ```typescript
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 import { myModule } from './my-module';
 
 describe('MyModule', () => {
@@ -102,7 +102,7 @@ Derivations are accessed via `system.derive.namespace.derivationName`.
 ## Mock Resolvers
 
 ```typescript
-import { createTestSystem, mockResolver, flushMicrotasks } from 'directive/testing';
+import { createTestSystem, mockResolver, flushMicrotasks } from '@directive-run/core/testing';
 
 test('mock resolver with manual control', async () => {
   // Create a mock that captures requirements instead of auto-resolving
@@ -176,7 +176,7 @@ test('check all generated requirements', async () => {
 ## Fake Timers
 
 ```typescript
-import { createFakeTimers, settleWithFakeTimers } from 'directive/testing';
+import { createFakeTimers, settleWithFakeTimers } from '@directive-run/core/testing';
 
 test('standalone fake timers', async () => {
   // Create an isolated timer that starts at 0

@@ -1,11 +1,32 @@
 /**
- * Constraints - Rules that produce requirements when conditions aren't met
+ * Constraints – Rules that produce requirements when conditions aren't met
  *
  * Features:
  * - Sync and async constraint evaluation
  * - Priority ordering (higher runs first)
  * - Timeout handling for async constraints
  * - Error isolation
+ *
+ * @example
+ * ```typescript
+ * constraints: {
+ *   // Sync constraint – auto-tracked deps
+ *   needsAuth: {
+ *     when: (facts) => !facts.user && facts.route !== "/login",
+ *     require: { type: "REDIRECT", to: "/login" },
+ *   },
+ *   // Async constraint – explicit deps required for correct tracking
+ *   needsData: {
+ *     async: true,
+ *     deps: ["userId"],
+ *     when: async (facts) => {
+ *       const valid = await checkPermissions(facts.userId);
+ *       return valid && !facts.data;
+ *     },
+ *     require: { type: "FETCH_DATA" },
+ *   },
+ * }
+ * ```
  */
 
 import { createRequirementWithId, RequirementSet } from "./requirements.js";
@@ -28,6 +49,14 @@ type RequirementOutput = Requirement | Requirement[] | null;
 // Constraints Manager
 // ============================================================================
 
+/**
+ * Manager for constraint evaluation. Constraints declare "when" conditions
+ * that produce requirements for resolvers to fulfill.
+ *
+ * Supports incremental evaluation (only re-evaluates constraints whose
+ * dependencies changed), priority ordering, and `after` dependencies
+ * for sequential constraint resolution.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface ConstraintsManager<_S extends Schema> {
 	/** Evaluate all constraints and return unmet requirements */
@@ -50,7 +79,10 @@ export interface ConstraintsManager<_S extends Schema> {
 	registerDefinitions(newDefs: ConstraintsDef<Schema>): void;
 }
 
-/** Options for creating a constraints manager */
+/**
+ * Options for creating a constraints manager.
+ * Passed internally by the engine.
+ */
 export interface CreateConstraintsOptions<S extends Schema> {
 	definitions: ConstraintsDef<S>;
 	facts: Facts<S>;
@@ -68,7 +100,15 @@ export interface CreateConstraintsOptions<S extends Schema> {
 const DEFAULT_TIMEOUT = 5000;
 
 /**
- * Create a constraints manager.
+ * Create a constraints manager that evaluates constraint `when` predicates
+ * against current facts and produces requirements when conditions are met.
+ *
+ * Supports sync and async evaluation, priority ordering, dependency-based
+ * incremental evaluation, `after` ordering for sequential resolution,
+ * and runtime enable/disable.
+ *
+ * @param options - Configuration including constraint definitions, facts proxy, and callbacks.
+ * @returns A `ConstraintsManager` with evaluate, enable/disable, and inspection methods.
  */
 export function createConstraintsManager<S extends Schema>(
 	options: CreateConstraintsOptions<S>,

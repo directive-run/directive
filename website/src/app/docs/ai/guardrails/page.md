@@ -19,7 +19,7 @@ Detect and optionally redact personal information before it reaches the agent:
 import {
   createAgentOrchestrator,
   createPIIGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -49,7 +49,7 @@ const orchestrator = createAgentOrchestrator({
 Block harmful content using your moderation API:
 
 ```typescript
-import { createModerationGuardrail } from 'directive/ai';
+import { createModerationGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -86,7 +86,7 @@ const orchestrator = createAgentOrchestrator({
 Allow or deny specific tools:
 
 ```typescript
-import { createToolGuardrail } from 'directive/ai';
+import { createToolGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -113,7 +113,7 @@ const orchestrator = createAgentOrchestrator({
 Ensure agent output matches an expected type:
 
 ```typescript
-import { createOutputTypeGuardrail } from 'directive/ai';
+import { createOutputTypeGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -145,7 +145,7 @@ const orchestrator = createAgentOrchestrator({
 For complex output validation, use `createOutputSchemaGuardrail` with a custom validator – or plug in Zod:
 
 ```typescript
-import { createOutputSchemaGuardrail } from 'directive/ai';
+import { createOutputSchemaGuardrail } from '@directive-run/ai';
 
 // Validate output with a custom function
 const orchestrator = createAgentOrchestrator({
@@ -206,7 +206,7 @@ const zodOrchestrator = createAgentOrchestrator({
 Limit output by character count or estimated token count:
 
 ```typescript
-import { createLengthGuardrail } from 'directive/ai';
+import { createLengthGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -234,7 +234,7 @@ const orchestrator = createAgentOrchestrator({
 Block output matching specific keywords or patterns:
 
 ```typescript
-import { createContentFilterGuardrail } from 'directive/ai';
+import { createContentFilterGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -262,7 +262,7 @@ String patterns are automatically regex-escaped, so special characters like `.` 
 Limit request frequency based on token usage and request count:
 
 ```typescript
-import { createRateLimitGuardrail } from 'directive/ai';
+import { createRateLimitGuardrail } from '@directive-run/ai';
 
 // Enforce both token-based and request-based rate limits
 const rateLimiter = createRateLimitGuardrail({
@@ -289,8 +289,8 @@ rateLimiter.reset();
 Write your own guardrail as a function that returns `{ passed, reason?, transformed? }`. The function receives `(data, context)` – you can omit `context` if you don't need it:
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/ai';
-import type { GuardrailFn, InputGuardrailData, OutputGuardrailData } from 'directive/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import type { GuardrailFn, InputGuardrailData, OutputGuardrailData } from '@directive-run/ai';
 
 // Block inputs that are too long
 const maxLengthGuardrail: GuardrailFn<InputGuardrailData> = (data) => {
@@ -333,7 +333,7 @@ const orchestrator = createAgentOrchestrator({
 Give guardrails a name for better error messages, and optionally add retry support:
 
 ```typescript
-import type { NamedGuardrail, InputGuardrailData } from 'directive/ai';
+import type { NamedGuardrail, InputGuardrailData } from '@directive-run/ai';
 
 const piiCheck: NamedGuardrail<InputGuardrailData> = {
   name: 'pii-detector',                // Shows up in error messages and hooks
@@ -371,7 +371,7 @@ const orchestrator = createAgentOrchestrator({
 When a guardrail fails, a structured `GuardrailError` is thrown:
 
 ```typescript
-import { isGuardrailError } from 'directive/ai';
+import { isGuardrailError } from '@directive-run/ai';
 
 try {
   await orchestrator.run(agent, userInput);
@@ -404,7 +404,7 @@ import {
   createPatternStreamingGuardrail,
   createToxicityStreamingGuardrail,
   combineStreamingGuardrails,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 // Halt the stream if the output grows too long
 const lengthGuard = createLengthStreamingGuardrail({
@@ -441,7 +441,7 @@ import {
   createPIIGuardrail,
   createToolGuardrail,
   createOutputTypeGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createOrchestratorBuilder()
   // Input guardrails run in the order they are added
@@ -472,8 +472,8 @@ Handle guardrail errors in your UI by catching `GuardrailError` from `orchestrat
 
 ```tsx
 import { useState, useCallback } from 'react';
-import { useAgentOrchestrator, useFact } from 'directive/react';
-import { isGuardrailError } from 'directive/ai';
+import { useAgentOrchestrator, useFact } from '@directive-run/react';
+import { isGuardrailError } from '@directive-run/ai';
 
 function GuardedChat() {
   const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -507,8 +507,8 @@ function GuardedChat() {
 ```html
 <script setup>
 import { ref, onUnmounted } from 'vue';
-import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
-import { useFact } from 'directive/vue';
+import { createAgentOrchestrator, isGuardrailError } from '@directive-run/ai';
+import { useFact } from '@directive-run/vue';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 onUnmounted(() => orchestrator.dispose());
@@ -538,8 +538,8 @@ async function send(input: string) {
 
 ```html
 <script>
-import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
-import { useFact } from 'directive/svelte';
+import { createAgentOrchestrator, isGuardrailError } from '@directive-run/ai';
+import { useFact } from '@directive-run/svelte';
 import { onDestroy } from 'svelte';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -567,8 +567,8 @@ async function send(input) {
 
 ```tsx
 import { createSignal } from 'solid-js';
-import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
-import { useFact } from 'directive/solid';
+import { createAgentOrchestrator, isGuardrailError } from '@directive-run/ai';
+import { useFact } from '@directive-run/solid';
 import { onCleanup } from 'solid-js';
 
 function GuardedChat() {
@@ -601,8 +601,8 @@ function GuardedChat() {
 
 ```typescript
 import { LitElement, html } from 'lit';
-import { createAgentOrchestrator, isGuardrailError } from 'directive/ai';
-import { FactController } from 'directive/lit';
+import { createAgentOrchestrator, isGuardrailError } from '@directive-run/ai';
+import { FactController } from '@directive-run/lit';
 
 class GuardedChat extends LitElement {
   private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });

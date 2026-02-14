@@ -25,22 +25,22 @@ Comprehensive reference documentation for every public export in Directive. {% .
 
 | Path | Contents |
 |------|----------|
-| `directive` | Core API – modules, systems, type builders, [constraint/resolver helpers](/docs/api/core#builders--helpers) |
-| `directive/react` | React hooks and components |
-| `directive/vue` | Vue composables |
-| `directive/svelte` | Svelte stores |
-| `directive/solid` | Solid signals |
-| `directive/lit` | Lit controllers |
-| `directive/plugins` | Built-in plugins (logging, devtools, persistence) |
-| `directive/testing` | Test utilities (mock resolvers, fake timers, assertions) |
-| `directive/ai` | AI agent orchestration, guardrails, streaming, [constraint builders](/docs/glossary#ai-builders-directiveai) |
-| `directive/worker` | Web Worker adapter |
+| `@directive-run/core` | Core API – modules, systems, type builders, [constraint/resolver helpers](/docs/api/core#builders--helpers) |
+| `@directive-run/react` | React hooks and components |
+| `@directive-run/vue` | Vue composables |
+| `@directive-run/svelte` | Svelte stores |
+| `@directive-run/solid` | Solid signals |
+| `@directive-run/lit` | Lit controllers |
+| `@directive-run/core/plugins` | Built-in plugins (logging, devtools, persistence) |
+| `@directive-run/core/testing` | Test utilities (mock resolvers, fake timers, assertions) |
+| `@directive-run/ai` | AI agent orchestration, guardrails, streaming, [constraint builders](/docs/glossary#ai-builders-directiveai) |
+| `@directive-run/core/worker` | Web Worker adapter |
 
 ---
 
 ## Next Steps
 
-- **[Core API Reference](/docs/api/core)** – Start here for the main `directive` exports
+- **[Core API Reference](/docs/api/core)** – Start here for the main `@directive-run/core` exports
 - **[Type Definitions](/docs/api/types)** – All TypeScript interfaces and types
 - **[React Hooks](/docs/api/react)** – React adapter hooks reference
 - **[Vue Composables](/docs/api/vue)** – Vue adapter composables reference

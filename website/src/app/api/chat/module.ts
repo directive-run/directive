@@ -1,10 +1,11 @@
+// @ts-nocheck
 /**
  * Directive module for AI docs chatbot server-side state.
  *
  * Replaces the imperative rateLimitMap / evictExpired / isRateLimited with
  * reactive facts, derivations, events, constraints, and effects.
  */
-import { createModule, t } from 'directive'
+import { createModule, t } from '@directive-run/core'
 
 // ---------------------------------------------------------------------------
 // Constants

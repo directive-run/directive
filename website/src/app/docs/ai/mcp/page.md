@@ -12,12 +12,12 @@ Bridge MCP servers into Directive with constraint-driven tool access control. {%
 The `createMCPAdapter` function connects to MCP servers and provides a Directive plugin for tool constraints, resource syncing, and approval workflows:
 
 {% callout type="note" title="Import Path" %}
-The `directive/mcp` entry point must be configured in your project. See the [installation docs](/docs/installation) for subpath setup.
+The `@directive-run/ai` package includes MCP support. See the [installation docs](/docs/installation) for setup.
 {% /callout %}
 
 ```typescript
-import { createMCPAdapter } from 'directive/mcp';
-import { createModule, createSystem, t } from 'directive';
+import { createMCPAdapter } from '@directive-run/ai';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const adapter = createMCPAdapter({
   servers: [
@@ -277,7 +277,7 @@ MCP is primarily server-side, but you can display tool status and approval reque
 ### React
 
 ```tsx
-import { useAgentOrchestrator, useFact } from 'directive/react';
+import { useAgentOrchestrator, useFact } from '@directive-run/react';
 
 function MCPToolPanel() {
   // Approval mode – tool calls require explicit sign-off
@@ -305,8 +305,8 @@ function MCPToolPanel() {
 
 ```html
 <script setup>
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact } from 'directive/vue';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact } from '@directive-run/vue';
 import { onUnmounted } from 'vue';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
@@ -329,8 +329,8 @@ const toolCalls = useFact(orchestrator.system, '__toolCalls');
 
 ```html
 <script>
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact } from 'directive/svelte';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact } from '@directive-run/svelte';
 import { onDestroy } from 'svelte';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });
@@ -352,8 +352,8 @@ const toolCalls = useFact(orchestrator.system, '__toolCalls');
 ### Solid
 
 ```tsx
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact } from 'directive/solid';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact } from '@directive-run/solid';
 import { onCleanup, For } from 'solid-js';
 
 function MCPToolPanel() {
@@ -379,8 +379,8 @@ function MCPToolPanel() {
 
 ```typescript
 import { LitElement, html } from 'lit';
-import { createAgentOrchestrator } from 'directive/ai';
-import { FactController } from 'directive/lit';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { FactController } from '@directive-run/lit';
 
 class MCPToolPanel extends LitElement {
   private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: false });

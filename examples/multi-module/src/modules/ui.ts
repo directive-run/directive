@@ -11,7 +11,7 @@
  * - No constraints or resolvers - purely reactive UI state
  */
 
-import { createModule, t, type ModuleSchema } from "directive";
+import { createModule, t, type ModuleSchema } from "@directive-run/core";
 import type { Notification } from "../types";
 import { authSchema } from "./auth";
 import { dataSchema } from "./data";

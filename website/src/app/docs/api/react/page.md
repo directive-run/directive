@@ -1,6 +1,6 @@
 ---
 title: React Hooks
-description: Complete API reference for all React hooks exported from directive/react. System-first pattern – every hook takes the system as its first argument.
+description: Complete API reference for all React hooks exported from @directive-run/react. System-first pattern – every hook takes the system as its first argument.
 ---
 
 React hooks API reference. All hooks use a system-first pattern – pass the system (or statusPlugin for requirement-status hooks) as the first argument. {% .lead %}
@@ -52,7 +52,7 @@ function useSelector<S, R>(
 | `equalityFn` | `(a, b) => boolean` | Optional custom equality check |
 
 ```tsx
-import { useSelector } from 'directive/react';
+import { useSelector } from '@directive-run/react';
 
 // Select and combine values from multiple facts
 const summary = useSelector(system, (facts) => ({
@@ -87,7 +87,7 @@ function useFact<S, K extends keyof InferFacts<S>>(
 | `key` / `keys` | `string` or `string[]` | Fact key(s) to subscribe to |
 
 ```tsx
-import { useFact } from 'directive/react';
+import { useFact } from '@directive-run/react';
 
 // Subscribe to a single fact value
 const count = useFact(system, "count");
@@ -126,7 +126,7 @@ function useDerived<S, K extends keyof InferDerivations<S>>(
 | `key` / `keys` | `string` or `string[]` | Derivation key(s) to subscribe to |
 
 ```tsx
-import { useDerived } from 'directive/react';
+import { useDerived } from '@directive-run/react';
 
 // Subscribe to a single computed derivation
 const total = useDerived(system, "cartTotal");
@@ -152,7 +152,7 @@ function useEvents<S>(
 ```
 
 ```tsx
-import { useEvents } from 'directive/react';
+import { useEvents } from '@directive-run/react';
 
 // Get typed event dispatchers for the system
 const events = useEvents(system);
@@ -175,7 +175,7 @@ function useDispatch<S>(
 ```
 
 ```tsx
-import { useDispatch } from 'directive/react';
+import { useDispatch } from '@directive-run/react';
 
 // Get the low-level dispatch function
 const dispatch = useDispatch(system);
@@ -216,7 +216,7 @@ function useWatch<T>(
 | `opts.equalityFn` | `(a, b) => boolean` | Optional custom equality check to control when the callback fires |
 
 ```tsx
-import { useWatch } from 'directive/react';
+import { useWatch } from '@directive-run/react';
 
 // Watch a fact (auto-detected)
 useWatch(system, "count", (newVal, oldVal) => {
@@ -257,12 +257,12 @@ function useInspect(
 | `system` | `SingleModuleSystem` | The Directive system |
 | `opts.throttleMs` | `number` | Optional minimum ms between updates |
 
-### Returns
+### useInspect Returns
 
 `SystemInspection` with `unmet`, `inflight`, `isSettled`, `constraints`, and more.
 
 ```tsx
-import { useInspect } from 'directive/react';
+import { useInspect } from '@directive-run/react';
 
 // Get reactive system inspection data
 const inspection = useInspect(system);
@@ -298,7 +298,7 @@ function useConstraintStatus(
 | `constraintId` | `string` | Optional constraint to inspect |
 
 ```tsx
-import { useConstraintStatus } from 'directive/react';
+import { useConstraintStatus } from '@directive-run/react';
 
 // Check if the auth constraint is currently active
 const auth = useConstraintStatus(system, "requireAuth");
@@ -327,12 +327,12 @@ function useExplain(
 | `system` | `SingleModuleSystem` | The Directive system |
 | `requirementType` | `string` | The requirement type to explain |
 
-### Returns
+### useExplain Returns
 
 `ExplanationResult` with `constraints` (which constraints produced it) and `status` (current resolution status).
 
 ```tsx
-import { useExplain } from 'directive/react';
+import { useExplain } from '@directive-run/react';
 
 // Get a detailed explanation of why a requirement exists
 const explanation = useExplain(system, "FETCH_USER");
@@ -366,7 +366,7 @@ function useRequirementStatus(
 | `type` / `types` | `string` or `string[]` | Requirement type(s) to track |
 
 ```tsx
-import { useRequirementStatus } from 'directive/react';
+import { useRequirementStatus } from '@directive-run/react';
 
 // Track the loading state of a specific requirement type
 const status = useRequirementStatus(statusPlugin, "FETCH_USER");
@@ -400,7 +400,7 @@ function useSuspenseRequirement(
 | `type` | `string` | The requirement type to wait for |
 
 ```tsx
-import { useSuspenseRequirement } from 'directive/react';
+import { useSuspenseRequirement } from '@directive-run/react';
 
 function UserProfile() {
   // Suspends rendering until the requirement resolves
@@ -435,12 +435,12 @@ function useOptimisticUpdate(
 | `statusPlugin` | `StatusPlugin` | The requirement status plugin |
 | `requirementType` | `string` | The requirement type for the operation |
 
-### Returns
+### useOptimisticUpdate Returns
 
 `OptimisticUpdateResult` with `mutate`, `isPending`, `error`, and `rollback`.
 
 ```tsx
-import { useOptimisticUpdate } from 'directive/react';
+import { useOptimisticUpdate } from '@directive-run/react';
 
 // Set up optimistic mutations for the save operation
 const { mutate, isPending, error, rollback } = useOptimisticUpdate(
@@ -480,7 +480,7 @@ function useDirectiveRef<M>(
 | `opts.initialFacts` | `Partial<InferFacts<M>>` | Initial fact values |
 
 ```tsx
-import { useDirectiveRef, useFact } from 'directive/react';
+import { useDirectiveRef, useFact } from '@directive-run/react';
 
 function Counter() {
   // Create a scoped system tied to this component's lifecycle
@@ -530,7 +530,7 @@ function useDirective<M, FK, DK>(
 | `selections.derived` | `string[]` | Derivation keys to subscribe to (omit for all) |
 
 ```tsx
-import { useDirective } from 'directive/react';
+import { useDirective } from '@directive-run/react';
 
 // Selective: subscribe to specific keys
 function Counter() {
@@ -566,7 +566,7 @@ function DirectiveDevTools(props: { system: SingleModuleSystem<any> }): JSX.Elem
 ```
 
 ```tsx
-import { DirectiveDevTools } from 'directive/react';
+import { DirectiveDevTools } from '@directive-run/react';
 
 function App() {
   return (
@@ -593,7 +593,7 @@ function DirectiveHydrator(props: {
 ```
 
 ```tsx
-import { DirectiveHydrator } from 'directive/react';
+import { DirectiveHydrator } from '@directive-run/react';
 
 function App({ serverSnapshot }) {
   return (
@@ -619,7 +619,7 @@ function useHydratedSystem<M>(
 ```
 
 ```tsx
-import { useHydratedSystem, useFact } from 'directive/react';
+import { useHydratedSystem, useFact } from '@directive-run/react';
 
 function Counter() {
   // Create a system pre-hydrated from the server snapshot
@@ -644,7 +644,7 @@ function useTimeTravel(
 ): TimeTravelState | null
 ```
 
-### Returns
+### useTimeTravel Returns
 
 ```typescript
 interface TimeTravelState {
@@ -658,7 +658,7 @@ interface TimeTravelState {
 ```
 
 ```tsx
-import { useTimeTravel } from 'directive/react';
+import { useTimeTravel } from '@directive-run/react';
 
 // Get reactive time-travel controls
 const tt = useTimeTravel(system);
@@ -687,7 +687,7 @@ function shallowEqual(a: unknown, b: unknown): boolean
 ```
 
 ```tsx
-import { useSelector, shallowEqual } from 'directive/react';
+import { useSelector, shallowEqual } from '@directive-run/react';
 
 // Use shallowEqual to prevent re-renders when x/y values haven't changed
 const coords = useSelector(

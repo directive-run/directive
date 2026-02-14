@@ -75,7 +75,7 @@ const service = interpret(trafficLightMachine).start();
 
 ```typescript
 // After: Directive approach – constraints declare when transitions should happen
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const trafficLightModule = createModule("traffic-light", {
   schema: {

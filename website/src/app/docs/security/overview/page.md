@@ -36,8 +36,8 @@ User Input
 ## Quick Setup
 
 ```typescript
-import { createAgentOrchestrator } from 'directive/ai';
-import { createEnhancedPIIGuardrail, createPromptInjectionGuardrail } from 'directive/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { createEnhancedPIIGuardrail, createPromptInjectionGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner: myRunner,

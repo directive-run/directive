@@ -1,0 +1,78 @@
+{
+  "name": "@directive-run/core",
+  "version": "0.1.0",
+  "description": "Constraint-driven runtime for TypeScript. Declare requirements, let the runtime resolve them.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DirectiveRun/DirectiveJS",
+    "directory": "packages/core"
+  },
+  "homepage": "https://directive.run",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "constraint-driven",
+    "state-management",
+    "constraints",
+    "reactive",
+    "runtime",
+    "typescript",
+    "signals"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins/index.d.ts",
+      "require": "./dist/plugins/index.cjs",
+      "import": "./dist/plugins/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "require": "./dist/testing.cjs",
+      "import": "./dist/testing.js"
+    },
+    "./migration": {
+      "types": "./dist/migration.d.ts",
+      "require": "./dist/migration.cjs",
+      "import": "./dist/migration.js"
+    },
+    "./adapter-utils": {
+      "types": "./dist/adapter-utils.d.ts",
+      "require": "./dist/adapter-utils.cjs",
+      "import": "./dist/adapter-utils.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "require": "./dist/worker.cjs",
+      "import": "./dist/worker.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

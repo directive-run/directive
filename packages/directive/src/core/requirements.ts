@@ -17,7 +17,25 @@ import { stableStringify } from "../utils/utils.js";
 
 /**
  * Generate a stable ID for a requirement.
- * Uses type + sorted properties by default.
+ * Uses type + sorted JSON of remaining properties by default.
+ * Pass a custom `keyFn` for fine-grained deduplication control (e.g., ignoring
+ * non-essential fields or grouping requests by a subset of properties).
+ *
+ * @param req - The requirement object (must have a `type` field).
+ * @param keyFn - Optional custom key function for deduplication control.
+ * @returns A stable string ID suitable for Map/Set keys and resolver dedup.
+ *
+ * @example
+ * ```typescript
+ * generateRequirementId({ type: "FETCH_USER", userId: 1 });
+ * // → 'FETCH_USER:{"userId":1}'
+ *
+ * generateRequirementId(
+ *   { type: "FETCH_USER", userId: 1, priority: "low" },
+ *   (req) => `fetch-user-${req.userId}`, // ignore priority for dedup
+ * );
+ * // → 'fetch-user-1'
+ * ```
  */
 export function generateRequirementId(
 	req: Requirement,
@@ -35,7 +53,11 @@ export function generateRequirementId(
 }
 
 /**
- * Check if two requirements are equal by their IDs.
+ * Check if two requirements are equal by comparing their computed IDs.
+ *
+ * @param a - First requirement to compare.
+ * @param b - Second requirement to compare.
+ * @returns `true` if both requirements have the same ID.
  */
 export function requirementsEqual(
 	a: RequirementWithId,
@@ -45,7 +67,13 @@ export function requirementsEqual(
 }
 
 /**
- * Create a requirement with its computed ID.
+ * Create a requirement bundled with its computed ID and source constraint.
+ * This is the internal factory used by the constraint evaluator.
+ *
+ * @param requirement - The raw requirement object.
+ * @param fromConstraint - ID of the constraint that produced this requirement.
+ * @param keyFn - Optional custom key function for ID generation.
+ * @returns A `RequirementWithId` containing `{ requirement, id, fromConstraint }`.
  */
 export function createRequirementWithId(
 	requirement: Requirement,
@@ -96,7 +124,19 @@ export function req<T extends string>(type: T) {
 }
 
 /**
- * Check if a requirement matches a type.
+ * Type guard that checks if a requirement matches a specific type string.
+ * Narrows the requirement type for subsequent property access.
+ *
+ * @param req - The requirement to check.
+ * @param type - The expected type string.
+ * @returns `true` if `req.type === type`, with narrowed TypeScript type.
+ *
+ * @example
+ * ```typescript
+ * if (isRequirementType(req, "FETCH_USER")) {
+ *   console.log(req.type); // "FETCH_USER" (narrowed)
+ * }
+ * ```
  */
 export function isRequirementType<T extends string>(
 	req: Requirement,
@@ -222,7 +262,12 @@ export class RequirementSet {
 		return copy;
 	}
 
-	/** Diff with another set - returns added and removed */
+	/**
+	 * Compute the difference between this set and another.
+	 *
+	 * @param other - The previous set to diff against.
+	 * @returns `{ added, removed, unchanged }` arrays of requirements.
+	 */
 	diff(other: RequirementSet): {
 		added: RequirementWithId[];
 		removed: RequirementWithId[];

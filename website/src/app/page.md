@@ -82,7 +82,7 @@ system.debug.goForward();
 First-class React support, with Vue, Svelte, Solid, and Lit adapters available.
 
 ```typescript
-import { useFact, useDerived } from 'directive/react';
+import { useFact, useDerived } from '@directive-run/react';
 
 function UserProfile({ system }) {
   const user = useFact(system, 'user');
@@ -96,7 +96,7 @@ function UserProfile({ system }) {
 ## Get Started
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Then check out the [Quick Start guide](/docs/quick-start) to build your first module.

@@ -1,6 +1,6 @@
 ---
 title: Lit Controllers
-description: Complete API reference for all Lit reactive controllers exported from directive/lit. Controller pattern – each controller subscribes on connect and cleans up on disconnect.
+description: Complete API reference for all Lit reactive controllers exported from @directive-run/lit. Controller pattern – each controller subscribes on connect and cleans up on disconnect.
 ---
 
 Lit controllers API reference. All controllers follow the Reactive Controller pattern – pass the host element and system to the constructor. {% .lead %}
@@ -31,7 +31,7 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 |---|---|---|
 | `DirectiveSelectorController` | Controller | Select across all facts |
 
-### Factory Functions
+### Factory Functions (Quick Reference)
 
 | Export | Type | Description |
 |---|---|---|
@@ -46,7 +46,7 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 | `createModule` | Factory | Shorthand for `new ModuleController` |
 | `createDirectiveSelector` | Factory | Shorthand for `new DirectiveSelectorController` |
 
-### Non-Reactive Utilities
+### Non-Reactive Utilities (Quick Reference)
 
 | Export | Type | Description |
 |---|---|---|
@@ -66,7 +66,7 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 Subscribe to one or more derivations. The host element re-renders when any subscribed derivation value changes.
 
 ```typescript
-import { DerivedController } from 'directive/lit';
+import { DerivedController } from '@directive-run/lit';
 
 // Single derivation
 new DerivedController<T>(host: ReactiveControllerHost, system: System, key: string)
@@ -118,7 +118,7 @@ class DashboardElement extends LitElement {
 Subscribe to a single fact. The host element re-renders when the fact value changes.
 
 ```typescript
-import { FactController } from 'directive/lit';
+import { FactController } from '@directive-run/lit';
 
 new FactController<T>(host: ReactiveControllerHost, system: System, key: string)
 ```
@@ -151,7 +151,7 @@ class StatusElement extends LitElement {
 Select across all facts with an auto-tracking selector. The host element re-renders only when the selected value changes.
 
 ```typescript
-import { DirectiveSelectorController } from 'directive/lit';
+import { DirectiveSelectorController } from '@directive-run/lit';
 
 new DirectiveSelectorController<R>(
   host: ReactiveControllerHost,
@@ -192,7 +192,7 @@ class SummaryElement extends LitElement {
 Side-effect watcher for facts or derivations. The key is auto-detected, so no discriminator is needed. Fires a callback when the watched value changes. Does not expose a `.value` property.
 
 ```typescript
-import { WatchController } from 'directive/lit';
+import { WatchController } from '@directive-run/lit';
 
 // Unified API – auto-detects fact vs derivation
 new WatchController(
@@ -247,7 +247,7 @@ The `{ kind: "fact", factKey: "key" }` options object is deprecated. Pass the ke
 System inspection controller. Provides reactive access to unmet requirements, inflight resolvers, constraint statuses, and settlement state. Supports optional throttling.
 
 ```typescript
-import { InspectController } from 'directive/lit';
+import { InspectController } from '@directive-run/lit';
 
 new InspectController(host: ReactiveControllerHost, system: System, opts?: { throttleMs?: number })
 ```
@@ -289,7 +289,7 @@ class DebugElement extends LitElement {
 Reactive requirement explanation. Provides a detailed breakdown of why a requirement exists and what constraint produced it.
 
 ```typescript
-import { ExplainController } from 'directive/lit';
+import { ExplainController } from '@directive-run/lit';
 
 new ExplainController(host: ReactiveControllerHost, system: System, requirementType: string)
 ```
@@ -327,7 +327,7 @@ class ExplainElement extends LitElement {
 Reactive constraint inspection. Subscribe to the status of a single constraint or all constraints.
 
 ```typescript
-import { ConstraintStatusController } from 'directive/lit';
+import { ConstraintStatusController } from '@directive-run/lit';
 
 new ConstraintStatusController(host: ReactiveControllerHost, system: System, constraintId?: string)
 ```
@@ -360,7 +360,7 @@ class ConstraintElement extends LitElement {
 Track the status of a specific requirement type, including inflight count and last error.
 
 ```typescript
-import { RequirementStatusController } from 'directive/lit';
+import { RequirementStatusController } from '@directive-run/lit';
 
 new RequirementStatusController(
   host: ReactiveControllerHost,
@@ -407,7 +407,7 @@ class LoadingElement extends LitElement {
 Optimistic mutations with automatic rollback on failure.
 
 ```typescript
-import { OptimisticUpdateController } from 'directive/lit';
+import { OptimisticUpdateController } from '@directive-run/lit';
 
 new OptimisticUpdateController(
   host: ReactiveControllerHost,
@@ -450,7 +450,7 @@ class LikeButton extends LitElement {
 Creates a scoped system tied to the element lifecycle. The system starts on `connectedCallback` and stops on `disconnectedCallback`.
 
 ```typescript
-import { ModuleController } from 'directive/lit';
+import { ModuleController } from '@directive-run/lit';
 
 new ModuleController(host: ReactiveControllerHost, module: Module, opts?: ModuleOpts)
 ```
@@ -489,7 +489,7 @@ class CounterElement extends LitElement {
 Create a full system scoped to the element lifecycle. Accepts either a module directly or a configuration object.
 
 ```typescript
-import { SystemController } from 'directive/lit';
+import { SystemController } from '@directive-run/lit';
 
 // Simple
 new SystemController(host: ReactiveControllerHost, module: Module)
@@ -536,7 +536,7 @@ class AppElement extends LitElement {
 Reactive time-travel state. Provides undo/redo capabilities and snapshot navigation.
 
 ```typescript
-import { TimeTravelController } from 'directive/lit';
+import { TimeTravelController } from '@directive-run/lit';
 
 new TimeTravelController(host: ReactiveControllerHost, system: System)
 ```
@@ -587,7 +587,7 @@ import {
   createOptimisticUpdate,
   createModule,
   createDirectiveSelector,
-} from 'directive/lit';
+} from '@directive-run/lit';
 
 class MyElement extends LitElement {
   // These are equivalent:
@@ -639,7 +639,7 @@ import {
   createTypedHooks,
   shallowEqual,
   directiveContext,
-} from 'directive/lit';
+} from '@directive-run/lit';
 ```
 
 ### useDispatch
@@ -769,7 +769,7 @@ const selected = new DirectiveSelectorController(
 A Lit context key for sharing systems through the component tree via `@lit/context`.
 
 ```typescript
-import { directiveContext } from 'directive/lit';
+import { directiveContext } from '@directive-run/lit';
 import { provide, consume } from '@lit/context';
 
 // Provider – share the system with descendant elements

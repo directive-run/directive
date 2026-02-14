@@ -19,19 +19,19 @@ Get Directive set up in your project in under a minute. {% .lead %}
 Using npm:
 
 ```shell
-npm install directive
+npm install @directive-run/core
 ```
 
 Using pnpm:
 
 ```shell
-pnpm add directive
+pnpm add @directive-run/core
 ```
 
 Using yarn:
 
 ```shell
-yarn add directive
+yarn add @directive-run/core
 ```
 
 ---
@@ -42,16 +42,16 @@ Directive uses subpath exports for tree-shaking and smaller bundles:
 
 ```typescript
 // Core API – modules, systems, and type builders
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 // React adapter – reactive hooks for facts and derivations
-import { useFact, useDerived, useDispatch } from 'directive/react';
+import { useFact, useDerived, useDispatch } from '@directive-run/react';
 
 // Plugins – extend the system with logging, devtools, or persistence
-import { loggingPlugin, devtoolsPlugin, persistencePlugin } from 'directive/plugins';
+import { loggingPlugin, devtoolsPlugin, persistencePlugin } from '@directive-run/core/plugins';
 
 // Testing utilities – mock resolvers and control async timing
-import { createTestSystem, createMockResolver, flushMicrotasks } from 'directive/testing';
+import { createTestSystem, createMockResolver, flushMicrotasks } from '@directive-run/core/testing';
 ```
 
 ---
@@ -64,7 +64,7 @@ Directive is written in TypeScript and provides full type inference. For the bes
 {
   "compilerOptions": {
     "strict": true,                  // Required for full type inference
-    "moduleResolution": "bundler",   // Enables subpath exports like directive/react
+    "moduleResolution": "bundler",   // Enables scoped package resolution
     "target": "ES2022"               // Proxy and WeakRef support
   }
 }
@@ -82,13 +82,13 @@ Directive is designed to be lightweight:
 
 | Export | Minified | Gzipped |
 |--------|----------|---------|
-| `directive` (core) | ~8 KB | ~3 KB |
-| `directive/react` | ~2 KB | ~1 KB |
-| `directive/vue` | ~2 KB | ~1 KB |
-| `directive/svelte` | ~2 KB | ~1 KB |
-| `directive/solid` | ~2 KB | ~1 KB |
-| `directive/lit` | ~2 KB | ~1 KB |
-| `directive/plugins` | ~4 KB | ~1.5 KB |
+| `@directive-run/core` | ~8 KB | ~3 KB |
+| `@directive-run/react` | ~2 KB | ~1 KB |
+| `@directive-run/vue` | ~2 KB | ~1 KB |
+| `@directive-run/svelte` | ~2 KB | ~1 KB |
+| `@directive-run/solid` | ~2 KB | ~1 KB |
+| `@directive-run/lit` | ~2 KB | ~1 KB |
+| `@directive-run/core/plugins` | ~4 KB | ~1.5 KB |
 
 All exports are tree-shakeable. Import only what you use.
 
@@ -99,8 +99,8 @@ All exports are tree-shakeable. Import only what you use.
 ### React
 
 ```tsx
-import { createSystem } from 'directive';
-import { useFact, useDerived } from 'directive/react';
+import { createSystem } from '@directive-run/core';
+import { useFact, useDerived } from '@directive-run/react';
 import { userModule } from './modules/user';
 
 // Create and start the system at module scope
@@ -119,8 +119,8 @@ function App() {
 
 ```html
 <script setup>
-import { createSystem } from 'directive';
-import { useFact } from 'directive/vue';
+import { createSystem } from '@directive-run/core';
+import { useFact } from '@directive-run/vue';
 import { userModule } from './modules/user';
 
 // Create the system
@@ -136,8 +136,8 @@ const name = useFact(system, 'name');
 
 ```html
 <script>
-  import { createSystem } from 'directive';
-  import { useFact } from 'directive/svelte';
+  import { createSystem } from '@directive-run/core';
+  import { useFact } from '@directive-run/svelte';
   import { userModule } from './modules/user';
 
   // Create the system
@@ -152,7 +152,7 @@ const name = useFact(system, 'name');
 ### Vanilla TypeScript
 
 ```typescript
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { userModule } from './modules/user';
 
 const system = createSystem({ module: userModule });
@@ -172,13 +172,66 @@ await system.settle();
 
 ---
 
+## AI Setup
+
+To use Directive's AI agent orchestration, install the AI package and a provider adapter:
+
+### OpenAI
+
+```shell
+pnpm add @directive-run/core @directive-run/ai @directive-run/adapter-openai
+```
+
+```typescript
+import { createAgentStack } from '@directive-run/ai';
+import { createOpenAIRunner } from '@directive-run/adapter-openai';
+
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+const stack = createAgentStack({ runner, agents: { assistant: { instructions: "You are helpful." } } });
+```
+
+### Anthropic
+
+```shell
+pnpm add @directive-run/core @directive-run/ai @directive-run/adapter-anthropic
+```
+
+```typescript
+import { createAgentStack } from '@directive-run/ai';
+import { createAnthropicRunner } from '@directive-run/adapter-anthropic';
+
+const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
+```
+
+### Ollama (local)
+
+```shell
+pnpm add @directive-run/core @directive-run/ai @directive-run/adapter-ollama
+```
+
+```typescript
+import { createAgentStack } from '@directive-run/ai';
+import { createOllamaRunner } from '@directive-run/adapter-ollama';
+
+const runner = createOllamaRunner(); // defaults to localhost:11434
+```
+
+| Package | Description |
+|---------|-------------|
+| `@directive-run/ai` | Agent orchestration, streaming, guardrails |
+| `@directive-run/adapter-openai` | OpenAI, Azure, Together, any OpenAI-compatible API |
+| `@directive-run/adapter-anthropic` | Anthropic Claude models |
+| `@directive-run/adapter-ollama` | Local Ollama inference |
+
+---
+
 ## Development Setup
 
 For the best development experience, add the devtools plugin:
 
 ```typescript
-import { createSystem } from 'directive';
-import { devtoolsPlugin, loggingPlugin } from 'directive/plugins';
+import { createSystem } from '@directive-run/core';
+import { devtoolsPlugin, loggingPlugin } from '@directive-run/core/plugins';
 import { userModule } from './modules/user';
 
 const system = createSystem({
@@ -209,7 +262,7 @@ For quick prototyping, you can use Directive from a CDN:
 ```html
 <script type="module">
   // Import directly from a CDN – no build step needed
-  import { createModule, createSystem, t } from 'https://esm.sh/directive';
+  import { createModule, createSystem, t } from 'https://esm.sh/@directive-run/core';
 
   // Define a minimal counter module
   const counterModule = createModule("counter", {
@@ -236,7 +289,7 @@ For quick prototyping, you can use Directive from a CDN:
 
 ## Troubleshooting
 
-### "Cannot find module 'directive/react'"
+### Cannot find module @directive-run/react
 
 Ensure your TypeScript config uses a compatible module resolution:
 
@@ -258,20 +311,21 @@ Check that you're only importing what you need. Avoid:
 
 ```typescript
 // Pulls in everything, defeating tree-shaking
-import * as Directive from 'directive'; // Don't do this
+import * as Directive from '@directive-run/core'; // Don't do this
 ```
 
 Instead:
 
 ```typescript
 // Import only what you need – unused exports are removed at build time
-import { createModule, createSystem } from 'directive';
+import { createModule, createSystem } from '@directive-run/core';
 ```
 
 ---
 
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** - Build your first module
-- **[Core Concepts](/docs/core-concepts)** - Understand the mental model
-- **[React Adapter](/docs/adapters/react)** - Full React setup guide
+- **[Quick Start](/docs/quick-start)** &ndash; Build your first module
+- **[Core Concepts](/docs/core-concepts)** &ndash; Understand the mental model
+- **[React Adapter](/docs/adapters/react)** &ndash; Full React setup guide
+- **[Migration Guide](/docs/migration/package-restructure)** &ndash; Migrating from the old `directive` package

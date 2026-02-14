@@ -17,6 +17,13 @@ import { Search } from '@/components/Search'
 import { ThemeToggle } from '@/components/ThemeSelector'
 import { BrandPresetSwitcher } from '@/components/BrandPresetSwitcher'
 import { VersionSelector } from '@/components/VersionSelector'
+import {
+  useCanUseChat,
+  useCanUseSearch,
+  useCanUseThemeSelector,
+  useCanUseBrandSwitcher,
+  useCanUseVersionSelector,
+} from '@/lib/feature-flags'
 
 function HeaderLink({
   href,
@@ -32,7 +39,7 @@ function HeaderLink({
     <Link
       href={href}
       className={clsx(
-        'flex items-center text-base font-medium',
+        'flex items-center text-sm font-medium',
         isActive
           ? 'text-brand-primary'
           : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
@@ -51,7 +58,7 @@ function SupportLink() {
     <Link
       href="/support"
       className={clsx(
-        'text-base font-medium',
+        'text-sm font-medium',
         isActive
           ? 'text-brand-primary'
           : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
@@ -83,6 +90,9 @@ function SkipLink() {
 
 function Header() {
   let [isScrolled, setIsScrolled] = useState(false)
+  let canUseSearch = useCanUseSearch()
+  let canUseThemeSelector = useCanUseThemeSelector()
+  let canUseBrandSwitcher = useCanUseBrandSwitcher()
 
   useEffect(() => {
     function onScroll() {
@@ -113,9 +123,11 @@ function Header() {
           <Logo className="hidden h-9 w-auto fill-slate-700 lg:block dark:fill-brand-primary-100" />
         </Link>
       </div>
-      <div className="-my-5 mr-6 sm:mr-8 md:mr-0">
-        <Search />
-      </div>
+      {canUseSearch && (
+        <div className="-my-5 mr-6 sm:mr-8 md:mr-0">
+          <Search />
+        </div>
+      )}
       <div className="relative flex basis-0 items-center justify-end gap-6 sm:gap-8 md:grow">
         <div className="hidden items-center gap-8 sm:gap-10 md:flex">
           <HeaderLink href="/docs/quick-start">Docs</HeaderLink>
@@ -123,8 +135,8 @@ function Header() {
           <SupportLink />
         </div>
         <div className="flex items-center gap-4">
-          <ThemeToggle />
-          <BrandPresetSwitcher className="relative z-10" />
+          {canUseThemeSelector && <ThemeToggle />}
+          {canUseBrandSwitcher && <BrandPresetSwitcher className="relative z-10" />}
           <Link href="https://github.com/sizls/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
             <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
           </Link>
@@ -137,6 +149,8 @@ function Header() {
 export function Layout({ children }: { children: React.ReactNode }) {
   let pathname = usePathname()
   let isHomePage = pathname === '/'
+  let canUseVersionSelector = useCanUseVersionSelector()
+  let canUseChat = useCanUseChat()
   let isStandalonePage =
     pathname.startsWith('/blog') ||
     pathname.startsWith('/support') ||
@@ -160,9 +174,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="absolute top-16 right-0 bottom-0 hidden h-12 w-px bg-linear-to-t from-slate-800 dark:block" />
             <div className="absolute top-28 right-0 bottom-0 hidden w-px bg-slate-800 dark:block" />
             <div className="sticky top-19 -ml-0.5 h-[calc(100vh-4.75rem)] w-64 overflow-x-hidden overflow-y-auto py-16 pr-8 pl-0.5 xl:w-72 xl:pr-16">
-              <div className="mb-6">
-                <VersionSelector className="w-full" />
-              </div>
+              {canUseVersionSelector && (
+                <div className="mb-6">
+                  <VersionSelector className="w-full" />
+                </div>
+              )}
               <Navigation />
               <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
                 <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -182,7 +198,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
       <Footer />
-      <AIChatWidget />
+      {canUseChat && <AIChatWidget />}
     </div>
   )
 }

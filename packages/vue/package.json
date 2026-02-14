@@ -1,0 +1,62 @@
+{
+  "name": "@directive-run/vue",
+  "version": "0.1.0",
+  "description": "Vue composition API adapter for Directive.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DirectiveRun/DirectiveJS",
+    "directory": "packages/vue"
+  },
+  "homepage": "https://directive.run",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "vue",
+    "composition-api",
+    "state-management",
+    "reactive",
+    "constraint-driven"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@directive-run/core": "workspace:*",
+    "vue": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@types/node": "^25.2.0",
+    "vue": "^3.4.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

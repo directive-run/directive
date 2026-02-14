@@ -13,7 +13,7 @@ Create a system on the server and wait for it to settle:
 
 ```typescript
 // server.ts
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 export async function renderPage(req) {
   // Create a fresh system per request to avoid shared state
@@ -47,7 +47,7 @@ Hydrate the system on the client using the server snapshot:
 
 ```typescript
 // client.ts
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 // Create the same module structure as the server
 const system = createSystem({ module: pageModule });
@@ -71,7 +71,7 @@ hydrateRoot(
 
 ```typescript
 // app/layout.tsx
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 export default async function Page() {
   // Server Component: create, start, and settle before rendering

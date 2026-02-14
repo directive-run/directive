@@ -21,7 +21,7 @@ Directive provides two ways to work with fake timers in tests:
 Create a standalone fake timer for fine-grained control:
 
 ```typescript
-import { createFakeTimers } from 'directive/testing';
+import { createFakeTimers } from '@directive-run/core/testing';
 
 test('advance time manually', async () => {
   // Create an isolated timer starting at 0
@@ -62,7 +62,7 @@ test('advance time manually', async () => {
 For integration tests, use `settleWithFakeTimers` with Vitest's fake timer mode. It steps through time in small increments, flushing microtasks at each step, until all resolvers complete:
 
 ```typescript
-import { createTestSystem, settleWithFakeTimers } from 'directive/testing';
+import { createTestSystem, settleWithFakeTimers } from '@directive-run/core/testing';
 
 test('system settles with fake timers', async () => {
   // Replace real timers with Vitest fakes
@@ -189,7 +189,7 @@ test('resolver timeout', async () => {
 For low-level control, use `flushMicrotasks` to flush pending Promise callbacks without advancing time:
 
 ```typescript
-import { flushMicrotasks } from 'directive/testing';
+import { flushMicrotasks } from '@directive-run/core/testing';
 
 test('flush microtasks manually', async () => {
   vi.useFakeTimers();

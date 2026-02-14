@@ -254,7 +254,7 @@ derive: {
 
 ## React Issues
 
-### "Cannot read properties of undefined"
+### Cannot read properties of undefined
 
 **Symptoms**: Error when using `useFact()` or `useDerived()`.
 
@@ -353,9 +353,9 @@ context.facts.user_id  // Error: property does not exist
 **Solution**: Install the package:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 # or
-pnpm add directive
+pnpm add @directive-run/core
 # or
 yarn add directive
 ```
@@ -368,9 +368,9 @@ yarn add directive
 
 ```typescript
 // Import from subpaths so the bundler can tree-shake unused exports
-import { createModule, createSystem } from 'directive';
-import { loggingPlugin } from 'directive/plugins';
-import { useFact } from 'directive/react';
+import { createModule, createSystem } from '@directive-run/core';
+import { loggingPlugin } from '@directive-run/core/plugins';
+import { useFact } from '@directive-run/react';
 ```
 
 ---
@@ -388,7 +388,7 @@ const system = createSystem({
 
 2. **Use the DevTools plugin**:
 ```typescript
-import { devtoolsPlugin } from 'directive/plugins';
+import { devtoolsPlugin } from '@directive-run/core/plugins';
 
 // DevTools shows live constraint evaluations, resolver activity, and facts
 const system = createSystem({

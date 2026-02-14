@@ -36,7 +36,7 @@ They share nothing directly. Cross-module aggregation happens at the system leve
 The simplest of the three. It fetches once on load, with retry logic for transient failures:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 interface SaleRecord {
   id: string;
@@ -306,8 +306,8 @@ The `needsRefresh` constraint checks whether enough time has elapsed since the l
 All three modules compose into a single system with one call:
 
 ```typescript
-import { createSystem } from 'directive';
-import { loggingPlugin } from 'directive/plugins';
+import { createSystem } from '@directive-run/core';
+import { loggingPlugin } from '@directive-run/core/plugins';
 
 const dashboard = createSystem({
   modules: {
@@ -330,7 +330,7 @@ Each module's facts live under its namespace &ndash; `dashboard.facts.history.re
 The real power of composition shows up in aggregated views. `useSelector` computes values that span module namespaces with auto-tracked dependencies:
 
 ```tsx
-import { useSelector, useFact, useDerived, useInspect } from 'directive/react';
+import { useSelector, useFact, useDerived, useInspect } from '@directive-run/react';
 
 function DashboardPage() {
   const inspection = useInspect(dashboard);
@@ -442,7 +442,7 @@ No module knows or cares about the others' error states. The system degrades gra
 Install Directive and start building:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Explore the patterns used in this tutorial:

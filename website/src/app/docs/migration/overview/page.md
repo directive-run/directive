@@ -34,7 +34,7 @@ All three guides follow the same pattern:
 Directive provides analysis utilities that inspect your existing store and generate a migration plan:
 
 ```typescript
-import { analyzeReduxSlice, generateMigrationChecklist } from 'directive';
+import { analyzeReduxSlice, generateMigrationChecklist } from '@directive-run/core';
 
 // Point the analyzer at your existing Redux slice
 const analysis = analyzeReduxSlice({

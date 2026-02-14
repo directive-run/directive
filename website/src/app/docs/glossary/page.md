@@ -314,14 +314,14 @@ system.debug?.goTo(5);  // Jump to a specific snapshot index
 
 Directive provides builder utilities for creating type-safe constraints and resolvers outside of `createModule()`. These are useful for reusable definitions, shared libraries, and orchestrator configuration.
 
-### Core Builders (`directive`)
+### Core Builders (`@directive-run/core`)
 
 Directive provides two categories of core builders: **fluent builders** for ergonomic chaining, and **factory helpers** for typed one-offs.
 
 #### Fluent Builders
 
 ```typescript
-import { constraint, when, system, module } from 'directive';
+import { constraint, when, system, module } from '@directive-run/core';
 ```
 
 | Function | Description |
@@ -359,7 +359,7 @@ import {
   resolverFactory,
   typedConstraint,
   typedResolver,
-} from 'directive';
+} from '@directive-run/core';
 ```
 
 | Function | Description |
@@ -371,12 +371,12 @@ import {
 
 **See also**: [Builders documentation](/docs/builders) for full API reference and examples
 
-### AI Builders (`directive/ai`)
+### AI Builders (`@directive-run/ai`)
 
 For orchestrator-level constraints. The AI adapter has its own `constraint` and `when` typed against `OrchestratorConstraint` (simplified). For general use, prefer the core builders above.
 
 ```typescript
-import { constraint, when, createOrchestratorBuilder } from 'directive/ai';
+import { constraint, when, createOrchestratorBuilder } from '@directive-run/ai';
 ```
 
 | Function | Description |

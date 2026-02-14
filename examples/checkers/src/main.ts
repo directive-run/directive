@@ -9,13 +9,13 @@
  * streaming, multi-agent, communication bus, semantic cache, observability, OTLP.
  */
 
-import { createSystem } from "directive";
+import { createSystem } from "@directive-run/core";
 import { checkersGame } from "./game.js";
 import { checkersChat } from "./chat.js";
 import { createCheckersAI } from "./ai-orchestrator.js";
 import { getApiKey, setApiKey } from "./claude-adapter.js";
-import type { DashboardData } from "directive/ai";
-import { createAISyncer } from "directive/ai";
+import type { DashboardData } from "@directive-run/ai";
+import { createAISyncer } from "@directive-run/ai";
 import type { Board, Player } from "./rules.js";
 import { getAllValidMoves, toRowCol } from "./rules.js";
 

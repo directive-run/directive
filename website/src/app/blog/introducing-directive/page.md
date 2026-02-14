@@ -108,7 +108,7 @@ Directive modules are built from six concepts: facts, derivations, constraints, 
 Facts are your module's mutable state. Define them with a typed schema and initialize them in `init`:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const userProfile = createModule("user-profile", {
   schema: {
@@ -300,7 +300,7 @@ Events trigger fact mutations, which trigger the reconciliation loop. Dispatchin
 Here's the complete user profile module with all six concepts working together:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const userProfile = createModule("user-profile", {
   schema: {
@@ -468,13 +468,13 @@ The threshold is roughly this: when you have five or more interacting rules that
 Install Directive:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Define your first module:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const app = createModule("app", {
   schema: {

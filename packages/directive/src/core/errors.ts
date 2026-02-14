@@ -21,19 +21,31 @@ import {
 // ============================================================================
 
 /**
- * Pending retry entry.
+ * A retry entry scheduled by the "retry-later" recovery strategy.
+ * Stored internally and processed on each reconciliation cycle.
  */
 export interface PendingRetry {
+	/** Error source type (constraint, resolver, effect, derivation, system) */
 	source: ErrorSource;
+	/** Identifier of the source that errored (e.g., resolver name) */
 	sourceId: string;
+	/** Opaque context passed through from the original error */
 	context: unknown;
+	/** Current retry attempt number (1-based) */
 	attempt: number;
+	/** Timestamp (ms since epoch) when this retry becomes eligible */
 	nextRetryTime: number;
+	/** Optional callback invoked when the retry fires */
 	callback?: () => void;
 }
 
 /**
- * Create a retry-later manager.
+ * Create a retry-later manager for scheduling deferred retries with
+ * exponential backoff. Used internally by the error boundary when
+ * recovery strategy is `"retry-later"`.
+ *
+ * @param config - Retry configuration (delay, max retries, backoff multiplier, max delay).
+ * @returns Manager with schedule, process, cancel, and clear methods.
  */
 export function createRetryLaterManager(config: RetryLaterConfig = {}): {
 	/** Schedule a retry */
@@ -126,6 +138,11 @@ export function createRetryLaterManager(config: RetryLaterConfig = {}): {
 // Error Boundary Manager
 // ============================================================================
 
+/**
+ * Manager for centralized error handling and recovery.
+ * Determines a recovery strategy for each error, stores error history,
+ * and coordinates retry-later scheduling.
+ */
 export interface ErrorBoundaryManager {
 	/** Handle an error from a specific source */
 	handleError(source: ErrorSource, sourceId: string, error: unknown, context?: unknown): RecoveryStrategy;
@@ -143,7 +160,10 @@ export interface ErrorBoundaryManager {
 	clearRetryAttempts(sourceId: string): void;
 }
 
-/** Options for creating an error boundary manager */
+/**
+ * Options for creating an error boundary manager.
+ * Passed internally by the engine.
+ */
 export interface CreateErrorBoundaryOptions {
 	config?: ErrorBoundaryConfig;
 	/** Callback when an error occurs */
@@ -162,7 +182,27 @@ const DEFAULT_STRATEGIES: Record<ErrorSource, RecoveryStrategy> = {
 };
 
 /**
- * Create an error boundary manager.
+ * Create an error boundary manager with configurable recovery strategies.
+ *
+ * Each error source (constraint, resolver, effect, derivation, system)
+ * can have its own recovery strategy: `"skip"`, `"retry"`, `"retry-later"`,
+ * `"disable"`, or `"throw"`. The default for most sources is `"skip"`;
+ * system errors default to `"throw"`.
+ *
+ * @param options - Configuration including per-source strategies and callbacks.
+ * @returns An `ErrorBoundaryManager` with error handling, inspection, and retry methods.
+ *
+ * @example
+ * ```typescript
+ * const errors = createErrorBoundaryManager({
+ *   config: {
+ *     onResolverError: "retry-later",
+ *     onEffectError: "skip",
+ *     retryLater: { delayMs: 2000, maxRetries: 5 },
+ *   },
+ *   onError: (err) => Sentry.captureException(err),
+ * });
+ * ```
  */
 export function createErrorBoundaryManager(
 	options: CreateErrorBoundaryOptions = {},

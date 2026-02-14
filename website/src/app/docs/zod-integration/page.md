@@ -13,7 +13,7 @@ Pass Zod schemas directly as fact types – no wrapper needed:
 
 ```typescript
 import { z } from 'zod';
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 // Define a Zod schema for the user shape
 const UserSchema = z.object({

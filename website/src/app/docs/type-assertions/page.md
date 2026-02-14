@@ -12,7 +12,7 @@ Two patterns for types without runtime validation, plus custom validation for wh
 For zero-overhead typing, use the type assertion pattern. This gives full TypeScript inference without any runtime validation:
 
 ```typescript
-import { createModule } from 'directive';
+import { createModule } from '@directive-run/core';
 
 const myModule = createModule("example", {
   schema: {
@@ -58,7 +58,7 @@ For runtime validation, use the chainable `.validate()` and `.refine()` methods 
 ### Basic Validator
 
 ```typescript
-import { t } from 'directive';
+import { t } from '@directive-run/core';
 
 schema: {
   facts: {

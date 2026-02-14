@@ -12,7 +12,7 @@ Facts are your source of truth – reactive state that constraints, derivations,
 Define facts in your module schema using `t` type builders:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const userModule = createModule("user", {
   schema: {

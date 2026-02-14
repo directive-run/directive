@@ -12,7 +12,7 @@ The classic counter example, reimagined with constraints. {% .lead %}
 Let's start with a simple counter that increments and decrements:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const counterModule = createModule("counter", {
   // Define the shape of our state
@@ -179,8 +179,8 @@ const counterWithEffectsModule = createModule("counter-effects", {
 Here's a complete React implementation:
 
 ```tsx
-import { createModule, createSystem, t } from 'directive';
-import { useFact, useDerived } from 'directive/react';
+import { createModule, createSystem, t } from '@directive-run/core';
+import { useFact, useDerived } from '@directive-run/react';
 
 // --- Module definition ---
 

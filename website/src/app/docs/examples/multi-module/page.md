@@ -175,7 +175,7 @@ const checkoutModule = createModule("checkout", {
 ## Composing Modules
 
 ```typescript
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 // Pass multiple modules via a named map instead of a single `module`
 const system = createSystem({

@@ -1,5 +1,5 @@
 /**
- * Resolvers - Capability-based handlers for requirements
+ * Resolvers – Capability-based handlers for requirements
  *
  * Features:
  * - Capability matching (handles predicate)
@@ -7,6 +7,21 @@
  * - Retry policies with exponential backoff
  * - Batched resolution for similar requirements
  * - Cancellation via AbortController
+ *
+ * @example
+ * ```typescript
+ * resolvers: {
+ *   fetchUser: {
+ *     requirement: "FETCH_USER",
+ *     key: (request) => `user-${request.userId}`,
+ *     retry: { attempts: 3, backoff: "exponential" },
+ *     resolve: async (request, context) => {
+ *       const user = await api.getUser(request.userId);
+ *       context.facts.user = user;
+ *     },
+ *   },
+ * }
+ * ```
  */
 
 import type {
@@ -29,13 +44,23 @@ import { withTimeout } from "../utils/utils.js";
 // Resolvers Manager
 // ============================================================================
 
-/** Inflight resolver info */
+/**
+ * Information about a currently executing resolver.
+ * Returned by `system.inspect().inflight` for monitoring active resolutions.
+ */
 export interface InflightInfo {
+	/** Requirement ID being resolved */
 	id: string;
+	/** Name of the resolver handling this requirement */
 	resolverId: string;
+	/** Timestamp (ms since epoch) when resolution started */
 	startedAt: number;
 }
 
+/**
+ * Manager for requirement resolution. Matches requirements to resolvers,
+ * handles retries, deduplication, batching, and cancellation.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface ResolversManager<_S extends Schema> {
 	/** Start resolving a requirement */
@@ -77,7 +102,10 @@ interface BatchState {
 	timer: ReturnType<typeof setTimeout> | null;
 }
 
-/** Options for creating a resolvers manager */
+/**
+ * Options for creating a resolvers manager.
+ * Passed internally by the engine.
+ */
 export interface CreateResolversOptions<S extends Schema> {
 	definitions: ResolversDef<S>;
 	facts: Facts<S>;
@@ -137,7 +165,14 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
 }
 
 /**
- * Create a resolvers manager.
+ * Create a resolvers manager that executes resolver functions to fulfill requirements.
+ *
+ * Handles requirement-to-resolver matching (by type string or predicate function),
+ * custom dedupe keys, retry with exponential backoff, batched resolution for
+ * N+1 prevention, and cancellation of stale requirements.
+ *
+ * @param options - Configuration including resolver definitions, facts proxy, store, and callbacks.
+ * @returns A `ResolversManager` with resolve, cancel, and inspection methods.
  */
 export function createResolversManager<S extends Schema>(
 	options: CreateResolversOptions<S>,

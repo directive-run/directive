@@ -7,7 +7,7 @@ Demonstrates the three supported patterns for defining Directive schemas.
 Uses Directive's schema builder functions with optional runtime validation.
 
 ```typescript
-import { createModule, t } from "directive";
+import { createModule, t } from "@directive-run/core";
 
 createModule("user", {
   schema: {
@@ -45,7 +45,7 @@ createModule("user", {
 Uses `{} as { ... }` for type-only definitions.
 
 ```typescript
-import { createModule } from "directive";
+import { createModule } from "@directive-run/core";
 
 createModule("user", {
   schema: {
@@ -83,7 +83,7 @@ createModule("user", {
 Uses Zod for rich runtime validation.
 
 ```typescript
-import { createModule } from "directive";
+import { createModule } from "@directive-run/core";
 import { z } from "zod";
 
 const StatusSchema = z.enum(["idle", "loading", "success", "error"]);
@@ -147,7 +147,7 @@ pnpm test
 You can mix patterns in the same schema:
 
 ```typescript
-import { createModule, t } from "directive";
+import { createModule, t } from "@directive-run/core";
 import { z } from "zod";
 
 createModule("mixed", {

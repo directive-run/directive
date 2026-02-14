@@ -10,7 +10,7 @@ Detect SSNs, credit cards, emails, phone numbers, and more – then block, redac
 ## Quick Start
 
 ```typescript
-import { createEnhancedPIIGuardrail } from 'directive';
+import { createEnhancedPIIGuardrail } from '@directive-run/core';
 
 // Define which PII types to scan for and how to handle matches
 const piiGuardrail = createEnhancedPIIGuardrail({
@@ -23,7 +23,7 @@ const piiGuardrail = createEnhancedPIIGuardrail({
 Use with an orchestrator:
 
 ```typescript
-import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
+import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
 
 // Connect to OpenAI (or any compatible provider)
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
@@ -99,8 +99,8 @@ const guardrail = createEnhancedPIIGuardrail({
 Scan agent outputs for PII leakage:
 
 ```typescript
-import { createOutputPIIGuardrail } from 'directive';
-import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
+import { createOutputPIIGuardrail } from '@directive-run/core';
+import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
 
 // Scan agent responses for accidentally leaked PII
 const outputGuardrail = createOutputPIIGuardrail({
@@ -126,7 +126,7 @@ const orchestrator = createAgentOrchestrator({
 Use PII detection outside of guardrails:
 
 ```typescript
-import { detectPII, redactPII } from 'directive';
+import { detectPII, redactPII } from '@directive-run/core';
 
 // Step 1: Scan text for PII matches
 const result = await detectPII('My SSN is 123-45-6789', {
@@ -189,7 +189,7 @@ const guardrail = createEnhancedPIIGuardrail({
 For basic use with the orchestrator, a simpler guardrail is available:
 
 ```typescript
-import { createPIIGuardrail } from 'directive/ai';
+import { createPIIGuardrail } from '@directive-run/ai';
 
 // Lightweight alternative using raw regex patterns (no detection pipeline)
 const guardrail = createPIIGuardrail({

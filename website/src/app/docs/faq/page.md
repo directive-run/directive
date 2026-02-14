@@ -53,7 +53,7 @@ Common reasons:
 Debug with the devtools plugin:
 
 ```typescript
-import { devtoolsPlugin } from 'directive/plugins';
+import { devtoolsPlugin } from '@directive-run/core/plugins';
 
 // Attach devtools to see constraint evaluations and resolver activity
 const system = createSystem({
@@ -134,7 +134,7 @@ clientSystem.start();
 Use the `t` type builders in your schema:
 
 ```typescript
-import { t } from 'directive';
+import { t } from '@directive-run/core';
 
 const myModule = createModule("app", {
   schema: {
@@ -165,7 +165,7 @@ Common issues:
 No. Directive uses a system-first pattern where hooks take the system as their first parameter. No provider or context is needed:
 
 ```tsx
-import { useFact } from 'directive/react';
+import { useFact } from '@directive-run/react';
 
 // No Provider wrapper needed – pass the system directly
 function MyComponent() {

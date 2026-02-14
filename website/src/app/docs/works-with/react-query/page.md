@@ -94,7 +94,7 @@ This lets Directive constraints react to mutation completion – for example, tr
 Directive constraints fire when conditions are met. Resolvers call `queryClient.prefetchQuery` to warm the cache before the user navigates:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const dashboardModule = createModule('dashboard', {
   schema: {
@@ -198,7 +198,7 @@ The versioning pattern prevents re-invalidation until permissions change again.
 Use Directive to orchestrate optimistic updates with automatic rollback:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const todoModule = createModule('todos', {
   schema: {
@@ -274,7 +274,7 @@ The resolver handles the full optimistic update lifecycle: cancel in-flight → 
 Use a plugin to sync query cache changes into Directive facts. Map known query key prefixes to declared fact keys:
 
 ```typescript
-import type { Plugin } from 'directive';
+import type { Plugin } from '@directive-run/core';
 
 type QueryKeyMapping = {
   prefix: unknown[]; // Query key prefix to match (e.g., ['user'])
@@ -359,7 +359,7 @@ Use both `useQuery` and `useDirective` in the same component:
 ```tsx
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useDirectiveRef } from 'directive/react';
+import { useDirectiveRef } from '@directive-run/react';
 
 function UserDashboard({ userId }: { userId: string }) {
   // useDirectiveRef returns the system directly (useDirective returns reactive selections)
@@ -457,7 +457,7 @@ resolvers: {
 Test constraint-driven prefetching with Directive's test utilities:
 
 ```typescript
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 
 test('prefetch constraint fires on dashboard route', async () => {
   const testSystem = createTestSystem(dashboardModule);

@@ -55,7 +55,7 @@ const value = store.getState().counter.value;
 
 ```typescript
 // After: Directive approach – no actions, no reducers, no dispatch
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 // Define a module with typed schema
 const counterModule = createModule("counter", {
@@ -252,7 +252,7 @@ const store = configureStore({
 
 ```typescript
 // After: Directive plugin – use the built-in or write a simple object
-import { loggingPlugin } from 'directive/plugins';
+import { loggingPlugin } from '@directive-run/core/plugins';
 
 // Built-in plugin handles common logging needs
 const system = createSystem({
@@ -339,7 +339,7 @@ function Counter() {
 
 ```typescript
 // After: Directive component – useFact to read, direct mutation to write
-import { useFact } from 'directive/react';
+import { useFact } from '@directive-run/react';
 import { system } from './system';
 
 function Counter() {

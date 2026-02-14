@@ -42,7 +42,7 @@ Events → mutate Facts → trigger Derivations
 ## Quick Example
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 // Define a counter module with typed schema, computed values, and events
 const counter = createModule('counter', {

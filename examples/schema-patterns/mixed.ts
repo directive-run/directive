@@ -7,7 +7,7 @@
  * - type assertion for type-only definitions
  */
 
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 import { z } from "zod";
 
 // ============================================================================

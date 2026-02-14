@@ -10,7 +10,7 @@ The `t` namespace provides chainable type builders for schema definitions. {% .l
 ## Primitive Types
 
 ```typescript
-import { t } from 'directive';
+import { t } from '@directive-run/core';
 
 schema: {
   facts: {
@@ -331,7 +331,7 @@ schema: {
 For zero-overhead typing without runtime validation, use the type assertion pattern. This gives full TypeScript inference with no runtime cost:
 
 ```typescript
-import { createModule } from 'directive';
+import { createModule } from '@directive-run/core';
 
 const myModule = createModule("example", {
   schema: {

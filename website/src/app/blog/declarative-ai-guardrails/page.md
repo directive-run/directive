@@ -91,7 +91,7 @@ In [Building AI Agents with Directive](/blog/building-ai-agents), we showed how 
 The $2,000 overnight bill happened because budget tracking was a variable that got checked sometimes. With Directive, the budget is a constraint. When it's violated, the runtime requires action.
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const agentSafety = createModule('agent-safety', {
   schema: {
@@ -389,8 +389,8 @@ The approval flow has two constraints working together. `sensitiveAction` fires 
 Each guardrail above is an independent module. They don't know about each other. They don't import each other. They don't coordinate explicitly. But Directive's engine evaluates all of them together in a single reconciliation loop.
 
 ```typescript
-import { createSystem } from 'directive';
-import { loggingPlugin } from 'directive/plugins';
+import { createSystem } from '@directive-run/core';
+import { loggingPlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
   modules: [agentSafety, piiGuardrail, toolGuardrail, approvalGuardrail],
@@ -456,7 +456,7 @@ Declarative guardrails change the properties of your safety layer:
 Install Directive:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Explore the AI safety documentation:

@@ -17,8 +17,8 @@ The `createAgentOrchestrator` function wraps your agent run function with Direct
 import {
   createAgentOrchestrator,
   createPIIGuardrail,
-} from 'directive/ai';
-import type { AgentLike, AgentRunner } from 'directive/ai';
+} from '@directive-run/ai';
+import type { AgentLike, AgentRunner } from '@directive-run/ai';
 
 // Describe what the agent does and which model it uses
 const agent: AgentLike = {
@@ -78,7 +78,7 @@ import {
   createAgentOrchestrator,
   createPIIGuardrail,
   createToolGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -288,7 +288,7 @@ Resolvers receive a context with `facts` (the combined orchestrator state), `run
 Use `constraint()` and `when()` for ergonomic constraint construction:
 
 ```typescript
-import { constraint, when } from 'directive/ai';
+import { constraint, when } from '@directive-run/ai';
 
 interface MyFacts { confidence: number; errors: number }
 
@@ -425,7 +425,7 @@ import {
   createPIIGuardrail,
   createToolGuardrail,
   createOutputTypeGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createOrchestratorBuilder()
   // Escalate when token usage gets high
@@ -465,7 +465,7 @@ The orchestrator exposes a `.system` property â€“ a standard Directive system â€
 ### React
 
 ```tsx
-import { useAgentOrchestrator, useFact, useSelector, useWatch, useInspect } from 'directive/react';
+import { useAgentOrchestrator, useFact, useSelector, useWatch, useInspect } from '@directive-run/react';
 
 function AgentPanel() {
   // Initialize the orchestrator as a React hook (auto-disposes on unmount)
@@ -513,8 +513,8 @@ function AgentPanel() {
 
 ```html
 <script setup>
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact, useSelector, useInspect } from 'directive/vue';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact, useSelector, useInspect } from '@directive-run/vue';
 import { onUnmounted } from 'vue';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -538,8 +538,8 @@ const { isSettled } = useInspect(orchestrator.system);
 
 ```html
 <script>
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact, useInspect } from 'directive/svelte';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/svelte';
 import { onDestroy } from 'svelte';
 
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
@@ -560,8 +560,8 @@ const inspect = useInspect(orchestrator.system);
 ### Solid
 
 ```tsx
-import { createAgentOrchestrator } from 'directive/ai';
-import { useFact, useInspect } from 'directive/solid';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { useFact, useInspect } from '@directive-run/solid';
 import { onCleanup } from 'solid-js';
 
 function AgentPanel() {
@@ -588,8 +588,8 @@ function AgentPanel() {
 
 ```typescript
 import { LitElement, html } from 'lit';
-import { createAgentOrchestrator } from 'directive/ai';
-import { FactController, InspectController } from 'directive/lit';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { FactController, InspectController } from '@directive-run/lit';
 
 class AgentPanel extends LitElement {
   private orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
