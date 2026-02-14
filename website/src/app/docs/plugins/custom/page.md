@@ -12,7 +12,7 @@ Plugins hook into every stage of a Directive system without modifying core behav
 A plugin is a plain object with a `name` and any combination of hooks:
 
 ```typescript
-import type { Plugin } from 'directive';
+import type { Plugin } from '@directive-run/core';
 
 const myPlugin: Plugin = {
   // Every plugin needs a unique name for deduplication and debugging

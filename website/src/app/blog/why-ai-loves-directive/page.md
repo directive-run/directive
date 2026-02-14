@@ -29,7 +29,7 @@ The root cause wasn't the agent. It was the budget. Budget was a variable that g
 import {
   createAgentOrchestrator,
   createPIIGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -104,7 +104,7 @@ const orchestrator = createAgentOrchestrator({
 Scrub personal information from inputs before the agent sees them, and from outputs before they reach the user:
 
 ```typescript
-import { createPIIGuardrail } from 'directive/ai';
+import { createPIIGuardrail } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -123,8 +123,8 @@ Four lines of guardrail config. PII is redacted on both sides of the agent &ndas
 Block dangerous tools by name, or inspect arguments for destructive operations:
 
 ```typescript
-import { createToolGuardrail } from 'directive/ai';
-import type { GuardrailFn, ToolCallGuardrailData } from 'directive/ai';
+import { createToolGuardrail } from '@directive-run/ai';
+import type { GuardrailFn, ToolCallGuardrailData } from '@directive-run/ai';
 
 // Built-in: block tools by name
 const toolGuard = createToolGuardrail({
@@ -200,7 +200,7 @@ Enforce output structure with schemas or type guards:
 import {
   createOutputSchemaGuardrail,
   createOutputTypeGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 import { z } from 'zod';
 
 const orchestrator = createAgentOrchestrator({
@@ -233,7 +233,7 @@ When the agent's output doesn't match the schema, the guardrail blocks it before
 Directive is not an LLM wrapper. It doesn't call OpenAI, Anthropic, or Ollama. It manages facts, evaluates constraints, and dispatches resolvers. Your LLM calls happen in the `runner` function &ndash; Directive doesn't know or care which provider is behind it.
 
 ```typescript
-import type { AgentRunner } from 'directive/ai';
+import type { AgentRunner } from '@directive-run/ai';
 
 // OpenAI
 const openaiRunner: AgentRunner = async (agent, input, options) => {
@@ -278,7 +278,7 @@ import {
   supervisor,
   concatResults,
   aggregateTokens,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createMultiAgentOrchestrator({
   runner,
@@ -349,7 +349,7 @@ What Directive adds: budget enforcement that can't be bypassed. PII detection th
 Install Directive:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Build your first orchestrated agent:
@@ -359,7 +359,7 @@ import {
   createAgentOrchestrator,
   createPIIGuardrail,
   createToolGuardrail,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,

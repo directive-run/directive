@@ -88,8 +88,8 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: process.env.NODE_ENV === 'development'
-              ? "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com; connect-src 'self' https: ws:; frame-src 'self' https://stackblitz.com https://codesandbox.io;"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com; connect-src 'self' https:; frame-src 'self' https://stackblitz.com https://codesandbox.io;",
+              ? "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; img-src 'self' data: https: https://www.google-analytics.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com; connect-src 'self' https: ws: https://www.google-analytics.com https://analytics.google.com; frame-src 'self' https://stackblitz.com https://codesandbox.io;"
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; img-src 'self' data: https: https://www.google-analytics.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com; connect-src 'self' https: https://www.google-analytics.com https://analytics.google.com; frame-src 'self' https://stackblitz.com https://codesandbox.io;",
           },
         ],
       },

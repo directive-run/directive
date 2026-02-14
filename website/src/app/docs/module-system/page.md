@@ -12,7 +12,7 @@ Modules encapsulate state and logic. Systems run modules and provide the runtime
 A module is created with `createModule`:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 // Define a module with its schema and initial values
 const counterModule = createModule("counter", {
@@ -49,7 +49,7 @@ const counterModule = createModule("counter", {
 A system runs one or more modules:
 
 ```typescript
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 // Single module – facts and derivations are accessed directly
 // const system = createSystem({ module: counterModule });
@@ -228,7 +228,7 @@ See **[Multi-Module](/docs/advanced/multi-module)** for more details.
 Use `createModuleFactory()` when you need multiple instances of the same module definition:
 
 ```typescript
-import { createModuleFactory, t } from 'directive';
+import { createModuleFactory, t } from '@directive-run/core';
 
 const chatRoom = createModuleFactory({
   schema: {

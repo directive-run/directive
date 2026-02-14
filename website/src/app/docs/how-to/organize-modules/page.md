@@ -34,7 +34,7 @@ src/
 
 ```typescript
 // modules/auth/schema.ts
-import { t } from 'directive';
+import { t } from '@directive-run/core';
 
 export const authSchema = {
   token: t.string().optional(),
@@ -43,7 +43,7 @@ export const authSchema = {
 };
 
 // modules/auth/index.ts
-import { createModule } from 'directive';
+import { createModule } from '@directive-run/core';
 import { authSchema } from './schema';
 import { authConstraints } from './constraints';
 import { authResolvers } from './resolvers';
@@ -65,7 +65,7 @@ export const authModule = createModule('auth', {
 
 ```typescript
 // modules/cart/index.ts
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 export const cartModule = createModule('cart', {
   schema: {
@@ -110,7 +110,7 @@ export const cartModule = createModule('cart', {
 
 ```typescript
 // system.ts
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { authModule } from './modules/auth';
 import { cartModule } from './modules/cart';
 import { notificationsModule } from './modules/notifications';
@@ -143,7 +143,7 @@ system.facts.cart.items;
 ### Module factory for reusable patterns
 
 ```typescript
-import { createModuleFactory } from 'directive';
+import { createModuleFactory } from '@directive-run/core';
 
 // Factory for CRUD modules
 const createCrudModule = createModuleFactory((name: string, endpoint: string) => ({

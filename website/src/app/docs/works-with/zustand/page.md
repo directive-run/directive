@@ -137,7 +137,7 @@ system.watch('appliedDiscounts', (discounts) => {
 Zustand manages what the user selects. Directive decides what to do about it – with retry and error handling:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const pricingModule = createModule('pricing', {
   schema: {
@@ -320,7 +320,7 @@ Wire both stores in a React component:
 
 ```tsx
 import { useEffect } from 'react';
-import { useDirectiveRef } from 'directive/react';
+import { useDirectiveRef } from '@directive-run/react';
 import { useStore } from './zustand-store';
 
 function PricingPage() {
@@ -372,7 +372,7 @@ For server-side rendering, see [Advanced: SSR & Hydration](/docs/advanced/ssr) f
 Test the integration with Directive's test utilities:
 
 ```typescript
-import { createTestSystem } from 'directive/testing';
+import { createTestSystem } from '@directive-run/core/testing';
 
 test('pricing constraint fires when plan selected', async () => {
   const testSystem = createTestSystem(pricingModule);

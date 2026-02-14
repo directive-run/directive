@@ -12,7 +12,7 @@ Directive provides first-class SolidJS integration with hooks that bridge Direct
 The Solid adapter is included in the main package:
 
 ```typescript
-import { useFact, useDerived, useEvents, useDispatch } from 'directive/solid';
+import { useFact, useDerived, useEvents, useDispatch } from '@directive-run/solid';
 ```
 
 ---
@@ -22,7 +22,7 @@ import { useFact, useDerived, useEvents, useDispatch } from 'directive/solid';
 Create a system and pass it directly to hooks – no provider wrapper needed:
 
 ```tsx
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { userModule } from './modules/user';
 
 // Create and start the system
@@ -54,7 +54,7 @@ Creates a scoped system **and** subscribes to facts and derivations. Two modes:
 - **Subscribe all** – omit keys to subscribe to everything (good for prototyping or small modules)
 
 ```tsx
-import { useDirective } from 'directive/solid';
+import { useDirective } from '@directive-run/solid';
 import { counterModule } from './modules/counter';
 
 // Subscribe all: omit keys for everything
@@ -93,7 +93,7 @@ All hooks below take `system` as their first parameter.
 The go-to hook for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those:
 
 ```tsx
-import { useSelector, shallowEqual } from 'directive/solid';
+import { useSelector, shallowEqual } from '@directive-run/solid';
 
 function Summary() {
   // Transform a single fact value
@@ -334,8 +334,8 @@ function RequirementDebug(props) {
 These hooks require a `statusPlugin` instance. Create one and pass it to the hooks directly:
 
 ```tsx
-import { createRequirementStatusPlugin } from 'directive';
-import { useRequirementStatus } from 'directive/solid';
+import { createRequirementStatusPlugin } from '@directive-run/core';
+import { useRequirementStatus } from '@directive-run/solid';
 
 // Create the status plugin for tracking requirement resolution
 const statusPlugin = createRequirementStatusPlugin();
@@ -459,7 +459,7 @@ Create signals outside of components. Useful for stores or other reactive contex
 ### createDerivedSignal
 
 ```typescript
-import { createDerivedSignal } from 'directive/solid';
+import { createDerivedSignal } from '@directive-run/solid';
 
 const system = createSystem({ module: myModule });
 system.start();
@@ -477,7 +477,7 @@ cleanup();
 ### createFactSignal
 
 ```typescript
-import { createFactSignal } from 'directive/solid';
+import { createFactSignal } from '@directive-run/solid';
 
 const system = createSystem({ module: myModule });
 system.start();
@@ -497,7 +497,7 @@ cleanup();
 Create fully typed hooks for your module schema. Returned hooks take `system` as their first parameter:
 
 ```typescript
-import { createTypedHooks } from 'directive/solid';
+import { createTypedHooks } from '@directive-run/solid';
 
 // Create typed hooks – full autocomplete for keys and events
 const {
@@ -525,7 +525,7 @@ function Profile() {
 ### Undo / Redo Controls
 
 ```tsx
-import { useTimeTravel } from 'directive/solid';
+import { useTimeTravel } from '@directive-run/solid';
 import { Show } from 'solid-js';
 
 function UndoRedo() {
@@ -744,8 +744,8 @@ function IncrementButton() {
 
 ```tsx
 import { render, screen } from '@solidjs/testing-library';
-import { createTestSystem } from 'directive/testing';
-import { useFact } from 'directive/solid';
+import { createTestSystem } from '@directive-run/core/testing';
+import { useFact } from '@directive-run/solid';
 import { userModule } from './modules/user';
 import { UserProfile } from './UserProfile';
 

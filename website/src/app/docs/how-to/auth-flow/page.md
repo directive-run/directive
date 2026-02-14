@@ -14,7 +14,7 @@ Authentication touches everything: login forms, token storage, automatic refresh
 ## The Solution
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const auth = createModule('auth', {
   schema: {

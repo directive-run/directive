@@ -389,7 +389,7 @@ State machines and constraint-driven systems aren't mutually exclusive. In pract
 XState actors can live inside a Directive system. A state machine manages the micro-level flow (form steps, animation states), while constraints manage the macro-level rules (when should this flow start? what happens when it completes? how does it interact with other flows?).
 
 ```typescript
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 import { createActor } from "xstate";
 import { checkoutFormMachine } from "./machines";
 

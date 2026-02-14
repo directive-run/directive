@@ -25,7 +25,7 @@ User Question
   → Browser Widget    (parse SSE, render markdown)
 ```
 
-The first three stages use Directive's AI adapter (`directive/ai`). The server-side operational state &ndash; request counting, token budget tracking, health monitoring &ndash; uses the core Directive runtime (`createModule`, `createSystem`).
+The first three stages use Directive's AI adapter (`@directive-run/ai`). The server-side operational state &ndash; request counting, token budget tracking, health monitoring &ndash; uses the core Directive runtime (`createModule`, `createSystem`).
 
 ---
 
@@ -65,35 +65,85 @@ Every message passes through prompt injection detection and PII redaction before
 
 ## The embedding pipeline
 
-At build time, a script walks every Markdoc doc page, splits each page into sections (by heading), chunks sections into 200&ndash;400 token pieces, and embeds them via OpenAI's `text-embedding-3-small`. The result is a JSON file of chunks with their vectors, stored in `public/embeddings.json`.
+The chatbot draws from two complementary knowledge sources, each chunked and embedded separately at build time.
+
+**Phase 1 &ndash; Documentation pages.** A script walks every Markdoc doc page, splits each page into sections (by heading), chunks sections into ~600-token pieces, and embeds them via OpenAI's `text-embedding-3-small`. Each chunk carries a `sourceType` of `"guide"` (hand-written docs) or `"blog"` (blog posts).
+
+**Phase 2 &ndash; API reference.** A second script uses `ts-morph` to walk every exported symbol in the Directive source code, extract JSDoc comments, parameter types, return types, and `@example` blocks, then outputs a structured JSON file. Each symbol becomes one embedding chunk with `sourceType: "api-reference"` and metadata like `symbolName` and `symbolKind`.
 
 ```text
-Markdoc pages → parse AST → extract sections → chunk → embed → JSON
+Phase 1: Markdoc pages ─→ parse AST ─→ section chunks ─→ embed
+                                                              ╲
+                                                                → combined embeddings.json
+                                                              ╱
+Phase 2: TypeScript src ─→ ts-morph  ─→ function chunks ─→ embed
 ```
 
-This runs once per deploy. The embeddings file ships as a static asset alongside the site.
+When a symbol appears in both the generated API reference and a hand-written `/docs/api/*` page, the pipeline deduplicates and keeps only the generated version (it's canonical, since it comes directly from the source code).
+
+The combined result is a single JSON file stored in `public/embeddings.json`, shipped as a static asset alongside the site. This runs once per deploy.
+
+---
+
+## Generating the API reference
+
+The Phase 2 extraction script (`scripts/extract-api-docs.ts`) uses `ts-morph` to load the package entry points and follow re-exports to find the original declaration of every public symbol. For each export, it extracts the function signature, JSDoc body, `@param` tags, `@returns`, `@example` blocks, and `@throws` &ndash; then writes both a structured JSON file (for the embedding pipeline) and a readable Markdown file (for the team).
+
+```typescript
+// scripts/extract-api-docs.ts (simplified)
+const project = new Project({ tsConfigFilePath: 'tsconfig.json' })
+const entryFile = project.getSourceFileOrThrow('src/index.ts')
+
+for (const [name, declarations] of entryFile.getExportedDeclarations()) {
+  const decl = declarations[0]
+  const jsDocs = decl.getJsDocs?.()
+  entries.push({
+    name,
+    kind: decl.getKindName(),
+    signature: decl.getType().getText(),
+    description: jsDocs?.[0]?.getDescription() ?? '',
+    params: extractParams(decl),
+    returns: extractReturns(decl),
+    examples: extractExamples(jsDocs),
+  })
+}
+```
+
+The output groups symbols by module (`directive` vs. `directive/ai`) and sorts alphabetically within each group. The current extraction produces over 400 entries &ndash; 128 functions, 187 interfaces, 80 type aliases, and more &ndash; with over 100 entries carrying runnable `@example` blocks.
+
+Adding `pnpm build:api-docs` to the deploy sequence keeps the reference in sync with the source code. When a contributor adds JSDoc to an exported function, the chatbot automatically learns about it on the next deploy.
 
 ---
 
 ## RAG retrieval
 
-When a user sends a question, `createRAGEnricher` embeds the query with the same model, searches the JSON file by cosine similarity, and prepends the top-matching chunks to the prompt:
+When a user sends a question, `createRAGEnricher` embeds the query with the same model, searches the JSON file by cosine similarity, and returns the top-matching chunks. But raw similarity isn't always enough &ndash; a question about `createModule`'s parameters should prioritize API reference chunks, while a conceptual question about constraint design should prioritize guide pages.
+
+The route handler classifies each query as `"api"` or `"conceptual"` using a zero-cost regex check, then re-ranks the results:
 
 ```typescript
-const enricher = createRAGEnricher({
-  embedder: createOpenAIEmbedder({ apiKey: openaiKey }),
-  storage: createJSONFileStore({
-    filePath: path.join(process.cwd(), 'public', 'embeddings.json'),
-  }),
+// Classify intent (regex-based, zero runtime cost)
+const intent = classifyIntent(message) // "api" | "conceptual"
+
+// Over-fetch top 7 chunks
+const matches = await enricher.retrieve(message, 7)
+
+// Re-rank with source-type boost
+const ranked = matches.map((chunk) => {
+  let boost = 0
+  if (intent === 'api' && chunk.metadata.sourceType === 'api-reference') boost += 0.1
+  if (intent === 'conceptual' && chunk.metadata.sourceType === 'guide') boost += 0.05
+  if (safePath && chunk.metadata.url?.startsWith(safePath)) boost += 0.05
+
+  return { ...chunk, boostedScore: chunk.similarity + boost }
 })
 
-const enrichedInput = await enricher.enrich(userMessage, {
-  prefix: `The user is viewing: ${currentPage}`,
-  history,
-})
+// Diversity cap: max 2 chunks per symbolName, take top 5
 ```
 
-The enriched input includes the retrieved doc context, conversation history, and the original question. If enrichment fails or times out (5-second cap), the raw message is used as a fallback.
+The re-ranking ensures that asking "what does `system.inspect()` return?" surfaces the generated API reference entry (with the exact return type from the source code), while asking "how do constraints work?" surfaces the hand-written guide page (with conceptual explanations and diagrams). The diversity cap prevents any single symbol from dominating all five context slots.
+
+If enrichment fails or times out (5-second cap), the raw message is used as a fallback.
 
 ---
 
@@ -196,7 +246,64 @@ const docsChatbot = createModule('docs-chatbot', {
     activeIPs: (facts) =>
       Object.keys(facts.requestCounts).length,
   },
-  // events, constraints, resolvers, effects...
+
+  events: {
+    incomingRequest: (facts, { ip }) => {
+      const now = Date.now()
+      const counts = { ...facts.requestCounts }
+      const entry = counts[ip]
+
+      if (!entry || now > entry.resetAt) {
+        counts[ip] = { count: 1, resetAt: now + RATE_LIMIT_WINDOW }
+      } else {
+        counts[ip] = { ...entry, count: entry.count + 1 }
+      }
+
+      facts.requestCounts = counts
+      facts.totalRequests += 1
+    },
+
+    requestCompleted: (facts, { tokens }) => {
+      facts.totalTokensUsed += tokens
+      facts.consecutiveErrors = 0
+    },
+
+    requestFailed: (facts) => {
+      facts.consecutiveErrors += 1
+      facts.lastErrorAt = Date.now()
+    },
+  },
+
+  constraints: {
+    budgetExceeded: {
+      when: (facts) => facts.totalTokensUsed >= DAILY_TOKEN_BUDGET,
+      require: { type: 'LOG_BUDGET_WARNING' },
+    },
+  },
+
+  resolvers: {
+    logBudgetWarning: {
+      requirement: 'LOG_BUDGET_WARNING',
+      resolve: async (request, context) => {
+        console.warn(
+          `[docs-chatbot] Daily token budget exceeded: ${context.facts.totalTokensUsed} tokens`,
+        )
+      },
+    },
+  },
+
+  effects: {
+    logMetrics: {
+      deps: ['totalRequests', 'totalTokensUsed', 'consecutiveErrors'],
+      run: (facts) => {
+        if (facts.totalRequests > 0) {
+          console.log(
+            `[docs-chatbot] requests=${facts.totalRequests} tokens=${facts.totalTokensUsed} errors=${facts.consecutiveErrors}`,
+          )
+        }
+      },
+    },
+  },
 })
 ```
 
@@ -244,103 +351,161 @@ The module tracks cumulative metrics. The stack protects individual runs. They c
 
 ---
 
-## Complete request lifecycle
+## Full route handler
 
-Here's the full path a single chat message takes, from the user clicking "Send" to the streamed response appearing in the widget. Every numbered step maps to real code in the production chatbot.
+Here's the complete Next.js API route. The module, stack, enricher, and transport are all singletons initialized once per server process:
 
-### Client side: building the request
+```typescript
+// app/api/chat/route.ts
+import { NextRequest } from 'next/server'
+import path from 'node:path'
+import {
+  createAgentStack,
+  createAnthropicRunner,
+  createAnthropicStreamingRunner,
+  createPromptInjectionGuardrail,
+  createEnhancedPIIGuardrail,
+  createRAGEnricher,
+  createJSONFileStore,
+  createOpenAIEmbedder,
+  createSSETransport,
+  createLengthGuardrail,
+} from '@directive-run/ai'
+import { createSystem } from '@directive-run/core'
+import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
 
-**Step 1 &ndash; User submits a question.** The `AIChatWidget` component captures the message text and the current page URL (e.g. `/docs/constraints`).
+// ── Singletons ──────────────────────────────────────────────
 
-**Step 2 &ndash; History assembly.** The widget collects the last 20 messages from the conversation state (alternating user/assistant pairs) to send as context.
+const chatbotSystem = createSystem({ module: docsChatbot })
+chatbotSystem.start()
 
-**Step 3 &ndash; POST to `/api/chat`.** The widget sends a `fetch` request with `{ message, history, pageUrl }` as JSON. The `AbortController` from the widget is attached so the user can cancel mid-stream.
+const enricher = createRAGEnricher({
+  embedder: createOpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY! }),
+  storage: createJSONFileStore({
+    filePath: path.join(process.cwd(), 'public', 'embeddings.json'),
+  }),
+})
 
-### Server side: validation and rate limiting
+const transport = createSSETransport({
+  maxResponseChars: 3_000,
+  errorMessages: {
+    INPUT_GUARDRAIL_FAILED:
+      'Your message was flagged by our safety filter. Please rephrase your question.',
+  },
+})
 
-**Step 4 &ndash; Origin validation.** The route handler checks the `Origin` header against an allowlist (`directive.run` + `localhost`). Requests from unknown origins get a `403`.
+const stack = createAgentStack({
+  runner: createAnthropicRunner({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+    model: 'claude-haiku-4-5-20251001',
+    maxTokens: 2000,
+  }),
+  streaming: {
+    runner: createAnthropicStreamingRunner({
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 2000,
+    }),
+  },
+  agents: {
+    'docs-qa': {
+      agent: { name: 'directive-docs-qa', instructions: SYSTEM_PROMPT },
+      capabilities: ['question-answering', 'code-examples'],
+    },
+  },
+  guardrails: {
+    input: [
+      createPromptInjectionGuardrail({ strictMode: true }),
+      createEnhancedPIIGuardrail({ redact: true }),
+    ],
+    output: [createLengthGuardrail({ maxCharacters: 3_000 })],
+  },
+  memory: { maxMessages: 20 },
+  circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
+  rateLimit: { maxPerMinute: 30 },
+  maxTokenBudget: 2000,
+  hooks: {
+    onAgentComplete: ({ tokenUsage }) => {
+      chatbotSystem.events.requestCompleted({ tokens: tokenUsage })
+    },
+    onAgentError: () => {
+      chatbotSystem.events.requestFailed()
+    },
+  },
+})
 
-**Step 5 &ndash; Directive module event.** `chatbotSystem.events.incomingRequest({ ip })` fires. The module's `incomingRequest` event handler increments the per-IP request count and the global `totalRequests` counter.
+// ── Route handler ───────────────────────────────────────────
 
-**Step 6 &ndash; Sliding-window rate limit.** The handler reads `chatbotSystem.facts.requestCounts[ip]` and checks the count against `MAX_REQUESTS_PER_WINDOW` (10 requests per 60 seconds). Exceeding the limit returns a `429`.
+export async function POST(request: NextRequest) {
+  // 1. Track request in the Directive module
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  chatbotSystem.events.incomingRequest({ ip })
 
-**Step 7 &ndash; Daily cap check.** A separate counter tracks per-IP daily usage. When the cap is reached (25 questions/day), the widget shows a friendly "come back tomorrow" message. The cap can be disabled via `DISABLE_DAILY_CAP=true` for development.
+  // 2. Rate limit + health gate (read directly from module state)
+  const entry = chatbotSystem.facts.requestCounts[ip]
+  if (entry && entry.count > MAX_REQUESTS_PER_WINDOW) {
+    return new Response(JSON.stringify({ error: 'Too many requests.' }), { status: 429 })
+  }
 
-**Step 8 &ndash; Health gate.** `chatbotSystem.derive.isHealthy` is a derivation that returns `false` when consecutive errors exceed 5 or the daily token budget is exhausted. If unhealthy, the route returns a `503` before touching the AI stack.
+  if (!chatbotSystem.derive.isHealthy) {
+    return new Response(JSON.stringify({ error: 'Service temporarily unavailable.' }), { status: 503 })
+  }
 
-**Step 9 &ndash; Input validation.** The message is trimmed and checked: must be a non-empty string under 2,000 characters. History entries are validated individually &ndash; only valid `{ role, content }` pairs with content under 2,000 characters pass through.
+  // 3. Parse and validate input
+  const { message, history = [], pageUrl } = await request.json()
+  if (!message || typeof message !== 'string' || message.length > 2000) {
+    return new Response(JSON.stringify({ error: 'Invalid message.' }), { status: 400 })
+  }
 
-### RAG enrichment
+  // 4. RAG enrichment with intent-aware re-ranking (5s timeout fallback)
+  const intent = classifyIntent(message) // "api" | "conceptual"
+  let enrichedInput = message
+  try {
+    const matches = await Promise.race([
+      enricher.retrieve(message, 7),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 5_000),
+      ),
+    ])
+    // Re-rank: boost API chunks for API queries, guide chunks for conceptual queries
+    const ranked = matches
+      .map((chunk) => {
+        let boost = 0
+        if (intent === 'api' && chunk.metadata.sourceType === 'api-reference') boost += 0.1
+        if (intent === 'conceptual' && chunk.metadata.sourceType === 'guide') boost += 0.05
+        return { ...chunk, boostedScore: chunk.similarity + boost }
+      })
+      .sort((a, b) => b.boostedScore - a.boostedScore)
+      .slice(0, 5)
+    enrichedInput = formatEnrichedInput(ranked, message, history, pageUrl)
+  } catch {
+    // Fall back to raw message
+  }
 
-**Step 10 &ndash; Embed the query.** `createRAGEnricher` sends the user's question to OpenAI's `text-embedding-3-small` model to get a 1536-dimension vector.
+  // 5. Stream the response
+  const dailyRemaining = Math.max(0, DAILY_CAP_PER_IP - (chatbotSystem.facts.dailyCounts[ip]?.count ?? 0))
+  const sseResponse = transport.toResponse(stack, 'docs-qa', enrichedInput, {
+    signal: request.signal,
+  })
 
-**Step 11 &ndash; Cosine similarity search.** The enricher loads `public/embeddings.json` (generated at build time from all doc pages), computes cosine similarity between the query vector and every chunk vector, and selects the top-k most relevant chunks.
+  sseResponse.headers.set('X-Daily-Remaining', String(dailyRemaining))
 
-**Step 12 &ndash; Assemble enriched input.** The enricher builds a single string:
-
-```text
-[Page context] The user is currently viewing: /docs/constraints
-[Doc chunks] (top-k relevant documentation sections)
-[History] (last 20 messages for conversational continuity)
-[Question] How do I use the `after` property?
+  return sseResponse
+}
 ```
 
-**Step 13 &ndash; Timeout guard.** The enrichment runs inside a `Promise.race` with a 5-second timeout. If the embedding API is slow, the raw message is used as a fallback &ndash; the chatbot still works, just without RAG context.
+Five numbered comments, five phases &ndash; the same flow as the diagram below, in runnable code.
 
-### Agent stack execution
+---
 
-**Step 14 &ndash; Input guardrails.** The enriched input passes through two guardrails before reaching the LLM:
-- **Prompt injection detection** (`createPromptInjectionGuardrail`): Catches attempts to override the system prompt or extract instructions. In `strictMode`, suspicious inputs are blocked immediately with a user-facing error.
-- **PII redaction** (`createEnhancedPIIGuardrail`): Detects and redacts email addresses, phone numbers, SSNs, and other personal information before they reach the model.
+## Request lifecycle
 
-If either guardrail fails, the SSE transport sends an `error` event with the mapped message and the stream ends. No LLM call is made.
-
-**Step 15 &ndash; Circuit breaker check.** The agent stack's built-in circuit breaker tracks consecutive failures. After 3 failures, the breaker opens and all requests are rejected for 30 seconds (the recovery window). This prevents cascading failures from a down API.
-
-**Step 16 &ndash; Rate limiter check.** The stack-level rate limiter enforces 30 requests per minute across all users. This is separate from the per-IP limit in Step 6 &ndash; it protects the LLM API from bursts.
-
-**Step 17 &ndash; Streaming LLM call.** `createAnthropicStreamingRunner` sends the enriched input to Claude Haiku 4.5 with `maxTokens: 2000` (the LLM's per-call token limit, separate from the stack's `maxTokenBudget` cap). The system prompt (`BASE_INSTRUCTIONS`) includes the full API reference for Directive to prevent hallucination. The runner returns an `AsyncIterable<string>` of token chunks.
-
-### SSE transport
-
-**Step 18 &ndash; Token framing.** `createSSETransport` reads from the token iterator and writes each chunk as an SSE `data:` frame:
-
-```text
-data: {"type":"text","text":"Constraints declare"}
-
-data: {"type":"text","text":" what must be true"}
-```
-
-**Step 19 &ndash; Response truncation.** The transport tracks cumulative character count. At 3,000 characters, it sends a `truncated` event with any remaining content and closes the stream. This prevents runaway responses from consuming excessive tokens.
-
-**Step 20 &ndash; Heartbeat (optional).** When `heartbeatIntervalMs` is configured, periodic `heartbeat` events keep the connection alive through proxies and load balancers. The production chatbot disables heartbeats since responses are short-lived.
-
-**Step 21 &ndash; Completion.** When the token iterator is exhausted, the transport sends a `done` event and closes the stream.
-
-**Step 22 &ndash; Abort propagation.** If the user closes the widget or navigates away, the browser aborts the fetch request. The `AbortSignal` propagates through the SSE transport to the streaming runner, which cancels the in-flight API call. No orphaned connections.
-
-### Client side: rendering the response
-
-**Step 23 &ndash; SSE reader.** The widget reads the response body as a `ReadableStream`, parsing each `data:` line. Text events are appended to a growing response string.
-
-**Step 24 &ndash; Inline markdown rendering.** As tokens arrive, the widget renders the accumulated text as markdown with syntax-highlighted code blocks (prism-react-renderer). The rendering updates on every chunk, giving the user a real-time typing effect.
-
-**Step 25 &ndash; Daily remaining update.** The response headers include `X-Daily-Remaining` and `X-Daily-Limit`. The widget reads these to show a "5 questions remaining today" indicator.
-
-### Post-response lifecycle hooks
-
-**Step 26 &ndash; Success hook.** When the stream completes normally, the agent stack fires `onAgentComplete({ tokenUsage })`. This dispatches `chatbotSystem.events.requestCompleted({ tokens })`, which updates `totalTokensUsed` in the Directive module. The `tokenBudgetPercent` derivation recomputes automatically.
-
-**Step 27 &ndash; Error hook.** If the LLM call fails, `onAgentError()` fires instead. This dispatches `chatbotSystem.events.requestFailed()`, incrementing `consecutiveErrors`. If this crosses the threshold, the `isHealthy` derivation flips to `false`, and subsequent requests are short-circuited at Step 8 before touching the AI stack.
-
-### Full flow diagram
+Here's the full path a message takes, from the user clicking "Send" to the streamed response appearing in the widget:
 
 ```
 CLIENT (AIChatWidget)
   │
-  │  User types question
-  │  Build payload + history
-  │  POST /api/chat
+  │  POST /api/chat { message, history, pageUrl }
   │
   ▼
 SERVER (Next.js API Route)
@@ -355,8 +520,11 @@ SERVER (Next.js API Route)
   ▼
 RAG Enricher
   │
+  ├─ Classify intent (api / conceptual)
   ├─ Embed query (OpenAI)
-  ├─ Cosine similarity search
+  ├─ Cosine similarity search (top 7)
+  ├─ Re-rank with source-type boost
+  ├─ Diversity cap + top 5
   ├─ Assemble enriched input
   ├─ 5s timeout fallback
   │
@@ -380,23 +548,33 @@ SSE Transport
   ▼
 CLIENT (response stream)
   │
-  ├─ SSE reader
-  ├─ Markdown renderer
+  ├─ SSE reader + markdown renderer
   ├─ X-Daily-Remaining header
   │
   ▼
 Post-Response Hooks
   │
-  ├─ onAgentComplete
-  │   → requestCompleted event
-  │   → update token metrics
-  │
-  └─ onAgentError
-      → requestFailed event
-      → update health state
+  ├─ onAgentComplete → requestCompleted event
+  └─ onAgentError → requestFailed event
 ```
 
-The entire round-trip &ndash; from user click to first visible token &ndash; typically completes in under 2 seconds. The bulk of the latency comes from two network hops: the OpenAI embedding call (Step 10) and the Anthropic streaming call (Step 17). The RAG search, guardrail checks, and Directive module operations are all synchronous and sub-millisecond.
+### Validation and gating
+
+The route handler runs five checks before touching the AI stack. Origin validation rejects unknown domains. The Directive module tracks per-IP request counts (10 per 60 seconds) and daily caps (25 questions/day, configurable). The `isHealthy` derivation short-circuits with a `503` when consecutive errors exceed 5 or the daily token budget is exhausted.
+
+### RAG and agent execution
+
+The enricher classifies the query intent (API vs. conceptual), embeds the query, over-fetches the top 7 chunks by cosine similarity, re-ranks with source-type boosting, caps diversity at 2 chunks per symbol, and assembles the enriched input with page context and conversation history. If the embedding API is slow, a 5-second timeout falls back to the raw message.
+
+The enriched input passes through prompt injection detection and PII redaction before reaching Claude Haiku 4.5. The circuit breaker and stack-level rate limiter (30/min) add a second layer of protection beyond the per-IP limits.
+
+### Streaming and post-response
+
+`createSSETransport` frames each token as an SSE `data:` line, truncates at 3,000 characters, and propagates the client's `AbortSignal` all the way to the LLM call &ndash; no orphaned connections when users navigate away.
+
+After the stream completes, lifecycle hooks feed metrics back to the Directive module: `onAgentComplete` dispatches `requestCompleted` (updating token usage), and `onAgentError` dispatches `requestFailed` (updating health state). The `tokenBudgetPercent` and `isHealthy` derivations recompute automatically.
+
+The entire round-trip &ndash; from user click to first visible token &ndash; typically completes in under 2 seconds. The latency comes from two network hops: the OpenAI embedding call and the Anthropic streaming call. Everything else is synchronous and sub-millisecond.
 
 ---
 
@@ -405,13 +583,21 @@ The entire round-trip &ndash; from user click to first visible token &ndash; typ
 Install Directive and configure the required API keys:
 
 ```bash
-pnpm add directive
+pnpm add @directive-run/core
 ```
 
 ```bash
 # .env.local (make sure this file is in your .gitignore)
 OPENAI_API_KEY=sk-...        # Embeddings + RAG query
 ANTHROPIC_API_KEY=sk-ant-...  # Chat response generation
+```
+
+Generate the API reference and embeddings before building the site:
+
+```bash
+pnpm build:api-docs     # ts-morph extracts JSDoc → JSON + Markdown
+pnpm build:embeddings   # Embeds docs + API reference → public/embeddings.json
+pnpm build              # Next.js site build
 ```
 
 See the [AI & Agents docs](/docs/ai/overview) for the full AI adapter API, [SSE Transport](/docs/ai/sse-transport) for streaming setup, and [RAG Enricher](/docs/ai/rag) for the embedding pipeline.

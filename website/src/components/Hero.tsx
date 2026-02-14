@@ -10,7 +10,7 @@ import { HeroBackground } from '@/components/HeroBackground'
 import blurCyanImage from '@/images/blur-cyan.png'
 import blurIndigoImage from '@/images/blur-indigo.png'
 
-const moduleCode = `import { createModule } from 'directive';
+const moduleCode = `import { createModule } from '@directive-run/core';
 
 export default createModule("publish", {
   constraints: {
@@ -35,7 +35,7 @@ export default createModule("publish", {
   },
 });`
 
-const reactCode = `import { useFact } from 'directive/react';
+const reactCode = `import { useFact } from '@directive-run/react';
 
 function PublishButton() {
   const saved = useFact(system, "saved");

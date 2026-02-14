@@ -177,7 +177,7 @@ interface TimeTravelState {
 ### React
 
 ```tsx
-import { useTimeTravel } from 'directive/react';
+import { useTimeTravel } from '@directive-run/react';
 
 function TimeTravelToolbar() {
   const timeTravel = useTimeTravel(system);
@@ -245,7 +245,7 @@ function TimeTravelToolbar() {
 
 ```html
 <script setup>
-import { useTimeTravel } from 'directive/vue';
+import { useTimeTravel } from '@directive-run/vue';
 import { system } from './system';
 
 const timeTravel = useTimeTravel(system);
@@ -300,7 +300,7 @@ function restoreSession() {
 
 ```html
 <script>
-import { useTimeTravel } from 'directive/svelte';
+import { useTimeTravel } from '@directive-run/svelte';
 import { system } from '$lib/directive';
 
 const timeTravel = useTimeTravel(system);
@@ -360,7 +360,7 @@ function restoreSession() {
 ### Solid
 
 ```tsx
-import { useTimeTravel } from 'directive/solid';
+import { useTimeTravel } from '@directive-run/solid';
 import { Show, For } from 'solid-js';
 
 function TimeTravelToolbar() {
@@ -430,7 +430,7 @@ function TimeTravelToolbar() {
 ### Lit
 
 ```typescript
-import { TimeTravelController } from 'directive/lit';
+import { TimeTravelController } from '@directive-run/lit';
 
 class TimeTravelToolbar extends LitElement {
   private _timeTravel = new TimeTravelController(this, system);
@@ -545,7 +545,7 @@ console.log(system.facts.count); // 5
 Create tamper-proof snapshots for secure transmission:
 
 ```typescript
-import { signSnapshot, verifySnapshotSignature } from 'directive';
+import { signSnapshot, verifySnapshotSignature } from '@directive-run/core';
 
 // Attach an HMAC signature to detect tampering
 const signed = signSnapshot(snapshot, process.env.SIGNING_SECRET);
@@ -563,7 +563,7 @@ if (isValid) {
 Compare two snapshots to see what changed:
 
 ```typescript
-import { diffSnapshots } from 'directive';
+import { diffSnapshots } from '@directive-run/core';
 
 // Take a "before" snapshot, let state change, then take an "after"
 const before = system.getSnapshot();

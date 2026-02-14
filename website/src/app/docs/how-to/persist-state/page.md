@@ -14,8 +14,8 @@ Users expect their preferences, draft content, and navigation state to survive p
 ## The Solution
 
 ```typescript
-import { createSystem } from 'directive';
-import { persistencePlugin } from 'directive/plugins';
+import { createSystem } from '@directive-run/core';
+import { persistencePlugin } from '@directive-run/core/plugins';
 import { authModule } from './modules/auth';
 import { settingsModule } from './modules/settings';
 

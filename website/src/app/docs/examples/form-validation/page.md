@@ -10,7 +10,7 @@ Validate forms declaratively with constraints. {% .lead %}
 ## The Module
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 const formModule = createModule("signup-form", {
   // Every field and its validation state lives in typed facts
@@ -121,8 +121,8 @@ const formModule = createModule("signup-form", {
 ## React Component
 
 ```typescript
-import { createSystem } from 'directive';
-import { useFact, useDerived } from 'directive/react';
+import { createSystem } from '@directive-run/core';
+import { useFact, useDerived } from '@directive-run/react';
 
 // Boot the form system once at module scope
 const system = createSystem({ module: formModule });

@@ -10,7 +10,7 @@ Handle data export requests, right-to-erasure, consent management, and retention
 ## Basic Setup
 
 ```typescript
-import { createCompliance, createInMemoryComplianceStorage } from 'directive/ai';
+import { createCompliance, createInMemoryComplianceStorage } from '@directive-run/ai';
 
 const compliance = createCompliance({
   // In-memory storage for development (use a database adapter in production)
@@ -117,7 +117,7 @@ const marketingUsers = await compliance.consent.getForPurpose('marketing');
 Block AI processing when consent is missing:
 
 ```typescript
-import { createAgentOrchestrator, createOpenAIRunner } from 'directive/ai';
+import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
 
 // Block AI processing unless the user has granted the 'ai_processing' consent
 const consentGuardrail = compliance.createConsentGuardrail('ai_processing');

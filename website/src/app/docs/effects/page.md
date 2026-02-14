@@ -12,7 +12,7 @@ Effects run side effects without blocking the reconciliation loop. {% .lead %}
 Define effects in your module to react to fact changes:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const analyticsModule = createModule("analytics", {
   schema: {

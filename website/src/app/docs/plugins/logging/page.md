@@ -10,7 +10,7 @@ The logging plugin hooks into every lifecycle event in a Directive system and lo
 ## Basic Usage
 
 ```typescript
-import { loggingPlugin } from 'directive/plugins';
+import { loggingPlugin } from '@directive-run/core/plugins';
 
 // Zero-config: logs info-level events and above with the [Directive] prefix
 const system = createSystem({

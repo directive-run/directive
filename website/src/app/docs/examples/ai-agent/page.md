@@ -14,7 +14,7 @@ This example requires the `openai` package: `npm install openai`
 {% /callout %}
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 import { OpenAI } from 'openai';
 
 // Shape of each message in the conversation history
@@ -165,7 +165,7 @@ const agentModule = createModule("agent", {
 
 ```typescript
 import { useState } from 'react';
-import { useFact } from 'directive/react';
+import { useFact } from '@directive-run/react';
 
 // Boot the agent system once at module scope
 const system = createSystem({ module: agentModule });

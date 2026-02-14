@@ -47,9 +47,39 @@ export function BlogPostLayout({
   } = frontmatter
   const author = authorId ? resolveAuthor(authorId) : null
   const readingTime = formatReadingTime(calculateReadingTime(nodes))
+  const canonicalUrl = slug ? `https://directive.run/blog/${slug}` : undefined
+  const ogImageUrl = title
+    ? `https://directive.run/api/og?title=${encodeURIComponent(title)}`
+    : undefined
 
   return (
     <div className="w-full py-16">
+      {title && <title>{`${title} | Directive Blog`}</title>}
+      {description && <meta name="description" content={description} />}
+      {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+      {title && <meta property="og:title" content={title} />}
+      {description && <meta property="og:description" content={description} />}
+      {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+      <meta property="og:type" content="article" />
+      {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      {title && <meta name="twitter:title" content={title} />}
+      {description && <meta name="twitter:description" content={description} />}
+      {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
+      {date && (
+        <meta
+          property="article:published_time"
+          content={date instanceof Date ? date.toISOString() : date}
+        />
+      )}
+      {dateModified && (
+        <meta
+          property="article:modified_time"
+          content={dateModified instanceof Date ? dateModified.toISOString() : String(dateModified)}
+        />
+      )}
+
       {title && description && slug && (
         <ArticleJsonLd
           title={title}

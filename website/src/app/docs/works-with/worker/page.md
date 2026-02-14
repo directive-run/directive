@@ -9,18 +9,18 @@ Run your Directive engine in a dedicated Web Worker so constraint evaluation, re
 
 ## Installation
 
-The worker adapter ships with the main `directive` package under the `directive/worker` subpath:
+The worker adapter ships with the `@directive-run/core` package under the `@directive-run/core/worker` subpath:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 ```typescript
 // Main thread – communicates with the worker over postMessage
-import { createWorkerClient } from 'directive/worker';
+import { createWorkerClient } from '@directive-run/core/worker';
 
 // Worker script – registers modules and handles messages
-import { registerWorkerModule, handleWorkerMessages } from 'directive/worker';
+import { registerWorkerModule, handleWorkerMessages } from '@directive-run/core/worker';
 ```
 
 ---
@@ -31,7 +31,7 @@ Modules contain functions, so they cannot be serialized over `postMessage`. Defi
 
 ```typescript
 // directive.worker.ts
-import { registerWorkerModule, handleWorkerMessages } from 'directive/worker';
+import { registerWorkerModule, handleWorkerMessages } from '@directive-run/core/worker';
 import { analyticsModule } from './modules/analytics';
 import { pricingModule } from './modules/pricing';
 
@@ -52,7 +52,7 @@ handleWorkerMessages();
 Use `createWorkerClient` to get a `WorkerClient` that communicates with the worker over `postMessage`:
 
 ```typescript
-import { createWorkerClient } from 'directive/worker';
+import { createWorkerClient } from '@directive-run/core/worker';
 
 // Create a Web Worker from the worker script
 const worker = new Worker(
@@ -219,7 +219,7 @@ await client.settle(5000);
 Cast the client to `TypedWorkerClient<M>` to get compile-time checks on `setFact`, `setFacts`, and `dispatch`:
 
 ```typescript
-import type { TypedWorkerClient } from 'directive/worker';
+import type { TypedWorkerClient } from '@directive-run/core/worker';
 import type { analyticsModule } from './modules/analytics';
 
 // Cast the client for compile-time key and value checks

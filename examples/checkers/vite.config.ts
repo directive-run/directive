@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { apiProxy } from "@directive/vite-plugin-api-proxy";
+import { apiProxy } from "@directive-run/vite-plugin-api-proxy";
 
 export default defineConfig({
   build: {

@@ -319,7 +319,7 @@ Each of these failure modes maps to a first-class Directive concept. Cross-store
 ### Cross-module derivations
 
 ```typescript
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 
 const auth = createModule("auth", {
   schema: {
@@ -522,7 +522,7 @@ Zustand and Directive aren't mutually exclusive. A practical migration path keep
 
 ```typescript
 import { create } from "zustand";
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 
 // Zustand: simple UI state that doesn't need orchestration
 const useUIStore = create(() => ({

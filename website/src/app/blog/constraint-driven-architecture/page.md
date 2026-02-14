@@ -105,7 +105,7 @@ This is [constraint-driven architecture](/docs/core-concepts): declare what must
 In Directive, you model your domain as a **module** – a self-contained unit with facts (state), constraints (rules), and resolvers (actions). Here's how the checkout example looks:
 
 ```typescript
-import { createModule, t } from "directive";
+import { createModule, t } from "@directive-run/core";
 
 const checkout = createModule("checkout", {
   schema: {
@@ -268,13 +268,13 @@ The sweet spot is systems where **the rules are complex enough that imperative c
 Install Directive:
 
 ```bash
-npm install directive
+npm install @directive-run/core
 ```
 
 Define a module with facts, constraints, and resolvers:
 
 ```typescript
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 
 const counter = createModule("counter", {
   schema: {

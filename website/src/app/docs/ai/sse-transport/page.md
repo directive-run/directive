@@ -12,7 +12,7 @@ Turn any AgentStack token stream into a Server-Sent Events HTTP response. {% .le
 `createSSETransport` converts the output of `stack.stream()` into a standard SSE byte stream. It works with any WinterCG-compatible runtime (Node 18+, Deno, Bun, Cloudflare Workers, Next.js App Router).
 
 ```typescript
-import { createSSETransport, createAgentStack } from 'directive/ai';
+import { createSSETransport, createAgentStack } from '@directive-run/ai';
 
 const transport = createSSETransport({
   maxResponseChars: 10_000,
@@ -53,7 +53,7 @@ Returns an `SSETransport` with two methods: `toResponse()` and `toStream()`.
 The transport emits a discriminated union of five event types. Import for client-side type safety:
 
 ```typescript
-import type { SSEEvent } from 'directive/ai';
+import type { SSEEvent } from '@directive-run/ai';
 ```
 
 ```typescript
@@ -276,14 +276,14 @@ The signal is forwarded to `stack.stream()`, which aborts the underlying LLM cal
 
 ## `createAnthropicStreamingRunner`
 
-A built-in streaming runner that calls the Anthropic Messages API with server-sent events. It is defined in `helpers.ts` but re-exported from the same `directive/ai` entry point. Pair it with the SSE transport for an end-to-end Anthropic streaming pipeline.
+A built-in streaming runner that calls the Anthropic Messages API with server-sent events. It is defined in `helpers.ts` but re-exported from the same `@directive-run/ai` entry point. Pair it with the SSE transport for an end-to-end Anthropic streaming pipeline.
 
 ```typescript
 import {
   createAnthropicRunner,
   createAnthropicStreamingRunner,
   createAgentStack,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const streamingRunner = createAnthropicStreamingRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -331,7 +331,7 @@ import {
   createJSONFileStore,
   createOpenAIEmbedder,
   createSSETransport,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const apiKey = process.env.ANTHROPIC_API_KEY!;
 

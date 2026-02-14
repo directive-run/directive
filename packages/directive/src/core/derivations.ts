@@ -1,5 +1,5 @@
 /**
- * Derivations - Auto-tracked computed values with composition
+ * Derivations – Auto-tracked computed values with composition
  *
  * Features:
  * - Automatic dependency tracking (no manual deps arrays)
@@ -7,6 +7,23 @@
  * - Derivation composition (derivations can depend on other derivations)
  * - Circular dependency detection
  * - Lazy evaluation
+ *
+ * @example
+ * ```typescript
+ * const myModule = createModule("counter", {
+ *   schema: {
+ *     facts: { count: t.number() },
+ *     derivations: { doubled: t.number(), isEven: t.boolean() },
+ *   },
+ *   init: (facts) => { facts.count = 0; },
+ *   derive: {
+ *     // Lazy evaluation – only recomputes when `count` changes
+ *     doubled: (facts) => facts.count * 2,
+ *     // Composition – derivations can depend on other derivations
+ *     isEven: (facts, derive) => derive.doubled % 2 === 0,
+ *   },
+ * });
+ * ```
  */
 
 import { trackAccess, withTracking } from "./tracking.js";
@@ -23,6 +40,11 @@ import type {
 // Derivations Manager
 // ============================================================================
 
+/**
+ * Manager for lazily-evaluated, auto-tracked derivations.
+ * Derivations recompute only when their tracked dependencies change.
+ * Supports composition (derivation → derivation), subscription, and inspection.
+ */
 export interface DerivationsManager<S extends Schema, D extends DerivationsDef<S>> {
 	/** Get a derived value (computes if stale) */
 	get<K extends keyof D>(id: K): ReturnType<D[K]>;
@@ -44,7 +66,11 @@ export interface DerivationsManager<S extends Schema, D extends DerivationsDef<S
 	registerDefinitions(newDefs: DerivationsDef<S>): void;
 }
 
-/** Options for creating a derivations manager */
+/**
+ * Options for creating a derivations manager.
+ * Passed internally by the engine – most users interact with derivations
+ * through `system.derive` or `system.read()`.
+ */
 export interface CreateDerivationsOptions<S extends Schema, D extends DerivationsDef<S>> {
 	definitions: D;
 	facts: Facts<S>;
@@ -58,7 +84,15 @@ export interface CreateDerivationsOptions<S extends Schema, D extends Derivation
 }
 
 /**
- * Create a derivations manager.
+ * Create a derivations manager that handles lazy evaluation, auto-tracking,
+ * and invalidation of derived values.
+ *
+ * Derivations are lazily computed on first read and cached until their
+ * dependencies change. Dependency tracking is automatic – the manager
+ * records which facts each derivation accesses during computation.
+ *
+ * @param options - Configuration including derivation definitions, facts proxy, and callbacks.
+ * @returns A `DerivationsManager` with methods for get, subscribe, invalidate, and inspect.
  */
 export function createDerivationsManager<S extends Schema, D extends DerivationsDef<S>>(
 	options: CreateDerivationsOptions<S, D>,

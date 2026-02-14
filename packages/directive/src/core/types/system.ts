@@ -69,13 +69,50 @@ export type EventsAccessor<M extends ModuleSchema> = EventsAccessorFromSchema<M>
 // Debug & Time-Travel Types
 // ============================================================================
 
-/** Debug configuration */
+/**
+ * Debug configuration passed to `createSystem()`.
+ * Enables time-travel debugging with configurable snapshot limits.
+ */
 export interface DebugConfig {
+	/** Enable time-travel debugging (default: false) */
 	timeTravel?: boolean;
+	/** Maximum number of snapshots to retain (default: 100) */
 	maxSnapshots?: number;
 }
 
-/** Time-travel API */
+/**
+ * Time-travel debugging API. Available on `system.debug` when `debug.timeTravel` is enabled.
+ * Provides snapshot-based undo/redo, export/import for session persistence,
+ * and changesets for grouping related mutations.
+ *
+ * @example
+ * ```typescript
+ * const system = createSystem({
+ *   module: myModule,
+ *   debug: { timeTravel: true, maxSnapshots: 100 },
+ * });
+ * system.start();
+ *
+ * // Navigate history
+ * system.debug.goBack();
+ * system.debug.goForward();
+ *
+ * // Group related changes into a single undo step
+ * system.debug.beginChangeset("form-edit");
+ * system.facts.firstName = "Jane";
+ * system.facts.lastName = "Doe";
+ * system.debug.endChangeset();
+ *
+ * // Suppress snapshots during bulk operations
+ * system.debug.pause();
+ * // ... bulk mutations ...
+ * system.debug.resume();
+ *
+ * // Export/import session for persistence
+ * const json = system.debug.export();
+ * system.debug.import(json);
+ * ```
+ */
 export interface TimeTravelAPI {
 	readonly snapshots: Snapshot[];
 	readonly currentIndex: number;
@@ -92,14 +129,21 @@ export interface TimeTravelAPI {
 	resume(): void;
 }
 
-/** Lightweight snapshot metadata (no facts data — keeps re-renders cheap) */
+/** Lightweight snapshot metadata (no facts data – keeps re-renders cheap) */
 export interface SnapshotMeta {
+	/** Auto-incremented snapshot ID */
 	id: number;
+	/** Unix timestamp when the snapshot was taken */
 	timestamp: number;
+	/** Human-readable trigger description (e.g., "facts-changed:count") */
 	trigger: string;
 }
 
-/** Reactive time-travel state for framework hooks */
+/**
+ * Reactive time-travel state for framework adapter hooks (e.g., `useTimeTravel()`).
+ * Provides all time-travel operations plus reactive properties (`canUndo`, `canRedo`)
+ * that trigger re-renders when snapshot history changes.
+ */
 export interface TimeTravelState {
 	// Existing (unchanged)
 	canUndo: boolean;
@@ -137,21 +181,49 @@ export interface TimeTravelState {
 // System Inspection Types
 // ============================================================================
 
-/** System inspection result */
+/**
+ * Runtime inspection snapshot returned by `system.inspect()`.
+ * Provides a point-in-time view of the system's constraint/resolver state
+ * for debugging and monitoring.
+ *
+ * @example
+ * ```typescript
+ * const inspection = system.inspect();
+ * console.log(`Unmet requirements: ${inspection.unmet.length}`);
+ * console.log(`Inflight resolvers: ${inspection.inflight.length}`);
+ * for (const c of inspection.constraints) {
+ *   console.log(`Constraint ${c.id}: active=${c.active}, priority=${c.priority}`);
+ * }
+ * ```
+ */
 export interface SystemInspection {
+	/** Currently unmet requirements produced by active constraints */
 	unmet: RequirementWithId[];
+	/** Resolvers currently executing (with their start time for latency tracking) */
 	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+	/** All constraint states (active/inactive and priority) */
 	constraints: Array<{ id: string; active: boolean; priority: number }>;
+	/** Resolver execution status keyed by resolver ID */
 	resolvers: Record<string, ResolverStatus>;
 }
 
-/** Explanation of why a requirement exists */
+/**
+ * Structured explanation of why a requirement exists.
+ * Returned by `system.explain()` to trace a requirement back to its
+ * originating constraint and the facts that triggered it.
+ */
 export interface RequirementExplanation {
+	/** Unique ID of the requirement */
 	requirementId: string;
+	/** The requirement type string (e.g., "FETCH_USER") */
 	requirementType: string;
+	/** ID of the constraint that produced this requirement */
 	constraintId: string;
+	/** Priority of the originating constraint */
 	constraintPriority: number;
+	/** Facts snapshot relevant to the constraint evaluation */
 	relevantFacts: Record<string, unknown>;
+	/** Current resolver execution status for this requirement */
 	resolverStatus: ResolverStatus;
 }
 
@@ -226,7 +298,19 @@ export interface DistributableSnapshot<T = Record<string, unknown>> {
  * System interface using consolidated module schema.
  * Provides full type inference for facts, derivations, events, and dispatch.
  */
-/** Runtime control for constraints */
+/**
+ * Runtime control for enabling/disabling individual constraints.
+ * Available on `system.constraints`.
+ *
+ * @example
+ * ```typescript
+ * // Disable a constraint during maintenance
+ * system.constraints.disable("rateLimiter");
+ *
+ * // Re-enable it
+ * system.constraints.enable("rateLimiter");
+ * ```
+ */
 export interface ConstraintsControl {
 	/** Disable a constraint by ID — it will be excluded from evaluation */
 	disable(id: string): void;
@@ -234,7 +318,21 @@ export interface ConstraintsControl {
 	enable(id: string): void;
 }
 
-/** Runtime control for effects */
+/**
+ * Runtime control for enabling/disabling individual effects.
+ * Available on `system.effects`.
+ *
+ * @example
+ * ```typescript
+ * // Disable analytics during tests
+ * system.effects.disable("trackPageView");
+ *
+ * // Check if an effect is active
+ * if (system.effects.isEnabled("trackPageView")) {
+ *   console.log("Analytics is running");
+ * }
+ * ```
+ */
 export interface EffectsControl {
 	/** Disable an effect by ID — it will be skipped during reconciliation */
 	disable(id: string): void;
@@ -269,6 +367,22 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	dispatch(event: InferEvents<M>): void;
 	dispatch(event: SystemEvent): void;
 
+	/**
+	 * Group multiple fact mutations into a single reconciliation cycle.
+	 * Nested batch calls are safe – only the outermost batch triggers reconciliation.
+	 *
+	 * @param fn - Synchronous function containing fact mutations.
+	 *
+	 * @example
+	 * ```typescript
+	 * system.batch(() => {
+	 *   system.facts.firstName = "Jane";
+	 *   system.facts.lastName = "Doe";
+	 *   system.facts.email = "jane@example.com";
+	 * });
+	 * // Single reconciliation for all three changes
+	 * ```
+	 */
 	batch(fn: () => void): void;
 
 	/**
@@ -332,8 +446,58 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 		options?: { timeout?: number },
 	): Promise<void>;
 
+	/**
+	 * Inspect the current runtime state – unmet requirements, inflight resolvers,
+	 * constraint activity, and resolver statuses.
+	 *
+	 * @returns A point-in-time snapshot of the system's constraint/resolver state.
+	 *
+	 * @example
+	 * ```typescript
+	 * const { unmet, inflight, constraints } = system.inspect();
+	 * if (inflight.length > 0) {
+	 *   console.log("Resolvers still running:", inflight.map(r => r.resolverId));
+	 * }
+	 * ```
+	 */
 	inspect(): SystemInspection;
+
+	/**
+	 * Wait until all inflight resolvers complete and no reconciliation is pending.
+	 * Useful in tests and scripts that need to await full system stabilization.
+	 *
+	 * @param maxWait - Maximum time to wait in milliseconds (default: 5000).
+	 * @throws If the timeout is exceeded while resolvers are still inflight.
+	 *
+	 * @example
+	 * ```typescript
+	 * system.start();
+	 * system.facts.userId = "u_123";
+	 * await system.settle(); // waits for FETCH_USER resolver to finish
+	 * expect(system.facts.user).toBeDefined();
+	 * ```
+	 */
 	settle(maxWait?: number): Promise<void>;
+
+	/**
+	 * Explain why a specific requirement exists – traces it back to the
+	 * originating constraint, its priority, payload, and the current resolver status.
+	 *
+	 * @param requirementId - The ID of the requirement to explain.
+	 * @returns A human-readable multi-line explanation string, or `null` if the requirement is not found.
+	 *
+	 * @example
+	 * ```typescript
+	 * const { unmet } = system.inspect();
+	 * for (const req of unmet) {
+	 *   console.log(system.explain(req.id));
+	 *   // Requirement "FETCH_USER" (id: req_abc123)
+	 *   // ├─ Produced by constraint: needsUser
+	 *   // ├─ Constraint priority: 50
+	 *   // └─ Resolver status: pending
+	 * }
+	 * ```
+	 */
 	explain(requirementId: string): string | null;
 	getSnapshot(): SystemSnapshot;
 	restore(snapshot: SystemSnapshot): void;

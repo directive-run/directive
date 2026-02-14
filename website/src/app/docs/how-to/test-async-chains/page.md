@@ -15,7 +15,7 @@ Constraint-resolver chains are inherently async: a fact change triggers a constr
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { createTestSystem, mockResolver, flushMicrotasks } from 'directive/testing';
+import { createTestSystem, mockResolver, flushMicrotasks } from '@directive-run/core/testing';
 import { authModule } from '../modules/auth';
 
 describe('auth flow', () => {

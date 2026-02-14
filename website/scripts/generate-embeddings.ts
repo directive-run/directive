@@ -1,15 +1,18 @@
 /**
  * Build-time embedding generation for the AI docs chatbot.
  *
- * Extracts sections from all Markdoc doc pages, chunks them into
- * 200-400 token pieces, embeds via OpenAI text-embedding-3-small,
- * and writes the result to public/embeddings.json.
+ * Two-phase pipeline:
+ *   Phase 1: Extract sections from Markdoc doc pages, chunk by paragraph
+ *   Phase 2: Read generated API reference (from extract-api-docs.ts), chunk per symbol
+ *
+ * Then embeds all chunks via OpenAI text-embedding-3-small and writes
+ * the result to public/embeddings.json.
  *
  * Usage:
  *   OPENAI_API_KEY=sk-... npx tsx scripts/generate-embeddings.ts
  *
- * Or via package.json script:
- *   pnpm build:embeddings
+ * Or via package.json:
+ *   pnpm build:api-docs && pnpm build:embeddings
  */
 
 import * as fs from 'node:fs'
@@ -20,11 +23,21 @@ import { glob } from 'fast-glob'
 // Types
 // ---------------------------------------------------------------------------
 
+type SourceType = 'guide' | 'api-reference' | 'blog'
+
 interface EmbeddingEntry {
   id: string
   content: string
   embedding: number[]
-  metadata: { url: string; title: string; section: string }
+  metadata: {
+    url: string
+    title: string
+    section: string
+    sourceType: SourceType
+    symbolName?: string
+    symbolKind?: string
+    module?: string
+  }
 }
 
 interface Section {
@@ -33,12 +46,30 @@ interface Section {
   paragraphs: string[]
 }
 
+/** Matches the ApiDocEntry shape from extract-api-docs.ts */
+interface ApiDocEntry {
+  name: string
+  kind: string
+  module: string
+  file: string
+  signature?: string
+  description: string
+  params?: Array<{ name: string; type: string; description: string }>
+  returns?: { type: string; description: string }
+  examples?: string[]
+  tags?: Record<string, string>
+  methods?: Array<{
+    name: string
+    signature: string
+    description: string
+    params?: Array<{ name: string; type: string; description: string }>
+    returns?: { type: string; description: string }
+  }>
+}
+
 // ---------------------------------------------------------------------------
 // Markdoc AST Helpers
 // ---------------------------------------------------------------------------
-// We walk the Markdoc AST directly rather than converting to HTML first.
-// This gives us clean text + code blocks without HTML artifacts, producing
-// higher-quality embeddings at lower token cost.
 
 /** Simple counter-based slugify (good enough for hashes) */
 function slugify(text: string): string {
@@ -114,11 +145,12 @@ function extractSections(node: any, sections: Section[], isRoot = true): void {
 
 // OpenAI's tokenizer averages ~4 chars/token for English prose + code.
 // We use this approximation to avoid pulling in a full tokenizer dependency.
+// Bumped to 600 from 400 — code-heavy chunks are denser than prose.
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
-const MAX_CHUNK_TOKENS = 400
+const MAX_CHUNK_TOKENS = 600
 const MIN_CHUNK_TOKENS = 50
 
 interface Chunk {
@@ -126,6 +158,18 @@ interface Chunk {
   url: string
   title: string
   section: string
+  sourceType: SourceType
+  symbolName?: string
+  symbolKind?: string
+  module?: string
+}
+
+/** Classify a page URL into a source type */
+function classifySourceType(url: string): SourceType {
+  if (url.startsWith('/blog/')) return 'blog'
+  if (url.startsWith('/docs/api/')) return 'api-reference'
+
+  return 'guide'
 }
 
 function chunkSection(
@@ -135,6 +179,7 @@ function chunkSection(
 ): Chunk[] {
   const sectionUrl = pageUrl + (section.hash ? `#${section.hash}` : '')
   const sectionTitle = section.title
+  const sourceType = classifySourceType(pageUrl)
 
   // Combine title + paragraphs
   const fullText = [sectionTitle, ...section.paragraphs].join('\n\n')
@@ -149,6 +194,7 @@ function chunkSection(
         url: sectionUrl,
         title: pageTitle,
         section: sectionTitle,
+        sourceType,
       },
     ]
   }
@@ -167,6 +213,7 @@ function chunkSection(
         url: sectionUrl,
         title: pageTitle,
         section: sectionTitle,
+        sourceType,
       })
       // Start new chunk with section title for context
       currentParagraphs = [`${sectionTitle} (continued)`]
@@ -184,10 +231,170 @@ function chunkSection(
       url: sectionUrl,
       title: pageTitle,
       section: sectionTitle,
+      sourceType,
     })
   }
 
   return chunks
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: API Reference Chunking
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert an ApiDocEntry to one or more embedding chunks.
+ * Each symbol becomes one chunk with a context prefix.
+ * If a symbol exceeds MAX_CHUNK_TOKENS, split at @example boundaries.
+ */
+function chunkAPIEntry(entry: ApiDocEntry): Chunk[] {
+  const parts: string[] = []
+
+  // Context prefix for retrieval
+  parts.push(`[Module] ${entry.module}`)
+  parts.push(`[${entry.kind}] ${entry.name}`)
+  parts.push('')
+
+  if (entry.description) {
+    parts.push(entry.description)
+    parts.push('')
+  }
+
+  if (entry.signature) {
+    parts.push('```typescript')
+    parts.push(entry.signature)
+    parts.push('```')
+    parts.push('')
+  }
+
+  if (entry.params && entry.params.length > 0) {
+    parts.push('Parameters:')
+    for (const p of entry.params) {
+      parts.push(`- ${p.name}: ${p.description}`)
+    }
+    parts.push('')
+  }
+
+  if (entry.returns) {
+    parts.push(`Returns: ${entry.returns.description}`)
+    parts.push('')
+  }
+
+  if (entry.methods && entry.methods.length > 0) {
+    parts.push('Methods:')
+    for (const m of entry.methods) {
+      parts.push(`- ${m.name}: ${m.description}`)
+    }
+    parts.push('')
+  }
+
+  // Build base content (without examples)
+  const baseContent = parts.join('\n')
+  const baseTokens = estimateTokens(baseContent)
+
+  // If base already exceeds limit, return as-is (truncated)
+  if (baseTokens > MAX_CHUNK_TOKENS && (!entry.examples || entry.examples.length === 0)) {
+    return [{
+      content: baseContent.slice(0, MAX_CHUNK_TOKENS * 4),
+      url: `/docs/api/core#${entry.name.toLowerCase()}`,
+      title: `API: ${entry.name}`,
+      section: entry.name,
+      sourceType: 'api-reference',
+      symbolName: entry.name,
+      symbolKind: entry.kind,
+      module: entry.module,
+    }]
+  }
+
+  // Add examples
+  const exampleParts: string[] = []
+  if (entry.examples && entry.examples.length > 0) {
+    for (const ex of entry.examples) {
+      if (ex.includes('```')) {
+        exampleParts.push(ex)
+      } else {
+        exampleParts.push(`\`\`\`typescript\n${ex}\n\`\`\``)
+      }
+    }
+  }
+
+  const fullContent = exampleParts.length > 0
+    ? baseContent + '\nExamples:\n\n' + exampleParts.join('\n\n')
+    : baseContent
+  const fullTokens = estimateTokens(fullContent)
+
+  // If it all fits, return one chunk
+  if (fullTokens <= MAX_CHUNK_TOKENS) {
+    return [{
+      content: fullContent,
+      url: `/docs/api/core#${entry.name.toLowerCase()}`,
+      title: `API: ${entry.name}`,
+      section: entry.name,
+      sourceType: 'api-reference',
+      symbolName: entry.name,
+      symbolKind: entry.kind,
+      module: entry.module,
+    }]
+  }
+
+  // Split: base chunk + example chunks
+  const chunks: Chunk[] = [{
+    content: baseContent,
+    url: `/docs/api/core#${entry.name.toLowerCase()}`,
+    title: `API: ${entry.name}`,
+    section: entry.name,
+    sourceType: 'api-reference',
+    symbolName: entry.name,
+    symbolKind: entry.kind,
+    module: entry.module,
+  }]
+
+  if (exampleParts.length > 0) {
+    const exContent = `[Module] ${entry.module}\n[${entry.kind}] ${entry.name} – examples\n\n` + exampleParts.join('\n\n')
+    chunks.push({
+      content: exContent.slice(0, MAX_CHUNK_TOKENS * 4),
+      url: `/docs/api/core#${entry.name.toLowerCase()}`,
+      title: `API: ${entry.name} (examples)`,
+      section: `${entry.name} examples`,
+      sourceType: 'api-reference',
+      symbolName: entry.name,
+      symbolKind: entry.kind,
+      module: entry.module,
+    })
+  }
+
+  return chunks
+}
+
+// ---------------------------------------------------------------------------
+// Build-time Deduplication
+// ---------------------------------------------------------------------------
+
+/**
+ * When a symbol appears in both generated API reference AND hand-written
+ * /docs/api/* pages, keep only the generated version (it's canonical).
+ */
+function deduplicateChunks(chunks: Chunk[]): Chunk[] {
+  // Collect symbol names from API reference chunks
+  const apiSymbols = new Set<string>()
+  for (const chunk of chunks) {
+    if (chunk.sourceType === 'api-reference' && chunk.symbolName) {
+      apiSymbols.add(chunk.symbolName.toLowerCase())
+    }
+  }
+
+  // Filter out hand-written /docs/api/* chunks that duplicate a generated symbol
+  return chunks.filter((chunk) => {
+    // Keep all non-guide and non-api-url chunks
+    if (chunk.sourceType !== 'api-reference' || chunk.symbolName) return true
+    // This is a hand-written /docs/api/* chunk — check if its section
+    // matches a generated symbol name
+    const sectionLower = chunk.section.toLowerCase()
+      .replace(/[()]/g, '')
+      .trim()
+
+    return !apiSymbols.has(sectionLower)
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -241,13 +448,14 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 async function main() {
   console.log('Generating embeddings for Directive docs...\n')
 
-  // 1. Find all page.md files
+  // =========================================================================
+  // Phase 1: Markdoc doc pages → paragraph chunks
+  // =========================================================================
+
   const pagesDir = path.resolve(__dirname, '../src/app')
   const files = glob.sync('**/page.md', { cwd: pagesDir })
-  console.log(`Found ${files.length} doc pages`)
+  console.log(`Phase 1: Found ${files.length} doc pages`)
 
-  // 2. Parse and extract sections using a lightweight Markdoc parse
-  // We use dynamic import for @markdoc/markdoc since it's ESM
   const Markdoc = await import('@markdoc/markdoc').then((m) => m.default ?? m)
 
   const allChunks: Chunk[] = []
@@ -272,19 +480,58 @@ async function main() {
     }
   }
 
-  console.log(`Extracted ${allChunks.length} chunks\n`)
+  console.log(`  → ${allChunks.length} doc chunks`)
 
-  if (allChunks.length === 0) {
+  // =========================================================================
+  // Phase 2: Generated API reference → function-level chunks
+  // =========================================================================
+
+  const apiRefPath = path.resolve(__dirname, '../docs/generated/api-reference.json')
+
+  if (fs.existsSync(apiRefPath)) {
+    const apiEntries: ApiDocEntry[] = JSON.parse(
+      fs.readFileSync(apiRefPath, 'utf-8'),
+    )
+
+    let apiChunkCount = 0
+    for (const entry of apiEntries) {
+      const chunks = chunkAPIEntry(entry)
+      allChunks.push(...chunks)
+      apiChunkCount += chunks.length
+    }
+
+    console.log(`Phase 2: ${apiEntries.length} API entries → ${apiChunkCount} chunks`)
+  } else {
+    console.log('Phase 2: No api-reference.json found, skipping (run pnpm build:api-docs first)')
+  }
+
+  // =========================================================================
+  // Phase 3: Deduplication
+  // =========================================================================
+
+  const beforeDedup = allChunks.length
+  const dedupedChunks = deduplicateChunks(allChunks)
+  const removed = beforeDedup - dedupedChunks.length
+  if (removed > 0) {
+    console.log(`Dedup: removed ${removed} duplicate chunks`)
+  }
+
+  console.log(`\nTotal: ${dedupedChunks.length} chunks to embed\n`)
+
+  if (dedupedChunks.length === 0) {
     console.error('No chunks extracted. Check that doc pages exist.')
     process.exit(1)
   }
 
-  // 3. Embed in batches
-  const entries: EmbeddingEntry[] = []
-  const totalBatches = Math.ceil(allChunks.length / BATCH_SIZE)
+  // =========================================================================
+  // Embed in batches
+  // =========================================================================
 
-  for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
-    const batch = allChunks.slice(i, i + BATCH_SIZE)
+  const entries: EmbeddingEntry[] = []
+  const totalBatches = Math.ceil(dedupedChunks.length / BATCH_SIZE)
+
+  for (let i = 0; i < dedupedChunks.length; i += BATCH_SIZE) {
+    const batch = dedupedChunks.slice(i, i + BATCH_SIZE)
     const batchNum = Math.floor(i / BATCH_SIZE) + 1
     const pct = Math.round((batchNum / totalBatches) * 100)
     console.log(
@@ -294,30 +541,46 @@ async function main() {
     const embeddings = await embedBatch(batch.map((c) => c.content))
 
     for (let j = 0; j < batch.length; j++) {
+      const chunk = batch[j]
       entries.push({
-        id: `${batch[j].url}-${j}`,
-        content: batch[j].content,
+        id: `${chunk.url}-${i + j}`,
+        content: chunk.content,
         embedding: embeddings[j],
         metadata: {
-          url: batch[j].url,
-          title: batch[j].title,
-          section: batch[j].section,
+          url: chunk.url,
+          title: chunk.title,
+          section: chunk.section,
+          sourceType: chunk.sourceType,
+          ...(chunk.symbolName ? { symbolName: chunk.symbolName } : {}),
+          ...(chunk.symbolKind ? { symbolKind: chunk.symbolKind } : {}),
+          ...(chunk.module ? { module: chunk.module } : {}),
         },
       })
     }
 
     // Rate limit: small delay between batches
-    if (i + BATCH_SIZE < allChunks.length) {
+    if (i + BATCH_SIZE < dedupedChunks.length) {
       await new Promise((r) => setTimeout(r, 200))
     }
   }
 
-  // 4. Write to public/embeddings.json
+  // Write to public/embeddings.json
   const outPath = path.resolve(__dirname, '../public/embeddings.json')
   fs.writeFileSync(outPath, JSON.stringify(entries))
 
   const sizeMB = (Buffer.byteLength(JSON.stringify(entries)) / (1024 * 1024)).toFixed(2)
   console.log(`\nWrote ${entries.length} embeddings to ${outPath} (${sizeMB} MB)`)
+
+  // Summary by source type
+  const byType = new Map<string, number>()
+  for (const e of entries) {
+    const t = e.metadata.sourceType
+    byType.set(t, (byType.get(t) ?? 0) + 1)
+  }
+  console.log('\nBy source type:')
+  for (const [type, count] of [...byType.entries()].sort()) {
+    console.log(`  ${type}: ${count}`)
+  }
   console.log('Done!')
 }
 

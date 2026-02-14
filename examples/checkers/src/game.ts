@@ -5,7 +5,7 @@
  * this file coordinates it through Directive's fact→derivation→constraint→resolver flow.
  */
 
-import { createModule, t, type ModuleSchema } from "directive";
+import { createModule, t, type ModuleSchema } from "@directive-run/core";
 import {
   type Board,
   type Player,

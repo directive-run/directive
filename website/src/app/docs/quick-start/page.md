@@ -18,7 +18,7 @@ Build a complete user profile feature with automatic data fetching in 5 minutes.
 ## Installation
 
 ```shell
-npm install directive
+npm install @directive-run/core
 ```
 
 ---
@@ -29,7 +29,7 @@ A module contains facts (state), constraints (rules), and resolvers (how to fulf
 
 ```typescript
 // user.module.ts
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 interface User {
   id: number;
@@ -135,7 +135,7 @@ A system runs your module. It provides the API to interact with facts.
 
 ```typescript
 // app.ts
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 import { userModule } from './user.module';
 
 const system = createSystem({ module: userModule });
@@ -208,7 +208,7 @@ console.log(system.derive.status);      // "idle" | "loading" | "error" | "ready
 Here's the full module:
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 interface User {
   id: number;

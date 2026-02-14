@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:api-docs": "tsx scripts/extract-api-docs.ts",
     "build:embeddings": "tsx scripts/generate-embeddings.ts",
     "start": "next start",
     "lint": "next lint"
@@ -22,7 +23,8 @@
     "@tailwindcss/typography": "^0.5.16",
     "@types/react-highlight-words": "^0.20.0",
     "clsx": "^2.1.1",
-    "directive": "workspace:*",
+    "@directive-run/core": "workspace:*",
+    "@directive-run/react": "workspace:*",
     "fast-glob": "^3.3.3",
     "flexsearch": "^0.8.205",
     "geist": "^1.7.0",
@@ -46,6 +48,7 @@
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "sharp": "0.34.3",
+    "ts-morph": "^27.0.2",
     "tsx": "^4.21.0"
   }
 }

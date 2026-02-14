@@ -17,12 +17,13 @@ import {
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import localFont from 'next/font/local'
+import Script from 'next/script'
 import clsx from 'clsx'
 
 import { Providers } from '@/app/providers'
 import { Layout } from '@/components/Layout'
 import { WebsiteJsonLd, SoftwareJsonLd } from '@/components/JsonLd'
-import { ThemeOnboardingToast } from '@/components/ThemeOnboardingToast'
+import { ConditionalOnboardingToast } from '@/components/ConditionalOnboardingToast'
 import { buildPresetInlineScript } from '@/lib/preset-inline-script'
 
 import '@/styles/tailwind.css'
@@ -210,6 +211,10 @@ export default function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
+        <link rel="alternate" type="application/rss+xml" title="Directive Blog" href="/blog/feed.xml" />
+        {/* Preconnect to Fontshare CDN for faster font loading */}
+        <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
         {/* Satoshi font from Fontshare CDN (for typography option 5) */}
         <link
           href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=general-sans@400,500,700&display=swap"
@@ -236,8 +241,22 @@ export default function RootLayout({
       <body className="flex min-h-full bg-brand-surface">
         <Providers>
           <Layout>{children}</Layout>
-          <ThemeOnboardingToast />
+          <ConditionalOnboardingToast />
         </Providers>
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');`}
+            </Script>
+          </>
+        )}
       </body>
     </html>
   )

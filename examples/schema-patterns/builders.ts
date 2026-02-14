@@ -4,7 +4,7 @@
  * Uses schema builders for type definitions with optional runtime validation.
  */
 
-import { createModule, createSystem, t } from "directive";
+import { createModule, createSystem, t } from "@directive-run/core";
 
 // ============================================================================
 // Types

@@ -16,7 +16,7 @@ import {
   createRAGEnricher,
   createJSONFileStore,
   createOpenAIEmbedder,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 const enricher = createRAGEnricher({
   embedder: createOpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY! }),
@@ -141,7 +141,7 @@ If your storage backend provides a `search()` method (e.g. a vector database wit
 `createJSONFileStore` creates a storage backend that reads chunks from a JSON file on disk. The file is lazy-loaded and cached in memory.
 
 ```typescript
-import { createJSONFileStore } from 'directive/ai';
+import { createJSONFileStore } from '@directive-run/ai';
 
 const storage = createJSONFileStore({
   filePath: './embeddings.json',
@@ -172,7 +172,7 @@ The store uses dynamic `import('node:fs')` so it can be imported isomorphically 
 `createOpenAIEmbedder` creates an `EmbedderFn` that calls the OpenAI embeddings API directly (no SDK dependency).
 
 ```typescript
-import { createOpenAIEmbedder } from 'directive/ai';
+import { createOpenAIEmbedder } from '@directive-run/ai';
 
 const embedder = createOpenAIEmbedder({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -229,7 +229,7 @@ import {
   createJSONFileStore,
   createOpenAIEmbedder,
   createSSETransport,
-} from 'directive/ai';
+} from '@directive-run/ai';
 
 // 1. Enricher
 const enricher = createRAGEnricher({

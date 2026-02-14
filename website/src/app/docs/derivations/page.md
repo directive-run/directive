@@ -12,7 +12,7 @@ Derivations compute values from facts with automatic dependency tracking. {% .le
 Define derivations in the `derive` block of your module. Each derivation is a function that receives `facts` and returns a computed value:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const userModule = createModule("user", {
   schema: {
@@ -75,7 +75,7 @@ This derivation:
 
 ## Accessing Derivations
 
-### Via `system.derive`
+### Derive proxy
 
 The most common way – access derivations as properties on `system.derive`:
 
@@ -105,7 +105,7 @@ system.derive.user.fullName;      // "Jane Doe"
 system.derive.cart.totalPrice;    // 42.99
 ```
 
-### Via `system.read()`
+### Read by ID
 
 Read a derivation value by its string ID. This is the same value as `system.derive.X`, but useful when the derivation name is dynamic or when passing to framework adapters:
 

@@ -24,7 +24,7 @@ Advanced features for production Directive applications – composition patterns
 Combine modules with namespaced access:
 
 ```typescript
-import { createSystem } from 'directive';
+import { createSystem } from '@directive-run/core';
 
 // Compose multiple modules into a single system
 const system = createSystem({

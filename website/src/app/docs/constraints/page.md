@@ -12,7 +12,7 @@ Constraints are the heart of Directive – they declare what must be true. {% .l
 Define constraints in your module to declare conditions and their requirements:
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const userModule = createModule("user", {
   schema: {

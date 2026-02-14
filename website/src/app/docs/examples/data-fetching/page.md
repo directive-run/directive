@@ -10,7 +10,7 @@ Fetch data automatically when conditions are met. {% .lead %}
 ## The Module
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
+import { createModule, createSystem, t } from '@directive-run/core';
 
 interface User {
   id: number;
@@ -93,7 +93,7 @@ system.start();
 ## React Component
 
 ```typescript
-import { useFact } from 'directive/react';
+import { useFact } from '@directive-run/react';
 
 function UserProfile() {
   // Subscribe to each fact individually –only re-renders when that fact changes

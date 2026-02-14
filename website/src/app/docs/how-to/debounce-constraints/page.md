@@ -14,7 +14,7 @@ When a user types in a search box, each keystroke updates a fact, which triggers
 ## The Solution
 
 ```typescript
-import { createModule, t } from 'directive';
+import { createModule, t } from '@directive-run/core';
 
 const search = createModule('search', {
   schema: {

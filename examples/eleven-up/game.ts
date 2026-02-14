@@ -9,7 +9,7 @@
  * - Goal: Clear all cards from the table
  */
 
-import { createModule, t, type ModuleSchema } from "directive";
+import { createModule, t, type ModuleSchema } from "@directive-run/core";
 
 // ============================================================================
 // Types

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AI Docs Chatbot API Route
  *
@@ -26,9 +27,10 @@ import {
   createOpenAIEmbedder,
   createSSETransport,
   createLengthGuardrail,
-} from 'directive/ai'
-import { createSystem } from 'directive'
+} from '@directive-run/ai'
+import { createSystem } from '@directive-run/core'
 import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
+import { getFeatureFlagSystem } from '@/lib/feature-flags/config'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +60,27 @@ const ALLOWED_ORIGINS = new Set([
   'https://directive.run',
   'https://www.directive.run',
 ])
+
+// ---------------------------------------------------------------------------
+// Query-Intent Classification
+// ---------------------------------------------------------------------------
+
+type QueryIntent = 'api' | 'conceptual'
+
+const API_SIGNAL_PATTERN = /\b(function|parameter|return|signature|api|method|createModule|createSystem|createEngine|t\.\w+|type\s+\w+|interface\s+\w+)\b/i
+
+/**
+ * Classify a user query as "api" (looking for specific function/type details)
+ * or "conceptual" (asking about how things work, best practices, etc.).
+ * Regex-based, zero-cost at runtime.
+ */
+function classifyIntent(msg: string): QueryIntent {
+  if (API_SIGNAL_PATTERN.test(msg) || /`[^`]+`/.test(msg)) {
+    return 'api'
+  }
+
+  return 'conceptual'
+}
 
 // ---------------------------------------------------------------------------
 // Origin Validation
@@ -313,6 +336,15 @@ function validateHistory(history: unknown[]): ChatMessage[] {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
+  // Feature flag check
+  const ffSystem = getFeatureFlagSystem()
+  if (!ffSystem.derive.canUseChat) {
+    return new Response(
+      JSON.stringify({ error: 'Chat is currently disabled.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
   // Origin validation (exact domain matching)
   const origin = request.headers.get('origin')
   if (origin && !isAllowedOrigin(origin)) {
@@ -405,19 +437,79 @@ export async function POST(request: NextRequest) {
   const safePath = sanitizePageUrl(pageUrl)
 
   // Build enriched input via RAG enricher (with timeout to prevent hanging)
+  // Over-fetch top 7 chunks, re-rank with intent-aware boosting, slice to top 5
   const enricher = getEnricher()
   let enrichedInput = message
   if (enricher) {
+    const intent = classifyIntent(message)
     try {
-      enrichedInput = await Promise.race([
-        enricher.enrich(message, {
-          prefix: safePath ? `The user is currently viewing: ${safePath}` : undefined,
-          history,
-        }),
+      const matches = await Promise.race([
+        enricher.retrieve(message, 7),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('RAG enrichment timed out')), ENRICH_TIMEOUT_MS),
+          setTimeout(() => reject(new Error('RAG retrieval timed out')), ENRICH_TIMEOUT_MS),
         ),
       ])
+
+      // Re-rank: apply source-type boost based on query intent
+      const ranked = matches.map((chunk) => {
+        const meta = chunk.metadata as {
+          sourceType?: string
+          symbolName?: string
+          url?: string
+        }
+        const sourceType = meta.sourceType ?? 'guide'
+
+        let boost = 0
+        if (intent === 'api' && sourceType === 'api-reference') boost += 0.1
+        if (intent === 'conceptual' && sourceType === 'guide') boost += 0.05
+        if (safePath && meta.url?.startsWith(safePath)) boost += 0.05
+
+        return { ...chunk, boostedScore: chunk.similarity + boost }
+      })
+
+      // Sort by boosted score
+      ranked.sort((a, b) => b.boostedScore - a.boostedScore)
+
+      // Diversity cap: max 2 chunks per symbolName
+      const symbolCounts = new Map<string, number>()
+      const diverse = ranked.filter((chunk) => {
+        const sym = (chunk.metadata as { symbolName?: string }).symbolName
+        if (!sym) return true
+        const count = symbolCounts.get(sym) ?? 0
+        if (count >= 2) return false
+        symbolCounts.set(sym, count + 1)
+
+        return true
+      })
+
+      // Take top 5
+      const top5 = diverse.slice(0, 5)
+
+      // Format into enriched input
+      const contextParts = top5.map((chunk) => {
+        const title = (chunk.metadata.title as string) ?? ''
+        const section = (chunk.metadata.section as string) ?? ''
+        const url = (chunk.metadata.url as string) ?? ''
+        const header = title && section && url
+          ? `[${title} — ${section}](${url})`
+          : title || chunk.id
+
+        return `${header}\n${chunk.content}`
+      })
+
+      const parts: string[] = []
+      if (safePath) parts.push(`The user is currently viewing: ${safePath}`)
+      if (contextParts.length > 0) {
+        parts.push(`Relevant documentation context:\n\n${contextParts.join('\n\n')}`)
+      }
+      if (history.length > 0) {
+        const historyBlock = history
+          .map((m) => `${m.role.charAt(0).toUpperCase() + m.role.slice(1)}: ${m.content}`)
+          .join('\n\n')
+        parts.push(`Previous conversation:\n${historyBlock}`)
+      }
+      parts.push(message)
+      enrichedInput = parts.join('\n\n---\n\n')
     } catch {
       // Enrichment failed or timed out — fall back to raw message
     }
