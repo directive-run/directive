@@ -10,7 +10,9 @@ import {
   DEFAULT_TYPO_PRESET,
   applyColorPreset,
   applyTypoPreset,
+  applyFontSize,
   clearPresets,
+  clearFontSize,
   findColorPreset,
   findTypoPreset,
   type ColorPreset,
@@ -34,6 +36,7 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   const [isOpen, setIsOpen] = useState(false)
   const [colorId, setColorId] = useState<string>('default')
   const [typoId, setTypoId] = useState<number>(0)
+  const [fontScale, setFontScale] = useState<number>(100)
   const [mounted, setMounted] = useState(false)
   const [copied, setCopied] = useState(false)
   const [voted, setVoted] = useState(false)
@@ -61,6 +64,15 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
       if (preset) {
         setTypoId(id)
         applyTypoPreset(preset)
+      }
+    }
+
+    const savedFontSize = safeGetItem(STORAGE_KEYS.FONT_SIZE)
+    if (savedFontSize) {
+      const scale = parseFloat(savedFontSize)
+      if (!isNaN(scale)) {
+        setFontScale(scale)
+        applyFontSize(scale)
       }
     }
 
@@ -109,13 +121,31 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
     safeSetItem(STORAGE_KEYS.TYPO, String(preset.id))
   }, [])
 
+  const handleFontSizeChange = useCallback((delta: number) => {
+    setFontScale((prev) => {
+      const next = Math.round((prev + delta) * 10) / 10
+      const clamped = Math.max(75, Math.min(150, next))
+      applyFontSize(clamped)
+      if (clamped === 100) {
+        clearFontSize()
+        safeRemoveItem(STORAGE_KEYS.FONT_SIZE)
+      } else {
+        safeSetItem(STORAGE_KEYS.FONT_SIZE, String(clamped))
+      }
+
+      return clamped
+    })
+  }, [])
+
   const handleReset = useCallback(() => {
     activeColorRef.current = 'default'
     clearPresets()
     setColorId('default')
     setTypoId(0)
+    setFontScale(100)
     safeRemoveItem(STORAGE_KEYS.COLOR)
     safeRemoveItem(STORAGE_KEYS.TYPO)
+    safeRemoveItem(STORAGE_KEYS.FONT_SIZE)
   }, [])
 
   // Hover preview — temporarily apply preset, restore on leave
@@ -388,6 +418,44 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Text Size */}
+          <div className="mt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Text Size
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => handleFontSizeChange(-12.5)}
+                disabled={fontScale <= 75}
+                className={clsx(
+                  'flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition',
+                  fontScale <= 75
+                    ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
+                )}
+                aria-label="Decrease text size"
+              >
+                &minus;
+              </button>
+              <span className="font-mono text-xs text-slate-600 dark:text-slate-300">
+                {fontScale}%
+              </span>
+              <button
+                onClick={() => handleFontSizeChange(12.5)}
+                disabled={fontScale >= 150}
+                className={clsx(
+                  'flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition',
+                  fontScale >= 150
+                    ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
+                )}
+                aria-label="Increase text size"
+              >
+                +
+              </button>
             </div>
           </div>
 

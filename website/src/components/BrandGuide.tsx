@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 
 const GOOGLE_FONTS_URL =
-  'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap'
+  'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&family=Bricolage+Grotesque:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap'
 
 function useFontLoader() {
   useEffect(() => {
@@ -59,6 +59,30 @@ const SCALES: Record<string, Record<string, string>> = {
     '50': '#f8fafc', '100': '#f1f5f9', '200': '#e2e8f0', '300': '#cbd5e1', '400': '#94a3b8',
     '500': '#64748b', '600': '#475569', '700': '#334155', '800': '#1e293b', '900': '#0f172a', '950': '#020617',
   },
+  rose: {
+    '50': '#fff1f2', '100': '#ffe4e6', '200': '#fecdd3', '300': '#fda4af', '400': '#fb7185',
+    '500': '#f43f5e', '600': '#e11d48', '700': '#be123c', '800': '#9f1239', '900': '#881337', '950': '#4c0519',
+  },
+  cyan: {
+    '50': '#ecfeff', '100': '#cffafe', '200': '#a5f3fc', '300': '#67e8f9', '400': '#22d3ee',
+    '500': '#06b6d4', '600': '#0891b2', '700': '#0e7490', '800': '#155e75', '900': '#164e63', '950': '#083344',
+  },
+  zinc: {
+    '50': '#fafafa', '100': '#f4f4f5', '200': '#e4e4e7', '300': '#d4d4d8', '400': '#a1a1aa',
+    '500': '#71717a', '600': '#52525b', '700': '#3f3f46', '800': '#27272a', '900': '#18181b', '950': '#09090b',
+  },
+  lime: {
+    '50': '#f7fee7', '100': '#ecfccb', '200': '#d9f99d', '300': '#bef264', '400': '#a3e635',
+    '500': '#84cc16', '600': '#65a30d', '700': '#4d7c0f', '800': '#3f6212', '900': '#365314', '950': '#1a2e05',
+  },
+  fuchsia: {
+    '50': '#fdf4ff', '100': '#fae8ff', '200': '#f5d0fe', '300': '#f0abfc', '400': '#e879f9',
+    '500': '#d946ef', '600': '#c026d3', '700': '#a21caf', '800': '#86198f', '900': '#701a75', '950': '#4a044e',
+  },
+  orange: {
+    '50': '#fff7ed', '100': '#ffedd5', '200': '#fed7aa', '300': '#fdba74', '400': '#fb923c',
+    '500': '#f97316', '600': '#ea580c', '700': '#c2410c', '800': '#9a3412', '900': '#7c2d12', '950': '#431407',
+  },
 }
 
 const COLOR_CANDIDATES = [
@@ -69,6 +93,12 @@ const COLOR_CANDIDATES = [
   { name: 'Emerald', key: 'emerald', hex: '#10B981', source: 'AI pick', notes: '"Resolved, handled"  -- aligns with product promise' },
   { name: 'Amber/Gold', key: 'amber', hex: '#F59E0B', source: 'AI pick', notes: 'Bold, uncommon in dev tools' },
   { name: 'Sky Blue', key: 'sky', hex: '#0EA5E9', source: 'Current', notes: 'Reference only  -- very common in TS ecosystem' },
+  { name: 'Rose', key: 'rose', hex: '#F43F5E', source: 'AI pick', notes: 'Warm energy, bold and distinctive' },
+  { name: 'Cyan', key: 'cyan', hex: '#06B6D4', source: 'AI pick', notes: 'Cool precision, strong dark-mode contrast' },
+  { name: 'Zinc', key: 'zinc', hex: '#71717A', source: 'AI pick', notes: 'Muted authority, pairs with bright accents' },
+  { name: 'Lime', key: 'lime', hex: '#84CC16', source: 'AI pick', notes: 'High-energy accent, terminal green vibes' },
+  { name: 'Fuchsia', key: 'fuchsia', hex: '#D946EF', source: 'AI pick', notes: 'Vibrant, creative, maximum energy' },
+  { name: 'Orange', key: 'orange', hex: '#F97316', source: 'AI pick', notes: 'Urgent energy, uncommon in dev tools' },
 ]
 
 const COMBOS = [
@@ -149,6 +179,41 @@ const COMBOS = [
     gradient: { from: '#a7f3d0', via: '#a78bfa', to: '#a7f3d0' },
     verdict: 'Flipped A — green-primary, high trademark distinctiveness',
   },
+  {
+    id: 'L',
+    primary: { name: 'Rose', hex: '#F43F5E', key: 'rose' },
+    accent: { name: 'Cyan', hex: '#06B6D4', key: 'cyan' },
+    gradient: { from: '#fecdd3', via: '#22d3ee', to: '#fecdd3' },
+    verdict: 'Bold warmth balanced by cool precision',
+  },
+  {
+    id: 'M',
+    primary: { name: 'Zinc', hex: '#71717A', key: 'zinc' },
+    accent: { name: 'Lime', hex: '#84CC16', key: 'lime' },
+    gradient: { from: '#d4d4d8', via: '#a3e635', to: '#d4d4d8' },
+    verdict: 'Understated base with high-energy accent',
+  },
+  {
+    id: 'N',
+    primary: { name: 'Fuchsia', hex: '#D946EF', key: 'fuchsia' },
+    accent: { name: 'Teal', hex: '#14B8A6', key: 'teal' },
+    gradient: { from: '#f5d0fe', via: '#2dd4bf', to: '#f5d0fe' },
+    verdict: 'Vibrant energy with grounded cool accent',
+  },
+  {
+    id: 'O',
+    primary: { name: 'Slate', hex: '#64748B', key: 'slate' },
+    accent: { name: 'Violet', hex: '#7C3AED', key: 'violet' },
+    gradient: { from: '#cbd5e1', via: '#a78bfa', to: '#cbd5e1' },
+    verdict: 'Professional restraint with intelligent accent',
+  },
+  {
+    id: 'P',
+    primary: { name: 'Orange', hex: '#F97316', key: 'orange' },
+    accent: { name: 'Indigo', hex: '#6366F1', key: 'indigo' },
+    gradient: { from: '#fed7aa', via: '#818cf8', to: '#fed7aa' },
+    verdict: 'High-energy primary with deep precision accent',
+  },
 ]
 
 const FONT_PAIRINGS = [
@@ -190,6 +255,30 @@ const FONT_PAIRINGS = [
     body: { name: 'DM Sans', family: '"DM Sans", system-ui, sans-serif' },
     code: { name: 'JetBrains Mono', family: '"JetBrains Mono", monospace' },
     notes: 'Editorial credibility, premium but approachable. Satoshi requires Fontshare CDN.',
+    topPick: false,
+  },
+  {
+    id: 6,
+    display: { name: 'Plus Jakarta Sans', family: '"Plus Jakarta Sans", system-ui, sans-serif' },
+    body: { name: 'Source Sans 3', family: '"Source Sans 3", system-ui, sans-serif' },
+    code: { name: 'Source Code Pro', family: '"Source Code Pro", monospace' },
+    notes: 'Clean geometric display with neutral professional body',
+    topPick: false,
+  },
+  {
+    id: 7,
+    display: { name: 'Bricolage Grotesque', family: '"Bricolage Grotesque", system-ui, sans-serif' },
+    body: { name: 'Geist Sans', family: '"Geist", system-ui, -apple-system, sans-serif' },
+    code: { name: 'Fira Code', family: '"Fira Code", monospace' },
+    notes: 'Eclectic display with modern body and ligature-rich code font',
+    topPick: false,
+  },
+  {
+    id: 8,
+    display: { name: 'General Sans', family: '"General Sans", system-ui, sans-serif' },
+    body: { name: 'Inter', family: '"Inter", system-ui, sans-serif' },
+    code: { name: 'Berkeley Mono', family: '"Berkeley Mono", ui-monospace, monospace' },
+    notes: 'Premium geometric display with trusted body and luxury code font',
     topPick: false,
   },
 ]
@@ -434,7 +523,7 @@ function ColorPaletteSection() {
     <section>
       <SectionHeader
         title="1. Brand Color Options"
-        description="7 primary color candidates with full 50-950 scales"
+        description="13 primary color candidates with full 50-950 scales"
         mode={mode}
         onModeChange={setMode}
       />
@@ -677,7 +766,7 @@ function ComboPairingsSection() {
     <section>
       <SectionHeader
         title="2. Color Combo Pairings"
-        description="11 primary + accent combos with logo, hero, and UI mockups"
+        description="16 primary + accent combos with logo, hero, and UI mockups"
         mode={mode}
         onModeChange={setMode}
       />
@@ -848,7 +937,7 @@ function TypographySection() {
     <section>
       <SectionHeader
         title="3. Typography Options"
-        description="5 font pairings  -- Display + Body + Code"
+        description="8 font pairings  -- Display + Body + Code"
         mode={mode}
         onModeChange={setMode}
       />
@@ -1362,8 +1451,8 @@ const AE_VOTES: AgentVote[] = [
   },
 ]
 
-const COMBO_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] as const
-const TYPO_IDS = [1, 2, 3, 4, 5] as const
+const COMBO_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'] as const
+const TYPO_IDS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
 function tallyVotes<T extends string | number>(
   votes: AgentVote[],

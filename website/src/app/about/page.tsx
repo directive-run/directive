@@ -239,7 +239,7 @@ export default function AboutPage() {
               </h3>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Our application engineering team handles architecture analysis,
+              Our engineering team handles architecture analysis,
               security auditing, and defense-in-depth hardening across the
               constraint engine, resolver pipeline, and effects system.
             </p>

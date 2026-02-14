@@ -27,19 +27,20 @@ export function Footer() {
                 Directive
               </span>
             </div>
-            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-[15px] text-slate-500 dark:text-slate-400">
               Declare requirements. Let the runtime resolve them. A constraint-driven state management library for TypeScript that handles async resolution, dependency tracking, and side effects automatically.
             </p>
           </div>
 
           {/* Col 2: Resources */}
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Resources
             </h3>
             <ul className="mt-3 space-y-2">
               {[
                 { href: '/docs/quick-start', label: 'Docs' },
+                { href: '/docs/philosophy', label: 'Philosophy' },
                 { href: '/blog', label: 'Blog' },
                 { href: '/about', label: 'About' },
                 { href: 'https://github.com/sizls/directive', label: 'GitHub', external: true },
@@ -48,7 +49,7 @@ export function Footer() {
                   <Link
                     href={href}
                     {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                    className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+                    className="text-[15px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
                   >
                     {label}
                   </Link>
@@ -59,23 +60,23 @@ export function Footer() {
 
           {/* Col 3: Community */}
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Community
             </h3>
-            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-[15px] text-slate-500 dark:text-slate-400">
               Directive is free and open source, sustained by the community. Help shape the project by contributing, sponsoring, or voting on the default theme each month.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <Link
                 href="/support"
-                className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+                className="inline-flex items-center gap-1.5 text-[15px] text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
               >
                 <Heart weight="fill" className="h-3.5 w-3.5" />
                 Support the project
               </Link>
               <Link
                 href="/docs/community/theme-vote"
-                className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+                className="inline-flex items-center gap-1.5 text-[15px] text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
               >
                 <Palette weight="fill" className="h-3.5 w-3.5" />
                 Vote on this month&apos;s theme
