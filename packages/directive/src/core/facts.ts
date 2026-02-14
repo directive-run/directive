@@ -1017,7 +1017,7 @@ export function createFactsStore<S extends Schema>(
 
 	// Internal: register new schema keys for dynamic module registration.
 	// Not part of the public FactsStore interface — used by engine.registerModule().
-	(store as Record<string, unknown>).registerKeys = (newSchema: Record<string, unknown>) => {
+	(store as unknown as Record<string, unknown>).registerKeys = (newSchema: Record<string, unknown>) => {
 		for (const key of Object.keys(newSchema)) {
 			// Defense-in-depth: skip prototype pollution keys
 			if (BLOCKED_PROPS.has(key)) continue;
@@ -1045,7 +1045,6 @@ export function createFactsProxy<S extends Schema>(
 	store: FactsStore<S>,
 	schema: S,
 ): Facts<S> {
-	const schemaKeys = Object.keys(schema);
 	const snapshot = (): FactsSnapshot<S> => ({
 		get: <K extends keyof InferSchema<S>>(key: K) =>
 			withoutTracking(() => store.get(key)),

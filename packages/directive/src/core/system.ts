@@ -399,7 +399,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					deps: constraintDef.deps?.map((dep) => `${namespace}${SEPARATOR}${dep}`),
 					when: (facts: unknown) => {
 						// Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-						// Otherwise use module-scoped proxy for direct access (facts.key → namespace_key)
+						// Otherwise use module-scoped proxy for direct access (facts.key → namespace::key)
 						const factsProxy = hasCrossModuleDeps
 							? createCrossModuleFactsProxy(facts as Record<string, unknown>, namespace, depNamespaces)
 							: createModuleFactsProxy(facts as Record<string, unknown>, namespace);
@@ -432,7 +432,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 				prefixedResolvers[`${namespace}${SEPARATOR}${key}`] = {
 					...resolverDef,
 					resolve: async (req: unknown, ctx: { facts: unknown; signal: AbortSignal }) => {
-						const namespacedFacts = createNamespacedFactsProxy(ctx.facts as Record<string, unknown>, modulesMap);
+						const namespacedFacts = createNamespacedFactsProxy(ctx.facts as Record<string, unknown>, modulesMap, () => Object.keys(modulesMap));
 						await resolverDef.resolve(req, {
 							facts: namespacedFacts[namespace],
 							signal: ctx.signal,
@@ -457,7 +457,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 					// biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
 					run: (facts: any, prev: any) => {
 						// Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-						// Otherwise use module-scoped proxy for direct access (facts.key → namespace_key)
+						// Otherwise use module-scoped proxy for direct access (facts.key → namespace::key)
 						const factsProxy = hasCrossModuleDeps
 							? createCrossModuleFactsProxy(facts as Record<string, unknown>, namespace, depNamespaces)
 							: createModuleFactsProxy(facts as Record<string, unknown>, namespace);
@@ -703,7 +703,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		dispatch(event: { type: string; [key: string]: unknown }) {
 			// Events are dispatched with namespace prefix
 			// e.g., { type: "login", token: "abc" } from auth module
-			// becomes { type: "auth_login", token: "abc" }
+			// becomes { type: "auth::login", token: "abc" }
 			// But we keep them simple - the event type should match the schema
 			engine.dispatch(event);
 		},
@@ -712,7 +712,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
 		/**
 		 * Read a derivation value using namespaced syntax.
-		 * Accepts either "namespace.key" or "namespace_key" format.
+		 * Accepts "namespace.key" format.
 		 *
 		 * @example
 		 * system.read("auth.status")  // → "authenticated"
@@ -724,7 +724,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
 		/**
 		 * Subscribe to derivation changes using namespaced syntax.
-		 * Accepts either "namespace.key" or "namespace_key" format.
+		 * Accepts "namespace.key" format.
 		 * Supports wildcard "namespace.*" to subscribe to all keys in a module.
 		 *
 		 * @example
@@ -777,7 +777,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		/**
 		 * Watch a fact or derivation for changes using namespaced syntax.
 		 * The key is auto-detected -- works with both fact keys and derivation keys.
-		 * Accepts either "namespace.key" or "namespace_key" format.
+		 * Accepts "namespace.key" format.
 		 *
 		 * @example
 		 * system.watch("auth.token", (newVal, oldVal) => { ... })   // fact
