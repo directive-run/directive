@@ -143,10 +143,12 @@ export {
   createRunner,
   createOpenAIRunner,
   createAnthropicRunner,
+  createAnthropicStreamingRunner,
   createOllamaRunner,
   type CreateRunnerOptions,
   type OpenAIRunnerOptions,
   type AnthropicRunnerOptions,
+  type AnthropicStreamingRunnerOptions,
   type OllamaRunnerOptions,
 } from "./helpers.js";
 
@@ -1815,6 +1817,20 @@ export {
   type CircuitState,
 } from "../plugins/circuit-breaker.js";
 
+// Prompt Injection Guardrails
+export {
+  createPromptInjectionGuardrail,
+  createUntrustedContentGuardrail,
+  type PromptInjectionGuardrailOptions,
+} from "../guardrails/prompt-injection.js";
+
+// Enhanced PII Guardrails
+export {
+  createEnhancedPIIGuardrail,
+  createOutputPIIGuardrail,
+  type EnhancedPIIGuardrailOptions,
+} from "../guardrails/pii-enhanced.js";
+
 // ANN Index
 export {
   createBruteForceIndex,
@@ -1868,3 +1884,25 @@ export {
 
 // AI Bridge — Sync AgentStack state into Directive system
 export { createAISyncer } from "./bridge.js";
+
+// RAG Enricher
+export {
+  createRAGEnricher,
+  createJSONFileStore,
+  createOpenAIEmbedder,
+  type RAGChunk,
+  type RAGStorage,
+  type RAGEnricherConfig,
+  type RAGEnrichOptions,
+  type RAGEnricher,
+  type OpenAIEmbedderOptions,
+  type JSONFileStoreOptions,
+} from "./rag.js";
+
+// SSE Transport
+export {
+  createSSETransport,
+  type SSEEvent,
+  type SSETransportConfig,
+  type SSETransport,
+} from "./sse-transport.js";
