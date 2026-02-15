@@ -374,20 +374,20 @@ const userModule = createModule("user", {
     fetchUser: {
       requirement: "FETCH_USER",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      resolve: async (req, context) => {
+        context.facts.user = await api.getUser(context.facts.userId);
       },
     },
     fetchPosts: {
       requirement: "FETCH_POSTS",
-      resolve: async (req, ctx) => {
-        ctx.facts.posts = await api.getPosts(ctx.facts.userId);
+      resolve: async (req, context) => {
+        context.facts.posts = await api.getPosts(context.facts.userId);
       },
     },
     verifyUser: {
       requirement: "VERIFY_USER",
-      resolve: async (req, ctx) => {
-        await api.sendVerification(ctx.facts.user!.email);
+      resolve: async (req, context) => {
+        await api.sendVerification(context.facts.user!.email);
       },
     },
   },
@@ -477,14 +477,14 @@ const userModule = createModule("user", {
     fetchUser: {
       requirement: "FETCH_USER",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (req, ctx) => {
-        ctx.facts.loading = true;
+      resolve: async (req, context) => {
+        context.facts.loading = true;
         try {
-          ctx.facts.user = await api.getUser(ctx.facts.userId);
+          context.facts.user = await api.getUser(context.facts.userId);
         } catch (e) {
-          ctx.facts.error = e instanceof Error ? e.message : 'Failed';
+          context.facts.error = e instanceof Error ? e.message : 'Failed';
         }
-        ctx.facts.loading = false;
+        context.facts.loading = false;
       },
     },
   },

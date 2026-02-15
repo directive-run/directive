@@ -96,12 +96,12 @@ export const cartModule = createModule('cart', {
   resolvers: {
     checkout: {
       requirement: 'CHECKOUT',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         await fetch('/api/checkout', {
           method: 'POST',
-          body: JSON.stringify({ items: ctx.facts.items }),
+          body: JSON.stringify({ items: context.facts.items }),
         });
-        ctx.facts.items = [];
+        context.facts.items = [];
       },
     },
   },
@@ -164,11 +164,11 @@ const createCrudModule = createModuleFactory((name: string, endpoint: string) =>
   resolvers: {
     fetch: {
       requirement: `FETCH_${name.toUpperCase()}`,
-      resolve: async (req, ctx) => {
-        ctx.facts.loading = true;
+      resolve: async (req, context) => {
+        context.facts.loading = true;
         const res = await fetch(endpoint);
-        ctx.facts.items = await res.json();
-        ctx.facts.loading = false;
+        context.facts.items = await res.json();
+        context.facts.loading = false;
       },
     },
   },

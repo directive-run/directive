@@ -2,8 +2,8 @@
 title: Inside Directive's Reconciliation Loop
 description: A technical deep-dive into Directive's five-phase reconciliation cycle – how fact mutations propagate through derivations, constraints, and resolvers to reach a settled state.
 layout: blog
-date: 2026-01-28
-dateModified: 2026-02-12
+date: 2026-02-02
+dateModified: 2026-02-02
 slug: inside-the-reconciliation-loop
 author: directive-labs
 categories: [Architecture, Engineering]
@@ -35,7 +35,7 @@ Let's walk through each phase.
 
 ### Phase 1: Fact mutation triggers tracking
 
-When you write `ctx.facts.phase = "green"`, you're setting a value on a proxy. The proxy's `set` trap does three things:
+When you write `context.facts.phase = "green"`, you're setting a value on a proxy. The proxy's `set` trap does three things:
 
 1. Stores the new value.
 2. Records the key (`"phase"`) in a `changedKeys` set.
@@ -122,7 +122,7 @@ This diff-and-patch approach is directly analogous to React's virtual DOM diffin
 
 New requirements are matched to resolvers by their `requirement` type. Each resolver runs asynchronously with an `AbortController` for cancellation. When a resolver completes, its `onResolutionComplete` callback fires, which does two things: it notifies settlement listeners (so `isSettled` recalculates) and it calls `scheduleReconcile()` to start the next cycle. The resolver's fact mutations – wrapped in `store.batch()` – then propagate through phases 1-4 again.
 
-Cancellation is worth its own mention. When a requirement is *removed* during diffing (Phase 4), the engine calls `resolversManager.cancel(req.id)`, which aborts the resolver's `AbortController`. The resolver's `resolve` function receives this signal via `ctx.signal` – the standard `AbortSignal` interface. If the resolver is mid-fetch, it can pass the signal to `fetch()` for clean cancellation. The `.finally()` handler on the resolver's promise checks whether `inflight.delete()` succeeds before firing `onResolutionComplete`, preventing double-settlement notifications from a cancel/complete race.
+Cancellation is worth its own mention. When a requirement is *removed* during diffing (Phase 4), the engine calls `resolversManager.cancel(req.id)`, which aborts the resolver's `AbortController`. The resolver's `resolve` function receives this signal via `context.signal` – the standard `AbortSignal` interface. If the resolver is mid-fetch, it can pass the signal to `fetch()` for clean cancellation. The `.finally()` handler on the resolver's promise checks whether `inflight.delete()` succeeds before firing `onResolutionComplete`, preventing double-settlement notifications from a cancel/complete race.
 
 Effects run for the changed keys from this cycle. Unlike resolvers (which fulfill requirements), effects are fire-and-forget side effects: logging, analytics, WebSocket messages. They run *before* constraint evaluation in the current implementation, so they see the facts that changed but not the new requirements produced by those changes. Effects are also wrapped in `store.batch()` to coalesce any fact mutations they make – an effect that sets two facts produces one notification, not two.
 
@@ -314,9 +314,9 @@ resolvers: {
   processPayment: {
     requirement: "PROCESS_PAYMENT",
     retry: { attempts: 3, backoff: "exponential", maxDelay: 10000 },
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       const result = await chargeCard();
-      ctx.facts.paymentConfirmed = result.success;
+      context.facts.paymentConfirmed = result.success;
     },
   },
 }

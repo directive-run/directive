@@ -107,6 +107,5 @@ Show the user:
 > **Post-release steps:**
 > 1. Push commits and tags: `git push --follow-tags`
 > 2. Create GitHub release (if desired)
-> 3. Regenerate API reference and embeddings: `cd website && pnpm build:api-docs && pnpm build:embeddings`
-> 4. Redeploy website: `/deploy`
-> 5. Announce on social channels
+> 3. Website auto-redeploys via Vercel on push to main (API docs + embeddings regenerated automatically)
+> 4. Announce on social channels

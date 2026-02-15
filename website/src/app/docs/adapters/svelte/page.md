@@ -629,10 +629,10 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
-        ctx.facts.loading = true;
-        ctx.facts.user = await api.getUser(req.userId);
-        ctx.facts.loading = false;
+      resolve: async (req, context) => {
+        context.facts.loading = true;
+        context.facts.user = await api.getUser(req.userId);
+        context.facts.loading = false;
       },
     },
   },

@@ -400,5 +400,5 @@ const system = createSystem({
 3. **Check the FAQ** at [/docs/faq](/docs/faq)
 
 4. **Ask for help**:
-   - [GitHub Discussions](https://github.com/sizls/directive/discussions)
+   - [GitHub Discussions](https://github.com/directive-run/directive/discussions)
    - [Discord](https://discord.gg/directive)

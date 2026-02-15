@@ -272,11 +272,11 @@ const itemsModule = createModule('items', {
     fetchItems: {
       requirement: 'FETCH_ITEMS',
       retry: { attempts: 3, backoff: 'exponential', initialDelay: 500 },
-      resolve: async (_req, ctx) => {
-        ctx.facts.status = 'loading';
+      resolve: async (_req, context) => {
+        context.facts.status = 'loading';
         // ... fetch logic
-        ctx.facts.lastFetch = Date.now();
-        ctx.facts.status = 'idle';
+        context.facts.lastFetch = Date.now();
+        context.facts.status = 'idle';
       },
     },
   },
@@ -344,10 +344,10 @@ const dataModule = createModule('data', {
   resolvers: {
     loadUsers: {
       requirement: 'LOAD_USERS',
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const res = await fetch('/api/users');
-        ctx.facts.users = await res.json();
-        ctx.facts.loaded = true;
+        context.facts.users = await res.json();
+        context.facts.loaded = true;
       },
     },
   },

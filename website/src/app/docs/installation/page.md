@@ -174,17 +174,19 @@ await system.settle();
 
 ## AI Setup
 
-To use Directive's AI agent orchestration, install the AI package and a provider adapter:
+To use Directive's AI agent orchestration, install the AI package:
+
+```shell
+pnpm add @directive-run/core @directive-run/ai
+```
+
+Then import a provider adapter via subpath exports:
 
 ### OpenAI
 
-```shell
-pnpm add @directive-run/core @directive-run/ai @directive-run/adapter-openai
-```
-
 ```typescript
 import { createAgentStack } from '@directive-run/ai';
-import { createOpenAIRunner } from '@directive-run/adapter-openai';
+import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 const stack = createAgentStack({ runner, agents: { assistant: { instructions: "You are helpful." } } });
@@ -192,36 +194,28 @@ const stack = createAgentStack({ runner, agents: { assistant: { instructions: "Y
 
 ### Anthropic
 
-```shell
-pnpm add @directive-run/core @directive-run/ai @directive-run/adapter-anthropic
-```
-
 ```typescript
 import { createAgentStack } from '@directive-run/ai';
-import { createAnthropicRunner } from '@directive-run/adapter-anthropic';
+import { createAnthropicRunner } from '@directive-run/ai/anthropic';
 
 const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
 ```
 
 ### Ollama (local)
 
-```shell
-pnpm add @directive-run/core @directive-run/ai @directive-run/adapter-ollama
-```
-
 ```typescript
 import { createAgentStack } from '@directive-run/ai';
-import { createOllamaRunner } from '@directive-run/adapter-ollama';
+import { createOllamaRunner } from '@directive-run/ai/ollama';
 
 const runner = createOllamaRunner(); // defaults to localhost:11434
 ```
 
-| Package | Description |
+| Subpath | Description |
 |---------|-------------|
 | `@directive-run/ai` | Agent orchestration, streaming, guardrails |
-| `@directive-run/adapter-openai` | OpenAI, Azure, Together, any OpenAI-compatible API |
-| `@directive-run/adapter-anthropic` | Anthropic Claude models |
-| `@directive-run/adapter-ollama` | Local Ollama inference |
+| `@directive-run/ai/openai` | OpenAI, Azure, Together, any OpenAI-compatible API |
+| `@directive-run/ai/anthropic` | Anthropic Claude models |
+| `@directive-run/ai/ollama` | Local Ollama inference |
 
 ---
 
@@ -328,4 +322,4 @@ import { createModule, createSystem } from '@directive-run/core';
 - **[Quick Start](/docs/quick-start)** &ndash; Build your first module
 - **[Core Concepts](/docs/core-concepts)** &ndash; Understand the mental model
 - **[React Adapter](/docs/adapters/react)** &ndash; Full React setup guide
-- **[Migration Guide](/docs/migration/package-restructure)** &ndash; Migrating from the old `directive` package
+

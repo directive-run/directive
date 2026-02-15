@@ -161,18 +161,25 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
         </code>,
       )
     } else if (match[4] && match[5]) {
-      // [text](url)
-      nodes.push(
-        <a
-          key={match.index}
-          href={match[5]}
-          className="text-brand-primary underline hover:text-brand-primary-600"
-          target={match[5].startsWith('http') ? '_blank' : undefined}
-          rel={match[5].startsWith('http') ? 'noopener noreferrer' : undefined}
-        >
-          {match[4]}
-        </a>,
-      )
+      // [text](url) — only allow safe protocols to prevent javascript: XSS
+      const href = match[5]
+      const isSafe = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/')
+      if (isSafe) {
+        nodes.push(
+          <a
+            key={match.index}
+            href={href}
+            className="text-brand-primary underline hover:text-brand-primary-600"
+            target={href.startsWith('http') ? '_blank' : undefined}
+            rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+          >
+            {match[4]}
+          </a>,
+        )
+      } else {
+        // Unsafe protocol — render as plain text
+        nodes.push(match[0])
+      }
     }
 
     lastIndex = match.index + match[0].length
@@ -539,10 +546,10 @@ const ChatDialog = memo(function ChatDialog({
           setMessages((prev) => [...prev, assistantMessage])
           setStreamingContent('')
         }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return // User cancelled
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return // User cancelled
         const errorMessage =
-          err?.message || 'Something went wrong. Try the search feature instead.'
+          err instanceof Error ? err.message : 'Something went wrong. Try the search feature instead.'
         setError(errorMessage)
 
         // If we have partial content, save it

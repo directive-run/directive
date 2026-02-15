@@ -133,6 +133,53 @@ Both methods automatically track tokens, record observability spans, and publish
 
 ---
 
+## Provider Streaming Runners
+
+Directive ships pre-built streaming runners for OpenAI and Anthropic. These handle SSE parsing, token extraction, and lifecycle hooks automatically:
+
+### OpenAI Streaming
+
+```typescript
+import { createOpenAIRunner, createOpenAIStreamingRunner } from '@directive-run/ai/openai';
+
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+const streamingRunner = createOpenAIStreamingRunner({
+  apiKey: process.env.OPENAI_API_KEY!,
+  hooks: {
+    onAfterCall: ({ durationMs, tokenUsage }) => {
+      console.log(`${durationMs}ms – ${tokenUsage.inputTokens}in/${tokenUsage.outputTokens}out`);
+    },
+  },
+});
+
+const stack = createAgentStack({
+  runner,
+  streaming: { runner: streamingRunner },
+  agents: { chat: { instructions: 'You are a helpful assistant.' } },
+});
+```
+
+### Anthropic Streaming
+
+```typescript
+import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
+
+const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
+const streamingRunner = createAnthropicStreamingRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+
+const stack = createAgentStack({
+  runner,
+  streaming: { runner: streamingRunner },
+  agents: { chat: { instructions: 'You are a helpful assistant.' } },
+});
+```
+
+Both streaming runners return `tokenUsage` with input/output breakdown and support the same `hooks` interface as the standard runners.
+
+---
+
 ## Standalone Streaming
 
 For streaming outside the orchestrator (e.g., direct agent runs without guardrails/approvals), use `createStreamingRunner`:

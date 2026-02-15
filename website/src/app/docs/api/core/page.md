@@ -450,8 +450,8 @@ const factory = resolverFactory<typeof schema>();
 
 const fetchUser = factory.create<{ type: "FETCH_USER"; userId: string }>({
   requirement: "FETCH_USER",
-  resolve: async (req, ctx) => {
-    ctx.facts.user = await api.getUser(req.userId);
+  resolve: async (req, context) => {
+    context.facts.user = await api.getUser(req.userId);
   },
 });
 ```
@@ -491,8 +491,8 @@ import { typedResolver } from '@directive-run/core';
 
 const resetResolver = typedResolver<typeof schema, { type: "RESET" }>({
   requirement: "RESET",
-  resolve: async (_req, ctx) => {
-    ctx.facts.count = 0;
+  resolve: async (_req, context) => {
+    context.facts.count = 0;
   },
 });
 ```

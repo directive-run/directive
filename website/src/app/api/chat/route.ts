@@ -27,6 +27,7 @@ import {
   createOpenAIEmbedder,
   createSSETransport,
   createLengthGuardrail,
+  createOpenAIRunner,
 } from '@directive-run/ai'
 import { createSystem } from '@directive-run/core'
 import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
@@ -172,8 +173,8 @@ const mod = createModule("moduleName", {
     fetchData: {
       requirement: "FETCH_DATA",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (request, context) => {
-        context.facts.data = await api.get(request.id);
+      resolve: async (req, context) => {
+        context.facts.data = await api.get(req.id);
       },
     },
   },
@@ -193,8 +194,8 @@ const mod = createModule("moduleName", {
 ### Key API rules
 - createModule always takes a string name as first arg
 - schema.facts uses t.number(), t.string(), t.boolean(), t.object<T>(), t.array<T>()
-- Resolvers are objects with \`requirement\` (string) and \`resolve(request, context)\` — never bare functions
-- Resolver params are always spelled out as \`request, context\` — never \`req, ctx\`
+- Resolvers are objects with \`requirement\` (string) and \`resolve(req, context)\` — never bare functions
+- \`req\` is the requirement object (not "request"). Never abbreviate \`context\` to \`ctx\`
 - context.facts is mutable; context.signal is an AbortSignal
 - Effects have a \`run(facts, prev)\` method — they fire on fact changes, NOT on resolver completion
 - In multi-module systems, the namespace separator is \`::\` (e.g. \`system.dispatch({ type: "auth::login" })\`)`
@@ -204,24 +205,33 @@ const mod = createModule("moduleName", {
 // ---------------------------------------------------------------------------
 
 let enricherInstance: ReturnType<typeof createRAGEnricher> | null = null
+let enricherInitPromise: Promise<ReturnType<typeof createRAGEnricher> | null> | null = null
 
-function getEnricher() {
-  if (enricherInstance) return enricherInstance
+function getEnricher(): Promise<ReturnType<typeof createRAGEnricher> | null> {
+  if (enricherInstance) return Promise.resolve(enricherInstance)
+  if (enricherInitPromise) return enricherInitPromise
+
   const openaiKey = process.env.OPENAI_API_KEY
-  if (!openaiKey) return null
+  if (!openaiKey) return Promise.resolve(null)
 
-  enricherInstance = createRAGEnricher({
-    embedder: createOpenAIEmbedder({ apiKey: openaiKey }),
-    storage: createJSONFileStore({
-      filePath: path.join(process.cwd(), 'public', 'embeddings.json'),
-    }),
-    onError: (err) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[chat] RAG enrichment failed:', err)
-      }
-    },
-  })
-  return enricherInstance
+  // Serialize initialization so concurrent first requests share a single instance
+  enricherInitPromise = (async () => {
+    enricherInstance = createRAGEnricher({
+      embedder: createOpenAIEmbedder({ apiKey: openaiKey }),
+      storage: createJSONFileStore({
+        filePath: path.join(process.cwd(), 'public', 'embeddings.json'),
+      }),
+      onError: (err) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[chat] RAG enrichment failed:', err)
+        }
+      },
+    })
+
+    return enricherInstance
+  })()
+
+  return enricherInitPromise
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +270,15 @@ function getStack() {
     maxTokens: 2000,
   })
 
+  // OpenAI fallback runner (only created if API key is available)
+  const openaiKey = process.env.OPENAI_API_KEY
+  const fallbackRunners = openaiKey
+    ? [createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })]
+    : []
+
+  // Claude Haiku 4.5 pricing (per million tokens)
+  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+
   agentStackInstance = createAgentStack({
     runner,
     streaming: { runner: streamingRunner },
@@ -285,6 +304,23 @@ function getStack() {
     circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
     rateLimit: { maxPerMinute: 30 },
     maxTokenBudget: 2000,
+
+    // P2: Intelligent retry – retries 429/503, skips 400/401/403
+    intelligentRetry: { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 },
+
+    // P0: Provider fallback – fall back to OpenAI when Anthropic is down
+    ...(fallbackRunners.length > 0 && {
+      fallback: { runners: fallbackRunners },
+    }),
+
+    // P1: Cost budget – cap hourly spend at $5 using Haiku pricing
+    budget: {
+      budgets: [
+        { window: 'hour' as const, maxCost: 5.00, pricing: haikuPricing },
+        { window: 'day' as const, maxCost: 50.00, pricing: haikuPricing },
+      ],
+    },
+
     hooks: {
       onAgentComplete: ({ tokenUsage }) => {
         chatbotSystem.events.requestCompleted({ tokens: tokenUsage })
@@ -438,7 +474,7 @@ export async function POST(request: NextRequest) {
 
   // Build enriched input via RAG enricher (with timeout to prevent hanging)
   // Over-fetch top 7 chunks, re-rank with intent-aware boosting, slice to top 5
-  const enricher = getEnricher()
+  const enricher = await getEnricher()
   let enrichedInput = message
   if (enricher) {
     const intent = classifyIntent(message)

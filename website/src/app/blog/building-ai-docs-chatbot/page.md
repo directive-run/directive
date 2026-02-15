@@ -2,8 +2,8 @@
 title: "Building an AI Docs Chatbot with Directive"
 description: How the AI adapter and the core runtime work together to power a RAG-backed docs chatbot with streaming, guardrails, and reactive server-side state.
 layout: blog
-date: 2026-02-12
-dateModified: 2026-02-12
+date: 2026-02-03
+dateModified: 2026-02-03
 slug: building-ai-docs-chatbot
 author: jason-comes
 categories: [AI, Tutorial]
@@ -56,10 +56,20 @@ const stack = createAgentStack({
   circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
   rateLimit: { maxPerMinute: 30 },
   maxTokenBudget: 2000,
+
+  // Production resilience (P0–P2)
+  intelligentRetry: { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 },
+  fallback: { runners: [openaiBackupRunner] },
+  budget: {
+    budgets: [
+      { window: 'hour', maxCost: 5.00, pricing: haikuPricing },
+      { window: 'day', maxCost: 50.00, pricing: haikuPricing },
+    ],
+  },
 })
 ```
 
-Every message passes through prompt injection detection and PII redaction before reaching the LLM. The circuit breaker trips after three consecutive failures and recovers after 30 seconds. The rate limiter caps throughput at 30 requests per minute across all users.
+Every message passes through prompt injection detection and PII redaction before reaching the LLM. The circuit breaker trips after three consecutive failures and recovers after 30 seconds. The rate limiter caps throughput at 30 requests per minute across all users. Intelligent retry handles 429/503 errors with exponential backoff, provider fallback routes to an OpenAI backup when Anthropic is down, and cost budget guards cap hourly and daily LLM spend.
 
 ---
 
@@ -284,7 +294,7 @@ const docsChatbot = createModule('docs-chatbot', {
   resolvers: {
     logBudgetWarning: {
       requirement: 'LOG_BUDGET_WARNING',
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         console.warn(
           `[docs-chatbot] Daily token budget exceeded: ${context.facts.totalTokensUsed} tokens`,
         )
@@ -394,12 +404,22 @@ const transport = createSSETransport({
   },
 })
 
+const runner = createAnthropicRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: 'claude-haiku-4-5-20251001',
+  maxTokens: 2000,
+})
+
+// OpenAI fallback runner (only created if API key is available)
+const openaiKey = process.env.OPENAI_API_KEY
+const fallbackRunners = openaiKey
+  ? [createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })]
+  : []
+
+const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+
 const stack = createAgentStack({
-  runner: createAnthropicRunner({
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-    model: 'claude-haiku-4-5-20251001',
-    maxTokens: 2000,
-  }),
+  runner,
   streaming: {
     runner: createAnthropicStreamingRunner({
       apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -424,6 +444,23 @@ const stack = createAgentStack({
   circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
   rateLimit: { maxPerMinute: 30 },
   maxTokenBudget: 2000,
+
+  // Retry 429/503 with exponential backoff (never retries 400/401/403)
+  intelligentRetry: { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 },
+
+  // Fall back to OpenAI when Anthropic is unavailable
+  ...(fallbackRunners.length > 0 && {
+    fallback: { runners: fallbackRunners },
+  }),
+
+  // Cap hourly and daily spend using Haiku pricing
+  budget: {
+    budgets: [
+      { window: 'hour', maxCost: 5.00, pricing: haikuPricing },
+      { window: 'day', maxCost: 50.00, pricing: haikuPricing },
+    ],
+  },
+
   hooks: {
     onAgentComplete: ({ tokenUsage }) => {
       chatbotSystem.events.requestCompleted({ tokens: tokenUsage })
@@ -534,6 +571,9 @@ Agent Stack
   ├─ Input guardrails
   │   ├─ Prompt injection
   │   └─ PII redaction
+  ├─ Cost budget guard ($5/hr, $50/day)
+  ├─ Intelligent retry (429/503 → backoff)
+  ├─ Provider fallback (Anthropic → OpenAI)
   ├─ Circuit breaker (3 fails → open)
   ├─ Rate limiter (30/min)
   ├─ Streaming LLM (Claude Haiku 4.5)

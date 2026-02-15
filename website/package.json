@@ -5,7 +5,8 @@
   "description": "Documentation site for Directive - constraint-driven state management for TypeScript",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx scripts/extract-api-docs.ts && tsx scripts/generate-embeddings.ts && next build",
+    "build:next-only": "next build",
     "build:api-docs": "tsx scripts/extract-api-docs.ts",
     "build:embeddings": "tsx scripts/generate-embeddings.ts",
     "start": "next start",

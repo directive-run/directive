@@ -56,8 +56,8 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      resolve: async (req, context) => {
+        context.facts.user = await api.getUser(context.facts.userId);
       },
     },
   },

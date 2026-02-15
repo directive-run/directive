@@ -20,11 +20,8 @@ Show the two **fixed groups** (packages in a fixed group always share the same v
 - `@directive-run/solid`
 - `@directive-run/lit`
 
-**AI + Adapters:**
+**AI:**
 - `@directive-run/ai`
-- `@directive-run/adapter-openai`
-- `@directive-run/adapter-anthropic`
-- `@directive-run/adapter-ollama`
 
 **Ignored (not versioned by changesets):** `directive`, `vite-plugin-api-proxy`. These are excluded from changesets and must be versioned manually if needed.
 
@@ -34,7 +31,7 @@ Show the two **fixed groups** (packages in a fixed group always share the same v
 
 Options:
 - Core + Frameworks (all 6 packages)
-- AI + Adapters (all 4 packages)
+- AI (1 package)
 - Both groups
 - Individual packages (let user specify)
 

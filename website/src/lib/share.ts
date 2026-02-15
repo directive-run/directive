@@ -1,86 +1,98 @@
-// Social sharing utilities for theme voting
-// All URLs use whitelisted preset IDs — no user input in URL construction
+// Social sharing utilities for page-level sharing
 
-import { findColorPreset, findTypoPreset } from './brand-presets'
-
-const SITE_URL = 'https://directive.run'
-const HASHTAG = 'DirectiveTheme'
-const HANDLE = '@directive_run'
-
-interface ShareContext {
-  colorId: string
-  typoId: number
-}
-
-interface ShareContent {
-  text: string
+export interface ShareContent {
+  title: string
   url: string
+  description?: string
 }
 
-function getPresetLabels(ctx: ShareContext) {
-  const color = findColorPreset(ctx.colorId)
-  const typo = findTypoPreset(ctx.typoId)
-  return {
-    colorName: color?.name ?? 'Blueprint',
-    typoName: typo?.name ?? 'Foundation',
-    primaryColor: color?.primary.name ?? 'Sky',
-    accentColor: color?.accent.name ?? 'Indigo',
-    tagline: color?.tagline ?? 'Where it all started',
-  }
-}
-
-const VARIANTS = [
-  (labels: ReturnType<typeof getPresetLabels>) =>
-    `I'm voting for ${labels.colorName} as the default ${HANDLE} theme. ${labels.tagline} #${HASHTAG}`,
-  (labels: ReturnType<typeof getPresetLabels>) =>
-    `Just configured my ${HANDLE} docs — ${labels.colorName} (${labels.primaryColor} + ${labels.accentColor}). This should be the default. #${HASHTAG}`,
-  (labels: ReturnType<typeof getPresetLabels>) =>
-    `Team ${labels.colorName} checking in. ${HANDLE} should ship this look. #${HASHTAG}`,
-  (labels: ReturnType<typeof getPresetLabels>) =>
-    `My ${HANDLE} theme: ${labels.colorName} + ${labels.typoName}. Cast yours at directive.run #${HASHTAG}`,
+const SHARE_PHRASES = [
+  'This is lowkey fire.',
+  'No cap, this slaps.',
+  'Main character energy right here.',
+  'Ate and left no crumbs.',
+  'Living rent free in my head now.',
+  'Okay this goes stupid hard.',
+  'Certified banger alert.',
+  'Sheeeesh.',
+  'Cooked. In a good way.',
+  'It\'s giving "I know what I\'m doing."',
+  'Understood the assignment.',
+  'This hits different.',
+  'Not me sharing state management content at 2am.',
+  'POV: you found the good stuff.',
+  'Tell me why this is so clean.',
+  'Bruh. Just read it.',
+  'I\'m not a runtime, but I resolve things too.',
+  'Constraints? Declared. Requirements? Resolved. Hotel? Trivago.',
+  'It\'s the declarative state for me.',
+  'Drop what you\'re doing and peep this.',
+  'Bussin\' respectfully.',
+  'Big brain energy.',
+  'Slay (derogatory) (affectionate) (technical).',
+  'Core memory unlocked.',
+  'This just works and I\'m suspicious.',
+  'Ngl this might be peak.',
+  'Runtime said "I got you fam."',
+  'State management, but make it fashion.',
+  'Hold my beer, I\'m declaring constraints.',
+  'I showed this to my rubber duck and it nodded.',
 ]
 
-function getRandomVariant(ctx: ShareContext): string {
-  const labels = getPresetLabels(ctx)
-  const variant = VARIANTS[Math.floor(Math.random() * VARIANTS.length)]
-  return variant(labels)
+export function getRandomSharePhrase(): string {
+  return SHARE_PHRASES[Math.floor(Math.random() * SHARE_PHRASES.length)]
 }
 
-export function buildTwitterUrl(ctx: ShareContext): string {
-  const text = getRandomVariant(ctx)
+function addUtmParams(url: string, platform: string): string {
+  const parsed = new URL(url)
+  parsed.searchParams.set('utm_source', platform)
+  parsed.searchParams.set('utm_medium', 'share')
+
+  return parsed.toString()
+}
+
+export function buildTwitterUrl(content: ShareContent): string {
+  const url = addUtmParams(content.url, 'twitter')
   const params = new URLSearchParams({
-    text,
-    url: SITE_URL,
-    hashtags: HASHTAG,
+    text: content.title,
+    url,
   })
+
   return `https://twitter.com/intent/tweet?${params.toString()}`
 }
 
-export function buildBlueskyUrl(ctx: ShareContext): string {
-  const text = `${getRandomVariant(ctx)} ${SITE_URL}`
+export function buildBlueskyUrl(content: ShareContent): string {
+  const url = addUtmParams(content.url, 'bluesky')
+  const text = `${content.title} ${url}`
   const params = new URLSearchParams({ text })
+
   return `https://bsky.app/intent/compose?${params.toString()}`
 }
 
-export function buildClipboardText(ctx: ShareContext): string {
-  return `${getRandomVariant(ctx)} ${SITE_URL}`
+export function buildLinkedInUrl(content: ShareContent): string {
+  const url = addUtmParams(content.url, 'linkedin')
+  const params = new URLSearchParams({ url })
+
+  return `https://www.linkedin.com/sharing/share-offsite/?${params.toString()}`
 }
 
-export function getShareContent(ctx: ShareContext): ShareContent {
-  return {
-    text: getRandomVariant(ctx),
-    url: SITE_URL,
+export function buildClipboardText(content: ShareContent): string {
+  return `${content.title} ${addUtmParams(content.url, 'clipboard')}`
+}
+
+export async function nativeShare(content: ShareContent): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.share) {
+    return false
   }
-}
 
-export async function castVote(ctx: ShareContext): Promise<void> {
   try {
-    await fetch('/api/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ color: ctx.colorId, typo: ctx.typoId }),
+    await navigator.share({
+      title: content.title,
+      url: addUtmParams(content.url, 'native'),
     })
+
+    return true
   } catch {
-    // Fire-and-forget -- don't block sharing
+    return false
   }
 }

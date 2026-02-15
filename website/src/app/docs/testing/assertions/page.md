@@ -77,8 +77,8 @@ test('resolver was called', async () => {
     mocks: {
       resolvers: {
         FETCH_DATA: {
-          resolve: (req, ctx) => {
-            ctx.facts.app_data = 'loaded';
+          resolve: (req, context) => {
+            context.facts.app_data = 'loaded';
           },
         },
       },
@@ -243,8 +243,8 @@ test('full resolver lifecycle', async () => {
     mocks: {
       resolvers: {
         FETCH_USER: {
-          resolve: (req, ctx) => {
-            ctx.facts.user_name = 'John';
+          resolve: (req, context) => {
+            context.facts.user_name = 'John';
           },
         },
       },

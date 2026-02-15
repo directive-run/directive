@@ -55,11 +55,12 @@ A runtime that automatically resolves what your system needs. Declare constraint
 
 ## Package Structure
 
-Single package for MVP: `packages/directive/`
-- Main: `directive`
-- React: `directive/react`
-- Plugins: `directive/plugins`
-- Testing: `directive/testing`
+Scoped packages under `packages/`:
+- Core: `@directive-run/core` (`packages/core`)
+- AI: `@directive-run/ai` (`packages/ai`)
+- React: `@directive-run/react` (`packages/react`)
+- Vue/Svelte/Solid/Lit: `@directive-run/{vue,svelte,solid,lit}`
+- AI Adapters: `@directive-run/ai/openai`, `ai/anthropic`, `ai/ollama` (subpath exports)
 
 ## Build Order
 

@@ -2,8 +2,8 @@
 title: Your Zustand Store Is Secretly an Imperative State Machine
 description: Zustand starts simple. But as loading states, retry logic, and cross-store dependencies pile up, you end up maintaining an ad-hoc state machine without the guarantees. Here's how to spot the inflection point.
 layout: blog
-date: 2026-02-05
-dateModified: 2026-02-12
+date: 2026-02-08
+dateModified: 2026-02-08
 slug: zustand-imperative-state-machine
 author: directive-labs
 categories: [Comparison, State Management]
@@ -380,9 +380,9 @@ const system = createSystem({
   resolvers: {
     loadPermissions: {
       requirement: "LOAD_PERMISSIONS",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const perms = await api.getPermissions(req.role);
-        ctx.facts.permissions.entries = perms;
+        context.facts.permissions.entries = perms;
       },
     },
   },
@@ -446,21 +446,21 @@ const onboarding = createModule("onboarding", {
   resolvers: {
     fetchProfile: {
       requirement: "FETCH_PROFILE",
-      resolve: async (_req, ctx) => {
-        ctx.facts.profile = await api.getProfile(ctx.facts.userId);
+      resolve: async (_req, context) => {
+        context.facts.profile = await api.getProfile(context.facts.userId);
       },
     },
     fetchTeam: {
       requirement: "FETCH_TEAM",
-      resolve: async (req, ctx) => {
-        ctx.facts.team = await api.getTeam(req.teamId);
+      resolve: async (req, context) => {
+        context.facts.team = await api.getTeam(req.teamId);
       },
     },
     fetchConfig: {
       requirement: "FETCH_CONFIG",
       retry: { attempts: 2, backoff: "exponential" },
-      resolve: async (req, ctx) => {
-        ctx.facts.config = await api.getEnterpriseConfig(req.teamId);
+      resolve: async (req, context) => {
+        context.facts.config = await api.getEnterpriseConfig(req.teamId);
       },
     },
   },
@@ -490,8 +490,8 @@ const data = createModule("data", {
     fetchData: {
       requirement: "FETCH_DATA",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
-        ctx.facts.result = await api.getData();
+      resolve: async (_req, context) => {
+        context.facts.result = await api.getData();
       },
     },
   },
@@ -578,20 +578,20 @@ const dataLayer = createModule("data-layer", {
     fetchUser: {
       requirement: "FETCH_USER",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      resolve: async (_req, context) => {
+        context.facts.user = await api.getUser(context.facts.userId);
       },
     },
     fetchPermissions: {
       requirement: "FETCH_PERMISSIONS",
-      resolve: async (_req, ctx) => {
-        ctx.facts.permissions = await api.getPermissions(ctx.facts.user!.role);
+      resolve: async (_req, context) => {
+        context.facts.permissions = await api.getPermissions(context.facts.user!.role);
       },
     },
     fetchConfig: {
       requirement: "FETCH_CONFIG",
-      resolve: async (_req, ctx) => {
-        ctx.facts.config = await api.getAppConfig();
+      resolve: async (_req, context) => {
+        context.facts.config = await api.getAppConfig();
       },
     },
   },

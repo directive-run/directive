@@ -45,7 +45,7 @@ const ws = createModule('ws', {
     // Manages the WebSocket lifecycle
     connection: {
       deps: ['url', 'status'],
-      run: (facts, prev, ctx) => {
+      run: (facts, prev, context) => {
         if (facts.url === '' || facts.status !== 'connecting') {
           return;
         }
@@ -53,22 +53,22 @@ const ws = createModule('ws', {
         const socket = new WebSocket(facts.url);
 
         socket.onopen = () => {
-          ctx.system.batch(() => {
-            ctx.facts.status = 'connected';
-            ctx.facts.retryCount = 0;
+          context.system.batch(() => {
+            context.facts.status = 'connected';
+            context.facts.retryCount = 0;
           });
         };
 
         socket.onmessage = (event) => {
-          ctx.facts.lastMessage = JSON.parse(event.data);
+          context.facts.lastMessage = JSON.parse(event.data);
         };
 
         socket.onclose = () => {
-          ctx.facts.status = 'error';
+          context.facts.status = 'error';
         };
 
         socket.onerror = () => {
-          ctx.facts.status = 'error';
+          context.facts.status = 'error';
         };
 
         // Cleanup: close socket when effect re-runs or system stops
@@ -93,11 +93,11 @@ const ws = createModule('ws', {
   resolvers: {
     reconnect: {
       requirement: 'RECONNECT',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         await new Promise((r) => setTimeout(r, req.delay));
-        ctx.system.batch(() => {
-          ctx.facts.retryCount = ctx.facts.retryCount + 1;
-          ctx.facts.status = 'connecting';
+        context.system.batch(() => {
+          context.facts.retryCount = context.facts.retryCount + 1;
+          context.facts.status = 'connecting';
         });
       },
     },
@@ -153,9 +153,9 @@ function sendMessage(system, type: string, payload: unknown) {
 resolvers: {
   send: {
     requirement: 'WS_SEND',
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       // Access socket through a shared ref or module state
-      if (ctx.facts.status !== 'connected') {
+      if (context.facts.status !== 'connected') {
         throw new Error('Not connected');
       }
       // Socket reference managed by the effect

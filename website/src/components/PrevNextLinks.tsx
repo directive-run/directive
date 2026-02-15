@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
 
-import { navigation } from '@/lib/navigation'
+import { getNavigationForVersion } from '@/lib/navigation'
+import { useDocsVersion } from '@/lib/hooks/useDocsVersion'
 
 function ArrowIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
@@ -52,19 +53,23 @@ const PageLink = memo(function PageLink({
   )
 })
 
-// Memoize the flattened links array since navigation is static
-const allLinks = navigation.flatMap((section) => section.links)
-
 export const PrevNextLinks = memo(function PrevNextLinks() {
   const pathname = usePathname()
+  const { version } = useDocsVersion()
+
+  const allLinks = useMemo(
+    () => getNavigationForVersion(version).flatMap((section) => section.links),
+    [version],
+  )
 
   const { previousPage, nextPage } = useMemo(() => {
     const linkIndex = allLinks.findIndex((link) => link.href === pathname)
+
     return {
       previousPage: linkIndex > -1 ? allLinks[linkIndex - 1] : null,
       nextPage: linkIndex > -1 ? allLinks[linkIndex + 1] : null,
     }
-  }, [pathname])
+  }, [allLinks, pathname])
 
   if (!nextPage && !previousPage) {
     return null

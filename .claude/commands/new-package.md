@@ -39,7 +39,7 @@ All types include:
 - `version`: Read the current version from an existing package in the target fixed group and use that version (e.g., if core is at `0.2.0`, use `0.2.0`)
 - `license`: `"MIT"`
 - `author`: `"Jason Comes"`
-- `repository.url`: `"https://github.com/DirectiveRun/DirectiveJS"`
+- `repository.url`: `"https://github.com/directive-run/directive"`
 - `repository.directory`: `"packages/<name>"`
 - `homepage`: `"https://directive.run"`
 - `engines.node`: `">=18"`

@@ -23,8 +23,16 @@ export interface RunResult<T = unknown> {
   messages: Message[];
   toolCalls: ToolCall[];
   totalTokens: number;
+  /** Breakdown of input vs output tokens, when available from the provider */
+  tokenUsage?: TokenUsage;
   /** True when result was served from semantic cache */
   isCached?: boolean;
+}
+
+/** Breakdown of token usage by input/output */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
 }
 
 /** Message from agent run */
@@ -55,6 +63,59 @@ export interface RunOptions {
   signal?: AbortSignal;
   onMessage?: (message: Message) => void;
   onToolCall?: (toolCall: ToolCall) => void;
+}
+
+// ============================================================================
+// Adapter Lifecycle Hooks
+// ============================================================================
+
+/**
+ * Lifecycle hooks for adapter-level observability.
+ *
+ * Attach to any adapter (runner or streaming runner) to trace, log,
+ * or measure individual LLM calls without modifying application code.
+ *
+ * @example
+ * ```typescript
+ * const runner = createOpenAIRunner({
+ *   apiKey: process.env.OPENAI_API_KEY!,
+ *   hooks: {
+ *     onBeforeCall: ({ agent, input }) => console.log(`→ ${agent.name}`, input.slice(0, 50)),
+ *     onAfterCall: ({ durationMs, tokenUsage }) => {
+ *       metrics.track('llm_call', { durationMs, ...tokenUsage });
+ *     },
+ *     onError: ({ error }) => Sentry.captureException(error),
+ *   },
+ * });
+ * ```
+ */
+export interface AdapterHooks {
+  /** Fires before each LLM API call. */
+  onBeforeCall?: (event: {
+    agent: AgentLike;
+    input: string;
+    timestamp: number;
+  }) => void;
+
+  /** Fires after a successful LLM API call. */
+  onAfterCall?: (event: {
+    agent: AgentLike;
+    input: string;
+    output: string;
+    totalTokens: number;
+    tokenUsage: TokenUsage;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
+
+  /** Fires when an LLM API call fails. */
+  onError?: (event: {
+    agent: AgentLike;
+    input: string;
+    error: Error;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
 }
 
 // ============================================================================

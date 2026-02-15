@@ -2,8 +2,8 @@
 title: From Redux to Directive in 10 Minutes
 description: A practical migration guide showing how Redux Toolkit patterns map to Directive's constraint-driven model, with real auth examples and incremental adoption strategies.
 layout: blog
-date: 2026-02-07
-dateModified: 2026-02-12
+date: 2026-02-10
+dateModified: 2026-02-10
 slug: from-redux-to-directive
 author: directive-labs
 categories: [Migration, Tutorial]
@@ -230,24 +230,24 @@ const auth = createModule("auth", {
     checkSession: {
       requirement: "CHECK_SESSION",
       retry: { attempts: 2, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         try {
           const response = await fetch("/api/auth/session");
           if (!response.ok) throw new Error("Session expired");
           const data = await response.json();
-          ctx.facts.user = data.user;
-          ctx.facts.token = data.token;
+          context.facts.user = data.user;
+          context.facts.token = data.token;
         } catch {
-          ctx.facts.user = undefined;
-          ctx.facts.token = undefined;
+          context.facts.user = undefined;
+          context.facts.token = undefined;
         }
-        ctx.facts.sessionChecked = true;
+        context.facts.sessionChecked = true;
       },
     },
     clearStaleUser: {
       requirement: "CLEAR_STALE_USER",
-      resolve: async (_req, ctx) => {
-        ctx.facts.user = undefined;
+      resolve: async (_req, context) => {
+        context.facts.user = undefined;
       },
     },
   },

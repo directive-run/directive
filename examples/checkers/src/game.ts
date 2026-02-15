@@ -338,8 +338,8 @@ export const checkersGame = createModule("checkers", {
   resolvers: {
     executeMove: {
       requirement: "EXECUTE_MOVE",
-      resolve: async (req, ctx) => {
-        const board = ctx.facts.board as Board;
+      resolve: async (req, context) => {
+        const board = context.facts.board as Board;
         const move: Move = { from: req.from, to: req.to, captured: req.captured };
 
         // Apply the move
@@ -349,25 +349,25 @@ export const checkersGame = createModule("checkers", {
         if (req.captured !== null) {
           const capturedPiece = board[req.captured];
           if (capturedPiece) {
-            const counts = { ...(ctx.facts.capturedCount as { red: number; black: number }) };
+            const counts = { ...(context.facts.capturedCount as { red: number; black: number }) };
             counts[capturedPiece.player]++;
-            ctx.facts.capturedCount = counts;
+            context.facts.capturedCount = counts;
           }
         }
 
-        ctx.facts.moveCount++;
+        context.facts.moveCount++;
 
         // Check kinging
         if (shouldKing(newBoard, req.to)) {
           // Kinging ends the turn (standard American checkers)
           newBoard = promotePiece(newBoard, req.to);
-          ctx.facts.board = newBoard;
-          ctx.facts.selectedIndex = null;
-          ctx.facts.targetIndex = null;
-          ctx.facts.mustContinueFrom = null;
-          const next = opponent(ctx.facts.currentPlayer);
-          ctx.facts.currentPlayer = next;
-          ctx.facts.message = `Kinged! ${next}'s turn.`;
+          context.facts.board = newBoard;
+          context.facts.selectedIndex = null;
+          context.facts.targetIndex = null;
+          context.facts.mustContinueFrom = null;
+          const next = opponent(context.facts.currentPlayer);
+          context.facts.currentPlayer = next;
+          context.facts.message = `Kinged! ${next}'s turn.`;
           return;
         }
 
@@ -375,42 +375,42 @@ export const checkersGame = createModule("checkers", {
         if (req.captured !== null) {
           const moreJumps = getJumpMoves(newBoard, req.to);
           if (moreJumps.length > 0) {
-            ctx.facts.board = newBoard;
-            ctx.facts.selectedIndex = req.to;
-            ctx.facts.targetIndex = null;
-            ctx.facts.mustContinueFrom = req.to;
-            ctx.facts.message = "Jump again! You must continue capturing.";
+            context.facts.board = newBoard;
+            context.facts.selectedIndex = req.to;
+            context.facts.targetIndex = null;
+            context.facts.mustContinueFrom = req.to;
+            context.facts.message = "Jump again! You must continue capturing.";
             return;
           }
         }
 
         // Normal turn end: switch players
-        ctx.facts.board = newBoard;
-        ctx.facts.selectedIndex = null;
-        ctx.facts.targetIndex = null;
-        ctx.facts.mustContinueFrom = null;
-        const next = opponent(ctx.facts.currentPlayer);
-        ctx.facts.currentPlayer = next;
-        ctx.facts.message = `${next}'s turn.`;
+        context.facts.board = newBoard;
+        context.facts.selectedIndex = null;
+        context.facts.targetIndex = null;
+        context.facts.mustContinueFrom = null;
+        const next = opponent(context.facts.currentPlayer);
+        context.facts.currentPlayer = next;
+        context.facts.message = `${next}'s turn.`;
       },
     },
 
     kingPiece: {
       requirement: "KING_PIECE",
-      resolve: async (req, ctx) => {
-        ctx.facts.board = promotePiece(ctx.facts.board, req.index);
+      resolve: async (req, context) => {
+        context.facts.board = promotePiece(context.facts.board, req.index);
       },
     },
 
     endGame: {
       requirement: "END_GAME",
-      resolve: async (req, ctx) => {
-        ctx.facts.gameOver = true;
-        ctx.facts.winner = req.winner;
-        ctx.facts.selectedIndex = null;
-        ctx.facts.targetIndex = null;
-        ctx.facts.mustContinueFrom = null;
-        ctx.facts.message = req.reason;
+      resolve: async (req, context) => {
+        context.facts.gameOver = true;
+        context.facts.winner = req.winner;
+        context.facts.selectedIndex = null;
+        context.facts.targetIndex = null;
+        context.facts.mustContinueFrom = null;
+        context.facts.message = req.reason;
       },
     },
   },

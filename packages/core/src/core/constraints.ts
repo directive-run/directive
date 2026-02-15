@@ -68,7 +68,16 @@ export interface CreateConstraintsOptions<S extends Schema> {
 const DEFAULT_TIMEOUT = 5000;
 
 /**
- * Create a constraints manager.
+ * Create a manager that evaluates constraint rules and produces unmet
+ * requirements.
+ *
+ * Constraints are evaluated in priority order (higher first), with
+ * topological ordering for same-priority constraints connected by `after`
+ * dependencies. Supports sync and async `when()` predicates, incremental
+ * evaluation based on changed fact keys, and per-constraint enable/disable.
+ *
+ * @param options - Constraint definitions, facts proxy, custom requirement key functions, and lifecycle callbacks
+ * @returns A `ConstraintsManager` with evaluate/invalidate/enable/disable/markResolved methods
  */
 export function createConstraintsManager<S extends Schema>(
 	options: CreateConstraintsOptions<S>,

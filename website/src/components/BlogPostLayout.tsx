@@ -18,7 +18,14 @@ interface BlogFrontmatter {
 }
 
 function formatDate(dateStr: string | Date): string {
-  const date = dateStr instanceof Date ? dateStr : new Date(dateStr + 'T00:00:00')
+  const date =
+    dateStr instanceof Date
+      ? dateStr
+      : new Date(
+          typeof dateStr === 'string' && !dateStr.includes('T')
+            ? dateStr + 'T00:00:00'
+            : dateStr,
+        )
 
   return date.toLocaleDateString('en-US', {
     year: 'numeric',

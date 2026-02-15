@@ -29,16 +29,16 @@ const todos = createModule('todos', {
     toggleTodo: {
       requirement: 'TOGGLE_TODO',
       key: (req) => `toggle-${req.id}`,
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         // 1. Snapshot current state for rollback
-        const snapshot = ctx.snapshot();
-        const item = ctx.facts.items.find((i) => i.id === req.id);
+        const snapshot = context.snapshot();
+        const item = context.facts.items.find((i) => i.id === req.id);
         if (!item) {
           return;
         }
 
         // 2. Apply optimistic update immediately
-        ctx.facts.items = ctx.facts.items.map((i) =>
+        context.facts.items = context.facts.items.map((i) =>
           i.id === req.id ? { ...i, done: !i.done } : i,
         );
 
@@ -49,8 +49,8 @@ const todos = createModule('todos', {
           });
           if (!res.ok) throw new Error('Server rejected update');
         } catch (error) {
-          // 4. Rollback on failure
-          snapshot.restore();
+          // 4. Rollback on failure using snapshot.get()
+          context.facts.items = snapshot.get('items')!;
           throw error; // Re-throw so status reflects the failure
         }
       },
@@ -58,10 +58,10 @@ const todos = createModule('todos', {
     deleteTodo: {
       requirement: 'DELETE_TODO',
       key: (req) => `delete-${req.id}`,
-      resolve: async (req, ctx) => {
-        const snapshot = ctx.snapshot();
+      resolve: async (req, context) => {
+        const snapshot = context.snapshot();
         // Optimistically remove
-        ctx.facts.items = ctx.facts.items.filter((i) => i.id !== req.id);
+        context.facts.items = context.facts.items.filter((i) => i.id !== req.id);
 
         try {
           const res = await fetch(`/api/todos/${req.id}`, {
@@ -69,7 +69,7 @@ const todos = createModule('todos', {
           });
           if (!res.ok) throw new Error('Failed to delete');
         } catch (error) {
-          snapshot.restore();
+          context.facts.items = snapshot.get('items')!;
           throw error;
         }
       },
@@ -110,13 +110,13 @@ function TodoList({ system }) {
 
 ## Step by Step
 
-1. **`ctx.snapshot()`** captures the current facts state before any mutation. This is a deep copy, so it's safe regardless of subsequent changes.
+1. **`context.snapshot()`** captures the current facts state before any mutation. This is a deep copy, so it's safe regardless of subsequent changes.
 
 2. **Optimistic mutation** happens synchronously inside the resolver, before the `await`. The UI sees the change immediately because fact updates trigger re-renders.
 
 3. **Server sync** runs in the background. If it succeeds, the optimistic state becomes the real state – nothing more to do.
 
-4. **`snapshot.restore()`** rolls back all facts to their pre-mutation values if the server rejects the change. The UI automatically reverts.
+4. **`snapshot.get(key)`** retrieves the pre-mutation value for a specific fact. Assign it back to roll back the change. The UI automatically reverts.
 
 5. **`key` deduplicates** concurrent operations – toggling the same todo twice doesn't create two in-flight requests. The second dispatch waits for or replaces the first.
 
@@ -125,11 +125,11 @@ function TodoList({ system }) {
 ### Optimistic with server-provided data
 
 ```typescript
-resolve: async (req, ctx) => {
-  const snapshot = ctx.snapshot();
+resolve: async (req, context) => {
+  const snapshot = context.snapshot();
 
   // Optimistic: use local data
-  ctx.facts.items = [...ctx.facts.items, { id: 'temp', text: req.text, done: false }];
+  context.facts.items = [...context.facts.items, { id: 'temp', text: req.text, done: false }];
 
   try {
     const res = await fetch('/api/todos', {
@@ -138,11 +138,11 @@ resolve: async (req, ctx) => {
     });
     const created = await res.json();
     // Replace optimistic entry with server data (real ID, timestamps, etc.)
-    ctx.facts.items = ctx.facts.items.map((i) =>
+    context.facts.items = context.facts.items.map((i) =>
       i.id === 'temp' ? created : i,
     );
   } catch (error) {
-    snapshot.restore();
+    context.facts.items = snapshot.get('items')!;
     throw error;
   }
 },
@@ -151,15 +151,15 @@ resolve: async (req, ctx) => {
 ### Toast notification on rollback
 
 ```typescript
-resolve: async (req, ctx) => {
-  const snapshot = ctx.snapshot();
-  ctx.facts.items = ctx.facts.items.filter((i) => i.id !== req.id);
+resolve: async (req, context) => {
+  const snapshot = context.snapshot();
+  context.facts.items = context.facts.items.filter((i) => i.id !== req.id);
 
   try {
     await fetch(`/api/todos/${req.id}`, { method: 'DELETE' });
   } catch (error) {
-    snapshot.restore();
-    ctx.facts.toastMessage = 'Failed to delete – change reverted';
+    context.facts.items = snapshot.get('items')!;
+    context.facts.toastMessage = 'Failed to delete – change reverted';
     throw error;
   }
 },
@@ -167,7 +167,7 @@ resolve: async (req, ctx) => {
 
 ## Related
 
-- [Resolvers](/docs/resolvers) – `key`, retry policies, and `ctx.snapshot()`
+- [Resolvers](/docs/resolvers) – `key`, retry policies, and `context.snapshot()`
 - [Loading & Error States](/docs/how-to/loading-states) – tracking pending operations
 - [Batch Mutations](/docs/how-to/batch-mutations) – atomic multi-field updates
 - [React Hooks](/docs/api/react) – `useOptimisticUpdate` reference

@@ -225,9 +225,9 @@ interface ResolverDef<S, R extends Requirement> {
   batch?: BatchConfig;
 
   // Resolution strategies (provide one)
-  resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
-  resolveBatch?: (reqs: R[], ctx: ResolverContext<S>) => Promise<void>;
-  resolveBatchWithResults?: (reqs: R[], ctx: ResolverContext<S>) => Promise<BatchItemResult[]>;
+  resolve?: (req: R, context: ResolverContext<S>) => Promise<void>;
+  resolveBatch?: (reqs: R[], context: ResolverContext<S>) => Promise<void>;
+  resolveBatchWithResults?: (reqs: R[], context: ResolverContext<S>) => Promise<BatchItemResult[]>;
 }
 ```
 

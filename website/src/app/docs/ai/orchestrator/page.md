@@ -391,6 +391,8 @@ const orchestrator = createAgentOrchestrator({
 });
 ```
 
+For HTTP-status-aware retry with provider fallback and cost budget guards, see [Resilience & Routing](/docs/ai/resilience-routing). The `withRetry` wrapper respects `Retry-After` headers on `429` responses and uses exponential backoff with jitter on `503`, while `withFallback` chains multiple providers for automatic failover.
+
 ---
 
 ## Pause & Resume
@@ -435,8 +437,8 @@ const orchestrator = createOrchestratorBuilder()
   })
   .withResolver('escalate', {
     requirement: 'ESCALATE',
-    resolve: async (req, ctx) => {
-      console.warn('Token budget escalation:', ctx.facts.agent.tokenUsage);
+    resolve: async (req, context) => {
+      console.warn('Token budget escalation:', context.facts.agent.tokenUsage);
     },
   })
 

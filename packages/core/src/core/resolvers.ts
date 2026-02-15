@@ -137,7 +137,17 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
 }
 
 /**
- * Create a resolvers manager.
+ * Create a manager that fulfills requirements by matching them to resolver
+ * handlers.
+ *
+ * Resolvers are matched by requirement type (string or predicate). Each
+ * resolution runs with an `AbortController` for cancellation, configurable
+ * retry policies (none/linear/exponential backoff), and optional batching
+ * for grouping similar requirements. Duplicate in-flight requirements are
+ * automatically deduplicated.
+ *
+ * @param options - Resolver definitions, facts proxy, store, and lifecycle callbacks (onStart/onComplete/onError/onRetry/onCancel/onResolutionComplete)
+ * @returns A `ResolversManager` with resolve/cancel/cancelAll/getStatus/processBatches methods
  */
 export function createResolversManager<S extends Schema>(
 	options: CreateResolversOptions<S>,

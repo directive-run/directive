@@ -54,9 +54,9 @@ export const adminModule = createModule('admin', {
   resolvers: {
     fetchUsers: {
       requirement: 'FETCH_ADMIN_USERS',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const res = await fetch('/api/admin/users');
-        ctx.facts.users = await res.json();
+        context.facts.users = await res.json();
       },
     },
   },

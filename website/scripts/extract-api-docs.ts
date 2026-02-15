@@ -535,25 +535,26 @@ async function main() {
 	console.log("Extracting API documentation from TypeScript sources...\n");
 
 	const rootDir = path.resolve(__dirname, "..");
-	const packageDir = path.resolve(rootDir, "../packages/directive");
-	const basePath = packageDir;
+	const corePackageDir = path.resolve(rootDir, "../packages/core");
+	const aiPackageDir = path.resolve(rootDir, "../packages/ai");
+	const basePath = corePackageDir;
 
 	// Create ts-morph project
 	const project = new Project({
-		tsConfigFilePath: path.join(packageDir, "tsconfig.json"),
+		tsConfigFilePath: path.join(corePackageDir, "tsconfig.json"),
 		skipAddingFilesFromTsConfig: true,
 	});
 
 	// Add entry points
-	const coreEntry = path.join(packageDir, "src/index.ts");
-	const aiEntry = path.join(packageDir, "src/adapters/ai/index.ts");
+	const coreEntry = path.join(corePackageDir, "src/index.ts");
+	const aiEntry = path.join(aiPackageDir, "src/index.ts");
 
 	const entryFiles: Array<{ path: string; module: string }> = [
-		{ path: coreEntry, module: "directive" },
+		{ path: coreEntry, module: "@directive-run/core" },
 	];
 
 	if (fs.existsSync(aiEntry)) {
-		entryFiles.push({ path: aiEntry, module: "directive/ai" });
+		entryFiles.push({ path: aiEntry, module: "@directive-run/ai" });
 	}
 
 	const allEntries: ApiDocEntry[] = [];

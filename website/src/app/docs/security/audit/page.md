@@ -3,11 +3,13 @@ title: Audit Trail
 description: Cryptographic audit logging with hash chains, PII masking, and tamper detection.
 ---
 
-Maintain an immutable, tamper-evident audit trail of every operation in your system. {% .lead %}
+Maintain an immutable, tamper-evident audit trail of every operation. Part of the `@directive-run/ai` package. {% .lead %}
 
 ---
 
-## Basic Setup
+## Quick Start
+
+Create an audit trail and start recording entries:
 
 ```typescript
 import { createAuditTrail } from '@directive-run/ai';
@@ -18,14 +20,12 @@ const audit = createAuditTrail({
   retentionMs: 7 * 24 * 60 * 60 * 1000, // 7 days
 });
 
-// Attach as a plugin to automatically log all system operations
-const system = createSystem({
-  module: myModule,
-  plugins: [audit.createPlugin()],
+// Record custom events
+await audit.addEntry('agent.run.start', {
+  agentName: 'researcher',
+  input: 'Find recent papers on AI safety',
 });
 ```
-
-The plugin automatically records fact changes, requirement lifecycle, resolver operations, and errors as hash-chained entries.
 
 ---
 
@@ -76,12 +76,12 @@ const audit = createAuditTrail({
 | `maxEntries` | `number` | `10000` | Max entries before oldest are evicted |
 | `retentionMs` | `number` | `7 days` | Retention period for entries |
 | `exportInterval` | `number` | `60000` | How often to flush to exporter (ms) |
-| `exporter` | `(entries) => Promise<void>` | – | Async function to ship entries externally |
-| `piiMasking` | `PIIMaskingConfig` | – | PII detection and redaction config |
-| `signing` | `SigningConfig` | – | Cryptographic signing for non-repudiation |
-| `sessionId` | `string` | – | Session ID attached to all entries |
-| `actorId` | `string` | – | Actor ID attached to all entries |
-| `events` | `object` | – | Callbacks for entry, chain, and export events |
+| `exporter` | `(entries) => Promise<void>` | &ndash; | Async function to ship entries externally |
+| `piiMasking` | `PIIMaskingConfig` | &ndash; | PII detection and redaction config |
+| `signing` | `SigningConfig` | &ndash; | Cryptographic signing for non-repudiation |
+| `sessionId` | `string` | &ndash; | Session ID attached to all entries |
+| `actorId` | `string` | &ndash; | Actor ID attached to all entries |
+| `events` | `object` | &ndash; | Callbacks for entry, chain, and export events |
 
 ---
 
@@ -101,7 +101,7 @@ const audit = createAuditTrail({
 });
 ```
 
-When enabled, each entry includes both the original `payload` and a `maskedPayload` with PII redacted. Supported redaction styles: `'typed'` (replaces with type label), `'masked'` (partial masking like `***-**-1234`), or `'hash'` (SHA-256 hash of original).
+When enabled, each entry includes both the original `payload` and a `maskedPayload` with PII redacted. Supported redaction styles: `'placeholder'` (replaces with `[REDACTED]`), `'typed'` (replaces with type label like `[SSN]`), `'masked'` (partial masking like `***-**-1234`), or `'hashed'` (SHA-256 hash of original).
 
 ---
 
@@ -170,20 +170,6 @@ const userActions = audit.getEntries({
 
 ---
 
-## Manual Entries
-
-Add custom audit entries:
-
-```typescript
-// Record custom events alongside the automatic system entries
-await audit.addEntry('agent.run.start', {
-  agentName: 'researcher',
-  input: 'Find recent papers on AI safety',
-});
-```
-
----
-
 ## Statistics
 
 ```typescript
@@ -212,8 +198,31 @@ await audit.dispose();
 
 ---
 
+## AI Integration
+
+Attach the audit trail as a plugin to an orchestrator &ndash; it automatically records agent runs, tool calls, approval decisions, and errors:
+
+```typescript
+import { createAuditTrail, createAgentOrchestrator } from '@directive-run/ai';
+
+const audit = createAuditTrail({
+  maxEntries: 10000,
+  retentionMs: 7 * 24 * 60 * 60 * 1000,
+});
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  autoApproveToolCalls: true,
+  plugins: [audit.createPlugin()],
+});
+```
+
+See [Guardrails](/docs/ai/guardrails) for error handling, streaming guardrails, and the builder pattern.
+
+---
+
 ## Next Steps
 
-- [PII Detection](/docs/security/pii) – detect and redact sensitive data
-- [Compliance](/docs/security/compliance) – GDPR/CCPA data subject rights
-- [Guardrails](/docs/ai/guardrails) – AI safety guardrails
+- [PII Detection](/docs/security/pii) &ndash; detect and redact sensitive data
+- [GDPR/CCPA](/docs/security/compliance) &ndash; data subject rights
+- [Security Overview](/docs/security/overview) &ndash; defense-in-depth architecture

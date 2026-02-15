@@ -60,7 +60,7 @@ resolvers: {
     requirement: "FETCH_USER",
     retry: { attempts: 3, backoff: "exponential" },
     timeout: 5000,
-    resolve: async (req, ctx) => { /* ... */ }
+    resolve: async (req, context) => { /* ... */ }
   }
 }
 ```

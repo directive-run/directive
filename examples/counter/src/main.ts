@@ -214,46 +214,46 @@ const numberMatch = createModule("number-match", {
   resolvers: {
     removeTiles: {
       requirement: "REMOVE_TILES",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         log("RESOLVER removeTiles: START");
-        const tilesToRemove = ctx.facts.table.filter((tile: Tile) =>
+        const tilesToRemove = context.facts.table.filter((tile: Tile) =>
           req.tileIds.includes(tile.id)
         );
 
         // Multiple fact mutations — this is what causes the freeze in eleven-up
         log("RESOLVER removeTiles: setting table");
-        ctx.facts.table = ctx.facts.table.filter(
+        context.facts.table = context.facts.table.filter(
           (tile: Tile) => !req.tileIds.includes(tile.id)
         );
         log("RESOLVER removeTiles: setting removed");
-        ctx.facts.removed = [...ctx.facts.removed, ...tilesToRemove];
+        context.facts.removed = [...context.facts.removed, ...tilesToRemove];
         log("RESOLVER removeTiles: clearing selected");
-        ctx.facts.selected = [];
+        context.facts.selected = [];
         log("RESOLVER removeTiles: incrementing moveCount");
-        ctx.facts.moveCount++;
+        context.facts.moveCount++;
         log("RESOLVER removeTiles: setting message");
-        ctx.facts.message = `Removed ${tilesToRemove[0].value} + ${tilesToRemove[1].value} = 10!`;
+        context.facts.message = `Removed ${tilesToRemove[0].value} + ${tilesToRemove[1].value} = 10!`;
         log("RESOLVER removeTiles: DONE");
       },
     },
 
     refillTable: {
       requirement: "REFILL_TABLE",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         log(`RESOLVER refillTable: START (count: ${req.count})`);
-        const newTiles = ctx.facts.pool.slice(0, req.count);
-        ctx.facts.pool = ctx.facts.pool.slice(req.count);
-        ctx.facts.table = [...ctx.facts.table, ...newTiles];
-        log(`RESOLVER refillTable: DONE (table now: ${ctx.facts.table.length})`);
+        const newTiles = context.facts.pool.slice(0, req.count);
+        context.facts.pool = context.facts.pool.slice(req.count);
+        context.facts.table = [...context.facts.table, ...newTiles];
+        log(`RESOLVER refillTable: DONE (table now: ${context.facts.table.length})`);
       },
     },
 
     endGame: {
       requirement: "END_GAME",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         log(`RESOLVER endGame: ${req.reason}`);
-        ctx.facts.gameOver = true;
-        ctx.facts.message = req.reason;
+        context.facts.gameOver = true;
+        context.facts.message = req.reason;
       },
     },
   },

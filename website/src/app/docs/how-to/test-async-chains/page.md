@@ -24,14 +24,14 @@ describe('auth flow', () => {
       module: authModule,
       resolvers: {
         // Mock resolvers with controlled responses
-        login: mockResolver('LOGIN', async (req, ctx) => {
-          ctx.facts.token = 'mock-token';
-          ctx.facts.refreshToken = 'mock-refresh';
-          ctx.facts.expiresAt = Date.now() + 3600_000;
-          ctx.facts.status = 'authenticated';
+        login: mockResolver('LOGIN', async (req, context) => {
+          context.facts.token = 'mock-token';
+          context.facts.refreshToken = 'mock-refresh';
+          context.facts.expiresAt = Date.now() + 3600_000;
+          context.facts.status = 'authenticated';
         }),
-        fetchUser: mockResolver('FETCH_USER', async (req, ctx) => {
-          ctx.facts.user = { id: '1', name: 'Test User', role: 'admin' };
+        fetchUser: mockResolver('FETCH_USER', async (req, context) => {
+          context.facts.user = { id: '1', name: 'Test User', role: 'admin' };
         }),
       },
     });
@@ -70,9 +70,9 @@ describe('auth flow', () => {
   });
 
   it('auto-refreshes when token expires', async () => {
-    const refreshMock = mockResolver('REFRESH_TOKEN', async (req, ctx) => {
-      ctx.facts.token = 'new-token';
-      ctx.facts.expiresAt = Date.now() + 3600_000;
+    const refreshMock = mockResolver('REFRESH_TOKEN', async (req, context) => {
+      context.facts.token = 'new-token';
+      context.facts.expiresAt = Date.now() + 3600_000;
     });
 
     const system = createTestSystem({
@@ -164,10 +164,10 @@ it('checkout requires authentication', async () => {
 ```typescript
 it('retries on transient failure', async () => {
   let attempts = 0;
-  const fetchMock = mockResolver('FETCH_PROFILE', async (req, ctx) => {
+  const fetchMock = mockResolver('FETCH_PROFILE', async (req, context) => {
     attempts++;
     if (attempts < 3) throw new Error('Network error');
-    ctx.facts.profile = { name: 'Test', avatar: '' };
+    context.facts.profile = { name: 'Test', avatar: '' };
   });
 
   const system = createTestSystem({

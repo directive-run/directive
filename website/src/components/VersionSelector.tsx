@@ -2,19 +2,12 @@
 
 import { Fragment, memo } from 'react'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react'
+import { useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
 
-interface Version {
-  value: string
-  label: string
-  status?: 'current' | 'latest' | 'deprecated'
-}
-
-const VERSIONS: Version[] = [
-  { value: 'v2', label: 'v2.x (Latest)', status: 'latest' },
-  { value: 'v1', label: 'v1.x', status: 'current' },
-  { value: 'v0', label: 'v0.x (Deprecated)', status: 'deprecated' },
-]
+import { type DocsVersion, LATEST_VERSION, switchVersionPath } from '@/lib/versions'
+import { useDocsVersion } from '@/lib/hooks/useDocsVersion'
 
 function ChevronUpDownIcon({ className }: { className?: string }) {
   return (
@@ -38,42 +31,56 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
+function StatusBadge({ status }: { status: DocsVersion['status'] }) {
+  if (status === 'latest') {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+        Latest
+      </span>
+    )
+  }
+
+  if (status === 'deprecated') {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+        Deprecated
+      </span>
+    )
+  }
+
+  return null
+}
+
 export const VersionSelector = memo(function VersionSelector({
   className,
 }: {
   className?: string
 }) {
-  // For now, default to latest version
-  // In a real implementation, this would be tied to routing
-  const selectedVersion = VERSIONS[0]
+  const router = useRouter()
+  const pathname = usePathname()
+  const { version, allVersions } = useDocsVersion()
 
-  const handleVersionChange = (version: Version) => {
-    // In a real implementation, this would navigate to the versioned docs
-    // For now, just show what would happen
-    if (version.value !== selectedVersion.value) {
-      // Could use router.push(`/docs/${version.value}/...`)
-      console.log(`Switching to ${version.label}`)
+  const handleVersionChange = (selected: DocsVersion) => {
+    if (selected.slug !== version.slug) {
+      const newPath = switchVersionPath(pathname, version, selected)
+      router.push(newPath)
     }
   }
 
+  // Don't render the picker when there's only one version
+  if (allVersions.length <= 1) {
+    return null
+  }
+
   return (
-    <Listbox value={selectedVersion} onChange={handleVersionChange}>
+    <Listbox value={version} onChange={handleVersionChange}>
       <div className={clsx('relative', className)}>
         <ListboxButton className="relative w-full cursor-pointer rounded-lg bg-white py-2 pl-3 pr-10 text-left text-sm ring-1 ring-slate-200 transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary dark:bg-slate-800 dark:ring-slate-700">
           <span className="flex items-center gap-2">
             <span className="block truncate font-medium text-slate-900 dark:text-white">
-              {selectedVersion.label}
+              {version.label}
             </span>
-            {selectedVersion.status === 'latest' && (
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                Latest
-              </span>
-            )}
-            {selectedVersion.status === 'deprecated' && (
-              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                Deprecated
-              </span>
-            )}
+            <StatusBadge status={version.status} />
           </span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
             <ChevronUpDownIcon className="h-5 w-5 text-slate-400" />
@@ -86,10 +93,10 @@ export const VersionSelector = memo(function VersionSelector({
           leaveTo="opacity-0"
         >
           <ListboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm dark:bg-slate-800 dark:ring-white/5">
-            {VERSIONS.map((version) => (
+            {allVersions.map((v) => (
               <ListboxOption
-                key={version.value}
-                value={version}
+                key={v.slug}
+                value={v}
                 className={({ focus }) =>
                   clsx(
                     'relative cursor-pointer select-none py-2 pl-10 pr-4',
@@ -100,17 +107,8 @@ export const VersionSelector = memo(function VersionSelector({
                 {({ selected }) => (
                   <>
                     <span className={clsx('flex items-center gap-2', selected ? 'font-medium' : 'font-normal')}>
-                      {version.label}
-                      {version.status === 'latest' && (
-                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                          Latest
-                        </span>
-                      )}
-                      {version.status === 'deprecated' && (
-                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                          Deprecated
-                        </span>
-                      )}
+                      {v.label}
+                      <StatusBadge status={v.status} />
                     </span>
                     {selected && (
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-brand-primary-600 dark:text-brand-primary-400">
@@ -128,17 +126,16 @@ export const VersionSelector = memo(function VersionSelector({
   )
 })
 
-// Version banner for deprecated/old versions
 export const VersionBanner = memo(function VersionBanner({
   version,
-  latestVersion = 'v2',
 }: {
-  version: string
-  latestVersion?: string
+  version: DocsVersion
 }) {
-  if (version === latestVersion) return null
+  if (version.status === 'latest') {
+    return null
+  }
 
-  const isDeprecated = version === 'v0'
+  const isDeprecated = version.status === 'deprecated'
 
   return (
     <div
@@ -181,12 +178,12 @@ export const VersionBanner = memo(function VersionBanner({
               isDeprecated ? 'text-amber-700 dark:text-amber-300' : 'text-brand-primary-700 dark:text-brand-primary-300'
             )}
           >
-            You are viewing documentation for {version}.{' '}
+            You are viewing documentation for {version.label}.{' '}
             {isDeprecated
               ? 'This version is deprecated and no longer maintained.'
               : 'A newer version is available.'}{' '}
             <a
-              href={`/docs`}
+              href="/docs"
               className={clsx(
                 'font-medium underline',
                 isDeprecated
@@ -194,7 +191,7 @@ export const VersionBanner = memo(function VersionBanner({
                   : 'text-brand-primary-800 hover:text-brand-primary-900 dark:text-brand-primary-200 dark:hover:text-brand-primary-100'
               )}
             >
-              View {latestVersion} documentation
+              View {LATEST_VERSION.label} documentation
             </a>
           </p>
         </div>
