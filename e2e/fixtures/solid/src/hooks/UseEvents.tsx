@@ -1,4 +1,4 @@
-import { useFact, useEvents } from "directive/solid";
+import { useFact, useEvents } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

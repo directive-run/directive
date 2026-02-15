@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useFact, useOptimisticUpdate } from "directive/vue";
+import { useFact, useOptimisticUpdate } from "@directive-run/vue";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

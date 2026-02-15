@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { useFact } from "directive/svelte";
-  import { useRequirementStatus } from "directive/svelte";
+  import { useFact } from "@directive-run/svelte";
+  import { useRequirementStatus } from "@directive-run/svelte";
   import { system, statusPlugin } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 

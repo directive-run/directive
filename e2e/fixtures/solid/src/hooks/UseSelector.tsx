@@ -1,4 +1,4 @@
-import { useSelector } from "directive/solid";
+import { useSelector } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

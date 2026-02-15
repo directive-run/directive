@@ -1,4 +1,4 @@
-import { useFact, useExplain } from "directive/solid";
+import { useFact, useExplain } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

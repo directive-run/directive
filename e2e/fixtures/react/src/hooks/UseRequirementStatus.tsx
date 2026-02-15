@@ -1,5 +1,5 @@
-import { useFact } from "directive/react";
-import { useRequirementStatus } from "directive/react";
+import { useFact } from "@directive-run/react";
+import { useRequirementStatus } from "@directive-run/react";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

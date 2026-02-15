@@ -1,4 +1,4 @@
-import { useDerived } from "directive/solid";
+import { useDerived } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

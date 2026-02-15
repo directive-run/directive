@@ -1,5 +1,5 @@
-import { useFact } from "directive/solid";
-import { useTimeTravel } from "directive/solid";
+import { useFact } from "@directive-run/solid";
+import { useTimeTravel } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

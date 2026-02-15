@@ -1,5 +1,5 @@
-import { useFact } from "directive/react";
-import { useTimeTravel } from "directive/react";
+import { useFact } from "@directive-run/react";
+import { useTimeTravel } from "@directive-run/react";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

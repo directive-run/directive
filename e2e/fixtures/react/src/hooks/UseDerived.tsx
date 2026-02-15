@@ -1,4 +1,4 @@
-import { useDerived } from "directive/react";
+import { useDerived } from "@directive-run/react";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 
