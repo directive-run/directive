@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useFact, useConstraintStatus } from "directive/svelte";
+  import { useFact, useConstraintStatus } from "@directive-run/svelte";
   import { system } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 

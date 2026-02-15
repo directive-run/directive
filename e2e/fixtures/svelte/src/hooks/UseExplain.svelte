@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useFact, useExplain } from "directive/svelte";
+  import { useFact, useExplain } from "@directive-run/svelte";
   import { system } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 

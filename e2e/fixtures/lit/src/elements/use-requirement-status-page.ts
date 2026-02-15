@@ -1,6 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController, RequirementStatusController } from "directive/lit";
+import { FactController, RequirementStatusController } from "@directive-run/lit";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

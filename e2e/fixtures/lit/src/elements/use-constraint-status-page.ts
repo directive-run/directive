@@ -1,7 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController, ConstraintStatusController } from "directive/lit";
-import type { ConstraintInfo } from "directive/lit";
+import { FactController, ConstraintStatusController } from "@directive-run/lit";
+import type { ConstraintInfo } from "@directive-run/lit";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 
