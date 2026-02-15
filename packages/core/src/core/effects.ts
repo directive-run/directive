@@ -89,7 +89,17 @@ export interface CreateEffectsOptions<S extends Schema> {
 }
 
 /**
- * Create an effects manager.
+ * Create a manager for fire-and-forget side effects that run after facts
+ * stabilize.
+ *
+ * Effects support auto-tracked dependencies (re-tracked on every run to
+ * capture conditional reads) or explicit `deps` arrays. Each effect can
+ * return a cleanup function that runs before the next execution or on
+ * system stop. Errors in effects are isolated and never break the
+ * reconciliation loop.
+ *
+ * @param options - Effect definitions, facts proxy, store, and optional lifecycle callbacks
+ * @returns An `EffectsManager` with runEffects/runAll/enable/disable/cleanupAll methods
  */
 export function createEffectsManager<S extends Schema>(
 	options: CreateEffectsOptions<S>,

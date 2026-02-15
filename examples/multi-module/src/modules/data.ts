@@ -102,28 +102,28 @@ export const dataModule = createModule("data", {
         backoff: "exponential",
         initialDelay: 500,
       },
-      resolve: async (_req, ctx) => {
-        ctx.facts.isLoading = true;
-        ctx.facts.error = null;
+      resolve: async (_req, context) => {
+        context.facts.isLoading = true;
+        context.facts.error = null;
 
         try {
           // Simulate API call
           await new Promise((resolve) => setTimeout(resolve, 800));
 
           // Simulate response
-          ctx.facts.users = [
+          context.facts.users = [
             { id: "1", name: "Alice Johnson", department: "Engineering" },
             { id: "2", name: "Bob Smith", department: "Design" },
             { id: "3", name: "Carol Williams", department: "Product" },
             { id: "4", name: "David Brown", department: "Engineering" },
             { id: "5", name: "Eve Davis", department: "Marketing" },
           ];
-          ctx.facts.lastFetched = new Date();
+          context.facts.lastFetched = new Date();
         } catch (error) {
-          ctx.facts.error =
+          context.facts.error =
             error instanceof Error ? error.message : "Failed to fetch users";
         } finally {
-          ctx.facts.isLoading = false;
+          context.facts.isLoading = false;
         }
       },
     },

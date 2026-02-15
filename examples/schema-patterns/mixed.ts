@@ -151,16 +151,16 @@ const userProfileModule = createModule("user-profile", {
   resolvers: {
     validateEmail: {
       requirement: "VALIDATE_EMAIL",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         console.log(`[Resolver] Validating email: ${req.email}`);
         await new Promise((r) => setTimeout(r, 50));
         // Mark as verified
-        ctx.facts.email = `${req.email}@verified`;
+        context.facts.email = `${req.email}@verified`;
       },
     },
     geocodeAddress: {
       requirement: "GEOCODE_ADDRESS",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         console.log(`[Resolver] Geocoding address: ${req.address.city}, ${req.address.state}`);
         await new Promise((r) => setTimeout(r, 50));
         // In real app, would add lat/lng to address

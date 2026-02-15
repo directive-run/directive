@@ -515,36 +515,36 @@ export const elevenUpGame = createModule("eleven-up", {
   resolvers: {
     removeCards: {
       requirement: "REMOVE_CARDS",
-      resolve: async (req, ctx) => {
-        const cardsToRemove = ctx.facts.table.filter((c: Card) =>
+      resolve: async (req, context) => {
+        const cardsToRemove = context.facts.table.filter((c: Card) =>
           req.cardIds.includes(c.id)
         );
 
-        ctx.facts.table = ctx.facts.table.filter(
+        context.facts.table = context.facts.table.filter(
           (c: Card) => !req.cardIds.includes(c.id)
         );
-        ctx.facts.removed = [...ctx.facts.removed, ...cardsToRemove];
-        ctx.facts.selected = [];
+        context.facts.removed = [...context.facts.removed, ...cardsToRemove];
+        context.facts.selected = [];
 
         const isAutoCombo = req.reason === "autoCombo";
 
         if (isAutoCombo) {
           // Auto-combos are freebies: no moveCount increment
-          ctx.facts.comboCount++;
+          context.facts.comboCount++;
           const isPair = cardsToRemove.length === 2;
-          ctx.facts.lastMessage = isPair
+          context.facts.lastMessage = isPair
             ? `Auto-combo! ${cardsToRemove[0].value} + ${cardsToRemove[1].value} = 11`
             : "Auto-combo! J + Q + K";
         } else {
           // User move: track streak and moveCount, clear newCardIds
-          ctx.facts.newCardIds = [];
-          ctx.facts.moveCount++;
-          ctx.facts.currentStreak++;
-          if (ctx.facts.currentStreak > ctx.facts.maxStreak) {
-            ctx.facts.maxStreak = ctx.facts.currentStreak;
+          context.facts.newCardIds = [];
+          context.facts.moveCount++;
+          context.facts.currentStreak++;
+          if (context.facts.currentStreak > context.facts.maxStreak) {
+            context.facts.maxStreak = context.facts.currentStreak;
           }
 
-          ctx.facts.lastMessage =
+          context.facts.lastMessage =
             req.reason === "pair"
               ? `Removed ${cardsToRemove[0].value} + ${cardsToRemove[1].value} = 11!`
               : "Removed J + Q + K!";
@@ -554,20 +554,20 @@ export const elevenUpGame = createModule("eleven-up", {
 
     refillTable: {
       requirement: "REFILL_TABLE",
-      resolve: async (req, ctx) => {
-        const newCards = ctx.facts.deck.slice(0, req.count);
-        ctx.facts.deck = ctx.facts.deck.slice(req.count);
-        ctx.facts.table = [...ctx.facts.table, ...newCards];
-        ctx.facts.newCardIds = newCards.map((c: Card) => c.id);
+      resolve: async (req, context) => {
+        const newCards = context.facts.deck.slice(0, req.count);
+        context.facts.deck = context.facts.deck.slice(req.count);
+        context.facts.table = [...context.facts.table, ...newCards];
+        context.facts.newCardIds = newCards.map((c: Card) => c.id);
       },
     },
 
     endGame: {
       requirement: "END_GAME",
-      resolve: async (req, ctx) => {
-        ctx.facts.gameOver = true;
-        ctx.facts.won = req.won;
-        ctx.facts.lastMessage = req.reason;
+      resolve: async (req, context) => {
+        context.facts.gameOver = true;
+        context.facts.won = req.won;
+        context.facts.lastMessage = req.reason;
       },
     },
   },

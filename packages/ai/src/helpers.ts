@@ -1,13 +1,15 @@
 /**
- * Helper functions for AI adapter — createRunner, estimateCost, state queries.
+ * Helper functions for AI adapter — createRunner, estimateCost, state queries, validation.
  */
 
 import type {
+  AdapterHooks,
   AgentLike,
   AgentRunner,
   RunResult,
   RunOptions,
   Message,
+  TokenUsage,
   AgentState,
   ApprovalState,
 } from "./types.js";
@@ -45,10 +47,49 @@ export function estimateCost(
 }
 
 // ============================================================================
+// Validation Helpers
+// ============================================================================
+
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
+
+/**
+ * Validate that a baseURL uses http or https.
+ * Throws immediately at adapter creation time (not at call time) to catch config errors early.
+ */
+export function validateBaseURL(baseURL: string): void {
+  try {
+    const url = new URL(baseURL);
+    if (!ALLOWED_PROTOCOLS.has(url.protocol)) {
+      throw new Error(
+        `[Directive] Invalid baseURL protocol "${url.protocol}" – only http: and https: are allowed`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("[Directive]")) {
+      throw err;
+    }
+
+    throw new Error(
+      `[Directive] Invalid baseURL "${baseURL}" – must be a valid URL (e.g. "https://api.openai.com/v1")`,
+    );
+  }
+}
+
+// ============================================================================
 // createRunner Helper
 // ============================================================================
 
-/** Options for creating a AgentRunner from buildRequest/parseResponse */
+/** Parsed response from an LLM provider */
+export interface ParsedResponse {
+  text: string;
+  totalTokens: number;
+  /** Input token count, when available from the provider */
+  inputTokens?: number;
+  /** Output token count, when available from the provider */
+  outputTokens?: number;
+}
+
+/** Options for creating an AgentRunner from buildRequest/parseResponse */
 export interface CreateRunnerOptions {
   fetch?: typeof globalThis.fetch;
   buildRequest: (
@@ -59,13 +100,20 @@ export interface CreateRunnerOptions {
   parseResponse: (
     response: Response,
     messages: Message[]
-  ) => Promise<{ text: string; totalTokens: number }>;
+  ) => Promise<ParsedResponse>;
   parseOutput?: <T>(text: string) => T;
+  /** Lifecycle hooks for tracing, logging, and metrics */
+  hooks?: AdapterHooks;
 }
 
 /**
- * Create a AgentRunner from buildRequest/parseResponse helpers.
+ * Create an AgentRunner from buildRequest/parseResponse helpers.
  * Reduces ~50 lines of fetch boilerplate to ~20 lines of configuration.
+ *
+ * Supports lifecycle hooks for observability:
+ * - `onBeforeCall` fires before each API request
+ * - `onAfterCall` fires after a successful response (includes token breakdown)
+ * - `onError` fires when the request fails
  *
  * @example
  * ```typescript
@@ -84,10 +132,19 @@ export interface CreateRunnerOptions {
  *   }),
  *   parseResponse: async (res) => {
  *     const data = await res.json();
+ *     const inputTokens = data.usage?.input_tokens ?? 0;
+ *     const outputTokens = data.usage?.output_tokens ?? 0;
  *     return {
  *       text: data.content?.[0]?.text ?? "",
- *       totalTokens: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
+ *       totalTokens: inputTokens + outputTokens,
+ *       inputTokens,
+ *       outputTokens,
  *     };
+ *   },
+ *   hooks: {
+ *     onAfterCall: ({ durationMs, tokenUsage }) => {
+ *       console.log(`LLM call: ${durationMs}ms, ${tokenUsage.inputTokens}in/${tokenUsage.outputTokens}out`);
+ *     },
  *   },
  * });
  * ```
@@ -98,6 +155,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     buildRequest,
     parseResponse,
     parseOutput,
+    hooks,
   } = options;
 
   const defaultParseOutput = <T>(text: string): T => {
@@ -115,35 +173,70 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     input: string,
     runOptions?: RunOptions
   ): Promise<RunResult<T>> => {
+    const startTime = Date.now();
+    hooks?.onBeforeCall?.({ agent, input, timestamp: startTime });
+
     const messages: Message[] = [{ role: "user", content: input }];
-    const { url, init } = buildRequest(agent, input, messages);
 
-    const fetchInit: RequestInit = runOptions?.signal
-      ? { ...init, signal: runOptions.signal }
-      : init;
+    try {
+      const { url, init } = buildRequest(agent, input, messages);
 
-    const response = await fetchFn(url, fetchInit);
+      const fetchInit: RequestInit = runOptions?.signal
+        ? { ...init, signal: runOptions.signal }
+        : init;
 
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      throw new Error(
-        `[Directive] AgentRunner request failed: ${response.status} ${response.statusText}${errBody ? ` – ${errBody.slice(0, 300)}` : ""}`,
-      );
+      const response = await fetchFn(url, fetchInit);
+
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+
+        throw new Error(
+          `[Directive] AgentRunner request failed: ${response.status} ${response.statusText}${errBody ? ` – ${errBody.slice(0, 300)}` : ""}`,
+        );
+      }
+
+      const parsed = await parseResponse(response, messages);
+      const tokenUsage: TokenUsage = {
+        inputTokens: parsed.inputTokens ?? 0,
+        outputTokens: parsed.outputTokens ?? 0,
+      };
+
+      const assistantMessage: Message = { role: "assistant", content: parsed.text };
+      const allMessages: Message[] = [...messages, assistantMessage];
+
+      runOptions?.onMessage?.(assistantMessage);
+
+      const durationMs = Date.now() - startTime;
+      hooks?.onAfterCall?.({
+        agent,
+        input,
+        output: parsed.text,
+        totalTokens: parsed.totalTokens,
+        tokenUsage,
+        durationMs,
+        timestamp: Date.now(),
+      });
+
+      return {
+        output: parse<T>(parsed.text),
+        messages: allMessages,
+        toolCalls: [],
+        totalTokens: parsed.totalTokens,
+        tokenUsage,
+      };
+    } catch (err) {
+      const durationMs = Date.now() - startTime;
+      if (err instanceof Error) {
+        hooks?.onError?.({
+          agent,
+          input,
+          error: err,
+          durationMs,
+          timestamp: Date.now(),
+        });
+      }
+
+      throw err;
     }
-
-    const { text, totalTokens } = await parseResponse(response, messages);
-
-    const assistantMessage: Message = { role: "assistant", content: text };
-    const allMessages: Message[] = [...messages, assistantMessage];
-
-    runOptions?.onMessage?.(assistantMessage);
-
-    return {
-      output: parse<T>(text),
-      messages: allMessages,
-      toolCalls: [],
-      totalTokens,
-    };
   };
 }
-

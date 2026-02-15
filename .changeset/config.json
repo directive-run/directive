@@ -12,10 +12,7 @@
       "@directive-run/lit"
     ],
     [
-      "@directive-run/ai",
-      "@directive-run/adapter-openai",
-      "@directive-run/adapter-anthropic",
-      "@directive-run/adapter-ollama"
+      "@directive-run/ai"
     ]
   ],
   "access": "public",
