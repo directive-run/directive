@@ -14,6 +14,7 @@ import { Logo, Logomark } from '@/components/Logo'
 import { MobileNavigation } from '@/components/MobileNavigation'
 import { Navigation } from '@/components/Navigation'
 import { Search } from '@/components/Search'
+import { ShareButton } from '@/components/ShareButton'
 import { ThemeToggle } from '@/components/ThemeSelector'
 import { BrandPresetSwitcher } from '@/components/BrandPresetSwitcher'
 import { VersionSelector } from '@/components/VersionSelector'
@@ -23,6 +24,7 @@ import {
   useCanUseThemeSelector,
   useCanUseBrandSwitcher,
   useCanUseVersionSelector,
+  useCanUseShareButton,
 } from '@/lib/feature-flags'
 
 function HeaderLink({
@@ -93,6 +95,7 @@ function Header() {
   let canUseSearch = useCanUseSearch()
   let canUseThemeSelector = useCanUseThemeSelector()
   let canUseBrandSwitcher = useCanUseBrandSwitcher()
+  let canUseShareButton = useCanUseShareButton()
 
   useEffect(() => {
     function onScroll() {
@@ -137,7 +140,8 @@ function Header() {
         <div className="flex items-center gap-4">
           {canUseThemeSelector && <ThemeToggle />}
           {canUseBrandSwitcher && <BrandPresetSwitcher className="relative z-10" />}
-          <Link href="https://github.com/sizls/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
+          {canUseShareButton && <ShareButton />}
+          <Link href="https://github.com/directive-run/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
             <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
           </Link>
         </div>
@@ -154,7 +158,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   let isStandalonePage =
     pathname.startsWith('/blog') ||
     pathname.startsWith('/support') ||
-    pathname.startsWith('/about')
+    pathname.startsWith('/about') ||
+    pathname.startsWith('/contact')
 
   return (
     <div className="flex w-full flex-col">

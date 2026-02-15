@@ -33,24 +33,54 @@ export function resolveAuthor(authorId: string): Author {
 
 export const posts: BlogPost[] = [
   {
-    slug: 'building-ai-docs-chatbot',
-    title: 'Building an AI Docs Chatbot with Directive',
+    slug: 'declarative-forms-with-directive',
+    title: "Declarative Forms with Directive: Zero useState, Zero useEffect",
     description:
-      'How the AI adapter and the core runtime work together to power a RAG-backed docs chatbot with streaming, guardrails, and reactive server-side state.',
-    date: '2026-02-12',
+      'Build a production contact form using Directive\'s six primitives. Per-field validation, async submission, rate limiting, and auto-reset \u2013 without a single useState or useEffect.',
+    date: '2026-02-16',
     author: 'jason-comes',
-    categories: ['AI', 'Tutorial'],
-    featured: true,
+    categories: ['Tutorial', 'Architecture'],
+    featured: false,
   },
   {
     slug: 'introducing-directive',
     title: 'Introducing Directive',
     description:
       'Declare what must be true. Let the runtime resolve it. Directive is a constraint-driven runtime for TypeScript that replaces imperative state management with declarative rules.',
-    date: '2026-02-12',
+    date: '2026-02-15',
     author: 'jason-comes',
     categories: ['Architecture', 'State Management'],
     featured: true,
+  },
+  {
+    slug: 'constraint-driven-architecture',
+    title: 'Constraint-Driven Architecture',
+    description:
+      'Learn why declaring "what must be true" is more powerful than imperative state transitions. Explore the paradigm shift from event-driven to constraint-driven systems.',
+    date: '2026-02-14',
+    author: 'directive-labs',
+    categories: ['Architecture', 'State Management'],
+    featured: true,
+  },
+  {
+    slug: 'data-fetching-with-directive',
+    title: 'Data Fetching with Directive',
+    description:
+      'The complete guide to fetching, caching, invalidation, deduplication, cancellation, batching, optimistic updates, and polling – all with constraints and resolvers.',
+    date: '2026-02-13',
+    author: 'directive-labs',
+    categories: ['Tutorial', 'Architecture'],
+    featured: true,
+  },
+  {
+    slug: 'stop-writing-if-else-chains',
+    title: 'Stop Writing If-Else Chains for Business Logic',
+    description:
+      'Replace sprawling conditional logic with declarative constraints. See how constraint-driven architecture eliminates imperative rule spaghetti.',
+    date: '2026-02-12',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Tutorial'],
+    featured: false,
   },
   {
     slug: 'why-ai-loves-directive',
@@ -60,36 +90,26 @@ export const posts: BlogPost[] = [
     date: '2026-02-11',
     author: 'directive-labs',
     categories: ['AI', 'Architecture'],
-    featured: true,
-  },
-  {
-    slug: 'stop-writing-if-else-chains',
-    title: 'Stop Writing If-Else Chains for Business Logic',
-    description:
-      'Replace sprawling conditional logic with declarative constraints. See how constraint-driven architecture eliminates imperative rule spaghetti.',
-    date: '2026-02-10',
-    author: 'directive-labs',
-    categories: ['Architecture', 'Tutorial'],
     featured: false,
-  },
-  {
-    slug: 'data-fetching-with-directive',
-    title: 'Data Fetching with Directive',
-    description:
-      'The complete guide to fetching, caching, invalidation, deduplication, cancellation, batching, optimistic updates, and polling – all with constraints and resolvers.',
-    date: '2026-02-14',
-    author: 'directive-labs',
-    categories: ['Tutorial', 'Architecture'],
-    featured: true,
   },
   {
     slug: 'from-redux-to-directive',
     title: 'From Redux to Directive in 10 Minutes',
     description:
       'A step-by-step migration from Redux Toolkit to Directive. See how actions, reducers, selectors, and thunks map to facts, derivations, constraints, and resolvers.',
-    date: '2026-02-07',
+    date: '2026-02-10',
     author: 'directive-labs',
     categories: ['Migration', 'Tutorial'],
+    featured: false,
+  },
+  {
+    slug: 'why-state-machines-arent-enough',
+    title: "Why State Machines Aren't Enough",
+    description:
+      'State machines are great for UI flows, but struggle with data-driven constraints. Discover when to use state machines vs. constraint-driven systems.',
+    date: '2026-02-09',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Comparison'],
     featured: false,
   },
   {
@@ -97,7 +117,7 @@ export const posts: BlogPost[] = [
     title: 'Your Zustand Store Is Secretly an Imperative State Machine',
     description:
       'Zustand is great for simple state. But when stores grow complex with async logic, cross-store deps, and manual retries, you have built an ad-hoc state machine without the guarantees.',
-    date: '2026-02-05',
+    date: '2026-02-08',
     author: 'directive-labs',
     categories: ['Comparison', 'State Management'],
     featured: false,
@@ -107,49 +127,9 @@ export const posts: BlogPost[] = [
     title: 'Declarative AI Guardrails: Why Your Agent Framework Needs a Constraint Layer',
     description:
       'Budget enforcement, PII protection, tool denylists, and human-in-the-loop approval — declared as constraints, enforced by the runtime.',
-    date: '2026-02-03',
+    date: '2026-02-07',
     author: 'directive-labs',
     categories: ['AI', 'Architecture'],
-    featured: false,
-  },
-  {
-    slug: 'constraint-driven-architecture',
-    title: 'Constraint-Driven Architecture',
-    description:
-      'Learn why declaring "what must be true" is more powerful than imperative state transitions. Explore the paradigm shift from event-driven to constraint-driven systems.',
-    date: '2026-02-01',
-    author: 'directive-labs',
-    categories: ['Architecture', 'State Management'],
-    featured: true,
-  },
-  {
-    slug: 'inside-the-reconciliation-loop',
-    title: "Inside Directive's Reconciliation Loop",
-    description:
-      'A deep dive into the 5-phase engine cycle: fact mutation, derivation invalidation, constraint evaluation, requirement deduplication, and resolver dispatch.',
-    date: '2026-01-28',
-    author: 'directive-labs',
-    categories: ['Architecture', 'Engineering'],
-    featured: true,
-  },
-  {
-    slug: 'why-state-machines-arent-enough',
-    title: "Why State Machines Aren't Enough",
-    description:
-      'State machines are great for UI flows, but struggle with data-driven constraints. Discover when to use state machines vs. constraint-driven systems.',
-    date: '2026-01-25',
-    author: 'directive-labs',
-    categories: ['Architecture', 'Comparison'],
-    featured: false,
-  },
-  {
-    slug: 'real-time-dashboard',
-    title: 'Building a Real-Time Dashboard with Directive',
-    description:
-      'Orchestrate REST APIs, WebSockets, and polling with separate modules, cross-source derivations, and resilient reconnection constraints.',
-    date: '2026-01-22',
-    author: 'directive-labs',
-    categories: ['Tutorial', 'Architecture'],
     featured: false,
   },
   {
@@ -157,9 +137,49 @@ export const posts: BlogPost[] = [
     title: 'Building AI Agents with Directive',
     description:
       'A practical guide to orchestrating AI agents with approval flows, guardrails, and budget constraints using Directive.',
-    date: '2026-01-18',
+    date: '2026-02-06',
     author: 'directive-labs',
     categories: ['AI', 'Tutorial'],
+    featured: false,
+  },
+  {
+    slug: 'real-time-dashboard',
+    title: 'Building a Real-Time Dashboard with Directive',
+    description:
+      'Orchestrate REST APIs, WebSockets, and polling with separate modules, cross-source derivations, and resilient reconnection constraints.',
+    date: '2026-02-05',
+    author: 'directive-labs',
+    categories: ['Tutorial', 'Architecture'],
+    featured: false,
+  },
+  {
+    slug: 'feature-flags-without-a-service',
+    title: 'Feature Flags Without a Feature Flag Service',
+    description:
+      'Boolean flags don\'t scale. Build a reactive, inspectable feature flag system using constraints, derivations, and effects.',
+    date: '2026-02-04',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Tutorial'],
+    featured: false,
+  },
+  {
+    slug: 'building-ai-docs-chatbot',
+    title: 'Building an AI Docs Chatbot with Directive',
+    description:
+      'How the AI adapter and the core runtime work together to power a RAG-backed docs chatbot with streaming, guardrails, and reactive server-side state.',
+    date: '2026-02-03',
+    author: 'jason-comes',
+    categories: ['AI', 'Tutorial'],
+    featured: false,
+  },
+  {
+    slug: 'inside-the-reconciliation-loop',
+    title: "Inside Directive's Reconciliation Loop",
+    description:
+      'A deep dive into the 5-phase engine cycle: fact mutation, derivation invalidation, constraint evaluation, requirement deduplication, and resolver dispatch.',
+    date: '2026-02-02',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Engineering'],
     featured: false,
   },
 ]

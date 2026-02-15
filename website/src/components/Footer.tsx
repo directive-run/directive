@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Heart, Palette } from '@phosphor-icons/react'
+import { Heart, PaperPlaneTilt } from '@phosphor-icons/react'
 
 import { Logomark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeSelector'
@@ -43,7 +43,7 @@ export function Footer() {
                 { href: '/docs/philosophy', label: 'Philosophy' },
                 { href: '/blog', label: 'Blog' },
                 { href: '/about', label: 'About' },
-                { href: 'https://github.com/sizls/directive', label: 'GitHub', external: true },
+                { href: '/contact', label: 'Contact' },
               ].map(({ href, label, external }) => (
                 <li key={href}>
                   <Link
@@ -64,7 +64,7 @@ export function Footer() {
               Community
             </h3>
             <p className="mt-3 text-[15px] text-slate-500 dark:text-slate-400">
-              Directive is free and open source, sustained by the community. Help shape the project by contributing, sponsoring, or voting on the default theme each month.
+              Directive is free and open source, sustained by the community. Help shape the project by contributing or sponsoring.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <Link
@@ -75,11 +75,11 @@ export function Footer() {
                 Support the project
               </Link>
               <Link
-                href="/docs/community/theme-vote"
+                href="/contact"
                 className="inline-flex items-center gap-1.5 text-[15px] text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
               >
-                <Palette weight="fill" className="h-3.5 w-3.5" />
-                Vote on this month&apos;s theme
+                <PaperPlaneTilt weight="fill" className="h-3.5 w-3.5" />
+                Get in touch
               </Link>
             </div>
           </div>
@@ -90,7 +90,7 @@ export function Footer() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Link
-              href="https://github.com/sizls/directive"
+              href="https://github.com/directive-run/directive"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
