@@ -18,17 +18,15 @@ import { NextRequest } from 'next/server'
 import path from 'node:path'
 import {
   createAgentStack,
-  createAnthropicRunner,
-  createAnthropicStreamingRunner,
   createPromptInjectionGuardrail,
   createEnhancedPIIGuardrail,
   createRAGEnricher,
   createJSONFileStore,
-  createOpenAIEmbedder,
   createSSETransport,
   createLengthGuardrail,
-  createOpenAIRunner,
 } from '@directive-run/ai'
+import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic'
+import { createOpenAIRunner, createOpenAIEmbedder } from '@directive-run/ai/openai'
 import { createSystem } from '@directive-run/core'
 import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
 import { getFeatureFlagSystem } from '@/lib/feature-flags/config'
