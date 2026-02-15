@@ -172,7 +172,7 @@ export const docsChatbot = createModule('docs-chatbot', {
   resolvers: {
     logBudgetWarning: {
       requirement: 'LOG_BUDGET_WARNING',
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         if (process.env.NODE_ENV === 'development') {
           console.warn(
             `[docs-chatbot] Daily token budget exceeded: ${context.facts.totalTokensUsed} tokens used`,

@@ -5,6 +5,12 @@ description: Validate AI agent inputs, outputs, and tool calls with built-in and
 
 Protect AI agents with input validation, output checks, and tool access control. {% .lead %}
 
+{% callout title="Security Guardrails" %}
+For advanced security &ndash; enhanced PII detection, prompt injection prevention,
+audit trails, and GDPR/CCPA compliance &ndash; see
+[Security & Compliance](/docs/security/overview).
+{% /callout %}
+
 ---
 
 ## Built-in Guardrails

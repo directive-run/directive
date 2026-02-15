@@ -35,6 +35,6 @@ export function useCanUseVersionSelector() {
   return useDerived(getFeatureFlagSystem(), 'canUseVersionSelector')
 }
 
-export function useCanUseVoteApi() {
-  return useDerived(getFeatureFlagSystem(), 'canUseVoteApi')
+export function useCanUseShareButton() {
+  return useDerived(getFeatureFlagSystem(), 'canUseShareButton')
 }

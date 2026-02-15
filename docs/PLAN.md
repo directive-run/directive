@@ -34,35 +34,41 @@ directive/
 │   ├── CLAUDE.md              # Project context
 │   └── session-log.md         # Session tracking
 ├── packages/
-│   └── directive/             # Single package for MVP
-│       ├── src/
-│       │   ├── index.ts       # Public exports
-│       │   ├── types.ts       # Core types
-│       │   ├── facts.ts       # Proxy-based facts store with auto-tracking
-│       │   ├── tracking.ts    # Dependency tracking context
-│       │   ├── derivations.ts # Auto-tracked computed values with composition
-│       │   ├── effects.ts     # Side effect system
-│       │   ├── constraints.ts # Constraint evaluation (sync + async)
-│       │   ├── requirements.ts # Typed requirement identity
-│       │   ├── resolvers.ts   # Resolver execution with retry/batch
-│       │   ├── engine.ts      # Reconciliation loop
-│       │   ├── plugins.ts     # Plugin architecture
-│       │   ├── time-travel.ts # Time-travel debugging
-│       │   ├── errors.ts      # Error boundaries
-│       │   ├── module.ts      # createModule
-│       │   ├── system.ts      # createSystem
-│       │   ├── helpers.ts     # sequencer, etc.
-│       │   ├── testing.ts     # Testing utilities
-│       │   ├── react.ts       # React adapter (subpath export)
-│       │   └── __tests__/
-│       ├── package.json
-│       ├── tsconfig.json
-│       └── tsup.config.ts
+│   ├── core/                  # @directive-run/core — runtime, modules, systems
+│   │   ├── src/
+│   │   │   ├── core/          # Core primitives
+│   │   │   │   ├── types.ts
+│   │   │   │   ├── tracking.ts
+│   │   │   │   ├── facts.ts
+│   │   │   │   ├── derivations.ts
+│   │   │   │   ├── effects.ts
+│   │   │   │   ├── constraints.ts
+│   │   │   │   ├── requirements.ts
+│   │   │   │   ├── resolvers.ts
+│   │   │   │   ├── engine.ts
+│   │   │   │   ├── errors.ts
+│   │   │   │   ├── module.ts
+│   │   │   │   ├── system.ts
+│   │   │   │   └── composition.ts
+│   │   │   ├── plugins/       # Built-in plugins
+│   │   │   ├── utils/         # Helpers, testing utilities
+│   │   │   ├── adapters/      # Adapter utilities
+│   │   │   └── index.ts       # Public exports
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── tsup.config.ts
+│   ├── react/                 # @directive-run/react — React hooks
+│   ├── vue/                   # @directive-run/vue — Vue composables
+│   ├── svelte/                # @directive-run/svelte — Svelte stores
+│   ├── solid/                 # @directive-run/solid — Solid signals
+│   ├── lit/                   # @directive-run/lit — Lit controllers
+│   ├── ai/                    # @directive-run/ai — AI agent orchestration
+│   └── directive/             # Deprecated — redirects to @directive-run/core
 ├── examples/
 │   ├── traffic-light/
 │   └── data-fetching/
-├── docs/                      # Documentation site
-├── website/                   # Marketing landing page
+├── docs/                      # Documentation
+├── website/                   # Marketing landing page (directive.run)
 ├── codemods/                  # Migration tools
 │   ├── from-redux/
 │   ├── from-zustand/
@@ -281,8 +287,8 @@ Week 7+: Examples & Docs
 ### 2.4 Complete API Design
 
 ```typescript
-import { createModule, createSystem, t } from 'directive';
-import { loggingPlugin, devtoolsPlugin, persistencePlugin } from 'directive/plugins';
+import { createModule, createSystem, t } from '@directive-run/core';
+import { loggingPlugin, devtoolsPlugin, persistencePlugin } from '@directive-run/core/plugins';
 
 const trafficLight = createModule("traffic-light", {
   // 1. Schema with optional dev-mode validation
@@ -422,7 +428,7 @@ system.debug.export();       // Export history as JSON
 system.debug.import(json);   // Import history
 
 // Testing utilities
-import { createTestSystem, mockResolver, fakeTimers } from 'directive/testing';
+import { createTestSystem, mockResolver, fakeTimers } from '@directive-run/core/testing';
 
 const testSystem = createTestSystem({
   modules: { traffic: trafficLight },

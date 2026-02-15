@@ -23,7 +23,7 @@ export const featureFlags = createModule('feature-flags', {
       themeSelectorEnabled: t.boolean(),
       onboardingToastEnabled: t.boolean(),
       versionSelectorEnabled: t.boolean(),
-      voteApiEnabled: t.boolean(),
+      shareButtonEnabled: t.boolean(),
 
       // Context facts
       environment: t.string(),
@@ -38,7 +38,7 @@ export const featureFlags = createModule('feature-flags', {
       canUseThemeSelector: t.boolean(),
       canShowOnboardingToast: t.boolean(),
       canUseVersionSelector: t.boolean(),
-      canUseVoteApi: t.boolean(),
+      canUseShareButton: t.boolean(),
       enabledCount: t.number(),
       allFeaturesEnabled: t.boolean(),
     },
@@ -51,7 +51,7 @@ export const featureFlags = createModule('feature-flags', {
         themeSelectorEnabled: t.boolean(),
         onboardingToastEnabled: t.boolean(),
         versionSelectorEnabled: t.boolean(),
-        voteApiEnabled: t.boolean(),
+        shareButtonEnabled: t.boolean(),
       },
       setMaintenanceMode: { enabled: t.boolean() },
       toggleFlag: { flag: t.string(), enabled: t.boolean() },
@@ -71,7 +71,7 @@ export const featureFlags = createModule('feature-flags', {
     facts.themeSelectorEnabled = true
     facts.onboardingToastEnabled = true
     facts.versionSelectorEnabled = true
-    facts.voteApiEnabled = true
+    facts.shareButtonEnabled = true
 
     facts.environment = 'production'
     facts.maintenanceMode = false
@@ -93,8 +93,8 @@ export const featureFlags = createModule('feature-flags', {
       facts.onboardingToastEnabled && facts.brandSwitcherEnabled,
     canUseVersionSelector: (facts) =>
       facts.versionSelectorEnabled,
-    canUseVoteApi: (facts) =>
-      facts.voteApiEnabled && !facts.maintenanceMode,
+    canUseShareButton: (facts) =>
+      facts.shareButtonEnabled,
     enabledCount: (facts) => {
       let count = 0
       if (facts.chatEnabled) count++
@@ -104,7 +104,7 @@ export const featureFlags = createModule('feature-flags', {
       if (facts.themeSelectorEnabled) count++
       if (facts.onboardingToastEnabled) count++
       if (facts.versionSelectorEnabled) count++
-      if (facts.voteApiEnabled) count++
+      if (facts.shareButtonEnabled) count++
 
       return count
     },
@@ -116,7 +116,7 @@ export const featureFlags = createModule('feature-flags', {
       facts.themeSelectorEnabled &&
       facts.onboardingToastEnabled &&
       facts.versionSelectorEnabled &&
-      facts.voteApiEnabled,
+      facts.shareButtonEnabled,
   },
 
   events: {
@@ -128,7 +128,7 @@ export const featureFlags = createModule('feature-flags', {
       facts.themeSelectorEnabled = payload.themeSelectorEnabled
       facts.onboardingToastEnabled = payload.onboardingToastEnabled
       facts.versionSelectorEnabled = payload.versionSelectorEnabled
-      facts.voteApiEnabled = payload.voteApiEnabled
+      facts.shareButtonEnabled = payload.shareButtonEnabled
     },
 
     setMaintenanceMode: (facts, { enabled }) => {
@@ -150,7 +150,7 @@ export const featureFlags = createModule('feature-flags', {
       facts.themeSelectorEnabled = true
       facts.onboardingToastEnabled = true
       facts.versionSelectorEnabled = true
-      facts.voteApiEnabled = true
+      facts.shareButtonEnabled = true
       facts.maintenanceMode = false
     },
   },
@@ -170,17 +170,17 @@ export const featureFlags = createModule('feature-flags', {
   resolvers: {
     enableBrandSwitcher: {
       requirement: 'ENABLE_BRAND_SWITCHER',
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         context.facts.brandSwitcherEnabled = true
       },
     },
 
     logMaintenanceWarning: {
       requirement: 'LOG_MAINTENANCE_WARNING',
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         if (process.env.NODE_ENV === 'development') {
           console.warn(
-            '[feature-flags] Maintenance mode is active. Chat, search, playground, and vote API are disabled.',
+            '[feature-flags] Maintenance mode is active. Chat, search, and playground are disabled.',
           )
         }
       },
@@ -197,13 +197,14 @@ export const featureFlags = createModule('feature-flags', {
         'themeSelectorEnabled',
         'onboardingToastEnabled',
         'versionSelectorEnabled',
-        'voteApiEnabled',
+        'shareButtonEnabled',
         'maintenanceMode',
       ],
       run: (facts, prev) => {
         if (process.env.NODE_ENV !== 'development') {
           return
         }
+        
         if (!prev) {
           return
         }
@@ -216,7 +217,7 @@ export const featureFlags = createModule('feature-flags', {
           'themeSelectorEnabled',
           'onboardingToastEnabled',
           'versionSelectorEnabled',
-          'voteApiEnabled',
+          'shareButtonEnabled',
           'maintenanceMode',
         ] as const
 

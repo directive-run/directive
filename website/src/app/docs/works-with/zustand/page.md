@@ -9,6 +9,10 @@ Zustand is great for simple, fast UI state. Directive adds constraint evaluation
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
 {% /callout %}
 
+{% callout title="Migrating from Zustand?" %}
+Want to replace Zustand entirely? See the [Zustand to Directive migration guide](/docs/migration/from-zustand) for step-by-step codemods and concept mapping.
+{% /callout %}
+
 ---
 
 ## Why Use Both
@@ -183,15 +187,15 @@ const pricingModule = createModule('pricing', {
       requirement: 'FETCH_PRICING',
       key: (req) => `${req.plan}-${req.cycle}`,
       retry: { attempts: 3, backoff: 'exponential' },
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         try {
           const result = await api.getPricing(req.plan, req.cycle);
-          ctx.facts.pricingResult = result;
-          ctx.facts.pricingError = null;
+          context.facts.pricingResult = result;
+          context.facts.pricingError = null;
           // Push result back to Zustand for UI
           store.setState({ pricing: result, pricingLoading: false });
         } catch (err) {
-          ctx.facts.pricingError = err;
+          context.facts.pricingError = err;
           store.setState({ pricingLoading: false, pricingError: String(err) });
           throw err; // Let retry policy handle it
         }
@@ -375,19 +379,22 @@ Test the integration with Directive's test utilities:
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('pricing constraint fires when plan selected', async () => {
-  const testSystem = createTestSystem(pricingModule);
+  const testSystem = createTestSystem({ module: pricingModule });
+  testSystem.start();
 
   testSystem.batch(() => {
     testSystem.facts.selectedPlan = 'pro';
     testSystem.facts.billingCycle = 'annual';
   });
 
-  await testSystem.reconcile();
-  expect(testSystem.pendingRequirements()).toContainEqual(
+  await testSystem.waitForIdle();
+  expect(testSystem.allRequirements).toContainEqual(
     expect.objectContaining({
-      type: 'FETCH_PRICING',
-      plan: 'pro',
-      cycle: 'annual',
+      requirement: expect.objectContaining({
+        type: 'FETCH_PRICING',
+        plan: 'pro',
+        cycle: 'annual',
+      }),
     })
   );
 });

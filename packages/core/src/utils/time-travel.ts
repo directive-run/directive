@@ -50,7 +50,17 @@ export interface CreateTimeTravelOptions<S extends Schema> {
 }
 
 /**
- * Create a time-travel manager.
+ * Create a snapshot-based time-travel debugger with a ring buffer of state
+ * history.
+ *
+ * Snapshots are taken automatically after fact changes (during
+ * reconciliation) and can be navigated with `goBack`/`goForward`/`goTo`.
+ * Changesets group multiple snapshots into a single undo/redo unit.
+ * The entire history can be exported to JSON and re-imported for
+ * cross-session debugging.
+ *
+ * @param options - Debug config (maxSnapshots, timeTravel flag), facts proxy, store, and snapshot/time-travel callbacks
+ * @returns A `TimeTravelManager` with takeSnapshot/restore/goBack/goForward/goTo/replay/export/import and changeset methods
  */
 export function createTimeTravelManager<S extends Schema>(
 	options: CreateTimeTravelOptions<S>,
@@ -350,7 +360,10 @@ export function createTimeTravelManager<S extends Schema>(
 }
 
 /**
- * Create a disabled time-travel manager (no-op).
+ * Create a no-op time-travel manager used when `debug.timeTravel` is
+ * disabled. All methods are safe to call but perform no work.
+ *
+ * @returns A `TimeTravelManager` where every method is a no-op and `isEnabled` is `false`
  */
 export function createDisabledTimeTravel<S extends Schema>(): TimeTravelManager<S> {
 	const noopSnapshot: Snapshot = { id: -1, timestamp: 0, facts: {}, trigger: "" };

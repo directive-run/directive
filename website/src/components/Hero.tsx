@@ -96,7 +96,7 @@ export function Hero() {
               <div className="mt-8 flex gap-4 md:justify-center lg:justify-start">
                 <Button href="/docs/quick-start">Get started</Button>
                 <Button
-                  href="https://github.com/sizls/directive"
+                  href="https://github.com/directive-run/directive"
                   variant="secondary"
                 >
                   View on GitHub

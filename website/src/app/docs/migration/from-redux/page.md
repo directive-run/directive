@@ -288,8 +288,9 @@ const directiveSystem = createSystem({ module: newFeatureModule });
 directiveSystem.start();
 
 // Optional: sync Directive fact changes back into Redux during migration
-directiveSystem.facts.$store.subscribeAll((key, value) => {
-  reduxStore.dispatch(syncFromDirective({ [key]: value }));
+directiveSystem.facts.$store.subscribeAll(() => {
+  const snapshot = directiveSystem.facts.$store.toObject();
+  reduxStore.dispatch(syncFromDirective(snapshot));
 });
 ```
 

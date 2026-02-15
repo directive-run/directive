@@ -195,19 +195,19 @@ const userName = useSelector(system, (facts) => facts.user?.name);
 
 ### Where can I ask questions?
 
-- **GitHub Issues**: [github.com/sizls/directive/issues](https://github.com/sizls/directive/issues)
-- **GitHub Discussions**: [github.com/sizls/directive/discussions](https://github.com/sizls/directive/discussions)
+- **GitHub Issues**: [github.com/directive-run/directive/issues](https://github.com/directive-run/directive/issues)
+- **GitHub Discussions**: [github.com/directive-run/directive/discussions](https://github.com/directive-run/directive/discussions)
 - **Discord**: [discord.gg/directive](https://discord.gg/directive)
 
 ### How do I report a bug?
 
-1. Check if it's already reported in [GitHub Issues](https://github.com/sizls/directive/issues)
+1. Check if it's already reported in [GitHub Issues](https://github.com/directive-run/directive/issues)
 2. Create a minimal reproduction
 3. Include: Directive version, TypeScript version, error message, steps to reproduce
 
 ### How do I contribute?
 
-See our [Contributing Guide](https://github.com/sizls/directive/blob/main/CONTRIBUTING.md). We welcome:
+See our [Contributing Guide](https://github.com/directive-run/directive/blob/main/CONTRIBUTING.md). We welcome:
 - Bug fixes
 - Documentation improvements
 - Feature proposals (open an issue first)

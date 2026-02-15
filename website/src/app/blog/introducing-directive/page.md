@@ -2,8 +2,8 @@
 title: Introducing Directive
 description: Declare what must be true. Let the runtime resolve it. Directive is a constraint-driven runtime for TypeScript that replaces imperative state management with declarative rules.
 layout: blog
-date: 2026-02-12
-dateModified: 2026-02-12
+date: 2026-02-15
+dateModified: 2026-02-15
 slug: introducing-directive
 author: jason-comes
 categories: [Architecture, State Management]
@@ -188,12 +188,12 @@ Resolvers are the "how" to a constraint's "what." Each resolver handles one requ
 resolvers: {
   verifySession: {
     requirement: 'VERIFY_SESSION',
-    resolve: async (_req, ctx) => {
+    resolve: async (_req, context) => {
       try {
         const session = await verifySession();
-        ctx.facts.sessionValid = session.valid;
+        context.facts.sessionValid = session.valid;
       } catch {
-        ctx.facts.sessionValid = false;
+        context.facts.sessionValid = false;
       }
     },
   },
@@ -201,18 +201,18 @@ resolvers: {
     requirement: 'FETCH_USER',
     timeout: 10000,
     retry: { attempts: 3, backoff: 'exponential', initialDelay: 500 },
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       const user = await fetch(`/api/users/${req.userId}`)
         .then((r) => r.json());
-      ctx.facts.user = user;
+      context.facts.user = user;
     },
   },
   fetchPreferences: {
     requirement: 'FETCH_PREFERENCES',
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       const prefs = await fetch(`/api/users/${req.userId}/preferences`)
         .then((r) => r.json());
-      ctx.facts.preferences = prefs;
+      context.facts.preferences = prefs;
     },
   },
 },
@@ -220,7 +220,7 @@ resolvers: {
 
 Retry logic is declarative. `fetchUser` will retry three times with exponential backoff starting at 500ms. If all attempts fail, the error boundary handles it. No `while` loops, no `setTimeout` chains, no manual attempt counters.
 
-The resolver receives `req` (the requirement payload) and `ctx` (a context with `ctx.facts`, `ctx.signal` for cancellation, and `ctx.snapshot()` for reading point-in-time state).
+The resolver receives `req` (the requirement payload) and `context` (a context with `context.facts`, `context.signal` for cancellation, and `context.snapshot()` for reading point-in-time state).
 
 ### Effects
 
@@ -382,26 +382,26 @@ const userProfile = createModule("user-profile", {
   resolvers: {
     verifySession: {
       requirement: 'VERIFY_SESSION',
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const session = await verifySession();
-        ctx.facts.sessionValid = session.valid;
+        context.facts.sessionValid = session.valid;
       },
     },
     fetchUser: {
       requirement: 'FETCH_USER',
       retry: { attempts: 3, backoff: 'exponential', initialDelay: 500 },
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const user = await fetch(`/api/users/${req.userId}`)
           .then((r) => r.json());
-        ctx.facts.user = user;
+        context.facts.user = user;
       },
     },
     fetchPreferences: {
       requirement: 'FETCH_PREFERENCES',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const prefs = await fetch(`/api/users/${req.userId}/preferences`)
           .then((r) => r.json());
-        ctx.facts.preferences = prefs;
+        context.facts.preferences = prefs;
       },
     },
   },
@@ -435,7 +435,7 @@ Every module built with Directive inherits runtime behaviors that you'd otherwis
 
 - **Retry with backoff.** Exponential, linear, or fixed-delay retry on any resolver. Configurable attempts, delays, and max duration. See [Resolvers](/docs/resolvers).
 - **Requirement deduplication.** Two constraints requiring `FETCH_USER` for the same userId produce one resolver execution, not two. Custom `key` functions control deduplication granularity.
-- **Automatic cancellation.** When a requirement is no longer needed (the constraint that emitted it is now satisfied), in-flight resolvers receive an abort signal via `ctx.signal`.
+- **Automatic cancellation.** When a requirement is no longer needed (the constraint that emitted it is now satisfied), in-flight resolvers receive an abort signal via `context.signal`.
 - **Error boundaries.** Resolver failures are caught and routed through configurable recovery strategies &ndash; retry, skip, or escalate. See [Error Boundaries](/docs/advanced/errors).
 - **Time-travel debugging.** Record snapshots of every fact mutation and replay them forward and backward. Export and import state for bug reproduction. See [Time Travel](/docs/advanced/time-travel).
 - **Plugin system.** Lifecycle hooks for logging, persistence, devtools, and custom integrations. Ship with built-in logging and devtools plugins. See [Plugins](/docs/plugins/overview).
@@ -495,8 +495,8 @@ const app = createModule("app", {
   resolvers: {
     reset: {
       requirement: 'RESET',
-      resolve: async (_req, ctx) => {
-        ctx.facts.count = 0;
+      resolve: async (_req, context) => {
+        context.facts.count = 0;
       },
     },
   },

@@ -2,8 +2,8 @@
 title: "Declarative AI Guardrails: Why Your Agent Framework Needs a Constraint Layer"
 description: Budget blowouts, PII leaks, and destructive API calls are real production failures. Learn how declarative constraints enforce safety rules that imperative checks miss.
 layout: blog
-date: 2026-02-03
-dateModified: 2026-02-12
+date: 2026-02-07
+dateModified: 2026-02-07
 slug: declarative-ai-guardrails
 author: directive-labs
 categories: [AI, Architecture]
@@ -144,14 +144,14 @@ const agentSafety = createModule('agent-safety', {
   resolvers: {
     pauseAgent: {
       requirement: 'PAUSE_AGENT',
-      resolve: async (req, ctx) => {
-        ctx.facts.agentStatus = 'paused';
-        ctx.facts.pauseReason = req.reason;
+      resolve: async (req, context) => {
+        context.facts.agentStatus = 'paused';
+        context.facts.pauseReason = req.reason;
       },
     },
     warnBudget: {
       requirement: 'WARN_BUDGET',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         await notifyOpsChannel(
           `Agent at ${req.percent}% of token budget`
         );
@@ -206,14 +206,14 @@ const piiGuardrail = createModule('pii-guardrail', {
   resolvers: {
     redactPII: {
       requirement: 'REDACT_PII',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         if (req.target === 'input') {
-          ctx.facts.lastInput = scanForPII(ctx.facts.lastInput).redacted;
+          context.facts.lastInput = scanForPII(context.facts.lastInput).redacted;
         } else {
-          ctx.facts.lastOutput = scanForPII(ctx.facts.lastOutput).redacted;
+          context.facts.lastOutput = scanForPII(context.facts.lastOutput).redacted;
         }
-        ctx.facts.piiDetectedIn = req.target;
-        ctx.facts.redactionApplied = true;
+        context.facts.piiDetectedIn = req.target;
+        context.facts.redactionApplied = true;
       },
     },
   },
@@ -282,11 +282,11 @@ const toolGuardrail = createModule('tool-guardrail', {
   resolvers: {
     blockTool: {
       requirement: 'BLOCK_TOOL_CALL',
-      resolve: async (req, ctx) => {
-        ctx.facts.toolCallBlocked = true;
-        ctx.facts.blockReason = req.reason;
-        ctx.facts.pendingToolCall = undefined;
-        ctx.facts.pendingToolArgs = undefined;
+      resolve: async (req, context) => {
+        context.facts.toolCallBlocked = true;
+        context.facts.blockReason = req.reason;
+        context.facts.pendingToolCall = undefined;
+        context.facts.pendingToolArgs = undefined;
         await logSecurityEvent('tool_blocked', {
           tool: req.tool,
           reason: req.reason,
@@ -347,11 +347,11 @@ const approvalGuardrail = createModule('approval-guardrail', {
   resolvers: {
     requestApproval: {
       requirement: 'REQUEST_HUMAN_APPROVAL',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const id = crypto.randomUUID();
-        ctx.facts.approvalId = id;
-        ctx.facts.approvalStatus = 'pending';
-        ctx.facts.agentPaused = true;
+        context.facts.approvalId = id;
+        context.facts.approvalStatus = 'pending';
+        context.facts.agentPaused = true;
 
         // Push to your review queue – Slack, dashboard, email
         await sendApprovalRequest({
@@ -368,11 +368,11 @@ const approvalGuardrail = createModule('approval-guardrail', {
     },
     cancelAction: {
       requirement: 'CANCEL_ACTION',
-      resolve: async (req, ctx) => {
-        ctx.facts.pendingAction = undefined;
-        ctx.facts.pendingPayload = undefined;
-        ctx.facts.approvalStatus = 'none';
-        ctx.facts.agentPaused = false;
+      resolve: async (req, context) => {
+        context.facts.pendingAction = undefined;
+        context.facts.pendingPayload = undefined;
+        context.facts.approvalStatus = 'none';
+        context.facts.agentPaused = false;
         await logSecurityEvent('action_rejected', { reason: req.reason });
       },
     },

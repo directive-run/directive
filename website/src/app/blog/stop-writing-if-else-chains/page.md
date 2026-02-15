@@ -2,7 +2,7 @@
 title: Stop Writing If-Else Chains for Business Logic
 description: Nested conditionals don't scale. Learn how constraint-driven architecture replaces imperative rule spaghetti with independent, testable declarations.
 layout: blog
-date: 2026-02-10
+date: 2026-02-12
 dateModified: 2026-02-12
 slug: stop-writing-if-else-chains
 author: directive-labs
@@ -182,31 +182,31 @@ const checkout = createModule("checkout", {
   resolvers: {
     verifyAccount: {
       requirement: "VERIFY_ACCOUNT",
-      resolve: async (_req, ctx) => {
-        const result = await verifyUserAccount(ctx.facts);
-        ctx.facts.userVerified = result.verified;
+      resolve: async (_req, context) => {
+        const result = await verifyUserAccount(context.facts);
+        context.facts.userVerified = result.verified;
       },
     },
     checkFraud: {
       requirement: "CHECK_FRAUD",
       retry: { attempts: 2, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
-        const review = await checkFraudStatus(ctx.facts);
-        ctx.facts.fraudStatus = review.status;
+      resolve: async (_req, context) => {
+        const review = await checkFraudStatus(context.facts);
+        context.facts.fraudStatus = review.status;
       },
     },
     checkInventory: {
       requirement: "CHECK_INVENTORY",
-      resolve: async (_req, ctx) => {
-        const stock = await checkAllInventory(ctx.facts);
-        ctx.facts.allItemsInStock = stock.allAvailable;
-        ctx.facts.hasOverseasOvernight = stock.hasOverseasOvernight;
+      resolve: async (_req, context) => {
+        const stock = await checkAllInventory(context.facts);
+        context.facts.allItemsInStock = stock.allAvailable;
+        context.facts.hasOverseasOvernight = stock.hasOverseasOvernight;
       },
     },
     blockCheckout: {
       requirement: "BLOCK_CHECKOUT",
-      resolve: async (req, ctx) => {
-        ctx.facts.checkoutReady = false;
+      resolve: async (req, context) => {
+        context.facts.checkoutReady = false;
         notifyUser(req.reason);
       },
     },

@@ -88,23 +88,23 @@ export const authModule = createModule("auth", {
         backoff: "exponential",
         initialDelay: 500,
       },
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         // Simulate API call
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Simulate validation (in real app, call your auth API)
         if (req.token === "valid-token") {
-          ctx.facts.user = {
+          context.facts.user = {
             id: "user-123",
             name: "John Doe",
             email: "john@example.com",
           };
-          ctx.facts.isAuthenticated = true;
+          context.facts.isAuthenticated = true;
         } else {
-          ctx.facts.user = null;
-          ctx.facts.isAuthenticated = false;
+          context.facts.user = null;
+          context.facts.isAuthenticated = false;
         }
-        ctx.facts.isValidating = false;
+        context.facts.isValidating = false;
       },
     },
   },

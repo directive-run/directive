@@ -56,8 +56,8 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
-        ctx.facts.user = await api.getUser(ctx.facts.userId);
+      resolve: async (req, context) => {
+        context.facts.user = await api.getUser(context.facts.userId);
       },
     },
   },
@@ -331,10 +331,6 @@ useWatch(system, "pageViews", (newValue, prevValue) => {
   analytics.track("pageViews", { from: prevValue, to: newValue });
 });
 
-// With custom equality function (4th parameter)
-useWatch(system, "position", (newVal, oldVal) => {
-  canvas.moveTo(newVal.x, newVal.y);
-}, { equalityFn: (a, b) => a?.x === b?.x && a?.y === b?.y });
 ```
 
 ---

@@ -33,7 +33,15 @@ export interface PendingRetry {
 }
 
 /**
- * Create a retry-later manager.
+ * Create a manager for deferred retry scheduling with exponential backoff.
+ *
+ * Retries are stored in a Map keyed by source ID. Each retry tracks its
+ * attempt number and next retry time. When `processDueRetries()` is called
+ * (typically during reconciliation), entries whose time has elapsed are
+ * returned and removed from the queue.
+ *
+ * @param config - Backoff configuration: `delayMs`, `maxRetries`, `backoffMultiplier`, `maxDelayMs`
+ * @returns A manager with `scheduleRetry`, `getPendingRetries`, `processDueRetries`, `cancelRetry`, and `clearAll` methods
  */
 export function createRetryLaterManager(config: RetryLaterConfig = {}): {
 	/** Schedule a retry */
@@ -162,7 +170,32 @@ const DEFAULT_STRATEGIES: Record<ErrorSource, RecoveryStrategy> = {
 };
 
 /**
- * Create an error boundary manager.
+ * Create a manager that handles errors from constraints, resolvers, effects,
+ * and derivations with configurable per-source recovery strategies.
+ *
+ * Supported strategies: `"skip"` (ignore), `"retry"` (immediate),
+ * `"retry-later"` (deferred with backoff), `"disable"` (turn off source),
+ * and `"throw"` (re-throw). Recent errors are kept in a ring buffer
+ * (last 100) for inspection. The retry-later strategy delegates to an
+ * internal {@link createRetryLaterManager}.
+ *
+ * @param options - Error boundary configuration, plus `onError` and `onRecovery` callbacks for plugin integration
+ * @returns An `ErrorBoundaryManager` with handleError/getLastError/getAllErrors/clearErrors/processDueRetries methods
+ *
+ * @example
+ * ```ts
+ * const boundary = createErrorBoundaryManager({
+ *   config: {
+ *     onResolverError: "retry-later",
+ *     onEffectError: "skip",
+ *     retryLater: { maxRetries: 5, delayMs: 500 },
+ *   },
+ *   onError: (err) => console.error(err.source, err.message),
+ * });
+ *
+ * const strategy = boundary.handleError("resolver", "fetchUser", new Error("timeout"));
+ * // strategy === "retry-later"
+ * ```
  */
 export function createErrorBoundaryManager(
 	options: CreateErrorBoundaryOptions = {},

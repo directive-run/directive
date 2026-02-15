@@ -9,6 +9,10 @@ Redux handles predictable state with reducers, actions, and devtools. Directive 
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
 {% /callout %}
 
+{% callout title="Migrating from Redux?" %}
+Want to replace Redux entirely? See the [Redux to Directive migration guide](/docs/migration/from-redux) for step-by-step codemods and concept mapping.
+{% /callout %}
+
 ---
 
 ## Why Use Both
@@ -193,9 +197,9 @@ const cartModule = createModule('cart', {
       requirement: 'APPLY_DISCOUNT',
       key: (req) => `discount-${req.discount}`,
       retry: { attempts: 3, backoff: 'exponential' },
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const result = await api.applyDiscount(req.discount);
-        ctx.facts.discountApplied = true;
+        context.facts.discountApplied = true;
         // Push result back to Redux
         store.dispatch(cartActions.setDiscount(result));
       },
@@ -358,7 +362,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('constraint fires when Redux state synced', async () => {
-  const testSystem = createTestSystem(cartModule);
+  const testSystem = createTestSystem({ module: cartModule });
+  testSystem.start();
 
   // Simulate Redux state arriving
   testSystem.batch(() => {
@@ -368,33 +373,11 @@ test('constraint fires when Redux state synced', async () => {
   });
 
   // Constraint should fire and produce a requirement
-  await testSystem.reconcile();
-  expect(testSystem.pendingRequirements()).toContainEqual(
-    expect.objectContaining({ type: 'APPLY_DISCOUNT' })
-  );
-});
-
-test('resolver dispatches back to Redux', async () => {
-  const testSystem = createTestSystem(cartModule);
-  const reduxStore = configureStore({ reducer: rootReducer });
-  const dispatched: any[] = [];
-  const originalDispatch = reduxStore.dispatch;
-  reduxStore.dispatch = ((action: any) => {
-    dispatched.push(action);
-
-    return originalDispatch(action);
-  }) as typeof reduxStore.dispatch;
-
-  testSystem.batch(() => {
-    testSystem.facts.cartTotal = 150;
-    testSystem.facts.user = { tier: 'premium' };
-    testSystem.facts.discountApplied = false;
-  });
-
-  // Run resolver and verify it dispatches
-  await testSystem.resolveNext('APPLY_DISCOUNT');
-  expect(dispatched).toContainEqual(
-    expect.objectContaining({ type: 'cart/setDiscount' })
+  await testSystem.waitForIdle();
+  expect(testSystem.allRequirements).toContainEqual(
+    expect.objectContaining({
+      requirement: expect.objectContaining({ type: 'APPLY_DISCOUNT' }),
+    })
   );
 });
 ```

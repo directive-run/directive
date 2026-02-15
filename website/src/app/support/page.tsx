@@ -228,7 +228,7 @@ export default function SupportPage() {
         <div className="mt-12 space-y-4">
           {/* Primary: GitHub Sponsors */}
           <a
-            href="https://github.com/sponsors/sizls"
+            href="https://github.com/sponsors/directive-run"
             target="_blank"
             rel="noopener noreferrer"
             className="group flex items-center justify-between rounded-2xl bg-brand-primary px-6 py-5 text-white shadow-md transition-shadow hover:shadow-lg dark:bg-brand-primary-600"
@@ -287,7 +287,7 @@ export default function SupportPage() {
 
           {/* Tertiary: Star on GitHub */}
           <a
-            href="https://github.com/sizls/directive"
+            href="https://github.com/directive-run/directive"
             target="_blank"
             rel="noopener noreferrer"
             className="group flex items-center justify-between rounded-2xl border border-slate-200 px-6 py-5 transition-colors hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"

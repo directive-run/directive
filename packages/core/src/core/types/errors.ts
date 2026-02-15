@@ -9,7 +9,33 @@
 /** Error source types */
 export type ErrorSource = "constraint" | "resolver" | "effect" | "derivation" | "system";
 
-/** Directive error class */
+/**
+ * Extended Error class with source tracking, recovery metadata, and
+ * arbitrary context for structured error handling within Directive.
+ *
+ * Thrown or returned by the error boundary manager. The `source` and
+ * `sourceId` fields identify where the error originated, and `recoverable`
+ * indicates whether the engine can apply a recovery strategy.
+ *
+ * @param message - Human-readable error description
+ * @param source - Which subsystem produced the error (`"constraint"`, `"resolver"`, `"effect"`, `"derivation"`, or `"system"`)
+ * @param sourceId - The ID of the specific constraint, resolver, effect, or derivation that failed
+ * @param context - Optional arbitrary data for debugging (e.g., the requirement that triggered a resolver error)
+ * @param recoverable - Whether the error boundary can apply a recovery strategy (default `true`; `false` for system errors)
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await system.settle();
+ * } catch (err) {
+ *   if (err instanceof DirectiveError) {
+ *     console.log(err.source);      // "resolver"
+ *     console.log(err.sourceId);    // "fetchUser"
+ *     console.log(err.recoverable); // true
+ *   }
+ * }
+ * ```
+ */
 export class DirectiveError extends Error {
 	constructor(
 		message: string,

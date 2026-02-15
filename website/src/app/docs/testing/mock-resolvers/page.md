@@ -30,9 +30,9 @@ test('user is fetched', async () => {
       resolvers: {
         // Replace the real FETCH_USER resolver with a synchronous stub
         FETCH_USER: {
-          resolve: (req, ctx) => {
-            ctx.facts.user_name = 'Test User';
-            ctx.facts.user_email = 'test@example.com';
+          resolve: (req, context) => {
+            context.facts.user_name = 'Test User';
+            context.facts.user_email = 'test@example.com';
           },
         },
       },
@@ -95,8 +95,8 @@ const system = createTestSystem({
       FETCH_USER: {
         // Wait 500ms before resolving – useful for testing loading states
         delay: 500,
-        resolve: (req, ctx) => {
-          ctx.facts.user_name = 'Test User';
+        resolve: (req, context) => {
+          context.facts.user_name = 'Test User';
         },
       },
     },
@@ -247,8 +247,8 @@ test('resolver was called', async () => {
     mocks: {
       resolvers: {
         FETCH_USER: {
-          resolve: (req, ctx) => {
-            ctx.facts.user_name = 'Test';
+          resolve: (req, context) => {
+            context.facts.user_name = 'Test';
           },
         },
       },

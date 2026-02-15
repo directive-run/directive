@@ -2,8 +2,8 @@
 title: Data Fetching with Directive
 description: The complete guide to fetching, caching, invalidation, deduplication, cancellation, batching, optimistic updates, and polling – all with constraints and resolvers.
 layout: blog
-date: 2026-02-14
-dateModified: 2026-02-14
+date: 2026-02-13
+dateModified: 2026-02-13
 slug: data-fetching-with-directive
 author: directive-labs
 categories: [Tutorial, Architecture]
@@ -170,11 +170,11 @@ const kanban = createModule("kanban", {
       requirement: "FETCH_BOARD",
       timeout: 15000,
       retry: { attempts: 3, backoff: "exponential", initialDelay: 500 },
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         context.facts.loading = true;
         context.facts.error = null;
         try {
-          const res = await fetch(`/api/boards/${request.boardId}`, {
+          const res = await fetch(`/api/boards/${req.boardId}`, {
             signal: context.signal,
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -264,13 +264,13 @@ const kanban = createModule("kanban", {
   resolvers: {
     fetchAssignee: {
       requirement: "FETCH_ASSIGNEE",
-      key: (request) => `assignee-${request.userId}`,
-      resolve: async (request, context) => {
-        const res = await fetch(`/api/users/${request.userId}`);
+      key: (req) => `assignee-${req.userId}`,
+      resolve: async (req, context) => {
+        const res = await fetch(`/api/users/${req.userId}`);
         const user = await res.json();
         context.facts.assignees = {
           ...context.facts.assignees,
-          [request.userId]: user,
+          [req.userId]: user,
         };
       },
     },
@@ -294,14 +294,14 @@ Replace the individual `resolve` with `resolveBatch`:
 resolvers: {
   fetchAssignee: {
     requirement: "FETCH_ASSIGNEE",
-    key: (request) => `assignee-${request.userId}`,
+    key: (req) => `assignee-${req.userId}`,
     batch: {
       enabled: true,
       windowMs: 50,
       maxSize: 100,
     },
-    resolveBatch: async (requests, context) => {
-      const userIds = requests.map((r) => r.userId);
+    resolveBatch: async (reqs, context) => {
+      const userIds = reqs.map((r) => r.userId);
       const res = await fetch("/api/users/batch", {
         method: "POST",
         body: JSON.stringify({ userIds }),
@@ -327,8 +327,8 @@ Here's the runtime sequence:
 `resolveBatch` is all-or-nothing: if the request fails, all 30 requirements retry together. For per-item error handling, use `resolveBatchWithResults` instead:
 
 ```typescript
-resolveBatchWithResults: async (requests, context) => {
-  const userIds = requests.map((r) => r.userId);
+resolveBatchWithResults: async (reqs, context) => {
+  const userIds = reqs.map((r) => r.userId);
   const res = await fetch("/api/users/batch", {
     method: "POST",
     body: JSON.stringify({ userIds }),
@@ -340,9 +340,9 @@ resolveBatchWithResults: async (requests, context) => {
   context.facts.assignees = { ...context.facts.assignees, ...byId };
 
   // Return per-item results
-  return requests.map((request) => ({
-    success: byId[request.userId] !== undefined,
-    error: byId[request.userId] ? undefined : new Error(`User ${request.userId} not found`),
+  return reqs.map((req) => ({
+    success: byId[req.userId] !== undefined,
+    error: byId[req.userId] ? undefined : new Error(`User ${req.userId} not found`),
   }));
 },
 ```
@@ -398,25 +398,25 @@ const kanban = createModule("kanban", {
   resolvers: {
     moveCard: {
       requirement: "MOVE_CARD",
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         // 1. Snapshot before mutation
         const snapshot = context.snapshot();
 
         // 2. Optimistic update – move the card immediately
         context.facts.cards = context.facts.cards.map((card) =>
-          card.id === request.cardId
-            ? { ...card, columnId: request.toColumn, position: request.position }
+          card.id === req.cardId
+            ? { ...card, columnId: req.toColumn, position: req.position }
             : card,
         );
         context.facts.pendingMove = null;
 
         try {
           // 3. Persist to server
-          const res = await fetch(`/api/cards/${request.cardId}/move`, {
+          const res = await fetch(`/api/cards/${req.cardId}/move`, {
             method: "POST",
             body: JSON.stringify({
-              toColumn: request.toColumn,
-              position: request.position,
+              toColumn: req.toColumn,
+              position: req.position,
             }),
             signal: context.signal,
           });

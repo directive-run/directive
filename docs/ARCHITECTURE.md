@@ -319,7 +319,7 @@ derive.filteredUsers  // [{ name: "Alice" }] (computed from users + filter)
 The `useDirective` hook automatically subscribes to derivations:
 
 ```tsx
-import { useDirective } from "directive/react";
+import { useDirective } from "@directive-run/react";
 
 function UserList() {
   // Component re-renders when userCount changes
@@ -500,7 +500,7 @@ This pattern:
 Despite the flat merge at runtime, you can test modules in isolation:
 
 ```typescript
-import { createTestSystem, mockResolver } from 'directive/testing';
+import { createTestSystem, mockResolver } from '@directive-run/core/testing';
 
 // Test authModule in isolation
 const testSystem = createTestSystem({
@@ -518,6 +518,26 @@ await testSystem.settle();
 expect(testSystem.facts.auth.isAuthenticated).toBe(true);
 ```
 
+## Naming Decisions
+
+### Why "Derivations" (Not "Computed" or "Selectors")
+
+The primitive family uses simple nouns: **facts**, **constraints**, **resolvers**, **effects**. "Derive" is a verb used as a noun, but the API surface (`derive:`, `system.derive`) reads cleanly in code.
+
+**Alternatives considered:**
+
+| Term | Why Not |
+|------|---------|
+| **computed** | Generic adjective, collides with Vue/MobX terminology |
+| **selectors** | Implies filtering, not computing &ndash; Redux/Zustand baggage |
+| **formulas** | Uncommon in JS ecosystem |
+| **views** | Overloaded with UI meaning |
+| **projections** | Niche (event sourcing), even harder to say |
+
+**Decision: Keep "derivations."** The precision and uniqueness outweigh the 4-syllable pronunciation friction. The word is typed far more than spoken. `derive` and `system.derive` are concise in code. Renaming to "computed" would cost a major version bump across 150+ files for marginal gain &ndash; and would lose the distinctive identity that sets Directive apart.
+
+If pronunciation becomes a real adoption blocker (conference talks, video tutorials), "computed" is the strongest alternative &ndash; but that's a v2 conversation.
+
 ## Design Rationale Summary
 
 | Decision | Rationale |
@@ -527,5 +547,6 @@ expect(testSystem.facts.auth.isAuthenticated).toBe(true);
 | System as runtime | Separates configuration from definition |
 | Namespace convention | Scales flat merge to larger applications |
 | Collision detection | Catches errors early in development |
+| "Derivations" naming | Precise, unique, clean in code (`derive:`); alternatives are generic or overloaded |
 
 The flat merge isn't a limitation - it's what makes Directive's constraint-driven model work. When you need modules to coordinate based on shared state, the flat merge gives you that capability with zero boilerplate.

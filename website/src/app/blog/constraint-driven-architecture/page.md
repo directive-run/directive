@@ -2,8 +2,8 @@
 title: Constraint-Driven Architecture
 description: Learn why declaring "what must be true" is more powerful than imperative state transitions. Explore the paradigm shift from event-driven to constraint-driven systems.
 layout: blog
-date: 2026-02-01
-dateModified: 2026-02-12
+date: 2026-02-14
+dateModified: 2026-02-14
 slug: constraint-driven-architecture
 author: directive-labs
 categories: [Architecture, State Management]
@@ -148,32 +148,32 @@ const checkout = createModule("checkout", {
   resolvers: {
     authenticate: {
       requirement: "AUTHENTICATE",
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const session = await verifySession();
-        ctx.facts.authenticated = session.valid;
+        context.facts.authenticated = session.valid;
       },
     },
     checkInventory: {
       requirement: "CHECK_INVENTORY",
-      resolve: async (_req, ctx) => {
-        const result = await checkInventory(ctx.facts);
-        ctx.facts.inventoryChecked = true;
-        ctx.facts.allInStock = result.every((i) => i.available);
+      resolve: async (_req, context) => {
+        const result = await checkInventory(context.facts);
+        context.facts.inventoryChecked = true;
+        context.facts.allInStock = result.every((i) => i.available);
       },
     },
     processPayment: {
       requirement: "PROCESS_PAYMENT",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
-        const result = await chargeCard(ctx.facts);
-        ctx.facts.paymentConfirmed = result.success;
+      resolve: async (_req, context) => {
+        const result = await chargeCard(context.facts);
+        context.facts.paymentConfirmed = result.success;
       },
     },
     createOrder: {
       requirement: "CREATE_ORDER",
-      resolve: async (_req, ctx) => {
-        await submitOrder(ctx.facts);
-        ctx.facts.orderCreated = true;
+      resolve: async (_req, context) => {
+        await submitOrder(context.facts);
+        context.facts.orderCreated = true;
       },
     },
   },
@@ -297,9 +297,9 @@ const counter = createModule("counter", {
   resolvers: {
     reset: {
       requirement: "RESET_COUNTER",
-      resolve: async (_req, ctx) => {
-        ctx.facts.count = 0;
-        ctx.facts.maxReached = true;
+      resolve: async (_req, context) => {
+        context.facts.count = 0;
+        context.facts.maxReached = true;
       },
     },
   },

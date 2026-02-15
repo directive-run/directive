@@ -683,7 +683,29 @@ export interface CreateFactsStoreOptions<S extends Schema> {
 }
 
 /**
- * Create a facts store with the given schema.
+ * Create a reactive facts store backed by a Map with schema validation,
+ * batched mutations, and granular key-level subscriptions.
+ *
+ * The store is the low-level primitive that powers the `facts` proxy.
+ * Most users should use {@link createFacts} or `createModule` instead.
+ *
+ * @param options - Store configuration including schema, validation settings, and change callbacks
+ * @returns A `FactsStore<S>` with get/set/batch/subscribe methods and automatic schema validation
+ *
+ * @example
+ * ```ts
+ * const store = createFactsStore({
+ *   schema: { count: t.number(), name: t.string() },
+ * });
+ *
+ * store.set("count", 1);
+ * store.get("count"); // 1
+ *
+ * store.batch(() => {
+ *   store.set("count", 2);
+ *   store.set("name", "hello");
+ * }); // listeners fire once after batch completes
+ * ```
  */
 export function createFactsStore<S extends Schema>(
 	options: CreateFactsStoreOptions<S>,
@@ -1038,8 +1060,17 @@ export function createFactsStore<S extends Schema>(
 const BLOCKED_PROPS = Object.freeze(new Set(["__proto__", "constructor", "prototype"]));
 
 /**
- * Create a proxy-based facts accessor.
- * Allows clean syntax: facts.phase instead of facts.get("phase")
+ * Create a Proxy wrapper around a {@link FactsStore} for clean property-style
+ * access (`facts.phase`) with automatic dependency tracking.
+ *
+ * Reading a property calls `store.get()` (which tracks the access for
+ * auto-tracked derivations). Writing a property calls `store.set()` (which
+ * validates against the schema). The proxy also exposes `$store` for direct
+ * store access and `$snapshot()` for untracked reads.
+ *
+ * @param store - The underlying facts store to wrap
+ * @param schema - The schema definition (used for `ownKeys` enumeration)
+ * @returns A `Facts<S>` proxy with property-style get/set and prototype pollution guards
  */
 export function createFactsProxy<S extends Schema>(
 	store: FactsStore<S>,
@@ -1119,7 +1150,25 @@ export function createFactsProxy<S extends Schema>(
 // ============================================================================
 
 /**
- * Create facts store and proxy together.
+ * Convenience factory that creates both a {@link FactsStore} and its
+ * {@link createFactsProxy | proxy wrapper} in a single call.
+ *
+ * This is the recommended entry point when you need low-level store access
+ * outside of `createModule` / `createSystem`.
+ *
+ * @param options - Same options as {@link createFactsStore}
+ * @returns An object with `store` (the reactive Map-backed store) and `facts` (the Proxy accessor)
+ *
+ * @example
+ * ```ts
+ * const { store, facts } = createFacts({
+ *   schema: { phase: t.string<"red" | "green">() },
+ * });
+ *
+ * facts.phase = "red";
+ * console.log(facts.phase); // "red"
+ * store.subscribe(["phase"], () => console.log("phase changed"));
+ * ```
  */
 export function createFacts<S extends Schema>(
 	options: CreateFactsStoreOptions<S>,

@@ -446,6 +446,17 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  // Graceful skip when OPENAI_API_KEY is not available (CI, local dev)
+  if (!OPENAI_API_KEY) {
+    console.warn(
+      '\n⚠ OPENAI_API_KEY not set — skipping embedding generation.\n' +
+      '  The site will build without chatbot search.\n' +
+      '  Set OPENAI_API_KEY to generate embeddings.\n'
+    )
+
+    return
+  }
+
   console.log('Generating embeddings for Directive docs...\n')
 
   // =========================================================================

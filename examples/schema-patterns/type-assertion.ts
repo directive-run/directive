@@ -100,19 +100,19 @@ const userModule = createModule("user", {
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         // req.userId is typed as number from schema
         console.log(`[Resolver] Fetching user ${req.userId}`);
 
         // Simulate API call
         await new Promise((r) => setTimeout(r, 100));
 
-        ctx.facts.user = {
+        context.facts.user = {
           id: req.userId,
           name: `User ${req.userId}`,
           email: `user${req.userId}@example.com`,
         };
-        ctx.facts.status = "success";
+        context.facts.status = "success";
       },
     },
   },

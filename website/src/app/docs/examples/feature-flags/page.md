@@ -33,7 +33,7 @@ const featureFlags = createModule("feature-flags", {
       themeSelectorEnabled: t.boolean(),
       onboardingToastEnabled: t.boolean(),
       versionSelectorEnabled: t.boolean(),
-      voteApiEnabled: t.boolean(),
+      shareButtonEnabled: t.boolean(),
       maintenanceMode: t.boolean(),
     },
     derivations: {
@@ -44,7 +44,7 @@ const featureFlags = createModule("feature-flags", {
       canUseThemeSelector: t.boolean(),
       canShowOnboardingToast: t.boolean(),
       canUseVersionSelector: t.boolean(),
-      canUseVoteApi: t.boolean(),
+      canUseShareButton: t.boolean(),
       enabledCount: t.number(),
       allFeaturesEnabled: t.boolean(),
     },
@@ -66,7 +66,7 @@ const featureFlags = createModule("feature-flags", {
     facts.themeSelectorEnabled = true;
     facts.onboardingToastEnabled = true;
     facts.versionSelectorEnabled = true;
-    facts.voteApiEnabled = true;
+    facts.shareButtonEnabled = true;
     facts.maintenanceMode = false;
   },
 
@@ -85,8 +85,8 @@ const featureFlags = createModule("feature-flags", {
       facts.onboardingToastEnabled && facts.brandSwitcherEnabled,
     canUseVersionSelector: (facts) =>
       facts.versionSelectorEnabled,
-    canUseVoteApi: (facts) =>
-      facts.voteApiEnabled && !facts.maintenanceMode,
+    canUseShareButton: (facts) =>
+      facts.shareButtonEnabled,
     enabledCount: (facts) => {
       let count = 0;
       if (facts.chatEnabled) count++;
@@ -96,7 +96,7 @@ const featureFlags = createModule("feature-flags", {
       if (facts.themeSelectorEnabled) count++;
       if (facts.onboardingToastEnabled) count++;
       if (facts.versionSelectorEnabled) count++;
-      if (facts.voteApiEnabled) count++;
+      if (facts.shareButtonEnabled) count++;
 
       return count;
     },
@@ -108,7 +108,7 @@ const featureFlags = createModule("feature-flags", {
       facts.themeSelectorEnabled &&
       facts.onboardingToastEnabled &&
       facts.versionSelectorEnabled &&
-      facts.voteApiEnabled,
+      facts.shareButtonEnabled,
   },
 
   constraints: {
@@ -121,7 +121,7 @@ const featureFlags = createModule("feature-flags", {
   resolvers: {
     enableBrandSwitcher: {
       requirement: "ENABLE_BRAND_SWITCHER",
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         context.facts.brandSwitcherEnabled = true;
       },
     },
@@ -156,7 +156,7 @@ Four derivations are gated by `maintenanceMode`:
 canUseChat: (facts) => facts.chatEnabled && !facts.maintenanceMode,
 canUseSearch: (facts) => facts.searchEnabled && !facts.maintenanceMode,
 canUsePlayground: (facts) => facts.playgroundEnabled && !facts.maintenanceMode,
-canUseVoteApi: (facts) => facts.voteApiEnabled && !facts.maintenanceMode,
+canUseShareButton: (facts) => facts.shareButtonEnabled,
 ```
 
 One `setMaintenanceMode` dispatch flips all four to `false`. The three UI flags (brand switcher, theme selector, version selector) are not gated &ndash; they should still work when interactive features are down.

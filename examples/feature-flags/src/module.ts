@@ -163,14 +163,14 @@ export const featureFlagsModule = createModule("feature-flags", {
   resolvers: {
     enableBrandSwitcher: {
       requirement: "ENABLE_BRAND_SWITCHER",
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         context.facts.brandSwitcherEnabled = true;
       },
     },
 
     logMaintenanceWarning: {
       requirement: "LOG_MAINTENANCE_WARNING",
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         console.warn(
           "[feature-flags] Maintenance mode is active. Chat, search, playground, and vote API are disabled.",
         );
