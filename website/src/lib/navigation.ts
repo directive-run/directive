@@ -1,4 +1,36 @@
-export const navigation = [
+import type { DocsVersion } from '@/lib/versions'
+
+export interface NavigationLink {
+  title: string
+  href: string
+}
+
+export interface NavigationSection {
+  title: string
+  links: NavigationLink[]
+}
+
+/**
+ * Return the navigation tree with all hrefs prefixed for a given version.
+ * For latest (pathPrefix: ""), this returns the original navigation unchanged.
+ */
+export function getNavigationForVersion(
+  version: DocsVersion,
+): NavigationSection[] {
+  if (!version.pathPrefix) {
+    return navigation
+  }
+
+  return navigation.map((section) => ({
+    ...section,
+    links: section.links.map((link) => ({
+      ...link,
+      href: link.href.replace('/docs', `/docs${version.pathPrefix}`),
+    })),
+  }))
+}
+
+export const navigation: NavigationSection[] = [
   {
     title: 'Getting Started',
     links: [
@@ -44,9 +76,6 @@ export const navigation = [
       { title: 'Persistence', href: '/docs/plugins/persistence' },
       { title: 'Performance', href: '/docs/plugins/performance' },
       { title: 'Custom Plugins', href: '/docs/plugins/custom' },
-      { title: 'PII Detection', href: '/docs/security/pii' },
-      { title: 'Audit Trail', href: '/docs/security/audit' },
-      { title: 'GDPR/CCPA', href: '/docs/security/compliance' },
     ],
   },
   {
@@ -54,15 +83,25 @@ export const navigation = [
     links: [
       { title: 'Overview', href: '/docs/ai/overview' },
       { title: 'Running Agents', href: '/docs/ai/running-agents' },
+      { title: 'Resilience & Routing', href: '/docs/ai/resilience-routing' },
       { title: 'Orchestrator', href: '/docs/ai/orchestrator' },
       { title: 'Agent Stack', href: '/docs/ai/agent-stack' },
       { title: 'Guardrails', href: '/docs/ai/guardrails' },
       { title: 'Streaming', href: '/docs/ai/streaming' },
-      { title: 'RAG Enricher', href: '/docs/ai/rag' },
-      { title: 'SSE Transport', href: '/docs/ai/sse-transport' },
       { title: 'Multi-Agent', href: '/docs/ai/multi-agent' },
       { title: 'MCP Integration', href: '/docs/ai/mcp' },
+      { title: 'SSE Transport', href: '/docs/ai/sse-transport' },
+      { title: 'RAG Enricher', href: '/docs/ai/rag' },
+    ],
+  },
+  {
+    title: 'Security & Compliance',
+    links: [
+      { title: 'Overview', href: '/docs/security/overview' },
+      { title: 'PII Detection', href: '/docs/security/pii' },
       { title: 'Prompt Injection', href: '/docs/security/prompt-injection' },
+      { title: 'Audit Trail', href: '/docs/security/audit' },
+      { title: 'GDPR/CCPA', href: '/docs/security/compliance' },
     ],
   },
   {
@@ -94,10 +133,6 @@ export const navigation = [
       { title: 'XState', href: '/docs/works-with/xstate' },
       { title: 'React Query', href: '/docs/works-with/react-query' },
       { title: 'Web Worker', href: '/docs/works-with/worker' },
-      { title: 'From Redux', href: '/docs/migration/from-redux' },
-      { title: 'From Zustand', href: '/docs/migration/from-zustand' },
-      { title: 'From XState', href: '/docs/migration/from-xstate' },
-      { title: 'Package Restructure', href: '/docs/migration/package-restructure' },
     ],
   },
   {
@@ -123,6 +158,7 @@ export const navigation = [
       { title: 'Multi-Module App', href: '/docs/examples/multi-module' },
       { title: 'AI Agent', href: '/docs/examples/ai-agent' },
       { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
+      { title: 'Contact Form', href: '/docs/examples/contact-form' },
     ],
   },
   {
@@ -148,7 +184,6 @@ export const navigation = [
       { title: 'FAQ', href: '/docs/faq' },
       { title: 'Troubleshooting', href: '/docs/troubleshooting' },
       { title: 'Brand Guide', href: '/docs/branding' },
-      { title: 'Theme Vote', href: '/docs/community/theme-vote' },
     ],
   },
 ]

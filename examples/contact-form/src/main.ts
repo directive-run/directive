@@ -1,0 +1,396 @@
+/**
+ * Contact Form - Vanilla Directive Example
+ *
+ * Demonstrates all six primitives:
+ * - Facts: form field values, touched state, status
+ * - Derivations: per-field validation, isValid, canSubmit, charCount
+ * - Events: updateField, touchField, submit, reset
+ * - Constraints: submitForm (status === 'submitting'), resetAfterSuccess
+ * - Resolvers: simulated async submit, auto-reset after delay
+ * - Effects: logging status transitions
+ *
+ * Uses a simulated setTimeout instead of Formspree so no account is needed.
+ */
+
+import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RATE_LIMIT_MS = 10_000; // 10 seconds (shorter for demo)
+
+// ============================================================================
+// Schema
+// ============================================================================
+
+const schema = {
+  facts: {
+    name: t.string(),
+    email: t.string(),
+    subject: t.string(),
+    message: t.string(),
+    touched: t.any<Record<string, boolean>>(),
+    status: t.string<"idle" | "submitting" | "success" | "error">(),
+    errorMessage: t.string(),
+    lastSubmittedAt: t.number(),
+    submissionCount: t.number(),
+  },
+  derivations: {
+    nameError: t.string(),
+    emailError: t.string(),
+    subjectError: t.string(),
+    messageError: t.string(),
+    isValid: t.boolean(),
+    canSubmit: t.boolean(),
+    messageCharCount: t.number(),
+  },
+  events: {
+    updateField: { field: t.string(), value: t.string() },
+    touchField: { field: t.string() },
+    submit: {},
+    reset: {},
+  },
+  requirements: {
+    SEND_MESSAGE: {},
+    RESET_AFTER_DELAY: {},
+  },
+} satisfies ModuleSchema;
+
+// ============================================================================
+// Module
+// ============================================================================
+
+const contactForm = createModule("contact-form", {
+  schema,
+
+  init: (facts) => {
+    facts.name = "";
+    facts.email = "";
+    facts.subject = "";
+    facts.message = "";
+    facts.touched = {};
+    facts.status = "idle";
+    facts.errorMessage = "";
+    facts.lastSubmittedAt = 0;
+    facts.submissionCount = 0;
+  },
+
+  derive: {
+    nameError: (facts) => {
+      if (!facts.touched.name) {
+        return "";
+      }
+      if (!facts.name.trim()) {
+        return "Name is required";
+      }
+      if (facts.name.trim().length < 2) {
+        return "Name must be at least 2 characters";
+      }
+
+      return "";
+    },
+
+    emailError: (facts) => {
+      if (!facts.touched.email) {
+        return "";
+      }
+      if (!facts.email.trim()) {
+        return "Email is required";
+      }
+      if (!EMAIL_REGEX.test(facts.email)) {
+        return "Enter a valid email address";
+      }
+
+      return "";
+    },
+
+    subjectError: (facts) => {
+      if (!facts.touched.subject) {
+        return "";
+      }
+      if (!facts.subject) {
+        return "Please select a subject";
+      }
+
+      return "";
+    },
+
+    messageError: (facts) => {
+      if (!facts.touched.message) {
+        return "";
+      }
+      if (!facts.message.trim()) {
+        return "Message is required";
+      }
+      if (facts.message.trim().length < 10) {
+        return "Message must be at least 10 characters";
+      }
+
+      return "";
+    },
+
+    isValid: (facts) =>
+      facts.name.trim().length >= 2 &&
+      EMAIL_REGEX.test(facts.email) &&
+      facts.subject !== "" &&
+      facts.message.trim().length >= 10,
+
+    canSubmit: (facts, derive) => {
+      if (!derive.isValid) {
+        return false;
+      }
+      if (facts.status !== "idle") {
+        return false;
+      }
+      if (
+        facts.lastSubmittedAt > 0 &&
+        Date.now() - facts.lastSubmittedAt < RATE_LIMIT_MS
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+
+    messageCharCount: (facts) => facts.message.length,
+  },
+
+  events: {
+    updateField: (facts, { field, value }) => {
+      const key = field as "name" | "email" | "subject" | "message";
+      if (key in facts && typeof facts[key] === "string") {
+        (facts as Record<string, string>)[key] = value;
+      }
+    },
+
+    touchField: (facts, { field }) => {
+      facts.touched = { ...facts.touched, [field]: true };
+    },
+
+    submit: (facts) => {
+      facts.touched = { name: true, email: true, subject: true, message: true };
+      facts.status = "submitting";
+    },
+
+    reset: (facts) => {
+      facts.name = "";
+      facts.email = "";
+      facts.subject = "";
+      facts.message = "";
+      facts.touched = {};
+      facts.status = "idle";
+      facts.errorMessage = "";
+    },
+  },
+
+  constraints: {
+    submitForm: {
+      when: (facts) => facts.status === "submitting",
+      require: { type: "SEND_MESSAGE" },
+    },
+
+    resetAfterSuccess: {
+      when: (facts) => facts.status === "success",
+      require: { type: "RESET_AFTER_DELAY" },
+    },
+  },
+
+  resolvers: {
+    // Simulated submission — no Formspree account needed
+    sendMessage: {
+      requirement: "SEND_MESSAGE",
+      resolve: async (req, context) => {
+        log(
+          `Sending: ${context.facts.name} <${context.facts.email}> [${context.facts.subject}]`,
+        );
+
+        // Simulate network delay
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        // Simulate occasional failure (20% chance)
+        if (Math.random() < 0.2) {
+          context.facts.status = "error";
+          context.facts.errorMessage =
+            "Simulated error — try again (20% failure rate for demo).";
+          log("Submission failed (simulated)");
+
+          return;
+        }
+
+        context.facts.status = "success";
+        context.facts.lastSubmittedAt = Date.now();
+        context.facts.submissionCount++;
+        log(
+          `Submission #${context.facts.submissionCount} succeeded`,
+        );
+      },
+    },
+
+    resetAfterDelay: {
+      requirement: "RESET_AFTER_DELAY",
+      resolve: async (req, context) => {
+        log("Auto-resetting in 3 seconds...");
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        context.facts.name = "";
+        context.facts.email = "";
+        context.facts.subject = "";
+        context.facts.message = "";
+        context.facts.touched = {};
+        context.facts.status = "idle";
+        context.facts.errorMessage = "";
+        log("Form reset");
+      },
+    },
+  },
+
+  effects: {
+    logSubmission: {
+      deps: ["status", "submissionCount"],
+      run: (facts, prev) => {
+        if (!prev) {
+          return;
+        }
+
+        if (facts.status !== prev.status) {
+          log(`Status: ${prev.status} → ${facts.status}`);
+        }
+      },
+    },
+  },
+});
+
+// ============================================================================
+// System
+// ============================================================================
+
+const system = createSystem({ module: contactForm });
+system.start();
+
+// ============================================================================
+// Logging helper
+// ============================================================================
+
+const logEl = document.getElementById("log")!;
+function log(msg: string) {
+  console.log(`[contact-form] ${msg}`);
+  const line = document.createElement("div");
+  line.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ============================================================================
+// DOM Bindings
+// ============================================================================
+
+const nameInput = document.getElementById("name") as HTMLInputElement;
+const emailInput = document.getElementById("email") as HTMLInputElement;
+const subjectInput = document.getElementById("subject") as HTMLSelectElement;
+const messageInput = document.getElementById("message") as HTMLTextAreaElement;
+const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+const clearBtn = document.getElementById("clear-btn") as HTMLButtonElement;
+const statusBanner = document.getElementById("status-banner")!;
+const nameErrorEl = document.getElementById("name-error")!;
+const emailErrorEl = document.getElementById("email-error")!;
+const subjectErrorEl = document.getElementById("subject-error")!;
+const messageErrorEl = document.getElementById("message-error")!;
+const charCountEl = document.getElementById("char-count")!;
+
+// Input handlers
+for (const [el, field] of [
+  [nameInput, "name"],
+  [emailInput, "email"],
+  [subjectInput, "subject"],
+  [messageInput, "message"],
+] as const) {
+  el.addEventListener("input", () => {
+    system.events.updateField({ field, value: el.value });
+  });
+  el.addEventListener("blur", () => {
+    system.events.touchField({ field });
+  });
+}
+
+submitBtn.addEventListener("click", () => {
+  system.events.submit({});
+});
+
+clearBtn.addEventListener("click", () => {
+  system.events.reset({});
+});
+
+// ============================================================================
+// Render
+// ============================================================================
+
+function render() {
+  // Sync input values (for reset)
+  nameInput.value = system.facts.name;
+  emailInput.value = system.facts.email;
+  subjectInput.value = system.facts.subject;
+  messageInput.value = system.facts.message;
+
+  // Derivation values
+  const nameError = system.read("nameError") as string;
+  const emailError = system.read("emailError") as string;
+  const subjectError = system.read("subjectError") as string;
+  const messageError = system.read("messageError") as string;
+  const charCount = system.read("messageCharCount") as number;
+  const canSubmit = system.read("canSubmit") as boolean;
+
+  nameErrorEl.textContent = nameError;
+  emailErrorEl.textContent = emailError;
+  subjectErrorEl.textContent = subjectError;
+  messageErrorEl.textContent = messageError;
+  charCountEl.textContent = `${charCount} / 10 min`;
+
+  submitBtn.disabled = !canSubmit;
+
+  const status = system.facts.status;
+  if (status === "submitting") {
+    submitBtn.textContent = "Sending...";
+    statusBanner.className = "status-banner status-submitting";
+    statusBanner.textContent = "Submitting your message...";
+  } else if (status === "success") {
+    submitBtn.textContent = "Send Message";
+    statusBanner.className = "status-banner status-success";
+    statusBanner.textContent = "Message sent! Form will reset shortly.";
+  } else if (status === "error") {
+    submitBtn.textContent = "Send Message";
+    statusBanner.className = "status-banner status-error";
+    statusBanner.textContent = system.facts.errorMessage;
+  } else {
+    submitBtn.textContent = "Send Message";
+    statusBanner.className = "status-banner hidden";
+    statusBanner.textContent = "";
+  }
+}
+
+// Subscribe to all relevant facts and derivations
+system.subscribe(
+  [
+    "name",
+    "email",
+    "subject",
+    "message",
+    "touched",
+    "status",
+    "errorMessage",
+    "lastSubmittedAt",
+    "submissionCount",
+    "nameError",
+    "emailError",
+    "subjectError",
+    "messageError",
+    "isValid",
+    "canSubmit",
+    "messageCharCount",
+  ],
+  render,
+);
+
+// Initial render
+render();
+log("Contact form ready. Fill in all fields and submit.");
