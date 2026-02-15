@@ -216,7 +216,7 @@ export default function AboutPage() {
               <ArrowRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5" />
             </a>
             <a
-              href="https://github.com/sizls/directive"
+              href="https://github.com/directive-run/directive"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:border-slate-300 dark:border-slate-700 dark:text-white dark:hover:border-slate-600"

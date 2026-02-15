@@ -39,8 +39,8 @@ const nextConfig = {
         permanent: true,
       },
       {
-        source: '/docs/security/overview',
-        destination: '/docs/ai/overview',
+        source: '/docs/ai/production-features',
+        destination: '/docs/ai/resilience-routing',
         permanent: true,
       },
       {
@@ -87,7 +87,8 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: process.env.NODE_ENV === 'development'
+            // unsafe-eval ONLY for local dev (Next.js HMR). Never on Vercel (VERCEL env is always set).
+            value: process.env.NODE_ENV === 'development' && !process.env.VERCEL
               ? "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; img-src 'self' data: https: https://www.google-analytics.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com; connect-src 'self' https: ws: https://www.google-analytics.com https://analytics.google.com; frame-src 'self' https://stackblitz.com https://codesandbox.io;"
               : "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; img-src 'self' data: https: https://www.google-analytics.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com; connect-src 'self' https: https://www.google-analytics.com https://analytics.google.com; frame-src 'self' https://stackblitz.com https://codesandbox.io;",
           },

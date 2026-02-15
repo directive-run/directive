@@ -6,7 +6,6 @@ export const STORAGE_KEYS = {
   FIRST_VISIT: 'directive-brand-first-visit',
   ONBOARDED: 'directive-brand-onboarded',
   FONT_SIZE: 'directive-brand-font-size',
-  VOTED_PREFIX: 'directive-voted-month-',
 } as const
 
 export function safeGetItem(key: string): string | null {
@@ -31,17 +30,3 @@ export function safeRemoveItem(key: string): void {
   } catch {}
 }
 
-function getVotedMonthKey(): string {
-  const now = new Date()
-  const yyyy = now.getFullYear()
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  return `${STORAGE_KEYS.VOTED_PREFIX}${yyyy}-${mm}`
-}
-
-export function hasVotedThisMonth(): boolean {
-  return safeGetItem(getVotedMonthKey()) === '1'
-}
-
-export function markVotedThisMonth(): void {
-  safeSetItem(getVotedMonthKey(), '1')
-}

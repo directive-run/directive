@@ -58,7 +58,18 @@ export interface CreateDerivationsOptions<S extends Schema, D extends Derivation
 }
 
 /**
- * Create a derivations manager.
+ * Create a manager for lazily-evaluated, auto-tracked derived values.
+ *
+ * Derivations are memoized computations that automatically track which facts
+ * they read. When a tracked fact changes, the derivation is invalidated and
+ * recomputed on next access. Derivations can depend on other derivations
+ * (composition), and circular dependencies are detected at compute time.
+ *
+ * Notifications are deferred during invalidation so listeners always see
+ * consistent state across multiple simultaneous fact changes.
+ *
+ * @param options - Derivation definitions, facts proxy, store, and optional lifecycle callbacks
+ * @returns A `DerivationsManager` with get/invalidate/subscribe/getProxy methods
  */
 export function createDerivationsManager<S extends Schema, D extends DerivationsDef<S>>(
 	options: CreateDerivationsOptions<S, D>,

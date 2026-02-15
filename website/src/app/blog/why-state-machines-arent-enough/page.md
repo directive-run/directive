@@ -2,8 +2,8 @@
 title: Why State Machines Aren't Enough
 description: State machines are great for UI flows, but struggle with data-driven constraints, state explosion, and async coordination. Discover when to use state machines vs. constraint-driven systems.
 layout: blog
-date: 2026-01-25
-dateModified: 2026-02-12
+date: 2026-02-09
+dateModified: 2026-02-09
 slug: why-state-machines-arent-enough
 author: directive-labs
 categories: [Architecture, Comparison]
@@ -93,16 +93,16 @@ const permissions = createModule("permissions", {
   resolvers: {
     refreshPerms: {
       requirement: "REFRESH_PERMISSIONS",
-      resolve: async (_req, ctx) => {
-        const perms = await fetchPermissions(ctx.facts.role);
-        ctx.facts.accessLevel = perms.level;
-        ctx.facts.cacheFresh = true;
+      resolve: async (_req, context) => {
+        const perms = await fetchPermissions(context.facts.role);
+        context.facts.accessLevel = perms.level;
+        context.facts.cacheFresh = true;
       },
     },
     downgradeAccess: {
       requirement: "DOWNGRADE_ACCESS",
-      resolve: async (req, ctx) => {
-        ctx.facts.accessLevel = req.to;
+      resolve: async (req, context) => {
+        context.facts.accessLevel = req.to;
       },
     },
   },
@@ -137,15 +137,15 @@ const inventoryMachine = createMachine({
         STOCK_CHANGED: [
           {
             target: "rushOrdering",
-            cond: (ctx) =>
-              ctx.stock < ctx.threshold * 0.5 &&
+            cond: (context) =>
+              context.stock < context.threshold * 0.5 &&
               isBusinessHours() &&
-              ctx.supplierAvailable,
+              context.supplierAvailable,
           },
           {
             target: "reordering",
-            cond: (ctx) =>
-              ctx.stock < ctx.threshold && ctx.supplierAvailable,
+            cond: (context) =>
+              context.stock < context.threshold && context.supplierAvailable,
           },
           { target: "monitoring" },
         ],
@@ -204,16 +204,16 @@ const inventory = createModule("inventory", {
     reorder: {
       requirement: "REORDER",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (req, ctx) => {
-        await placeOrder({ rush: req.rush, quantity: ctx.facts.threshold * 2 });
-        ctx.facts.stock += ctx.facts.threshold * 2;
+      resolve: async (req, context) => {
+        await placeOrder({ rush: req.rush, quantity: context.facts.threshold * 2 });
+        context.facts.stock += context.facts.threshold * 2;
       },
     },
     emergencyReorder: {
       requirement: "EMERGENCY_REORDER",
-      resolve: async (_req, ctx) => {
-        await placeEmergencyOrder(ctx.facts);
-        ctx.facts.stock += ctx.facts.threshold * 3;
+      resolve: async (_req, context) => {
+        await placeEmergencyOrder(context.facts);
+        context.facts.stock += context.facts.threshold * 3;
       },
     },
   },
@@ -325,33 +325,33 @@ const checkout = createModule("checkout", {
     authenticate: {
       requirement: "AUTHENTICATE",
       retry: { attempts: 1 },
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const session = await verifySession();
-        ctx.facts.authenticated = session.valid;
+        context.facts.authenticated = session.valid;
       },
     },
     checkInventory: {
       requirement: "CHECK_INVENTORY",
       retry: { attempts: 2, backoff: "linear" },
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const result = await checkStock();
-        ctx.facts.inventoryChecked = true;
-        ctx.facts.allInStock = result.every((i) => i.available);
+        context.facts.inventoryChecked = true;
+        context.facts.allInStock = result.every((i) => i.available);
       },
     },
     processPayment: {
       requirement: "PROCESS_PAYMENT",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const result = await chargeCard();
-        ctx.facts.paymentConfirmed = result.success;
+        context.facts.paymentConfirmed = result.success;
       },
     },
     createOrder: {
       requirement: "CREATE_ORDER",
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         await submitOrder();
-        ctx.facts.orderCreated = true;
+        context.facts.orderCreated = true;
       },
     },
   },
@@ -422,24 +422,24 @@ const orchestrator = createModule("orchestrator", {
   resolvers: {
     startFlow: {
       requirement: "START_CHECKOUT_FLOW",
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         // XState manages the step-by-step UI flow
         const actor = createActor(checkoutFormMachine);
         actor.subscribe((state) => {
           if (state.matches("complete")) {
-            ctx.facts.checkoutComplete = true;
+            context.facts.checkoutComplete = true;
           }
         });
         actor.start();
-        ctx.facts.checkoutFlowActive = true;
+        context.facts.checkoutFlowActive = true;
       },
     },
     confirmOrder: {
       requirement: "CONFIRM_ORDER",
       retry: { attempts: 3, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         await submitFinalOrder();
-        ctx.facts.orderConfirmed = true;
+        context.facts.orderConfirmed = true;
       },
     },
   },

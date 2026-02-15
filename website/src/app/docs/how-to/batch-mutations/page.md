@@ -45,7 +45,7 @@ const checkout = createModule('checkout', {
   resolvers: {
     processPayment: {
       requirement: 'PROCESS_PAYMENT',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const res = await fetch('/api/payment', {
           method: 'POST',
           body: JSON.stringify({ total: req.total, items: req.items }),
@@ -53,11 +53,11 @@ const checkout = createModule('checkout', {
         const data = await res.json();
 
         // Batch the completion update
-        ctx.system.batch(() => {
-          ctx.facts.status = 'complete';
-          ctx.facts.orderId = data.orderId;
-          ctx.facts.items = [];
-          ctx.facts.total = 0;
+        context.system.batch(() => {
+          context.facts.status = 'complete';
+          context.facts.orderId = data.orderId;
+          context.facts.items = [];
+          context.facts.total = 0;
         });
       },
     },
@@ -94,7 +94,7 @@ function CheckoutButton({ system }) {
 
 2. **Constraints see consistent state** – when `needsPayment` evaluates after the batch, both `status` and `total` reflect the new values. There's no intermediate state where status is `'processing'` but total is still `0`.
 
-3. **Batches inside resolvers use `ctx.system.batch()`** – when a resolver completes and updates multiple facts, batching prevents the UI from briefly showing a "complete" status with stale items.
+3. **Batches inside resolvers use `context.system.batch()`** – when a resolver completes and updates multiple facts, batching prevents the UI from briefly showing a "complete" status with stale items.
 
 4. **Derivations recompute once** – without batch, changing `items` then `total` triggers two derivation cycles. With batch, derivations recompute once with the final state.
 

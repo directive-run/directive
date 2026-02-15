@@ -58,7 +58,31 @@ interface EngineState<_S extends Schema> {
 }
 
 /**
- * Create the Directive engine.
+ * Create the core Directive reconciliation engine that wires facts, derivations,
+ * effects, constraints, resolvers, plugins, error boundaries, and time-travel
+ * into a single reactive system.
+ *
+ * This is the internal factory used by `createSystem`. Most users should call
+ * `createSystem` instead, which provides a friendlier API and handles module
+ * composition.
+ *
+ * @param config - Full system configuration: modules, plugins, error boundary settings, and debug options
+ * @returns A `System` instance with facts, derive, events, dispatch, subscribe, watch, settle, and lifecycle methods
+ *
+ * @example
+ * ```ts
+ * // Prefer createSystem for most use cases:
+ * import { createSystem, createModule, t } from "@directive-run/core";
+ *
+ * const counter = createModule("counter", {
+ *   schema: { count: t.number() },
+ *   init: (facts) => { facts.count = 0; },
+ * });
+ *
+ * const system = createSystem({ module: counter });
+ * system.start();
+ * system.facts.count = 42;
+ * ```
  */
 // biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
 export function createEngine<S extends Schema>(

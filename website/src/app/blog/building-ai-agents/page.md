@@ -2,8 +2,8 @@
 title: Building AI Agents with Directive
 description: A practical guide to orchestrating AI agents with approval flows, guardrails, and budget constraints using Directive.
 layout: blog
-date: 2026-01-18
-dateModified: 2026-02-12
+date: 2026-02-06
+dateModified: 2026-02-06
 slug: building-ai-agents
 author: directive-labs
 categories: [AI, Tutorial]
@@ -351,6 +351,86 @@ try {
 
 ---
 
+## Production Resilience
+
+Guardrails protect against bad inputs and outputs. But what happens when the LLM provider itself goes down? A `429` rate limit at 2 AM shouldn't take your agent offline, and a transient `503` shouldn't lose the user's request.
+
+Directive's resilience wrappers compose around your runner &ndash; retry, fallback, and cost budget guards that work with any provider:
+
+```typescript
+import {
+  createAgentStack,
+  createOpenAIRunner,
+  createAnthropicRunner,
+  createPIIGuardrail,
+  createToolGuardrail,
+} from '@directive-run/ai';
+import type { AgentLike } from '@directive-run/ai';
+
+// Primary provider
+const anthropicRunner = createAnthropicRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+
+// Fallback provider – used only when the primary fails
+const openaiRunner = createOpenAIRunner({
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: 'gpt-4o-mini',
+});
+
+const stack = createAgentStack({
+  runner: anthropicRunner,
+
+  // P2: Intelligent retry – respects Retry-After headers on 429,
+  // exponential backoff on 503, never retries 400/401/403
+  intelligentRetry: {
+    maxRetries: 2,
+    baseDelayMs: 1_000,
+    maxDelayMs: 10_000,
+  },
+
+  // P0: Provider fallback – automatic failover when primary is down
+  fallback: {
+    runners: [openaiRunner],
+  },
+
+  // P1: Cost budget – rolling windows prevent runaway spend
+  budget: {
+    budgets: [
+      { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+      { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+    ],
+  },
+
+  // Guardrails still apply on top of resilience
+  guardrails: {
+    input: [createPIIGuardrail({ redact: true })],
+    toolCall: [createToolGuardrail({ denylist: ['shell', 'eval'] })],
+  },
+});
+```
+
+The composition order is automatic: budget checks run first (reject before spending), then retry wraps the call, then fallback catches provider-level failures. Add all three with config keys &ndash; no manual wrapper chaining.
+
+The wrappers also work standalone if you don't need the full stack:
+
+```typescript
+import { withRetry, withFallback, withBudget } from '@directive-run/ai';
+
+// Compose manually: budget → retry → fallback → runner
+const resilientRunner = withBudget(
+  withRetry(
+    withFallback([anthropicRunner, openaiRunner]),
+    { maxRetries: 2, baseDelayMs: 1_000 }
+  ),
+  { budgets: [{ window: 'hour', maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } }] }
+);
+```
+
+See the [Resilience & Routing documentation](/docs/ai/resilience-routing) for the full API including model selection, structured outputs, and constraint-driven provider routing.
+
+---
+
 ## Getting Started
 
 Install Directive and start building:
@@ -363,6 +443,7 @@ Explore the full AI documentation:
 
 - **[AI & Agents Overview](/docs/ai/overview)** &ndash; architecture and learning path
 - **[Running Agents](/docs/ai/running-agents)** &ndash; provider setup for OpenAI, Anthropic, and Ollama
+- **[Resilience & Routing](/docs/ai/resilience-routing)** &ndash; retry, fallback, budgets, and model selection
 - **[Agent Orchestrator](/docs/ai/orchestrator)** &ndash; single-agent patterns, constraints, and approval workflows
 - **[Guardrails & Safety](/docs/ai/guardrails)** &ndash; input, output, and streaming validation
 - **[Multi-Agent Patterns](/docs/ai/multi-agent)** &ndash; parallel, sequential, and supervisor coordination

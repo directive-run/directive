@@ -16,11 +16,11 @@ const FLAG_DEFAULTS = {
   chatEnabled: true,
   searchEnabled: true,
   playgroundEnabled: true,
-  brandSwitcherEnabled: true,
+  brandSwitcherEnabled: false,
   themeSelectorEnabled: true,
   onboardingToastEnabled: true,
   versionSelectorEnabled: true,
-  voteApiEnabled: true,
+  shareButtonEnabled: true,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -52,6 +52,11 @@ export function getFeatureFlagSystem() {
       ? process.env?.VERCEL_ENV ?? process.env?.NODE_ENV ?? 'production'
       : 'production'
   instance.facts.environment = environment
+
+  // Brand switcher is dev-only
+  if (environment === 'development') {
+    instance.facts.brandSwitcherEnabled = true
+  }
 
   // Context: API keys configured (server-side only)
   const apiKeysConfigured =

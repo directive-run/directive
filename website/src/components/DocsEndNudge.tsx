@@ -7,7 +7,7 @@ export function DocsEndNudge() {
       <span>
         Was this helpful?{' '}
         <Link
-          href="https://github.com/sizls/directive"
+          href="https://github.com/directive-run/directive"
           target="_blank"
           rel="noopener noreferrer"
           className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"

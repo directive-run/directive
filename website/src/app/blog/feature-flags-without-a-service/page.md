@@ -2,14 +2,14 @@
 title: Feature Flags Without a Feature Flag Service
 description: Boolean flags don't scale. Build a reactive, inspectable feature flag system using constraints, derivations, and effects.
 layout: blog
-date: 2026-02-15
-dateModified: 2026-02-15
+date: 2026-02-04
+dateModified: 2026-02-04
 slug: feature-flags-without-a-service
 author: directive-labs
 categories: [Architecture, Tutorial]
 ---
 
-You start with one feature flag. `chatEnabled = true`. Easy. Then you add `searchEnabled`, `playgroundEnabled`, and `voteApiEnabled` &ndash; all gated by a `maintenanceMode` toggle because the infrastructure team needs a kill switch. Then `onboardingToastEnabled`, except the toast uses the brand switcher component, so it can't show unless `brandSwitcherEnabled` is also true. Then `themeSelectorEnabled` and `versionSelectorEnabled` because the design team wants to gate those independently.
+You start with one feature flag. `chatEnabled = true`. Easy. Then you add `searchEnabled`, `playgroundEnabled`, and `shareButtonEnabled` &ndash; some gated by a `maintenanceMode` toggle because the infrastructure team needs a kill switch. Then `onboardingToastEnabled`, except the toast uses the brand switcher component, so it can't show unless `brandSwitcherEnabled` is also true. Then `themeSelectorEnabled` and `versionSelectorEnabled` because the design team wants to gate those independently.
 
 Eight flags. Here's what the layout component looks like:
 
@@ -18,7 +18,7 @@ function renderLayout(flags: FeatureFlags) {
   const chatVisible = flags.chatEnabled && !flags.maintenanceMode;
   const searchVisible = flags.searchEnabled && !flags.maintenanceMode;
   const playgroundVisible = flags.playgroundEnabled && !flags.maintenanceMode;
-  const voteVisible = flags.voteApiEnabled && !flags.maintenanceMode;
+  const shareVisible = flags.shareButtonEnabled;
 
   // Onboarding toast needs brand switcher — but who enforces that?
   if (flags.onboardingToastEnabled && !flags.brandSwitcherEnabled) {
@@ -70,7 +70,7 @@ const featureFlags = createModule("feature-flags", {
       themeSelectorEnabled: t.boolean(),
       onboardingToastEnabled: t.boolean(),
       versionSelectorEnabled: t.boolean(),
-      voteApiEnabled: t.boolean(),
+      shareButtonEnabled: t.boolean(),
       maintenanceMode: t.boolean(),
     },
     derivations: {
@@ -81,7 +81,7 @@ const featureFlags = createModule("feature-flags", {
       canUseThemeSelector: t.boolean(),
       canShowOnboardingToast: t.boolean(),
       canUseVersionSelector: t.boolean(),
-      canUseVoteApi: t.boolean(),
+      canUseShareButton: t.boolean(),
       enabledCount: t.number(),
       allFeaturesEnabled: t.boolean(),
     },
@@ -94,7 +94,7 @@ const featureFlags = createModule("feature-flags", {
         themeSelectorEnabled: t.boolean(),
         onboardingToastEnabled: t.boolean(),
         versionSelectorEnabled: t.boolean(),
-        voteApiEnabled: t.boolean(),
+        shareButtonEnabled: t.boolean(),
       },
       setMaintenanceMode: { enabled: t.boolean() },
       toggleFlag: { flag: t.string(), enabled: t.boolean() },
@@ -114,7 +114,7 @@ const featureFlags = createModule("feature-flags", {
     facts.themeSelectorEnabled = true;
     facts.onboardingToastEnabled = true;
     facts.versionSelectorEnabled = true;
-    facts.voteApiEnabled = true;
+    facts.shareButtonEnabled = true;
     facts.maintenanceMode = false;
   },
 
@@ -133,8 +133,8 @@ const featureFlags = createModule("feature-flags", {
       facts.onboardingToastEnabled && facts.brandSwitcherEnabled,
     canUseVersionSelector: (facts) =>
       facts.versionSelectorEnabled,
-    canUseVoteApi: (facts) =>
-      facts.voteApiEnabled && !facts.maintenanceMode,
+    canUseShareButton: (facts) =>
+      facts.shareButtonEnabled,
     enabledCount: (facts) => {
       let count = 0;
       if (facts.chatEnabled) count++;
@@ -144,7 +144,7 @@ const featureFlags = createModule("feature-flags", {
       if (facts.themeSelectorEnabled) count++;
       if (facts.onboardingToastEnabled) count++;
       if (facts.versionSelectorEnabled) count++;
-      if (facts.voteApiEnabled) count++;
+      if (facts.shareButtonEnabled) count++;
 
       return count;
     },
@@ -156,7 +156,7 @@ const featureFlags = createModule("feature-flags", {
       facts.themeSelectorEnabled &&
       facts.onboardingToastEnabled &&
       facts.versionSelectorEnabled &&
-      facts.voteApiEnabled,
+      facts.shareButtonEnabled,
   },
 
   events: {
@@ -168,7 +168,7 @@ const featureFlags = createModule("feature-flags", {
       facts.themeSelectorEnabled = payload.themeSelectorEnabled;
       facts.onboardingToastEnabled = payload.onboardingToastEnabled;
       facts.versionSelectorEnabled = payload.versionSelectorEnabled;
-      facts.voteApiEnabled = payload.voteApiEnabled;
+      facts.shareButtonEnabled = payload.shareButtonEnabled;
     },
     setMaintenanceMode: (facts, { enabled }) => {
       facts.maintenanceMode = enabled;
@@ -187,7 +187,7 @@ const featureFlags = createModule("feature-flags", {
       facts.themeSelectorEnabled = true;
       facts.onboardingToastEnabled = true;
       facts.versionSelectorEnabled = true;
-      facts.voteApiEnabled = true;
+      facts.shareButtonEnabled = true;
       facts.maintenanceMode = false;
     },
   },
@@ -206,15 +206,15 @@ const featureFlags = createModule("feature-flags", {
   resolvers: {
     enableBrandSwitcher: {
       requirement: "ENABLE_BRAND_SWITCHER",
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         context.facts.brandSwitcherEnabled = true;
       },
     },
     logMaintenanceWarning: {
       requirement: "LOG_MAINTENANCE_WARNING",
-      resolve: async (request, context) => {
+      resolve: async (req, context) => {
         console.warn(
-          "[feature-flags] Maintenance mode active. Chat, search, playground, and vote API disabled.",
+          "[feature-flags] Maintenance mode active. Chat, search, and playground disabled.",
         );
       },
     },
@@ -226,7 +226,7 @@ const featureFlags = createModule("feature-flags", {
         "chatEnabled", "searchEnabled", "playgroundEnabled",
         "brandSwitcherEnabled", "themeSelectorEnabled",
         "onboardingToastEnabled", "versionSelectorEnabled",
-        "voteApiEnabled", "maintenanceMode",
+        "shareButtonEnabled", "maintenanceMode",
       ],
       run: (facts, prev) => {
         if (!prev) {
@@ -237,7 +237,7 @@ const featureFlags = createModule("feature-flags", {
           "chatEnabled", "searchEnabled", "playgroundEnabled",
           "brandSwitcherEnabled", "themeSelectorEnabled",
           "onboardingToastEnabled", "versionSelectorEnabled",
-          "voteApiEnabled", "maintenanceMode",
+          "shareButtonEnabled", "maintenanceMode",
         ] as const;
 
         for (const flag of flags) {
@@ -283,8 +283,8 @@ derive: {
     facts.searchEnabled && !facts.maintenanceMode,
   canUsePlayground: (facts) =>
     facts.playgroundEnabled && !facts.maintenanceMode,
-  canUseVoteApi: (facts) =>
-    facts.voteApiEnabled && !facts.maintenanceMode,
+  canUseShareButton: (facts) =>
+    facts.shareButtonEnabled && !facts.maintenanceMode,
 },
 ```
 
@@ -377,7 +377,7 @@ export function getFeatureFlagSystem() {
     themeSelectorEnabled: true,
     onboardingToastEnabled: true,
     versionSelectorEnabled: true,
-    voteApiEnabled: true,
+    shareButtonEnabled: true,
   });
 
   // Maintenance mode from Vercel env var
@@ -389,7 +389,7 @@ export function getFeatureFlagSystem() {
 }
 ```
 
-Flip `NEXT_PUBLIC_FF_MAINTENANCE` to `true` in the Vercel dashboard and chat, search, playground, and the vote API disable instantly on the next page load. No code change, no deploy, no flag service.
+Flip `NEXT_PUBLIC_FF_MAINTENANCE` to `true` in the Vercel dashboard and chat, search, and playground disable instantly on the next page load. No code change, no deploy, no flag service.
 
 ---
 
@@ -426,7 +426,7 @@ effects: {
       "chatEnabled", "searchEnabled", "playgroundEnabled",
       "brandSwitcherEnabled", "themeSelectorEnabled",
       "onboardingToastEnabled", "versionSelectorEnabled",
-      "voteApiEnabled", "maintenanceMode",
+      "shareButtonEnabled", "maintenanceMode",
     ],
     run: (facts, prev) => {
       if (!prev) {
@@ -437,7 +437,7 @@ effects: {
         "chatEnabled", "searchEnabled", "playgroundEnabled",
         "brandSwitcherEnabled", "themeSelectorEnabled",
         "onboardingToastEnabled", "versionSelectorEnabled",
-        "voteApiEnabled", "maintenanceMode",
+        "shareButtonEnabled", "maintenanceMode",
       ] as const;
 
       for (const flag of flags) {

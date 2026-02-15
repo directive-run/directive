@@ -53,7 +53,7 @@ import { createSystem } from '@directive-run/core';
 const system = createSystem({ module: pageModule });
 
 // Restore facts from the server snapshot – skips a full reconciliation
-system.hydrate(() => window.__DIRECTIVE_STATE__);
+system.restore(window.__DIRECTIVE_STATE__);
 system.start();
 
 // Hydrate React using the pre-populated system – no provider needed
@@ -63,7 +63,7 @@ hydrateRoot(
 );
 ```
 
-`system.hydrate()` restores facts from the serialized snapshot without triggering a full reconciliation.
+`system.restore()` restores facts from the serialized snapshot without triggering a full reconciliation.
 
 ---
 

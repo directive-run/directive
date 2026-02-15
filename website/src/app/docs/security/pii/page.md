@@ -1,40 +1,35 @@
 ---
 title: PII Detection
-description: Detect and redact personally identifiable information in AI agent inputs and outputs.
+description: Detect and redact personally identifiable information in text, API inputs, and AI agent pipelines.
 ---
 
-Detect SSNs, credit cards, emails, phone numbers, and more – then block, redact, or mask them before they reach your AI agents. {% .lead %}
+Detect SSNs, credit cards, emails, phone numbers, and more &ndash; then block, redact, or mask them before they leave your system. {% .lead %}
 
 ---
 
 ## Quick Start
 
-```typescript
-import { createEnhancedPIIGuardrail } from '@directive-run/core';
-
-// Define which PII types to scan for and how to handle matches
-const piiGuardrail = createEnhancedPIIGuardrail({
-  types: ['ssn', 'credit_card', 'email'],
-  redact: true,
-  redactionStyle: 'typed', // replaces with [SSN], [CREDIT_CARD], etc.
-});
-```
-
-Use with an orchestrator:
+Scan any string for PII and redact matches &ndash; no orchestrator required:
 
 ```typescript
-import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
+import { detectPII, redactPII } from '@directive-run/ai';
 
-// Connect to OpenAI (or any compatible provider)
-const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
-
-// Attach the PII guardrail to the orchestrator's input pipeline
-const orchestrator = createAgentOrchestrator({
-  runner,
-  guardrails: {
-    input: [{ name: 'pii', fn: piiGuardrail }],
-  },
+// Step 1: Scan text for PII matches
+const result = await detectPII('My SSN is 123-45-6789', {
+  types: ['ssn', 'email'],
+  minConfidence: 0.7,
 });
+
+console.log(result.detected);  // true
+console.log(result.items);     // [{ type: 'ssn', value: '123-45-6789', confidence: 0.95, ... }]
+
+// Step 2: Replace detected items with type-safe placeholders
+const redacted = redactPII(
+  'My SSN is 123-45-6789',
+  result.items,
+  'typed'
+);
+console.log(redacted); // 'My SSN is [SSN]'
 ```
 
 ---
@@ -62,6 +57,8 @@ const orchestrator = createAgentOrchestrator({
 ## Configuration
 
 ```typescript
+import { createEnhancedPIIGuardrail } from '@directive-run/ai';
+
 const guardrail = createEnhancedPIIGuardrail({
   // What to look for
   types: ['ssn', 'credit_card', 'email', 'phone'],
@@ -69,7 +66,7 @@ const guardrail = createEnhancedPIIGuardrail({
 
   // How to handle matches
   redact: true,              // redact instead of blocking
-  redactionStyle: 'typed',   // 'typed' | 'masked' | 'hash'
+  redactionStyle: 'typed',   // 'placeholder' | 'typed' | 'masked' | 'hashed'
 
   // Tuning and thresholds
   minConfidence: 0.7,        // confidence threshold (0-1)
@@ -88,63 +85,10 @@ const guardrail = createEnhancedPIIGuardrail({
 
 | Style | Example |
 |-------|---------|
+| `placeholder` | `My SSN is [REDACTED]` |
 | `typed` | `My SSN is [SSN]` |
 | `masked` | `My SSN is ***-**-1234` |
-| `hash` | `My SSN is a1b2c3d4...` |
-
----
-
-## Output PII Guardrail
-
-Scan agent outputs for PII leakage:
-
-```typescript
-import { createOutputPIIGuardrail } from '@directive-run/core';
-import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
-
-// Scan agent responses for accidentally leaked PII
-const outputGuardrail = createOutputPIIGuardrail({
-  types: ['ssn', 'credit_card'],
-  redact: true,
-});
-
-const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
-
-// Output guardrails run after the agent responds, before the user sees it
-const orchestrator = createAgentOrchestrator({
-  runner,
-  guardrails: {
-    output: [{ name: 'output-pii', fn: outputGuardrail }],
-  },
-});
-```
-
----
-
-## Standalone Detection
-
-Use PII detection outside of guardrails:
-
-```typescript
-import { detectPII, redactPII } from '@directive-run/core';
-
-// Step 1: Scan text for PII matches
-const result = await detectPII('My SSN is 123-45-6789', {
-  types: ['ssn', 'email'],
-  minConfidence: 0.7,
-});
-
-console.log(result.detected);  // true
-console.log(result.items);     // [{ type: 'ssn', value: '123-45-6789', confidence: 0.95, ... }]
-
-// Step 2: Replace detected items with type-safe placeholders
-const redacted = redactPII(
-  'My SSN is 123-45-6789',
-  result.items,
-  'typed'
-);
-console.log(redacted); // 'My SSN is [SSN]'
-```
+| `hashed` | `My SSN is a1b2c3d4...` |
 
 ---
 
@@ -186,7 +130,7 @@ const guardrail = createEnhancedPIIGuardrail({
 
 ## Simple PII Guardrail
 
-For basic use with the orchestrator, a simpler guardrail is available:
+For basic use, a simpler regex-only guardrail is available:
 
 ```typescript
 import { createPIIGuardrail } from '@directive-run/ai';
@@ -203,8 +147,40 @@ This version uses regex patterns directly without the full detection pipeline.
 
 ---
 
+## AI Integration
+
+Wire PII detection into an orchestrator as input and output guardrails:
+
+```typescript
+import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
+
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  guardrails: {
+    // Redact PII from user messages before the agent sees them
+    input: [{ name: 'pii', fn: createEnhancedPIIGuardrail({
+      types: ['ssn', 'credit_card', 'email'],
+      redact: true,
+      redactionStyle: 'typed',
+    }) }],
+
+    // Catch any PII the agent leaks in its response
+    output: [{ name: 'output-pii', fn: createOutputPIIGuardrail({
+      types: ['ssn', 'credit_card'],
+      redact: true,
+    }) }],
+  },
+});
+```
+
+See [Guardrails](/docs/ai/guardrails) for error handling, streaming guardrails, and the builder pattern.
+
+---
+
 ## Next Steps
 
-- [Prompt Injection](/docs/security/prompt-injection) – block injection attacks
-- [Audit Trail](/docs/security/audit) – audit logging with PII masking
-- [Compliance](/docs/security/compliance) – GDPR/CCPA data subject rights
+- [Prompt Injection](/docs/security/prompt-injection) &ndash; block injection attacks
+- [Audit Trail](/docs/security/audit) &ndash; audit logging with PII masking
+- [GDPR/CCPA](/docs/security/compliance) &ndash; data subject rights

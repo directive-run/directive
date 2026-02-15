@@ -91,7 +91,14 @@ export interface PluginManager<_S extends Schema = any> {
 }
 
 /**
- * Create a plugin manager.
+ * Create a manager that broadcasts lifecycle events to registered plugins.
+ *
+ * Plugins are called in registration order. All hook invocations are
+ * wrapped in try-catch so a misbehaving plugin never breaks the engine.
+ * Duplicate plugin names are detected and the older registration is
+ * replaced with a warning.
+ *
+ * @returns A `PluginManager` with register/unregister/getPlugins and emit* methods for every lifecycle event
  */
 // biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
 export function createPluginManager<S extends Schema = any>(): PluginManager<S> {

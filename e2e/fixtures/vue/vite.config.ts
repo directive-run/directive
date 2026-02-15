@@ -2,14 +2,16 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "node:path";
 
-const dist = path.resolve(__dirname, "../../../packages/directive/dist");
+const coreDist = path.resolve(__dirname, "../../../packages/core/dist");
+const vueDist = path.resolve(__dirname, "../../../packages/vue/dist");
 
 export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: [
-      { find: /^directive\/(.+)$/, replacement: path.join(dist, "$1.js") },
-      { find: /^directive$/, replacement: path.join(dist, "index.js") },
+      { find: /^@directive-run\/vue$/, replacement: path.join(vueDist, "index.js") },
+      { find: /^@directive-run\/core\/(.+)$/, replacement: path.join(coreDist, "$1.js") },
+      { find: /^@directive-run\/core$/, replacement: path.join(coreDist, "index.js") },
     ],
     dedupe: ["vue"],
   },

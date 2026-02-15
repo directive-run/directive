@@ -61,6 +61,11 @@ import type { SemanticCache, CacheStats, EmbedderFn } from "./guardrails/semanti
 import type { MessageBus, TypedAgentMessage } from "./communication.js";
 import type { AgentRegistry, ExecutionPattern, MultiAgentOrchestrator } from "./multi.js";
 import type { StreamChannel } from "./stream-channel.js";
+import type { RetryConfig } from "./retry.js";
+import type { FallbackConfig } from "./fallback.js";
+import type { BudgetConfig } from "./budget.js";
+import type { ModelRule } from "./model-selector.js";
+import type { StructuredOutputConfig } from "./structured-output.js";
 
 import { createAgentOrchestrator } from "./index.js";
 import { estimateCost } from "./helpers.js";
@@ -74,6 +79,11 @@ import { createMessageBus as createBus } from "./communication.js";
 import { createMultiAgentOrchestrator } from "./multi.js";
 import { createStreamingRunner } from "./streaming.js";
 import { createStreamChannel, pipeThrough } from "./stream-channel.js";
+import { withRetry } from "./retry.js";
+import { withFallback } from "./fallback.js";
+import { withBudget } from "./budget.js";
+import { withModelSelection } from "./model-selector.js";
+import { withStructuredOutput } from "./structured-output.js";
 
 // ============================================================================
 // Config Types
@@ -150,6 +160,19 @@ export interface AgentStackConfig {
 
 	// Lifecycle hooks for observability
 	hooks?: OrchestratorLifecycleHooks;
+
+	// --- Advanced AI features (P0–P6) ---
+
+	/** P2: Intelligent retry config for the base runner. */
+	intelligentRetry?: RetryConfig;
+	/** P0: Fallback runners (tried in order on failure). */
+	fallback?: { runners: AgentRunner[]; config?: FallbackConfig };
+	/** P1: Cost budget guards. */
+	budget?: BudgetConfig;
+	/** P3: Model selection rules (first match wins). */
+	modelSelection?: ModelRule[];
+	/** P6: Structured output config (applied per-agent via agents map, or globally here). */
+	structuredOutput?: StructuredOutputConfig;
 }
 
 // ============================================================================
@@ -380,7 +403,6 @@ class TokenStreamImpl<T = string> implements TokenStream<T> {
  */
 export function createAgentStack(config: AgentStackConfig): AgentStack {
 	const {
-		runner,
 		streaming: streamingConfig,
 		agents: agentRegistry,
 		patterns,
@@ -389,6 +411,44 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 		debug = false,
 	} = config;
 	const costRatePerMillion = config.costPerMillionTokens ?? config.costRatePerMillion ?? 0;
+
+	// Warn when both retry systems are configured
+	if (config.retry && config.intelligentRetry) {
+		console.warn(
+			"[AgentStack] Both 'retry' (orchestrator-level) and 'intelligentRetry' (HTTP-aware) are configured. " +
+			"This causes double-retry behavior. Use 'intelligentRetry' for HTTP status-aware retry, or 'retry' for orchestrator-level retry, but not both.",
+		);
+	}
+
+	// --- Compose runner pipeline (innermost → outermost) ---
+	// Order: Model Selection → Fallback → Retry → Budget → Structured Output
+	// The outermost wrapper executes first on each call.
+	let runner: AgentRunner = config.runner;
+
+	// P3: Model Selection (innermost — runs just before the provider)
+	if (config.modelSelection && config.modelSelection.length > 0) {
+		runner = withModelSelection(runner, config.modelSelection);
+	}
+
+	// P0: Fallback (wraps model-selected runner)
+	if (config.fallback) {
+		runner = withFallback([runner, ...config.fallback.runners], config.fallback.config);
+	}
+
+	// P2: Intelligent Retry (wraps fallback chain)
+	if (config.intelligentRetry) {
+		runner = withRetry(runner, config.intelligentRetry);
+	}
+
+	// P1: Budget (wraps retry — budget check happens before any retries)
+	if (config.budget) {
+		runner = withBudget(runner, config.budget);
+	}
+
+	// P6: Structured Output (outermost — validates after everything else)
+	if (config.structuredOutput) {
+		runner = withStructuredOutput(runner, config.structuredOutput);
+	}
 
 	// --- Expand features ---
 	const memory = expandMemory(config.memory);
@@ -655,7 +715,9 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 			const validation = validate(result.output);
 			const isValid = typeof validation === "boolean" ? validation : validation.valid;
 
-			if (isValid) return result;
+			if (isValid) {
+				return result;
+			}
 
 			const errors = typeof validation === "object" && validation.errors
 				? validation.errors.join("; ")

@@ -7,6 +7,9 @@
  *
  * Also available:
  * - `@directive-run/ai/testing` – Mock runners, test orchestrators, assertion helpers
+ * - `@directive-run/ai/anthropic` – Anthropic Claude adapter
+ * - `@directive-run/ai/openai` – OpenAI / Azure / Together adapter
+ * - `@directive-run/ai/ollama` – Local Ollama inference adapter
  *
  * @example
  * ```typescript
@@ -58,10 +61,12 @@ import { createSystem } from "@directive-run/core";
 export type {
   AgentLike,
   RunResult,
+  TokenUsage,
   Message,
   ToolCall,
   AgentRunner,
   RunOptions,
+  AdapterHooks,
   GuardrailFn,
   GuardrailContext,
   GuardrailResult,
@@ -143,8 +148,10 @@ export {
   isAgentRunning,
   hasPendingApprovals,
   estimateCost,
+  validateBaseURL,
   createRunner,
   type CreateRunnerOptions,
+  type ParsedResponse,
 } from "./helpers.js";
 
 // Re-export constraint helpers
@@ -1812,17 +1819,41 @@ export {
   type CircuitState,
 } from "@directive-run/core/plugins";
 
+// Audit Trail
+export {
+  createAuditTrail,
+  createAgentAuditHandlers,
+  type AuditPluginConfig,
+  type AuditInstance,
+} from "./plugins/audit.js";
+
 // Prompt Injection Guardrails
 export {
   createPromptInjectionGuardrail,
   createUntrustedContentGuardrail,
+  detectPromptInjection,
+  sanitizeInjection,
+  markUntrustedContent,
+  DEFAULT_INJECTION_PATTERNS,
+  STRICT_INJECTION_PATTERNS,
   type PromptInjectionGuardrailOptions,
 } from "./guardrails/prompt-injection.js";
+
+// Compliance (GDPR/CCPA)
+export {
+  createCompliance,
+  createInMemoryComplianceStorage,
+  type ComplianceConfig,
+  type ComplianceInstance,
+  type ComplianceStorage,
+} from "./plugins/compliance.js";
 
 // Enhanced PII Guardrails
 export {
   createEnhancedPIIGuardrail,
   createOutputPIIGuardrail,
+  detectPII,
+  redactPII,
   type EnhancedPIIGuardrailOptions,
 } from "./guardrails/pii-enhanced.js";
 
@@ -1899,6 +1930,71 @@ export {
   type SSETransportConfig,
   type SSETransport,
 } from "./sse-transport.js";
+
+// P2: Intelligent Retry
+export {
+  withRetry,
+  parseHttpStatus,
+  parseRetryAfter,
+  RetryExhaustedError,
+  type RetryConfig,
+} from "./retry.js";
+
+// P0: Provider Fallback
+export {
+  withFallback,
+  AllProvidersFailedError,
+  type FallbackConfig,
+} from "./fallback.js";
+
+// P1: Cost Budget Guards
+export {
+  withBudget,
+  BudgetExceededError,
+  type BudgetConfig,
+  type BudgetRunner,
+  type BudgetWindow,
+  type TokenPricing,
+  type BudgetExceededDetails,
+} from "./budget.js";
+
+// P3: Smart Model Selection
+export {
+  withModelSelection,
+  byInputLength,
+  byAgentName,
+  byPattern,
+  type ModelRule,
+  type ModelSelectionConfig,
+} from "./model-selector.js";
+
+// P6: Structured Outputs
+export {
+  withStructuredOutput,
+  extractJsonFromOutput,
+  StructuredOutputError,
+  type StructuredOutputConfig,
+  type SafeParseable,
+  type SafeParseResult,
+} from "./structured-output.js";
+
+// P5: Batch Queue
+export {
+  createBatchQueue,
+  type BatchQueue,
+  type BatchQueueConfig,
+} from "./batch.js";
+
+// P4: Constraint-Driven Provider Routing
+export {
+  createConstraintRouter,
+  type ConstraintRouterConfig,
+  type ConstraintRouterRunner,
+  type RoutingProvider,
+  type RoutingFacts,
+  type ProviderStats,
+  type RoutingConstraint,
+} from "./provider-routing.js";
 
 // MCP (Model Context Protocol)
 export {

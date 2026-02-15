@@ -63,8 +63,12 @@ const stack = createAgentStack({
 | `hooks` | `OrchestratorLifecycleHooks` | – | Lifecycle callbacks |
 | `maxTokenBudget` | `number` | – | Token budget limit |
 | `costPerMillionTokens` | `number` | – | Blended cost rate for estimation |
-| `costRates` | `{ inputRate, outputRate }` | – | Per-direction cost rates (per million tokens) |
 | `debug` | `boolean` | `false` | Enable debug logging |
+| `intelligentRetry` | [`RetryConfig`](/docs/ai/resilience-routing#intelligent-retry) | – | HTTP-aware retry with backoff |
+| `fallback` | `{ runners: AgentRunner[], config? }` | – | [Provider fallback](/docs/ai/resilience-routing#provider-fallback) chain |
+| `budget` | [`BudgetConfig`](/docs/ai/resilience-routing#cost-budget-guards) | – | Cost budget guards (per-call + rolling windows) |
+| `modelSelection` | [`ModelRule[]`](/docs/ai/resilience-routing#smart-model-selection) | – | Rule-based model routing |
+| `structuredOutput` | [`StructuredOutputConfig`](/docs/ai/resilience-routing#structured-outputs) | – | Schema validation with auto-retry |
 
 ---
 

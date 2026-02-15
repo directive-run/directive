@@ -112,31 +112,6 @@ const marketingUsers = await compliance.consent.getForPurpose('marketing');
 
 ---
 
-## Consent Guardrail
-
-Block AI processing when consent is missing:
-
-```typescript
-import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
-
-// Block AI processing unless the user has granted the 'ai_processing' consent
-const consentGuardrail = compliance.createConsentGuardrail('ai_processing');
-
-const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
-
-// Consent is checked before every agent invocation
-const orchestrator = createAgentOrchestrator({
-  runner,
-  guardrails: {
-    input: [{ name: 'consent', fn: consentGuardrail }],
-  },
-});
-```
-
-The guardrail checks the subject's consent status before allowing the input through. If consent is not granted, the guardrail blocks the request.
-
----
-
 ## Retention Enforcement
 
 Automatically delete data that exceeds retention periods:
@@ -237,8 +212,33 @@ const storage: ComplianceStorage = {
 
 ---
 
+## AI Integration
+
+Block AI processing when consent is missing by wiring the consent guardrail into an orchestrator:
+
+```typescript
+import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
+
+// Block AI processing unless the user has granted the 'ai_processing' consent
+const consentGuardrail = compliance.createConsentGuardrail('ai_processing');
+
+const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+
+// Consent is checked before every agent invocation
+const orchestrator = createAgentOrchestrator({
+  runner,
+  guardrails: {
+    input: [{ name: 'consent', fn: consentGuardrail }],
+  },
+});
+```
+
+See [Guardrails](/docs/ai/guardrails) for error handling, streaming guardrails, and the builder pattern.
+
+---
+
 ## Next Steps
 
-- [Audit Trail](/docs/security/audit) – tamper-evident audit logging
-- [PII Detection](/docs/security/pii) – detect and redact sensitive data
-- [Guardrails](/docs/ai/guardrails) – AI safety guardrails
+- [Audit Trail](/docs/security/audit) &ndash; tamper-evident audit logging
+- [PII Detection](/docs/security/pii) &ndash; detect and redact sensitive data
+- [Security Overview](/docs/security/overview) &ndash; defense-in-depth architecture

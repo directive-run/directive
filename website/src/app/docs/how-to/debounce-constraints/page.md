@@ -35,9 +35,9 @@ const search = createModule('search', {
     // Debounce: copy query → debouncedQuery after 300ms of inactivity
     debounceQuery: {
       deps: ['query'],
-      run: (facts, prev, ctx) => {
+      run: (facts, prev, context) => {
         const timer = setTimeout(() => {
-          ctx.facts.debouncedQuery = facts.query;
+          context.facts.debouncedQuery = facts.query;
         }, 300);
 
         // Cleanup cancels the timer if query changes again
@@ -65,17 +65,17 @@ const search = createModule('search', {
       // Key by query – if debouncedQuery changes while in-flight,
       // the old request is superseded
       key: (req) => `search-${req.query}`,
-      resolve: async (req, ctx) => {
-        ctx.facts.isSearching = true;
+      resolve: async (req, context) => {
+        context.facts.isSearching = true;
         try {
           const res = await fetch(`/api/search?q=${encodeURIComponent(req.query)}`);
           const data = await res.json();
           // Only apply if this is still the current query
-          if (ctx.facts.debouncedQuery === req.query) {
-            ctx.facts.results = data.results;
+          if (context.facts.debouncedQuery === req.query) {
+            context.facts.results = data.results;
           }
         } finally {
-          ctx.facts.isSearching = false;
+          context.facts.isSearching = false;
         }
       },
     },
@@ -123,9 +123,9 @@ function SearchBox({ system }) {
 effects: {
   throttleQuery: {
     deps: ['query'],
-    run: (facts, prev, ctx) => {
+    run: (facts, prev, context) => {
       // Fire immediately, then ignore for 500ms
-      ctx.facts.debouncedQuery = facts.query;
+      context.facts.debouncedQuery = facts.query;
       let blocked = true;
       const timer = setTimeout(() => { blocked = false; }, 500);
 

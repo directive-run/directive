@@ -6,7 +6,7 @@
   "author": "Jason Comes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DirectiveRun/DirectiveJS",
+    "url": "https://github.com/directive-run/directive",
     "directory": "packages/vue"
   },
   "homepage": "https://directive.run",

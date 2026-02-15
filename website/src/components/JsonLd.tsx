@@ -31,7 +31,7 @@ export function SoftwareJsonLd() {
     name: 'Directive',
     description:
       'Constraint-driven state management for TypeScript. Declare what must be true, define how to make it true, let Directive orchestrate the rest.',
-    codeRepository: 'https://github.com/sizls/directive',
+    codeRepository: 'https://github.com/directive-run/directive',
     programmingLanguage: {
       '@type': 'ComputerLanguage',
       name: 'TypeScript',

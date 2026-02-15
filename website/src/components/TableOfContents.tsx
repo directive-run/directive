@@ -6,92 +6,6 @@ import clsx from 'clsx'
 
 import { type Section, type Subsection } from '@/lib/sections'
 
-function ChevronIcon({ className, isOpen }: { className?: string; isOpen: boolean }) {
-  return (
-    <svg
-      className={clsx(className, 'transition-transform', isOpen && 'rotate-180')}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  )
-}
-
-function MobileTableOfContents({
-  tableOfContents,
-  currentSection,
-  isActive,
-}: {
-  tableOfContents: Array<Section>
-  currentSection: string | undefined
-  isActive: (section: Section | Subsection) => boolean
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  if (tableOfContents.length === 0) return null
-
-  const currentTitle = tableOfContents.find(s => s.id === currentSection)?.title
-    ?? tableOfContents[0]?.title
-    ?? 'On this page'
-
-  return (
-    <div className="sticky top-14 z-40 -mx-4 bg-white px-4 py-3 shadow-sm xl:hidden dark:bg-slate-900">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between text-sm font-medium text-slate-900 dark:text-white"
-        aria-expanded={isOpen}
-      >
-        <span className="truncate">{currentTitle}</span>
-        <ChevronIcon className="h-4 w-4 flex-shrink-0 text-slate-500" isOpen={isOpen} />
-      </button>
-      {isOpen && (
-        <nav className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
-          <ol role="list" className="space-y-2 text-sm">
-            {tableOfContents.map((section) => (
-              <li key={section.id}>
-                <Link
-                  href={`#${section.id}`}
-                  onClick={() => setIsOpen(false)}
-                  className={clsx(
-                    'block py-1',
-                    isActive(section)
-                      ? 'text-brand-primary'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
-                  )}
-                >
-                  {section.title}
-                </Link>
-                {section.children.length > 0 && (
-                  <ol role="list" className="mt-1 space-y-1 pl-4">
-                    {section.children.map((subSection) => (
-                      <li key={subSection.id}>
-                        <Link
-                          href={`#${subSection.id}`}
-                          onClick={() => setIsOpen(false)}
-                          className={clsx(
-                            'block py-1 text-xs',
-                            isActive(subSection)
-                              ? 'text-brand-primary'
-                              : 'text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-400',
-                          )}
-                        >
-                          {subSection.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
-    </div>
-  )
-}
-
 function DesktopTableOfContents({
   tableOfContents,
   isActive,
@@ -245,16 +159,9 @@ export function TableOfContents({
   }, [currentSection])
 
   return (
-    <>
-      <MobileTableOfContents
-        tableOfContents={tableOfContents}
-        currentSection={currentSection}
-        isActive={isActive}
-      />
-      <DesktopTableOfContents
-        tableOfContents={tableOfContents}
-        isActive={isActive}
-      />
-    </>
+    <DesktopTableOfContents
+      tableOfContents={tableOfContents}
+      isActive={isActive}
+    />
   )
 }

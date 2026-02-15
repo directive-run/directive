@@ -66,7 +66,17 @@
       "Bash(npx playwright test:*)",
       "Bash(node -e:*)",
       "Bash(pnpm test:e2e:*)",
-      "Bash(OPENAI_API_KEY=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 npx tsx scripts/generate-embeddings.ts)"
+      "Bash(OPENAI_API_KEY=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 npx tsx scripts/generate-embeddings.ts)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pnpm add:*)",
+      "Bash(git config:*)",
+      "Bash(brew install:*)",
+      "Bash(git status:*)",
+      "Bash(vercel project get:*)",
+      "Bash(vercel project inspect:*)",
+      "Bash(head:*)",
+      "Bash(pnpm --filter @directive-run/ai build:*)"
     ]
   }
 }

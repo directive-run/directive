@@ -28,14 +28,15 @@ Build up from simple to complex:
 | Level | Page | What You Learn |
 |-------|------|---------------|
 | 1 | [Running Agents](/docs/ai/running-agents) | End-to-end examples and deployment patterns |
-| 2 | [Orchestrator](/docs/ai/orchestrator) | Single-agent runs with guardrails and constraints |
-| 3 | [Agent Stack](/docs/ai/agent-stack) | Composable agent pipelines with `.run()` / `.stream()` / `.structured()` |
-| 4 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
-| 5 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
-| 6 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, and supervisor execution patterns |
-| 7 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
-| 8 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
-| 9 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
+| 2 | [Resilience & Routing](/docs/ai/resilience-routing) | Retry, fallback, budgets, model selection, structured outputs |
+| 3 | [Orchestrator](/docs/ai/orchestrator) | Single-agent runs with guardrails and constraints |
+| 4 | [Agent Stack](/docs/ai/agent-stack) | Composable agent pipelines with `.run()` / `.stream()` / `.structured()` |
+| 5 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
+| 6 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
+| 7 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, and supervisor execution patterns |
+| 8 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
+| 9 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
+| 10 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
 
 ---
 
@@ -48,6 +49,7 @@ Build up from simple to complex:
 | **Guardrails** | Input, output, and tool-call validators that block or transform data |
 | **Constraints** | Declarative rules (e.g., "if confidence < 0.7, escalate to expert") |
 | **Memory** | Sliding window, token-based, or hybrid conversation management |
+| **Resilience** | Intelligent retry, provider fallback chains, and cost budget guards |
 | **Circuit Breaker** | Automatic fault isolation for failing agent calls |
 
 ---
@@ -84,7 +86,7 @@ const result = await orchestrator.run(myAgent, 'Hello!');
 
 ## Safety & Compliance
 
-Directive provides security guardrails and compliance tooling for AI agent systems. Apply multiple layers of protection:
+Directive provides security guardrails and compliance tooling for AI agent systems. See the [Security & Compliance](/docs/security/overview) section for full details. Apply multiple layers of protection:
 
 ```
 User Input
@@ -114,5 +116,6 @@ User Input
 ## Next Steps
 
 - **New to AI adapter?** Start with [Running Agents](/docs/ai/running-agents)
+- **Need resilience?** See [Resilience & Routing](/docs/ai/resilience-routing) for retry, fallback, and budgets
 - **Want streaming?** See [Streaming](/docs/ai/streaming)
-- **Need safety?** See [Guardrails](/docs/ai/guardrails) and [PII Detection](/docs/security/pii)
+- **Need safety?** See [Guardrails](/docs/ai/guardrails) and [Security & Compliance](/docs/security/overview)

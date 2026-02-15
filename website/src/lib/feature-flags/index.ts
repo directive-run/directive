@@ -8,5 +8,5 @@ export {
   useCanUseThemeSelector,
   useCanShowOnboardingToast,
   useCanUseVersionSelector,
-  useCanUseVoteApi,
+  useCanUseShareButton,
 } from './hooks'

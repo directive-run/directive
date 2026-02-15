@@ -68,8 +68,8 @@ const auth = createModule('auth', {
   resolvers: {
     login: {
       requirement: 'LOGIN',
-      resolve: async (req, ctx) => {
-        ctx.facts.status = 'authenticating';
+      resolve: async (req, context) => {
+        context.facts.status = 'authenticating';
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -80,16 +80,16 @@ const auth = createModule('auth', {
         });
         if (!res.ok) throw new Error('Login failed');
         const data = await res.json();
-        ctx.facts.token = data.token;
-        ctx.facts.refreshToken = data.refreshToken;
-        ctx.facts.expiresAt = Date.now() + data.expiresIn * 1000;
-        ctx.facts.status = 'authenticated';
+        context.facts.token = data.token;
+        context.facts.refreshToken = data.refreshToken;
+        context.facts.expiresAt = Date.now() + data.expiresIn * 1000;
+        context.facts.status = 'authenticated';
       },
     },
     refreshToken: {
       requirement: 'REFRESH_TOKEN',
       retry: { attempts: 2, backoff: 'exponential' },
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const res = await fetch('/api/auth/refresh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -97,26 +97,26 @@ const auth = createModule('auth', {
         });
         if (!res.ok) {
           // Refresh failed – force logout
-          ctx.facts.token = undefined;
-          ctx.facts.refreshToken = undefined;
-          ctx.facts.status = 'expired';
+          context.facts.token = undefined;
+          context.facts.refreshToken = undefined;
+          context.facts.status = 'expired';
 
           return;
         }
         const data = await res.json();
-        ctx.facts.token = data.token;
-        ctx.facts.refreshToken = data.refreshToken;
-        ctx.facts.expiresAt = Date.now() + data.expiresIn * 1000;
+        context.facts.token = data.token;
+        context.facts.refreshToken = data.refreshToken;
+        context.facts.expiresAt = Date.now() + data.expiresIn * 1000;
       },
     },
     fetchUser: {
       requirement: 'FETCH_USER',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         const res = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${req.token}` },
         });
         if (!res.ok) throw new Error('Failed to fetch user');
-        ctx.facts.user = await res.json();
+        context.facts.user = await res.json();
       },
     },
   },

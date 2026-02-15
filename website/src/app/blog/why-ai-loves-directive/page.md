@@ -1,9 +1,9 @@
 ---
 title: Why AI Loves Directive
-description: AI frameworks handle LLM calls. Production agents need budget enforcement, PII redaction, tool control, and approval workflows. Directive adds the orchestration layer without replacing your framework.
+description: AI frameworks handle LLM calls. Production agents need budget enforcement, PII redaction, tool control, approval workflows, and provider resilience. Directive adds the orchestration layer without replacing your framework.
 layout: blog
 date: 2026-02-11
-dateModified: 2026-02-12
+dateModified: 2026-02-11
 slug: why-ai-loves-directive
 author: directive-labs
 categories: [AI, Architecture]
@@ -11,7 +11,7 @@ categories: [AI, Architecture]
 
 AI frameworks are excellent at calling LLMs. They handle prompt templates, tool definitions, streaming responses, and multi-turn conversations. What they don't handle is everything around the LLM call &ndash; the production concerns that determine whether your agent is safe to deploy.
 
-Budget enforcement. PII redaction. Tool access control. Human-in-the-loop approval. Output validation. Error recovery with structured retry policies. These aren't LLM problems. They're orchestration problems. And they're the difference between a demo agent and a production agent.
+Budget enforcement. PII redaction. Tool access control. Human-in-the-loop approval. Output validation. Provider resilience. These aren't LLM problems. They're orchestration problems. And they're the difference between a demo agent and a production agent.
 
 Most teams solve these problems imperatively &ndash; `if` checks scattered across handler functions, manual token counters, middleware that developers forget to include in new routes. It works until it doesn't. A missed check in one code path leads to a $2,000 overnight bill, a PII leak to a third-party tool, or a hallucinated `DROP TABLE` that reaches your database.
 
@@ -55,7 +55,7 @@ const orchestrator = createAgentOrchestrator({
 
 ---
 
-## Five production problems, five declarative solutions
+## Six production problems, six declarative solutions
 
 ### Budget enforcement
 
@@ -70,14 +70,14 @@ const orchestrator = createAgentOrchestrator({
   constraints: {
     budgetWarning: {
       when: (facts) =>
-        facts.agent.tokenUsage >= facts.agent.tokenBudget * 0.8 &&
+        facts.agent.tokenUsage >= 80000 &&
         facts.agent.status === 'running',
       require: { type: 'WARN_BUDGET', percent: 80 },
       priority: 50,
     },
     budgetCritical: {
       when: (facts) =>
-        facts.agent.tokenUsage >= facts.agent.tokenBudget * 0.95 &&
+        facts.agent.tokenUsage >= 95000 &&
         facts.agent.status === 'running',
       require: { type: 'WARN_BUDGET', percent: 95 },
       priority: 75,
@@ -87,7 +87,7 @@ const orchestrator = createAgentOrchestrator({
   resolvers: {
     warnBudget: {
       requirement: 'WARN_BUDGET',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         await notifyOpsChannel(
           `Agent at ${req.percent}% of token budget`
         );
@@ -225,6 +225,51 @@ const orchestrator = createAgentOrchestrator({
 ```
 
 When the agent's output doesn't match the schema, the guardrail blocks it before it reaches the user. The error includes validation details so you can log, retry with a modified prompt, or escalate.
+
+### Provider resilience
+
+Your agent works perfectly &ndash; until the provider returns `429 Too Many Requests` at 2 AM. Or a transient `503` drops the user's request mid-conversation. Single-provider dependence is a production risk.
+
+Directive's resilience wrappers compose around your runner without changing a line of agent code:
+
+```typescript
+import {
+  createAgentStack,
+  createOpenAIRunner,
+} from '@directive-run/ai';
+
+const stack = createAgentStack({
+  runner, // Primary provider (Anthropic, OpenAI, etc.)
+
+  // HTTP-status-aware retry – respects Retry-After on 429,
+  // exponential backoff on 503, never retries 400/401/403
+  intelligentRetry: {
+    maxRetries: 2,
+    baseDelayMs: 1_000,
+    maxDelayMs: 10_000,
+  },
+
+  // Automatic failover when the primary provider is down
+  fallback: {
+    runners: [
+      createOpenAIRunner({
+        apiKey: process.env.OPENAI_API_KEY!,
+        model: 'gpt-4o-mini',
+      }),
+    ],
+  },
+
+  // Rolling budget windows prevent runaway spend
+  budget: {
+    budgets: [
+      { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+      { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+    ],
+  },
+});
+```
+
+Retry, fallback, and budget compose automatically. The stack checks the budget before each call (reject before spending), retries transient failures with appropriate backoff, and falls back to the next provider when the primary is unavailable. Three config keys. Zero imperative retry loops.
 
 ---
 
@@ -380,6 +425,7 @@ Explore the AI documentation:
 - **[Agent Orchestrator](/docs/ai/orchestrator)** &ndash; single-agent patterns, constraints, and approval workflows
 - **[Guardrails & Safety](/docs/ai/guardrails)** &ndash; built-in and custom guardrails
 - **[Multi-Agent Patterns](/docs/ai/multi-agent)** &ndash; parallel, sequential, and supervisor coordination
+- **[Resilience & Routing](/docs/ai/resilience-routing)** &ndash; retry, fallback, budgets, and model selection
 - **[Building AI Agents](/blog/building-ai-agents)** &ndash; the full tutorial
 - **[Declarative AI Guardrails](/blog/declarative-ai-guardrails)** &ndash; building guardrails with `createModule`
 

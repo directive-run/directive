@@ -9,6 +9,10 @@ XState handles explicit state machine transitions with actors and guards. Direct
 This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Module & System](/docs/module-system). Need to install first? See [Installation](/docs/installation).
 {% /callout %}
 
+{% callout title="Migrating from XState?" %}
+Want to replace XState entirely? See the [XState to Directive migration guide](/docs/migration/from-xstate) for step-by-step codemods and concept mapping.
+{% /callout %}
+
 ---
 
 ## Why Use Both
@@ -143,8 +147,8 @@ const checkoutModule = createModule('checkout', {
       requirement: 'PROCESS_PAYMENT',
       key: (req) => `payment-${req.method}`,
       retry: { attempts: 2, backoff: 'exponential' },
-      resolve: async (req, ctx) => {
-        ctx.facts.paymentStatus = 'processing';
+      resolve: async (req, context) => {
+        context.facts.paymentStatus = 'processing';
 
         const actor = createActor(paymentMachine, {
           input: { amount: req.amount, method: req.method },
@@ -154,8 +158,8 @@ const checkoutModule = createModule('checkout', {
         // toPromise resolves with snapshot.output when the machine reaches a final state
         try {
           const output = await toPromise(actor);
-          ctx.facts.paymentStatus = output.status;
-          ctx.facts.orderConfirmed = output.status === 'success';
+          context.facts.paymentStatus = output.status;
+          context.facts.orderConfirmed = output.status === 'success';
         } finally {
           actor.stop(); // Always clean up the actor
         }
@@ -170,7 +174,7 @@ For more control over intermediate states, use `waitFor` instead:
 ```typescript
 import { createActor, waitFor } from 'xstate';
 
-resolve: async (req, ctx) => {
+resolve: async (req, context) => {
   const actor = createActor(paymentMachine, {
     input: { amount: req.amount },
   });
@@ -188,7 +192,7 @@ resolve: async (req, ctx) => {
       throw snapshot.error;
     }
 
-    ctx.facts.paymentStatus = snapshot.output.status;
+    context.facts.paymentStatus = snapshot.output.status;
   } finally {
     actor.stop(); // Always clean up the actor
   }
@@ -286,7 +290,7 @@ const orderModule = createModule('order', {
   resolvers: {
     ship: {
       requirement: 'SHIP_ORDER',
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         await api.createShipment(req.userId, req.items);
       },
     },
@@ -380,11 +384,11 @@ resolvers: {
   recover: {
     requirement: 'RECOVER_MACHINE',
     retry: { attempts: 3, backoff: 'exponential' },
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       // Restart the actor with fresh state
       const actor = createActor(machine);
       actor.start();
-      ctx.facts.machineError = null;
+      context.facts.machineError = null;
     },
   },
 },
@@ -393,16 +397,16 @@ resolvers: {
 For resolvers that use `toPromise`, errors from the machine are thrown automatically:
 
 ```typescript
-resolve: async (req, ctx) => {
+resolve: async (req, context) => {
   const actor = createActor(machine, { input: req });
   actor.start();
 
   try {
     const output = await toPromise(actor);
-    ctx.facts.result = output;
+    context.facts.result = output;
   } catch (err) {
     // Machine reached 'error' status – toPromise rejects
-    ctx.facts.error = String(err);
+    context.facts.error = String(err);
     throw err; // Let Directive's retry policy handle it
   }
 },
@@ -474,30 +478,11 @@ For server-side rendering, see [Advanced: SSR & Hydration](/docs/advanced/ssr) f
 Test machine-as-resolver patterns with Directive's test utilities:
 
 ```typescript
-import { createActor, toPromise } from 'xstate';
 import { createTestSystem } from '@directive-run/core/testing';
 
-test('payment machine resolver completes', async () => {
-  const testSystem = createTestSystem(checkoutModule);
-
-  testSystem.batch(() => {
-    testSystem.facts.paymentStatus = 'idle';
-    testSystem.facts.orderConfirmed = false;
-  });
-
-  // Trigger the resolver
-  await testSystem.resolve('PROCESS_PAYMENT', {
-    type: 'PROCESS_PAYMENT',
-    amount: 99.99,
-    method: 'card',
-  });
-
-  expect(testSystem.facts.paymentStatus).toBe('success');
-  expect(testSystem.facts.orderConfirmed).toBe(true);
-});
-
 test('multi-machine constraint fires when all ready', async () => {
-  const testSystem = createTestSystem(orderModule);
+  const testSystem = createTestSystem({ module: orderModule });
+  testSystem.start();
 
   testSystem.batch(() => {
     testSystem.facts.authState = 'authenticated';
@@ -507,9 +492,11 @@ test('multi-machine constraint fires when all ready', async () => {
     testSystem.facts.cartItems = [{ id: 'item-1' }];
   });
 
-  await testSystem.reconcile();
-  expect(testSystem.pendingRequirements()).toContainEqual(
-    expect.objectContaining({ type: 'SHIP_ORDER' })
+  await testSystem.waitForIdle();
+  expect(testSystem.allRequirements).toContainEqual(
+    expect.objectContaining({
+      requirement: expect.objectContaining({ type: 'SHIP_ORDER' }),
+    })
   );
 });
 ```

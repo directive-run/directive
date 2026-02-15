@@ -1,23 +1,34 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
 
-import { navigation } from '@/lib/navigation'
+import { type NavigationSection, getNavigationForVersion } from '@/lib/navigation'
+import { useDocsVersion } from '@/lib/hooks/useDocsVersion'
 
 export const Navigation = memo(function Navigation({
   className,
   onLinkClick,
+  navigationOverride,
 }: {
   className?: string
   onLinkClick?: React.MouseEventHandler<HTMLAnchorElement>
+  navigationOverride?: NavigationSection[]
 }) {
   let pathname = usePathname()
+  const { version } = useDocsVersion()
+
+  const sections = useMemo(
+    () => navigationOverride ?? getNavigationForVersion(version),
+    [navigationOverride, version],
+  )
 
   return (
     <nav className={clsx('text-base lg:text-sm', className)}>
       <ul role="list" className="space-y-9">
-        {navigation.map((section) => (
+        {sections.map((section) => (
           <li key={section.title}>
             <h2 className="font-display font-medium text-slate-900 dark:text-white">
               {section.title}

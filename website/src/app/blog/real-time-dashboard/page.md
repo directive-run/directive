@@ -2,8 +2,8 @@
 title: Building a Real-Time Dashboard with Directive
 description: A step-by-step tutorial for building a sales analytics dashboard with multiple async data sources, live WebSocket updates, and cross-module derivations using Directive.
 layout: blog
-date: 2026-01-22
-dateModified: 2026-02-12
+date: 2026-02-05
+dateModified: 2026-02-05
 slug: real-time-dashboard
 author: directive-labs
 categories: [Tutorial, Architecture]
@@ -87,18 +87,18 @@ const historyModule = createModule("history", {
       requirement: "FETCH_HISTORY",
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 15000,
-      resolve: async (req, ctx) => {
-        ctx.facts.loading = true;
-        ctx.facts.error = null;
+      resolve: async (req, context) => {
+        context.facts.loading = true;
+        context.facts.error = null;
         try {
           const res = await fetch(`/api/sales/history?since=${req.since}`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          ctx.facts.records = await res.json();
-          ctx.facts.fetchedAt = Date.now();
+          context.facts.records = await res.json();
+          context.facts.fetchedAt = Date.now();
         } catch (err) {
-          ctx.facts.error = err.message;
+          context.facts.error = err.message;
         } finally {
-          ctx.facts.loading = false;
+          context.facts.loading = false;
         }
       },
     },
@@ -169,31 +169,31 @@ const liveModule = createModule("live", {
   resolvers: {
     connect: {
       requirement: "CONNECT_WS",
-      resolve: async (_req, ctx) => {
+      resolve: async (_req, context) => {
         const ws = new WebSocket("wss://api.example.com/sales/live");
 
         ws.onopen = () => {
-          ctx.facts.connected = true;
-          ctx.facts.reconnectCount = 0;
+          context.facts.connected = true;
+          context.facts.reconnectCount = 0;
         };
         ws.onmessage = (event) => {
           const tx: LiveTransaction = JSON.parse(event.data);
-          ctx.facts.transactions = [...ctx.facts.transactions, tx];
-          ctx.facts.lastMessageAt = Date.now();
+          context.facts.transactions = [...context.facts.transactions, tx];
+          context.facts.lastMessageAt = Date.now();
         };
-        ws.onclose = () => { ctx.facts.connected = false; };
+        ws.onclose = () => { context.facts.connected = false; };
         ws.onerror = () => {
-          ctx.facts.connected = false;
-          ctx.facts.error = "WebSocket connection failed";
+          context.facts.connected = false;
+          context.facts.error = "WebSocket connection failed";
         };
       },
     },
     reconnect: {
       requirement: "RECONNECT_WS",
       retry: { attempts: 5, backoff: "exponential" },
-      resolve: async (_req, ctx) => {
-        ctx.facts.reconnectCount += 1;
-        ctx.facts.error = null;
+      resolve: async (_req, context) => {
+        context.facts.reconnectCount += 1;
+        context.facts.error = null;
         // Clearing error re-activates needsConnection
       },
     },
@@ -278,18 +278,18 @@ const pollModule = createModule("poll", {
       requirement: "REFRESH_STATS",
       retry: { attempts: 2, backoff: "exponential" },
       timeout: 10000,
-      resolve: async (_req, ctx) => {
-        ctx.facts.loading = true;
-        ctx.facts.error = null;
+      resolve: async (_req, context) => {
+        context.facts.loading = true;
+        context.facts.error = null;
         try {
           const res = await fetch("/api/sales/summary");
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          ctx.facts.stats = await res.json();
-          ctx.facts.lastFetchAt = Date.now();
+          context.facts.stats = await res.json();
+          context.facts.lastFetchAt = Date.now();
         } catch (err) {
-          ctx.facts.error = err.message;
+          context.facts.error = err.message;
         } finally {
-          ctx.facts.loading = false;
+          context.facts.loading = false;
         }
       },
     },

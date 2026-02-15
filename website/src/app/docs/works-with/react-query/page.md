@@ -136,12 +136,12 @@ const dashboardModule = createModule('dashboard', {
     prefetch: {
       requirement: 'PREFETCH_PROFILE',
       key: (req) => `profile-${req.userId}`,
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         await queryClient.prefetchQuery({
           queryKey: ['user', req.userId],
           queryFn: () => api.getUser(req.userId),
         });
-        ctx.facts.profilePrefetched = true;
+        context.facts.profilePrefetched = true;
       },
     },
   },
@@ -181,9 +181,9 @@ constraints: {
 resolvers: {
   invalidate: {
     requirement: 'INVALIDATE_PROTECTED_DATA',
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       await queryClient.invalidateQueries({ queryKey: ['protected-data'] });
-      ctx.facts.lastRefreshVersion = ctx.facts.permissionsVersion;
+      context.facts.lastRefreshVersion = context.facts.permissionsVersion;
     },
   },
 },
@@ -233,7 +233,7 @@ const todoModule = createModule('todos', {
     updateTodo: {
       requirement: 'UPDATE_TODO',
       key: (req) => `todo-${req.id}`,
-      resolve: async (req, ctx) => {
+      resolve: async (req, context) => {
         // Cancel in-flight queries for this todo
         await queryClient.cancelQueries({ queryKey: ['todo', req.id] });
 
@@ -248,15 +248,15 @@ const todoModule = createModule('todos', {
 
         try {
           await api.updateTodo(req.id, { title: req.title });
-          ctx.facts.pendingUpdate = null;
-          ctx.facts.updateError = null;
+          context.facts.pendingUpdate = null;
+          context.facts.updateError = null;
           // Refetch to ensure server state is canonical
           await queryClient.invalidateQueries({ queryKey: ['todo', req.id] });
         } catch (err) {
           // Rollback optimistic update
           queryClient.setQueryData(['todo', req.id], previousTodo);
-          ctx.facts.updateError = String(err);
-          ctx.facts.pendingUpdate = null;
+          context.facts.updateError = String(err);
+          context.facts.pendingUpdate = null;
           throw err;
         }
       },
@@ -441,10 +441,10 @@ resolvers: {
   recoverQuery: {
     requirement: 'RECOVER_QUERY',
     retry: { attempts: 2, backoff: 'exponential' },
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       // Pass the original queryKey array directly – not wrapped in another array
       await queryClient.invalidateQueries({ queryKey: req.queryKey });
-      ctx.facts.queryError = null;
+      context.facts.queryError = null;
     },
   },
 },
@@ -460,7 +460,8 @@ Test constraint-driven prefetching with Directive's test utilities:
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('prefetch constraint fires on dashboard route', async () => {
-  const testSystem = createTestSystem(dashboardModule);
+  const testSystem = createTestSystem({ module: dashboardModule });
+  testSystem.start();
 
   testSystem.batch(() => {
     testSystem.facts.currentRoute = '/dashboard';
@@ -468,17 +469,20 @@ test('prefetch constraint fires on dashboard route', async () => {
     testSystem.facts.profilePrefetched = false;
   });
 
-  await testSystem.reconcile();
-  expect(testSystem.pendingRequirements()).toContainEqual(
+  await testSystem.waitForIdle();
+  expect(testSystem.allRequirements).toContainEqual(
     expect.objectContaining({
-      type: 'PREFETCH_PROFILE',
-      userId: 'user-123',
+      requirement: expect.objectContaining({
+        type: 'PREFETCH_PROFILE',
+        userId: 'user-123',
+      }),
     })
   );
 });
 
 test('prefetch does not re-fire after completion', async () => {
-  const testSystem = createTestSystem(dashboardModule);
+  const testSystem = createTestSystem({ module: dashboardModule });
+  testSystem.start();
 
   testSystem.batch(() => {
     testSystem.facts.currentRoute = '/dashboard';
@@ -486,8 +490,8 @@ test('prefetch does not re-fire after completion', async () => {
     testSystem.facts.profilePrefetched = true;
   });
 
-  await testSystem.reconcile();
-  expect(testSystem.pendingRequirements()).toEqual([]);
+  await testSystem.waitForIdle();
+  expect(testSystem.allRequirements).toEqual([]);
 });
 ```
 
@@ -511,10 +515,10 @@ constraints: {
 resolvers: {
   refresh: {
     requirement: 'REFRESH_DATA',
-    resolve: async (req, ctx) => {
+    resolve: async (req, context) => {
       await queryClient.invalidateQueries({ queryKey: ['data'] });
       // Mark this version as refreshed so the constraint doesn't re-fire
-      ctx.facts.lastRefreshedVersion = ctx.facts.dataVersion;
+      context.facts.lastRefreshedVersion = context.facts.dataVersion;
     },
   },
 },
