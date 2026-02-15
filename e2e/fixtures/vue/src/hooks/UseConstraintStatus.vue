@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useFact, useConstraintStatus } from "directive/vue";
+import { useFact, useConstraintStatus } from "@directive-run/vue";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

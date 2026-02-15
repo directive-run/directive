@@ -2,7 +2,7 @@
  * Shared Directive module used by all 5 framework fixtures.
  * Exercises facts, derivations, events, constraints, resolvers, and time-travel.
  */
-import { createModule, t, type ModuleSchema } from "directive";
+import { createModule, t, type ModuleSchema } from "@directive-run/core";
 
 const testSchema = {
   facts: {

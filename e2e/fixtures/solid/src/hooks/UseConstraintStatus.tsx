@@ -1,4 +1,4 @@
-import { useFact, useConstraintStatus } from "directive/solid";
+import { useFact, useConstraintStatus } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

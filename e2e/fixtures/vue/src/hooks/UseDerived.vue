@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDerived } from "directive/vue";
+import { useDerived } from "@directive-run/vue";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

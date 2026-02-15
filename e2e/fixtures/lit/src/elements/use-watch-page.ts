@@ -1,6 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { WatchController } from "directive/lit";
+import { WatchController } from "@directive-run/lit";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

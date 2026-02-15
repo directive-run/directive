@@ -1,4 +1,4 @@
-import { useFact, useConstraintStatus } from "directive/react";
+import { useFact, useConstraintStatus } from "@directive-run/react";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

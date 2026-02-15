@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDirective } from "directive/vue";
+import { useDirective } from "@directive-run/vue";
 import { testModule } from "../../../../shared/test-module";
 import { TestIds } from "../../../../shared/test-ids";
 

@@ -8,7 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "directive": "workspace:*",
+    "@directive-run/core": "workspace:*",
+    "@directive-run/vue": "workspace:*",
     "vue": "^3.4.0"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import { useDirective } from "directive/react";
+import { useDirective } from "@directive-run/react";
 import { testModule } from "../../../../shared/test-module";
 import { TestIds } from "../../../../shared/test-ids";
 

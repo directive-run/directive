@@ -1,4 +1,4 @@
-import { useFact, useOptimisticUpdate } from "directive/solid";
+import { useFact, useOptimisticUpdate } from "@directive-run/solid";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

@@ -1,4 +1,4 @@
-import { useDirective } from "directive/solid";
+import { useDirective } from "@directive-run/solid";
 import { testModule } from "../../../../shared/test-module";
 import { TestIds } from "../../../../shared/test-ids";
 

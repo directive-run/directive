@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useFact } from "directive/vue";
-import { useRequirementStatus } from "directive/vue";
+import { useFact } from "@directive-run/vue";
+import { useRequirementStatus } from "@directive-run/vue";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

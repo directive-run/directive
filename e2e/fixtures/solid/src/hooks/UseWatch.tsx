@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { useWatch } from "directive/solid";
+import { useWatch } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

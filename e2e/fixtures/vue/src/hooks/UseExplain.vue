@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useFact, useExplain } from "directive/vue";
+import { useFact, useExplain } from "@directive-run/vue";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

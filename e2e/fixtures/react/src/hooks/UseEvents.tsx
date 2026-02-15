@@ -1,4 +1,4 @@
-import { useFact, useEvents } from "directive/react";
+import { useFact, useEvents } from "@directive-run/react";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 
