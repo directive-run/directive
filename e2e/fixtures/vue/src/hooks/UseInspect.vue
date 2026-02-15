@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useFact, useInspect } from "directive/vue";
+import { useFact, useInspect } from "@directive-run/vue";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

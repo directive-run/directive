@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useDirective } from "directive/svelte";
+  import { useDirective } from "@directive-run/svelte";
   import { testModule } from "../../../../shared/test-module";
   import { TestIds } from "../../../../shared/test-ids";
 

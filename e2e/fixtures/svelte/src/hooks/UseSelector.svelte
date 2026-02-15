@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useSelector } from "directive/svelte";
+  import { useSelector } from "@directive-run/svelte";
   import { system } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 

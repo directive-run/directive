@@ -1,6 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { ModuleController } from "directive/lit";
+import { ModuleController } from "@directive-run/lit";
 import { testModule } from "../../../../shared/test-module";
 import { TestIds } from "../../../../shared/test-ids";
 

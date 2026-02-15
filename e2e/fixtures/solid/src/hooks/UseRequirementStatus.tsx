@@ -1,5 +1,5 @@
-import { useFact } from "directive/solid";
-import { useRequirementStatus } from "directive/solid";
+import { useFact } from "@directive-run/solid";
+import { useRequirementStatus } from "@directive-run/solid";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

@@ -1,4 +1,4 @@
-import { useFact, useInspect } from "directive/react";
+import { useFact, useInspect } from "@directive-run/react";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

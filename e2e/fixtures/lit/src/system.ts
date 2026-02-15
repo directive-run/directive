@@ -1,4 +1,4 @@
-import { createSystem, createRequirementStatusPlugin } from "directive";
+import { createSystem, createRequirementStatusPlugin } from "@directive-run/core";
 import { testModule } from "../../../shared/test-module";
 
 const statusPlugin = createRequirementStatusPlugin();

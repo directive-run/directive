@@ -1,4 +1,4 @@
-import { useFact, useOptimisticUpdate } from "directive/react";
+import { useFact, useOptimisticUpdate } from "@directive-run/react";
 import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

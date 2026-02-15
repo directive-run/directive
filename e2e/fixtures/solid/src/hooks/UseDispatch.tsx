@@ -1,4 +1,4 @@
-import { useFact, useDispatch } from "directive/solid";
+import { useFact, useDispatch } from "@directive-run/solid";
 import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
 

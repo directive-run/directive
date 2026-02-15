@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useDerived } from "directive/svelte";
+  import { useDerived } from "@directive-run/svelte";
   import { system } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 

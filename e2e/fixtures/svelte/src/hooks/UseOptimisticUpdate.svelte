@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useFact, useOptimisticUpdate } from "directive/svelte";
+  import { useFact, useOptimisticUpdate } from "@directive-run/svelte";
   import { system, statusPlugin } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 

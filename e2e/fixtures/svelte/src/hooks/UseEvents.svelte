@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useFact, useEvents } from "directive/svelte";
+  import { useFact, useEvents } from "@directive-run/svelte";
   import { system } from "../system";
   import { TestIds } from "../../../../shared/test-ids";
 
