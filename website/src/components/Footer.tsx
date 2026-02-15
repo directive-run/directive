@@ -44,11 +44,10 @@ export function Footer() {
                 { href: '/blog', label: 'Blog' },
                 { href: '/about', label: 'About' },
                 { href: '/contact', label: 'Contact' },
-              ].map(({ href, label, external }) => (
+              ].map(({ href, label }) => (
                 <li key={href}>
                   <Link
                     href={href}
-                    {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="text-[15px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
                   >
                     {label}
