@@ -10,6 +10,13 @@
     "directory": "packages/solid"
   },
   "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -47,11 +54,6 @@
   "peerDependencies": {
     "@directive-run/core": "workspace:*",
     "solid-js": ">=1"
-  },
-  "peerDependenciesMeta": {
-    "solid-js": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
