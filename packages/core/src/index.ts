@@ -184,9 +184,6 @@ export { DirectiveError } from "./core/types.js";
  * - `t.email()` - Email string format
  * - `t.url()` - URL string format
  *
- * **Escape Hatch:**
- * - `t.any<T>()` - Bypass validation (warns in dev)
- *
  * **Chainable Methods (available on most types):**
  * - `.default(value)` - Set default value
  * - `.transform(fn)` - Transform values

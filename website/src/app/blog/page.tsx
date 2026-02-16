@@ -41,7 +41,7 @@ export default function BlogPage() {
   const featured = getFeaturedPosts()
 
   return (
-    <div className="w-full py-16">
+    <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">
       <div className="mb-12">
         <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
           Blog

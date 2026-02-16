@@ -50,7 +50,10 @@ function useBoard(boardId: string) {
         const res = await fetch(`/api/boards/${boardId}`, {
           signal: controller.signal,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
         const data = await res.json();
         setColumns(data.columns);
         setLoading(false);
@@ -177,7 +180,10 @@ const kanban = createModule("kanban", {
           const res = await fetch(`/api/boards/${req.boardId}`, {
             signal: context.signal,
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
           const data = await res.json();
           context.facts.columns = data.columns;
           context.facts.cards = data.cards;
@@ -420,7 +426,9 @@ const kanban = createModule("kanban", {
             }),
             signal: context.signal,
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
         } catch (err: any) {
           if (err.name === "AbortError") {
             return;

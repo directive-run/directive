@@ -15,7 +15,7 @@ import type { User } from "../types";
 export const authSchema = {
   facts: {
     token: t.string().nullable(),
-    user: t.any<User | null>(),
+    user: t.object<User | null>(),
     isAuthenticated: t.boolean(),
     isValidating: t.boolean(),
   },

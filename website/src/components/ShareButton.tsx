@@ -121,7 +121,7 @@ export function ShareButton() {
 
       {isOpen && (
         <div
-          className="absolute top-full right-0 mt-3 w-48 rounded-xl bg-white p-2 shadow-md ring-1 shadow-black/5 ring-black/5 dark:bg-slate-800 dark:ring-white/5"
+          className="absolute top-full right-0 mt-3 w-48 rounded-xl bg-white p-2 shadow-md ring-1 shadow-black/5 ring-black/5 dark:bg-brand-surface-raised dark:ring-white/5"
           role="menu"
         >
           <button

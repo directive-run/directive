@@ -77,7 +77,9 @@
       "Bash(vercel project inspect:*)",
       "Bash(head:*)",
       "Bash(pnpm --filter @directive-run/ai build:*)",
-      "Bash(pnpm --filter:*)"
+      "Bash(pnpm --filter:*)",
+      "Bash(pnpm pack:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

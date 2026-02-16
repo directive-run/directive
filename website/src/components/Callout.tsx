@@ -5,13 +5,13 @@ import { Icon } from '@/components/Icon'
 const styles = {
   note: {
     container:
-      'bg-brand-primary-50 dark:bg-slate-800/60 dark:ring-1 dark:ring-slate-300/10',
+      'bg-brand-primary-50 dark:bg-brand-surface-raised/60 dark:ring-1 dark:ring-slate-300/10',
     title: 'text-brand-primary-900 dark:text-brand-primary-400',
     body: 'text-brand-primary-800 [--tw-prose-background:var(--brand-primary-50)] prose-a:text-brand-primary-900 prose-code:text-brand-primary-900 dark:text-slate-300 dark:prose-code:text-slate-300',
   },
   warning: {
     container:
-      'bg-amber-50 dark:bg-slate-800/60 dark:ring-1 dark:ring-slate-300/10',
+      'bg-amber-50 dark:bg-brand-surface-raised/60 dark:ring-1 dark:ring-slate-300/10',
     title: 'text-amber-900 dark:text-amber-500',
     body: 'text-amber-800 [--tw-prose-underline:var(--color-amber-400)] [--tw-prose-background:var(--color-amber-50)] prose-a:text-amber-900 prose-code:text-amber-900 dark:text-slate-300 dark:[--tw-prose-underline:var(--brand-primary-700)] dark:prose-code:text-slate-300',
   },

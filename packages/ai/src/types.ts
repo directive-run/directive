@@ -2,7 +2,7 @@
  * Shared types for AI adapter — used by orchestrator, guardrails, helpers, and stack.
  */
 
-import type { Requirement, ModuleSchema } from "@directive-run/core";
+import type { Requirement, ModuleSchema, SchemaType } from "@directive-run/core";
 import { t } from "@directive-run/core";
 
 // ============================================================================
@@ -430,13 +430,13 @@ export const APPROVAL_KEY = "__approval" as const;
 export const CONVERSATION_KEY = "__conversation" as const;
 export const TOOL_CALLS_KEY = "__toolCalls" as const;
 
-/** Bridge schema for orchestrator */
+/** Bridge schema for orchestrator (internal plumbing — types cast to bypass t.object constraint) */
 export const orchestratorBridgeSchema = {
   facts: {
-    [AGENT_KEY]: t.any<AgentState>(),
-    [APPROVAL_KEY]: t.any<ApprovalState>(),
-    [CONVERSATION_KEY]: t.any<Message[]>(),
-    [TOOL_CALLS_KEY]: t.any<ToolCall[]>(),
+    [AGENT_KEY]: t.object() as unknown as SchemaType<AgentState>,
+    [APPROVAL_KEY]: t.object() as unknown as SchemaType<ApprovalState>,
+    [CONVERSATION_KEY]: t.object() as unknown as SchemaType<Message[]>,
+    [TOOL_CALLS_KEY]: t.object() as unknown as SchemaType<ToolCall[]>,
   },
   derivations: {},
   events: {},

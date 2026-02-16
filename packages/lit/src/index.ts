@@ -380,32 +380,10 @@ export class WatchController<T> extends DirectiveController {
 		system: SingleModuleSystem<any>,
 		key: string,
 		callback: (newValue: T, previousValue: T | undefined) => void,
-	);
-	/**
-	 * Watch a fact by explicit options.
-	 * @deprecated Use `new WatchController(host, system, factKey, callback)` instead — facts are now auto-detected.
-	 */
-	constructor(
-		host: ReactiveControllerHost,
-		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: SingleModuleSystem<any>,
-		options: { kind: "fact"; factKey: string },
-		callback: (newValue: T, previousValue: T | undefined) => void,
-	);
-	constructor(
-		host: ReactiveControllerHost,
-		// biome-ignore lint/suspicious/noExplicitAny: System type varies
-		system: SingleModuleSystem<any>,
-		keyOrOptions: string | { kind: "fact"; factKey: string },
-		callback?: (newValue: T, previousValue: T | undefined) => void,
 	) {
 		super(host, system);
-		if (typeof keyOrOptions === "string") {
-			this.key = keyOrOptions;
-		} else {
-			this.key = keyOrOptions.factKey;
-		}
-		this.callback = callback!;
+		this.key = key;
+		this.callback = callback;
 	}
 
 	protected subscribe(): void {

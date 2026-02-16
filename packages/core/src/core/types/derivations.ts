@@ -17,42 +17,27 @@ export interface TrackingContext {
 }
 
 // ============================================================================
-// Legacy Derivation Types (for internal engine use)
+// Derivation Types (internal engine use)
 // ============================================================================
 
-/**
- * Legacy derivation definition function signature.
- * Used internally by the engine.
- *
- * @deprecated For typed derivations, use TypedDerivationsDef from module.ts
- */
+/** Derivation definition function signature. */
 export interface DerivationDef<S extends Schema, T, D extends DerivationsDef<S>> {
 	(facts: Facts<S>, derive: DerivedValues<S, D>): T;
 }
 
-/**
- * Legacy map of derivation definitions.
- * Used internally by the engine.
- *
- * @deprecated For typed derivations, use TypedDerivationsDef from module.ts
- */
+/** Map of derivation definitions. */
 export type DerivationsDef<S extends Schema> = Record<
 	string,
 	DerivationDef<S, unknown, DerivationsDef<S>>
 >;
 
-/**
- * Legacy computed derived values.
- * Used internally by the engine.
- *
- * @deprecated For typed derivations, use InferDerivations from schema.ts
- */
+/** Computed derived values. */
 export type DerivedValues<S extends Schema, D extends DerivationsDef<S>> = {
 	readonly [K in keyof D]: ReturnType<D[K]>;
 };
 
 // ============================================================================
-// Schema-Based Derivation Types (New)
+// Schema-Based Derivation Types
 // ============================================================================
 
 /**

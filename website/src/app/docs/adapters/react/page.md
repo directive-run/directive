@@ -28,7 +28,7 @@ const userModule = createModule("user", {
   schema: {
     facts: {
       userId: t.number(),
-      user: t.any<User | null>(),
+      user: t.object<User | null>(),
     },
     derivations: {
       displayName: t.string(),

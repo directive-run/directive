@@ -10,6 +10,7 @@
 import { Fragment, memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Dialog, DialogPanel, Transition, TransitionChild } from '@headlessui/react'
 import { Highlight } from 'prism-react-renderer'
+import { ChatCircleDots, PaperPlaneTilt, Sparkle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 // ---------------------------------------------------------------------------
@@ -33,50 +34,6 @@ const EXAMPLE_QUESTIONS = [
   'How do I use Directive with React?',
   'Can you show me a data fetching example?',
 ]
-
-// ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
-
-function ChatIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
-      />
-    </svg>
-  )
-}
-
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
-      />
-    </svg>
-  )
-}
-
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  )
-}
-
-function SendIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-    </svg>
-  )
-}
 
 function LoadingDots() {
   return (
@@ -375,7 +332,7 @@ function MessageBubble({ message }: { message: Message }) {
         {isUser ? (
           <span className="text-sm font-medium text-white">U</span>
         ) : (
-          <SparklesIcon className="h-4 w-4 text-white" />
+          <Sparkle weight="duotone" className="h-4 w-4 text-white" />
         )}
       </div>
       <div
@@ -383,7 +340,7 @@ function MessageBubble({ message }: { message: Message }) {
           'max-w-[80%] rounded-2xl px-4 py-2',
           isUser
             ? 'bg-brand-primary text-white'
-            : 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-slate-100'
+            : 'bg-slate-100 text-slate-900 dark:bg-brand-surface-raised dark:text-slate-100'
         )}
       >
         {isUser ? (
@@ -487,7 +444,9 @@ const ChatDialog = memo(function ChatDialog({
 
         // Read SSE stream
         const reader = response.body?.getReader()
-        if (!reader) throw new Error('No response body')
+        if (!reader) {
+          throw new Error('No response body')
+        }
 
         const decoder = new TextDecoder()
         let buffer = ''
@@ -614,12 +573,12 @@ const ChatDialog = memo(function ChatDialog({
             leaveFrom="opacity-100 translate-y-0 sm:scale-100"
             leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
           >
-            <DialogPanel className="flex h-[600px] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800">
+            <DialogPanel className="flex h-[600px] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-brand-surface-raised">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                    <SparklesIcon className="h-4 w-4 text-white" />
+                    <Sparkle weight="duotone" className="h-4 w-4 text-white" />
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -634,7 +593,7 @@ const ChatDialog = memo(function ChatDialog({
                   onClick={onClose}
                   className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
                 >
-                  <CloseIcon className="h-5 w-5" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
@@ -643,7 +602,7 @@ const ChatDialog = memo(function ChatDialog({
                 {messages.length === 0 && !streamingContent ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                      <SparklesIcon className="h-8 w-8 text-white" />
+                      <Sparkle weight="duotone" className="h-8 w-8 text-white" />
                     </div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                       Ask anything about Directive
@@ -673,9 +632,9 @@ const ChatDialog = memo(function ChatDialog({
                     {streamingContent && (
                       <div className="flex gap-3">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                          <SparklesIcon className="h-4 w-4 text-white" />
+                          <Sparkle weight="duotone" className="h-4 w-4 text-white" />
                         </div>
-                        <div className="max-w-[80%] rounded-2xl bg-slate-100 px-4 py-2 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
+                        <div className="max-w-[80%] rounded-2xl bg-slate-100 px-4 py-2 text-slate-900 dark:bg-brand-surface-raised dark:text-slate-100">
                           <MarkdownContent content={streamingContent} />
                         </div>
                       </div>
@@ -685,9 +644,9 @@ const ChatDialog = memo(function ChatDialog({
                     {isLoading && !streamingContent && (
                       <div className="flex gap-3">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                          <SparklesIcon className="h-4 w-4 text-white" />
+                          <Sparkle weight="duotone" className="h-4 w-4 text-white" />
                         </div>
-                        <div className="flex items-center rounded-2xl bg-slate-100 px-4 py-3 dark:bg-slate-700">
+                        <div className="flex items-center rounded-2xl bg-slate-100 px-4 py-3 dark:bg-brand-surface-raised">
                           <LoadingDots />
                         </div>
                       </div>
@@ -716,14 +675,14 @@ const ChatDialog = memo(function ChatDialog({
                     onKeyDown={handleKeyDown}
                     placeholder={dailyRemaining === 0 ? 'Daily limit reached' : 'Ask about Directive...'}
                     disabled={dailyRemaining === 0}
-                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
+                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-brand-surface-raised dark:text-white dark:placeholder-slate-400"
                   />
                   <button
                     onClick={() => handleSend()}
                     disabled={!input.trim() || isLoading || dailyRemaining === 0}
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white transition hover:bg-brand-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <SendIcon className="h-5 w-5" />
+                    <PaperPlaneTilt weight="fill" className="h-5 w-5" />
                   </button>
                 </div>
                 <p className="mt-2 text-center text-xs text-slate-400">
@@ -765,7 +724,7 @@ export const AIChatWidget = memo(function AIChatWidget() {
         className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))] text-white shadow-lg transition hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
         aria-label="Open AI Chat"
       >
-        <ChatIcon className="h-6 w-6" />
+        <ChatCircleDots weight="duotone" className="h-6 w-6" />
       </button>
 
       {/* Chat dialog */}

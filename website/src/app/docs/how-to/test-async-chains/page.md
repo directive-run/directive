@@ -166,7 +166,10 @@ it('retries on transient failure', async () => {
   let attempts = 0;
   const fetchMock = mockResolver('FETCH_PROFILE', async (req, context) => {
     attempts++;
-    if (attempts < 3) throw new Error('Network error');
+    if (attempts < 3) {
+      throw new Error('Network error');
+    }
+
     context.facts.profile = { name: 'Test', avatar: '' };
   });
 

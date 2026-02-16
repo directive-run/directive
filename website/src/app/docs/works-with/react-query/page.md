@@ -203,8 +203,8 @@ import { createModule, t } from '@directive-run/core';
 const todoModule = createModule('todos', {
   schema: {
     facts: {
-      pendingUpdate: t.any(),
-      updateError: t.any(),
+      pendingUpdate: t.object(),
+      updateError: t.object(),
     },
     derivations: {},
     events: {},

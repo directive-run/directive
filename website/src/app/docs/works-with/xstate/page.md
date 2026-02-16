@@ -248,19 +248,19 @@ const orderModule = createModule('order', {
   schema: {
     facts: {
       authState: t.string(),
-      authUser: t.any(),
+      authUser: t.object(),
       cartState: t.string(),
-      cartItems: t.array(t.any()),
+      cartItems: t.array(t.object()),
       paymentState: t.string(),
-      paymentError: t.any(),
+      paymentError: t.object(),
     },
     derivations: {
       readyToShip: t.boolean(),
-      orderSummary: t.any(),
+      orderSummary: t.object(),
     },
     events: {},
     requirements: {
-      SHIP_ORDER: { userId: t.string(), items: t.array(t.any()) },
+      SHIP_ORDER: { userId: t.string(), items: t.array(t.object()) },
     },
   },
 

@@ -32,7 +32,7 @@ import { createModule, createSystem, t, type ModuleSchema } from '@directive-run
 const schema = {
   facts: {
     userId: t.number(),
-    user: t.any<{ id: number; name: string } | null>(),
+    user: t.object<{ id: number; name: string } | null>(),
   },
   derivations: {
     isLoggedIn: t.boolean(),
@@ -166,7 +166,6 @@ Available builders:
 - `t.literal(value)` &ndash; Exact value matching
 - `t.nullable(type)` &ndash; `T | null`
 - `t.optional(type)` &ndash; `T | undefined`
-- `t.any<T>()` &ndash; Escape hatch (bypasses validation, use sparingly)
 
 #### Pattern 2: Type Assertions (`{} as {}`)
 
@@ -774,7 +773,9 @@ await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
 // In API routes - no Directive runtime needed
 async function checkEntitlements(userId: string) {
   const cached = await redis.get(`entitlements:${userId}`);
-  if (!cached) throw new UnauthorizedError('Session expired');
+  if (!cached) {
+    throw new UnauthorizedError('Session expired');
+  }
 
   const snapshot = JSON.parse(cached);
 
@@ -962,7 +963,7 @@ const useStore = create((set) => ({
 import { createModule, createSystem, t, type ModuleSchema } from '@directive-run/core';
 
 const schema = {
-  facts: { count: t.number(), userId: t.number(), user: t.any<User | null>() },
+  facts: { count: t.number(), userId: t.number(), user: t.object<User | null>() },
   derivations: {},
   events: { increment: {} },
   requirements: { FETCH_USER: {} },
@@ -1026,7 +1027,7 @@ const userSlice = createSlice({
 
 // Directive equivalent - loading/error states are automatic
 const schema = {
-  facts: { userId: t.number(), user: t.any<User | null>() },
+  facts: { userId: t.number(), user: t.object<User | null>() },
   derivations: {},
   events: {},
   requirements: { FETCH_USER: {} },

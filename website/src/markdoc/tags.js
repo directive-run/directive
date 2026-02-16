@@ -1,9 +1,14 @@
 import { Callout } from '@/components/Callout'
+import { ComparisonTable } from '@/components/ComparisonTable'
 import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 
 const tags = {
+  'comparison-table': {
+    render: ComparisonTable,
+    selfClosing: true,
+  },
   'constraint-flow-diagram': {
     render: ConstraintFlowDiagram,
     selfClosing: true,

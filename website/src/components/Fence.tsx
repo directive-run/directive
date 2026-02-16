@@ -2,22 +2,7 @@
 
 import { Fragment, memo, useCallback, useState } from 'react'
 import { Highlight } from 'prism-react-renderer'
-
-const CopyIcon = memo(function CopyIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-  )
-})
-
-const CheckIcon = memo(function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  )
-})
+import { Check, Copy } from '@phosphor-icons/react'
 
 const CopyButton = memo(function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
@@ -40,12 +25,12 @@ const CopyButton = memo(function CopyButton({ code }: { code: string }) {
     >
       {copied ? (
         <span className="flex items-center gap-1">
-          <CheckIcon className="h-3 w-3" />
+          <Check className="h-3 w-3" weight="bold" />
           Copied
         </span>
       ) : (
         <span className="flex items-center gap-1">
-          <CopyIcon className="h-3 w-3" />
+          <Copy className="h-3 w-3" />
           Copy
         </span>
       )}

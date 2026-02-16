@@ -40,6 +40,16 @@ export const posts: BlogPost[] = [
     date: '2026-02-16',
     author: 'jason-comes',
     categories: ['Tutorial', 'Architecture'],
+    featured: true,
+  },
+  {
+    slug: 'directive-on-the-server',
+    title: 'Directive on the Server',
+    description:
+      'Distributable snapshots, signed verification, audit trails, and GDPR compliance \u2013 Directive runs on Node.js without React.',
+    date: '2026-02-18',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Tutorial'],
     featured: false,
   },
   {
@@ -180,6 +190,16 @@ export const posts: BlogPost[] = [
     date: '2026-05-11',
     author: 'directive-labs',
     categories: ['Architecture', 'Engineering'],
+    featured: false,
+  },
+  {
+    slug: 'ab-testing-with-directive',
+    title: 'A/B Testing with Directive',
+    description:
+      'Build a complete A/B testing engine using constraints, resolvers, and effects. Deterministic assignment, exposure tracking, and variant gating \u2013 no third-party service required.',
+    date: '2026-05-18',
+    author: 'directive-labs',
+    categories: ['Tutorial', 'Architecture'],
     featured: false,
   },
 ]

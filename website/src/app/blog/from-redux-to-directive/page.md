@@ -48,7 +48,9 @@ export const login = createAsyncThunk(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
       });
-      if (!response.ok) throw new Error("Invalid credentials");
+      if (!response.ok) {
+        throw new Error("Invalid credentials");
+      }
 
       return await response.json();
     } catch (err) {
@@ -66,7 +68,9 @@ export const checkSession = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await fetch("/api/auth/session");
-      if (!response.ok) throw new Error("Session expired");
+      if (!response.ok) {
+        throw new Error("Session expired");
+      }
 
       return await response.json();
     } catch (err) {
@@ -233,7 +237,10 @@ const auth = createModule("auth", {
       resolve: async (_req, context) => {
         try {
           const response = await fetch("/api/auth/session");
-          if (!response.ok) throw new Error("Session expired");
+          if (!response.ok) {
+            throw new Error("Session expired");
+          }
+
           const data = await response.json();
           context.facts.user = data.user;
           context.facts.token = data.token;
@@ -267,7 +274,10 @@ async function login(email: string, password: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (!response.ok) throw new Error("Invalid credentials");
+    if (!response.ok) {
+      throw new Error("Invalid credentials");
+    }
+
     const data = await response.json();
     system.facts.user = data.user;
     system.facts.token = data.token;

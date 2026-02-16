@@ -78,7 +78,10 @@ const auth = createModule('auth', {
             password: req.password,
           }),
         });
-        if (!res.ok) throw new Error('Login failed');
+        if (!res.ok) {
+          throw new Error('Login failed');
+        }
+
         const data = await res.json();
         context.facts.token = data.token;
         context.facts.refreshToken = data.refreshToken;
@@ -115,7 +118,10 @@ const auth = createModule('auth', {
         const res = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${req.token}` },
         });
-        if (!res.ok) throw new Error('Failed to fetch user');
+        if (!res.ok) {
+          throw new Error('Failed to fetch user');
+        }
+
         context.facts.user = await res.json();
       },
     },

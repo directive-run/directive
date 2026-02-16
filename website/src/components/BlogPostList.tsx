@@ -55,7 +55,7 @@ export function BlogPostList() {
             className={`shrink-0 cursor-pointer rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               !activeCategory
                 ? 'bg-brand-primary text-white dark:bg-brand-primary-400 dark:text-slate-900'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-brand-surface-raised dark:text-slate-400 dark:hover:bg-slate-700'
             }`}
           >
             All
@@ -67,7 +67,7 @@ export function BlogPostList() {
               className={`shrink-0 cursor-pointer rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 activeCategory === cat
                   ? 'bg-brand-primary text-white dark:bg-brand-primary-400 dark:text-slate-900'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-brand-surface-raised dark:text-slate-400 dark:hover:bg-slate-700'
               }`}
             >
               {cat}

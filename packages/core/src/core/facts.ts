@@ -49,9 +49,6 @@ function safeStringify(value: unknown, maxLength = 100): string {
 	}
 }
 
-/** Track types that have already warned to avoid spam */
-const warnedTypes = new Set<string>();
-
 /** Create a schema type builder with optional type name */
 function createSchemaType<T>(
 	validators: Array<(v: T) => boolean> = [],
@@ -393,31 +390,6 @@ export const t = {
 		return createChainableObject([
 			(v) => typeof v === "object" && v !== null && !Array.isArray(v),
 		]);
-	},
-
-	/**
-	 * Create an any-typed schema (bypasses all validation).
-	 *
-	 * @deprecated Use specific types (`t.string()`, `t.object()`, `t.union()`) for type safety.
-	 * This bypasses all runtime validation.
-	 *
-	 * @example
-	 * ```typescript
-	 * // Use when type is complex or external
-	 * schema: {
-	 *   externalApiResponse: t.any<ExternalAPIResponse>(),
-	 * }
-	 * ```
-	 */
-	any<T>() {
-		if (process.env.NODE_ENV !== "production" && !warnedTypes.has("any")) {
-			warnedTypes.add("any");
-			console.warn(
-				"[Directive] t.any() bypasses runtime validation. " +
-				"Consider using t.object<T>(), t.union(), or a Zod schema for type safety."
-			);
-		}
-		return createSchemaType<T>([], "any");
 	},
 
 	/**

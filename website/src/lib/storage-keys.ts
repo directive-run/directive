@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   FIRST_VISIT: 'directive-brand-first-visit',
   ONBOARDED: 'directive-brand-onboarded',
   FONT_SIZE: 'directive-brand-font-size',
+  EXPERIMENTS: 'directive-labs-experiments',
 } as const
 
 export function safeGetItem(key: string): string | null {

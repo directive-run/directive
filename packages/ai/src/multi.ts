@@ -528,7 +528,10 @@ export function createMultiAgentOrchestrator(
       const promises = pattern.agents.map((agentId) =>
         runSingleAgent(agentId, _input, { signal: controller.signal }).catch(
           (error) => {
-            if (pattern.minSuccess === undefined) throw error;
+            if (pattern.minSuccess === undefined) {
+              throw error;
+            }
+
             return null;
           }
         )
@@ -575,7 +578,9 @@ export function createMultiAgentOrchestrator(
           }
         }
       } catch (error) {
-        if (!pattern.continueOnError) throw error;
+        if (!pattern.continueOnError) {
+          throw error;
+        }
       }
     }
 

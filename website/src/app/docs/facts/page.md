@@ -54,7 +54,6 @@ The `t` object provides type builders for schema definitions. All builders retur
 | `t.literal(v)` | exact value | `t.literal("admin")`, `t.literal(42)` |
 | `t.union(...)` | union of types | `t.union(t.string(), t.number())` |
 | `t.record(v)` | `Record<string, V>` | `t.record(t.number())` |
-| `t.any<T>()` | `T` (no validation) | `t.any<ExternalResponse>()` |
 
 ### Common Modifiers
 
