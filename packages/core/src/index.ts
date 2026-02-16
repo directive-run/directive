@@ -30,6 +30,7 @@ export type {
 	EventPayloadSchema,
 	InferFacts,
 	InferDerivations,
+	InferSelectorState,
 	InferEventPayloadFromSchema,
 	InferEvents,
 	InferRequirementPayloadFromSchema,

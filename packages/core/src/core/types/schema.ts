@@ -147,6 +147,9 @@ export type InferDerivations<M extends ModuleSchema> = {
 	readonly [K in keyof GetDerivations<M>]: InferSchemaType<GetDerivations<M>[K]>;
 };
 
+/** Combined facts + derivations — matches the useSelector proxy at runtime. */
+export type InferSelectorState<M extends ModuleSchema> = InferFacts<M> & InferDerivations<M>;
+
 /**
  * Infer event payload type from an event payload schema.
  */
