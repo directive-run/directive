@@ -783,7 +783,7 @@ export function createDirectiveSelector<R>(
 	host: ReactiveControllerHost,
 	// biome-ignore lint/suspicious/noExplicitAny: System type varies
 	system: SingleModuleSystem<any>,
-	selector: (facts: Record<string, unknown>) => R,
+	selector: (state: Record<string, unknown>) => R,
 	equalityFn: (a: R, b: R) => boolean = defaultEquality,
 	options?: { autoTrack?: boolean },
 ): DirectiveSelectorController<R> {
