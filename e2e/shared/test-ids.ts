@@ -12,6 +12,9 @@ export const TestIds = {
 
   // useSelector
   selectorResult: "selector-result",
+  selectorDefault: "selector-default",
+  selectorRefDefault: "selector-ref-default",
+  selectorRefLive: "selector-ref-live",
 
   // useDispatch
   dispatchResult: "dispatch-result",

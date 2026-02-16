@@ -143,7 +143,7 @@ function ContactForm() {
   }, [events])
 
   const inputClass =
-    'block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-brand-primary-400 dark:focus:ring-brand-primary-400/20'
+    'block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-brand-primary-400 dark:focus:ring-brand-primary-400/20'
 
   if (status === 'success') {
     return (
@@ -209,7 +209,7 @@ function ContactForm() {
           value={subject}
           onChange={handleChange('subject')}
           onBlur={handleBlur('subject')}
-          className={inputClass}
+          className={inputClass + ' appearance-none bg-[length:16px_16px] bg-[position:right_12px_center] bg-no-repeat bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20fill%3D%27%2394a3b8%27%3E%3Cpath%20d%3D%27M4.22%206.22a.75.75%200%20011.06%200L8%208.94l2.72-2.72a.75.75%200%20111.06%201.06l-3.25%203.25a.75.75%200%2001-1.06%200L4.22%207.28a.75.75%200%20010-1.06z%27/%3E%3C/svg%3E")] pr-10'}
         >
           {SUBJECTS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -236,11 +236,11 @@ function ContactForm() {
         </div>
       </Field>
 
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center justify-end gap-3 pt-2">
         <button
           type="submit"
           disabled={!canSubmit}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-primary-600 dark:hover:bg-brand-primary-500"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-primary-600 dark:hover:bg-brand-primary-500"
         >
           {status === 'submitting' ? (
             <>
@@ -250,7 +250,7 @@ function ContactForm() {
           ) : (
             <>
               <Envelope weight="bold" className="h-4 w-4" />
-              Send Message
+              Reach Out
             </>
           )}
         </button>
@@ -287,7 +287,7 @@ export default function ContactPage() {
         </p>
 
         {/* Form */}
-        <div className="mt-10 rounded-2xl border border-slate-200 bg-white/50 p-6 shadow-sm sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50/60 p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
           <ContactForm />
         </div>
 

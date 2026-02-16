@@ -1,11 +1,12 @@
-import { type Metadata } from 'next'
-
+import { buildPageMetadata } from '@/lib/metadata'
 import { BrandGuide } from '@/components/BrandGuide'
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: 'Brand Guide',
   description: 'Brand identity options and color system for Directive',
-}
+  path: '/docs/branding',
+  section: 'Docs',
+})
 
 export default function BrandGuidePage() {
   return (

@@ -1,4 +1,6 @@
-import type { Metadata } from 'next'
+import {
+  buildPageMetadata,
+} from '@/lib/metadata'
 import {
   ArrowRight,
   Coffee,
@@ -10,11 +12,12 @@ import {
   Terminal,
 } from '@phosphor-icons/react/dist/ssr'
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: 'Support — Directive',
   description:
     'Support the Directive project through sponsorship, donations, or by starring us on GitHub.',
-}
+  path: '/support',
+})
 
 // Inline SVG logos for fictional sponsors
 function AxiomLogo({ className }: { className?: string }) {

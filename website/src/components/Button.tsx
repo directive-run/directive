@@ -3,9 +3,9 @@ import clsx from 'clsx'
 
 const variantStyles = {
   primary:
-    'rounded-full bg-brand-primary-300 py-3 px-6 sm:py-2 sm:px-4 text-sm font-semibold text-slate-900 hover:bg-brand-primary-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary-300/50 active:bg-brand-primary-500',
+    'cursor-pointer rounded-full bg-brand-primary-300 py-3 px-6 sm:py-2 sm:px-4 text-sm font-semibold text-slate-900 hover:bg-brand-primary-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary-300/50 active:bg-brand-primary-500',
   secondary:
-    'rounded-full bg-slate-800 py-3 px-6 sm:py-2 sm:px-4 text-sm font-medium text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 active:text-slate-400',
+    'cursor-pointer rounded-full bg-slate-800 py-3 px-6 sm:py-2 sm:px-4 text-sm font-medium text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 active:text-slate-400',
 }
 
 type ButtonProps = {

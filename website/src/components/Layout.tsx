@@ -9,6 +9,7 @@ import { Heart } from '@phosphor-icons/react'
 
 import { AIChatWidget } from '@/components/AIChatWidget'
 import { Footer } from '@/components/Footer'
+import { Newsletter } from '@/components/Newsletter'
 import { Hero } from '@/components/Hero'
 import { Logo, Logomark } from '@/components/Logo'
 import { MobileNavigation } from '@/components/MobileNavigation'
@@ -111,7 +112,7 @@ function Header() {
   return (
     <header
       className={clsx(
-        'sticky top-0 z-50 flex flex-none flex-wrap items-center justify-between bg-white px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none',
+        'sticky top-0 z-50 flex flex-none items-center justify-between bg-white px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none',
         isScrolled
           ? 'dark:bg-slate-900/95 dark:backdrop-blur-sm dark:[@supports(backdrop-filter:blur(0))]:bg-slate-900/75'
           : 'dark:bg-transparent',
@@ -127,7 +128,7 @@ function Header() {
         </Link>
       </div>
       {canUseSearch && (
-        <div className="-my-5 mr-6 sm:mr-8 md:mr-0">
+        <div className="-my-5 mr-2 min-w-0 md:mr-6 md:min-w-[190px] md:flex-1 lg:mr-8">
           <Search />
         </div>
       )}
@@ -155,11 +156,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   let isHomePage = pathname === '/'
   let canUseVersionSelector = useCanUseVersionSelector()
   let canUseChat = useCanUseChat()
-  let isStandalonePage =
-    pathname.startsWith('/blog') ||
-    pathname.startsWith('/support') ||
-    pathname.startsWith('/about') ||
-    pathname.startsWith('/contact')
+  let isDocsPage = pathname === '/' || pathname.startsWith('/docs')
 
   return (
     <div className="flex w-full flex-col">
@@ -168,11 +165,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {isHomePage && <Hero />}
 
-      {isStandalonePage ? (
-        <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto px-4 sm:px-6 lg:px-8 xl:px-12">
-          {children}
-        </div>
-      ) : (
+      {isDocsPage ? (
         <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto justify-center sm:px-2 lg:px-8 xl:px-12">
           <div className="hidden lg:relative lg:block lg:flex-none">
             <div className="absolute inset-y-0 right-0 w-[50vw] bg-slate-50 dark:hidden" />
@@ -201,7 +194,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           {children}
         </div>
+      ) : (
+        <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto px-4 sm:px-6 lg:px-8 xl:px-12">
+          {children}
+        </div>
       )}
+      <Newsletter />
       <Footer />
       {canUseChat && <AIChatWidget />}
     </div>
