@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
 import { STORAGE_KEYS, safeGetItem, safeSetItem } from '@/lib/storage-keys'
+import { EXPERIMENT_CHANGE_EVENT } from '@/lib/useExperiment'
 
 interface Variant {
   id: string
@@ -24,18 +25,8 @@ const EXPERIMENTS: Experiment[] = [
     name: 'Theme Icons',
     description: 'Which icon style should the theme selector use?',
     variants: [
-      { id: 'custom-svg', label: 'Custom SVG', description: 'Hand-drawn SVG icons (current)' },
-      { id: 'phosphor', label: 'Phosphor Duotone', description: 'Phosphor icon library with duotone weight' },
-    ],
-  },
-  {
-    id: 'cta-color',
-    name: 'CTA Button Color',
-    description: 'Which color drives more engagement on call-to-action buttons?',
-    variants: [
-      { id: 'brand', label: 'Brand Primary', description: 'Uses the current brand color' },
-      { id: 'green', label: 'Green', description: 'Emerald green for positive action' },
-      { id: 'orange', label: 'Orange', description: 'High-energy warm tone' },
+      { id: 'custom-svg', label: 'Custom SVG', description: 'Hand-drawn SVG icons' },
+      { id: 'phosphor', label: 'Phosphor Duotone', description: 'Phosphor icon library with duotone weight (default)' },
     ],
   },
 ]
@@ -102,6 +93,7 @@ export const LabsExperimentPanel = memo(function LabsExperimentPanel({
       setAssignments((prev) => {
         const next = { ...prev, [experimentId]: variantId }
         safeSetItem(STORAGE_KEYS.EXPERIMENTS, JSON.stringify(next))
+        window.dispatchEvent(new CustomEvent(EXPERIMENT_CHANGE_EVENT))
 
         return next
       })
@@ -171,9 +163,6 @@ export const LabsExperimentPanel = memo(function LabsExperimentPanel({
             </p>
             {experiment.id === 'theme-icons' && (
               <ThemeIconPreview activeVariant={assignments[experiment.id]} />
-            )}
-            {experiment.id === 'cta-color' && (
-              <CtaColorPreview activeVariant={assignments[experiment.id]} />
             )}
           </div>
         </div>
@@ -254,38 +243,3 @@ function ThemeIconPreview({ activeVariant }: { activeVariant: string }) {
   )
 }
 
-const CTA_VARIANTS = [
-  { id: 'brand', label: 'Brand Primary', classes: 'bg-brand-primary hover:bg-brand-primary-600 text-white' },
-  { id: 'green', label: 'Green', classes: 'bg-emerald-500 hover:bg-emerald-600 text-white' },
-  { id: 'orange', label: 'Orange', classes: 'bg-orange-500 hover:bg-orange-600 text-white' },
-] as const
-
-function CtaColorPreview({ activeVariant }: { activeVariant: string }) {
-  return (
-    <div className="flex flex-wrap items-center gap-4">
-      {CTA_VARIANTS.map((variant) => (
-        <div
-          key={variant.id}
-          className={clsx(
-            'flex flex-col items-center gap-2 rounded-xl p-3 transition',
-            activeVariant === variant.id
-              ? 'ring-2 ring-brand-primary'
-              : 'opacity-50',
-          )}
-        >
-          <span
-            role="presentation"
-            aria-hidden="true"
-            className={clsx(
-              'rounded-lg px-6 py-2.5 text-sm font-semibold',
-              variant.classes,
-            )}
-          >
-            Get Started
-          </span>
-          <span className="text-xs text-slate-500 dark:text-slate-400">{variant.label}</span>
-        </div>
-      ))}
-    </div>
-  )
-}

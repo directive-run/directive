@@ -30,17 +30,17 @@ export default function LabsPage() {
 
       <div className="space-y-12">
         {/* Section 1: Theme Customization */}
-        <section aria-label="Theme customization" className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
+        <section aria-label="Theme customization" className="rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
           <LabsThemePanel />
         </section>
 
         {/* Section 2 + 3: Experiments and Constraint Viz */}
         <div className="grid gap-12 lg:grid-cols-5">
-          <section aria-label="A/B experiments" className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 lg:col-span-3 dark:border-slate-700 dark:bg-slate-800/50">
+          <section aria-label="A/B experiments" className="rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 lg:col-span-3 dark:border-slate-700 dark:bg-slate-800/50">
             <LabsExperimentPanel onExperimentChange={handleExperimentChange} />
           </section>
 
-          <section aria-label="Constraint flow visualization" className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <section aria-label="Constraint flow visualization" className="rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800/50">
             <LabsConstraintViz lastEvent={lastEvent} />
           </section>
         </div>

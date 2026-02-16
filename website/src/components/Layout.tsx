@@ -23,7 +23,6 @@ import {
   useCanUseChat,
   useCanUseSearch,
   useCanUseThemeSelector,
-  useCanUseBrandSwitcher,
   useCanUseVersionSelector,
   useCanUseShareButton,
 } from '@/lib/feature-flags'
@@ -95,7 +94,6 @@ function Header() {
   let [isScrolled, setIsScrolled] = useState(false)
   let canUseSearch = useCanUseSearch()
   let canUseThemeSelector = useCanUseThemeSelector()
-  let canUseBrandSwitcher = useCanUseBrandSwitcher()
   let canUseShareButton = useCanUseShareButton()
 
   useEffect(() => {
@@ -136,12 +134,11 @@ function Header() {
         <div className="hidden items-center gap-8 sm:gap-10 md:flex">
           <HeaderLink href="/docs/quick-start">Docs</HeaderLink>
           <HeaderLink href="/blog">Blog</HeaderLink>
-          <HeaderLink href="/labs">Labs</HeaderLink>
           <SupportLink />
         </div>
         <div className="flex items-center gap-4">
           {canUseThemeSelector && <ThemeToggle />}
-          {canUseBrandSwitcher && <BrandPresetSwitcher className="relative z-10" />}
+          <BrandPresetSwitcher className="relative z-10" />
           {canUseShareButton && <ShareButton />}
           <Link href="https://github.com/directive-run/directive" className="group flex h-10 w-10 items-center justify-center sm:h-6 sm:w-6" aria-label="GitHub">
             <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />

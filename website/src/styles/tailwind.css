@@ -48,6 +48,7 @@
   --brand-surface: color-mix(in oklab, white 88%, var(--brand-primary-200));
   --brand-surface-raised: color-mix(in oklab, white 75%, var(--brand-primary-100));
   --brand-surface-inset: var(--brand-surface);
+  --brand-surface-card: color-mix(in oklab, white 92%, var(--brand-primary-100));
   --brand-code-bg: #0f172a;
 }
 
@@ -55,6 +56,7 @@
   --brand-surface: color-mix(in oklab, #0f172a 95%, var(--brand-primary-400));
   --brand-surface-raised: color-mix(in oklab, #1e293b 90%, var(--brand-primary-400));
   --brand-surface-inset: var(--brand-surface);
+  --brand-surface-card: color-mix(in oklab, #1e293b 85%, var(--brand-primary-400));
   --brand-code-bg: color-mix(in oklab, #151d2e 92%, var(--brand-primary-400));
 }
 
@@ -123,6 +125,7 @@
   --color-brand-surface: var(--brand-surface);
   --color-brand-surface-raised: var(--brand-surface-raised);
   --color-brand-surface-inset: var(--brand-surface-inset);
+  --color-brand-surface-card: var(--brand-surface-card);
   --color-brand-code-bg: var(--brand-code-bg);
 }
 

@@ -11,6 +11,7 @@ import {
   Star,
   Terminal,
 } from '@phosphor-icons/react/dist/ssr'
+import { CardLink } from '@/components/CardLink'
 
 export const metadata = buildPageMetadata({
   title: 'Support — Directive',
@@ -243,7 +244,7 @@ export default function SupportPage() {
                   GitHub Sponsors
                 </h3>
                 <p className="mt-0.5 text-sm text-white/80">
-                  Recurring monthly support
+                  Become a backer &ndash; cancel anytime
                 </p>
               </div>
             </div>
@@ -252,48 +253,48 @@ export default function SupportPage() {
 
           {/* Secondary: Buy Me a Coffee + Ko-fi */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <a
+            <CardLink
               href="https://buymeacoffee.com/sizls"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group rounded-2xl bg-brand-primary-50/30 px-6 py-5 shadow-sm ring-1 ring-brand-primary-200/40 transition-all hover:bg-brand-primary-50/60 hover:shadow-md dark:bg-slate-800/80 dark:ring-brand-primary-400/10 dark:hover:bg-slate-700/80 dark:hover:ring-brand-primary-400/20"
+              external
+              rounded="rounded-2xl"
+              className="px-6 py-6"
             >
               <Coffee
                 weight="duotone"
-                className="h-8 w-8 text-slate-400 group-hover:text-brand-primary dark:text-slate-500 dark:group-hover:text-brand-primary-400"
+                className="h-8 w-8 text-brand-primary dark:text-brand-primary-400"
               />
               <h3 className="mt-3 font-display text-lg font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">
                 Buy Me a Coffee
               </h3>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                One-time support
+                Fuel a late-night coding session
               </p>
-            </a>
-            <a
+            </CardLink>
+            <CardLink
               href="https://ko-fi.com/sizls"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group rounded-2xl bg-brand-primary-50/30 px-6 py-5 shadow-sm ring-1 ring-brand-primary-200/40 transition-all hover:bg-brand-primary-50/60 hover:shadow-md dark:bg-slate-800/80 dark:ring-brand-primary-400/10 dark:hover:bg-slate-700/80 dark:hover:ring-brand-primary-400/20"
+              external
+              rounded="rounded-2xl"
+              className="px-6 py-6"
             >
               <Gift
                 weight="duotone"
-                className="h-8 w-8 text-slate-400 group-hover:text-brand-primary dark:text-slate-500 dark:group-hover:text-brand-primary-400"
+                className="h-8 w-8 text-brand-primary dark:text-brand-primary-400"
               />
               <h3 className="mt-3 font-display text-lg font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">
                 Ko-fi
               </h3>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                One-time support
+                Drop a tip, make our day
               </p>
-            </a>
+            </CardLink>
           </div>
 
           {/* Tertiary: Star on GitHub */}
-          <a
+          <CardLink
             href="https://github.com/directive-run/directive"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center justify-between rounded-2xl border border-slate-200 px-6 py-5 transition-colors hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
+            external
+            rounded="rounded-2xl"
+            className="flex items-center justify-between px-6 py-6"
           >
             <div className="flex items-center gap-4">
               <Star weight="fill" className="h-8 w-8 shrink-0 text-amber-400" />
@@ -302,12 +303,12 @@ export default function SupportPage() {
                   Star on GitHub
                 </h3>
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                  Free — help us reach more developers
+                  Free &ndash; costs nothing, means everything
                 </p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-0.5" />
-          </a>
+          </CardLink>
         </div>
 
         {/* Sponsors */}

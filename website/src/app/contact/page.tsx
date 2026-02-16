@@ -9,11 +9,12 @@ import {
   ChatCircle,
   CheckCircle,
   CircleNotch,
-  Envelope,
+  PaperPlaneTilt,
   GithubLogo,
   Warning,
   XCircle,
 } from '@phosphor-icons/react'
+import { CardLink } from '@/components/CardLink'
 
 import {
   useContactField,
@@ -250,7 +251,7 @@ function ContactForm() {
             </>
           ) : (
             <>
-              <Envelope weight="bold" className="h-4 w-4" />
+              <PaperPlaneTilt weight="bold" className="h-4 w-4" />
               Reach Out
             </>
           )}
@@ -311,11 +312,10 @@ export default function ContactPage() {
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <a
+            <CardLink
               href="https://github.com/directive-run/directive/discussions"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
+              external
+              className="flex items-center gap-3 px-5 py-4"
             >
               <GithubLogo
                 weight="duotone"
@@ -329,13 +329,12 @@ export default function ContactPage() {
                   Ask questions &amp; share ideas
                 </p>
               </div>
-            </a>
+            </CardLink>
 
-            <a
+            <CardLink
               href="https://x.com/directive_run"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
+              external
+              className="flex items-center gap-3 px-5 py-4"
             >
               <XIcon className="h-7 w-7 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
               <div>
@@ -343,16 +342,15 @@ export default function ContactPage() {
                   X / Twitter
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Follow for updates
+                  Follow for updates &amp; hot takes
                 </p>
               </div>
-            </a>
+            </CardLink>
 
-            <a
+            <CardLink
               href="https://bsky.app/profile/directive.run"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
+              external
+              className="flex items-center gap-3 px-5 py-4"
             >
               <BlueSkyIcon className="h-7 w-7 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
               <div>
@@ -360,10 +358,10 @@ export default function ContactPage() {
                   Bluesky
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Join the conversation
+                  Join the conversation &amp; vibe
                 </p>
               </div>
-            </a>
+            </CardLink>
           </div>
         </div>
 
