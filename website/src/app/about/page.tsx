@@ -234,7 +234,7 @@ export default function AboutPage() {
           </div>
 
           {/* Engineering Standards */}
-          <div className="mt-14 rounded-xl border border-slate-200/60 bg-slate-50/50 px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
+          <div className="mt-10 rounded-xl border border-slate-200/60 bg-brand-surface-card px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
             <div className="flex items-center gap-3">
               <ShieldCheck
                 weight="duotone"
@@ -250,7 +250,7 @@ export default function AboutPage() {
               and effects system are continuously stress-tested.
             </p>
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+              <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
                 <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
                   1,400+
                 </p>
@@ -258,7 +258,7 @@ export default function AboutPage() {
                   tests passing
                 </p>
               </div>
-              <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+              <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
                 <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
                   20+
                 </p>
@@ -266,7 +266,7 @@ export default function AboutPage() {
                   hardening fixes shipped
                 </p>
               </div>
-              <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+              <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
                 <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
                   100+
                 </p>
@@ -282,32 +282,6 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* Next Steps */}
-        <div className="mt-20 rounded-xl border border-slate-200/60 bg-slate-50/50 px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
-          <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-            Next Steps
-          </h2>
-          <ul className="mt-4 space-y-2">
-            {[
-              { href: '/docs/quick-start', label: 'Quick Start', description: 'Build your first module in 5 minutes' },
-              { href: '/philosophy', label: 'Philosophy', description: 'The design principles behind the constraint model' },
-              { href: '/support', label: 'Support', description: 'Star, sponsor, or contribute' },
-              { href: '/contact', label: 'Get in Touch', description: 'Bug reports, features, partnerships' },
-            ].map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="group flex items-center gap-2 text-base text-brand-primary hover:underline dark:text-brand-primary-400"
-                >
-                  <span className="font-semibold">{link.label}</span>
-                  <span className="text-slate-400 dark:text-slate-500">
-                    &ndash; {link.description}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
 
         {/* Directive Callout */}
         <div className="mt-6">
