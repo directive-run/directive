@@ -14,14 +14,11 @@ import blurIndigoImage from '@/images/blur-indigo.png'
 export function Newsletter() {
   const system = useDirectiveRef(newsletter)
 
-  const email = useSelector(system, (s) => s.email, '')
-  const status = useSelector(system, (s) => s.status, 'idle')
-  const errorMessage = useSelector(system, (s) => s.errorMessage, '')
-  // Derivations are accessible through the selector proxy at runtime but not yet typed
-  // @ts-expect-error -- useSelector proxy exposes derivations; type fix tracked separately
-  const emailError = useSelector(system, (s) => s.emailError, '')
-  // @ts-expect-error -- useSelector proxy exposes derivations; type fix tracked separately
-  const canSubmit = useSelector(system, (s) => s.canSubmit, false)
+  const email = useSelector(system, (state) => state.email, '')
+  const status = useSelector(system, (state) => state.status, 'idle')
+  const errorMessage = useSelector(system, (state) => state.errorMessage, '')
+  const emailError = useSelector(system, (state) => state.emailError, '')
+  const canSubmit = useSelector(system, (state) => state.canSubmit, false)
 
   const events = useEvents(system)
 

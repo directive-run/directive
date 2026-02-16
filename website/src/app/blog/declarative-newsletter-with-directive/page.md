@@ -11,17 +11,63 @@ categories: [Tutorial, Architecture]
 
 In [Declarative Forms with Directive](/blog/declarative-forms-with-directive), we listed "single-field newsletter signup" under "not a good fit." One input, one submit. `useState` and `fetch` are fine.
 
-Here's the code we were defending:
+Here's what the full imperative version looks like with validation, rate limiting, auto-reset, and logging:
 
 ```typescript
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RATE_LIMIT_MS = 60_000;
+const RESET_DELAY_MS = 8_000;
+
 function Newsletter() {
   const [email, setEmail] = useState("");
+  const [touched, setTouched] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const lastSubmittedAt = useRef(0);
+  const prevStatus = useRef(status);
+
+  const emailError = touched
+    ? !email.trim()
+      ? "Email is required"
+      : !EMAIL_REGEX.test(email)
+        ? "Enter a valid email address"
+        : ""
+    : "";
+
+  const isValid = EMAIL_REGEX.test(email);
+  const isRateLimited = lastSubmittedAt.current > 0
+    && Date.now() - lastSubmittedAt.current < RATE_LIMIT_MS;
+  const canSubmit = isValid && status === "idle" && !isRateLimited;
+
+  // Auto-reset after success
+  useEffect(() => {
+    if (status !== "success") {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setEmail("");
+      setTouched(false);
+      setStatus("idle");
+      setErrorMessage("");
+    }, RESET_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  // Dev logging
+  useEffect(() => {
+    if (prevStatus.current !== status) {
+      console.log(`[newsletter] status: ${prevStatus.current} → ${status}`);
+      prevStatus.current = status;
+    }
+  }, [status]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) { return; }
+    setTouched(true);
+    if (!canSubmit) {
+      return;
+    }
 
     setStatus("submitting");
     setErrorMessage("");
@@ -33,58 +79,55 @@ function Newsletter() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         setStatus("error");
         setErrorMessage(data.error || "Something went wrong. Try again.");
+
         return;
       }
 
       setStatus("success");
-      setEmail("");
+      lastSubmittedAt.current = Date.now();
     } catch {
       setStatus("error");
-      setErrorMessage("Something went wrong. Try again.");
+      setErrorMessage("Network error. Check your connection and try again.");
     }
   }
 
   return (
     <form onSubmit={handleSubmit}>
-      <input value={email} onChange={(e) => setEmail(e.target.value)} />
-      <button disabled={status === "submitting"}>Subscribe</button>
-      {status === "error" && <p>{errorMessage}</p>}
-      {status === "success" && <p>You're in!</p>}
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        onBlur={() => setTouched(true)}
+        placeholder="Enter your email"
+      />
+      <button disabled={!canSubmit}>
+        {status === "submitting" ? "Subscribing..." : "Subscribe"}
+      </button>
+      {emailError ? (
+        <p className="error">{emailError}</p>
+      ) : status === "error" && errorMessage ? (
+        <p className="error">{errorMessage}</p>
+      ) : (
+        <p className="privacy">We'll never share your email.</p>
+      )}
+      {status === "success" && <p className="success">You're in!</p>}
     </form>
   );
 }
 ```
 
-Three `useState` calls. A `handleSubmit` that manages status transitions manually. It works. Ship it.
-
-But look at what's missing.
-
----
-
-## The hidden complexity
-
-1. **No validation.** The `required` attribute on the input stops empty submissions at the browser level, but there's no email format check, no error message for invalid input, and nothing happens on blur.
-
-2. **No rate limiting.** A user can hammer the subscribe button and fire a POST on every click. The only guard is `disabled={status === "submitting"}` &ndash; which re-enables the moment the request completes.
-
-3. **No auto-reset.** After success, the "You're in!" message stays forever. The user sees a stale success state if they scroll back up to the footer.
-
-4. **No logging.** Status transitions are invisible. In development, you'd add a `console.log` somewhere and remove it later. Maybe.
-
-Adding these four behaviors imperatively means two `useEffect` hooks (one for the auto-reset timer, one to re-enable the button after a cooldown), a `useRef` for the last-submitted timestamp, timer cleanup in both effects, and email validation duplicated between an error message and the submit guard.
-
-For one field.
+Four `useState` calls, a `useRef`, two `useEffect` hooks, manual cleanup, derived values scattered across the function body, and a `handleSubmit` that manages status transitions by hand. It works. But read through it &ndash; can you tell at a glance what behaviors this component has?
 
 ---
 
 ## The module
 
-Here's the same signup with all four missing behaviors, built as a Directive module:
+Here's the same signup as a Directive module:
 
 ```typescript
 import { createModule, t } from "@directive-run/core";
@@ -256,11 +299,11 @@ import { newsletter } from "./module";
 function Newsletter() {
   const system = useDirectiveRef(newsletter);
 
-  const email = useSelector(system, (s) => s.email, "");
-  const status = useSelector(system, (s) => s.status, "idle");
-  const errorMessage = useSelector(system, (s) => s.errorMessage, "");
-  const emailError = useSelector(system, (s) => s.emailError, "");
-  const canSubmit = useSelector(system, (s) => s.canSubmit, false);
+  const email = useSelector(system, (state) => state.email, "");
+  const status = useSelector(system, (state) => state.status, "idle");
+  const errorMessage = useSelector(system, (state) => state.errorMessage, "");
+  const emailError = useSelector(system, (state) => state.emailError, "");
+  const canSubmit = useSelector(system, (state) => state.canSubmit, false);
 
   const events = useEvents(system);
 
@@ -318,23 +361,25 @@ function Newsletter() {
 
 ## What changed
 
-### Facts replace useState
+### Facts replace useState + useRef
 
-Five facts replace three `useState` calls. `touched` and `lastSubmittedAt` are new &ndash; they back validation and rate limiting that the imperative version didn't have. `touched` is a simple boolean (not `Record<string, boolean>` like the contact form) because there's only one field.
+Five facts replace four `useState` calls and a `useRef`. The imperative version needs `lastSubmittedAt` as a ref because it's not render-driving state &ndash; but the component still reads it during render for the `canSubmit` check. In Directive, it's just another fact.
 
-### Derivations replace inline checks
+### Derivations replace inline computations
 
-`emailError` is touch-gated &ndash; no error shows until the user blurs the input. `isValid` checks the email regex without caring about touch state. `canSubmit` composes `derive.isValid` with status and rate-limit checks. One chain, no duplication.
+The imperative version computes `emailError`, `isValid`, `isRateLimited`, and `canSubmit` as local variables scattered across the function body. They re-run on every render whether their inputs changed or not.
 
-The button uses `disabled={!canSubmit}` instead of `disabled={status === "submitting"}`. This single change adds rate limiting and validation gating for free.
+In the module, each is a named derivation with auto-tracked dependencies. `canSubmit` composes `derive.isValid` &ndash; if `isValid` hasn't changed, `canSubmit` doesn't recompute.
 
 ### Events replace scattered setState
 
-`updateEmail` sets the email. `touchEmail` sets touched. `submit` does both (so validation errors show on premature submit) and sets status to `"submitting"`. What *happens* when status becomes `"submitting"` is the constraint's job, not the event's.
+The imperative `handleSubmit` calls `setTouched(true)`, then checks `canSubmit`, then calls `setStatus("submitting")` and `setErrorMessage("")`. Four state updates across multiple lines.
 
-### Constraints add missing behavior
+The Directive event `submit` sets `facts.touched = true` and `facts.status = "submitting"`. What *happens* when status becomes `"submitting"` is the constraint's job, not the event's.
 
-The two constraints &ndash; `subscribe` and `resetAfterSuccess` &ndash; are the behaviors the imperative version was missing:
+### Constraints replace useEffect
+
+The imperative version needs two `useEffect` hooks &ndash; one for auto-reset with `setTimeout` + `clearTimeout`, one for logging with a `prevStatus` ref. Both require manual dependency arrays and cleanup.
 
 ```typescript
 // "When status is submitting, this must be resolved"
@@ -354,7 +399,9 @@ No `useEffect`. No dependency arrays. No cleanup functions. The constraint decla
 
 ### Resolvers handle async
 
-The `subscribe` resolver POSTs to `/api/newsletter` and updates status. The `resetAfterDelay` resolver waits 8 seconds and clears the form. If status changes before the delay completes, the resolver is cancelled automatically &ndash; no `clearTimeout` needed.
+The imperative version inlines `fetch` inside `handleSubmit` with a try/catch that manually sets four different state values across three branches. The `subscribe` resolver does the same work but the status transitions are the resolver's only job &ndash; no event handler orchestration.
+
+The `resetAfterDelay` resolver waits 8 seconds and clears the form. If status changes before the delay completes, the resolver is cancelled automatically &ndash; no `clearTimeout` needed.
 
 ---
 
@@ -364,29 +411,28 @@ The `subscribe` resolver POSTs to `/api/newsletter` and updates status. The `res
 |---|---|---|
 | Email state | `useState("")` | `email` fact |
 | Status state | `useState("idle")` | `status` fact |
+| Touched state | `useState(false)` | `touched` fact |
 | Error state | `useState("")` | `errorMessage` fact |
-| Validation | None (missing) | `emailError` + `isValid` derivations |
-| Submit guard | `status === "submitting"` only | `canSubmit` derivation (valid + idle + rate limit) |
-| Rate limiting | None (missing) | `lastSubmittedAt` fact + `canSubmit` derivation |
-| Auto-reset | None (missing) | `resetAfterSuccess` constraint + resolver |
-| Logging | None (missing) | `logSubscription` effect |
-| Submission | Inline `fetch` in handler | `subscribe` constraint + resolver |
+| Last submitted | `useRef(0)` | `lastSubmittedAt` fact |
+| Validation | Inline ternary chain | `emailError` + `isValid` derivations |
+| Submit guard | Local `canSubmit` variable | `canSubmit` derivation (composing `derive.isValid`) |
+| Rate limiting | `Date.now()` check in render | `lastSubmittedAt` fact + `canSubmit` derivation |
+| Auto-reset | `useEffect` + `setTimeout` + `clearTimeout` | `resetAfterSuccess` constraint + resolver |
+| Logging | `useEffect` + `useRef` for prev status | `logSubscription` effect with `deps: ["status"]` |
+| Submission | Inline `fetch` in `handleSubmit` | `subscribe` constraint + resolver |
 
-The imperative version is shorter &ndash; but it's missing four behaviors. Adding them imperatively would make it longer than the Directive version, with more complexity to manage.
+Both versions have the same behaviors. The difference is *how* each behavior is expressed.
 
 ---
 
-## When the simplest case isn't simple
+## Where the imperative version breaks down
 
-The imperative newsletter signup looks simple because it's *incomplete*. It has no validation, no rate limiting, no auto-reset, and no logging. Those aren't gold-plating &ndash; they're the kind of behaviors you add after the first user reports a problem.
+The imperative version works. Both versions do the same thing. But the imperative approach has structural problems that compound as the component grows:
 
-Adding all four imperatively requires:
-
-- A `useEffect` with `setTimeout` + `clearTimeout` for auto-reset
-- A `useRef` or `useState` for the last-submitted timestamp
-- A `useEffect` or `setInterval` to re-enable the button after the cooldown (or accept that the button re-enables on the next interaction)
-- Email regex validation duplicated between an error message and the submit guard
-- A `console.log` you'll forget to remove
+- **Scattered state transitions.** `setStatus`, `setErrorMessage`, `setTouched`, and `setEmail` are called across `handleSubmit`, two `useEffect` hooks, and the auto-reset timer callback. Following a single status change means jumping between four locations.
+- **Manual cleanup.** The auto-reset `useEffect` needs `clearTimeout` in its cleanup function. Forget it and you get stale state updates after unmount.
+- **Implicit dependencies.** `canSubmit` reads `lastSubmittedAt.current` during render, but nothing tells React that this value changed. The rate limit only takes effect when something else triggers a re-render.
+- **No composition.** `isValid` and `isRateLimited` are local variables. They can't be observed, subscribed to, or tested independently.
 
 The Directive module expresses each behavior as a named primitive. Validation is a derivation. Rate limiting is a derivation that composes another derivation. Auto-reset is a constraint that triggers a resolver. Logging is an effect with explicit deps. Each one is declared, named, and testable in isolation.
 
