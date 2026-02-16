@@ -2,11 +2,11 @@
 
 import { useCallback } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { CircleNotch, CheckCircle } from '@phosphor-icons/react'
 import { useDirectiveRef, useSelector, useEvents } from '@directive-run/react'
 
 import { Button } from '@/components/Button'
+import { DirectiveCallout } from '@/components/DirectiveCallout'
 import { newsletter } from '@/lib/newsletter'
 import blurCyanImage from '@/images/blur-cyan.png'
 import blurIndigoImage from '@/images/blur-indigo.png'
@@ -107,22 +107,11 @@ export function Newsletter() {
       </div>
 
       {/* Directive callout */}
-      <div className="mx-auto mt-8 max-w-5xl px-4 sm:px-6 lg:px-8 xl:px-12">
-        <div className="rounded-xl border border-brand-primary-400/20 bg-brand-primary-950/20 px-5 py-4">
-          <p className="text-sm text-slate-400">
-            <span className="font-semibold text-white">Powered by Directive.</span>{' '}
-            This signup uses a Directive module with facts, derivations, constraints, and resolvers &ndash; zero{' '}
-            <code className="rounded bg-slate-700 px-1.5 py-0.5 text-xs">useState</code>,
-            zero{' '}
-            <code className="rounded bg-slate-700 px-1.5 py-0.5 text-xs">useEffect</code>.{' '}
-            <Link
-              href="/blog/declarative-newsletter-with-directive"
-              className="font-medium text-brand-primary-400 hover:text-brand-primary-300"
-            >
-              Read how it works &rarr;
-            </Link>
-          </p>
-        </div>
+      <div className="dark mx-auto mt-8 max-w-5xl px-4 sm:px-6 lg:px-8 xl:px-12">
+        <DirectiveCallout
+          subject="signup"
+          href="/blog/declarative-newsletter-with-directive"
+        />
       </div>
 
       <Image

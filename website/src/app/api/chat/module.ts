@@ -15,7 +15,7 @@ const RATE_LIMIT_WINDOW = 60 * 1000
 const MAX_REQUESTS_PER_WINDOW = 10
 const DAILY_TOKEN_BUDGET = 500_000
 const MAX_RATE_LIMIT_ENTRIES = 10_000
-const DAILY_CAP_PER_IP = 25
+const DAILY_CAP_PER_IP = 15
 const DAILY_CAP_WINDOW = 24 * 60 * 60 * 1000
 
 // ---------------------------------------------------------------------------

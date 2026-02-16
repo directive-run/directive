@@ -197,15 +197,12 @@ export default function AboutPage() {
 
           <div className="mt-8 space-y-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
             <p>
-              20+ years building for the web &ndash; from freelance roots to
-              Senior Web Developer at Vision Video Interactive, Engineering
-              Manager at Higher Education, and staff-level roles at Red
-              Ventures. Currently a Senior Application Engineer building
-              integration infrastructure for B2B platforms. The idea behind
-              Directive came from a hobby project &ndash; building Minglingo, a
-              real-time social app where wrangling complex, interconnected
-              systems demanded something better. Instead of reaching for
-              another library, the answer was to build one that met entirely new
+              20+ years building for the web &ndash; from freelance beginnings
+              to senior engineering roles. The idea behind Directive came
+              from a hobby project &ndash; building Minglingo, a real-time
+              social app where wrangling complex, interconnected systems
+              demanded something better. Instead of reaching for another
+              library, the answer was to build one that met entirely new
               constraints. So Directive was born!
             </p>
             <p>
