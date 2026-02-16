@@ -186,7 +186,7 @@ function MyComponent() {
 const user = useFact(system, "user");
 
 // Good: re-renders only when the name changes
-const userName = useSelector(system, (facts) => facts.user?.name);
+const userName = useSelector(system, (state) => state.user?.name);
 ```
 
 ---

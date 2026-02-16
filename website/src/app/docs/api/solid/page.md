@@ -116,10 +116,10 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 ## useSelector
 
-Auto-tracking cross-fact selector. Uses `withTracking()` to detect which facts are accessed, then subscribes only to those keys. Takes `system` as the first parameter.
+Auto-tracking selector over facts and derivations. Uses `withTracking()` to detect which keys are accessed, then subscribes only to those. Takes `system` as the first parameter.
 
 ```typescript
-useSelector<R>(system: System, selector: (facts: Record<string, unknown>) => R, equalityFn?: (a: R, b: R) => boolean): Accessor<R>
+useSelector<R>(system: System, selector: (state: Record<string, unknown>) => R, equalityFn?: (a: R, b: R) => boolean): Accessor<R>
 ```
 
 ```tsx
@@ -127,9 +127,9 @@ import { useSelector } from '@directive-run/solid';
 
 function Summary() {
   // Select and combine values from multiple facts
-  const summary = useSelector(system, (facts) => ({
-    userName: facts.user?.name,
-    itemCount: facts.items?.length ?? 0,
+  const summary = useSelector(system, (state) => ({
+    userName: state.user?.name,
+    itemCount: state.items?.length ?? 0,
   }));
 
   return <p>{summary().userName} has {summary().itemCount} items</p>;
@@ -591,7 +591,7 @@ import { useSelector, shallowEqual } from '@directive-run/solid';
 
 function UserInfo() {
   // Use shallowEqual to prevent updates when name/age haven't changed
-  const info = useSelector(system, (facts) => ({ name: facts.user?.name, age: facts.user?.age }), shallowEqual);
+  const info = useSelector(system, (state) => ({ name: state.user?.name, age: state.user?.age }), shallowEqual);
 
   return <p>{info().name}, {info().age}</p>;
 }

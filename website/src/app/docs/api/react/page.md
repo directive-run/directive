@@ -102,10 +102,10 @@ The 3rd parameter is discriminated at runtime: if it's a function and no 4th arg
 If your default value is itself a function, the runtime will misinterpret it as `equalityFn`. Force the new API path by passing the equality function (or `undefined`) as the 4th argument:
 ```tsx
 // Wrong — () => {} is treated as equalityFn
-useSelector(system, (s) => s.handler, () => {});
+useSelector(system, (state) => state.handler, () => {});
 
 // Correct — explicitly pass undefined as equalityFn
-useSelector(system, (s) => s.handler, () => {}, undefined);
+useSelector(system, (state) => state.handler, () => {}, undefined);
 ```
 This edge case only applies when the default value is a function. Primitives, objects, and arrays work as expected.
 {% /callout %}

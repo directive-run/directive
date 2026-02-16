@@ -7,8 +7,8 @@ export function UseSelectorDefaultPage() {
   const system = useDirectiveRef(testModule);
 
   // Default value surfaces on first render, then init value takes over after start()
-  const name = useSelector(system, (facts) => facts.name, "pre-start-default");
-  const count = useSelector(system, (facts) => facts.count, -1);
+  const name = useSelector(system, (state) => state.name, "pre-start-default");
+  const count = useSelector(system, (state) => state.count, -1);
 
   const events = useEvents(system);
 

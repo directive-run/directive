@@ -152,17 +152,17 @@ import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Transform a single fact value
-const upperName = useSelector(system, (facts) => facts.user?.name?.toUpperCase() ?? 'GUEST');
+const upperName = useSelector(system, (state) => state.user?.name?.toUpperCase() ?? 'GUEST');
 
-// Extract a slice from a fact
-const itemCount = useSelector(system, (facts) => facts.items?.length ?? 0);
+// Extract a slice from state
+const itemCount = useSelector(system, (state) => state.items?.length ?? 0);
 
-// Combine values from multiple facts
+// Combine values from multiple facts and derivations
 const summary = useSelector(
   system,
-  (facts) => ({
-    userName: facts.user?.name,
-    itemCount: facts.items?.length ?? 0,
+  (state) => ({
+    userName: state.user?.name,
+    itemCount: state.items?.length ?? 0,
   }),
   (a, b) => a.userName === b.userName && a.itemCount === b.itemCount
 );
@@ -696,7 +696,7 @@ import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Use shallowEqual to prevent updates when x/y values haven't changed
-const coords = useSelector(system, (facts) => ({ x: facts.position?.x, y: facts.position?.y }), shallowEqual);
+const coords = useSelector(system, (state) => ({ x: state.position?.x, y: state.position?.y }), shallowEqual);
 ```
 
 ---

@@ -22,6 +22,7 @@ import type {
 	ErrorBoundaryConfig,
 	InferFacts,
 	InferDerivations,
+	InferSelectorState,
 	InferEvents,
 	SingleModuleSystem,
 	SystemSnapshot,
@@ -187,24 +188,24 @@ function _useDerivedMulti(system: SingleModuleSystem<any>, derivationIds: string
 }
 
 // ============================================================================
-// useSelector — auto-tracking cross-fact selector
+// useSelector — auto-tracking selector over facts and derivations
 // ============================================================================
 
 /**
- * Auto-tracking cross-fact selector.
+ * Auto-tracking selector over facts and derivations.
  * Uses `withTracking()` to detect which facts the selector accesses,
  * then subscribes only to those keys.
  */
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S>,
-	selector: (facts: InferFacts<S>) => R,
+	selector: (state: InferSelectorState<S>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): Accessor<R>;
 export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
 	system: SingleModuleSystem<any>,
-	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
-	selector: (facts: Record<string, any>) => R,
+	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
+	selector: (state: Record<string, any>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): Accessor<R>;
 export function useSelector(
