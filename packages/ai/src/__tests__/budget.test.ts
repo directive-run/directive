@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { withBudget, BudgetExceededError } from "../budget.js";
-import type { BudgetRunner } from "../budget.js";
 import type { AgentRunner, RunResult } from "../types.js";
 
 // ============================================================================
