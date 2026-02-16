@@ -51,7 +51,7 @@ class SearchErrorBoundary extends Component<
       return (
         <button
           type="button"
-          className="group flex h-10 w-10 items-center justify-center text-slate-400 sm:justify-start md:h-auto md:w-96 md:flex-none md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 lg:w-[32rem]"
+          className="group flex h-10 w-10 items-center justify-center text-slate-400 sm:justify-start md:h-auto md:w-full md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200"
           onClick={() => this.setState({ hasError: false })}
         >
           <span className="text-xs">Search unavailable - click to retry</span>
@@ -508,7 +508,7 @@ function SearchInner() {
     <>
       <button
         type="button"
-        className="group flex h-10 w-10 items-center justify-center sm:justify-start md:h-auto md:w-96 md:flex-none md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 md:hover:ring-slate-300 lg:w-[32rem] dark:md:bg-slate-800/75 dark:md:ring-white/5 dark:md:ring-inset dark:md:hover:bg-slate-700/40 dark:md:hover:ring-slate-500"
+        className="group flex h-10 w-10 items-center justify-center sm:justify-start md:h-auto md:w-full md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 md:hover:ring-slate-300 dark:md:bg-slate-800/75 dark:md:ring-white/5 dark:md:ring-inset dark:md:hover:bg-slate-700/40 dark:md:hover:ring-slate-500"
         {...buttonProps}
       >
         <SearchIcon className="h-5 w-5 flex-none fill-slate-400 group-hover:fill-slate-500 md:group-hover:fill-slate-400 dark:fill-slate-500" />

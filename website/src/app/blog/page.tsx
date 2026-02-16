@@ -1,6 +1,6 @@
 import dynamic from 'next/dynamic'
-import type { Metadata } from 'next'
 
+import { buildPageMetadata } from '@/lib/metadata'
 import { BlogCard } from '@/components/BlogCard'
 import { BlogListItem } from '@/components/BlogListItem'
 import { getFeaturedPosts, posts } from '@/lib/blog'
@@ -29,11 +29,13 @@ const BlogPostList = dynamic(
   },
 )
 
-export const metadata: Metadata = {
-  title: 'Blog - Directive',
+export const metadata = buildPageMetadata({
+  title: 'Blog — Directive',
   description:
     'Deep dives into constraint-driven architecture, state management patterns, and building AI agents with Directive.',
-}
+  path: '/blog',
+  section: 'Blog',
+})
 
 export default function BlogPage() {
   const featured = getFeaturedPosts()
