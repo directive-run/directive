@@ -483,10 +483,10 @@ function AgentPanel() {
   const approval = useFact(system, '__approval');
 
   // Derive a summary object – only re-renders when derived values change
-  const summary = useSelector(system, (facts) => ({
-    status: facts.__agent?.status,
-    tokens: facts.__agent?.tokenUsage,
-    pending: facts.__approval?.pending?.length ?? 0,
+  const summary = useSelector(system, (state) => ({
+    status: state.__agent?.status,
+    tokens: state.__agent?.tokenUsage,
+    pending: state.__approval?.pending?.length ?? 0,
   }));
 
   // Check whether the orchestrator has finished all pending work

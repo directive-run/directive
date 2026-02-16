@@ -308,11 +308,11 @@ function _useDerivedMulti(
 }
 
 // ============================================================================
-// useSelector — cross-fact Zustand-style selector
+// useSelector — Zustand-style selector over facts and derivations
 // ============================================================================
 
 /**
- * Auto-tracking cross-fact selector (Zustand-style).
+ * Auto-tracking selector over facts and derivations (Zustand-style).
  * Uses `withTracking()` to detect which facts the selector accesses,
  * then subscribes only to those keys. Falls back to subscribeAll
  * if no keys are detected.
@@ -351,8 +351,8 @@ export function useSelector<S extends ModuleSchema, R>(
 export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
 	system: SingleModuleSystem<any>,
-	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
-	selector: (facts: Record<string, any>) => R,
+	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
+	selector: (state: Record<string, any>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
@@ -360,8 +360,8 @@ export function useSelector<R>(
 export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
 	system: SingleModuleSystem<any> | null | undefined,
-	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
-	selector: (facts: Record<string, any>) => R,
+	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
+	selector: (state: Record<string, any>) => R,
 	defaultValue: R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;

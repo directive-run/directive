@@ -286,7 +286,7 @@ function UserProfile() {
 const user = useFact(system, "user");
 
 // GOOD: useSelector narrows the subscription to just the name property
-const userName = useSelector(system, (facts) => facts.user?.name);
+const userName = useSelector(system, (state) => state.user?.name);
 ```
 
 2. **Reading from stale closure**:

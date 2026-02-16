@@ -229,18 +229,18 @@ The go-to hook for **transforms and derived values** from facts. Directive auto-
 
 ```tsx
 // Transform a single fact value
-const upperName = useSelector(system, (facts) => facts.user?.name?.toUpperCase() ?? "GUEST");
+const upperName = useSelector(system, (state) => state.user?.name?.toUpperCase() ?? "GUEST");
 
-// Combine values from multiple facts
-const summary = useSelector(system, (facts) => ({
-  userName: facts.user?.name,
-  itemCount: facts.items?.length ?? 0,
+// Combine values from multiple facts and derivations
+const summary = useSelector(system, (state) => ({
+  userName: state.user?.name,
+  itemCount: state.items?.length ?? 0,
 }));
 
 // Custom equality to prevent unnecessary re-renders on array/object results
 const ids = useSelector(
   system,
-  (facts) => facts.users?.map(u => u.id) ?? [],
+  (state) => state.users?.map(u => u.id) ?? [],
   shallowEqual,
 );
 ```
@@ -251,19 +251,19 @@ Pass a default value as the 3rd parameter. The default is returned before the sy
 
 ```tsx
 // Without default – requires ?? fallback at each call site
-const email = useSelector(system, (s) => s.email) ?? "";
+const email = useSelector(system, (state) => state.email) ?? "";
 
 // With default – cleaner, prevents React's "uncontrolled to controlled" warning
-const email = useSelector(system, (s) => s.email, "");
-const status = useSelector(system, (s) => s.status, "idle");
-const canSubmit = useSelector(system, (s) => s.canSubmit, false);
+const email = useSelector(system, (state) => state.email, "");
+const status = useSelector(system, (state) => state.status, "idle");
+const canSubmit = useSelector(system, (state) => state.canSubmit, false);
 ```
 
 When a default value is provided, the system parameter may be `null` or `undefined`. The hook returns the default and recomputes automatically when the system becomes available:
 
 ```tsx
 // Nullable system – useful for conditional or lazy initialization
-const status = useSelector(maybeSystem, (s) => s.status, "idle");
+const status = useSelector(maybeSystem, (state) => state.status, "idle");
 ```
 
 {% callout type="note" title="Backward compatible" %}
@@ -643,7 +643,7 @@ test('displays user name', async () => {
 |---|---|---|
 | `useFact` | Hook | Read single/multi facts |
 | `useDerived` | Hook | Read single/multi derivations |
-| `useSelector` | Hook | Auto-tracking selector over all facts |
+| `useSelector` | Hook | Auto-tracking selector over facts and derivations |
 | `useEvents` | Hook | Typed event dispatchers |
 | `useDispatch` | Hook | Low-level event dispatch |
 | `useWatch` | Hook | Side-effect watcher for facts or derivations |

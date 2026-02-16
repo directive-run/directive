@@ -25,7 +25,7 @@ function BadProfile({ system }) {
 
 // ✅ GOOD: Re-renders only when user.name changes
 function GoodProfile({ system }) {
-  const name = useSelector(system, (facts) => facts.user.name);
+  const name = useSelector(system, (state) => state.user.name);
 
   return <span>{name}</span>;
 }
@@ -54,7 +54,7 @@ function CartBadge({ system }) {
 
 ```tsx
 // Use useSelector for computed/transformed values
-const fullName = useSelector(system, (facts) => `${facts.first} ${facts.last}`);
+const fullName = useSelector(system, (state) => `${state.first} ${state.last}`);
 
 // Use useFact for a single fact by key
 const items = useFact(system, 'items');
@@ -70,7 +70,7 @@ const { facts, derived } = useDirective(system);
 
 1. **`useSelector` is the default choice** – it accepts a selector function and only re-renders when the return value changes (via `Object.is`). Use it for any computed or plucked value.
 
-2. **`useFact` is shorthand for a single fact** – `useFact(system, 'user')` is equivalent to `useSelector(system, (f) => f.user)` but more readable when you just need one field.
+2. **`useFact` is shorthand for a single fact** – `useFact(system, 'user')` is equivalent to `useSelector(system, (state) => state.user)` but more readable when you just need one field.
 
 3. **`useDerived` subscribes to derivations** – derivations are cached and only recompute when their tracked dependencies change. Subscribing to a derivation is always cheaper than computing the same value in a selector.
 
@@ -84,12 +84,12 @@ const { facts, derived } = useDirective(system);
 import { shallowEqual } from '@directive-run/react';
 
 // Without custom equality: re-renders when any item in the array changes identity
-const items = useSelector(system, (facts) => facts.items);
+const items = useSelector(system, (state) => state.items);
 
 // With shallowEqual: only re-renders when the array contents actually differ
 const items = useSelector(
   system,
-  (facts) => facts.items,
+  (state) => state.items,
   shallowEqual,
 );
 ```
@@ -98,8 +98,8 @@ const items = useSelector(
 
 ```typescript
 // Instead of complex selectors in components...
-const expensiveValue = useSelector(system, (facts) => {
-  return facts.items.filter(i => i.active).map(i => i.price).reduce((a, b) => a + b, 0);
+const expensiveValue = useSelector(system, (state) => {
+  return state.items.filter(i => i.active).map(i => i.price).reduce((a, b) => a + b, 0);
 });
 
 // ...define a derivation in the module (cached, shared across components)

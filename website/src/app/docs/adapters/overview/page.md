@@ -25,7 +25,7 @@ All adapters share the same core hook names and signatures (adapted to each fram
 
 | Hook | Purpose |
 |------|---------|
-| `useSelector(system, fn)` | Auto-tracking cross-fact selector |
+| `useSelector(system, fn)` | Auto-tracking selector over facts and derivations |
 | `useFact(system, key)` | Subscribe to a single fact |
 | `useFact(system, [keys])` | Subscribe to multiple facts |
 | `useDerived(system, key)` | Subscribe to a derivation |
