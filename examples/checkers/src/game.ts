@@ -31,24 +31,24 @@ import {
 
 export const checkersSchema = {
   facts: {
-    board: t.any<Board>(),
-    currentPlayer: t.any<Player>(),
-    selectedIndex: t.any<number | null>(),
-    targetIndex: t.any<number | null>(),
-    mustContinueFrom: t.any<number | null>(),
+    board: t.object<Board>(),
+    currentPlayer: t.object<Player>(),
+    selectedIndex: t.object<number | null>(),
+    targetIndex: t.object<number | null>(),
+    mustContinueFrom: t.object<number | null>(),
     message: t.string(),
     moveCount: t.number(),
-    capturedCount: t.any<{ red: number; black: number }>(),
+    capturedCount: t.object<{ red: number; black: number }>(),
     gameOver: t.boolean(),
-    winner: t.any<Player | null>(),
-    gameMode: t.any<"2player" | "computer" | "ai">(),
-    aiPlayer: t.any<Player>(),
+    winner: t.object<Player | null>(),
+    gameMode: t.object<"2player" | "computer" | "ai">(),
+    aiPlayer: t.object<Player>(),
   },
   derivations: {
-    validMoves: t.any<Move[]>(),
+    validMoves: t.object<Move[]>(),
     jumpRequired: t.boolean(),
-    highlightSquares: t.any<number[]>(),
-    selectableSquares: t.any<number[]>(),
+    highlightSquares: t.object<number[]>(),
+    selectableSquares: t.object<number[]>(),
     redCount: t.number(),
     blackCount: t.number(),
     score: t.string(),
@@ -56,7 +56,7 @@ export const checkersSchema = {
   events: {
     clickSquare: { index: t.number() },
     newGame: {},
-    setGameMode: { mode: t.any<"2player" | "computer" | "ai">() },
+    setGameMode: { mode: t.object<"2player" | "computer" | "ai">() },
     aiMove: {},
     claudeMove: { from: t.number(), to: t.number() },
   },
@@ -64,10 +64,10 @@ export const checkersSchema = {
     EXECUTE_MOVE: {
       from: t.number(),
       to: t.number(),
-      captured: t.any<number | null>(),
+      captured: t.object<number | null>(),
     },
     KING_PIECE: { index: t.number() },
-    END_GAME: { winner: t.any<Player>(), reason: t.string() },
+    END_GAME: { winner: t.object<Player>(), reason: t.string() },
   },
 } satisfies ModuleSchema;
 

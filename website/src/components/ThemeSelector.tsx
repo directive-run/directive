@@ -11,12 +11,6 @@ import {
 } from '@headlessui/react'
 import clsx from 'clsx'
 
-const themes = [
-  { name: 'Light', value: 'light', icon: LightIcon },
-  { name: 'Dark', value: 'dark', icon: DarkIcon },
-  { name: 'System', value: 'system', icon: SystemIcon },
-]
-
 function LightIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
     <svg aria-hidden="true" viewBox="0 0 16 16" {...props}>
@@ -52,6 +46,12 @@ function SystemIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
     </svg>
   )
 }
+
+const themes = [
+  { name: 'Light', value: 'light', icon: LightIcon },
+  { name: 'Dark', value: 'dark', icon: DarkIcon },
+  { name: 'System', value: 'system', icon: SystemIcon },
+]
 
 const themeToggleOptions = [
   { value: 'system', icon: SystemIcon, label: 'System' },

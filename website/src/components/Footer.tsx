@@ -40,12 +40,13 @@ export function Footer() {
             <ul className="mt-3 space-y-2">
               {[
                 { href: '/docs/quick-start', label: 'Docs' },
-                { href: '/docs/philosophy', label: 'Philosophy' },
+                { href: '/philosophy', label: 'Philosophy' },
                 { href: '/blog', label: 'Blog' },
+                { href: '/labs', label: 'Labs' },
                 { href: '/about', label: 'About' },
                 { href: '/contact', label: 'Contact' },
               ].map(({ href, label }) => (
-                <li key={href}>
+                <li key={label}>
                   <Link
                     href={href}
                     className="text-[15px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
@@ -92,7 +93,7 @@ export function Footer() {
               href="https://github.com/directive-run/directive"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+              className="group flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-brand-surface-raised dark:hover:bg-slate-700"
               aria-label="GitHub"
             >
               <GitHubIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />

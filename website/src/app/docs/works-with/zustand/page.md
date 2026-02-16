@@ -148,8 +148,8 @@ const pricingModule = createModule('pricing', {
     facts: {
       selectedPlan: t.string(),
       billingCycle: t.string<'monthly' | 'annual'>(),
-      pricingResult: t.any(),
-      pricingError: t.any(),
+      pricingResult: t.object(),
+      pricingError: t.object(),
     },
     derivations: {
       hasPlanSelected: t.boolean(),

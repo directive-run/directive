@@ -24,7 +24,7 @@ export interface ChatMessage {
 
 export const chatSchema = {
   facts: {
-    messages: t.any<ChatMessage[]>(),
+    messages: t.object<ChatMessage[]>(),
     thinking: t.boolean(),
     totalTokens: t.number(),
     estimatedCost: t.number(),
@@ -41,7 +41,7 @@ export const chatSchema = {
   derivations: {},
   events: {
     addMessage: {
-      message: t.any<ChatMessage>(),
+      message: t.object<ChatMessage>(),
     },
     setThinking: { thinking: t.boolean() },
     updateAIState: {

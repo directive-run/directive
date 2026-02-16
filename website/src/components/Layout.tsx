@@ -112,9 +112,9 @@ function Header() {
   return (
     <header
       className={clsx(
-        'sticky top-0 z-50 flex flex-none items-center justify-between bg-white px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none',
+        'sticky top-0 z-50 flex flex-none items-center justify-between bg-brand-surface px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none',
         isScrolled
-          ? 'dark:bg-slate-900/95 dark:backdrop-blur-sm dark:[@supports(backdrop-filter:blur(0))]:bg-slate-900/75'
+          ? 'dark:bg-brand-surface/95 dark:backdrop-blur-sm dark:[@supports(backdrop-filter:blur(0))]:bg-brand-surface/75'
           : 'dark:bg-transparent',
       )}
     >
@@ -136,6 +136,7 @@ function Header() {
         <div className="hidden items-center gap-8 sm:gap-10 md:flex">
           <HeaderLink href="/docs/quick-start">Docs</HeaderLink>
           <HeaderLink href="/blog">Blog</HeaderLink>
+          <HeaderLink href="/labs">Labs</HeaderLink>
           <SupportLink />
         </div>
         <div className="flex items-center gap-4">
@@ -168,9 +169,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {isDocsPage ? (
         <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto justify-center sm:px-2 lg:px-8 xl:px-12">
           <div className="hidden lg:relative lg:block lg:flex-none">
-            <div className="absolute inset-y-0 right-0 w-[50vw] bg-slate-50 dark:hidden" />
-            <div className="absolute top-16 right-0 bottom-0 hidden h-12 w-px bg-linear-to-t from-slate-800 dark:block" />
-            <div className="absolute top-28 right-0 bottom-0 hidden w-px bg-slate-800 dark:block" />
+            <div className="absolute inset-y-0 right-0 w-[50vw] bg-brand-surface-inset" />
+            <div className="absolute top-16 right-0 bottom-0 h-12 w-px bg-linear-to-t from-slate-200 dark:from-slate-800" />
+            <div className="absolute top-28 right-0 bottom-0 w-px bg-slate-200 dark:bg-slate-800" />
             <div className="sticky top-19 -ml-0.5 h-[calc(100vh-4.75rem)] w-64 overflow-x-hidden overflow-y-auto py-16 pr-8 pl-0.5 xl:w-72 xl:pr-16">
               {canUseVersionSelector && (
                 <div className="mb-6">
@@ -195,7 +196,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       ) : (
-        <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto px-4 sm:px-6 lg:px-8 xl:px-12">
+        <div id="main-content" className="relative w-full flex-auto">
           {children}
         </div>
       )}

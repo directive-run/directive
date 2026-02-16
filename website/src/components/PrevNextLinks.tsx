@@ -3,18 +3,11 @@
 import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { ArrowRight } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { getNavigationForVersion } from '@/lib/navigation'
 import { useDocsVersion } from '@/lib/hooks/useDocsVersion'
-
-function ArrowIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
-      <path d="m9.182 13.423-1.17-1.16 3.505-3.505H3V7.065h8.517l-3.506-3.5L9.181 2.4l5.512 5.511-5.511 5.512Z" />
-    </svg>
-  )
-}
 
 const PageLink = memo(function PageLink({
   title,
@@ -35,15 +28,16 @@ const PageLink = memo(function PageLink({
         <Link
           href={href}
           aria-label={`Go to ${dir} page: ${title}`}
+          onClick={() => window.scrollTo(0, 0)}
           className={clsx(
             'flex items-center gap-x-1 text-base font-semibold text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300',
             dir === 'previous' && 'flex-row-reverse',
           )}
         >
           {title}
-          <ArrowIcon
+          <ArrowRight
             className={clsx(
-              'h-4 w-4 flex-none fill-current',
+              'h-4 w-4 flex-none',
               dir === 'previous' && '-scale-x-100',
             )}
           />

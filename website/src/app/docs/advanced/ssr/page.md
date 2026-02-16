@@ -86,6 +86,57 @@ export default async function Page() {
 
 ---
 
+## Express / Fastify
+
+Directive works with any Node.js HTTP framework. Create a system per request, seed facts, settle, and return JSON:
+
+```typescript
+// Express route handler
+import express from 'express';
+import { createSystem } from '@directive-run/core';
+
+const app = express();
+
+app.get('/api/user/:id', async (req, res) => {
+  const system = createSystem({ module: userModule });
+  system.start();
+
+  // Seed facts from the request
+  system.facts.userId = req.params.id;
+
+  // Block until constraints + resolvers settle
+  await system.settle(5000);
+
+  // Return the settled state as JSON
+  res.json(system.getSnapshot());
+  system.destroy();
+});
+```
+
+The same pattern works with Fastify, Hono, Koa, or any framework that supports `async` handlers. See the [Server (Node.js) example](/docs/examples/server) for a full API with snapshots, audit trails, and GDPR compliance.
+
+---
+
+## Distributable Snapshots for APIs
+
+For API responses, prefer `getDistributableSnapshot()` over `getSnapshot()`. Distributable snapshots include computed derivations and support TTL expiry:
+
+```typescript
+await system.settle(5000);
+
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan', 'canUseFeature'],
+  ttlSeconds: 3600, // Expires after 1 hour
+});
+
+// Cache in Redis, serve from CDN, or return directly
+res.json(snapshot);
+```
+
+The snapshot includes `createdAt` and `expiresAt` timestamps. Use `isSnapshotExpired()` to check validity before serving cached values. See [Snapshots](/docs/advanced/snapshots) for the full API.
+
+---
+
 ## Avoiding Singletons
 
 Never use module-level systems in SSR – they would be shared across requests:
@@ -104,6 +155,8 @@ export function getSystem() {
 
 ## Next Steps
 
-- [Time-Travel & Snapshots](/docs/advanced/time-travel) – Serialization
-- [React Adapter](/docs/adapters/react) – Client setup
-- [Module and System](/docs/module-system) – Basics
+- [Server (Node.js) Example](/docs/examples/server) &ndash; Full Express API example
+- [Snapshots](/docs/advanced/snapshots) &ndash; Distributable snapshots, signing, TTL
+- [Time-Travel & Snapshots](/docs/advanced/time-travel) &ndash; Serialization
+- [React Adapter](/docs/adapters/react) &ndash; Client setup
+- [Module and System](/docs/module-system) &ndash; Basics

@@ -4,6 +4,7 @@
 import { useCallback } from 'react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { DirectiveCallout } from '@/components/DirectiveCallout'
 import {
   ChatCircle,
   CheckCircle,
@@ -275,7 +276,7 @@ function ContactForm() {
 
 export default function ContactPage() {
   return (
-    <div className="w-full py-16">
+    <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">
       <div className="mx-auto max-w-3xl">
         {/* Hero */}
         <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
@@ -287,25 +288,17 @@ export default function ContactPage() {
         </p>
 
         {/* Form */}
-        <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50/60 p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
           <ContactForm />
         </div>
 
         {/* Directive callout */}
-        <div className="mt-6 rounded-xl border border-brand-primary-100/50 bg-brand-primary-50/20 px-5 py-4 dark:border-brand-primary-800/20 dark:bg-brand-primary-950/10">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            <span className="font-semibold text-slate-900 dark:text-white">Powered by Directive.</span>{' '}
-            This form uses a Directive module with facts, derivations, constraints, and resolvers &ndash; zero{' '}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-700">useState</code>,
-            zero{' '}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-700">useEffect</code>.{' '}
-            <Link
-              href="/blog/declarative-forms-with-directive"
-              className="font-medium text-brand-primary hover:underline dark:text-brand-primary-400"
-            >
-              Read the blog post &rarr;
-            </Link>
-          </p>
+        <div className="mt-6">
+          <DirectiveCallout
+            subject="form"
+            href="/blog/declarative-forms-with-directive"
+            linkLabel="Read the blog post"
+          />
         </div>
 
         {/* Social / alternative contact */}
@@ -322,7 +315,7 @@ export default function ContactPage() {
               href="https://github.com/directive-run/directive/discussions"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-slate-200 px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
+              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
             >
               <GithubLogo
                 weight="duotone"
@@ -342,7 +335,7 @@ export default function ContactPage() {
               href="https://x.com/directive_run"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-slate-200 px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
+              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
             >
               <XIcon className="h-7 w-7 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
               <div>
@@ -359,7 +352,7 @@ export default function ContactPage() {
               href="https://bsky.app/profile/directive.run"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-3 rounded-xl border border-slate-200 px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
+              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-slate-600"
             >
               <BlueSkyIcon className="h-7 w-7 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
               <div>
@@ -375,7 +368,7 @@ export default function ContactPage() {
         </div>
 
         {/* Chat callout */}
-        <div className="mt-8 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-5 py-4 dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="mt-8 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 dark:border-slate-700 dark:bg-slate-800/50">
           <ChatCircle
             weight="duotone"
             className="h-8 w-8 shrink-0 text-brand-primary dark:text-brand-primary-400"

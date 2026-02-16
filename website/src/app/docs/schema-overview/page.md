@@ -315,7 +315,7 @@ Bypass all validation (use sparingly):
 schema: {
   facts: {
     // Typed but not validated – use for external data you can't control
-    externalResponse: t.any<ExternalAPIResponse>(),
+    externalResponse: t.object<ExternalAPIResponse>(),
   },
 }
 ```

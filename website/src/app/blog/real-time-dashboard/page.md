@@ -92,7 +92,10 @@ const historyModule = createModule("history", {
         context.facts.error = null;
         try {
           const res = await fetch(`/api/sales/history?since=${req.since}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
           context.facts.records = await res.json();
           context.facts.fetchedAt = Date.now();
         } catch (err) {
@@ -283,7 +286,10 @@ const pollModule = createModule("poll", {
         context.facts.error = null;
         try {
           const res = await fetch("/api/sales/summary");
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
           context.facts.stats = await res.json();
           context.facts.lastFetchAt = Date.now();
         } catch (err) {

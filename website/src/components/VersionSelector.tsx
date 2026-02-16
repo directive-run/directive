@@ -4,32 +4,11 @@ import { Fragment, memo } from 'react'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react'
 import { useRouter } from 'next/navigation'
 import { usePathname } from 'next/navigation'
+import { CaretUpDown, Check, Warning } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { type DocsVersion, LATEST_VERSION, switchVersionPath } from '@/lib/versions'
 import { useDocsVersion } from '@/lib/hooks/useDocsVersion'
-
-function ChevronUpDownIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-    </svg>
-  )
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-    </svg>
-  )
-}
 
 function StatusBadge({ status }: { status: DocsVersion['status'] }) {
   if (status === 'latest') {
@@ -83,7 +62,7 @@ export const VersionSelector = memo(function VersionSelector({
             <StatusBadge status={version.status} />
           </span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-            <ChevronUpDownIcon className="h-5 w-5 text-slate-400" />
+            <CaretUpDown className="h-5 w-5 text-slate-400" />
           </span>
         </ListboxButton>
         <Transition
@@ -112,7 +91,7 @@ export const VersionSelector = memo(function VersionSelector({
                     </span>
                     {selected && (
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-brand-primary-600 dark:text-brand-primary-400">
-                        <CheckIcon className="h-5 w-5" />
+                        <Check className="h-5 w-5" weight="bold" />
                       </span>
                     )}
                   </>
@@ -147,22 +126,13 @@ export const VersionBanner = memo(function VersionBanner({
       )}
     >
       <div className="flex items-start gap-3">
-        <svg
+        <Warning
+          weight="duotone"
           className={clsx(
             'mt-0.5 h-5 w-5 flex-shrink-0',
             isDeprecated ? 'text-amber-500' : 'text-brand-primary'
           )}
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-          />
-        </svg>
+        />
         <div className="flex-1">
           <h4
             className={clsx(

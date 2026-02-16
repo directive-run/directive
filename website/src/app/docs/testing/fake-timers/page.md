@@ -122,7 +122,9 @@ test('retry with exponential backoff', async () => {
           // Fail the first two attempts, succeed on the third
           resolve: () => {
             attempts++;
-            if (attempts < 3) throw new Error('Fail');
+            if (attempts < 3) {
+              throw new Error('Fail');
+            }
           },
         },
       },

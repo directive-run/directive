@@ -31,7 +31,7 @@ const schema = {
     email: t.string(),
     subject: t.string(),
     message: t.string(),
-    touched: t.any<Record<string, boolean>>(),
+    touched: t.object<Record<string, boolean>>(),
     status: t.string<"idle" | "submitting" | "success" | "error">(),
     errorMessage: t.string(),
     lastSubmittedAt: t.number(),

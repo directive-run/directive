@@ -110,6 +110,7 @@ export const navigation: NavigationSection[] = [
       { title: 'Overview', href: '/docs/advanced/overview' },
       { title: 'Multi-Module', href: '/docs/advanced/multi-module' },
       { title: 'Time-Travel & Snapshots', href: '/docs/advanced/time-travel' },
+      { title: 'Snapshots', href: '/docs/advanced/snapshots' },
       { title: 'SSR & Hydration', href: '/docs/advanced/ssr' },
       { title: 'Error Boundaries', href: '/docs/advanced/errors' },
     ],
@@ -158,7 +159,9 @@ export const navigation: NavigationSection[] = [
       { title: 'Multi-Module App', href: '/docs/examples/multi-module' },
       { title: 'AI Agent', href: '/docs/examples/ai-agent' },
       { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
+      { title: 'A/B Testing', href: '/docs/examples/ab-testing' },
       { title: 'Contact Form', href: '/docs/examples/contact-form' },
+      { title: 'Server (Node.js)', href: '/docs/examples/server' },
     ],
   },
   {
