@@ -49,6 +49,7 @@ import type {
 	ErrorBoundaryConfig,
 	InferFacts,
 	InferDerivations,
+	InferSelectorState,
 	InferEvents,
 	SingleModuleSystem,
 	SystemSnapshot,
@@ -326,14 +327,14 @@ function _useDerivedMulti(
 // Existing: non-null system, no default (equalityFn as 3rd param)
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S>,
-	selector: (facts: InferFacts<S>) => R,
+	selector: (state: InferSelectorState<S>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
 // New: non-null system, with default value
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S>,
-	selector: (facts: InferFacts<S>) => R,
+	selector: (state: InferSelectorState<S>) => R,
 	defaultValue: R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
@@ -341,7 +342,7 @@ export function useSelector<S extends ModuleSchema, R>(
 // New: nullable system, default REQUIRED
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S> | null | undefined,
-	selector: (facts: InferFacts<S>) => R,
+	selector: (state: InferSelectorState<S>) => R,
 	defaultValue: R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;

@@ -11,7 +11,7 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `useSelector` | Hook | Auto-tracking selector over all facts |
+| `useSelector` | Hook | Auto-tracking selector over facts and derivations |
 | `useFact` | Hook | Read single/multi facts |
 | `useDerived` | Hook | Read single/multi derivations |
 | `useEvents` | Hook | Typed event dispatchers |
@@ -35,20 +35,20 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 
 ## useSelector
 
-Auto-tracking selector over all facts and derivations. Similar to Zustand's `useStore` pattern. Supports an optional default value and nullable systems.
+Auto-tracking selector over facts and derivations. The selector receives a merged proxy of both facts and derivations, so you can access either with the same syntax. Similar to Zustand's `useStore` pattern. Supports an optional default value and nullable systems.
 
 ```typescript
 // Original: equalityFn as 3rd param
 function useSelector<S, R>(
   system: SingleModuleSystem<S>,
-  selector: (facts: InferFacts<S>) => R,
+  selector: (state: InferSelectorState<S>) => R,
   equalityFn?: (a: R, b: R) => boolean,
 ): R
 
 // With default value
 function useSelector<S, R>(
   system: SingleModuleSystem<S>,
-  selector: (facts: InferFacts<S>) => R,
+  selector: (state: InferSelectorState<S>) => R,
   defaultValue: R,
   equalityFn?: (a: R, b: R) => boolean,
 ): R
@@ -56,7 +56,7 @@ function useSelector<S, R>(
 // Nullable system (default required)
 function useSelector<S, R>(
   system: SingleModuleSystem<S> | null | undefined,
-  selector: (facts: InferFacts<S>) => R,
+  selector: (state: InferSelectorState<S>) => R,
   defaultValue: R,
   equalityFn?: (a: R, b: R) => boolean,
 ): R
@@ -65,33 +65,33 @@ function useSelector<S, R>(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `system` | `SingleModuleSystem<S>` or `null` | The Directive system. May be `null`/`undefined` when a default value is provided. |
-| `selector` | `(facts) => R` | Selector function over all facts and derivations |
+| `selector` | `(state) => R` | Selector function receiving both facts and derivations |
 | `defaultValue` | `R` | Optional default returned before the system starts or when system is null |
 | `equalityFn` | `(a, b) => boolean` | Optional custom equality check (4th param when using default, 3rd param without) |
 
 ```tsx
 import { useSelector, shallowEqual } from '@directive-run/react';
 
-// Basic: select and combine values
-const summary = useSelector(system, (facts) => ({
-  userName: facts.user?.name,
-  itemCount: facts.items?.length ?? 0,
+// Basic: select and combine values (facts and derivations)
+const summary = useSelector(system, (state) => ({
+  userName: state.user?.name,
+  itemCount: state.items?.length ?? 0,
 }));
 
 // With default value – avoids undefined on first render
-const email = useSelector(system, (s) => s.email, "");
-const count = useSelector(system, (s) => s.count, 0);
+const email = useSelector(system, (state) => state.email, "");
+const count = useSelector(system, (state) => state.count, 0);
 
 // With default value + custom equality
 const ids = useSelector(
   system,
-  (facts) => facts.users?.map(u => u.id) ?? [],
+  (state) => state.users?.map(u => u.id) ?? [],
   [],
   shallowEqual,
 );
 
 // Nullable system – returns default until system is available
-const status = useSelector(maybeSystem, (s) => s.status, "idle");
+const status = useSelector(maybeSystem, (state) => state.status, "idle");
 ```
 
 {% callout type="note" title="Backward compatible" %}

@@ -20,6 +20,7 @@ export type {
 	// Schema inference utilities
 	InferFacts,
 	InferDerivations,
+	InferSelectorState,
 	InferEventPayloadFromSchema,
 	InferEvents,
 	InferRequirementPayloadFromSchema,
