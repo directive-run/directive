@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { BlogListItem } from '@/components/BlogListItem'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
-import { getAllCategories, posts } from '@/lib/blog'
+import { getAllCategories, getPublishedPosts } from '@/lib/blog'
 
 const PAGE_SIZE = 10
 
@@ -15,12 +15,13 @@ export function BlogPostList() {
   const activeCategory = searchParams.get('category') ?? ''
   const categories = getAllCategories()
 
+  const published = getPublishedPosts()
   const filteredPosts = useMemo(
     () =>
       activeCategory
-        ? posts.filter((p) => p.categories.includes(activeCategory))
-        : posts,
-    [activeCategory],
+        ? published.filter((p) => p.categories.includes(activeCategory))
+        : published,
+    [activeCategory, published],
   )
 
   const { visibleCount, sentinelRef } = useInfiniteScroll(

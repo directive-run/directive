@@ -1,5 +1,5 @@
 import { navigation } from '@/lib/navigation'
-import { posts } from '@/lib/blog'
+import { getPublishedPosts } from '@/lib/blog'
 
 export function GET() {
   const baseUrl = 'https://directive.run'
@@ -25,7 +25,7 @@ export function GET() {
 
   lines.push('## Blog')
   lines.push('')
-  for (const post of posts) {
+  for (const post of getPublishedPosts()) {
     lines.push(`- [${post.title}](${baseUrl}/blog/${post.slug}): ${post.description}`)
   }
   lines.push('')

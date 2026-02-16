@@ -67,7 +67,7 @@ export const posts: BlogPost[] = [
     title: 'Data Fetching with Directive',
     description:
       'The complete guide to fetching, caching, invalidation, deduplication, cancellation, batching, optimistic updates, and polling – all with constraints and resolvers.',
-    date: '2026-02-13',
+    date: '2026-02-23',
     author: 'directive-labs',
     categories: ['Tutorial', 'Architecture'],
     featured: true,
@@ -77,7 +77,7 @@ export const posts: BlogPost[] = [
     title: 'Stop Writing If-Else Chains for Business Logic',
     description:
       'Replace sprawling conditional logic with declarative constraints. See how constraint-driven architecture eliminates imperative rule spaghetti.',
-    date: '2026-02-12',
+    date: '2026-03-02',
     author: 'directive-labs',
     categories: ['Architecture', 'Tutorial'],
     featured: false,
@@ -87,7 +87,7 @@ export const posts: BlogPost[] = [
     title: 'Why AI Loves Directive',
     description:
       'AI frameworks handle LLM calls. Production agents need budget enforcement, PII redaction, tool control, and approval workflows. Directive adds the orchestration layer without replacing your framework.',
-    date: '2026-02-11',
+    date: '2026-03-09',
     author: 'directive-labs',
     categories: ['AI', 'Architecture'],
     featured: false,
@@ -97,7 +97,7 @@ export const posts: BlogPost[] = [
     title: 'From Redux to Directive in 10 Minutes',
     description:
       'A step-by-step migration from Redux Toolkit to Directive. See how actions, reducers, selectors, and thunks map to facts, derivations, constraints, and resolvers.',
-    date: '2026-02-10',
+    date: '2026-03-16',
     author: 'directive-labs',
     categories: ['Migration', 'Tutorial'],
     featured: false,
@@ -107,7 +107,7 @@ export const posts: BlogPost[] = [
     title: "Why State Machines Aren't Enough",
     description:
       'State machines are great for UI flows, but struggle with data-driven constraints. Discover when to use state machines vs. constraint-driven systems.',
-    date: '2026-02-09',
+    date: '2026-03-23',
     author: 'directive-labs',
     categories: ['Architecture', 'Comparison'],
     featured: false,
@@ -117,7 +117,7 @@ export const posts: BlogPost[] = [
     title: 'Your Zustand Store Is Secretly an Imperative State Machine',
     description:
       'Zustand is great for simple state. But when stores grow complex with async logic, cross-store deps, and manual retries, you have built an ad-hoc state machine without the guarantees.',
-    date: '2026-02-08',
+    date: '2026-03-30',
     author: 'directive-labs',
     categories: ['Comparison', 'State Management'],
     featured: false,
@@ -127,7 +127,7 @@ export const posts: BlogPost[] = [
     title: 'Declarative AI Guardrails: Why Your Agent Framework Needs a Constraint Layer',
     description:
       'Budget enforcement, PII protection, tool denylists, and human-in-the-loop approval — declared as constraints, enforced by the runtime.',
-    date: '2026-02-07',
+    date: '2026-04-06',
     author: 'directive-labs',
     categories: ['AI', 'Architecture'],
     featured: false,
@@ -137,7 +137,7 @@ export const posts: BlogPost[] = [
     title: 'Building AI Agents with Directive',
     description:
       'A practical guide to orchestrating AI agents with approval flows, guardrails, and budget constraints using Directive.',
-    date: '2026-02-06',
+    date: '2026-04-13',
     author: 'directive-labs',
     categories: ['AI', 'Tutorial'],
     featured: false,
@@ -147,7 +147,7 @@ export const posts: BlogPost[] = [
     title: 'Building a Real-Time Dashboard with Directive',
     description:
       'Orchestrate REST APIs, WebSockets, and polling with separate modules, cross-source derivations, and resilient reconnection constraints.',
-    date: '2026-02-05',
+    date: '2026-04-20',
     author: 'directive-labs',
     categories: ['Tutorial', 'Architecture'],
     featured: false,
@@ -157,7 +157,7 @@ export const posts: BlogPost[] = [
     title: 'Feature Flags Without a Feature Flag Service',
     description:
       'Boolean flags don\'t scale. Build a reactive, inspectable feature flag system using constraints, derivations, and effects.',
-    date: '2026-02-04',
+    date: '2026-04-27',
     author: 'directive-labs',
     categories: ['Architecture', 'Tutorial'],
     featured: false,
@@ -167,7 +167,7 @@ export const posts: BlogPost[] = [
     title: 'Building an AI Docs Chatbot with Directive',
     description:
       'How the AI adapter and the core runtime work together to power a RAG-backed docs chatbot with streaming, guardrails, and reactive server-side state.',
-    date: '2026-02-03',
+    date: '2026-05-04',
     author: 'jason-comes',
     categories: ['AI', 'Tutorial'],
     featured: false,
@@ -177,27 +177,43 @@ export const posts: BlogPost[] = [
     title: "Inside Directive's Reconciliation Loop",
     description:
       'A deep dive into the 5-phase engine cycle: fact mutation, derivation invalidation, constraint evaluation, requirement deduplication, and resolver dispatch.',
-    date: '2026-02-02',
+    date: '2026-05-11',
     author: 'directive-labs',
     categories: ['Architecture', 'Engineering'],
     featured: false,
   },
 ]
 
+function isPublished(post: BlogPost): boolean {
+  const today = new Date().toISOString().slice(0, 10)
+
+  return post.date <= today
+}
+
+export function getPublishedPosts(): BlogPost[] {
+  return posts.filter(isPublished)
+}
+
 export function getPost(slug: string): BlogPost | undefined {
-  return posts.find((p) => p.slug === slug)
+  const post = posts.find((p) => p.slug === slug)
+  if (post && !isPublished(post)) {
+    return undefined
+  }
+
+  return post
 }
 
 export function getFeaturedPosts(): BlogPost[] {
-  return posts.filter((p) => p.featured)
+  return posts.filter((p) => p.featured && isPublished(p))
 }
 
 export function getAllCategories(): string[] {
   const cats = new Set<string>()
-  for (const post of posts) {
+  for (const post of getPublishedPosts()) {
     for (const cat of post.categories) {
       cats.add(cat)
     }
   }
+
   return Array.from(cats).sort()
 }

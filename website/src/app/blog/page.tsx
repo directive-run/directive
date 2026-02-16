@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic'
 import { buildPageMetadata } from '@/lib/metadata'
 import { BlogCard } from '@/components/BlogCard'
 import { BlogListItem } from '@/components/BlogListItem'
-import { getFeaturedPosts, posts } from '@/lib/blog'
+import { getFeaturedPosts, getPublishedPosts } from '@/lib/blog'
 
 function BlogPostListFallback() {
   return (
@@ -14,7 +14,7 @@ function BlogPostListFallback() {
         </h2>
       </div>
       <div>
-        {posts.map((post) => (
+        {getPublishedPosts().map((post) => (
           <BlogListItem key={post.slug} post={post} />
         ))}
       </div>
