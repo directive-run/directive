@@ -80,7 +80,7 @@ export function analyzeReduxSlice(config: ReduxSliceConfig): DirectiveModuleStru
 		// Simple heuristic: if reducer name suggests payload, add it
 		const hasPayload = reducerName.includes("By") || reducerName.includes("Set") || reducerName.includes("With");
 		if (hasPayload) {
-			events[reducerName] = { payload: "t.any()" };
+			events[reducerName] = { payload: "t.object()" };
 			eventsCode[reducerName] = `(facts, { payload }) => {\n    // TODO: Implement ${reducerName}\n  }`;
 		} else {
 			events[reducerName] = {};
@@ -334,8 +334,8 @@ export function generateModuleCode(structure: DirectiveModuleStructure): string 
  * Infer a t.* type string from a JavaScript value.
  */
 function inferTypeString(value: unknown): string {
-	if (value === null) return "t.any().nullable()";
-	if (value === undefined) return "t.any().optional()";
+	if (value === null) return "t.object().nullable()";
+	if (value === undefined) return "t.object().optional()";
 
 	switch (typeof value) {
 		case "number":
@@ -346,11 +346,11 @@ function inferTypeString(value: unknown): string {
 			return "t.boolean()";
 		case "object":
 			if (Array.isArray(value)) {
-				return "t.array(t.any())";
+				return "t.array(t.object())";
 			}
 			return "t.object()";
 		default:
-			return "t.any()";
+			return "t.object()";
 	}
 }
 

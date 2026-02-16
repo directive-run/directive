@@ -58,7 +58,10 @@ const dashboard = createModule('dashboard', {
       retry: { attempts: 3, backoff: 'exponential' },
       resolve: async (req, context) => {
         const res = await fetch(`/api/users/${req.userId}/profile`);
-        if (!res.ok) throw new Error('Failed to fetch profile');
+        if (!res.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+
         context.facts.profile = await res.json();
       },
     },
@@ -66,7 +69,10 @@ const dashboard = createModule('dashboard', {
       requirement: 'FETCH_PREFERENCES',
       resolve: async (req, context) => {
         const res = await fetch(`/api/users/${req.userId}/preferences`);
-        if (!res.ok) throw new Error('Failed to fetch preferences');
+        if (!res.ok) {
+          throw new Error('Failed to fetch preferences');
+        }
+
         context.facts.preferences = await res.json();
       },
     },

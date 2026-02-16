@@ -47,7 +47,9 @@ const todos = createModule('todos', {
           const res = await fetch(`/api/todos/${req.id}/toggle`, {
             method: 'PATCH',
           });
-          if (!res.ok) throw new Error('Server rejected update');
+          if (!res.ok) {
+            throw new Error('Server rejected update');
+          }
         } catch (error) {
           // 4. Rollback on failure using snapshot.get()
           context.facts.items = snapshot.get('items')!;
@@ -67,7 +69,9 @@ const todos = createModule('todos', {
           const res = await fetch(`/api/todos/${req.id}`, {
             method: 'DELETE',
           });
-          if (!res.ok) throw new Error('Failed to delete');
+          if (!res.ok) {
+            throw new Error('Failed to delete');
+          }
         } catch (error) {
           context.facts.items = snapshot.get('items')!;
           throw error;

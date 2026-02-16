@@ -27,7 +27,7 @@ const userModule = createModule("user", {
     // Facts with schema builders
     facts: {
       userId: t.number(),
-      user: t.any<User | null>(),
+      user: t.object<User | null>(),
       status: t.string<Status>(),
       errorMessage: t.string(),
     },

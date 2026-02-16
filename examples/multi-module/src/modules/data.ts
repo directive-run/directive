@@ -20,7 +20,7 @@ export const dataSchema = {
     users: t.array<UserData>(),
     isLoading: t.boolean(),
     error: t.string().nullable(),
-    lastFetched: t.any<Date | null>(),
+    lastFetched: t.object<Date | null>(),
   },
   derivations: {
     userCount: t.number(),

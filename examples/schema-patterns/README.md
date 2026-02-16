@@ -13,7 +13,7 @@ createModule("user", {
   schema: {
     facts: {
       userId: t.number().min(0),
-      user: t.any<User | null>(),
+      user: t.object<User | null>(),
       status: t.string<Status>(),
     },
     derivations: {

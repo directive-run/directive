@@ -45,11 +45,17 @@
   --brand-font-code: ui-monospace, monospace;
 
   /* Brand Surface — subtle tint derived from primary palette */
-  --brand-surface: color-mix(in oklab, white 95%, var(--brand-primary-200));
+  --brand-surface: color-mix(in oklab, white 88%, var(--brand-primary-200));
+  --brand-surface-raised: color-mix(in oklab, white 75%, var(--brand-primary-100));
+  --brand-surface-inset: var(--brand-surface);
+  --brand-code-bg: #0f172a;
 }
 
 .dark {
   --brand-surface: color-mix(in oklab, #0f172a 95%, var(--brand-primary-400));
+  --brand-surface-raised: color-mix(in oklab, #1e293b 90%, var(--brand-primary-400));
+  --brand-surface-inset: var(--brand-surface);
+  --brand-code-bg: color-mix(in oklab, #151d2e 92%, var(--brand-primary-400));
 }
 
 @theme {
@@ -115,6 +121,9 @@
   --color-brand-accent-950: var(--brand-accent-950);
 
   --color-brand-surface: var(--brand-surface);
+  --color-brand-surface-raised: var(--brand-surface-raised);
+  --color-brand-surface-inset: var(--brand-surface-inset);
+  --color-brand-code-bg: var(--brand-code-bg);
 }
 
 @layer base {

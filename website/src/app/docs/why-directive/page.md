@@ -50,7 +50,9 @@ async function fetchWithRetry(fn, attempts = 3) {
       return await fn();
     } catch (e) {
       // Give up on the last attempt
-      if (i === attempts - 1) throw e;
+      if (i === attempts - 1) {
+        throw e;
+      }
 
       // Exponential backoff: 1s, 2s, 4s...
       await sleep(Math.pow(2, i) * 1000);

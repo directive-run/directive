@@ -125,8 +125,6 @@ export interface AgentStackConfig {
 		intervalMs?: number;
 		onError?: (err: Error, type: "metrics" | "traces") => void;
 	};
-	/** @deprecated Use `messageBus` instead */
-	bus?: { maxHistory?: number } | MessageBus;
 	/** Message bus for agent communication */
 	messageBus?: { maxHistory?: number } | MessageBus;
 
@@ -138,8 +136,6 @@ export interface AgentStackConfig {
 	maxTokenBudget?: number;
 	/** Cost per million tokens for cost estimation */
 	costPerMillionTokens?: number;
-	/** @deprecated Use `costPerMillionTokens` */
-	costRatePerMillion?: number;
 	debug?: boolean;
 
 	// Directive constraint-driven orchestration
@@ -251,13 +247,6 @@ export interface AgentStack {
 
 	/** Get observability timeline (spans + metrics) for debugging */
 	getTimeline(limit?: number): { spans: readonly TraceSpan[]; metrics: Record<string, AggregatedMetric> };
-
-	/** @deprecated Use `observability` */
-	readonly obs: ObservabilityInstance | null;
-	/** @deprecated Use `messageBus` */
-	readonly bus: MessageBus | null;
-	/** @deprecated Use `coordinator` */
-	readonly multi: MultiAgentOrchestrator | null;
 }
 
 // ============================================================================
@@ -359,7 +348,7 @@ function isPreBuiltBus(v: unknown): v is MessageBus {
 	return typeof obj.publish === "function" && typeof obj.getHistory === "function" && typeof obj.clear === "function";
 }
 
-function expandBus(cfg: AgentStackConfig["bus"]): MessageBus | null {
+function expandBus(cfg: AgentStackConfig["messageBus"]): MessageBus | null {
 	if (!cfg) return null;
 	if (isPreBuiltBus(cfg)) return cfg;
 	return createBus({ maxHistory: cfg.maxHistory ?? 100 });
@@ -410,7 +399,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 		maxTokenBudget,
 		debug = false,
 	} = config;
-	const costRatePerMillion = config.costPerMillionTokens ?? config.costRatePerMillion ?? 0;
+	const costRatePerMillion = config.costPerMillionTokens ?? 0;
 
 	// Warn when both retry systems are configured
 	if (config.retry && config.intelligentRetry) {
@@ -455,7 +444,7 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 	const circuitBreaker = expandCircuitBreaker(config.circuitBreaker);
 	const obsInstance = expandObservability(config.observability);
 	const cacheInstance = expandCache(config.cache);
-	const busInstance = expandBus(config.messageBus ?? config.bus);
+	const busInstance = expandBus(config.messageBus);
 
 	// --- Agent metrics helper ---
 	const metrics = obsInstance ? createAgentMetrics(obsInstance) : null;
@@ -1123,9 +1112,5 @@ export function createAgentStack(config: AgentStackConfig): AgentStack {
 				metrics: obsInstance?.getDashboard()?.metrics ?? {},
 			};
 		},
-		// Deprecated aliases
-		get obs() { return obsInstance; },
-		get bus() { return busInstance; },
-		get multi() { return multi; },
 	};
 }

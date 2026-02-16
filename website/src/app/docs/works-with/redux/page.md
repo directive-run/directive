@@ -158,9 +158,9 @@ import { createModule, t } from '@directive-run/core';
 const cartModule = createModule('cart', {
   schema: {
     facts: {
-      cartItems: t.array(t.any()),
+      cartItems: t.array(t.object()),
       cartTotal: t.number(),
-      user: t.any(),
+      user: t.object(),
       discountApplied: t.boolean(),
     },
     derivations: {

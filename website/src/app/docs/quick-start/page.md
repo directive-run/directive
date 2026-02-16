@@ -108,7 +108,10 @@ export const userModule = createModule("user", {
 
         try {
           const response = await fetch(`/api/users/${context.facts.userId}`);
-          if (!response.ok) throw new Error('Failed to fetch user');
+          if (!response.ok) {
+            throw new Error('Failed to fetch user');
+          }
+
           context.facts.user = await response.json();
         } catch (error) {
           context.facts.error = error instanceof Error ? error.message : 'Unknown error';
@@ -262,7 +265,10 @@ const userModule = createModule("user", {
         context.facts.error = null;
         try {
           const response = await fetch(`/api/users/${context.facts.userId}`);
-          if (!response.ok) throw new Error('Failed to fetch');
+          if (!response.ok) {
+            throw new Error('Failed to fetch');
+          }
+
           context.facts.user = await response.json();
         } catch (error) {
           context.facts.error = error instanceof Error ? error.message : 'Unknown';

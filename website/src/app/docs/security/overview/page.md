@@ -68,6 +68,23 @@ const orchestrator = createAgentOrchestrator({
 
 ---
 
+## Server vs. Browser
+
+All security features use `globalThis.crypto.subtle` (Web Crypto API) and work in both environments:
+
+| Feature | Server (Node 18+) | Browser | Primary Use |
+|---------|-------------------|---------|-------------|
+| PII Detection | Yes | Yes | Both &ndash; input/output scanning |
+| Prompt Injection | Yes | Yes | Both &ndash; input validation |
+| Audit Trail | Yes | Yes | Primarily server &ndash; tamper-evident logs, SIEM export |
+| GDPR/CCPA Compliance | Yes | Yes | Primarily server &ndash; data export, deletion certificates |
+
+Node 18+ is required for `crypto.subtle`. No Node-specific imports are used &ndash; the same code runs in Deno and Bun as well.
+
+Audit trails and compliance tooling are most useful on the server where you control the data layer. PII detection and prompt injection prevention are equally valuable in both environments. See the [Server (Node.js) example](/docs/examples/server) for a full API demonstrating all four features together.
+
+---
+
 ## Next Steps
 
 - **Start with safety** – [PII Detection](/docs/security/pii) is the most common first step

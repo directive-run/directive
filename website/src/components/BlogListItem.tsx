@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ArrowRight } from '@phosphor-icons/react/dist/ssr'
 
 import type { BlogPost } from '@/lib/blog'
 import { resolveAuthor } from '@/lib/blog'
@@ -39,7 +40,7 @@ export function BlogListItem({ post }: { post: BlogPost }) {
               <Link
                 key={cat}
                 href={`/blog?category=${encodeURIComponent(cat)}`}
-                className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-brand-surface-raised dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 {cat}
               </Link>
@@ -57,19 +58,7 @@ export function BlogListItem({ post }: { post: BlogPost }) {
           </p>
           <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-primary dark:text-brand-primary-400">
             Read more
-            <svg
-              className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-              />
-            </svg>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </span>
         </Link>
       </div>

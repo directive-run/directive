@@ -44,10 +44,10 @@ function createPool(): Tile[] {
 
 const schema = {
   facts: {
-    pool: t.any<Tile[]>(),
-    table: t.any<Tile[]>(),
-    removed: t.any<Tile[]>(),
-    selected: t.any<string[]>(),
+    pool: t.object<Tile[]>(),
+    table: t.object<Tile[]>(),
+    removed: t.object<Tile[]>(),
+    selected: t.object<string[]>(),
     message: t.string(),
     moveCount: t.number(),
     gameOver: t.boolean(),
@@ -55,7 +55,7 @@ const schema = {
   derivations: {
     poolCount: t.number(),
     removedCount: t.number(),
-    selectedTiles: t.any<Tile[]>(),
+    selectedTiles: t.object<Tile[]>(),
     hasValidMoves: t.boolean(),
   },
   events: {
@@ -65,7 +65,7 @@ const schema = {
     clearSelection: {},
   },
   requirements: {
-    REMOVE_TILES: { tileIds: t.any<string[]>() },
+    REMOVE_TILES: { tileIds: t.object<string[]>() },
     REFILL_TABLE: { count: t.number() },
     END_GAME: { reason: t.string() },
   },

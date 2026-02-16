@@ -499,9 +499,9 @@ import type { ModuleSchema } from '@directive-run/core';
 import { t } from '@directive-run/core';
 
 const schema = {
-  facts: { count: t.number(), user: t.any<User | null>() },
+  facts: { count: t.number(), user: t.object<User | null>() },
   derivations: { doubled: t.number() },
-  events: { increment: {}, setUser: { user: t.any<User>() } },
+  events: { increment: {}, setUser: { user: t.object<User>() } },
   requirements: {},
 } satisfies ModuleSchema;
 

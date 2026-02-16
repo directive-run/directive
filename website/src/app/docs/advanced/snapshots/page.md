@@ -103,6 +103,41 @@ const unsubscribe = system.watchDistributableSnapshot(
 
 ---
 
+## Validating Snapshot Expiry
+
+Before serving a cached snapshot, check that it hasn't expired:
+
+```typescript
+import { isSnapshotExpired, validateSnapshot } from '@directive-run/core';
+
+// Simple check
+if (isSnapshotExpired(cachedSnapshot)) {
+  // Fetch a fresh snapshot
+}
+
+// Strict validation: throws if expired, missing data, or malformed
+try {
+  const data = validateSnapshot(cachedSnapshot);
+} catch (error) {
+  // Handle expired or invalid snapshot
+}
+```
+
+When verifying signed snapshots, check both the signature and expiry:
+
+```typescript
+const isValid = await verifySnapshotSignature(signed, secret);
+const isExpired = isSnapshotExpired(signed);
+
+if (!isValid || isExpired) {
+  // Reject: tampered or stale
+}
+```
+
+`signSnapshot` and `verifySnapshotSignature` use `globalThis.crypto.subtle` (Web Crypto API) and work in Node 18+, all modern browsers, Deno, and Bun. No Node-specific imports required.
+
+---
+
 ## Next Steps
 
 - [Time-Travel](/docs/advanced/time-travel) – Navigation

@@ -60,7 +60,7 @@ export function BlogPostLayout({
     : undefined
 
   return (
-    <div className="w-full py-16">
+    <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">
       {title && <title>{`${title} | Directive Blog`}</title>}
       {description && <meta name="description" content={description} />}
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
@@ -161,7 +161,7 @@ export function BlogPostLayout({
                   <Link
                     key={cat}
                     href={`/blog?category=${encodeURIComponent(cat)}`}
-                    className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-brand-surface-raised dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     {cat}
                   </Link>
@@ -189,7 +189,7 @@ export function BlogPostLayout({
                     <Link
                       key={cat}
                       href={`/blog?category=${encodeURIComponent(cat)}`}
-                      className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                      className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-200 dark:bg-brand-surface-raised dark:text-slate-400 dark:hover:bg-slate-700"
                     >
                       {cat}
                     </Link>

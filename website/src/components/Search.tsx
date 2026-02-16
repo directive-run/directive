@@ -25,6 +25,8 @@ import {
 import { Dialog, DialogPanel } from '@headlessui/react'
 import clsx from 'clsx'
 
+import { MagnifyingGlass } from '@phosphor-icons/react'
+
 import { navigation } from '@/lib/navigation'
 import { type Result } from '@/markdoc/search.mjs'
 
@@ -70,14 +72,6 @@ type Autocomplete = AutocompleteApi<
   React.MouseEvent,
   React.KeyboardEvent
 >
-
-function SearchIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" {...props}>
-      <path d="M16.293 17.707a1 1 0 0 0 1.414-1.414l-1.414 1.414ZM9 14a5 5 0 0 1-5-5H2a7 7 0 0 0 7 7v-2ZM4 9a5 5 0 0 1 5-5V2a7 7 0 0 0-7 7h2Zm5-5a5 5 0 0 1 5 5h2a7 7 0 0 0-7-7v2Zm8.707 12.293-3.757-3.757-1.414 1.414 3.757 3.757 1.414-1.414ZM14 9a4.98 4.98 0 0 1-1.464 3.536l1.414 1.414A6.98 6.98 0 0 0 16 9h-2Zm-1.464 3.536A4.98 4.98 0 0 1 9 14v2a6.98 6.98 0 0 0 4.95-2.05l-1.414-1.414Z" />
-    </svg>
-  )
-}
 
 // Memoized search source to prevent re-importing on every keystroke
 let searchModule: { search: (query: string, options?: { limit?: number }) => Array<Result> } | null = null
@@ -321,7 +315,7 @@ const SearchInput = forwardRef<
 
   return (
     <div className="group relative flex h-12">
-      <SearchIcon className="pointer-events-none absolute top-0 left-4 h-full w-5 fill-slate-400 dark:fill-slate-500" />
+      <MagnifyingGlass className="pointer-events-none absolute top-0 left-4 h-full w-5 text-slate-400 dark:text-slate-500" />
       <input
         ref={inputRef}
         data-autofocus
@@ -434,7 +428,7 @@ function SearchDialog({
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" />
 
         <div className="fixed inset-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-20 md:py-32 lg:px-8 lg:py-[15vh]">
-          <DialogPanel className="mx-auto transform-gpu overflow-hidden rounded-xl bg-white shadow-xl sm:max-w-xl dark:bg-slate-800 dark:ring-1 dark:ring-slate-700">
+          <DialogPanel className="mx-auto transform-gpu overflow-hidden rounded-xl bg-white shadow-xl sm:max-w-xl dark:bg-brand-surface-raised dark:ring-1 dark:ring-slate-700">
             <div {...autocomplete.getRootProps({})}>
               <form
                 ref={formRef}
@@ -450,7 +444,7 @@ function SearchDialog({
                 />
                 <div
                   ref={panelRef}
-                  className="border-t border-slate-200 bg-white px-2 py-3 empty:hidden dark:border-slate-400/10 dark:bg-slate-800"
+                  className="border-t border-slate-200 bg-white px-2 py-3 empty:hidden dark:border-slate-400/10 dark:bg-brand-surface-raised"
                   {...autocomplete.getPanelProps({})}
                 >
                   {autocompleteState.isOpen && (
@@ -508,10 +502,10 @@ function SearchInner() {
     <>
       <button
         type="button"
-        className="group flex h-10 w-10 items-center justify-center sm:justify-start md:h-auto md:w-full md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 md:hover:ring-slate-300 dark:md:bg-slate-800/75 dark:md:ring-white/5 dark:md:ring-inset dark:md:hover:bg-slate-700/40 dark:md:hover:ring-slate-500"
+        className="group flex h-10 w-10 items-center justify-center sm:justify-start md:h-auto md:w-full md:rounded-lg md:py-2.5 md:pr-3.5 md:pl-4 md:text-sm md:ring-1 md:ring-slate-200 md:hover:ring-slate-300 dark:md:bg-brand-surface-raised/75 dark:md:ring-white/5 dark:md:ring-inset dark:md:hover:bg-slate-700/40 dark:md:hover:ring-slate-500"
         {...buttonProps}
       >
-        <SearchIcon className="h-5 w-5 flex-none fill-slate-400 group-hover:fill-slate-500 md:group-hover:fill-slate-400 dark:fill-slate-500" />
+        <MagnifyingGlass className="h-5 w-5 flex-none text-slate-400 group-hover:text-slate-500 md:group-hover:text-slate-400 dark:text-slate-500" />
         <span className="sr-only md:not-sr-only md:ml-2 md:text-slate-500 md:dark:text-slate-400">
           Search docs
         </span>

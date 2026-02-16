@@ -11,22 +11,10 @@ import {
   TYPO_PRESETS,
   DEFAULT_COLOR_PRESET,
   DEFAULT_TYPO_PRESET,
-  applyColorPreset,
-  applyTypoPreset,
-  applyFontSize,
-  clearPresets,
-  clearFontSize,
   findColorPreset,
   findTypoPreset,
-  type ColorPreset,
-  type TypoPreset,
 } from '@/lib/brand-presets'
-import {
-  STORAGE_KEYS,
-  safeGetItem,
-  safeSetItem,
-  safeRemoveItem,
-} from '@/lib/storage-keys'
+import { useThemePresets } from '@/lib/useThemePresets'
 
 export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   className,
@@ -34,67 +22,51 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   className?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [colorId, setColorId] = useState<string>('default')
-  const [typoId, setTypoId] = useState<number>(0)
-  const [fontScale, setFontScale] = useState<number>(100)
-  const [mounted, setMounted] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const firstColorRef = useRef<HTMLButtonElement>(null)
-  const activeColorRef = useRef(colorId)
 
-  useEffect(() => {
-    setMounted(true)
-    const savedColor = safeGetItem(STORAGE_KEYS.COLOR)
-    const savedTypo = safeGetItem(STORAGE_KEYS.TYPO)
-
-    if (savedColor) {
-      const preset = findColorPreset(savedColor)
-      if (preset) {
-        setColorId(savedColor)
-        activeColorRef.current = savedColor
-        applyColorPreset(preset)
-      }
-    }
-
-    if (savedTypo) {
-      const id = parseInt(savedTypo, 10)
-      const preset = findTypoPreset(id)
-      if (preset) {
-        setTypoId(id)
-        applyTypoPreset(preset)
-      }
-    }
-
-    const savedFontSize = safeGetItem(STORAGE_KEYS.FONT_SIZE)
-    if (savedFontSize) {
-      const scale = parseFloat(savedFontSize)
-      if (!isNaN(scale)) {
-        setFontScale(scale)
-        applyFontSize(scale)
-      }
-    }
-
-  }, [])
+  const {
+    colorId,
+    typoId,
+    fontScale,
+    mounted,
+    handleColorChange,
+    handleTypoChange,
+    handleFontSizeChange,
+    handleReset,
+    handleColorHover,
+    handleColorLeave,
+  } = useThemePresets()
 
   // Close on click outside
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      return
+    }
+
     function handleClick(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
+
     return () => document.removeEventListener('mousedown', handleClick)
   }, [isOpen])
 
   // Close on Escape key
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      return
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsOpen(false)
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
+
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen])
 
@@ -105,55 +77,9 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
     }
   }, [isOpen])
 
-  const handleColorChange = useCallback((preset: ColorPreset) => {
-    activeColorRef.current = preset.id
-    setColorId(preset.id)
-    applyColorPreset(preset)
-    safeSetItem(STORAGE_KEYS.COLOR, preset.id)
-  }, [])
-
-  const handleTypoChange = useCallback((preset: TypoPreset) => {
-    setTypoId(preset.id)
-    applyTypoPreset(preset)
-    safeSetItem(STORAGE_KEYS.TYPO, String(preset.id))
-  }, [])
-
-  const handleFontSizeChange = useCallback((delta: number) => {
-    setFontScale((prev) => {
-      const next = Math.round((prev + delta) * 10) / 10
-      const clamped = Math.max(75, Math.min(150, next))
-      applyFontSize(clamped)
-      if (clamped === 100) {
-        clearFontSize()
-        safeRemoveItem(STORAGE_KEYS.FONT_SIZE)
-      } else {
-        safeSetItem(STORAGE_KEYS.FONT_SIZE, String(clamped))
-      }
-
-      return clamped
-    })
-  }, [])
-
-  const handleReset = useCallback(() => {
-    activeColorRef.current = 'default'
-    clearPresets()
-    setColorId('default')
-    setTypoId(0)
-    setFontScale(100)
-    safeRemoveItem(STORAGE_KEYS.COLOR)
-    safeRemoveItem(STORAGE_KEYS.TYPO)
-    safeRemoveItem(STORAGE_KEYS.FONT_SIZE)
-  }, [])
-
-  // Hover preview — temporarily apply preset, restore on leave
-  const handleColorHover = useCallback((preset: ColorPreset) => {
-    applyColorPreset(preset)
-  }, [])
-
-  const handleColorLeave = useCallback(() => {
-    const current = findColorPreset(activeColorRef.current)
-    if (current) applyColorPreset(current)
-  }, [])
+  const handleFontSizeDelta = useCallback((delta: number) => {
+    handleFontSizeChange(fontScale + delta)
+  }, [fontScale, handleFontSizeChange])
 
   if (!mounted) {
     return <div className={clsx('h-10 w-10 sm:h-8 sm:w-8', className)} suppressHydrationWarning />
@@ -284,11 +210,11 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
             </p>
             <div className="flex items-center justify-center gap-4">
               <button
-                onClick={() => handleFontSizeChange(-12.5)}
-                disabled={fontScale <= 75}
+                onClick={() => handleFontSizeDelta(-10)}
+                disabled={fontScale <= 80}
                 className={clsx(
                   'flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition',
-                  fontScale <= 75
+                  fontScale <= 80
                     ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
                 )}
@@ -300,7 +226,7 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                 {fontScale}%
               </span>
               <button
-                onClick={() => handleFontSizeChange(12.5)}
+                onClick={() => handleFontSizeDelta(10)}
                 disabled={fontScale >= 150}
                 className={clsx(
                   'flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition',
