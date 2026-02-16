@@ -24,7 +24,7 @@ export const uiSchema = {
   },
   derivations: {
     hasNotifications: t.boolean(),
-    latestNotification: t.any<Notification | null>(),
+    latestNotification: t.object<Notification | null>(),
     // Cross-module derivation: computes from auth + data modules
     canShowDashboard: t.boolean(),
     statusSummary: t.string(),

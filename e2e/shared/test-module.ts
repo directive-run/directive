@@ -15,7 +15,7 @@ const testSchema = {
     doubled: t.number(),
     isPositive: t.boolean(),
     itemCount: t.number(),
-    summary: t.any<{ phase: string; doubled: number; isPositive: boolean }>(),
+    summary: t.object<{ phase: string; doubled: number; isPositive: boolean }>(),
   },
   events: {
     increment: {},

@@ -557,23 +557,6 @@ export function useWatch<
 	) => void,
 ): void;
 
-/**
- * Watch a fact by explicit "fact" discriminator.
- * @deprecated Use `useWatch(system, key, callback)` instead — facts are now auto-detected.
- */
-export function useWatch<
-	S extends ModuleSchema,
-	K extends keyof InferFacts<S> & string,
->(
-	system: SingleModuleSystem<S>,
-	kind: "fact",
-	factKey: K,
-	callback: (
-		newValue: InferFacts<S>[K] | undefined,
-		prevValue: InferFacts<S>[K] | undefined,
-	) => void,
-): void;
-
 /** Watch a fact or derivation (generic fallback) */
 export function useWatch<T>(
 	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
@@ -586,24 +569,11 @@ export function useWatch<T>(
 export function useWatch(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	system: SingleModuleSystem<any>,
-	derivationIdOrKind: string,
+	key: string,
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
-	callbackOrFactKey: string | ((newValue: any, prevValue: any) => void),
-	// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
-	maybeCallback?: (newValue: any, prevValue: any) => void,
+	callback: (newValue: any, prevValue: any) => void,
 ): void {
 	assertSystem("useWatch", system);
-	// Backward compat: useWatch(system, "fact", factKey, callback)
-	const isFact =
-		derivationIdOrKind === "fact" &&
-		typeof callbackOrFactKey === "string" &&
-		typeof maybeCallback === "function";
-	const key = isFact ? (callbackOrFactKey as string) : derivationIdOrKind;
-	const callback = isFact
-		// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
-		? (maybeCallback as (newValue: any, prevValue: any) => void)
-		// biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
-		: (callbackOrFactKey as (newValue: any, prevValue: any) => void);
 
 	const callbackRef = useRef(callback);
 	callbackRef.current = callback;

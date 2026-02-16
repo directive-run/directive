@@ -202,7 +202,9 @@ export interface DistributableSnapshotOptions {
  *
  * // Later, in an API route (no Directive runtime needed)
  * const cached = JSON.parse(await redis.get(`entitlements:${userId}`));
- * if (!cached.data.canUseFeature.api) throw new ForbiddenError();
+ * if (!cached.data.canUseFeature.api) {
+ *   throw new ForbiddenError();
+ * }
  * ```
  */
 export interface DistributableSnapshot<T = Record<string, unknown>> {
