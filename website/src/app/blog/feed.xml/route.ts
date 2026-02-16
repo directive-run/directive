@@ -1,4 +1,4 @@
-import { posts } from '@/lib/blog'
+import { getPublishedPosts } from '@/lib/blog'
 
 function escapeXml(str: string): string {
   return str
@@ -12,7 +12,7 @@ function escapeXml(str: string): string {
 export function GET() {
   const baseUrl = 'https://directive.run'
 
-  const sortedPosts = [...posts].sort(
+  const sortedPosts = [...getPublishedPosts()].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   )
 
