@@ -2,6 +2,15 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import {
+  PencilSimple,
+  ArrowsClockwise,
+  Funnel,
+  PaperPlaneTilt,
+  Lightning,
+  CheckCircle,
+  Clock,
+} from '@phosphor-icons/react'
 
 import type { ExperimentChangeEvent } from '@/components/LabsExperimentPanel'
 
@@ -10,94 +19,69 @@ interface Step {
   label: string
   idleDetail: string
   activeDetail?: (event: ExperimentChangeEvent) => string
-
-  bgActive: string
-  bgIdle: string
-  border: string
-  borderActive: string
-  textActive: string
-  dot: string
+  icon: React.ElementType
+  iconBg: string
+  iconBgDone: string
 }
 
 const STEPS: Step[] = [
   {
     id: 'fact',
-    label: 'Fact Mutated',
-    idleDetail: 'assignments[experimentId] = variant',
+    label: 'Fact mutated',
+    idleDetail: 'A value in the store changes',
     activeDetail: (e) => `assignments["${e.experimentId}"] = "${e.toVariant}"`,
-
-    bgActive: 'bg-brand-primary-100 dark:bg-brand-primary-900/50',
-    bgIdle: 'bg-brand-primary-50 dark:bg-brand-primary-950/30',
-    border: 'border-brand-primary-300 dark:border-brand-primary-700',
-    borderActive: 'border-brand-primary-500',
-    textActive: 'text-brand-primary-700 dark:text-brand-primary-300',
-    dot: 'bg-brand-primary',
+    icon: PencilSimple,
+    iconBg: 'bg-brand-primary',
+    iconBgDone: 'bg-brand-primary',
   },
   {
     id: 'derivation',
-    label: 'Derivation Invalidated',
-    idleDetail: 'activeExperiments recomputed',
-
-    bgActive: 'bg-sky-100 dark:bg-sky-900/50',
-    bgIdle: 'bg-sky-50 dark:bg-sky-950/30',
-    border: 'border-sky-300 dark:border-sky-700',
-    borderActive: 'border-sky-500',
-    textActive: 'text-sky-700 dark:text-sky-300',
-    dot: 'bg-sky-500',
+    label: 'Derivation invalidated',
+    idleDetail: 'Computed values that depend on it recompute',
+    icon: ArrowsClockwise,
+    iconBg: 'bg-sky-500',
+    iconBgDone: 'bg-sky-500',
   },
   {
     id: 'constraint',
-    label: 'Constraint Evaluates',
-    idleDetail: 'needsExposure(experimentId) → true',
+    label: 'Constraint evaluates',
+    idleDetail: 'Rules check if any action is needed',
     activeDetail: (e) => `needsExposure("${e.experimentId}") → true`,
-
-    bgActive: 'bg-amber-100 dark:bg-amber-900/50',
-    bgIdle: 'bg-amber-50 dark:bg-amber-950/30',
-    border: 'border-amber-300 dark:border-amber-700',
-    borderActive: 'border-amber-500',
-    textActive: 'text-amber-700 dark:text-amber-300',
-    dot: 'bg-amber-500',
+    icon: Funnel,
+    iconBg: 'bg-amber-500',
+    iconBgDone: 'bg-amber-500',
   },
   {
     id: 'requirement',
-    label: 'Requirement Emitted',
-    idleDetail: 'TRACK_EXPOSURE { experimentId, variantId }',
+    label: 'Requirement emitted',
+    idleDetail: 'A needed action is identified and queued',
     activeDetail: (e) => `TRACK_EXPOSURE { "${e.experimentId}", "${e.toVariant}" }`,
-
-    bgActive: 'bg-violet-100 dark:bg-violet-900/50',
-    bgIdle: 'bg-violet-50 dark:bg-violet-950/30',
-    border: 'border-violet-300 dark:border-violet-700',
-    borderActive: 'border-violet-500',
-    textActive: 'text-violet-700 dark:text-violet-300',
-    dot: 'bg-violet-500',
+    icon: PaperPlaneTilt,
+    iconBg: 'bg-violet-500',
+    iconBgDone: 'bg-violet-500',
   },
   {
     id: 'resolver',
-    label: 'Resolver Executes',
-    idleDetail: 'trackExposure(experimentId, variantId)',
+    label: 'Resolver executes',
+    idleDetail: 'The matching handler fulfills the requirement',
     activeDetail: (e) => `trackExposure("${e.experimentId}", "${e.toVariant}")`,
-
-    bgActive: 'bg-emerald-100 dark:bg-emerald-900/50',
-    bgIdle: 'bg-emerald-50 dark:bg-emerald-950/30',
-    border: 'border-emerald-300 dark:border-emerald-700',
-    borderActive: 'border-emerald-500',
-    textActive: 'text-emerald-700 dark:text-emerald-300',
-    dot: 'bg-emerald-500',
+    icon: Lightning,
+    iconBg: 'bg-emerald-500',
+    iconBgDone: 'bg-emerald-500',
   },
   {
     id: 'settled',
-    label: 'Facts Updated',
-    idleDetail: 'exposures[experimentId] = timestamp',
+    label: 'Facts updated',
+    idleDetail: 'Results written back to the store',
     activeDetail: (e) => `exposures["${e.experimentId}"] = ${e.timestamp}`,
-
-    bgActive: 'bg-brand-primary-100 dark:bg-brand-primary-900/50',
-    bgIdle: 'bg-brand-primary-50 dark:bg-brand-primary-950/30',
-    border: 'border-brand-primary-300 dark:border-brand-primary-700',
-    borderActive: 'border-brand-primary-500',
-    textActive: 'text-brand-primary-700 dark:text-brand-primary-300',
-    dot: 'bg-brand-primary',
+    icon: CheckCircle,
+    iconBg: 'bg-brand-primary',
+    iconBgDone: 'bg-brand-primary',
   },
 ]
+
+/** Delay between steps in ms (slowed for visualization). */
+const STEP_DELAY = 600
 
 interface LabsConstraintVizProps {
   lastEvent: ExperimentChangeEvent | null
@@ -119,12 +103,11 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
       setActiveStep(step)
       step++
       if (step <= STEPS.length) {
-        timeoutRef.current = setTimeout(next, 500)
+        timeoutRef.current = setTimeout(next, STEP_DELAY)
       } else {
         timeoutRef.current = setTimeout(() => {
-          setActiveStep(-1)
           setIsAnimating(false)
-        }, 1000)
+        }, 800)
       }
     }
 
@@ -150,120 +133,141 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
   }, [])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
           Constraint Flow
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Toggle an experiment to watch the constraint → resolver cycle animate in real time.
+          Toggle an experiment to watch the constraint &rarr; resolver cycle.
         </p>
       </div>
 
-      {/* Flow Visualization */}
-      <div className="relative">
-        {/* Steps */}
-        <div className="space-y-3">
-          {STEPS.map((step, i) => (
-            <div key={step.id} className="flex items-start gap-4">
-              {/* Timeline */}
-              <div className="flex flex-col items-center">
-                <div
-                  className={clsx(
-                    'flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all duration-300',
-                    activeStep === i
-                      ? `${step.borderActive} ${step.bgActive} scale-110`
-                      : activeStep > i
-                        ? `${step.borderActive} ${step.bgActive}`
-                        : `${step.border} ${step.bgIdle}`,
-                  )}
-                >
-                  {activeStep > i ? (
-                    <svg className={clsx('h-4 w-4', step.textActive)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <span className={clsx(
-                      'text-xs font-bold transition-colors',
-                      activeStep === i ? step.textActive : 'text-slate-400 dark:text-slate-500',
-                    )}>
-                      {i + 1}
-                    </span>
-                  )}
-                </div>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={clsx(
-                      'h-6 w-0.5 transition-colors duration-300',
-                      activeStep > i ? step.dot : 'bg-slate-200 dark:bg-slate-700',
-                    )}
-                  />
-                )}
-              </div>
+      {/* Slow-motion callout */}
+      <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">
+        <Clock weight="bold" className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+          Slowed to {STEP_DELAY}ms per step for visualization. In production this cycle completes synchronously in &lt;1ms.
+        </p>
+      </div>
 
-              {/* Content */}
-              <div
-                className={clsx(
-                  'flex-1 rounded-xl border px-4 py-3 transition-all duration-300',
-                  activeStep === i
-                    ? `${step.bgActive} ${step.borderActive} shadow-sm`
-                    : activeStep > i
-                      ? `${step.bgActive} ${step.border}`
-                      : `${step.bgIdle} ${step.border}`,
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={clsx(
-                      'text-sm font-semibold transition-colors',
-                      activeStep >= i
-                        ? step.textActive
-                        : 'text-slate-500 dark:text-slate-400',
-                    )}
-                  >
-                    {step.label}
-                  </span>
-                  {activeStep === i && (
-                    <span className={clsx('h-2 w-2 animate-pulse rounded-full', step.dot)} />
-                  )}
-                </div>
-                <p
-                  className={clsx(
-                    'mt-0.5 font-mono text-xs transition-colors',
-                    activeStep >= i
-                      ? 'text-slate-600 dark:text-slate-300'
-                      : 'text-slate-400 dark:text-slate-500',
-                  )}
-                >
-                  {lastEvent && activeStep >= i && step.activeDetail
-                    ? step.activeDetail(lastEvent)
-                    : step.idleDetail}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Feed */}
+      <div className="flow-root">
+        <ul role="list" className="-mb-8">
+          {STEPS.map((step, i) => {
+            const isActive = activeStep === i
+            const isDone = activeStep > i
+            const isReached = activeStep >= i
+            const Icon = step.icon
 
-        {/* Status */}
-        <div className="mt-4 flex items-center justify-center gap-2" aria-live="polite">
-          {isAnimating ? (
-            <>
-              <span className="h-2 w-2 animate-pulse rounded-full bg-brand-primary" />
-              <span className="text-xs font-medium text-brand-primary">Reconciling&hellip;</span>
-            </>
-          ) : activeStep >= STEPS.length - 1 ? (
-            <>
-              <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Settled</span>
-            </>
-          ) : (
-            <span className="text-xs text-slate-400">
+            return (
+              <li key={step.id}>
+                <div className="relative pb-8">
+                  {/* Connector line */}
+                  {i < STEPS.length - 1 && (
+                    <span
+                      aria-hidden="true"
+                      className={clsx(
+                        'absolute top-4 left-4 -ml-px h-full w-0.5 transition-colors duration-300',
+                        isDone
+                          ? 'bg-slate-300 dark:bg-slate-600'
+                          : 'bg-slate-200 dark:bg-slate-700/50',
+                      )}
+                    />
+                  )}
+
+                  <div className="relative flex space-x-3">
+                    {/* Icon circle */}
+                    <div>
+                      <span
+                        className={clsx(
+                          'flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white transition-all duration-300 dark:ring-slate-800',
+                          isReached
+                            ? step.iconBg
+                            : 'bg-slate-200 dark:bg-slate-700',
+                          isActive && 'scale-110 shadow-lg',
+                        )}
+                      >
+                        <Icon
+                          weight="bold"
+                          aria-hidden="true"
+                          className={clsx(
+                            'h-4 w-4 transition-colors duration-300',
+                            isReached
+                              ? 'text-white'
+                              : 'text-slate-400 dark:text-slate-500',
+                          )}
+                        />
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex min-w-0 flex-1 justify-between pt-1">
+                      <div className="min-w-0">
+                        <p
+                          className={clsx(
+                            'flex items-center text-sm font-medium transition-colors duration-300',
+                            isReached
+                              ? 'text-slate-900 dark:text-white'
+                              : 'text-slate-400 dark:text-slate-500',
+                          )}
+                        >
+                          {step.label}
+                          {isActive && (
+                            <span className="ml-2 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-brand-primary" />
+                          )}
+                        </p>
+                        <p
+                          className={clsx(
+                            'mt-0.5 truncate font-mono text-xs transition-colors duration-300',
+                            isReached
+                              ? 'text-slate-500 dark:text-slate-400'
+                              : 'text-slate-300 dark:text-slate-600',
+                          )}
+                        >
+                          {lastEvent && isReached && step.activeDetail
+                            ? step.activeDetail(lastEvent)
+                            : step.idleDetail}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
+      {/* Status banner */}
+      <div aria-live="polite">
+        {isAnimating && activeStep < STEPS.length ? (
+          <div className="flex items-center gap-2.5 rounded-lg border border-brand-primary-200 bg-brand-primary-50 px-4 py-3 dark:border-brand-primary-800/40 dark:bg-brand-primary-950/30">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-primary" />
+            <span className="text-sm font-semibold text-brand-primary-700 dark:text-brand-primary-300">
+              Reconciling&hellip;
+            </span>
+            <span className="text-xs text-brand-primary-500 dark:text-brand-primary-400">
+              Step {activeStep + 1} of {STEPS.length}
+            </span>
+          </div>
+        ) : activeStep >= STEPS.length - 1 ? (
+          <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/30">
+            <CheckCircle weight="fill" className="h-5 w-5 text-emerald-500" />
+            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+              Settled
+            </span>
+            <span className="text-xs text-emerald-500 dark:text-emerald-400">
+              All constraints resolved
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+            <span className="text-sm text-slate-400 dark:text-slate-500">
               Toggle an experiment to see the cycle
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

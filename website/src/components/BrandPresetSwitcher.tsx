@@ -3,7 +3,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
-import { Palette } from '@phosphor-icons/react'
+import Link from 'next/link'
+import { ArrowRight, Flask } from '@phosphor-icons/react'
 import { IconButton } from '@/components/IconButton'
 
 import {
@@ -95,23 +96,40 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
       <IconButton
         onClick={() => setIsOpen(!isOpen)}
         active={isOpen}
-        aria-label="Toggle brand preset switcher"
+        aria-label="Toggle labs panel"
         aria-expanded={isOpen}
-        title="Brand Preset Switcher"
+        title="Labs"
       >
-        <Palette className="h-6 w-6 sm:h-5 sm:w-5" weight="duotone" />
+        <Flask className="h-6 w-6 sm:h-5 sm:w-5" weight="duotone" />
       </IconButton>
 
       {isOpen && (
         <div
           className="absolute top-full right-0 mt-3 max-h-[calc(100vh-8rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-white p-4 shadow-md ring-1 shadow-black/5 ring-black/5 dark:bg-slate-800 dark:ring-white/5"
           role="dialog"
-          aria-label="Brand presets"
+          aria-label="Labs"
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-3">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              Brand Presets
+              Labs
             </h3>
+          </div>
+
+          <Link
+            href="/labs"
+            onClick={() => setIsOpen(false)}
+            className="mb-4 flex items-center justify-between rounded-lg bg-brand-primary/10 px-3 py-2.5 text-sm font-medium text-brand-primary transition-colors hover:bg-brand-primary/15 dark:text-brand-primary-400"
+          >
+            Open Labs
+            <ArrowRight className="h-4 w-4" weight="bold" />
+          </Link>
+
+          <div className="mb-4 border-t border-slate-200 dark:border-slate-700" />
+
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Brand Presets
+            </p>
             <button
               onClick={handleReset}
               className="cursor-pointer text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
