@@ -97,17 +97,17 @@ import { useSelector, shallowEqual } from '@directive-run/solid';
 
 function Summary() {
   // Transform a single fact value
-  const upperName = useSelector(system, (facts) => facts.user?.name?.toUpperCase() ?? "GUEST");
+  const upperName = useSelector(system, (state) => state.user?.name?.toUpperCase() ?? "GUEST");
 
-  // Extract a slice from a fact
-  const itemCount = useSelector(system, (facts) => facts.items?.length ?? 0);
+  // Extract a slice from state
+  const itemCount = useSelector(system, (state) => state.items?.length ?? 0);
 
-  // Combine values from multiple facts with custom equality
+  // Combine values with custom equality
   const summary = useSelector(
     system,
-    (facts) => ({
-      userName: facts.user?.name,
-      itemCount: facts.items?.length ?? 0,
+    (state) => ({
+      userName: state.user?.name,
+      itemCount: state.items?.length ?? 0,
     }),
     (a, b) => a.userName === b.userName && a.itemCount === b.itemCount
   );

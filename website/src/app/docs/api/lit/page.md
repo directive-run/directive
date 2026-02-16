@@ -156,7 +156,7 @@ import { DirectiveSelectorController } from '@directive-run/lit';
 new DirectiveSelectorController<R>(
   host: ReactiveControllerHost,
   system: System,
-  selector: (facts: FactsProxy) => R,
+  selector: (state: FactsProxy) => R,
   equalityFn?: (a: R, b: R) => boolean,
 )
 ```
@@ -165,7 +165,7 @@ new DirectiveSelectorController<R>(
 |---|---|---|
 | `host` | `ReactiveControllerHost` | The Lit element (`this`) |
 | `system` | `System` | The Directive system |
-| `selector` | `(facts: FactsProxy) => R` | Selector over all facts |
+| `selector` | `(state: FactsProxy) => R` | Selector over facts and derivations |
 | `equalityFn` | `(a: R, b: R) => boolean` | Optional custom equality check (defaults to `===`) |
 
 | Property | Type | Description |

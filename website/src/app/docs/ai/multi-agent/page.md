@@ -1019,9 +1019,9 @@ function MultiAgentPanel() {
   const { system } = orchestrator;
 
   const agent = useFact(system, '__agent');
-  const summary = useSelector(system, (facts) => ({
-    status: facts.__agent?.status,
-    tokens: facts.__agent?.totalTokens,
+  const summary = useSelector(system, (state) => ({
+    status: state.__agent?.status,
+    tokens: state.__agent?.totalTokens,
   }));
 
   return (

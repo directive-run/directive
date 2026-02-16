@@ -350,9 +350,9 @@ function DashboardPage() {
 }
 
 function RevenueCard() {
-  const totalRevenue = useSelector(dashboard, (facts) =>
-    facts.history.records.reduce((sum, r) => sum + r.amount, 0) +
-    facts.live.transactions.reduce((sum, tx) => sum + tx.amount, 0),
+  const totalRevenue = useSelector(dashboard, (state) =>
+    state.history.records.reduce((sum, r) => sum + r.amount, 0) +
+    state.live.transactions.reduce((sum, tx) => sum + tx.amount, 0),
   );
   return (
     <div className="card">

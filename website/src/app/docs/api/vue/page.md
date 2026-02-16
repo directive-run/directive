@@ -107,12 +107,12 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 ## useSelector
 
-Auto-tracking cross-fact selector. Uses `withTracking()` to detect which facts the selector accesses, then subscribes only to those keys.
+Auto-tracking selector over facts and derivations. Uses `withTracking()` to detect which keys the selector accesses, then subscribes only to those.
 
 ```typescript
 function useSelector<R>(
   system: System,
-  selector: (facts: Record<string, unknown>) => R,
+  selector: (state: Record<string, unknown>) => R,
   equalityFn?: (a: R, b: R) => boolean,
 ): Ref<R>
 ```
@@ -127,9 +127,9 @@ import { system } from './system';
 // Select and combine values from multiple facts with shallow equality
 const summary = useSelector(
   system,
-  (facts) => ({
-    userName: facts.user?.name,
-    itemCount: facts.items?.length ?? 0,
+  (state) => ({
+    userName: state.user?.name,
+    itemCount: state.items?.length ?? 0,
   }),
   shallowEqual,
 );

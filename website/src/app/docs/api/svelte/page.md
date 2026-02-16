@@ -101,12 +101,12 @@ Use [`useSelector`](#useselector) to derive values from facts. It auto-tracks de
 
 ## useSelector
 
-Select values from the entire facts store with an optional custom equality function. Returns a Svelte `Readable` store.
+Auto-tracking selector over facts and derivations. Returns a Svelte `Readable` store.
 
 ```typescript
 function useSelector<R>(
   system: System,
-  selector: (facts: Record<string, any>) => R,
+  selector: (state: Record<string, any>) => R,
   equalityFn?: (a: R, b: R) => boolean,
 ): Readable<R>
 ```
@@ -119,9 +119,9 @@ function useSelector<R>(
   import { system } from '$lib/directive';
 
   // Select and combine values from multiple facts
-  const summary = useSelector(system, (facts) => ({
-    userName: facts.user?.name,
-    itemCount: facts.items?.length ?? 0,
+  const summary = useSelector(system, (state) => ({
+    userName: state.user?.name,
+    itemCount: state.items?.length ?? 0,
   }));
 </script>
 
