@@ -3,6 +3,7 @@ import { type Node } from '@markdoc/markdoc'
 
 import { Prose } from '@/components/Prose'
 import { ArticleJsonLd } from '@/components/JsonLd'
+import { RelatedPosts } from '@/components/RelatedPosts'
 import { calculateReadingTime, formatReadingTime } from '@/lib/readingTime'
 import { resolveAuthor } from '@/lib/blog'
 
@@ -217,7 +218,9 @@ export function BlogPostLayout({
         .
       </p>
 
-      <div className="mt-16 border-t border-slate-200 pt-8 dark:border-slate-800">
+      {slug && <RelatedPosts slug={slug} />}
+
+      <div className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-800">
         <Link
           href="/blog"
           className="group inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300"

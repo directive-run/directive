@@ -13,6 +13,8 @@ import { Highlight } from 'prism-react-renderer'
 import { ChatCircleDots, PaperPlaneTilt, Sparkle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
+import { DirectiveCallout } from '@/components/DirectiveCallout'
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -370,7 +372,7 @@ const ChatDialog = memo(function ChatDialog({
   const [streamingContent, setStreamingContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [dailyRemaining, setDailyRemaining] = useState<number | null>(null)
-  const [dailyLimit, setDailyLimit] = useState(25)
+  const [dailyLimit, setDailyLimit] = useState(15)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -700,6 +702,14 @@ const ChatDialog = memo(function ChatDialog({
                     {dailyRemaining} of {dailyLimit} questions remaining today
                   </p>
                 )}
+
+                <div className="mt-3">
+                  <DirectiveCallout
+                    subject="chat"
+                    href="/blog/building-ai-docs-chatbot"
+                    compact
+                  />
+                </div>
               </div>
             </DialogPanel>
           </TransitionChild>

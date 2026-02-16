@@ -247,3 +247,28 @@ export function getAllCategories(): string[] {
 
   return Array.from(cats).sort()
 }
+
+export function getRelatedPosts(slug: string, limit = 3): BlogPost[] {
+  const current = posts.find((p) => p.slug === slug)
+  if (!current) {
+    return []
+  }
+
+  const published = getPublishedPosts().filter((p) => p.slug !== slug)
+
+  const scored = published.map((post) => {
+    const shared = post.categories.filter((c) => current.categories.includes(c)).length
+
+    return { post, shared }
+  })
+
+  scored.sort((a, b) => {
+    if (b.shared !== a.shared) {
+      return b.shared - a.shared
+    }
+
+    return b.post.date.localeCompare(a.post.date)
+  })
+
+  return scored.slice(0, limit).map((s) => s.post)
+}
