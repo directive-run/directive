@@ -83,13 +83,6 @@ export function MobileNavigation() {
               Blog
             </Link>
             <Link
-              href="/labs"
-              onClick={onLinkClick}
-              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
-            >
-              Labs
-            </Link>
-            <Link
               href="/about"
               onClick={onLinkClick}
               className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"

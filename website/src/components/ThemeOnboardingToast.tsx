@@ -51,7 +51,7 @@ export function ThemeOnboardingToast() {
 
   const handleVote = useCallback(() => {
     dismiss()
-    const switcher = document.querySelector('[aria-label="Toggle brand preset switcher"]')
+    const switcher = document.querySelector('[aria-label="Toggle labs panel"]')
     if (switcher instanceof HTMLElement) {
       switcher.click()
       setTimeout(() => {

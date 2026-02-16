@@ -1,19 +1,21 @@
+import Link from 'next/link'
 import {
   buildPageMetadata,
 } from '@/lib/metadata'
 import {
-  ArrowRight,
   Code,
   GithubLogo,
   Globe,
   Lightning,
   LinkedinLogo,
   MapPin,
-  Scales,
+  Package,
+  ShieldCheck,
   Sparkle,
-  User,
-  UsersThree,
 } from '@phosphor-icons/react/dist/ssr'
+import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
+import { CardLink } from '@/components/CardLink'
+import { DirectiveCallout } from '@/components/DirectiveCallout'
 
 export const metadata = buildPageMetadata({
   title: 'About — Directive',
@@ -24,19 +26,19 @@ export const metadata = buildPageMetadata({
 
 const projectStats = [
   {
-    label: 'MIT Licensed',
-    description: 'Free and open source, forever',
-    icon: Scales,
+    label: '1,400+ Tests',
+    description: 'Defense-in-depth coverage across the full runtime',
+    icon: ShieldCheck,
+  },
+  {
+    label: '~3KB Gzipped',
+    description: 'Tree-shakeable, zero dependencies',
+    icon: Package,
   },
   {
     label: 'TypeScript-First',
     description: 'Full type inference, zero codegen',
     icon: Code,
-  },
-  {
-    label: 'Framework Agnostic',
-    description: 'Works with React, Vue, Svelte, and more',
-    icon: Globe,
   },
 ]
 
@@ -46,86 +48,21 @@ export default function AboutPage() {
       <div className="mx-auto max-w-3xl">
         {/* Hero */}
         <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-          About Directive
+          State management shouldn&rsquo;t require you to be the runtime.
         </h1>
         <p className="mt-4 text-xl text-slate-600 dark:text-slate-400">
-          A constraint-driven runtime for TypeScript. Declare what must be true,
-          and let the runtime figure out how to make it happen.
+          Directive is an open-source runtime for TypeScript that replaces manual
+          state orchestration with declarative constraints. Built by a solo
+          engineer, hardened by 1,400+ tests, designed to scale from UI state
+          to AI agent coordination.
         </p>
 
-        {/* The Project */}
-        <div className="mt-16">
-          <h2 className="font-display text-3xl font-semibold text-slate-900 dark:text-white">
-            The Project
-          </h2>
-
-          {/* Origin */}
-          <div className="mt-8">
-            <div className="flex items-center gap-3">
-              <Lightning
-                weight="duotone"
-                className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-primary-400"
-              />
-              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
-                Origin
-              </h3>
-            </div>
-            <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
-              Directive was born from building a game engine. When managing
-              dozens of interconnected systems &ndash; physics, rendering, AI,
-              audio &ndash; it became clear that traditional state management
-              doesn&rsquo;t scale. Every state change triggered a cascade of
-              manual orchestration: check this flag, update that dependency,
-              notify these listeners. The realization was simple &ndash; state
-              management shouldn&rsquo;t require you to be the runtime.
-            </p>
-          </div>
-
-          {/* Philosophy */}
-          <div className="mt-10">
-            <div className="flex items-center gap-3">
-              <Sparkle
-                weight="duotone"
-                className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-primary-400"
-              />
-              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
-                Philosophy
-              </h3>
-            </div>
-            <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
-              Most state management libraries ask you to describe{' '}
-              <em>how</em> things change. Directive asks you to describe{' '}
-              <em>what</em> must be true. You declare constraints &ndash; rules
-              about your system&rsquo;s valid states &ndash; and the runtime
-              resolves them automatically. When facts change, constraints
-              evaluate, requirements emerge, and resolvers execute. No manual
-              wiring, no action dispatching, no forgotten edge cases.
-            </p>
-          </div>
-
-          {/* Vision */}
-          <div className="mt-10">
-            <div className="flex items-center gap-3">
-              <Globe
-                weight="duotone"
-                className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-primary-400"
-              />
-              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
-                Vision
-              </h3>
-            </div>
-            <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
-              Directive is heading toward AI agent orchestration, where
-              autonomous systems need to declare goals and let the runtime
-              coordinate their resolution. The same constraint-driven model that
-              manages UI state can manage multi-agent workflows, real-time
-              collaboration, and complex business logic. Framework-agnostic by
-              design, with developer experience at the core.
-            </p>
-          </div>
+        {/* Constraint Flow Diagram */}
+        <div className="mt-12">
+          <ConstraintFlowDiagram />
         </div>
 
-        {/* Project stat cards */}
+        {/* Stat Cards */}
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-3">
           {projectStats.map((stat) => (
             <div
@@ -146,30 +83,102 @@ export default function AboutPage() {
           ))}
         </div>
 
+        {/* Narrative */}
+        <div className="mt-16">
+          <h2 className="font-display text-3xl font-semibold text-slate-900 dark:text-white">
+            The Project
+          </h2>
+
+          {/* What It Does */}
+          <div className="mt-8">
+            <div className="flex items-center gap-3">
+              <Sparkle
+                weight="duotone"
+                className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-primary-400"
+              />
+              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
+                What It Does
+              </h3>
+            </div>
+            <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
+              Most state management libraries ask you to describe{' '}
+              <em>how</em> things change. Directive asks you to describe{' '}
+              <em>what</em> must be true. You declare constraints &ndash; rules
+              about your system&rsquo;s valid states &ndash; and the runtime
+              resolves them automatically. When facts change, constraints
+              evaluate, requirements emerge, and resolvers execute. No manual
+              wiring, no action dispatching, no forgotten edge cases.
+            </p>
+          </div>
+
+          {/* Why It Exists */}
+          <div className="mt-10">
+            <div className="flex items-center gap-3">
+              <Lightning
+                weight="duotone"
+                className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-primary-400"
+              />
+              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
+                Why It Exists
+              </h3>
+            </div>
+            <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
+              Directive was born from building a game engine. When managing
+              dozens of interconnected systems &ndash; physics, rendering, AI,
+              audio &ndash; it became clear that traditional state management
+              doesn&rsquo;t scale. Every state change triggered a cascade of
+              manual orchestration: check this flag, update that dependency,
+              notify these listeners. The realization was simple &ndash; state
+              management shouldn&rsquo;t require you to be the runtime.
+            </p>
+          </div>
+
+          {/* Where It's Going */}
+          <div className="mt-10">
+            <div className="flex items-center gap-3">
+              <Globe
+                weight="duotone"
+                className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-primary-400"
+              />
+              <h3 className="font-display text-xl font-semibold text-slate-900 dark:text-white">
+                Where It&rsquo;s Going
+              </h3>
+            </div>
+            <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
+              Directive is heading toward AI agent orchestration, where
+              autonomous systems need to declare goals and let the runtime
+              coordinate their resolution. The same constraint-driven model that
+              manages UI state can manage multi-agent workflows, real-time
+              collaboration, and complex business logic. Framework-agnostic by
+              design, with developer experience at the core.
+            </p>
+          </div>
+        </div>
+
+        {/* Philosophy Link */}
+        <p className="mt-8 text-base text-slate-600 dark:text-slate-400">
+          Directive is opinionated about how state should work.{' '}
+          <Link href="/philosophy" className="font-semibold text-brand-primary hover:underline dark:text-brand-primary-400">
+            Read the full philosophy &rarr;
+          </Link>
+        </p>
+
         {/* The Team */}
         <div className="mt-20">
           <h2 className="font-display text-3xl font-semibold text-slate-900 dark:text-white">
             The Team
           </h2>
 
-          <p className="mt-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
-            Directive is built by a small, focused engineering team. Architecture
-            decisions, code reviews, security audits, and runtime hardening are
-            all handled in-house. We stay small by design &ndash; it keeps the
-            vision sharp and the iteration speed high.
-          </p>
-
           <p className="mt-10 text-xs font-semibold uppercase tracking-widest text-brand-primary dark:text-brand-primary-400">
             Creator &amp; Lead
           </p>
 
           <div className="mt-3 flex flex-col gap-8 sm:flex-row sm:items-start">
-            {/* Avatar placeholder */}
+            {/* Initials fallback */}
             <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl bg-brand-primary-50/30 ring-1 ring-brand-primary-200/40 dark:bg-brand-primary-950/20 dark:ring-brand-primary-800/20">
-              <User
-                weight="duotone"
-                className="h-14 w-14 text-brand-primary/60 dark:text-brand-primary-400/60"
-              />
+              <span className="font-display text-3xl font-bold text-brand-primary dark:text-brand-primary-400">
+                JC
+              </span>
             </div>
 
             <div>
@@ -206,45 +215,39 @@ export default function AboutPage() {
             </p>
           </div>
 
-          {/* Links */}
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="https://www.linkedin.com/in/jasonwcomes/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center justify-center gap-2 rounded-xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md dark:bg-brand-primary-600"
-            >
-              <LinkedinLogo weight="fill" className="h-5 w-5" />
-              LinkedIn
-              <ArrowRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5" />
-            </a>
-            <a
-              href="https://github.com/directive-run/directive"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:border-slate-300 dark:border-slate-700 dark:text-white dark:hover:border-slate-600"
-            >
-              <GithubLogo weight="fill" className="h-5 w-5" />
-              GitHub
-              <ArrowRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5" />
-            </a>
+          {/* Social Links */}
+          <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <CardLink href="https://www.linkedin.com/in/jasonwcomes/" external className="flex items-center gap-3 px-5 py-4">
+              <LinkedinLogo weight="fill" className="h-6 w-6 shrink-0 text-slate-400 group-hover:text-[#0A66C2]" />
+              <div>
+                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">LinkedIn</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Connect with Jason</p>
+              </div>
+            </CardLink>
+            <CardLink href="https://github.com/directive-run/directive" external className="flex items-center gap-3 px-5 py-4">
+              <GithubLogo weight="fill" className="h-6 w-6 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
+              <div>
+                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">GitHub</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Star, contribute, or fork</p>
+              </div>
+            </CardLink>
           </div>
 
-          {/* Application Engineers */}
+          {/* Engineering Standards */}
           <div className="mt-14 rounded-xl border border-slate-200/60 bg-slate-50/50 px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
             <div className="flex items-center gap-3">
-              <UsersThree
+              <ShieldCheck
                 weight="duotone"
                 className="h-7 w-7 text-brand-primary dark:text-brand-primary-400"
               />
               <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                Application Engineers
+                Engineering Standards
               </h3>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Our engineering team handles architecture analysis,
-              security auditing, and defense-in-depth hardening across the
-              constraint engine, resolver pipeline, and effects system.
+              Every change goes through architecture review, security audit, and
+              runtime hardening analysis. The constraint engine, resolver pipeline,
+              and effects system are continuously stress-tested.
             </p>
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-white/80 px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
@@ -272,7 +275,47 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
+            <p className="mt-5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              Directive is built in the open. Contributions, bug reports, and RFCs
+              are welcome on GitHub.
+            </p>
           </div>
+        </div>
+
+        {/* Next Steps */}
+        <div className="mt-20 rounded-xl border border-slate-200/60 bg-slate-50/50 px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
+          <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+            Next Steps
+          </h2>
+          <ul className="mt-4 space-y-2">
+            {[
+              { href: '/docs/quick-start', label: 'Quick Start', description: 'Build your first module in 5 minutes' },
+              { href: '/philosophy', label: 'Philosophy', description: 'The design principles behind the constraint model' },
+              { href: '/support', label: 'Support', description: 'Star, sponsor, or contribute' },
+              { href: '/contact', label: 'Get in Touch', description: 'Bug reports, features, partnerships' },
+            ].map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="group flex items-center gap-2 text-base text-brand-primary hover:underline dark:text-brand-primary-400"
+                >
+                  <span className="font-semibold">{link.label}</span>
+                  <span className="text-slate-400 dark:text-slate-500">
+                    &ndash; {link.description}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Directive Callout */}
+        <div className="mt-6">
+          <DirectiveCallout
+            subject="website"
+            href="/docs/quick-start"
+            linkLabel="Get started"
+          />
         </div>
 
       </div>

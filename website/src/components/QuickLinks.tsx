@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { Icon } from '@/components/Icon'
+import { CardLink } from '@/components/CardLink'
 
 export function QuickLinks({ children }: { children: React.ReactNode }) {
   return (
@@ -22,20 +21,14 @@ export function QuickLink({
   icon: React.ComponentProps<typeof Icon>['icon']
 }) {
   return (
-    <div className="group relative rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-brand-primary focus-within:ring-offset-2 dark:border-slate-800 dark:focus-within:ring-offset-slate-900">
-      <div className="absolute -inset-px rounded-xl border-2 border-transparent opacity-0 [background:linear-gradient(var(--quick-links-hover-bg,var(--brand-primary-50)),var(--quick-links-hover-bg,var(--brand-primary-50)))_padding-box,linear-gradient(to_top,var(--brand-accent-400),var(--brand-primary-400),var(--brand-primary-500))_border-box] group-hover:opacity-100 group-focus-within:opacity-100 dark:[--quick-links-hover-bg:var(--color-slate-800)]" />
-      <div className="relative overflow-hidden rounded-xl p-6">
-        <Icon icon={icon} className="h-8 w-8" />
-        <h2 className="mt-4 font-display text-base text-slate-900 dark:text-white">
-          <Link href={href}>
-            <span className="absolute -inset-px rounded-xl" />
-            {title}
-          </Link>
-        </h2>
-        <p className="mt-1 text-sm text-slate-700 dark:text-slate-400">
-          {description}
-        </p>
-      </div>
-    </div>
+    <CardLink href={href} className="p-6">
+      <Icon icon={icon} className="h-8 w-8" />
+      <h2 className="mt-4 font-display text-base text-slate-900 dark:text-white">
+        {title}
+      </h2>
+      <p className="mt-1 text-sm text-slate-700 dark:text-slate-400">
+        {description}
+      </p>
+    </CardLink>
   )
 }
