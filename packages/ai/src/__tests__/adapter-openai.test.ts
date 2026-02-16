@@ -77,7 +77,7 @@ describe("createOpenAIRunner", () => {
 		await runner(mockAgent(), "Hi");
 
 		expect(mockFetch).toHaveBeenCalledOnce();
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://api.openai.com/v1/chat/completions");
 	});
 
@@ -92,7 +92,7 @@ describe("createOpenAIRunner", () => {
 		const runner = createOpenAIRunner({ apiKey: "sk-abc123", fetch: mockFetch });
 		await runner(mockAgent(), "Hello");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		expect(init.headers).toEqual(
 			expect.objectContaining({ Authorization: "Bearer sk-abc123" }),
 		);
@@ -109,7 +109,7 @@ describe("createOpenAIRunner", () => {
 		const runner = createOpenAIRunner({ apiKey: "test-key", fetch: mockFetch });
 		await runner(mockAgent({ instructions: "Be brief." }), "What is 2+2?");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("gpt-4o");
@@ -130,7 +130,7 @@ describe("createOpenAIRunner", () => {
 		const runner = createOpenAIRunner({ apiKey: "test-key", fetch: mockFetch });
 		await runner(mockAgent({ model: "gpt-4o-mini" }), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("gpt-4o-mini");
@@ -151,7 +151,7 @@ describe("createOpenAIRunner", () => {
 		});
 		await runner(mockAgent(), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("gpt-3.5-turbo");
@@ -205,7 +205,7 @@ describe("createOpenAIRunner", () => {
 		});
 		await runner(mockAgent(), "test");
 
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://my-proxy.example.com/v1/chat/completions");
 	});
 
@@ -220,7 +220,7 @@ describe("createOpenAIRunner", () => {
 		const runner = createOpenAIRunner({ apiKey: "test-key", fetch: mockFetch });
 		await runner(mockAgent({ instructions: undefined }), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.messages).toEqual([{ role: "user", content: "test" }]);
@@ -244,7 +244,7 @@ describe("createOpenAIEmbedder", () => {
 		await embedder("Hello world");
 
 		expect(mockFetch).toHaveBeenCalledOnce();
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://api.openai.com/v1/embeddings");
 	});
 
@@ -259,7 +259,7 @@ describe("createOpenAIEmbedder", () => {
 		});
 		await embedder("test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		expect(init.headers).toEqual(
 			expect.objectContaining({ Authorization: "Bearer sk-embed-key" }),
 		);
@@ -278,7 +278,7 @@ describe("createOpenAIEmbedder", () => {
 		});
 		await embedder("embed this");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("text-embedding-3-large");
@@ -338,7 +338,7 @@ describe("createOpenAIEmbedder", () => {
 		});
 		await embedder("test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("text-embedding-3-small");
@@ -368,7 +368,7 @@ describe("createOpenAIStreamingRunner", () => {
 		await streamingRunner(mockAgent(), "Hello", {});
 
 		expect(mockFetch).toHaveBeenCalledOnce();
-		const [url, init] = mockFetch.mock.calls[0];
+		const [url, init] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://api.openai.com/v1/chat/completions");
 
 		const body = JSON.parse(init.body as string);
@@ -392,7 +392,7 @@ describe("createOpenAIStreamingRunner", () => {
 
 		await streamingRunner(mockAgent(), "test", {});
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		expect(init.headers).toEqual(
 			expect.objectContaining({ Authorization: "Bearer sk-stream-key" }),
 		);
@@ -567,7 +567,7 @@ describe("createOpenAIStreamingRunner", () => {
 			signal: controller.signal,
 		});
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		expect(init.signal).toBe(controller.signal);
 	});
 });

@@ -79,7 +79,7 @@ describe("createAnthropicRunner", () => {
 		await runner(mockAgent(), "Hi");
 
 		expect(mockFetch).toHaveBeenCalledOnce();
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://api.anthropic.com/v1/messages");
 	});
 
@@ -97,7 +97,7 @@ describe("createAnthropicRunner", () => {
 		});
 		await runner(mockAgent(), "Hello");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		expect(init.headers).toEqual(
 			expect.objectContaining({
 				"x-api-key": "sk-ant-abc123",
@@ -120,7 +120,7 @@ describe("createAnthropicRunner", () => {
 		});
 		await runner(mockAgent({ instructions: "Be brief." }), "What is 2+2?");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("claude-sonnet-4-5-20250929");
@@ -145,7 +145,7 @@ describe("createAnthropicRunner", () => {
 		});
 		await runner(mockAgent({ model: "claude-haiku-3-5-20241022" }), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("claude-haiku-3-5-20241022");
@@ -208,7 +208,7 @@ describe("createAnthropicRunner", () => {
 		});
 		await runner(mockAgent(), "test");
 
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://my-proxy.example.com/v1/messages");
 	});
 
@@ -227,7 +227,7 @@ describe("createAnthropicRunner", () => {
 		});
 		await runner(mockAgent(), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.max_tokens).toBe(8192);
@@ -257,7 +257,7 @@ describe("createAnthropicStreamingRunner", () => {
 		await streamingRunner(mockAgent(), "Hi", {});
 
 		expect(mockFetch).toHaveBeenCalledOnce();
-		const [url, init] = mockFetch.mock.calls[0];
+		const [url, init] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("https://api.anthropic.com/v1/messages");
 
 		const body = JSON.parse(init.body as string);
@@ -280,7 +280,7 @@ describe("createAnthropicStreamingRunner", () => {
 
 		await streamingRunner(mockAgent(), "test", {});
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		expect(init.headers).toEqual(
 			expect.objectContaining({
 				"x-api-key": "sk-ant-stream",
