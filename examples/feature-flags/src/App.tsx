@@ -9,22 +9,28 @@ import { Preview } from "./Preview";
 const system = createSystem({
   module: featureFlagsModule,
   plugins: [
-    persistencePlugin({ key: "directive-feature-flags-example" }),
+    persistencePlugin({ storage: localStorage, key: "directive-feature-flags-example" }),
   ],
 });
 system.start();
+
+// Cast to access internal effects/constraints APIs for demo purposes
+const engine = system as unknown as {
+  effects: { disable(id: string): void; enable(id: string): void };
+  constraints: { disable(id: string): void; enable(id: string): void };
+};
 
 export function App() {
   const [effectsDisabled, setEffectsDisabled] = useState<Set<string>>(new Set());
   const [constraintsDisabled, setConstraintsDisabled] = useState<Set<string>>(new Set());
 
   const handleDisableEffect = useCallback((effectId: string) => {
-    system.effects.disable(effectId);
+    engine.effects.disable(effectId);
     setEffectsDisabled((prev) => new Set([...prev, effectId]));
   }, []);
 
   const handleEnableEffect = useCallback((effectId: string) => {
-    system.effects.enable(effectId);
+    engine.effects.enable(effectId);
     setEffectsDisabled((prev) => {
       const next = new Set(prev);
       next.delete(effectId);
@@ -34,12 +40,12 @@ export function App() {
   }, []);
 
   const handleDisableConstraint = useCallback((constraintId: string) => {
-    system.constraints.disable(constraintId);
+    engine.constraints.disable(constraintId);
     setConstraintsDisabled((prev) => new Set([...prev, constraintId]));
   }, []);
 
   const handleEnableConstraint = useCallback((constraintId: string) => {
-    system.constraints.enable(constraintId);
+    engine.constraints.enable(constraintId);
     setConstraintsDisabled((prev) => {
       const next = new Set(prev);
       next.delete(constraintId);
