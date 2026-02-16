@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createConstraintRouter } from "../provider-routing.js";
-import type { AgentRunner, AgentLike, RunResult } from "../types.js";
-import type { ConstraintRouterRunner } from "../provider-routing.js";
+import type { AgentRunner, RunResult } from "../types.js";
 
 // ============================================================================
 // Helpers
@@ -97,7 +96,7 @@ describe("createConstraintRouter", () => {
 				{ name: "anthropic", runner: makeProviderRunner("anthropic") },
 			],
 			defaultProvider: "openai",
-		}) as ConstraintRouterRunner;
+		}) as ReturnType<typeof createConstraintRouter>;
 
 		// First call fails (openai errors)
 		await expect(runner(mockAgent(), "hello")).rejects.toThrow("openai failed");
@@ -165,7 +164,7 @@ describe("createConstraintRouter", () => {
 				{ name: "openai", runner: makeProviderRunner("openai"), pricing: { inputPerMillion: 10, outputPerMillion: 30 } },
 			],
 			defaultProvider: "openai",
-		}) as ConstraintRouterRunner;
+		}) as ReturnType<typeof createConstraintRouter>;
 
 		await runner(mockAgent(), "hello");
 		await runner(mockAgent(), "hello");
@@ -192,7 +191,7 @@ describe("createConstraintRouter", () => {
 				{ name: "openai", runner: makeProviderRunner("openai") },
 			],
 			defaultProvider: "openai",
-		}) as ConstraintRouterRunner;
+		}) as ReturnType<typeof createConstraintRouter>;
 
 		await runner(mockAgent(), "hello");
 
@@ -306,7 +305,7 @@ describe("RoutingFacts immutability", () => {
 				{ name: "openai", runner: makeProviderRunner("openai"), pricing: { inputPerMillion: 5, outputPerMillion: 15 } },
 			],
 			defaultProvider: "openai",
-		}) as ConstraintRouterRunner;
+		}) as ReturnType<typeof createConstraintRouter>;
 
 		await runner(mockAgent(), "hello");
 

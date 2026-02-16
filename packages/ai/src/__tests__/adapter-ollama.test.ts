@@ -48,7 +48,7 @@ describe("createOllamaRunner", () => {
 		await runner(mockAgent(), "Hi");
 
 		expect(mockFetch).toHaveBeenCalledOnce();
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("http://localhost:11434/api/chat");
 	});
 
@@ -64,7 +64,7 @@ describe("createOllamaRunner", () => {
 		const runner = createOllamaRunner({ fetch: mockFetch });
 		await runner(mockAgent({ instructions: "Be brief." }), "What is 2+2?");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("llama3");
@@ -87,7 +87,7 @@ describe("createOllamaRunner", () => {
 		const runner = createOllamaRunner({ fetch: mockFetch });
 		await runner(mockAgent({ model: "mistral" }), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("mistral");
@@ -105,7 +105,7 @@ describe("createOllamaRunner", () => {
 		const runner = createOllamaRunner({ model: "phi3", fetch: mockFetch });
 		await runner(mockAgent(), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.model).toBe("phi3");
@@ -179,7 +179,7 @@ describe("createOllamaRunner", () => {
 		});
 		await runner(mockAgent(), "test");
 
-		const [url] = mockFetch.mock.calls[0];
+		const [url] = mockFetch.mock.calls[0]!;
 		expect(url).toBe("http://gpu-server:11434/api/chat");
 	});
 
@@ -195,7 +195,7 @@ describe("createOllamaRunner", () => {
 		const runner = createOllamaRunner({ fetch: mockFetch });
 		await runner(mockAgent({ instructions: undefined }), "test");
 
-		const [, init] = mockFetch.mock.calls[0];
+		const [, init] = mockFetch.mock.calls[0]!;
 		const body = JSON.parse(init.body as string);
 
 		expect(body.messages).toEqual([{ role: "user", content: "test" }]);
