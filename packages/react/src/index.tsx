@@ -315,12 +315,38 @@ function _useDerivedMulti(
  * Uses `withTracking()` to detect which facts the selector accesses,
  * then subscribes only to those keys. Falls back to subscribeAll
  * if no keys are detected.
+ *
+ * Supports an optional default value as the 3rd parameter, used when
+ * the system is null/undefined or the selector returns undefined.
+ * When a default value is provided, the system parameter may be
+ * null | undefined — the hook returns the default and recomputes
+ * when the system becomes available.
  */
+
+// Existing: non-null system, no default (equalityFn as 3rd param)
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S>,
 	selector: (facts: InferFacts<S>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
+
+// New: non-null system, with default value
+export function useSelector<S extends ModuleSchema, R>(
+	system: SingleModuleSystem<S>,
+	selector: (facts: InferFacts<S>) => R,
+	defaultValue: R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
+// New: nullable system, default REQUIRED
+export function useSelector<S extends ModuleSchema, R>(
+	system: SingleModuleSystem<S> | null | undefined,
+	selector: (facts: InferFacts<S>) => R,
+	defaultValue: R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
+// Backward-compatible `any` fallback: equalityFn as 3rd param
 export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
 	system: SingleModuleSystem<any>,
@@ -328,19 +354,60 @@ export function useSelector<R>(
 	selector: (facts: Record<string, any>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
+
+// Backward-compatible `any` fallback: default value + nullable system
+export function useSelector<R>(
+	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	system: SingleModuleSystem<any> | null | undefined,
+	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic facts
+	selector: (facts: Record<string, any>) => R,
+	defaultValue: R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
 export function useSelector(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
-	system: SingleModuleSystem<any>,
+	system: SingleModuleSystem<any> | null | undefined,
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	selector: (state: any) => unknown,
-	equalityFn?: (a: unknown, b: unknown) => boolean,
+	defaultValueOrEqFn?: unknown,
+	maybeEqFn?: (a: unknown, b: unknown) => boolean,
 ): unknown {
-	assertSystem("useSelector", system);
-	// Store selector/eq in refs to avoid resubscription churn
+	// Discriminate arg3: function → old API (equalityFn), otherwise → new API (defaultValue)
+	let defaultValue: unknown;
+	let hasDefault = false;
+	let equalityFn: (a: unknown, b: unknown) => boolean;
+
+	if (typeof defaultValueOrEqFn === "function" && maybeEqFn === undefined) {
+		// Old API: useSelector(system, selector, equalityFn)
+		equalityFn = defaultValueOrEqFn as (a: unknown, b: unknown) => boolean;
+	} else {
+		// New API: useSelector(system, selector, defaultValue, equalityFn?)
+		// Also covers: useSelector(system, selector) when defaultValueOrEqFn is undefined
+		if (defaultValueOrEqFn !== undefined) {
+			defaultValue = defaultValueOrEqFn;
+			hasDefault = true;
+		}
+		equalityFn = maybeEqFn ?? defaultEquality;
+	}
+
+	// Dev-mode warning: null system without a default value
+	if (process.env.NODE_ENV !== "production") {
+		if (!system && !hasDefault) {
+			console.error(
+				"[Directive] useSelector() received a null/undefined system without a default value. " +
+					"Provide a default value as the 3rd parameter: useSelector(system, selector, defaultValue)",
+			);
+		}
+	}
+
+	// Store selector/eq/default in refs to avoid resubscription churn
 	const selectorRef = useRef(selector);
-	const eqRef = useRef(equalityFn ?? defaultEquality);
+	const eqRef = useRef(equalityFn);
+	const defaultValueRef = useRef(defaultValue);
 	selectorRef.current = selector;
-	eqRef.current = equalityFn ?? defaultEquality;
+	eqRef.current = equalityFn;
+	defaultValueRef.current = defaultValue;
 
 	const trackedFactKeysRef = useRef<string[]>([]);
 	const trackedDeriveKeysRef = useRef<string[]>([]);
@@ -348,14 +415,26 @@ export function useSelector(
 	const unsubsRef = useRef<Array<() => void>>([]);
 
 	// Build a tracking-aware state proxy that exposes both facts and derivations
-	const deriveKeys = useMemo(() => new Set(Object.keys(system.derive)), [system]);
+	const deriveKeys = useMemo(
+		() => (system ? new Set(Object.keys(system.derive)) : new Set<string>()),
+		[system],
+	);
 
 	const runWithTracking = useCallback(() => {
+		if (!system) {
+			return { value: defaultValueRef.current, factKeys: [] as string[], deriveKeys: [] as string[] };
+		}
+
 		return runTrackedSelector(system, deriveKeys, selectorRef.current);
 	}, [system, deriveKeys]);
 
 	const subscribe = useCallback(
 		(onStoreChange: () => void) => {
+			if (!system) {
+				// No system — return noop unsubscribe
+				return () => {};
+			}
+
 			const resubscribe = () => {
 				// Cleanup previous subscriptions
 				for (const unsub of unsubsRef.current) unsub();
@@ -407,17 +486,27 @@ export function useSelector(
 	);
 
 	const getSnapshot = useCallback(() => {
-		const { value: newValue } = runWithTracking();
+		let effectiveValue: unknown;
+
+		if (!system) {
+			effectiveValue = defaultValueRef.current;
+		} else {
+			const { value: newValue } = runWithTracking();
+
+			// When selector returns undefined and we have a default, use it
+			effectiveValue = newValue === undefined && hasDefault ? defaultValueRef.current : newValue;
+		}
 
 		if (
 			cachedValue.current !== UNINITIALIZED &&
-			eqRef.current(cachedValue.current, newValue)
+			eqRef.current(cachedValue.current, effectiveValue)
 		) {
 			return cachedValue.current;
 		}
-		cachedValue.current = newValue;
-		return newValue;
-	}, [runWithTracking]);
+		cachedValue.current = effectiveValue;
+
+		return effectiveValue;
+	}, [runWithTracking, system, hasDefault]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
