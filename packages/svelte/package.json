@@ -10,6 +10,13 @@
     "directory": "packages/svelte"
   },
   "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -46,11 +53,6 @@
   "peerDependencies": {
     "@directive-run/core": "workspace:*",
     "svelte": ">=4"
-  },
-  "peerDependenciesMeta": {
-    "svelte": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
