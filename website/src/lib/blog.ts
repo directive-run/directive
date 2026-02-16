@@ -43,6 +43,16 @@ export const posts: BlogPost[] = [
     featured: true,
   },
   {
+    slug: 'declarative-newsletter-with-directive',
+    title: 'Declarative Newsletter Signup with Directive: The Simplest Module',
+    description:
+      'We said newsletter signup didn\u2019t need Directive. Here\u2019s why we were wrong.',
+    date: '2026-02-17',
+    author: 'jason-comes',
+    categories: ['Tutorial', 'Architecture'],
+    featured: false,
+  },
+  {
     slug: 'directive-on-the-server',
     title: 'Directive on the Server',
     description:
