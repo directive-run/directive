@@ -56,7 +56,7 @@ export function BlogPostLayout({
   const readingTime = formatReadingTime(calculateReadingTime(nodes))
   const canonicalUrl = slug ? `https://directive.run/blog/${slug}` : undefined
   const ogImageUrl = title
-    ? `https://directive.run/api/og?title=${encodeURIComponent(title)}`
+    ? `https://directive.run/api/og?title=${encodeURIComponent(title)}&section=Blog`
     : undefined
 
   return (
@@ -68,11 +68,13 @@ export function BlogPostLayout({
       {description && <meta property="og:description" content={description} />}
       {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       <meta property="og:type" content="article" />
+      <meta property="og:site_name" content="Directive" />
       {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       {title && <meta name="twitter:title" content={title} />}
       {description && <meta name="twitter:description" content={description} />}
+      <meta name="twitter:card" content="summary_large_image" />
       {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
       {date && (
         <meta

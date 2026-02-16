@@ -1,4 +1,6 @@
-import type { Metadata } from 'next'
+import {
+  buildPageMetadata,
+} from '@/lib/metadata'
 import {
   ArrowRight,
   Code,
@@ -13,11 +15,12 @@ import {
   UsersThree,
 } from '@phosphor-icons/react/dist/ssr'
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: 'About — Directive',
   description:
     'Learn about the Directive project, its constraint-driven philosophy, and the team behind it.',
-}
+  path: '/about',
+})
 
 const projectStats = [
   {

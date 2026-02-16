@@ -98,7 +98,7 @@ export function Footer() {
               <GitHubIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />
             </Link>
           </div>
-          <span>MIT License &copy; {new Date().getFullYear()} &middot; Made possible by sponsors and contributors</span>
+          <span>MIT License &copy; {new Date().getFullYear()} Directive &middot; Made possible by sponsors and contributors</span>
         </div>
       </div>
     </footer>

@@ -35,31 +35,80 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 
 ## useSelector
 
-Auto-tracking selector over all facts. Similar to Zustand's `useStore` pattern.
+Auto-tracking selector over all facts and derivations. Similar to Zustand's `useStore` pattern. Supports an optional default value and nullable systems.
 
 ```typescript
+// Original: equalityFn as 3rd param
 function useSelector<S, R>(
   system: SingleModuleSystem<S>,
   selector: (facts: InferFacts<S>) => R,
+  equalityFn?: (a: R, b: R) => boolean,
+): R
+
+// With default value
+function useSelector<S, R>(
+  system: SingleModuleSystem<S>,
+  selector: (facts: InferFacts<S>) => R,
+  defaultValue: R,
+  equalityFn?: (a: R, b: R) => boolean,
+): R
+
+// Nullable system (default required)
+function useSelector<S, R>(
+  system: SingleModuleSystem<S> | null | undefined,
+  selector: (facts: InferFacts<S>) => R,
+  defaultValue: R,
   equalityFn?: (a: R, b: R) => boolean,
 ): R
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `system` | `SingleModuleSystem<S>` | The Directive system |
-| `selector` | `(facts) => R` | Selector function over all facts |
-| `equalityFn` | `(a, b) => boolean` | Optional custom equality check |
+| `system` | `SingleModuleSystem<S>` or `null` | The Directive system. May be `null`/`undefined` when a default value is provided. |
+| `selector` | `(facts) => R` | Selector function over all facts and derivations |
+| `defaultValue` | `R` | Optional default returned before the system starts or when system is null |
+| `equalityFn` | `(a, b) => boolean` | Optional custom equality check (4th param when using default, 3rd param without) |
 
 ```tsx
-import { useSelector } from '@directive-run/react';
+import { useSelector, shallowEqual } from '@directive-run/react';
 
-// Select and combine values from multiple facts
+// Basic: select and combine values
 const summary = useSelector(system, (facts) => ({
   userName: facts.user?.name,
   itemCount: facts.items?.length ?? 0,
 }));
+
+// With default value – avoids undefined on first render
+const email = useSelector(system, (s) => s.email, "");
+const count = useSelector(system, (s) => s.count, 0);
+
+// With default value + custom equality
+const ids = useSelector(
+  system,
+  (facts) => facts.users?.map(u => u.id) ?? [],
+  [],
+  shallowEqual,
+);
+
+// Nullable system – returns default until system is available
+const status = useSelector(maybeSystem, (s) => s.status, "idle");
 ```
+
+{% callout type="note" title="Backward compatible" %}
+The 3rd parameter is discriminated at runtime: if it's a function and no 4th argument is provided, it's treated as `equalityFn` (original API). Otherwise it's treated as `defaultValue`. Existing code using `useSelector(system, selector, shallowEqual)` continues to work unchanged.
+{% /callout %}
+
+{% callout type="warning" title="Function defaults" %}
+If your default value is itself a function, the runtime will misinterpret it as `equalityFn`. Force the new API path by passing the equality function (or `undefined`) as the 4th argument:
+```tsx
+// Wrong — () => {} is treated as equalityFn
+useSelector(system, (s) => s.handler, () => {});
+
+// Correct — explicitly pass undefined as equalityFn
+useSelector(system, (s) => s.handler, () => {}, undefined);
+```
+This edge case only applies when the default value is a function. Primitives, objects, and arrays work as expected.
+{% /callout %}
 
 ---
 
@@ -689,10 +738,18 @@ function shallowEqual(a: unknown, b: unknown): boolean
 ```tsx
 import { useSelector, shallowEqual } from '@directive-run/react';
 
-// Use shallowEqual to prevent re-renders when x/y values haven't changed
+// As equalityFn (3rd param – no default value)
 const coords = useSelector(
   system,
   (facts) => ({ x: facts.position?.x, y: facts.position?.y }),
+  shallowEqual,
+);
+
+// As equalityFn (4th param – with default value)
+const coords = useSelector(
+  system,
+  (facts) => ({ x: facts.position?.x ?? 0, y: facts.position?.y ?? 0 }),
+  { x: 0, y: 0 },
   shallowEqual,
 );
 ```

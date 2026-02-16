@@ -225,14 +225,11 @@ const { facts, derived, events, dispatch } = useDirective(counterModule, {
 
 ### useSelector
 
-The go-to hook for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those – no manual dependency lists:
+The go-to hook for **transforms and derived values** from facts. Directive auto-tracks which fact keys your selector reads and subscribes only to those &ndash; no manual dependency lists:
 
 ```tsx
 // Transform a single fact value
 const upperName = useSelector(system, (facts) => facts.user?.name?.toUpperCase() ?? "GUEST");
-
-// Extract a slice from a fact
-const itemCount = useSelector(system, (facts) => facts.items?.length ?? 0);
 
 // Combine values from multiple facts
 const summary = useSelector(system, (facts) => ({
@@ -248,8 +245,33 @@ const ids = useSelector(
 );
 ```
 
+#### Default values
+
+Pass a default value as the 3rd parameter. The default is returned before the system starts (when using `useDirectiveRef`, `start()` runs in a `useEffect` after first render) or when the selector returns `undefined`:
+
+```tsx
+// Without default – requires ?? fallback at each call site
+const email = useSelector(system, (s) => s.email) ?? "";
+
+// With default – cleaner, prevents React's "uncontrolled to controlled" warning
+const email = useSelector(system, (s) => s.email, "");
+const status = useSelector(system, (s) => s.status, "idle");
+const canSubmit = useSelector(system, (s) => s.canSubmit, false);
+```
+
+When a default value is provided, the system parameter may be `null` or `undefined`. The hook returns the default and recomputes automatically when the system becomes available:
+
+```tsx
+// Nullable system – useful for conditional or lazy initialization
+const status = useSelector(maybeSystem, (s) => s.status, "idle");
+```
+
+{% callout type="note" title="Backward compatible" %}
+The 3rd parameter is discriminated at runtime: if it's a function (and no 4th arg), it's `equalityFn`. Otherwise it's `defaultValue`, and `equalityFn` moves to the 4th position. Existing `useSelector(system, selector, shallowEqual)` calls work unchanged. If your default value is itself a function, pass `equalityFn` (or `undefined`) as the 4th argument to force the new API path.
+{% /callout %}
+
 {% callout type="note" title="Auto-tracking" %}
-`useSelector` uses Directive's tracking system to detect accessed fact keys at subscription time. Inline selectors work without `useCallback` – the hook stores the selector in a ref internally (Zustand pattern).
+`useSelector` uses Directive's tracking system to detect accessed fact keys at subscription time. Inline selectors work without `useCallback` &ndash; the hook stores the selector in a ref internally (Zustand pattern).
 {% /callout %}
 
 ### useFact

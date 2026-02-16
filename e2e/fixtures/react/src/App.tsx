@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { UseFactPage } from "./hooks/UseFact";
 import { UseDerivedPage } from "./hooks/UseDerived";
 import { UseSelectorPage } from "./hooks/UseSelector";
+import { UseSelectorDefaultPage } from "./hooks/UseSelectorDefault";
 import { UseDispatchPage } from "./hooks/UseDispatch";
 import { UseWatchPage } from "./hooks/UseWatch";
 import { UseInspectPage } from "./hooks/UseInspect";
@@ -17,6 +18,7 @@ const routes: Record<string, () => JSX.Element> = {
   "useFact": UseFactPage,
   "useDerived": UseDerivedPage,
   "useSelector": UseSelectorPage,
+  "useSelectorDefault": UseSelectorDefaultPage,
   "useDispatch": UseDispatchPage,
   "useWatch": UseWatchPage,
   "useInspect": UseInspectPage,

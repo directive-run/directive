@@ -597,9 +597,10 @@ The derivation approach means the button is disabled whenever the constraint say
 - **Forms shared across frameworks.** The module works with React, Vue, Svelte, Solid, and Lit. Write validation once, use everywhere.
 
 **Not a good fit:**
-- **Single-field newsletter signup.** One input, one submit. `useState` and `fetch` are fine.
 - **No validation.** If there's nothing to validate, there's nothing to derive.
 - **Static forms.** If the form doesn't need async behavior, rate limiting, or cross-field logic, the overhead isn't justified.
+
+Even a [single-field newsletter signup](/blog/declarative-newsletter-with-directive) benefits from Directive once you add validation, rate limiting, and auto-reset &ndash; behaviors that look simple but accumulate imperative complexity quickly.
 
 ---
 

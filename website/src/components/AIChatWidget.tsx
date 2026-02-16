@@ -132,8 +132,8 @@ const CodeBlock = memo(function CodeBlock({
 /** Process inline markdown: bold, inline code, links */
 function renderInlineMarkdown(text: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = []
-  // Pattern matches: **bold**, `code`, [text](url)
-  const inlinePattern = /(\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g
+  // Pattern matches: **bold**, *italic*, `code`, [text](url)
+  const inlinePattern = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g
   let lastIndex = 0
   let match
 
@@ -151,18 +151,25 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
         </strong>,
       )
     } else if (match[3]) {
+      // *italic*
+      nodes.push(
+        <em key={match.index}>
+          {match[3]}
+        </em>,
+      )
+    } else if (match[4]) {
       // `inline code`
       nodes.push(
         <code
           key={match.index}
           className="rounded bg-slate-200 px-1 py-0.5 text-xs dark:bg-slate-600"
         >
-          {match[3]}
+          {match[4]}
         </code>,
       )
-    } else if (match[4] && match[5]) {
+    } else if (match[5] && match[6]) {
       // [text](url) — only allow safe protocols to prevent javascript: XSS
-      const href = match[5]
+      const href = match[6]
       const isSafe = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/')
       if (isSafe) {
         nodes.push(
@@ -173,7 +180,7 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
             target={href.startsWith('http') ? '_blank' : undefined}
             rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
           >
-            {match[4]}
+            {match[5]}
           </a>,
         )
       } else {
