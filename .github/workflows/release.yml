@@ -29,7 +29,7 @@ jobs:
 
       - run: pnpm -r --filter './packages/*' build
 
-      - run: pnpm typecheck
+      - run: pnpm -r --filter './packages/*' typecheck
 
       - run: pnpm test -- --run
 

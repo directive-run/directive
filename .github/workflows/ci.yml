@@ -25,4 +25,4 @@ jobs:
 
       - run: pnpm lint
 
-      - run: pnpm typecheck
+      - run: pnpm -r --filter './packages/*' typecheck
