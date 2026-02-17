@@ -208,3 +208,12 @@ export function getCandidates(grid: Grid, index: number): number[] {
 
   return candidates;
 }
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Create an array of 81 empty Sets for per-cell notes. */
+export function createEmptyNotes(): Set<number>[] {
+  return Array.from({ length: 81 }, () => new Set<number>());
+}
