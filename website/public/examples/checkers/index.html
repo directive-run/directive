@@ -21,19 +21,16 @@
     .app-container {
       display: flex;
       gap: 1.5rem;
-      max-width: 960px;
       width: 100%;
       align-items: flex-start;
     }
     .game-side {
       text-align: center;
-      max-width: 560px;
       width: 100%;
-      flex-shrink: 0;
+      flex: 1;
+      min-width: 0;
     }
 
-    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; color: #e2e8f0; }
-    .subtitle { color: #64748b; margin-bottom: 1.25rem; font-size: 0.875rem; }
 
     /* Game info */
     .game-info {
@@ -70,7 +67,7 @@
     /* Board */
     .board {
       display: grid; grid-template-columns: repeat(8, 1fr);
-      max-width: 480px; margin: 0 auto 1.25rem; aspect-ratio: 1;
+      width: 100%; margin: 0 auto 1.25rem; aspect-ratio: 1;
       border: 3px solid #475569; border-radius: 4px; overflow: hidden;
     }
     .square {
@@ -137,7 +134,8 @@
 
     /* Controls */
     .controls {
-      display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 1.25rem;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;
+      margin-bottom: 1.25rem;
     }
     button {
       background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
@@ -516,61 +514,58 @@
       }
     }
   </style>
-  <script type="module" crossorigin src="/examples/checkers/assets/index-BKde_WYq.js"></script>
+  <script type="module" crossorigin src="/examples/checkers/assets/index-BmneMMU4.js"></script>
 </head>
 <body>
   <div class="app-container">
     <div class="game-side">
-      <h1>Checkers</h1>
-      <p class="subtitle">Constraint-driven game logic with Directive</p>
-
       <div class="game-info">
         <div class="info-item">
-          <span id="player-dot" class="player-dot red"></span>
-          <span id="current-player" class="info-value">red</span>
+          <span id="checkers-player-dot" class="player-dot red" data-testid="checkers-player-dot"></span>
+          <span id="checkers-current-player" class="info-value" data-testid="checkers-current-player">red</span>
         </div>
         <div class="info-item">
           <span class="info-label">Score</span>
-          <span id="score" class="info-value">Red 12 — Black 12</span>
+          <span id="checkers-score" class="info-value" data-testid="checkers-score">Red 12 &mdash; Black 12</span>
         </div>
         <div class="info-item">
           <span class="info-label">Moves</span>
-          <span id="moves" class="info-value">0</span>
+          <span id="checkers-moves" class="info-value" data-testid="checkers-moves">0</span>
         </div>
         <div class="info-item">
           <span class="info-label">Captured</span>
-          <span id="captured-red" class="info-value" style="color: #CC3333;">0</span>
+          <span id="checkers-captured-red" class="info-value" data-testid="checkers-captured-red" style="color: #CC3333;">0</span>
           <span style="color: #64748b;">/</span>
-          <span id="captured-black" class="info-value" style="color: #999;">0</span>
+          <span id="checkers-captured-black" class="info-value" data-testid="checkers-captured-black" style="color: #999;">0</span>
         </div>
-        <div class="info-item ai-info" id="ai-info" style="display: none;">
+        <div class="info-item ai-info" id="checkers-ai-info" style="display: none;">
           <span class="info-label">Tokens</span>
-          <span id="token-count" class="info-value">0</span>
-          <span id="circuit-dot" class="circuit-dot closed" title="Circuit: CLOSED"></span>
+          <span id="checkers-token-count" class="info-value">0</span>
+          <span id="checkers-circuit-dot" class="circuit-dot closed" title="Circuit: CLOSED"></span>
         </div>
       </div>
 
-      <div id="message" class="message">Red's turn. Select a piece to move.</div>
+      <div id="checkers-message" class="message" data-testid="checkers-message">Red's turn. Select a piece to move.</div>
 
-      <div id="board" class="board"></div>
+      <div id="checkers-board" class="board" data-testid="checkers-board"></div>
 
       <div class="mode-toggle">
-        <button id="mode-2p" class="mode-btn active">2 Player</button>
-        <button id="mode-computer" class="mode-btn">Computer</button>
-        <button id="mode-ai" class="mode-btn">vs Claude</button>
+        <button id="checkers-mode-2p" class="mode-btn active" data-testid="checkers-mode-2p">2 Player</button>
+        <button id="checkers-mode-computer" class="mode-btn" data-testid="checkers-mode-computer">Computer</button>
+        <button id="checkers-mode-ai" class="mode-btn" data-testid="checkers-mode-ai">vs Claude</button>
       </div>
 
-      <div id="api-key-section" class="api-key-section hidden">
+      <div id="checkers-api-key-section" class="api-key-section hidden">
         <div class="api-key-row">
-          <input id="api-key-input" type="password" placeholder="Anthropic API key" autocomplete="off" />
-          <button id="api-key-save">Save</button>
+          <input id="checkers-api-key-input" type="password" placeholder="Anthropic API key" autocomplete="off" />
+          <button id="checkers-api-key-save">Save</button>
         </div>
       </div>
 
       <div class="controls">
-        <button id="undo-btn" disabled aria-label="Undo last move (Cmd+Z)">Undo</button>
-        <button id="redo-btn" disabled aria-label="Redo last move (Cmd+Shift+Z)">Redo</button>
-        <button id="new-game" class="primary">New Game</button>
+        <button id="checkers-undo-btn" disabled aria-label="Undo last move (Cmd+Z)" data-testid="checkers-undo-btn">Undo</button>
+        <button id="checkers-redo-btn" disabled aria-label="Redo last move (Cmd+Shift+Z)" data-testid="checkers-redo-btn">Redo</button>
+        <button id="checkers-new-game" class="primary" data-testid="checkers-new-game">New Game</button>
       </div>
 
       <div class="rules">
@@ -601,30 +596,30 @@
         <p class="directive-note">Multi-module: game + chat modules composed in one system. Claude mode uses directive/openai-agents adapters.</p>
       </div>
 
-      <div id="ai-dashboard" class="dashboard-panel hidden">
-        <h3 id="dashboard-toggle">
-          <span class="toggle-arrow" id="dashboard-arrow">▶</span>
+      <div id="checkers-ai-dashboard" class="dashboard-panel hidden">
+        <h3 id="checkers-dashboard-toggle">
+          <span class="toggle-arrow" id="checkers-dashboard-arrow">▶</span>
           AI Dashboard
         </h3>
-        <div id="dashboard-content" class="dashboard-content"></div>
+        <div id="checkers-dashboard-content" class="dashboard-content"></div>
       </div>
     </div>
 
-    <div id="chat-panel" class="chat-panel hidden">
+    <div id="checkers-chat-panel" class="chat-panel hidden">
       <div class="chat-header">Claude Opponent</div>
-      <div id="chat-messages" class="chat-messages"></div>
+      <div id="checkers-chat-messages" class="chat-messages"></div>
       <div class="chat-input-bar">
-        <input id="chat-input" type="text" placeholder="Ask Claude something..." autocomplete="off" />
-        <button id="chat-send">Send</button>
+        <input id="checkers-chat-input" type="text" placeholder="Ask Claude something..." autocomplete="off" />
+        <button id="checkers-chat-send">Send</button>
       </div>
     </div>
   </div>
 
-  <div id="game-over-modal" class="modal hidden">
+  <div id="checkers-game-over-modal" class="modal hidden" data-testid="checkers-game-over-modal">
     <div class="modal-content">
-      <h2 id="modal-message">Red wins!</h2>
+      <h2 id="checkers-modal-message">Red wins!</h2>
       <p>Game over</p>
-      <button id="modal-new-game" class="primary">Play Again</button>
+      <button id="checkers-modal-new-game" class="primary" data-testid="checkers-modal-new-game">Play Again</button>
     </div>
   </div>
 

@@ -10,12 +10,12 @@ Create an interactive, embeddable example that renders directly in the docs site
 
 Every example is a **showcase of Directive**. The code must be:
 
-- **100% Directive** &ndash; Use `createModule`, `createSystem`, facts, derivations, constraints, resolvers, effects, and events. Do not use raw `useState`, Redux, Zustand, or any other state management. The entire application state must flow through Directive.
-- **Clean and professional** &ndash; Production-quality TypeScript. Strict types, no `any`, no `as` casts unless truly necessary. Consistent formatting. Clear variable names.
-- **Implementation spec** &ndash; Follow the exact Directive API as documented. Use the correct patterns: `schema` + `t.*` type builders, `init` for initial state, `derive` for computed values, `constraints` with `when`/`require`, `resolvers` with `requirement`/`resolve`, `effects` with `run`.
-- **Well-structured** &ndash; Separate Directive module logic from rendering. Module definition in its own file (e.g., `src/counter.ts`), rendering/DOM in `src/main.ts`. Pure business logic (if any) in its own file (e.g., `src/rules.ts`).
-- **Demonstrative** &ndash; Each example should clearly demonstrate specific Directive features. The "How it works" section on the page must list which Directive concepts are used and why.
-- **Self-contained** &ndash; No external API dependencies unless the example specifically demonstrates API integration. Should work offline after build.
+- **100% Directive** - Use `createModule`, `createSystem`, facts, derivations, constraints, resolvers, effects, and events. Do not use raw `useState`, Redux, Zustand, or any other state management. The entire application state must flow through Directive.
+- **Clean and professional** - Production-quality TypeScript. Strict types, no `any`, no `as` casts unless truly necessary. Consistent formatting. Clear variable names.
+- **Implementation spec** - Follow the exact Directive API as documented. Use the correct patterns: `schema` + `t.*` type builders, `init` for initial state, `derive` for computed values, `constraints` with `when`/`require`, `resolvers` with `requirement`/`resolve`, `effects` with `run`.
+- **Well-structured** - Separate Directive module logic from rendering. Module definition in its own file (e.g., `src/counter.ts`), rendering/DOM in `src/main.ts`. Pure business logic (if any) in its own file (e.g., `src/rules.ts`).
+- **Demonstrative** - Each example should clearly demonstrate specific Directive features. The "How it works" section on the page must list which Directive concepts are used and why.
+- **Self-contained** - No external API dependencies unless the example specifically demonstrates API integration. Should work offline after build.
 
 **The source code IS the documentation.** Readers will study it to learn Directive. Write it as if it will be read more than it will be run.
 
@@ -23,27 +23,27 @@ Every example is a **showcase of Directive**. The code must be:
 
 **Use AskUserQuestion:** Is this example interactive (visual output) or code-only?
 
-- **Interactive** &ndash; Has visual output (games, UIs, forms, dashboards). Follow all steps below.
-- **Code-only** &ndash; Server-side, CLI, or pattern-showcase. Create a `page.md` with Markdoc instead. Skip the build/embed steps.
+- **Interactive** - Has visual output (games, UIs, forms, dashboards). Follow all steps below.
+- **Code-only** - Server-side, CLI, or pattern-showcase. Create a `page.md` with Markdoc instead. Skip the build/embed steps.
 
 ## Step 0: AE Brainstorm
 
 Before writing any code, brainstorm the example design from multiple perspectives.
 Launch 4 Plan agents in parallel with these focuses:
 
-1. **UX & Game Design** &ndash; Visual layout, user flow, interaction patterns,
+1. **UX & Game Design** - Visual layout, user flow, interaction patterns,
    difficulty tuning, mobile responsiveness, wow factor
-2. **Directive Architecture** &ndash; Schema design, which facts/derivations/events/
+2. **Directive Architecture** - Schema design, which facts/derivations/events/
    constraints/resolvers/effects, how the constraint cascade works, what makes
    this a compelling Directive showcase
-3. **Code Quality & Teaching** &ndash; File organization, line count targets, what
+3. **Code Quality & Teaching** - File organization, line count targets, what
    this example teaches better than existing examples, "How it works" narrative,
    minimum viable features vs nice-to-haves
-4. **AI Integration** &ndash; Is there a natural use case for `@directive-run/ai`?
+4. **AI Integration** - Is there a natural use case for `@directive-run/ai`?
    Could an AI agent enhance the example (opponent, assistant, hint engine,
    content generation)? What AI adapter features would it showcase (orchestrator,
    streaming, guardrails, circuit breaker, memory)? If no compelling fit, say so
-   &ndash; not every example needs AI
+   - not every example needs AI
 
 Present the synthesized brainstorm to the user and resolve design decisions
 before proceeding to Step 1.
@@ -113,7 +113,7 @@ export default defineConfig({
 
 ### Element IDs
 
-Use unique IDs prefixed with the example name (e.g., `checkers-board`, `counter-display`). Never use generic IDs like `root`, `app`, or `container` &ndash; they will conflict with the host page.
+Use unique IDs prefixed with the example name (e.g., `checkers-board`, `counter-display`). Never use generic IDs like `root`, `app`, or `container` - they will conflict with the host page.
 
 ### Source file structure
 
@@ -124,6 +124,68 @@ src/
   <name>.ts          # Directive module definition (schema, derive, constraints, resolvers, effects)
   <logic>.ts         # Pure business logic (no Directive dependency, optional)
 ```
+
+### Standard HTML Layout
+
+Every example follows the three-zone stack: **Header &rarr; Board &rarr; Controls &rarr; Rules**.
+
+```html
+<!-- Zone 1: Header -->
+<h1><Name></h1>
+<p class="subtitle">...</p>
+
+<!-- Zone 2: Board (full-width, no inner max-width) -->
+<div id="<name>-grid" class="<name>-grid" data-testid="<name>-grid"></div>
+
+<!-- Zone 3: Controls (CSS grid, not flex) -->
+<div class="<name>-actions" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.5rem;">
+  <button id="<name>-action" data-testid="<name>-action">Action</button>
+</div>
+
+<!-- Zone 4: Rules -->
+<div class="<name>-rules">...</div>
+```
+
+Key rules:
+- Board fills container width &ndash; never set `max-width` on the board element
+- Controls use CSS grid (`grid-template-columns`) &ndash; never single-row flex
+- Every interactive element gets a `data-testid` attribute matching its ID
+- Dynamically created elements (cells, squares) get `data-testid="<name>-cell-${index}"` in `main.ts`
+- All IDs prefixed with example name (no generic `root`, `app`, `board`)
+
+For two-panel layouts (e.g., game + chat sidebar), wrap in a flex container:
+
+```html
+<div class="app-container" style="display: flex; gap: 1.5rem;">
+  <div class="game-side"><!-- board + controls --></div>
+  <div class="chat-panel"><!-- sidebar --></div>
+</div>
+```
+
+### main.ts Rendering Pattern
+
+`main.ts` follows six canonical sections, each separated by `===` comment bars:
+
+```
+1. System          &ndash; createSystem + modules
+2. DOM References  &ndash; ALL getElementById in one block
+3. Render          &ndash; reads state, writes DOM
+4. Subscribe       &ndash; system.subscribeModule(...)
+5. Controls        &ndash; event listener wiring
+6. Initial Render  &ndash; render() as the last line
+```
+
+Key rules:
+- No scattered DOM refs &ndash; all `getElementById` calls live in section 2
+- Render reads state then writes DOM &ndash; never mix mutations with reads
+- Events use `system.events.{module}.{event}()` &ndash; never mutate facts directly
+- Initial `render()` is always the last line in the file
+- Each section starts with:
+  ```typescript
+  // ============================================================================
+  // Section Name
+  // ============================================================================
+  ```
 
 The Directive module file (`<name>.ts`) is the star of the example. It must demonstrate Directive patterns clearly:
 
@@ -231,7 +293,7 @@ Create `website/src/app/docs/examples/<name>/<Name>Demo.tsx`:
 
 import { ExampleEmbed } from '@/components/ExampleEmbed'
 import type { ExampleBuild, ExampleSource } from '@/lib/examples'
-import { Fence } from '@/components/Fence'
+import { CodeTabs } from '@/components/CodeTabs'
 
 export function <Name>Demo({
   build,
@@ -311,16 +373,14 @@ export function <Name>Demo({
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
-        <div className="space-y-6">
-          {sources.map((s) => (
-            <div key={s.filename}>
-              <div className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {s.filename} ({s.code.split('\n').length} lines)
-              </div>
-              <Fence language="typescript">{s.code}</Fence>
-            </div>
-          ))}
-        </div>
+        <CodeTabs
+          tabs={sources.map((s) => ({
+            filename: s.filename,
+            label: s.filename,
+            code: s.code,
+            language: 'typescript',
+          }))}
+        />
       </section>
     </div>
   )
@@ -343,7 +403,7 @@ Add a listing in `website/src/app/docs/examples/overview/page.md` under the
 appropriate category (or create one). Include:
 
 - Link to the example page
-- 1&ndash;2 sentence description of what it demonstrates
+- 1-2 sentence description of what it demonstrates
 - **Directive features** line listing which concepts it showcases
 
 ```markdown
@@ -361,11 +421,59 @@ pnpm install
 cd website && pnpm build:next-only
 ```
 
+## Step 5.5: E2E Tests
+
+Create `website/e2e/specs/<name>.spec.ts`:
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { gotoExample, tid } from "../helpers/example-test.js";
+
+test.describe("<Name> example", () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoExample(page, "<name>");
+  });
+
+  test("page loads and embed renders", async ({ page }) => {
+    const el = page.locator("directive-<name>");
+    await expect(el).toBeAttached();
+  });
+
+  test("interactive elements respond to clicks", async ({ page }) => {
+    // Test primary interaction (click cell/square, press button, etc.)
+    const target = tid(page, "<name>-<primary-element>");
+    await target.click();
+    // Assert visible state change
+  });
+
+  test("controls respond", async ({ page }) => {
+    // Test each control button
+    const btn = tid(page, "<name>-<action>");
+    await btn.click();
+    // Assert state change
+  });
+
+  test("no JS errors on load", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (err) => errors.push(err.message));
+    await gotoExample(page, "<name>");
+    expect(errors).toEqual([]);
+  });
+});
+```
+
+Run the tests:
+
+```bash
+cd website && pnpm test:e2e
+```
+
 ## Step 6: Verification Checklist
 
 ### Functionality
 - [ ] Interactive &ndash; clicks/inputs work in the embed
 - [ ] No CSS leakage to host page (check headings, buttons, links)
+- [ ] Source code uses tabbed view (CodeTabs component)
 - [ ] Source code displays as always-visible code blocks (not collapsible)
 - [ ] Source code renders with syntax highlighting
 - [ ] Summary section has What/How/Why content filled in
@@ -375,16 +483,24 @@ cd website && pnpm build:next-only
 - [ ] Element IDs are unique (not generic `root`, `app`, etc.)
 - [ ] `vite.config.ts` has correct `base` path
 
+### Layout & Testing
+- [ ] All interactive elements have `data-testid` attributes
+- [ ] Board fills container width (no inner `max-width`)
+- [ ] Controls use CSS grid (not single-row flex)
+- [ ] `main.ts` follows the six-section pattern
+- [ ] E2E test at `website/e2e/specs/<name>.spec.ts`
+- [ ] IDs prefixed with example name (no generic `root`, `app`, `board`)
+
 ### Docs Integration
 - [ ] Navigation entry added in `website/src/lib/navigation.ts`
 - [ ] Listed on examples overview page (`website/src/app/docs/examples/overview/page.md`)
 - [ ] Overview listing has description, Directive features line, and link to example page
 
 ### Code Quality
-- [ ] 100% Directive &ndash; all state managed through `createModule`/`createSystem`, no raw React state or third-party state libs
+- [ ] 100% Directive - all state managed through `createModule`/`createSystem`, no raw React state or third-party state libs
 - [ ] TypeScript strict mode passes (`pnpm typecheck`)
 - [ ] No `any` types, no unnecessary `as` casts
 - [ ] Module file is clean, well-commented, and demonstrates Directive patterns clearly
 - [ ] Rendering logic is separate from Directive module definition
 - [ ] "How it works" section accurately describes which Directive features are used
-- [ ] Code reads like documentation &ndash; a developer learning Directive could study it
+- [ ] Code reads like documentation - a developer learning Directive could study it

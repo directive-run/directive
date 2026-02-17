@@ -32,7 +32,7 @@ export function shuffle<T>(array: T[]): T[] {
  * Solve a Sudoku grid using backtracking with MRV (Minimum Remaining Values)
  * heuristic. Returns the solved grid or null if unsolvable.
  *
- * Operates on a copy &ndash; does not mutate the input.
+ * Operates on a copy – does not mutate the input.
  */
 const MAX_SOLVER_ITERATIONS = 100_000;
 
@@ -69,7 +69,7 @@ export function solve(grid: Grid): Grid | null {
 
     const cell = findMRVCell();
 
-    // No empty cells found &ndash; puzzle is solved
+    // No empty cells found – puzzle is solved
     if (cell === -1) {
       return !work.includes(0);
     }
@@ -156,7 +156,7 @@ export function generatePuzzle(difficulty: Difficulty, attempt = 0): { puzzle: G
     if (check && check[idx] === saved) {
       removed++;
     } else {
-      // Removing this cell creates ambiguity &ndash; put it back
+      // Removing this cell creates ambiguity – put it back
       puzzle[idx] = saved;
     }
   }

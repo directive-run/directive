@@ -19,13 +19,9 @@
 
     /* Layout */
     .sudoku-container {
-      max-width: 520px;
       width: 100%;
       text-align: center;
     }
-
-    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; color: #e2e8f0; }
-    .subtitle { color: #64748b; margin-bottom: 1rem; font-size: 0.875rem; }
 
     /* Top bar: timer + progress */
     .sudoku-top-bar {
@@ -61,8 +57,11 @@
 
     /* Info bar */
     .sudoku-info {
-      display: flex; gap: 0.75rem; justify-content: center; align-items: center;
-      margin-bottom: 0.75rem; flex-wrap: wrap;
+      display: flex; gap: 0.75rem; justify-content: space-between; align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .sudoku-info-left {
+      display: flex; gap: 0.5rem; align-items: center;
     }
     .info-item {
       background: #1e293b; padding: 0.35rem 0.65rem; border-radius: 8px;
@@ -85,7 +84,7 @@
     .sudoku-grid {
       display: grid;
       grid-template-columns: repeat(9, 1fr);
-      max-width: 450px;
+      width: 100%;
       margin: 0 auto 1rem;
       aspect-ratio: 1;
       border: 3px solid #475569;
@@ -149,30 +148,36 @@
       line-height: 1;
     }
 
-    /* Mode toggle */
+    /* Mode toggle (button group) */
     .mode-toggle {
-      display: flex; justify-content: center; margin-bottom: 0.75rem;
+      display: inline-flex; border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
     }
     .mode-btn {
-      background: #1e293b; border: 1px solid #334155; color: #94a3b8;
-      padding: 0.4rem 0.9rem; font-size: 0.8rem; cursor: pointer;
-      transition: all 0.15s;
+      position: relative;
+      background: rgba(255, 255, 255, 0.1); color: #e2e8f0;
+      padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+      border: none;
+      box-shadow: inset 0 0 0 1px #334155;
     }
     .mode-btn:first-child { border-radius: 6px 0 0 6px; }
     .mode-btn:last-child { border-radius: 0 6px 6px 0; }
-    .mode-btn:not(:first-child) { border-left: none; }
+    .mode-btn:not(:first-child) { margin-left: -1px; }
+    .mode-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.2); }
+    .mode-btn:focus { z-index: 1; }
     .mode-btn.active {
-      background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600;
+      background: #3b82f6; color: #fff;
+      box-shadow: inset 0 0 0 1px #3b82f6;
     }
-    .mode-btn:hover:not(.active) { background: #334155; }
 
     /* Number pad */
     .sudoku-numpad {
-      display: flex; gap: 0.35rem; justify-content: center;
-      margin-bottom: 0.75rem; flex-wrap: wrap;
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.35rem;
+      margin-bottom: 0.75rem;
     }
     .num-btn {
-      width: 44px; height: 44px;
+      min-height: 44px;
       background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
       border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 600;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -188,8 +193,8 @@
 
     /* Action buttons */
     .sudoku-actions {
-      display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 0.75rem;
-      flex-wrap: wrap;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.5rem;
+      margin-bottom: 0.75rem;
     }
     button {
       background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
@@ -242,9 +247,8 @@
     /* Responsive – maintain 44px minimum touch targets */
     @media (max-width: 480px) {
       body { padding: 0.75rem; }
-      .sudoku-grid { max-width: 100%; }
       .sudoku-numpad { gap: 0.5rem; }
-      .num-btn { min-width: 44px; min-height: 44px; font-size: 1rem; }
+      .num-btn { min-height: 44px; font-size: 1rem; }
       .sudoku-actions { gap: 0.4rem; }
       .sudoku-actions button { padding: 0.5rem 0.75rem; font-size: 0.75rem; min-height: 44px; }
     }
@@ -252,68 +256,65 @@
 </head>
 <body>
   <div class="sudoku-container">
-    <h1>Sudoku</h1>
-    <p class="subtitle">Constraint satisfaction, powered by Directive</p>
-
     <!-- Top bar -->
     <div class="sudoku-top-bar">
-      <span id="sudoku-timer" class="sudoku-timer">20:00</span>
+      <span id="sudoku-timer" class="sudoku-timer" data-testid="sudoku-timer">20:00</span>
       <div class="sudoku-progress-wrap">
         <div class="sudoku-progress-track">
-          <div id="sudoku-progress-bar" class="sudoku-progress-fill" style="width: 0%"></div>
+          <div id="sudoku-progress-bar" class="sudoku-progress-fill" data-testid="sudoku-progress-bar" style="width: 0%"></div>
         </div>
-        <span id="sudoku-progress" class="sudoku-progress-text">0%</span>
+        <span id="sudoku-progress" class="sudoku-progress-text" data-testid="sudoku-progress">0%</span>
       </div>
     </div>
 
-    <!-- Info bar -->
+    <!-- Info bar + difficulty toggle -->
     <div class="sudoku-info">
-      <div class="info-item">
-        <span class="info-label">Hints</span>
-        <span id="sudoku-hints-remaining" class="info-value">3</span>
+      <div class="sudoku-info-left">
+        <div class="info-item">
+          <span class="info-label">Hints</span>
+          <span id="sudoku-hints-remaining" class="info-value" data-testid="sudoku-hints-remaining">3</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Errors</span>
+          <span id="sudoku-errors" class="info-value" data-testid="sudoku-errors">0</span>
+        </div>
       </div>
-      <div class="info-item">
-        <span class="info-label">Errors</span>
-        <span id="sudoku-errors" class="info-value">0</span>
+      <div class="mode-toggle">
+        <button id="sudoku-mode-easy" class="mode-btn active" data-testid="sudoku-mode-easy">Easy</button>
+        <button id="sudoku-mode-medium" class="mode-btn" data-testid="sudoku-mode-medium">Medium</button>
+        <button id="sudoku-mode-hard" class="mode-btn" data-testid="sudoku-mode-hard">Hard</button>
       </div>
     </div>
 
     <!-- Message -->
-    <div id="sudoku-message" class="sudoku-message">
+    <div id="sudoku-message" class="sudoku-message" data-testid="sudoku-message">
       Fill in the grid. No duplicates in rows, columns, or boxes.
     </div>
 
     <!-- Grid -->
-    <div id="sudoku-grid" class="sudoku-grid"></div>
-
-    <!-- Difficulty toggle -->
-    <div class="mode-toggle">
-      <button id="sudoku-mode-easy" class="mode-btn active">Easy</button>
-      <button id="sudoku-mode-medium" class="mode-btn">Medium</button>
-      <button id="sudoku-mode-hard" class="mode-btn">Hard</button>
-    </div>
+    <div id="sudoku-grid" class="sudoku-grid" data-testid="sudoku-grid"></div>
 
     <!-- Number pad -->
     <div class="sudoku-numpad">
-      <button id="sudoku-num-1" class="num-btn">1<span class="num-badge">9</span></button>
-      <button id="sudoku-num-2" class="num-btn">2<span class="num-badge">9</span></button>
-      <button id="sudoku-num-3" class="num-btn">3<span class="num-badge">9</span></button>
-      <button id="sudoku-num-4" class="num-btn">4<span class="num-badge">9</span></button>
-      <button id="sudoku-num-5" class="num-btn">5<span class="num-badge">9</span></button>
-      <button id="sudoku-num-6" class="num-btn">6<span class="num-badge">9</span></button>
-      <button id="sudoku-num-7" class="num-btn">7<span class="num-badge">9</span></button>
-      <button id="sudoku-num-8" class="num-btn">8<span class="num-badge">9</span></button>
-      <button id="sudoku-num-9" class="num-btn">9<span class="num-badge">9</span></button>
-      <button id="sudoku-num-0" class="num-btn clear-btn">Clear</button>
+      <button id="sudoku-num-1" class="num-btn" data-testid="sudoku-num-1">1<span class="num-badge">9</span></button>
+      <button id="sudoku-num-2" class="num-btn" data-testid="sudoku-num-2">2<span class="num-badge">9</span></button>
+      <button id="sudoku-num-3" class="num-btn" data-testid="sudoku-num-3">3<span class="num-badge">9</span></button>
+      <button id="sudoku-num-4" class="num-btn" data-testid="sudoku-num-4">4<span class="num-badge">9</span></button>
+      <button id="sudoku-num-5" class="num-btn" data-testid="sudoku-num-5">5<span class="num-badge">9</span></button>
+      <button id="sudoku-num-6" class="num-btn" data-testid="sudoku-num-6">6<span class="num-badge">9</span></button>
+      <button id="sudoku-num-7" class="num-btn" data-testid="sudoku-num-7">7<span class="num-badge">9</span></button>
+      <button id="sudoku-num-8" class="num-btn" data-testid="sudoku-num-8">8<span class="num-badge">9</span></button>
+      <button id="sudoku-num-9" class="num-btn" data-testid="sudoku-num-9">9<span class="num-badge">9</span></button>
+      <button id="sudoku-num-0" class="num-btn clear-btn" data-testid="sudoku-num-0">Clear</button>
     </div>
 
     <!-- Actions -->
     <div class="sudoku-actions">
-      <button id="sudoku-notes-toggle">Notes (N)</button>
-      <button id="sudoku-hint-btn">Hint (H)</button>
-      <button id="sudoku-undo-btn">Undo</button>
-      <button id="sudoku-redo-btn">Redo</button>
-      <button id="sudoku-new-game" class="primary">New Game</button>
+      <button id="sudoku-notes-toggle" data-testid="sudoku-notes-toggle">Notes (N)</button>
+      <button id="sudoku-hint-btn" data-testid="sudoku-hint-btn">Hint (H)</button>
+      <button id="sudoku-undo-btn" data-testid="sudoku-undo-btn">Undo</button>
+      <button id="sudoku-redo-btn" data-testid="sudoku-redo-btn">Redo</button>
+      <button id="sudoku-new-game" class="primary" data-testid="sudoku-new-game">New Game</button>
     </div>
 
     <!-- Rules -->
@@ -336,7 +337,7 @@
     <div class="sudoku-modal-content">
       <h2 id="sudoku-modal-title">Puzzle Solved!</h2>
       <p id="sudoku-modal-message">Well done!</p>
-      <button id="sudoku-modal-new-game" class="primary">Play Again</button>
+      <button id="sudoku-modal-new-game" class="primary" data-testid="sudoku-modal-new-game">Play Again</button>
     </div>
   </div>
 
