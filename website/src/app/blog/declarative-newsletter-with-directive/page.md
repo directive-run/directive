@@ -2,8 +2,8 @@
 title: "Declarative Newsletter Signup with Directive: The Simplest Module"
 description: We said newsletter signup didn't need Directive. Here's why we were wrong.
 layout: blog
-date: 2026-02-17
-dateModified: 2026-02-17
+date: 2026-02-16
+dateModified: 2026-02-16
 slug: declarative-newsletter-with-directive
 author: jason-comes
 categories: [Tutorial, Architecture]
@@ -464,13 +464,3 @@ pnpm dev
 
 It uses a simulated submission with a 20% failure rate and a 10-second rate limit, so you can see every state transition without an API key.
 
----
-
-## Related
-
-- **[Declarative Forms with Directive](/blog/declarative-forms-with-directive)** &ndash; the full contact form tutorial (four fields, seven derivations)
-- **[Constraints](/docs/constraints)** &ndash; how `when` / `require` works
-- **[Derivations](/docs/derivations)** &ndash; auto-tracked computed values
-- **[Resolvers](/docs/resolvers)** &ndash; async requirement fulfillment
-- **[Effects](/docs/effects)** &ndash; fire-and-forget side effects
-- **[React Adapter](/docs/adapters/react)** &ndash; `useDirectiveRef`, `useSelector`, `useEvents`

@@ -32,36 +32,7 @@ export function resolveAuthor(authorId: string): Author {
 }
 
 export const posts: BlogPost[] = [
-  {
-    slug: 'declarative-forms-with-directive',
-    title: "Declarative Forms with Directive: Zero useState, Zero useEffect",
-    description:
-      'Build a production contact form using Directive\'s six primitives. Per-field validation, async submission, rate limiting, and auto-reset \u2013 without a single useState or useEffect.',
-    date: '2026-02-16',
-    author: 'jason-comes',
-    categories: ['Tutorial', 'Architecture'],
-    featured: true,
-  },
-  {
-    slug: 'declarative-newsletter-with-directive',
-    title: 'Declarative Newsletter Signup with Directive: The Simplest Module',
-    description:
-      'We said newsletter signup didn\u2019t need Directive. Here\u2019s why we were wrong.',
-    date: '2026-02-17',
-    author: 'jason-comes',
-    categories: ['Tutorial', 'Architecture'],
-    featured: false,
-  },
-  {
-    slug: 'directive-on-the-server',
-    title: 'Directive on the Server',
-    description:
-      'Distributable snapshots, signed verification, audit trails, and GDPR compliance \u2013 Directive runs on Node.js without React.',
-    date: '2026-02-18',
-    author: 'directive-labs',
-    categories: ['Architecture', 'Tutorial'],
-    featured: false,
-  },
+  // — Featured (foundational → practical progression) —
   {
     slug: 'introducing-directive',
     title: 'Introducing Directive',
@@ -83,6 +54,36 @@ export const posts: BlogPost[] = [
     featured: true,
   },
   {
+    slug: 'feature-flags-without-a-service',
+    title: 'Feature Flags Without a Feature Flag Service',
+    description:
+      'Boolean flags don\'t scale. Build a reactive, inspectable feature flag system using constraints, derivations, and effects.',
+    date: '2026-02-04',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Tutorial'],
+    featured: true,
+  },
+  {
+    slug: 'ab-testing-with-directive',
+    title: 'A/B Testing with Directive',
+    description:
+      'Build a complete A/B testing engine using constraints, resolvers, and effects. Deterministic assignment, exposure tracking, and variant gating \u2013 no third-party service required.',
+    date: '2026-02-16',
+    author: 'directive-labs',
+    categories: ['Tutorial', 'Architecture'],
+    featured: true,
+  },
+  {
+    slug: 'declarative-forms-with-directive',
+    title: "Declarative Forms with Directive: Zero useState, Zero useEffect",
+    description:
+      'Build a production contact form using Directive\'s six primitives. Per-field validation, async submission, rate limiting, and auto-reset \u2013 without a single useState or useEffect.',
+    date: '2026-02-16',
+    author: 'jason-comes',
+    categories: ['Tutorial', 'Architecture'],
+    featured: true,
+  },
+  {
     slug: 'data-fetching-with-directive',
     title: 'Data Fetching with Directive',
     description:
@@ -91,6 +92,37 @@ export const posts: BlogPost[] = [
     author: 'directive-labs',
     categories: ['Tutorial', 'Architecture'],
     featured: true,
+  },
+  // — All other posts —
+  {
+    slug: 'declarative-newsletter-with-directive',
+    title: 'Declarative Newsletter Signup with Directive: The Simplest Module',
+    description:
+      'We said newsletter signup didn\u2019t need Directive. Here\u2019s why we were wrong.',
+    date: '2026-02-16',
+    author: 'jason-comes',
+    categories: ['Tutorial', 'Architecture'],
+    featured: false,
+  },
+  {
+    slug: 'directive-on-the-server',
+    title: 'Directive on the Server',
+    description:
+      'Distributable snapshots, signed verification, audit trails, and GDPR compliance \u2013 Directive runs on Node.js without React.',
+    date: '2026-02-18',
+    author: 'directive-labs',
+    categories: ['Architecture', 'Tutorial'],
+    featured: false,
+  },
+  {
+    slug: 'building-ai-docs-chatbot',
+    title: 'Building an AI Docs Chatbot with Directive',
+    description:
+      'How the AI adapter and the core runtime work together to power a RAG-backed docs chatbot with streaming, guardrails, and reactive server-side state.',
+    date: '2026-02-03',
+    author: 'jason-comes',
+    categories: ['AI', 'Tutorial'],
+    featured: false,
   },
   {
     slug: 'stop-writing-if-else-chains',
@@ -173,26 +205,6 @@ export const posts: BlogPost[] = [
     featured: false,
   },
   {
-    slug: 'feature-flags-without-a-service',
-    title: 'Feature Flags Without a Feature Flag Service',
-    description:
-      'Boolean flags don\'t scale. Build a reactive, inspectable feature flag system using constraints, derivations, and effects.',
-    date: '2026-04-27',
-    author: 'directive-labs',
-    categories: ['Architecture', 'Tutorial'],
-    featured: false,
-  },
-  {
-    slug: 'building-ai-docs-chatbot',
-    title: 'Building an AI Docs Chatbot with Directive',
-    description:
-      'How the AI adapter and the core runtime work together to power a RAG-backed docs chatbot with streaming, guardrails, and reactive server-side state.',
-    date: '2026-05-04',
-    author: 'jason-comes',
-    categories: ['AI', 'Tutorial'],
-    featured: false,
-  },
-  {
     slug: 'inside-the-reconciliation-loop',
     title: "Inside Directive's Reconciliation Loop",
     description:
@@ -200,16 +212,6 @@ export const posts: BlogPost[] = [
     date: '2026-05-11',
     author: 'directive-labs',
     categories: ['Architecture', 'Engineering'],
-    featured: false,
-  },
-  {
-    slug: 'ab-testing-with-directive',
-    title: 'A/B Testing with Directive',
-    description:
-      'Build a complete A/B testing engine using constraints, resolvers, and effects. Deterministic assignment, exposure tracking, and variant gating \u2013 no third-party service required.',
-    date: '2026-05-18',
-    author: 'directive-labs',
-    categories: ['Tutorial', 'Architecture'],
     featured: false,
   },
 ]

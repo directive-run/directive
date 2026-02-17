@@ -3,6 +3,7 @@ import { ComparisonTable } from '@/components/ComparisonTable'
 import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
+import { UseCaseCards } from '@/components/UseCaseCards'
 
 const tags = {
   'comparison-table': {
@@ -71,6 +72,10 @@ const tags = {
       projectId: { type: String },
       text: { type: String },
     },
+  },
+  'use-case-cards': {
+    render: UseCaseCards,
+    selfClosing: true,
   },
 }
 

@@ -133,7 +133,7 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
   }, [])
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <div>
         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
           Constraint Flow
@@ -243,21 +243,21 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
       <div aria-live="polite">
         {isAnimating && activeStep < STEPS.length ? (
           <div className="flex items-center gap-2.5 rounded-lg border border-brand-primary-200 bg-brand-primary-50 px-4 py-3 dark:border-brand-primary-800/40 dark:bg-brand-primary-950/30">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-primary" />
-            <span className="text-sm font-semibold text-brand-primary-700 dark:text-brand-primary-300">
+            <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-brand-primary" />
+            <span className="min-w-0 truncate text-sm font-semibold text-brand-primary-700 dark:text-brand-primary-300">
               Reconciling&hellip;
             </span>
-            <span className="text-xs text-brand-primary-500 dark:text-brand-primary-400">
+            <span className="shrink-0 text-xs text-brand-primary-500 dark:text-brand-primary-400">
               Step {activeStep + 1} of {STEPS.length}
             </span>
           </div>
         ) : activeStep >= STEPS.length - 1 ? (
           <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/30">
-            <CheckCircle weight="fill" className="h-5 w-5 text-emerald-500" />
-            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            <CheckCircle weight="fill" className="h-5 w-5 shrink-0 text-emerald-500" />
+            <span className="min-w-0 truncate text-sm font-semibold text-emerald-700 dark:text-emerald-300">
               Settled
             </span>
-            <span className="text-xs text-emerald-500 dark:text-emerald-400">
+            <span className="shrink-0 text-xs text-emerald-500 dark:text-emerald-400">
               All constraints resolved
             </span>
           </div>

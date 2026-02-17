@@ -42,7 +42,7 @@ export function Newsletter() {
   )
 
   return (
-    <div className="relative isolate mt-12 overflow-hidden border-t border-slate-200 bg-slate-900 pt-16 pb-16 sm:pt-24 sm:pb-24 dark:mt-12 dark:border-slate-800 dark:bg-brand-surface dark:pt-24">
+    <div className="relative isolate overflow-hidden border-t border-slate-200 bg-slate-900 pt-16 pb-16 sm:pt-24 sm:pb-24 dark:border-slate-800 dark:bg-brand-surface dark:pt-24">
       <div className="mx-auto flex max-w-5xl flex-col gap-10 px-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:px-12">
         <h2 className="max-w-xl font-display text-5xl font-semibold tracking-tight text-balance sm:text-6xl xl:flex-auto">
           <span className="inline bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(to right, var(--color-brand-primary-300), white, var(--color-brand-accent-200))' }}>
