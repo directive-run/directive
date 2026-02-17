@@ -143,6 +143,34 @@ export function createEngine<S extends Schema>(
 		if (module.resolvers) Object.assign(mergedResolvers, module.resolvers);
 	}
 
+	// Build snapshotEventNames: Set<string> | null
+	// If any module declares snapshotEvents, build the filter set.
+	// Modules WITHOUT snapshotEvents have all their events added (they still snapshot).
+	let snapshotEventNames: Set<string> | null = null;
+	// biome-ignore lint/suspicious/noExplicitAny: Module may have snapshotEvents at runtime
+	const hasAnySnapshotEvents = config.modules.some((m: any) => m.snapshotEvents);
+	if (hasAnySnapshotEvents) {
+		snapshotEventNames = new Set<string>();
+		for (const module of config.modules) {
+			// biome-ignore lint/suspicious/noExplicitAny: Module may have snapshotEvents at runtime
+			const mod = module as any;
+			if (mod.snapshotEvents) {
+				for (const eventName of mod.snapshotEvents) {
+					snapshotEventNames.add(eventName);
+				}
+			} else if (mod.events) {
+				// No filter — all events from this module create snapshots
+				for (const eventName of Object.keys(mod.events)) {
+					snapshotEventNames.add(eventName);
+				}
+			}
+		}
+	}
+
+	// Snapshot intent flags — track whether the current change batch should create a snapshot
+	let dispatchDepth = 0;
+	let shouldTakeSnapshot = false;
+
 	// Dev-mode: Warn if a fact and derivation share the same name
 	if (process.env.NODE_ENV !== "production") {
 		const derivationNames = new Set(Object.keys(mergedDerive));
@@ -188,6 +216,10 @@ export function createEngine<S extends Schema>(
 			// The restored state is already reconciled; re-reconciling would create
 			// spurious snapshots that break undo/redo.
 			if (timeTravelRef?.isRestoring) return;
+			// Direct fact mutations (outside event dispatch) always create snapshots
+			if (dispatchDepth === 0) {
+				shouldTakeSnapshot = true;
+			}
 			state.changedKeys.add(key);
 			scheduleReconcile();
 		},
@@ -202,6 +234,10 @@ export function createEngine<S extends Schema>(
 			invalidateManyDerivations(keys);
 			// During time-travel restore, skip change tracking and reconciliation.
 			if (timeTravelRef?.isRestoring) return;
+			// Resolver/effect batches (outside event dispatch) always create snapshots
+			if (dispatchDepth === 0) {
+				shouldTakeSnapshot = true;
+			}
 			for (const change of changes) {
 				state.changedKeys.add(change.key);
 			}
@@ -374,9 +410,12 @@ export function createEngine<S extends Schema>(
 		notifySettlementChange();
 
 		try {
-			// Take snapshot before reconciliation
+			// Take snapshot before reconciliation (respects snapshotEvents filtering)
 			if (state.changedKeys.size > 0) {
-				timeTravelManager.takeSnapshot(`facts-changed:${[...state.changedKeys].join(",")}`);
+				if (snapshotEventNames === null || shouldTakeSnapshot) {
+					timeTravelManager.takeSnapshot(`facts-changed:${[...state.changedKeys].join(",")}`);
+				}
+				shouldTakeSnapshot = false;
 			}
 
 			// Get snapshot for plugins
@@ -497,9 +536,17 @@ export function createEngine<S extends Schema>(
 			return (payload?: Record<string, unknown>) => {
 				const handler = mergedEvents[prop];
 				if (handler) {
-					store.batch(() => {
-						handler(facts, { type: prop, ...payload });
-					});
+					dispatchDepth++;
+					if (snapshotEventNames === null || snapshotEventNames.has(prop)) {
+						shouldTakeSnapshot = true;
+					}
+					try {
+						store.batch(() => {
+							handler(facts, { type: prop, ...payload });
+						});
+					} finally {
+						dispatchDepth--;
+					}
 				} else if (process.env.NODE_ENV !== "production") {
 					console.warn(
 						`[Directive] Unknown event type "${prop}". ` +
@@ -617,9 +664,17 @@ export function createEngine<S extends Schema>(
 			if (BLOCKED_PROPS.has(event.type)) return;
 			const handler = mergedEvents[event.type];
 			if (handler) {
-				store.batch(() => {
-					handler(facts, event);
-				});
+				dispatchDepth++;
+				if (snapshotEventNames === null || snapshotEventNames.has(event.type)) {
+					shouldTakeSnapshot = true;
+				}
+				try {
+					store.batch(() => {
+						handler(facts, event);
+					});
+				} finally {
+					dispatchDepth--;
+				}
 			} else if (process.env.NODE_ENV !== "production") {
 				console.warn(
 					`[Directive] Unknown event type "${event.type}". ` +
@@ -1176,6 +1231,7 @@ export function createEngine<S extends Schema>(
 		constraints?: Record<string, unknown>;
 		resolvers?: Record<string, unknown>;
 		hooks?: { onInit?: (s: unknown) => void; onStart?: (s: unknown) => void; onStop?: (s: unknown) => void; onError?: (e: unknown, ctx: unknown) => void };
+		snapshotEvents?: string[];
 	}): void {
 		// Guard: cannot register during reconciliation (would corrupt iteration state)
 		if (state.isReconciling) {
@@ -1227,6 +1283,22 @@ export function createEngine<S extends Schema>(
 						`[Directive] "${key}" exists as both a fact and a derivation after registering module "${module.id}".`,
 					);
 				}
+			}
+		}
+
+		// Update snapshotEventNames BEFORE merging events so we capture pre-merge state
+		if (module.snapshotEvents) {
+			if (snapshotEventNames === null) {
+				// First module with snapshotEvents — initialize the set with all existing event names
+				snapshotEventNames = new Set<string>(Object.keys(mergedEvents));
+			}
+			for (const eventName of module.snapshotEvents) {
+				snapshotEventNames.add(eventName);
+			}
+		} else if (snapshotEventNames !== null && module.events) {
+			// Filtering is active and this module has no filter — add all its events
+			for (const eventName of Object.keys(module.events)) {
+				snapshotEventNames.add(eventName);
 			}
 		}
 

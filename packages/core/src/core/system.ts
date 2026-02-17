@@ -210,6 +210,11 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 	const modulesMap = options.modules;
 	const moduleNamespaces = new Set(Object.keys(modulesMap));
 
+	// Build snapshot module filter set (null = all modules snapshot)
+	const snapshotModulesSet = options.debug?.snapshotModules
+		? new Set(options.debug.snapshotModules)
+		: null;
+
 	// Validate tickMs if provided
 	if (options.tickMs !== undefined && options.tickMs <= 0) {
 		throw new Error("[Directive] tickMs must be a positive number");
@@ -233,6 +238,18 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 						);
 					}
 				}
+			}
+		}
+	}
+
+	// Dev-mode: Validate snapshotModules references existing modules
+	if (process.env.NODE_ENV !== "production" && options.debug?.snapshotModules) {
+		for (const name of options.debug.snapshotModules) {
+			if (!moduleNamespaces.has(name)) {
+				console.warn(
+					`[Directive] debug.snapshotModules entry "${name}" doesn't match any module. ` +
+					`Available modules: ${[...moduleNamespaces].join(", ")}`,
+				);
 			}
 		}
 	}
@@ -489,6 +506,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 			constraints: prefixedConstraints,
 			resolvers: prefixedResolvers,
 			hooks: mod.hooks,
+			snapshotEvents: (snapshotModulesSet && !snapshotModulesSet.has(namespace))
+				? []  // Module excluded from snapshots
+				: mod.snapshotEvents?.map((e: string) => `${namespace}${SEPARATOR}${e}`),
 		// biome-ignore lint/suspicious/noExplicitAny: Module transformation
 		} as any);
 	}
@@ -572,6 +592,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 			constraints: mod.constraints,
 			resolvers: mod.resolvers,
 			hooks: mod.hooks,
+			snapshotEvents: mod.snapshotEvents,
 		})) as any,
 		plugins: options.plugins,
 		debug,
@@ -1120,6 +1141,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 				constraints: Object.keys(prefixedConstraints).length > 0 ? prefixedConstraints : undefined,
 				resolvers: Object.keys(prefixedResolvers).length > 0 ? prefixedResolvers : undefined,
 				hooks: mod.hooks,
+				snapshotEvents: (snapshotModulesSet && !snapshotModulesSet.has(namespace))
+					? []  // Module excluded from snapshots
+					: mod.snapshotEvents?.map((e: string) => `${namespace}${SEPARATOR}${e}`),
 			});
 		},
 
@@ -1545,6 +1569,15 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 				);
 			}
 		}
+
+		// Warn if snapshotModules is set (has no effect in single-module mode)
+		if (options.debug?.snapshotModules) {
+			console.warn(
+				"[Directive] debug.snapshotModules has no effect in single-module mode. " +
+				"Use snapshotEvents on the module definition instead, or switch to " +
+				"createSystem({ modules: { ... } }) for multi-module filtering.",
+			);
+		}
 	}
 
 	// Apply zero-config defaults if enabled
@@ -1590,6 +1623,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 				constraints: mod.constraints,
 				resolvers: mod.resolvers,
 				hooks: mod.hooks,
+				snapshotEvents: mod.snapshotEvents,
 			},
 		// biome-ignore lint/suspicious/noExplicitAny: Module format
 		] as any,
@@ -1753,6 +1787,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 				constraints: moduleDef.constraints,
 				resolvers: moduleDef.resolvers,
 				hooks: moduleDef.hooks,
+				snapshotEvents: moduleDef.snapshotEvents,
 			});
 		},
 	// biome-ignore lint/suspicious/noExplicitAny: Type narrowing

@@ -6,19 +6,25 @@
  */
 
 import { createSystem } from "@directive-run/core";
-import { sudokuGame } from "./sudoku.js";
+import { sudokuGame, sudokuSchema } from "./sudoku.js";
 import type { Grid, Difficulty, Conflict } from "./rules.js";
 import { MAX_HINTS } from "./rules.js";
 
 // ============================================================================
-// System
+// System (single module – direct access, no namespace)
 // ============================================================================
 
 const system = createSystem({
-  modules: { sudoku: sudokuGame },
+  module: sudokuGame,
   debug: { timeTravel: true, maxSnapshots: 200 },
 });
 system.start();
+
+// All fact + derivation keys for subscribe-all
+const allKeys = [
+  ...Object.keys(sudokuSchema.facts),
+  ...Object.keys(sudokuSchema.derivations),
+];
 
 // ============================================================================
 // DOM References
@@ -53,7 +59,7 @@ let timerInterval: ReturnType<typeof setInterval> | null = null;
 function startTimer(): void {
   stopTimer();
   timerInterval = setInterval(() => {
-    system.events.sudoku.tick();
+    system.events.tick();
   }, 1000);
 }
 
@@ -69,8 +75,8 @@ function stopTimer(): void {
 // ============================================================================
 
 function render(): void {
-  const facts = system.facts.sudoku;
-  const derive = system.derive.sudoku;
+  const facts = system.facts;
+  const derive = system.derive;
 
   const grid = facts.grid as Grid;
   const givens = facts.givens as Set<number>;
@@ -199,7 +205,7 @@ function render(): void {
 
     cell.tabIndex = 0;
     cell.addEventListener("click", () => {
-      system.events.sudoku.selectCell({ index: i });
+      system.events.selectCell({ index: i });
     });
 
     gridEl.appendChild(cell);
@@ -244,43 +250,30 @@ function render(): void {
 // Subscribe
 // ============================================================================
 
-system.subscribeModule("sudoku", render);
+system.subscribe(allKeys, render);
 
 // ============================================================================
 // Controls
 // ============================================================================
-
-/**
- * Only snapshot board-changing actions (number input, notes, hints).
- * Selection, timer ticks, and UI toggles are excluded from undo history.
- */
-function withSnapshot(fn: () => void): void {
-  system.debug?.resume();
-  fn();
-  system.debug?.pause();
-}
-
-// Pause time-travel by default — only meaningful plays get snapshots
-system.debug?.pause();
 
 // Number pad
 for (let d = 0; d <= 9; d++) {
   const btn = document.getElementById(`sudoku-num-${d}`);
   if (btn) {
     btn.addEventListener("click", () => {
-      withSnapshot(() => system.events.sudoku.inputNumber({ value: d }));
+      system.events.inputNumber({ value: d });
     });
   }
 }
 
 // Notes toggle
 notesToggle.addEventListener("click", () => {
-  system.events.sudoku.toggleNotesMode();
+  system.events.toggleNotesMode();
 });
 
 // Hint
 hintBtn.addEventListener("click", () => {
-  withSnapshot(() => system.events.sudoku.requestHint());
+  system.events.requestHint();
 });
 
 // Undo / Redo
@@ -295,28 +288,28 @@ redoBtn.addEventListener("click", () => {
 // New game
 newGameBtn.addEventListener("click", () => {
   stopTimer();
-  system.events.sudoku.newGame({ difficulty: system.facts.sudoku.difficulty as Difficulty });
+  system.events.newGame({ difficulty: system.facts.difficulty as Difficulty });
 });
 
 modalNewGame.addEventListener("click", () => {
   stopTimer();
-  system.events.sudoku.newGame({ difficulty: system.facts.sudoku.difficulty as Difficulty });
+  system.events.newGame({ difficulty: system.facts.difficulty as Difficulty });
 });
 
 // Difficulty mode buttons
 modeEasy.addEventListener("click", () => {
   stopTimer();
-  system.events.sudoku.newGame({ difficulty: "easy" });
+  system.events.newGame({ difficulty: "easy" });
 });
 
 modeMedium.addEventListener("click", () => {
   stopTimer();
-  system.events.sudoku.newGame({ difficulty: "medium" });
+  system.events.newGame({ difficulty: "medium" });
 });
 
 modeHard.addEventListener("click", () => {
   stopTimer();
-  system.events.sudoku.newGame({ difficulty: "hard" });
+  system.events.newGame({ difficulty: "hard" });
 });
 
 // ============================================================================
@@ -324,7 +317,7 @@ modeHard.addEventListener("click", () => {
 // ============================================================================
 
 document.addEventListener("keydown", (e) => {
-  const facts = system.facts.sudoku;
+  const facts = system.facts;
   const sel = facts.selectedIndex as number | null;
 
   // Arrow keys: move selection
@@ -346,7 +339,7 @@ document.addEventListener("keydown", (e) => {
       newCol = Math.min(8, col + 1);
     }
 
-    system.events.sudoku.selectCell({ index: newRow * 9 + newCol });
+    system.events.selectCell({ index: newRow * 9 + newCol });
 
     return;
   }
@@ -356,9 +349,9 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     const value = parseInt(e.key, 10);
     if (facts.notesMode) {
-      withSnapshot(() => system.events.sudoku.toggleNote({ value }));
+      system.events.toggleNote({ value });
     } else {
-      withSnapshot(() => system.events.sudoku.inputNumber({ value }));
+      system.events.inputNumber({ value });
     }
 
     return;
@@ -367,7 +360,7 @@ document.addEventListener("keydown", (e) => {
   // Backspace / Delete: clear cell
   if (e.key === "Backspace" || e.key === "Delete") {
     e.preventDefault();
-    withSnapshot(() => system.events.sudoku.inputNumber({ value: 0 }));
+    system.events.inputNumber({ value: 0 });
 
     return;
   }
@@ -375,7 +368,7 @@ document.addEventListener("keydown", (e) => {
   // N: toggle notes mode
   if (e.key === "n" || e.key === "N") {
     e.preventDefault();
-    system.events.sudoku.toggleNotesMode();
+    system.events.toggleNotesMode();
 
     return;
   }
@@ -383,7 +376,7 @@ document.addEventListener("keydown", (e) => {
   // H: request hint
   if (e.key === "h" || e.key === "H") {
     e.preventDefault();
-    withSnapshot(() => system.events.sudoku.requestHint());
+    system.events.requestHint();
 
     return;
   }
