@@ -73,6 +73,8 @@ export type EventsAccessor<M extends ModuleSchema> = EventsAccessorFromSchema<M>
 export interface DebugConfig {
 	timeTravel?: boolean;
 	maxSnapshots?: number;
+	/** Only snapshot events from these modules. Omit to snapshot all modules. Multi-module only. */
+	snapshotModules?: string[];
 }
 
 /** Time-travel API */
