@@ -38,7 +38,7 @@ export const metadata = buildPageMetadata({
 })
 
 export default function BlogPage() {
-  const featured = getFeaturedPosts()
+  const featured = getFeaturedPosts().slice(0, 3)
 
   return (
     <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">

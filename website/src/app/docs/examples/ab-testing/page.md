@@ -71,6 +71,28 @@ const abTesting = createModule("ab-testing", {
     exposedCount: (facts) => Object.keys(facts.exposures).length,
   },
 
+  events: {
+    registerExperiment: (facts, { id, name, variants }) => {
+      facts.experiments = [
+        ...facts.experiments,
+        { id, name, variants, active: true },
+      ];
+    },
+    assignVariant: (facts, { experimentId, variantId }) => {
+      facts.assignments = { ...facts.assignments, [experimentId]: variantId };
+    },
+    pauseAll: (facts) => {
+      facts.paused = true;
+    },
+    resumeAll: (facts) => {
+      facts.paused = false;
+    },
+    reset: (facts) => {
+      facts.assignments = {};
+      facts.exposures = {};
+    },
+  },
+
   constraints: {
     needsAssignment: {
       priority: 100,
@@ -86,7 +108,7 @@ const abTesting = createModule("ab-testing", {
           (e) => e.active && !facts.assignments[e.id],
         );
 
-        return { type: "ASSIGN_VARIANT", experimentId: unassigned.id };
+        return { type: "ASSIGN_VARIANT", experimentId: unassigned!.id };
       },
     },
 
@@ -106,8 +128,8 @@ const abTesting = createModule("ab-testing", {
 
         return {
           type: "TRACK_EXPOSURE",
-          experimentId,
-          variantId: facts.assignments[experimentId],
+          experimentId: experimentId!,
+          variantId: facts.assignments[experimentId!],
         };
       },
     },
@@ -118,7 +140,7 @@ const abTesting = createModule("ab-testing", {
       requirement: "ASSIGN_VARIANT",
       resolve: async (req, context) => {
         const experiment = context.facts.experiments.find((e) => e.id === req.experimentId);
-        const variantId = pickVariant(context.facts.userId, req.experimentId, experiment.variants);
+        const variantId = pickVariant(context.facts.userId, req.experimentId, experiment!.variants);
         context.facts.assignments = { ...context.facts.assignments, [req.experimentId]: variantId };
       },
     },
@@ -130,6 +152,23 @@ const abTesting = createModule("ab-testing", {
           ...context.facts.exposures,
           [req.experimentId]: Date.now(),
         };
+      },
+    },
+  },
+
+  effects: {
+    logAssignment: {
+      deps: ["assignments"],
+      run: (facts, prev) => {
+        if (!prev) {
+          return;
+        }
+
+        for (const [id, variant] of Object.entries(facts.assignments)) {
+          if (!prev.assignments[id]) {
+            console.log(`[ab-testing] Assigned ${id} → ${variant}`);
+          }
+        }
       },
     },
   },
@@ -159,6 +198,16 @@ The engine settles automatically. No manual orchestration needed.
 The same `userId + experimentId` always produces the same variant:
 
 ```typescript
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+
+  return Math.abs(hash);
+}
+
 function pickVariant(userId: string, experimentId: string, variants: Variant[]): string {
   const hash = hashCode(`${userId}:${experimentId}`);
   const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);

@@ -5,6 +5,8 @@ description: See how Directive compares to Redux, Zustand, XState, and React Que
 
 Understand when to use Directive versus other popular state management solutions. {% .lead %}
 
+Redux, Zustand, XState, and React Query are excellent libraries &ndash; each solving distinct problems well. Directive doesn't aim to replace them. It fills a specific niche: **constraint-driven business logic** where you declare what must be true and let the runtime figure out how. Many apps benefit from pairing Directive *with* these libraries &ndash; for example, React Query for data fetching and caching alongside Directive for the business rules that act on that data.
+
 ---
 
 ## Feature Comparison
@@ -15,7 +17,7 @@ Understand when to use Directive versus other popular state management solutions
 
 ## Redux
 
-Redux pioneered predictable state management with actions and reducers.
+Redux pioneered predictable state management with actions and reducers. Redux Toolkit (RTK) modernizes the experience with less boilerplate, excellent TypeScript inference, and RTK Query for data fetching.
 
 ### When Redux is Better
 
@@ -23,51 +25,51 @@ Redux pioneered predictable state management with actions and reducers.
 - Extensive middleware ecosystem needed
 - Lots of existing Redux code
 
-### vs Redux: When Directive is Better
+### When Directive Adds Value
 
-- Complex async flows
-- Automatic dependency tracking
-- Less boilerplate for constraints
+- Complex async flows with declarative retry/timeout
+- Automatic dependency tracking instead of manual selectors
+- Constraint-driven logic that reacts to state changes without manual dispatch
 
 ### vs Redux: Code Comparison
 
-**Redux:**
+**Redux Toolkit:**
 ```typescript
-// actions.ts – define a constant for every state transition
-const FETCH_USER = 'FETCH_USER';
-const FETCH_USER_SUCCESS = 'FETCH_USER_SUCCESS';
-const FETCH_USER_FAILURE = 'FETCH_USER_FAILURE';
+// RTK slice – much less boilerplate than legacy Redux
+const userSlice = createSlice({
+  name: 'user',
+  initialState: { userId: 0, user: null, loading: false, error: null },
+  reducers: {
+    setUserId: (state, action) => { state.userId = action.payload; },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchUser.pending, (state) => { state.loading = true; })
+      .addCase(fetchUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(fetchUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message ?? 'Failed';
+      });
+  },
+});
 
-// reducer.ts – manually handle each action type
-function userReducer(state, action) {
-  switch (action.type) {
-    case FETCH_USER:
-      return { ...state, loading: true };
-    case FETCH_USER_SUCCESS:
-      return { ...state, loading: false, user: action.payload };
-    case FETCH_USER_FAILURE:
-      return { ...state, loading: false, error: action.error };
-    default:
-      return state;
-  }
-}
+// Async thunk – you dispatch this when the user changes
+const fetchUser = createAsyncThunk(
+  'user/fetchUser',
+  async (userId: number) => api.getUser(userId),
+);
 
-// thunk.ts – orchestrate async flow with dispatches
-const fetchUser = (userId) => async (dispatch) => {
-  dispatch({ type: FETCH_USER });
-
-  try {
-    const user = await api.getUser(userId);
-    dispatch({ type: FETCH_USER_SUCCESS, payload: user });
-  } catch (error) {
-    dispatch({ type: FETCH_USER_FAILURE, error });
-  }
-};
+// Component must dispatch the thunk at the right time
+dispatch(setUserId(123));
+dispatch(fetchUser(123));
 ```
 
 **Directive:**
 ```typescript
-// One module replaces actions + reducer + thunk
+// One module – constraints detect the need automatically
 const userModule = createModule("user", {
   schema: {
     facts: {
@@ -103,13 +105,16 @@ const userModule = createModule("user", {
     },
   },
 });
+
+// Just set the fact – the constraint handles the rest
+system.facts.userId = 123;
 ```
 
 ---
 
 ## Zustand
 
-Zustand is a minimal, hooks-first state manager.
+Zustand is a minimal, hooks-first state manager. Its tiny bundle and simple API make it great for straightforward global state.
 
 ### When Zustand is Better
 
@@ -117,7 +122,7 @@ Zustand is a minimal, hooks-first state manager.
 - Smallest possible bundle
 - Quick prototyping
 
-### vs Zustand: When Directive is Better
+### When Directive Adds Value
 
 - Complex constraints and business rules
 - Automatic retry/timeout
@@ -199,7 +204,7 @@ await system.settle();
 
 ## XState
 
-XState is a state machine library with full statechart support.
+XState is a state machine and statechart library. Its actor model, visual editor, and formal verification support make it ideal for modeling complex UI flows.
 
 ### When XState is Better
 
@@ -207,43 +212,59 @@ XState is a state machine library with full statechart support.
 - Need visual state machine editor
 - Formal verification requirements
 
-### vs XState: When Directive is Better
+### When Directive Adds Value
 
-- Data-driven constraints
+- Data-driven constraints (vs explicit state/event graphs)
 - Less ceremony for common patterns
 - AI agent orchestration
 
 ### vs XState: Code Comparison
 
-**XState:**
+**XState v5:**
 ```typescript
 // Define every possible state and transition explicitly
-const userMachine = createMachine({
+const userMachine = setup({
+  types: {
+    context: {} as { userId: number; user: User | null },
+    events: {} as
+      | { type: 'SET_USER_ID'; userId: number }
+      | { type: 'RETRY' },
+  },
+  guards: {
+    hasUserId: (_, params: { userId: number }) => params.userId > 0,
+  },
+  actors: {
+    fetchUser: fromPromise(({ input }: { input: { userId: number } }) =>
+      api.getUser(input.userId),
+    ),
+  },
+}).createMachine({
   id: 'user',
   initial: 'idle',
   context: { userId: 0, user: null },
   states: {
     idle: {
       on: {
-        // Must wire each event to a target state
         SET_USER_ID: {
           target: 'loading',
-          actions: assign({ userId: (_, e) => e.userId }),
-          cond: (_, e) => e.userId > 0,
+          guard: { type: 'hasUserId', params: ({ event }) => event },
+          actions: assign({ userId: ({ event }) => event.userId }),
         },
       },
     },
     loading: {
-      // Invoke an async service for this state
       invoke: {
-        src: (context) => api.getUser(context.userId),
-        onDone: { target: 'success', actions: assign({ user: (_, e) => e.data }) },
+        src: 'fetchUser',
+        input: ({ context }) => ({ userId: context.userId }),
+        onDone: {
+          target: 'success',
+          actions: assign({ user: ({ event }) => event.output }),
+        },
         onError: { target: 'error' },
       },
     },
     success: {},
     error: {
-      // Manual retry requires sending another event
       on: { RETRY: 'loading' },
     },
   },
@@ -291,7 +312,7 @@ const userModule = createModule("user", {
 
 ## React Query / TanStack Query
 
-React Query excels at server state synchronization.
+React Query excels at server state synchronization with built-in caching, background refetching, and optimistic updates. TanStack Query extends this to Vue, Solid, Svelte, and Angular.
 
 ### When React Query is Better
 
@@ -299,11 +320,15 @@ React Query excels at server state synchronization.
 - Background refetching, stale-while-revalidate
 - Pagination, infinite scroll
 
-### vs React Query: When Directive is Better
+### When Directive Adds Value
 
 - Complex business logic beyond fetching
 - Multi-step async flows
-- Cross-cutting constraints
+- Cross-cutting constraints that React Query wasn't designed for
+
+### Pairing Directive with React Query
+
+React Query handles *what data to fetch and cache*. Directive handles *what the system should do about it*. They work well together &ndash; use React Query for server state, and Directive for the business rules and coordination that act on that data.
 
 ### vs React Query: Code Comparison
 
@@ -392,11 +417,16 @@ const userModule = createModule("user", {
 | Simple global state | Zustand |
 | Server state + caching | React Query |
 | Explicit state machines | XState |
-| Large team + conventions | Redux |
-| **Constraint-driven logic** | Directive |
-| **AI agent orchestration** | Directive |
-| **Complex async with retry** | Directive |
-| **Multi-module coordination** | Directive |
+| Large team + conventions | Redux (RTK) |
+| UI flow state machines | XState |
+| Minimal global store | Zustand |
+| Data fetching + caching | React Query |
+| Declarative business rules | Directive |
+| AI agent orchestration | Directive |
+| Complex async with retry | Directive |
+| Multi-module coordination | Directive |
+| Constraint + fetch combo | Directive + React Query |
+| State machines + business rules | XState + Directive |
 
 ---
 
@@ -404,14 +434,14 @@ const userModule = createModule("user", {
 
 Already using another library? See our migration guides:
 
-- **[From Redux](/docs/migration/from-redux)** - Migrate reducers to modules
-- **[From Zustand](/docs/migration/from-zustand)** - Convert stores to modules
-- **[From XState](/docs/migration/from-xstate)** - Transform machines to constraints
+- **[From Redux](/docs/migration/from-redux)** &ndash; Migrate reducers to modules
+- **[From Zustand](/docs/migration/from-zustand)** &ndash; Convert stores to modules
+- **[From XState](/docs/migration/from-xstate)** &ndash; Transform machines to constraints
 
 ---
 
 ## Next Steps
 
-- **[Quick Start](/docs/quick-start)** - Try Directive in 5 minutes
-- **[Core Concepts](/docs/core-concepts)** - Understand the mental model
-- **[Examples](/docs/examples/counter)** - See real-world patterns
+- **[Quick Start](/docs/quick-start)** &ndash; Try Directive in 5 minutes
+- **[Core Concepts](/docs/core-concepts)** &ndash; Understand the mental model
+- **[Examples](/docs/examples/counter)** &ndash; See real-world patterns

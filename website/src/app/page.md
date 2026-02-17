@@ -17,6 +17,43 @@ description: Declare what must be true. Define how to make it true. Let Directiv
 
 ---
 
+## Try It in 30 Seconds
+
+```bash
+npm install @directive-run/core
+```
+
+```typescript
+import { createModule, createSystem, t } from '@directive-run/core';
+
+const counter = createModule("counter", {
+  schema: { count: t.number() },
+  init: (facts) => { facts.count = 0; },
+
+  constraints: {
+    tooLow: {
+      when: (facts) => facts.count < 1,
+      require: { type: "INCREMENT" },
+    },
+  },
+
+  resolvers: {
+    increment: {
+      requirement: "INCREMENT",
+      resolve: (req, context) => { context.facts.count += 1; },
+    },
+  },
+});
+
+const system = createSystem({ module: counter });
+system.start();
+console.log(system.facts.count); // 1
+```
+
+The constraint detected `count < 1`, emitted a requirement, and the resolver fulfilled it &ndash; automatically.
+
+---
+
 ## Why Directive?
 
 Traditional state management focuses on **how** state changes. You write reducers, actions, sagas, and thunks - all describing the mechanics of state transitions.
@@ -90,6 +127,12 @@ function UserProfile({ system }) {
   // ...
 }
 ```
+
+---
+
+## Built with Directive
+
+{% use-case-cards /%}
 
 ---
 

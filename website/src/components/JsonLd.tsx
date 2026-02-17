@@ -65,17 +65,27 @@ export function ArticleJsonLd({
   url,
   datePublished,
   dateModified,
+  author,
+  image,
+  keywords,
+  articleSection,
 }: {
   title: string
   description: string
   url: string
   datePublished?: string | Date
   dateModified?: string | Date
+  author?: { name: string; url?: string }
+  image?: string
+  keywords?: string[]
+  articleSection?: string
 }) {
   const published = datePublished instanceof Date ? datePublished.toISOString() : datePublished
   const modified = dateModified instanceof Date ? dateModified.toISOString() : dateModified
 
-  const jsonLd = {
+  const isPersonAuthor = author && author.name !== 'Directive Labs'
+
+  const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: title,
@@ -83,16 +93,25 @@ export function ArticleJsonLd({
     url: url,
     datePublished: published || new Date().toISOString(),
     dateModified: modified || new Date().toISOString(),
-    author: {
-      '@type': 'Organization',
-      name: 'Sizls',
-      url: 'https://sizls.com',
-    },
+    author: author
+      ? {
+          '@type': isPersonAuthor ? 'Person' : 'Organization',
+          name: author.name,
+          ...(author.url ? { url: author.url } : {}),
+        }
+      : {
+          '@type': 'Organization',
+          name: 'Sizls',
+          url: 'https://sizls.com',
+        },
     publisher: {
       '@type': 'Organization',
       name: 'Directive',
       url: 'https://directive.run',
     },
+    ...(image ? { image } : {}),
+    ...(keywords && keywords.length > 0 ? { keywords: keywords.join(', ') } : {}),
+    ...(articleSection ? { articleSection } : {}),
   }
 
   return (

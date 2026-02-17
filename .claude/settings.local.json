@@ -79,7 +79,9 @@
       "Bash(pnpm --filter @directive-run/ai build:*)",
       "Bash(pnpm --filter:*)",
       "Bash(pnpm pack:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "WebFetch(domain:bundlephobia.com)",
+      "Bash(npx next build:*)"
     ]
   }
 }
