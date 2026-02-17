@@ -52,35 +52,35 @@ const syncAI = createAISyncer(checkersAI, (state) => {
 // DOM References
 // ============================================================================
 
-const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
-const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
-const boardEl = document.getElementById("board")!;
-const messageEl = document.getElementById("message")!;
-const currentPlayerEl = document.getElementById("current-player")!;
-const playerDotEl = document.getElementById("player-dot")!;
-const scoreEl = document.getElementById("score")!;
-const movesEl = document.getElementById("moves")!;
-const capturedRedEl = document.getElementById("captured-red")!;
-const capturedBlackEl = document.getElementById("captured-black")!;
-const modalEl = document.getElementById("game-over-modal")!;
-const modalMessageEl = document.getElementById("modal-message")!;
-const mode2pBtn = document.getElementById("mode-2p")!;
-const modeComputerBtn = document.getElementById("mode-computer")!;
-const modeAiBtn = document.getElementById("mode-ai")!;
-const chatPanel = document.getElementById("chat-panel")!;
-const chatMessages = document.getElementById("chat-messages")!;
-const apiKeySection = document.getElementById("api-key-section")!;
-const apiKeyInput = document.getElementById("api-key-input") as HTMLInputElement;
-const apiKeySaveBtn = document.getElementById("api-key-save")!;
-const chatInput = document.getElementById("chat-input") as HTMLInputElement;
-const chatSendBtn = document.getElementById("chat-send")!;
-const tokenCountEl = document.getElementById("token-count");
-const circuitDotEl = document.getElementById("circuit-dot");
-const aiInfoEl = document.getElementById("ai-info");
-const dashboardPanel = document.getElementById("ai-dashboard")!;
-const dashboardToggle = document.getElementById("dashboard-toggle")!;
-const dashboardArrow = document.getElementById("dashboard-arrow")!;
-const dashboardContent = document.getElementById("dashboard-content")!;
+const undoBtn = document.getElementById("checkers-undo-btn") as HTMLButtonElement;
+const redoBtn = document.getElementById("checkers-redo-btn") as HTMLButtonElement;
+const boardEl = document.getElementById("checkers-board")!;
+const messageEl = document.getElementById("checkers-message")!;
+const currentPlayerEl = document.getElementById("checkers-current-player")!;
+const playerDotEl = document.getElementById("checkers-player-dot")!;
+const scoreEl = document.getElementById("checkers-score")!;
+const movesEl = document.getElementById("checkers-moves")!;
+const capturedRedEl = document.getElementById("checkers-captured-red")!;
+const capturedBlackEl = document.getElementById("checkers-captured-black")!;
+const modalEl = document.getElementById("checkers-game-over-modal")!;
+const modalMessageEl = document.getElementById("checkers-modal-message")!;
+const mode2pBtn = document.getElementById("checkers-mode-2p")!;
+const modeComputerBtn = document.getElementById("checkers-mode-computer")!;
+const modeAiBtn = document.getElementById("checkers-mode-ai")!;
+const chatPanel = document.getElementById("checkers-chat-panel")!;
+const chatMessages = document.getElementById("checkers-chat-messages")!;
+const apiKeySection = document.getElementById("checkers-api-key-section")!;
+const apiKeyInput = document.getElementById("checkers-api-key-input") as HTMLInputElement;
+const apiKeySaveBtn = document.getElementById("checkers-api-key-save")!;
+const chatInput = document.getElementById("checkers-chat-input") as HTMLInputElement;
+const chatSendBtn = document.getElementById("checkers-chat-send")!;
+const tokenCountEl = document.getElementById("checkers-token-count");
+const circuitDotEl = document.getElementById("checkers-circuit-dot");
+const aiInfoEl = document.getElementById("checkers-ai-info");
+const dashboardPanel = document.getElementById("checkers-ai-dashboard")!;
+const dashboardToggle = document.getElementById("checkers-dashboard-toggle")!;
+const dashboardArrow = document.getElementById("checkers-dashboard-arrow")!;
+const dashboardContent = document.getElementById("checkers-dashboard-content")!;
 
 let aiTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let dashboardIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -320,6 +320,7 @@ function render() {
 
       const square = document.createElement("div");
       square.className = `square ${isDark ? "dark" : "light"}`;
+      square.dataset.testid = `checkers-square-${index}`;
 
       if (isDark) {
         if (index === selectedIndex) square.classList.add("selected");
@@ -484,12 +485,12 @@ function resetAll() {
   system.events.chat.clearChat();
 }
 
-document.getElementById("new-game")!.addEventListener("click", () => {
+document.getElementById("checkers-new-game")!.addEventListener("click", () => {
   resetAll();
   system.events.game.newGame();
 });
 
-document.getElementById("modal-new-game")!.addEventListener("click", () => {
+document.getElementById("checkers-modal-new-game")!.addEventListener("click", () => {
   resetAll();
   system.events.game.newGame();
 });
