@@ -2,6 +2,7 @@ import { nodes as defaultNodes, Tag } from '@markdoc/markdoc'
 import { slugifyWithCounter } from '@sindresorhus/slugify'
 import yaml from 'js-yaml'
 
+import { ChecklistItem } from '@/components/ChecklistItem'
 import { DocumentLayout } from '@/components/DocumentLayout'
 import { Fence } from '@/components/Fence'
 
@@ -82,6 +83,34 @@ const nodes = {
       language: {
         type: String,
       },
+    },
+  },
+  item: {
+    ...defaultNodes.item,
+    render: ChecklistItem,
+    transform(node, config) {
+      let children = node.transformChildren(config)
+      let first = children[0]
+
+      if (typeof first === 'string') {
+        let status = null
+        if (first.startsWith('[x] ') || first === '[x]') {
+          status = 'checked'
+        } else if (first.startsWith('[-] ') || first === '[-]') {
+          status = 'progress'
+        } else if (first.startsWith('[ ] ') || first === '[ ]') {
+          status = 'unchecked'
+        }
+
+        if (status !== null) {
+          let stripped = first.replace(/^\[[ x\-]\]\s?/, '')
+          let rest = stripped ? [stripped, ...children.slice(1)] : children.slice(1)
+
+          return new Tag(this.render, { status }, rest)
+        }
+      }
+
+      return new Tag('li', node.transformAttributes(config), children)
     },
   },
 }

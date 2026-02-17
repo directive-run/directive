@@ -27,6 +27,7 @@ import {
   toRowCol,
   getPeers,
   getCandidates,
+  createEmptyNotes,
 } from "./rules.js";
 import { generatePuzzle } from "./generator.js";
 
@@ -101,10 +102,6 @@ export const sudokuSchema = {
 // ============================================================================
 // Module
 // ============================================================================
-
-function createEmptyNotes(): Set<number>[] {
-  return Array.from({ length: 81 }, () => new Set<number>());
-}
 
 export const sudokuGame = createModule("sudoku", {
   schema: sudokuSchema,
