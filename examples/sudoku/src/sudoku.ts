@@ -1,12 +1,12 @@
 /**
- * Sudoku &ndash; Directive Module
+ * Sudoku – Directive Module
  *
  * Constraint-driven Sudoku game. Sudoku IS a constraint satisfaction problem:
  * no duplicates in rows, columns, or 3x3 boxes. The game rules map directly
- * to Directive's constraint&rarr;resolver flow.
+ * to Directive's constraint→resolver flow.
  *
  * Also demonstrates temporal constraints (countdown timer) and runtime
- * reconfiguration (difficulty modes) &ndash; patterns not shown in checkers.
+ * reconfiguration (difficulty modes) – patterns not shown in checkers.
  *
  * Pure Sudoku logic lives in rules.ts; puzzle generation in generator.ts.
  */
@@ -416,7 +416,7 @@ export const sudokuGame = createModule("sudoku", {
   },
 
   // ============================================================================
-  // Constraints &ndash; The Showcase
+  // Constraints – The Showcase
   // ============================================================================
 
   constraints: {
@@ -439,17 +439,17 @@ export const sudokuGame = createModule("sudoku", {
     // Detect conflicts on player-placed cells
     detectConflict: {
       priority: 100,
-      when: (facts, _req, derive) => {
+      when: (facts) => {
         if (facts.gameOver) {
           return false;
         }
-        const conflicts = derive.conflicts as Conflict[];
+        const conflicts = findConflicts(facts.grid as Grid);
         const givens = facts.givens as Set<number>;
 
         return conflicts.some((c) => !givens.has(c.index));
       },
-      require: (facts, _req, derive) => {
-        const conflicts = derive.conflicts as Conflict[];
+      require: (facts) => {
+        const conflicts = findConflicts(facts.grid as Grid);
         const givens = facts.givens as Set<number>;
         const playerConflict = conflicts.find((c) => !givens.has(c.index));
         const idx = playerConflict?.index ?? 0;
@@ -468,12 +468,12 @@ export const sudokuGame = createModule("sudoku", {
     // Puzzle solved: all cells filled with no conflicts
     puzzleSolved: {
       priority: 90,
-      when: (facts, _req, derive) => {
+      when: (facts) => {
         if (facts.gameOver) {
           return false;
         }
 
-        return (derive.isComplete as boolean) && !(derive.hasConflicts as boolean);
+        return isBoardComplete(facts.grid as Grid) && findConflicts(facts.grid as Grid).length === 0;
       },
       require: (facts) => ({
         type: "GAME_WON",

@@ -18,6 +18,7 @@ const system = createSystem({
   modules: { sudoku: sudokuGame },
   debug: { timeTravel: true, maxSnapshots: 200 },
 });
+system.start();
 
 // ============================================================================
 // DOM References
@@ -153,6 +154,7 @@ function render(): void {
     const col = i % 9;
 
     cell.className = "sudoku-cell";
+    cell.dataset.testid = `sudoku-cell-${i}`;
     cell.setAttribute("aria-label", `Row ${row + 1}, Column ${col + 1}${value ? `, value ${value}` : ", empty"}`);
     if (isGiven) {
       cell.classList.add("given");
@@ -248,12 +250,25 @@ system.subscribeModule("sudoku", render);
 // Controls
 // ============================================================================
 
+/**
+ * Only snapshot board-changing actions (number input, notes, hints).
+ * Selection, timer ticks, and UI toggles are excluded from undo history.
+ */
+function withSnapshot(fn: () => void): void {
+  system.debug?.resume();
+  fn();
+  system.debug?.pause();
+}
+
+// Pause time-travel by default — only meaningful plays get snapshots
+system.debug?.pause();
+
 // Number pad
 for (let d = 0; d <= 9; d++) {
   const btn = document.getElementById(`sudoku-num-${d}`);
   if (btn) {
     btn.addEventListener("click", () => {
-      system.events.sudoku.inputNumber({ value: d });
+      withSnapshot(() => system.events.sudoku.inputNumber({ value: d }));
     });
   }
 }
@@ -265,7 +280,7 @@ notesToggle.addEventListener("click", () => {
 
 // Hint
 hintBtn.addEventListener("click", () => {
-  system.events.sudoku.requestHint();
+  withSnapshot(() => system.events.sudoku.requestHint());
 });
 
 // Undo / Redo
@@ -341,9 +356,9 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     const value = parseInt(e.key, 10);
     if (facts.notesMode) {
-      system.events.sudoku.toggleNote({ value });
+      withSnapshot(() => system.events.sudoku.toggleNote({ value }));
     } else {
-      system.events.sudoku.inputNumber({ value });
+      withSnapshot(() => system.events.sudoku.inputNumber({ value }));
     }
 
     return;
@@ -352,7 +367,7 @@ document.addEventListener("keydown", (e) => {
   // Backspace / Delete: clear cell
   if (e.key === "Backspace" || e.key === "Delete") {
     e.preventDefault();
-    system.events.sudoku.inputNumber({ value: 0 });
+    withSnapshot(() => system.events.sudoku.inputNumber({ value: 0 }));
 
     return;
   }
@@ -368,7 +383,7 @@ document.addEventListener("keydown", (e) => {
   // H: request hint
   if (e.key === "h" || e.key === "H") {
     e.preventDefault();
-    system.events.sudoku.requestHint();
+    withSnapshot(() => system.events.sudoku.requestHint());
 
     return;
   }

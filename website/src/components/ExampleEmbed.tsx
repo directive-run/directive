@@ -68,6 +68,7 @@ export function ExampleEmbed({
 
     const host = hostRef.current
     if (host && !host.querySelector(tag)) {
+      host.innerHTML = ''
       const el = document.createElement(tag)
       host.appendChild(el)
     }

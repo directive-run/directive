@@ -1,7 +1,7 @@
 'use client'
 
 import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { Fence } from '@/components/Fence'
+import { CodeTabs } from '@/components/CodeTabs'
 
 export function SudokuDemo({
   build,
@@ -154,32 +154,28 @@ export function SudokuDemo({
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
-        <div className="space-y-6">
-          {sudokuSource && (
-            <Fence
-              language="typescript"
-              title={`sudoku.ts \u2013 Directive module (${sudokuSource.code.split('\n').length} lines)`}
-            >
-              {sudokuSource.code}
-            </Fence>
-          )}
-          {rulesSource && (
-            <Fence
-              language="typescript"
-              title={`rules.ts \u2013 Pure Sudoku logic (${rulesSource.code.split('\n').length} lines)`}
-            >
-              {rulesSource.code}
-            </Fence>
-          )}
-          {generatorSource && (
-            <Fence
-              language="typescript"
-              title={`generator.ts \u2013 Puzzle generation (${generatorSource.code.split('\n').length} lines)`}
-            >
-              {generatorSource.code}
-            </Fence>
-          )}
-        </div>
+        <CodeTabs
+          tabs={[
+            sudokuSource && {
+              filename: 'sudoku.ts',
+              label: 'sudoku.ts - Directive module',
+              code: sudokuSource.code,
+              language: 'typescript',
+            },
+            rulesSource && {
+              filename: 'rules.ts',
+              label: 'rules.ts - Pure Sudoku logic',
+              code: rulesSource.code,
+              language: 'typescript',
+            },
+            generatorSource && {
+              filename: 'generator.ts',
+              label: 'generator.ts - Puzzle generation',
+              code: generatorSource.code,
+              language: 'typescript',
+            },
+          ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
+        />
       </section>
     </div>
   )
