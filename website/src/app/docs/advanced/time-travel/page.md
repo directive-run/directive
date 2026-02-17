@@ -25,6 +25,82 @@ When enabled, `system.debug` exposes the time-travel API. When disabled, `system
 
 ---
 
+## Filtering Snapshot Events
+
+By default, **every** event that changes facts creates a time-travel snapshot. In interactive apps this means UI-only events (cell selection, timer ticks) pollute the undo history, making Ctrl+Z useless.
+
+Add `snapshotEvents` to your module to declare which events create snapshots:
+
+```typescript
+const game = createModule("game", {
+  schema: gameSchema,
+
+  // Only these events appear in undo/redo history.
+  // Omit this field to snapshot ALL events (the default).
+  snapshotEvents: ["inputNumber", "toggleNote", "requestHint", "newGame"],
+
+  events: {
+    tick: (facts) => { /* timer – no snapshot */ },
+    selectCell: (facts, { index }) => { /* selection – no snapshot */ },
+    inputNumber: (facts, { value }) => { /* creates snapshot */ },
+    toggleNote: (facts, { value }) => { /* creates snapshot */ },
+    requestHint: (facts) => { /* creates snapshot */ },
+    newGame: (facts, { difficulty }) => { /* creates snapshot */ },
+  },
+});
+```
+
+### Rules
+
+- **Omitted** &ndash; all events create snapshots (backward compatible).
+- **Provided** &ndash; only listed events create snapshots; unlisted events silently skip.
+- **Direct fact mutations** (`system.facts.x = 5`) always create snapshots regardless of filtering.
+- **Resolver and effect** fact changes always create snapshots.
+- **Multi-module** &ndash; each module controls its own events. A module without `snapshotEvents` still snapshots all of its events, even if another module in the system uses filtering. Use `debug.snapshotModules` to filter at the system level instead.
+
+### Module-Level Filtering
+
+In a multi-module system, you can control which **modules** create snapshots without touching module definitions. This is useful when composing modules you didn't author:
+
+```typescript
+const system = createSystem({
+  modules: {
+    ui: uiModule,       // UI-only state (selection, hover, etc.)
+    game: gameModule,    // Core game logic (moves, scores)
+  },
+  debug: {
+    timeTravel: true,
+    snapshotModules: ["game"],  // Only game events create snapshots
+  },
+});
+```
+
+**Rules:**
+
+- **Omitted** &ndash; all modules create snapshots (backward compatible).
+- **Provided** &ndash; only events from listed modules create snapshots; events from excluded modules silently skip.
+- **Intersects with `snapshotEvents`** &ndash; if a module has `snapshotEvents: ["move"]` AND is in `snapshotModules`, only `move` events create snapshots.
+- **Direct fact mutations** and resolver/effect changes always create snapshots regardless of filtering.
+
+**When to use which:**
+
+| Scenario | Use |
+|----------|-----|
+| Filter specific events within a module | `snapshotEvents` on `createModule()` |
+| Exclude entire modules from snapshots | `debug.snapshotModules` on `createSystem()` |
+| Both | They intersect &ndash; the module must be in `snapshotModules` AND the event must be in `snapshotEvents` |
+
+### Type Safety
+
+`snapshotEvents` entries are type-checked against your schema events. Typos or removed event names produce compile-time errors:
+
+```typescript
+snapshotEvents: ["inputNumber", "typoEvent"],
+//                               ^^^^^^^^^ Type error: not in schema.events
+```
+
+---
+
 ## Basic Navigation
 
 ```typescript

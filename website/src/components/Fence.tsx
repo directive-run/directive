@@ -3,6 +3,35 @@
 import { Fragment, memo } from 'react'
 import { Highlight } from 'prism-react-renderer'
 import { CopyButton } from './CodeTabs'
+import { useCodeTheme } from '@/lib/useCodeTheme'
+
+function getWrapperClasses(codeTheme: string, hasTitle: boolean): string {
+  if (!hasTitle) {
+    return 'group relative'
+  }
+
+  if (codeTheme === 'light') {
+    return 'group relative overflow-hidden rounded-xl bg-slate-50 shadow-lg ring-1 ring-slate-200'
+  }
+
+  if (codeTheme === 'dark') {
+    return 'group relative overflow-hidden rounded-xl bg-brand-code-bg shadow-lg ring-1 ring-slate-300/10'
+  }
+
+  return 'group relative overflow-hidden rounded-xl bg-slate-50 shadow-lg ring-1 ring-slate-200 dark:bg-brand-code-bg dark:ring-slate-300/10'
+}
+
+function getTitleBarClasses(codeTheme: string): string {
+  if (codeTheme === 'light') {
+    return 'border-b border-slate-200 px-5 pt-3 pb-2 font-mono text-xs text-slate-500'
+  }
+
+  if (codeTheme === 'dark') {
+    return 'border-b border-slate-700/50 px-5 pt-3 pb-2 font-mono text-xs text-slate-400'
+  }
+
+  return 'border-b border-slate-200 px-5 pt-3 pb-2 font-mono text-xs text-slate-500 dark:border-slate-700/50 dark:text-slate-400'
+}
 
 export const Fence = memo(function Fence({
   children,
@@ -13,22 +42,20 @@ export const Fence = memo(function Fence({
   language: string
   title?: string
 }) {
+  const codeTheme = useCodeTheme()
   const code = children.trimEnd()
 
   return (
     <div
-      className={
-        title
-          ? 'group relative overflow-hidden rounded-xl bg-brand-code-bg shadow-lg dark:shadow-none dark:ring-1 dark:ring-slate-300/10'
-          : 'group relative'
-      }
+      className={getWrapperClasses(codeTheme, !!title)}
+      data-code-theme={codeTheme !== 'auto' ? codeTheme : undefined}
     >
       {title && (
-        <div className="border-b border-slate-700/50 px-5 pt-3 pb-2 font-mono text-xs text-slate-400">
+        <div className={getTitleBarClasses(codeTheme)}>
           {title}
         </div>
       )}
-      <CopyButton code={code} />
+      <CopyButton code={code} codeTheme={codeTheme} />
       <Highlight
         code={code}
         language={language || 'text'}
