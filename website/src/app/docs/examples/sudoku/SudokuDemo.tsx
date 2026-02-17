@@ -1,7 +1,7 @@
 'use client'
 
 import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CollapsibleSource } from '@/components/CollapsibleSource'
+import { Fence } from '@/components/Fence'
 
 export function SudokuDemo({
   build,
@@ -117,32 +117,67 @@ export function SudokuDemo({
         </div>
       </section>
 
+      {/* Summary */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
+          Summary
+        </h2>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            A fully playable Sudoku puzzle with multiple difficulties, notes,
+            hints, undo/redo, and a countdown timer.
+          </p>
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
+            The game is a single Directive module with 14 facts tracking
+            grid/selection/timer state. Derivations auto-compute conflicts,
+            progress, and candidates. Four prioritized constraints cascade on
+            every input to detect conflicts, check for a win, expire the timer,
+            or reveal hints. Resolvers handle the outcomes. Effects fire timer
+            warnings.
+          </p>
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">
+              Why it works:
+            </strong>{' '}
+            Sudoku is a constraint satisfaction problem &ndash;
+            Directive&rsquo;s constraint&ndash;resolver flow maps 1:1 to the
+            game rules. No imperative state machine needed; declare what must be
+            true and Directive handles the rest.
+          </p>
+        </div>
+      </section>
+
       {/* Source code */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-6">
           {sudokuSource && (
-            <CollapsibleSource
-              title={`sudoku.ts \u2013 Directive module (${sudokuSource.code.split('\n').length} lines)`}
-              code={sudokuSource.code}
+            <Fence
               language="typescript"
-            />
+              title={`sudoku.ts \u2013 Directive module (${sudokuSource.code.split('\n').length} lines)`}
+            >
+              {sudokuSource.code}
+            </Fence>
           )}
           {rulesSource && (
-            <CollapsibleSource
-              title={`rules.ts \u2013 Pure Sudoku logic (${rulesSource.code.split('\n').length} lines)`}
-              code={rulesSource.code}
+            <Fence
               language="typescript"
-            />
+              title={`rules.ts \u2013 Pure Sudoku logic (${rulesSource.code.split('\n').length} lines)`}
+            >
+              {rulesSource.code}
+            </Fence>
           )}
           {generatorSource && (
-            <CollapsibleSource
-              title={`generator.ts \u2013 Puzzle generation (${generatorSource.code.split('\n').length} lines)`}
-              code={generatorSource.code}
+            <Fence
               language="typescript"
-            />
+              title={`generator.ts \u2013 Puzzle generation (${generatorSource.code.split('\n').length} lines)`}
+            >
+              {generatorSource.code}
+            </Fence>
           )}
         </div>
       </section>

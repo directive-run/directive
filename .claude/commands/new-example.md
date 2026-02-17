@@ -231,7 +231,7 @@ Create `website/src/app/docs/examples/<name>/<Name>Demo.tsx`:
 
 import { ExampleEmbed } from '@/components/ExampleEmbed'
 import type { ExampleBuild, ExampleSource } from '@/lib/examples'
-import { CollapsibleSource } from '@/components/CollapsibleSource'
+import { Fence } from '@/components/Fence'
 
 export function <Name>Demo({
   build,
@@ -285,19 +285,40 @@ export function <Name>Demo({
         </div>
       </section>
 
+      {/* Summary */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
+          Summary
+        </h2>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            {/* What was built — one sentence describing the example */}
+          </p>
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
+            {/* How Directive powers it — which features, how they connect */}
+          </p>
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">Why it works:</strong>{' '}
+            {/* Why Directive is a natural fit for this problem */}
+          </p>
+        </div>
+      </section>
+
       {/* Source code */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-6">
           {sources.map((s) => (
-            <CollapsibleSource
-              key={s.filename}
-              title={`${s.filename} (${s.code.split('\n').length} lines)`}
-              code={s.code}
-              language="typescript"
-            />
+            <div key={s.filename}>
+              <div className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {s.filename} ({s.code.split('\n').length} lines)
+              </div>
+              <Fence language="typescript">{s.code}</Fence>
+            </div>
           ))}
         </div>
       </section>
@@ -345,7 +366,9 @@ cd website && pnpm build:next-only
 ### Functionality
 - [ ] Interactive &ndash; clicks/inputs work in the embed
 - [ ] No CSS leakage to host page (check headings, buttons, links)
+- [ ] Source code displays as always-visible code blocks (not collapsible)
 - [ ] Source code renders with syntax highlighting
+- [ ] Summary section has What/How/Why content filled in
 - [ ] Dark mode looks correct
 - [ ] Mobile responsive
 - [ ] `pnpm build` (full website build) succeeds

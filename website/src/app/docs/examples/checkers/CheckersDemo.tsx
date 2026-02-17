@@ -2,7 +2,6 @@
 
 import { Fence } from '@/components/Fence'
 import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CollapsibleSource } from '@/components/CollapsibleSource'
 
 const EMBED_SNIPPET = `<script>
 class DirectiveCheckers extends HTMLElement {
@@ -148,25 +147,61 @@ export function CheckersDemo({
         </div>
       </section>
 
+      {/* Summary */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
+          Summary
+        </h2>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            A two-player checkers game with optional AI opponent, multi-jump
+            chains, king promotion, and move validation.
+          </p>
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
+            Built as a multi-module Directive system. The <code>game</code>{' '}
+            module tracks board state, selection, and turns. Derivations compute
+            valid moves and highlights. Constraints fire when a valid move is
+            selected, a piece reaches the back row, or no moves remain. Pure
+            game rules live in <code>rules.ts</code> with no Directive
+            dependency.
+          </p>
+          <p>
+            <strong className="text-slate-900 dark:text-slate-200">
+              Why it works:
+            </strong>{' '}
+            Checkers has complex cascading logic (move &rarr; capture &rarr;
+            multi-jump &rarr; king &rarr; game over). Directive&rsquo;s
+            constraint priorities handle the cascade automatically &ndash; the{' '}
+            <code>executeMove</code> constraint fires first, then{' '}
+            <code>kingPiece</code>, then <code>gameOver</code>, each reacting to
+            the state the previous one left behind.
+          </p>
+        </div>
+      </section>
+
       {/* Source code */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-6">
           {gameSource && (
-            <CollapsibleSource
-              title={`game.ts \u2013 Directive module (${gameSource.code.split('\n').length} lines)`}
-              code={gameSource.code}
+            <Fence
               language="typescript"
-            />
+              title={`game.ts \u2013 Directive module (${gameSource.code.split('\n').length} lines)`}
+            >
+              {gameSource.code}
+            </Fence>
           )}
           {rulesSource && (
-            <CollapsibleSource
-              title={`rules.ts \u2013 Pure game logic (${rulesSource.code.split('\n').length} lines)`}
-              code={rulesSource.code}
+            <Fence
               language="typescript"
-            />
+              title={`rules.ts \u2013 Pure game logic (${rulesSource.code.split('\n').length} lines)`}
+            >
+              {rulesSource.code}
+            </Fence>
           )}
         </div>
       </section>
