@@ -320,6 +320,12 @@ export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
 	resolvers?: TypedResolversDef<M>;
 	hooks?: ModuleHooks<M>;
 	/**
+	 * Events that create time-travel snapshots.
+	 * If omitted, ALL events create snapshots (default).
+	 * If provided, only listed events create snapshots for undo/redo.
+	 */
+	snapshotEvents?: Array<keyof GetEventsSchema<M> & string>;
+	/**
 	 * Cross-module dependencies (runtime marker).
 	 * When present, constraints/effects receive `facts.self.*` + `facts.{dep}.*`.
 	 * @internal

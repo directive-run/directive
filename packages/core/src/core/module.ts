@@ -38,6 +38,8 @@ export interface ModuleConfig<M extends ModuleSchema> {
 	constraints?: TypedConstraintsDef<M>;
 	resolvers?: TypedResolversDef<M>;
 	hooks?: ModuleHooks<M>;
+	/** Events that create time-travel snapshots for undo/redo. Omit to snapshot all events. */
+	snapshotEvents?: Array<keyof (M["events"] extends Record<string, unknown> ? M["events"] : Record<string, never>) & string>;
 }
 
 /**
@@ -111,6 +113,8 @@ export interface ModuleConfigWithDeps<
 	/** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
 	resolvers?: TypedResolversDef<M>;
 	hooks?: ModuleHooks<M>;
+	/** Events that create time-travel snapshots for undo/redo. Omit to snapshot all events. */
+	snapshotEvents?: Array<keyof (M["events"] extends Record<string, unknown> ? M["events"] : Record<string, never>) & string>;
 }
 
 /**
@@ -275,6 +279,25 @@ export function createModule<const M extends ModuleSchema>(
 			}
 		}
 
+		// Validate snapshotEvents reference valid event names
+		if (config.snapshotEvents) {
+			if (config.snapshotEvents.length === 0) {
+				console.warn(
+					`[Directive] snapshotEvents is an empty array — no events will create time-travel snapshots. ` +
+						`Omit snapshotEvents entirely to snapshot all events, or list specific events.`,
+				);
+			}
+			const schemaEventKeysForValidation = new Set(Object.keys(config.schema?.events ?? {}));
+			for (const eventName of config.snapshotEvents) {
+				if (!schemaEventKeysForValidation.has(eventName)) {
+					console.warn(
+						`[Directive] snapshotEvents entry "${eventName}" not declared in schema.events. ` +
+							`Available events: ${[...schemaEventKeysForValidation].join(", ") || "(none)"}`,
+					);
+				}
+			}
+		}
+
 		// Validate resolvers reference valid requirement types
 		if (config.resolvers && config.schema?.requirements) {
 			const requirementTypes = new Set(Object.keys(config.schema.requirements));
@@ -307,6 +330,7 @@ export function createModule<const M extends ModuleSchema>(
 		constraints: config.constraints as TypedConstraintsDef<M> | undefined,
 		resolvers: config.resolvers,
 		hooks: config.hooks,
+		snapshotEvents: config.snapshotEvents,
 		// Store crossModuleDeps for runtime proxy creation
 		crossModuleDeps: crossModuleDeps as CrossModuleDeps | undefined,
 	};
