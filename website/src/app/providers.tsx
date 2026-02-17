@@ -2,10 +2,14 @@
 
 import { ThemeProvider } from 'next-themes'
 
+import { ExperimentsProvider } from '@/lib/useExperiment'
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" storageKey="directive-theme" disableTransitionOnChange>
-      {children}
+      <ExperimentsProvider>
+        {children}
+      </ExperimentsProvider>
     </ThemeProvider>
   )
 }

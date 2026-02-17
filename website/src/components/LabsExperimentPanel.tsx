@@ -29,6 +29,16 @@ const EXPERIMENTS: Experiment[] = [
       { id: 'phosphor', label: 'Phosphor Duotone', description: 'Phosphor icon library with duotone weight (default)' },
     ],
   },
+  {
+    id: 'code-theme',
+    name: 'Code Theme',
+    description: 'Override the code block color scheme independently of the site theme.',
+    variants: [
+      { id: 'auto', label: 'Auto', description: 'Follows your light/dark site theme' },
+      { id: 'light', label: 'Light', description: 'Always use light code blocks' },
+      { id: 'dark', label: 'Dark', description: 'Always use dark code blocks' },
+    ],
+  },
 ]
 
 type Assignments = Record<string, string>
@@ -93,9 +103,14 @@ export const LabsExperimentPanel = memo(function LabsExperimentPanel({
       setAssignments((prev) => {
         const next = { ...prev, [experimentId]: variantId }
         safeSetItem(STORAGE_KEYS.EXPERIMENTS, JSON.stringify(next))
-        window.dispatchEvent(new CustomEvent(EXPERIMENT_CHANGE_EVENT))
 
         return next
+      })
+
+      // Dispatch after the state update completes — dispatching inside the
+      // updater triggers setState in ExperimentsProvider during this render.
+      queueMicrotask(() => {
+        window.dispatchEvent(new CustomEvent(EXPERIMENT_CHANGE_EVENT))
       })
 
       onExperimentChange?.({
@@ -163,6 +178,9 @@ export const LabsExperimentPanel = memo(function LabsExperimentPanel({
             </p>
             {experiment.id === 'theme-icons' && (
               <ThemeIconPreview activeVariant={assignments[experiment.id]} />
+            )}
+            {experiment.id === 'code-theme' && (
+              <CodeThemePreview activeVariant={assignments[experiment.id]} />
             )}
           </div>
         </div>
@@ -239,6 +257,74 @@ function ThemeIconPreview({ activeVariant }: { activeVariant: string }) {
         </div>
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Phosphor</span>
       </div>
+    </div>
+  )
+}
+
+const CODE_PREVIEW_SNIPPET = `const system = createSystem({
+  module: trafficLight,
+  plugins: [loggingPlugin()],
+})`
+
+function CodeThemePreview({ activeVariant }: { activeVariant: string }) {
+  const variants = [
+    { id: 'auto', label: 'Auto' },
+    { id: 'light', label: 'Light' },
+    { id: 'dark', label: 'Dark' },
+  ]
+
+  return (
+    <div className="flex flex-col gap-3">
+      {variants.map((v) => (
+        <div
+          key={v.id}
+          className={clsx(
+            'rounded-xl p-3 transition',
+            activeVariant === v.id
+              ? 'ring-2 ring-brand-primary'
+              : 'opacity-50',
+          )}
+        >
+          <div
+            data-code-theme={v.id !== 'auto' ? v.id : undefined}
+            className={clsx(
+              'overflow-hidden rounded-lg p-3 font-mono text-[11px] leading-5',
+              v.id === 'light'
+                ? 'bg-slate-50 ring-1 ring-slate-200'
+                : v.id === 'dark'
+                  ? 'bg-[#1e293b] ring-1 ring-slate-300/10'
+                  : 'bg-slate-50 ring-1 ring-slate-200 dark:bg-[#1e293b] dark:ring-slate-300/10',
+            )}
+          >
+            <pre className="language-typescript">
+              <code>
+                <span className={clsx(
+                  'token keyword',
+                  v.id === 'light' ? 'text-purple-600' : v.id === 'dark' ? 'text-slate-300' : '',
+                )}>const</span>
+                <span className={clsx(
+                  v.id === 'light' ? 'text-slate-800' : v.id === 'dark' ? 'text-slate-50' : 'text-slate-800 dark:text-slate-50',
+                )}> system </span>
+                <span className={clsx(
+                  'token operator',
+                  v.id === 'light' ? 'text-slate-400' : v.id === 'dark' ? 'text-slate-400' : '',
+                )}>=</span>
+                <span className={clsx(
+                  'token function',
+                  v.id === 'light' ? 'text-pink-600' : v.id === 'dark' ? 'text-pink-400' : '',
+                )}> createSystem</span>
+                <span className={clsx(
+                  'token punctuation',
+                  v.id === 'light' ? 'text-slate-500' : v.id === 'dark' ? 'text-slate-500' : '',
+                )}>{'({'}</span>
+              </code>
+            </pre>
+          </div>
+          <p className="mt-2 text-center text-[10px] font-medium text-slate-500 dark:text-slate-400">
+            {v.label}
+          </p>
+        </div>
+      ))}
     </div>
   )
 }

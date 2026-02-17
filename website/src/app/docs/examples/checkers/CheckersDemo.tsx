@@ -46,6 +46,7 @@ export function CheckersDemo({
   sources: import('@/lib/examples').ExampleSource[]
 }) {
   const gameSource = sources.find((s) => s.filename === 'game.ts')
+  const mainSource = sources.find((s) => s.filename === 'main.ts')
   const rulesSource = sources.find((s) => s.filename === 'rules.ts')
 
   return (
@@ -193,6 +194,12 @@ export function CheckersDemo({
               filename: 'game.ts',
               label: 'game.ts - Directive module',
               code: gameSource.code,
+              language: 'typescript',
+            },
+            mainSource && {
+              filename: 'main.ts',
+              label: 'main.ts - DOM wiring',
+              code: mainSource.code,
               language: 'typescript',
             },
             rulesSource && {

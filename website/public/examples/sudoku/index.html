@@ -8,8 +8,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: #161412;
+      color: #c8bfb4;
       display: flex;
       justify-content: center;
       align-items: flex-start;
@@ -29,12 +29,12 @@
       margin-bottom: 0.75rem; gap: 0.75rem;
     }
     .sudoku-timer {
-      background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 8px;
-      border: 1px solid #334155; font-size: 0.9rem; font-weight: 600;
+      background: #1f1b17; padding: 0.4rem 0.75rem; border-radius: 8px;
+      border: 1px solid #2a2520; font-size: 0.9rem; font-weight: 600;
       font-variant-numeric: tabular-nums;
     }
-    .sudoku-timer.warning { color: #fbbf24; border-color: #854d0e; }
-    .sudoku-timer.critical { color: #ef4444; border-color: #991b1b; animation: pulse 1s infinite; }
+    .sudoku-timer.warning { color: #c4c07a; border-color: #6b5020; }
+    .sudoku-timer.critical { color: #e8836f; border-color: #7a3028; animation: pulse 1s infinite; }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.6; }
@@ -44,15 +44,15 @@
       display: flex; align-items: center; gap: 0.5rem;
     }
     .sudoku-progress-track {
-      flex: 1; height: 6px; background: #1e293b; border-radius: 3px;
-      border: 1px solid #334155; overflow: hidden;
+      flex: 1; height: 6px; background: #1f1b17; border-radius: 3px;
+      border: 1px solid #2a2520; overflow: hidden;
     }
     .sudoku-progress-fill {
-      height: 100%; background: #3b82f6; border-radius: 3px;
+      height: 100%; background: #c4c07a; border-radius: 3px;
       transition: width 0.3s ease;
     }
     .sudoku-progress-text {
-      font-size: 0.75rem; color: #64748b; min-width: 2.5rem; text-align: right;
+      font-size: 0.75rem; color: #6b6055; min-width: 2.5rem; text-align: right;
     }
 
     /* Info bar */
@@ -64,21 +64,21 @@
       display: flex; gap: 0.5rem; align-items: center;
     }
     .info-item {
-      background: #1e293b; padding: 0.35rem 0.65rem; border-radius: 8px;
-      border: 1px solid #334155; font-size: 0.75rem; display: flex;
+      background: #1f1b17; padding: 0.35rem 0.65rem; border-radius: 8px;
+      border: 1px solid #2a2520; font-size: 0.75rem; display: flex;
       align-items: center; gap: 0.35rem;
     }
-    .info-label { color: #64748b; text-transform: uppercase; font-size: 0.6rem; }
+    .info-label { color: #6b6055; text-transform: uppercase; font-size: 0.6rem; }
     .info-value { font-weight: 600; }
 
     /* Message */
     .sudoku-message {
-      background: #1e293b; padding: 0.5rem; border-radius: 8px;
-      border: 1px solid #334155; font-size: 0.8rem; color: #94a3b8;
+      background: #1f1b17; padding: 0.5rem; border-radius: 8px;
+      border: 1px solid #2a2520; font-size: 0.8rem; color: #9a8e80;
       margin-bottom: 0.75rem; min-height: 2rem;
       display: flex; align-items: center; justify-content: center;
     }
-    .sudoku-message.hidden { display: none; }
+    .sudoku-message.hidden { visibility: hidden; }
 
     /* Grid */
     .sudoku-grid {
@@ -87,51 +87,51 @@
       width: 100%;
       margin: 0 auto 1rem;
       aspect-ratio: 1;
-      border: 3px solid #475569;
+      border: 3px solid #4a4035;
       border-radius: 4px;
       overflow: hidden;
-      background: #334155;
+      background: #2a2520;
       gap: 1px;
     }
 
     .sudoku-cell {
       aspect-ratio: 1;
       display: flex; align-items: center; justify-content: center;
-      background: #1e293b;
+      background: #1f1b17;
       font-size: clamp(0.9rem, 3vw, 1.3rem);
       font-weight: 500;
       cursor: pointer;
       position: relative;
       transition: background 0.1s;
-      color: #60a5fa;
+      color: #c4c07a;
       user-select: none;
       -webkit-user-select: none;
     }
-    .sudoku-cell:hover { background: #253348; }
-    .sudoku-cell:focus { outline: 2px solid #60a5fa; outline-offset: -2px; z-index: 1; }
+    .sudoku-cell:hover { background: #262118; }
+    .sudoku-cell:focus { outline: 2px solid #5ba3a3; outline-offset: -2px; z-index: 1; }
     .sudoku-cell.given {
-      color: #e2e8f0;
+      color: #c8bfb4;
       font-weight: 700;
     }
     .sudoku-cell.selected {
-      background: #1e3a5f;
-      box-shadow: inset 0 0 0 2px #3b82f6;
+      background: #1a2a2a;
+      box-shadow: inset 0 0 0 2px #5ba3a3;
     }
-    .sudoku-cell.peer { background: #162033; }
-    .sudoku-cell.same-value { background: #1e3a8f; }
+    .sudoku-cell.peer { background: #241f1a; }
+    .sudoku-cell.same-value { background: #2a2215; }
     .sudoku-cell.conflict {
-      background: rgba(239, 68, 68, 0.15);
-      color: #fca5a5;
+      background: rgba(200, 60, 50, 0.18);
+      color: #e8836f;
     }
 
     /* Notes mode indicator on grid */
     .sudoku-grid.notes-mode {
-      box-shadow: 0 0 0 2px #10b981;
+      box-shadow: 0 0 0 2px #6dab72;
     }
 
     /* Box borders (thick lines every 3 cells) */
-    .sudoku-cell.box-left { border-left: 2px solid #475569; margin-left: -1px; }
-    .sudoku-cell.box-top { border-top: 2px solid #475569; margin-top: -1px; }
+    .sudoku-cell.box-left { border-left: 2px solid #4a4035; margin-left: -1px; }
+    .sudoku-cell.box-top { border-top: 2px solid #4a4035; margin-top: -1px; }
 
     /* Pencil marks */
     .notes-grid {
@@ -144,31 +144,24 @@
     .note-digit {
       display: flex; align-items: center; justify-content: center;
       font-size: clamp(0.4rem, 1.2vw, 0.55rem);
-      color: #64748b;
+      color: #6b6055;
       line-height: 1;
     }
 
-    /* Mode toggle (button group) */
+    /* Mode toggle */
     .mode-toggle {
-      display: inline-flex; border-radius: 6px;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+      display: inline-flex; gap: 0.4rem;
     }
     .mode-btn {
-      position: relative;
-      background: rgba(255, 255, 255, 0.1); color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.08); color: #c8bfb4;
       padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600;
       cursor: pointer; transition: all 0.15s;
-      border: none;
-      box-shadow: inset 0 0 0 1px #334155;
+      border: 1px solid #2a2520; border-radius: 6px;
     }
-    .mode-btn:first-child { border-radius: 6px 0 0 6px; }
-    .mode-btn:last-child { border-radius: 0 6px 6px 0; }
-    .mode-btn:not(:first-child) { margin-left: -1px; }
-    .mode-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.2); }
-    .mode-btn:focus { z-index: 1; }
+    .mode-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.15); }
     .mode-btn.active {
-      background: #3b82f6; color: #fff;
-      box-shadow: inset 0 0 0 1px #3b82f6;
+      background: #5ba3a3; color: #fff;
+      border-color: #5ba3a3;
     }
 
     /* Number pad */
@@ -178,18 +171,18 @@
     }
     .num-btn {
       min-height: 44px;
-      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      background: #1f1b17; border: 1px solid #2a2520; color: #c8bfb4;
       border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 600;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       transition: all 0.15s; position: relative;
     }
-    .num-btn:hover { background: #334155; }
-    .num-btn:active { background: #3b82f6; }
+    .num-btn:hover { background: #2a2520; }
+    .num-btn:active { background: #5ba3a3; }
     .num-badge {
-      font-size: 0.5rem; color: #64748b; font-weight: 400;
+      font-size: 0.5rem; color: #6b6055; font-weight: 400;
       position: absolute; bottom: 2px; right: 4px;
     }
-    .num-badge.complete { color: #22c55e; }
+    .num-badge.complete { color: #6dab72; }
 
     /* Action buttons */
     .sudoku-actions {
@@ -197,24 +190,24 @@
       margin-bottom: 0.75rem;
     }
     button {
-      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      background: #1f1b17; border: 1px solid #2a2520; color: #c8bfb4;
       padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;
       font-size: 0.8rem; transition: all 0.15s;
     }
-    button:hover:not(:disabled):not(.disabled) { background: #334155; }
+    button:hover:not(:disabled):not(.disabled) { background: #2a2520; }
     button:disabled, button.disabled { opacity: 0.4; cursor: not-allowed; }
-    button.primary { background: #3b82f6; border-color: #3b82f6; }
-    button.primary:hover { background: #2563eb; }
+    button.primary { background: #5ba3a3; border-color: #5ba3a3; }
+    button.primary:hover { background: #4d8f8f; }
     button.active {
-      background: #3b82f6; border-color: #3b82f6; color: #fff;
+      background: #5ba3a3; border-color: #5ba3a3; color: #fff;
     }
     button.notes-active {
-      background: #10b981; border-color: #10b981; color: #fff; font-weight: 600;
+      background: #4a8c50; border-color: #4a8c50; color: #fff; font-weight: 600;
     }
 
     /* Clear button */
     .num-btn.clear-btn {
-      font-size: 0.75rem; color: #94a3b8;
+      font-size: 0.75rem; color: #9a8e80;
     }
 
     /* Game over modal */
@@ -225,23 +218,23 @@
     }
     .sudoku-modal.hidden { display: none; }
     .sudoku-modal-content {
-      background: #1e293b; border: 1px solid #475569; border-radius: 12px;
+      background: #1f1b17; border: 1px solid #4a4035; border-radius: 12px;
       padding: 2rem; text-align: center; max-width: 320px;
     }
     .sudoku-modal-content h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    .sudoku-modal-content p { color: #94a3b8; margin-bottom: 1.25rem; font-size: 0.85rem; }
+    .sudoku-modal-content p { color: #9a8e80; margin-bottom: 1.25rem; font-size: 0.85rem; }
 
     /* Rules summary */
     .sudoku-rules {
-      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
-      padding: 0.75rem; text-align: left; font-size: 0.7rem; color: #64748b;
+      background: #1f1b17; border: 1px solid #2a2520; border-radius: 8px;
+      padding: 0.75rem; text-align: left; font-size: 0.7rem; color: #6b6055;
     }
-    .sudoku-rules h3 { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.4rem; }
+    .sudoku-rules h3 { color: #9a8e80; font-size: 0.75rem; margin-bottom: 0.4rem; }
     .sudoku-rules ul { padding-left: 1.2rem; }
     .sudoku-rules li { margin-bottom: 0.2rem; }
     .sudoku-rules .directive-note {
-      margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid #334155;
-      font-style: italic; color: #475569;
+      margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid #2a2520;
+      font-style: italic; color: #4a4035;
     }
 
     /* Responsive – maintain 44px minimum touch targets */
@@ -253,7 +246,7 @@
       .sudoku-actions button { padding: 0.5rem 0.75rem; font-size: 0.75rem; min-height: 44px; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/sudoku/assets/index-DG1Zgrgx.js"></script>
+  <script type="module" crossorigin src="/examples/sudoku/assets/index-BdDLf0Mo.js"></script>
 </head>
 <body>
   <div class="sudoku-container">

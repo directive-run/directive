@@ -14,6 +14,7 @@ export default function SudokuPage() {
   const build = parseExampleBuild('sudoku')
   const sources = readExampleSources('sudoku', [
     'sudoku.ts',
+    'main.ts',
     'rules.ts',
     'generator.ts',
   ])
