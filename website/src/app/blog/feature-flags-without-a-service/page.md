@@ -134,7 +134,7 @@ const featureFlags = createModule("feature-flags", {
     canUseVersionSelector: (facts) =>
       facts.versionSelectorEnabled,
     canUseShareButton: (facts) =>
-      facts.shareButtonEnabled,
+      facts.shareButtonEnabled && !facts.maintenanceMode,
     enabledCount: (facts) => {
       let count = 0;
       if (facts.chatEnabled) count++;
@@ -214,7 +214,7 @@ const featureFlags = createModule("feature-flags", {
       requirement: "LOG_MAINTENANCE_WARNING",
       resolve: async (req, context) => {
         console.warn(
-          "[feature-flags] Maintenance mode active. Chat, search, and playground disabled.",
+          "[feature-flags] Maintenance mode active. Chat, search, playground, and share button disabled.",
         );
       },
     },
@@ -389,7 +389,7 @@ export function getFeatureFlagSystem() {
 }
 ```
 
-Flip `NEXT_PUBLIC_FF_MAINTENANCE` to `true` in the Vercel dashboard and chat, search, and playground disable instantly on the next page load. No code change, no deploy, no flag service.
+Flip `NEXT_PUBLIC_FF_MAINTENANCE` to `true` in the Vercel dashboard and chat, search, playground, and share button disable instantly on the next page load. No code change, no deploy, no flag service.
 
 ---
 

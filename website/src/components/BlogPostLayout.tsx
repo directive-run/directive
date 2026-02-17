@@ -89,6 +89,8 @@ export function BlogPostLayout({
           content={dateModified instanceof Date ? dateModified.toISOString() : String(dateModified)}
         />
       )}
+      {author && <meta property="article:author" content={author.name} />}
+      {categories.length > 0 && <meta property="article:section" content={categories[0]} />}
 
       {title && description && slug && (
         <ArticleJsonLd
@@ -97,6 +99,10 @@ export function BlogPostLayout({
           url={`https://directive.run/blog/${slug}`}
           datePublished={date}
           dateModified={dateModified || date}
+          author={author ? { name: author.name } : undefined}
+          image={ogImageUrl}
+          articleSection={categories[0]}
+          keywords={categories}
         />
       )}
       <div className="mb-8">
@@ -201,6 +207,7 @@ export function BlogPostLayout({
           </div>
 
           <Prose>{children}</Prose>
+          {slug && <RelatedPosts slug={slug} />}
         </div>
 
         {/* Right spacer for xl symmetry */}
@@ -217,8 +224,6 @@ export function BlogPostLayout({
         </Link>
         .
       </p>
-
-      {slug && <RelatedPosts slug={slug} />}
 
       <div className="mt-8 border-t border-slate-200 pt-8 dark:border-slate-800">
         <Link

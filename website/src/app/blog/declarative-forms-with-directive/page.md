@@ -618,13 +618,3 @@ pnpm dev
 
 It uses a simulated submission instead of Formspree, so no API key is needed.
 
----
-
-## Related
-
-- **[Contact Form Example](/docs/examples/contact-form)** &ndash; the docs page with the full module and runtime walkthrough
-- **[Constraints](/docs/constraints)** &ndash; how `when` / `require` works
-- **[Derivations](/docs/derivations)** &ndash; auto-tracked computed values
-- **[Resolvers](/docs/resolvers)** &ndash; async requirement fulfillment
-- **[Effects](/docs/effects)** &ndash; fire-and-forget side effects
-- **[React Adapter](/docs/adapters/react)** &ndash; `useFact`, `useDerived`, `useEvents`

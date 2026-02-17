@@ -7,7 +7,6 @@ import {
   Gauge,
   Minus,
   PlugsConnected,
-  SealCheck,
   ShieldCheck,
   Wrench,
 } from '@phosphor-icons/react/dist/ssr'
@@ -84,7 +83,7 @@ const sections: Section[] = [
           Redux: 'Slices',
           Zustand: 'Slices',
 
-          XState: false,
+          XState: 'Actors',
           'React Query': false,
           Directive: true,
         },
@@ -103,7 +102,7 @@ const sections: Section[] = [
       {
         name: 'Optimistic updates',
         values: {
-          Redux: false,
+          Redux: 'RTK Query',
           Zustand: false,
 
           XState: false,
@@ -120,10 +119,10 @@ const sections: Section[] = [
       {
         name: 'Built-in retry/timeout',
         values: {
-          Redux: false,
+          Redux: 'RTK Query',
           Zustand: false,
 
-          XState: false,
+          XState: 'Partial',
           'React Query': true,
           Directive: true,
         },
@@ -135,7 +134,7 @@ const sections: Section[] = [
           Zustand: false,
 
           XState: false,
-          'React Query': false,
+          'React Query': true,
           Directive: true,
         },
       },
@@ -173,7 +172,7 @@ const sections: Section[] = [
           Redux: true,
           Zustand: false,
 
-          XState: false,
+          XState: true,
           'React Query': false,
           Directive: true,
         },
@@ -182,7 +181,7 @@ const sections: Section[] = [
         name: 'Time-travel debugging',
         values: {
           Redux: true,
-          Zustand: false,
+          Zustand: true,
 
           XState: true,
           'React Query': false,
@@ -206,7 +205,7 @@ const sections: Section[] = [
           Redux: false,
           Zustand: false,
 
-          XState: false,
+          XState: true,
           'React Query': true,
           Directive: true,
         },
@@ -219,16 +218,16 @@ const sections: Section[] = [
 
           XState: 'Good',
           'React Query': 'Good',
-          Directive: 'Excellent',
+          Directive: 'Good',
         },
       },
       {
         name: 'Bundle size (gzip)',
         values: {
-          Redux: '~2KB',
+          Redux: '~11KB',
           Zustand: '~1KB',
 
-          XState: '~4KB',
+          XState: '~14KB',
           'React Query': '~13KB',
           Directive: '~3KB',
         },
@@ -268,7 +267,7 @@ const sections: Section[] = [
           Zustand: true,
 
           XState: true,
-          'React Query': 'React-first',
+          'React Query': true,
           Directive: true,
         },
       },
@@ -334,22 +333,6 @@ function CellContent({
         />
         <span className="text-sm text-amber-600 dark:text-amber-400">
           Partial
-        </span>
-      </span>
-    )
-  }
-
-  // Excellent (TypeScript inference)
-  if (value === 'Excellent') {
-    return (
-      <span className="inline-flex items-center gap-1">
-        <SealCheck
-          weight="fill"
-          className="h-4 w-4 text-brand-primary"
-          aria-hidden="true"
-        />
-        <span className="text-sm font-medium text-brand-primary-700 dark:text-brand-primary-300">
-          Excellent
         </span>
       </span>
     )

@@ -38,18 +38,16 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-            Theme Customization
-          </h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {currentColor.name} &ndash; {currentColor.tagline}
-          </p>
-        </div>
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+          Theme Customization
+        </h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {currentColor.name} &ndash; {currentColor.tagline}
+        </p>
         <button
           onClick={handleReset}
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           Reset All
         </button>

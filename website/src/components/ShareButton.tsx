@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { HandFist } from '@phosphor-icons/react'
+import { HandFist, LinkSimple } from '@phosphor-icons/react'
 
 import { IconButton } from '@/components/IconButton'
 import {
@@ -180,11 +180,9 @@ export function ShareButton() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
               </svg>
             ) : (
-              <svg className="h-4 w-4 flex-none text-brand-accent dark:text-brand-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-1.032a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.25 8.106" />
-              </svg>
+              <LinkSimple className="h-4 w-4 flex-none text-brand-accent dark:text-brand-accent-400" weight="duotone" />
             )}
-            {copied ? 'Copied!' : 'Copy link'}
+            {copied ? 'Copied!' : 'Copy share text'}
           </button>
         </div>
       )}

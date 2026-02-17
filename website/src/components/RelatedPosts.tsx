@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
-import { type BlogPost, getRelatedPosts } from '@/lib/blog'
+import { Prose } from '@/components/Prose'
+import { getRelatedPosts } from '@/lib/blog'
 
 interface RelatedPostsProps {
   slug: string
@@ -14,27 +15,19 @@ export function RelatedPosts({ slug }: RelatedPostsProps) {
   }
 
   return (
-    <div className="mt-12 border-t border-slate-200 pt-8 dark:border-slate-800">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-        Related Posts
-      </h2>
-      <ul className="mt-4 space-y-4">
+    <Prose>
+      <hr />
+      <h2>Related</h2>
+      <ul>
         {related.map((post) => (
           <li key={post.slug}>
-            <Link
-              href={`/blog/${post.slug}`}
-              className="group block"
-            >
-              <p className="font-semibold text-brand-primary group-hover:underline dark:text-brand-primary-400">
-                {post.title}
-              </p>
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                {post.description}
-              </p>
-            </Link>
+            <strong>
+              <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+            </strong>
+            {' '}&ndash; {post.description}
           </li>
         ))}
       </ul>
-    </div>
+    </Prose>
   )
 }
