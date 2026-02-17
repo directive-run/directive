@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sudoku - Directive Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    /* Layout */
+    .sudoku-container {
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; color: #e2e8f0; }
+    .subtitle { color: #64748b; margin-bottom: 1rem; font-size: 0.875rem; }
+
+    /* Top bar: timer + progress */
+    .sudoku-top-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 0.75rem; gap: 0.75rem;
+    }
+    .sudoku-timer {
+      background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 8px;
+      border: 1px solid #334155; font-size: 0.9rem; font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .sudoku-timer.warning { color: #fbbf24; border-color: #854d0e; }
+    .sudoku-timer.critical { color: #ef4444; border-color: #991b1b; animation: pulse 1s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .sudoku-progress-wrap {
+      flex: 1;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .sudoku-progress-track {
+      flex: 1; height: 6px; background: #1e293b; border-radius: 3px;
+      border: 1px solid #334155; overflow: hidden;
+    }
+    .sudoku-progress-fill {
+      height: 100%; background: #3b82f6; border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .sudoku-progress-text {
+      font-size: 0.75rem; color: #64748b; min-width: 2.5rem; text-align: right;
+    }
+
+    /* Info bar */
+    .sudoku-info {
+      display: flex; gap: 0.75rem; justify-content: center; align-items: center;
+      margin-bottom: 0.75rem; flex-wrap: wrap;
+    }
+    .info-item {
+      background: #1e293b; padding: 0.35rem 0.65rem; border-radius: 8px;
+      border: 1px solid #334155; font-size: 0.75rem; display: flex;
+      align-items: center; gap: 0.35rem;
+    }
+    .info-label { color: #64748b; text-transform: uppercase; font-size: 0.6rem; }
+    .info-value { font-weight: 600; }
+
+    /* Message */
+    .sudoku-message {
+      background: #1e293b; padding: 0.5rem; border-radius: 8px;
+      border: 1px solid #334155; font-size: 0.8rem; color: #94a3b8;
+      margin-bottom: 0.75rem; min-height: 2rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sudoku-message.hidden { display: none; }
+
+    /* Grid */
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      max-width: 450px;
+      margin: 0 auto 1rem;
+      aspect-ratio: 1;
+      border: 3px solid #475569;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #334155;
+      gap: 1px;
+    }
+
+    .sudoku-cell {
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      background: #1e293b;
+      font-size: clamp(0.9rem, 3vw, 1.3rem);
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.1s;
+      color: #60a5fa;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .sudoku-cell:hover { background: #253348; }
+    .sudoku-cell:focus { outline: 2px solid #60a5fa; outline-offset: -2px; z-index: 1; }
+    .sudoku-cell.given {
+      color: #e2e8f0;
+      font-weight: 700;
+    }
+    .sudoku-cell.selected {
+      background: #1e3a5f;
+      box-shadow: inset 0 0 0 2px #3b82f6;
+    }
+    .sudoku-cell.peer { background: #162033; }
+    .sudoku-cell.same-value { background: #1e3a8f; }
+    .sudoku-cell.conflict {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+    }
+
+    /* Notes mode indicator on grid */
+    .sudoku-grid.notes-mode {
+      box-shadow: 0 0 0 2px #10b981;
+    }
+
+    /* Box borders (thick lines every 3 cells) */
+    .sudoku-cell.box-left { border-left: 2px solid #475569; margin-left: -1px; }
+    .sudoku-cell.box-top { border-top: 2px solid #475569; margin-top: -1px; }
+
+    /* Pencil marks */
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%; height: 100%;
+      padding: 1px;
+    }
+    .note-digit {
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(0.4rem, 1.2vw, 0.55rem);
+      color: #64748b;
+      line-height: 1;
+    }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex; justify-content: center; margin-bottom: 0.75rem;
+    }
+    .mode-btn {
+      background: #1e293b; border: 1px solid #334155; color: #94a3b8;
+      padding: 0.4rem 0.9rem; font-size: 0.8rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mode-btn:first-child { border-radius: 6px 0 0 6px; }
+    .mode-btn:last-child { border-radius: 0 6px 6px 0; }
+    .mode-btn:not(:first-child) { border-left: none; }
+    .mode-btn.active {
+      background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600;
+    }
+    .mode-btn:hover:not(.active) { background: #334155; }
+
+    /* Number pad */
+    .sudoku-numpad {
+      display: flex; gap: 0.35rem; justify-content: center;
+      margin-bottom: 0.75rem; flex-wrap: wrap;
+    }
+    .num-btn {
+      width: 44px; height: 44px;
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 600;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: all 0.15s; position: relative;
+    }
+    .num-btn:hover { background: #334155; }
+    .num-btn:active { background: #3b82f6; }
+    .num-badge {
+      font-size: 0.5rem; color: #64748b; font-weight: 400;
+      position: absolute; bottom: 2px; right: 4px;
+    }
+    .num-badge.complete { color: #22c55e; }
+
+    /* Action buttons */
+    .sudoku-actions {
+      display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;
+      font-size: 0.8rem; transition: all 0.15s;
+    }
+    button:hover:not(:disabled):not(.disabled) { background: #334155; }
+    button:disabled, button.disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background: #3b82f6; border-color: #3b82f6; }
+    button.primary:hover { background: #2563eb; }
+    button.active {
+      background: #3b82f6; border-color: #3b82f6; color: #fff;
+    }
+    button.notes-active {
+      background: #10b981; border-color: #10b981; color: #fff; font-weight: 600;
+    }
+
+    /* Clear button */
+    .num-btn.clear-btn {
+      font-size: 0.75rem; color: #94a3b8;
+    }
+
+    /* Game over modal */
+    .sudoku-modal {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7); display: flex;
+      align-items: center; justify-content: center; z-index: 10;
+    }
+    .sudoku-modal.hidden { display: none; }
+    .sudoku-modal-content {
+      background: #1e293b; border: 1px solid #475569; border-radius: 12px;
+      padding: 2rem; text-align: center; max-width: 320px;
+    }
+    .sudoku-modal-content h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .sudoku-modal-content p { color: #94a3b8; margin-bottom: 1.25rem; font-size: 0.85rem; }
+
+    /* Rules summary */
+    .sudoku-rules {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 0.75rem; text-align: left; font-size: 0.7rem; color: #64748b;
+    }
+    .sudoku-rules h3 { color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.4rem; }
+    .sudoku-rules ul { padding-left: 1.2rem; }
+    .sudoku-rules li { margin-bottom: 0.2rem; }
+    .sudoku-rules .directive-note {
+      margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid #334155;
+      font-style: italic; color: #475569;
+    }
+
+    /* Responsive – maintain 44px minimum touch targets */
+    @media (max-width: 480px) {
+      body { padding: 0.75rem; }
+      .sudoku-grid { max-width: 100%; }
+      .sudoku-numpad { gap: 0.5rem; }
+      .num-btn { min-width: 44px; min-height: 44px; font-size: 1rem; }
+      .sudoku-actions { gap: 0.4rem; }
+      .sudoku-actions button { padding: 0.5rem 0.75rem; font-size: 0.75rem; min-height: 44px; }
+    }
+  </style>
+  <script type="module" crossorigin src="/examples/sudoku/assets/index-DZQK4FYF.js"></script>
+</head>
+<body>
+  <div class="sudoku-container">
+    <h1>Sudoku</h1>
+    <p class="subtitle">Constraint satisfaction, powered by Directive</p>
+
+    <!-- Top bar -->
+    <div class="sudoku-top-bar">
+      <span id="sudoku-timer" class="sudoku-timer">20:00</span>
+      <div class="sudoku-progress-wrap">
+        <div class="sudoku-progress-track">
+          <div id="sudoku-progress-bar" class="sudoku-progress-fill" style="width: 0%"></div>
+        </div>
+        <span id="sudoku-progress" class="sudoku-progress-text">0%</span>
+      </div>
+    </div>
+
+    <!-- Info bar -->
+    <div class="sudoku-info">
+      <div class="info-item">
+        <span class="info-label">Hints</span>
+        <span id="sudoku-hints-remaining" class="info-value">3</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Errors</span>
+        <span id="sudoku-errors" class="info-value">0</span>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div id="sudoku-message" class="sudoku-message">
+      Fill in the grid. No duplicates in rows, columns, or boxes.
+    </div>
+
+    <!-- Grid -->
+    <div id="sudoku-grid" class="sudoku-grid"></div>
+
+    <!-- Difficulty toggle -->
+    <div class="mode-toggle">
+      <button id="sudoku-mode-easy" class="mode-btn active">Easy</button>
+      <button id="sudoku-mode-medium" class="mode-btn">Medium</button>
+      <button id="sudoku-mode-hard" class="mode-btn">Hard</button>
+    </div>
+
+    <!-- Number pad -->
+    <div class="sudoku-numpad">
+      <button id="sudoku-num-1" class="num-btn">1<span class="num-badge">9</span></button>
+      <button id="sudoku-num-2" class="num-btn">2<span class="num-badge">9</span></button>
+      <button id="sudoku-num-3" class="num-btn">3<span class="num-badge">9</span></button>
+      <button id="sudoku-num-4" class="num-btn">4<span class="num-badge">9</span></button>
+      <button id="sudoku-num-5" class="num-btn">5<span class="num-badge">9</span></button>
+      <button id="sudoku-num-6" class="num-btn">6<span class="num-badge">9</span></button>
+      <button id="sudoku-num-7" class="num-btn">7<span class="num-badge">9</span></button>
+      <button id="sudoku-num-8" class="num-btn">8<span class="num-badge">9</span></button>
+      <button id="sudoku-num-9" class="num-btn">9<span class="num-badge">9</span></button>
+      <button id="sudoku-num-0" class="num-btn clear-btn">Clear</button>
+    </div>
+
+    <!-- Actions -->
+    <div class="sudoku-actions">
+      <button id="sudoku-notes-toggle">Notes (N)</button>
+      <button id="sudoku-hint-btn">Hint (H)</button>
+      <button id="sudoku-undo-btn">Undo</button>
+      <button id="sudoku-redo-btn">Redo</button>
+      <button id="sudoku-new-game" class="primary">New Game</button>
+    </div>
+
+    <!-- Rules -->
+    <div class="sudoku-rules">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>Facts</strong> &ndash; Grid, solution, givens, timer, notes, selection</li>
+        <li><strong>Derivations</strong> &ndash; Conflicts, progress, timer display, same-number highlight (auto-tracked)</li>
+        <li><strong>Events</strong> &ndash; selectCell, inputNumber, toggleNote, requestHint, tick, newGame</li>
+        <li><strong>Constraints</strong> &ndash; timerExpired (priority 200), detectConflict (100), puzzleSolved (90), hintAvailable (70)</li>
+        <li><strong>Resolvers</strong> &ndash; Handle game won/lost, show conflicts, reveal hints</li>
+        <li><strong>Effects</strong> &ndash; Timer warnings, game result logging</li>
+      </ul>
+      <p class="directive-note">Sudoku IS a constraint satisfaction problem. The game rules map 1:1 to Directive's constraint&rarr;resolver flow.</p>
+    </div>
+  </div>
+
+  <!-- Game over modal -->
+  <div id="sudoku-modal" class="sudoku-modal hidden">
+    <div class="sudoku-modal-content">
+      <h2 id="sudoku-modal-title">Puzzle Solved!</h2>
+      <p id="sudoku-modal-message">Well done!</p>
+      <button id="sudoku-modal-new-game" class="primary">Play Again</button>
+    </div>
+  </div>
+
+</body>
+</html>

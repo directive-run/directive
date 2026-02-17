@@ -1,6 +1,5 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Cat, Dog, Bug, Rabbit, Cow } from '@phosphor-icons/react'
 
@@ -34,23 +33,20 @@ const animals = [
 
 export function NotFoundContent() {
   const pathname = usePathname()
-  const [index, setIndex] = useState(0)
-
-  useEffect(() => {
-    setIndex(Math.floor(Math.random() * animals.length))
-  }, [])
-
-  const { Icon, subtitle, resolver } = animals[index]
+  const index =
+    pathname.split('').reduce((sum, ch) => sum * 37 + ch.charCodeAt(0), 0) %
+    animals.length
+  const { Icon, subtitle, resolver } = animals[Math.abs(index)]
 
   return (
-    <>
-      <Icon size={100} weight="duotone" className="text-slate-500 opacity-70" />
+    <div suppressHydrationWarning>
+      <Icon size={100} weight="duotone" className="mx-auto text-slate-500 opacity-70" />
 
       <p className="bg-gradient-to-r from-[var(--color-brand-primary-200)] via-[var(--color-brand-primary-300)] to-[var(--color-brand-accent-200)] bg-clip-text font-display text-8xl font-bold tracking-tight text-transparent sm:text-9xl">
         404
       </p>
 
-      <h1 className="mt-4 font-display text-2xl font-semibold text-white">
+      <h1 className="mt-4 font-display text-2xl font-semibold text-white" suppressHydrationWarning>
         {subtitle}
       </h1>
 
@@ -75,7 +71,7 @@ export function NotFoundContent() {
             <span className="text-white">&quot;{pathname}&quot;</span>
             {' }'}
           </p>
-          <p className="mt-1 pl-4">
+          <p className="mt-1 pl-4" suppressHydrationWarning>
             resolver:{' '}
             <span className="text-red-400">{resolver}</span>
           </p>
@@ -86,6 +82,6 @@ export function NotFoundContent() {
       <p className="mt-6 text-base text-slate-400">
         This route has no resolver. Let&apos;s get you back on track.
       </p>
-    </>
+    </div>
   )
 }
