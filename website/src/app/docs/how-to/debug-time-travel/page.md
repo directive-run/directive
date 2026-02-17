@@ -121,7 +121,7 @@ system.debug.goBack(); // See the state before that
 
 ## Step by Step
 
-1. **Enable time-travel in the system config** – `debug: { timeTravel: true }` tells the engine to snapshot state after every reconciliation cycle. Each snapshot captures facts, derived values, active constraints, and in-flight resolvers.
+1. **Enable time-travel in the system config** – `debug: { timeTravel: true }` tells the engine to snapshot state after reconciliation cycles. By default every event that changes facts creates a snapshot. Use `snapshotEvents` on your module to limit which events create snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/time-travel#filtering-snapshot-events).
 
 2. **`useInspect` gives you the engine's internal state** – all constraints (with their `when` results), all resolvers (with their status), and the snapshot timeline. This is read-only and doesn't affect the system.
 

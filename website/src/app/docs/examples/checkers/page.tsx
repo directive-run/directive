@@ -12,7 +12,7 @@ export const metadata = buildPageMetadata({
 
 export default function CheckersPage() {
   const build = parseExampleBuild('checkers')
-  const sources = readExampleSources('checkers', ['game.ts', 'rules.ts'])
+  const sources = readExampleSources('checkers', ['game.ts', 'main.ts', 'rules.ts'])
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">

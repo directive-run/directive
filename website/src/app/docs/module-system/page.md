@@ -41,6 +41,7 @@ const counterModule = createModule("counter", {
 | `constraints` | Rules that generate requirements |
 | `resolvers` | Functions that fulfill requirements |
 | `effects` | Side effects that run on changes |
+| `snapshotEvents` | Which events create time-travel snapshots (omit to snapshot all) |
 
 ---
 
