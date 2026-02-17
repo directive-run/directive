@@ -1,5 +1,6 @@
 'use client'
 
+import { CodeTabs } from '@/components/CodeTabs'
 import { Fence } from '@/components/Fence'
 import { ExampleEmbed } from '@/components/ExampleEmbed'
 
@@ -186,24 +187,22 @@ export function CheckersDemo({
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
-        <div className="space-y-6">
-          {gameSource && (
-            <Fence
-              language="typescript"
-              title={`game.ts \u2013 Directive module (${gameSource.code.split('\n').length} lines)`}
-            >
-              {gameSource.code}
-            </Fence>
-          )}
-          {rulesSource && (
-            <Fence
-              language="typescript"
-              title={`rules.ts \u2013 Pure game logic (${rulesSource.code.split('\n').length} lines)`}
-            >
-              {rulesSource.code}
-            </Fence>
-          )}
-        </div>
+        <CodeTabs
+          tabs={[
+            gameSource && {
+              filename: 'game.ts',
+              label: 'game.ts - Directive module',
+              code: gameSource.code,
+              language: 'typescript',
+            },
+            rulesSource && {
+              filename: 'rules.ts',
+              label: 'rules.ts - Pure game logic',
+              code: rulesSource.code,
+              language: 'typescript',
+            },
+          ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
+        />
       </section>
     </div>
   )

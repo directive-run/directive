@@ -12,11 +12,16 @@
     "start": "next start",
     "lint": "next lint",
     "build:example": "tsx scripts/build-example.ts",
-    "build:examples": "tsx scripts/build-example.ts --all"
+    "build:examples": "tsx scripts/build-example.ts --all",
+    "test:e2e": "npx playwright test --config e2e/playwright.config.ts",
+    "test:e2e:ui": "npx playwright test --config e2e/playwright.config.ts --ui",
+    "test:e2e:headed": "npx playwright test --config e2e/playwright.config.ts --headed"
   },
   "browserslist": "defaults, not ie <= 11",
   "dependencies": {
     "@algolia/autocomplete-core": "^1.19.2",
+    "@directive-run/core": "workspace:*",
+    "@directive-run/react": "workspace:*",
     "@headlessui/react": "^2.2.6",
     "@markdoc/markdoc": "^0.5.2",
     "@markdoc/next.js": "^0.5.0",
@@ -26,8 +31,6 @@
     "@tailwindcss/typography": "^0.5.16",
     "@types/react-highlight-words": "^0.20.0",
     "clsx": "^2.1.1",
-    "@directive-run/core": "workspace:*",
-    "@directive-run/react": "workspace:*",
     "fast-glob": "^3.3.3",
     "flexsearch": "^0.8.205",
     "geist": "^1.7.0",
@@ -43,6 +46,7 @@
     "typescript": "^5.8.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.0",
     "@types/node": "^24.1.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
