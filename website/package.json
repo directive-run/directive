@@ -10,7 +10,9 @@
     "build:api-docs": "tsx scripts/extract-api-docs.ts",
     "build:embeddings": "tsx scripts/generate-embeddings.ts",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:example": "tsx scripts/build-example.ts",
+    "build:examples": "tsx scripts/build-example.ts --all"
   },
   "browserslist": "defaults, not ie <= 11",
   "dependencies": {

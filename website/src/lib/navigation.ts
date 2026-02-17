@@ -30,6 +30,9 @@ export function getNavigationForVersion(
   }))
 }
 
+/** Set of all valid doc hrefs derived from the navigation tree. */
+export const validDocRoutes: Set<string> = new Set()
+
 export const navigation: NavigationSection[] = [
   {
     title: 'Getting Started',
@@ -153,15 +156,19 @@ export const navigation: NavigationSection[] = [
     title: 'Examples',
     links: [
       { title: 'Overview', href: '/docs/examples/overview' },
-      { title: 'Counter', href: '/docs/examples/counter' },
-      { title: 'Data Fetching', href: '/docs/examples/data-fetching' },
-      { title: 'Form Validation', href: '/docs/examples/form-validation' },
-      { title: 'Multi-Module App', href: '/docs/examples/multi-module' },
-      { title: 'AI Agent', href: '/docs/examples/ai-agent' },
-      { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
-      { title: 'A/B Testing', href: '/docs/examples/ab-testing' },
-      { title: 'Contact Form', href: '/docs/examples/contact-form' },
-      { title: 'Server (Node.js)', href: '/docs/examples/server' },
+      { title: 'Sudoku', href: '/docs/examples/sudoku' },
+      // Individual examples hidden while verifying each one works.
+      // Add back one at a time after confirming.
+      // { title: 'Checkers', href: '/docs/examples/checkers' },
+      // { title: 'Counter', href: '/docs/examples/counter' },
+      // { title: 'Data Fetching', href: '/docs/examples/data-fetching' },
+      // { title: 'Form Validation', href: '/docs/examples/form-validation' },
+      // { title: 'Multi-Module App', href: '/docs/examples/multi-module' },
+      // { title: 'AI Agent', href: '/docs/examples/ai-agent' },
+      // { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
+      // { title: 'A/B Testing', href: '/docs/examples/ab-testing' },
+      // { title: 'Contact Form', href: '/docs/examples/contact-form' },
+      // { title: 'Server (Node.js)', href: '/docs/examples/server' },
     ],
   },
   {
@@ -187,6 +194,14 @@ export const navigation: NavigationSection[] = [
       { title: 'FAQ', href: '/docs/faq' },
       { title: 'Troubleshooting', href: '/docs/troubleshooting' },
       { title: 'Brand Guide', href: '/docs/branding' },
+      { title: 'Roadmap', href: '/docs/roadmap' },
     ],
   },
 ]
+
+// Populate the valid routes Set from the navigation tree
+for (const section of navigation) {
+  for (const link of section.links) {
+    validDocRoutes.add(link.href)
+  }
+}
