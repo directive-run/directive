@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { apiProxy } from "@directive-run/vite-plugin-api-proxy";
 
 export default defineConfig({
+  base: "/examples/checkers/",
   build: {
     target: "esnext",
   },

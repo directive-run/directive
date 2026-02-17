@@ -8,6 +8,7 @@ import clsx from 'clsx'
 import { Heart } from '@phosphor-icons/react'
 
 import { AIChatWidget } from '@/components/AIChatWidget'
+import { NotificationBanners } from '@/components/NotificationBanners'
 import { Footer } from '@/components/Footer'
 import { Newsletter } from '@/components/Newsletter'
 import { Hero } from '@/components/Hero'
@@ -159,6 +160,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex w-full flex-col">
       <SkipLink />
+      <NotificationBanners />
       <Header />
 
       {isHomePage && <Hero />}

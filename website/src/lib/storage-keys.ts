@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   ONBOARDED: 'directive-brand-onboarded',
   FONT_SIZE: 'directive-brand-font-size',
   EXPERIMENTS: 'directive-labs-experiments',
+  DISMISSED_NOTIFICATIONS: 'directive-dismissed-notifications',
 } as const
 
 export function safeGetItem(key: string): string | null {

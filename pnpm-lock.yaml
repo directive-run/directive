@@ -327,6 +327,19 @@ importers:
         specifier: ^5.3.0
         version: 5.9.3
 
+  examples/sudoku:
+    dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
   packages/ai:
     devDependencies:
       '@directive-run/core':
