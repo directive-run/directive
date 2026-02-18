@@ -28,7 +28,6 @@ const PageLink = memo(function PageLink({
         <Link
           href={href}
           aria-label={`Go to ${dir} page: ${title}`}
-          onClick={() => window.scrollTo(0, 0)}
           className={clsx(
             'flex items-center gap-x-1 text-base font-semibold text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300',
             dir === 'previous' && 'flex-row-reverse',

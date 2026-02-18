@@ -322,16 +322,32 @@ function _useDerivedMulti(
  * When a default value is provided, the system parameter may be
  * null | undefined — the hook returns the default and recomputes
  * when the system becomes available.
+ *
+ * An optional equality function can be passed as the 4th parameter
+ * to customize when the selector result is considered "changed".
+ * Defaults to `Object.is`. Use `shallowEqual` (exported from this
+ * package) when your selector returns a new object/array each time.
+ *
+ * @example
+ * ```tsx
+ * // Basic usage
+ * const count = useSelector(system, (s) => s.count);
+ *
+ * // With default value (allows nullable system)
+ * const count = useSelector(system, (s) => s.count, 0);
+ *
+ * // With default value + custom equality
+ * const coords = useSelector(system, (s) => ({ x: s.x, y: s.y }), { x: 0, y: 0 }, shallowEqual);
+ * ```
  */
 
-// Existing: non-null system, no default (equalityFn as 3rd param)
+// Non-null system, no default
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S>,
 	selector: (state: InferSelectorState<S>) => R,
-	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
-// New: non-null system, with default value
+// Non-null system, with default value and optional equality
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S>,
 	selector: (state: InferSelectorState<S>) => R,
@@ -339,7 +355,7 @@ export function useSelector<S extends ModuleSchema, R>(
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
-// New: nullable system, default REQUIRED
+// Nullable system, default REQUIRED
 export function useSelector<S extends ModuleSchema, R>(
 	system: SingleModuleSystem<S> | null | undefined,
 	selector: (state: InferSelectorState<S>) => R,
@@ -347,18 +363,19 @@ export function useSelector<S extends ModuleSchema, R>(
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
-// Backward-compatible `any` fallback: equalityFn as 3rd param
+// Generic fallback: non-null system
 export function useSelector<R>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	// biome-ignore lint/suspicious/noExplicitAny: Generic fallback
 	system: SingleModuleSystem<any>,
 	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
 	selector: (state: Record<string, any>) => R,
+	defaultValue?: R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
-// Backward-compatible `any` fallback: default value + nullable system
+// Generic fallback: nullable system
 export function useSelector<R>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
+	// biome-ignore lint/suspicious/noExplicitAny: Generic fallback
 	system: SingleModuleSystem<any> | null | undefined,
 	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
 	selector: (state: Record<string, any>) => R,
@@ -371,25 +388,16 @@ export function useSelector(
 	system: SingleModuleSystem<any> | null | undefined,
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	selector: (state: any) => unknown,
-	defaultValueOrEqFn?: unknown,
-	maybeEqFn?: (a: unknown, b: unknown) => boolean,
+	defaultValueArg?: unknown,
+	equalityFnArg?: (a: unknown, b: unknown) => boolean,
 ): unknown {
-	// Discriminate arg3: function → old API (equalityFn), otherwise → new API (defaultValue)
 	let defaultValue: unknown;
 	let hasDefault = false;
-	let equalityFn: (a: unknown, b: unknown) => boolean;
+	const equalityFn: (a: unknown, b: unknown) => boolean = equalityFnArg ?? defaultEquality;
 
-	if (typeof defaultValueOrEqFn === "function" && maybeEqFn === undefined) {
-		// Old API: useSelector(system, selector, equalityFn)
-		equalityFn = defaultValueOrEqFn as (a: unknown, b: unknown) => boolean;
-	} else {
-		// New API: useSelector(system, selector, defaultValue, equalityFn?)
-		// Also covers: useSelector(system, selector) when defaultValueOrEqFn is undefined
-		if (defaultValueOrEqFn !== undefined) {
-			defaultValue = defaultValueOrEqFn;
-			hasDefault = true;
-		}
-		equalityFn = maybeEqFn ?? defaultEquality;
+	if (defaultValueArg !== undefined) {
+		defaultValue = defaultValueArg;
+		hasDefault = true;
 	}
 
 	// Dev-mode warning: null system without a default value
@@ -555,14 +563,6 @@ export function useWatch<
 		newValue: InferFacts<S>[K] | undefined,
 		prevValue: InferFacts<S>[K] | undefined,
 	) => void,
-): void;
-
-/** Watch a fact or derivation (generic fallback) */
-export function useWatch<T>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
-	system: SingleModuleSystem<any>,
-	key: string,
-	callback: (newValue: T, prevValue: T | undefined) => void,
 ): void;
 
 /** Implementation */

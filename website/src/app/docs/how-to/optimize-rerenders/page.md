@@ -90,6 +90,7 @@ const items = useSelector(system, (state) => state.items);
 const items = useSelector(
   system,
   (state) => state.items,
+  undefined,
   shallowEqual,
 );
 ```

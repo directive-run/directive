@@ -201,13 +201,6 @@ export function useSelector<S extends ModuleSchema, R>(
 	selector: (state: InferSelectorState<S>) => R,
 	equalityFn?: (a: R, b: R) => boolean,
 ): Accessor<R>;
-export function useSelector<R>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
-	system: SingleModuleSystem<any>,
-	// biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
-	selector: (state: Record<string, any>) => R,
-	equalityFn?: (a: R, b: R) => boolean,
-): Accessor<R>;
 export function useSelector(
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	system: SingleModuleSystem<any>,
@@ -307,13 +300,6 @@ export function useWatch<S extends ModuleSchema, K extends keyof InferFacts<S> &
 	system: SingleModuleSystem<S>,
 	key: K,
 	callback: (newValue: InferFacts<S>[K] | undefined, previousValue: InferFacts<S>[K] | undefined) => void,
-): void;
-/** Watch a fact or derivation (generic fallback) */
-export function useWatch<T>(
-	// biome-ignore lint/suspicious/noExplicitAny: Backward-compatible fallback
-	system: SingleModuleSystem<any>,
-	key: string,
-	callback: (newValue: T, previousValue: T | undefined) => void,
 ): void;
 /** Implementation */
 export function useWatch(

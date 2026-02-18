@@ -38,11 +38,10 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 Auto-tracking selector over facts and derivations. The selector receives a merged proxy of both facts and derivations, so you can access either with the same syntax. Similar to Zustand's `useStore` pattern. Supports an optional default value and nullable systems.
 
 ```typescript
-// Original: equalityFn as 3rd param
+// Without default value
 function useSelector<S, R>(
   system: SingleModuleSystem<S>,
   selector: (state: InferSelectorState<S>) => R,
-  equalityFn?: (a: R, b: R) => boolean,
 ): R
 
 // With default value
@@ -67,7 +66,7 @@ function useSelector<S, R>(
 | `system` | `SingleModuleSystem<S>` or `null` | The Directive system. May be `null`/`undefined` when a default value is provided. |
 | `selector` | `(state) => R` | Selector function receiving both facts and derivations |
 | `defaultValue` | `R` | Optional default returned before the system starts or when system is null |
-| `equalityFn` | `(a, b) => boolean` | Optional custom equality check (4th param when using default, 3rd param without) |
+| `equalityFn` | `(a, b) => boolean` | Optional custom equality check (4th parameter) |
 
 ```tsx
 import { useSelector, shallowEqual } from '@directive-run/react';
@@ -93,22 +92,6 @@ const ids = useSelector(
 // Nullable system – returns default until system is available
 const status = useSelector(maybeSystem, (state) => state.status, "idle");
 ```
-
-{% callout type="note" title="Backward compatible" %}
-The 3rd parameter is discriminated at runtime: if it's a function and no 4th argument is provided, it's treated as `equalityFn` (original API). Otherwise it's treated as `defaultValue`. Existing code using `useSelector(system, selector, shallowEqual)` continues to work unchanged.
-{% /callout %}
-
-{% callout type="warning" title="Function defaults" %}
-If your default value is itself a function, the runtime will misinterpret it as `equalityFn`. Force the new API path by passing the equality function (or `undefined`) as the 4th argument:
-```tsx
-// Wrong — () => {} is treated as equalityFn
-useSelector(system, (state) => state.handler, () => {});
-
-// Correct — explicitly pass undefined as equalityFn
-useSelector(system, (state) => state.handler, () => {}, undefined);
-```
-This edge case only applies when the default value is a function. Primitives, objects, and arrays work as expected.
-{% /callout %}
 
 ---
 
@@ -738,14 +721,15 @@ function shallowEqual(a: unknown, b: unknown): boolean
 ```tsx
 import { useSelector, shallowEqual } from '@directive-run/react';
 
-// As equalityFn (3rd param – no default value)
+// Without default value
 const coords = useSelector(
   system,
   (facts) => ({ x: facts.position?.x, y: facts.position?.y }),
+  undefined,
   shallowEqual,
 );
 
-// As equalityFn (4th param – with default value)
+// With default value
 const coords = useSelector(
   system,
   (facts) => ({ x: facts.position?.x ?? 0, y: facts.position?.y ?? 0 }),
