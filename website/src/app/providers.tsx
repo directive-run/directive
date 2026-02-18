@@ -6,7 +6,7 @@ import { ExperimentsProvider } from '@/lib/useExperiment'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="directive-theme" disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" storageKey="directive-theme" disableTransitionOnChange>
       <ExperimentsProvider>
         {children}
       </ExperimentsProvider>

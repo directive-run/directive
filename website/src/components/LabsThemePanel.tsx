@@ -38,7 +38,7 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col gap-3 min-[786px]:flex-row min-[786px]:items-start min-[786px]:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
             Theme Customization

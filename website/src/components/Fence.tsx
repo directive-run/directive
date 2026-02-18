@@ -3,35 +3,6 @@
 import { Fragment, memo } from 'react'
 import { Highlight } from 'prism-react-renderer'
 import { CopyButton } from './CodeTabs'
-import { useCodeTheme } from '@/lib/useCodeTheme'
-
-function getWrapperClasses(codeTheme: string, hasTitle: boolean): string {
-  if (!hasTitle) {
-    return 'group relative'
-  }
-
-  if (codeTheme === 'light') {
-    return 'group relative overflow-hidden rounded-xl bg-slate-50 shadow-lg ring-1 ring-slate-200'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'group relative overflow-hidden rounded-xl bg-brand-code-bg shadow-lg ring-1 ring-slate-300/10'
-  }
-
-  return 'group relative overflow-hidden rounded-xl bg-slate-50 shadow-lg ring-1 ring-slate-200 dark:bg-brand-code-bg dark:ring-slate-300/10'
-}
-
-function getTitleBarClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'border-b border-slate-200 px-5 pt-3 pb-2 font-mono text-xs text-slate-500'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'border-b border-slate-700/50 px-5 pt-3 pb-2 font-mono text-xs text-slate-400'
-  }
-
-  return 'border-b border-slate-200 px-5 pt-3 pb-2 font-mono text-xs text-slate-500 dark:border-slate-700/50 dark:text-slate-400'
-}
 
 export const Fence = memo(function Fence({
   children,
@@ -42,20 +13,25 @@ export const Fence = memo(function Fence({
   language: string
   title?: string
 }) {
-  const codeTheme = useCodeTheme()
   const code = children.trimEnd()
 
   return (
     <div
-      className={getWrapperClasses(codeTheme, !!title)}
-      data-code-theme={codeTheme !== 'auto' ? codeTheme : undefined}
+      className={title ? 'group relative overflow-hidden rounded-xl' : 'group relative'}
+      style={title ? {
+        backgroundColor: 'var(--code-bg)',
+        boxShadow: '0 0 0 1px var(--code-ring), var(--code-shadow)',
+      } : undefined}
     >
       {title && (
-        <div className={getTitleBarClasses(codeTheme)}>
+        <div
+          className="border-b px-5 pt-3 pb-2 font-mono text-xs"
+          style={{ borderColor: 'var(--code-title-border)', color: 'var(--code-title-text)' }}
+        >
           {title}
         </div>
       )}
-      <CopyButton code={code} codeTheme={codeTheme} />
+      <CopyButton code={code} />
       <Highlight
         code={code}
         language={language || 'text'}
