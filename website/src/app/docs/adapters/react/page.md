@@ -241,6 +241,7 @@ const summary = useSelector(system, (state) => ({
 const ids = useSelector(
   system,
   (state) => state.users?.map(u => u.id) ?? [],
+  undefined,
   shallowEqual,
 );
 ```
@@ -265,10 +266,6 @@ When a default value is provided, the system parameter may be `null` or `undefin
 // Nullable system – useful for conditional or lazy initialization
 const status = useSelector(maybeSystem, (state) => state.status, "idle");
 ```
-
-{% callout type="note" title="Backward compatible" %}
-The 3rd parameter is discriminated at runtime: if it's a function (and no 4th arg), it's `equalityFn`. Otherwise it's `defaultValue`, and `equalityFn` moves to the 4th position. Existing `useSelector(system, selector, shallowEqual)` calls work unchanged. If your default value is itself a function, pass `equalityFn` (or `undefined`) as the 4th argument to force the new API path.
-{% /callout %}
 
 {% callout type="note" title="Auto-tracking" %}
 `useSelector` uses Directive's tracking system to detect accessed fact keys at subscription time. Inline selectors work without `useCallback` &ndash; the hook stores the selector in a ref internally (Zustand pattern).

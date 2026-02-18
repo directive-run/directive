@@ -38,7 +38,7 @@ export function Callout({
   return (
     <div className={clsx('my-8 flex rounded-3xl p-6', styles[type].container)}>
       <IconComponent className="h-8 w-8 flex-none" />
-      <div className="ml-4 flex-auto">
+      <div className="ml-4 min-w-0 flex-auto">
         <p
           className={clsx('not-prose font-display text-xl', styles[type].title)}
         >
