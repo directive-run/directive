@@ -42,19 +42,19 @@ export function Newsletter() {
   )
 
   return (
-    <div className="relative isolate overflow-hidden border-t border-slate-200 bg-slate-900 pt-16 pb-16 sm:pt-24 sm:pb-24 dark:border-slate-800 dark:bg-brand-surface dark:pt-24">
+    <div className="relative isolate overflow-hidden border-t border-slate-200 bg-brand-surface pt-16 pb-16 sm:pt-24 sm:pb-24 dark:border-slate-800 dark:pt-24">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4 text-center sm:px-6 lg:flex-row lg:items-center lg:text-left lg:px-8 xl:px-12">
         <h2 className="max-w-xl font-display text-5xl font-semibold tracking-tight text-balance sm:text-6xl lg:flex-auto">
-          <span className="inline bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(to right, var(--color-brand-primary-300), white, var(--color-brand-accent-200))' }}>
+          <span className="newsletter-heading-gradient inline bg-clip-text text-transparent">
             Stay in the loop. Sign up for our newsletter.
           </span>
         </h2>
 
         {status === 'success' ? (
-          <div className="w-full max-w-md rounded-xl border border-emerald-400/20 bg-emerald-950/20 px-5 py-4">
+          <div className="w-full max-w-md rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-400/20 dark:bg-emerald-950/20">
             <div className="flex items-center gap-2">
-              <CheckCircle weight="duotone" className="h-5 w-5 shrink-0 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-300">
+              <CheckCircle weight="duotone" className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 You&apos;re in! Watch for updates.
               </span>
             </div>
@@ -75,7 +75,7 @@ export function Newsletter() {
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter your email"
-                className="min-w-0 flex-auto rounded-full bg-white/5 px-4 py-2 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-brand-primary sm:text-sm/6"
+                className="min-w-0 flex-auto rounded-full bg-white px-4 py-2 text-base text-slate-900 outline-1 -outline-offset-1 outline-slate-300 placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-brand-primary dark:bg-white/5 dark:text-white dark:outline-white/10 sm:text-sm/6"
               />
               <Button
                 type="submit"
@@ -94,11 +94,11 @@ export function Newsletter() {
             </div>
 
             {emailError ? (
-              <p className="mt-4 text-sm/6 text-red-400">{emailError}</p>
+              <p className="mt-4 text-sm/6 text-red-600 dark:text-red-400">{emailError}</p>
             ) : status === 'error' && errorMessage ? (
-              <p className="mt-4 text-sm/6 text-red-400">{errorMessage}</p>
+              <p className="mt-4 text-sm/6 text-red-600 dark:text-red-400">{errorMessage}</p>
             ) : (
-              <p className="mt-4 text-sm/6 text-slate-300">
+              <p className="mt-4 text-sm/6 text-slate-500 dark:text-slate-300">
                 We care about your data. We&apos;ll never share your email.
               </p>
             )}
@@ -107,7 +107,7 @@ export function Newsletter() {
       </div>
 
       {/* Directive callout */}
-      <div className="dark mx-auto mt-8 max-w-5xl px-4 sm:px-6 lg:px-8 xl:px-12">
+      <div className="mx-auto mt-8 max-w-5xl px-4 sm:px-6 lg:px-8 xl:px-12">
         <DirectiveCallout
           subject="signup"
           href="/blog/declarative-newsletter-with-directive"
@@ -115,7 +115,7 @@ export function Newsletter() {
       </div>
 
       <Image
-        className="pointer-events-none absolute -top-40 -left-40 -z-10 opacity-40"
+        className="pointer-events-none absolute -top-40 -left-40 -z-10 opacity-20 dark:opacity-40"
         src={blurCyanImage}
         alt=""
         width={530}
@@ -123,7 +123,7 @@ export function Newsletter() {
         unoptimized
       />
       <Image
-        className="pointer-events-none absolute -right-40 -bottom-40 -z-10 opacity-40"
+        className="pointer-events-none absolute -right-40 -bottom-40 -z-10 opacity-20 dark:opacity-40"
         src={blurIndigoImage}
         alt=""
         width={567}
