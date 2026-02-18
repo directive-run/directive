@@ -51,7 +51,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "workspace:*",
+    "@directive-run/core": "*",
     "react": ">=18"
   },
   "devDependencies": {

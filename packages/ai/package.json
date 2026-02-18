@@ -72,7 +72,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "workspace:*"
+    "@directive-run/core": "*"
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
