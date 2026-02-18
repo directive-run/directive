@@ -7,7 +7,6 @@ import { Highlight } from 'prism-react-renderer'
 
 import { Button } from '@/components/Button'
 import { HeroBackground } from '@/components/HeroBackground'
-import { useCodeTheme } from '@/lib/useCodeTheme'
 import blurCyanImage from '@/images/blur-cyan.png'
 import blurIndigoImage from '@/images/blur-indigo.png'
 
@@ -67,81 +66,8 @@ function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   )
 }
 
-function getEditorClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'relative rounded-2xl bg-slate-50 ring-1 ring-slate-200 shadow-lg'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'relative rounded-2xl bg-[#0A101F]/80 ring-1 ring-white/10 backdrop-blur-sm'
-  }
-
-  return 'relative rounded-2xl bg-slate-50 ring-1 ring-slate-200 shadow-lg dark:bg-[#0A101F]/80 dark:ring-white/10 dark:shadow-none dark:backdrop-blur-sm'
-}
-
-function getTrafficLightsClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'h-2.5 w-auto stroke-slate-300'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'h-2.5 w-auto stroke-slate-500/30'
-  }
-
-  return 'h-2.5 w-auto stroke-slate-300 dark:stroke-slate-500/30'
-}
-
-function getActivePillClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium text-brand-primary-700'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium text-brand-primary-300'
-  }
-
-  return 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium text-brand-primary-700 dark:text-brand-primary-300'
-}
-
-function getInactivePillClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'text-slate-400 hover:text-slate-600'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'text-slate-500 hover:text-slate-400'
-  }
-
-  return 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-400'
-}
-
-function getActivePillInnerClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'flex items-center rounded-full px-2.5 bg-slate-50'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'flex items-center rounded-full px-2.5 bg-slate-800'
-  }
-
-  return 'flex items-center rounded-full px-2.5 bg-slate-50 dark:bg-slate-800'
-}
-
-function getLineNumberClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'border-r border-slate-200 pr-4 font-mono text-slate-400 select-none'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'border-r border-slate-300/5 pr-4 font-mono text-slate-600 select-none'
-  }
-
-  return 'border-r border-slate-200 pr-4 font-mono text-slate-400 select-none dark:border-slate-300/5 dark:text-slate-600'
-}
-
 export function Hero() {
   const [activeTab, setActiveTab] = useState(0)
-  const codeTheme = useCodeTheme()
   const activeCode = codeBlocks[activeTab]
   const activeLanguage = tabs[activeTab].language
 
@@ -204,13 +130,20 @@ export function Hero() {
               <div className="absolute inset-0 rounded-2xl bg-linear-to-tr from-brand-primary-300 via-brand-primary-300/70 to-brand-primary-200 opacity-10 blur-lg" />
               <div className="absolute inset-0 rounded-2xl bg-linear-to-tr from-brand-primary-300 via-brand-primary-300/70 to-brand-primary-200 opacity-10" />
               <div
-                className={getEditorClasses(codeTheme)}
-                data-code-theme={codeTheme !== 'auto' ? codeTheme : undefined}
+                className="relative rounded-2xl"
+                style={{
+                  backgroundColor: 'var(--hero-editor-bg)',
+                  boxShadow: '0 0 0 1px var(--hero-editor-ring), var(--hero-editor-shadow)',
+                  backdropFilter: 'var(--hero-editor-backdrop)',
+                }}
               >
                 <div className="absolute -top-px right-11 left-20 h-px bg-linear-to-r from-brand-primary-300/0 via-brand-primary-300/70 to-brand-primary-300/0" />
                 <div className="absolute right-20 -bottom-px left-11 h-px bg-linear-to-r from-brand-accent-400/0 via-brand-accent-400 to-brand-accent-400/0" />
                 <div className="pt-4 pl-4">
-                  <TrafficLightsIcon className={getTrafficLightsClasses(codeTheme)} />
+                  <TrafficLightsIcon
+                    className="h-2.5 w-auto"
+                    style={{ stroke: 'var(--hero-traffic-stroke)' }}
+                  />
                   <div className="mt-4 flex space-x-2 text-xs">
                     {tabs.map((tab, index) => (
                       <div
@@ -218,17 +151,17 @@ export function Hero() {
                         className={clsx(
                           'flex h-6 cursor-pointer rounded-full',
                           index === activeTab
-                            ? getActivePillClasses(codeTheme)
-                            : getInactivePillClasses(codeTheme),
+                            ? 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium'
+                            : 'hero-pill-inactive',
                         )}
+                        style={index === activeTab ? { color: 'var(--hero-pill-active-text)' } : undefined}
                         onClick={() => setActiveTab(index)}
                       >
                         <div
                           className={clsx(
-                            index === activeTab
-                              ? getActivePillInnerClasses(codeTheme)
-                              : 'flex items-center rounded-full px-2.5',
+                            'flex items-center rounded-full px-2.5',
                           )}
+                          style={index === activeTab ? { backgroundColor: 'var(--hero-pill-active-bg)' } : undefined}
                         >
                           {tab.name}
                         </div>
@@ -238,7 +171,11 @@ export function Hero() {
                   <div className="mt-6 flex items-start px-1 text-sm">
                     <div
                       aria-hidden="true"
-                      className={getLineNumberClasses(codeTheme)}
+                      className="border-r pr-4 font-mono select-none"
+                      style={{
+                        borderColor: 'var(--hero-line-border)',
+                        color: 'var(--hero-line-text)',
+                      }}
                     >
                       {Array.from({
                         length: activeCode.split('\n').length,

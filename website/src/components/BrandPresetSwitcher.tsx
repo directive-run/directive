@@ -82,10 +82,6 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
     handleFontSizeChange(fontScale + delta)
   }, [fontScale, handleFontSizeChange])
 
-  if (!mounted) {
-    return <div className={clsx('h-10 w-10 sm:h-8 sm:w-8', className)} suppressHydrationWarning />
-  }
-
   const allColors = [DEFAULT_COLOR_PRESET, ...COLOR_PRESETS]
   const allTypos = [DEFAULT_TYPO_PRESET, ...TYPO_PRESETS]
   const currentColor = findColorPreset(colorId) ?? DEFAULT_COLOR_PRESET

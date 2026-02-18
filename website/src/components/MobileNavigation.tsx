@@ -40,7 +40,7 @@ export function MobileNavigation() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="relative"
+        className="relative cursor-pointer"
         aria-label="Open navigation"
       >
         <List className="h-6 w-6 text-slate-500" />
@@ -59,6 +59,7 @@ export function MobileNavigation() {
             <button
               type="button"
               onClick={() => close()}
+              className="cursor-pointer"
               aria-label="Close navigation"
             >
               <X className="h-6 w-6 text-slate-500" />

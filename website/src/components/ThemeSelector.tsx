@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import {
   Label,
@@ -102,19 +101,11 @@ const themeToggleOrder = [
 
 export function ThemeToggle() {
   let { theme, setTheme } = useTheme()
-  let [mounted, setMounted] = useState(false)
   const icons = useThemeIcons()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div className="h-8 w-24" />
-  }
+  const activeTheme = theme ?? 'dark'
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+    <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" suppressHydrationWarning>
       {themeToggleOrder.map((option) => {
         const Icon = icons[option.value as keyof typeof icons]
 
@@ -123,9 +114,10 @@ export function ThemeToggle() {
             key={option.value}
             onClick={() => setTheme(option.value)}
             aria-label={option.label}
+            suppressHydrationWarning
             className={clsx(
               'cursor-pointer rounded-full p-1.5 transition-colors',
-              theme === option.value
+              activeTheme === option.value
                 ? 'bg-white shadow-sm dark:bg-slate-700'
                 : 'text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400',
             )}
@@ -133,7 +125,7 @@ export function ThemeToggle() {
             <Icon
               className={clsx(
                 'h-4 w-4',
-                theme === option.value
+                activeTheme === option.value
                   ? iconColors.toggleActive
                   : iconColors.toggleInactive,
               )}
@@ -149,37 +141,30 @@ export function ThemeSelector(
   props: React.ComponentPropsWithoutRef<typeof Listbox<'div'>>,
 ) {
   let { theme, setTheme } = useTheme()
-  let [mounted, setMounted] = useState(false)
   const icons = useThemeIcons()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div className="h-10 w-10 sm:h-6 sm:w-6" suppressHydrationWarning />
-  }
+  const activeTheme = theme ?? 'dark'
 
   const LightIcon = icons.light
   const DarkIcon = icons.dark
 
   return (
-    <Listbox as="div" value={theme} onChange={setTheme} {...props}>
+    <Listbox as="div" value={activeTheme} onChange={setTheme} {...props}>
       <Label className="sr-only">Theme</Label>
       <ListboxButton
         className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-md ring-1 shadow-black/5 ring-black/5 sm:h-6 sm:w-6 dark:bg-slate-600 dark:ring-brand-primary/50"
         aria-label="Theme"
+        suppressHydrationWarning
       >
         <LightIcon
           className={clsx(
             'h-4 w-4 dark:hidden',
-            theme === 'system' ? iconColors.buttonLightSystem : iconColors.buttonLight,
+            activeTheme === 'system' ? iconColors.buttonLightSystem : iconColors.buttonLight,
           )}
         />
         <DarkIcon
           className={clsx(
             'hidden h-4 w-4 dark:block',
-            theme === 'system' ? iconColors.buttonDarkSystem : iconColors.buttonDark,
+            activeTheme === 'system' ? iconColors.buttonDarkSystem : iconColors.buttonDark,
           )}
         />
       </ListboxButton>

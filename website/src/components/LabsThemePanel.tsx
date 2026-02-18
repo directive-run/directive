@@ -1,8 +1,7 @@
 'use client'
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo } from 'react'
 import clsx from 'clsx'
-import { DotsThreeVertical } from '@phosphor-icons/react'
 
 import {
   COLOR_PRESETS,
@@ -39,25 +38,18 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-              Theme Customization
-            </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {currentColor.name} &ndash; {currentColor.tagline}
-            </p>
-          </div>
-
-          {/* Mobile: dropdown trigger */}
-          <MobileResetDropdown onReset={handleReset} />
+      <div className="flex flex-col gap-3 min-[786px]:flex-row min-[786px]:items-start min-[786px]:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+            Theme Customization
+          </h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {currentColor.name} &ndash; {currentColor.tagline}
+          </p>
         </div>
-
-        {/* Desktop: visible button */}
         <button
           onClick={handleReset}
-          className="mt-3 hidden rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 sm:inline-flex dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="inline-flex shrink-0 cursor-pointer self-start rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           Reset All
         </button>
@@ -180,48 +172,3 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
   )
 })
 
-function MobileResetDropdown({ onReset }: { onReset: () => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (ref.current && !ref.current.contains(e.target as Node)) {
-      setOpen(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [open, handleClickOutside])
-
-  return (
-    <div ref={ref} className="relative sm:hidden">
-      <button
-        onClick={() => setOpen((prev) => !prev)}
-        aria-label="Theme options"
-        className="cursor-pointer rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-      >
-        <DotsThreeVertical className="h-5 w-5" weight="bold" />
-      </button>
-      {open && (
-        <div className="absolute right-0 z-20 mt-1 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
-          <button
-            onClick={() => {
-              onReset()
-              setOpen(false)
-            }}
-            className="w-full cursor-pointer px-3 py-2 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            Reset All
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}

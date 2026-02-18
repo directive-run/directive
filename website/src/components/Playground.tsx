@@ -45,7 +45,7 @@ function PlaygroundTabs({
           key={key}
           onClick={() => onChange(key)}
           className={clsx(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition',
+            'cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition',
             activeExample === key
               ? 'bg-brand-primary text-white'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
@@ -115,7 +115,7 @@ function FallbackEditor({
         <div className="flex gap-2">
           <button
             onClick={handleCopy}
-            className="rounded-md bg-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            className="cursor-pointer rounded-md bg-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
           >
             {copied ? 'Copied!' : 'Copy Code'}
           </button>
