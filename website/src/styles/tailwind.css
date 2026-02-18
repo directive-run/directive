@@ -183,3 +183,21 @@
 @utility animate-fade-out-down {
   animation: fade-out-down 0.4s ease-in-out both;
 }
+
+@utility newsletter-heading-gradient {
+  background-image: linear-gradient(
+    to right,
+    var(--brand-primary-600),
+    var(--color-slate-900, #0f172a),
+    var(--brand-accent-600)
+  );
+
+  .dark & {
+    background-image: linear-gradient(
+      to right,
+      var(--brand-primary-300),
+      white,
+      var(--brand-accent-200)
+    );
+  }
+}
