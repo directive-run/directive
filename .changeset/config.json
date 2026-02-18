@@ -18,17 +18,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": [
-    "directive-monorepo",
-    "directive-website",
-    "@directive-run/vite-plugin-api-proxy",
-    "@directive-run/example-counter",
-    "@directive-run/example-checkers",
-    "@directive-run/example-contact-form",
-    "@directive-run/example-eleven-up",
-    "@directive-run/example-feature-flags",
-    "@directive-run/example-multi-module",
-    "@directive-run/example-newsletter",
-    "@directive-run/example-schema-patterns"
-  ]
+  "ignore": []
 }
