@@ -93,13 +93,13 @@ export function ThemeOnboardingToast() {
         <div className="mt-2 flex gap-2">
           <button
             onClick={handleVote}
-            className="rounded-md bg-brand-primary px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-primary/90"
+            className="cursor-pointer rounded-md bg-brand-primary px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-primary/90"
           >
             Vote
           </button>
           <button
             onClick={dismiss}
-            className="rounded-md px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
           >
             Dismiss
           </button>
@@ -109,7 +109,7 @@ export function ThemeOnboardingToast() {
       {/* Close button */}
       <button
         onClick={dismiss}
-        className="flex-none text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+        className="cursor-pointer flex-none text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
         aria-label="Dismiss"
       >
         <X className="h-4 w-4" />
