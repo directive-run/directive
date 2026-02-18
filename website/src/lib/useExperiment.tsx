@@ -17,7 +17,8 @@ export const ExperimentsContext = createContext<ExperimentsContextValue>({
 
 /* ── Module-level snapshot cache ── */
 
-const emptyExperiments: Record<string, string> = {}
+const SAFE_KEY_RE = /^[a-z0-9-]+$/i
+const emptyExperiments: Record<string, string> = Object.freeze({})
 let cachedRaw: string | null = null
 let cachedExperiments: Record<string, string> = emptyExperiments
 
@@ -84,9 +85,13 @@ export function ExperimentsProvider({ children }: { children: React.ReactNode })
     const nextKeys = new Set<string>()
 
     for (const key of Object.keys(experiments)) {
+      if (!SAFE_KEY_RE.test(key)) {
+        continue
+      }
+
       const value = experiments[key]
       if (value) {
-        el.setAttribute(`data-${key}`, value)
+        el.setAttribute(`data-${key}`, value.slice(0, 100))
         nextKeys.add(key)
       }
     }

@@ -509,7 +509,7 @@ function SearchInner() {
         <span className="sr-only md:not-sr-only md:ml-2 md:text-slate-500 md:dark:text-slate-400">
           Search docs
         </span>
-        <kbd className="ml-auto hidden font-medium text-slate-400 md:block dark:text-slate-500">
+        <kbd className="ml-auto hidden font-medium text-slate-400 md:block dark:text-slate-500" suppressHydrationWarning>
           <kbd className="font-sans">{modifierKey}</kbd>
           <kbd className="font-sans">K</kbd>
         </kbd>

@@ -3,7 +3,6 @@
 import { Fragment, memo, useCallback, useState } from 'react'
 import { Highlight } from 'prism-react-renderer'
 import { Check, Copy } from '@phosphor-icons/react'
-import { useCodeTheme } from '@/lib/useCodeTheme'
 
 export interface CodeTab {
   filename: string
@@ -18,10 +17,8 @@ interface CodeTabsProps {
 
 export const CopyButton = memo(function CopyButton({
   code,
-  codeTheme = 'auto',
 }: {
   code: string
-  codeTheme?: string
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -35,21 +32,10 @@ export const CopyButton = memo(function CopyButton({
     }
   }, [code])
 
-  const baseClasses = 'cursor-pointer absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-xs opacity-50 transition hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary'
-
-  let themeClasses: string
-  if (codeTheme === 'light') {
-    themeClasses = 'bg-black/5 text-slate-500 hover:bg-black/10 hover:text-slate-700'
-  } else if (codeTheme === 'dark') {
-    themeClasses = 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300'
-  } else {
-    themeClasses = 'bg-black/5 text-slate-500 hover:bg-black/10 hover:text-slate-700 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-300'
-  }
-
   return (
     <button
       onClick={handleCopy}
-      className={`${baseClasses} ${themeClasses}`}
+      className="code-copy-btn cursor-pointer absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-xs opacity-50 transition hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
       aria-label={copied ? 'Copied!' : 'Copy code'}
     >
       {copied ? (
@@ -67,94 +53,18 @@ export const CopyButton = memo(function CopyButton({
   )
 })
 
-function getContainerClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'group relative overflow-hidden rounded-xl bg-slate-50 shadow-lg ring-1 ring-slate-200'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'group relative overflow-hidden rounded-xl bg-brand-code-bg shadow-lg ring-1 ring-slate-300/10'
-  }
-
-  return 'group relative overflow-hidden rounded-xl bg-slate-50 shadow-lg ring-1 ring-slate-200 dark:bg-brand-code-bg dark:ring-slate-300/10'
-}
-
-function getTitleBarClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'border-b border-slate-200 px-5 pt-3 pb-2 font-mono text-xs text-slate-500'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'border-b border-slate-700/50 px-5 pt-3 pb-2 font-mono text-xs text-slate-400'
-  }
-
-  return 'border-b border-slate-200 px-5 pt-3 pb-2 font-mono text-xs text-slate-500 dark:border-slate-700/50 dark:text-slate-400'
-}
-
-function getTabBarClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'flex border-b border-slate-200'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'flex border-b border-slate-700/50'
-  }
-
-  return 'flex border-b border-slate-200 dark:border-slate-700/50'
-}
-
-function getTabClasses(codeTheme: string, isActive: boolean): string {
-  const base = 'cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors'
-
-  if (isActive) {
-    if (codeTheme === 'light') {
-      return `${base} border-b-2 border-brand-primary text-slate-800`
-    }
-
-    if (codeTheme === 'dark') {
-      return `${base} border-b-2 border-brand-primary text-slate-200`
-    }
-
-    return `${base} border-b-2 border-brand-primary text-slate-800 dark:text-slate-200`
-  }
-
-  if (codeTheme === 'light') {
-    return `${base} text-slate-400 hover:text-slate-600`
-  }
-
-  if (codeTheme === 'dark') {
-    return `${base} text-slate-500 hover:text-slate-400`
-  }
-
-  return `${base} text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-400`
-}
-
-function getLineCountClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'ml-1.5 text-slate-400'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'ml-1.5 text-slate-600'
-  }
-
-  return 'ml-1.5 text-slate-400 dark:text-slate-600'
-}
-
 export const CodeBlock = memo(function CodeBlock({
   code,
   language,
-  codeTheme = 'auto',
 }: {
   code: string
   language: string
-  codeTheme?: string
 }) {
   const trimmed = code.trimEnd()
 
   return (
     <>
-      <CopyButton code={trimmed} codeTheme={codeTheme} />
+      <CopyButton code={trimmed} />
       <Highlight
         code={trimmed}
         language={language || 'text'}
@@ -186,7 +96,6 @@ export const CodeBlock = memo(function CodeBlock({
 
 export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const codeTheme = useCodeTheme()
 
   if (tabs.length === 0) {
     return null
@@ -197,16 +106,26 @@ export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
 
   return (
     <div
-      className={getContainerClasses(codeTheme)}
-      data-code-theme={codeTheme !== 'auto' ? codeTheme : undefined}
+      className="group relative overflow-hidden rounded-xl"
+      style={{
+        backgroundColor: 'var(--code-bg)',
+        boxShadow: '0 0 0 1px var(--code-ring), var(--code-shadow)',
+      }}
     >
       {/* Header: single title or tab bar */}
       {isSingle ? (
-        <div className={getTitleBarClasses(codeTheme)}>
+        <div
+          className="border-b px-5 pt-3 pb-2 font-mono text-xs"
+          style={{ borderColor: 'var(--code-title-border)', color: 'var(--code-title-text)' }}
+        >
           {activeTab.filename}
         </div>
       ) : (
-        <div className={getTabBarClasses(codeTheme)} data-testid="code-tabs-bar">
+        <div
+          className="flex border-b"
+          style={{ borderColor: 'var(--code-title-border)' }}
+          data-testid="code-tabs-bar"
+        >
           {tabs.map((tab, i) => {
             const isActive = i === activeIndex
             const lines = tab.code.trimEnd().split('\n').length
@@ -215,10 +134,15 @@ export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
               <button
                 key={tab.filename}
                 onClick={() => setActiveIndex(i)}
-                className={getTabClasses(codeTheme, isActive)}
+                className={
+                  isActive
+                    ? 'cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors border-b-2 border-brand-primary'
+                    : 'code-tab-inactive cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors'
+                }
+                style={isActive ? { color: 'var(--code-tab-active-text)' } : undefined}
               >
                 {tab.filename}
-                <span className={getLineCountClasses(codeTheme)}>
+                <span className="ml-1.5" style={{ color: 'var(--code-line-count)' }}>
                   ({lines})
                 </span>
               </button>
@@ -228,7 +152,7 @@ export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
       )}
 
       {/* Code block */}
-      <CodeBlock code={activeTab.code} language={activeTab.language} codeTheme={codeTheme} />
+      <CodeBlock code={activeTab.code} language={activeTab.language} />
     </div>
   )
 })
