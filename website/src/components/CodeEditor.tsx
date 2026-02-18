@@ -5,7 +5,6 @@ import clsx from 'clsx'
 import { Highlight } from 'prism-react-renderer'
 
 import { CopyButton } from './CodeTabs'
-import { useCodeTheme } from '@/lib/useCodeTheme'
 
 export interface CodeEditorTab {
   filename: string
@@ -30,80 +29,6 @@ function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   )
 }
 
-function getContainerClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'relative rounded-2xl bg-white ring-1 ring-slate-200 shadow-lg'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'relative rounded-2xl bg-[#0A101F]/80 ring-1 ring-white/10 backdrop-blur-sm'
-  }
-
-  return 'relative rounded-2xl bg-white ring-1 ring-slate-200 shadow-lg dark:bg-[#0A101F]/80 dark:ring-white/10 dark:shadow-none dark:backdrop-blur-sm'
-}
-
-function getTrafficLightsClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'h-2.5 w-auto stroke-slate-300'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'h-2.5 w-auto stroke-slate-500/30'
-  }
-
-  return 'h-2.5 w-auto stroke-slate-300 dark:stroke-slate-500/30'
-}
-
-function getTabBarClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'flex border-b border-slate-200'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'flex border-b border-slate-700/50'
-  }
-
-  return 'flex border-b border-slate-200 dark:border-slate-700/50'
-}
-
-function getTabClasses(codeTheme: string, isActive: boolean): string {
-  const base = 'cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors'
-
-  if (isActive) {
-    if (codeTheme === 'light') {
-      return `${base} border-b-2 border-brand-primary text-slate-800`
-    }
-
-    if (codeTheme === 'dark') {
-      return `${base} border-b-2 border-brand-primary text-slate-200`
-    }
-
-    return `${base} border-b-2 border-brand-primary text-slate-800 dark:text-slate-200`
-  }
-
-  if (codeTheme === 'light') {
-    return `${base} text-slate-400 hover:text-slate-600`
-  }
-
-  if (codeTheme === 'dark') {
-    return `${base} text-slate-500 hover:text-slate-400`
-  }
-
-  return `${base} text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-400`
-}
-
-function getLineNumberClasses(codeTheme: string): string {
-  if (codeTheme === 'light') {
-    return 'border-r border-slate-200 pr-4 font-mono text-slate-400 select-none'
-  }
-
-  if (codeTheme === 'dark') {
-    return 'border-r border-slate-300/5 pr-4 font-mono text-slate-600 select-none'
-  }
-
-  return 'border-r border-slate-200 pr-4 font-mono text-slate-400 select-none dark:border-slate-300/5 dark:text-slate-600'
-}
-
 export function CodeEditor({
   tabs,
   className,
@@ -111,7 +36,6 @@ export function CodeEditor({
   showTrafficLights = true,
 }: CodeEditorProps) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const codeTheme = useCodeTheme()
 
   if (tabs.length === 0) {
     return null
@@ -123,36 +47,59 @@ export function CodeEditor({
 
   return (
     <div
-      className={clsx(getContainerClasses(codeTheme), className)}
-      data-code-theme={codeTheme !== 'auto' ? codeTheme : undefined}
+      className={clsx('relative rounded-2xl', className)}
+      style={{
+        backgroundColor: 'var(--hero-editor-bg)',
+        boxShadow: '0 0 0 1px var(--hero-editor-ring), var(--hero-editor-shadow)',
+        backdropFilter: 'var(--hero-editor-backdrop)',
+      }}
     >
       <div className="pt-4 pl-4">
         {showTrafficLights && (
-          <TrafficLightsIcon className={getTrafficLightsClasses(codeTheme)} />
+          <TrafficLightsIcon
+            className="h-2.5 w-auto"
+            style={{ stroke: 'var(--code-traffic-stroke)' }}
+          />
         )}
 
         {/* Tab bar */}
-        <div className={clsx('mt-4 -ml-4', getTabBarClasses(codeTheme))}>
-          {tabs.map((tab, i) => (
-            <button
-              key={tab.filename}
-              onClick={() => setActiveIndex(i)}
-              className={getTabClasses(codeTheme, i === activeIndex)}
-            >
-              {tab.filename}
-            </button>
-          ))}
+        <div
+          className="mt-4 -ml-4 flex border-b"
+          style={{ borderColor: 'var(--code-title-border)' }}
+        >
+          {tabs.map((tab, i) => {
+            const isActive = i === activeIndex
+
+            return (
+              <button
+                key={tab.filename}
+                onClick={() => setActiveIndex(i)}
+                className={
+                  isActive
+                    ? 'cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors border-b-2 border-brand-primary'
+                    : 'code-tab-inactive cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors'
+                }
+                style={isActive ? { color: 'var(--code-tab-active-text)' } : undefined}
+              >
+                {tab.filename}
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {/* Code area */}
       <div className="relative">
-        <CopyButton code={code} codeTheme={codeTheme} />
+        <CopyButton code={code} />
         <div className="flex items-start px-1 pt-4 text-sm">
           {showLineNumbers && (
             <div
               aria-hidden="true"
-              className={getLineNumberClasses(codeTheme)}
+              className="border-r pr-4 font-mono select-none"
+              style={{
+                borderColor: 'var(--code-line-border)',
+                color: 'var(--code-line-text)',
+              }}
             >
               {lines.map((_, index) => (
                 <Fragment key={index}>

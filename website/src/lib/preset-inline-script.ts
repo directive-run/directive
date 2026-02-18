@@ -73,6 +73,6 @@ var fs=localStorage.getItem(FSK);
 if(fs){var fv=parseFloat(fs);if(!isNaN(fv))document.documentElement.style.fontSize=fv+'%';}
 var EK='${STORAGE_KEYS.EXPERIMENTS}';
 var ex=localStorage.getItem(EK);
-if(ex){try{var ep=JSON.parse(ex);if(ep&&typeof ep==='object'){for(var k in ep){if(ep.hasOwnProperty(k)&&ep[k])document.documentElement.setAttribute('data-'+k,ep[k]);}}}catch(e2){}}
+if(ex){try{var ep=JSON.parse(ex);if(ep&&typeof ep==='object'){for(var k in ep){if(ep.hasOwnProperty(k)&&typeof ep[k]==='string'&&/^[a-z0-9-]+$/i.test(k)){var v=ep[k].slice(0,100);if(v)document.documentElement.setAttribute('data-'+k,v);}}}}catch(e2){}}
 }catch(e){}})();`
 }

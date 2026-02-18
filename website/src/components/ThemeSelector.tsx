@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import {
   Label,
@@ -100,24 +101,28 @@ const themeToggleOrder = [
 ]
 
 export function ThemeToggle() {
-  let { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const icons = useThemeIcons()
-  const activeTheme = theme ?? 'dark'
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
+
+  const activeTheme = mounted ? theme : null
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" suppressHydrationWarning>
+    <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
       {themeToggleOrder.map((option) => {
         const Icon = icons[option.value as keyof typeof icons]
+        const isActive = activeTheme === option.value
 
         return (
           <button
             key={option.value}
             onClick={() => setTheme(option.value)}
             aria-label={option.label}
-            suppressHydrationWarning
             className={clsx(
               'cursor-pointer rounded-full p-1.5 transition-colors',
-              activeTheme === option.value
+              isActive
                 ? 'bg-white shadow-sm dark:bg-slate-700'
                 : 'text-slate-400 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-400',
             )}
@@ -125,7 +130,7 @@ export function ThemeToggle() {
             <Icon
               className={clsx(
                 'h-4 w-4',
-                activeTheme === option.value
+                isActive
                   ? iconColors.toggleActive
                   : iconColors.toggleInactive,
               )}
@@ -140,9 +145,13 @@ export function ThemeToggle() {
 export function ThemeSelector(
   props: React.ComponentPropsWithoutRef<typeof Listbox<'div'>>,
 ) {
-  let { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const icons = useThemeIcons()
-  const activeTheme = theme ?? 'dark'
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
+
+  const activeTheme = mounted ? (theme ?? 'system') : 'system'
 
   const LightIcon = icons.light
   const DarkIcon = icons.dark
@@ -153,7 +162,6 @@ export function ThemeSelector(
       <ListboxButton
         className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-md ring-1 shadow-black/5 ring-black/5 sm:h-6 sm:w-6 dark:bg-slate-600 dark:ring-brand-primary/50"
         aria-label="Theme"
-        suppressHydrationWarning
       >
         <LightIcon
           className={clsx(
