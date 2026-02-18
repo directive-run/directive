@@ -27,6 +27,8 @@ export function Prose<T extends React.ElementType = 'div'>({
         // code (inline)
         'prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-sm prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-brand-surface-raised',
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit',
+        // tables — scroll horizontally instead of blowing out layout
+        '[&_table]:block [&_table]:overflow-x-auto',
         // hr
         'dark:prose-hr:border-slate-800',
       )}

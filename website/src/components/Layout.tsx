@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
@@ -156,6 +156,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   let canUseVersionSelector = useCanUseVersionSelector()
   let canUseChat = useCanUseChat()
   let isDocsPage = pathname === '/' || pathname.startsWith('/docs')
+
+  // Scroll to top on navigation (Link clicks), but not on back/forward
+  let isPopStateRef = useRef(false)
+
+  useEffect(() => {
+    let handlePopState = () => {
+      isPopStateRef.current = true
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    if (isPopStateRef.current) {
+      isPopStateRef.current = false
+
+      return
+    }
+
+    window.scrollTo(0, 0)
+  }, [pathname])
 
   return (
     <div className="flex w-full flex-col">
