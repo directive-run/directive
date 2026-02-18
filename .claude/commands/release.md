@@ -4,108 +4,81 @@ description: Full release orchestration – version, build, test, publish to npm
 
 # Release
 
-Orchestrate a full release: version bumps, builds, tests, and npm publish.
+The release process is automated via GitHub Actions (`changesets/action`). You just need to create a changeset and push — CI handles the rest.
+
+## How It Works
+
+1. **You create a changeset** (`/changeset`) and push it to `main`
+2. **GitHub Action detects the changeset** and opens a "Version Packages" PR
+   - Bumps `package.json` versions
+   - Generates `CHANGELOG.md` entries
+   - Consumes the `.changeset/*.md` file
+3. **You merge the PR** when ready
+4. **GitHub Action publishes to npm** automatically on merge
+   - Builds all packages
+   - Runs typechecks and tests
+   - Publishes to npm with `--access public`
+   - Creates git tags
+
+Website auto-deploys via Vercel on any push to `main`.
 
 ## Step 1: Check for Pending Changesets
 
 ```bash
-pnpm changeset status
+ls .changeset/*.md 2>/dev/null | grep -v config.json
 ```
 
-If there are **no pending changesets**, stop and tell the user:
+If there are **no pending changeset files**, tell the user:
 
-> No pending changesets found. Run `/changeset` first to create one, then re-run `/release`.
+> No pending changesets. Run `/changeset` first to create one.
 
-## Step 2: Version Bump
+## Step 2: Review Changeset
 
-Run changeset version to bump package versions and generate changelogs:
+Read the changeset file and show:
+- Which packages will be bumped
+- Bump type (patch/minor/major)
+- The changelog summary
+
+## Step 3: Push to Main
+
+If the changeset isn't committed yet, commit it:
 
 ```bash
-pnpm changeset version
+git add .changeset/
+git commit -m "[chore] Add changeset for next release"
+git push
 ```
 
-Show which packages were bumped and to what versions.
+Then tell the user:
 
-## Step 3: Build All Packages
+> Changeset pushed. The GitHub Action will create a "Version Packages" PR shortly.
+> Check: https://github.com/directive-run/directive/pulls
+>
+> When you're ready to release, merge that PR. The action will publish to npm automatically.
+
+## Local Release (Fallback)
+
+Only use this if GitHub Actions isn't working or you need to publish manually.
 
 ```bash
-pnpm -r build
+pnpm changeset version        # Bump versions + generate changelogs
+pnpm -r build                 # Build all packages
+pnpm test -- --run             # Run tests
+npm whoami                     # Verify npm auth
+pnpm publish -r --access public  # Publish to npm
+pnpm changeset tag             # Create git tags
+git push --follow-tags         # Push commits + tags
 ```
 
-If the build fails, stop and report errors. Do not continue to publish.
+## CI Pipeline Details
 
-## Step 4: Run Tests
+**File:** `.github/workflows/release.yml`
 
-```bash
-pnpm test -- --run
-```
+Triggers on push to `main`. Steps:
+1. `pnpm install --frozen-lockfile`
+2. `pnpm -r --filter './packages/*' build`
+3. `pnpm -r --filter './packages/*' typecheck`
+4. `pnpm test -- --run`
+5. `changesets/action` — creates PR or publishes
 
-Note: `--run` prevents Vitest from entering watch mode. If tests fail, stop and report failures. Do not continue to publish.
-
-## Step 5: Review Changes
-
-Show the user:
-- Version diffs (`git diff packages/*/package.json` focusing on version fields)
-- Generated changelog entries
-- List of packages that will be published
-
-**Use AskUserQuestion** to confirm:
-- "Publish these versions to npm?" (Yes / No, abort)
-
-If the user aborts, stop. Changes remain uncommitted so they can adjust.
-
-## Step 6: Create Release Commit
-
-Stage only the files that changesets modified (version bumps + changelogs):
-
-```bash
-git add packages/*/package.json packages/*/CHANGELOG.md .changeset/
-```
-
-Show `git diff --cached --stat` so the user can verify what will be committed.
-
-Then commit following project conventions. **Do NOT include Co-Authored-By or AI attribution** (per `/commit` guidelines):
-
-```bash
-git commit -m "chore: release $(date +%Y-%m-%d)"
-```
-
-## Step 7: Publish to npm
-
-First verify npm auth:
-
-```bash
-npm whoami 2>/dev/null || echo "ERROR: Not logged in to npm – run npm login first"
-```
-
-If not authenticated, stop and instruct the user to run `npm login`.
-
-Then publish:
-
-```bash
-pnpm changeset publish
-```
-
-Report for each package:
-- Package name
-- Published version
-- npm URL (`https://www.npmjs.com/package/@directive-run/<name>`)
-- Any errors
-
-## Step 8: Create Git Tags
-
-```bash
-pnpm changeset tag
-```
-
-This creates git tags like `@directive-run/core@0.2.0` for each published package.
-
-## Step 9: Post-Release Checklist
-
-Show the user:
-
-> **Post-release steps:**
-> 1. Push commits and tags: `git push --follow-tags`
-> 2. Create GitHub release (if desired)
-> 3. Website auto-redeploys via Vercel on push to main (API docs + embeddings regenerated automatically)
-> 4. Announce on social channels
+**Required secrets:** `NPM_TOKEN`, `GITHUB_TOKEN`

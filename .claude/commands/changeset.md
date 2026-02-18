@@ -4,71 +4,118 @@ description: Create a changeset for unreleased changes
 
 # Changeset
 
-Create a changeset file describing unreleased changes for versioning and changelogs.
+Create an accurate changeset by analyzing actual package changes since the last version bump.
 
-## Step 1: List Packages
+**IMPORTANT:** Only `packages/` changes matter. Ignore `website/`, `docs/`, `.claude/`, config files, etc. — those are not published to npm.
 
-Read all `packages/*/package.json` files to list every package name and current version.
+## Step 1: Detect Last Version Bump
 
-Show the two **fixed groups** (packages in a fixed group always share the same version):
+Find the most recent version bump commit:
+```bash
+git log --oneline --all --grep="Bump\|bump\|version\|0\.\|1\." -- packages/*/package.json | head -5
+```
 
-**Core + Frameworks:**
-- `@directive-run/core`
-- `@directive-run/react`
-- `@directive-run/vue`
-- `@directive-run/svelte`
-- `@directive-run/solid`
-- `@directive-run/lit`
+If unclear, read `.changeset/config.json` for the fixed groups, then check current versions:
+```bash
+for f in packages/*/package.json; do echo "$(basename $(dirname $f)): $(jq -r '.name + " " + .version' $f)"; done
+```
+
+Also check for any npm version tags:
+```bash
+git tag --sort=-v:refname | head -10
+```
+
+## Step 2: Analyze Package Changes
+
+Run a diff from the last version bump to HEAD, scoped to `packages/` source code only (not READMEs or tests):
+
+```bash
+git log --oneline <last-bump-hash>..HEAD -- packages/*/src/
+```
+
+Then get the file-level diff for source files:
+```bash
+git diff <last-bump-hash>..HEAD --stat -- packages/*/src/
+```
+
+For significant changes, read the actual diff to understand new/changed exports:
+```bash
+git diff <last-bump-hash>..HEAD -- packages/core/src/ packages/react/src/ packages/ai/src/
+```
+
+**Ignore these entirely** — they don't affect the published package:
+- `website/` (docs site, not published)
+- `packages/*/README.md` (docs only, not a code change)
+- `packages/*/__tests__/` or `packages/*/test/` (tests, not shipped)
+- `.claude/`, `.changeset/`, root config files
+
+## Step 3: Classify Changes Per Package
+
+For each affected package, classify the **source code** changes:
+- **Features** (new exports, new APIs, new options) → **minor** bump
+- **Bug fixes** (behavior corrections, edge case fixes) → **patch** bump
+- **Breaking changes** (removed/renamed exports, changed signatures) → **major** bump
+- **Internal only** (refactors with no public API change) → **patch** bump
+
+The highest classification wins per group:
+- Any breaking change in any package in the group → major for the group
+- Any new feature in any package in the group → minor for the group
+- Only fixes/internal → patch for the group
+
+## Step 4: Present Findings
+
+Show the user a summary of detected **source code** changes per package group:
+
+**Core + Frameworks** (fixed group — all bump together):
+- `@directive-run/core`: [list actual src/ changes found]
+- `@directive-run/react`: [list actual src/ changes found]
+- (etc. — only list packages that actually changed)
 
 **AI:**
-- `@directive-run/ai`
+- `@directive-run/ai`: [list actual src/ changes found]
 
-**Ignored (not versioned by changesets):** `directive`, `vite-plugin-api-proxy`. These are excluded from changesets and must be versioned manually if needed.
+**Recommended bump:** [patch/minor/major] because [reason]
 
-## Step 2: Select Packages
-
-**Use AskUserQuestion:** Which group or individual packages changed?
-
-Options:
-- Core + Frameworks (all 6 packages)
-- AI (1 package)
-- Both groups
-- Individual packages (let user specify)
-
-## Step 3: Select Bump Type
-
-**Use AskUserQuestion:** What type of version bump?
-
-Options:
-- **patch** (0.1.0 -> 0.1.1) – Bug fixes, docs, internal changes
-- **minor** (0.1.0 -> 0.2.0) – New features, non-breaking additions
-- **major** (0.1.0 -> 1.0.0) – Breaking changes
-
-Note: Fixed group packages all receive the same bump.
-
-## Step 4: Summary
-
-**Use AskUserQuestion:** Ask for a human-readable summary of the changes (1-3 sentences).
+**Use AskUserQuestion** to confirm:
+- The bump type (with your recommendation marked)
+- Whether the detected changes are complete (user may know about unlisted changes)
 
 ## Step 5: Generate Changeset
 
-Generate a unique changeset filename (adjective-noun-verb pattern, e.g., `funny-dogs-dance.md`).
+Generate a unique filename (adjective-noun-verb, e.g., `bright-foxes-leap.md`).
 
-Write the file to `.changeset/<name>.md`:
+Write **one** `.changeset/<name>.md` file:
 
 ```markdown
 ---
 "@directive-run/core": minor
-"@directive-run/react": minor
+"@directive-run/ai": patch
 ---
 
-Summary of changes here.
+Add snapshotEvents API for event-driven state snapshots. Simplify single-module system creation across all framework adapters.
 ```
 
-For fixed groups, list every package in the group even though they share versions.
+**How fixed groups work:**
+- List only ONE package from the fixed group (e.g., `@directive-run/core`)
+- Changesets automatically bumps ALL packages in the group (core, react, vue, svelte, solid, lit) to the same version
+- Do NOT list every package in the group — that's redundant and confusing
+- AI is its own group, so add a separate entry if it also changed
+
+**Summary rules:**
+- User-facing changelog text only (no internal jargon, no review references)
+- Focus on what npm consumers get: new APIs, fixed bugs, improved behavior
+- Use imperative mood: "Add X", "Fix Y", "Improve Z"
+- 1-3 sentences max
 
 ## Step 6: Confirm
 
-Show the created changeset file path and contents. Remind the user:
+Show the created changeset and remind the user:
 
-> Run `/release` when ready to publish, or create more changesets for additional changes.
+> Changeset created. Run `/release` when ready to version bump + publish to npm.
+
+## Fixed Groups Reference
+
+From `.changeset/config.json`:
+- **Core group** (all share one version): core, react, vue, svelte, solid, lit
+- **AI group** (independent version): ai
+- **Not managed by changesets:** directive, vite-plugin-api-proxy
