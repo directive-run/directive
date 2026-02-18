@@ -122,7 +122,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
         <button
           onClick={() => setIsAnimating(!isAnimating)}
           className={clsx(
-            'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition',
+            'flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition',
             isAnimating
               ? 'bg-brand-primary text-white hover:bg-brand-primary-600'
               : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'

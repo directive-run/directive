@@ -1,15 +1,11 @@
 'use client'
 
-import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from 'react'
 
 import { STORAGE_KEYS, safeGetItem } from '@/lib/storage-keys'
 
 /** Custom event name fired when any experiment assignment changes. */
 export const EXPERIMENT_CHANGE_EVENT = 'directive-experiment-change'
-
-/** useLayoutEffect on client, useEffect on server (avoids SSR warning). */
-const useIsomorphicLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 interface ExperimentsContextValue {
   experiments: Record<string, string>
@@ -19,47 +15,91 @@ export const ExperimentsContext = createContext<ExperimentsContextValue>({
   experiments: {},
 })
 
-function readExperiments(): Record<string, string> {
+/* ── Module-level snapshot cache ── */
+
+const emptyExperiments: Record<string, string> = {}
+let cachedRaw: string | null = null
+let cachedExperiments: Record<string, string> = emptyExperiments
+
+function getSnapshot(): Record<string, string> {
   const raw = safeGetItem(STORAGE_KEYS.EXPERIMENTS)
+
   if (!raw) {
-    return {}
+    cachedRaw = null
+    cachedExperiments = emptyExperiments
+
+    return emptyExperiments
+  }
+
+  // Same raw string → return stable reference (avoids re-renders)
+  if (raw === cachedRaw) {
+    return cachedExperiments
   }
 
   try {
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      return parsed as Record<string, string>
+      cachedRaw = raw
+      cachedExperiments = parsed as Record<string, string>
+
+      return cachedExperiments
     }
   } catch {
     // fall through
   }
 
-  return {}
+  cachedRaw = null
+  cachedExperiments = emptyExperiments
+
+  return emptyExperiments
+}
+
+function getServerSnapshot(): Record<string, string> {
+  return emptyExperiments
+}
+
+function subscribe(callback: () => void): () => void {
+  window.addEventListener(EXPERIMENT_CHANGE_EVENT, callback)
+
+  return () => {
+    window.removeEventListener(EXPERIMENT_CHANGE_EVENT, callback)
+  }
 }
 
 /**
- * Reads all experiment assignments from localStorage on mount (before paint)
- * and re-reads whenever the labs panel fires a change event.
+ * Reads all experiment assignments from localStorage synchronously during
+ * render via useSyncExternalStore — first client render has real values.
  *
- * Uses useLayoutEffect so experiments resolve before the browser paints —
- * child components never see the wrong values.
+ * Also syncs experiment values to <html> data attributes so CSS selectors
+ * and the pre-hydration inline script can read them.
  */
 export function ExperimentsProvider({ children }: { children: React.ReactNode }) {
-  const [experiments, setExperiments] = useState<Record<string, string>>({})
+  const experiments = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
-  useIsomorphicLayoutEffect(() => {
-    setExperiments(readExperiments())
+  // Sync experiments to <html> data attributes for CSS / inline script
+  const prevKeysRef = useRef<Set<string>>(new Set())
 
-    function onExperimentChange() {
-      setExperiments(readExperiments())
+  useEffect(() => {
+    const el = document.documentElement
+    const nextKeys = new Set<string>()
+
+    for (const key of Object.keys(experiments)) {
+      const value = experiments[key]
+      if (value) {
+        el.setAttribute(`data-${key}`, value)
+        nextKeys.add(key)
+      }
     }
 
-    window.addEventListener(EXPERIMENT_CHANGE_EVENT, onExperimentChange)
-
-    return () => {
-      window.removeEventListener(EXPERIMENT_CHANGE_EVENT, onExperimentChange)
+    // Remove attributes for experiments that were removed
+    for (const key of prevKeysRef.current) {
+      if (!nextKeys.has(key)) {
+        el.removeAttribute(`data-${key}`)
+      }
     }
-  }, [])
+
+    prevKeysRef.current = nextKeys
+  }, [experiments])
 
   return (
     <ExperimentsContext.Provider value={{ experiments }}>

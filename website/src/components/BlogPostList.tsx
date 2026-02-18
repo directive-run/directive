@@ -92,7 +92,7 @@ export function BlogPostList() {
           </p>
           <button
             onClick={() => setCategory('')}
-            className="mt-3 text-sm font-medium text-brand-primary hover:text-brand-primary/80 dark:text-brand-primary-400 dark:hover:text-brand-primary-400/80"
+            className="mt-3 cursor-pointer text-sm font-medium text-brand-primary hover:text-brand-primary/80 dark:text-brand-primary-400 dark:hover:text-brand-primary-400/80"
           >
             View all posts
           </button>
