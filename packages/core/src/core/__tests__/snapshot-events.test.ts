@@ -5,7 +5,7 @@ import { createModule, createSystem, t } from "../../index.js";
 // Helpers
 // ============================================================================
 
-function createTestModule(options?: { snapshotEvents?: string[] }) {
+function createTestModule(options?: { snapshotEvents?: ("increment" | "setLabel" | "reset")[] }) {
 	return createModule("test", {
 		schema: {
 			facts: {
@@ -256,7 +256,8 @@ describe("snapshotEvents", () => {
 			events: {
 				increment: (facts) => { facts.count = (facts.count as number) + 1; },
 			},
-			snapshotEvents: ["increment", "nonExistentEvent"],
+			// @ts-expect-error — intentionally passing invalid event name to test dev warning
+		snapshotEvents: ["increment", "nonExistentEvent"],
 		});
 
 		expect(warnSpy).toHaveBeenCalledWith(
