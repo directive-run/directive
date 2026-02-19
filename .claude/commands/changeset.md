@@ -98,8 +98,10 @@ Add snapshotEvents API for event-driven state snapshots. Simplify single-module 
 **How fixed groups work:**
 - List only ONE package from the fixed group (e.g., `@directive-run/core`)
 - Changesets automatically bumps ALL packages in the group (core, react, vue, svelte, solid, lit) to the same version
-- Do NOT list every package in the group — that's redundant and confusing
+- Do NOT list every package in the group just for the version bump &ndash; that's redundant
 - AI is its own group, so add a separate entry if it also changed
+
+**Per-package changelogs:** Fixed groups share version numbers, but changelog entries only appear for packages explicitly listed in the changeset file. If an adapter (react, vue, etc.) has its own meaningful changes, list it explicitly alongside `core` so it gets its own changelog entry. Example: if `core` adds a new API and `react` adds a new hook, list both `@directive-run/core` and `@directive-run/react`. Packages with no changes of their own don't need listing &ndash; they'll still get the version bump from the group.
 
 **Summary rules:**
 - User-facing changelog text only (no internal jargon, no review references)
