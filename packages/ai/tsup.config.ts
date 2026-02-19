@@ -7,6 +7,7 @@ export default defineConfig({
 		anthropic: "src/adapters/anthropic.ts",
 		openai: "src/adapters/openai.ts",
 		ollama: "src/adapters/ollama.ts",
+		gemini: "src/adapters/gemini.ts",
 	},
 	format: ["esm", "cjs"],
 	dts: true,

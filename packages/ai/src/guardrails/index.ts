@@ -107,13 +107,13 @@ export {
   createToolGuardrail,
   createLengthGuardrail,
   createContentFilterGuardrail,
-} from "../index.js";
+} from "../builtin-guardrails.js";
 
 // ============================================================================
 // Output Sanitization
 // ============================================================================
 
-import type { GuardrailFn, OutputGuardrailData, GuardrailResult } from "../index.js";
+import type { GuardrailFn, OutputGuardrailData, GuardrailResult } from "../types.js";
 import { detectPromptInjection, STRICT_INJECTION_PATTERNS } from "./prompt-injection.js";
 
 /** Options for output sanitizer */

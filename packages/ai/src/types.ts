@@ -57,12 +57,25 @@ export type AgentRunner = <T = unknown>(
   options?: RunOptions
 ) => Promise<RunResult<T>>;
 
+/** Callback-based streaming run function (e.g. for SSE-based LLM APIs) */
+export type StreamingCallbackRunner = (
+  agent: AgentLike,
+  input: string,
+  callbacks: {
+    onToken?: (token: string) => void;
+    onToolStart?: (tool: string, id: string, args: string) => void;
+    onToolEnd?: (tool: string, id: string, result: string) => void;
+    onMessage?: (message: Message) => void;
+    signal?: AbortSignal;
+  },
+) => Promise<RunResult<unknown>>;
+
 /** Run options */
 export interface RunOptions {
   maxTurns?: number;
   signal?: AbortSignal;
   onMessage?: (message: Message) => void;
-  onToolCall?: (toolCall: ToolCall) => void;
+  onToolCall?: (toolCall: ToolCall) => void | Promise<void>;
 }
 
 // ============================================================================
@@ -326,6 +339,101 @@ export interface OrchestratorLifecycleHooks {
   }) => void;
 }
 
+/** Lifecycle hooks for multi-agent orchestrator observability */
+export interface MultiAgentLifecycleHooks {
+  onAgentStart?: (event: {
+    agentId: string;
+    agentName: string;
+    input: string;
+    timestamp: number;
+  }) => void;
+  onAgentComplete?: (event: {
+    agentId: string;
+    agentName: string;
+    input: string;
+    output: unknown;
+    tokenUsage: number;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
+  onAgentError?: (event: {
+    agentId: string;
+    agentName: string;
+    input: string;
+    error: Error;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
+  onGuardrailCheck?: (event: {
+    agentId: string;
+    guardrailName: string;
+    guardrailType: "input" | "output" | "toolCall";
+    passed: boolean;
+    reason?: string;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
+  onAgentRetry?: (event: {
+    agentId: string;
+    agentName: string;
+    input: string;
+    attempt: number;
+    error: Error;
+    delayMs: number;
+    timestamp: number;
+  }) => void;
+  onHandoff?: (request: { id: string; fromAgent: string; toAgent: string; input: string; requestedAt: number }) => void;
+  onHandoffComplete?: (result: { request: { id: string; fromAgent: string; toAgent: string }; completedAt: number }) => void;
+  onPatternStart?: (event: {
+    patternId: string;
+    patternType: "parallel" | "sequential" | "supervisor" | "dag";
+    input: string;
+    timestamp: number;
+  }) => void;
+  onPatternComplete?: (event: {
+    patternId: string;
+    patternType: "parallel" | "sequential" | "supervisor" | "dag";
+    durationMs: number;
+    timestamp: number;
+    error?: Error;
+  }) => void;
+  onDagNodeStart?: (event: {
+    patternId: string;
+    nodeId: string;
+    agentId: string;
+    timestamp: number;
+  }) => void;
+  onDagNodeComplete?: (event: {
+    patternId: string;
+    nodeId: string;
+    agentId: string;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
+  onDagNodeError?: (event: {
+    patternId: string;
+    nodeId: string;
+    agentId: string;
+    error: Error;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
+  onDagNodeSkipped?: (event: {
+    patternId: string;
+    nodeId: string;
+    agentId: string;
+    reason: string;
+    timestamp: number;
+  }) => void;
+  onHealthChange?: (event: {
+    agentId: string;
+    oldScore: number;
+    newScore: number;
+    timestamp: number;
+  }) => void;
+  onReroute?: (event: RerouteEvent) => void;
+}
+
 // ============================================================================
 // Error Types
 // ============================================================================
@@ -430,13 +538,334 @@ export const APPROVAL_KEY = "__approval" as const;
 export const CONVERSATION_KEY = "__conversation" as const;
 export const TOOL_CALLS_KEY = "__toolCalls" as const;
 
+// ============================================================================
+// DAG Execution Types (Multi-Agent)
+// ============================================================================
+
+/** Status of a DAG node during execution */
+export type DagNodeStatus = "pending" | "ready" | "running" | "completed" | "error" | "skipped";
+
+/** Execution context available to DAG node callbacks */
+export interface DagExecutionContext {
+  /** Original input to the DAG */
+  input: string;
+  /** Outputs keyed by node ID (populated as nodes complete) */
+  outputs: Record<string, unknown>;
+  /** Statuses keyed by node ID */
+  statuses: Record<string, DagNodeStatus>;
+  /** Error messages keyed by node ID */
+  errors: Record<string, string>;
+  /** Full RunResult keyed by node ID */
+  results: Record<string, RunResult<unknown>>;
+}
+
+/** A node in a DAG execution pattern */
+export interface DagNode {
+  /** Registered agent ID to run for this node */
+  agent: string;
+  /** Upstream node IDs this node depends on */
+  deps?: string[];
+  /** Conditional edge — evaluated when deps are met. Default: unconditional */
+  when?: (context: DagExecutionContext) => boolean;
+  /** Build input string for this node's agent. Default: JSON.stringify upstream outputs */
+  transform?: (context: DagExecutionContext) => string;
+  /** Per-node timeout (ms) */
+  timeout?: number;
+  /** Tiebreaker when multiple nodes are ready (higher = first). Default: 0 */
+  priority?: number;
+}
+
+/** DAG execution pattern — nodes are agents, edges are reactive conditions */
+export interface DagPattern<T = unknown> {
+  type: "dag";
+  /** Nodes keyed by node ID */
+  nodes: Record<string, DagNode>;
+  /** Merge all node outputs into the final result */
+  merge: (context: DagExecutionContext) => T | Promise<T>;
+  /** Overall DAG timeout (ms) */
+  timeout?: number;
+  /** Maximum nodes running concurrently. Default: Infinity */
+  maxConcurrent?: number;
+  /** Error handling strategy. Default: "fail" */
+  onNodeError?: "fail" | "skip-downstream" | "continue";
+}
+
+// ============================================================================
+// Debug Timeline Types
+// ============================================================================
+
+/** All debug event types */
+export type DebugEventType =
+  | "agent_start"
+  | "agent_complete"
+  | "agent_error"
+  | "agent_retry"
+  | "guardrail_check"
+  | "constraint_evaluate"
+  | "resolver_start"
+  | "resolver_complete"
+  | "resolver_error"
+  | "approval_request"
+  | "approval_response"
+  | "handoff_start"
+  | "handoff_complete"
+  | "pattern_start"
+  | "pattern_complete"
+  | "dag_node_update";
+
+/** Base debug event */
+export interface DebugEventBase {
+  id: number;
+  type: DebugEventType;
+  timestamp: number;
+  agentId?: string;
+  snapshotId: number | null;
+}
+
+/** Agent start event */
+export interface AgentStartEvent extends DebugEventBase {
+  type: "agent_start";
+  agentId: string;
+  inputLength: number;
+}
+
+/** Agent complete event */
+export interface AgentCompleteEvent extends DebugEventBase {
+  type: "agent_complete";
+  agentId: string;
+  outputLength: number;
+  totalTokens: number;
+  durationMs: number;
+}
+
+/** Agent error event */
+export interface AgentErrorEvent extends DebugEventBase {
+  type: "agent_error";
+  agentId: string;
+  errorMessage: string;
+  durationMs: number;
+}
+
+/** Agent retry event */
+export interface AgentRetryEvent extends DebugEventBase {
+  type: "agent_retry";
+  agentId: string;
+  attempt: number;
+  errorMessage: string;
+  delayMs: number;
+}
+
+/** Guardrail check event */
+export interface GuardrailCheckEvent extends DebugEventBase {
+  type: "guardrail_check";
+  guardrailName: string;
+  guardrailType: "input" | "output" | "toolCall";
+  passed: boolean;
+  reason?: string;
+  durationMs: number;
+}
+
+/** Constraint evaluate event */
+export interface ConstraintEvaluateEvent extends DebugEventBase {
+  type: "constraint_evaluate";
+  constraintId: string;
+  fired: boolean;
+}
+
+/** Resolver start event */
+export interface ResolverStartEvent extends DebugEventBase {
+  type: "resolver_start";
+  resolverId: string;
+  requirementType: string;
+}
+
+/** Resolver complete event */
+export interface ResolverCompleteEvent extends DebugEventBase {
+  type: "resolver_complete";
+  resolverId: string;
+  durationMs: number;
+}
+
+/** Resolver error event */
+export interface ResolverErrorEvent extends DebugEventBase {
+  type: "resolver_error";
+  resolverId: string;
+  errorMessage: string;
+  durationMs: number;
+}
+
+/** Approval request event */
+export interface ApprovalRequestEvent extends DebugEventBase {
+  type: "approval_request";
+  requestId: string;
+  approvalType: "tool_call" | "output" | "handoff";
+}
+
+/** Approval response event */
+export interface ApprovalResponseEvent extends DebugEventBase {
+  type: "approval_response";
+  requestId: string;
+  approved: boolean;
+  reason?: string;
+}
+
+/** Handoff start event */
+export interface HandoffStartEvent extends DebugEventBase {
+  type: "handoff_start";
+  fromAgent: string;
+  toAgent: string;
+}
+
+/** Handoff complete event */
+export interface HandoffCompleteEvent extends DebugEventBase {
+  type: "handoff_complete";
+  fromAgent: string;
+  toAgent: string;
+  durationMs: number;
+}
+
+/** Pattern start event */
+export interface PatternStartEvent extends DebugEventBase {
+  type: "pattern_start";
+  patternId: string;
+  patternType: "parallel" | "sequential" | "supervisor" | "dag";
+}
+
+/** Pattern complete event */
+export interface PatternCompleteEvent extends DebugEventBase {
+  type: "pattern_complete";
+  patternId: string;
+  patternType: "parallel" | "sequential" | "supervisor" | "dag";
+  durationMs: number;
+  error?: string;
+}
+
+/** DAG node update event */
+export interface DagNodeUpdateEvent extends DebugEventBase {
+  type: "dag_node_update";
+  nodeId: string;
+  status: DagNodeStatus;
+}
+
+/** Union of all debug event types */
+export type DebugEvent =
+  | AgentStartEvent
+  | AgentCompleteEvent
+  | AgentErrorEvent
+  | AgentRetryEvent
+  | GuardrailCheckEvent
+  | ConstraintEvaluateEvent
+  | ResolverStartEvent
+  | ResolverCompleteEvent
+  | ResolverErrorEvent
+  | ApprovalRequestEvent
+  | ApprovalResponseEvent
+  | HandoffStartEvent
+  | HandoffCompleteEvent
+  | PatternStartEvent
+  | PatternCompleteEvent
+  | DagNodeUpdateEvent;
+
+// ============================================================================
+// Self-Healing Types
+// ============================================================================
+
+/** Health state for an agent stored in facts */
+export interface AgentHealthState {
+  circuitState: "CLOSED" | "OPEN" | "HALF_OPEN";
+  healthScore: number;
+  lastUpdated: number;
+}
+
+/** Reroute event fired when an agent is rerouted */
+export interface RerouteEvent {
+  originalAgent: string;
+  reroutedTo: string;
+  reason: string;
+  timestamp: number;
+}
+
+/** Health monitor configuration */
+export interface HealthMonitorConfig {
+  /** Rolling window for metrics (ms). Default: 60000 */
+  windowMs?: number;
+  /** Weights for health score computation */
+  weights?: {
+    /** Weight for success rate (0-1). Default: 0.5 */
+    successRate?: number;
+    /** Weight for latency (0-1). Default: 0.3 */
+    latency?: number;
+    /** Weight for circuit state (0-1). Default: 0.2 */
+    circuitState?: number;
+  };
+  /** Max latency considered "normal" (ms). Default: 5000 */
+  maxNormalLatencyMs?: number;
+}
+
+/** Self-healing configuration for single-agent orchestrator */
+export interface SelfHealingConfig {
+  /** Fallback runners to try in order when primary CB is open */
+  fallbackRunners?: AgentRunner[];
+  /** Fallback agent to try when all runners fail */
+  fallbackAgent?: AgentLike;
+  /** Circuit breaker config for primary runner */
+  circuitBreaker?: CircuitBreakerConfig;
+  /** Health score below which to trigger reroute. Default: 30 */
+  healthThreshold?: number;
+  /** Behavior when all fallbacks exhausted */
+  degradation?: "reject" | "fallback-response";
+  /** Static response to return when degradation is "fallback-response" */
+  fallbackResponse?: unknown;
+  /** Callback when reroute occurs */
+  onReroute?: (event: RerouteEvent) => void;
+}
+
+/** Self-healing configuration for multi-agent orchestrator */
+export interface MultiAgentSelfHealingConfig {
+  /** Default circuit breaker config for agents without their own */
+  circuitBreakerDefaults?: CircuitBreakerConfig;
+  /** Health score below which to trigger reroute. Default: 30 */
+  healthThreshold?: number;
+  /** Explicit equivalency groups (group name → agent IDs) */
+  equivalencyGroups?: Record<string, string[]>;
+  /** Use capability matching for implicit equivalency. Default: true */
+  useCapabilities?: boolean;
+  /** Strategy for selecting equivalent agent */
+  selectionStrategy?: "healthiest" | "round-robin";
+  /** Behavior when all equivalents are down */
+  degradation?: "reject" | "fallback-response";
+  /** Static response for "fallback-response" degradation */
+  fallbackResponse?: unknown;
+  /** Callback when reroute occurs */
+  onReroute?: (event: RerouteEvent) => void;
+  /** Callback when agent health changes */
+  onHealthChange?: (event: { agentId: string; oldScore: number; newScore: number }) => void;
+  /** Health monitor configuration */
+  healthMonitor?: HealthMonitorConfig;
+}
+
+/** Circuit breaker config type (re-exported for convenience) */
+export interface CircuitBreakerConfig {
+  /** Number of failures before opening. Default: 5 */
+  failureThreshold?: number;
+  /** Time before trying half-open (ms). Default: 30000 */
+  resetTimeoutMs?: number;
+  /** Successes needed to close from half-open. Default: 2 */
+  halfOpenSuccesses?: number;
+  /** State change callback */
+  onStateChange?: (from: string, to: string) => void;
+}
+
+/** Internal key for health state in coordinator facts */
+export const HEALTH_KEY = "__agentHealth" as const;
+
 /** Bridge schema for orchestrator (internal plumbing — types cast to bypass t.object constraint) */
 export const orchestratorBridgeSchema = {
   facts: {
     [AGENT_KEY]: t.object() as unknown as SchemaType<AgentState>,
     [APPROVAL_KEY]: t.object() as unknown as SchemaType<ApprovalState>,
-    [CONVERSATION_KEY]: t.object() as unknown as SchemaType<Message[]>,
-    [TOOL_CALLS_KEY]: t.object() as unknown as SchemaType<ToolCall[]>,
+    [CONVERSATION_KEY]: t.array() as unknown as SchemaType<Message[]>,
+    [TOOL_CALLS_KEY]: t.array() as unknown as SchemaType<ToolCall[]>,
   },
   derivations: {},
   events: {},

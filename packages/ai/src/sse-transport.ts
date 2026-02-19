@@ -1,13 +1,17 @@
 /**
- * SSE Transport — Wrap a Directive AgentStack token stream into an HTTP
- * Server-Sent Events response.
+ * SSE Transport — Wrap a streamable source into an HTTP Server-Sent Events
+ * response.
  *
  * Framework-agnostic: uses the WinterCG `Response` constructor (Node 18+,
  * Deno, Bun, Cloudflare Workers, Next.js).
  *
  * @example
  * ```typescript
- * import { createSSETransport, createAgentStack } from '@directive-run/ai';
+ * import {
+ *   createSSETransport,
+ *   createAgentOrchestrator,
+ *   createStreamingRunner,
+ * } from '@directive-run/ai';
  *
  * const transport = createSSETransport({
  *   maxResponseChars: 10_000,
@@ -19,12 +23,29 @@
  * // Next.js route handler
  * export async function POST(req: Request) {
  *   const { message } = await req.json();
- *   return transport.toResponse(stack, 'docs-qa', message);
+ *   return transport.toResponse(streamable, 'docs-qa', message);
  * }
  * ```
  */
 
-import type { AgentStack, TokenStream } from "./stack.js";
+// ============================================================================
+// Structural types — describe only what SSE transport actually needs
+// ============================================================================
+
+/** Async iterable of string tokens with result promise and abort */
+interface SSETokenStream extends AsyncIterable<string> {
+  result: Promise<unknown>;
+  abort(): void;
+}
+
+/** Any object with a .stream() method compatible with SSE transport */
+interface SSEStreamable {
+  stream(
+    agentId: string,
+    input: string,
+    opts?: { signal?: AbortSignal },
+  ): SSETokenStream;
+}
 
 // ============================================================================
 // Types
@@ -53,14 +74,14 @@ export interface SSETransportConfig {
 export interface SSETransport {
   /** Create a full HTTP Response with SSE headers */
   toResponse(
-    stack: AgentStack,
+    source: SSEStreamable,
     agentId: string,
     input: string,
     opts?: { signal?: AbortSignal },
   ): Response;
   /** Return just the ReadableStream (for Express/Koa `res.write()`) */
   toStream(
-    stack: AgentStack,
+    source: SSEStreamable,
     agentId: string,
     input: string,
     opts?: { signal?: AbortSignal },
@@ -75,8 +96,7 @@ const DEFAULT_ERROR_MESSAGE =
   "AI service temporarily unavailable. Please try again.";
 
 /**
- * Create an SSE transport that converts a Directive AgentStack token stream
- * into Server-Sent Events.
+ * Create an SSE transport that converts a token stream into Server-Sent Events.
  */
 export function createSSETransport(
   config: SSETransportConfig = {},
@@ -120,7 +140,7 @@ export function createSSETransport(
   }
 
   function buildStream(
-    stack: AgentStack,
+    source: SSEStreamable,
     agentId: string,
     input: string,
     opts?: { signal?: AbortSignal },
@@ -134,7 +154,7 @@ export function createSSETransport(
     return new ReadableStream<Uint8Array>({
       async start(controller) {
         let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-        let tokenStream: TokenStream | null = null;
+        let tokenStream: SSETokenStream | null = null;
 
         try {
           // Heartbeat
@@ -148,7 +168,7 @@ export function createSSETransport(
             }, heartbeatIntervalMs);
           }
 
-          tokenStream = stack.stream(agentId, input, {
+          tokenStream = source.stream(agentId, input, {
             signal: opts?.signal,
           });
 
@@ -200,12 +220,12 @@ export function createSSETransport(
   };
 
   return {
-    toResponse(stack, agentId, input, opts) {
-      const stream = buildStream(stack, agentId, input, opts);
+    toResponse(source, agentId, input, opts) {
+      const stream = buildStream(source, agentId, input, opts);
       return new Response(stream, { headers: sseHeaders });
     },
-    toStream(stack, agentId, input, opts) {
-      return buildStream(stack, agentId, input, opts);
+    toStream(source, agentId, input, opts) {
+      return buildStream(source, agentId, input, opts);
     },
   };
 }
