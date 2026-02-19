@@ -5,13 +5,42 @@ description: Retry, fallback, budget guards, model selection, structured outputs
 
 Composable wrappers that make any `AgentRunner` production-ready. {% .lead %}
 
-Each feature follows the same pattern: wrap a runner, get a runner back. Stack them in any order, or let the [Agent Stack](/docs/ai/agent-stack) compose them for you.
+Each feature follows the same pattern: wrap a runner, get a runner back. Stack them in any order — compose middleware on your runner.
 
 ---
 
 ## Composition Model
 
-Every wrapper has the signature `(runner, config) => AgentRunner`. Chain them like middleware:
+Every wrapper has the signature `(runner, config) => AgentRunner`. Chain them like middleware.
+
+### Using `pipe()`
+
+The cleanest way to compose middleware is `pipe()`, which applies wrappers left-to-right:
+
+```typescript
+import {
+  pipe,
+  withRetry,
+  withFallback,
+  withBudget,
+  withModelSelection,
+  withStructuredOutput,
+  byInputLength,
+} from '@directive-run/ai';
+
+const runner = pipe(
+  baseRunner,
+  (r) => withModelSelection(r, [byInputLength(200, 'gpt-4o-mini')]),
+  (r) => withFallback([r, backupRunner]),
+  (r) => withRetry(r, { maxRetries: 3 }),
+  (r) => withBudget(r, { budgets: [{ window: 'hour', maxCost: 5, pricing }] }),
+  (r) => withStructuredOutput(r, { schema: MySchema }),
+);
+```
+
+### Manual Composition
+
+Or apply wrappers manually:
 
 ```typescript
 import {
@@ -33,18 +62,32 @@ runner = withBudget(runner, { budgets: [{ window: 'hour', maxCost: 5, pricing }]
 runner = withStructuredOutput(runner, { schema: MySchema });
 ```
 
-Or use the [Agent Stack](/docs/ai/agent-stack) which wires them in the correct order automatically:
+### With Orchestrators
+
+Pass the composed runner to either orchestrator:
 
 ```typescript
-const stack = createAgentStack({
-  runner: baseRunner,
-  modelSelection: [byInputLength(200, 'gpt-4o-mini')],
-  fallback: { runners: [backupRunner] },
-  intelligentRetry: { maxRetries: 3 },
-  budget: { budgets: [{ window: 'hour', maxCost: 5, pricing }] },
-  structuredOutput: { schema: MySchema },
-  agents: { assistant: { agent, capabilities: ['chat'] } },
+import { createAgentOrchestrator, createMultiAgentOrchestrator, pipe, withRetry, withFallback } from '@directive-run/ai';
+
+const runner = pipe(
+  baseRunner,
+  (r) => withFallback([r, backupRunner]),
+  (r) => withRetry(r, { maxRetries: 3 }),
+);
+
+// Single-agent
+const single = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
+const result = await single.run(agent, 'Hello!');
+
+// Multi-agent — the same composed runner is shared across all agents
+const multi = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: { agent: researcher, maxConcurrent: 3 },
+    writer: { agent: writer, maxConcurrent: 1 },
+  },
 });
+const research = await multi.runAgent('researcher', 'Explain WASM');
 ```
 
 ---
@@ -388,6 +431,29 @@ console.log('Call count:', router.facts.callCount);
 console.log('Avg latency:', router.facts.avgLatencyMs, 'ms');
 ```
 
+### `RoutingFacts` Type
+
+The `router.facts` object exposes all runtime stats for use in constraints:
+
+```typescript
+interface RoutingFacts {
+  totalCost: number;
+  callCount: number;
+  errorCount: number;
+  lastProvider: string | null;
+  avgLatencyMs: number;
+  providers: Record<string, ProviderStats>;
+}
+
+interface ProviderStats {
+  callCount: number;
+  errorCount: number;
+  totalCost: number;
+  avgLatencyMs: number;
+  lastErrorAt: number | null;
+}
+```
+
 ### Provider Stats
 
 The router tracks per-provider statistics accessible via `router.facts.providers`:
@@ -405,51 +471,87 @@ console.log({
 
 ---
 
-## Agent Stack Integration
+## Full Composition Example
 
-All features integrate with the [Agent Stack](/docs/ai/agent-stack) via config keys:
+Compose all features onto a single runner with `pipe()`, then pass it to the [Orchestrator](/docs/ai/orchestrator):
 
 ```typescript
-import { createAgentStack, byInputLength } from '@directive-run/ai';
+import {
+  createAgentOrchestrator,
+  pipe,
+  withRetry,
+  withFallback,
+  withBudget,
+  withModelSelection,
+  withStructuredOutput,
+  byInputLength,
+} from '@directive-run/ai';
 
-const stack = createAgentStack({
-  runner: baseRunner,
-  agents: {
-    assistant: { agent: myAgent, capabilities: ['chat'] },
-  },
+const pricing = { inputPerMillion: 5, outputPerMillion: 15 };
 
-  // P2: Intelligent retry
-  intelligentRetry: { maxRetries: 3, baseDelayMs: 1000 },
-
-  // P0: Provider fallback
-  fallback: { runners: [backupRunner] },
-
-  // P1: Cost budget guards
-  budget: {
+const runner = pipe(
+  baseRunner,
+  (r) => withModelSelection(r, [byInputLength(200, 'gpt-4o-mini')]),
+  (r) => withFallback([r, backupRunner]),
+  (r) => withRetry(r, { maxRetries: 3, baseDelayMs: 1000 }),
+  (r) => withBudget(r, {
     maxCostPerCall: 0.10,
-    pricing: { inputPerMillion: 5, outputPerMillion: 15 },
-    budgets: [{ window: 'hour', maxCost: 5, pricing: { inputPerMillion: 5, outputPerMillion: 15 } }],
-  },
+    pricing,
+    budgets: [{ window: 'hour', maxCost: 5, pricing }],
+  }),
+  (r) => withStructuredOutput(r, { schema: MySchema, maxRetries: 2 }),
+);
 
-  // P3: Model selection
-  modelSelection: [byInputLength(200, 'gpt-4o-mini')],
-
-  // P6: Structured output (applied to all agents)
-  structuredOutput: { schema: MySchema, maxRetries: 2 },
-});
-
-const result = await stack.run('assistant', 'Hello!');
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
+const result = await orchestrator.run(myAgent, 'Hello!');
 ```
 
 {% callout title="Composition order" %}
-The stack applies wrappers in this order (outermost first): **Structured Output → Budget → Retry → Fallback → Model Selection → Provider Runner**. Budget checks happen before any retries, and model selection runs closest to the provider.
+Apply wrappers from inside out: **Model Selection → Fallback → Retry → Budget → Structured Output**. Budget checks happen before any retries, and model selection runs closest to the provider.
 {% /callout %}
+
+---
+
+## Token Budgets in Multi-Agent
+
+The multi-agent orchestrator tracks token usage across all agents with `maxTokenBudget`. When the budget is reached, a built-in constraint pauses further agent runs. Combine this with a `budgetWarningThreshold` callback to alert before the hard stop:
+
+```typescript
+import { createMultiAgentOrchestrator, pipe, withRetry, withFallback } from '@directive-run/ai';
+
+const runner = pipe(
+  baseRunner,
+  (r) => withFallback([r, backupRunner]),
+  (r) => withRetry(r, { maxRetries: 2 }),
+);
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: { agent: researcher, maxConcurrent: 3 },
+    writer: { agent: writer, maxConcurrent: 1 },
+  },
+  maxTokenBudget: 50000,
+  budgetWarningThreshold: 0.8,   // Fire callback at 80% usage
+  onBudgetWarning: ({ currentTokens, maxBudget, percentage }) => {
+    console.warn(`Token budget ${(percentage * 100).toFixed(0)}% used: ${currentTokens}/${maxBudget}`);
+  },
+});
+
+// Each runAgent call contributes to the shared budget
+const research = await orchestrator.runAgent('researcher', 'Summarize recent AI papers');
+const article = await orchestrator.runAgent('writer', String(research.output));
+
+console.log(`Total tokens used: ${orchestrator.totalTokens}`);
+```
+
+The budget is shared across all agents in the orchestrator. Individual agent runs that would exceed the remaining budget are blocked by a constraint before the LLM call is made.
 
 ---
 
 ## Next Steps
 
 - [Running Agents](/docs/ai/running-agents) – basic runner setup
-- [Agent Stack](/docs/ai/agent-stack) – all-in-one composition factory
+- [Orchestrator](/docs/ai/orchestrator) – agent orchestration with constraints and approvals
 - [Guardrails](/docs/ai/guardrails) – input validation and output safety
 - [Streaming](/docs/ai/streaming) – real-time token streaming

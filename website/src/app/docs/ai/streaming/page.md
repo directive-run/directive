@@ -72,11 +72,13 @@ Every stream chunk has a `type` discriminant:
 | `tool_end` | `tool`, `toolCallId`, `result` | Tool call completes |
 | `message` | `message` | Full message added to conversation |
 | `guardrail_triggered` | `guardrailName`, `reason`, `partialOutput`, `stopped` | A guardrail blocked content |
-| `approval_required` | `requestId`, `toolName` | Tool call needs approval |
-| `approval_resolved` | `requestId`, `approved` | Approval decision made |
-| `progress` | `phase`, `message` | Status update (starting, generating, tool_calling, finishing) |
+| `approval_required` | `requestId`, `toolName` | Tool call needs approval \* |
+| `approval_resolved` | `requestId`, `approved` | Approval decision made \* |
+| `progress` | `phase`, `percent?`, `message` | Status update (starting, generating, tool_calling, finishing) |
 | `done` | `totalTokens`, `duration`, `droppedTokens` | Stream completed |
 | `error` | `error`, `partialOutput?` | An error occurred |
+
+\* `approval_required` and `approval_resolved` are only emitted by orchestrator streaming (`runStream` / `runAgentStream`), not by the base `createStreamingRunner`.
 
 ---
 
@@ -102,34 +104,80 @@ controller.abort();
 
 ---
 
-## Stack Streaming
+## Multi-Agent Streaming
 
-The `AgentStack` offers two streaming methods. `stack.stream()` yields raw token strings, while `stack.streamChunks()` yields the same rich `StreamChunk` types as the orchestrator:
+Stream from a specific agent in a multi-agent orchestrator with `runAgentStream()`. All guardrails, approval checks, and state tracking apply:
 
 ```typescript
-import { createAgentStack } from '@directive-run/ai';
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
 
-const stack = createAgentStack({
+const orchestrator = createMultiAgentOrchestrator({
   runner,
-  streaming: { runner: myStreamingRunner },
-  agents: { chat: { agent: chatAgent, capabilities: ['chat'] } },
+  agents: {
+    researcher: { agent: researcher, maxConcurrent: 3 },
+    writer: { agent: writer, maxConcurrent: 1 },
+  },
+  guardrails: {
+    input: [createPIIGuardrail({ redact: true })],
+  },
 });
 
-// Simple stream – yields one raw token string at a time
-const tokenStream = stack.stream('chat', 'Hello!');
-for await (const token of tokenStream) {
-  process.stdout.write(token);
-}
+// Stream a specific agent's output
+const { stream, result, abort } = orchestrator.runAgentStream<string>('writer', 'Write about AI');
 
-// Rich stream – yields typed chunks (tokens, tool calls, guardrails, progress)
-const { stream, result, abort } = stack.streamChunks('chat', 'Hello!');
 for await (const chunk of stream) {
   if (chunk.type === 'token') process.stdout.write(chunk.data);
+  if (chunk.type === 'done') console.log(`\nDone: ${chunk.totalTokens} tokens`);
 }
+
 const finalResult = await result;
 ```
 
-Both methods automatically track tokens, record observability spans, and publish to the message bus.
+The chunk types are identical to `orchestrator.runStream()` &ndash; see the [Chunk Types](#chunk-types) table above.
+
+### Guardrail Failures in Multi-Agent Streaming
+
+When a guardrail blocks an agent during a multi-agent streaming run, the stream emits a `guardrail_triggered` chunk with `stopped: true` before the `error` chunk. This lets UI code show a guardrail-specific message instead of a generic error:
+
+```typescript
+for await (const chunk of stream) {
+  if (chunk.type === 'guardrail_triggered' && chunk.stopped) {
+    showBanner(`Blocked by ${chunk.guardrailName}: ${chunk.reason}`);
+    break;  // Stream is already terminated
+  }
+}
+```
+
+Both orchestrator-level and per-agent guardrails can trigger this behavior. The `partialOutput` field contains whatever the agent generated before the guardrail fired.
+
+---
+
+## Direct Streaming Runner
+
+For streaming outside the orchestrator (e.g., direct agent runs without guardrails/approvals), use `createStreamingRunner` directly:
+
+```typescript
+import { createStreamingRunner } from '@directive-run/ai';
+
+const streamRunner = createStreamingRunner(myStreamingCallbackRunner);
+
+const chatAgent = {
+  name: 'chat',
+  instructions: 'You are a helpful assistant.',
+  model: 'gpt-4',
+};
+
+// Start a streaming run – returns the stream, a result promise, and an abort handle
+const { stream, result, abort } = streamRunner(chatAgent, 'Hello!');
+
+for await (const chunk of stream) {
+  if (chunk.type === 'token') process.stdout.write(chunk.data);
+}
+
+const finalResult = await result;
+```
+
+The streaming runner handles token tracking and lifecycle hooks automatically.
 
 ---
 
@@ -140,10 +188,10 @@ Directive ships pre-built streaming runners for OpenAI and Anthropic. These hand
 ### OpenAI Streaming
 
 ```typescript
-import { createOpenAIRunner, createOpenAIStreamingRunner } from '@directive-run/ai/openai';
+import { createOpenAIStreamingRunner } from '@directive-run/ai/openai';
+import { createStreamingRunner } from '@directive-run/ai';
 
-const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
-const streamingRunner = createOpenAIStreamingRunner({
+const openaiStreamingRunner = createOpenAIStreamingRunner({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     onAfterCall: ({ durationMs, tokenUsage }) => {
@@ -152,37 +200,51 @@ const streamingRunner = createOpenAIStreamingRunner({
   },
 });
 
-const stack = createAgentStack({
-  runner,
-  streaming: { runner: streamingRunner },
-  agents: { chat: { instructions: 'You are a helpful assistant.' } },
-});
+const streamRunner = createStreamingRunner(openaiStreamingRunner);
+
+const chatAgent = { name: 'chat', instructions: 'You are a helpful assistant.', model: 'gpt-4' };
+const { stream, result } = streamRunner(chatAgent, 'Hello!');
 ```
 
 ### Anthropic Streaming
 
 ```typescript
-import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
+import { createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
+import { createStreamingRunner } from '@directive-run/ai';
 
-const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
-const streamingRunner = createAnthropicStreamingRunner({
+const anthropicStreamingRunner = createAnthropicStreamingRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
-const stack = createAgentStack({
-  runner,
-  streaming: { runner: streamingRunner },
-  agents: { chat: { instructions: 'You are a helpful assistant.' } },
-});
+const streamRunner = createStreamingRunner(anthropicStreamingRunner);
+
+const chatAgent = { name: 'chat', instructions: 'You are a helpful assistant.', model: 'claude-sonnet-4-5-20250929' };
+const { stream, result } = streamRunner(chatAgent, 'Hello!');
 ```
 
-Both streaming runners return `tokenUsage` with input/output breakdown and support the same `hooks` interface as the standard runners.
+### Gemini Streaming
+
+```typescript
+import { createGeminiStreamingRunner } from '@directive-run/ai/gemini';
+import { createStreamingRunner } from '@directive-run/ai';
+
+const geminiStreamingRunner = createGeminiStreamingRunner({
+  apiKey: process.env.GEMINI_API_KEY!,
+});
+
+const streamRunner = createStreamingRunner(geminiStreamingRunner);
+
+const chatAgent = { name: 'chat', instructions: 'You are a helpful assistant.', model: 'gemini-2.0-flash' };
+const { stream, result } = streamRunner(chatAgent, 'Hello!');
+```
+
+All streaming runners return `tokenUsage` with input/output breakdown and support the same `hooks` interface as the standard runners.
 
 ---
 
-## Standalone Streaming
+## Custom Streaming Runner
 
-For streaming outside the orchestrator (e.g., direct agent runs without guardrails/approvals), use `createStreamingRunner`:
+Build a custom streaming runner by wrapping your LLM SDK's streaming API with `createStreamingRunner`:
 
 ```typescript
 import { createStreamingRunner } from '@directive-run/ai';

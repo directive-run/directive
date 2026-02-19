@@ -1,8 +1,7 @@
-// @ts-nocheck
 /**
  * AI Docs Chatbot API Route
  *
- * Architecture: RAG retrieval → Directive agent stack → SSE streaming
+ * Architecture: RAG retrieval → Directive orchestrator + middleware → SSE streaming
  *
  * Server-side operational state (per-IP rate limiting, token usage, error
  * tracking) is managed by a Directive module. The AI adapter handles
@@ -11,23 +10,34 @@
  * 1. Directive module tracks per-IP request counts, cumulative metrics
  * 2. Embeds the user query via OpenAI, finds relevant doc chunks (cosine similarity)
  * 3. Passes enriched input (RAG context + conversation history + question) to
- *    a Directive `createAgentStack` with prompt-injection & PII guardrails
+ *    a Directive orchestrator with prompt-injection & PII guardrails + middleware
  * 4. Streams tokens back to the client as SSE `data:` frames
  */
 import { NextRequest } from 'next/server'
 import path from 'node:path'
 import {
-  createAgentStack,
+  createAgentOrchestrator,
+  createAgentMemory,
+  createSlidingWindowStrategy,
+  createStreamingRunner,
   createPromptInjectionGuardrail,
   createEnhancedPIIGuardrail,
   createRAGEnricher,
   createJSONFileStore,
   createSSETransport,
   createLengthGuardrail,
+  withRetry,
+  withFallback,
+  withBudget,
+  type AgentLike,
+  type RunResult,
+  type NamedGuardrail,
+  type InputGuardrailData,
 } from '@directive-run/ai'
 import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic'
 import { createOpenAIRunner, createOpenAIEmbedder } from '@directive-run/ai/openai'
 import { createSystem } from '@directive-run/core'
+import { createCircuitBreaker } from '@directive-run/core/plugins'
 import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
 import { getFeatureFlagSystem } from '@/lib/feature-flags/config'
 
@@ -245,24 +255,29 @@ const transport = createSSETransport({
 })
 
 // ---------------------------------------------------------------------------
-// Directive Agent Stack (singleton)
+// Directive Agent Orchestrator (singleton)
 // ---------------------------------------------------------------------------
 
-let agentStackInstance: ReturnType<typeof createAgentStack> | null = null
+/** Streamable wrapper that adapts orchestrator + streaming runner for SSE transport */
+interface Streamable {
+  stream(agentId: string, input: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> & { result: Promise<unknown>; abort(): void }
+}
 
-function getStack() {
-  if (agentStackInstance) return agentStackInstance
+let orchestratorInstance: { orchestrator: ReturnType<typeof createAgentOrchestrator>; streamable: Streamable } | null = null
+
+function getOrchestrator() {
+  if (orchestratorInstance) return orchestratorInstance
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY
   if (!anthropicKey) return null
 
-  const runner = createAnthropicRunner({
+  let runner = createAnthropicRunner({
     apiKey: anthropicKey,
     model: 'claude-haiku-4-5-20251001',
     maxTokens: 2000,
   })
 
-  const streamingRunner = createAnthropicStreamingRunner({
+  const streamingCallbackRunner = createAnthropicStreamingRunner({
     apiKey: anthropicKey,
     model: 'claude-haiku-4-5-20251001',
     maxTokens: 2000,
@@ -270,27 +285,68 @@ function getStack() {
 
   // OpenAI fallback runner (only created if API key is available)
   const openaiKey = process.env.OPENAI_API_KEY
-  const fallbackRunners = openaiKey
-    ? [createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })]
-    : []
+  if (openaiKey) {
+    const fallbackRunner = createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })
+    runner = withFallback([runner, fallbackRunner])
+  }
+
+  // P2: Intelligent retry – retries 429/503, skips 400/401/403
+  runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 })
 
   // Claude Haiku 4.5 pricing (per million tokens)
   const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
 
-  agentStackInstance = createAgentStack({
-    runner,
-    streaming: { runner: streamingRunner },
-    agents: {
-      'docs-qa': {
-        agent: {
-          name: 'directive-docs-qa',
-          instructions: BASE_INSTRUCTIONS,
-        },
-        capabilities: ['question-answering', 'code-examples'],
-      },
+  // P1: Cost budget – cap hourly spend at $5 using Haiku pricing
+  runner = withBudget(runner, {
+    budgets: [
+      { window: 'hour' as const, maxCost: 5.00, pricing: haikuPricing },
+      { window: 'day' as const, maxCost: 50.00, pricing: haikuPricing },
+    ],
+  })
+
+  // Rate limiter as input guardrail
+  const rateLimitTimestamps: number[] = []
+  let rateLimitStartIdx = 0
+  const MAX_PER_MINUTE = 30
+
+  const rateLimitGuardrail: NamedGuardrail<InputGuardrailData> = {
+    name: 'rate-limit',
+    fn: () => {
+      const now = Date.now()
+      const windowStart = now - 60_000
+      while (rateLimitStartIdx < rateLimitTimestamps.length && rateLimitTimestamps[rateLimitStartIdx]! < windowStart) {
+        rateLimitStartIdx++
+      }
+      if (rateLimitStartIdx > rateLimitTimestamps.length / 2 && rateLimitStartIdx > 100) {
+        rateLimitTimestamps.splice(0, rateLimitStartIdx)
+        rateLimitStartIdx = 0
+      }
+      const active = rateLimitTimestamps.length - rateLimitStartIdx
+      if (active >= MAX_PER_MINUTE) {
+        return { passed: false, reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)` }
+      }
+      rateLimitTimestamps.push(now)
+
+      return { passed: true }
     },
+  }
+
+  const memory = createAgentMemory({
+    strategy: createSlidingWindowStrategy(),
+    strategyConfig: { maxMessages: MAX_HISTORY_MESSAGES, preserveRecentCount: 6 },
+    autoManage: true,
+  })
+
+  const cb = createCircuitBreaker({ failureThreshold: 3, recoveryTimeMs: 30_000 })
+
+  const orchestrator = createAgentOrchestrator({
+    runner,
+    maxTokenBudget: 2000,
+    memory,
+    circuitBreaker: cb,
     guardrails: {
       input: [
+        rateLimitGuardrail,
         createPromptInjectionGuardrail({ strictMode: true }),
         createEnhancedPIIGuardrail({ redact: true }),
       ],
@@ -298,27 +354,6 @@ function getStack() {
         createLengthGuardrail({ maxCharacters: MAX_RESPONSE_CHARS }),
       ],
     },
-    memory: { maxMessages: MAX_HISTORY_MESSAGES },
-    circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
-    rateLimit: { maxPerMinute: 30 },
-    maxTokenBudget: 2000,
-
-    // P2: Intelligent retry – retries 429/503, skips 400/401/403
-    intelligentRetry: { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 },
-
-    // P0: Provider fallback – fall back to OpenAI when Anthropic is down
-    ...(fallbackRunners.length > 0 && {
-      fallback: { runners: fallbackRunners },
-    }),
-
-    // P1: Cost budget – cap hourly spend at $5 using Haiku pricing
-    budget: {
-      budgets: [
-        { window: 'hour' as const, maxCost: 5.00, pricing: haikuPricing },
-        { window: 'day' as const, maxCost: 50.00, pricing: haikuPricing },
-      ],
-    },
-
     hooks: {
       onAgentComplete: ({ tokenUsage }) => {
         chatbotSystem.events.requestCompleted({ tokens: tokenUsage })
@@ -329,7 +364,47 @@ function getStack() {
     },
   })
 
-  return agentStackInstance
+  // Build a streaming runner for SSE transport
+  const streamRunner = createStreamingRunner(streamingCallbackRunner)
+
+  const docsAgent: AgentLike = {
+    name: 'directive-docs-qa',
+    instructions: BASE_INSTRUCTIONS,
+  }
+
+  // Streamable adapter for SSE transport
+  const streamable: Streamable = {
+    stream(_agentId: string, input: string, opts?: { signal?: AbortSignal }) {
+      const { stream, result, abort } = streamRunner(docsAgent, input, {
+        signal: opts?.signal,
+      })
+
+      // Adapt StreamChunk async iterable to string async iterable
+      const tokenStream: AsyncIterable<string> & { result: Promise<unknown>; abort(): void } = {
+        result: result as Promise<unknown>,
+        abort,
+        [Symbol.asyncIterator]() {
+          const iter = stream[Symbol.asyncIterator]()
+
+          return {
+            async next() {
+              const { done, value } = await iter.next()
+              if (done) return { done: true, value: undefined }
+              if (value.type === 'token') return { done: false, value: value.data }
+
+              return { done: false, value: '' }
+            },
+          }
+        },
+      }
+
+      return tokenStream
+    },
+  }
+
+  orchestratorInstance = { orchestrator, streamable }
+
+  return orchestratorInstance
 }
 
 // ---------------------------------------------------------------------------
@@ -362,6 +437,7 @@ function validateHistory(history: unknown[]): ChatMessage[] {
   ) {
     console.warn(`[chat] Dropped ${dropped} invalid history entries`)
   }
+
   return valid.slice(-MAX_HISTORY_MESSAGES)
 }
 
@@ -372,7 +448,7 @@ function validateHistory(history: unknown[]): ChatMessage[] {
 export async function POST(request: NextRequest) {
   // Feature flag check
   const ffSystem = getFeatureFlagSystem()
-  if (!ffSystem.derive.canUseChat) {
+  if (!ffSystem || !ffSystem.derive.canUseChat) {
     return new Response(
       JSON.stringify({ error: 'Chat is currently disabled.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
@@ -456,8 +532,8 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const agentStack = getStack()
-  if (!agentStack) {
+  const instance = getOrchestrator()
+  if (!instance) {
     return new Response(
       JSON.stringify({ error: 'Chat service is not configured.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
@@ -550,7 +626,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Stream via SSE transport (propagate request abort signal)
-  const sseResponse = transport.toResponse(agentStack, 'docs-qa', enrichedInput, {
+  const sseResponse = transport.toResponse(instance.streamable, 'docs-qa', enrichedInput, {
     signal: request.signal,
   })
 

@@ -59,6 +59,11 @@
       "types": "./dist/ollama.d.ts",
       "require": "./dist/ollama.cjs",
       "import": "./dist/ollama.js"
+    },
+    "./gemini": {
+      "types": "./dist/gemini.d.ts",
+      "require": "./dist/gemini.cjs",
+      "import": "./dist/gemini.js"
     }
   },
   "files": [

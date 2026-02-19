@@ -75,7 +75,7 @@ const enrichedInput = await enricher.enrich('How do constraints work?', {
 });
 
 // Pass the enriched input to any agent runner — returns RunResult<T>
-const result = await stack.run('docs-qa', enrichedInput);
+const result = await orchestrator.run(docsAgent, enrichedInput);
 ```
 
 #### `RAGEnrichOptions`
@@ -216,18 +216,21 @@ The default `formatChunk` renders `[Title – Section](url)` when all three meta
 
 ---
 
-## Integration with AgentStack and SSE Transport
+## Integration with Orchestrator and SSE Transport
 
-Combine the RAG enricher with [AgentStack](/docs/ai/agent-stack) and [SSE Transport](/docs/ai/sse-transport) for a full server-side chat pipeline:
+Combine the RAG enricher with [Agent Orchestrator](/docs/ai/orchestrator) and [SSE Transport](/docs/ai/sse-transport) for a full server-side chat pipeline:
 
 ```typescript
 import {
-  createAgentStack,
   createAnthropicRunner,
   createAnthropicStreamingRunner,
+} from '@directive-run/ai/anthropic';
+import { createOpenAIEmbedder } from '@directive-run/ai/openai';
+import {
+  createAgentOrchestrator,
+  createStreamingRunner,
   createRAGEnricher,
   createJSONFileStore,
-  createOpenAIEmbedder,
   createSSETransport,
 } from '@directive-run/ai';
 
@@ -237,34 +240,84 @@ const enricher = createRAGEnricher({
   storage: createJSONFileStore({ filePath: './embeddings.json' }),
 });
 
-// 2. Agent stack
-const stack = createAgentStack({
+// 2. Agent + orchestrator
+const docsAgent = {
+  name: 'docs-qa',
+  instructions: 'Answer questions using the provided documentation context.',
+  model: 'claude-sonnet-4-5-20250929',
+};
+
+const orchestrator = createAgentOrchestrator({
   runner: createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! }),
-  streaming: {
-    runner: createAnthropicStreamingRunner({ apiKey: process.env.ANTHROPIC_API_KEY! }),
-  },
-  agents: {
-    'docs-qa': {
-      agent: {
-        name: 'docs-qa',
-        instructions: 'Answer questions using the provided documentation context.',
-        model: 'claude-sonnet-4-5-20250929',
-      },
-      capabilities: ['chat'],
-    },
-  },
 });
 
-// 3. SSE transport
+// 3. Streaming runner + SSE streamable wrapper
+const streamRunner = createStreamingRunner(
+  createAnthropicStreamingRunner({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+);
+
+const streamable = {
+  stream: (input: string) => streamRunner(docsAgent, input),
+};
+
+// 4. SSE transport
 const transport = createSSETransport({ maxResponseChars: 10_000 });
 
-// 4. Route handler (Next.js App Router)
+// 5. Route handler (Next.js App Router)
 export async function POST(request: Request) {
   const { message, history } = await request.json();
   const enrichedInput = await enricher.enrich(message, { history });
 
-  return transport.toResponse(stack, 'docs-qa', enrichedInput);
+  return transport.toResponse(streamable, enrichedInput);
 }
+```
+
+---
+
+## With Multi-Agent Orchestrator
+
+The RAG enricher works with both orchestrators. For multi-agent, enrich the input before routing to a specific agent:
+
+```typescript
+import {
+  createMultiAgentOrchestrator,
+  createRAGEnricher,
+  createJSONFileStore,
+  createOpenAIEmbedder,
+  createAnthropicRunner,
+} from '@directive-run/ai';
+
+const enricher = createRAGEnricher({
+  embedder: createOpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY! }),
+  storage: createJSONFileStore({ filePath: './embeddings.json' }),
+});
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner: createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+  agents: {
+    docsQA: {
+      agent: {
+        name: 'docs-qa',
+        instructions: 'Answer questions using provided documentation context.',
+        model: 'claude-sonnet-4-5-20250929',
+      },
+    },
+    summarizer: {
+      agent: {
+        name: 'summarizer',
+        instructions: 'Summarize documents concisely.',
+        model: 'claude-sonnet-4-5-20250929',
+      },
+    },
+  },
+});
+
+// Enrich the input, then route to the appropriate agent
+const enrichedInput = await enricher.enrich('How do constraints work?', {
+  filter: (chunk) => chunk.metadata.section === 'constraints',
+});
+
+const result = await orchestrator.runAgent('docsQA', enrichedInput);
 ```
 
 ---
@@ -272,6 +325,7 @@ export async function POST(request: Request) {
 ## Next Steps
 
 - [SSE Transport](/docs/ai/sse-transport) – Stream enriched responses over HTTP
-- [Agent Stack](/docs/ai/agent-stack) – Compose all AI features in one factory
+- [Agent Orchestrator](/docs/ai/orchestrator) – Full orchestrator API
+- [Multi-Agent](/docs/ai/multi-agent) – Parallel, sequential, and supervisor patterns
 - [Guardrails](/docs/ai/guardrails) – Input/output validation and safety
 - [Streaming](/docs/ai/streaming) – Real-time token streaming and backpressure

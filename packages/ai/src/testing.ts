@@ -1,5 +1,5 @@
 /**
- * OpenAI Agents Testing Utilities
+ * Directive AI Testing Utilities
  *
  * Provides testing helpers for:
  * - Mock agent runners with configurable responses
@@ -37,10 +37,9 @@ import type {
   GuardrailContext,
   GuardrailResult,
   ApprovalRequest,
-  OrchestratorOptions,
-  AgentOrchestrator,
-} from "./index.js";
-import { createAgentOrchestrator } from "./index.js";
+} from "./types.js";
+import { createAgentOrchestrator, type OrchestratorOptions, type AgentOrchestrator } from "./agent-orchestrator.js";
+import { createMultiAgentOrchestrator, type MultiAgentOrchestratorOptions, type MultiAgentOrchestrator } from "./multi-agent-orchestrator.js";
 
 // ============================================================================
 // Mock Agent Runner
@@ -421,9 +420,11 @@ export function createApprovalSimulator(
         requests.push(request);
       }
 
-      // Notify waiters
-      for (const waiter of requestWaiters) {
+      // Notify waiters (resolve matching ones, remove them from array)
+      for (let i = requestWaiters.length - 1; i >= 0; i--) {
+        const waiter = requestWaiters[i]!;
         if (waiter.predicate(request)) {
+          requestWaiters.splice(i, 1);
           waiter.resolve(request);
         }
       }
@@ -463,11 +464,16 @@ export function createApprovalSimulator(
       }
     },
 
-    reject(requestId: string, _reason?: string) {
+    reject(requestId: string, reason?: string) {
       const pending = pendingRequests.get(requestId);
       if (pending) {
         pending.resolve("rejected");
         pendingRequests.delete(requestId);
+        // Store reason on the request for test assertions
+        const request = requests.find((r) => r.id === requestId);
+        if (request) {
+          (request as ApprovalRequest & { rejectionReason?: string }).rejectionReason = reason;
+        }
       }
     },
 
@@ -480,17 +486,23 @@ export function createApprovalSimulator(
 
       // Wait for future request
       return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error("Timeout waiting for approval request"));
-        }, timeoutMs);
-
-        requestWaiters.push({
+        const entry = {
           predicate,
-          resolve: (req) => {
+          resolve: (req: ApprovalRequest) => {
             clearTimeout(timeout);
             resolve(req);
           },
-        });
+        };
+
+        const timeout = setTimeout(() => {
+          const idx = requestWaiters.indexOf(entry);
+          if (idx >= 0) {
+            requestWaiters.splice(idx, 1);
+          }
+          reject(new Error("Timeout waiting for approval request"));
+        }, timeoutMs);
+
+        requestWaiters.push(entry);
       });
     },
   };
@@ -747,4 +759,589 @@ export function createTimeController(startTime = Date.now()): {
     set: (time) => { currentTime = time; },
     reset: () => { currentTime = initial; },
   };
+}
+
+// ============================================================================
+// Multi-Agent Test Orchestrator
+// ============================================================================
+
+/** Options for test multi-agent orchestrator */
+export interface TestMultiAgentOrchestratorOptions extends Omit<MultiAgentOrchestratorOptions, "runner"> {
+  /** Mock responses keyed by agent ID — internally mapped to agent names for the mock runner */
+  mockResponses?: Record<string, MockAgentConfig>;
+  /** Default mock response for unmatched agents */
+  defaultMockResponse?: MockAgentConfig;
+}
+
+/** Test multi-agent orchestrator with additional testing utilities */
+export interface TestMultiAgentOrchestrator extends MultiAgentOrchestrator {
+  /** The mock runner */
+  mockRunner: MockAgentRunner;
+  /** Approval simulator */
+  approvalSimulator: ApprovalSimulator;
+  /** Get recorded agent calls */
+  getCalls(): RecordedCall[];
+  /** Get approval requests */
+  getApprovalRequests(): ApprovalRequest[];
+  /** Reset all state */
+  resetAll(): void;
+}
+
+/**
+ * Create a test multi-agent orchestrator with mocking and simulation built in.
+ *
+ * @example
+ * ```typescript
+ * const test = createTestMultiAgentOrchestrator({
+ *   agents: {
+ *     researcher: { agent: { name: 'researcher' } },
+ *     writer: { agent: { name: 'writer' } },
+ *   },
+ *   mockResponses: {
+ *     researcher: { output: 'Research results', totalTokens: 100 },
+ *     writer: { output: 'Written article', totalTokens: 200 },
+ *   },
+ * });
+ *
+ * const result = await test.runAgent('researcher', 'What is AI?');
+ * expect(result.output).toBe('Research results');
+ * expect(test.getCalls()).toHaveLength(1);
+ * ```
+ */
+export function createTestMultiAgentOrchestrator(
+  options: TestMultiAgentOrchestratorOptions
+): TestMultiAgentOrchestrator {
+  const {
+    mockResponses = {},
+    defaultMockResponse,
+    ...orchestratorOptions
+  } = options;
+
+  // Map mock responses by agent name (from agent registration)
+  const responsesByName: Record<string, MockAgentConfig> = {};
+  for (const [agentId, config] of Object.entries(mockResponses)) {
+    const registration = orchestratorOptions.agents[agentId];
+    if (registration) {
+      responsesByName[registration.agent.name] = config;
+    }
+  }
+
+  const mockRunner = createMockAgentRunner({
+    responses: responsesByName,
+    defaultResponse: defaultMockResponse,
+  });
+
+  const approvalSimulator = createApprovalSimulator();
+
+  const orchestrator = createMultiAgentOrchestrator({
+    ...orchestratorOptions,
+    runner: mockRunner.run,
+    onApprovalRequest: (req) => {
+      approvalSimulator.handle(req);
+      orchestratorOptions.onApprovalRequest?.(req);
+    },
+  });
+
+  return {
+    ...orchestrator,
+    mockRunner,
+    approvalSimulator,
+    getCalls: () => mockRunner.getCalls(),
+    getApprovalRequests: () => approvalSimulator.getRequests(),
+    resetAll() {
+      orchestrator.reset();
+      mockRunner.clearCalls();
+      approvalSimulator.clearRequests();
+    },
+  };
+}
+
+// ============================================================================
+// Multi-Agent Assertion Helpers
+// ============================================================================
+
+/**
+ * Assert that a multi-agent orchestrator has specific state.
+ *
+ * @example
+ * ```typescript
+ * assertMultiAgentState(orchestrator, {
+ *   agentStatus: { researcher: 'completed', writer: 'idle' },
+ *   globalTokens: { min: 0, max: 1000 },
+ *   pendingHandoffs: 0,
+ * });
+ * ```
+ */
+export function assertMultiAgentState(
+  orchestrator: MultiAgentOrchestrator,
+  expected: {
+    agentStatus?: Record<string, "idle" | "running" | "completed" | "error">;
+    totalTokens?: { agentId?: string; min?: number; max?: number };
+    globalTokens?: { min?: number; max?: number };
+    pendingHandoffs?: number;
+  }
+): void {
+  if (expected.agentStatus) {
+    for (const [agentId, expectedStatus] of Object.entries(expected.agentStatus)) {
+      const state = orchestrator.getAgentState(agentId);
+      if (!state) {
+        throw new Error(`Expected agent "${agentId}" to exist, but it was not found`);
+      }
+      if (state.status !== expectedStatus) {
+        throw new Error(
+          `Expected agent "${agentId}" status to be "${expectedStatus}", got "${state.status}"`
+        );
+      }
+    }
+  }
+
+  if (expected.totalTokens) {
+    const { agentId, min, max } = expected.totalTokens;
+    if (agentId) {
+      const state = orchestrator.getAgentState(agentId);
+      if (!state) {
+        throw new Error(`Expected agent "${agentId}" to exist, but it was not found`);
+      }
+      if (min !== undefined && state.totalTokens < min) {
+        throw new Error(
+          `Expected agent "${agentId}" tokens to be at least ${min}, got ${state.totalTokens}`
+        );
+      }
+      if (max !== undefined && state.totalTokens > max) {
+        throw new Error(
+          `Expected agent "${agentId}" tokens to be at most ${max}, got ${state.totalTokens}`
+        );
+      }
+    } else {
+      const allStates = orchestrator.getAllAgentStates();
+      const total = Object.values(allStates).reduce((sum, s) => sum + s.totalTokens, 0);
+      if (min !== undefined && total < min) {
+        throw new Error(`Expected total tokens to be at least ${min}, got ${total}`);
+      }
+      if (max !== undefined && total > max) {
+        throw new Error(`Expected total tokens to be at most ${max}, got ${total}`);
+      }
+    }
+  }
+
+  if (expected.globalTokens) {
+    const { min, max } = expected.globalTokens;
+    const total = orchestrator.totalTokens;
+    if (min !== undefined && total < min) {
+      throw new Error(`Expected global tokens to be at least ${min}, got ${total}`);
+    }
+    if (max !== undefined && total > max) {
+      throw new Error(`Expected global tokens to be at most ${max}, got ${total}`);
+    }
+  }
+
+  if (expected.pendingHandoffs !== undefined) {
+    const pendingCount = orchestrator.getPendingHandoffs().length;
+    if (pendingCount !== expected.pendingHandoffs) {
+      throw new Error(
+        `Expected ${expected.pendingHandoffs} pending handoffs, got ${pendingCount}`
+      );
+    }
+  }
+}
+
+// ============================================================================
+// DAG Testing Helpers
+// ============================================================================
+
+import type { DagNode, DagExecutionContext, DagNodeStatus, DagPattern } from "./types.js";
+import { dag } from "./multi-agent-orchestrator.js";
+
+/**
+ * Create a test DAG pattern from a simplified node spec.
+ *
+ * @example
+ * ```typescript
+ * const pattern = createTestDag({
+ *   A: { agent: "researcher" },
+ *   B: { agent: "writer", deps: ["A"] },
+ *   C: { agent: "reviewer", deps: ["B"] },
+ * });
+ * ```
+ */
+export function createTestDag<T = unknown>(
+  nodes: Record<string, Pick<DagNode, "agent" | "deps" | "when" | "transform" | "timeout" | "priority">>,
+  merge?: (context: DagExecutionContext) => T | Promise<T>,
+  options?: { timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" },
+): DagPattern<T> {
+  const defaultMerge = (context: DagExecutionContext) => context.outputs as unknown as T;
+
+  return dag<T>(nodes, merge ?? defaultMerge, options);
+}
+
+/**
+ * Assert that a DAG execution produced the expected node statuses.
+ *
+ * @example
+ * ```typescript
+ * assertDagExecution(context, {
+ *   nodeStatuses: { A: "completed", B: "completed", C: "skipped" },
+ *   completedNodes: ["A", "B"],
+ *   skippedNodes: ["C"],
+ * });
+ * ```
+ */
+export function assertDagExecution(
+  context: DagExecutionContext,
+  expected: {
+    nodeStatuses?: Record<string, DagNodeStatus>;
+    completedNodes?: string[];
+    skippedNodes?: string[];
+    errorNodes?: string[];
+    outputContains?: Record<string, unknown>;
+  },
+): void {
+  if (expected.nodeStatuses) {
+    for (const [nodeId, expectedStatus] of Object.entries(expected.nodeStatuses)) {
+      const actual = context.statuses[nodeId];
+      if (actual !== expectedStatus) {
+        throw new Error(
+          `Expected node "${nodeId}" status to be "${expectedStatus}", got "${actual}"`
+        );
+      }
+    }
+  }
+
+  if (expected.completedNodes) {
+    for (const nodeId of expected.completedNodes) {
+      if (context.statuses[nodeId] !== "completed") {
+        throw new Error(
+          `Expected node "${nodeId}" to be completed, got "${context.statuses[nodeId]}"`
+        );
+      }
+    }
+  }
+
+  if (expected.skippedNodes) {
+    for (const nodeId of expected.skippedNodes) {
+      if (context.statuses[nodeId] !== "skipped") {
+        throw new Error(
+          `Expected node "${nodeId}" to be skipped, got "${context.statuses[nodeId]}"`
+        );
+      }
+    }
+  }
+
+  if (expected.errorNodes) {
+    for (const nodeId of expected.errorNodes) {
+      if (context.statuses[nodeId] !== "error") {
+        throw new Error(
+          `Expected node "${nodeId}" to be error, got "${context.statuses[nodeId]}"`
+        );
+      }
+    }
+  }
+
+  if (expected.outputContains) {
+    for (const [nodeId, expectedOutput] of Object.entries(expected.outputContains)) {
+      const actual = context.outputs[nodeId];
+      if (actual !== expectedOutput) {
+        throw new Error(
+          `Expected node "${nodeId}" output to be ${JSON.stringify(expectedOutput)}, got ${JSON.stringify(actual)}`
+        );
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Debug Timeline Testing Helpers
+// ============================================================================
+
+import type { DebugEvent, DebugEventType } from "./types.js";
+import { createDebugTimeline, type DebugTimeline } from "./debug-timeline.js";
+
+/**
+ * Create a test debug timeline pre-populated with events.
+ *
+ * @example
+ * ```typescript
+ * const timeline = createTestTimeline([
+ *   { type: "agent_start", agentId: "researcher", inputLength: 42 },
+ *   { type: "agent_complete", agentId: "researcher", outputLength: 100, durationMs: 500, totalTokens: 200 },
+ * ]);
+ *
+ * expect(timeline.getEventsForAgent("researcher")).toHaveLength(2);
+ * ```
+ */
+export function createTestTimeline(
+  events?: Array<Partial<DebugEvent> & { type: DebugEventType }>,
+  options?: { maxEvents?: number },
+): DebugTimeline {
+  const timeline = createDebugTimeline({ maxEvents: options?.maxEvents ?? 500 });
+
+  if (events) {
+    for (const event of events) {
+      timeline.record({
+        timestamp: Date.now(),
+        snapshotId: null,
+        agentId: "",
+        ...event,
+      } as Omit<DebugEvent, "id">);
+    }
+  }
+
+  return timeline;
+}
+
+/**
+ * Assert that a debug timeline contains expected events.
+ *
+ * @example
+ * ```typescript
+ * assertTimelineEvents(timeline, {
+ *   totalEvents: 5,
+ *   eventTypes: ["agent_start", "guardrail_check", "agent_complete"],
+ *   agentEvents: { researcher: 3, writer: 2 },
+ *   hasType: "guardrail_check",
+ * });
+ * ```
+ */
+export function assertTimelineEvents(
+  timeline: DebugTimeline,
+  expected: {
+    totalEvents?: number;
+    minEvents?: number;
+    maxEvents?: number;
+    eventTypes?: DebugEventType[];
+    agentEvents?: Record<string, number>;
+    hasType?: DebugEventType;
+    doesNotHaveType?: DebugEventType;
+  },
+): void {
+  const events = timeline.getEvents();
+
+  if (expected.totalEvents !== undefined && events.length !== expected.totalEvents) {
+    throw new Error(
+      `Expected ${expected.totalEvents} timeline events, got ${events.length}`
+    );
+  }
+
+  if (expected.minEvents !== undefined && events.length < expected.minEvents) {
+    throw new Error(
+      `Expected at least ${expected.minEvents} timeline events, got ${events.length}`
+    );
+  }
+
+  if (expected.maxEvents !== undefined && events.length > expected.maxEvents) {
+    throw new Error(
+      `Expected at most ${expected.maxEvents} timeline events, got ${events.length}`
+    );
+  }
+
+  if (expected.eventTypes) {
+    for (const type of expected.eventTypes) {
+      const found = events.some((e) => e.type === type);
+      if (!found) {
+        throw new Error(
+          `Expected timeline to contain event of type "${type}", but none found`
+        );
+      }
+    }
+  }
+
+  if (expected.agentEvents) {
+    for (const [agentId, expectedCount] of Object.entries(expected.agentEvents)) {
+      const actual = timeline.getEventsForAgent(agentId).length;
+      if (actual !== expectedCount) {
+        throw new Error(
+          `Expected ${expectedCount} events for agent "${agentId}", got ${actual}`
+        );
+      }
+    }
+  }
+
+  if (expected.hasType) {
+    const found = events.some((e) => e.type === expected.hasType);
+    if (!found) {
+      throw new Error(
+        `Expected timeline to contain event of type "${expected.hasType}"`
+      );
+    }
+  }
+
+  if (expected.doesNotHaveType) {
+    const found = events.some((e) => e.type === expected.doesNotHaveType);
+    if (found) {
+      throw new Error(
+        `Expected timeline NOT to contain event of type "${expected.doesNotHaveType}"`
+      );
+    }
+  }
+}
+
+// ============================================================================
+// Self-Healing Testing Helpers
+// ============================================================================
+
+import type { RerouteEvent } from "./types.js";
+import type { HealthMonitor } from "./health-monitor.js";
+
+/**
+ * Create a runner that always fails, useful for testing self-healing.
+ *
+ * @example
+ * ```typescript
+ * const failing = createFailingRunner(new Error("Provider down"));
+ * const orchestrator = createAgentOrchestrator({
+ *   runner: failing,
+ *   selfHealing: { fallbackRunners: [backupRunner] },
+ * });
+ * ```
+ */
+export function createFailingRunner(
+  error?: Error,
+  options?: { delay?: number; failAfter?: number },
+): AgentRunner {
+  let callCount = 0;
+  const failAfter = options?.failAfter ?? 0;
+
+  return async <T>(
+    _agent: AgentLike,
+    _input: string,
+    _runOptions?: RunOptions,
+  ): Promise<RunResult<T>> => {
+    callCount++;
+
+    if (failAfter > 0 && callCount <= failAfter) {
+      return {
+        output: "success" as T,
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      };
+    }
+
+    if (options?.delay && options.delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, options.delay));
+    }
+
+    throw error ?? new Error("Runner failed");
+  };
+}
+
+/**
+ * Assert that an agent was rerouted during execution.
+ *
+ * @example
+ * ```typescript
+ * const events: RerouteEvent[] = [];
+ * const orchestrator = createMultiAgentOrchestrator({
+ *   selfHealing: {
+ *     onReroute: (event) => events.push(event),
+ *   },
+ * });
+ *
+ * // ... trigger reroute ...
+ * assertRerouted(events, {
+ *   fromAgent: "primary",
+ *   toAgent: "backup",
+ *   reason: /circuit breaker/i,
+ * });
+ * ```
+ */
+export function assertRerouted(
+  events: RerouteEvent[],
+  expected: {
+    fromAgent?: string;
+    toAgent?: string;
+    reason?: string | RegExp;
+    minReroutes?: number;
+  },
+): void {
+  if (events.length === 0) {
+    throw new Error("Expected at least one reroute event, but none occurred");
+  }
+
+  if (expected.minReroutes !== undefined && events.length < expected.minReroutes) {
+    throw new Error(
+      `Expected at least ${expected.minReroutes} reroute events, got ${events.length}`
+    );
+  }
+
+  if (expected.fromAgent) {
+    const found = events.some((e) => e.originalAgent === expected.fromAgent);
+    if (!found) {
+      throw new Error(
+        `Expected reroute from agent "${expected.fromAgent}", but no matching event found`
+      );
+    }
+  }
+
+  if (expected.toAgent) {
+    const found = events.some((e) => e.reroutedTo === expected.toAgent);
+    if (!found) {
+      throw new Error(
+        `Expected reroute to agent "${expected.toAgent}", but no matching event found`
+      );
+    }
+  }
+
+  if (expected.reason) {
+    const found = events.some((e) => {
+      if (typeof expected.reason === "string") {
+        return e.reason.includes(expected.reason);
+      }
+
+      return expected.reason!.test(e.reason);
+    });
+    if (!found) {
+      throw new Error(
+        `Expected reroute reason matching ${expected.reason}, but no matching event found`
+      );
+    }
+  }
+}
+
+/**
+ * Assert the health state of an agent in the health monitor.
+ *
+ * @example
+ * ```typescript
+ * assertAgentHealth(monitor, "researcher", {
+ *   minScore: 70,
+ *   circuitState: "CLOSED",
+ * });
+ * ```
+ */
+export function assertAgentHealth(
+  monitor: HealthMonitor,
+  agentId: string,
+  expected: {
+    minScore?: number;
+    maxScore?: number;
+    circuitState?: "CLOSED" | "OPEN" | "HALF_OPEN";
+    minSuccessRate?: number;
+  },
+): void {
+  const metrics = monitor.getMetrics(agentId);
+
+  if (expected.minScore !== undefined && metrics.healthScore < expected.minScore) {
+    throw new Error(
+      `Expected agent "${agentId}" health score to be at least ${expected.minScore}, got ${metrics.healthScore}`
+    );
+  }
+
+  if (expected.maxScore !== undefined && metrics.healthScore > expected.maxScore) {
+    throw new Error(
+      `Expected agent "${agentId}" health score to be at most ${expected.maxScore}, got ${metrics.healthScore}`
+    );
+  }
+
+  if (expected.circuitState !== undefined && metrics.circuitState !== expected.circuitState) {
+    throw new Error(
+      `Expected agent "${agentId}" circuit state to be "${expected.circuitState}", got "${metrics.circuitState}"`
+    );
+  }
+
+  if (expected.minSuccessRate !== undefined && metrics.successRate < expected.minSuccessRate) {
+    throw new Error(
+      `Expected agent "${agentId}" success rate to be at least ${expected.minSuccessRate}, got ${metrics.successRate}`
+    );
+  }
 }

@@ -88,7 +88,6 @@ export const navigation: NavigationSection[] = [
       { title: 'Running Agents', href: '/docs/ai/running-agents' },
       { title: 'Resilience & Routing', href: '/docs/ai/resilience-routing' },
       { title: 'Orchestrator', href: '/docs/ai/orchestrator' },
-      { title: 'Agent Stack', href: '/docs/ai/agent-stack' },
       { title: 'Guardrails', href: '/docs/ai/guardrails' },
       { title: 'Streaming', href: '/docs/ai/streaming' },
       { title: 'Multi-Agent', href: '/docs/ai/multi-agent' },

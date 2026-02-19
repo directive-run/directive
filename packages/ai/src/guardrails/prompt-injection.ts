@@ -18,7 +18,7 @@
  * ```
  */
 
-import type { GuardrailFn, InputGuardrailData, GuardrailResult } from "../index.js";
+import type { GuardrailFn, InputGuardrailData, GuardrailResult } from "../types.js";
 
 // ============================================================================
 // Pattern Categories

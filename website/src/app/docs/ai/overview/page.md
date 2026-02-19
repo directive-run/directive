@@ -28,15 +28,47 @@ Build up from simple to complex:
 | Level | Page | What You Learn |
 |-------|------|---------------|
 | 1 | [Running Agents](/docs/ai/running-agents) | End-to-end examples and deployment patterns |
-| 2 | [Resilience & Routing](/docs/ai/resilience-routing) | Retry, fallback, budgets, model selection, structured outputs |
+| 2 | [Resilience & Routing](/docs/ai/resilience-routing) | `pipe()` composition, retry, fallback, budgets, model selection, structured outputs |
 | 3 | [Orchestrator](/docs/ai/orchestrator) | Single-agent runs with guardrails and constraints |
-| 4 | [Agent Stack](/docs/ai/agent-stack) | Composable agent pipelines with `.run()` / `.stream()` / `.structured()` |
-| 5 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
-| 6 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
-| 7 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, and supervisor execution patterns |
-| 8 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
-| 9 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
-| 10 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
+| 4 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
+| 5 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
+| 6 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, supervisor patterns with per-agent guardrails and streaming |
+| 7 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
+| 8 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
+| 9 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
+
+---
+
+## Two Orchestrators
+
+Directive ships two orchestrators. Both are backed by a Directive System with reactive state, constraints, guardrails, streaming, approval, memory, retry, budget, hooks, and time-travel debugging. The multi-agent orchestrator has full feature parity with the single-agent orchestrator &mdash; each registered agent becomes a namespaced Directive module with its own reactive state and constraint evaluation.
+
+| | Single-Agent | Multi-Agent |
+|---|---|---|
+| **Function** | `createAgentOrchestrator` | `createMultiAgentOrchestrator` |
+| **Scope** | One agent at a time | Multiple named agents with concurrency control |
+| **State** | `orchestrator.facts.agent` | `orchestrator.facts` (namespaced per agent) |
+| **Streaming** | `orchestrator.runStream()` | `orchestrator.runAgentStream()` |
+| **Patterns** | &ndash; | `parallel()`, `sequential()`, `supervisor()` |
+| **Guardrails** | Orchestrator-level | Orchestrator-level + per-agent |
+| **Constraints** | Orchestrator-level | Orchestrator-level + per-agent |
+| **Approval** | `approve()` / `reject()` | `approve()` / `reject()` (routes to correct agent) |
+| **Use when** | Simple chatbot, single-purpose agent | Pipelines, fan-out, delegation, routing |
+
+```typescript
+// Single-agent
+const single = createAgentOrchestrator({ runner, guardrails, maxTokenBudget: 10000 });
+const result = await single.run(agent, 'Hello!');
+
+// Multi-agent
+const multi = createMultiAgentOrchestrator({
+  runner,
+  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  guardrails,
+  maxTokenBudget: 50000,
+});
+const result = await multi.runAgent('researcher', 'What is WASM?');
+```
 
 ---
 
@@ -45,7 +77,9 @@ Build up from simple to complex:
 | Concept | Description |
 |---------|-------------|
 | **Orchestrator** | Wraps an `AgentRunner` with constraints, guardrails, and state tracking |
-| **Agent Stack** | Composable `.run()` / `.stream()` / `.structured()` API |
+| **Multi-Agent Orchestrator** | Coordinates multiple named agents with concurrency, patterns, and per-agent configuration |
+| **`pipe()`** | Left-to-right middleware composition: `pipe(runner, withRetry(...), withBudget(...))` |
+| **Middleware** | Composable `with*` wrappers (`withRetry`, `withFallback`, `withBudget`) that stack on any runner |
 | **Guardrails** | Input, output, and tool-call validators that block or transform data |
 | **Constraints** | Declarative rules (e.g., "if confidence < 0.7, escalate to expert") |
 | **Memory** | Sliding window, token-based, or hybrid conversation management |
@@ -64,7 +98,7 @@ const orchestrator = createAgentOrchestrator({
 
   // Block any user input that contains personal information
   guardrails: {
-    input: [createPIIGuardrail({ action: 'block' })],
+    input: [createPIIGuardrail()],
   },
 
   // Pause agents automatically when token spend exceeds the budget

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Directive module for AI docs chatbot server-side state.
  *
