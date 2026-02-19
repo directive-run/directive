@@ -17,8 +17,9 @@ The release process is automated via GitHub Actions (`changesets/action`). You j
 4. **GitHub Action publishes to npm** automatically on merge
    - Builds all packages
    - Runs typechecks and tests
-   - Publishes to npm with `--access public`
-   - Creates git tags
+   - Publishes to npm with provenance signing
+   - Creates git tags (e.g., `@directive-run/core@0.2.0`)
+   - Creates GitHub Releases for each published package
 
 Website auto-deploys via Vercel on any push to `main`.
 
@@ -65,20 +66,26 @@ pnpm changeset version        # Bump versions + generate changelogs
 pnpm -r build                 # Build all packages
 pnpm test -- --run             # Run tests
 npm whoami                     # Verify npm auth
-pnpm publish -r --access public  # Publish to npm
-pnpm changeset tag             # Create git tags
+pnpm changeset publish         # Publish to npm + create git tags
 git push --follow-tags         # Push commits + tags
 ```
+
+**Note:** Local publishes do not create GitHub Releases. If needed, create them manually at https://github.com/directive-run/directive/releases/new using the git tags created by `changeset publish`.
 
 ## CI Pipeline Details
 
 **File:** `.github/workflows/release.yml`
 
-Triggers on push to `main`. Steps:
+Triggers on push to `main` (only for changes in `packages/`, `.changeset/`, `release.yml`, or `pnpm-lock.yaml`). Steps:
 1. `pnpm install --frozen-lockfile`
 2. `pnpm -r --filter './packages/*' build`
 3. `pnpm -r --filter './packages/*' typecheck`
 4. `pnpm test -- --run`
-5. `changesets/action` — creates PR or publishes
+5. `changesets/action` &ndash; creates PR or publishes
+
+**Key settings:**
+- `createGithubReleases: true` &ndash; creates a GitHub Release for each published package
+- `permissions: id-token: write` &ndash; enables npm provenance signing
+- `publish: pnpm changeset publish` &ndash; creates git tags + skips already-published versions
 
 **Required secrets:** `NPM_TOKEN`, `GITHUB_TOKEN`

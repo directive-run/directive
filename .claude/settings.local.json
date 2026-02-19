@@ -83,7 +83,11 @@
       "WebFetch(domain:bundlephobia.com)",
       "Bash(npx next build:*)",
       "Bash(pnpm build:example:*)",
-      "Bash(pnpm build:next-only:*)"
+      "Bash(pnpm build:next-only:*)",
+      "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive log --oneline --all)",
+      "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive show 486c0ed --stat)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh run list:*)"
     ]
   }
 }
