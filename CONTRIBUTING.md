@@ -72,8 +72,8 @@ Changesets uses **fixed groups** so packages in the same group always share the 
 
 | Group | Packages | Current Version |
 |-------|----------|-----------------|
-| Core + Frameworks | `core`, `react`, `vue`, `svelte`, `solid`, `lit` | 0.1.0 |
-| AI | `ai` | 0.1.0 (independent) |
+| Core + Frameworks | `core`, `react`, `vue`, `svelte`, `solid`, `lit` | 0.2.0 |
+| AI | `ai` | 0.2.0 (independent) |
 
 `vite-plugin-api-proxy` is excluded from changesets.
 
@@ -237,7 +237,7 @@ Runs on every pull request. **All checks must pass** before merge.
 
 ### Merge to main &ndash; `release.yml`
 
-Runs on push to main. Handles npm publishing via Changesets.
+Runs on push to main when `packages/`, `.changeset/`, `release.yml`, or `pnpm-lock.yaml` change. Skips website-only and docs-only pushes.
 
 1. Checkout + pnpm setup (Node 22)
 2. `pnpm install`
@@ -246,7 +246,7 @@ Runs on push to main. Handles npm publishing via Changesets.
 5. `pnpm test -- --run`
 6. **Changesets action:**
    - If pending changesets exist → creates/updates a "Version Packages" PR
-   - If no pending changesets (version PR was just merged) → publishes to npm with provenance
+   - If no pending changesets (version PR was just merged) → publishes to npm with provenance, creates git tags, creates GitHub Releases
 
 ### Merge to main &ndash; Vercel
 
@@ -260,6 +260,24 @@ Vercel auto-deploys the website on every push to main:
 
 ## Release Process
 
+### Flow Diagram
+
+```mermaid
+flowchart TD
+    A[Developer creates changeset] --> B[Push to main]
+    B --> C[release.yml triggers]
+    C --> D[Build + Typecheck + Test]
+    D --> E{Pending changesets?}
+    E -- Yes --> F["Version mode:<br/>Creates 'Version Packages' PR"]
+    F --> G[Developer merges PR]
+    G --> B
+    E -- No --> H[Publish mode]
+    H --> I[npm publish with provenance]
+    I --> J[Git tags created]
+    J --> K[GitHub Releases created]
+    K --> L[Vercel redeploys website]
+```
+
 ### Step-by-Step
 
 **1. Create a changeset**
@@ -270,31 +288,74 @@ pnpm changeset
 
 Or use the `/changeset` skill in Claude Code. Select the affected packages and describe the change.
 
-**2. Open a PR and merge**
+**Tips for fixed groups:**
+- List one package from the group (e.g., `@directive-run/core`) &ndash; all group members bump automatically
+- If an adapter (react, vue, etc.) has its own meaningful changes, list it explicitly for a proper changelog entry
+- Packages with no changes of their own don't need listing &ndash; they get the version bump from the group
+
+**2. Push to main**
 
 The changeset file (`.changeset/*.md`) is committed with your code changes. CI runs on the PR. Merge when green.
 
-**3. Version Packages PR**
+**3. Version Packages PR (automatic)**
 
 After merge, `release.yml` runs the Changesets action. It detects pending changesets and creates a "Version Packages" PR that:
-- Bumps versions in all affected `package.json` files
+- Bumps versions in all affected `package.json` files (fixed groups bump together)
 - Updates `CHANGELOG.md` in each package
 - Removes the consumed `.changeset/*.md` files
 
 **4. Merge the Version PR**
 
-Merging this PR triggers `release.yml` again. This time there are no pending changesets, so the Changesets action **publishes to npm** with provenance signing.
+Review the version bumps and changelogs, then merge.
 
-### Version Groups
+**5. Publish (automatic)**
 
-All packages in a fixed group get the same version bump:
+Merging triggers `release.yml` again. This time there are no pending changesets, so the Changesets action:
+- Publishes to npm with provenance signing (`id-token: write` permission)
+- Creates git tags (e.g., `@directive-run/core@0.2.0`)
+- Creates GitHub Releases for each published package
+- Vercel auto-redeploys the website with updated API docs
 
-- Bumping `core` also bumps `react`, `vue`, `svelte`, `solid`, `lit`
-- `ai` versions independently
+### `pnpm changeset publish` vs `pnpm publish -r`
 
-### Post-Release
+| Feature | `changeset publish` | `publish -r` |
+|---------|---------------------|--------------|
+| Creates git tags | Yes | No |
+| GitHub Releases (via action) | Yes | No |
+| Skips already-published versions | Yes | No (fails on conflict) |
+| Reads `access` from config | Yes | Needs `--access public` |
+| Provenance signing | Yes (with `id-token`) | Yes (with `id-token`) |
 
-After npm publish, Vercel auto-redeploys the website. The new API docs are regenerated from the updated source.
+### Changeset Configuration
+
+Key settings in `.changeset/config.json`:
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `fixed` | `[["core", "react", "vue", ...]]` | Fixed groups &ndash; all bump together |
+| `access` | `"public"` | Publish as public scoped packages |
+| `baseBranch` | `"main"` | PR target branch |
+| `onlyUpdatePeerDependentsWhenOutOfRange` | `true` | Prevents major bumps from peer dep changes |
+| `changelog` | `"@changesets/changelog-github"` | GitHub-linked changelog entries |
+
+### Changelog Behavior
+
+Fixed groups share version numbers, but **changelog entries only appear for packages explicitly listed in the changeset file**. If only `@directive-run/core` is listed, the other group members (react, vue, svelte, solid, lit) get the version bump but their `CHANGELOG.md` files won't have an entry for that release. If an adapter has its own changes, list it explicitly in the changeset for a proper changelog entry.
+
+### Local Fallback
+
+Only use this if GitHub Actions isn't working:
+
+```bash
+pnpm changeset version        # Bump versions + generate changelogs
+pnpm -r build                 # Build all packages
+pnpm test -- --run             # Run tests
+npm whoami                     # Verify npm auth
+pnpm changeset publish         # Publish to npm + create git tags
+git push --follow-tags         # Push commits + tags
+```
+
+**Note:** Local publishes don't create GitHub Releases. Create them manually at [github.com/directive-run/directive/releases/new](https://github.com/directive-run/directive/releases/new) using the git tags created by `changeset publish`.
 
 ---
 

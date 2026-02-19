@@ -1133,6 +1133,10 @@ const trafficLight = createModule("traffic-light", {
 - [API Reference](https://directive.run/api)
 - [Examples](https://github.com/directive-run/directive/tree/main/examples)
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture overview, and release process.
+
 ## License
 
 MIT

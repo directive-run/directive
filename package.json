@@ -17,7 +17,7 @@
     "clean": "pnpm -r clean && rm -rf node_modules",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "pnpm publish -r --access public"
+    "changeset:publish": "pnpm changeset publish"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
