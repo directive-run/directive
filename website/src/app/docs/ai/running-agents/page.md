@@ -5,7 +5,7 @@ description: The fastest way to run a single AI agent with Directive – pick a 
 
 Run a single AI agent in three lines. {% .lead %}
 
-This is the minimal path. No orchestrator, no guardrails, no memory &ndash; just a runner function, an agent, and an input. When you need more, layer in the [orchestrator](/docs/ai/orchestrator) or the full [agent stack](/docs/ai/agent-stack).
+This is the minimal path. No orchestrator, no guardrails, no memory &ndash; just a runner function, an agent, and an input. When you need more, layer in the [orchestrator](/docs/ai/orchestrator).
 
 ---
 
@@ -65,6 +65,18 @@ const runner = createAnthropicRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
   model: 'claude-sonnet-4-5-20250929',     // Default Claude model
   maxTokens: 4096,                         // Max output tokens per request
+});
+```
+
+### Google Gemini
+
+```typescript
+import { createGeminiRunner } from '@directive-run/ai/gemini';
+
+const runner = createGeminiRunner({
+  apiKey: process.env.GEMINI_API_KEY!,
+  model: 'gemini-2.0-flash',                    // Default Gemini model
+  maxOutputTokens: 4096,                         // Max output tokens per request
 });
 ```
 
@@ -143,6 +155,7 @@ Available pricing constants:
 |--------|--------|
 | `OPENAI_PRICING` from `@directive-run/ai/openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `o3-mini` |
 | `ANTHROPIC_PRICING` from `@directive-run/ai/anthropic` | `claude-sonnet-4-5-20250929`, `claude-haiku-3-5-20241022`, `claude-opus-4-20250514` |
+| `GEMINI_PRICING` from `@directive-run/ai/gemini` | `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-lite` |
 
 {% callout title="Pricing disclaimer" %}
 Pricing changes over time. The constants are provided as a convenience and may not reflect the latest rates. Always verify at your provider's pricing page.
@@ -184,7 +197,7 @@ const runner = createAnthropicRunner({
 | `onAfterCall` | After a successful response | `agent`, `input`, `output`, `totalTokens`, `tokenUsage`, `durationMs`, `timestamp` |
 | `onError` | When a call fails | `agent`, `input`, `error`, `durationMs`, `timestamp` |
 
-Hooks work on both standard runners (`createOpenAIRunner`, `createAnthropicRunner`, `createOllamaRunner`) and streaming runners (`createOpenAIStreamingRunner`, `createAnthropicStreamingRunner`).
+Hooks work on all standard runners (`createOpenAIRunner`, `createAnthropicRunner`, `createGeminiRunner`, `createOllamaRunner`) and streaming runners (`createOpenAIStreamingRunner`, `createAnthropicStreamingRunner`, `createGeminiStreamingRunner`).
 
 ---
 
@@ -264,8 +277,8 @@ The raw runner is perfect for scripts, one-off calls, and simple integrations. L
 | Approval workflows | [Orchestrator](/docs/ai/orchestrator) |
 | Token budgets | [Orchestrator](/docs/ai/orchestrator) |
 | Reactive UI state | [Orchestrator](/docs/ai/orchestrator) + [Framework hooks](/docs/ai/orchestrator#framework-integration) |
-| Memory / conversation context | [Agent Stack](/docs/ai/agent-stack) |
-| Caching, circuit breakers, observability | [Agent Stack](/docs/ai/agent-stack) |
+| Memory / conversation context | [Orchestrator](/docs/ai/orchestrator) |
+| Caching, circuit breakers, observability | [Resilience & Routing](/docs/ai/resilience-routing) |
 | Parallel / sequential / supervisor patterns | [Multi-Agent](/docs/ai/multi-agent) |
 
 ---
@@ -274,6 +287,5 @@ The raw runner is perfect for scripts, one-off calls, and simple integrations. L
 
 - [Resilience & Routing](/docs/ai/resilience-routing) – retry, fallback, budgets, model selection, structured outputs
 - [Orchestrator](/docs/ai/orchestrator) – add guardrails, approvals, and state tracking
-- [Agent Stack](/docs/ai/agent-stack) – all-in-one factory with memory, caching, and resilience
 - [Streaming](/docs/ai/streaming) – real-time token streaming
 - [Guardrails](/docs/ai/guardrails) – input validation and output safety

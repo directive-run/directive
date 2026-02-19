@@ -19,7 +19,7 @@
  * ```
  */
 
-import type { GuardrailFn, InputGuardrailData, OutputGuardrailData, GuardrailResult } from "../index.js";
+import type { GuardrailFn, InputGuardrailData, OutputGuardrailData, GuardrailResult } from "../types.js";
 
 // ============================================================================
 // PII Types

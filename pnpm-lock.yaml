@@ -477,6 +477,9 @@ importers:
       '@algolia/autocomplete-core':
         specifier: ^1.19.2
         version: 1.19.5(@algolia/client-search@5.48.1)(algoliasearch@5.48.1)(search-insights@2.17.3)
+      '@directive-run/ai':
+        specifier: workspace:*
+        version: link:../packages/ai
       '@directive-run/core':
         specifier: workspace:*
         version: link:../packages/core

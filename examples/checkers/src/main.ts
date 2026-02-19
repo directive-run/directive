@@ -15,7 +15,6 @@ import { checkersChat } from "./chat.js";
 import { createCheckersAI } from "./ai-orchestrator.js";
 import { getApiKey, setApiKey } from "./claude-adapter.js";
 import type { DashboardData } from "@directive-run/ai";
-import { createAISyncer } from "@directive-run/ai";
 import type { Board, Player } from "./rules.js";
 import { getAllValidMoves, toRowCol } from "./rules.js";
 
@@ -35,8 +34,9 @@ system.start();
 
 const checkersAI = createCheckersAI();
 
-// Sync AI adapter state → directive system (replaces manual getState + dispatch)
-const syncAI = createAISyncer(checkersAI, (state) => {
+/** Sync AI adapter state → directive system */
+function syncAI(): void {
+  const state = checkersAI.getState();
   system.events.chat.updateAIState({
     totalTokens: state.totalTokens,
     estimatedCost: state.estimatedCost,
@@ -46,7 +46,7 @@ const syncAI = createAISyncer(checkersAI, (state) => {
     hitRate: state.cacheStats.hitRate,
     entries: state.cacheStats.totalEntries,
   });
-});
+}
 
 // ============================================================================
 // DOM References

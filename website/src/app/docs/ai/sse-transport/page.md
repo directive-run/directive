@@ -1,18 +1,18 @@
 ---
 title: SSE Transport
-description: Wrap a Directive AgentStack token stream into an HTTP Server-Sent Events response with truncation, heartbeat, error mapping, and abort signal propagation.
+description: Wrap a Directive streaming source into an HTTP Server-Sent Events response with truncation, heartbeat, error mapping, and abort signal propagation.
 ---
 
-Turn any AgentStack token stream into a Server-Sent Events HTTP response. {% .lead %}
+Turn any streamable source into a Server-Sent Events HTTP response. {% .lead %}
 
 ---
 
 ## Overview
 
-`createSSETransport` converts the output of `stack.stream()` into a standard SSE byte stream. It works with any WinterCG-compatible runtime (Node 18+, Deno, Bun, Cloudflare Workers, Next.js App Router).
+`createSSETransport` converts token streams into a standard SSE byte stream. It accepts any object implementing the `SSEStreamable` interface (an object with a `.stream()` method). It works with any WinterCG-compatible runtime (Node 18+, Deno, Bun, Cloudflare Workers, Next.js App Router).
 
 ```typescript
-import { createSSETransport, createAgentStack } from '@directive-run/ai';
+import { createSSETransport, createStreamingRunner, createAgentOrchestrator } from '@directive-run/ai';
 
 const transport = createSSETransport({
   maxResponseChars: 10_000,
@@ -22,11 +22,25 @@ const transport = createSSETransport({
   },
 });
 
+// Create a streamable wrapper that SSE transport can use
+const streamRunner = createStreamingRunner(myStreamingCallbackRunner);
+
+const docsAgent = {
+  name: 'docs-qa',
+  instructions: 'Answer questions using the provided documentation context.',
+  model: 'claude-sonnet-4-5-20250929',
+};
+
+// SSE transport accepts any SSEStreamable – an object with a .stream(agentOrInput, input?) method
+const streamable = {
+  stream: (input: string) => streamRunner(docsAgent, input),
+};
+
 // Next.js route handler
 export async function POST(request: Request) {
   const { message } = await request.json();
 
-  return transport.toResponse(stack, 'docs-qa', message);
+  return transport.toResponse(streamable, message);
 }
 ```
 
@@ -65,7 +79,7 @@ type SSEEvent =
   | { type: 'heartbeat'; timestamp: number };
 ```
 
-### `toResponse(stack, agentId, input, opts?)`
+### `toResponse(streamable, input, opts?)`
 
 Creates a full `Response` object with SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`). Pass it directly as the return value from a route handler.
 
@@ -73,17 +87,17 @@ Creates a full `Response` object with SSE headers (`Content-Type: text/event-str
 export async function POST(request: Request) {
   const { message } = await request.json();
 
-  return transport.toResponse(stack, 'docs-qa', message);
+  return transport.toResponse(streamable, message);
 }
 ```
 
-### `toStream(stack, agentId, input, opts?)`
+### `toStream(streamable, input, opts?)`
 
 Returns just the `ReadableStream<Uint8Array>` for frameworks like Express or Koa where you pipe the stream into `res.write()` manually.
 
 ```typescript
 app.post('/api/chat', async (req, res) => {
-  const stream = transport.toStream(stack, 'docs-qa', req.body.message);
+  const stream = transport.toStream(streamable, req.body.message);
   const reader = stream.getReader();
   res.setHeader('Content-Type', 'text/event-stream');
 
@@ -224,7 +238,7 @@ const transport = createSSETransport({
 });
 ```
 
-When the limit is hit, the transport sends the truncation message as a `truncated` event, sends a `done` event, and aborts the underlying token stream. The final `stack.stream().result` is still awaited to ensure metrics and token counts are recorded.
+When the limit is hit, the transport sends the truncation message as a `truncated` event, sends a `done` event, and aborts the underlying token stream. The final stream `result` is still awaited to ensure metrics and token counts are recorded.
 
 {% callout type="note" title="Truncation sizing" %}
 The `truncationMessage` length is **not** counted against `maxResponseChars`. Suggested values:
@@ -264,43 +278,41 @@ Pass an `AbortSignal` to cancel the stream from the server side. This is useful 
 export async function POST(request: Request) {
   const { message } = await request.json();
 
-  return transport.toResponse(stack, 'docs-qa', message, {
+  return transport.toResponse(streamable, message, {
     signal: request.signal,  // Cancels the agent stream if the client disconnects
   });
 }
 ```
 
-The signal is forwarded to `stack.stream()`, which aborts the underlying LLM call.
+The signal is forwarded to the streaming runner, which aborts the underlying LLM call.
 
 ---
 
 ## `createAnthropicStreamingRunner`
 
-A built-in streaming runner that calls the Anthropic Messages API with server-sent events. It is defined in `helpers.ts` but re-exported from the same `@directive-run/ai` entry point. Pair it with the SSE transport for an end-to-end Anthropic streaming pipeline.
+A built-in streaming runner that calls the Anthropic Messages API with server-sent events. It is re-exported from the `@directive-run/ai` entry point (and also available from `@directive-run/ai/anthropic`). Pair it with the SSE transport for an end-to-end Anthropic streaming pipeline.
 
 ```typescript
 import {
   createAnthropicRunner,
   createAnthropicStreamingRunner,
-  createAgentStack,
-} from '@directive-run/ai';
+} from '@directive-run/ai/anthropic';
+import { createStreamingRunner } from '@directive-run/ai';
 
-const streamingRunner = createAnthropicStreamingRunner({
+const anthropicStreamingRunner = createAnthropicStreamingRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
   model: 'claude-sonnet-4-5-20250929',
   maxTokens: 4096,
 });
 
-const stack = createAgentStack({
-  runner: createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! }),
-  streaming: { runner: streamingRunner },
-  agents: {
-    chat: {
-      agent: { name: 'chat', instructions: 'You are helpful.', model: 'claude-sonnet-4-5-20250929' },
-      capabilities: ['chat'],
-    },
-  },
-});
+const streamRunner = createStreamingRunner(anthropicStreamingRunner);
+
+const chatAgent = { name: 'chat', instructions: 'You are helpful.', model: 'claude-sonnet-4-5-20250929' };
+
+// Create a streamable wrapper for SSE transport
+const streamable = {
+  stream: (input: string) => streamRunner(chatAgent, input),
+};
 ```
 
 ### `AnthropicStreamingRunnerOptions`
@@ -319,17 +331,19 @@ The runner reads each SSE event from the Anthropic API, emits tokens via `callba
 
 ## Full Example: Next.js Route Handler
 
-A complete Next.js App Router endpoint combining [RAG enrichment](/docs/ai/rag), SSE transport, and [AgentStack](/docs/ai/agent-stack):
+A complete Next.js App Router endpoint combining [RAG enrichment](/docs/ai/rag), SSE transport, and a streaming runner:
 
 ```typescript
 // app/api/chat/route.ts
 import {
-  createAgentStack,
   createAnthropicRunner,
   createAnthropicStreamingRunner,
+} from '@directive-run/ai/anthropic';
+import { createOpenAIEmbedder } from '@directive-run/ai/openai';
+import {
+  createStreamingRunner,
   createRAGEnricher,
   createJSONFileStore,
-  createOpenAIEmbedder,
   createSSETransport,
 } from '@directive-run/ai';
 
@@ -342,23 +356,20 @@ const enricher = createRAGEnricher({
   minSimilarity: 0.3,
 });
 
-const stack = createAgentStack({
-  runner: createAnthropicRunner({ apiKey }),
-  streaming: {
-    runner: createAnthropicStreamingRunner({ apiKey }),
-  },
-  agents: {
-    'docs-qa': {
-      agent: {
-        name: 'docs-qa',
-        instructions: 'Answer questions using the provided documentation context.',
-        model: 'claude-sonnet-4-5-20250929',
-      },
-      capabilities: ['chat'],
-    },
-  },
-  memory: { maxMessages: 20 },
-});
+const docsAgent = {
+  name: 'docs-qa',
+  instructions: 'Answer questions using the provided documentation context.',
+  model: 'claude-sonnet-4-5-20250929',
+};
+
+const streamRunner = createStreamingRunner(
+  createAnthropicStreamingRunner({ apiKey }),
+);
+
+// SSE transport accepts any SSEStreamable
+const streamable = {
+  stream: (input: string) => streamRunner(docsAgent, input),
+};
 
 const transport = createSSETransport({
   maxResponseChars: 10_000,
@@ -376,9 +387,59 @@ export async function POST(request: Request) {
     filter: (chunk) => chunk.metadata.type === 'docs',
   });
 
-  return transport.toResponse(stack, 'docs-qa', enrichedInput, {
+  return transport.toResponse(streamable, enrichedInput, {
     signal: request.signal,
   });
+}
+```
+
+---
+
+## Multi-Agent + SSE
+
+Route SSE streams from a multi-agent orchestrator by agent ID. Each agent streams through the same transport:
+
+```typescript
+import { createMultiAgentOrchestrator, createStreamingRunner, createSSETransport } from '@directive-run/ai';
+import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
+
+const apiKey = process.env.ANTHROPIC_API_KEY!;
+
+const researcher = { name: 'researcher', instructions: 'Research topics.', model: 'claude-sonnet-4-5-20250929' };
+const writer = { name: 'writer', instructions: 'Write articles.', model: 'claude-sonnet-4-5-20250929' };
+
+const streamRunner = createStreamingRunner(
+  createAnthropicStreamingRunner({ apiKey }),
+);
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner: createAnthropicRunner({ apiKey }),
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
+});
+
+const agentMap: Record<string, typeof researcher> = { researcher, writer };
+
+const transport = createSSETransport({
+  maxResponseChars: 10_000,
+  heartbeatIntervalMs: 15_000,
+});
+
+// Route requests to the correct agent via a body field
+export async function POST(request: Request) {
+  const { message, agentId } = await request.json();
+  const agentDef = agentMap[agentId];
+  if (!agentDef) {
+    return new Response(JSON.stringify({ error: `Unknown agent: ${agentId}` }), { status: 400 });
+  }
+
+  const streamable = {
+    stream: (input: string) => streamRunner(agentDef, input),
+  };
+
+  return transport.toResponse(streamable, message, { signal: request.signal });
 }
 ```
 
@@ -387,6 +448,7 @@ export async function POST(request: Request) {
 ## Next Steps
 
 - [RAG Enricher](/docs/ai/rag) – Retrieval-augmented generation pipeline
-- [Agent Stack](/docs/ai/agent-stack) – Compose all AI features in one factory
+- [Agent Orchestrator](/docs/ai/orchestrator) – Full orchestrator API
+- [Multi-Agent](/docs/ai/multi-agent) – Parallel, sequential, and supervisor patterns
 - [Streaming](/docs/ai/streaming) – Token streaming, backpressure, and stream operators
 - [Guardrails](/docs/ai/guardrails) – Input/output validation and safety

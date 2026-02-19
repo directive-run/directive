@@ -5,7 +5,11 @@ description: Build AI agents with constraint-driven orchestration, guardrails, a
 
 Orchestrate AI agents with guardrails, approvals, and budget control. {% .lead %}
 
-The orchestrator is **LLM-agnostic** – provide any `runner` function that accepts an agent and input, and Directive handles safety, approvals, and state tracking. Works with OpenAI, Anthropic, Ollama, or your own backend.
+The orchestrator is **LLM-agnostic** – provide any `runner` function that accepts an agent and input, and Directive handles safety, approvals, and state tracking. Works with OpenAI, Anthropic, Gemini, Ollama, or your own backend.
+
+{% callout title="Need multiple agents?" %}
+For parallel, sequential, or supervisor execution with per-agent guardrails and concurrency control, see [Multi-Agent Orchestration](/docs/ai/multi-agent). The multi-agent orchestrator has full feature parity with the single-agent orchestrator documented here.
+{% /callout %}
 
 ---
 
@@ -283,42 +287,23 @@ const orchestrator = createAgentOrchestrator<{}, MyOutput>({
 
 Resolvers receive a context with `facts` (the combined orchestrator state), `runAgent` (to run additional agents), and `signal` (for cancellation).
 
-### Constraint Helpers
+### Defining Constraints
 
-Use `constraint()` and `when()` for ergonomic constraint construction:
+Constraints are plain objects with `when`, `require`, and optional `priority`:
 
 ```typescript
-import { constraint, when } from '@directive-run/ai';
-
-interface MyFacts { confidence: number; errors: number }
-
-const orchestrator = createAgentOrchestrator<MyFacts>({
-  runner,
-  autoApproveToolCalls: true,
-
-  constraints: {
-    // Fluent builder – chain .when().require().priority().build()
-    escalate: constraint<MyFacts>()
-      .when((f) => f.confidence < 0.7)
-      .require({ type: 'ESCALATE' })
-      .priority(50)
-      .build(),
-
-    // Quick shorthand – one-liner that returns a constraint directly
-    pause: when<MyFacts>((f) => f.errors > 3)
-      .require({ type: 'PAUSE' }),
-
-    // Shorthand with explicit priority for conflict resolution
-    halt: when<MyFacts>((f) => f.errors > 10)
-      .require({ type: 'HALT' })
-      .withPriority(100),
+constraints: {
+  escalate: {
+    when: (facts) => facts.agent.output?.confidence < 0.7,
+    require: { type: 'ESCALATE' },
+    priority: 50,
   },
-});
+  pause: {
+    when: (facts) => facts.agent.tokenUsage > 10000,
+    require: { type: 'PAUSE' },
+  },
+},
 ```
-
-Both produce plain `OrchestratorConstraint` objects – zero runtime overhead, just ergonomic sugar. The `when()` shorthand returns a constraint directly (no `.build()` needed), and `.withPriority()` returns a new constraint with the priority set.
-
-For the full list of all builder utilities (including core module helpers like `constraintFactory` and `typedConstraint`), see the [Glossary: Builders & Helpers](/docs/glossary#builders--helpers).
 
 ---
 
@@ -395,6 +380,39 @@ For HTTP-status-aware retry with provider fallback and cost budget guards, see [
 
 ---
 
+## Composing Middleware with `pipe()`
+
+Use `pipe()` to compose middleware left-to-right onto a runner before passing it to the orchestrator. This is cleaner than nested `with*()` calls:
+
+```typescript
+import {
+  createAgentOrchestrator,
+  pipe,
+  withRetry,
+  withFallback,
+  withBudget,
+  withModelSelection,
+  byInputLength,
+} from '@directive-run/ai';
+
+// pipe() applies middleware left to right — innermost first
+const runner = pipe(
+  baseRunner,
+  (r) => withModelSelection(r, [byInputLength(200, 'gpt-4o-mini')]),
+  (r) => withFallback([r, backupRunner]),
+  (r) => withRetry(r, { maxRetries: 3 }),
+  (r) => withBudget(r, {
+    budgets: [{ window: 'hour', maxCost: 5, pricing }],
+  }),
+);
+
+const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
+```
+
+See [Resilience & Routing](/docs/ai/resilience-routing) for all available middleware wrappers.
+
+---
+
 ## Pause & Resume
 
 Manually control agent execution:
@@ -413,49 +431,6 @@ orchestrator.reset();
 
 // Release resources when the component or process shuts down
 orchestrator.dispose();
-```
-
----
-
-## Builder Pattern
-
-For complex configurations, use the fluent builder:
-
-```typescript
-import {
-  createOrchestratorBuilder,
-  createPIIGuardrail,
-  createToolGuardrail,
-  createOutputTypeGuardrail,
-} from '@directive-run/ai';
-
-const orchestrator = createOrchestratorBuilder()
-  // Escalate when token usage gets high
-  .withConstraint('escalate', {
-    when: (facts) => facts.agent.tokenUsage > 5000,
-    require: { type: 'ESCALATE' },
-  })
-  .withResolver('escalate', {
-    requirement: 'ESCALATE',
-    resolve: async (req, context) => {
-      console.warn('Token budget escalation:', context.facts.agent.tokenUsage);
-    },
-  })
-
-  // Layer on guardrails for input, tools, and output
-  .withInputGuardrail('pii', createPIIGuardrail({ redact: true }))
-  .withToolCallGuardrail('tools', createToolGuardrail({ denylist: ['shell'] }))
-  .withOutputGuardrail('type', createOutputTypeGuardrail({ type: 'string' }))
-
-  // Set budget and enable debug logging
-  .withBudget(10000)
-  .withDebug()
-
-  // Finalize with the runner
-  .build({
-    runner,
-    autoApproveToolCalls: true,
-  });
 ```
 
 ---
@@ -624,4 +599,3 @@ class AgentPanel extends LitElement {
 - [Guardrails & Safety](/docs/ai/guardrails) – Input validation, PII detection, and streaming constraints
 - [Streaming](/docs/ai/streaming) – Real-time response processing
 - [Multi-Agent Patterns](/docs/ai/multi-agent) – Parallel, sequential, and supervisor patterns
-- [Agent Stack](/docs/ai/agent-stack) – All-in-one composition API

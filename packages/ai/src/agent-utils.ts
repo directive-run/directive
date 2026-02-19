@@ -1,5 +1,5 @@
 /**
- * Helper functions for AI adapter — createRunner, estimateCost, state queries, validation.
+ * Agent utilities — createRunner, estimateCost, state queries, URL validation.
  */
 
 import type {

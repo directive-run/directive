@@ -185,29 +185,34 @@ Then import a provider adapter via subpath exports:
 ### OpenAI
 
 ```typescript
-import { createAgentStack } from '@directive-run/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
 import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
-const stack = createAgentStack({ runner, agents: { assistant: { instructions: "You are helpful." } } });
+const orchestrator = createAgentOrchestrator({ runner, guardrails: { /* ... */ } });
+const result = await orchestrator.run(agent, input);
 ```
 
 ### Anthropic
 
 ```typescript
-import { createAgentStack } from '@directive-run/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
 import { createAnthropicRunner } from '@directive-run/ai/anthropic';
 
 const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
+const orchestrator = createAgentOrchestrator({ runner, guardrails: { /* ... */ } });
+const result = await orchestrator.run(agent, input);
 ```
 
 ### Ollama (local)
 
 ```typescript
-import { createAgentStack } from '@directive-run/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
 import { createOllamaRunner } from '@directive-run/ai/ollama';
 
 const runner = createOllamaRunner(); // defaults to localhost:11434
+const orchestrator = createAgentOrchestrator({ runner, guardrails: { /* ... */ } });
+const result = await orchestrator.run(agent, input);
 ```
 
 | Subpath | Description |
