@@ -32,10 +32,7 @@ const orchestrator = createAgentOrchestrator({
   autoApproveToolCalls: true,
   guardrails: {
     input: [
-      // Block any input that contains personal information
-      createPIIGuardrail({}),
-
-      // Or scrub PII in-place and allow the request to continue
+      // Scrub PII in-place and allow the request to continue
       createPIIGuardrail({
         redact: true,
         redactReplacement: '[REDACTED]',
@@ -408,7 +405,6 @@ import {
   createStreamingRunner,
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
-  createToxicityStreamingGuardrail,
   combineStreamingGuardrails,
 } from '@directive-run/ai';
 
@@ -437,36 +433,94 @@ const streamRunner = createStreamingRunner(baseRunner, {
 
 ---
 
-## Builder Pattern
+## Composing All Guardrail Types
 
-Use the fluent builder to compose guardrails:
+Pass input, tool call, and output guardrails directly to `createAgentOrchestrator`:
 
 ```typescript
 import {
-  createOrchestratorBuilder,
+  createAgentOrchestrator,
   createPIIGuardrail,
   createToolGuardrail,
   createOutputTypeGuardrail,
 } from '@directive-run/ai';
 
-const orchestrator = createOrchestratorBuilder()
-  // Input guardrails run in the order they are added
-  .withInputGuardrail('pii', createPIIGuardrail({ redact: true }))
-  .withInputGuardrail('length', (data) => ({
-    passed: data.input.length <= 10000,
-    reason: data.input.length > 10000 ? 'Input too long' : undefined,
-  }))
-
-  // Tool call and output guardrails
-  .withToolCallGuardrail('tools', createToolGuardrail({ denylist: ['shell'] }))
-  .withOutputGuardrail('type', createOutputTypeGuardrail({ type: 'string' }))
-
-  // Finalize with the runner
-  .build({
-    runner,
-    autoApproveToolCalls: true,
-  });
+const orchestrator = createAgentOrchestrator({
+  runner,
+  autoApproveToolCalls: true,
+  guardrails: {
+    // Input guardrails run in the order they are listed
+    input: [
+      createPIIGuardrail({ redact: true }),
+      (data) => ({
+        passed: data.input.length <= 10000,
+        reason: data.input.length > 10000 ? 'Input too long' : undefined,
+      }),
+    ],
+    // Tool call guardrails
+    toolCall: [
+      createToolGuardrail({ denylist: ['shell'] }),
+    ],
+    // Output guardrails
+    output: [
+      createOutputTypeGuardrail({ type: 'string' }),
+    ],
+  },
+});
 ```
+
+---
+
+## With Multi-Agent
+
+The multi-agent orchestrator supports guardrails at two levels: orchestrator-level (applied to every agent) and per-agent (additive). Orchestrator guardrails execute first, then per-agent guardrails. This lets you enforce global policies while allowing agents to have specialized checks.
+
+```typescript
+import {
+  createMultiAgentOrchestrator,
+  createPIIGuardrail,
+  createToolGuardrail,
+  createOutputTypeGuardrail,
+  createContentFilterGuardrail,
+} from '@directive-run/ai';
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: {
+      agent: researcher,
+      maxConcurrent: 3,
+      // Researcher-specific: ensure non-trivial output
+      guardrails: {
+        output: [createOutputTypeGuardrail({ type: 'string', minStringLength: 50 })],
+      },
+    },
+    writer: {
+      agent: writer,
+      maxConcurrent: 1,
+      // Writer-specific: block internal jargon in output
+      guardrails: {
+        output: [
+          createContentFilterGuardrail({
+            blockedPatterns: ['internal-only', /\bTODO\b/i],
+          }),
+        ],
+      },
+    },
+  },
+
+  // Global guardrails — applied to ALL agents before per-agent guardrails
+  guardrails: {
+    input: [createPIIGuardrail({ redact: true })],
+    toolCall: [createToolGuardrail({ denylist: ['shell', 'eval'] })],
+    output: [createPIIGuardrail()],
+  },
+});
+```
+
+When a guardrail fails during a streaming run (`runAgentStream()`), the stream emits a `guardrail_triggered` chunk with `stopped: true` before the `error` chunk. See [Streaming &ndash; Guardrail Failures in Multi-Agent Streaming](/docs/ai/streaming#guardrail-failures-in-multi-agent-streaming) for details.
+
+For the full multi-agent API, see [Multi-Agent](/docs/ai/multi-agent).
 
 ---
 

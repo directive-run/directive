@@ -14,7 +14,7 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../helpers.js";
+import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 
 // ============================================================================
@@ -44,7 +44,8 @@ export interface OllamaRunnerOptions {
  * @example
  * ```typescript
  * const runner = createOllamaRunner({ model: "llama3" });
- * const stack = createAgentStack({ runner, agents: { ... } });
+ * const orchestrator = createAgentOrchestrator({ runner });
+ * const result = await orchestrator.run(agent, input);
  * ```
  */
 export function createOllamaRunner(

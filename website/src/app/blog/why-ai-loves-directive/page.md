@@ -15,7 +15,7 @@ Budget enforcement. PII redaction. Tool access control. Human-in-the-loop approv
 
 Most teams solve these problems imperatively &ndash; `if` checks scattered across handler functions, manual token counters, middleware that developers forget to include in new routes. It works until it doesn't. A missed check in one code path leads to a $2,000 overnight bill, a PII leak to a third-party tool, or a hallucinated `DROP TABLE` that reaches your database.
 
-Directive adds a **constraint layer** to your existing agent stack. It doesn't replace your LLM framework. It doesn't wrap your API calls. It sits between your agent code and production, enforcing rules that are declared once and evaluated on every cycle. The same [constraint-driven architecture](/blog/constraint-driven-architecture) that manages application state now manages your agents.
+Directive adds a **constraint layer** to your existing agent setup. It doesn't replace your LLM framework. It doesn't wrap your API calls. It sits between your agent code and production, enforcing rules that are declared once and evaluated on every cycle. The same [constraint-driven architecture](/blog/constraint-driven-architecture) that manages application state now manages your agents.
 
 ---
 
@@ -230,46 +230,46 @@ When the agent's output doesn't match the schema, the guardrail blocks it before
 
 Your agent works perfectly &ndash; until the provider returns `429 Too Many Requests` at 2 AM. Or a transient `503` drops the user's request mid-conversation. Single-provider dependence is a production risk.
 
-Directive's resilience wrappers compose around your runner without changing a line of agent code:
+Directive's resilience middleware composes around your runner without changing a line of agent code:
 
 ```typescript
 import {
-  createAgentStack,
+  withRetry,
+  withFallback,
+  withBudget,
   createOpenAIRunner,
 } from '@directive-run/ai';
 
-const stack = createAgentStack({
-  runner, // Primary provider (Anthropic, OpenAI, etc.)
+// Start with your primary provider
+let resilientRunner = runner;
 
-  // HTTP-status-aware retry – respects Retry-After on 429,
-  // exponential backoff on 503, never retries 400/401/403
-  intelligentRetry: {
-    maxRetries: 2,
-    baseDelayMs: 1_000,
-    maxDelayMs: 10_000,
-  },
+// HTTP-status-aware retry – respects Retry-After on 429,
+// exponential backoff on 503, never retries 400/401/403
+resilientRunner = withRetry(resilientRunner, {
+  maxRetries: 2,
+  baseDelayMs: 1_000,
+  maxDelayMs: 10_000,
+});
 
-  // Automatic failover when the primary provider is down
-  fallback: {
-    runners: [
-      createOpenAIRunner({
-        apiKey: process.env.OPENAI_API_KEY!,
-        model: 'gpt-4o-mini',
-      }),
-    ],
-  },
+// Automatic failover when the primary provider is down
+resilientRunner = withFallback([
+  resilientRunner,
+  createOpenAIRunner({
+    apiKey: process.env.OPENAI_API_KEY!,
+    model: 'gpt-4o-mini',
+  }),
+]);
 
-  // Rolling budget windows prevent runaway spend
-  budget: {
-    budgets: [
-      { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
-      { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
-    ],
-  },
+// Rolling budget windows prevent runaway spend
+resilientRunner = withBudget(resilientRunner, {
+  budgets: [
+    { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+    { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+  ],
 });
 ```
 
-Retry, fallback, and budget compose automatically. The stack checks the budget before each call (reject before spending), retries transient failures with appropriate backoff, and falls back to the next provider when the primary is unavailable. Three config keys. Zero imperative retry loops.
+Retry, fallback, and budget compose as middleware. Each `with*` wrapper checks its condition before each call (reject before spending), retries transient failures with appropriate backoff, and falls back to the next provider when the primary is unavailable. Three wrappers. Zero imperative retry loops.
 
 ---
 

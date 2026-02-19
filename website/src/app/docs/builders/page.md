@@ -1,113 +1,30 @@
 ---
-title: Builders
-description: Fluent builder APIs for creating constraints, modules, and systems with TypeScript inference.
+title: Builders & Helpers
+description: Fluent builder APIs for modules and systems, plus factory helpers for typed definitions.
 ---
 
-Fluent builder APIs for creating constraints, modules, and systems. Builders provide an ergonomic alternative to object literals with full TypeScript inference. {% .lead %}
+Fluent builder APIs for modules and systems, plus factory helpers for typed constraints and resolvers. Builders provide an ergonomic alternative to object literals with full TypeScript inference. {% .lead %}
 
 ---
 
-## Constraint Builders
+## Constraints as Object Literals
 
-Two ways to build typed constraints outside of `createModule()`.
-
-### `constraint()` – Full Builder
-
-Chain `.when()`, `.require()`, optional fields, then `.build()`. All fields from `TypedConstraintDef` are supported.
+Constraints, resolvers, and effects are defined as plain object literals inside `createModule()`. TypeScript provides full type inference on the object literal — no builder functions needed:
 
 ```typescript
-import { constraint } from '@directive-run/core';
-
-const escalate = constraint<typeof schema>()
-  .when(f => f.confidence < 0.7)
-  .require({ type: 'ESCALATE' })
-  .priority(50)
-  .after('healthCheck')
-  .deps('confidence')
-  .timeout(5000)
-  .async(true)
-  .build();
-```
-
-The chain enforces order: `.when()` first, `.require()` second, then any optional methods, then `.build()`.
-
-| Method | Required | Description |
-|--------|----------|-------------|
-| `.when(fn)` | Yes | Condition function – receives typed facts |
-| `.require(value)` | Yes | Requirement(s), function, array, or `null` |
-| `.priority(n)` | No | Higher runs first |
-| `.after(...ids)` | No | Wait for other constraints' resolvers |
-| `.deps(...keys)` | No | Explicit fact dependencies (required for async) |
-| `.timeout(ms)` | No | Timeout for async evaluation |
-| `.async(bool)` | No | Mark as async constraint |
-| `.build()` | Yes | Returns `TypedConstraintDef<M>` |
-
-### `when()` – Quick Shorthand
-
-Returns a valid constraint directly – no `.build()` needed. Optional chaining via `with*` methods returns a new immutable constraint each time.
-
-```typescript
-import { when } from '@directive-run/core';
-
-// Minimal – ready to use immediately
-const pause = when<typeof schema>(f => f.errors > 3)
-  .require({ type: 'PAUSE' });
-
-// With options (immutable – each call returns a new constraint)
-const halt = when<typeof schema>(f => f.errors > 10)
-  .require({ type: 'HALT' })
-  .withPriority(100)
-  .withAfter('healthCheck');
-```
-
-| Method | Description |
-|--------|-------------|
-| `.require(value)` | Required – returns the constraint |
-| `.withPriority(n)` | Returns new constraint with priority |
-| `.withAfter(...ids)` | Returns new constraint with after deps |
-| `.withDeps(...keys)` | Returns new constraint with explicit deps |
-| `.withTimeout(ms)` | Returns new constraint with timeout |
-| `.withAsync(bool)` | Returns new constraint marked async |
-
-### `require` Accepts Multiple Forms
-
-Both builders accept the same `require` values:
-
-```typescript
-// Static requirement
-.require({ type: 'PAUSE' })
-
-// Dynamic (function)
-.require(f => ({ type: 'TRANSITION', to: f.phase === 'red' ? 'green' : 'red' }))
-
-// Multiple requirements
-.require([{ type: 'PAUSE' }, { type: 'ESCALATE' }])
-
-// Suppress (no requirement even when condition matches)
-.require(null)
-```
-
-### Using Builder Output in Modules
-
-Builder output is a plain `TypedConstraintDef<M>` – drop it directly into `constraints`:
-
-```typescript
-const myConstraint = when<typeof schema>(f => f.errors > 3)
-  .require({ type: 'PAUSE' })
-  .withPriority(50);
-
-const myModule = createModule('example', {
+const myModule = createModule("example", {
   schema,
   constraints: {
-    pause: myConstraint,    // Works directly
-    escalate: constraint<typeof schema>()
-      .when(f => f.confidence < 0.5)
-      .require({ type: 'ESCALATE' })
-      .build(),             // Also works
+    needsData: {
+      when: (facts) => !facts.data,
+      require: { type: "FETCH_DATA" },
+      priority: 50,
+    },
   },
-  // ...
 });
 ```
+
+For reusable typed constraints outside of `createModule()`, use the [factory helpers](/docs/api/core#constraintfactory) (`constraintFactory`, `typedConstraint`) documented in the Core API.
 
 ---
 
@@ -192,103 +109,12 @@ Calling `.module()` or `.modules()` narrows the builder type – you can't mix t
 
 ---
 
-## Complete Examples
+## Complete Example
 
-### Module with Constraint Builders
-
-A full module definition using `when()` and `constraint()` for reusable, composable constraints.
+Wire up multiple modules, plugins, and configuration using the `system()` and `module()` builders.
 
 ```typescript
-import { createModule, constraint, when, t } from '@directive-run/core';
-import type { ModuleSchema } from '@directive-run/core';
-
-const schema = {
-  facts: {
-    items: t.array<string>(),
-    status: t.string<'idle' | 'loading' | 'error'>(),
-    errorCount: t.number(),
-    lastFetch: t.number(),
-  },
-  derivations: {
-    isEmpty: t.boolean(),
-    shouldRetry: t.boolean(),
-  },
-  events: {
-    addItem: { item: t.string() },
-    clearErrors: {},
-  },
-  requirements: {
-    FETCH_ITEMS: {},
-    PAUSE: {},
-    ALERT: { message: t.string() },
-  },
-} satisfies ModuleSchema;
-
-// Reusable constraints defined outside the module
-const fetchWhenEmpty = when<typeof schema>(f => f.items.length === 0 && f.status === 'idle')
-  .require({ type: 'FETCH_ITEMS' });
-
-const pauseOnErrors = when<typeof schema>(f => f.errorCount > 3)
-  .require({ type: 'PAUSE' })
-  .withPriority(90);
-
-const alertOnCritical = constraint<typeof schema>()
-  .when(f => f.errorCount > 10)
-  .require(f => ({ type: 'ALERT', message: `${f.errorCount} errors detected` }))
-  .priority(100)
-  .after('pauseOnErrors')
-  .deps('errorCount')
-  .build();
-
-const itemsModule = createModule('items', {
-  schema,
-  init: (facts) => {
-    facts.items = [];
-    facts.status = 'idle';
-    facts.errorCount = 0;
-    facts.lastFetch = 0;
-  },
-  derive: {
-    isEmpty: (facts) => facts.items.length === 0,
-    shouldRetry: (facts) => facts.status === 'error' && facts.errorCount <= 3,
-  },
-  events: {
-    addItem: (facts, { item }) => { facts.items = [...facts.items, item]; },
-    clearErrors: (facts) => { facts.errorCount = 0; facts.status = 'idle'; },
-  },
-  // Mix builder-created and inline constraints
-  constraints: {
-    fetchWhenEmpty,
-    pauseOnErrors,
-    alertOnCritical,
-    // Inline constraint (object literal) works alongside builders
-    staleData: {
-      when: (facts) => Date.now() - facts.lastFetch > 60_000,
-      require: { type: 'FETCH_ITEMS' },
-      priority: 10,
-    },
-  },
-  resolvers: {
-    fetchItems: {
-      requirement: 'FETCH_ITEMS',
-      retry: { attempts: 3, backoff: 'exponential', initialDelay: 500 },
-      resolve: async (_req, context) => {
-        context.facts.status = 'loading';
-        // ... fetch logic
-        context.facts.lastFetch = Date.now();
-        context.facts.status = 'idle';
-      },
-    },
-  },
-});
-```
-
-### Full App with System Builder
-
-Wire up multiple modules, plugins, and configuration using the `system()` builder.
-
-```typescript
-import { system, module, when, t } from '@directive-run/core';
+import { system, module, createModule, t } from '@directive-run/core';
 import { loggingPlugin } from '@directive-run/core/plugins';
 import type { ModuleSchema } from '@directive-run/core';
 
@@ -322,7 +148,7 @@ const authModule = module('auth')
   })
   .build();
 
-// Data module (using createModule + constraint builders)
+// Data module (using createModule with object literal constraints)
 const dataSchema = {
   facts: {
     users: t.array<{ id: string; name: string }>(),
@@ -333,14 +159,16 @@ const dataSchema = {
   requirements: { LOAD_USERS: {} },
 } satisfies ModuleSchema;
 
-const loadWhenNeeded = when<typeof dataSchema>(f => !f.loaded)
-  .require({ type: 'LOAD_USERS' });
-
 const dataModule = createModule('data', {
   schema: dataSchema,
   init: (facts) => { facts.users = []; facts.loaded = false; },
   derive: { userCount: (facts) => facts.users.length },
-  constraints: { loadWhenNeeded },
+  constraints: {
+    loadWhenNeeded: {
+      when: (facts) => !facts.loaded,
+      require: { type: 'LOAD_USERS' },
+    },
+  },
   resolvers: {
     loadUsers: {
       requirement: 'LOAD_USERS',
@@ -380,9 +208,7 @@ app.events.auth.logout();       // dispatch logout event
 | Scenario | Recommended |
 |----------|-------------|
 | Inline constraints in `createModule()` | Object literals |
-| Reusable constraints shared across modules | `constraint()` or `when()` |
-| Quick one-off constraint | `when()` shorthand |
-| Constraint with many optional fields | `constraint()` full builder |
+| Reusable typed constraints shared across modules | `constraintFactory()` or `typedConstraint()` |
 | Simple system setup | `createSystem()` |
 | System with many options | `system()` builder |
 

@@ -5,6 +5,8 @@ description: Orchestrate multiple AI agents with parallel, sequential, and super
 
 Coordinate multiple agents with execution patterns, handoffs, communication channels, and result merging. {% .lead %}
 
+The multi-agent orchestrator has **full feature parity** with the [single-agent orchestrator](/docs/ai/orchestrator): guardrails (orchestrator-level + per-agent), streaming, approval workflows, pause/resume, memory, hooks, retry, budget, plugins, time-travel debugging, constraints, and resolvers. Each registered agent becomes a namespaced module in a Directive System.
+
 ---
 
 ## Setup
@@ -14,11 +16,15 @@ Multi-agent orchestration builds on the [Agent Orchestrator](/docs/ai/orchestrat
 ```typescript
 import {
   createMultiAgentOrchestrator,
+  createPIIGuardrail,
   parallel,
   sequential,
   supervisor,
+  composePatterns,
   selectAgent,
   runAgentRequirement,
+  findAgentsByCapability,
+  capabilityRoute,
   concatResults,
   collectOutputs,
   pickBestResult,
@@ -53,9 +59,8 @@ const reviewer: AgentLike = {
 
 // Wrap your LLM SDK in a standard runner function
 const runner: AgentRunner = async (agent, input, options) => {
-  const result = await openaiAgentsRun(agent, input, options);
-
-  return result;
+  // Your LLM SDK call — e.g. OpenAI, Anthropic, Ollama
+  return { output: '...', totalTokens: 0 };
 };
 ```
 
@@ -136,10 +141,24 @@ The orchestrator validates that all patterns reference registered agents at crea
 | `runner` | `AgentRunner` | *required* | Base LLM execution function |
 | `agents` | `AgentRegistry` | *required* | Map of agent ID to `AgentRegistration` |
 | `patterns` | `Record<string, ExecutionPattern>` | `{}` | Named execution patterns |
+| `guardrails` | `GuardrailsConfig` | &ndash; | Orchestrator-level input/output/toolCall guardrails (applied to all agents) |
+| `hooks` | `MultiAgentLifecycleHooks` | &ndash; | Lifecycle hooks for observability |
+| `memory` | `AgentMemory` | &ndash; | Shared memory across all agents |
+| `agentRetry` | `AgentRetryConfig` | &ndash; | Default retry config for all agents (per-agent overrides this) |
+| `maxTokenBudget` | `number` | &ndash; | Maximum token budget across all agent runs |
+| `budgetWarningThreshold` | `number` | `0.8` | Fires `onBudgetWarning` when token usage reaches this fraction (0&ndash;1) of `maxTokenBudget` |
+| `onBudgetWarning` | `(event) => void` | &ndash; | Callback when budget warning threshold is reached. Event: `{ currentTokens, maxBudget, percentage }` |
+| `plugins` | `Plugin[]` | `[]` | Plugins to attach to the underlying Directive System |
+| `onApprovalRequest` | `(request: ApprovalRequest) => void` | &ndash; | Callback for approval requests |
+| `autoApproveToolCalls` | `boolean` | `true` | Auto-approve tool calls |
+| `approvalTimeoutMs` | `number` | `300000` | Approval timeout (ms) |
+| `constraints` | `Record<string, OrchestratorConstraint>` | &ndash; | Orchestrator-level constraints |
+| `resolvers` | `Record<string, OrchestratorResolver>` | &ndash; | Orchestrator-level resolvers |
+| `circuitBreaker` | `CircuitBreaker` | &ndash; | Orchestrator-level circuit breaker |
 | `onHandoff` | `(request: HandoffRequest) => void` | &ndash; | Called when a handoff starts |
 | `onHandoffComplete` | `(result: HandoffResult) => void` | &ndash; | Called when a handoff finishes |
 | `maxHandoffHistory` | `number` | `1000` | Max completed handoff results to retain |
-| `debug` | `boolean` | `false` | Enable debug logging |
+| `debug` | `boolean` | `false` | Enable debug logging and time-travel |
 
 ### Agent Registration
 
@@ -153,7 +172,14 @@ Each entry in the `agents` map is an `AgentRegistration`:
 | `runOptions` | `Omit<RunOptions, 'signal'>` | &ndash; | Default run options (e.g. `onMessage`, `onToken`) |
 | `description` | `string` | &ndash; | Human-readable description for constraint-based selection |
 | `capabilities` | `string[]` | &ndash; | Capability tags for `selectAgent()` lookups |
-| `guardrails.output` | `Array<GuardrailFn \| NamedGuardrail>` | &ndash; | Per-agent output guardrails (additive with stack-level) |
+| `guardrails.input` | `Array<GuardrailFn \| NamedGuardrail>` | &ndash; | Per-agent input guardrails (additive with orchestrator-level) |
+| `guardrails.output` | `Array<GuardrailFn \| NamedGuardrail>` | &ndash; | Per-agent output guardrails (additive with orchestrator-level) |
+| `guardrails.toolCall` | `Array<GuardrailFn \| NamedGuardrail>` | &ndash; | Per-agent tool call guardrails (additive with orchestrator-level) |
+| `retry` | `AgentRetryConfig` | &ndash; | Per-agent retry config (overrides orchestrator-level `agentRetry`) |
+| `constraints` | `Record<string, OrchestratorConstraint>` | &ndash; | Per-agent constraints |
+| `resolvers` | `Record<string, OrchestratorResolver>` | &ndash; | Per-agent resolvers |
+| `memory` | `AgentMemory` | &ndash; | Per-agent memory (overrides orchestrator-level `memory`) |
+| `circuitBreaker` | `CircuitBreaker` | &ndash; | Per-agent circuit breaker (overrides orchestrator-level) |
 
 ---
 
@@ -182,6 +208,27 @@ const result = await orchestrator.runAgent('researcher', 'Explain WASM', {
 ```
 
 External signals are combined with the per-agent `timeout` &ndash; whichever fires first aborts the run. Both are cleaned up properly to prevent memory leaks.
+
+### `run()` and `runStream()` Aliases
+
+For convenience, `run()` and `runStream()` are aliases for `runAgent()` and `runAgentStream()` respectively. They have identical signatures:
+
+```typescript
+const result = await orchestrator.run<string>('researcher', 'What is WebAssembly?');
+
+const { stream } = orchestrator.runStream<string>('writer', 'Write about AI');
+```
+
+### `totalTokens` Getter
+
+Read the cumulative token count across all agent runs at any time:
+
+```typescript
+await orchestrator.runAgent('researcher', 'Summarize this...');
+await orchestrator.runAgent('writer', 'Write an article...');
+
+console.log(orchestrator.totalTokens);  // e.g. 1250
+```
 
 ---
 
@@ -218,9 +265,19 @@ const answers = await orchestrator.runParallel(
   ['Explain REST', 'Explain GraphQL', 'Explain gRPC'],
   (results) => collectOutputs(results)  // Returns string[]
 );
+
+// With minSuccess and timeout options
+const tolerant = await orchestrator.runParallel(
+  ['researcher', 'researcher', 'researcher'],
+  'What are WebSockets?',
+  (results) => concatResults(results),
+  { minSuccess: 2, timeout: 15000 }
+);
 ```
 
 When passing an array of inputs, the count must match the agent count. If they don't match, the orchestrator throws immediately.
+
+`runParallel` accepts an optional fourth argument with `minSuccess` and `timeout` options. These work identically to the `parallel()` pattern options but are applied inline without defining a named pattern.
 
 ### `parallel()` Options
 
@@ -229,10 +286,10 @@ When passing an array of inputs, the count must match the agent count. If they d
 | `minSuccess` | `number` | all | Minimum successful results required. Failed agents are silently caught when set |
 | `timeout` | `number` | &ndash; | Overall timeout for the entire parallel batch (ms) |
 
-When `minSuccess` is set, individual agent failures are caught silently. If fewer agents succeed than the threshold, the pattern throws with the count:
+When `minSuccess` is set, individual agent failures are caught silently. If fewer agents succeed than the threshold, the pattern throws:
 
 ```
-Not enough successful results: 1/2
+[Directive MultiAgent] Parallel pattern: Only 1/3 agents succeeded (minimum required: 2, failed: 2)
 ```
 
 ---
@@ -278,12 +335,14 @@ const totalTokens = aggregateTokens(results);
 
 Without a `transform`, the output is stringified automatically (`string` values pass through; objects are `JSON.stringify`'d).
 
-### `sequential()` Options
+### `sequential()` Pattern Options
+
+These options apply when defining a named pattern with `sequential()`. The `runSequential` method accepts only `transform`.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `transform` | `(output, agentId, index) => string` | auto-stringify | Transform each agent's output into the next agent's input |
-| `extract` | `(output) => T` | identity | Extract the final result from the last agent's output |
+| `extract` | `(output) => T` | identity | Extract the final result from the last agent's output (pattern definitions only, not `runSequential`) |
 | `continueOnError` | `boolean` | `false` | Skip failed agents instead of aborting the pipeline |
 
 By default, if any agent in the sequence fails the entire pipeline throws. Set `continueOnError: true` to skip failures:
@@ -459,6 +518,67 @@ interface RunAgentRequirement extends Requirement {
   context?: Record<string, unknown>;
 }
 ```
+
+### `findAgentsByCapability` Utility
+
+Find agents in a registry that match all required capabilities. Returns an array of matching agent IDs:
+
+```typescript
+import { findAgentsByCapability } from '@directive-run/ai';
+
+const agents = {
+  researcher: { agent: researchAgent, capabilities: ['search', 'summarize'] },
+  coder: { agent: coderAgent, capabilities: ['code', 'debug'] },
+  writer: { agent: writerAgent, capabilities: ['write', 'edit'] },
+};
+
+const matches = findAgentsByCapability(agents, ['search']);
+// Returns ['researcher']
+
+const matches2 = findAgentsByCapability(agents, ['write', 'edit']);
+// Returns ['writer']
+
+const noMatches = findAgentsByCapability(agents, ['search', 'code']);
+// Returns [] &ndash; no single agent has both
+```
+
+### `capabilityRoute` Utility
+
+Create a constraint that automatically routes work to an agent based on capabilities. Combines `findAgentsByCapability` with constraint-driven selection:
+
+```typescript
+import { capabilityRoute } from '@directive-run/ai';
+
+const routeByCapability = capabilityRoute(
+  agents,
+  (facts) => facts.requiredCapabilities as string[],
+  (facts) => facts.query as string,
+);
+```
+
+When multiple agents match, the first match is chosen by default. Use the `options.select` callback to implement custom tiebreaking:
+
+```typescript
+const routeWithTiebreaker = capabilityRoute(
+  agents,
+  (facts) => facts.requiredCapabilities as string[],
+  (facts) => facts.query as string,
+  {
+    priority: 50,
+    select: (matches, registry) => {
+      // Pick the agent with the fewest capabilities (most specialized)
+      return matches.reduce((best, id) => {
+        const bestCaps = registry[best]?.capabilities?.length ?? 0;
+        const currentCaps = registry[id]?.capabilities?.length ?? 0;
+
+        return currentCaps < bestCaps ? id : best;
+      });
+    },
+  }
+);
+```
+
+The `capabilityRoute` function returns an `OrchestratorConstraint` &ndash; use it in the `constraints` option of `createMultiAgentOrchestrator`.
 
 ---
 
@@ -751,6 +871,31 @@ const totalTokens = aggregateTokens(results);
 
 ---
 
+## Pattern Composition
+
+Compose multiple patterns into a pipeline where each pattern's output feeds as input to the next. `composePatterns()` returns an async function `(orchestrator, input) => Promise<unknown>`:
+
+```typescript
+import { composePatterns, parallel, sequential, concatResults } from '@directive-run/ai';
+
+// Build a two-stage workflow: parallel research, then sequential write + review
+const workflow = composePatterns(
+  parallel(['researcher', 'researcher'], (results) => concatResults(results)),
+  sequential(['writer', 'reviewer']),
+);
+
+// Run the composed workflow
+const result = await workflow(orchestrator, 'Research and write about AI safety');
+```
+
+Between patterns, output is automatically converted to a string input for the next pattern:
+- `string` output passes through directly
+- Objects are `JSON.stringify`'d
+
+`composePatterns` requires at least one pattern. Supervisor patterns in a composed pipeline run the supervisor agent directly (without the full delegation loop).
+
+---
+
 ## Concurrency Control
 
 Each registered agent gets its own `Semaphore` instance based on `maxConcurrent`. The semaphore is queue-based (no polling):
@@ -817,17 +962,455 @@ interface MultiAgentState {
 }
 ```
 
+### Pause & Resume
+
+```typescript
+// Pause all agent activity (e.g., user clicked "stop" or budget exceeded)
+orchestrator.pause();
+
+// Resume from where the orchestrator left off
+orchestrator.resume();
+```
+
+When paused, subsequent `runAgent()` calls throw immediately. Budget limits also trigger automatic pausing via the built-in constraint.
+
+### Wait for Idle
+
+`waitForIdle()` returns a promise that resolves when every registered agent's status is `idle`, `completed`, or `error` (i.e., no agents are `running`). An optional timeout rejects the promise if agents are still busy:
+
+```typescript
+// Fire-and-forget several runs, then wait for all to finish
+orchestrator.runAgent('researcher', 'Topic A');
+orchestrator.runAgent('researcher', 'Topic B');
+orchestrator.runAgent('writer', 'Draft article');
+
+await orchestrator.waitForIdle();
+console.log('All agents finished');
+
+// With timeout — throws if agents are still running after 10s
+await orchestrator.waitForIdle(10000);
+```
+
+If all agents are already idle when called, the promise resolves immediately.
+
 ### Reset and Dispose
 
 ```typescript
 // Reset all agent states, drain semaphores, clear handoff history
 orchestrator.reset();
 
-// Alias for reset &ndash; use when you're done with the orchestrator
+// Reset + destroy the underlying Directive System
 orchestrator.dispose();
 ```
 
 `reset()` drains all semaphores (rejecting pending waiters with an error), resets every agent to `idle` with zero counts, and clears both pending and completed handoff lists.
+
+---
+
+## Dynamic Agent Management
+
+Register and unregister agents at runtime with `registerAgent()`, `unregisterAgent()`, and `getAgentIds()`. Dynamically registered agents get full parity: their own Directive module, semaphore, constraints, resolvers, and guardrails.
+
+```typescript
+// Register a new agent after creation
+const editor: AgentLike = {
+  name: 'editor',
+  instructions: 'You proofread and format documents.',
+  model: 'gpt-4',
+};
+
+orchestrator.registerAgent('editor', {
+  agent: editor,
+  maxConcurrent: 2,
+  timeout: 30000,
+  capabilities: ['proofread', 'format'],
+});
+
+// Use the newly registered agent immediately
+const result = await orchestrator.runAgent('editor', 'Fix the grammar in this draft...');
+
+// List all registered agent IDs
+console.log(orchestrator.getAgentIds());  // ['researcher', 'writer', 'reviewer', 'editor']
+
+// Unregister when no longer needed (agent must be idle)
+orchestrator.unregisterAgent('editor');
+```
+
+`registerAgent()` throws if the agent ID is already registered or is a reserved ID. `unregisterAgent()` throws if the agent is currently running. Unregistering drains the agent's semaphore, resets its System facts, and removes it from the orchestrator's registry.
+
+---
+
+## Guardrails
+
+Guardrails run at two levels: orchestrator-level (applied to every agent) and per-agent (additive). Orchestrator guardrails execute first, then per-agent guardrails.
+
+```typescript
+import {
+  createMultiAgentOrchestrator,
+  createPIIGuardrail,
+  createToolGuardrail,
+  createOutputTypeGuardrail,
+} from '@directive-run/ai';
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: {
+      agent: researcher,
+      maxConcurrent: 3,
+      // Per-agent guardrails — additive with orchestrator-level
+      guardrails: {
+        output: [createOutputTypeGuardrail({ type: 'string', minStringLength: 10 })],
+      },
+    },
+    writer: {
+      agent: writer,
+      maxConcurrent: 1,
+      guardrails: {
+        input: [createPIIGuardrail({ redact: true })],
+        output: [createPIIGuardrail()],
+        toolCall: [createToolGuardrail({ denylist: ['shell'] })],
+      },
+    },
+  },
+
+  // Orchestrator-level guardrails — applied to ALL agents
+  guardrails: {
+    input: [createPIIGuardrail({ redact: true })],
+    toolCall: [createToolGuardrail({ denylist: ['eval', 'exec'] })],
+  },
+});
+```
+
+For the full guardrails API, see [Guardrails & Safety](/docs/ai/guardrails).
+
+---
+
+## Streaming
+
+Stream individual agent responses with `runAgentStream()`. All guardrails, approval checks, and state tracking apply:
+
+```typescript
+const { stream, result, abort } = orchestrator.runAgentStream<string>('writer', 'Write about AI');
+
+for await (const chunk of stream) {
+  switch (chunk.type) {
+    case 'token':
+      process.stdout.write(chunk.data);
+      break;
+    case 'tool_start':
+      console.log(`\nCalling tool: ${chunk.tool}`);
+      break;
+    case 'tool_end':
+      console.log(`Tool done: ${chunk.result}`);
+      break;
+    case 'guardrail_triggered':
+      console.warn(`Guardrail ${chunk.guardrailName}: ${chunk.reason}`);
+      break;
+    case 'done':
+      console.log(`\n\nDone: ${chunk.totalTokens} tokens in ${chunk.duration}ms`);
+      break;
+    case 'error':
+      console.error(chunk.error);
+      break;
+  }
+}
+
+const finalResult = await result;
+```
+
+When a guardrail error occurs during a streaming run, `runAgentStream` emits a `guardrail_triggered` chunk before the `error` chunk. This lets consumers display a guardrail-specific message to the user while the stream is still open:
+
+```typescript
+case 'guardrail_triggered':
+  console.warn(`Guardrail ${chunk.guardrailName}: ${chunk.reason}`);
+  console.log(`Partial output so far: ${chunk.partialOutput}`);
+  break;
+```
+
+The `guardrail_triggered` chunk includes `guardrailName`, `reason`, `partialOutput` (any output accumulated before the guardrail fired), and `stopped: true`.
+
+Cancel a stream at any time with the `abort` handle or an `AbortSignal`:
+
+```typescript
+const controller = new AbortController();
+const { stream } = orchestrator.runAgentStream('writer', input, {
+  signal: controller.signal,
+});
+```
+
+For chunk types and stream operators, see [Streaming](/docs/ai/streaming).
+
+---
+
+## Approval Workflow
+
+Require human approval before tool calls execute. The workflow is identical to the [single-agent orchestrator](/docs/ai/orchestrator#approval-workflow), but `approve()` and `reject()` automatically route to the correct agent's approval state:
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
+  autoApproveToolCalls: false,
+  approvalTimeoutMs: 60000,
+
+  onApprovalRequest: (request) => {
+    // request.agentName identifies which agent wants to act
+    broadcastToAdminDashboard(request);
+  },
+});
+
+// Human clicks approve or reject in the dashboard
+orchestrator.approve(requestId);
+orchestrator.reject(requestId, 'Denied by reviewer');
+```
+
+---
+
+## Lifecycle Hooks
+
+Observe agent runs, guardrail checks, retries, handoffs, and pattern execution. Multi-agent hooks include `agentId` in every event to distinguish which registered agent fired:
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { /* ... */ },
+
+  hooks: {
+    onAgentStart: ({ agentId, agentName, input, timestamp }) => {
+      console.log(`[${agentId}] Starting at ${timestamp}`);
+    },
+    onAgentComplete: ({ agentId, agentName, tokenUsage, durationMs }) => {
+      console.log(`[${agentId}] Done: ${tokenUsage} tokens in ${durationMs}ms`);
+    },
+    onAgentError: ({ agentId, error, durationMs }) => {
+      console.error(`[${agentId}] Failed after ${durationMs}ms:`, error.message);
+    },
+    onGuardrailCheck: ({ agentId, guardrailName, guardrailType, passed, reason }) => {
+      if (!passed) {
+        console.warn(`[${agentId}] Guardrail ${guardrailName} (${guardrailType}) blocked: ${reason}`);
+      }
+    },
+    onAgentRetry: ({ agentId, attempt, error, delayMs }) => {
+      console.log(`[${agentId}] Retry #${attempt} in ${delayMs}ms: ${error.message}`);
+    },
+    onHandoff: (request) => {
+      console.log(`Handoff: ${request.fromAgent} → ${request.toAgent}`);
+    },
+    onHandoffComplete: (result) => {
+      console.log(`Handoff ${result.request.id} complete`);
+    },
+    onPatternStart: ({ patternId, patternType, timestamp }) => {
+      console.log(`Pattern ${patternId} (${patternType}) started`);
+    },
+    onPatternComplete: ({ patternId, durationMs, error }) => {
+      if (error) {
+        console.error(`Pattern ${patternId} failed after ${durationMs}ms:`, error.message);
+      } else {
+        console.log(`Pattern ${patternId} completed in ${durationMs}ms`);
+      }
+    },
+  },
+});
+```
+
+---
+
+## Retries
+
+Configure automatic retries at the orchestrator level (applies to all agents) or per-agent (overrides the default):
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: {
+      agent: researcher,
+      // Per-agent retry overrides the orchestrator default
+      retry: {
+        attempts: 5,
+        backoff: 'exponential',
+        baseDelayMs: 500,
+      },
+    },
+    writer: { agent: writer },
+  },
+
+  // Default retry config for all agents (writer uses this)
+  agentRetry: {
+    attempts: 3,
+    backoff: 'exponential',
+    baseDelayMs: 1000,
+    maxDelayMs: 30000,
+    isRetryable: (error) => {
+      return error.message.includes('429') || error.message.includes('500');
+    },
+  },
+});
+```
+
+---
+
+## Budget Control
+
+Set a token budget that automatically pauses all agents when exceeded:
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  maxTokenBudget: 50000,
+});
+
+await orchestrator.runAgent('researcher', 'Summarize this...');
+await orchestrator.runAgent('writer', 'Write an article...');
+
+// When cumulative tokens across all agents exceed 50000,
+// the orchestrator pauses and subsequent runAgent() calls throw
+```
+
+### Budget Warning Threshold
+
+Get an early warning before the budget limit is reached. The `budgetWarningThreshold` (0&ndash;1, default `0.8`) fires the `onBudgetWarning` callback once when token usage crosses that fraction of `maxTokenBudget`:
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  maxTokenBudget: 50000,
+  budgetWarningThreshold: 0.75,  // Warn at 75%
+  onBudgetWarning: ({ currentTokens, maxBudget, percentage }) => {
+    console.warn(
+      `Budget warning: ${currentTokens}/${maxBudget} tokens used (${(percentage * 100).toFixed(0)}%)`
+    );
+  },
+});
+```
+
+The callback fires exactly once per orchestrator lifetime (reset with `orchestrator.reset()`). The `percentage` value is the actual ratio at the moment the threshold was crossed, which may be higher than the threshold if a single agent run consumed a large chunk.
+
+Combine with custom constraints for more granular control:
+
+```typescript
+import { requirementGuard } from '@directive-run/core/adapter-utils';
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { /* ... */ },
+  maxTokenBudget: 50000,
+
+  constraints: {
+    costWarning: {
+      priority: 100,
+      when: (facts) => facts.globalTokens > 25000,
+      require: { type: 'COST_WARNING' },
+    },
+  },
+
+  resolvers: {
+    costWarning: {
+      requirement: requirementGuard('COST_WARNING'),
+      resolve: async (req, context) => {
+        console.warn('Token usage high:', context.facts.globalTokens);
+      },
+    },
+  },
+});
+```
+
+---
+
+## Memory
+
+Attach shared memory across all agents or per-agent memory that overrides the shared one:
+
+```typescript
+import { createAgentMemory, createSlidingWindowStrategy } from '@directive-run/ai';
+
+const sharedMemory = createAgentMemory({
+  strategy: createSlidingWindowStrategy({ maxMessages: 50 }),
+});
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: {
+      agent: researcher,
+      // Per-agent memory — overrides shared memory for this agent
+      memory: createAgentMemory({
+        strategy: createSlidingWindowStrategy({ maxMessages: 100 }),
+      }),
+    },
+    writer: { agent: writer },  // Uses shared memory
+  },
+  memory: sharedMemory,
+});
+```
+
+---
+
+## Constraints & Resolvers
+
+Define constraints and resolvers at both the orchestrator level and per-agent. Per-agent constraints/resolvers are namespaced within that agent's module in the Directive System:
+
+```typescript
+import { requirementGuard } from '@directive-run/core/adapter-utils';
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: {
+      agent: researcher,
+      // Per-agent constraint: escalate when researcher finds low-confidence data
+      constraints: {
+        lowConfidence: {
+          when: (facts) => (facts.agent.output?.confidence ?? 1) < 0.5,
+          require: { type: 'RUN_AGENT', agent: 'expert', input: 'Verify findings' },
+        },
+      },
+    },
+    expert: { agent: expert },
+  },
+
+  // Orchestrator-level constraint: pause everything when budget is high
+  constraints: {
+    budgetAlert: {
+      priority: 100,
+      when: (facts) => facts.globalTokens > 40000,
+      require: { type: 'BUDGET_ALERT' },
+    },
+  },
+
+  resolvers: {
+    budgetAlert: {
+      requirement: requirementGuard('BUDGET_ALERT'),
+      resolve: async (req, context) => {
+        console.warn('Approaching budget limit');
+      },
+    },
+  },
+});
+```
+
+---
+
+## Debug & Time-Travel
+
+Enable `debug: true` to get console logging and time-travel snapshot support on the underlying Directive System:
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { /* ... */ },
+  debug: true,  // Enables console logging + time-travel snapshots
+});
+
+// Access the underlying Directive System for inspection
+const { system } = orchestrator;
+```
 
 ---
 
@@ -851,7 +1434,7 @@ const research = parallel(
 Without `continueOnError`, the first failure stops the pipeline. With `continueOnError: true`, failed agents are skipped and the pipeline continues with the last successful output. If no agent succeeds, the pipeline throws:
 
 ```
-No successful results in sequential pattern
+[Directive MultiAgent] No successful results in sequential pattern
 ```
 
 ### Supervisor Error Handling
@@ -859,16 +1442,16 @@ No successful results in sequential pattern
 If a worker fails, the error propagates immediately (no retry at the supervisor level). If the supervisor requests an invalid worker, the pattern throws:
 
 ```
-Invalid worker: unknown-agent
+[Directive MultiAgent] Supervisor delegated to unknown worker "unknown-agent". Available workers: researcher, writer
 ```
 
 ### Unknown Agents and Patterns
 
 ```typescript
-// Throws: 'Unknown agent: nonexistent'
+// Throws: '[Directive MultiAgent] Unknown agent "nonexistent". Registered agents: researcher, writer'
 await orchestrator.runAgent('nonexistent', 'hello');
 
-// Throws: 'Unknown pattern: nonexistent'
+// Throws: '[Directive MultiAgent] Unknown pattern "nonexistent". Available patterns: research, writeAndReview'
 await orchestrator.runPattern('nonexistent', 'hello');
 ```
 
@@ -876,33 +1459,25 @@ await orchestrator.runPattern('nonexistent', 'hello');
 
 ## Testing
 
-Use `createMockAgentRunner` to test multi-agent patterns without real LLM calls:
+Use `createTestMultiAgentOrchestrator` for testing with built-in mocking and assertion helpers. Import from `@directive-run/ai/testing`:
 
 ```typescript
 import {
-  createMockAgentRunner,
-  createMultiAgentOrchestrator,
-  parallel,
-  sequential,
-  concatResults,
-} from '@directive-run/ai';
+  createTestMultiAgentOrchestrator,
+  assertMultiAgentState,
+} from '@directive-run/ai/testing';
+import { parallel, sequential, concatResults } from '@directive-run/ai';
 
-const runner = createMockAgentRunner({
-  responses: {
-    researcher: 'Research findings about WebAssembly...',
-    writer: 'WebAssembly (WASM) is a binary instruction format...',
-    reviewer: 'APPROVED. The article is technically accurate.',
-  },
-  tokenCount: 150,
-  latencyMs: 50,
-});
-
-const orchestrator = createMultiAgentOrchestrator({
-  runner,
+const test = createTestMultiAgentOrchestrator({
   agents: {
     researcher: { agent: { name: 'researcher' }, maxConcurrent: 3 },
     writer: { agent: { name: 'writer' }, maxConcurrent: 1 },
     reviewer: { agent: { name: 'reviewer' }, maxConcurrent: 1 },
+  },
+  mockResponses: {
+    researcher: { output: 'Research findings about WebAssembly...', totalTokens: 150 },
+    writer: { output: 'WebAssembly (WASM) is a binary instruction format...', totalTokens: 200 },
+    reviewer: { output: 'APPROVED. The article is technically accurate.', totalTokens: 50 },
   },
   patterns: {
     research: parallel(
@@ -914,33 +1489,41 @@ const orchestrator = createMultiAgentOrchestrator({
 });
 
 // Test a parallel pattern
-const research = await orchestrator.runPattern('research', 'Explain WASM');
+const research = await test.runPattern('research', 'Explain WASM');
 expect(research).toContain('Research findings');
 
 // Test a sequential pipeline
-const article = await orchestrator.runPattern('pipeline', 'Write about WASM');
+const article = await test.runPattern('pipeline', 'Write about WASM');
 
-// Inspect runner call history
-expect(runner.getCallCount('researcher')).toBe(3);  // 2 parallel + 1 sequential
-expect(runner.getCallCount('writer')).toBe(1);
-expect(runner.calls.length).toBe(5);
+// Inspect mock runner call history
+expect(test.getCalls()).toHaveLength(5);  // 2 parallel + 3 sequential
+
+// Assert orchestrator state
+assertMultiAgentState(test, {
+  agentStatus: { researcher: 'completed', writer: 'completed', reviewer: 'completed' },
+  globalTokens: { min: 0, max: 2000 },
+  pendingHandoffs: 0,
+});
 
 // Reset between tests
-runner.reset();
-orchestrator.reset();
+test.resetAll();
 ```
 
 ### Testing with Failures
 
 ```typescript
+import { createMockAgentRunner } from '@directive-run/ai/testing';
+import { createMultiAgentOrchestrator, parallel, concatResults } from '@directive-run/ai';
+
 const flakyRunner = createMockAgentRunner({
-  defaultResponse: 'OK',
-  shouldFail: (agent) => agent.name === 'researcher',
-  failureError: new Error('Rate limited'),
+  defaultResponse: { output: 'OK', totalTokens: 10 },
+  responses: {
+    researcher: { error: new Error('Rate limited') },
+  },
 });
 
 const orchestrator = createMultiAgentOrchestrator({
-  runner: flakyRunner,
+  runner: flakyRunner.run,
   agents: {
     researcher: { agent: { name: 'researcher' }, maxConcurrent: 1 },
     writer: { agent: { name: 'writer' }, maxConcurrent: 1 },
@@ -961,73 +1544,38 @@ expect(result).toBe('OK');
 
 ---
 
-## Integration with Agent Stack
-
-The [Agent Stack](/docs/ai/agent-stack) composes multi-agent patterns with memory, caching, observability, and guardrails in a single factory:
-
-```typescript
-import { createAgentStack, parallel, sequential } from '@directive-run/ai';
-
-const stack = createAgentStack({
-  runner,
-  agents: {
-    researcher: { agent: researcher, maxConcurrent: 3 },
-    writer: { agent: writer, maxConcurrent: 1 },
-    reviewer: { agent: reviewer, maxConcurrent: 1 },
-  },
-  patterns: {
-    research: parallel(
-      ['researcher', 'researcher'],
-      (results) => concatResults(results)
-    ),
-    pipeline: sequential(['researcher', 'writer', 'reviewer']),
-  },
-  // Stack-level features apply to all agent runs
-  memory: { strategy: 'sliding', maxMessages: 50 },
-  circuitBreaker: { maxFailures: 5, resetMs: 60000 },
-  guardrails: {
-    input: [createPIIGuardrail({ redact: true })],
-    output: [createModerationGuardrail({ checkFn: moderate })],
-  },
-  messageBus: { maxHistory: 500 },
-});
-
-// Run patterns through the stack
-const research = await stack.runPattern('research', 'Explain WASM');
-
-// Access the underlying multi-agent orchestrator
-const coordinator = stack.coordinator;
-const state = coordinator.getAgentState('researcher');
-
-// Access the message bus
-const bus = stack.messageBus;
-```
-
----
-
 ## Framework Integration
 
-Track multi-agent state through the [Agent Orchestrator](/docs/ai/orchestrator) adapter's `.system` bridge. The `__agent` key holds the active agent status, `__agents` for per-agent states.
+The multi-agent orchestrator exposes a `.system` property &ndash; a standard Directive System with namespaced modules. Each agent's state is under its agent ID key (e.g., `researcher`, `writer`), with bridge keys `__agent`, `__approval`, `__conversation`, and `__toolCalls` inside each namespace.
 
 ### React
 
 ```tsx
-import { useAgentOrchestrator, useFact, useSelector } from '@directive-run/react';
+import { useFact, useSelector, useInspect } from '@directive-run/react';
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
 
-function MultiAgentPanel() {
-  const orchestrator = useAgentOrchestrator({ runner, autoApproveToolCalls: true });
+function MultiAgentPanel({ orchestrator }: { orchestrator: MultiAgentOrchestrator }) {
   const { system } = orchestrator;
 
-  const agent = useFact(system, '__agent');
+  // Subscribe to a specific agent's state (namespaced under the agent ID)
+  const researcherAgent = useFact(system, 'researcher.__agent');
+  const writerAgent = useFact(system, 'writer.__agent');
+
+  // Derive a summary across multiple agents
   const summary = useSelector(system, (state) => ({
-    status: state.__agent?.status,
-    tokens: state.__agent?.totalTokens,
+    researcherStatus: state.researcher?.__agent?.status,
+    writerStatus: state.writer?.__agent?.status,
+    researcherTokens: state.researcher?.__agent?.tokenUsage ?? 0,
+    writerTokens: state.writer?.__agent?.tokenUsage ?? 0,
   }));
+
+  const { isSettled } = useInspect(system);
 
   return (
     <div>
-      <p>Status: {agent?.status}</p>
-      <p>Tokens: {summary.tokens}</p>
+      <p>Researcher: {researcherAgent?.status} ({summary.researcherTokens} tokens)</p>
+      <p>Writer: {writerAgent?.status} ({summary.writerTokens} tokens)</p>
+      <p>{isSettled ? 'Idle' : 'Working...'}</p>
     </div>
   );
 }
@@ -1044,12 +1592,14 @@ import { onUnmounted } from 'vue';
 const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
 onUnmounted(() => orchestrator.dispose());
 
-const agent = useFact(orchestrator.system, '__agent');
+const researcherAgent = useFact(orchestrator.system, 'researcher.__agent');
+const writerAgent = useFact(orchestrator.system, 'writer.__agent');
 const { isSettled } = useInspect(orchestrator.system);
 </script>
 
 <template>
-  <p>Status: {{ agent?.status }}</p>
+  <p>Researcher: {{ researcherAgent?.status }}</p>
+  <p>Writer: {{ writerAgent?.status }}</p>
   <p>{{ isSettled ? 'Idle' : 'Working...' }}</p>
 </template>
 ```
@@ -1065,11 +1615,13 @@ import { onDestroy } from 'svelte';
 const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
 onDestroy(() => orchestrator.dispose());
 
-const agent = useFact(orchestrator.system, '__agent');
+const researcherAgent = useFact(orchestrator.system, 'researcher.__agent');
+const writerAgent = useFact(orchestrator.system, 'writer.__agent');
 const inspect = useInspect(orchestrator.system);
 </script>
 
-<p>Status: {$agent?.status}</p>
+<p>Researcher: {$researcherAgent?.status}</p>
+<p>Writer: {$writerAgent?.status}</p>
 <p>{$inspect.isSettled ? 'Idle' : 'Working...'}</p>
 ```
 
@@ -1084,12 +1636,14 @@ function MultiAgentPanel() {
   const orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
   onCleanup(() => orchestrator.dispose());
 
-  const agent = useFact(orchestrator.system, '__agent');
+  const researcherAgent = useFact(orchestrator.system, 'researcher.__agent');
+  const writerAgent = useFact(orchestrator.system, 'writer.__agent');
   const inspect = useInspect(orchestrator.system);
 
   return (
     <div>
-      <p>Status: {agent()?.status}</p>
+      <p>Researcher: {researcherAgent()?.status}</p>
+      <p>Writer: {writerAgent()?.status}</p>
       <p>{inspect().isSettled ? 'Idle' : 'Working...'}</p>
     </div>
   );
@@ -1105,7 +1659,8 @@ import { FactController, InspectController } from '@directive-run/lit';
 
 class MultiAgentPanel extends LitElement {
   private orchestrator = createMultiAgentOrchestrator({ runner, agents: { /* ... */ } });
-  private agent = new FactController(this, this.orchestrator.system, '__agent');
+  private researcherAgent = new FactController(this, this.orchestrator.system, 'researcher.__agent');
+  private writerAgent = new FactController(this, this.orchestrator.system, 'writer.__agent');
   private inspect = new InspectController(this, this.orchestrator.system);
 
   disconnectedCallback() {
@@ -1115,7 +1670,8 @@ class MultiAgentPanel extends LitElement {
 
   render() {
     return html`
-      <p>Status: ${this.agent.value?.status}</p>
+      <p>Researcher: ${this.researcherAgent.value?.status}</p>
+      <p>Writer: ${this.writerAgent.value?.status}</p>
       <p>${this.inspect.value?.isSettled ? 'Idle' : 'Working...'}</p>
     `;
   }
@@ -1126,8 +1682,7 @@ class MultiAgentPanel extends LitElement {
 
 ## Next Steps
 
-- [Agent Orchestrator](/docs/ai/orchestrator) &ndash; Single-agent orchestration, constraints, and approvals
-- [Agent Stack](/docs/ai/agent-stack) &ndash; All-in-one composition with memory, caching, and observability
+- [Orchestrator](/docs/ai/orchestrator) &ndash; Single-agent orchestration, constraints, and approvals
 - [Guardrails](/docs/ai/guardrails) &ndash; Input/output validation and safety
 - [Streaming](/docs/ai/streaming) &ndash; Real-time token streaming
 - [MCP Integration](/docs/ai/mcp) &ndash; Model Context Protocol server connections

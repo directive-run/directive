@@ -20,7 +20,7 @@ Every chat message flows through a five-stage pipeline:
 ```text
 User Question
   → RAG Enrichment    (embed query, find relevant doc chunks)
-  → Agent Stack       (guardrails, circuit breaker, streaming runner)
+  → Agent Orchestrator (guardrails, circuit breaker, streaming runner)
   → SSE Transport     (tokens → Server-Sent Events frames)
   → Browser Widget    (parse SSE, render markdown)
 ```
@@ -31,18 +31,22 @@ The first three stages use Directive's AI adapter (`@directive-run/ai`). The ser
 
 ## What the AI adapter handles
 
-The `createAgentStack` configures the agent-level protection layer:
+Middleware functions compose around the runner to add resilience, and `createAgentOrchestrator` configures the agent-level protection layer:
 
 ```typescript
-const stack = createAgentStack({
+// Compose resilience middleware on the runner
+let runner = createAnthropicRunner({ ... });
+runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 });
+runner = withFallback([runner, openaiBackupRunner]);
+runner = withBudget(runner, {
+  budgets: [
+    { window: 'hour', maxCost: 5.00, pricing: haikuPricing },
+    { window: 'day', maxCost: 50.00, pricing: haikuPricing },
+  ],
+});
+
+const orchestrator = createAgentOrchestrator({
   runner,
-  streaming: { runner: streamingRunner },
-  agents: {
-    'docs-qa': {
-      agent: { name: 'directive-docs-qa', instructions: BASE_INSTRUCTIONS },
-      capabilities: ['question-answering', 'code-examples'],
-    },
-  },
   guardrails: {
     input: [
       createPromptInjectionGuardrail({ strictMode: true }),
@@ -52,24 +56,13 @@ const stack = createAgentStack({
       createLengthGuardrail({ maxCharacters: 3_000 }),
     ],
   },
-  memory: { maxMessages: 20 },
-  circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
-  rateLimit: { maxPerMinute: 30 },
+  memory: createAgentMemory({ maxMessages: 20 }),
+  circuitBreaker: createCircuitBreaker({ failureThreshold: 3, recoveryTimeMs: 30_000 }),
   maxTokenBudget: 2000,
-
-  // Production resilience (P0–P2)
-  intelligentRetry: { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 },
-  fallback: { runners: [openaiBackupRunner] },
-  budget: {
-    budgets: [
-      { window: 'hour', maxCost: 5.00, pricing: haikuPricing },
-      { window: 'day', maxCost: 50.00, pricing: haikuPricing },
-    ],
-  },
-})
+});
 ```
 
-Every message passes through prompt injection detection and PII redaction before reaching the LLM. The circuit breaker trips after three consecutive failures and recovers after 30 seconds. The rate limiter caps throughput at 30 requests per minute across all users. Intelligent retry handles 429/503 errors with exponential backoff, provider fallback routes to an OpenAI backup when Anthropic is down, and cost budget guards cap hourly and daily LLM spend.
+Every message passes through prompt injection detection and PII redaction before reaching the LLM. The circuit breaker trips after three consecutive failures and recovers after 30 seconds. The `with*` middleware on the runner handles retry with exponential backoff on 429/503 errors, provider fallback to an OpenAI backup when Anthropic is down, and cost budget guards that cap hourly and daily LLM spend.
 
 ---
 
@@ -159,7 +152,7 @@ If enrichment fails or times out (5-second cap), the raw message is used as a fa
 
 ## SSE streaming
 
-`createSSETransport` wraps the agent stack's token stream into Server-Sent Events. Five event types flow over the wire:
+`createSSETransport` wraps the orchestrator's token stream into Server-Sent Events. Five event types flow over the wire:
 
 | Event | Purpose |
 |-------|---------|
@@ -203,7 +196,7 @@ function isRateLimited(ip: string): boolean {
 }
 ```
 
-This worked, but it had blind spots. Token usage wasn't tracked server-side. Error streaks were invisible. There was no connection between the agent stack's lifecycle events and the server state. The AI adapter was fully configured, but the operational state around it was imperative code with no observability.
+This worked, but it had blind spots. Token usage wasn't tracked server-side. Error streaks were invisible. There was no connection between the AI adapter's lifecycle events and the server state. The AI adapter was fully configured, but the operational state around it was imperative code with no observability.
 
 ---
 
@@ -332,7 +325,7 @@ if (!chatbotSystem.derive.isHealthy) {
 }
 ```
 
-The agent stack's lifecycle hooks feed data back to the module:
+The orchestrator's lifecycle hooks feed data back to the module:
 
 ```typescript
 hooks: {
@@ -355,22 +348,24 @@ The chatbot has two Directive layers that compose through lifecycle hooks:
 
 **Core module** (server-side operational state): Tracks per-IP request counts, cumulative token usage, error streaks, and system health. Runs as a singleton `createSystem` in the server process. Provides derivations like `isHealthy` and `isOverBudget` that the route handler reads synchronously.
 
-**AI adapter stack** (agent-level safety): Runs prompt injection detection, PII redaction, circuit breaking, and rate limiting on every agent call. Manages the streaming token pipeline. Enforces per-call token budgets.
+**AI adapter orchestrator** (agent-level safety): Runs prompt injection detection, PII redaction, circuit breaking, and rate limiting on every agent call. Manages the streaming token pipeline. Enforces per-call token budgets.
 
-The module tracks cumulative metrics. The stack protects individual runs. They communicate via `hooks`: when the stack completes an agent run, it dispatches `requestCompleted` to the module; when it fails, it dispatches `requestFailed`. The module's derived `isHealthy` state can short-circuit the request before the stack is even invoked.
+The module tracks cumulative metrics. The orchestrator protects individual runs. They communicate via `hooks`: when the orchestrator completes an agent run, it dispatches `requestCompleted` to the module; when it fails, it dispatches `requestFailed`. The module's derived `isHealthy` state can short-circuit the request before the orchestrator is even invoked.
 
 ---
 
 ## Full route handler
 
-Here's the complete Next.js API route. The module, stack, enricher, and transport are all singletons initialized once per server process:
+Here's the complete Next.js API route. The module, orchestrator, enricher, and transport are all singletons initialized once per server process:
 
 ```typescript
 // app/api/chat/route.ts
 import { NextRequest } from 'next/server'
 import path from 'node:path'
 import {
-  createAgentStack,
+  createAgentOrchestrator,
+  createAgentMemory,
+  createCircuitBreaker,
   createAnthropicRunner,
   createAnthropicStreamingRunner,
   createPromptInjectionGuardrail,
@@ -380,7 +375,11 @@ import {
   createOpenAIEmbedder,
   createSSETransport,
   createLengthGuardrail,
+  withRetry,
+  withFallback,
+  withBudget,
 } from '@directive-run/ai'
+import { createOpenAIRunner } from '@directive-run/ai/openai'
 import { createSystem } from '@directive-run/core'
 import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
 
@@ -404,35 +403,44 @@ const transport = createSSETransport({
   },
 })
 
-const runner = createAnthropicRunner({
+// OpenAI fallback runner (only created if API key is available)
+const openaiKey = process.env.OPENAI_API_KEY
+const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+
+// Compose resilience middleware on the runner
+let runner = createAnthropicRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
   model: 'claude-haiku-4-5-20251001',
   maxTokens: 2000,
 })
 
-// OpenAI fallback runner (only created if API key is available)
-const openaiKey = process.env.OPENAI_API_KEY
-const fallbackRunners = openaiKey
-  ? [createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })]
-  : []
+// Retry 429/503 with exponential backoff (never retries 400/401/403)
+runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 })
 
-const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+// Fall back to OpenAI when Anthropic is unavailable
+if (openaiKey) {
+  const openaiRunner = createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })
+  runner = withFallback([runner, openaiRunner])
+}
 
-const stack = createAgentStack({
+// Cap hourly and daily spend using Haiku pricing
+runner = withBudget(runner, {
+  budgets: [
+    { window: 'hour', maxCost: 5.00, pricing: haikuPricing },
+    { window: 'day', maxCost: 50.00, pricing: haikuPricing },
+  ],
+})
+
+const streamingRunner = createAnthropicStreamingRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: 'claude-haiku-4-5-20251001',
+  maxTokens: 2000,
+})
+
+const docsQaAgent = { name: 'directive-docs-qa', instructions: SYSTEM_PROMPT }
+
+const orchestrator = createAgentOrchestrator({
   runner,
-  streaming: {
-    runner: createAnthropicStreamingRunner({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-      model: 'claude-haiku-4-5-20251001',
-      maxTokens: 2000,
-    }),
-  },
-  agents: {
-    'docs-qa': {
-      agent: { name: 'directive-docs-qa', instructions: SYSTEM_PROMPT },
-      capabilities: ['question-answering', 'code-examples'],
-    },
-  },
   guardrails: {
     input: [
       createPromptInjectionGuardrail({ strictMode: true }),
@@ -440,26 +448,9 @@ const stack = createAgentStack({
     ],
     output: [createLengthGuardrail({ maxCharacters: 3_000 })],
   },
-  memory: { maxMessages: 20 },
-  circuitBreaker: { failureThreshold: 3, recoveryTimeMs: 30_000 },
-  rateLimit: { maxPerMinute: 30 },
+  memory: createAgentMemory({ maxMessages: 20 }),
+  circuitBreaker: createCircuitBreaker({ failureThreshold: 3, recoveryTimeMs: 30_000 }),
   maxTokenBudget: 2000,
-
-  // Retry 429/503 with exponential backoff (never retries 400/401/403)
-  intelligentRetry: { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 },
-
-  // Fall back to OpenAI when Anthropic is unavailable
-  ...(fallbackRunners.length > 0 && {
-    fallback: { runners: fallbackRunners },
-  }),
-
-  // Cap hourly and daily spend using Haiku pricing
-  budget: {
-    budgets: [
-      { window: 'hour', maxCost: 5.00, pricing: haikuPricing },
-      { window: 'day', maxCost: 50.00, pricing: haikuPricing },
-    ],
-  },
 
   hooks: {
     onAgentComplete: ({ tokenUsage }) => {
@@ -519,11 +510,10 @@ export async function POST(request: NextRequest) {
     // Fall back to raw message
   }
 
-  // 5. Stream the response
+  // 5. Stream the response via the SSE transport
   const dailyRemaining = Math.max(0, DAILY_CAP_PER_IP - (chatbotSystem.facts.dailyCounts[ip]?.count ?? 0))
-  const sseResponse = transport.toResponse(stack, 'docs-qa', enrichedInput, {
-    signal: request.signal,
-  })
+  const stream = streamingRunner(docsQaAgent, enrichedInput, { signal: request.signal })
+  const sseResponse = transport.toResponse(stream)
 
   sseResponse.headers.set('X-Daily-Remaining', String(dailyRemaining))
 
@@ -566,7 +556,7 @@ RAG Enricher
   ├─ 5s timeout fallback
   │
   ▼
-Agent Stack
+Agent Orchestrator + Middleware
   │
   ├─ Input guardrails
   │   ├─ Prompt injection
@@ -575,7 +565,6 @@ Agent Stack
   ├─ Intelligent retry (429/503 → backoff)
   ├─ Provider fallback (Anthropic → OpenAI)
   ├─ Circuit breaker (3 fails → open)
-  ├─ Rate limiter (30/min)
   ├─ Streaming LLM (Claude Haiku 4.5)
   │
   ▼
@@ -600,13 +589,13 @@ Post-Response Hooks
 
 ### Validation and gating
 
-The route handler runs five checks before touching the AI stack. Origin validation rejects unknown domains. The Directive module tracks per-IP request counts (10 per 60 seconds) and daily caps (25 questions/day, configurable). The `isHealthy` derivation short-circuits with a `503` when consecutive errors exceed 5 or the daily token budget is exhausted.
+The route handler runs five checks before touching the AI orchestrator. Origin validation rejects unknown domains. The Directive module tracks per-IP request counts (10 per 60 seconds) and daily caps (25 questions/day, configurable). The `isHealthy` derivation short-circuits with a `503` when consecutive errors exceed 5 or the daily token budget is exhausted.
 
 ### RAG and agent execution
 
 The enricher classifies the query intent (API vs. conceptual), embeds the query, over-fetches the top 7 chunks by cosine similarity, re-ranks with source-type boosting, caps diversity at 2 chunks per symbol, and assembles the enriched input with page context and conversation history. If the embedding API is slow, a 5-second timeout falls back to the raw message.
 
-The enriched input passes through prompt injection detection and PII redaction before reaching Claude Haiku 4.5. The circuit breaker and stack-level rate limiter (30/min) add a second layer of protection beyond the per-IP limits.
+The enriched input passes through prompt injection detection and PII redaction before reaching Claude Haiku 4.5. The circuit breaker adds a second layer of protection beyond the per-IP limits.
 
 ### Streaming and post-response
 

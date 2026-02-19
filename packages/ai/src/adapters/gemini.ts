@@ -1,14 +1,14 @@
 /**
- * @directive-run/ai/anthropic
+ * @directive-run/ai/gemini
  *
- * Anthropic adapter for Directive AI. Provides runners for the
- * Anthropic Messages API, including streaming support.
+ * Google Gemini adapter for Directive AI. Provides runners for the
+ * Gemini generateContent API, including streaming support.
  *
  * @example
  * ```typescript
- * import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
+ * import { createGeminiRunner, createGeminiStreamingRunner } from '@directive-run/ai/gemini';
  *
- * const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY! });
+ * const runner = createGeminiRunner({ apiKey: process.env.GEMINI_API_KEY! });
  * ```
  */
 
@@ -21,37 +21,37 @@ import type { StreamingCallbackRunner } from "../types.js";
 // ============================================================================
 
 /**
- * Anthropic model pricing (USD per million tokens).
+ * Gemini model pricing (USD per million tokens).
  *
  * Use with `estimateCost()` for per-call cost tracking:
  * ```typescript
  * import { estimateCost } from '@directive-run/ai';
- * import { ANTHROPIC_PRICING } from '@directive-run/ai/anthropic';
+ * import { GEMINI_PRICING } from '@directive-run/ai/gemini';
  *
  * const cost =
- *   estimateCost(result.tokenUsage!.inputTokens, ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"].input) +
- *   estimateCost(result.tokenUsage!.outputTokens, ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"].output);
+ *   estimateCost(result.tokenUsage!.inputTokens, GEMINI_PRICING["gemini-2.0-flash"].input) +
+ *   estimateCost(result.tokenUsage!.outputTokens, GEMINI_PRICING["gemini-2.0-flash"].output);
  * ```
  *
  * **Note:** Pricing changes over time. These values are provided as a convenience
- * and may not reflect the latest rates. Always verify at https://anthropic.com/pricing
+ * and may not reflect the latest rates. Always verify at https://ai.google.dev/pricing
  */
-export const ANTHROPIC_PRICING: Record<string, { input: number; output: number }> = {
-	"claude-sonnet-4-5-20250929": { input: 3, output: 15 },
-	"claude-haiku-3-5-20241022": { input: 0.8, output: 4 },
-	"claude-opus-4-20250514": { input: 15, output: 75 },
+export const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
+	"gemini-2.5-pro": { input: 1.25, output: 10 },
+	"gemini-2.5-flash": { input: 0.15, output: 0.6 },
+	"gemini-2.0-flash": { input: 0.1, output: 0.4 },
+	"gemini-2.0-flash-lite": { input: 0.025, output: 0.1 },
 };
 
 // ============================================================================
-// Anthropic Runner
+// Gemini Runner
 // ============================================================================
 
-/** Options for createAnthropicRunner */
-export interface AnthropicRunnerOptions {
+/** Options for createGeminiRunner */
+export interface GeminiRunnerOptions {
 	apiKey: string;
 	model?: string;
-	/** @default 4096 */
-	maxTokens?: number;
+	maxOutputTokens?: number;
 	baseURL?: string;
 	fetch?: typeof globalThis.fetch;
 	/** @default undefined */
@@ -61,32 +61,26 @@ export interface AnthropicRunnerOptions {
 }
 
 /**
- * Create an AgentRunner for the Anthropic Messages API.
+ * Create an AgentRunner for the Google Gemini generateContent API.
  *
  * Returns `tokenUsage` with input/output breakdown for cost tracking.
  *
  * @example
  * ```typescript
- * const runner = createAnthropicRunner({
- *   apiKey: process.env.ANTHROPIC_API_KEY!,
- *   hooks: {
- *     onAfterCall: ({ durationMs, tokenUsage }) => {
- *       console.log(`${durationMs}ms – ${tokenUsage.inputTokens}in/${tokenUsage.outputTokens}out`);
- *     },
- *   },
+ * const runner = createGeminiRunner({
+ *   apiKey: process.env.GEMINI_API_KEY!,
+ *   model: 'gemini-2.0-flash',
  * });
  * const orchestrator = createAgentOrchestrator({ runner });
  * const result = await orchestrator.run(agent, input);
  * ```
  */
-export function createAnthropicRunner(
-	options: AnthropicRunnerOptions,
-): AgentRunner {
+export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
 	const {
 		apiKey,
-		model = "claude-sonnet-4-5-20250929",
-		maxTokens = 4096,
-		baseURL = "https://api.anthropic.com/v1",
+		model = "gemini-2.0-flash",
+		maxOutputTokens,
+		baseURL = "https://generativelanguage.googleapis.com/v1beta",
 		fetch: fetchFn = globalThis.fetch,
 		timeoutMs,
 		hooks,
@@ -95,38 +89,40 @@ export function createAnthropicRunner(
 	validateBaseURL(baseURL);
 
 	if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production" && !apiKey) {
-		console.warn("[Directive] createAnthropicRunner: apiKey is empty. API calls will fail.");
+		console.warn("[Directive] createGeminiRunner: apiKey is empty. API calls will fail.");
 	}
 
 	return createRunner({
 		fetch: fetchFn,
 		hooks,
 		buildRequest: (agent, _input, messages) => ({
-			url: `${baseURL}/messages`,
+			url: `${baseURL}/models/${agent.model ?? model}:generateContent`,
 			init: {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"x-api-key": apiKey,
-					"anthropic-version": "2023-06-01",
+					"x-goog-api-key": apiKey,
 				},
 				body: JSON.stringify({
-					model: agent.model ?? model,
-					max_tokens: maxTokens,
-					system: agent.instructions ?? "",
-					messages: messages.map((m) => ({
-						role: m.role,
-						content: m.content,
+					...(agent.instructions
+						? { systemInstruction: { parts: [{ text: agent.instructions }] } }
+						: {}),
+					contents: messages.map((m) => ({
+						role: m.role === "assistant" ? "model" : "user",
+						parts: [{ text: m.content }],
 					})),
+					...(maxOutputTokens != null
+						? { generationConfig: { maxOutputTokens } }
+						: {}),
 				}),
 				...(timeoutMs != null ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
 			},
 		}),
 		parseResponse: async (res) => {
 			const data = await res.json();
-			const text = data.content?.[0]?.text ?? "";
-			const inputTokens = data.usage?.input_tokens ?? 0;
-			const outputTokens = data.usage?.output_tokens ?? 0;
+			const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+			const inputTokens = data.usageMetadata?.promptTokenCount ?? 0;
+			const outputTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
 
 			return {
 				text,
@@ -139,15 +135,14 @@ export function createAnthropicRunner(
 }
 
 // ============================================================================
-// Anthropic Streaming Runner
+// Gemini Streaming Runner
 // ============================================================================
 
-/** Options for createAnthropicStreamingRunner */
-export interface AnthropicStreamingRunnerOptions {
+/** Options for createGeminiStreamingRunner */
+export interface GeminiStreamingRunnerOptions {
 	apiKey: string;
 	model?: string;
-	/** @default 4096 */
-	maxTokens?: number;
+	maxOutputTokens?: number;
 	baseURL?: string;
 	fetch?: typeof globalThis.fetch;
 	/** Lifecycle hooks for tracing, logging, and metrics */
@@ -155,28 +150,28 @@ export interface AnthropicStreamingRunnerOptions {
 }
 
 /**
- * Create a StreamingCallbackRunner for the Anthropic Messages API with
- * server-sent events. Can be used standalone or paired with `createAnthropicRunner`.
+ * Create a StreamingCallbackRunner for the Gemini streamGenerateContent API
+ * with server-sent events. Can be used standalone or paired with `createGeminiRunner`.
  *
  * Returns `tokenUsage` with input/output breakdown for cost tracking.
  *
  * @example
  * ```typescript
- * const streamingRunner = createAnthropicStreamingRunner({
- *   apiKey: process.env.ANTHROPIC_API_KEY!,
+ * const streamingRunner = createGeminiStreamingRunner({
+ *   apiKey: process.env.GEMINI_API_KEY!,
  * });
  * const streamRunner = createStreamingRunner(streamingRunner);
  * const { stream, result } = streamRunner(agent, input);
  * ```
  */
-export function createAnthropicStreamingRunner(
-	options: AnthropicStreamingRunnerOptions,
+export function createGeminiStreamingRunner(
+	options: GeminiStreamingRunnerOptions,
 ): StreamingCallbackRunner {
 	const {
 		apiKey,
-		model = "claude-sonnet-4-5-20250929",
-		maxTokens = 4096,
-		baseURL = "https://api.anthropic.com/v1",
+		model = "gemini-2.0-flash",
+		maxOutputTokens,
+		baseURL = "https://generativelanguage.googleapis.com/v1beta",
 		fetch: fetchFn = globalThis.fetch,
 		hooks,
 	} = options;
@@ -184,7 +179,7 @@ export function createAnthropicStreamingRunner(
 	validateBaseURL(baseURL);
 
 	if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production" && !apiKey) {
-		console.warn("[Directive] createAnthropicStreamingRunner: apiKey is empty. API calls will fail.");
+		console.warn("[Directive] createGeminiStreamingRunner: apiKey is empty. API calls will fail.");
 	}
 
 	return async (agent, input, callbacks) => {
@@ -192,28 +187,32 @@ export function createAnthropicStreamingRunner(
 		hooks?.onBeforeCall?.({ agent, input, timestamp: startTime });
 
 		try {
-			const response = await fetchFn(`${baseURL}/messages`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"x-api-key": apiKey,
-					"anthropic-version": "2023-06-01",
+			const response = await fetchFn(
+				`${baseURL}/models/${agent.model ?? model}:streamGenerateContent?alt=sse`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"x-goog-api-key": apiKey,
+					},
+					body: JSON.stringify({
+						...(agent.instructions
+							? { systemInstruction: { parts: [{ text: agent.instructions }] } }
+							: {}),
+						contents: [{ role: "user", parts: [{ text: input }] }],
+						...(maxOutputTokens != null
+							? { generationConfig: { maxOutputTokens } }
+							: {}),
+					}),
+					signal: callbacks.signal,
 				},
-				body: JSON.stringify({
-					model: agent.model ?? model,
-					max_tokens: maxTokens,
-					system: agent.instructions ?? "",
-					messages: [{ role: "user", content: input }],
-					stream: true,
-				}),
-				signal: callbacks.signal,
-			});
+			);
 
 			if (!response.ok) {
 				const errBody = await response.text().catch(() => "");
 
 				throw new Error(
-					`[Directive] Anthropic streaming error ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
+					`[Directive] Gemini streaming error ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
 				);
 			}
 
@@ -244,26 +243,24 @@ export function createAnthropicStreamingRunner(
 							continue;
 						}
 						const data = line.slice(6).trim();
+						if (data === "[DONE]") {
+							continue;
+						}
 
 						try {
 							const event = JSON.parse(data);
-							if (event.type === "error") {
-								throw new Error(
-									`[Directive] Anthropic stream error: ${event.error?.message ?? JSON.stringify(event.error)}`,
-								);
+
+							// Extract text from candidates
+							const text = event.candidates?.[0]?.content?.parts?.[0]?.text;
+							if (text) {
+								fullText += text;
+								callbacks.onToken?.(text);
 							}
-							if (
-								event.type === "content_block_delta" &&
-								event.delta?.type === "text_delta"
-							) {
-								fullText += event.delta.text;
-								callbacks.onToken?.(event.delta.text);
-							}
-							if (event.type === "message_delta" && event.usage) {
-								outputTokens = event.usage.output_tokens ?? 0;
-							}
-							if (event.type === "message_start" && event.message?.usage) {
-								inputTokens = event.message.usage.input_tokens ?? 0;
+
+							// Extract usage metadata from any chunk that has it
+							if (event.usageMetadata) {
+								inputTokens = event.usageMetadata.promptTokenCount ?? inputTokens;
+								outputTokens = event.usageMetadata.candidatesTokenCount ?? outputTokens;
 							}
 						} catch (parseErr) {
 							if (parseErr instanceof SyntaxError) {
@@ -272,7 +269,7 @@ export function createAnthropicStreamingRunner(
 									process.env?.NODE_ENV === "development"
 								) {
 									console.warn(
-										"[Directive] Malformed SSE event from Anthropic:",
+										"[Directive] Malformed SSE event from Gemini:",
 										data,
 									);
 								}

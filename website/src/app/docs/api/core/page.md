@@ -497,8 +497,8 @@ const resetResolver = typedResolver<typeof schema, { type: "RESET" }>({
 });
 ```
 
-{% callout title="AI Orchestrator Builders" %}
-For AI agent orchestrators, `@directive-run/ai` exports additional builders: `constraint()` (fluent builder), `when()` (quick shorthand), and `createOrchestratorBuilder()` (full orchestrator composition). See [Orchestrator](/docs/ai/orchestrator) and [Glossary](/docs/glossary#builders--helpers).
+{% callout title="AI Orchestrator" %}
+For AI agent orchestrators, see `createAgentOrchestrator()` in `@directive-run/ai`. See [Orchestrator](/docs/ai/orchestrator).
 {% /callout %}
 
 ---

@@ -355,20 +355,23 @@ try {
 
 Guardrails protect against bad inputs and outputs. But what happens when the LLM provider itself goes down? A `429` rate limit at 2 AM shouldn't take your agent offline, and a transient `503` shouldn't lose the user's request.
 
-Directive's resilience wrappers compose around your runner &ndash; retry, fallback, and cost budget guards that work with any provider:
+Directive's resilience middleware composes around your runner &ndash; retry, fallback, and cost budget guards that work with any provider:
 
 ```typescript
 import {
-  createAgentStack,
+  createAgentOrchestrator,
   createOpenAIRunner,
   createAnthropicRunner,
   createPIIGuardrail,
   createToolGuardrail,
+  withRetry,
+  withFallback,
+  withBudget,
 } from '@directive-run/ai';
 import type { AgentLike } from '@directive-run/ai';
 
 // Primary provider
-const anthropicRunner = createAnthropicRunner({
+let runner = createAnthropicRunner({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
@@ -378,31 +381,25 @@ const openaiRunner = createOpenAIRunner({
   model: 'gpt-4o-mini',
 });
 
-const stack = createAgentStack({
-  runner: anthropicRunner,
+// Compose resilience middleware on the runner
+// P2: Intelligent retry – respects Retry-After headers on 429,
+// exponential backoff on 503, never retries 400/401/403
+runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 });
 
-  // P2: Intelligent retry – respects Retry-After headers on 429,
-  // exponential backoff on 503, never retries 400/401/403
-  intelligentRetry: {
-    maxRetries: 2,
-    baseDelayMs: 1_000,
-    maxDelayMs: 10_000,
-  },
+// P0: Provider fallback – automatic failover when primary is down
+runner = withFallback([runner, openaiRunner]);
 
-  // P0: Provider fallback – automatic failover when primary is down
-  fallback: {
-    runners: [openaiRunner],
-  },
+// P1: Cost budget – rolling windows prevent runaway spend
+runner = withBudget(runner, {
+  budgets: [
+    { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+    { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+  ],
+});
 
-  // P1: Cost budget – rolling windows prevent runaway spend
-  budget: {
-    budgets: [
-      { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
-      { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
-    ],
-  },
-
-  // Guardrails still apply on top of resilience
+// Guardrails still apply on top of resilience
+const orchestrator = createAgentOrchestrator({
+  runner,
   guardrails: {
     input: [createPIIGuardrail({ redact: true })],
     toolCall: [createToolGuardrail({ denylist: ['shell', 'eval'] })],
@@ -410,22 +407,7 @@ const stack = createAgentStack({
 });
 ```
 
-The composition order is automatic: budget checks run first (reject before spending), then retry wraps the call, then fallback catches provider-level failures. Add all three with config keys &ndash; no manual wrapper chaining.
-
-The wrappers also work standalone if you don't need the full stack:
-
-```typescript
-import { withRetry, withFallback, withBudget } from '@directive-run/ai';
-
-// Compose manually: budget → retry → fallback → runner
-const resilientRunner = withBudget(
-  withRetry(
-    withFallback([anthropicRunner, openaiRunner]),
-    { maxRetries: 2, baseDelayMs: 1_000 }
-  ),
-  { budgets: [{ window: 'hour', maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } }] }
-);
-```
+The composition order matters: budget checks run first (reject before spending), then retry wraps the call, then fallback catches provider-level failures. Each `with*` wrapper returns a new runner, so you can compose them in the order that makes sense for your use case.
 
 See the [Resilience & Routing documentation](/docs/ai/resilience-routing) for the full API including model selection, structured outputs, and constraint-driven provider routing.
 

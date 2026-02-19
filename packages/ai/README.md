@@ -25,24 +25,22 @@ Provider adapters are subpath exports &ndash; no extra packages needed.
 ## Quick Start
 
 ```typescript
-import { createAgentStack } from "@directive-run/ai";
+import { createAgentOrchestrator } from "@directive-run/ai";
 import { createOpenAIRunner } from "@directive-run/ai/openai";
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 
-const stack = createAgentStack({
+const orchestrator = createAgentOrchestrator({
   runner,
-  agents: {
-    assistant: {
-      agent: { name: "assistant", instructions: "You are a helpful assistant." },
-    },
-  },
   guardrails: {
     input: [async (data) => ({ passed: data.input.length < 10000 })],
   },
 });
 
-const result = await stack.run("assistant", "Hello!");
+const result = await orchestrator.run(
+  { name: "assistant", instructions: "You are a helpful assistant." },
+  "Hello!",
+);
 console.log(result.output);
 ```
 
@@ -101,7 +99,7 @@ const runner = createAnthropicRunner({
 Coordinate multiple agents with built-in execution patterns:
 
 ```typescript
-import { createAgentStack, parallel } from "@directive-run/ai";
+import { createMultiAgentOrchestrator, parallel } from "@directive-run/ai";
 import { createOpenAIRunner } from "@directive-run/ai/openai";
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
@@ -109,7 +107,7 @@ const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 const researchAgent = { name: "researcher", instructions: "Research the topic thoroughly." };
 const writerAgent = { name: "writer", instructions: "Write a clear summary." };
 
-const stack = createAgentStack({
+const orchestrator = createMultiAgentOrchestrator({
   runner,
   agents: {
     researcher: { agent: researchAgent, maxConcurrent: 3 },
@@ -124,7 +122,7 @@ const stack = createAgentStack({
 });
 
 // Run the pattern
-const result = await stack.runPattern("researchAndWrite", "Quantum computing basics");
+const result = await orchestrator.runPattern("researchAndWrite", "Quantum computing basics");
 ```
 
 ## Subpath Exports
@@ -142,7 +140,7 @@ const result = await stack.runPattern("researchAndWrite", "Quantum computing bas
 Mock runners for unit testing without real LLM calls:
 
 ```typescript
-import { createAgentStack } from "@directive-run/ai";
+import { createAgentOrchestrator } from "@directive-run/ai";
 import { createMockAgentRunner } from "@directive-run/ai/testing";
 
 const mock = createMockAgentRunner({
@@ -151,16 +149,12 @@ const mock = createMockAgentRunner({
   },
 });
 
-const stack = createAgentStack({
-  runner: mock.run,
-  agents: {
-    assistant: {
-      agent: { name: "assistant", instructions: "You are a helpful assistant." },
-    },
-  },
-});
+const orchestrator = createAgentOrchestrator({ runner: mock.run });
 
-const result = await stack.run("assistant", "Hello!");
+const result = await orchestrator.run(
+  { name: "assistant", instructions: "You are a helpful assistant." },
+  "Hello!",
+);
 // result.output === "This is a mock response."
 ```
 

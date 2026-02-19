@@ -13,9 +13,9 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../helpers.js";
+import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { AdapterHooks, AgentRunner, Message, TokenUsage } from "../types.js";
-import type { StreamingCallbackRunner } from "../stack.js";
+import type { StreamingCallbackRunner } from "../types.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
 
 // ============================================================================
@@ -244,11 +244,8 @@ export interface OpenAIStreamingRunnerOptions {
  * const streamingRunner = createOpenAIStreamingRunner({
  *   apiKey: process.env.OPENAI_API_KEY!,
  * });
- * const stack = createAgentStack({
- *   runner: createOpenAIRunner({ apiKey }),
- *   streaming: { runner: streamingRunner },
- *   agents: { ... },
- * });
+ * const streamRunner = createStreamingRunner(streamingRunner);
+ * const { stream, result } = streamRunner(agent, input);
  * ```
  */
 export function createOpenAIStreamingRunner(
