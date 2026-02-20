@@ -94,6 +94,8 @@ export const navigation: NavigationSection[] = [
       { title: 'MCP Integration', href: '/docs/ai/mcp' },
       { title: 'SSE Transport', href: '/docs/ai/sse-transport' },
       { title: 'RAG Enricher', href: '/docs/ai/rag' },
+      { title: 'Debug Timeline', href: '/docs/ai/debug-timeline' },
+      { title: 'Self-Healing', href: '/docs/ai/self-healing' },
     ],
   },
   {

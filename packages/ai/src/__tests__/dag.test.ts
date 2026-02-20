@@ -468,9 +468,8 @@ describe("DAG: error — skip-downstream mode", () => {
     }>("skip", "go");
 
     expect(result.statuses.A).toBe("error");
-    // B stays pending because its dep A is "error" (not "completed" or "skipped"),
-    // so depsResolved is false and B is never evaluated for skip-downstream
-    expect(result.statuses.B).toBe("pending");
+    // B is skipped because its dep A errored and onNodeError is "skip-downstream"
+    expect(result.statuses.B).toBe("skipped");
     expect(result.statuses.C).toBe("completed");
     expect(result.errors.A).toContain("a failed");
   });
@@ -503,10 +502,9 @@ describe("DAG: error — skip-downstream mode", () => {
     const result = await orchestrator.runPattern<Record<string, string>>("skip", "go");
 
     expect(result.A).toBe("error");
-    // B and C stay pending because their upstream dep has "error" status,
-    // which doesn't satisfy the depsResolved check (requires "completed" or "skipped")
-    expect(result.B).toBe("pending");
-    expect(result.C).toBe("pending");
+    // B is skipped (direct dep errored), C is also skipped (transitive: dep B is skipped)
+    expect(result.B).toBe("skipped");
+    expect(result.C).toBe("skipped");
   });
 });
 

@@ -67,12 +67,19 @@ import type {
   DagExecutionContext,
   MultiAgentSelfHealingConfig,
   RerouteEvent,
+  CrossAgentSnapshot,
+  CrossAgentDerivationFn,
+  Scratchpad,
 } from "./types.js";
 import {
   GuardrailError,
   APPROVAL_KEY,
+  BREAKPOINT_KEY,
+  SCRATCHPAD_KEY,
   orchestratorBridgeSchema,
 } from "./types.js";
+import { ReflectionExhaustedError } from "./reflection.js";
+import type { ReflectionEvaluation } from "./reflection.js";
 import { createDebugTimeline, createDebugTimelinePlugin, type DebugTimeline } from "./debug-timeline.js";
 import { createHealthMonitor, type HealthMonitor } from "./health-monitor.js";
 import {
@@ -90,9 +97,17 @@ import {
   setConversation,
   getToolCalls,
   setToolCalls,
+  getBreakpointState,
+  setBreakpointState,
   getOrchestratorState,
   convertOrchestratorConstraints,
 } from "./orchestrator-bridge.js";
+
+import { withStructuredOutput, type SafeParseable } from "./structured-output.js";
+import { createCheckpointId, validateCheckpoint, type Checkpoint, type CheckpointStore, type MultiAgentCheckpointLocalState } from "./checkpoint.js";
+import type { BreakpointConfig, BreakpointRequest, BreakpointModifications, BreakpointContext, MultiAgentBreakpointType } from "./breakpoints.js";
+import { matchBreakpoint, createBreakpointId, createInitialBreakpointState, MAX_BREAKPOINT_HISTORY } from "./breakpoints.js";
+import { mergeTaggedStreams, type MultiplexedStreamResult } from "./streaming.js";
 
 // ============================================================================
 /** Safe JSON.stringify that handles circular refs or throwing toJSON */
@@ -106,6 +121,49 @@ function safeStringify(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+/** Shallow structural equality for change detection (plain objects, arrays, and primitives) */
+function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+
+  if (typeof a !== typeof b || a === null || b === null) {
+    return false;
+  }
+
+  if (typeof a !== "object") {
+    return false;
+  }
+
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== (b as unknown[]).length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== (b as unknown[])[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const aKeys = Object.keys(aObj);
+  const bKeys = Object.keys(bObj);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+  for (const key of aKeys) {
+    if (aObj[key] !== bObj[key]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // Async Semaphore (for slot acquisition without polling)
@@ -275,6 +333,14 @@ export interface AgentRegistration {
   memory?: AgentMemory;
   /** Per-agent circuit breaker (overrides orchestrator-level circuitBreaker) */
   circuitBreaker?: CircuitBreaker;
+  /** Per-agent output schema for structured output */
+  outputSchema?: SafeParseable<unknown>;
+  /** Max retries for structured output validation (default: 2) */
+  maxSchemaRetries?: number;
+  /** Custom JSON extractor for structured output */
+  extractJson?: (output: string) => unknown;
+  /** Description of the schema for structured output prompting */
+  schemaDescription?: string;
 }
 
 /** Agent registry configuration */
@@ -319,10 +385,118 @@ export interface SupervisorPattern<T = unknown> {
   supervisor: string;
   /** Worker agent IDs */
   workers: string[];
-  /** Maximum delegation rounds */
+  /** Maximum delegation rounds. @default 5 */
   maxRounds?: number;
   /** Extract final result */
   extract?: (supervisorOutput: unknown, workerResults: RunResult<unknown>[]) => T;
+}
+
+/** Record of a single reflection iteration (for score history) */
+export interface ReflectIterationRecord {
+  iteration: number;
+  passed: boolean;
+  score?: number;
+  feedback?: string;
+  durationMs: number;
+  producerTokens: number;
+  evaluatorTokens: number;
+}
+
+/**
+ * Reflect pattern - produce, evaluate, retry with feedback.
+ * @see reflect — factory helper
+ * @see ReflectIterationRecord — per-iteration history entries
+ */
+export interface ReflectPattern<T = unknown> {
+  type: "reflect";
+  /** Producer agent ID */
+  agent: string;
+  /** Evaluator agent ID (receives output as input) */
+  evaluator: string;
+  /** Maximum iterations. @default 2 */
+  maxIterations?: number;
+  /** Parse evaluator output into ReflectionEvaluation. @default JSON.parse */
+  parseEvaluation?: (output: unknown) => ReflectionEvaluation;
+  /** Build retry input from original input + feedback */
+  buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+  /** Extract result from raw producer output. Unlike race's extract (which receives RunResult), this receives the output directly since the producer is already selected. */
+  extract?: (output: unknown) => T;
+  /** Behavior when maxIterations exhausted. @default "accept-last" */
+  onExhausted?: "accept-last" | "accept-best" | "throw";
+  /** Callback fired after each iteration with score/feedback data. @see ReflectIterationRecord */
+  onIteration?: (record: ReflectIterationRecord) => void;
+  /** AbortSignal for external cancellation of the reflection loop */
+  signal?: AbortSignal;
+  /** Overall timeout (ms). Creates an internal AbortSignal. */
+  timeout?: number;
+  /** Score threshold for acceptance. Number or function of iteration. When set, evaluator score >= threshold is treated as passed. */
+  threshold?: number | ((iteration: number) => number);
+}
+
+/**
+ * Race pattern - first successful agent wins, rest cancelled.
+ * @see race — factory helper
+ * @see RaceResult — return type
+ */
+export interface RacePattern<T = unknown> {
+  type: "race";
+  /** Agent IDs to race */
+  agents: string[];
+  /** Extract result from winning RunResult (receives full RunResult for access to tokens/metadata). @default output field */
+  extract?: (result: RunResult<unknown>) => T;
+  /** Overall timeout (ms) */
+  timeout?: number;
+  /** Require N successful results before resolving. @default 1 */
+  minSuccess?: number;
+  /** AbortSignal for external cancellation */
+  signal?: AbortSignal;
+}
+
+/** Return type from debate pattern execution */
+export interface DebateResult<T = unknown> {
+  winnerId: string;
+  result: T;
+  rounds: Array<{
+    proposals: Array<{ agentId: string; output: unknown }>;
+    judgement: { winnerId: string; feedback?: string; score?: number };
+  }>;
+}
+
+/** Individual result entry returned when minSuccess > 1 */
+export interface RaceSuccessEntry<T = unknown> {
+  agentId: string;
+  result: T;
+}
+
+/** Return type from race pattern execution */
+export interface RaceResult<T = unknown> {
+  winnerId: string;
+  result: T;
+  allResults?: Array<RaceSuccessEntry<T>>;
+}
+
+/**
+ * Debate pattern - agents compete, evaluator judges across rounds.
+ * @see debate — factory helper
+ * @see runDebate — imperative API
+ * @see DebateResult — return type
+ */
+export interface DebatePattern<T = unknown> {
+  type: "debate";
+  /** Agent IDs that will generate competing proposals */
+  agents: string[];
+  /** Evaluator agent ID that judges proposals */
+  evaluator: string;
+  /** Maximum rounds of debate. @default 2 */
+  maxRounds?: number;
+  /** Extract final result from the winning proposal */
+  extract?: (output: unknown) => T;
+  /** Parse evaluator output. @default JSON.parse expecting `{ winnerId, feedback }` */
+  parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+  /** AbortSignal for external cancellation */
+  signal?: AbortSignal;
+  /** Overall timeout (ms). Creates an internal AbortSignal. */
+  timeout?: number;
 }
 
 /** Union of all patterns */
@@ -330,7 +504,10 @@ export type ExecutionPattern<T = unknown> =
   | ParallelPattern<T>
   | SequentialPattern<T>
   | SupervisorPattern<T>
-  | DagPattern<T>;
+  | DagPattern<T>
+  | ReflectPattern<T>
+  | RacePattern<T>
+  | DebatePattern<T>;
 
 // ============================================================================
 // Handoff Types
@@ -377,7 +554,7 @@ export interface MultiAgentOrchestratorOptions {
   onHandoff?: (request: HandoffRequest) => void;
   /** Handoff completion callbacks */
   onHandoffComplete?: (result: HandoffResult) => void;
-  /** Maximum number of handoff results to retain (default: 1000) */
+  /** Maximum number of handoff results to retain. @default 1000 */
   maxHandoffHistory?: number;
   /** Debug mode */
   debug?: boolean;
@@ -391,7 +568,7 @@ export interface MultiAgentOrchestratorOptions {
   agentRetry?: AgentRetryConfig;
   /** Maximum token budget across all agent runs */
   maxTokenBudget?: number;
-  /** Fires when token usage reaches this percentage of maxTokenBudget (0-1, default: 0.8) */
+  /** Fires when token usage reaches this percentage of maxTokenBudget (0-1). @default 0.8 */
   budgetWarningThreshold?: number;
   /** Callback when budget warning threshold is reached */
   onBudgetWarning?: (event: { currentTokens: number; maxBudget: number; percentage: number }) => void;
@@ -411,6 +588,18 @@ export interface MultiAgentOrchestratorOptions {
   circuitBreaker?: CircuitBreaker;
   /** Self-healing configuration for automatic agent rerouting */
   selfHealing?: MultiAgentSelfHealingConfig;
+  /** Checkpoint store for persistent state */
+  checkpointStore?: CheckpointStore;
+  /** Breakpoints for human-in-the-loop pause/inspect/modify */
+  breakpoints?: BreakpointConfig<MultiAgentBreakpointType>[];
+  /** Callback when a breakpoint fires */
+  onBreakpoint?: (request: BreakpointRequest) => void;
+  /** Timeout for breakpoint resolution (default: 300000 = 5 min) */
+  breakpointTimeoutMs?: number;
+  /** Cross-agent derivation functions — compute values from combined agent states */
+  derive?: Record<string, CrossAgentDerivationFn>;
+  /** Shared scratchpad configuration */
+  scratchpad?: { init: Record<string, unknown> };
 }
 
 /** Multi-agent state in facts */
@@ -430,6 +619,14 @@ export interface MultiAgentState {
   __handoffResults: HandoffResult[];
 }
 
+/** Per-call options for multi-agent runAgent/run */
+export interface MultiAgentRunCallOptions extends RunOptions {
+  /** Override structured output schema for this call. Set to `null` to opt out of per-agent schema. */
+  outputSchema?: SafeParseable<unknown> | null;
+  /** Override max schema retries for this call. */
+  maxSchemaRetries?: number;
+}
+
 /** Multi-agent orchestrator instance */
 export interface MultiAgentOrchestrator {
   /** The underlying Directive System */
@@ -438,7 +635,7 @@ export interface MultiAgentOrchestrator {
   /** Combined facts from all agent modules + coordinator */
   facts: Record<string, unknown>;
   /** Run a single agent */
-  runAgent<T>(agentId: string, input: string, options?: RunOptions): Promise<RunResult<T>>;
+  runAgent<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>>;
   /** Run an agent with streaming support */
   runAgentStream<T>(agentId: string, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
   /** Run an execution pattern */
@@ -471,7 +668,7 @@ export interface MultiAgentOrchestrator {
   /** Wait until all agents are idle */
   waitForIdle(timeoutMs?: number): Promise<void>;
   /** Alias for runAgent */
-  run<T>(agentId: string, input: string, options?: RunOptions): Promise<RunResult<T>>;
+  run<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>>;
   /** Alias for runAgentStream */
   runStream<T>(agentId: string, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
   /** Register a new agent dynamically */
@@ -492,6 +689,67 @@ export interface MultiAgentOrchestrator {
   readonly timeline: DebugTimeline | null;
   /** Health monitor (null when selfHealing is not configured) */
   readonly healthMonitor: HealthMonitor | null;
+  /** Create a checkpoint of the current state */
+  checkpoint(options?: { label?: string }): Promise<Checkpoint>;
+  /** Restore from a checkpoint */
+  restore(checkpoint: Checkpoint, options?: { restoreTimeline?: boolean }): void;
+  /** Run multiple agents with multiplexed streaming */
+  runParallelStream<T>(
+    agentIds: string[],
+    inputs: string | string[],
+    merge: (results: RunResult<unknown>[]) => T | Promise<T>,
+    options?: { minSuccess?: number; timeout?: number; signal?: AbortSignal }
+  ): MultiplexedStreamResult<T>;
+  /** Resume a paused breakpoint */
+  resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;
+  /** Cancel a paused breakpoint */
+  cancelBreakpoint(id: string, reason?: string): void;
+  /** Get pending breakpoints */
+  getPendingBreakpoints(): BreakpointRequest[];
+  /** Race multiple agents — first successful result wins, rest cancelled */
+  runRace<T>(
+    agentIds: string[],
+    input: string,
+    options?: { extract?: (result: RunResult<unknown>) => T; timeout?: number; minSuccess?: number; signal?: AbortSignal }
+  ): Promise<RaceResult<T>>;
+  /** Run a reflect pattern imperatively (no pre-registration needed) */
+  runReflect<T>(
+    producerId: string,
+    evaluatorId: string,
+    input: string,
+    options?: {
+      maxIterations?: number;
+      parseEvaluation?: (output: unknown) => ReflectionEvaluation;
+      buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+      extract?: (output: unknown) => T;
+      onExhausted?: "accept-last" | "accept-best" | "throw";
+      onIteration?: (record: ReflectIterationRecord) => void;
+      signal?: AbortSignal;
+      timeout?: number;
+      threshold?: number | ((iteration: number) => number);
+    }
+  ): Promise<{ result: T; iterations: number; history: ReflectIterationRecord[]; exhausted: boolean }>;
+  /** Run a debate imperatively (no pre-registration needed) */
+  runDebate<T>(
+    agentIds: string[],
+    evaluatorId: string,
+    input: string,
+    options?: {
+      maxRounds?: number;
+      extract?: (output: unknown) => T;
+      parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+      signal?: AbortSignal;
+      timeout?: number;
+    }
+  ): Promise<DebateResult<T>>;
+  /** Get reflection iteration history from last runReflectPattern call */
+  getLastReflectionHistory(): ReflectIterationRecord[] | null;
+  /** Cross-agent derived values (frozen snapshot). Empty when derive not configured. */
+  readonly derived: Record<string, unknown>;
+  /** Subscribe to cross-agent derivation changes */
+  onDerivedChange(callback: (id: string, value: unknown) => void): () => void;
+  /** Shared scratchpad (null when not configured) */
+  readonly scratchpad: Scratchpad | null;
   /** Dispose of the orchestrator, resetting all state */
   dispose(): void;
 }
@@ -575,6 +833,12 @@ export function createMultiAgentOrchestrator(
     budgetWarningThreshold = 0.8,
     onBudgetWarning,
     selfHealing,
+    checkpointStore,
+    breakpoints: breakpointConfigs = [],
+    onBreakpoint,
+    breakpointTimeoutMs = 300000,
+    derive: userDerivations,
+    scratchpad: scratchpadConfig,
   } = options;
 
   // Shallow copy so registerAgent/unregisterAgent don't mutate the caller's object
@@ -624,6 +888,15 @@ export function createMultiAgentOrchestrator(
         for (const node of Object.values(pattern.nodes)) {
           agentsToCheck.push(node.agent);
         }
+        break;
+      case "reflect":
+        agentsToCheck.push(pattern.agent, pattern.evaluator);
+        break;
+      case "race":
+        agentsToCheck.push(...pattern.agents);
+        break;
+      case "debate":
+        agentsToCheck.push(...(pattern as DebatePattern).agents, (pattern as DebatePattern).evaluator);
         break;
     }
 
@@ -697,14 +970,27 @@ export function createMultiAgentOrchestrator(
   }
 
   // ---- Coordinator Module ----
+  // biome-ignore lint/suspicious/noExplicitAny: Dynamic schema construction
+  const coordFacts: Record<string, any> = {
+    __globalTokens: t.number(),
+    __status: t.string(),
+    __handoffs: t.array() as unknown as ReturnType<typeof t.array>,
+    __handoffResults: t.array() as unknown as ReturnType<typeof t.array>,
+    __budgetWarningFired: t.boolean(),
+  };
+
+  // Add scratchpad fact to coordinator schema if configured
+  if (scratchpadConfig) {
+    coordFacts[SCRATCHPAD_KEY] = t.object() as unknown;
+  }
+
+  // Add __derived bridge fact so constraints can read derivation values via facts.__derived
+  if (userDerivations && Object.keys(userDerivations).length > 0) {
+    coordFacts["__derived"] = t.object() as unknown;
+  }
+
   const coordSchema = {
-    facts: {
-      __globalTokens: t.number(),
-      __status: t.string(),
-      __handoffs: t.array() as unknown as ReturnType<typeof t.array>,
-      __handoffResults: t.array() as unknown as ReturnType<typeof t.array>,
-      __budgetWarningFired: t.boolean(),
-    },
+    facts: coordFacts,
     derivations: {},
     events: {},
     requirements: {},
@@ -729,7 +1015,7 @@ export function createMultiAgentOrchestrator(
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
-  const coordResolvers: Record<string, any> = {};
+  const coordResolvers: Record<string, any> = Object.create(null);
 
   // Convert user-provided orchestrator-level resolvers
   for (const [id, resolver] of Object.entries(userResolvers)) {
@@ -783,6 +1069,10 @@ export function createMultiAgentOrchestrator(
       setBridgeFact(facts, "__handoffs", []);
       setBridgeFact(facts, "__handoffResults", []);
       setBridgeFact(facts, "__budgetWarningFired", false);
+      if (scratchpadConfig) {
+        setBridgeFact(facts, SCRATCHPAD_KEY, { ...scratchpadConfig.init });
+      }
+      // Derived values initialized via recomputeDerivations() after system creation
     },
     constraints: coordConstraints,
     resolvers: coordResolvers as any,
@@ -801,7 +1091,7 @@ export function createMultiAgentOrchestrator(
 
     // Convert per-agent resolvers (C3 fix)
     // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
-    const perAgentResolvers: Record<string, any> = {};
+    const perAgentResolvers: Record<string, any> = Object.create(null);
     if (registration.resolvers) {
       for (const [id, resolver] of Object.entries(registration.resolvers)) {
         perAgentResolvers[id] = {
@@ -843,6 +1133,7 @@ export function createMultiAgentOrchestrator(
         setApprovalState(facts, { pending: [], approved: [], rejected: [] });
         setConversation(facts, []);
         setToolCalls(facts, []);
+        setBreakpointState(facts, createInitialBreakpointState());
       },
       constraints: perAgentConstraints,
       resolvers: Object.keys(perAgentResolvers).length > 0 ? (perAgentResolvers as any) : undefined,
@@ -888,6 +1179,8 @@ export function createMultiAgentOrchestrator(
   // Tracks in-flight runAgent calls (incremented synchronously before any await)
   // so waitForIdle knows when runs have been dispatched but not yet started
   let pendingRuns = 0;
+  // Reflection score history — updated after each runReflectPattern call
+  let lastReflectionHistory: ReflectIterationRecord[] | null = null;
 
   function assertNotDisposed(): void {
     if (disposed) {
@@ -932,6 +1225,415 @@ export function createMultiAgentOrchestrator(
     for (const waiter of idleWaiters) {
       waiter();
     }
+  }
+
+  // ---- Cross-Agent Derivations ----
+  const derivedValues: Record<string, unknown> = Object.create(null);
+  const derivedChangeCallbacks = new Set<(id: string, value: unknown) => void>();
+
+  /** Build a CrossAgentSnapshot from current state */
+  function buildCrossAgentSnapshot(): CrossAgentSnapshot {
+    const agentsSnap: CrossAgentSnapshot["agents"] = Object.create(null);
+    for (const [id, s] of Object.entries(agentStates)) {
+      agentsSnap[id] = {
+        status: s.status,
+        lastInput: s.lastInput,
+        lastOutput: s.lastOutput,
+        lastError: s.lastError,
+        runCount: s.runCount,
+        totalTokens: s.totalTokens,
+      };
+    }
+
+    const coordFacts = getAgentFacts("__coord");
+    const snapshot: CrossAgentSnapshot = {
+      agents: agentsSnap,
+      coordinator: {
+        globalTokens: globalTokenCount,
+        status: globalStatus,
+      },
+    };
+
+    // Include scratchpad in snapshot if configured
+    if (scratchpadConfig && coordFacts) {
+      snapshot.scratchpad = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
+    }
+
+    return snapshot;
+  }
+
+  /** Recompute all cross-agent derivations */
+  function recomputeDerivations(): void {
+    if (!userDerivations) {
+      return;
+    }
+
+    const snapshot = buildCrossAgentSnapshot();
+
+    system.batch(() => {
+      for (const [derivId, derivFn] of Object.entries(userDerivations)) {
+        try {
+          const newValue = derivFn(snapshot);
+          const oldValue = derivedValues[derivId];
+
+          // Change detection: === for primitives, shallow equality for objects
+          const changed = !shallowEqual(newValue, oldValue);
+
+          derivedValues[derivId] = newValue;
+
+          if (changed) {
+            // Record timeline event
+            if (timeline) {
+              timeline.record({
+                type: "derivation_update",
+                timestamp: Date.now(),
+                snapshotId: null,
+                derivationId: derivId,
+                valueType: typeof newValue,
+              });
+            }
+
+            // Fire lifecycle hook
+            fireHook("onDerivationUpdate", {
+              derivationId: derivId,
+              value: newValue,
+              timestamp: Date.now(),
+            });
+
+            // Fire change callbacks
+            for (const cb of derivedChangeCallbacks) {
+              try {
+                cb(derivId, newValue);
+              } catch {
+                // callback error is non-fatal
+              }
+            }
+          }
+        } catch (derivError) {
+          console.warn(`[Directive MultiAgent] Derivation "${derivId}" threw:`, derivError);
+          fireHook("onDerivationError", {
+            derivationId: derivId,
+            error: derivError instanceof Error ? derivError : new Error(String(derivError)),
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      // Inject derived values into coordinator facts AFTER computation so constraints see current-cycle values
+      const coordFacts = getAgentFacts("__coord");
+      if (coordFacts) {
+        setBridgeFact(coordFacts, "__derived", { ...derivedValues });
+      }
+    });
+  }
+
+  // ---- Shared Scratchpad ----
+  const scratchpadChangeCallbacks = new Set<(key: string, value: unknown) => void>();
+  const scratchpadKeyCallbacks = new Map<string, Set<(key: string, value: unknown) => void>>();
+
+  const scratchpadInstance: Scratchpad | null = scratchpadConfig ? {
+    get(key: string): unknown {
+      const coordFacts = getAgentFacts("__coord");
+      const data = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY);
+      if (data == null || !Object.hasOwn(data, key)) {
+        return undefined;
+      }
+
+      return data[key];
+    },
+
+    set(key: string, value: unknown): void {
+      if (key === "__proto__" || key === "constructor" || key === "prototype") {
+        return;
+      }
+
+      const coordFacts = getAgentFacts("__coord");
+      const changedKeys = [key];
+      system.batch(() => {
+        const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
+        setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...current, [key]: value });
+      });
+
+      notifyScratchpadChange(changedKeys, key, value);
+      recomputeDerivations();
+    },
+
+    has(key: string): boolean {
+      const coordFacts = getAgentFacts("__coord");
+      const data = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY);
+
+      return data != null && Object.hasOwn(data, key);
+    },
+
+    delete(key: string): void {
+      const coordFacts = getAgentFacts("__coord");
+      system.batch(() => {
+        const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
+        const { [key]: _, ...rest } = current;
+        setBridgeFact(coordFacts, SCRATCHPAD_KEY, rest);
+      });
+
+      notifyScratchpadChange([key], key, undefined);
+      recomputeDerivations();
+    },
+
+    update(values: Record<string, unknown>): void {
+      // Filter out prototype pollution keys
+      const safeValues: Record<string, unknown> = Object.create(null);
+      for (const k of Object.keys(values)) {
+        if (k === "__proto__" || k === "constructor" || k === "prototype") {
+          continue;
+        }
+        safeValues[k] = values[k];
+      }
+
+      const coordFacts = getAgentFacts("__coord");
+      const keys = Object.keys(safeValues);
+      if (keys.length === 0) {
+        return;
+      }
+
+      system.batch(() => {
+        const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
+        setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...current, ...safeValues });
+      });
+
+      for (const [k, v] of Object.entries(safeValues)) {
+        notifyScratchpadChange(keys, k, v);
+      }
+      recomputeDerivations();
+    },
+
+    getAll(): Record<string, unknown> {
+      const coordFacts = getAgentFacts("__coord");
+
+      return { ...(getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {}) };
+    },
+
+    subscribe(keys: string[], callback: (key: string, value: unknown) => void): () => void {
+      for (const key of keys) {
+        if (!scratchpadKeyCallbacks.has(key)) {
+          scratchpadKeyCallbacks.set(key, new Set());
+        }
+        scratchpadKeyCallbacks.get(key)!.add(callback);
+      }
+
+      return () => {
+        for (const key of keys) {
+          scratchpadKeyCallbacks.get(key)?.delete(callback);
+        }
+      };
+    },
+
+    onChange(callback: (key: string, value: unknown) => void): () => void {
+      scratchpadChangeCallbacks.add(callback);
+
+      return () => {
+        scratchpadChangeCallbacks.delete(callback);
+      };
+    },
+
+    reset(): void {
+      if (!scratchpadConfig) {
+        return;
+      }
+      const coordFacts = getAgentFacts("__coord");
+      system.batch(() => {
+        setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...scratchpadConfig.init });
+      });
+    },
+  } : null;
+
+  function notifyScratchpadChange(allKeys: string[], key: string, value: unknown): void {
+    // Fire key-specific callbacks
+    const keyCbs = scratchpadKeyCallbacks.get(key);
+    if (keyCbs) {
+      for (const cb of keyCbs) {
+        try { cb(key, value); } catch { /* non-fatal */ }
+      }
+    }
+
+    // Fire global change callbacks
+    for (const cb of scratchpadChangeCallbacks) {
+      try { cb(key, value); } catch { /* non-fatal */ }
+    }
+
+    // Record timeline event (once per batch of keys, not per key)
+    if (timeline && key === allKeys[allKeys.length - 1]) {
+      timeline.record({
+        type: "scratchpad_update",
+        timestamp: Date.now(),
+        snapshotId: null,
+        keys: allKeys,
+      });
+    }
+
+    // Fire lifecycle hook (once per batch of keys)
+    if (key === allKeys[allKeys.length - 1]) {
+      fireHook("onScratchpadUpdate", {
+        keys: allKeys,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  // ---- Breakpoint Infrastructure ----
+  const breakpointModifications = new Map<string, BreakpointModifications>();
+  const breakpointCancelReasons = new Map<string, string>();
+
+  /** Wait for a breakpoint to be resolved or cancelled */
+  function waitForBreakpointResolution(agentId: string, breakpointId: string, signal?: AbortSignal): Promise<BreakpointModifications | null> {
+    return new Promise((resolve, reject) => {
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      let settled = false;
+      let onAbort: (() => void) | undefined;
+      const agentFacts = getAgentFacts(agentId);
+
+      const cleanupAll = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        if (onAbort && signal) {
+          signal.removeEventListener("abort", onAbort);
+        }
+        unsubscribe();
+      };
+
+      const unsubscribe = system.subscribe([`${agentId}.${BREAKPOINT_KEY}`], () => {
+        const bpState = getBreakpointState(agentFacts);
+        if (bpState.resolved.includes(breakpointId)) {
+          cleanupAll();
+          const mods = breakpointModifications.get(breakpointId) ?? null;
+          breakpointModifications.delete(breakpointId);
+
+          resolve(mods);
+        } else if (bpState.cancelled.includes(breakpointId)) {
+          cleanupAll();
+          breakpointModifications.delete(breakpointId);
+          const cancelReason = breakpointCancelReasons.get(breakpointId);
+          breakpointCancelReasons.delete(breakpointId);
+          reject(new Error(cancelReason
+            ? `[Directive MultiAgent] Breakpoint ${breakpointId} cancelled: ${cancelReason}`
+            : `[Directive MultiAgent] Breakpoint ${breakpointId} cancelled`
+          ));
+        }
+      });
+
+      if (signal) {
+        onAbort = () => {
+          cleanupAll();
+          reject(new Error(`[Directive MultiAgent] Breakpoint wait aborted for ${breakpointId}`));
+        };
+        if (signal.aborted) {
+          cleanupAll();
+          reject(new Error(`[Directive MultiAgent] Breakpoint wait aborted for ${breakpointId}`));
+
+          return;
+        }
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      timeoutId = setTimeout(() => {
+        cleanupAll();
+        breakpointModifications.delete(breakpointId);
+        breakpointCancelReasons.delete(breakpointId);
+        reject(new Error(
+          `[Directive MultiAgent] Breakpoint timeout: ${breakpointId} not resolved within ${Math.round(breakpointTimeoutMs / 1000)}s`
+        ));
+      }, breakpointTimeoutMs);
+    });
+  }
+
+  /** Check and handle a breakpoint at a given execution point */
+  async function handleBreakpoint(
+    type: MultiAgentBreakpointType,
+    agentId: string,
+    agentName: string,
+    input: string,
+    signal?: AbortSignal,
+    extra?: { patternId?: string; handoff?: { fromAgent: string; toAgent: string } }
+  ): Promise<{ input: string; skip: boolean }> {
+    if (breakpointConfigs.length === 0) {
+      return { input, skip: false };
+    }
+
+    const agentFacts = getAgentFacts(agentId);
+    const context: BreakpointContext = {
+      agentId,
+      agentName,
+      input,
+      state: getOrchestratorState(agentFacts) as unknown as Record<string, unknown>,
+      breakpointType: type,
+      patternId: extra?.patternId,
+      handoff: extra?.handoff,
+    };
+
+    const matched = matchBreakpoint(breakpointConfigs, type, context);
+    if (!matched) {
+      return { input, skip: false };
+    }
+
+    const bpId = createBreakpointId();
+    const request: BreakpointRequest = {
+      id: bpId,
+      type,
+      agentId,
+      input,
+      label: matched.label,
+      requestedAt: Date.now(),
+    };
+
+    // Write to facts
+    system.batch(() => {
+      const currentBp = getBreakpointState(agentFacts);
+      setBreakpointState(agentFacts, {
+        ...currentBp,
+        pending: [...currentBp.pending, request],
+      });
+    });
+
+    // Fire callbacks
+    try { onBreakpoint?.(request); } catch { /* callback error non-fatal */ }
+    try { (hooks as any).onBreakpoint?.(request); } catch { /* hook error non-fatal */ }
+
+    // Record timeline event
+    if (timeline) {
+      timeline.record({
+        type: "breakpoint_hit",
+        timestamp: Date.now(),
+        agentId,
+        snapshotId: null,
+        breakpointId: bpId,
+        breakpointType: type,
+        label: matched.label,
+      });
+    }
+
+    // Wait for resolution
+    const modifications = await waitForBreakpointResolution(agentId, bpId, signal);
+
+    // Record resume event
+    if (timeline) {
+      timeline.record({
+        type: "breakpoint_resumed",
+        timestamp: Date.now(),
+        agentId,
+        snapshotId: null,
+        breakpointId: bpId,
+        modified: !!modifications?.input,
+        skipped: !!modifications?.skip,
+      });
+    }
+
+    return {
+      input: modifications?.input ?? input,
+      skip: modifications?.skip ?? false,
+    };
   }
 
   // ---- Helper: Get per-agent facts from namespaced System ----
@@ -1014,7 +1716,7 @@ export function createMultiAgentOrchestrator(
   async function runSingleAgent<T>(
     agentId: string,
     input: string,
-    opts?: RunOptions
+    opts?: MultiAgentRunCallOptions
   ): Promise<RunResult<T>> {
     assertNotDisposed();
 
@@ -1112,7 +1814,7 @@ export function createMultiAgentOrchestrator(
     agentId: string,
     registration: AgentRegistration,
     originalInput: string,
-    opts?: RunOptions
+    opts?: MultiAgentRunCallOptions
   ): Promise<RunResult<T>> {
     const startTime = Date.now();
     const agentFacts = getAgentFacts(agentId);
@@ -1177,6 +1879,18 @@ export function createMultiAgentOrchestrator(
         });
       }
 
+      // ---- Breakpoint: pre_input_guardrails ----
+      {
+        const bpResult = await handleBreakpoint("pre_input_guardrails", agentId, agent.name, processedInput, opts?.signal);
+        if (bpResult.skip) {
+          state.status = "completed";
+          notifyIdleWaiters();
+
+          return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        }
+        processedInput = bpResult.input;
+      }
+
       // ---- Input guardrails: orchestrator-level, then per-agent ----
       const allInputGuardrails = [
         ...(guardrails.input ?? []),
@@ -1236,11 +1950,37 @@ export function createMultiAgentOrchestrator(
       state.status = "running";
       state.lastInput = processedInput;
 
+      // ---- Breakpoint: pre_agent_run ----
+      {
+        const bpResult = await handleBreakpoint("pre_agent_run", agentId, agent.name, processedInput, opts?.signal);
+        if (bpResult.skip) {
+          state.status = "completed";
+          notifyIdleWaiters();
+
+          return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        }
+        processedInput = bpResult.input;
+      }
+
+      // ---- Per-agent structured output wrapping (per-call overrides per-agent) ----
+      let effectiveRunner: AgentRunner = runner;
+      const effectiveSchema = opts?.outputSchema !== undefined
+        ? opts.outputSchema              // null = opt-out, SafeParseable = override
+        : registration.outputSchema;     // per-agent default
+      if (effectiveSchema) {
+        effectiveRunner = withStructuredOutput(runner, {
+          schema: effectiveSchema,
+          maxRetries: opts?.maxSchemaRetries ?? registration.maxSchemaRetries ?? 2,
+          extractJson: registration.extractJson,
+          schemaDescription: registration.schemaDescription,
+        });
+      }
+
       // Effective retry config: per-agent overrides orchestrator default
       const effectiveRetry = registration.retry ?? defaultAgentRetry;
 
       // Run agent with retry support
-      const result = await executeAgentWithRetry<T>(runner, agent, processedInput, {
+      const result = await executeAgentWithRetry<T>(effectiveRunner, agent, processedInput, {
         ...registration.runOptions,
         ...opts,
         signal: controller.signal,
@@ -1343,6 +2083,18 @@ export function createMultiAgentOrchestrator(
           });
         },
       } : undefined);
+
+      // ---- Breakpoint: pre_output_guardrails ----
+      {
+        const bpResult = await handleBreakpoint("pre_output_guardrails", agentId, agent.name, processedInput, opts?.signal);
+        if (bpResult.skip) {
+          // Skip output guardrails, return result directly
+          state.status = "completed";
+          notifyIdleWaiters();
+
+          return result;
+        }
+      }
 
       // ---- Output guardrails: orchestrator-level, then per-agent ----
       const allOutputGuardrails = [
@@ -1489,6 +2241,12 @@ export function createMultiAgentOrchestrator(
         healthMonitorInstance.recordSuccess(agentId, Date.now() - startTime);
       }
 
+      // Recompute cross-agent derivations
+      recomputeDerivations();
+
+      // ---- Breakpoint: post_run ----
+      await handleBreakpoint("post_run", agentId, agent.name, processedInput, opts?.signal);
+
       return result;
     } catch (error) {
       state.status = "error";
@@ -1536,6 +2294,9 @@ export function createMultiAgentOrchestrator(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
+
+      // Recompute cross-agent derivations
+      recomputeDerivations();
 
       throw error;
     } finally {
@@ -1773,6 +2534,17 @@ export function createMultiAgentOrchestrator(
       for (let i = 0; i < pattern.agents.length; i++) {
         const agentId = pattern.agents[i]!;
 
+        // ---- Breakpoint: pre_pattern_step ----
+        {
+          const bpResult = await handleBreakpoint("pre_pattern_step", agentId, agents[agentId]?.agent.name ?? agentId, currentInput, undefined, {
+            patternId,
+          });
+          if (bpResult.skip) {
+            continue;
+          }
+          currentInput = bpResult.input;
+        }
+
         try {
           lastResult = await runSingleAgent(agentId, currentInput);
 
@@ -1833,6 +2605,9 @@ export function createMultiAgentOrchestrator(
 
     const workerResults: RunResult<unknown>[] = [];
     const maxRounds = pattern.maxRounds ?? 5;
+    if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
+      throw new Error("[Directive MultiAgent] supervisor maxRounds must be >= 1");
+    }
     let patternError: Error | undefined;
 
     try {
@@ -1974,10 +2749,12 @@ export function createMultiAgentOrchestrator(
             continue;
           }
 
-          // Check if any dep errored (for skip-downstream)
+          // Check if any dep errored or was skipped (for skip-downstream propagation)
           if (onNodeError === "skip-downstream") {
-            const anyDepErrored = (node.deps ?? []).some((depId) => context.statuses[depId] === "error");
-            if (anyDepErrored) {
+            const anyDepFailed = (node.deps ?? []).some(
+              (depId) => context.statuses[depId] === "error" || context.statuses[depId] === "skipped",
+            );
+            if (anyDepFailed) {
               context.statuses[nodeId] = "skipped";
               if (timeline) {
                 timeline.record({
@@ -2210,6 +2987,652 @@ export function createMultiAgentOrchestrator(
     }
   }
 
+  // ---- Reflect Pattern Runner ----
+  async function runReflectPattern<T>(
+    pattern: ReflectPattern<T>,
+    input: string,
+    patternId?: string
+  ): Promise<T> {
+    const patternStartTime = Date.now();
+    const pId = patternId ?? "__inline_reflect";
+    const maxIterations = pattern.maxIterations ?? 2;
+
+    if (maxIterations < 1) {
+      throw new Error("[Directive MultiAgent] Reflect pattern maxIterations must be >= 1");
+    }
+    if (debug && maxIterations > 3) {
+      console.warn("[Directive MultiAgent] Reflection loops > 3 iterations rarely improve quality. Consider reducing maxIterations.");
+    }
+
+    // Merge timeout into signal if provided
+    let effectiveSignal = pattern.signal;
+    let reflectTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let reflectExternalOnAbort: (() => void) | undefined;
+    if (pattern.timeout && !effectiveSignal) {
+      const controller = new AbortController();
+      reflectTimeoutId = setTimeout(() => controller.abort(), pattern.timeout);
+      effectiveSignal = controller.signal;
+    } else if (pattern.timeout && effectiveSignal) {
+      // Both timeout and signal: combine them
+      const controller = new AbortController();
+      reflectTimeoutId = setTimeout(() => controller.abort(), pattern.timeout);
+      reflectExternalOnAbort = () => controller.abort();
+      effectiveSignal.addEventListener("abort", reflectExternalOnAbort, { once: true });
+      effectiveSignal = controller.signal;
+    }
+
+    const parseEvaluation = pattern.parseEvaluation ?? ((output: unknown): ReflectionEvaluation => {
+      if (typeof output === "string") {
+        try {
+          return JSON.parse(output);
+        } catch {
+          return { passed: false, feedback: `Evaluator returned unparseable output: ${output.slice(0, 200)}` };
+        }
+      }
+      if (output && typeof output === "object" && "passed" in output) {
+        return output as ReflectionEvaluation;
+      }
+
+      return { passed: false, feedback: "Evaluator returned invalid format" };
+    });
+    const buildRetryInput = pattern.buildRetryInput ?? (
+      (inp: string, feedback: string, _iteration: number) =>
+        `${inp}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`
+    );
+
+    if (patternId) {
+      fireHook("onPatternStart", {
+        patternId: pId,
+        patternType: "reflect",
+        input,
+        timestamp: patternStartTime,
+      });
+    }
+
+    let patternError: Error | undefined;
+    let lastProducerResult: RunResult<unknown> | undefined;
+    const history: ReflectIterationRecord[] = [];
+    // Track per-iteration producer outputs for accept-best
+    const producerOutputs: Array<{ output: unknown; score?: number }> = [];
+
+    try {
+      let effectiveInput = input;
+
+      for (let iteration = 0; iteration < maxIterations; iteration++) {
+        // Check abort signal at top of each iteration
+        if (effectiveSignal?.aborted) {
+          if (lastProducerResult) {
+            lastReflectionHistory = history;
+
+            return pattern.extract
+              ? pattern.extract(lastProducerResult.output)
+              : (lastProducerResult.output as T);
+          }
+
+          throw new DOMException("Reflect pattern aborted", "AbortError");
+        }
+
+        const iterStart = Date.now();
+
+        // Run producer (pass signal through)
+        const producerResult = await runSingleAgent(pattern.agent, effectiveInput, { signal: effectiveSignal });
+        lastProducerResult = producerResult;
+        const producerOutput = typeof producerResult.output === "string"
+          ? producerResult.output
+          : safeStringify(producerResult.output);
+
+        // Check abort after producer, before evaluator
+        if (effectiveSignal?.aborted) {
+          lastReflectionHistory = history;
+
+          return pattern.extract
+            ? pattern.extract(producerResult.output)
+            : (producerResult.output as T);
+        }
+
+        // Run evaluator (pass signal through)
+        const evaluatorResult = await runSingleAgent(pattern.evaluator, producerOutput, { signal: effectiveSignal });
+        let evaluation: ReflectionEvaluation;
+        try {
+          evaluation = parseEvaluation(evaluatorResult.output);
+        } catch (parseError) {
+          evaluation = {
+            passed: false,
+            feedback: `Evaluation parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+          };
+        }
+
+        // Apply threshold-based pass override
+        if (!evaluation.passed && pattern.threshold != null && evaluation.score != null) {
+          const thresholdValue = typeof pattern.threshold === "function"
+            ? pattern.threshold(iteration)
+            : pattern.threshold;
+          if (evaluation.score >= thresholdValue) {
+            evaluation = { ...evaluation, passed: true };
+          }
+        }
+
+        const iterDurationMs = Date.now() - iterStart;
+
+        // Store producer output for accept-best
+        producerOutputs.push({ output: producerResult.output, score: evaluation.score });
+
+        // Build iteration record
+        const record: ReflectIterationRecord = {
+          iteration,
+          passed: evaluation.passed,
+          score: evaluation.score,
+          feedback: evaluation.feedback,
+          durationMs: iterDurationMs,
+          producerTokens: producerResult.totalTokens ?? 0,
+          evaluatorTokens: evaluatorResult.totalTokens ?? 0,
+        };
+        history.push(record);
+
+        // Fire onIteration callback
+        if (pattern.onIteration) {
+          try {
+            pattern.onIteration(record);
+          } catch (cbError) {
+            if (debug) {
+              console.warn("[Directive MultiAgent] onIteration callback threw:", cbError);
+            }
+          }
+        }
+
+        // Record timeline event
+        if (timeline) {
+          timeline.record({
+            type: "reflection_iteration",
+            timestamp: Date.now(),
+            snapshotId: null,
+            iteration,
+            passed: evaluation.passed,
+            score: evaluation.score,
+            durationMs: iterDurationMs,
+            producerTokens: producerResult.totalTokens,
+            evaluatorTokens: evaluatorResult.totalTokens,
+          });
+        }
+
+        if (evaluation.passed) {
+          lastReflectionHistory = history;
+
+          return pattern.extract
+            ? pattern.extract(producerResult.output)
+            : (producerResult.output as T);
+        }
+
+        // Build retry input for next iteration
+        if (iteration < maxIterations - 1 && evaluation.feedback) {
+          try {
+            effectiveInput = buildRetryInput(input, evaluation.feedback, iteration);
+          } catch (retryError) {
+            if (debug) {
+              console.warn("[Directive MultiAgent] buildRetryInput threw, using default format:", retryError);
+            }
+            effectiveInput = `${input}\n\nFeedback on your previous response:\n${evaluation.feedback}\n\nPlease improve your response.`;
+          }
+        }
+      }
+
+      lastReflectionHistory = history;
+
+      // Exhausted
+      if (pattern.onExhausted === "throw") {
+        throw new ReflectionExhaustedError({
+          iterations: maxIterations,
+          history: history.map((h) => ({
+            passed: h.passed,
+            feedback: h.feedback,
+            score: h.score,
+          })),
+          lastResult: lastProducerResult!,
+          totalTokens: lastProducerResult!.totalTokens ?? 0,
+        });
+      }
+
+      // "accept-best" — pick iteration with highest score
+      if (pattern.onExhausted === "accept-best" && producerOutputs.length > 0) {
+        const hasAnyScore = producerOutputs.some((p) => p.score != null);
+        if (!hasAnyScore && debug) {
+          console.warn("[Directive MultiAgent] accept-best exhaustion strategy used but no iterations returned scores. Falling back to last output.");
+        }
+        let bestIdx = producerOutputs.length - 1;
+        let bestScore = -Infinity;
+        for (let i = 0; i < producerOutputs.length; i++) {
+          const s = producerOutputs[i]!.score;
+          if (s != null && s > bestScore) {
+            bestScore = s;
+            bestIdx = i;
+          }
+        }
+
+        const bestOutput = producerOutputs[bestIdx]!.output;
+
+        return pattern.extract
+          ? pattern.extract(bestOutput)
+          : (bestOutput as T);
+      }
+
+      // "accept-last" (default)
+      return pattern.extract
+        ? pattern.extract(lastProducerResult!.output)
+        : (lastProducerResult!.output as T);
+    } catch (error) {
+      lastReflectionHistory = history;
+      patternError = error instanceof Error ? error : new Error(String(error));
+      throw error;
+    } finally {
+      if (reflectTimeoutId) {
+        clearTimeout(reflectTimeoutId);
+      }
+      if (reflectExternalOnAbort && pattern.signal) {
+        pattern.signal.removeEventListener("abort", reflectExternalOnAbort);
+      }
+      if (patternId) {
+        fireHook("onPatternComplete", {
+          patternId: pId,
+          patternType: "reflect",
+          durationMs: Date.now() - patternStartTime,
+          timestamp: Date.now(),
+          error: patternError,
+        });
+      }
+    }
+  }
+
+  // ---- Race Pattern Runner ----
+  async function runRacePattern<T>(
+    pattern: RacePattern<T>,
+    input: string,
+    patternId?: string
+  ): Promise<RaceResult<T>> {
+    if (pattern.agents.length === 0) {
+      throw new Error("[Directive MultiAgent] Race pattern requires at least one agent");
+    }
+
+    const minSuccess = pattern.minSuccess ?? 1;
+
+    if (!Number.isInteger(minSuccess) || minSuccess < 1) {
+      throw new Error("[Directive MultiAgent] Race pattern minSuccess must be a positive integer");
+    }
+    if (minSuccess > pattern.agents.length) {
+      throw new Error(
+        `[Directive MultiAgent] Race pattern minSuccess (${minSuccess}) exceeds agent count (${pattern.agents.length})`
+      );
+    }
+
+    // Validate agent IDs
+    for (const agentId of pattern.agents) {
+      if (!agents[agentId]) {
+        throw new Error(`[Directive MultiAgent] Race: unknown agent "${agentId}"`);
+      }
+    }
+
+    const patternStartTime = Date.now();
+    const pId = patternId ?? "__inline_race";
+    const controller = new AbortController();
+    let raceTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    // Wire external signal into internal controller
+    let raceExternalOnAbort: (() => void) | undefined;
+    if (pattern.signal) {
+      if (pattern.signal.aborted) {
+        controller.abort();
+      } else {
+        raceExternalOnAbort = () => controller.abort();
+        pattern.signal.addEventListener("abort", raceExternalOnAbort, { once: true });
+      }
+    }
+
+    if (patternId) {
+      fireHook("onPatternStart", {
+        patternId: pId,
+        patternType: "race",
+        input,
+        timestamp: patternStartTime,
+      });
+    }
+
+    if (timeline) {
+      timeline.record({
+        type: "race_start",
+        timestamp: patternStartTime,
+        snapshotId: null,
+        patternId: pId,
+        agents: pattern.agents,
+      });
+    }
+
+    if (pattern.timeout) {
+      raceTimeoutId = setTimeout(() => controller.abort(), pattern.timeout);
+    }
+
+    let patternError: Error | undefined;
+    const agentErrors: Record<string, string> = Object.create(null);
+    const startedAgents = [...pattern.agents];
+
+    try {
+      // Start all agents, collecting promises
+      type RaceEntry = { agentId: string; promise: Promise<{ agentId: string; result: RunResult<unknown> }> };
+      const entries: RaceEntry[] = pattern.agents.map((agentId) => ({
+        agentId,
+        // Output guardrails are already checked inside runSingleAgent
+        promise: runSingleAgent(agentId, input, { signal: controller.signal })
+          .then((result) => ({ agentId, result })),
+      }));
+
+      // Custom race: track settled count, await all promises for cleanup
+      const allPromises = entries.map((e) => e.promise.catch(() => undefined));
+
+      const collectedResults: Array<{ agentId: string; result: RunResult<unknown> }> = [];
+
+      const result = await new Promise<Array<{ agentId: string; result: RunResult<unknown> }>>((resolve, reject) => {
+        let settledCount = 0;
+        let resolved = false;
+
+        for (const entry of entries) {
+          entry.promise
+            .then((winner) => {
+              settledCount++;
+              if (resolved) {
+                return;
+              }
+              collectedResults.push(winner);
+              if (collectedResults.length >= minSuccess) {
+                resolved = true;
+                controller.abort();
+                resolve([...collectedResults]);
+              }
+            })
+            .catch((error) => {
+              agentErrors[entry.agentId] = error instanceof Error ? error.message : String(error);
+              settledCount++;
+
+              if (resolved) {
+                return;
+              }
+
+              const failedCount = Object.keys(agentErrors).length;
+              const maxPossibleSuccesses = collectedResults.length + (entries.length - settledCount);
+
+              // All agents failed
+              if (settledCount === entries.length && failedCount === entries.length) {
+                resolved = true;
+                reject(new Error(
+                  `[Directive MultiAgent] Race: all ${entries.length} agents failed.\n` +
+                  Object.entries(agentErrors)
+                    .map(([id, msg]) => `  - ${id}: ${msg}`)
+                    .join("\n")
+                ));
+              } else if (maxPossibleSuccesses < minSuccess) {
+                // Impossible to reach minSuccess — some succeeded but not enough can
+                resolved = true;
+                reject(new Error(
+                  `[Directive MultiAgent] Race: cannot reach minSuccess (${minSuccess}). ` +
+                  `${failedCount} agent(s) failed.\n` +
+                  Object.entries(agentErrors)
+                    .map(([id, msg]) => `  - ${id}: ${msg}`)
+                    .join("\n")
+                ));
+              }
+            });
+        }
+      });
+
+      // Wait for all losing agents to settle so their side effects
+      // (token counting, state mutations) complete before we return
+      await Promise.all(allPromises).catch(() => {});
+
+      // First result is the "winner" (fastest) — guaranteed to exist since minSuccess >= 1
+      const first = result[0]!;
+      const winnerId = first.agentId;
+      const successIds = new Set(result.map((r) => r.agentId));
+      const cancelledIds = startedAgents.filter((id) => !successIds.has(id) && !(id in agentErrors));
+
+      if (timeline) {
+        timeline.record({
+          type: "race_winner",
+          timestamp: Date.now(),
+          snapshotId: null,
+          patternId: pId,
+          winnerId,
+          durationMs: Date.now() - patternStartTime,
+        });
+        if (cancelledIds.length > 0) {
+          timeline.record({
+            type: "race_cancelled",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId: pId,
+            cancelledIds,
+            reason: "winner_found",
+          });
+        }
+      }
+
+      const extracted = pattern.extract
+        ? pattern.extract(first.result)
+        : (first.result.output as T);
+
+      // Build allResults when minSuccess > 1
+      const allResults = minSuccess > 1
+        ? result.map((r) => ({
+            agentId: r.agentId,
+            result: pattern.extract
+              ? pattern.extract(r.result)
+              : (r.result.output as T),
+          }))
+        : undefined;
+
+      return { winnerId, result: extracted, allResults };
+    } catch (error) {
+      patternError = error instanceof Error ? error : new Error(String(error));
+
+      // Record cancellation due to all-failed or timeout
+      if (timeline) {
+        timeline.record({
+          type: "race_cancelled",
+          timestamp: Date.now(),
+          snapshotId: null,
+          patternId: pId,
+          cancelledIds: startedAgents,
+          reason: controller.signal.aborted ? "timeout" : "all_failed",
+        });
+      }
+
+      throw error;
+    } finally {
+      if (raceTimeoutId) {
+        clearTimeout(raceTimeoutId);
+      }
+      if (raceExternalOnAbort && pattern.signal) {
+        pattern.signal.removeEventListener("abort", raceExternalOnAbort);
+      }
+      if (patternId) {
+        fireHook("onPatternComplete", {
+          patternId: pId,
+          patternType: "race",
+          durationMs: Date.now() - patternStartTime,
+          timestamp: Date.now(),
+          error: patternError,
+        });
+      }
+    }
+  }
+
+  // ---- Debate Pattern Runner ----
+  async function runDebateInternal<T>(
+    pattern: DebatePattern<T>,
+    input: string,
+    patternId?: string,
+  ): Promise<DebateResult<T>> {
+    const { agents: debateAgents, evaluator, maxRounds = 2, extract, parseJudgement } = pattern;
+
+    if (debateAgents.length < 2) {
+      throw new Error("[Directive MultiAgent] debate requires at least 2 agents");
+    }
+    if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
+      throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
+    }
+
+    // Signal/timeout composition
+    let effectiveSignal = pattern.signal;
+    let debateTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let externalOnAbort: (() => void) | undefined;
+    if (pattern.timeout && !effectiveSignal) {
+      const ctrl = new AbortController();
+      debateTimeoutId = setTimeout(() => ctrl.abort(), pattern.timeout);
+      effectiveSignal = ctrl.signal;
+    } else if (pattern.timeout && effectiveSignal) {
+      const ctrl = new AbortController();
+      debateTimeoutId = setTimeout(() => ctrl.abort(), pattern.timeout);
+      externalOnAbort = () => ctrl.abort();
+      effectiveSignal.addEventListener("abort", externalOnAbort, { once: true });
+      effectiveSignal = ctrl.signal;
+    }
+
+    const defaultParseJudgement = (output: unknown): { winnerId: string; feedback?: string; score?: number } => {
+      if (typeof output === "string") {
+        try {
+          const parsed = JSON.parse(output);
+          if (parsed && typeof parsed === "object" && typeof parsed.winnerId === "string") {
+            return parsed;
+          }
+
+          if (debug) {
+            console.warn("[Directive MultiAgent] defaultParseJudgement: parsed JSON missing winnerId, falling back to first agent");
+          }
+
+          return { winnerId: debateAgents[0]! };
+        } catch {
+          if (debug) {
+            console.warn("[Directive MultiAgent] defaultParseJudgement: output is not valid JSON, falling back to first agent");
+          }
+
+          return { winnerId: debateAgents[0]! };
+        }
+      }
+      if (output && typeof output === "object" && "winnerId" in output && typeof (output as Record<string, unknown>).winnerId === "string") {
+        return output as { winnerId: string; feedback?: string; score?: number };
+      }
+
+      if (debug) {
+        console.warn("[Directive MultiAgent] defaultParseJudgement: unrecognized output format, falling back to first agent");
+      }
+
+      return { winnerId: debateAgents[0]! };
+    };
+
+    const parseJudge = parseJudgement ?? defaultParseJudgement;
+    const rounds: DebateResult<T>["rounds"] = [];
+    let currentInput = input;
+    let lastWinnerId = debateAgents[0]!;
+    let lastWinnerOutput: unknown = undefined;
+
+    const pId = patternId ?? "__inline_debate";
+    const patternStartTime = Date.now();
+
+    if (patternId) {
+      fireHook("onPatternStart", {
+        patternId: pId,
+        patternType: "debate",
+        input,
+        timestamp: patternStartTime,
+      });
+    }
+
+    let patternError: Error | undefined;
+    try {
+      for (let round = 0; round < maxRounds; round++) {
+        if (effectiveSignal?.aborted) {
+          break;
+        }
+
+        const proposalPromises = debateAgents.map(async (agentId) => {
+          const result = await runSingleAgent(agentId, currentInput, { signal: effectiveSignal });
+
+          return { agentId, output: result.output };
+        });
+        const proposals = await Promise.all(proposalPromises);
+
+        if (effectiveSignal?.aborted) {
+          break;
+        }
+
+        const evalInput = JSON.stringify({
+          round: round + 1,
+          totalRounds: maxRounds,
+          proposals: proposals.map((p) => ({
+            agentId: p.agentId,
+            proposal: p.output,
+          })),
+        });
+
+        const evalResult = await runSingleAgent(evaluator, evalInput, { signal: effectiveSignal });
+        const judgement = parseJudge(evalResult.output);
+
+        // Validate winnerId
+        if (!debateAgents.includes(judgement.winnerId)) {
+          judgement.winnerId = debateAgents[0]!;
+        }
+
+        rounds.push({ proposals, judgement });
+
+        // Record debate round timeline event
+        if (timeline) {
+          timeline.record({
+            type: "debate_round",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId: pId,
+            round: round + 1,
+            totalRounds: maxRounds,
+            winnerId: judgement.winnerId,
+            score: judgement.score,
+            agentCount: debateAgents.length,
+          });
+        }
+
+        lastWinnerId = judgement.winnerId;
+        const winnerProposal = proposals.find((p) => p.agentId === judgement.winnerId);
+        lastWinnerOutput = winnerProposal?.output ?? proposals[0]!.output;
+
+        if (round < maxRounds - 1 && judgement.feedback) {
+          currentInput = `Previous round feedback: ${judgement.feedback}\n\nOriginal task: ${input}`;
+        }
+      }
+
+      if (debug && rounds.length === 0 && effectiveSignal?.aborted) {
+        console.debug("[Directive MultiAgent] debate returned with 0 rounds completed (signal was aborted)");
+      }
+
+      const result = extract ? extract(lastWinnerOutput) : lastWinnerOutput as T;
+
+      return { winnerId: lastWinnerId, result, rounds };
+    } catch (error) {
+      patternError = error instanceof Error ? error : new Error(String(error));
+      throw error;
+    } finally {
+      if (debateTimeoutId) {
+        clearTimeout(debateTimeoutId);
+      }
+      if (externalOnAbort && pattern.signal) {
+        pattern.signal.removeEventListener("abort", externalOnAbort);
+      }
+      if (patternId) {
+        fireHook("onPatternComplete", {
+          patternId: pId,
+          patternType: "debate",
+          durationMs: Date.now() - patternStartTime,
+          timestamp: Date.now(),
+          error: patternError,
+        });
+      }
+    }
+  }
+
   // ---- Self-Healing Helpers ----
   function findEquivalentAgents(agentId: string): string[] {
     if (!selfHealing) {
@@ -2315,6 +3738,22 @@ export function createMultiAgentOrchestrator(
       return healthMonitorInstance;
     },
 
+    get derived() {
+      return Object.freeze({ ...derivedValues });
+    },
+
+    onDerivedChange(callback: (id: string, value: unknown) => void): () => void {
+      derivedChangeCallbacks.add(callback);
+
+      return () => {
+        derivedChangeCallbacks.delete(callback);
+      };
+    },
+
+    get scratchpad() {
+      return scratchpadInstance;
+    },
+
     runAgent: runSingleAgent,
     runAgentStream: runAgentStreamImpl,
 
@@ -2328,17 +3767,59 @@ export function createMultiAgentOrchestrator(
         throw new Error(`[Directive MultiAgent] Unknown pattern "${patternId}". Available patterns: ${available}`);
       }
 
-      switch (pattern.type) {
-        case "parallel":
-          return runParallelPattern(pattern as ParallelPattern<T>, input, patternId);
-        case "sequential":
-          return runSequentialPattern(pattern as SequentialPattern<T>, input, patternId);
-        case "supervisor":
-          return runSupervisorPattern(pattern as SupervisorPattern<T>, input, patternId);
-        case "dag":
-          return runDagPattern(pattern as DagPattern<T>, input, patternId);
-        default:
-          throw new Error(`[Directive MultiAgent] Unknown pattern type: ${(pattern as { type: string }).type}`);
+      const patternStartTime = Date.now();
+      if (timeline) {
+        timeline.record({
+          type: "pattern_start",
+          timestamp: patternStartTime,
+          snapshotId: null,
+          patternId,
+          patternType: pattern.type,
+        });
+      }
+
+      let patternError: Error | undefined;
+      try {
+        switch (pattern.type) {
+          case "parallel":
+            return await runParallelPattern(pattern as ParallelPattern<T>, input, patternId);
+          case "sequential":
+            return await runSequentialPattern(pattern as SequentialPattern<T>, input, patternId);
+          case "supervisor":
+            return await runSupervisorPattern(pattern as SupervisorPattern<T>, input, patternId);
+          case "dag":
+            return await runDagPattern(pattern as DagPattern<T>, input, patternId);
+          case "reflect":
+            return await runReflectPattern(pattern as ReflectPattern<T>, input, patternId);
+          case "race": {
+            const raceResult = await runRacePattern(pattern as RacePattern<T>, input, patternId);
+
+            return raceResult.result;
+          }
+          case "debate": {
+            const debatePattern = pattern as DebatePattern<T>;
+            const debateResult = await runDebateInternal<T>(debatePattern, input, patternId);
+
+            return debateResult.result;
+          }
+          default:
+            throw new Error(`[Directive MultiAgent] Unknown pattern type: ${(pattern as { type: string }).type}`);
+        }
+      } catch (error) {
+        patternError = error instanceof Error ? error : new Error(String(error));
+        throw error;
+      } finally {
+        if (timeline) {
+          timeline.record({
+            type: "pattern_complete",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId,
+            patternType: pattern.type,
+            durationMs: Date.now() - patternStartTime,
+            ...(patternError ? { error: patternError.message } : {}),
+          });
+        }
       }
     },
 
@@ -2443,6 +3924,17 @@ export function createMultiAgentOrchestrator(
         const available = Object.keys(agents).join(", ") || "(none)";
 
         throw new Error(`[Directive MultiAgent] Handoff target agent "${toAgent}" not found. Registered: ${available}`);
+      }
+
+      // ---- Breakpoint: pre_handoff ----
+      {
+        const bpResult = await handleBreakpoint("pre_handoff", fromAgent, agents[fromAgent]!.agent.name, input, undefined, {
+          handoff: { fromAgent, toAgent },
+        });
+        if (bpResult.skip) {
+          return { output: undefined as unknown, messages: [], toolCalls: [], totalTokens: 0 };
+        }
+        input = bpResult.input;
       }
 
       const request: HandoffRequest = {
@@ -2603,11 +4095,15 @@ export function createMultiAgentOrchestrator(
     },
 
     getAgentState(agentId: string) {
-      return agentStates[agentId];
+      const state = agentStates[agentId];
+
+      return state ? { ...state } : undefined;
     },
 
     getAllAgentStates() {
-      return { ...agentStates };
+      return Object.fromEntries(
+        Object.entries(agentStates).map(([k, v]) => [k, { ...v }])
+      );
     },
 
     getPendingHandoffs() {
@@ -2657,7 +4153,7 @@ export function createMultiAgentOrchestrator(
     },
 
     /** Alias for runAgent */
-    run<T>(agentId: string, input: string, options?: RunOptions): Promise<RunResult<T>> {
+    run<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>> {
       return runSingleAgent<T>(agentId, input, options);
     },
 
@@ -2682,7 +4178,7 @@ export function createMultiAgentOrchestrator(
         : {};
 
       // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
-      const perAgentResolvers: Record<string, any> = {};
+      const perAgentResolvers: Record<string, any> = Object.create(null);
       if (registration.resolvers) {
         for (const [id, resolver] of Object.entries(registration.resolvers)) {
           perAgentResolvers[id] = {
@@ -2725,6 +4221,7 @@ export function createMultiAgentOrchestrator(
           setApprovalState(facts, { pending: [], approved: [], rejected: [] });
           setConversation(facts, []);
           setToolCalls(facts, []);
+          setBreakpointState(facts, createInitialBreakpointState());
         },
         constraints: perAgentConstraints,
         resolvers: Object.keys(perAgentResolvers).length > 0 ? (perAgentResolvers as any) : undefined,
@@ -2749,6 +4246,8 @@ export function createMultiAgentOrchestrator(
       if (debug) {
         console.debug(`[Directive MultiAgent] Registered agent "${agentId}" (${registration.agent.name})`);
       }
+
+      recomputeDerivations();
     },
 
     unregisterAgent(agentId: string): void {
@@ -2765,11 +4264,28 @@ export function createMultiAgentOrchestrator(
       // Warn about orphaned patterns referencing this agent
       if (debug) {
         for (const [patternId, pattern] of Object.entries(patterns)) {
-          const referencedAgents = pattern.type === "supervisor"
-            ? [pattern.supervisor, ...pattern.workers]
-            : pattern.type === "dag"
-              ? Object.values(pattern.nodes).map((n) => n.agent)
-              : pattern.agents;
+          let referencedAgents: string[];
+          switch (pattern.type) {
+            case "supervisor":
+              referencedAgents = [pattern.supervisor, ...pattern.workers];
+              break;
+            case "dag":
+              referencedAgents = Object.values(pattern.nodes).map((n) => n.agent);
+              break;
+            case "reflect":
+              referencedAgents = [pattern.agent, pattern.evaluator];
+              break;
+            case "parallel":
+            case "sequential":
+            case "race":
+              referencedAgents = pattern.agents;
+              break;
+            case "debate":
+              referencedAgents = [...(pattern as DebatePattern).agents, (pattern as DebatePattern).evaluator];
+              break;
+            default:
+              referencedAgents = [];
+          }
           if (referencedAgents.includes(agentId)) {
             console.debug(
               `[Directive MultiAgent] Warning: Pattern "${patternId}" references unregistered agent "${agentId}"`
@@ -2803,6 +4319,7 @@ export function createMultiAgentOrchestrator(
           setApprovalState(agentFacts, { pending: [], approved: [], rejected: [] });
           setConversation(agentFacts, []);
           setToolCalls(agentFacts, []);
+          setBreakpointState(agentFacts, createInitialBreakpointState());
         });
       }
 
@@ -2815,6 +4332,8 @@ export function createMultiAgentOrchestrator(
       if (debug) {
         console.debug(`[Directive MultiAgent] Unregistered agent "${agentId}"`);
       }
+
+      recomputeDerivations();
     },
 
     getAgentIds(): string[] {
@@ -2853,8 +4372,11 @@ export function createMultiAgentOrchestrator(
           setApprovalState(agentFacts, { pending: [], approved: [], rejected: [] });
           setConversation(agentFacts, []);
           setToolCalls(agentFacts, []);
+          setBreakpointState(agentFacts, createInitialBreakpointState());
         });
       }
+      breakpointModifications.clear();
+      breakpointCancelReasons.clear();
       pendingHandoffs.length = 0;
       handoffResults.length = 0;
       handoffCounter = 0;
@@ -2871,7 +4393,411 @@ export function createMultiAgentOrchestrator(
         setBridgeFact(coordFacts, "__handoffs", []);
         setBridgeFact(coordFacts, "__handoffResults", []);
         setBridgeFact(coordFacts, "__budgetWarningFired", false);
+        if (scratchpadConfig) {
+          setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...scratchpadConfig.init });
+        }
       });
+
+      // Reset derived values and recompute
+      for (const key of Object.keys(derivedValues)) {
+        delete derivedValues[key];
+      }
+      recomputeDerivations();
+    },
+
+    // ---- Checkpoint Methods ----
+
+    async checkpoint(opts?: { label?: string }): Promise<Checkpoint> {
+      assertNotDisposed();
+
+      // Ensure no agents are running
+      for (const [id, s] of Object.entries(agentStates)) {
+        if (s.status === "running") {
+          throw new Error(`[Directive MultiAgent] Cannot checkpoint while agent "${id}" is running`);
+        }
+      }
+      if (!(system as any).debug?.export) {
+        throw new Error(
+          "[Directive MultiAgent] Checkpointing requires debug mode. Set `debug: true` in orchestrator options."
+        );
+      }
+
+      const checkpoint: Checkpoint = {
+        version: 1,
+        id: createCheckpointId(),
+        createdAt: new Date().toISOString(),
+        label: opts?.label,
+        systemExport: (system as any).debug.export(),
+        timelineExport: timeline?.export() ?? null,
+        localState: {
+          type: "multi",
+          globalTokenCount,
+          globalStatus,
+          agentStates: Object.fromEntries(
+            Object.entries(agentStates).map(([k, v]) => [k, structuredClone(v)])
+          ),
+          handoffCounter,
+          pendingHandoffs: [...pendingHandoffs],
+          handoffResults: [...handoffResults],
+          roundRobinCounters: roundRobinCounters
+            ? Object.fromEntries(roundRobinCounters)
+            : null,
+        } satisfies MultiAgentCheckpointLocalState,
+        memoryExport: sharedMemory ? (sharedMemory as any).export?.() ?? null : null,
+        orchestratorType: "multi",
+      };
+
+      if (checkpointStore) {
+        await checkpointStore.save(checkpoint);
+      }
+
+      return checkpoint;
+    },
+
+    restore(cp: Checkpoint, opts?: { restoreTimeline?: boolean }): void {
+      assertNotDisposed();
+
+      if (!validateCheckpoint(cp)) {
+        throw new Error("[Directive MultiAgent] Invalid checkpoint data");
+      }
+      if (cp.orchestratorType !== "multi") {
+        throw new Error(`[Directive MultiAgent] Expected multi-agent checkpoint, got "${cp.orchestratorType}"`);
+      }
+
+      // Restore system state
+      if (!(system as any).debug?.import) {
+        throw new Error(
+          "[Directive MultiAgent] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options."
+        );
+      }
+      (system as any).debug.import(cp.systemExport);
+
+      // Restore timeline
+      if (opts?.restoreTimeline !== false && cp.timelineExport && timeline) {
+        timeline.import(cp.timelineExport);
+      }
+
+      // Restore memory
+      if (cp.memoryExport && sharedMemory && (sharedMemory as any).import) {
+        (sharedMemory as any).import(cp.memoryExport);
+      }
+
+      // Restore closure-local state
+      const local = cp.localState as MultiAgentCheckpointLocalState;
+      globalTokenCount = local.globalTokenCount;
+      globalStatus = local.globalStatus;
+      handoffCounter = local.handoffCounter;
+      pendingHandoffs.length = 0;
+      pendingHandoffs.push(...(local.pendingHandoffs as HandoffRequest[]));
+      handoffResults.length = 0;
+      handoffResults.push(...(local.handoffResults as HandoffResult[]));
+
+      // Restore agent states
+      for (const [id, s] of Object.entries(local.agentStates)) {
+        if (agentStates[id]) {
+          agentStates[id] = { ...s };
+        }
+      }
+
+      // Restore round robin counters
+      if (local.roundRobinCounters && roundRobinCounters) {
+        roundRobinCounters.clear();
+        for (const [k, v] of Object.entries(local.roundRobinCounters)) {
+          roundRobinCounters.set(k, v);
+        }
+      }
+
+      // Rebuild semaphores from registrations
+      for (const [agentId, reg] of Object.entries(agents)) {
+        const existing = semaphores.get(agentId);
+        if (existing) {
+          existing.drain();
+        }
+        semaphores.set(agentId, new Semaphore(reg.maxConcurrent ?? 1));
+      }
+
+      // Recompute derivations from restored state
+      recomputeDerivations();
+    },
+
+    // ---- Parallel Streaming ----
+
+    runParallelStream<T>(
+      agentIds: string[],
+      inputs: string | string[],
+      merge: (results: RunResult<unknown>[]) => T | Promise<T>,
+      opts?: { minSuccess?: number; timeout?: number; signal?: AbortSignal }
+    ): MultiplexedStreamResult<T> {
+      assertNotDisposed();
+
+      const inputArray = Array.isArray(inputs)
+        ? inputs
+        : agentIds.map(() => inputs);
+
+      if (inputArray.length !== agentIds.length) {
+        throw new Error(
+          `[Directive MultiAgent] Input count (${inputArray.length}) must match agent count (${agentIds.length})`
+        );
+      }
+
+      const controller = new AbortController();
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+      if (opts?.timeout) {
+        timeoutId = setTimeout(() => controller.abort(), opts.timeout);
+      }
+      // External signal handling is done after mergeTaggedStreams setup
+
+      // Launch per-agent streams
+      const perAgentStreams = agentIds.map((agentId, i) => {
+        const streamResult = runAgentStreamImpl(agentId, inputArray[i]!, {
+          signal: controller.signal,
+        });
+
+        return {
+          agentId,
+          streamResult,
+        };
+      });
+
+      // Merge tagged streams
+      const taggedSources = perAgentStreams.map(({ agentId, streamResult }) => ({
+        agentId,
+        stream: streamResult.stream,
+      }));
+
+      const { stream: mergedStream, getDroppedCount } = mergeTaggedStreams(taggedSources);
+
+      // Clean up external abort listener when done
+      let externalOnAbort: (() => void) | undefined;
+      if (opts?.signal) {
+        externalOnAbort = () => controller.abort();
+        opts.signal.addEventListener("abort", externalOnAbort, { once: true });
+      }
+
+      // Collect all results
+      const resultsPromise = Promise.allSettled(
+        perAgentStreams.map(({ streamResult }) => streamResult.result)
+      ).then((settled) => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        // Clean up external signal listener
+        if (externalOnAbort && opts?.signal) {
+          opts.signal.removeEventListener("abort", externalOnAbort);
+        }
+
+        const successes: RunResult<unknown>[] = [];
+        for (const s of settled) {
+          if (s.status === "fulfilled") {
+            successes.push(s.value);
+          }
+        }
+
+        if (opts?.minSuccess !== undefined && successes.length < opts.minSuccess) {
+          throw new Error(
+            `[Directive MultiAgent] runParallelStream: Only ${successes.length}/${agentIds.length} agents succeeded ` +
+            `(minimum required: ${opts.minSuccess})`
+          );
+        }
+
+        return successes;
+      });
+
+      const mergePromise = resultsPromise.then((results) => merge(results));
+
+      // Prevent unhandled rejections
+      resultsPromise.catch(() => {});
+      mergePromise.catch(() => {});
+
+      return {
+        stream: mergedStream,
+        results: resultsPromise,
+        merge: mergePromise,
+        getDroppedCount,
+        abort: () => {
+          controller.abort();
+          if (externalOnAbort && opts?.signal) {
+            opts.signal.removeEventListener("abort", externalOnAbort);
+          }
+          for (const { streamResult } of perAgentStreams) {
+            streamResult.abort();
+          }
+        },
+      };
+    },
+
+    // ---- Race ----
+
+    async runRace<T>(
+      agentIds: string[],
+      input: string,
+      raceOpts?: { extract?: (result: RunResult<unknown>) => T; timeout?: number; minSuccess?: number; signal?: AbortSignal }
+    ): Promise<RaceResult<T>> {
+      assertNotDisposed();
+
+      const pattern: RacePattern<T> = {
+        type: "race",
+        agents: agentIds,
+        extract: raceOpts?.extract,
+        timeout: raceOpts?.timeout,
+        minSuccess: raceOpts?.minSuccess,
+        signal: raceOpts?.signal,
+      };
+
+      return runRacePattern<T>(pattern, input, "__imperative_race");
+    },
+
+    // ---- Reflect (imperative) ----
+
+    async runReflect<T>(
+      producerId: string,
+      evaluatorId: string,
+      input: string,
+      reflectOpts?: {
+        maxIterations?: number;
+        parseEvaluation?: (output: unknown) => ReflectionEvaluation;
+        buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+        extract?: (output: unknown) => T;
+        onExhausted?: "accept-last" | "accept-best" | "throw";
+        onIteration?: (record: ReflectIterationRecord) => void;
+        signal?: AbortSignal;
+        timeout?: number;
+        threshold?: number | ((iteration: number) => number);
+      }
+    ): Promise<{ result: T; iterations: number; history: ReflectIterationRecord[]; exhausted: boolean }> {
+      assertNotDisposed();
+
+      const pattern: ReflectPattern<T> = {
+        type: "reflect",
+        agent: producerId,
+        evaluator: evaluatorId,
+        maxIterations: reflectOpts?.maxIterations,
+        parseEvaluation: reflectOpts?.parseEvaluation,
+        buildRetryInput: reflectOpts?.buildRetryInput,
+        extract: reflectOpts?.extract,
+        onExhausted: reflectOpts?.onExhausted,
+        onIteration: reflectOpts?.onIteration,
+        signal: reflectOpts?.signal,
+        timeout: reflectOpts?.timeout,
+        threshold: reflectOpts?.threshold,
+      };
+
+      const result = await runReflectPattern<T>(pattern, input, "__imperative_reflect");
+      const history = lastReflectionHistory ? [...lastReflectionHistory] : [];
+      const exhausted = history.length > 0 && !history[history.length - 1]!.passed;
+
+      return { result, iterations: history.length, history, exhausted };
+    },
+
+    // ---- Debate (imperative) ----
+
+    async runDebate<T>(
+      agentIds: string[],
+      evaluatorId: string,
+      input: string,
+      debateOpts?: {
+        maxRounds?: number;
+        extract?: (output: unknown) => T;
+        parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+        signal?: AbortSignal;
+        timeout?: number;
+      }
+    ): Promise<DebateResult<T>> {
+      assertNotDisposed();
+
+      return runDebateInternal<T>(
+        {
+          type: "debate",
+          agents: agentIds,
+          evaluator: evaluatorId,
+          maxRounds: debateOpts?.maxRounds,
+          extract: debateOpts?.extract,
+          parseJudgement: debateOpts?.parseJudgement,
+          signal: debateOpts?.signal,
+          timeout: debateOpts?.timeout,
+        },
+        input,
+        "__imperative_debate",
+      );
+    },
+
+    // ---- Breakpoint Methods ----
+
+    resumeBreakpoint(id: string, modifications?: BreakpointModifications): void {
+      assertNotDisposed();
+
+      if (modifications) {
+        breakpointModifications.set(id, modifications);
+      }
+
+      // Find which agent has this breakpoint pending and resolve it
+      for (const agentId of Object.keys(agents)) {
+        const agentFacts = getAgentFacts(agentId);
+        const bpState = getBreakpointState(agentFacts);
+        if (bpState.pending.some((r: BreakpointRequest) => r.id === id)) {
+          system.batch(() => {
+            const currentBp = getBreakpointState(agentFacts);
+            const resolved = [...currentBp.resolved, id];
+            setBreakpointState(agentFacts, {
+              ...currentBp,
+              pending: currentBp.pending.filter((r: BreakpointRequest) => r.id !== id),
+              resolved: resolved.length > MAX_BREAKPOINT_HISTORY ? resolved.slice(-MAX_BREAKPOINT_HISTORY) : resolved,
+            });
+          });
+
+          return;
+        }
+      }
+
+      if (debug) {
+        console.debug(`[Directive MultiAgent] resumeBreakpoint() ignored: no pending breakpoint "${id}"`);
+      }
+    },
+
+    cancelBreakpoint(id: string, reason?: string): void {
+      assertNotDisposed();
+
+      if (reason) {
+        breakpointCancelReasons.set(id, reason);
+      }
+
+      for (const agentId of Object.keys(agents)) {
+        const agentFacts = getAgentFacts(agentId);
+        const bpState = getBreakpointState(agentFacts);
+        if (bpState.pending.some((r: BreakpointRequest) => r.id === id)) {
+          system.batch(() => {
+            const currentBp = getBreakpointState(agentFacts);
+            const cancelled = [...currentBp.cancelled, id];
+            setBreakpointState(agentFacts, {
+              ...currentBp,
+              pending: currentBp.pending.filter((r: BreakpointRequest) => r.id !== id),
+              cancelled: cancelled.length > MAX_BREAKPOINT_HISTORY ? cancelled.slice(-MAX_BREAKPOINT_HISTORY) : cancelled,
+            });
+          });
+
+          return;
+        }
+      }
+
+      if (debug) {
+        console.debug(`[Directive MultiAgent] cancelBreakpoint() ignored: no pending breakpoint "${id}"`);
+      }
+    },
+
+    getPendingBreakpoints(): BreakpointRequest[] {
+      const pending: BreakpointRequest[] = [];
+      for (const agentId of Object.keys(agents)) {
+        const agentFacts = getAgentFacts(agentId);
+        const bpState = getBreakpointState(agentFacts);
+        pending.push(...bpState.pending);
+      }
+
+      return pending;
+    },
+
+    getLastReflectionHistory(): ReflectIterationRecord[] | null {
+      return lastReflectionHistory ? [...lastReflectionHistory] : null;
     },
 
     dispose() {
@@ -2880,10 +4806,18 @@ export function createMultiAgentOrchestrator(
       }
       // Reset before marking as disposed (reset() calls assertNotDisposed())
       orchestrator.reset();
+      // Clear callback references to allow garbage collection
+      scratchpadChangeCallbacks.clear();
+      scratchpadKeyCallbacks.clear();
+      derivedChangeCallbacks.clear();
+      idleWaiters.clear();
       disposed = true;
       system.destroy();
     },
   };
+
+  // Compute initial derivation values so they're available immediately
+  recomputeDerivations();
 
   return orchestrator;
 }
@@ -2894,6 +4828,10 @@ export function createMultiAgentOrchestrator(
 
 /**
  * Create a parallel pattern configuration.
+ *
+ * @param agents - Agent IDs to run concurrently
+ * @param merge - Combine all agent results into a single output
+ * @param options - Optional `minSuccess` and `timeout` overrides
  *
  * @example
  * ```typescript
@@ -2918,6 +4856,9 @@ export function parallel<T>(
 
 /**
  * Create a sequential pattern configuration.
+ *
+ * @param agents - Agent IDs to run in order (output of each feeds into the next)
+ * @param options - Optional `transform`, `extract`, `continueOnError`
  *
  * @example
  * ```typescript
@@ -2944,6 +4885,10 @@ export function sequential<T>(
 
 /**
  * Create a supervisor pattern configuration.
+ *
+ * @param supervisorAgent - Agent ID that coordinates the workers
+ * @param workers - Agent IDs for the worker pool
+ * @param options - Optional `maxRounds` and `extract`
  *
  * @example
  * ```typescript
@@ -2972,6 +4917,10 @@ export function supervisor<T>(
 
 /**
  * Create a DAG execution pattern.
+ *
+ * @param nodes - Node definitions keyed by ID, each with `agent` and optional `deps`
+ * @param merge - Combine DAG outputs into a single result (defaults to `context.outputs`)
+ * @param options - Optional `timeout`, `maxConcurrent`, `onNodeError`
  *
  * @example
  * ```typescript
@@ -3006,6 +4955,68 @@ export function dag<T = Record<string, unknown>>(
     type: "dag",
     nodes,
     merge: merge ?? ((context: DagExecutionContext) => context.outputs as T),
+    ...options,
+  };
+}
+
+/**
+ * Create a reflect pattern configuration.
+ *
+ * @param agent - Producer agent ID that generates output
+ * @param evaluator - Evaluator agent ID that judges quality
+ * @param options - Optional iteration, parsing, signal, and threshold config
+ *
+ * @example
+ * ```typescript
+ * const reviewed = reflect('writer', 'reviewer', { maxIterations: 2 });
+ * ```
+ */
+export function reflect<T>(
+  agent: string,
+  evaluator: string,
+  options?: {
+    maxIterations?: number;
+    parseEvaluation?: (output: unknown) => ReflectionEvaluation;
+    buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+    extract?: (output: unknown) => T;
+    onExhausted?: "accept-last" | "accept-best" | "throw";
+    onIteration?: (record: ReflectIterationRecord) => void;
+    signal?: AbortSignal;
+    timeout?: number;
+    threshold?: number | ((iteration: number) => number);
+  }
+): ReflectPattern<T> {
+  return {
+    type: "reflect",
+    agent,
+    evaluator,
+    ...options,
+  };
+}
+
+/**
+ * Create a race pattern configuration.
+ *
+ * @param agents - Agent IDs to race concurrently
+ * @param options - Optional `extract`, `timeout`, `minSuccess`, `signal`
+ *
+ * @example
+ * ```typescript
+ * const fastest = race(['fast-model', 'smart-model'], { timeout: 5000 });
+ * ```
+ */
+export function race<T>(
+  agents: string[],
+  options?: {
+    extract?: (result: RunResult<unknown>) => T;
+    timeout?: number;
+    minSuccess?: number;
+    signal?: AbortSignal;
+  }
+): RacePattern<T> {
+  return {
+    type: "race",
+    agents,
     ...options,
   };
 }
@@ -3261,6 +5272,9 @@ export function composePatterns(
         case "supervisor": {
           const supPattern = pattern as SupervisorPattern<unknown>;
           const maxRounds = supPattern.maxRounds ?? 5;
+          if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
+            throw new Error("[Directive MultiAgent] supervisor maxRounds must be >= 1");
+          }
           const workerResults: RunResult<unknown>[] = [];
           let supervisorResult = await orchestrator.runAgent<unknown>(
             supPattern.supervisor,
@@ -3323,6 +5337,9 @@ export function composePatterns(
 
           // Simple sequential execution of DAG for composePatterns
           // (Full parallel DAG execution happens via runPattern/runDagPattern)
+          if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+            console.debug("[Directive MultiAgent] composePatterns: DAG nodes executed sequentially — use runPattern() for full parallel DAG execution");
+          }
           const nodeIds = Object.keys(dagPattern.nodes);
           for (const nodeId of nodeIds) {
             const node = dagPattern.nodes[nodeId]!;
@@ -3355,6 +5372,79 @@ export function composePatterns(
           lastOutput = await dagPattern.merge(dagContext);
           break;
         }
+
+        case "reflect": {
+          const reflectPattern = pattern as ReflectPattern<unknown>;
+          // Run producer→evaluator loop using runAgent
+          const maxIter = reflectPattern.maxIterations ?? 2;
+          const parseEval = reflectPattern.parseEvaluation ?? ((output: unknown): ReflectionEvaluation => {
+            if (typeof output === "string") {
+              try { return JSON.parse(output); } catch { return { passed: false, feedback: output }; }
+            }
+            if (output && typeof output === "object" && "passed" in output) {
+              return output as ReflectionEvaluation;
+            }
+
+            return { passed: false, feedback: "Invalid evaluator output" };
+          });
+          const buildInput = reflectPattern.buildRetryInput ?? (
+            (inp: string, feedback: string) => `${inp}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`
+          );
+
+          let effectiveInput = currentInput;
+          let producerOutput: unknown;
+          for (let i = 0; i < maxIter; i++) {
+            const producerResult = await orchestrator.runAgent(reflectPattern.agent, effectiveInput);
+            producerOutput = producerResult.output;
+            const producerStr = typeof producerOutput === "string"
+              ? producerOutput
+              : JSON.stringify(producerOutput);
+            const evalResult = await orchestrator.runAgent(reflectPattern.evaluator, producerStr);
+            const evaluation = parseEval(evalResult.output);
+            if (evaluation.passed) {
+              break;
+            }
+            if (i < maxIter - 1 && evaluation.feedback) {
+              effectiveInput = buildInput(currentInput, evaluation.feedback, i);
+            }
+          }
+          lastOutput = reflectPattern.extract
+            ? reflectPattern.extract(producerOutput)
+            : producerOutput;
+          break;
+        }
+
+        case "race": {
+          const racePattern = pattern as RacePattern<unknown>;
+          const raceResult = await orchestrator.runRace(
+            racePattern.agents,
+            currentInput,
+            { extract: racePattern.extract, timeout: racePattern.timeout },
+          );
+          lastOutput = raceResult.result;
+          break;
+        }
+
+        case "debate": {
+          const debatePattern = pattern as DebatePattern<unknown>;
+          const debateResult = await orchestrator.runDebate(
+            debatePattern.agents,
+            debatePattern.evaluator,
+            currentInput,
+            {
+              maxRounds: debatePattern.maxRounds,
+              extract: debatePattern.extract,
+              parseJudgement: debatePattern.parseJudgement,
+              signal: debatePattern.signal,
+              timeout: debatePattern.timeout,
+            },
+          );
+          lastOutput = debateResult.result;
+          break;
+        }
+
+        default:
+          throw new Error(`[Directive MultiAgent] composePatterns: unknown pattern type "${(pattern as ExecutionPattern).type}"`);
       }
 
       // Convert output to string for next pattern's input
@@ -3454,6 +5544,319 @@ export function capabilityRoute(
         agent: chosen,
         input: getInput(facts),
       } as RunAgentRequirement;
+    },
+    priority,
+  };
+}
+
+// ============================================================================
+// Constraint-Driven Agent Spawning
+// ============================================================================
+
+let spawnOnConditionOptionsWarned = false;
+
+/**
+ * Options for spawnOnCondition.
+ */
+export interface SpawnOnConditionOptions {
+  /** Priority for the constraint (higher = evaluated first) */
+  priority?: number;
+  /** Additional context passed to the agent */
+  context?: Record<string, unknown>;
+}
+
+/**
+ * Create a constraint that auto-runs an agent when a condition is met.
+ *
+ * The orchestrator's built-in RUN_AGENT resolver handles execution —
+ * you only need to add this to your `constraints` config.
+ *
+ * @example
+ * ```typescript
+ * const orchestrator = createMultiAgentOrchestrator({
+ *   agents: { reviewer: { agent: reviewerAgent } },
+ *   constraints: {
+ *     autoReview: spawnOnCondition({
+ *       when: (facts) => (facts.confidence as number) < 0.7,
+ *       agent: 'reviewer',
+ *       input: (facts) => `Review this: ${facts.lastOutput}`,
+ *     }),
+ *   },
+ * });
+ * ```
+ */
+export function spawnOnCondition(config: {
+  when: (facts: Record<string, unknown>) => boolean;
+  agent: string;
+  input: (facts: Record<string, unknown>) => string;
+  /** Priority for the constraint (higher = evaluated first) */
+  priority?: number;
+  /** Additional context passed to the agent */
+  context?: Record<string, unknown>;
+  /** @deprecated Use top-level `priority` and `context` instead */
+  options?: SpawnOnConditionOptions;
+}): OrchestratorConstraint<Record<string, unknown>> {
+  const { when, agent, input, priority, context, options } = config;
+  if (options && !spawnOnConditionOptionsWarned) {
+    spawnOnConditionOptionsWarned = true;
+    console.warn("[Directive MultiAgent] spawnOnCondition `options` is deprecated. Use top-level `priority` and `context` instead.");
+  }
+  const effectivePriority = priority ?? options?.priority;
+  const effectiveContext = context ?? options?.context;
+
+  return {
+    when,
+    require: (facts) => ({
+      type: "RUN_AGENT",
+      agent,
+      input: input(facts),
+      context: effectiveContext,
+    } as RunAgentRequirement),
+    priority: effectivePriority,
+  };
+}
+
+// ============================================================================
+// Debate Pattern
+// ============================================================================
+
+/** Configuration for the debate pattern (used with runDebate imperative API) */
+export interface DebateConfig<T = unknown> {
+  /** Agent IDs that will generate competing proposals */
+  agents: string[];
+  /** Evaluator agent ID that judges proposals */
+  evaluator: string;
+  /** Maximum rounds of debate (default: 2) */
+  maxRounds?: number;
+  /** Extract final result from the winning proposal */
+  extract?: (output: unknown) => T;
+  /** Parse evaluator output. Default: JSON.parse expecting { winnerId, feedback } */
+  parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+  /** AbortSignal for external cancellation */
+  signal?: AbortSignal;
+  /** Overall timeout (ms) */
+  timeout?: number;
+}
+
+/**
+ * Create a debate pattern where agents compete and an evaluator picks the best.
+ *
+ * Flow:
+ * 1. All agents produce proposals in parallel
+ * 2. Evaluator receives all proposals and picks a winner
+ * 3. Optionally repeat with evaluator feedback for refinement
+ *
+ * @param config - Debate configuration with `agents`, `evaluator`, and optional settings
+ * @see runDebate for the imperative API
+ *
+ * @example
+ * ```typescript
+ * const orchestrator = createMultiAgentOrchestrator({
+ *   agents: {
+ *     optimist: { agent: optimistAgent },
+ *     pessimist: { agent: pessimistAgent },
+ *     judge: { agent: judgeAgent },
+ *   },
+ *   patterns: {
+ *     debate: debate({
+ *       agents: ['optimist', 'pessimist'],
+ *       evaluator: 'judge',
+ *       maxRounds: 2,
+ *     }),
+ *   },
+ * });
+ *
+ * const result = await orchestrator.runPattern('debate', 'Should we invest in X?');
+ * ```
+ */
+export function debate<T = unknown>(config: DebateConfig<T>): DebatePattern<T> {
+  const { agents, evaluator, maxRounds, extract, parseJudgement, signal, timeout } = config;
+
+  if (agents.length < 2) {
+    throw new Error("[Directive MultiAgent] debate requires at least 2 agents");
+  }
+  if (maxRounds != null && (maxRounds < 1 || !Number.isFinite(maxRounds))) {
+    throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
+  }
+
+  return {
+    type: "debate",
+    agents,
+    evaluator,
+    maxRounds,
+    extract,
+    parseJudgement,
+    signal,
+    timeout,
+  };
+}
+
+/**
+ * Run a debate imperatively on an orchestrator (no pattern registration needed).
+ * Delegates to `orchestrator.runDebate()` so that lifecycle hooks, debug timeline,
+ * and signal propagation all work correctly.
+ *
+ * @param orchestrator - The multi-agent orchestrator instance
+ * @param config - Debate configuration with agents, evaluator, and optional settings
+ * @param input - The initial input/prompt for the debate
+ * @see debate for the declarative pattern API
+ * @returns The winning agent's output, the winner ID, and all proposals from each round
+ */
+export async function runDebate<T>(
+  orchestrator: MultiAgentOrchestrator,
+  config: DebateConfig<T>,
+  input: string,
+): Promise<DebateResult<T>> {
+  return orchestrator.runDebate<T>(
+    config.agents,
+    config.evaluator,
+    input,
+    {
+      maxRounds: config.maxRounds,
+      extract: config.extract,
+      parseJudgement: config.parseJudgement,
+      signal: config.signal,
+      timeout: config.timeout,
+    },
+  );
+}
+
+// ============================================================================
+// Derivation-Triggered Constraints
+// ============================================================================
+
+/**
+ * Create a constraint that fires when a cross-agent derivation meets a condition.
+ *
+ * Wire this into the orchestrator's `derive` config and `constraints` config together.
+ * The constraint's `when()` reads the derivation value from the orchestrator's derived snapshot.
+ *
+ * @example
+ * ```typescript
+ * const orchestrator = createMultiAgentOrchestrator({
+ *   agents: { ... },
+ *   derive: {
+ *     totalCost: (snap) => snap.coordinator.globalTokens * 0.001,
+ *   },
+ *   constraints: {
+ *     budgetAlert: derivedConstraint('totalCost', (cost) => cost > 5.0, {
+ *       agent: 'budget-manager',
+ *       input: (value) => `Budget exceeded: $${value}`,
+ *     }),
+ *   },
+ * });
+ * ```
+ */
+export function derivedConstraint(
+  derivationId: string,
+  condition: (value: unknown) => boolean,
+  action: {
+    agent: string;
+    input: (value: unknown) => string;
+    priority?: number;
+    context?: Record<string, unknown>;
+  },
+): OrchestratorConstraint<Record<string, unknown>> {
+  // Generation counter to guard against stale closure between when() and require()
+  let lastValue: unknown = undefined;
+  let whenGeneration = 0;
+  let requireGeneration = -1;
+
+  return {
+    when: (facts) => {
+      // Read derivation value from coordinator facts (injected by recomputeDerivations)
+      const derived = facts.__derived as Record<string, unknown> | undefined;
+      const value = derived?.[derivationId];
+      lastValue = value;
+      whenGeneration++;
+
+      return condition(value);
+    },
+    require: (facts) => {
+      // Re-read from facts if generation is stale (concurrent evaluation)
+      const value = whenGeneration !== requireGeneration
+        ? (requireGeneration = whenGeneration, lastValue)
+        : ((facts.__derived as Record<string, unknown> | undefined)?.[derivationId]);
+
+      return {
+        type: "RUN_AGENT",
+        agent: action.agent,
+        input: action.input(value),
+        context: action.context,
+      } as RunAgentRequirement;
+    },
+    priority: action.priority,
+  };
+}
+
+// ============================================================================
+// Pool Auto-Scaling Constraint
+// ============================================================================
+
+/** Configuration for spawnPool constraint-driven auto-scaling */
+export interface SpawnPoolConfig {
+  /** Agent ID to spawn (must be registered in the orchestrator) */
+  agent: string;
+  /** Build the input for each spawned agent. Receives current facts and spawn index (0-based). */
+  input: (facts: Record<string, unknown>, index: number) => string;
+  /** How many agents to spawn. Number or function of facts for dynamic scaling. */
+  count: number | ((facts: Record<string, unknown>) => number);
+  /** Priority for the constraint. @default undefined */
+  priority?: number;
+  /** Additional context passed to each spawned agent */
+  context?: Record<string, unknown>;
+}
+
+/**
+ * Create a constraint that spawns a pool of agent instances when a condition is met.
+ *
+ * Unlike `spawnOnCondition` (which spawns one agent), `spawnPool` can target N agents.
+ * However, only **one requirement is emitted per constraint evaluation cycle** — the constraint
+ * re-fires on subsequent cycles as long as `when()` returns true, spawning one agent per cycle.
+ *
+ * @see spawnOnCondition — for spawning a single agent
+ *
+ * @example
+ * ```typescript
+ * const orchestrator = createMultiAgentOrchestrator({
+ *   agents: { worker: { agent: workerAgent } },
+ *   constraints: {
+ *     scaleWorkers: spawnPool(
+ *       (facts) => (facts.pendingTasks as number) > 0,
+ *       {
+ *         agent: 'worker',
+ *         count: (facts) => Math.min(facts.pendingTasks as number, 5),
+ *         input: (facts, i) => `Process task ${i + 1}`,
+ *       },
+ *     ),
+ *   },
+ * });
+ * ```
+ */
+export function spawnPool(
+  when: (facts: Record<string, unknown>) => boolean,
+  config: SpawnPoolConfig,
+): OrchestratorConstraint<Record<string, unknown>> {
+  const { agent, input, count, priority, context } = config;
+
+  return {
+    when,
+    require: (facts) => {
+      const n = typeof count === "function" ? count(facts) : count;
+      const clamped = Math.max(1, Math.floor(n));
+      const requirements: RunAgentRequirement[] = [];
+      for (let i = 0; i < clamped; i++) {
+        requirements.push({
+          type: "RUN_AGENT",
+          agent,
+          input: input(facts, i),
+          context,
+        } as RunAgentRequirement);
+      }
+
+      // Return first requirement (orchestrator processes one per constraint per cycle)
+      // For N > 1, the constraint re-fires on subsequent cycles as long as `when` is true
+      return requirements[0]!;
     },
     priority,
   };

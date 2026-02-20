@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { createMockAgentRunner, testGuardrail, createApprovalSimulator } from '@directive-run/ai';
+ * import { createMockAgentRunner, testGuardrail, createApprovalSimulator } from '@directive-run/ai/testing';
  *
  * describe('MyOrchestrator', () => {
  *   it('should block PII in input', async () => {
@@ -38,6 +38,9 @@ import type {
   GuardrailResult,
   ApprovalRequest,
 } from "./types.js";
+import { InMemoryCheckpointStore, type Checkpoint, type CheckpointStore } from "./checkpoint.js";
+import type { BreakpointRequest, BreakpointModifications } from "./breakpoints.js";
+import type { MultiplexedStreamChunk } from "./streaming.js";
 import { createAgentOrchestrator, type OrchestratorOptions, type AgentOrchestrator } from "./agent-orchestrator.js";
 import { createMultiAgentOrchestrator, type MultiAgentOrchestratorOptions, type MultiAgentOrchestrator } from "./multi-agent-orchestrator.js";
 
@@ -580,18 +583,19 @@ export function createTestOrchestrator<F extends Record<string, unknown> = Recor
     },
   });
 
-  return {
-    ...orchestrator,
-    mockRunner,
-    approvalSimulator,
-    getCalls: () => mockRunner.getCalls(),
-    getApprovalRequests: () => approvalSimulator.getRequests(),
-    resetAll() {
-      orchestrator.reset();
-      mockRunner.clearCalls();
-      approvalSimulator.clearRequests();
-    },
+  // Use Object.create to preserve getters instead of { ...orchestrator } which evaluates them once
+  const testOrchestrator = Object.create(orchestrator) as TestOrchestrator<F>;
+  testOrchestrator.mockRunner = mockRunner;
+  testOrchestrator.approvalSimulator = approvalSimulator;
+  testOrchestrator.getCalls = () => mockRunner.getCalls();
+  testOrchestrator.getApprovalRequests = () => approvalSimulator.getRequests();
+  testOrchestrator.resetAll = () => {
+    orchestrator.reset();
+    mockRunner.clearCalls();
+    approvalSimulator.clearRequests();
   };
+
+  return testOrchestrator;
 }
 
 // ============================================================================
@@ -842,18 +846,20 @@ export function createTestMultiAgentOrchestrator(
     },
   });
 
-  return {
-    ...orchestrator,
-    mockRunner,
-    approvalSimulator,
-    getCalls: () => mockRunner.getCalls(),
-    getApprovalRequests: () => approvalSimulator.getRequests(),
-    resetAll() {
-      orchestrator.reset();
-      mockRunner.clearCalls();
-      approvalSimulator.clearRequests();
-    },
+  // Use Object.create to preserve getters (derived, scratchpad, timeline, etc.)
+  // instead of { ...orchestrator } which evaluates getters at spread time
+  const testOrchestrator = Object.create(orchestrator) as TestMultiAgentOrchestrator;
+  testOrchestrator.mockRunner = mockRunner;
+  testOrchestrator.approvalSimulator = approvalSimulator;
+  testOrchestrator.getCalls = () => mockRunner.getCalls();
+  testOrchestrator.getApprovalRequests = () => approvalSimulator.getRequests();
+  testOrchestrator.resetAll = () => {
+    orchestrator.reset();
+    mockRunner.clearCalls();
+    approvalSimulator.clearRequests();
   };
+
+  return testOrchestrator;
 }
 
 // ============================================================================
@@ -1179,8 +1185,9 @@ export function assertTimelineEvents(
 // Self-Healing Testing Helpers
 // ============================================================================
 
-import type { RerouteEvent } from "./types.js";
+import type { RerouteEvent, Scratchpad } from "./types.js";
 import type { HealthMonitor } from "./health-monitor.js";
+import type { ReflectionEvaluator } from "./reflection.js";
 
 /**
  * Create a runner that always fails, useful for testing self-healing.
@@ -1343,5 +1350,431 @@ export function assertAgentHealth(
     throw new Error(
       `Expected agent "${agentId}" success rate to be at least ${expected.minSuccessRate}, got ${metrics.successRate}`
     );
+  }
+}
+
+// ============================================================================
+// Checkpoint Test Helpers
+// ============================================================================
+
+/**
+ * Create a test checkpoint store (wraps InMemoryCheckpointStore with assertion helpers).
+ *
+ * @example
+ * ```typescript
+ * const store = createTestCheckpointStore();
+ * const orchestrator = createAgentOrchestrator({ runner, checkpointStore: store });
+ * const cp = await orchestrator.checkpoint();
+ * expect(store.saved).toHaveLength(1);
+ * ```
+ */
+export function createTestCheckpointStore(maxCheckpoints = 100): CheckpointStore & {
+  saved: Checkpoint[];
+  inner: InMemoryCheckpointStore;
+  /** Get the most recently saved checkpoint */
+  getLatest: () => Checkpoint | undefined;
+} {
+  const inner = new InMemoryCheckpointStore({ maxCheckpoints });
+  const saved: Checkpoint[] = [];
+
+  return {
+    inner,
+    saved,
+    getLatest: () => saved[saved.length - 1],
+    async save(checkpoint: Checkpoint): Promise<string> {
+      saved.push(checkpoint);
+
+      return inner.save(checkpoint);
+    },
+    load: (id: string) => inner.load(id),
+    list: () => inner.list(),
+    delete: (id: string) => inner.delete(id),
+    clear: () => inner.clear(),
+  };
+}
+
+/**
+ * Assert that a checkpoint has expected properties.
+ */
+export function assertCheckpoint(
+  checkpoint: Checkpoint,
+  expected: {
+    orchestratorType?: "single" | "multi";
+    hasTimeline?: boolean;
+    hasMemory?: boolean;
+    hasSystemExport?: boolean;
+    label?: string;
+  },
+): void {
+  if (expected.orchestratorType !== undefined && checkpoint.orchestratorType !== expected.orchestratorType) {
+    throw new Error(
+      `Expected checkpoint orchestratorType "${expected.orchestratorType}", got "${checkpoint.orchestratorType}"`
+    );
+  }
+
+  if (expected.hasSystemExport === true && (!checkpoint.systemExport || checkpoint.systemExport === "")) {
+    throw new Error("Expected checkpoint to have non-empty systemExport, but it was empty");
+  }
+
+  if (expected.hasTimeline === true && checkpoint.timelineExport === null) {
+    throw new Error("Expected checkpoint to have timeline export, but it was null");
+  }
+
+  if (expected.hasTimeline === false && checkpoint.timelineExport !== null) {
+    throw new Error("Expected checkpoint to have no timeline export, but it was present");
+  }
+
+  if (expected.hasMemory === true && checkpoint.memoryExport === null) {
+    throw new Error("Expected checkpoint to have memory export, but it was null");
+  }
+
+  if (expected.hasMemory === false && checkpoint.memoryExport !== null) {
+    throw new Error("Expected checkpoint to have no memory export, but it was present");
+  }
+
+  if (expected.label !== undefined && checkpoint.label !== expected.label) {
+    throw new Error(`Expected checkpoint label "${expected.label}", got "${checkpoint.label}"`);
+  }
+}
+
+// ============================================================================
+// Breakpoint Test Helpers
+// ============================================================================
+
+/** Options for the breakpoint simulator */
+export interface BreakpointSimulatorOptions {
+  /** Auto-resume after this delay (ms). Default: 0 (immediate) */
+  autoResumeDelay?: number;
+  /** Modifications to apply on resume */
+  modifications?: BreakpointModifications;
+  /** If true, cancel instead of resume */
+  cancel?: boolean;
+  /** Cancel reason */
+  cancelReason?: string;
+}
+
+/**
+ * Create a breakpoint simulator that auto-resolves breakpoints.
+ *
+ * @example
+ * ```typescript
+ * const simulator = createBreakpointSimulator({ autoResumeDelay: 10 });
+ * const orchestrator = createAgentOrchestrator({
+ *   runner,
+ *   breakpoints: [{ type: "pre_agent_run" }],
+ *   onBreakpoint: simulator.handler,
+ * });
+ * // Run agent — breakpoint fires and auto-resumes
+ * await orchestrator.run("test input");
+ * expect(simulator.hits).toHaveLength(1);
+ * ```
+ */
+/** Minimal interface for breakpoint-capable orchestrators */
+export interface BreakpointCapable {
+  resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;
+  cancelBreakpoint(id: string, reason?: string): void;
+}
+
+export function createBreakpointSimulator(
+  options: BreakpointSimulatorOptions = {},
+): {
+  handler: (request: BreakpointRequest) => void;
+  hits: BreakpointRequest[];
+  attachTo: (orchestrator: BreakpointCapable) => void;
+} {
+  const hits: BreakpointRequest[] = [];
+  let orchestratorRef: BreakpointCapable | null = null;
+  let attached = false;
+
+  const handler = (request: BreakpointRequest) => {
+    hits.push(request);
+
+    if (!attached) {
+      throw new Error(
+        "[Directive] BreakpointSimulator: handler called but attachTo() was never called. " +
+        "Breakpoints will not be resolved. Call simulator.attachTo(orchestrator) after creation."
+      );
+    }
+
+    const delay = options.autoResumeDelay ?? 0;
+
+    const doResolve = () => {
+      if (!orchestratorRef) {
+        return;
+      }
+      if (options.cancel) {
+        orchestratorRef.cancelBreakpoint(request.id, options.cancelReason);
+      } else {
+        orchestratorRef.resumeBreakpoint(request.id, options.modifications);
+      }
+    };
+
+    if (delay > 0) {
+      setTimeout(doResolve, delay);
+    } else {
+      // Use queueMicrotask so the breakpoint state is written before we resolve
+      queueMicrotask(doResolve);
+    }
+  };
+
+  return {
+    handler,
+    hits,
+    attachTo: (orch: BreakpointCapable) => {
+      orchestratorRef = orch;
+      attached = true;
+    },
+  };
+}
+
+/**
+ * Assert that a breakpoint was hit with expected properties.
+ */
+export function assertBreakpointHit(
+  hits: BreakpointRequest[],
+  expected: {
+    type?: string;
+    agentId?: string;
+    count?: number;
+  },
+): void {
+  if (expected.count !== undefined && hits.length !== expected.count) {
+    throw new Error(
+      `Expected ${expected.count} breakpoint hits, got ${hits.length}`
+    );
+  }
+
+  if (expected.type) {
+    const found = hits.some((h) => h.type === expected.type);
+    if (!found) {
+      const types = hits.map((h) => h.type).join(", ");
+
+      throw new Error(
+        `Expected breakpoint of type "${expected.type}", found types: [${types}]`
+      );
+    }
+  }
+
+  if (expected.agentId) {
+    const found = hits.some((h) => h.agentId === expected.agentId);
+    if (!found) {
+      const agents = hits.map((h) => h.agentId).join(", ");
+
+      throw new Error(
+        `Expected breakpoint for agent "${expected.agentId}", found agents: [${agents}]`
+      );
+    }
+  }
+}
+
+// ============================================================================
+// Structured Output Test Helpers
+// ============================================================================
+
+/**
+ * Create a mock SafeParseable schema for testing.
+ *
+ * @example
+ * ```typescript
+ * const schema = createMockSchema((data) => typeof data === "object" && data !== null);
+ * const orchestrator = createAgentOrchestrator({
+ *   runner,
+ *   outputSchema: schema,
+ * });
+ * ```
+ */
+export function createMockSchema<T>(
+  validate: (data: unknown) => boolean,
+  description?: string,
+): { safeParse: (data: unknown) => { success: boolean; data?: T; error?: { message: string } }; description?: string } {
+  return {
+    safeParse: (data: unknown) => {
+      if (validate(data)) {
+        return { success: true, data: data as T };
+      }
+
+      return { success: false, error: { message: "Validation failed" } };
+    },
+    description,
+  };
+}
+
+// ============================================================================
+// Multiplexed Stream Test Helpers
+// ============================================================================
+
+/**
+ * Collect all chunks from a multiplexed stream into an array.
+ *
+ * @example
+ * ```typescript
+ * const { stream } = orchestrator.runParallelStream(["a", "b"], "input", merge);
+ * const chunks = await collectMultiplexedStream(stream);
+ * expect(chunks.length).toBeGreaterThan(0);
+ * ```
+ */
+export async function collectMultiplexedStream(
+  stream: AsyncIterable<MultiplexedStreamChunk>,
+): Promise<MultiplexedStreamChunk[]> {
+  const chunks: MultiplexedStreamChunk[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+
+  return chunks;
+}
+
+/**
+ * Assert properties of collected multiplexed stream chunks.
+ */
+export function assertMultiplexedStream(
+  chunks: MultiplexedStreamChunk[],
+  expected: {
+    agentIds?: string[];
+    minChunks?: number;
+    hasDone?: boolean;
+    hasErrors?: boolean;
+  },
+): void {
+  if (expected.minChunks !== undefined && chunks.length < expected.minChunks) {
+    throw new Error(
+      `Expected at least ${expected.minChunks} chunks, got ${chunks.length}`
+    );
+  }
+
+  if (expected.agentIds) {
+    const seenAgents = new Set(chunks.map((c) => c.agentId));
+    for (const agentId of expected.agentIds) {
+      if (!seenAgents.has(agentId)) {
+        throw new Error(
+          `Expected chunks from agent "${agentId}", found agents: [${[...seenAgents].join(", ")}]`
+        );
+      }
+    }
+  }
+
+  if (expected.hasDone === true) {
+    const hasDone = chunks.some((c) => c.chunk.type === "done");
+    if (!hasDone) {
+      throw new Error("Expected at least one 'done' chunk, found none");
+    }
+  }
+
+  if (expected.hasErrors === true) {
+    const hasError = chunks.some((c) => c.chunk.type === "error");
+    if (!hasError) {
+      throw new Error("Expected at least one 'error' chunk, found none");
+    }
+  }
+
+  if (expected.hasErrors === false) {
+    const hasError = chunks.some((c) => c.chunk.type === "error");
+    if (hasError) {
+      throw new Error("Expected no 'error' chunks, but found some");
+    }
+  }
+}
+
+// ============================================================================
+// Reflection Test Helpers
+// ============================================================================
+
+/**
+ * Create a test reflection evaluator that passes after N iterations.
+ *
+ * @example
+ * ```typescript
+ * const evaluator = createTestReflectionEvaluator({ passAfter: 2 });
+ * const reflective = withReflection(runner, { evaluate: evaluator });
+ * ```
+ */
+export function createTestReflectionEvaluator(options?: {
+  /** Pass after this many evaluations (1 = pass on first try). Default: 1 */
+  passAfter?: number;
+  /** Feedback to provide on failure */
+  feedback?: string;
+  /** Score to assign (0-1) */
+  score?: number;
+}): ReflectionEvaluator {
+  const passAfter = options?.passAfter ?? 1;
+  const feedback = options?.feedback ?? "Needs improvement";
+  const score = options?.score;
+  let callCount = 0;
+
+  return (_output: unknown, _context) => {
+    callCount++;
+    const passed = callCount >= passAfter;
+
+    return {
+      passed,
+      feedback: passed ? undefined : feedback,
+      score: score ?? (passed ? 1 : 0.5),
+    };
+  };
+}
+
+// ============================================================================
+// Scratchpad Test Helpers
+// ============================================================================
+
+/**
+ * Assert that a scratchpad contains expected values.
+ *
+ * @example
+ * ```typescript
+ * assertScratchpadState(orchestrator.scratchpad!, {
+ *   "plan.status": "complete",
+ *   "research.results": expect.any(Array),
+ * });
+ * ```
+ */
+export function assertScratchpadState(
+  scratchpad: Scratchpad,
+  expected: Record<string, unknown>,
+): void {
+  const all = scratchpad.getAll();
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    const actual = all[key];
+    if (actual !== expectedValue) {
+      throw new Error(
+        `Expected scratchpad key "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
+      );
+    }
+  }
+}
+
+// ============================================================================
+// Derivation Test Helpers
+// ============================================================================
+
+/**
+ * Assert that derived values match expected values.
+ *
+ * @example
+ * ```typescript
+ * assertDerivedValues(orchestrator, {
+ *   totalRuns: 3,
+ *   allComplete: true,
+ * });
+ * ```
+ */
+export function assertDerivedValues(
+  orchestrator: MultiAgentOrchestrator,
+  expected: Record<string, unknown>,
+): void {
+  const derived = orchestrator.derived;
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    const actual = derived[key];
+    if (typeof expectedValue === "object" && expectedValue !== null) {
+      if (JSON.stringify(actual) !== JSON.stringify(expectedValue)) {
+        throw new Error(
+          `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
+        );
+      }
+    } else if (actual !== expectedValue) {
+      throw new Error(
+        `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
+      );
+    }
   }
 }

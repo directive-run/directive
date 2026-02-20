@@ -46,6 +46,7 @@ import type {
 import {
   GuardrailError,
   APPROVAL_KEY,
+  BREAKPOINT_KEY,
   orchestratorBridgeSchema,
 } from "./types.js";
 
@@ -66,10 +67,17 @@ import {
   setConversation,
   getToolCalls,
   setToolCalls,
+  getBreakpointState,
+  setBreakpointState,
   getOrchestratorState,
   convertOrchestratorConstraints,
   convertOrchestratorResolvers,
 } from "./orchestrator-bridge.js";
+
+import { withStructuredOutput, type SafeParseable } from "./structured-output.js";
+import { createCheckpointId, validateCheckpoint, type Checkpoint, type CheckpointStore } from "./checkpoint.js";
+import type { BreakpointConfig, BreakpointRequest, BreakpointModifications, BreakpointContext } from "./breakpoints.js";
+import { matchBreakpoint, createBreakpointId, MAX_BREAKPOINT_HISTORY } from "./breakpoints.js";
 
 // Bridge accessors and constraint/resolver converters imported from orchestrator-bridge.ts
 
@@ -153,6 +161,31 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   circuitBreaker?: CircuitBreaker;
   /** Self-healing configuration for automatic fallback */
   selfHealing?: SelfHealingConfig;
+  /**
+   * Default schema for structured output. When set, agent output is parsed and
+   * validated against this schema with automatic retry on failure.
+   * Any Zod-compatible schema (anything with `safeParse`) works.
+   */
+  outputSchema?: SafeParseable<unknown>;
+  /**
+   * Max retries for structured output parsing.
+   * @default 2
+   */
+  maxSchemaRetries?: number;
+  /** Optional checkpoint store for save/restore workflow state. */
+  checkpointStore?: CheckpointStore;
+  /**
+   * Breakpoint configurations for human-in-the-loop pause points.
+   * Zero overhead when empty — guard checks at each insertion point.
+   */
+  breakpoints?: BreakpointConfig[];
+  /** Callback fired when a breakpoint is hit and waiting for resolution. */
+  onBreakpoint?: (req: BreakpointRequest) => void;
+  /**
+   * Timeout for breakpoint resolution in milliseconds.
+   * @default 300000 (5 minutes)
+   */
+  breakpointTimeoutMs?: number;
 }
 
 /** Streaming run result from orchestrator */
@@ -179,6 +212,10 @@ export interface RunCallOptions {
   inputGuardrails?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
   /** Signal for abort */
   signal?: AbortSignal;
+  /** Override structured output schema for this call. Set to `null` to opt out. */
+  outputSchema?: SafeParseable<unknown> | null;
+  /** Override max schema retries for this call. */
+  maxSchemaRetries?: number;
 }
 
 /** Orchestrator instance */
@@ -218,6 +255,16 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   reset(): void;
   /** Debug timeline (null when debug is false) */
   readonly timeline: DebugTimeline | null;
+  /** Create a checkpoint of the current orchestrator state. Only valid when agent is not running. */
+  checkpoint(options?: { label?: string }): Promise<Checkpoint>;
+  /** Restore orchestrator state from a checkpoint. */
+  restore(checkpoint: Checkpoint, options?: { restoreTimeline?: boolean }): void;
+  /** Resume a pending breakpoint, optionally with input modifications. */
+  resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;
+  /** Cancel a pending breakpoint with optional reason. */
+  cancelBreakpoint(id: string, reason?: string): void;
+  /** Get all currently pending breakpoint requests. */
+  getPendingBreakpoints(): BreakpointRequest[];
   /** Dispose of the orchestrator */
   dispose(): void;
 }
@@ -227,7 +274,7 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
 // ============================================================================
 
 /**
- * Create an orchestrator for OpenAI agents with Directive constraints.
+ * Create a constraint-driven agent orchestrator.
  *
  * @example
  * ```typescript
@@ -291,6 +338,12 @@ export function createAgentOrchestrator<
     memory,
     circuitBreaker,
     selfHealing,
+    outputSchema,
+    maxSchemaRetries,
+    checkpointStore,
+    breakpoints,
+    onBreakpoint,
+    breakpointTimeoutMs,
   } = options;
 
   // Warn if selfHealing is configured without circuitBreaker (selfHealing only triggers in CB error path)
@@ -389,9 +442,9 @@ export function createAgentOrchestrator<
   directiveResolvers["__pause"] = {
     requirement: requirementGuard<PauseBudgetExceededReq>("__PAUSE_BUDGET_EXCEEDED"),
     // biome-ignore lint/suspicious/noExplicitAny: Context type varies
-    resolve: async (_req: Requirement, ctx: any) => {
-      const currentAgent = getAgentState(ctx.facts);
-      setAgentState(ctx.facts, {
+    resolve: async (_req: Requirement, context: any) => {
+      const currentAgent = getAgentState(context.facts);
+      setAgentState(context.facts, {
         ...currentAgent,
         status: "paused",
       });
@@ -448,6 +501,7 @@ export function createAgentOrchestrator<
       });
       setConversation(facts, []);
       setToolCalls(facts, []);
+      setBreakpointState(facts, { pending: [], resolved: [], cancelled: [] });
       if (init) {
         const state = getOrchestratorState(facts);
         const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
@@ -602,6 +656,24 @@ export function createAgentOrchestrator<
       });
     }
 
+    // Breakpoint: pre_input_guardrails
+    if (breakpoints && breakpoints.length > 0) {
+      const bpContext: BreakpointContext = {
+        agentId: agent.name,
+        agentName: agent.name,
+        input,
+        state: system.facts.$store.toObject(),
+        breakpointType: "pre_input_guardrails",
+      };
+      const mods = await handleBreakpoint("pre_input_guardrails", bpContext, callOptions?.signal ?? opts?.signal);
+      if (mods?.skip) {
+        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+      }
+      if (mods?.input) {
+        input = mods.input;
+      }
+    }
+
     // Resolve which guardrails to use: per-call override > orchestrator defaults
     const effectiveInputGuardrails = callOptions?.inputGuardrails !== undefined
       ? callOptions.inputGuardrails
@@ -664,8 +736,39 @@ export function createAgentOrchestrator<
       });
     });
 
+    // Breakpoint: pre_agent_run
+    if (breakpoints && breakpoints.length > 0) {
+      const bpContext: BreakpointContext = {
+        agentId: agent.name,
+        agentName: agent.name,
+        input,
+        state: system.facts.$store.toObject(),
+        breakpointType: "pre_agent_run",
+      };
+      const mods = await handleBreakpoint("pre_agent_run", bpContext, callOptions?.signal ?? opts?.signal);
+      if (mods?.skip) {
+        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+      }
+      if (mods?.input) {
+        input = mods.input;
+      }
+    }
+
+    // Structured output wrapping
+    const effectiveSchema = callOptions?.outputSchema !== undefined
+      ? callOptions.outputSchema
+      : outputSchema;
+
+    let effectiveRunner = runner;
+    if (effectiveSchema) {
+      effectiveRunner = withStructuredOutput(runner, {
+        schema: effectiveSchema,
+        maxRetries: callOptions?.maxSchemaRetries ?? maxSchemaRetries ?? 2,
+      });
+    }
+
     // Run the agent with retry support
-    const result = await executeAgentWithRetry<T>(runner, agent, input, {
+    const result = await executeAgentWithRetry<T>(effectiveRunner, agent, input, {
       ...opts,
       signal: opts?.signal,
       onMessage: (message) => {
@@ -757,6 +860,24 @@ export function createAgentOrchestrator<
         });
       },
     } : undefined);
+
+    // Breakpoint: pre_output_guardrails
+    if (breakpoints && breakpoints.length > 0) {
+      const bpContext: BreakpointContext = {
+        agentId: agent.name,
+        agentName: agent.name,
+        input,
+        state: system.facts.$store.toObject(),
+        breakpointType: "pre_output_guardrails",
+      };
+      const mods = await handleBreakpoint("pre_output_guardrails", bpContext, callOptions?.signal ?? opts?.signal);
+      if (mods?.skip) {
+        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+      }
+      if (mods?.input) {
+        input = mods.input;
+      }
+    }
 
     // Run output guardrails with retry support
     const outputGuardrailsList = effectiveOutputGuardrails.map((g, i) =>
@@ -851,11 +972,165 @@ export function createAgentOrchestrator<
       });
     }
 
+    // Breakpoint: post_run
+    if (breakpoints && breakpoints.length > 0) {
+      const bpContext: BreakpointContext = {
+        agentId: agent.name,
+        agentName: agent.name,
+        input,
+        state: system.facts.$store.toObject(),
+        breakpointType: "post_run",
+      };
+      const mods = await handleBreakpoint("post_run", bpContext, callOptions?.signal ?? opts?.signal);
+      if (mods?.skip) {
+        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+      }
+      if (mods?.input) {
+        input = mods.input;
+      }
+    }
+
     return result;
   }
 
   // Assign the function to the forward-declared variable
   runAgentWithGuardrailsFn = runAgentWithGuardrails;
+
+  // ---- Breakpoint infrastructure ----
+  const breakpointModifications = new Map<string, BreakpointModifications>();
+  const breakpointCancelReasons = new Map<string, string>();
+
+  function waitForBreakpointResolution(bpId: string, signal?: AbortSignal): Promise<BreakpointModifications | null> {
+    if (signal?.aborted) {
+      return Promise.reject(signal.reason ?? new Error("Aborted while waiting for breakpoint"));
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      const cleanupAll = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        if (signal) {
+          signal.removeEventListener("abort", onAbort);
+        }
+        unsubscribe();
+      };
+
+      const onAbort = () => {
+        cleanupAll();
+        reject(signal!.reason ?? new Error(`Breakpoint wait for ${bpId} aborted`));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      const unsubscribe = system.facts.$store.subscribe([BREAKPOINT_KEY], () => {
+        if (settled) {
+          return;
+        }
+
+        const bpState = getBreakpointState(system.facts);
+        if (bpState.resolved.includes(bpId)) {
+          cleanupAll();
+          const mods = breakpointModifications.get(bpId) ?? null;
+          breakpointModifications.delete(bpId);
+          resolve(mods);
+        } else if (bpState.cancelled.includes(bpId)) {
+          cleanupAll();
+          breakpointModifications.delete(bpId);
+          const cancelReason = breakpointCancelReasons.get(bpId);
+          breakpointCancelReasons.delete(bpId);
+          reject(new Error(cancelReason ? `Breakpoint ${bpId} was cancelled: ${cancelReason}` : `Breakpoint ${bpId} was cancelled`));
+        }
+      });
+
+      const bpTimeout = breakpointTimeoutMs ?? 300000;
+      timeoutId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+
+        cleanupAll();
+        breakpointModifications.delete(bpId);
+        breakpointCancelReasons.delete(bpId);
+        reject(new Error(`[Directive] Breakpoint timeout: ${bpId} not resolved within ${Math.round(bpTimeout / 1000)}s`));
+      }, bpTimeout);
+    });
+  }
+
+  async function handleBreakpoint(
+    type: string,
+    context: BreakpointContext,
+    signal?: AbortSignal,
+  ): Promise<BreakpointModifications | null> {
+    if (!breakpoints || breakpoints.length === 0) {
+      return null;
+    }
+
+    const match = matchBreakpoint(breakpoints as BreakpointConfig<string>[], type, context);
+    if (!match) {
+      return null;
+    }
+
+    const bpId = createBreakpointId();
+    const request: BreakpointRequest = {
+      id: bpId,
+      type,
+      agentId: context.agentId,
+      input: context.input,
+      label: match.label,
+      requestedAt: Date.now(),
+    };
+
+    system.batch(() => {
+      const bpState = getBreakpointState(system.facts);
+      setBreakpointState(system.facts, {
+        ...bpState,
+        pending: [...bpState.pending, request],
+      });
+    });
+
+    try { onBreakpoint?.(request); } catch { /* non-fatal */ }
+    try { hooks.onBreakpoint?.(request); } catch { /* non-fatal */ }
+
+    if (timeline) {
+      timeline.record({
+        type: "breakpoint_hit",
+        timestamp: Date.now(),
+        snapshotId: null,
+        agentId: context.agentId,
+        breakpointId: bpId,
+        breakpointType: type,
+        label: match.label,
+      });
+    }
+
+    const mods = await waitForBreakpointResolution(bpId, signal);
+
+    if (timeline) {
+      timeline.record({
+        type: "breakpoint_resumed",
+        timestamp: Date.now(),
+        snapshotId: null,
+        agentId: context.agentId,
+        breakpointId: bpId,
+        modified: !!mods?.input,
+        skipped: !!mods?.skip,
+      });
+    }
+
+    return mods;
+  }
 
   // Wait for approval with configurable timeout and abort signal support
   function waitForApproval(requestId: string, signal?: AbortSignal): Promise<void> {
@@ -1343,7 +1618,100 @@ export function createAgentOrchestrator<
         });
         setConversation(system.facts, []);
         setToolCalls(system.facts, []);
+        setBreakpointState(system.facts, { pending: [], resolved: [], cancelled: [] });
       });
+      breakpointModifications.clear();
+      breakpointCancelReasons.clear();
+    },
+
+    async checkpoint(cpOptions?: { label?: string }): Promise<Checkpoint> {
+      const agentState = getAgentState(system.facts);
+      if (agentState.status === "running") {
+        throw new Error("[Directive] Cannot checkpoint while agent is running");
+      }
+      if (!system.debug?.export) {
+        throw new Error(
+          "[Directive] Checkpointing requires debug mode. Set `debug: true` in orchestrator options."
+        );
+      }
+
+      const cp: Checkpoint = {
+        version: 1,
+        id: createCheckpointId(),
+        createdAt: new Date().toISOString(),
+        label: cpOptions?.label,
+        systemExport: system.debug.export(),
+        timelineExport: timeline?.export() ?? null,
+        localState: { type: "single" },
+        memoryExport: memory ? (memory as any).export?.() ?? null : null,
+        orchestratorType: "single",
+      };
+
+      if (checkpointStore) {
+        await checkpointStore.save(cp);
+      }
+
+      return cp;
+    },
+
+    restore(cp: Checkpoint, restoreOpts?: { restoreTimeline?: boolean }): void {
+      if (!validateCheckpoint(cp)) {
+        throw new Error("[Directive] Invalid checkpoint data");
+      }
+      if (cp.orchestratorType !== "single") {
+        throw new Error("[Directive] Cannot restore multi-agent checkpoint in single-agent orchestrator");
+      }
+      if (!system.debug?.import) {
+        throw new Error(
+          "[Directive] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options."
+        );
+      }
+
+      system.debug.import(cp.systemExport);
+
+      if (restoreOpts?.restoreTimeline !== false && cp.timelineExport && timeline) {
+        timeline.import(cp.timelineExport);
+      }
+
+      if (cp.memoryExport !== null && memory && (memory as any).import) {
+        (memory as any).import(cp.memoryExport);
+      }
+    },
+
+    resumeBreakpoint(id: string, modifications?: BreakpointModifications): void {
+      if (modifications) {
+        breakpointModifications.set(id, modifications);
+      }
+      system.batch(() => {
+        const bpState = getBreakpointState(system.facts);
+        const resolved = [...bpState.resolved, id];
+        setBreakpointState(system.facts, {
+          ...bpState,
+          pending: bpState.pending.filter((r) => r.id !== id),
+          resolved: resolved.length > MAX_BREAKPOINT_HISTORY ? resolved.slice(-MAX_BREAKPOINT_HISTORY) : resolved,
+        });
+      });
+    },
+
+    cancelBreakpoint(id: string, reason?: string): void {
+      if (reason) {
+        breakpointCancelReasons.set(id, reason);
+      }
+      system.batch(() => {
+        const bpState = getBreakpointState(system.facts);
+        const cancelled = [...bpState.cancelled, id];
+        setBreakpointState(system.facts, {
+          ...bpState,
+          pending: bpState.pending.filter((r) => r.id !== id),
+          cancelled: cancelled.length > MAX_BREAKPOINT_HISTORY ? cancelled.slice(-MAX_BREAKPOINT_HISTORY) : cancelled,
+        });
+      });
+    },
+
+    getPendingBreakpoints(): BreakpointRequest[] {
+      const bpState = getBreakpointState(system.facts);
+
+      return [...bpState.pending];
     },
 
     dispose(): void {
