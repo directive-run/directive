@@ -17,6 +17,9 @@ import type { DebugEvent, DebugEventType } from "./types.js";
 // Types
 // ============================================================================
 
+/** Callback fired when a new event is recorded */
+export type DebugTimelineListener = (event: DebugEvent) => void;
+
 /** Debug timeline instance */
 export interface DebugTimeline {
   /** Record a new event (id is auto-assigned) */
@@ -39,13 +42,15 @@ export interface DebugTimeline {
   import(json: string): void;
   /** Clear all events */
   clear(): void;
+  /** Subscribe to new events. Returns unsubscribe function. */
+  subscribe(listener: DebugTimelineListener): () => void;
   /** Current number of events */
   readonly length: number;
 }
 
 /** Options for creating a debug timeline */
 export interface DebugTimelineOptions {
-  /** Maximum events before eviction. Default: 500 */
+  /** Maximum events before eviction. @default 2000 */
   maxEvents?: number;
   /** Callback to get current snapshot ID from the system */
   getSnapshotId?: () => number | null;
@@ -85,20 +90,36 @@ const BLOCKED_IMPORT_KEYS = new Set([
  * ```
  */
 export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTimeline {
-  const maxEvents = options.maxEvents ?? 500;
+  const maxEvents = options.maxEvents ?? 2000;
   const goToSnapshot = options.goToSnapshot;
+
+  // Validate config
+  if (!Number.isFinite(maxEvents) || maxEvents < 1) {
+    throw new Error("[Directive DebugTimeline] maxEvents must be >= 1");
+  }
 
   let events: DebugEvent[] = [];
   let nextId = 0;
+  const listeners = new Set<DebugTimelineListener>();
 
   const timeline: DebugTimeline = {
     record(event: Omit<DebugEvent, "id">): DebugEvent {
       const fullEvent = { ...event, id: nextId++ } as DebugEvent;
       events.push(fullEvent);
 
-      // Ring buffer eviction
-      while (events.length > maxEvents) {
-        events.shift();
+      // Batch eviction — single splice instead of per-element shift
+      const overflow = events.length - maxEvents;
+      if (overflow > 0) {
+        events.splice(0, overflow);
+      }
+
+      // Notify listeners
+      for (const listener of listeners) {
+        try {
+          listener(fullEvent);
+        } catch {
+          // Listener errors must not break recording
+        }
       }
 
       return fullEvent;
@@ -193,13 +214,22 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
         }
       }
 
-      events = validated;
+      // Enforce maxEvents cap on imported data
+      events = validated.length > maxEvents ? validated.slice(-maxEvents) : validated;
       nextId = typeof data.nextId === "number" ? data.nextId : validated.length;
     },
 
     clear(): void {
       events = [];
       nextId = 0;
+    },
+
+    subscribe(listener: DebugTimelineListener): () => void {
+      listeners.add(listener);
+
+      return () => {
+        listeners.delete(listener);
+      };
     },
 
     get length(): number {

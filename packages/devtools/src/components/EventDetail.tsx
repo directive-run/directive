@@ -1,0 +1,135 @@
+import type { DebugEvent } from "../lib/types";
+import { EVENT_COLORS, getEventCategory } from "../lib/colors";
+
+interface EventDetailProps {
+  event: DebugEvent;
+  onClose: () => void;
+}
+
+function formatTimestamp(ts: number): string {
+  const date = new Date(ts);
+
+  return date.toLocaleTimeString(undefined, { hour12: false, fractionalSecondDigits: 3 });
+}
+
+/** Extract all meaningful properties from an event */
+function getEventProperties(event: DebugEvent): [string, unknown][] {
+  const skip = new Set(["id", "type", "timestamp", "snapshotId", "agentId"]);
+  const entries: [string, unknown][] = [];
+
+  for (const [key, value] of Object.entries(event)) {
+    if (!skip.has(key) && value !== undefined && value !== null) {
+      entries.push([key, value]);
+    }
+  }
+
+  return entries;
+}
+
+function PropertyValue({ value }: { value: unknown }) {
+  if (typeof value === "boolean") {
+    return (
+      <span className={value ? "text-emerald-400" : "text-red-400"}>
+        {String(value)}
+      </span>
+    );
+  }
+
+  if (typeof value === "number") {
+    return <span className="text-blue-400">{value.toLocaleString()}</span>;
+  }
+
+  if (typeof value === "string") {
+    return (
+      <span className="text-amber-300 break-all">
+        {value.length > 200 ? `${value.slice(0, 200)}...` : value}
+      </span>
+    );
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      <span className="text-zinc-400">
+        [{value.map((v, i) => (
+          <span key={i}>
+            {i > 0 && ", "}
+            <PropertyValue value={v} />
+          </span>
+        ))}]
+      </span>
+    );
+  }
+
+  return <span className="text-zinc-400">{JSON.stringify(value)}</span>;
+}
+
+export function EventDetail({ event, onClose }: EventDetailProps) {
+  const properties = getEventProperties(event);
+  const color = EVENT_COLORS[event.type];
+  const category = getEventCategory(event.type);
+
+  return (
+    <div className="p-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-block h-3 w-3 rounded-sm"
+              style={{ backgroundColor: color }}
+            />
+            <span className="text-sm font-semibold text-zinc-100">
+              {event.type.replace(/_/g, " ")}
+            </span>
+          </div>
+          <div className="mt-1 text-xs text-zinc-500">
+            {category} &middot; ID #{event.id}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Metadata */}
+      <div className="mt-4 space-y-2 text-xs">
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Time</span>
+          <span className="text-zinc-300 font-mono">{formatTimestamp(event.timestamp)}</span>
+        </div>
+
+        {event.agentId && (
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Agent</span>
+            <span className="text-zinc-300 font-mono">{event.agentId}</span>
+          </div>
+        )}
+
+        {event.snapshotId != null && (
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Snapshot</span>
+            <span className="text-zinc-300 font-mono">#{event.snapshotId}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Properties */}
+      {properties.length > 0 && (
+        <div className="mt-4">
+          <h3 className="mb-2 text-xs font-medium text-zinc-400">Properties</h3>
+          <div className="space-y-1.5">
+            {properties.map(([key, value]) => (
+              <div key={key} className="text-xs">
+                <span className="text-zinc-500">{key}: </span>
+                <PropertyValue value={value} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -21,7 +21,7 @@
  *   constraints: {
  *     needsExpertReview: {
  *       when: (facts) => facts.decision.confidence < 0.7,
- *       require: { type: 'EXPERT_AGENT', query: facts.userQuery }
+ *       require: (facts) => ({ type: 'EXPERT_AGENT', query: facts.userQuery })
  *     },
  *     budgetLimit: {
  *       when: (facts) => facts.tokenUsage > 10000,
@@ -104,7 +104,26 @@ export type {
   HealthMonitorConfig,
   SelfHealingConfig,
   MultiAgentSelfHealingConfig,
+  AgentCircuitBreakerConfig,
+  // Breakpoint event types
+  BreakpointHitEvent,
+  BreakpointResumedEvent,
+  // Cross-agent derivation types
+  CrossAgentSnapshot,
+  CrossAgentDerivationFn,
+  // Scratchpad types
+  Scratchpad,
+  // New debug event types
+  DerivationUpdateEvent,
+  ScratchpadUpdateEvent,
+  ReflectionIterationEvent,
+  RaceStartEvent,
+  RaceWinnerEvent,
+  RaceCancelledEvent,
+  DebateRoundEvent,
 } from "./types.js";
+
+export { SCRATCHPAD_KEY } from "./types.js";
 
 export { GuardrailError, isGuardrailError } from "./types.js";
 
@@ -207,6 +226,10 @@ export {
   type StreamingGuardrail,
   type StreamingGuardrailResult,
   type BackpressureStrategy,
+  type MultiplexedStreamChunk,
+  type MultiplexedStreamResult,
+  type MergedTaggedStreamResult,
+  mergeTaggedStreams,
 } from "./streaming.js";
 
 // Multi-agent orchestration
@@ -217,6 +240,10 @@ export {
   sequential,
   supervisor,
   dag,
+  reflect,
+  race,
+  debate,
+  runDebate,
   selectAgent,
   runAgentRequirement,
   concatResults,
@@ -226,6 +253,9 @@ export {
   composePatterns,
   findAgentsByCapability,
   capabilityRoute,
+  spawnOnCondition,
+  derivedConstraint,
+  spawnPool,
   type MultiAgentOrchestrator,
   type MultiAgentOrchestratorOptions,
   type MultiAgentState,
@@ -235,9 +265,20 @@ export {
   type ParallelPattern,
   type SequentialPattern,
   type SupervisorPattern,
+  type ReflectPattern,
+  type RacePattern,
+  type RaceResult,
+  type RaceSuccessEntry,
+  type ReflectIterationRecord,
+  type DebateConfig,
+  type DebateResult,
+  type DebatePattern,
+  type SpawnOnConditionOptions,
+  type SpawnPoolConfig,
   type HandoffRequest,
   type HandoffResult,
   type RunAgentRequirement,
+  type MultiAgentRunCallOptions,
 } from "./multi-agent-orchestrator.js";
 
 // Agent communication
@@ -296,6 +337,7 @@ export {
   type CircuitBreaker,
   type CircuitBreakerConfig,
   type CircuitBreakerStats,
+  /** @see HealthCircuitState — health-monitor-specific circuit state */
   type CircuitState,
 } from "@directive-run/core/plugins";
 
@@ -395,7 +437,7 @@ export {
   type SSETransport,
 } from "./sse-transport.js";
 
-// P2: Intelligent Retry
+// Intelligent Retry
 export {
   withRetry,
   parseHttpStatus,
@@ -404,14 +446,14 @@ export {
   type RetryConfig,
 } from "./retry.js";
 
-// P0: Provider Fallback
+// Provider Fallback
 export {
   withFallback,
   AllProvidersFailedError,
   type FallbackConfig,
 } from "./fallback.js";
 
-// P1: Cost Budget Guards
+// Cost Budget Guards
 export {
   withBudget,
   BudgetExceededError,
@@ -422,7 +464,7 @@ export {
   type BudgetExceededDetails,
 } from "./budget.js";
 
-// P3: Smart Model Selection
+// Smart Model Selection
 export {
   withModelSelection,
   byInputLength,
@@ -432,7 +474,7 @@ export {
   type ModelSelectionConfig,
 } from "./model-selector.js";
 
-// P6: Structured Outputs
+// Structured Outputs
 export {
   withStructuredOutput,
   extractJsonFromOutput,
@@ -442,14 +484,14 @@ export {
   type SafeParseResult,
 } from "./structured-output.js";
 
-// P5: Batch Queue
+// Batch Queue
 export {
   createBatchQueue,
   type BatchQueue,
   type BatchQueueConfig,
 } from "./batch.js";
 
-// P4: Constraint-Driven Provider Routing
+// Constraint-Driven Provider Routing
 export {
   createConstraintRouter,
   type ConstraintRouterConfig,
@@ -466,6 +508,7 @@ export {
   createDebugTimelinePlugin,
   type DebugTimeline,
   type DebugTimelineOptions,
+  type DebugTimelineListener,
 } from "./debug-timeline.js";
 
 // Health Monitor
@@ -473,8 +516,80 @@ export {
   createHealthMonitor,
   type HealthMonitor,
   type AgentHealthMetrics,
-  type CircuitState as HealthCircuitState,
+  /** @see CircuitState — core circuit breaker state */
+  type HealthCircuitState,
 } from "./health-monitor.js";
+
+// DevTools Server
+export {
+  createDevToolsServer,
+  createWsTransport,
+  connectDevTools,
+  type DevToolsServer,
+  type DevToolsServerConfig,
+  type DevToolsClient,
+  type DevToolsTransport,
+  type DevToolsServerMessage,
+  type DevToolsClientMessage,
+  type DevToolsSnapshot,
+  type WsTransportConfig,
+  type ConnectDevToolsOptions,
+  type DevToolsCompatibleOrchestrator,
+} from "./devtools-server.js";
+
+// Checkpointing
+export {
+  createCheckpointId,
+  validateCheckpoint,
+  InMemoryCheckpointStore,
+  type Checkpoint,
+  type CheckpointStore,
+  type CheckpointLocalState,
+  type SingleAgentCheckpointLocalState,
+  type MultiAgentCheckpointLocalState,
+  type InMemoryCheckpointStoreOptions,
+} from "./checkpoint.js";
+
+// Breakpoints
+export {
+  matchBreakpoint,
+  createBreakpointId,
+  createInitialBreakpointState,
+  MAX_BREAKPOINT_HISTORY,
+  type BreakpointType,
+  type MultiAgentBreakpointType,
+  type BreakpointConfig,
+  type BreakpointContext,
+  type BreakpointRequest,
+  type BreakpointModifications,
+  type BreakpointState,
+} from "./breakpoints.js";
+
+// Reflection
+export {
+  withReflection,
+  ReflectionExhaustedError,
+  type ReflectionConfig,
+  type ReflectionContext,
+  type ReflectionEvaluation,
+  type ReflectionEvaluator,
+} from "./reflection.js";
+
+// Goal-Driven Coordination
+export {
+  createGoalEngine,
+  buildDependencyGraph,
+  type GoalAgentDeclaration,
+  type GoalDefinition,
+  type ConvergenceResult,
+  type DependencyEdge,
+  type DependencyGraph,
+  type GoalEngineConfig,
+  type GoalEngine,
+  type GoalValidationResult,
+  type PlanStep,
+  type ExecutionPlan,
+} from "./goals.js";
 
 // MCP (Model Context Protocol)
 export {
@@ -500,3 +615,49 @@ export type {
   MCPSyncResourcesRequirement,
   MCPRequirement,
 } from "./mcp-types.js";
+
+// Evaluation Framework
+export {
+  createEvalSuite,
+  evalCost,
+  evalLatency,
+  evalOutputLength,
+  evalSafety,
+  evalStructure,
+  evalMatch,
+  evalJudge,
+  evalFaithfulness,
+  evalRelevance,
+  evalCoherence,
+  evalAssert,
+  type EvalCase,
+  type EvalScore,
+  type EvalContext,
+  type EvalCriterionFn,
+  type EvalCriterion,
+  type EvalCaseResult,
+  type EvalAgentSummary,
+  type EvalResults,
+  type EvalSuiteConfig,
+  type EvalSuite,
+  type EvalCostOptions,
+  type EvalLatencyOptions,
+  type EvalOutputLengthOptions,
+  type EvalSafetyOptions,
+  type EvalStructureOptions,
+  type EvalJudgeOptions,
+  type EvalMatchOptions,
+  type EvalSemanticOptions,
+  type EvalAssertOptions,
+} from "./evals.js";
+
+// OpenTelemetry Integration
+export {
+  createOtelPlugin,
+  OtelStatusCode,
+  type OtelSpan,
+  type OtelTracer,
+  type OtelPluginConfig,
+  type SpanData,
+  type OtelPlugin,
+} from "./otel.js";

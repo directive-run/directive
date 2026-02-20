@@ -40,14 +40,14 @@ describe("ring buffer overflow/eviction", () => {
     expect(events[2]!.agentId).toBe("a4");
   });
 
-  it("defaults to 500 maxEvents", () => {
+  it("defaults to 2000 maxEvents", () => {
     const timeline = createDebugTimeline();
 
-    for (let i = 0; i < 510; i++) {
+    for (let i = 0; i < 2010; i++) {
       timeline.record(makeEvent("agent_start", { agentId: `a${i}`, inputLength: i } as any));
     }
 
-    expect(timeline.length).toBe(500);
+    expect(timeline.length).toBe(2000);
   });
 
   it("handles maxEvents of 1", () => {
@@ -117,7 +117,7 @@ describe("getEventsForAgent() filtering", () => {
     const timeline = createTestTimeline([
       { type: "agent_start", agentId: "researcher", inputLength: 10 } as any,
       { type: "agent_start", agentId: "writer", inputLength: 20 } as any,
-      { type: "agent_complete", agentId: "researcher", outputLength: 50, durationMs: 100, tokenUsage: 200 } as any,
+      { type: "agent_complete", agentId: "researcher", outputLength: 50, durationMs: 100, totalTokens: 200 } as any,
     ]);
 
     const researcherEvents = timeline.getEventsForAgent("researcher");
@@ -154,7 +154,7 @@ describe("getEventsByType() type narrowing", () => {
     const timeline = createTestTimeline([
       { type: "agent_start", agentId: "a", inputLength: 10 } as any,
       { type: "guardrail_check", agentId: "a", guardrailName: "pii", guardrailType: "input", passed: true, durationMs: 5 } as any,
-      { type: "agent_complete", agentId: "a", outputLength: 50, durationMs: 100, tokenUsage: 200 } as any,
+      { type: "agent_complete", agentId: "a", outputLength: 50, durationMs: 100, totalTokens: 200 } as any,
     ]);
 
     const startEvents = timeline.getEventsByType("agent_start");
@@ -229,7 +229,7 @@ describe("getEventsAtSnapshot() correlation", () => {
     // but the plugin does. Verify the option is accepted.
     timeline.record({ type: "agent_start", timestamp: Date.now(), snapshotId: currentSnapshot, agentId: "a", inputLength: 1 } as Omit<DebugEvent, "id">);
     currentSnapshot = 10;
-    timeline.record({ type: "agent_complete", timestamp: Date.now(), snapshotId: currentSnapshot, agentId: "a", outputLength: 1, tokenUsage: 10, durationMs: 5 } as Omit<DebugEvent, "id">);
+    timeline.record({ type: "agent_complete", timestamp: Date.now(), snapshotId: currentSnapshot, agentId: "a", outputLength: 1, totalTokens: 10, durationMs: 5 } as Omit<DebugEvent, "id">);
 
     expect(timeline.getEventsAtSnapshot(5)).toHaveLength(1);
     expect(timeline.getEventsAtSnapshot(10)).toHaveLength(1);
@@ -327,7 +327,7 @@ describe("export()/import() roundtrip", () => {
   it("roundtrips events through export and import", () => {
     const timeline = createDebugTimeline();
     timeline.record(makeEvent("agent_start", { agentId: "a", timestamp: 1000, inputLength: 42 } as any));
-    timeline.record(makeEvent("agent_complete", { agentId: "a", timestamp: 2000, outputLength: 100, durationMs: 1000, tokenUsage: 200 } as any));
+    timeline.record(makeEvent("agent_complete", { agentId: "a", timestamp: 2000, outputLength: 100, durationMs: 1000, totalTokens: 200 } as any));
 
     const exported = timeline.export();
     const imported = createDebugTimeline();
@@ -430,7 +430,7 @@ describe("export()/import() roundtrip", () => {
 //       Remove .skip once orchestrator bridge schema is stabilized.
 // ============================================================================
 
-describe.skip("integration: single-agent events during run()", () => {
+describe("integration: single-agent events during run()", () => {
   it("records agent_start and agent_complete events", async () => {
     const orchestrator = createTestOrchestrator({
       debug: { timeTravel: true },
@@ -471,7 +471,7 @@ describe.skip("integration: single-agent events during run()", () => {
 
     const completeEvents = orchestrator.timeline!.getEventsByType("agent_complete");
     expect(completeEvents).toHaveLength(1);
-    expect(completeEvents[0]!.tokenUsage).toBe(75);
+    expect(completeEvents[0]!.totalTokens).toBe(75);
     expect(completeEvents[0]!.durationMs).toBeGreaterThanOrEqual(0);
   });
 });
@@ -481,7 +481,7 @@ describe.skip("integration: single-agent events during run()", () => {
 // NOTE: Skipped — orchestrator init has validation changes in progress.
 // ============================================================================
 
-describe.skip("integration: multi-agent events during run()", () => {
+describe("integration: multi-agent events during run()", () => {
   it("records agent-indexed events for individual agents", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       debug: { timeTravel: true },
@@ -532,7 +532,7 @@ describe.skip("integration: multi-agent events during run()", () => {
 // NOTE: Skipped — orchestrator init has validation changes in progress.
 // ============================================================================
 
-describe.skip("zero-cost when debug: false", () => {
+describe("zero-cost when debug: false", () => {
   it("timeline is null when debug option is not set", () => {
     const orchestrator = createTestOrchestrator({
       mockResponses: { "test-agent": { output: "ok" } },
@@ -568,7 +568,7 @@ describe.skip("zero-cost when debug: false", () => {
 // NOTE: Skipped — orchestrator init has validation changes in progress.
 // ============================================================================
 
-describe.skip("guardrail pass/fail events", () => {
+describe("guardrail pass/fail events", () => {
   it("records guardrail_check via lifecycle hooks (single-agent)", async () => {
     const guardrailEvents: Array<{ guardrailName: string; passed: boolean }> = [];
 
@@ -633,7 +633,7 @@ describe.skip("guardrail pass/fail events", () => {
 // NOTE: Skipped — orchestrator init has validation changes in progress.
 // ============================================================================
 
-describe.skip("approval events", () => {
+describe("approval events", () => {
   it("records approval_request on timeline (multi-agent)", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       debug: { timeTravel: true },
@@ -672,7 +672,7 @@ describe.skip("approval events", () => {
 // NOTE: Skipped — orchestrator init has validation changes in progress.
 // ============================================================================
 
-describe.skip("pattern events (multi-agent)", () => {
+describe("pattern events (multi-agent)", () => {
   it("records pattern_start and pattern_complete for parallel execution", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       debug: { timeTravel: true },
@@ -684,13 +684,16 @@ describe.skip("pattern events (multi-agent)", () => {
         a: { output: "result-a", totalTokens: 10 },
         b: { output: "result-b", totalTokens: 10 },
       },
+      patterns: {
+        par: {
+          type: "parallel",
+          agents: ["a", "b"],
+          merge: (results: any[]) => results.map((r: any) => r.output).join(", "),
+        },
+      },
     });
 
-    await orchestrator.runPattern({
-      type: "parallel",
-      agents: ["a", "b"],
-      merge: (results) => results.map((r) => r.output).join(", "),
-    }, "Go");
+    await orchestrator.runPattern("par", "Go");
 
     const timeline = orchestrator.timeline;
     expect(timeline).not.toBeNull();
@@ -714,13 +717,16 @@ describe.skip("pattern events (multi-agent)", () => {
         first: { output: "step-1", totalTokens: 10 },
         second: { output: "step-2", totalTokens: 10 },
       },
+      patterns: {
+        seq: {
+          type: "sequential",
+          agents: ["first", "second"],
+          transform: (_output: unknown, _agentId: string) => String(_output),
+        },
+      },
     });
 
-    await orchestrator.runPattern({
-      type: "sequential",
-      agents: ["first", "second"],
-      passThrough: (_output, _input) => String(_output),
-    }, "Start");
+    await orchestrator.runPattern("seq", "Start");
 
     const timeline = orchestrator.timeline;
     expect(timeline).not.toBeNull();
