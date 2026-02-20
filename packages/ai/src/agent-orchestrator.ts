@@ -81,6 +81,11 @@ import { matchBreakpoint, createBreakpointId, MAX_BREAKPOINT_HISTORY } from "./b
 
 // Bridge accessors and constraint/resolver converters imported from orchestrator-bridge.ts
 
+/** Maximum conversation messages retained (FIFO eviction) */
+const MAX_CONVERSATION_MESSAGES = 500;
+/** Maximum tool calls retained (FIFO eviction) */
+const MAX_TOOL_CALLS = 200;
+
 /** Built-in pause requirement type */
 interface PauseBudgetExceededReq extends Requirement {
   type: "__PAUSE_BUDGET_EXCEEDED";
@@ -94,7 +99,17 @@ interface PauseBudgetExceededReq extends Requirement {
 export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Function to run an agent */
   runner: AgentRunner;
-  /** Additional facts schema */
+  /**
+   * Schema for custom facts tracked in the orchestrator's Directive System.
+   * @example
+   * ```typescript
+   * import { t } from '@directive-run/core';
+   * const orchestrator = createOrchestrator({
+   *   factsSchema: { confidence: t.number(), category: t.string() },
+   *   // ...
+   * });
+   * ```
+   */
   factsSchema?: Record<string, { _type: unknown; _validators: [] }>;
   /** Initialize additional facts */
   init?: (facts: F & OrchestratorState) => void;
@@ -180,7 +195,7 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
    */
   breakpoints?: BreakpointConfig[];
   /** Callback fired when a breakpoint is hit and waiting for resolution. */
-  onBreakpoint?: (req: BreakpointRequest) => void;
+  onBreakpoint?: (request: BreakpointRequest) => void;
   /**
    * Timeout for breakpoint resolution in milliseconds.
    * @default 300000 (5 minutes)
@@ -347,7 +362,7 @@ export function createAgentOrchestrator<
   } = options;
 
   // Warn if selfHealing is configured without circuitBreaker (selfHealing only triggers in CB error path)
-  if (selfHealing && !circuitBreaker) {
+  if (debug && selfHealing && !circuitBreaker) {
     console.warn(
       "[Directive] selfHealing config has no effect without a circuitBreaker — " +
       "fallback behavior requires the circuit breaker to detect failures."
@@ -773,7 +788,10 @@ export function createAgentOrchestrator<
       signal: opts?.signal,
       onMessage: (message) => {
         const currentConversation = getConversation(system.facts);
-        setConversation(system.facts, [...currentConversation, message]);
+        const updated = [...currentConversation, message];
+        setConversation(system.facts, updated.length > MAX_CONVERSATION_MESSAGES
+          ? updated.slice(-MAX_CONVERSATION_MESSAGES)
+          : updated);
         opts?.onMessage?.(message);
       },
       onToolCall: async (toolCall) => {
@@ -843,7 +861,10 @@ export function createAgentOrchestrator<
         }
 
         const currentToolCalls = getToolCalls(system.facts);
-        setToolCalls(system.facts, [...currentToolCalls, toolCall]);
+        const updatedToolCalls = [...currentToolCalls, toolCall];
+        setToolCalls(system.facts, updatedToolCalls.length > MAX_TOOL_CALLS
+          ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
+          : updatedToolCalls);
         opts?.onToolCall?.(toolCall);
       },
     }, agentRetry ? {
@@ -1234,11 +1255,13 @@ export function createAgentOrchestrator<
       options: { signal?: AbortSignal } = {}
     ): OrchestratorStreamResult<T> {
       const abortController = new AbortController();
+      const MAX_STREAM_BUFFER = 10_000;
       const chunks: OrchestratorStreamChunk[] = [];
       const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
       let closed = false;
       const startTime = Date.now();
       let tokenCount = 0;
+      const MAX_ACCUMULATED_OUTPUT = 100_000;
       let accumulatedOutput = "";
 
       // Combine external abort signal
@@ -1262,6 +1285,10 @@ export function createAgentOrchestrator<
           waiter(chunk);
         } else {
           chunks.push(chunk);
+          // FIFO eviction when buffer exceeds max
+          if (chunks.length > MAX_STREAM_BUFFER) {
+            chunks.shift();
+          }
         }
       };
 
@@ -1347,6 +1374,9 @@ export function createAgentOrchestrator<
                 const newTokens = Math.ceil(message.content.length / 4);
                 tokenCount += newTokens;
                 accumulatedOutput += message.content;
+                if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
+                  accumulatedOutput = accumulatedOutput.slice(-MAX_ACCUMULATED_OUTPUT);
+                }
                 pushChunk({ type: "token", data: message.content, tokenCount });
               }
             },

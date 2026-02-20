@@ -70,8 +70,9 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
   }
 
   return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
     if (!signal) {
+      setTimeout(resolve, ms);
+
       return;
     }
 
@@ -79,6 +80,10 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
       clearTimeout(timer);
       reject(signal.reason ?? new Error("Aborted"));
     };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }

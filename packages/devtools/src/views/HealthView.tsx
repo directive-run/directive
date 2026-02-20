@@ -29,16 +29,16 @@ function extractReroutes(events: DebugEvent[]): { from: string; to: string; time
   const reroutes: { from: string; to: string; timestamp: number; reason: string }[] = [];
 
   for (const event of events) {
-    if (event.type === "agent_error" && event.agentId) {
-      const nextEvent = events.find(
-        (e) => e.type === "agent_start" && e.timestamp > event.timestamp && e.agentId !== event.agentId,
-      );
-      if (nextEvent) {
+    if (event.type === "reroute") {
+      const from = (event as Record<string, unknown>).from;
+      const to = (event as Record<string, unknown>).to;
+      const reason = (event as Record<string, unknown>).reason;
+      if (typeof from === "string" && typeof to === "string") {
         reroutes.push({
-          from: event.agentId,
-          to: nextEvent.agentId!,
+          from,
+          to,
           timestamp: event.timestamp,
-          reason: ((event as Record<string, unknown>).errorMessage as string) ?? "Unknown",
+          reason: typeof reason === "string" ? reason : "Unknown",
         });
       }
     }

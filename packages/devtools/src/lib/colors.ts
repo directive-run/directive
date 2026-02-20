@@ -26,11 +26,13 @@ export const EVENT_COLORS: Record<DebugEventType, string> = {
   race_start: "#38bdf8",      // sky-light
   race_winner: "#4ade80",     // green-light
   race_cancelled: "#fbbf24",  // amber-light
+  reroute: "#f472b6",         // pink-400
+  debate_round: "#c084fc",    // purple-400
 };
 
 /** Color for event type categories */
 export function getEventCategory(type: DebugEventType): string {
-  if (type.startsWith("agent_")) {
+  if (type.startsWith("agent_") || type === "reroute") {
     return "Agent";
   }
   if (type.startsWith("guardrail") || type.startsWith("constraint") || type.startsWith("resolver")) {
@@ -39,8 +41,11 @@ export function getEventCategory(type: DebugEventType): string {
   if (type.startsWith("approval") || type.startsWith("breakpoint")) {
     return "Control";
   }
-  if (type.startsWith("handoff") || type.startsWith("pattern") || type.startsWith("dag")) {
+  if (type.startsWith("handoff") || type.startsWith("pattern") || type.startsWith("dag") || type.startsWith("race_")) {
     return "Orchestration";
+  }
+  if (type.startsWith("derivation") || type.startsWith("scratchpad") || type.startsWith("reflection") || type === "debate_round") {
+    return "State";
   }
 
   return "Other";

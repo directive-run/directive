@@ -33,6 +33,8 @@ const EVENT_TYPE_LABELS: Partial<Record<DebugEventType, string>> = {
   race_start: "Race",
   race_winner: "Winner",
   race_cancelled: "Cancelled",
+  reroute: "Reroute",
+  debate_round: "Debate",
 };
 
 export function TimelineView({ events }: TimelineViewProps) {
@@ -130,6 +132,51 @@ export function TimelineView({ events }: TimelineViewProps) {
     return Array.from(set);
   }, [events]);
 
+  // Compute row for a bar to avoid overlaps
+  function computeRow(event: DebugEvent, laneEvts: DebugEvent[], range: { start: number; duration: number }): number {
+    const getLeft = (e: DebugEvent) => ((e.timestamp - range.start) / range.duration) * 100;
+    const getRight = (e: DebugEvent) => {
+      const dur = (e as Record<string, unknown>).durationMs;
+      const w = typeof dur === "number" && dur > 0 ? (dur / range.duration) * 100 : 0.5;
+
+      return getLeft(e) + w;
+    };
+
+    const myLeft = getLeft(event);
+    const myRight = getRight(event);
+    const occupiedRows: number[] = [];
+
+    for (const other of laneEvts) {
+      if (other.id === event.id) {
+        break;
+      }
+      const oLeft = getLeft(other);
+      const oRight = getRight(other);
+      if (oLeft < myRight && oRight > myLeft) {
+        occupiedRows.push(computeRow(other, laneEvts, range));
+      }
+    }
+
+    let row = 0;
+    while (occupiedRows.includes(row)) {
+      row++;
+    }
+
+    return row;
+  }
+
+  function computeMaxRow(laneEvts: DebugEvent[], range: { start: number; duration: number }): number {
+    let max = 0;
+    for (const e of laneEvts) {
+      const r = computeRow(e, laneEvts, range);
+      if (r > max) {
+        max = r;
+      }
+    }
+
+    return max;
+  }
+
   if (events.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
@@ -150,6 +197,7 @@ export function TimelineView({ events }: TimelineViewProps) {
         <select
           value={agentFilter ?? ""}
           onChange={(e) => setAgentFilter(e.target.value || null)}
+          aria-label="Filter by agent"
           className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200"
         >
           <option value="">All agents</option>
@@ -166,8 +214,8 @@ export function TimelineView({ events }: TimelineViewProps) {
               onClick={() => toggleType(type)}
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
                 typeFilter.size === 0 || typeFilter.has(type)
-                  ? "opacity-100"
-                  : "opacity-30"
+                  ? ""
+                  : "!bg-zinc-800 !text-zinc-500 !border-zinc-700"
               }`}
               style={{
                 backgroundColor: `${EVENT_COLORS[type]}20`,
@@ -199,7 +247,7 @@ export function TimelineView({ events }: TimelineViewProps) {
                 </div>
 
                 {/* Event bars */}
-                <div className="relative min-h-[36px] flex-1 px-1 py-1">
+                <div className="relative flex-1 px-1" style={{ minHeight: `${Math.max(36, 4 + computeMaxRow(laneEvents, timeRange) * 24 + 24)}px` }}>
                   {laneEvents.map((event) => (
                     <TimelineBar
                       key={event.id}
@@ -209,6 +257,7 @@ export function TimelineView({ events }: TimelineViewProps) {
                       onClick={() => setSelectedEvent(
                         selectedEvent?.id === event.id ? null : event,
                       )}
+                      row={computeRow(event, laneEvents, timeRange)}
                     />
                   ))}
                 </div>

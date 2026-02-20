@@ -20,7 +20,7 @@
  * ```
  */
 
-import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData } from "./types.js";
+import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData, StreamingCallbackRunner } from "./types.js";
 import type { OrchestratorStreamChunk } from "./agent-orchestrator.js";
 
 // ============================================================================
@@ -36,8 +36,6 @@ export const DEFAULT_GUARDRAIL_CHECK_INTERVAL = 50;
 /** Default toxicity threshold for toxicity streaming guardrail */
 export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
 
-/** Maximum number of stream keys to track for warning deduplication */
-export const MAX_TRACKED_STREAMS = 100;
 
 // ============================================================================
 // Stream Event Types
@@ -141,13 +139,13 @@ export interface StreamRunOptions {
   maxTurns?: number;
   /** Abort signal for cancellation */
   signal?: AbortSignal;
-  /** Backpressure strategy (default: 'buffer') */
+  /** Backpressure strategy. @default "buffer" */
   backpressure?: BackpressureStrategy;
-  /** Buffer size for 'drop' and 'block' strategies */
+  /** Buffer size for 'drop' and 'block' strategies. @default 1000 */
   bufferSize?: number;
-  /** Evaluate guardrails every N tokens (default: 50) */
+  /** Evaluate guardrails every N tokens. @default 50 */
   guardrailCheckInterval?: number;
-  /** Stop stream on guardrail trigger (default: true for critical) */
+  /** Stop stream on guardrail trigger. @default true */
   stopOnGuardrail?: boolean | ((chunk: GuardrailTriggeredChunk) => boolean);
 }
 
@@ -178,7 +176,7 @@ export interface StreamingGuardrail {
   name: string;
   /** Check partial output (called every guardrailCheckInterval tokens) */
   check: (partialOutput: string, tokenCount: number) => StreamingGuardrailResult | Promise<StreamingGuardrailResult>;
-  /** Whether to stop the stream on failure (default: true) */
+  /** Whether to stop the stream on failure. @default true */
   stopOnFail?: boolean;
 }
 
@@ -300,17 +298,7 @@ class StreamBuffer<T> {
  * @param options - Configuration options
  */
 export function createStreamingRunner(
-  baseRunner: (
-    agent: AgentLike,
-    input: string,
-    callbacks: {
-      onToken?: (token: string) => void;
-      onToolStart?: (tool: string, id: string, args: string) => void;
-      onToolEnd?: (tool: string, id: string, result: string) => void;
-      onMessage?: (message: Message) => void;
-      signal?: AbortSignal;
-    }
-  ) => Promise<RunResult<unknown>>,
+  baseRunner: StreamingCallbackRunner,
   options: {
     streamingGuardrails?: StreamingGuardrail[];
   } = {}
@@ -387,9 +375,9 @@ export function createStreamingRunner(
 
             return chunk;
           }
-        } catch (error) {
-          // Guardrail error - log but continue
-          console.error(`Streaming guardrail "${guardrail.name}" error:`, error);
+        } catch {
+          // Guardrail errors during streaming are silently swallowed —
+          // the guardrail result itself carries error info when applicable.
         }
       }
       return null;
@@ -502,9 +490,9 @@ export function createStreamingRunner(
 export function createToxicityStreamingGuardrail(options: {
   /** Toxicity scoring function (returns 0-1) */
   checkFn: (text: string) => number | Promise<number>;
-  /** Threshold above which content is flagged (default: 0.8) */
+  /** Threshold above which content is flagged. @default 0.8 */
   threshold?: number;
-  /** Stop the stream on detection (default: true) */
+  /** Stop the stream on detection. @default true */
   stopOnFail?: boolean;
 }): StreamingGuardrail {
   const { checkFn, threshold = DEFAULT_TOXICITY_THRESHOLD, stopOnFail = true } = options;
@@ -542,23 +530,19 @@ export function createLengthStreamingGuardrail(options: {
   maxTokens: number;
   /** Warn at this token count (optional) */
   warnAt?: number;
-  /** Stop the stream on max (default: true) */
+  /** Stop the stream on max. @default true */
   stopOnFail?: boolean;
 }): StreamingGuardrail {
   const { maxTokens, warnAt, stopOnFail = true } = options;
 
-  // Track warned state per-stream with bounded size to prevent memory leaks
-  // Uses a simple FIFO eviction when max size is reached
-  const warnedStreams = new Set<string>();
+  // Per-instance flag: if this guardrail is shared across concurrent streams,
+  // the warning fires only once globally. Create separate instances for independent warning per stream.
+  let warned = false;
 
   return {
     name: "length-streaming",
     stopOnFail,
     check(_partialOutput, tokenCount) {
-      // Generate a unique key for this stream based on content length + token count
-      // This allows warning to trigger once per stream when threshold is crossed
-      const streamKey = `${_partialOutput.length}-${tokenCount}`;
-
       if (tokenCount >= maxTokens) {
         return {
           passed: false,
@@ -567,15 +551,9 @@ export function createLengthStreamingGuardrail(options: {
         };
       }
 
-      if (warnAt && tokenCount >= warnAt && !warnedStreams.has(streamKey)) {
-        // Mark as warned for token counts at or above warnAt threshold
-        warnedStreams.add(streamKey);
-        // Evict oldest entries if we exceed max tracked streams
-        if (warnedStreams.size > MAX_TRACKED_STREAMS) {
-          const firstKey = warnedStreams.values().next().value;
-          if (firstKey) warnedStreams.delete(firstKey);
-        }
-        // Emit warning but don't fail
+      if (warnAt && tokenCount >= warnAt && !warned) {
+        warned = true;
+
         return {
           passed: true,
           warning: `Approaching maximum length: ${tokenCount}/${maxTokens} tokens`,
@@ -648,14 +626,18 @@ export function combineStreamingGuardrails(
     name,
     stopOnFail: stopOnFirstFail,
     async check(partialOutput, tokenCount) {
+      const failures: string[] = [];
       for (const guardrail of guardrails) {
         const result = await guardrail.check(partialOutput, tokenCount);
-        if (!result.passed && stopOnFirstFail) {
-          return {
-            ...result,
-            reason: `[${guardrail.name}] ${result.reason}`,
-          };
+        if (!result.passed) {
+          if (stopOnFirstFail) {
+            return { ...result, reason: `[${guardrail.name}] ${result.reason}` };
+          }
+          failures.push(`[${guardrail.name}] ${result.reason ?? "failed"}`);
         }
+      }
+      if (failures.length > 0) {
+        return { passed: false, reason: failures.join("; ") };
       }
       return { passed: true };
     },

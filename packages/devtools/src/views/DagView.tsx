@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -45,13 +45,21 @@ function buildDagFromEvents(events: DebugEvent[]): Map<string, DagNodeState> | n
 
   for (const event of dagEvents) {
     if (event.type === "dag_node_update") {
-      const nodeId = (event as Record<string, unknown>).nodeId as string;
-      const status = (event as Record<string, unknown>).status as DagNodeStatus;
+      const nodeId = (event as Record<string, unknown>).nodeId;
+      const status = (event as Record<string, unknown>).status;
+      const deps = (event as Record<string, unknown>).deps as string[] | undefined;
+      if (typeof nodeId !== "string" || typeof status !== "string") {
+        continue;
+      }
+      const nodeStatus = status as DagNodeStatus;
       const existing = nodes.get(nodeId);
       if (existing) {
-        existing.status = status;
+        existing.status = nodeStatus;
+        if (deps) {
+          existing.deps = deps;
+        }
       } else {
-        nodes.set(nodeId, { agentId: nodeId, status, deps: [] });
+        nodes.set(nodeId, { agentId: nodeId, status: nodeStatus, deps: deps ?? [] });
       }
     }
   }
@@ -73,7 +81,8 @@ function buildDagFromSnapshot(snapshot: DevToolsSnapshot): Map<string, DagNodeSt
       status = "error";
     }
 
-    nodes.set(agentId, { agentId, status, deps: [] });
+    const deps = (state as Record<string, unknown>).deps as string[] ?? [];
+    nodes.set(agentId, { agentId, status, deps });
   }
 
   return nodes;
@@ -101,18 +110,62 @@ export function DagView({ events, snapshot }: DagViewProps) {
     }
 
     const nodeArray = Array.from(dagData.values());
-    const nodes: Node[] = nodeArray.map((n, i) => ({
-      id: n.agentId,
-      type: "agent",
-      position: { x: 200 + (i % 3) * 250, y: 80 + Math.floor(i / 3) * 150 },
-      data: {
-        label: n.agentId,
-        status: n.status,
-        color: DAG_NODE_COLORS[n.status],
-        selected: selectedNode === n.agentId,
-        agentState: snapshot?.agents[n.agentId],
-      },
-    }));
+
+    // Topological layout: assign layers by dependency depth
+    const layers = new Map<string, number>();
+    function getLayer(id: string, visited = new Set<string>()): number {
+      if (layers.has(id)) {
+        return layers.get(id)!;
+      }
+      if (visited.has(id)) {
+        return 0; // cycle guard
+      }
+      visited.add(id);
+      const node = dagData!.get(id);
+      if (!node || node.deps.length === 0) {
+        layers.set(id, 0);
+
+        return 0;
+      }
+      const maxParent = Math.max(...node.deps.map((d) => getLayer(d, visited)));
+      const layer = maxParent + 1;
+      layers.set(id, layer);
+
+      return layer;
+    }
+    for (const n of nodeArray) {
+      getLayer(n.agentId);
+    }
+
+    // Group by layer for horizontal positioning
+    const layerGroups = new Map<number, string[]>();
+    for (const n of nodeArray) {
+      const layer = layers.get(n.agentId) ?? 0;
+      if (!layerGroups.has(layer)) {
+        layerGroups.set(layer, []);
+      }
+      layerGroups.get(layer)!.push(n.agentId);
+    }
+
+    const nodes: Node[] = nodeArray.map((n) => {
+      const layer = layers.get(n.agentId) ?? 0;
+      const group = layerGroups.get(layer)!;
+      const indexInLayer = group.indexOf(n.agentId);
+      const totalInLayer = group.length;
+      const xOffset = (indexInLayer - (totalInLayer - 1) / 2) * 250;
+
+      return {
+        id: n.agentId,
+        type: "agent",
+        position: { x: 400 + xOffset, y: 80 + layer * 150 },
+        data: {
+          label: n.agentId,
+          status: n.status,
+          color: DAG_NODE_COLORS[n.status],
+          agentState: snapshot?.agents[n.agentId],
+        },
+      };
+    });
 
     const edges: Edge[] = [];
     for (const node of nodeArray) {
@@ -131,13 +184,13 @@ export function DagView({ events, snapshot }: DagViewProps) {
     }
 
     return { initialNodes: nodes, initialEdges: edges };
-  }, [dagData, snapshot, selectedNode]);
+  }, [dagData, snapshot]);
 
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
 
   // Update nodes/edges when data changes
-  useMemo(() => {
+  useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges]);
@@ -192,6 +245,7 @@ export function DagView({ events, snapshot }: DagViewProps) {
             <h3 className="text-sm font-semibold">{selectedNode}</h3>
             <button
               onClick={() => setSelectedNode(null)}
+              aria-label="Close detail panel"
               className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
             >
               ✕

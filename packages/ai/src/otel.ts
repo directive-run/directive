@@ -194,8 +194,8 @@ class CollectorTracer implements OtelTracer {
       parentSpanId?: string;
     },
   ): OtelSpan {
-    const spanId = options?.spanId ?? `fallback-${Date.now().toString(36)}`;
-    const traceId = options?.traceId ?? `fallback-${Date.now().toString(36)}`;
+    const spanId = options?.spanId ?? `fallback-${crypto.randomUUID()}`;
+    const traceId = options?.traceId ?? `fallback-${crypto.randomUUID()}`;
     const parentSpanId = options?.parentSpanId;
 
     return new CollectedSpan(
@@ -307,9 +307,17 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   let keyCounter = 0;
 
   // Secondary index for O(1) span lookup by "type:id" prefix
-  const spanKeyIndex = new Map<string, string>();
+  const spanKeyIndex = new Map<string, string[]>();
 
-  // Pattern span stack for proper nesting (inner patterns don't clobber outer)
+  /**
+   * Pattern span stack for proper nesting (inner patterns don't clobber outer).
+   *
+   * WARNING: A single OtelPlugin instance must NOT be attached to more than one
+   * timeline simultaneously. The patternStack is local to this closure and is
+   * shared across all events emitted through it. Concurrent use across multiple
+   * timelines will interleave push/pop operations, producing incorrect span
+   * hierarchies and potentially orphaned spans.
+   */
   const patternStack: ActiveSpanEntry[] = [];
 
   // Dev warning dedup
@@ -329,14 +337,17 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
 
   function findActiveSpan(type: string, id: string): { key: string; entry: ActiveSpanEntry } | null {
     const indexKey = `${type}:${id}`;
-    const key = spanKeyIndex.get(indexKey);
-    if (key) {
-      const entry = activeSpans.get(key);
-      if (entry) {
-        return { key, entry };
+    const keys = spanKeyIndex.get(indexKey);
+    if (keys) {
+      // Walk from end to find latest active span
+      for (let i = keys.length - 1; i >= 0; i--) {
+        const entry = activeSpans.get(keys[i]!);
+        if (entry) {
+          return { key: keys[i]!, entry };
+        }
       }
 
-      // Stale index entry
+      // All stale
       spanKeyIndex.delete(indexKey);
     }
 
@@ -345,18 +356,31 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
 
   function registerSpan(type: string, id: string, key: string, entry: ActiveSpanEntry): void {
     activeSpans.set(key, entry);
-    spanKeyIndex.set(`${type}:${id}`, key);
+    const indexKey = `${type}:${id}`;
+    const existing = spanKeyIndex.get(indexKey);
+    if (existing) {
+      existing.push(key);
+    } else {
+      spanKeyIndex.set(indexKey, [key]);
+    }
   }
 
   function removeSpan(key: string): void {
     activeSpans.delete(key);
 
-    // Clear index if it still points to this key
+    // Remove from index array
     const lastColon = key.lastIndexOf(":");
     if (lastColon > 0) {
       const indexKey = key.substring(0, lastColon);
-      if (spanKeyIndex.get(indexKey) === key) {
-        spanKeyIndex.delete(indexKey);
+      const keys = spanKeyIndex.get(indexKey);
+      if (keys) {
+        const idx = keys.indexOf(key);
+        if (idx !== -1) {
+          keys.splice(idx, 1);
+        }
+        if (keys.length === 0) {
+          spanKeyIndex.delete(indexKey);
+        }
       }
     }
   }

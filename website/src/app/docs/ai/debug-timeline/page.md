@@ -18,7 +18,7 @@ import { createAgentOrchestrator } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner,
-  debug: { timeTravel: true },
+  debug: true,
 });
 
 await orchestrator.run(agent, 'Hello!');
@@ -33,7 +33,7 @@ Both `createAgentOrchestrator` and `createMultiAgentOrchestrator` expose a `time
 
 ## Event Types
 
-The timeline records 16 event types covering the full agent lifecycle:
+The timeline records the following event types covering the full agent lifecycle:
 
 | Event | When it fires |
 | --- | --- |
@@ -53,6 +53,15 @@ The timeline records 16 event types covering the full agent lifecycle:
 | `pattern_start` | Execution pattern begins |
 | `pattern_complete` | Execution pattern completes |
 | `dag_node_update` | DAG node status changes |
+| `breakpoint_hit` | Breakpoint fires and pauses execution |
+| `breakpoint_resumed` | Breakpoint resumed or cancelled |
+| `derivation_update` | Cross-agent derivation recomputed |
+| `scratchpad_update` | Shared scratchpad value changed |
+| `reflection_iteration` | Reflection iteration completed |
+| `race_start` | Race pattern begins |
+| `race_winner` | Race pattern winner selected |
+| `race_cancelled` | Race pattern loser cancelled |
+| `debate_round` | Debate round completed |
 
 Every event includes `id`, `type`, `timestamp`, and `snapshotId` (for time-travel correlation). Agent-scoped events also include `agentId`.
 
@@ -166,7 +175,7 @@ In a multi-agent orchestrator, every event includes `agentId`, making it easy to
 const multi = createMultiAgentOrchestrator({
   runner,
   agents: { researcher: { agent: researcher }, writer: { agent: writer } },
-  debug: { timeTravel: true },
+  debug: true,
 });
 
 await multi.runPattern('research-and-write', 'Explain WASM');
@@ -185,7 +194,7 @@ const patternStarts = multi.timeline!.getEventsByType('pattern_start');
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `maxEvents` | 500 | Ring buffer size — oldest events evicted first |
+| `maxEvents` | 2000 | Ring buffer size — oldest events evicted first |
 | `getSnapshotId` | — | Callback to read current snapshot ID |
 | `goToSnapshot` | — | Callback for `forkFrom()` navigation |
 
