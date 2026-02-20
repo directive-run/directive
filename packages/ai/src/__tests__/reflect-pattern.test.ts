@@ -334,9 +334,9 @@ describe("reflect pattern (multi-agent)", () => {
       score: 0.4,
       feedback: "Add examples",
     });
-    expect(history![0].durationMs).toBeGreaterThanOrEqual(0);
-    expect(history![0].producerTokens).toBe(20);
-    expect(history![0].evaluatorTokens).toBe(8);
+    expect(history![0]!.durationMs).toBeGreaterThanOrEqual(0);
+    expect(history![0]!.producerTokens).toBe(20);
+    expect(history![0]!.evaluatorTokens).toBe(8);
 
     expect(history![1]).toMatchObject({
       iteration: 1,
@@ -382,11 +382,11 @@ describe("reflect pattern (multi-agent)", () => {
     await orchestrator.runPattern("review", "Go");
 
     expect(records).toHaveLength(2);
-    expect(records[0].iteration).toBe(0);
-    expect(records[0].passed).toBe(false);
-    expect(records[0].feedback).toBe("Try harder");
-    expect(records[1].iteration).toBe(1);
-    expect(records[1].passed).toBe(true);
+    expect(records[0]!.iteration).toBe(0);
+    expect(records[0]!.passed).toBe(false);
+    expect(records[0]!.feedback).toBe("Try harder");
+    expect(records[1]!.iteration).toBe(1);
+    expect(records[1]!.passed).toBe(true);
   });
 
   it("history cleared/overwritten on next reflect run", async () => {
@@ -420,12 +420,12 @@ describe("reflect pattern (multi-agent)", () => {
     await orchestrator.runPattern("review", "First");
     const firstHistory = orchestrator.getLastReflectionHistory();
     expect(firstHistory).toHaveLength(1);
-    expect(firstHistory![0].score).toBe(0.5);
+    expect(firstHistory![0]!.score).toBe(0.5);
 
     await orchestrator.runPattern("review", "Second");
     const secondHistory = orchestrator.getLastReflectionHistory();
     expect(secondHistory).toHaveLength(1);
-    expect(secondHistory![0].score).toBe(0.9);
+    expect(secondHistory![0]!.score).toBe(0.9);
   });
 
   // ---- AbortSignal tests ----
@@ -467,7 +467,7 @@ describe("reflect pattern (multi-agent)", () => {
     });
 
     // Should return last producer result since signal was aborted after producer ran
-    const result = await orchestrator.runPattern<string>("review", "Go");
+    await orchestrator.runPattern<string>("review", "Go");
 
     // The abort happens after the second producer call, so it should return that result
     expect(producerCallCount).toBeLessThanOrEqual(3);

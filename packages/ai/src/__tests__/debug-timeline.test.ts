@@ -433,7 +433,7 @@ describe("export()/import() roundtrip", () => {
 describe("integration: single-agent events during run()", () => {
   it("records agent_start and agent_complete events", async () => {
     const orchestrator = createTestOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       mockResponses: { "test-agent": { output: "hello", totalTokens: 50 } },
     });
 
@@ -450,7 +450,7 @@ describe("integration: single-agent events during run()", () => {
 
   it("records agent_start with inputLength", async () => {
     const orchestrator = createTestOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       mockResponses: { "test-agent": { output: "done" } },
     });
 
@@ -463,7 +463,7 @@ describe("integration: single-agent events during run()", () => {
 
   it("records agent_complete with token usage and duration", async () => {
     const orchestrator = createTestOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       mockResponses: { "test-agent": { output: "result", totalTokens: 75 } },
     });
 
@@ -484,7 +484,7 @@ describe("integration: single-agent events during run()", () => {
 describe("integration: multi-agent events during run()", () => {
   it("records agent-indexed events for individual agents", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       agents: {
         researcher: { agent: { name: "researcher" } },
         writer: { agent: { name: "writer" } },
@@ -510,7 +510,7 @@ describe("integration: multi-agent events during run()", () => {
 
   it("records events with correct agentId values", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       agents: {
         alpha: { agent: { name: "alpha" } },
       },
@@ -573,7 +573,7 @@ describe("guardrail pass/fail events", () => {
     const guardrailEvents: Array<{ guardrailName: string; passed: boolean }> = [];
 
     const orchestrator = createTestOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       mockResponses: { "test-agent": { output: "safe output" } },
       guardrails: {
         input: [
@@ -601,7 +601,7 @@ describe("guardrail pass/fail events", () => {
     const guardrailEvents: Array<{ passed: boolean; reason?: string }> = [];
 
     const orchestrator = createTestOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       mockResponses: { "test-agent": { output: "safe" } },
       guardrails: {
         input: [
@@ -636,11 +636,10 @@ describe("guardrail pass/fail events", () => {
 describe("approval events", () => {
   it("records approval_request on timeline (multi-agent)", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       agents: {
         worker: {
           agent: { name: "worker" },
-          approval: { toolCalls: true },
         },
       },
       mockResponses: {
@@ -675,7 +674,7 @@ describe("approval events", () => {
 describe("pattern events (multi-agent)", () => {
   it("records pattern_start and pattern_complete for parallel execution", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       agents: {
         a: { agent: { name: "a" } },
         b: { agent: { name: "b" } },
@@ -708,7 +707,7 @@ describe("pattern events (multi-agent)", () => {
 
   it("records pattern_start and pattern_complete for sequential execution", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
-      debug: { timeTravel: true },
+      debug: true,
       agents: {
         first: { agent: { name: "first" } },
         second: { agent: { name: "second" } },

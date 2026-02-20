@@ -23,43 +23,6 @@ interface MockClient {
   triggerClose: () => void;
 }
 
-function createMockClient(): MockClient {
-  const messages: DevToolsServerMessage[] = [];
-  let onMsg: ((data: string) => void) | null = null;
-  let onCls: (() => void) | null = null;
-
-  const mock: MockClient = {
-    messages,
-    closed: false,
-    triggerMessage(data: string) {
-      onMsg?.(data);
-    },
-    triggerClose() {
-      onCls?.();
-    },
-    client: {
-      send(data: string) {
-        messages.push(JSON.parse(data));
-      },
-      close() {
-        mock.closed = true;
-      },
-    },
-  };
-
-  // Wire up message/close handlers after the transport calls onConnection
-  Object.defineProperty(mock, "_setHandlers", {
-    value: (msgHandler: (h: (data: string) => void) => void, clsHandler: (h: () => void) => void) => {
-      msgHandler((data) => { onMsg = (() => {}); onMsg = data as unknown as ((d: string) => void); });
-      clsHandler(() => { onCls = () => {}; });
-      // Actually set them properly:
-    },
-    enumerable: false,
-  });
-
-  return mock;
-}
-
 function createMockTransport(): {
   transport: DevToolsTransport;
   connect: () => MockClient;
@@ -176,7 +139,7 @@ describe("DevTools Server", () => {
       const client1 = mockTransport.connect();
       expect(server.clientCount).toBe(1);
 
-      const client2 = mockTransport.connect();
+      mockTransport.connect();
       expect(server.clientCount).toBe(2);
 
       client1.triggerClose();
@@ -446,7 +409,7 @@ describe("DevTools Server", () => {
       expect(client.messages[0]!.type).toBe("snapshot");
 
       const msg = client.messages[0] as Extract<DevToolsServerMessage, { type: "snapshot" }>;
-      expect(msg.data.agents.researcher.status).toBe("completed");
+      expect(msg.data.agents.researcher!.status).toBe("completed");
 
       server.close();
     });

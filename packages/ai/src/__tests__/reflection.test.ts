@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { withReflection, ReflectionExhaustedError } from "../reflection.js";
 import { createMockAgentRunner } from "../testing.js";
-import type { AgentLike, RunResult } from "../types.js";
+import type { AgentLike } from "../types.js";
 
 // ============================================================================
 // Helper: simple mock runner
@@ -107,7 +107,7 @@ describe("withReflection", () => {
       const err = error as ReflectionExhaustedError;
       expect(err.iterations).toBe(2);
       expect(err.history).toHaveLength(2);
-      expect(err.history[0].feedback).toBe("Not good enough");
+      expect(err.history[0]!.feedback).toBe("Not good enough");
       expect(err.totalTokens).toBe(20);
     }
   });

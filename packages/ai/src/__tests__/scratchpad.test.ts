@@ -252,7 +252,7 @@ describe("shared scratchpad", () => {
 
     // set("a", 1) fires once, update({a, b}) fires once (batched per last key)
     expect(hookEvents).toHaveLength(2);
-    expect(hookEvents[0].keys).toEqual(["a"]);
+    expect(hookEvents[0]!.keys).toEqual(["a"]);
   });
 
   it("has() checks key existence", () => {

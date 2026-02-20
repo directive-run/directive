@@ -1,15 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHealthMonitor } from "../health-monitor.js";
-import type { HealthMonitor, AgentHealthMetrics } from "../health-monitor.js";
+import type { HealthMonitor } from "../health-monitor.js";
 import {
 	createTestOrchestrator,
 	createTestMultiAgentOrchestrator,
-	createMockAgentRunner,
 	createFailingRunner,
 	assertRerouted,
 	assertAgentHealth,
 } from "../testing.js";
-import type { RerouteEvent, AgentRunner, RunResult, AgentLike, RunOptions } from "../types.js";
+import type { RerouteEvent, AgentRunner, RunResult, AgentLike } from "../types.js";
 
 // ============================================================================
 // Helpers
@@ -43,12 +42,15 @@ function passthroughCircuitBreaker() {
 		execute: <T>(fn: () => Promise<T>) => fn(),
 		getState: () => "CLOSED" as const,
 		getStats: () => ({
-			totalRequests: 0,
-			successCount: 0,
-			failureCount: 0,
-			consecutiveFailures: 0,
-			lastFailureTime: null,
 			state: "CLOSED" as const,
+			totalRequests: 0,
+			totalFailures: 0,
+			totalSuccesses: 0,
+			totalRejected: 0,
+			recentFailures: 0,
+			lastFailureTime: null,
+			lastSuccessTime: null,
+			lastStateChange: 0,
 		}),
 		forceState: () => {},
 		reset: () => {},
@@ -817,7 +819,6 @@ describe("Multi-agent: health recovery", () => {
 		await orch.runAgent("alpha", "task 3");
 
 		const monitor = orch.healthMonitor!;
-		const metrics = monitor.getMetrics("alpha");
 		// The monitor tracks successes from the orchestrator's internal recording
 		// The exact count depends on whether the orchestrator auto-records
 		expect(monitor.getHealthScore("alpha")).toBeGreaterThanOrEqual(0);
@@ -843,7 +844,7 @@ describe("Integration: reroute + guardrails", () => {
 			},
 			guardrails: {
 				input: [
-					async (data) => {
+					async (_data) => {
 						guardrailCallCount++;
 
 						return { passed: true };

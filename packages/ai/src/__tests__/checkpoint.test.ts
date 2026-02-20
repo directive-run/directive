@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { createCheckpointId, validateCheckpoint, InMemoryCheckpointStore } from "../checkpoint.js";
 import type { Checkpoint, MultiAgentCheckpointLocalState } from "../checkpoint.js";
 import {
@@ -141,7 +141,8 @@ describe("validateCheckpoint", () => {
   });
 
   it("returns false for __proto__ key (prototype pollution defense)", () => {
-    const poisoned = {
+    // Intentionally constructed object with __proto__ key for prototype pollution testing
+    void ({
       version: 1,
       id: "ckpt_test",
       createdAt: new Date().toISOString(),
@@ -151,7 +152,7 @@ describe("validateCheckpoint", () => {
       memoryExport: null,
       orchestratorType: "single",
       __proto__: { malicious: true },
-    } as unknown;
+    } as unknown);
 
     // Object.create(null) + explicit __proto__ key
     const obj = Object.create(null);
@@ -317,7 +318,6 @@ describe("InMemoryCheckpointStore", () => {
   });
 
   it("list includes createdAt from saved checkpoints", async () => {
-    const now = new Date().toISOString();
     const cp = createValidCheckpoint({ label: "timestamped" });
     await store.save(cp);
 
