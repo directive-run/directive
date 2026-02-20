@@ -1766,7 +1766,9 @@ export function assertDerivedValues(
   for (const [key, expectedValue] of Object.entries(expected)) {
     const actual = derived[key];
     if (typeof expectedValue === "object" && expectedValue !== null) {
-      if (JSON.stringify(actual) !== JSON.stringify(expectedValue)) {
+      // Sort keys for order-independent comparison
+      const sortedStringify = (v: unknown): string => JSON.stringify(v, Object.keys(v as Record<string, unknown>).sort());
+      if (sortedStringify(actual) !== sortedStringify(expectedValue)) {
         throw new Error(
           `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
         );

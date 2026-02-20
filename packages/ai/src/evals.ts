@@ -452,7 +452,7 @@ export interface EvalSafetyOptions {
  *
  * When `categories` is provided, uses built-in pattern sets for each category.
  * When `blockedPatterns` is provided, uses those directly (overrides categories).
- * When neither is provided, defaults to PII patterns only.
+ * When neither is provided, defaults to all safety categories.
  *
  * Score = 1.0 when no blocked patterns found.
  * Score = 0.0 when any blocked pattern matches.
@@ -471,8 +471,11 @@ export function evalSafety(options: EvalSafetyOptions = {}): EvalCriterion {
       }
     }
   } else {
-    // Default: PII patterns only
-    patterns = [...SAFETY_CATEGORY_PATTERNS["pii"]!];
+    // Default: all safety categories
+    patterns = [];
+    for (const categoryPatterns of Object.values(SAFETY_CATEGORY_PATTERNS)) {
+      patterns.push(...categoryPatterns);
+    }
   }
 
   return {
@@ -581,6 +584,8 @@ export interface EvalJudgeOptions {
   judge: AgentLike;
   /** Custom grading prompt template. {{input}}, {{output}}, {{expected}} are replaced. */
   promptTemplate?: string;
+  /** Optional abort signal */
+  signal?: AbortSignal;
 }
 
 export function evalJudge(options: EvalJudgeOptions): EvalCriterion {
@@ -603,7 +608,7 @@ Respond with ONLY a JSON object: {"score": <number>, "reason": "<brief explanati
         .replaceAll("{{output}}", String(context.result.output));
 
       try {
-        const result = await options.runner(options.judge, prompt);
+        const result = await options.runner(options.judge, prompt, { signal: options.signal });
         const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
 
         const score = Math.max(0, Math.min(1, parsed.score));
@@ -666,6 +671,15 @@ export function evalMatch(options: EvalMatchOptions = {}): EvalCriterion {
       } else if (mode === "contains") {
         matched = a.includes(b);
       } else if (mode === "regex") {
+        const MAX_REGEX_LENGTH = 500;
+        if (expected.length > MAX_REGEX_LENGTH) {
+          return {
+            score: 0,
+            passed: false,
+            reason: `Regex pattern too long (${expected.length} chars, max ${MAX_REGEX_LENGTH})`,
+            durationMs: Date.now() - start,
+          };
+        }
         try {
           matched = new RegExp(expected, ci ? "i" : "").test(output);
         } catch {
@@ -700,6 +714,8 @@ export interface EvalSemanticOptions {
   runner: AgentRunner;
   /** Judge agent (model to use for evaluation) */
   judge: AgentLike;
+  /** Optional abort signal */
+  signal?: AbortSignal;
 }
 
 const FAITHFULNESS_PROMPT = `You are evaluating an AI agent's output for faithfulness to the provided context.
@@ -739,7 +755,7 @@ export function evalFaithfulness(options: EvalSemanticOptions): EvalCriterion {
         .replaceAll("{{output}}", String(context.result.output));
 
       try {
-        const result = await options.runner(options.judge, prompt);
+        const result = await options.runner(options.judge, prompt, { signal: options.signal });
         const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 
@@ -791,7 +807,7 @@ export function evalRelevance(options: EvalSemanticOptions): EvalCriterion {
         .replaceAll("{{output}}", String(context.result.output));
 
       try {
-        const result = await options.runner(options.judge, prompt);
+        const result = await options.runner(options.judge, prompt, { signal: options.signal });
         const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 
@@ -842,7 +858,7 @@ export function evalCoherence(options: EvalSemanticOptions): EvalCriterion {
         .replaceAll("{{output}}", String(context.result.output));
 
       try {
-        const result = await options.runner(options.judge, prompt);
+        const result = await options.runner(options.judge, prompt, { signal: options.signal });
         const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 

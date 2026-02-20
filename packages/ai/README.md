@@ -7,7 +7,7 @@
 
 AI agent orchestration with guardrails, cost tracking, and multi-agent coordination. Built on [Directive](https://www.npmjs.com/package/@directive-run/core)'s constraint-driven runtime.
 
-- **No SDK dependencies** &ndash; pure `fetch` adapters for OpenAI, Anthropic, and Ollama
+- **No SDK dependencies** &ndash; pure `fetch` adapters for OpenAI, Anthropic, Ollama, and Gemini
 - **Guardrails** &ndash; input, output, and tool call validation with retry support
 - **Multi-agent orchestration** &ndash; parallel, sequential, and supervisor patterns
 - **Cost tracking** &ndash; per-call token usage with pricing constants for every provider
@@ -48,15 +48,15 @@ console.log(result.output);
 
 Adapters are thin wrappers around each provider's HTTP API. No SDK dependencies &ndash; pure `fetch`.
 
-| | OpenAI | Anthropic | Ollama |
-|---|--------|-----------|--------|
-| Import | `@directive-run/ai/openai` | `@directive-run/ai/anthropic` | `@directive-run/ai/ollama` |
-| Default model | `gpt-4o` | `claude-sonnet-4-5-20250929` | `llama3` |
-| API key required | Yes | Yes | No |
-| Streaming runner | `createOpenAIStreamingRunner` | `createAnthropicStreamingRunner` | &ndash; |
-| Embedder | `createOpenAIEmbedder` | &ndash; | &ndash; |
-| Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | &ndash; |
-| Compatible APIs | Azure, Together, any OpenAI-compatible | &ndash; | &ndash; |
+| | OpenAI | Anthropic | Ollama | Gemini |
+|---|--------|-----------|--------|--------|
+| Import | `@directive-run/ai/openai` | `@directive-run/ai/anthropic` | `@directive-run/ai/ollama` | `@directive-run/ai/gemini` |
+| Default model | `gpt-4o` | `claude-sonnet-4-5-20250929` | `llama3` | `gemini-2.0-flash` |
+| API key required | Yes | Yes | No | Yes |
+| Streaming runner | `createOpenAIStreamingRunner` | `createAnthropicStreamingRunner` | &ndash; | `createGeminiStreamingRunner` |
+| Embedder | `createOpenAIEmbedder` | &ndash; | &ndash; | &ndash; |
+| Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | &ndash; | `GEMINI_PRICING` |
+| Compatible APIs | Azure, Together, any OpenAI-compatible | &ndash; | &ndash; | &ndash; |
 
 ## Cost Tracking
 
@@ -134,6 +134,7 @@ const result = await orchestrator.runPattern("researchAndWrite", "Quantum comput
 | `@directive-run/ai/openai` | OpenAI / Azure / Together adapter |
 | `@directive-run/ai/anthropic` | Anthropic Claude adapter |
 | `@directive-run/ai/ollama` | Local Ollama inference adapter |
+| `@directive-run/ai/gemini` | Google Gemini adapter |
 
 ## Testing
 

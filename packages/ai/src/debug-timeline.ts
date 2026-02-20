@@ -151,9 +151,8 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
       const lastEvent = targetEvents[targetEvents.length - 1];
 
       if (lastEvent) {
-        // Truncate events after the fork point
-        const cutoffTimestamp = lastEvent.timestamp;
-        events = events.filter((e) => e.timestamp <= cutoffTimestamp);
+        // Truncate events after the fork point (use monotonic id, not timestamp)
+        events = events.filter((e) => e.id <= lastEvent.id);
       } else {
         // No matching events — clear all
         events = [];

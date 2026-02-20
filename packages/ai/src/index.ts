@@ -123,8 +123,6 @@ export type {
   DebateRoundEvent,
 } from "./types.js";
 
-export { SCRATCHPAD_KEY } from "./types.js";
-
 export { GuardrailError, isGuardrailError } from "./types.js";
 
 // ============================================================================
@@ -256,6 +254,8 @@ export {
   spawnOnCondition,
   derivedConstraint,
   spawnPool,
+  patternToJSON,
+  patternFromJSON,
   type MultiAgentOrchestrator,
   type MultiAgentOrchestratorOptions,
   type MultiAgentState,
@@ -275,6 +275,8 @@ export {
   type DebatePattern,
   type SpawnOnConditionOptions,
   type SpawnPoolConfig,
+  type SerializedPattern,
+  type SerializedDagNode,
   type HandoffRequest,
   type HandoffResult,
   type RunAgentRequirement,

@@ -3,6 +3,7 @@
  */
 
 import type { Requirement, ModuleSchema, SchemaType } from "@directive-run/core";
+import type { BreakpointState as BreakpointStateFromBreakpoints, BreakpointRequest } from "./breakpoints.js";
 import { t } from "@directive-run/core";
 
 // ============================================================================
@@ -338,14 +339,7 @@ export interface OrchestratorLifecycleHooks {
     timestamp: number;
   }) => void;
   /** Called when a breakpoint is hit and waiting for resolution. */
-  onBreakpoint?: (request: {
-    id: string;
-    type: string;
-    agentId: string;
-    input: string;
-    label?: string;
-    requestedAt: number;
-  }) => void;
+  onBreakpoint?: (request: BreakpointRequest) => void;
 }
 
 /** Lifecycle hooks for multi-agent orchestrator observability */
@@ -442,14 +436,7 @@ export interface MultiAgentLifecycleHooks {
   }) => void;
   onReroute?: (event: RerouteEvent) => void;
   /** Called when a breakpoint is hit and waiting for resolution. */
-  onBreakpoint?: (request: {
-    id: string;
-    type: string;
-    agentId: string;
-    input: string;
-    label?: string;
-    requestedAt: number;
-  }) => void;
+  onBreakpoint?: (request: BreakpointRequest) => void;
   /** Called when a cross-agent derivation value updates */
   onDerivationUpdate?: (event: { derivationId: string; value: unknown; timestamp: number }) => void;
   /** Called when a cross-agent derivation throws an error */
@@ -590,13 +577,13 @@ export interface DagNode {
   agent: string;
   /** Upstream node IDs this node depends on */
   deps?: string[];
-  /** Conditional edge — evaluated when deps are met. Default: unconditional */
+  /** Conditional edge — evaluated when deps are met. @default unconditional */
   when?: (context: DagExecutionContext) => boolean;
-  /** Build input string for this node's agent. Default: JSON.stringify upstream outputs */
+  /** Build input string for this node's agent. @default JSON.stringify(upstream outputs) */
   transform?: (context: DagExecutionContext) => string;
   /** Per-node timeout (ms) */
   timeout?: number;
-  /** Tiebreaker when multiple nodes are ready (higher = first). Default: 0 */
+  /** Tiebreaker when multiple nodes are ready (higher = first). @default 0 */
   priority?: number;
 }
 
@@ -611,7 +598,7 @@ export interface DagPattern<T = unknown> {
   timeout?: number;
   /** Maximum nodes running concurrently. @default Infinity. Consider setting this to avoid API rate limits. */
   maxConcurrent?: number;
-  /** Error handling strategy. Default: "fail" */
+  /** Error handling strategy. @default "fail" */
   onNodeError?: "fail" | "skip-downstream" | "continue";
 }
 
@@ -904,20 +891,20 @@ export interface RerouteEvent {
 
 /** Health monitor configuration */
 export interface HealthMonitorConfig {
-  /** Rolling window for metrics (ms). Default: 60000 */
+  /** Rolling window for metrics (ms). @default 60000 */
   windowMs?: number;
-  /** Weights for health score computation */
+  /** Weights for health score computation (must sum to ~1.0) */
   weights?: {
-    /** Weight for success rate (0-1). Default: 0.5 */
+    /** Weight for success rate (0-1). @default 0.5 */
     successRate?: number;
-    /** Weight for latency (0-1). Default: 0.3 */
+    /** Weight for latency (0-1). @default 0.3 */
     latency?: number;
-    /** Weight for circuit state (0-1). Default: 0.2 */
+    /** Weight for circuit state (0-1). @default 0.2 */
     circuitState?: number;
   };
-  /** Max latency considered "normal" (ms). Default: 5000 */
+  /** Max latency considered "normal" (ms). @default 5000 */
   maxNormalLatencyMs?: number;
-  /** Max events per agent before FIFO eviction. Default: 1000 */
+  /** Max events per agent before FIFO eviction. @default 1000 */
   maxEventsPerAgent?: number;
 }
 
@@ -929,7 +916,7 @@ export interface SelfHealingConfig {
   fallbackAgent?: AgentLike;
   /** Circuit breaker config for primary runner */
   circuitBreaker?: AgentCircuitBreakerConfig;
-  /** Health score below which to trigger reroute. Default: 30 */
+  /** Health score below which to trigger reroute. @default 30 */
   healthThreshold?: number;
   /** Behavior when all fallbacks exhausted */
   degradation?: "reject" | "fallback-response";
@@ -943,11 +930,11 @@ export interface SelfHealingConfig {
 export interface MultiAgentSelfHealingConfig {
   /** Default circuit breaker config for agents without their own */
   circuitBreakerDefaults?: AgentCircuitBreakerConfig;
-  /** Health score below which to trigger reroute. Default: 30 */
+  /** Health score below which to trigger reroute. @default 30 */
   healthThreshold?: number;
   /** Explicit equivalency groups (group name → agent IDs) */
   equivalencyGroups?: Record<string, string[]>;
-  /** Use capability matching for implicit equivalency. Default: true */
+  /** Use capability matching for implicit equivalency. @default true */
   useCapabilities?: boolean;
   /** Strategy for selecting equivalent agent */
   selectionStrategy?: "healthiest" | "round-robin";
@@ -978,19 +965,8 @@ export interface AgentCircuitBreakerConfig {
 /** Internal key for health state in coordinator facts */
 export const HEALTH_KEY = "__agentHealth" as const;
 
-/** Breakpoint state stored in bridge schema */
-export interface BreakpointState {
-  pending: Array<{
-    id: string;
-    type: string;
-    agentId: string;
-    input: string;
-    label?: string;
-    requestedAt: number;
-  }>;
-  resolved: string[];
-  cancelled: string[];
-}
+/** Breakpoint state stored in bridge schema — canonical definition in breakpoints.ts */
+export type BreakpointState = BreakpointStateFromBreakpoints;
 
 // ============================================================================
 // Cross-Agent Derivation Types

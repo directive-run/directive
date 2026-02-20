@@ -80,6 +80,7 @@ export type DevToolsServerMessage =
   | { type: "snapshot"; data: DevToolsSnapshot }
   | { type: "health"; metrics: Record<string, AgentHealthMetrics> }
   | { type: "breakpoints"; state: BreakpointState }
+  | { type: "pong"; timestamp: number }
   | { type: "error"; code: string; message: string };
 
 /** Messages sent FROM clients TO the server */
@@ -135,6 +136,8 @@ export interface DevToolsServerConfig {
   batchIntervalMs?: number;
   /** Health metrics push interval (ms). 0 = no auto-push. Default: 0 */
   healthPushIntervalMs?: number;
+  /** Maximum connected clients. Default: 50 */
+  maxClients?: number;
 }
 
 // ============================================================================
@@ -186,8 +189,9 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     batchIntervalMs = 50,
     healthPushIntervalMs = 0,
   } = config;
+  const maxClients = config.maxClients ?? 50;
 
-  const sessionId = `devtools_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const sessionId = `devtools_${crypto.randomUUID()}`;
   const clients = new Set<DevToolsClient>();
   let batchBuffer: DebugEvent[] = [];
   let batchTimer: ReturnType<typeof setInterval> | null = null;
@@ -208,7 +212,8 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
   function broadcastMessage(message: DevToolsServerMessage): void {
     const data = JSON.stringify(message);
-    for (const client of clients) {
+    const snapshot = [...clients];
+    for (const client of snapshot) {
       try {
         client.send(data);
       } catch {
@@ -286,9 +291,18 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
       return;
     }
 
+    const now = Date.now();
+    const last = clientLastMessage.get(client) ?? 0;
+    if (now - last < MIN_MESSAGE_INTERVAL_MS) {
+      sendToClient(client, { type: "error", code: "RATE_LIMITED", message: "Too many requests" });
+
+      return;
+    }
+    clientLastMessage.set(client, now);
+
     switch (msg.type) {
       case "ping":
-        sendToClient(client, { type: "welcome", version: PROTOCOL_VERSION, sessionId, timestamp: Date.now() });
+        sendToClient(client, { type: "pong", timestamp: Date.now() });
         break;
 
       case "request_snapshot":
@@ -325,7 +339,11 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
       case "resume_breakpoint":
         if (onResumeBreakpoint && typeof msg.breakpointId === "string") {
-          onResumeBreakpoint(msg.breakpointId, msg.modifications);
+          // Sanitize: only extract known fields to prevent prototype pollution
+          const mods = msg.modifications
+            ? { input: msg.modifications.input, skip: msg.modifications.skip }
+            : undefined;
+          onResumeBreakpoint(msg.breakpointId, mods);
         } else {
           sendToClient(client, { type: "error", code: "NO_BREAKPOINTS", message: "Breakpoint resume not configured" });
         }
@@ -333,7 +351,8 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
       case "cancel_breakpoint":
         if (onCancelBreakpoint && typeof msg.breakpointId === "string") {
-          onCancelBreakpoint(msg.breakpointId, msg.reason);
+          const safeReason = typeof msg.reason === "string" ? msg.reason : undefined;
+          onCancelBreakpoint(msg.breakpointId, safeReason);
         } else {
           sendToClient(client, { type: "error", code: "NO_BREAKPOINTS", message: "Breakpoint cancel not configured" });
         }
@@ -362,15 +381,31 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
       }
 
       default:
-        sendToClient(client, { type: "error", code: "UNKNOWN_COMMAND", message: `Unknown message type: ${(msg as { type: string }).type}` });
+        sendToClient(client, { type: "error", code: "UNKNOWN_COMMAND", message: `Unknown message type: ${String((msg as { type: string }).type).slice(0, 100)}` });
     }
   }
+
+  // ------------------------------------------------------------------
+  // Rate limiting
+  // ------------------------------------------------------------------
+
+  const clientLastMessage = new Map<DevToolsClient, number>();
+  const MIN_MESSAGE_INTERVAL_MS = 50;
 
   // ------------------------------------------------------------------
   // Connection handler
   // ------------------------------------------------------------------
 
   transport.onConnection((client, onMessage, onClose) => {
+    if (clients.size >= maxClients) {
+      try {
+        const msg: DevToolsServerMessage = { type: "error", code: "MAX_CLIENTS", message: "Connection limit reached" };
+        client.send(JSON.stringify(msg));
+      } catch { /* ignore */ }
+      client.close();
+
+      return;
+    }
     clients.add(client);
 
     // Send welcome message with current state
@@ -382,7 +417,10 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     });
 
     onMessage((data) => handleClientMessage(client, data));
-    onClose(() => clients.delete(client));
+    onClose(() => {
+      clients.delete(client);
+      clientLastMessage.delete(client);
+    });
   });
 
   // ------------------------------------------------------------------
@@ -433,6 +471,7 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
         }
       }
       clients.clear();
+      clientLastMessage.clear();
 
       transport.close();
     },
@@ -472,6 +511,9 @@ export interface DevToolsCompatibleOrchestrator {
  * automatically wiring up the orchestrator's timeline, health monitor, and breakpoint system.
  *
  * Requires the `ws` package: `npm install ws`
+ *
+ * **Security:** Binding to `0.0.0.0` exposes the server to all network interfaces.
+ * Only do this behind a firewall or with proper authentication.
  *
  * @example
  * ```typescript
@@ -538,6 +580,8 @@ export interface WsTransportConfig {
   port?: number;
   /** Host to bind to. Default: "localhost" */
   host?: string;
+  /** Maximum incoming message size in bytes. Default: 1048576 (1MB) */
+  maxPayloadBytes?: number;
 }
 
 /**
@@ -558,7 +602,8 @@ export async function createWsTransport(config: WsTransportConfig = {}): Promise
 
   // Dynamic import so ws is not a hard dependency
   const { WebSocketServer } = await import("ws");
-  const wss = new WebSocketServer({ port, host });
+  // maxPayload is supported at runtime but missing from @types/ws ServerOptions
+  const wss = new WebSocketServer({ port, host, ...{ maxPayload: config.maxPayloadBytes ?? 1_048_576 } });
 
   let connectionHandler: ((
     client: DevToolsClient,
