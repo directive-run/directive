@@ -15,17 +15,19 @@ import type { HealthMonitorConfig } from "./types.js";
 // ============================================================================
 
 /** Circuit state values */
-export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
+export type HealthCircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
 /** Per-agent health metrics */
 export interface AgentHealthMetrics {
   agentId: string;
-  circuitState: CircuitState;
+  circuitState: HealthCircuitState;
   successRate: number;
   avgLatencyMs: number;
   recentFailures: number;
   recentSuccesses: number;
   healthScore: number;
+  /** Last N error messages (most recent last) */
+  lastErrors: string[];
 }
 
 /** Internal event record */
@@ -33,16 +35,20 @@ interface HealthEvent {
   success: boolean;
   latencyMs: number;
   timestamp: number;
+  errorMessage?: string;
 }
 
 /** Health monitor instance */
 export interface HealthMonitor {
   recordSuccess(agentId: string, latencyMs: number): void;
-  recordFailure(agentId: string, latencyMs: number, error: Error): void;
+  recordFailure(agentId: string, latencyMs: number, error?: Error): void;
   getMetrics(agentId: string): AgentHealthMetrics;
   getAllMetrics(): Record<string, AgentHealthMetrics>;
+  /** Returns a 0-100 health score. Returns 50 (neutral) when no data is available for the agent. */
   getHealthScore(agentId: string): number;
-  updateCircuitState(agentId: string, state: CircuitState): void;
+  updateCircuitState(agentId: string, state: HealthCircuitState): void;
+  /** Reset all metrics. Useful for testing. */
+  reset(): void;
 }
 
 // ============================================================================
@@ -51,6 +57,8 @@ export interface HealthMonitor {
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX_NORMAL_LATENCY_MS = 5_000;
+const DEFAULT_MAX_EVENTS_PER_AGENT = 1_000;
+const DEFAULT_MAX_STORED_ERRORS = 5;
 const DEFAULT_WEIGHTS = {
   successRate: 0.5,
   latency: 0.3,
@@ -74,14 +82,32 @@ const DEFAULT_WEIGHTS = {
 export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMonitor {
   const windowMs = config.windowMs ?? DEFAULT_WINDOW_MS;
   const maxNormalLatencyMs = config.maxNormalLatencyMs ?? DEFAULT_MAX_NORMAL_LATENCY_MS;
+  const maxEventsPerAgent = config.maxEventsPerAgent ?? DEFAULT_MAX_EVENTS_PER_AGENT;
   const weights = {
     successRate: config.weights?.successRate ?? DEFAULT_WEIGHTS.successRate,
     latency: config.weights?.latency ?? DEFAULT_WEIGHTS.latency,
     circuitState: config.weights?.circuitState ?? DEFAULT_WEIGHTS.circuitState,
   };
 
+  // Validate config
+  if (!Number.isFinite(windowMs) || windowMs <= 0) {
+    throw new Error("[Directive HealthMonitor] windowMs must be a positive number");
+  }
+  if (!Number.isFinite(maxNormalLatencyMs) || maxNormalLatencyMs <= 0) {
+    throw new Error("[Directive HealthMonitor] maxNormalLatencyMs must be a positive number");
+  }
+  if (!Number.isFinite(maxEventsPerAgent) || maxEventsPerAgent < 1) {
+    throw new Error("[Directive HealthMonitor] maxEventsPerAgent must be >= 1");
+  }
+
+  // Validate weights sum approximately to 1.0
+  const weightSum = weights.successRate + weights.latency + weights.circuitState;
+  if (Math.abs(weightSum - 1.0) > 0.01) {
+    throw new Error(`[Directive HealthMonitor] weights must sum to 1.0 (got ${weightSum.toFixed(4)})`);
+  }
+
   const events = new Map<string, HealthEvent[]>();
-  const circuitStates = new Map<string, CircuitState>();
+  const circuitStates = new Map<string, HealthCircuitState>();
 
   function getAgentEvents(agentId: string): HealthEvent[] {
     let agentEvents = events.get(agentId);
@@ -93,10 +119,23 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     return agentEvents;
   }
 
-  function pruneOld(agentEvents: HealthEvent[], now: number): void {
+  function pruneAndCap(agentEvents: HealthEvent[], now: number): void {
+    // Time-based pruning: find first event within the window
     const cutoff = now - windowMs;
-    while (agentEvents.length > 0 && agentEvents[0]!.timestamp < cutoff) {
-      agentEvents.shift();
+    let firstValid = 0;
+    while (firstValid < agentEvents.length && agentEvents[firstValid]!.timestamp < cutoff) {
+      firstValid++;
+    }
+
+    // Cap-based pruning: ensure we don't exceed maxEventsPerAgent
+    const excessFromCap = (agentEvents.length - firstValid) - maxEventsPerAgent;
+    if (excessFromCap > 0) {
+      firstValid += excessFromCap;
+    }
+
+    // Batch remove all expired/excess events in one operation
+    if (firstValid > 0) {
+      agentEvents.splice(0, firstValid);
     }
   }
 
@@ -107,7 +146,7 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     }
 
     const now = Date.now();
-    pruneOld(agentEvents, now);
+    pruneAndCap(agentEvents, now);
 
     if (agentEvents.length === 0) {
       return 50;
@@ -133,7 +172,7 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
   function buildMetrics(agentId: string): AgentHealthMetrics {
     const agentEvents = getAgentEvents(agentId);
     const now = Date.now();
-    pruneOld(agentEvents, now);
+    pruneAndCap(agentEvents, now);
 
     const successes = agentEvents.filter((e) => e.success).length;
     const failures = agentEvents.length - successes;
@@ -141,6 +180,14 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     const avgLatencyMs = agentEvents.length > 0
       ? agentEvents.reduce((s, e) => s + e.latencyMs, 0) / agentEvents.length
       : 0;
+
+    // Collect last N error messages
+    const lastErrors: string[] = [];
+    for (let i = agentEvents.length - 1; i >= 0 && lastErrors.length < DEFAULT_MAX_STORED_ERRORS; i--) {
+      if (agentEvents[i]!.errorMessage) {
+        lastErrors.unshift(agentEvents[i]!.errorMessage!);
+      }
+    }
 
     return {
       agentId,
@@ -150,6 +197,7 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
       recentFailures: failures,
       recentSuccesses: successes,
       healthScore: computeScore(agentId),
+      lastErrors,
     };
   }
 
@@ -159,9 +207,14 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
       agentEvents.push({ success: true, latencyMs, timestamp: Date.now() });
     },
 
-    recordFailure(agentId: string, latencyMs: number, _error: Error): void {
+    recordFailure(agentId: string, latencyMs: number, error?: Error): void {
       const agentEvents = getAgentEvents(agentId);
-      agentEvents.push({ success: false, latencyMs, timestamp: Date.now() });
+      agentEvents.push({
+        success: false,
+        latencyMs,
+        timestamp: Date.now(),
+        errorMessage: error?.message,
+      });
     },
 
     getMetrics(agentId: string): AgentHealthMetrics {
@@ -181,8 +234,13 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
       return computeScore(agentId);
     },
 
-    updateCircuitState(agentId: string, state: CircuitState): void {
+    updateCircuitState(agentId: string, state: HealthCircuitState): void {
       circuitStates.set(agentId, state);
+    },
+
+    reset(): void {
+      events.clear();
+      circuitStates.clear();
     },
   };
 }

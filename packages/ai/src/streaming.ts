@@ -1,5 +1,5 @@
 /**
- * OpenAI Agents Streaming - Token-by-token streaming with backpressure support
+ * Agent Streaming - Token-by-token streaming with backpressure support
  *
  * Provides async iterators for streaming agent responses with guardrail evaluation
  * on partial output and configurable backpressure handling.
@@ -21,6 +21,7 @@
  */
 
 import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData } from "./types.js";
+import type { OrchestratorStreamChunk } from "./agent-orchestrator.js";
 
 // ============================================================================
 // Constants
@@ -211,7 +212,9 @@ class StreamBuffer<T> {
   }
 
   async push(item: T): Promise<boolean> {
-    if (this.closed) return false;
+    if (this.closed) {
+      return false;
+    }
 
     // If there's a pull waiter, send directly
     const pullWaiter = this.pullWaiters.shift();
@@ -231,7 +234,9 @@ class StreamBuffer<T> {
           await new Promise<void>((resolve) => {
             this.pushWaiters.push(resolve);
           });
-          if (this.closed) return false;
+          if (this.closed) {
+            return false;
+          }
           break;
         case "buffer":
           // Just push anyway (may use lots of memory)
@@ -608,6 +613,7 @@ export function createPatternStreamingGuardrail(options: {
     stopOnFail,
     check(partialOutput) {
       for (const { regex, name } of patterns) {
+        regex.lastIndex = 0;
         if (regex.test(partialOutput)) {
           return {
             passed: false,
@@ -797,4 +803,181 @@ export async function* mapStream<R>(
   for await (const chunk of stream) {
     yield await fn(chunk);
   }
+}
+
+// ============================================================================
+// Multiplexed Streaming (Parallel Agent Streams)
+// ============================================================================
+
+/** A multiplexed stream chunk tagged with the agent that produced it */
+export interface MultiplexedStreamChunk {
+  chunk: OrchestratorStreamChunk;
+  agentId: string;
+}
+
+/** Result from a parallel streaming operation */
+export interface MultiplexedStreamResult<T = unknown> {
+  stream: AsyncIterable<MultiplexedStreamChunk>;
+  results: Promise<RunResult<unknown>[]>;
+  merge: Promise<T>;
+  abort: () => void;
+  /** Number of chunks dropped due to buffer overflow */
+  getDroppedCount: () => number;
+}
+
+/** Maximum buffer size for multiplexed streams */
+const MAX_MULTIPLEX_BUFFER = 10_000;
+
+/** A source stream with its agent ID */
+interface TaggedSource {
+  agentId: string;
+  stream: AsyncIterable<OrchestratorStreamChunk>;
+}
+
+/**
+ * Merge multiple async iterables into a single multiplexed stream,
+ * tagging each chunk with its source agent ID.
+ *
+ * Race-based merge: pulls from all sources concurrently, emitting
+ * chunks in arrival order. Error chunks from individual agents are
+ * tagged and emitted (other agents continue).
+ *
+ * @example
+ * ```typescript
+ * const merged = mergeTaggedStreams([
+ *   { agentId: "researcher", stream: researchStream },
+ *   { agentId: "writer", stream: writerStream },
+ * ]);
+ *
+ * for await (const { chunk, agentId } of merged) {
+ *   console.log(`[${agentId}]`, chunk);
+ * }
+ * ```
+ */
+/** Result from mergeTaggedStreams */
+export interface MergedTaggedStreamResult {
+  stream: AsyncIterable<MultiplexedStreamChunk>;
+  /** Number of chunks dropped due to buffer overflow */
+  getDroppedCount: () => number;
+}
+
+export function mergeTaggedStreams(
+  sources: TaggedSource[],
+): MergedTaggedStreamResult {
+  // Guard: empty sources would hang forever since no consumer calls finish()
+  if (sources.length === 0) {
+    const emptyStream: AsyncIterable<MultiplexedStreamChunk> = {
+      [Symbol.asyncIterator]() {
+        const done = { done: true as const, value: undefined as unknown as MultiplexedStreamChunk };
+
+        return {
+          async next() { return done; },
+          async return() { return done; },
+        };
+      },
+    };
+
+    return { stream: emptyStream, getDroppedCount: () => 0 };
+  }
+
+  const buffer: MultiplexedStreamChunk[] = [];
+  const waiters: Array<(item: MultiplexedStreamChunk | null) => void> = [];
+  let activeSources = sources.length;
+  let closed = false;
+  let droppedCount = 0;
+
+  function push(item: MultiplexedStreamChunk): void {
+    if (closed) {
+      return;
+    }
+
+    const waiter = waiters.shift();
+    if (waiter) {
+      waiter(item);
+
+      return;
+    }
+
+    if (buffer.length < MAX_MULTIPLEX_BUFFER) {
+      buffer.push(item);
+    } else {
+      droppedCount++;
+    }
+  }
+
+  function finish(): void {
+    activeSources--;
+    if (activeSources <= 0) {
+      closed = true;
+      for (const waiter of waiters) {
+        waiter(null);
+      }
+      waiters.length = 0;
+    }
+  }
+
+  // Start consumers for each source
+  for (const source of sources) {
+    (async () => {
+      try {
+        for await (const chunk of source.stream) {
+          push({ chunk, agentId: source.agentId });
+        }
+      } catch (error) {
+        // Emit error as a tagged chunk
+        push({
+          chunk: {
+            type: "error",
+            error: error instanceof Error ? error : new Error(String(error)),
+          },
+          agentId: source.agentId,
+        });
+      } finally {
+        finish();
+      }
+    })();
+  }
+
+  const stream: AsyncIterable<MultiplexedStreamChunk> = {
+    [Symbol.asyncIterator](): AsyncIterator<MultiplexedStreamChunk> {
+      return {
+        async next(): Promise<IteratorResult<MultiplexedStreamChunk>> {
+          if (buffer.length > 0) {
+            return { done: false, value: buffer.shift()! };
+          }
+
+          if (closed) {
+            return { done: true, value: undefined };
+          }
+
+          return new Promise<IteratorResult<MultiplexedStreamChunk>>((resolve) => {
+            waiters.push((item) => {
+              if (item === null) {
+                resolve({ done: true, value: undefined });
+              } else {
+                resolve({ done: false, value: item });
+              }
+            });
+          });
+        },
+
+        return(): Promise<IteratorResult<MultiplexedStreamChunk>> {
+          // Stop accepting new chunks
+          closed = true;
+          buffer.length = 0;
+          for (const waiter of waiters) {
+            waiter(null);
+          }
+          waiters.length = 0;
+
+          return Promise.resolve({ done: true, value: undefined });
+        },
+      };
+    },
+  };
+
+  return {
+    stream,
+    getDroppedCount: () => droppedCount,
+  };
 }

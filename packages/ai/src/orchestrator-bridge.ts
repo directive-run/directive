@@ -24,6 +24,7 @@ import type {
   AgentState,
   ApprovalState,
   AgentHealthState,
+  BreakpointState,
   OrchestratorConstraint,
   OrchestratorResolverContext,
   OrchestratorResolver,
@@ -36,6 +37,7 @@ import {
   CONVERSATION_KEY,
   TOOL_CALLS_KEY,
   HEALTH_KEY,
+  BREAKPOINT_KEY,
 } from "./types.js";
 
 // ============================================================================
@@ -90,6 +92,16 @@ export function getHealthState(facts: any): Record<string, AgentHealthState> {
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setHealthState(facts: any, state: Record<string, AgentHealthState>): void {
   setBridgeFact(facts, HEALTH_KEY, state);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+export function getBreakpointState(facts: any): BreakpointState {
+  return getBridgeFact<BreakpointState>(facts, BREAKPOINT_KEY);
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+export function setBreakpointState(facts: any, state: BreakpointState): void {
+  setBridgeFact(facts, BREAKPOINT_KEY, state);
 }
 
 /** Get full orchestrator state from facts */
@@ -161,11 +173,11 @@ export function convertOrchestratorResolvers<F extends Record<string, unknown>>(
       requirement: resolver.requirement,
       key: resolver.key,
       // biome-ignore lint/suspicious/noExplicitAny: Context type varies
-      resolve: async (req: Requirement, ctx: any) => {
-        const state = getOrchestratorState(ctx.facts);
-        const combinedFacts = { ...ctx.facts, ...state } as unknown as F & OrchestratorState;
+      resolve: async (req: Requirement, context: any) => {
+        const state = getOrchestratorState(context.facts);
+        const combinedFacts = { ...context.facts, ...state } as unknown as F & OrchestratorState;
 
-        const orchestratorCtx: OrchestratorResolverContext<F> = {
+        const orchestratorContext: OrchestratorResolverContext<F> = {
           facts: combinedFacts,
           runAgent: async <T>(agent: AgentLike, input: string, opts?: RunOptions) => {
             return runAgentWithGuardrails<T>(
@@ -175,9 +187,9 @@ export function convertOrchestratorResolvers<F extends Record<string, unknown>>(
               opts
             );
           },
-          signal: ctx.signal,
+          signal: context.signal,
         };
-        await resolver.resolve(req, orchestratorCtx);
+        await resolver.resolve(req, orchestratorContext);
       },
     };
   }
