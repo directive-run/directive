@@ -178,7 +178,7 @@ export interface ToolCallGuardrailData {
 
 /** Retry configuration for guardrails */
 export interface GuardrailRetryConfig {
-  /** @default 1 */
+  /** Total attempts (1 = no retries, 2 = one retry, etc.). @default 1 */
   attempts?: number;
   /** @default "exponential" */
   backoff?: "exponential" | "linear" | "fixed";
@@ -296,7 +296,7 @@ export interface OrchestratorResolver<
 > {
   requirement: (req: Requirement) => req is R;
   key?: (req: R) => string;
-  resolve: (req: R, ctx: OrchestratorResolverContext<F>) => void | Promise<void>;
+  resolve: (req: R, context: OrchestratorResolverContext<F>) => void | Promise<void>;
 }
 
 /** Lifecycle hooks for observability */
@@ -336,6 +336,15 @@ export interface OrchestratorLifecycleHooks {
     error: Error;
     delayMs: number;
     timestamp: number;
+  }) => void;
+  /** Called when a breakpoint is hit and waiting for resolution. */
+  onBreakpoint?: (request: {
+    id: string;
+    type: string;
+    agentId: string;
+    input: string;
+    label?: string;
+    requestedAt: number;
   }) => void;
 }
 
@@ -386,13 +395,13 @@ export interface MultiAgentLifecycleHooks {
   onHandoffComplete?: (result: { request: { id: string; fromAgent: string; toAgent: string }; completedAt: number }) => void;
   onPatternStart?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag";
+    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
     input: string;
     timestamp: number;
   }) => void;
   onPatternComplete?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag";
+    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
     durationMs: number;
     timestamp: number;
     error?: Error;
@@ -432,6 +441,21 @@ export interface MultiAgentLifecycleHooks {
     timestamp: number;
   }) => void;
   onReroute?: (event: RerouteEvent) => void;
+  /** Called when a breakpoint is hit and waiting for resolution. */
+  onBreakpoint?: (request: {
+    id: string;
+    type: string;
+    agentId: string;
+    input: string;
+    label?: string;
+    requestedAt: number;
+  }) => void;
+  /** Called when a cross-agent derivation value updates */
+  onDerivationUpdate?: (event: { derivationId: string; value: unknown; timestamp: number }) => void;
+  /** Called when a cross-agent derivation throws an error */
+  onDerivationError?: (event: { derivationId: string; error: Error; timestamp: number }) => void;
+  /** Called when scratchpad values are updated */
+  onScratchpadUpdate?: (event: { keys: string[]; timestamp: number }) => void;
 }
 
 // ============================================================================
@@ -537,6 +561,7 @@ export const AGENT_KEY = "__agent" as const;
 export const APPROVAL_KEY = "__approval" as const;
 export const CONVERSATION_KEY = "__conversation" as const;
 export const TOOL_CALLS_KEY = "__toolCalls" as const;
+export const BREAKPOINT_KEY = "__breakpoints" as const;
 
 // ============================================================================
 // DAG Execution Types (Multi-Agent)
@@ -584,7 +609,7 @@ export interface DagPattern<T = unknown> {
   merge: (context: DagExecutionContext) => T | Promise<T>;
   /** Overall DAG timeout (ms) */
   timeout?: number;
-  /** Maximum nodes running concurrently. Default: Infinity */
+  /** Maximum nodes running concurrently. @default Infinity. Consider setting this to avoid API rate limits. */
   maxConcurrent?: number;
   /** Error handling strategy. Default: "fail" */
   onNodeError?: "fail" | "skip-downstream" | "continue";
@@ -611,7 +636,16 @@ export type DebugEventType =
   | "handoff_complete"
   | "pattern_start"
   | "pattern_complete"
-  | "dag_node_update";
+  | "dag_node_update"
+  | "breakpoint_hit"
+  | "breakpoint_resumed"
+  | "derivation_update"
+  | "scratchpad_update"
+  | "reflection_iteration"
+  | "race_start"
+  | "race_winner"
+  | "race_cancelled"
+  | "debate_round";
 
 /** Base debug event */
 export interface DebugEventBase {
@@ -728,14 +762,14 @@ export interface HandoffCompleteEvent extends DebugEventBase {
 export interface PatternStartEvent extends DebugEventBase {
   type: "pattern_start";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag";
+  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
 }
 
 /** Pattern complete event */
 export interface PatternCompleteEvent extends DebugEventBase {
   type: "pattern_complete";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag";
+  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
   durationMs: number;
   error?: string;
 }
@@ -745,6 +779,80 @@ export interface DagNodeUpdateEvent extends DebugEventBase {
   type: "dag_node_update";
   nodeId: string;
   status: DagNodeStatus;
+}
+
+/** Breakpoint hit event */
+export interface BreakpointHitEvent extends DebugEventBase {
+  type: "breakpoint_hit";
+  breakpointId: string;
+  breakpointType: string;
+  label?: string;
+}
+
+/** Breakpoint resumed event */
+export interface BreakpointResumedEvent extends DebugEventBase {
+  type: "breakpoint_resumed";
+  breakpointId: string;
+  modified: boolean;
+  skipped: boolean;
+}
+
+/** Derivation update event */
+export interface DerivationUpdateEvent extends DebugEventBase {
+  type: "derivation_update";
+  derivationId: string;
+  valueType: string;
+}
+
+/** Scratchpad update event */
+export interface ScratchpadUpdateEvent extends DebugEventBase {
+  type: "scratchpad_update";
+  keys: string[];
+}
+
+/** Reflection iteration event */
+export interface ReflectionIterationEvent extends DebugEventBase {
+  type: "reflection_iteration";
+  iteration: number;
+  passed: boolean;
+  score?: number;
+  durationMs: number;
+  producerTokens: number;
+  evaluatorTokens: number;
+}
+
+/** Race start event */
+export interface RaceStartEvent extends DebugEventBase {
+  type: "race_start";
+  patternId: string;
+  agents: string[];
+}
+
+/** Race winner event */
+export interface RaceWinnerEvent extends DebugEventBase {
+  type: "race_winner";
+  patternId: string;
+  winnerId: string;
+  durationMs: number;
+}
+
+/** Race cancelled event */
+export interface RaceCancelledEvent extends DebugEventBase {
+  type: "race_cancelled";
+  patternId: string;
+  cancelledIds: string[];
+  reason: "winner_found" | "timeout" | "all_failed";
+}
+
+/** Debate round event — emitted after each round's judgement */
+export interface DebateRoundEvent extends DebugEventBase {
+  type: "debate_round";
+  patternId: string;
+  round: number;
+  totalRounds: number;
+  winnerId: string;
+  score?: number;
+  agentCount: number;
 }
 
 /** Union of all debug event types */
@@ -764,7 +872,16 @@ export type DebugEvent =
   | HandoffCompleteEvent
   | PatternStartEvent
   | PatternCompleteEvent
-  | DagNodeUpdateEvent;
+  | DagNodeUpdateEvent
+  | BreakpointHitEvent
+  | BreakpointResumedEvent
+  | DerivationUpdateEvent
+  | ScratchpadUpdateEvent
+  | ReflectionIterationEvent
+  | RaceStartEvent
+  | RaceWinnerEvent
+  | RaceCancelledEvent
+  | DebateRoundEvent;
 
 // ============================================================================
 // Self-Healing Types
@@ -800,6 +917,8 @@ export interface HealthMonitorConfig {
   };
   /** Max latency considered "normal" (ms). Default: 5000 */
   maxNormalLatencyMs?: number;
+  /** Max events per agent before FIFO eviction. Default: 1000 */
+  maxEventsPerAgent?: number;
 }
 
 /** Self-healing configuration for single-agent orchestrator */
@@ -809,7 +928,7 @@ export interface SelfHealingConfig {
   /** Fallback agent to try when all runners fail */
   fallbackAgent?: AgentLike;
   /** Circuit breaker config for primary runner */
-  circuitBreaker?: CircuitBreakerConfig;
+  circuitBreaker?: AgentCircuitBreakerConfig;
   /** Health score below which to trigger reroute. Default: 30 */
   healthThreshold?: number;
   /** Behavior when all fallbacks exhausted */
@@ -823,7 +942,7 @@ export interface SelfHealingConfig {
 /** Self-healing configuration for multi-agent orchestrator */
 export interface MultiAgentSelfHealingConfig {
   /** Default circuit breaker config for agents without their own */
-  circuitBreakerDefaults?: CircuitBreakerConfig;
+  circuitBreakerDefaults?: AgentCircuitBreakerConfig;
   /** Health score below which to trigger reroute. Default: 30 */
   healthThreshold?: number;
   /** Explicit equivalency groups (group name → agent IDs) */
@@ -844,13 +963,13 @@ export interface MultiAgentSelfHealingConfig {
   healthMonitor?: HealthMonitorConfig;
 }
 
-/** Circuit breaker config type (re-exported for convenience) */
-export interface CircuitBreakerConfig {
-  /** Number of failures before opening. Default: 5 */
+/** Circuit breaker config for AI agent self-healing (simplified subset of core CircuitBreakerConfig) */
+export interface AgentCircuitBreakerConfig {
+  /** Number of failures before opening. @default 5 */
   failureThreshold?: number;
-  /** Time before trying half-open (ms). Default: 30000 */
+  /** Time before trying half-open (ms). @default 30000 */
   resetTimeoutMs?: number;
-  /** Successes needed to close from half-open. Default: 2 */
+  /** Successes needed to close from half-open. @default 2 */
   halfOpenSuccesses?: number;
   /** State change callback */
   onStateChange?: (from: string, to: string) => void;
@@ -859,6 +978,63 @@ export interface CircuitBreakerConfig {
 /** Internal key for health state in coordinator facts */
 export const HEALTH_KEY = "__agentHealth" as const;
 
+/** Breakpoint state stored in bridge schema */
+export interface BreakpointState {
+  pending: Array<{
+    id: string;
+    type: string;
+    agentId: string;
+    input: string;
+    label?: string;
+    requestedAt: number;
+  }>;
+  resolved: string[];
+  cancelled: string[];
+}
+
+// ============================================================================
+// Cross-Agent Derivation Types
+// ============================================================================
+
+/** Snapshot of all agent states for cross-agent derivations */
+export interface CrossAgentSnapshot {
+  agents: Record<string, {
+    status: "idle" | "running" | "completed" | "error";
+    lastInput?: string;
+    lastOutput?: unknown;
+    lastError?: string;
+    runCount: number;
+    totalTokens: number;
+  }>;
+  coordinator: { globalTokens: number; status: string };
+  scratchpad?: Record<string, unknown>;
+}
+
+/** Function that computes a derived value from a cross-agent snapshot */
+export type CrossAgentDerivationFn<T = unknown> = (snapshot: CrossAgentSnapshot) => T;
+
+// ============================================================================
+// Shared Scratchpad Types
+// ============================================================================
+
+/** Internal key for scratchpad fact on coordinator module */
+export const SCRATCHPAD_KEY = "__scratchpad" as const;
+
+/** Shared scratchpad interface for multi-agent collaboration */
+export interface Scratchpad<T extends Record<string, unknown> = Record<string, unknown>> {
+  get<K extends keyof T>(key: K): T[K];
+  set<K extends keyof T>(key: K, value: T[K]): void;
+  /** Check if a key exists in the scratchpad */
+  has<K extends keyof T>(key: K): boolean;
+  /** Delete a key from the scratchpad */
+  delete<K extends keyof T>(key: K): void;
+  update(values: Partial<T>): void;
+  getAll(): T;
+  subscribe(keys: (keyof T)[], callback: (key: keyof T, value: unknown) => void): () => void;
+  onChange(callback: (key: string, value: unknown) => void): () => void;
+  reset(): void;
+}
+
 /** Bridge schema for orchestrator (internal plumbing — types cast to bypass t.object constraint) */
 export const orchestratorBridgeSchema = {
   facts: {
@@ -866,6 +1042,7 @@ export const orchestratorBridgeSchema = {
     [APPROVAL_KEY]: t.object() as unknown as SchemaType<ApprovalState>,
     [CONVERSATION_KEY]: t.array() as unknown as SchemaType<Message[]>,
     [TOOL_CALLS_KEY]: t.array() as unknown as SchemaType<ToolCall[]>,
+    [BREAKPOINT_KEY]: t.object() as unknown as SchemaType<BreakpointState>,
   },
   derivations: {},
   events: {},
