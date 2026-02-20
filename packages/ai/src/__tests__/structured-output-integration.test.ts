@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
-  createMockAgentRunner,
   createTestOrchestrator,
   createTestMultiAgentOrchestrator,
   createMockSchema,
@@ -85,21 +84,6 @@ describe("Single-agent structured output", () => {
 
   it("invalid output triggers retry and succeeds on second call", async () => {
     let callCount = 0;
-    const runner = createMockAgentRunner({
-      defaultResponse: {
-        output: "not valid json",
-        totalTokens: 50,
-        generate: () => {
-          callCount++;
-          if (callCount <= 1) {
-            return { output: "not valid json" };
-          }
-
-          return { output: validJson };
-        },
-      },
-    });
-
     const schema = createMockSchema<{ name: string; score: number }>(
       (data) =>
         typeof data === "object" &&
@@ -222,13 +206,6 @@ describe("Multi-agent per-agent structured output", () => {
         data !== null &&
         "name" in data,
     );
-
-    const runner = createMockAgentRunner({
-      responses: {
-        "bad-agent": { output: "not json at all", totalTokens: 10 },
-      },
-      defaultResponse: { output: validJson, totalTokens: 10 },
-    });
 
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {

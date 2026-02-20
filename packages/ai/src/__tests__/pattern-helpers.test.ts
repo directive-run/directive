@@ -3,7 +3,6 @@ import {
   createTestMultiAgentOrchestrator,
 } from "../testing.js";
 import {
-  race,
   reflect,
   debate,
   runDebate,
@@ -147,7 +146,7 @@ describe("structural equality for derivations", () => {
         a: { output: "out", totalTokens: 10 },
       },
       derive: {
-        counter: (snap: CrossAgentSnapshot) => {
+        counter: (_snap: CrossAgentSnapshot) => {
           runCount++;
 
           return { count: runCount };
@@ -190,8 +189,8 @@ describe("spawnOnCondition", () => {
       input: () => "High score alert",
     });
 
-    expect(constraint.when({ score: 50 } as Record<string, unknown>)).toBe(false);
-    expect(constraint.when({ score: 200 } as Record<string, unknown>)).toBe(true);
+    expect(constraint.when({ score: 50 } as any)).toBe(false);
+    expect(constraint.when({ score: 200 } as any)).toBe(true);
   });
 
   it("require() returns RUN_AGENT requirement", () => {
@@ -202,7 +201,8 @@ describe("spawnOnCondition", () => {
       options: { priority: 10, context: { urgent: true } },
     });
 
-    const req = constraint.require!({ task: "do stuff" } as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({ task: "do stuff" } as any);
 
     expect(req).toMatchObject({
       type: "RUN_AGENT",
@@ -249,9 +249,9 @@ describe("runDebate", () => {
     expect(result.winnerId).toBe("optimist");
     expect(result.result).toBe("Things are great!");
     expect(result.rounds).toHaveLength(1);
-    expect(result.rounds[0].proposals).toHaveLength(2);
-    expect(result.rounds[0].judgement.winnerId).toBe("optimist");
-    expect(result.rounds[0].judgement.score).toBe(0.8);
+    expect(result.rounds[0]!.proposals).toHaveLength(2);
+    expect(result.rounds[0]!.judgement.winnerId).toBe("optimist");
+    expect(result.rounds[0]!.judgement.score).toBe(0.8);
   });
 
   it("multi-round debate passes feedback", async () => {
@@ -369,8 +369,8 @@ describe("derivedConstraint", () => {
     );
 
     // Simulates the orchestrator passing __derived in facts
-    expect(constraint.when({ __derived: { totalCost: 3.0 } } as Record<string, unknown>)).toBe(false);
-    expect(constraint.when({ __derived: { totalCost: 10.0 } } as Record<string, unknown>)).toBe(true);
+    expect(constraint.when({ __derived: { totalCost: 3.0 } } as any)).toBe(false);
+    expect(constraint.when({ __derived: { totalCost: 10.0 } } as any)).toBe(true);
   });
 
   it("require() returns RUN_AGENT with derived value", () => {
@@ -386,9 +386,10 @@ describe("derivedConstraint", () => {
     );
 
     // Trigger when() to capture value
-    constraint.when({ __derived: { risk: 0.95 } } as Record<string, unknown>);
+    constraint.when({ __derived: { risk: 0.95 } } as any);
 
-    const req = constraint.require!({} as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({} as any);
     expect(req).toMatchObject({
       type: "RUN_AGENT",
       agent: "risk-handler",
@@ -438,8 +439,8 @@ describe("runReflect (imperative)", () => {
     expect(result.result).toBe("essay");
     expect(result.iterations).toBe(2);
     expect(result.history).toHaveLength(2);
-    expect(result.history[0].passed).toBe(false);
-    expect(result.history[1].passed).toBe(true);
+    expect(result.history[0]!.passed).toBe(false);
+    expect(result.history[1]!.passed).toBe(true);
     expect(result.exhausted).toBe(false);
   });
 
@@ -570,8 +571,8 @@ describe("spawnPool", () => {
       },
     );
 
-    expect(constraint.when({ load: 5 } as Record<string, unknown>)).toBe(false);
-    expect(constraint.when({ load: 15 } as Record<string, unknown>)).toBe(true);
+    expect(constraint.when({ load: 5 } as any)).toBe(false);
+    expect(constraint.when({ load: 15 } as any)).toBe(true);
   });
 
   it("require() returns RUN_AGENT requirement", () => {
@@ -586,7 +587,8 @@ describe("spawnPool", () => {
       },
     );
 
-    const req = constraint.require!({} as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({} as any);
 
     expect(req).toMatchObject({
       type: "RUN_AGENT",
@@ -608,7 +610,8 @@ describe("spawnPool", () => {
     );
 
     // The constraint returns a single RUN_AGENT requirement per evaluation cycle
-    const req = constraint.require!({ pending: 5 } as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({ pending: 5 } as any);
 
     expect(req).toMatchObject({
       type: "RUN_AGENT",
@@ -633,7 +636,8 @@ describe("spawnOnCondition flattened options", () => {
     });
 
     expect(constraint.priority).toBe(42);
-    const req = constraint.require!({} as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({} as any);
     expect(req).toMatchObject({
       context: { urgent: true },
     });
@@ -648,7 +652,8 @@ describe("spawnOnCondition flattened options", () => {
     });
 
     expect(constraint.priority).toBe(10);
-    const req = constraint.require!({} as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({} as Record<string, unknown>);
     expect(req).toMatchObject({
       context: { legacy: true },
     });
@@ -665,7 +670,8 @@ describe("spawnOnCondition flattened options", () => {
     });
 
     expect(constraint.priority).toBe(99);
-    const req = constraint.require!({} as Record<string, unknown>);
+    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const req = requireFn({} as Record<string, unknown>);
     expect(req).toMatchObject({
       context: { modern: true },
     });

@@ -3,8 +3,6 @@ import {
   createGoalEngine,
   buildDependencyGraph,
   type GoalAgentDeclaration,
-  type GoalEngineConfig,
-  type ExecutionPlan,
 } from "../goals.js";
 import type { AgentRunner, RunResult } from "../types.js";
 
@@ -13,7 +11,7 @@ import type { AgentRunner, RunResult } from "../types.js";
 // ============================================================================
 
 function mockRunner(outputs: Record<string, unknown>): AgentRunner {
-  return async (agent, _input) => {
+  return (async (agent, _input) => {
     const output = outputs[agent.name];
 
     return {
@@ -22,7 +20,7 @@ function mockRunner(outputs: Record<string, unknown>): AgentRunner {
       toolCalls: [],
       totalTokens: 100,
     } as RunResult<unknown>;
-  };
+  }) as AgentRunner;
 }
 
 function makeAgents(defs: Record<string, { produces: string[]; requires: string[] }>): Record<string, GoalAgentDeclaration> {
@@ -149,7 +147,7 @@ describe("createGoalEngine", () => {
 
   it("handles parallel-ready agents", async () => {
     const engine = createGoalEngine({
-      runner: async (agent) => {
+      runner: (async (agent) => {
         const outputs: Record<string, unknown> = {
           a: { a_out: "a done" },
           b: { b_out: "b done" },
@@ -162,7 +160,7 @@ describe("createGoalEngine", () => {
           toolCalls: [],
           totalTokens: 50,
         };
-      },
+      }) as AgentRunner,
       agents: makeAgents({
         a: { produces: ["a_out"], requires: ["input"] },
         b: { produces: ["b_out"], requires: ["input"] },
@@ -203,12 +201,12 @@ describe("createGoalEngine", () => {
 
   it("respects maxSteps and reports stuck when no agents ready", async () => {
     const engine = createGoalEngine({
-      runner: async () => ({
+      runner: (async () => ({
         output: JSON.stringify({ data: "done" }),
         messages: [],
         toolCalls: [],
         totalTokens: 10,
-      }),
+      })) as AgentRunner,
       agents: makeAgents({
         worker: { produces: ["data"], requires: [] },
         consumer: { produces: ["result"], requires: ["data", "missing_key"] },
@@ -270,11 +268,11 @@ describe("createGoalEngine", () => {
     let receivedInput = "";
 
     const engine = createGoalEngine({
-      runner: async (_agent, input) => {
+      runner: (async (_agent, input) => {
         receivedInput = input;
 
         return { output: "ok", messages: [], toolCalls: [], totalTokens: 10 };
-      },
+      }) as AgentRunner,
       agents: {
         custom: {
           agent: { name: "custom" },
@@ -296,12 +294,12 @@ describe("createGoalEngine", () => {
 
   it("supports custom extractOutput", async () => {
     const engine = createGoalEngine({
-      runner: async () => ({
+      runner: (async () => ({
         output: "raw text output",
         messages: [],
         toolCalls: [],
         totalTokens: 10,
-      }),
+      })) as AgentRunner,
       agents: {
         agent: {
           agent: { name: "agent" },
@@ -322,13 +320,13 @@ describe("createGoalEngine", () => {
 
   it("handles agent errors gracefully", async () => {
     const engine = createGoalEngine({
-      runner: async (agent) => {
+      runner: (async (agent) => {
         if (agent.name === "flaky") {
           throw new Error("Network timeout");
         }
 
         return { output: "{}", messages: [], toolCalls: [], totalTokens: 10 };
-      },
+      }) as AgentRunner,
       agents: makeAgents({
         flaky: { produces: ["data"], requires: [] },
         consumer: { produces: ["result"], requires: ["data"] },
@@ -350,11 +348,11 @@ describe("createGoalEngine", () => {
     const controller = new AbortController();
 
     const engine = createGoalEngine({
-      runner: async () => {
+      runner: (async () => {
         controller.abort();
 
         return { output: "{}", messages: [], toolCalls: [], totalTokens: 10 };
-      },
+      }) as AgentRunner,
       agents: makeAgents({
         agent: { produces: ["x"], requires: [] },
       }),
@@ -404,12 +402,12 @@ describe("createGoalEngine", () => {
 
   it("single-produce agent uses raw output as fact value", async () => {
     const engine = createGoalEngine({
-      runner: async () => ({
+      runner: (async () => ({
         output: "raw string not json",
         messages: [],
         toolCalls: [],
         totalTokens: 10,
-      }),
+      })) as AgentRunner,
       agents: {
         simple: {
           agent: { name: "simple" },

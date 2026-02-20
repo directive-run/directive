@@ -1,8 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { matchBreakpoint, createBreakpointId, createInitialBreakpointState } from "../breakpoints.js";
 import type { BreakpointConfig, BreakpointContext, BreakpointRequest } from "../breakpoints.js";
 import {
-  createMockAgentRunner,
   createTestOrchestrator,
   createTestMultiAgentOrchestrator,
   createBreakpointSimulator,
@@ -144,7 +143,7 @@ describe("Single-agent breakpoints", () => {
     await orchestrator.run(agent, "test");
 
     expect(simulator.hits).toHaveLength(1);
-    expect(simulator.hits[0].type).toBe("pre_input_guardrails");
+    expect(simulator.hits[0]!.type).toBe("pre_input_guardrails");
   });
 
   it("pre_agent_run fires before agent execution", async () => {
@@ -158,7 +157,7 @@ describe("Single-agent breakpoints", () => {
     await orchestrator.run(agent, "test");
 
     expect(simulator.hits).toHaveLength(1);
-    expect(simulator.hits[0].type).toBe("pre_agent_run");
+    expect(simulator.hits[0]!.type).toBe("pre_agent_run");
   });
 
   it("pre_output_guardrails fires after agent, before output guardrails", async () => {
@@ -172,7 +171,7 @@ describe("Single-agent breakpoints", () => {
     await orchestrator.run(agent, "test");
 
     expect(simulator.hits).toHaveLength(1);
-    expect(simulator.hits[0].type).toBe("pre_output_guardrails");
+    expect(simulator.hits[0]!.type).toBe("pre_output_guardrails");
   });
 
   it("post_run fires after all processing", async () => {
@@ -186,7 +185,7 @@ describe("Single-agent breakpoints", () => {
     await orchestrator.run(agent, "test");
 
     expect(simulator.hits).toHaveLength(1);
-    expect(simulator.hits[0].type).toBe("post_run");
+    expect(simulator.hits[0]!.type).toBe("post_run");
   });
 
   it("resume with input modification changes agent input", async () => {
@@ -205,7 +204,7 @@ describe("Single-agent breakpoints", () => {
     // The mock runner should have received the modified input
     const calls = orchestrator.getCalls();
     expect(calls).toHaveLength(1);
-    expect(calls[0].input).toBe("modified input");
+    expect(calls[0]!.input).toBe("modified input");
   });
 
   it("resume with skip=true skips execution and returns empty result", async () => {
@@ -257,10 +256,10 @@ describe("Single-agent breakpoints", () => {
     await orchestrator.run(agent, "test");
 
     expect(simulator.hits).toHaveLength(4);
-    expect(simulator.hits[0].type).toBe("pre_input_guardrails");
-    expect(simulator.hits[1].type).toBe("pre_agent_run");
-    expect(simulator.hits[2].type).toBe("pre_output_guardrails");
-    expect(simulator.hits[3].type).toBe("post_run");
+    expect(simulator.hits[0]!.type).toBe("pre_input_guardrails");
+    expect(simulator.hits[1]!.type).toBe("pre_agent_run");
+    expect(simulator.hits[2]!.type).toBe("pre_output_guardrails");
+    expect(simulator.hits[3]!.type).toBe("post_run");
   });
 
   it("no breakpoint overhead when array is empty", async () => {
@@ -298,7 +297,7 @@ describe("Single-agent breakpoints", () => {
     await orchestrator.run(agent, "test");
 
     expect(simulator.hits).toHaveLength(1);
-    expect(simulator.hits[0].type).toBe("pre_agent_run");
+    expect(simulator.hits[0]!.type).toBe("pre_agent_run");
   });
 
   it("breakpoint timeout rejects after configured time", async () => {
@@ -335,8 +334,8 @@ describe("Multi-agent breakpoints", () => {
     await orchestrator.runAgent("alpha", "hello");
 
     expect(simulator.hits).toHaveLength(1);
-    expect(simulator.hits[0].type).toBe("pre_agent_run");
-    expect(simulator.hits[0].agentId).toBe("alpha");
+    expect(simulator.hits[0]!.type).toBe("pre_agent_run");
+    expect(simulator.hits[0]!.agentId).toBe("alpha");
   });
 
   it("pre_handoff fires during handoff", async () => {
@@ -355,7 +354,7 @@ describe("Multi-agent breakpoints", () => {
 
     const handoffHits = simulator.hits.filter((h) => h.type === "pre_handoff");
     expect(handoffHits).toHaveLength(1);
-    expect(handoffHits[0].agentId).toBe("alpha");
+    expect(handoffHits[0]!.agentId).toBe("alpha");
   });
 
   it("pre_pattern_step fires for sequential pattern steps", async () => {
@@ -398,7 +397,7 @@ describe("Multi-agent breakpoints", () => {
     // The mock runner should have received modified input
     const calls = orchestrator.getCalls();
     expect(calls).toHaveLength(1);
-    expect(calls[0].input).toBe("modified");
+    expect(calls[0]!.input).toBe("modified");
   });
 
   it("cancel works across agents", async () => {
@@ -442,11 +441,11 @@ describe("Multi-agent breakpoints", () => {
 
     const pending = orchestrator.getPendingBreakpoints();
     expect(pending.length).toBeGreaterThanOrEqual(1);
-    expect(pending[0].type).toBe("pre_agent_run");
+    expect(pending[0]!.type).toBe("pre_agent_run");
 
     // Resume to clean up
     if (capturedRequest) {
-      orchestrator.resumeBreakpoint(capturedRequest.id);
+      orchestrator.resumeBreakpoint((capturedRequest as BreakpointRequest).id);
     }
 
     await runPromise;

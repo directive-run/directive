@@ -23,15 +23,6 @@ import type {
 } from "../multi-agent-orchestrator.js";
 
 // ============================================================================
-// Round-trip helpers
-// ============================================================================
-
-function roundTrip<T>(pattern: Parameters<typeof patternToJSON>[0], overrides?: Parameters<typeof patternFromJSON>[1]) {
-  const json = patternToJSON(pattern);
-  return patternFromJSON<T>(json, overrides);
-}
-
-// ============================================================================
 // Tests
 // ============================================================================
 
@@ -146,8 +137,8 @@ describe("patternToJSON / patternFromJSON", () => {
     expect(restored.nodes["analyze"]!.timeout).toBe(3000);
     expect(restored.nodes["summarize"]!.priority).toBe(5);
     // when/transform stripped
-    expect((restored.nodes["analyze"] as Record<string, unknown>)["when"]).toBeUndefined();
-    expect((restored.nodes["analyze"] as Record<string, unknown>)["transform"]).toBeUndefined();
+    expect((restored.nodes["analyze"] as unknown as Record<string, unknown>)["when"]).toBeUndefined();
+    expect((restored.nodes["analyze"] as unknown as Record<string, unknown>)["transform"]).toBeUndefined();
     // merge function stripped
     expect(restored.merge).toBeUndefined();
   });
@@ -276,7 +267,7 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(malicious);
 
     // The restored object must not have a polluted prototype
-    expect((restored as Record<string, unknown>)["polluted"]).toBeUndefined();
+    expect((restored as unknown as Record<string, unknown>)["polluted"]).toBeUndefined();
     // The plain Object.prototype must not be polluted
     expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
 
@@ -300,7 +291,7 @@ describe("patternToJSON / patternFromJSON", () => {
     // The pattern itself must not carry the poisoned key
     const restored = patternFromJSON(poisoned);
     expect(restored.type).toBe("sequential");
-    expect((restored as Record<string, unknown>)["evil"]).toBeUndefined();
+    expect((restored as unknown as Record<string, unknown>)["evil"]).toBeUndefined();
   });
 
   // ---------- overrides ----------

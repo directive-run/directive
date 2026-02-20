@@ -603,6 +603,16 @@ export interface DagPattern<T = unknown> {
 }
 
 // ============================================================================
+// Debug Configuration
+// ============================================================================
+
+/** Debug configuration for orchestrators */
+export interface OrchestratorDebugConfig {
+  /** Include truncated input/output in timeline events for prompt/completion viewing */
+  verboseTimeline?: boolean;
+}
+
+// ============================================================================
 // Debug Timeline Types
 // ============================================================================
 
@@ -632,7 +642,8 @@ export type DebugEventType =
   | "race_start"
   | "race_winner"
   | "race_cancelled"
-  | "debate_round";
+  | "debate_round"
+  | "reroute";
 
 /** Base debug event */
 export interface DebugEventBase {
@@ -648,6 +659,8 @@ export interface AgentStartEvent extends DebugEventBase {
   type: "agent_start";
   agentId: string;
   inputLength: number;
+  /** Truncated input text (only when verboseTimeline is enabled) */
+  input?: string;
 }
 
 /** Agent complete event */
@@ -657,6 +670,8 @@ export interface AgentCompleteEvent extends DebugEventBase {
   outputLength: number;
   totalTokens: number;
   durationMs: number;
+  /** Truncated output text (only when verboseTimeline is enabled) */
+  output?: string;
 }
 
 /** Agent error event */
@@ -842,6 +857,15 @@ export interface DebateRoundEvent extends DebugEventBase {
   agentCount: number;
 }
 
+/** Reroute debug event recorded when self-healing reroutes to an alternate agent */
+export interface RerouteDebugEvent extends DebugEventBase {
+  type: "reroute";
+  agentId: string;
+  from: string;
+  to: string;
+  reason: string;
+}
+
 /** Union of all debug event types */
 export type DebugEvent =
   | AgentStartEvent
@@ -868,7 +892,8 @@ export type DebugEvent =
   | RaceStartEvent
   | RaceWinnerEvent
   | RaceCancelledEvent
-  | DebateRoundEvent;
+  | DebateRoundEvent
+  | RerouteDebugEvent;
 
 // ============================================================================
 // Self-Healing Types

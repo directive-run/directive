@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { AgentHealthMetrics, DebugEvent } from "../lib/types";
+import { isAgentComplete, isReroute, type AgentHealthMetrics, type DebugEvent } from "../lib/types";
 import { HealthCard } from "../components/HealthCard";
 import { CostChart } from "../components/CostChart";
 
@@ -13,11 +13,8 @@ function buildCostData(events: DebugEvent[]): { agentId: string; tokens: number;
   const data: { agentId: string; tokens: number; timestamp: number }[] = [];
 
   for (const event of events) {
-    if (event.type === "agent_complete" && event.agentId) {
-      const tokens = (event as Record<string, unknown>).totalTokens;
-      if (typeof tokens === "number") {
-        data.push({ agentId: event.agentId, tokens, timestamp: event.timestamp });
-      }
+    if (isAgentComplete(event) && event.totalTokens != null) {
+      data.push({ agentId: event.agentId, tokens: event.totalTokens, timestamp: event.timestamp });
     }
   }
 
@@ -29,18 +26,13 @@ function extractReroutes(events: DebugEvent[]): { from: string; to: string; time
   const reroutes: { from: string; to: string; timestamp: number; reason: string }[] = [];
 
   for (const event of events) {
-    if (event.type === "reroute") {
-      const from = (event as Record<string, unknown>).from;
-      const to = (event as Record<string, unknown>).to;
-      const reason = (event as Record<string, unknown>).reason;
-      if (typeof from === "string" && typeof to === "string") {
-        reroutes.push({
-          from,
-          to,
-          timestamp: event.timestamp,
-          reason: typeof reason === "string" ? reason : "Unknown",
-        });
-      }
+    if (isReroute(event)) {
+      reroutes.push({
+        from: event.from,
+        to: event.to,
+        timestamp: event.timestamp,
+        reason: event.reason ?? "Unknown",
+      });
     }
   }
 
