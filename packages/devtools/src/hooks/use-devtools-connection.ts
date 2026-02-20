@@ -152,7 +152,16 @@ export function useDevToolsConnection(): DevToolsConnection {
     };
 
     ws.onclose = () => {
+      // Guard against stale onclose from a previous socket nulling the current ref
+      if (wsRef.current !== ws) {
+        return;
+      }
       wsRef.current = null;
+      // Clean up ping timer for this socket
+      if (pingTimerRef.current) {
+        clearInterval(pingTimerRef.current);
+        pingTimerRef.current = null;
+      }
       if (shouldReconnectRef.current && urlRef.current) {
         reconnectAttemptsRef.current++;
         if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {

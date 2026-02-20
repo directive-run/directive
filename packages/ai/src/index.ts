@@ -78,6 +78,8 @@ export type {
   DagExecutionContext,
   DagNode,
   DagPattern,
+  // Debug configuration
+  OrchestratorDebugConfig,
   // Debug Timeline event types
   DebugEventType,
   DebugEventBase,
@@ -101,6 +103,7 @@ export type {
   // Self-Healing types
   AgentHealthState,
   RerouteEvent,
+  RerouteDebugEvent,
   HealthMonitorConfig,
   SelfHealingConfig,
   MultiAgentSelfHealingConfig,

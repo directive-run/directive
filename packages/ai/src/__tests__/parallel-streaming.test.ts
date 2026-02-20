@@ -1,14 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mergeTaggedStreams } from "../streaming.js";
-import type { MultiplexedStreamChunk, MultiplexedStreamResult } from "../streaming.js";
+import type { MultiplexedStreamChunk } from "../streaming.js";
 import type { OrchestratorStreamChunk } from "../agent-orchestrator.js";
 import {
-  createMockAgentRunner,
   createTestMultiAgentOrchestrator,
   collectMultiplexedStream,
   assertMultiplexedStream,
 } from "../testing.js";
-import type { RunResult } from "../types.js";
 
 // ============================================================================
 // Helpers
@@ -408,7 +406,7 @@ describe("Multi-agent runParallelStream", () => {
       mockResponses: {
         alpha: { output: "ok", totalTokens: 10 },
         beta: { output: "ok", totalTokens: 10 },
-        gamma: { error: new Error("gamma failed") },
+        gamma: { output: "", totalTokens: 0, error: new Error("gamma failed") },
       },
     });
 
@@ -435,7 +433,7 @@ describe("Multi-agent runParallelStream", () => {
         beta: { agent: { name: "beta", instructions: "" } },
       },
       mockResponses: {
-        alpha: { error: new Error("alpha failed") },
+        alpha: { output: "", totalTokens: 0, error: new Error("alpha failed") },
         beta: { output: "ok", totalTokens: 10 },
       },
     });

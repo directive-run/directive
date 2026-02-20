@@ -87,7 +87,9 @@
       "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive log --oneline --all)",
       "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive show 486c0ed --stat)",
       "Bash(gh pr diff:*)",
-      "Bash(gh run list:*)"
+      "Bash(gh run list:*)",
+      "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive log --oneline -5)",
+      "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive diff --stat HEAD)"
     ]
   }
 }

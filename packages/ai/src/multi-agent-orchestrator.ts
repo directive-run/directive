@@ -499,6 +499,9 @@ export interface DebatePattern<T = unknown> {
   timeout?: number;
 }
 
+/** Re-export types consumed by tests / external consumers */
+export type { DagPattern, DagExecutionContext } from "./types.js";
+
 /** Union of all patterns */
 export type ExecutionPattern<T = unknown> =
   | ParallelPattern<T>
@@ -556,8 +559,8 @@ export interface MultiAgentOrchestratorOptions {
   onHandoffComplete?: (result: HandoffResult) => void;
   /** Maximum number of handoff results to retain. @default 1000 */
   maxHandoffHistory?: number;
-  /** Debug mode */
-  debug?: boolean;
+  /** Debug mode — `true` for default debug, or config object for advanced options */
+  debug?: boolean | import("./types.js").OrchestratorDebugConfig;
   /** Orchestrator-level guardrails (applied to all agents) */
   guardrails?: GuardrailsConfig;
   /** Lifecycle hooks */
@@ -825,7 +828,7 @@ export function createMultiAgentOrchestrator(
     onHandoff,
     onHandoffComplete,
     maxHandoffHistory = 1000,
-    debug = false,
+    debug: rawDebug = false,
     guardrails = {},
     hooks = {},
     memory: sharedMemory,
@@ -848,6 +851,11 @@ export function createMultiAgentOrchestrator(
     derive: userDerivations,
     scratchpad: scratchpadConfig,
   } = options;
+
+  // Normalize debug config
+  const debug = typeof rawDebug === "object" ? true : !!rawDebug;
+  const verboseTimeline = typeof rawDebug === "object" ? !!rawDebug.verboseTimeline : false;
+  const MAX_VERBOSE_LENGTH = 5000;
 
   // Shallow copy so registerAgent/unregisterAgent don't mutate the caller's object
   const agents: AgentRegistry = { ...inputAgents };
@@ -1797,12 +1805,13 @@ export function createMultiAgentOrchestrator(
 
           if (timeline) {
             timeline.record({
-              type: "agent_error",
+              type: "reroute",
               timestamp: Date.now(),
               agentId,
               snapshotId: null,
-              errorMessage: `Rerouting to ${alternate}: ${error instanceof Error ? error.message : String(error)}`,
-              durationMs: 0,
+              from: agentId,
+              to: alternate,
+              reason: error instanceof Error ? error.message : String(error),
             });
           }
 
@@ -1904,6 +1913,7 @@ export function createMultiAgentOrchestrator(
           agentId,
           snapshotId: null,
           inputLength: processedInput.length,
+          ...(verboseTimeline ? { input: processedInput.slice(0, MAX_VERBOSE_LENGTH) } : {}),
         });
       }
 
@@ -2262,6 +2272,7 @@ export function createMultiAgentOrchestrator(
           outputLength: outputStr.length,
           totalTokens: result.totalTokens,
           durationMs: Date.now() - startTime,
+          ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
         });
       }
 

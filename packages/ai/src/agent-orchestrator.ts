@@ -151,10 +151,10 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Plugins */
   plugins?: Plugin[];
   /**
-   * Enable debugging
+   * Enable debugging — `true` for default debug, or config object for advanced options
    * @default false
    */
-  debug?: boolean;
+  debug?: boolean | import("./types.js").OrchestratorDebugConfig;
   /**
    * Approval timeout in milliseconds
    * @default 300000 (5 minutes)
@@ -346,7 +346,7 @@ export function createAgentOrchestrator<
     autoApproveToolCalls = true,
     maxTokenBudget,
     plugins = [],
-    debug = false,
+    debug: rawDebug = false,
     approvalTimeoutMs = 300000,
     agentRetry,
     hooks = {},
@@ -360,6 +360,11 @@ export function createAgentOrchestrator<
     onBreakpoint,
     breakpointTimeoutMs,
   } = options;
+
+  // Normalize debug config
+  const debug = typeof rawDebug === "object" ? true : !!rawDebug;
+  const verboseTimeline = typeof rawDebug === "object" ? !!rawDebug.verboseTimeline : false;
+  const MAX_VERBOSE_LENGTH = 5000;
 
   // Warn if selfHealing is configured without circuitBreaker (selfHealing only triggers in CB error path)
   if (debug && selfHealing && !circuitBreaker) {
@@ -581,12 +586,13 @@ export function createAgentOrchestrator<
                 try { selfHealing.onReroute?.(rerouteEvent); } catch { /* non-fatal */ }
                 if (timeline) {
                   timeline.record({
-                    type: "agent_error",
+                    type: "reroute",
                     timestamp: Date.now(),
                     agentId: agent.name,
                     snapshotId: null,
-                    errorMessage: `Rerouting to fallback runner: ${error instanceof Error ? error.message : String(error)}`,
-                    durationMs: 0,
+                    from: agent.name,
+                    to: "fallback-runner",
+                    reason: error instanceof Error ? error.message : String(error),
                   });
                 }
 
@@ -607,6 +613,17 @@ export function createAgentOrchestrator<
                 timestamp: Date.now(),
               };
               try { selfHealing.onReroute?.(rerouteEvent); } catch { /* non-fatal */ }
+              if (timeline) {
+                timeline.record({
+                  type: "reroute",
+                  timestamp: Date.now(),
+                  agentId: agent.name,
+                  snapshotId: null,
+                  from: agent.name,
+                  to: selfHealing.fallbackAgent.name,
+                  reason: error instanceof Error ? error.message : String(error),
+                });
+              }
 
               return await runner<T>(selfHealing.fallbackAgent, input, opts);
             } catch {
@@ -668,6 +685,7 @@ export function createAgentOrchestrator<
         agentId: agent.name,
         snapshotId: null,
         inputLength: input.length,
+        ...(verboseTimeline ? { input: input.slice(0, MAX_VERBOSE_LENGTH) } : {}),
       });
     }
 
@@ -990,6 +1008,7 @@ export function createAgentOrchestrator<
         outputLength: outputStr?.length ?? 0,
         totalTokens: result.totalTokens,
         durationMs: Date.now() - startTime,
+        ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
       });
     }
 

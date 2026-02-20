@@ -205,7 +205,7 @@ export function App() {
             </div>
           </div>
         ) : (
-          <ViewErrorBoundary>
+          <ViewErrorBoundary key={view}>
             {view === "timeline" && <TimelineView events={conn.events} />}
             {view === "dag" && <DagView events={conn.events} snapshot={conn.snapshot} />}
             {view === "health" && <HealthView metrics={conn.healthMetrics} events={conn.events} />}
