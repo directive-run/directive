@@ -293,7 +293,7 @@ describe("debate pattern", () => {
   });
 
   it("timeout — short timeout aborts debate, returns partial result", async () => {
-    const orchestrator = createTestMultiAgentOrchestrator({
+    createTestMultiAgentOrchestrator({
       agents: {
         slow1: { agent: { name: "slow1" } },
         slow2: { agent: { name: "slow2" } },

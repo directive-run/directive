@@ -1,9 +1,12 @@
+import { useState } from "react";
 import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS, getEventCategory } from "../lib/colors";
+import { PromptViewer } from "./PromptViewer";
 
 interface EventDetailProps {
   event: DebugEvent;
   onClose: () => void;
+  onForkFromSnapshot?: (eventId: number) => void;
 }
 
 function formatTimestamp(ts: number): string {
@@ -14,7 +17,7 @@ function formatTimestamp(ts: number): string {
 
 /** Extract all meaningful properties from an event */
 function getEventProperties(event: DebugEvent): [string, unknown][] {
-  const skip = new Set(["id", "type", "timestamp", "snapshotId", "agentId"]);
+  const skip = new Set(["id", "type", "timestamp", "snapshotId", "agentId", "input", "output"]);
   const entries: [string, unknown][] = [];
 
   for (const [key, value] of Object.entries(event)) {
@@ -73,10 +76,15 @@ function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number })
   return <span className="text-zinc-400">{JSON.stringify(value)}</span>;
 }
 
-export function EventDetail({ event, onClose }: EventDetailProps) {
+export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailProps) {
   const properties = getEventProperties(event);
   const color = EVENT_COLORS[event.type];
   const category = getEventCategory(event.type);
+  const [showForkConfirm, setShowForkConfirm] = useState(false);
+
+  // Check for prompt/completion data (from verbose timeline mode)
+  const hasPromptData = typeof event.input === "string" || typeof event.output === "string";
+  const canFork = onForkFromSnapshot && event.snapshotId != null;
 
   return (
     <div className="p-4">
@@ -139,6 +147,52 @@ export function EventDetail({ event, onClose }: EventDetailProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Prompt/Completion viewer (verbose timeline data) */}
+      {hasPromptData && (
+        <PromptViewer
+          input={event.input as string | undefined}
+          output={event.output as string | undefined}
+          totalTokens={typeof event.totalTokens === "number" ? event.totalTokens : undefined}
+        />
+      )}
+
+      {/* Fork from snapshot button */}
+      {canFork && (
+        <div className="mt-4">
+          {showForkConfirm ? (
+            <div className="rounded border border-amber-500/30 bg-amber-950/20 p-3">
+              <p className="text-xs text-amber-300">
+                Fork timeline from snapshot #{event.snapshotId}? This will truncate the timeline to this point.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => {
+                    onForkFromSnapshot!(event.id);
+                    setShowForkConfirm(false);
+                  }}
+                  className="rounded bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-500"
+                >
+                  Confirm Fork
+                </button>
+                <button
+                  onClick={() => setShowForkConfirm(false)}
+                  className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowForkConfirm(true)}
+              className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:border-amber-500/40 hover:bg-zinc-700"
+            >
+              Fork from here
+            </button>
+          )}
         </div>
       )}
     </div>

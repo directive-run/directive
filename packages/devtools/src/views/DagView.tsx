@@ -12,7 +12,7 @@ import {
   applyEdgeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { DebugEvent, DevToolsSnapshot, DagNodeStatus } from "../lib/types";
+import { isDagNodeUpdate, type DebugEvent, type DevToolsSnapshot, type DagNodeStatus } from "../lib/types";
 import { DAG_NODE_COLORS } from "../lib/colors";
 import { DagNode } from "../components/DagNode";
 
@@ -44,22 +44,15 @@ function buildDagFromEvents(events: DebugEvent[]): Map<string, DagNodeState> | n
   const nodes = new Map<string, DagNodeState>();
 
   for (const event of dagEvents) {
-    if (event.type === "dag_node_update") {
-      const nodeId = (event as Record<string, unknown>).nodeId;
-      const status = (event as Record<string, unknown>).status;
-      const deps = (event as Record<string, unknown>).deps as string[] | undefined;
-      if (typeof nodeId !== "string" || typeof status !== "string") {
-        continue;
-      }
-      const nodeStatus = status as DagNodeStatus;
-      const existing = nodes.get(nodeId);
+    if (isDagNodeUpdate(event)) {
+      const existing = nodes.get(event.nodeId);
       if (existing) {
-        existing.status = nodeStatus;
-        if (deps) {
-          existing.deps = deps;
+        existing.status = event.status;
+        if (event.deps) {
+          existing.deps = event.deps;
         }
       } else {
-        nodes.set(nodeId, { agentId: nodeId, status: nodeStatus, deps: deps ?? [] });
+        nodes.set(event.nodeId, { agentId: event.nodeId, status: event.status, deps: event.deps ?? [] });
       }
     }
   }

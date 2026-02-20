@@ -10,8 +10,6 @@ import {
   evalJudge,
   evalAssert,
   type EvalCase,
-  type EvalCaseResult,
-  type EvalAgentSummary,
 } from "../evals.js";
 import type { AgentLike, AgentRunner, RunResult } from "../types.js";
 
@@ -24,7 +22,7 @@ function mockAgent(name: string): AgentLike {
 }
 
 function mockRunner(outputs: Record<string, string | Record<string, unknown>>): AgentRunner {
-  return async (agent) => {
+  return (async (agent) => {
     const output = outputs[agent.name] ?? "";
 
     return {
@@ -33,11 +31,11 @@ function mockRunner(outputs: Record<string, string | Record<string, unknown>>): 
       toolCalls: [],
       totalTokens: 100,
     } as RunResult<unknown>;
-  };
+  }) as AgentRunner;
 }
 
 function slowRunner(delayMs: number): AgentRunner {
-  return async () => {
+  return (async () => {
     await new Promise((r) => setTimeout(r, delayMs));
 
     return {
@@ -46,7 +44,7 @@ function slowRunner(delayMs: number): AgentRunner {
       toolCalls: [],
       totalTokens: 50,
     };
-  };
+  }) as AgentRunner;
 }
 
 const dataset: EvalCase[] = [
@@ -361,12 +359,12 @@ describe("evalMatch", () => {
 
 describe("evalJudge", () => {
   it("uses LLM judge to score output", async () => {
-    const judgeRunner: AgentRunner = async () => ({
+    const judgeRunner = (async () => ({
       output: '{"score": 0.8, "reason": "Good answer"}',
       messages: [],
       toolCalls: [],
       totalTokens: 50,
-    });
+    })) as AgentRunner;
 
     const criterion = evalJudge({
       runner: judgeRunner,
@@ -386,9 +384,9 @@ describe("evalJudge", () => {
   });
 
   it("handles judge errors gracefully", async () => {
-    const judgeRunner: AgentRunner = async () => {
+    const judgeRunner = (async () => {
       throw new Error("Judge unavailable");
-    };
+    }) as AgentRunner;
 
     const criterion = evalJudge({
       runner: judgeRunner,
@@ -408,12 +406,12 @@ describe("evalJudge", () => {
   });
 
   it("clamps score to [0, 1]", async () => {
-    const judgeRunner: AgentRunner = async () => ({
+    const judgeRunner = (async () => ({
       output: '{"score": 5.0, "reason": "over"}',
       messages: [],
       toolCalls: [],
       totalTokens: 50,
-    });
+    })) as AgentRunner;
 
     const criterion = evalJudge({
       runner: judgeRunner,
@@ -510,13 +508,13 @@ describe("createEvalSuite", () => {
   });
 
   it("handles agent errors gracefully", async () => {
-    const runner: AgentRunner = async (agent) => {
+    const runner = (async (agent) => {
       if (agent.name === "failing") {
         throw new Error("Agent crashed");
       }
 
       return { output: "ok", messages: [], toolCalls: [], totalTokens: 50 };
-    };
+    }) as AgentRunner;
 
     const suite = createEvalSuite({
       criteria: {
