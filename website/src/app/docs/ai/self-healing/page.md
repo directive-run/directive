@@ -16,14 +16,14 @@ When an agent becomes unhealthy (circuit breaker opens, health score drops), the
 When the primary circuit breaker opens, fall back to alternate runners:
 
 ```typescript
-import { createAgentOrchestrator, withCircuitBreaker } from '@directive-run/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
 
 const orchestrator = createAgentOrchestrator({
   runner: primaryRunner,
-  circuitBreaker: { failureThreshold: 3, resetTimeout: 30000 },
+  circuitBreaker: { failureThreshold: 3, resetTimeoutMs: 30000 },
   selfHealing: {
     fallbackRunners: [backupRunner, emergencyRunner],
-    onReroute: (event) => console.log(`Rerouted to ${event.targetAgent}`),
+    onReroute: (event) => console.log(`Rerouted to ${event.reroutedTo}`),
   },
 });
 ```
@@ -45,10 +45,10 @@ const orchestrator = createMultiAgentOrchestrator({
     'researcher': { agent: researcher, capabilities: ['research'] },
   },
   selfHealing: {
-    circuitBreakerDefaults: { failureThreshold: 3, resetTimeout: 30000 },
+    circuitBreakerDefaults: { failureThreshold: 3, resetTimeoutMs: 30000 },
     useCapabilities: true,
     selectionStrategy: 'healthiest',
-    onReroute: (event) => console.log(`${event.sourceAgent} → ${event.targetAgent}`),
+    onReroute: (event) => console.log(`${event.originalAgent} → ${event.reroutedTo}`),
   },
 });
 ```
@@ -204,10 +204,10 @@ interface MultiAgentSelfHealingConfig {
 ```typescript
 selfHealing: {
   onReroute: (event) => {
-    // event.sourceAgent — the unhealthy agent
-    // event.targetAgent — the replacement
+    // event.originalAgent — the unhealthy agent
+    // event.reroutedTo — the replacement
     // event.reason — why rerouting happened
-    console.log(`Rerouted ${event.sourceAgent} → ${event.targetAgent}: ${event.reason}`);
+    console.log(`Rerouted ${event.originalAgent} → ${event.reroutedTo}: ${event.reason}`);
   },
 },
 ```

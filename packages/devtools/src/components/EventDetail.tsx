@@ -26,7 +26,9 @@ function getEventProperties(event: DebugEvent): [string, unknown][] {
   return entries;
 }
 
-function PropertyValue({ value }: { value: unknown }) {
+const MAX_RENDER_DEPTH = 5;
+
+function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (typeof value === "boolean") {
     return (
       <span className={value ? "text-emerald-400" : "text-red-400"}>
@@ -48,16 +50,24 @@ function PropertyValue({ value }: { value: unknown }) {
   }
 
   if (Array.isArray(value)) {
+    if (depth >= MAX_RENDER_DEPTH) {
+      return <span className="text-zinc-500">[...{value.length} items]</span>;
+    }
+
     return (
       <span className="text-zinc-400">
         [{value.map((v, i) => (
           <span key={i}>
             {i > 0 && ", "}
-            <PropertyValue value={v} />
+            <PropertyValue value={v} depth={depth + 1} />
           </span>
         ))}]
       </span>
     );
+  }
+
+  if (typeof value === "object" && value !== null && depth >= MAX_RENDER_DEPTH) {
+    return <span className="text-zinc-500">{"{...}"}</span>;
   }
 
   return <span className="text-zinc-400">{JSON.stringify(value)}</span>;
@@ -88,6 +98,7 @@ export function EventDetail({ event, onClose }: EventDetailProps) {
         </div>
         <button
           onClick={onClose}
+          aria-label="Close"
           className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
         >
           ✕

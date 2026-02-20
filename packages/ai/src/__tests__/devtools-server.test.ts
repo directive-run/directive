@@ -374,7 +374,7 @@ describe("DevTools Server", () => {
 
       sendCommand(client, { type: "ping" });
       expect(client.messages).toHaveLength(1);
-      expect(client.messages[0]!.type).toBe("welcome");
+      expect(client.messages[0]!.type).toBe("pong");
 
       server.close();
     });

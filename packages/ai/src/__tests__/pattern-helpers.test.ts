@@ -694,15 +694,12 @@ describe("runDebate with AbortSignal", () => {
       },
     });
 
-    const result = await runDebate(orchestrator, {
+    await expect(runDebate(orchestrator, {
       agents: ["a", "b"],
       evaluator: "judge",
       maxRounds: 3,
       signal: controller.signal,
-    }, "test");
-
-    // Should return immediately with default result (no rounds completed)
-    expect(result.rounds.length).toBe(0);
+    }, "test")).rejects.toThrow("Debate aborted before any round completed");
   });
 });
 

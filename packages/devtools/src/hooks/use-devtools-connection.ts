@@ -32,7 +32,9 @@ export interface DevToolsConnection {
 }
 
 const INITIAL_BREAKPOINT_STATE: BreakpointState = { pending: [], resolved: [], cancelled: [] };
-const RECONNECT_DELAY_MS = 3000;
+const INITIAL_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+const MAX_RECONNECT_ATTEMPTS = 20;
 const MAX_EVENTS = 5000;
 
 export function useDevToolsConnection(): DevToolsConnection {
@@ -48,6 +50,9 @@ export function useDevToolsConnection(): DevToolsConnection {
   const urlRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnectRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS);
+  const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
@@ -55,6 +60,8 @@ export function useDevToolsConnection(): DevToolsConnection {
         setSessionId(msg.sessionId);
         setStatus("connected");
         setError(null);
+        reconnectAttemptsRef.current = 0;
+        reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS;
         break;
 
       case "event":
@@ -85,6 +92,10 @@ export function useDevToolsConnection(): DevToolsConnection {
         setBreakpointState(msg.state);
         break;
 
+      case "pong":
+        // Keepalive response — no action needed
+        break;
+
       case "error":
         setError(`${msg.code}: ${msg.message}`);
         break;
@@ -98,8 +109,15 @@ export function useDevToolsConnection(): DevToolsConnection {
       wsRef.current.close();
     }
 
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+
     urlRef.current = url;
     shouldReconnectRef.current = true;
+    reconnectAttemptsRef.current = 0;
+    reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS;
     setStatus("connecting");
     setError(null);
 
@@ -108,6 +126,15 @@ export function useDevToolsConnection(): DevToolsConnection {
 
     ws.onopen = () => {
       // Welcome message from server sets status to "connected"
+      // Start keepalive pings
+      if (pingTimerRef.current) {
+        clearInterval(pingTimerRef.current);
+      }
+      pingTimerRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 30_000);
     };
 
     ws.onmessage = (e) => {
@@ -127,12 +154,25 @@ export function useDevToolsConnection(): DevToolsConnection {
     ws.onclose = () => {
       wsRef.current = null;
       if (shouldReconnectRef.current && urlRef.current) {
+        reconnectAttemptsRef.current++;
+        if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
+          setStatus("error");
+          setError(`Could not reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+          shouldReconnectRef.current = false;
+
+          return;
+        }
         setStatus("connecting");
+        const delay = Math.min(
+          reconnectDelayRef.current * (1 + Math.random() * 0.5),
+          MAX_RECONNECT_DELAY_MS,
+        );
         reconnectTimerRef.current = setTimeout(() => {
           if (urlRef.current) {
             connect(urlRef.current);
           }
-        }, RECONNECT_DELAY_MS);
+        }, delay);
+        reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, MAX_RECONNECT_DELAY_MS);
       } else {
         setStatus("disconnected");
       }
@@ -144,6 +184,10 @@ export function useDevToolsConnection(): DevToolsConnection {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    }
+    if (pingTimerRef.current) {
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
     }
     if (wsRef.current) {
       wsRef.current.close();
@@ -165,6 +209,9 @@ export function useDevToolsConnection(): DevToolsConnection {
       shouldReconnectRef.current = false;
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
+      }
+      if (pingTimerRef.current) {
+        clearInterval(pingTimerRef.current);
       }
       if (wsRef.current) {
         wsRef.current.close();
@@ -193,8 +240,21 @@ export function useDevToolsConnection(): DevToolsConnection {
     cancelBreakpoint: useCallback((id: string, reason?: string) => {
       send({ type: "cancel_breakpoint", breakpointId: id, reason });
     }, [send]),
-    exportSession: useCallback(() => send({ type: "export_session" }), [send]),
-    importSession: useCallback((data: string) => send({ type: "import_session", data }), [send]),
+    exportSession: useCallback(() => {
+      // Export is handled client-side by SessionPanel.handleExportToFile
+    }, []),
+    importSession: useCallback((data: string) => {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed && Array.isArray(parsed.events)) {
+          setEvents(parsed.events);
+        } else {
+          setError("Invalid session file: missing events array");
+        }
+      } catch {
+        setError("Invalid session file: could not parse JSON");
+      }
+    }, []),
     clearEvents: useCallback(() => setEvents([]), []),
   };
 }

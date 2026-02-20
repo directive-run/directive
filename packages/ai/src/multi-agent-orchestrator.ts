@@ -307,7 +307,7 @@ export class Semaphore {
 export interface AgentRegistration {
   /** The agent instance */
   agent: AgentLike;
-  /** Maximum concurrent runs for this agent (default: 1) */
+  /** Maximum concurrent runs for this agent. @default 1 */
   maxConcurrent?: number;
   /** Timeout for agent runs (ms) */
   timeout?: number;
@@ -335,7 +335,7 @@ export interface AgentRegistration {
   circuitBreaker?: CircuitBreaker;
   /** Per-agent output schema for structured output */
   outputSchema?: SafeParseable<unknown>;
-  /** Max retries for structured output validation (default: 2) */
+  /** Max retries for structured output validation. @default 2 */
   maxSchemaRetries?: number;
   /** Custom JSON extractor for structured output */
   extractJson?: (output: string) => unknown;
@@ -359,7 +359,7 @@ export interface ParallelPattern<T = unknown> {
   agents: string[];
   /** Function to merge results from all agents */
   merge: (results: RunResult<unknown>[]) => T | Promise<T>;
-  /** Minimum successful results required (default: all) */
+  /** Minimum successful results required. @default agents.length */
   minSuccess?: number;
   /** Overall timeout (ms) */
   timeout?: number;
@@ -370,11 +370,11 @@ export interface SequentialPattern<T = unknown> {
   type: "sequential";
   /** Agent IDs in execution order */
   agents: string[];
-  /** Transform output to next input (default: stringify) */
+  /** Transform output to next input. @default JSON.stringify */
   transform?: (output: unknown, agentId: string, index: number) => string;
   /** Final result extractor */
   extract?: (output: unknown) => T;
-  /** Continue on error (default: false) */
+  /** Continue on error. @default false */
   continueOnError?: boolean;
 }
 
@@ -576,9 +576,9 @@ export interface MultiAgentOrchestratorOptions {
   plugins?: Plugin[];
   /** Callback for approval requests */
   onApprovalRequest?: (request: ApprovalRequest) => void;
-  /** Auto-approve tool calls (default: true) */
+  /** Auto-approve tool calls. @default true */
   autoApproveToolCalls?: boolean;
-  /** Approval timeout in milliseconds (default: 300000 = 5 min) */
+  /** Approval timeout in milliseconds. @default 300000 */
   approvalTimeoutMs?: number;
   /** Orchestrator-level constraints */
   constraints?: Record<string, OrchestratorConstraint<Record<string, unknown>>>;
@@ -594,7 +594,7 @@ export interface MultiAgentOrchestratorOptions {
   breakpoints?: BreakpointConfig<MultiAgentBreakpointType>[];
   /** Callback when a breakpoint fires */
   onBreakpoint?: (request: BreakpointRequest) => void;
-  /** Timeout for breakpoint resolution (default: 300000 = 5 min) */
+  /** Timeout for breakpoint resolution (ms). @default 300000 */
   breakpointTimeoutMs?: number;
   /** Cross-agent derivation functions — compute values from combined agent states */
   derive?: Record<string, CrossAgentDerivationFn>;
@@ -638,7 +638,12 @@ export interface MultiAgentOrchestrator {
   runAgent<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>>;
   /** Run an agent with streaming support */
   runAgentStream<T>(agentId: string, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
-  /** Run an execution pattern */
+  /**
+   * Run an execution pattern by its registered pattern ID.
+   *
+   * Note: For race and debate patterns, `runPattern` returns only the extracted result value.
+   * Use `runRace()` or `runDebate()` to access full results including `winnerId` and `allResults`.
+   */
   runPattern<T>(patternId: string, input: string): Promise<T>;
   /** Run agents in parallel */
   runParallel<T>(
@@ -742,7 +747,10 @@ export interface MultiAgentOrchestrator {
       timeout?: number;
     }
   ): Promise<DebateResult<T>>;
-  /** Get reflection iteration history from last runReflectPattern call */
+  /**
+   * Get reflection iteration history from last runReflectPattern call.
+   * @deprecated Use the `history` field on the return value from `runReflect()` instead.
+   */
   getLastReflectionHistory(): ReflectIterationRecord[] | null;
   /** Cross-agent derived values (frozen snapshot). Empty when derive not configured. */
   readonly derived: Record<string, unknown>;
@@ -1219,6 +1227,9 @@ export function createMultiAgentOrchestrator(
     }
   }
 
+  // Approval request reverse index: requestId → agentId for O(1) approve/reject lookup
+  const approvalRequestIndex = new Map<string, string>();
+
   // Idle waiters — notified whenever any agent's status changes
   const idleWaiters = new Set<() => void>();
   function notifyIdleWaiters(): void {
@@ -1270,6 +1281,12 @@ export function createMultiAgentOrchestrator(
 
     const snapshot = buildCrossAgentSnapshot();
 
+    // Collect changed derivations and errors during the batch (fact writes only)
+    type ChangedEntry = { derivId: string; newValue: unknown };
+    type ErrorEntry = { derivId: string; derivError: unknown };
+    const changed: ChangedEntry[] = [];
+    const errors: ErrorEntry[] = [];
+
     system.batch(() => {
       for (const [derivId, derivFn] of Object.entries(userDerivations)) {
         try {
@@ -1277,45 +1294,15 @@ export function createMultiAgentOrchestrator(
           const oldValue = derivedValues[derivId];
 
           // Change detection: === for primitives, shallow equality for objects
-          const changed = !shallowEqual(newValue, oldValue);
+          const hasChanged = !shallowEqual(newValue, oldValue);
 
           derivedValues[derivId] = newValue;
 
-          if (changed) {
-            // Record timeline event
-            if (timeline) {
-              timeline.record({
-                type: "derivation_update",
-                timestamp: Date.now(),
-                snapshotId: null,
-                derivationId: derivId,
-                valueType: typeof newValue,
-              });
-            }
-
-            // Fire lifecycle hook
-            fireHook("onDerivationUpdate", {
-              derivationId: derivId,
-              value: newValue,
-              timestamp: Date.now(),
-            });
-
-            // Fire change callbacks
-            for (const cb of derivedChangeCallbacks) {
-              try {
-                cb(derivId, newValue);
-              } catch {
-                // callback error is non-fatal
-              }
-            }
+          if (hasChanged) {
+            changed.push({ derivId, newValue });
           }
         } catch (derivError) {
-          console.warn(`[Directive MultiAgent] Derivation "${derivId}" threw:`, derivError);
-          fireHook("onDerivationError", {
-            derivationId: derivId,
-            error: derivError instanceof Error ? derivError : new Error(String(derivError)),
-            timestamp: Date.now(),
-          });
+          errors.push({ derivId, derivError });
         }
       }
 
@@ -1325,6 +1312,44 @@ export function createMultiAgentOrchestrator(
         setBridgeFact(coordFacts, "__derived", { ...derivedValues });
       }
     });
+
+    // Fire timeline records, hooks, and callbacks outside the batch
+    for (const { derivId, newValue } of changed) {
+      if (timeline) {
+        timeline.record({
+          type: "derivation_update",
+          timestamp: Date.now(),
+          snapshotId: null,
+          derivationId: derivId,
+          valueType: typeof newValue,
+        });
+      }
+
+      fireHook("onDerivationUpdate", {
+        derivationId: derivId,
+        value: newValue,
+        timestamp: Date.now(),
+      });
+
+      for (const cb of derivedChangeCallbacks) {
+        try {
+          cb(derivId, newValue);
+        } catch {
+          // callback error is non-fatal
+        }
+      }
+    }
+
+    for (const { derivId, derivError } of errors) {
+      if (debug) {
+        console.warn(`[Directive MultiAgent] Derivation "${derivId}" threw:`, derivError);
+      }
+      fireHook("onDerivationError", {
+        derivationId: derivId,
+        error: derivError instanceof Error ? derivError : new Error(String(derivError)),
+        timestamp: Date.now(),
+      });
+    }
   }
 
   // ---- Shared Scratchpad ----
@@ -1366,6 +1391,9 @@ export function createMultiAgentOrchestrator(
     },
 
     delete(key: string): void {
+      if (key === "__proto__" || key === "constructor" || key === "prototype") {
+        return;
+      }
       const coordFacts = getAgentFacts("__coord");
       system.batch(() => {
         const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
@@ -2049,6 +2077,7 @@ export function createMultiAgentOrchestrator(
               requestedAt: Date.now(),
             };
 
+            approvalRequestIndex.set(approvalId, agentId);
             system.batch(() => {
               const currentApproval = getApprovalState(agentFacts);
               setApprovalState(agentFacts, {
@@ -2323,6 +2352,8 @@ export function createMultiAgentOrchestrator(
       throw new Error(`[Directive MultiAgent] Unknown agent "${agentId}". Registered agents: ${available}`);
     }
 
+    const MAX_AGENT_STREAM_BUFFER = 10_000;
+    const MAX_ACCUMULATED_OUTPUT = 100_000;
     const abortController = new AbortController();
     const chunks: OrchestratorStreamChunk[] = [];
     const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
@@ -2349,6 +2380,9 @@ export function createMultiAgentOrchestrator(
       if (waiter) {
         waiter(chunk);
       } else {
+        if (chunks.length >= MAX_AGENT_STREAM_BUFFER) {
+          chunks.shift();
+        }
         chunks.push(chunk);
       }
     };
@@ -2374,6 +2408,9 @@ export function createMultiAgentOrchestrator(
               const newTokens = Math.ceil(message.content.length / 4);
               tokenCount += newTokens;
               accumulatedOutput += message.content;
+              if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
+                accumulatedOutput = accumulatedOutput.slice(-MAX_ACCUMULATED_OUTPUT);
+              }
               pushChunk({ type: "token", data: message.content, tokenCount });
             }
           },
@@ -3604,8 +3641,8 @@ export function createMultiAgentOrchestrator(
         }
       }
 
-      if (debug && rounds.length === 0 && effectiveSignal?.aborted) {
-        console.debug("[Directive MultiAgent] debate returned with 0 rounds completed (signal was aborted)");
+      if (rounds.length === 0) {
+        throw new Error("[Directive MultiAgent] Debate aborted before any round completed");
       }
 
       const result = extract ? extract(lastWinnerOutput) : lastWinnerOutput as T;
@@ -4018,25 +4055,25 @@ export function createMultiAgentOrchestrator(
     approve(requestId: string): void {
       assertNotDisposed();
 
-      // Find which agent's approval state has this request
-      for (const agentId of Object.keys(agents)) {
+      // O(1) lookup via reverse index
+      const agentId = approvalRequestIndex.get(requestId);
+      if (agentId) {
+        approvalRequestIndex.delete(requestId);
         const agentFacts = getAgentFacts(agentId);
-        const approval = getApprovalState(agentFacts);
-        if (approval.pending.some((r: ApprovalRequest) => r.id === requestId)) {
-          system.batch(() => {
-            const currentApproval = getApprovalState(agentFacts);
-            const MAX_APPROVAL_HISTORY = 200;
-            const approved = [...currentApproval.approved, requestId];
-            setApprovalState(agentFacts, {
-              ...currentApproval,
-              pending: currentApproval.pending.filter((r: ApprovalRequest) => r.id !== requestId),
-              approved: approved.length > MAX_APPROVAL_HISTORY ? approved.slice(-MAX_APPROVAL_HISTORY) : approved,
-            });
+        system.batch(() => {
+          const currentApproval = getApprovalState(agentFacts);
+          const MAX_APPROVAL_HISTORY = 200;
+          const approved = [...currentApproval.approved, requestId];
+          setApprovalState(agentFacts, {
+            ...currentApproval,
+            pending: currentApproval.pending.filter((r: ApprovalRequest) => r.id !== requestId),
+            approved: approved.length > MAX_APPROVAL_HISTORY ? approved.slice(-MAX_APPROVAL_HISTORY) : approved,
           });
+        });
 
-          return;
-        }
+        return;
       }
+
       if (debug) {
         console.debug(`[Directive MultiAgent] approve() ignored: no pending request "${requestId}"`);
       }
@@ -4045,32 +4082,33 @@ export function createMultiAgentOrchestrator(
     reject(requestId: string, reason?: string): void {
       assertNotDisposed();
 
-      for (const agentId of Object.keys(agents)) {
+      // O(1) lookup via reverse index
+      const agentId = approvalRequestIndex.get(requestId);
+      if (agentId) {
+        approvalRequestIndex.delete(requestId);
         const agentFacts = getAgentFacts(agentId);
-        const approval = getApprovalState(agentFacts);
-        if (approval.pending.some((r: ApprovalRequest) => r.id === requestId)) {
-          system.batch(() => {
-            const currentApproval = getApprovalState(agentFacts);
-            if (reason && debug) {
-              console.debug(`[Directive MultiAgent] Request ${requestId} rejected: ${reason}`);
-            }
-            const rejectedRequest: RejectedRequest = {
-              id: requestId,
-              reason,
-              rejectedAt: Date.now(),
-            };
-            const MAX_REJECTION_HISTORY = 200;
-            const rejected = [...currentApproval.rejected, rejectedRequest];
-            setApprovalState(agentFacts, {
-              ...currentApproval,
-              pending: currentApproval.pending.filter((r: ApprovalRequest) => r.id !== requestId),
-              rejected: rejected.length > MAX_REJECTION_HISTORY ? rejected.slice(-MAX_REJECTION_HISTORY) : rejected,
-            });
+        system.batch(() => {
+          const currentApproval = getApprovalState(agentFacts);
+          if (reason && debug) {
+            console.debug(`[Directive MultiAgent] Request ${requestId} rejected: ${reason}`);
+          }
+          const rejectedRequest: RejectedRequest = {
+            id: requestId,
+            reason,
+            rejectedAt: Date.now(),
+          };
+          const MAX_REJECTION_HISTORY = 200;
+          const rejected = [...currentApproval.rejected, rejectedRequest];
+          setApprovalState(agentFacts, {
+            ...currentApproval,
+            pending: currentApproval.pending.filter((r: ApprovalRequest) => r.id !== requestId),
+            rejected: rejected.length > MAX_REJECTION_HISTORY ? rejected.slice(-MAX_REJECTION_HISTORY) : rejected,
           });
+        });
 
-          return;
-        }
+        return;
       }
+
       if (debug) {
         console.debug(`[Directive MultiAgent] reject() ignored: no pending request "${requestId}"`);
       }
@@ -4262,35 +4300,33 @@ export function createMultiAgentOrchestrator(
       }
 
       // Warn about orphaned patterns referencing this agent
-      if (debug) {
-        for (const [patternId, pattern] of Object.entries(patterns)) {
-          let referencedAgents: string[];
-          switch (pattern.type) {
-            case "supervisor":
-              referencedAgents = [pattern.supervisor, ...pattern.workers];
-              break;
-            case "dag":
-              referencedAgents = Object.values(pattern.nodes).map((n) => n.agent);
-              break;
-            case "reflect":
-              referencedAgents = [pattern.agent, pattern.evaluator];
-              break;
-            case "parallel":
-            case "sequential":
-            case "race":
-              referencedAgents = pattern.agents;
-              break;
-            case "debate":
-              referencedAgents = [...(pattern as DebatePattern).agents, (pattern as DebatePattern).evaluator];
-              break;
-            default:
-              referencedAgents = [];
-          }
-          if (referencedAgents.includes(agentId)) {
-            console.debug(
-              `[Directive MultiAgent] Warning: Pattern "${patternId}" references unregistered agent "${agentId}"`
-            );
-          }
+      for (const [patternId, pattern] of Object.entries(patterns)) {
+        let referencedAgents: string[];
+        switch (pattern.type) {
+          case "supervisor":
+            referencedAgents = [pattern.supervisor, ...pattern.workers];
+            break;
+          case "dag":
+            referencedAgents = Object.values(pattern.nodes).map((n) => n.agent);
+            break;
+          case "reflect":
+            referencedAgents = [pattern.agent, pattern.evaluator];
+            break;
+          case "parallel":
+          case "sequential":
+          case "race":
+            referencedAgents = pattern.agents;
+            break;
+          case "debate":
+            referencedAgents = [...(pattern as DebatePattern).agents, (pattern as DebatePattern).evaluator];
+            break;
+          default:
+            referencedAgents = [];
+        }
+        if (referencedAgents.includes(agentId)) {
+          console.warn(
+            `[Directive MultiAgent] Warning: Pattern "${patternId}" references unregistered agent "${agentId}"`
+          );
         }
       }
 
@@ -4377,6 +4413,7 @@ export function createMultiAgentOrchestrator(
       }
       breakpointModifications.clear();
       breakpointCancelReasons.clear();
+      approvalRequestIndex.clear();
       pendingHandoffs.length = 0;
       handoffResults.length = 0;
       handoffCounter = 0;
@@ -4397,6 +4434,13 @@ export function createMultiAgentOrchestrator(
           setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...scratchpadConfig.init });
         }
       });
+
+      // Reset health monitor to clear stale metrics
+      if (healthMonitorInstance) {
+        healthMonitorInstance.reset();
+      }
+
+      lastReflectionHistory = null;
 
       // Reset derived values and recompute
       for (const key of Object.keys(derivedValues)) {
@@ -4685,7 +4729,11 @@ export function createMultiAgentOrchestrator(
 
       const result = await runReflectPattern<T>(pattern, input, "__imperative_reflect");
       const history = lastReflectionHistory ? [...lastReflectionHistory] : [];
-      const exhausted = history.length > 0 && !history[history.length - 1]!.passed;
+      const maxIterations = reflectOpts?.maxIterations ?? 2;
+      const exhausted =
+        history.length > 0 &&
+        !history[history.length - 1]!.passed &&
+        history.length >= maxIterations;
 
       return { result, iterations: history.length, history, exhausted };
     },
@@ -4831,6 +4879,7 @@ export function createMultiAgentOrchestrator(
  *
  * @param agents - Agent IDs to run concurrently
  * @param merge - Combine all agent results into a single output
+ * @param config.merge - Receives all successful RunResults (array may be shorter than agents.length when minSuccess is set). Returns the merged result.
  * @param options - Optional `minSuccess` and `timeout` overrides
  *
  * @example
@@ -4968,7 +5017,7 @@ export function dag<T = Record<string, unknown>>(
  *
  * @example
  * ```typescript
- * const reviewed = reflect('writer', 'reviewer', { maxIterations: 2 });
+ * const reviewPattern = reflect('writer', 'reviewer', { maxIterations: 2 });
  * ```
  */
 export function reflect<T>(
@@ -5620,23 +5669,8 @@ export function spawnOnCondition(config: {
 // Debate Pattern
 // ============================================================================
 
-/** Configuration for the debate pattern (used with runDebate imperative API) */
-export interface DebateConfig<T = unknown> {
-  /** Agent IDs that will generate competing proposals */
-  agents: string[];
-  /** Evaluator agent ID that judges proposals */
-  evaluator: string;
-  /** Maximum rounds of debate (default: 2) */
-  maxRounds?: number;
-  /** Extract final result from the winning proposal */
-  extract?: (output: unknown) => T;
-  /** Parse evaluator output. Default: JSON.parse expecting { winnerId, feedback } */
-  parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
-  /** AbortSignal for external cancellation */
-  signal?: AbortSignal;
-  /** Overall timeout (ms) */
-  timeout?: number;
-}
+/** Configuration for the debate() factory and runDebate() imperative API. @see DebatePattern */
+export type DebateConfig<T = unknown> = Omit<DebatePattern<T>, "type">;
 
 /**
  * Create a debate pattern where agents compete and an evaluator picks the best.
@@ -5837,27 +5871,134 @@ export function spawnPool(
   when: (facts: Record<string, unknown>) => boolean,
   config: SpawnPoolConfig,
 ): OrchestratorConstraint<Record<string, unknown>> {
-  const { agent, input, count, priority, context } = config;
+  const { agent, input, priority, context } = config;
 
   return {
     when,
     require: (facts) => {
-      const n = typeof count === "function" ? count(facts) : count;
-      const clamped = Math.max(1, Math.floor(n));
-      const requirements: RunAgentRequirement[] = [];
-      for (let i = 0; i < clamped; i++) {
-        requirements.push({
-          type: "RUN_AGENT",
-          agent,
-          input: input(facts, i),
-          context,
-        } as RunAgentRequirement);
-      }
-
-      // Return first requirement (orchestrator processes one per constraint per cycle)
-      // For N > 1, the constraint re-fires on subsequent cycles as long as `when` is true
-      return requirements[0]!;
+      // Only the first requirement is used per constraint cycle.
+      // For count > 1, the constraint re-fires on subsequent cycles as long as `when` is true.
+      return {
+        type: "RUN_AGENT",
+        agent,
+        input: input(facts, 0),
+        context,
+      } as RunAgentRequirement;
     },
     priority,
   };
+}
+
+// ============================================================================
+// Pattern Serialization
+// ============================================================================
+
+/** Serialized DAG node (functions stripped) */
+export interface SerializedDagNode {
+  agent: string;
+  deps?: string[];
+  timeout?: number;
+  priority?: number;
+}
+
+/** JSON-safe representation of any execution pattern (all functions stripped) */
+export type SerializedPattern =
+  | { type: "parallel"; agents: string[]; minSuccess?: number; timeout?: number }
+  | { type: "sequential"; agents: string[]; continueOnError?: boolean }
+  | { type: "supervisor"; supervisor: string; workers: string[]; maxRounds?: number }
+  | { type: "dag"; nodes: Record<string, SerializedDagNode>; timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" }
+  | { type: "reflect"; agent: string; evaluator: string; maxIterations?: number; onExhausted?: "accept-last" | "accept-best" | "throw"; timeout?: number; threshold?: number }
+  | { type: "race"; agents: string[]; timeout?: number; minSuccess?: number }
+  | { type: "debate"; agents: string[]; evaluator: string; maxRounds?: number; timeout?: number };
+
+/**
+ * Serialize an execution pattern to a JSON-safe object.
+ *
+ * Strips all function callbacks and runtime objects (AbortSignal) while
+ * preserving the topology — which agents, in what structure, with what
+ * numeric/string/boolean options.
+ *
+ * Use this for visual editors, LLM-generated plans, persistence, or
+ * debugging. Restore with {@link patternFromJSON}.
+ *
+ * Note: Function-form `threshold` on reflect patterns is not serializable and will be dropped.
+ * Re-supply it via `overrides` when calling {@link patternFromJSON}.
+ *
+ * @example
+ * ```typescript
+ * const p = parallel({ agents: ["a", "b"], merge: (r) => r });
+ * const json = patternToJSON(p);
+ * // { type: "parallel", agents: ["a", "b"] }
+ * localStorage.setItem("plan", JSON.stringify(json));
+ * ```
+ */
+export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPattern {
+  switch (pattern.type) {
+    case "parallel":
+      return { type: "parallel", agents: pattern.agents, minSuccess: pattern.minSuccess, timeout: pattern.timeout };
+    case "sequential":
+      return { type: "sequential", agents: pattern.agents, continueOnError: pattern.continueOnError };
+    case "supervisor":
+      return { type: "supervisor", supervisor: pattern.supervisor, workers: pattern.workers, maxRounds: pattern.maxRounds };
+    case "dag": {
+      const nodes: Record<string, SerializedDagNode> = Object.create(null);
+      for (const [id, node] of Object.entries(pattern.nodes)) {
+        nodes[id] = { agent: node.agent, deps: node.deps, timeout: node.timeout, priority: node.priority };
+      }
+
+      return { type: "dag", nodes, timeout: pattern.timeout, maxConcurrent: pattern.maxConcurrent, onNodeError: pattern.onNodeError };
+    }
+    case "reflect":
+      return {
+        type: "reflect",
+        agent: pattern.agent,
+        evaluator: pattern.evaluator,
+        maxIterations: pattern.maxIterations,
+        onExhausted: pattern.onExhausted,
+        timeout: pattern.timeout,
+        threshold: typeof pattern.threshold === "number" ? pattern.threshold : undefined,
+      };
+    case "race":
+      return { type: "race", agents: pattern.agents, timeout: pattern.timeout, minSuccess: pattern.minSuccess };
+    case "debate":
+      return { type: "debate", agents: pattern.agents, evaluator: pattern.evaluator, maxRounds: pattern.maxRounds, timeout: pattern.timeout };
+  }
+}
+
+const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "dag", "reflect", "race", "debate"]);
+
+/**
+ * Restore an execution pattern from its serialized form.
+ *
+ * Returns the data structure with all function fields set to `undefined`.
+ * Supply callbacks via the optional `overrides` parameter to re-attach
+ * runtime behavior.
+ *
+ * @example
+ * ```typescript
+ * const json = JSON.parse(localStorage.getItem("plan")!);
+ * const pattern = patternFromJSON<string[]>(json, {
+ *   merge: (results) => results.map(r => r.output as string),
+ * });
+ * // Use the imperative API — runPattern takes a registered pattern ID, not an object
+ * if (pattern.type === "parallel") {
+ *   const result = await orchestrator.runParallel(pattern.agents, input, pattern.merge);
+ * }
+ * ```
+ */
+export function patternFromJSON<T = unknown>(
+  json: SerializedPattern,
+  overrides?: Partial<ExecutionPattern<T>>,
+): ExecutionPattern<T> {
+  if (!json || typeof json !== "object" || !ALLOWED_PATTERN_TYPES.has((json as SerializedPattern).type)) {
+    throw new Error(`[Directive] patternFromJSON: invalid or unknown pattern type "${(json as Record<string, unknown>)?.type}"`);
+  }
+  const safe: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(json)) {
+    if (k !== "__proto__" && k !== "constructor" && k !== "prototype") {
+      safe[k] = v;
+    }
+  }
+
+  return { ...safe, ...overrides } as ExecutionPattern<T>;
 }

@@ -6,6 +6,7 @@ interface TimelineBarProps {
   timeRange: { start: number; duration: number };
   isSelected: boolean;
   onClick: () => void;
+  row?: number;
 }
 
 /** Get duration from event if available */
@@ -19,7 +20,7 @@ function getEventDuration(event: DebugEvent): number {
   return 0;
 }
 
-export function TimelineBar({ event, timeRange, isSelected, onClick }: TimelineBarProps) {
+export function TimelineBar({ event, timeRange, isSelected, onClick, row = 0 }: TimelineBarProps) {
   const offset = event.timestamp - timeRange.start;
   const leftPct = (offset / timeRange.duration) * 100;
   const duration = getEventDuration(event);
@@ -33,12 +34,14 @@ export function TimelineBar({ event, timeRange, isSelected, onClick }: TimelineB
   return (
     <button
       onClick={onClick}
-      className={`absolute top-1 transition-all ${
+      aria-label={`${event.type.replace(/_/g, " ")}${event.agentId ? ` (${event.agentId})` : ""}${duration ? ` — ${duration}ms` : ""}`}
+      className={`absolute transition-all ${
         isSelected ? "ring-2 ring-white/40 z-20" : "hover:brightness-125 z-10"
       }`}
       style={{
         left: `${Math.min(leftPct, 99)}%`,
         width: isPoint ? "8px" : `max(${widthPct}%, 8px)`,
+        top: `${4 + row * 24}px`,
         height: "20px",
         backgroundColor: color,
         borderRadius: isPoint ? "50%" : "3px",

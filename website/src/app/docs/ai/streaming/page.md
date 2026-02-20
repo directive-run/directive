@@ -183,7 +183,7 @@ The streaming runner handles token tracking and lifecycle hooks automatically.
 
 ## Provider Streaming Runners
 
-Directive ships pre-built streaming runners for OpenAI and Anthropic. These handle SSE parsing, token extraction, and lifecycle hooks automatically:
+Directive ships pre-built streaming runners for OpenAI, Anthropic, and Gemini. These handle SSE parsing, token extraction, and lifecycle hooks automatically:
 
 ### OpenAI Streaming
 

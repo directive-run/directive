@@ -2,11 +2,10 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { DagNodeStatus } from "../lib/types";
 import { DAG_NODE_COLORS } from "../lib/colors";
 
-interface DagNodeData {
+export interface DagNodeData {
   label: string;
   status: DagNodeStatus;
   color: string;
-  selected: boolean;
   agentState?: {
     status: string;
     totalTokens: number;
@@ -24,9 +23,8 @@ const STATUS_ICONS: Record<DagNodeStatus, string> = {
   skipped: "⊘",
 };
 
-export function DagNode({ data }: NodeProps) {
-  const nodeData = data as unknown as DagNodeData;
-  const { label, status, selected, agentState } = nodeData;
+export function DagNode({ data, selected }: NodeProps) {
+  const { label, status, agentState } = data as DagNodeData;
   const color = DAG_NODE_COLORS[status];
 
   return (

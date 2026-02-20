@@ -65,7 +65,7 @@ export function SessionPanel({ events, onImport, onClear }: SessionPanelProps) {
         </button>
 
         <button
-          onClick={onClear}
+          onClick={() => { if (window.confirm("Clear all recorded events?")) { onClear(); } }}
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-red-400"
           disabled={events.length === 0}
         >

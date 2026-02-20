@@ -36,6 +36,8 @@ Build up from simple to complex:
 | 7 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
 | 8 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
 | 9 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
+| 10 | [Debug Timeline](/docs/ai/debug-timeline) | Trace and inspect agent execution events |
+| 11 | [Self-Healing](/docs/ai/self-healing) | Automatic error recovery and agent rerouting |
 
 ---
 

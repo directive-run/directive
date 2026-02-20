@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { BreakpointState } from "../lib/types";
 import { BreakpointCard } from "../components/BreakpointCard";
 
@@ -10,8 +9,6 @@ interface BreakpointViewProps {
 }
 
 export function BreakpointView({ state, onResume, onCancel, onRefresh }: BreakpointViewProps) {
-  const [stepThroughMode, setStepThroughMode] = useState(false);
-
   const hasPending = state.pending.length > 0;
 
   return (
@@ -28,17 +25,6 @@ export function BreakpointView({ state, onResume, onCancel, onRefresh }: Breakpo
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Step-through toggle */}
-          <label className="flex items-center gap-2 text-xs text-zinc-400">
-            <input
-              type="checkbox"
-              checked={stepThroughMode}
-              onChange={(e) => setStepThroughMode(e.target.checked)}
-              className="rounded border-zinc-600"
-            />
-            Step-through mode
-          </label>
-
           <button
             onClick={onRefresh}
             className="rounded bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
