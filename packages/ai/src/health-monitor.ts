@@ -103,7 +103,7 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
   // Validate weights sum approximately to 1.0
   const weightSum = weights.successRate + weights.latency + weights.circuitState;
   if (Math.abs(weightSum - 1.0) > 0.01) {
-    throw new Error(`[Directive HealthMonitor] weights must sum to 1.0 (got ${weightSum.toFixed(4)})`);
+    throw new Error(`[Directive HealthMonitor] weights must sum to ~1.0 (tolerance: ±0.01, got ${weightSum.toFixed(4)})`);
   }
 
   const events = new Map<string, HealthEvent[]>();

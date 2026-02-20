@@ -230,11 +230,15 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
       return;
     }
 
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timer);
       resolve();
-    }, { once: true });
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -743,18 +747,23 @@ export function createGoalEngine(config: GoalEngineConfig): GoalEngine {
                 } catch {
                   if (decl.produces.length === 1) {
                     outputFacts[decl.produces[0]!] = runResult.output;
+                    if (typeof process !== "undefined" && process.env?.["NODE_ENV"] !== "production") {
+                      console.warn(
+                        `[Directive Goals] Agent "${agentId}" output was not valid JSON. Using raw output as fact value for "${decl.produces[0]}".`,
+                      );
+                    }
                   }
                 }
               }
 
-              // Safe merge (prototype pollution guard)
-              safeMergeFacts(facts, outputFacts);
-              completedAgents.add(agentId);
-              // Track input version for allowRerun
+              // Track input version for allowRerun BEFORE merge
               agentInputVersions.set(
                 agentId,
                 JSON.stringify(decl.requires.map((k) => facts[k])),
               );
+              // Safe merge (prototype pollution guard)
+              safeMergeFacts(facts, outputFacts);
+              completedAgents.add(agentId);
               failedAgents.delete(agentId); // Reset failure count on success
               executionOrder.push(agentId);
               agentResults[agentId] = runResult;

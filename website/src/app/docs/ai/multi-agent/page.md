@@ -1197,12 +1197,6 @@ const orchestrator = createMultiAgentOrchestrator({
     onAgentRetry: ({ agentId, attempt, error, delayMs }) => {
       console.log(`[${agentId}] Retry #${attempt} in ${delayMs}ms: ${error.message}`);
     },
-    onHandoff: (request) => {
-      console.log(`Handoff: ${request.fromAgent} → ${request.toAgent}`);
-    },
-    onHandoffComplete: (result) => {
-      console.log(`Handoff ${result.request.id} complete`);
-    },
     onPatternStart: ({ patternId, patternType, timestamp }) => {
       console.log(`Pattern ${patternId} (${patternType}) started`);
     },
@@ -1213,6 +1207,13 @@ const orchestrator = createMultiAgentOrchestrator({
         console.log(`Pattern ${patternId} completed in ${durationMs}ms`);
       }
     },
+  },
+
+  onHandoff: (request) => {
+    console.log(`Handoff: ${request.fromAgent} → ${request.toAgent}`);
+  },
+  onHandoffComplete: (result) => {
+    console.log(`Handoff ${result.request.id} complete`);
   },
 });
 ```

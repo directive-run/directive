@@ -1,5 +1,8 @@
 /**
  * Shared types for DevTools UI — mirrors the devtools-server protocol.
+ *
+ * IMPORTANT: These types must stay in sync with `packages/ai/src/devtools-server.ts`.
+ * Any protocol changes there must be reflected here.
  */
 
 // ============================================================================
@@ -30,7 +33,9 @@ export type DebugEventType =
   | "reflection_iteration"
   | "race_start"
   | "race_winner"
-  | "race_cancelled";
+  | "race_cancelled"
+  | "reroute"
+  | "debate_round";
 
 export interface DebugEvent {
   id: number;
@@ -39,6 +44,63 @@ export interface DebugEvent {
   agentId?: string;
   snapshotId: number | null;
   [key: string]: unknown;
+}
+
+// ============================================================================
+// Typed Event Subtypes (for type-safe property access)
+// ============================================================================
+
+export interface AgentStartEvent extends DebugEvent {
+  type: "agent_start";
+  agentId: string;
+}
+
+export interface AgentCompleteEvent extends DebugEvent {
+  type: "agent_complete";
+  agentId: string;
+  durationMs?: number;
+  totalTokens?: number;
+}
+
+export interface AgentErrorEvent extends DebugEvent {
+  type: "agent_error";
+  agentId: string;
+  errorMessage?: string;
+}
+
+export interface DagNodeUpdateEvent extends DebugEvent {
+  type: "dag_node_update";
+  nodeId: string;
+  status: DagNodeStatus;
+  deps?: string[];
+}
+
+export interface RerouteEvent extends DebugEvent {
+  type: "reroute";
+  from: string;
+  to: string;
+  reason?: string;
+}
+
+// Type guards
+export function isAgentStart(e: DebugEvent): e is AgentStartEvent {
+  return e.type === "agent_start";
+}
+
+export function isAgentComplete(e: DebugEvent): e is AgentCompleteEvent {
+  return e.type === "agent_complete";
+}
+
+export function isAgentError(e: DebugEvent): e is AgentErrorEvent {
+  return e.type === "agent_error";
+}
+
+export function isDagNodeUpdate(e: DebugEvent): e is DagNodeUpdateEvent {
+  return e.type === "dag_node_update";
+}
+
+export function isReroute(e: DebugEvent): e is RerouteEvent {
+  return e.type === "reroute";
 }
 
 // ============================================================================
@@ -103,6 +165,7 @@ export interface DevToolsSnapshot {
 
 export type ServerMessage =
   | { type: "welcome"; version: number; sessionId: string; timestamp: number }
+  | { type: "pong"; timestamp: number }
   | { type: "event"; event: DebugEvent }
   | { type: "event_batch"; events: DebugEvent[] }
   | { type: "snapshot"; data: DevToolsSnapshot }
