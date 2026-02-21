@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DebugEvent, DebugEventType } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
 
@@ -73,8 +73,8 @@ function buildFlameStacks(events: DebugEvent[]): FlameBar[] {
         const start = openSpans.get(key);
         if (start) {
           const durationMs =
-            typeof (event as Record<string, unknown>).durationMs === "number"
-              ? ((event as Record<string, unknown>).durationMs as number)
+            typeof event.durationMs === "number"
+              ? event.durationMs
               : event.timestamp - start.timestamp;
 
           bars.push({
@@ -87,7 +87,7 @@ function buildFlameStacks(events: DebugEvent[]): FlameBar[] {
             label: event.agentId
               ? `${typeLabel(startType)}: ${event.agentId}`
               : typeLabel(startType),
-            tokens: (event as Record<string, unknown>).totalTokens as number | undefined,
+            tokens: typeof event.totalTokens === "number" ? event.totalTokens : undefined,
             event: start,
           });
           openSpans.delete(key);
@@ -148,6 +148,23 @@ export function FlamechartView({ events }: FlamechartViewProps) {
   const [selectedBar, setSelectedBar] = useState<FlameBar | null>(null);
   const [hoveredBar, setHoveredBar] = useState<FlameBar | null>(null);
 
+  // D2: Escape key closes detail panel
+  useEffect(() => {
+    if (!selectedBar) {
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedBar(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedBar]);
+
   const timeRange = useMemo(() => {
     if (events.length === 0) {
       return { start: 0, end: 1, duration: 1 };
@@ -190,7 +207,7 @@ export function FlamechartView({ events }: FlamechartViewProps) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-4xl">🔥</div>
+          <div className="mb-2 text-4xl" aria-hidden="true">🔥</div>
           <p>Run an agent to see the flamechart</p>
         </div>
       </div>

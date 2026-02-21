@@ -30,7 +30,7 @@ const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
 
 const STATUS_DOT_COLORS: Record<ConnectionStatus, string> = {
   connected: "bg-emerald-400",
-  connecting: "bg-amber-400 animate-pulse",
+  connecting: "bg-amber-400 motion-safe:animate-pulse",
   disconnected: "bg-zinc-500",
   error: "bg-red-400",
 };
@@ -52,14 +52,15 @@ class ViewErrorBoundary extends React.Component<
   render() {
     if (this.state.error) {
       return (
-        <div className="flex h-full items-center justify-center text-zinc-500">
+        <div className="flex h-full items-center justify-center text-zinc-500" role="alert">
           <div className="text-center">
-            <div className="mb-2 text-4xl">⚠</div>
+            <div className="mb-2 text-4xl" aria-hidden="true">⚠</div>
             <p className="text-red-400">View crashed</p>
             <p className="mt-1 text-xs text-zinc-400">{this.state.error.message}</p>
             <button
               onClick={() => this.setState({ error: null })}
               className="mt-3 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+              autoFocus
             >
               Retry
             </button>
@@ -131,9 +132,10 @@ export function App() {
 
         {/* Connection */}
         <div className="border-b border-zinc-800 px-4 py-3">
-          <label className="mb-1 block text-xs text-zinc-500">Server URL</label>
+          <label htmlFor="ws-url-input" className="mb-1 block text-xs text-zinc-500">Server URL</label>
           <div className="flex gap-1">
             <input
+              id="ws-url-input"
               type="text"
               value={wsUrl}
               onChange={(e) => setWsUrl(e.target.value)}
@@ -163,7 +165,7 @@ export function App() {
                   : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
               }`}
             >
-              <span className="text-base">{item.icon}</span>
+              <span className="text-base" aria-hidden="true">{item.icon}</span>
               <span>{item.label}</span>
               {item.id === "breakpoints" && conn.breakpointState.pending.length > 0 && (
                 <span className="ml-auto rounded-full bg-amber-500 px-1.5 text-xs font-medium text-black">
@@ -202,7 +204,7 @@ export function App() {
         />
 
         {/* Stats footer */}
-        <div className="overflow-y-auto border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500" style={{ maxHeight: "120px" }}>
+        <div className="overflow-y-auto border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500" style={{ maxHeight: "120px" }} aria-live="polite">
           <div>Events: {replay.state.active ? `${visibleEvents.length}/${conn.events.length}` : conn.events.length}</div>
           <div>Agents: {Object.keys(conn.healthMetrics).length}</div>
           {replay.state.active && (
@@ -218,6 +220,9 @@ export function App() {
           {conn.error && (
             <div className="mt-1 text-red-400">{conn.error.length > 200 ? `${conn.error.slice(0, 200)}...` : conn.error}</div>
           )}
+          {runSessions.saveError && (
+            <div className="mt-1 text-amber-400">{runSessions.saveError}</div>
+          )}
         </div>
       </nav>
 
@@ -231,11 +236,11 @@ export function App() {
         )}
 
         {conn.status !== "connected" && view !== "compare" ? (
-          <div className="flex h-full items-center justify-center text-zinc-500">
+          <div className="flex h-full items-center justify-center text-zinc-500" role={conn.status === "error" ? "alert" : undefined}>
             <div className="text-center">
               {conn.status === "error" ? (
                 <>
-                  <div className="mb-2 text-4xl">⚠</div>
+                  <div className="mb-2 text-4xl" aria-hidden="true">⚠</div>
                   <p className="text-red-400">Connection failed</p>
                   {conn.error && <p className="mt-1 text-xs text-red-400/70">{conn.error}</p>}
                   <div className="mt-3 rounded border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-left text-xs text-zinc-400">
@@ -255,13 +260,13 @@ export function App() {
                 </>
               ) : conn.status === "connecting" ? (
                 <>
-                  <div className="mb-2 text-4xl animate-pulse">⏳</div>
+                  <div className="mb-2 text-4xl motion-safe:animate-pulse" aria-hidden="true">⏳</div>
                   <p>Connecting to {wsUrl}...</p>
                   <p className="mt-1 text-xs">Attempting to establish connection</p>
                 </>
               ) : (
                 <>
-                  <div className="mb-2 text-4xl">⏳</div>
+                  <div className="mb-2 text-4xl" aria-hidden="true">⏳</div>
                   <p>Not connected</p>
                   <p className="mt-1 text-xs">
                     Start your orchestrator with{" "}
@@ -290,7 +295,7 @@ export function App() {
               )}
               {view === "flamechart" && <FlamechartView events={visibleEvents} />}
               {view === "dag" && <DagView events={visibleEvents} snapshot={conn.snapshot} />}
-              {view === "health" && <HealthView metrics={conn.healthMetrics} events={visibleEvents} />}
+              {view === "health" && <HealthView metrics={conn.healthMetrics} events={visibleEvents} onRequestHealth={conn.requestHealth} />}
               {view === "cost" && <CostView events={visibleEvents} />}
               {view === "breakpoints" && (
                 <BreakpointView

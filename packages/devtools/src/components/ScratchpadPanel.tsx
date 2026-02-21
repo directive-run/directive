@@ -22,7 +22,7 @@ export function ScratchpadPanel({ data }: ScratchpadPanelProps) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-2xl">📋</div>
+          <div className="mb-2 text-2xl" aria-hidden="true">📋</div>
           <p className="text-sm">No scratchpad data</p>
           <p className="mt-1 text-xs">Scratchpad entries appear when agents write to shared state</p>
         </div>
@@ -38,6 +38,7 @@ export function ScratchpadPanel({ data }: ScratchpadPanelProps) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Filter keys..."
+        aria-label="Filter scratchpad keys"
         className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
       />
 

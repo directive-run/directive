@@ -9,7 +9,14 @@ function HealthBar({ score }: { score: number }) {
   const color = score >= 70 ? "#22c55e" : score >= 40 ? "#f59e0b" : "#ef4444";
 
   return (
-    <div className="h-1.5 w-full rounded-full bg-zinc-800">
+    <div
+      className="h-1.5 w-full rounded-full bg-zinc-800"
+      role="progressbar"
+      aria-valuenow={score}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`Health score: ${score} out of 100`}
+    >
       <div
         className="h-full rounded-full transition-all duration-500"
         style={{ width: `${score}%`, backgroundColor: color }}
