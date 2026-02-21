@@ -35,7 +35,11 @@ export function BreakpointView({ state, onResume, onCancel, onRefresh }: Breakpo
           {/* Resume all */}
           {hasPending && (
             <button
-              onClick={() => state.pending.forEach((bp) => onResume(bp.id))}
+              onClick={() => {
+                if (window.confirm(`Resume all ${state.pending.length} pending breakpoints?`)) {
+                  state.pending.forEach((bp) => onResume(bp.id));
+                }
+              }}
               className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500"
             >
               Resume All
@@ -65,7 +69,7 @@ export function BreakpointView({ state, onResume, onCancel, onRefresh }: Breakpo
         ) : (
           <div className="flex h-48 items-center justify-center text-zinc-500">
             <div className="text-center">
-              <div className="mb-2 text-4xl">⏸</div>
+              <div className="mb-2 text-4xl" aria-hidden="true">⏸</div>
               <p>No pending breakpoints</p>
               <p className="mt-1 text-xs">Breakpoints pause execution at configured phases</p>
             </div>

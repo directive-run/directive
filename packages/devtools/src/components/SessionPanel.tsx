@@ -126,7 +126,7 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-50"
           disabled={events.length === 0}
         >
-          <span>📥</span> Export JSON
+          <span aria-hidden="true">📥</span> Export JSON
         </button>
 
         <button
@@ -134,7 +134,7 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-50"
           disabled={events.length === 0}
         >
-          <span>🌐</span> Export as HTML
+          <span aria-hidden="true">🌐</span> Export as HTML
         </button>
 
         <button
@@ -142,7 +142,7 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
           disabled={importing}
         >
-          <span>📤</span> {importing ? "Importing..." : "Import from file"}
+          <span aria-hidden="true">📤</span> {importing ? "Importing..." : "Import from file"}
         </button>
 
         {onSaveRun && (
@@ -151,7 +151,7 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
             className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
             disabled={events.length === 0}
           >
-            <span>💾</span> Save Run
+            <span aria-hidden="true">💾</span> Save Run
           </button>
         )}
 
@@ -161,7 +161,7 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
             className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
             disabled={importingRun}
           >
-            <span>📂</span> {importingRun ? "Importing..." : "Import Run"}
+            <span aria-hidden="true">📂</span> {importingRun ? "Importing..." : "Import Run"}
           </button>
         )}
 
@@ -170,7 +170,7 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-red-400 disabled:opacity-50"
           disabled={events.length === 0}
         >
-          <span>🗑</span> Clear events
+          <span aria-hidden="true">🗑</span> Clear events
         </button>
       </div>
 

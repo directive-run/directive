@@ -31,7 +31,7 @@ export function DagNode({ data, selected }: NodeProps) {
     <div
       className={`rounded-lg border-2 bg-zinc-900 px-4 py-3 shadow-lg transition-all ${
         selected ? "ring-2 ring-white/30" : ""
-      } ${status === "running" ? "animate-pulse" : ""}`}
+      } ${status === "running" ? "motion-safe:animate-pulse" : ""}`}
       style={{ borderColor: color }}
     >
       <Handle type="target" position={Position.Top} className="!bg-zinc-600 !w-2 !h-2" />

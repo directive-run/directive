@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ERROR_EVENT_TYPES, type DebugEvent, type DebugEventType } from "../lib/types";
 import type { Anomaly } from "../hooks/use-anomalies";
 import { EVENT_COLORS } from "../lib/colors";
@@ -55,8 +55,7 @@ function computeRows(laneEvts: DebugEvent[], range: { start: number; duration: n
   const rowMap = new Map<number, number>();
   const getLeft = (e: DebugEvent) => ((e.timestamp - range.start) / range.duration) * 100;
   const getRight = (e: DebugEvent) => {
-    const dur = (e as Record<string, unknown>).durationMs;
-    const w = typeof dur === "number" && dur > 0 ? (dur / range.duration) * 100 : 0.5;
+    const w = typeof e.durationMs === "number" && e.durationMs > 0 ? (e.durationMs / range.duration) * 100 : 0.5;
 
     return getLeft(e) + w;
   };
@@ -81,6 +80,32 @@ function computeRows(laneEvts: DebugEvent[], range: { start: number; duration: n
 
 export function TimelineView({ events, replayCursor, onForkFromSnapshot, streamingTokens, anomalies }: TimelineViewProps) {
   const [selectedEvent, setSelectedEvent] = useState<DebugEvent | null>(null);
+
+  // D1: Stable callback for TimelineBar — toggles selection without creating new closures per bar
+  const handleSelectEvent = useCallback((event: DebugEvent) => {
+    setSelectedEvent((prev) => prev?.id === event.id ? null : event);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedEvent(null);
+  }, []);
+
+  // D2: Escape key closes detail panel
+  useEffect(() => {
+    if (!selectedEvent) {
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        setSelectedEvent(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedEvent]);
 
   // M5: Extracted hooks
   const zoom = useTimelineZoom(events);
@@ -140,7 +165,7 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-4xl">📊</div>
+          <div className="mb-2 text-4xl" aria-hidden="true">📊</div>
           <p>No events recorded yet</p>
           <p className="mt-1 text-xs">Run an agent to see timeline events</p>
         </div>
@@ -174,11 +199,11 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
               <button
                 key={type}
                 onClick={() => filters.toggleType(type)}
-                aria-pressed={filters.typeFilter.size > 0 ? filters.typeFilter.has(type) : undefined}
+                aria-pressed={filters.typeFilter.size === 0 || filters.typeFilter.has(type)}
                 className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
                   isActive
                     ? ""
-                    : "!bg-zinc-800 !text-zinc-400 !border-zinc-600"
+                    : "!bg-zinc-800 !text-zinc-300 !border-zinc-600"
                 }`}
                 style={{
                   backgroundColor: `${EVENT_COLORS[type]}20`,
@@ -279,9 +304,7 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
                         event={event}
                         timeRange={zoom.visibleRange}
                         isSelected={selectedEvent?.id === event.id}
-                        onClick={() => setSelectedEvent(
-                          selectedEvent?.id === event.id ? null : event,
-                        )}
+                        onSelect={handleSelectEvent}
                         row={rowMap.get(event.id) ?? 0}
                         isAnomaly={anomalyEventIds.has(event.id)}
                       />
@@ -305,7 +328,7 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
           <div className="w-80 shrink-0 overflow-auto border-l border-zinc-800 bg-zinc-900">
             <EventDetail
               event={selectedEvent}
-              onClose={() => setSelectedEvent(null)}
+              onClose={handleCloseDetail}
               onForkFromSnapshot={onForkFromSnapshot}
             />
           </div>

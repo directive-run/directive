@@ -120,6 +120,7 @@ export function SearchBar({ events, onResults }: SearchBarProps) {
           value={query}
           onChange={handleChange}
           placeholder="Search events (regex)..."
+          aria-label="Search events by regex"
           spellCheck={false}
           className={`w-full rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-500 outline-none ring-1 ${
             isInvalidRegex
