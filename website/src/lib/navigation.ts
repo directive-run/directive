@@ -57,6 +57,8 @@ export const navigation: NavigationSection[] = [
       { title: 'Events', href: '/docs/events' },
       { title: 'Builders', href: '/docs/builders' },
       { title: 'Schema & Types', href: '/docs/schema-overview' },
+      { title: 'API Reference', href: '/docs/api/core' },
+      { title: 'Type Reference', href: '/docs/api/types' },
     ],
   },
   {
@@ -64,10 +66,15 @@ export const navigation: NavigationSection[] = [
     links: [
       { title: 'Overview', href: '/docs/adapters/overview' },
       { title: 'React', href: '/docs/adapters/react' },
+      { title: 'React API', href: '/docs/api/react' },
       { title: 'Vue', href: '/docs/adapters/vue' },
+      { title: 'Vue API', href: '/docs/api/vue' },
       { title: 'Svelte', href: '/docs/adapters/svelte' },
+      { title: 'Svelte API', href: '/docs/api/svelte' },
       { title: 'Solid', href: '/docs/adapters/solid' },
+      { title: 'Solid API', href: '/docs/api/solid' },
       { title: 'Lit', href: '/docs/adapters/lit' },
+      { title: 'Lit API', href: '/docs/api/lit' },
     ],
   },
   {
@@ -129,6 +136,7 @@ export const navigation: NavigationSection[] = [
       { title: 'Evals', href: '/docs/ai/evals' },
       { title: 'OpenTelemetry', href: '/docs/ai/otel' },
       { title: 'Testing', href: '/docs/ai/testing' },
+      { title: 'DevTools Live', href: '/devtools' },
     ],
   },
   {
@@ -171,19 +179,6 @@ export const navigation: NavigationSection[] = [
       { title: 'XState', href: '/docs/works-with/xstate' },
       { title: 'React Query', href: '/docs/works-with/react-query' },
       { title: 'Web Worker', href: '/docs/works-with/worker' },
-    ],
-  },
-  {
-    title: 'API Reference',
-    links: [
-      { title: 'Overview', href: '/docs/api/overview' },
-      { title: 'Core API', href: '/docs/api/core' },
-      { title: 'Types', href: '/docs/api/types' },
-      { title: 'React Hooks', href: '/docs/api/react' },
-      { title: 'Vue Composables', href: '/docs/api/vue' },
-      { title: 'Svelte Hooks', href: '/docs/api/svelte' },
-      { title: 'Solid Hooks', href: '/docs/api/solid' },
-      { title: 'Lit Controllers', href: '/docs/api/lit' },
     ],
   },
   {

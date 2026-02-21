@@ -9,6 +9,22 @@ The OTEL plugin subscribes to the debug timeline and creates spans for agent run
 
 ---
 
+## Setup
+
+Create an orchestrator with `debug: true` to enable the timeline, then attach the OTEL plugin:
+
+```typescript
+import { createAgentOrchestrator, createMultiAgentOrchestrator } from '@directive-run/ai';
+
+// Single-agent
+const single = createAgentOrchestrator({ runner, debug: true });
+const unsub = otel.attach(single.timeline!);
+
+// Multi-agent
+const multi = createMultiAgentOrchestrator({ runner, agents, debug: true });
+const unsub = otel.attach(multi.timeline!);
+```
+
 ## Quick Start
 
 ```typescript

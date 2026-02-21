@@ -323,6 +323,7 @@ export interface OrchestratorLifecycleHooks {
     timestamp: number;
   }) => void;
   onGuardrailCheck?: (event: {
+    agentId?: string;
     guardrailName: string;
     guardrailType: "input" | "output" | "toolCall";
     passed: boolean;
