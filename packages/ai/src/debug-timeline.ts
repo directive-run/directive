@@ -13,6 +13,22 @@
 import type { Plugin } from "@directive-run/core";
 import type { DebugEvent, DebugEventType } from "./types.js";
 
+/** A12: Known event types for import validation */
+const KNOWN_EVENT_TYPES: Set<string> = new Set([
+  "agent_start", "agent_complete", "agent_error", "agent_retry",
+  "guardrail_check", "constraint_evaluate",
+  "resolver_start", "resolver_complete", "resolver_error",
+  "approval_request", "approval_response",
+  "handoff_start", "handoff_complete",
+  "pattern_start", "pattern_complete",
+  "dag_node_update",
+  "breakpoint_hit", "breakpoint_resumed",
+  "derivation_update", "scratchpad_update",
+  "reflection_iteration",
+  "race_start", "race_winner", "race_cancelled",
+  "debate_round", "reroute",
+]);
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -117,8 +133,11 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
       for (const listener of listeners) {
         try {
           listener(fullEvent);
-        } catch {
-          // Listener errors must not break recording
+        } catch (err) {
+          // A6: Log listener errors in dev mode instead of swallowing silently
+          if (typeof process !== "undefined" && process.env?.["NODE_ENV"] !== "production") {
+            console.error("[Directive DebugTimeline] Listener threw:", err instanceof Error ? err.message : err);
+          }
         }
       }
 
@@ -146,13 +165,25 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
     },
 
     forkFrom(snapshotId: number): void {
-      // Find the last event at or before this snapshot
-      const targetEvents = events.filter((e) => e.snapshotId !== null && e.snapshotId <= snapshotId);
-      const lastEvent = targetEvents[targetEvents.length - 1];
+      // A8: Single reverse scan instead of two .filter() passes
+      let cutoffId = -1;
+      for (let i = events.length - 1; i >= 0; i--) {
+        if (events[i]!.snapshotId !== null && events[i]!.snapshotId! <= snapshotId) {
+          cutoffId = events[i]!.id;
+          break;
+        }
+      }
 
-      if (lastEvent) {
-        // Truncate events after the fork point (use monotonic id, not timestamp)
-        events = events.filter((e) => e.id <= lastEvent.id);
+      if (cutoffId >= 0) {
+        // Find the index to slice at (events are monotonic by id)
+        let sliceEnd = events.length;
+        for (let i = events.length - 1; i >= 0; i--) {
+          if (events[i]!.id <= cutoffId) {
+            sliceEnd = i + 1;
+            break;
+          }
+        }
+        events = events.slice(0, sliceEnd);
       } else {
         // No matching events — clear all
         events = [];
@@ -208,7 +239,8 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
         }
 
         const e = evt as Record<string, unknown>;
-        if (typeof e.id === "number" && typeof e.type === "string" && typeof e.timestamp === "number") {
+        // A12: Also validate that event type is a known DebugEventType
+        if (typeof e.id === "number" && typeof e.type === "string" && KNOWN_EVENT_TYPES.has(e.type) && typeof e.timestamp === "number") {
           validated.push(evt as DebugEvent);
         }
       }

@@ -24,12 +24,23 @@ const suite = createEvalSuite({
   criteria: {
     cost: evalCost({ maxTokensPerRun: 500 }),
     latency: evalLatency({ maxMs: 5000 }),
-    accuracy: evalMatch({ mode: 'contains', caseInsensitive: true }),
+    accuracy: evalMatch({
+      mode: 'contains',
+      caseInsensitive: true,
+    }),
   },
 
   agents: [
-    { name: 'gpt4', instructions: 'Answer questions accurately', model: 'gpt-4' },
-    { name: 'claude', instructions: 'Answer questions accurately', model: 'claude-3' },
+    {
+      name: 'gpt4',
+      instructions: 'Answer questions accurately',
+      model: 'gpt-4',
+    },
+    {
+      name: 'claude',
+      instructions: 'Answer questions accurately',
+      model: 'claude-3',
+    },
   ],
 
   runner,
@@ -158,7 +169,11 @@ LLM-as-judge scoring:
 ```typescript
 evalJudge({
   runner,
-  judge: { name: 'judge', instructions: 'Score outputs 0-1', model: 'gpt-4' },
+  judge: {
+    name: 'judge',
+    instructions: 'Score outputs 0-1',
+    model: 'gpt-4',
+  },
   promptTemplate: 'Rate this response: {{output}}\nExpected: {{expected}}',
   signal,
 })

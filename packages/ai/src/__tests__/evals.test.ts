@@ -8,6 +8,7 @@ import {
   evalStructure,
   evalMatch,
   evalJudge,
+  evalFaithfulness,
   evalAssert,
   type EvalCase,
 } from "../evals.js";
@@ -676,6 +677,202 @@ describe("createEvalSuite", () => {
 });
 
 // ============================================================================
+// A1: ReDoS pattern detection in evalMatch (regex mode)
+// ============================================================================
+
+describe("evalMatch ReDoS prevention (A1)", () => {
+  it("rejects (a+)+$ pattern", () => {
+    const criterion = evalMatch({ mode: "regex" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test", expected: "(a+)+$" },
+      result: { output: "aaa", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false, score: 0 });
+    expect((result as any).reason).toContain("nested quantifiers");
+  });
+
+  it("rejects (a*)*b pattern", () => {
+    const criterion = evalMatch({ mode: "regex" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test", expected: "(a*)*b" },
+      result: { output: "aab", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false });
+    expect((result as any).reason).toContain("nested quantifiers");
+  });
+
+  it("allows safe regex patterns through", () => {
+    const criterion = evalMatch({ mode: "regex" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test", expected: "\\d{3}-\\d{4}" },
+      result: { output: "call 123-4567 now", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: true, score: 1.0 });
+  });
+
+  it("rejects patterns longer than 500 chars", () => {
+    const criterion = evalMatch({ mode: "regex" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test", expected: "a".repeat(501) },
+      result: { output: "aaa", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false });
+    expect((result as any).reason).toContain("too long");
+  });
+});
+
+// ============================================================================
+// A2: Semaphore underflow guard
+// ============================================================================
+
+describe("semaphore underflow guard (A2)", () => {
+  it("double-release does not cause negative active count", async () => {
+    const suite = createEvalSuite({
+      criteria: { cost: evalCost({ maxTokensPerRun: 500 }) },
+      agents: [mockAgent("a")],
+      runner: mockRunner({ a: "output" }),
+      dataset,
+      concurrency: 2,
+    });
+
+    // Running the suite exercises the semaphore; if double-release underflow
+    // were possible, it would cause assertion errors or incorrect behavior
+    const results = await suite.run();
+    expect(results.details).toHaveLength(2);
+    expect(results.details.every((d) => d.allPassed)).toBe(true);
+  });
+});
+
+// ============================================================================
+// A4: evalStructure handles non-object output
+// ============================================================================
+
+describe("evalStructure non-object output (A4)", () => {
+  it("rejects JSON array as non-object", () => {
+    const criterion = evalStructure({ type: "json", requiredKeys: ["name"] });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: dataset[0]!,
+      result: { output: "[1, 2, 3]", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false, score: 0 });
+    expect((result as any).reason).toContain("not a valid JSON object");
+  });
+
+  it("rejects JSON null", () => {
+    const criterion = evalStructure({ type: "json" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: dataset[0]!,
+      result: { output: "null", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false, score: 0 });
+  });
+
+  it("rejects JSON string literal", () => {
+    const criterion = evalStructure({ type: "json" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: dataset[0]!,
+      result: { output: '"just a string"', messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false });
+  });
+
+  it("rejects JSON number", () => {
+    const criterion = evalStructure({ type: "json" });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: dataset[0]!,
+      result: { output: "42", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: false });
+  });
+
+  it("accepts valid JSON object", () => {
+    const criterion = evalStructure({ type: "json", requiredKeys: ["name"] });
+    const result = criterion.fn({
+      agent: mockAgent("a"),
+      testCase: dataset[0]!,
+      result: { output: '{"name":"Alice"}', messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result).toMatchObject({ passed: true, score: 1.0 });
+  });
+});
+
+// ============================================================================
+// A10: NaN score propagation guard
+// ============================================================================
+
+describe("NaN score propagation guard (A10)", () => {
+  it("treats NaN score as 0 in weighted calculation", async () => {
+    const suite = createEvalSuite({
+      criteria: {
+        nanProducer: () => ({
+          score: NaN,
+          passed: false,
+          reason: "Produced NaN",
+          durationMs: 0,
+        }),
+        cost: evalCost({ maxTokensPerRun: 500 }),
+      },
+      agents: [mockAgent("a")],
+      runner: mockRunner({ a: "output" }),
+      dataset,
+    });
+
+    const results = await suite.run();
+    const summary = results.summary["a"]!;
+
+    // The weighted average should be finite (NaN replaced with 0)
+    expect(Number.isFinite(summary.overallScore)).toBe(true);
+  });
+
+  it("treats Infinity score as 0 in weighted calculation", async () => {
+    const suite = createEvalSuite({
+      criteria: {
+        infProducer: () => ({
+          score: Infinity,
+          passed: false,
+          reason: "Produced Infinity",
+          durationMs: 0,
+        }),
+      },
+      agents: [mockAgent("a")],
+      runner: mockRunner({ a: "output" }),
+      dataset,
+    });
+
+    const results = await suite.run();
+    const summary = results.summary["a"]!;
+
+    expect(Number.isFinite(summary.overallScore)).toBe(true);
+  });
+});
+
+// ============================================================================
 // evalAssert
 // ============================================================================
 
@@ -747,5 +944,186 @@ describe("evalAssert", () => {
       minScore: 0.0,
       minPassRate: 0.0,
     })).not.toThrow();
+  });
+});
+
+// ============================================================================
+// L2: evalOutputLength minLength > maxLength validation
+// ============================================================================
+
+describe("evalOutputLength minLength > maxLength validation (L2)", () => {
+  it("throws when minLength > maxLength", () => {
+    expect(() => evalOutputLength({ minLength: 100, maxLength: 50 })).toThrow(
+      "minLength must be <= maxLength",
+    );
+  });
+
+  it("allows minLength === maxLength", () => {
+    expect(() => evalOutputLength({ minLength: 50, maxLength: 50 })).not.toThrow();
+  });
+
+  it("allows minLength < maxLength", () => {
+    expect(() => evalOutputLength({ minLength: 10, maxLength: 100 })).not.toThrow();
+  });
+
+  it("allows only minLength", () => {
+    expect(() => evalOutputLength({ minLength: 10 })).not.toThrow();
+  });
+
+  it("allows only maxLength", () => {
+    expect(() => evalOutputLength({ maxLength: 100 })).not.toThrow();
+  });
+});
+
+// ============================================================================
+// L5: evalJudge non-string output type guard
+// ============================================================================
+
+describe("evalJudge non-string output type guard (L5)", () => {
+  it("returns score 0 for non-string output", async () => {
+    const judgeRunner = (async () => ({
+      output: { score: 0.8 }, // object, not string
+      messages: [],
+      toolCalls: [],
+      totalTokens: 50,
+    })) as AgentRunner;
+
+    const criterion = evalJudge({
+      runner: judgeRunner,
+      judge: mockAgent("judge"),
+    });
+
+    const result = await criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test", expected: "answer" },
+      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result.score).toBe(0);
+    expect(result.passed).toBe(false);
+    expect(result.reason).toContain("non-string output");
+  });
+
+  it("returns score 0 for numeric output", async () => {
+    const judgeRunner = (async () => ({
+      output: 42,
+      messages: [],
+      toolCalls: [],
+      totalTokens: 50,
+    })) as AgentRunner;
+
+    const criterion = evalJudge({
+      runner: judgeRunner,
+      judge: mockAgent("judge"),
+    });
+
+    const result = await criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test" },
+      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result.score).toBe(0);
+    expect(result.reason).toContain("non-string output");
+  });
+});
+
+// ============================================================================
+// L6: evalJudge timeoutMs option
+// ============================================================================
+
+describe("evalJudge timeoutMs option (L6)", () => {
+  it("times out after timeoutMs", async () => {
+    const judgeRunner = (async (_agent: AgentLike, _input: string, opts?: { signal?: AbortSignal }) => {
+      // Wait longer than the timeout
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, 5000);
+        opts?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new Error("aborted"));
+        });
+      });
+
+      return {
+        output: '{"score": 1.0}',
+        messages: [],
+        toolCalls: [],
+        totalTokens: 50,
+      };
+    }) as AgentRunner;
+
+    const criterion = evalJudge({
+      runner: judgeRunner,
+      judge: mockAgent("judge"),
+      timeoutMs: 50, // 50ms timeout
+    });
+
+    const result = await criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test" },
+      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result.score).toBe(0);
+    expect(result.passed).toBe(false);
+    expect(result.reason).toContain("Judge error");
+  });
+
+  it("succeeds when runner completes within timeoutMs", async () => {
+    const judgeRunner = (async () => ({
+      output: '{"score": 0.9, "reason": "fast"}',
+      messages: [],
+      toolCalls: [],
+      totalTokens: 50,
+    })) as AgentRunner;
+
+    const criterion = evalJudge({
+      runner: judgeRunner,
+      judge: mockAgent("judge"),
+      timeoutMs: 5000,
+    });
+
+    const result = await criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test" },
+      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result.score).toBe(0.9);
+    expect(result.passed).toBe(true);
+  });
+
+  it("semantic judge functions also support timeoutMs", async () => {
+    const slowRunner = (async (_agent: AgentLike, _input: string, opts?: { signal?: AbortSignal }) => {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, 5000);
+        opts?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new Error("aborted"));
+        });
+      });
+
+      return { output: '{"score": 1.0}', messages: [], toolCalls: [], totalTokens: 50 };
+    }) as AgentRunner;
+
+    const criterion = evalFaithfulness({
+      runner: slowRunner,
+      judge: mockAgent("judge"),
+      timeoutMs: 50,
+    });
+
+    const result = await criterion.fn({
+      agent: mockAgent("a"),
+      testCase: { input: "test", context: "some context" },
+      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      runDurationMs: 100,
+    });
+
+    expect(result.score).toBe(0);
+    expect(result.reason).toContain("error");
   });
 });

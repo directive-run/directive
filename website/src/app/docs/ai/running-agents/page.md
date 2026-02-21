@@ -23,13 +23,19 @@ Directive ships pre-built runners (`createOpenAIRunner`, `createAnthropicRunner`
 import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 // Create a runner for OpenAI (just needs an API key)
-const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
+const runner = createOpenAIRunner({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
-// Run an agent – pass the agent definition and the user input
-const result = await runner(
-  { name: 'assistant', instructions: 'You are helpful.', model: 'gpt-4o' },
-  'What is WebAssembly?'
-);
+// Define an agent
+const agent = {
+  name: 'assistant',
+  instructions: 'You are helpful.',
+  model: 'gpt-4o',
+};
+
+// Run the agent with user input
+const result = await runner(agent, 'What is WebAssembly?');
 
 console.log(result.output);      // "WebAssembly is..."
 console.log(result.totalTokens); // 142
@@ -109,7 +115,11 @@ const agent: AgentLike = {
 };
 ```
 
-The `model` field is optional – if omitted, the runner function's default model is used.
+The `model` field is optional – if omitted, the runner's default model is used.
+
+{% callout title="Model names are not validated" %}
+The `model` field is an untyped `string` &ndash; Directive passes it directly to the provider's API without validation. If you use a model name the provider doesn't recognize, you'll get an error from the provider (e.g., OpenAI returns a 404). This is intentional: providers add models frequently, and runners like the OpenAI adapter also work with Azure, Together, and other compatible APIs that have their own model names.
+{% /callout %}
 
 ---
 

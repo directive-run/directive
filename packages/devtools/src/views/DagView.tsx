@@ -74,7 +74,8 @@ function buildDagFromSnapshot(snapshot: DevToolsSnapshot): Map<string, DagNodeSt
       status = "error";
     }
 
-    const deps = (state as Record<string, unknown>).deps as string[] ?? [];
+    const rawDeps = (state as Record<string, unknown>).deps;
+    const deps = Array.isArray(rawDeps) ? rawDeps.filter((d): d is string => typeof d === "string") : [];
     nodes.set(agentId, { agentId, status, deps });
   }
 

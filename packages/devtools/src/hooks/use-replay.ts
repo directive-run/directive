@@ -148,6 +148,11 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
   }, []);
 
   const play = useCallback(() => {
+    // D10: Guard against empty events array
+    if (events.length === 0) {
+      return;
+    }
+
     if (stateRef.current.cursorIndex >= events.length - 1) {
       // If at end, restart from beginning
       setCursorIndex(0);

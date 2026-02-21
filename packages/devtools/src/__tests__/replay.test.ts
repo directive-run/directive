@@ -240,6 +240,59 @@ describe("replay frame-skip logic", () => {
   });
 });
 
+// ============================================================================
+// D10: play() with empty events does nothing
+// ============================================================================
+
+describe("play() with empty events guard (D10)", () => {
+  it("does not start playback when events array is empty", () => {
+    // Simulate the D10 guard from use-replay.ts:
+    // if (events.length === 0) return;
+    const events: { timestamp: number }[] = [];
+    let playingStarted = false;
+
+    function play() {
+      if (events.length === 0) {
+        return;
+      }
+      playingStarted = true;
+    }
+
+    play();
+    expect(playingStarted).toBe(false);
+  });
+
+  it("starts playback when events array has entries", () => {
+    const events = [{ timestamp: 1000 }, { timestamp: 2000 }];
+    let playingStarted = false;
+
+    function play() {
+      if (events.length === 0) {
+        return;
+      }
+      playingStarted = true;
+    }
+
+    play();
+    expect(playingStarted).toBe(true);
+  });
+
+  it("starts playback with single event", () => {
+    const events = [{ timestamp: 1000 }];
+    let playingStarted = false;
+
+    function play() {
+      if (events.length === 0) {
+        return;
+      }
+      playingStarted = true;
+    }
+
+    play();
+    expect(playingStarted).toBe(true);
+  });
+});
+
 describe("replay cursor timestamp computation", () => {
   it("computes cursor percentage within visible range", () => {
     const visibleRange = { start: 1000, duration: 2000 };

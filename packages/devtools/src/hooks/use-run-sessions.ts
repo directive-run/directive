@@ -156,7 +156,8 @@ export function useRunSessions(): RunSessionsState {
       try {
         localStorage.setItem(AUTOSAVE_KEY, String(next));
       } catch {
-        // Ignore storage errors
+        // D7: Surface localStorage errors instead of swallowing
+        setSaveError("Failed to save auto-save preference");
       }
 
       return next;

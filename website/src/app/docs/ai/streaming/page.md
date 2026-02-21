@@ -202,7 +202,12 @@ const openaiStreamingRunner = createOpenAIStreamingRunner({
 
 const streamRunner = createStreamingRunner(openaiStreamingRunner);
 
-const chatAgent = { name: 'chat', instructions: 'You are a helpful assistant.', model: 'gpt-4' };
+const chatAgent = {
+  name: 'chat',
+  instructions: 'You are a helpful assistant.',
+  model: 'gpt-4',
+};
+
 const { stream, result } = streamRunner(chatAgent, 'Hello!');
 ```
 
@@ -218,7 +223,12 @@ const anthropicStreamingRunner = createAnthropicStreamingRunner({
 
 const streamRunner = createStreamingRunner(anthropicStreamingRunner);
 
-const chatAgent = { name: 'chat', instructions: 'You are a helpful assistant.', model: 'claude-sonnet-4-5-20250929' };
+const chatAgent = {
+  name: 'chat',
+  instructions: 'You are a helpful assistant.',
+  model: 'claude-sonnet-4-5-20250929',
+};
+
 const { stream, result } = streamRunner(chatAgent, 'Hello!');
 ```
 
@@ -234,7 +244,12 @@ const geminiStreamingRunner = createGeminiStreamingRunner({
 
 const streamRunner = createStreamingRunner(geminiStreamingRunner);
 
-const chatAgent = { name: 'chat', instructions: 'You are a helpful assistant.', model: 'gemini-2.0-flash' };
+const chatAgent = {
+  name: 'chat',
+  instructions: 'You are a helpful assistant.',
+  model: 'gemini-2.0-flash',
+};
+
 const { stream, result } = streamRunner(chatAgent, 'Hello!');
 ```
 

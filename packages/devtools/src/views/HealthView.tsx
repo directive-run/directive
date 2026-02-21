@@ -64,7 +64,8 @@ function extractReroutes(events: DebugEvent[]): { from: string; to: string; time
 }
 
 export function HealthView({ metrics, events, onRequestHealth }: HealthViewProps) {
-  const agents = useMemo(() => Object.values(metrics).sort((a, b) => a.agentId.localeCompare(b.agentId)), [metrics]);
+  // D12: Filter to only entries with valid agentId strings
+  const agents = useMemo(() => Object.values(metrics).filter((m) => typeof m.agentId === "string" && m.agentId.length > 0).sort((a, b) => a.agentId.localeCompare(b.agentId)), [metrics]);
   const costData = useMemo(() => buildCostData(events), [events]);
   const reroutes = useMemo(() => extractReroutes(events), [events]);
   // E5: Time series for sparklines

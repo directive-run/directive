@@ -17,12 +17,18 @@ import { createMultiAgentOrchestrator, parallel, sequential, concatResults } fro
 const orchestrator = createMultiAgentOrchestrator({
   runner,
   agents: {
-    researcher: { agent: researcher, maxConcurrent: 3 },
+    researcher: {
+      agent: researcher,
+      maxConcurrent: 3,
+    },
     writer: { agent: writer },
     reviewer: { agent: reviewer },
   },
   patterns: {
-    research: parallel(['researcher', 'researcher'], (results) => concatResults(results)),
+    research: parallel(
+      ['researcher', 'researcher'],
+      (results) => concatResults(results),
+    ),
     pipeline: sequential(['researcher', 'writer', 'reviewer']),
   },
 });
@@ -59,7 +65,10 @@ import { parallel, concatResults } from '@directive-run/ai';
 const orchestrator = createMultiAgentOrchestrator({
   runner,
   agents: {
-    researcher: { agent: researcher, maxConcurrent: 3 },
+    researcher: {
+      agent: researcher,
+      maxConcurrent: 3,
+    },
   },
 
   patterns: {
@@ -178,9 +187,18 @@ import { supervisor, collectOutputs, aggregateTokens } from '@directive-run/ai';
 const orchestrator = createMultiAgentOrchestrator({
   runner,
   agents: {
-    manager: { agent: manager, maxConcurrent: 1 },
-    researcher: { agent: researcher, maxConcurrent: 3 },
-    writer: { agent: writer, maxConcurrent: 1 },
+    manager: {
+      agent: manager,
+      maxConcurrent: 1,
+    },
+    researcher: {
+      agent: researcher,
+      maxConcurrent: 3,
+    },
+    writer: {
+      agent: writer,
+      maxConcurrent: 1,
+    },
   },
 
   patterns: {

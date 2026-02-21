@@ -1,9 +1,9 @@
 ---
 title: Self-Healing Networks
-description: Automatic agent rerouting when circuit breakers open or health scores drop — Directive-native self-healing for AI agent networks.
+description: Automatic agent rerouting when circuit breakers open or health scores drop – Directive-native self-healing for AI agent networks.
 ---
 
-Automatic agent rerouting when health degrades — Directive-native self-healing. {% .lead %}
+Automatic agent rerouting when health degrades – Directive-native self-healing. {% .lead %}
 
 When an agent becomes unhealthy (circuit breaker opens, health score drops), the system reactively reroutes work to a healthy equivalent. Zero overhead when not configured.
 
@@ -204,9 +204,9 @@ interface MultiAgentSelfHealingConfig {
 ```typescript
 selfHealing: {
   onReroute: (event) => {
-    // event.originalAgent — the unhealthy agent
-    // event.reroutedTo — the replacement
-    // event.reason — why rerouting happened
+    // event.originalAgent – the unhealthy agent
+    // event.reroutedTo – the replacement
+    // event.reason – why rerouting happened
     console.log(`Rerouted ${event.originalAgent} → ${event.reroutedTo}: ${event.reason}`);
   },
 },
@@ -216,7 +216,7 @@ selfHealing: {
 
 ## Circular Reroute Guard
 
-A rerouted agent cannot itself reroute — maximum 1 hop. This prevents infinite reroute loops when multiple agents in an equivalency group are failing simultaneously.
+A rerouted agent cannot itself reroute – maximum 1 hop. This prevents infinite reroute loops when multiple agents in an equivalency group are failing simultaneously.
 
 ---
 

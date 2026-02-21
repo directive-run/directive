@@ -21,7 +21,7 @@ const otel = createOtelPlugin({
 // Attach to an orchestrator's timeline
 const detach = otel.attach(orchestrator.timeline!);
 
-// Run agents — spans are created automatically
+// Run agents – spans are created automatically
 await orchestrator.runAgent('researcher', 'What is WASM?');
 
 // Inspect recorded spans
@@ -48,7 +48,7 @@ const otel = createOtelPlugin({
   // Prefix for span names (default: serviceName)
   spanPrefix: 'ai',
 
-  // Callback when spans end — send to your collector
+  // Callback when spans end – send to your collector
   onSpanEnd: (spanData) => {
     myExporter.export([spanData]);
   },
@@ -139,7 +139,7 @@ Agent spans include standard GenAI attributes:
 
 ```typescript
 interface OtelPlugin {
-  // Subscribe to timeline events — returns detach function
+  // Subscribe to timeline events – returns detach function
   attach(timeline: DebugTimeline): () => void;
 
   // Get all completed spans
@@ -186,7 +186,7 @@ For broader observability beyond OTEL spans, Directive re-exports `createObserva
 ```typescript
 import { createObservability, createAgentMetrics } from '@directive-run/ai';
 
-// Full observability suite — metrics, tracing, alerts
+// Full observability suite – metrics, tracing, alerts
 const obs = createObservability({
   serviceName: 'my-ai-app',
   metrics: true,
