@@ -1,3 +1,4 @@
+import React from "react";
 import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
 
@@ -7,6 +8,7 @@ interface TimelineBarProps {
   isSelected: boolean;
   onClick: () => void;
   row?: number;
+  isAnomaly?: boolean;
 }
 
 /** Get duration from event if available */
@@ -20,7 +22,8 @@ function getEventDuration(event: DebugEvent): number {
   return 0;
 }
 
-export function TimelineBar({ event, timeRange, isSelected, onClick, row = 0 }: TimelineBarProps) {
+// M11: React.memo prevents re-rendering all bars when only selection changes
+export const TimelineBar = React.memo(function TimelineBar({ event, timeRange, isSelected, onClick, row = 0, isAnomaly = false }: TimelineBarProps) {
   const offset = event.timestamp - timeRange.start;
   const leftPct = (offset / timeRange.duration) * 100;
   const duration = getEventDuration(event);
@@ -36,7 +39,13 @@ export function TimelineBar({ event, timeRange, isSelected, onClick, row = 0 }: 
       onClick={onClick}
       aria-label={`${event.type.replace(/_/g, " ")}${event.agentId ? ` (${event.agentId})` : ""}${duration ? ` — ${duration}ms` : ""}`}
       className={`absolute transition-all ${
-        isSelected ? "ring-2 ring-white/40 z-20" : "hover:brightness-125 z-10"
+        isSelected
+          ? isAnomaly
+            ? "ring-2 ring-red-500/80 z-20"
+            : "ring-2 ring-white/40 z-20"
+          : isAnomaly
+            ? "ring-2 ring-red-500/60 z-[15] hover:brightness-125"
+            : "hover:brightness-125 z-10"
       }`}
       style={{
         left: `${Math.min(leftPct, 99)}%`,
@@ -57,4 +66,4 @@ export function TimelineBar({ event, timeRange, isSelected, onClick, row = 0 }: 
       )}
     </button>
   );
-}
+});

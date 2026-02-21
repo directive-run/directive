@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  AgentHealthMetrics,
-  BreakpointState,
-  ClientMessage,
-  ConnectionStatus,
-  DebugEvent,
-  DevToolsSnapshot,
-  ServerMessage,
+import {
+  VALID_EVENT_TYPES,
+  VALID_SERVER_MESSAGE_TYPES,
+  type AgentHealthMetrics,
+  type BreakpointState,
+  type ClientMessage,
+  type ConnectionStatus,
+  type DebugEvent,
+  type DevToolsSnapshot,
+  type ServerMessage,
 } from "../lib/types";
 
 export interface DevToolsConnection {
@@ -17,6 +19,11 @@ export interface DevToolsConnection {
   healthMetrics: Record<string, AgentHealthMetrics>;
   breakpointState: BreakpointState;
   error: string | null;
+  // Phase 2: Scratchpad & derived state
+  scratchpadState: Record<string, unknown>;
+  derivedState: Record<string, unknown>;
+  // Phase 2: Token streaming
+  streamingTokens: Map<string, { tokens: string; count: number; startedAt: number }>;
   connect: (url: string) => void;
   disconnect: () => void;
   send: (message: ClientMessage) => void;
@@ -29,6 +36,10 @@ export interface DevToolsConnection {
   exportSession: () => void;
   importSession: (data: string) => void;
   clearEvents: () => void;
+  // Phase 2: New request methods
+  requestScratchpad: () => void;
+  requestDerived: () => void;
+  forkFromSnapshot: (eventId: number) => void;
 }
 
 const INITIAL_BREAKPOINT_STATE: BreakpointState = { pending: [], resolved: [], cancelled: [] };
@@ -36,6 +47,42 @@ const INITIAL_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30000;
 const MAX_RECONNECT_ATTEMPTS = 20;
 const MAX_EVENTS = 5000;
+const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_STREAMING_AGENTS = 50;
+/** Keys that must never be set via dynamic property assignment */
+const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Validate that a parsed message has a known ServerMessage type */
+function isValidServerMessage(value: unknown): value is ServerMessage {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  return typeof obj.type === "string" && VALID_SERVER_MESSAGE_TYPES.has(obj.type);
+}
+
+/** Validate that a value looks like a DebugEvent with a known type */
+function isValidEvent(value: unknown): value is DebugEvent {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  return (
+    typeof obj.id === "number" &&
+    typeof obj.type === "string" &&
+    VALID_EVENT_TYPES.has(obj.type) &&
+    typeof obj.timestamp === "number"
+  );
+}
+
+/** Validate and filter an array of events, returning only valid ones */
+function validateEvents(arr: unknown[]): DebugEvent[] {
+  return arr.filter(isValidEvent);
+}
 
 export function useDevToolsConnection(): DevToolsConnection {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
@@ -45,6 +92,10 @@ export function useDevToolsConnection(): DevToolsConnection {
   const [healthMetrics, setHealthMetrics] = useState<Record<string, AgentHealthMetrics>>({});
   const [breakpointState, setBreakpointState] = useState<BreakpointState>(INITIAL_BREAKPOINT_STATE);
   const [error, setError] = useState<string | null>(null);
+  // Phase 2 state
+  const [scratchpadState, setScratchpadState] = useState<Record<string, unknown>>({});
+  const [derivedState, setDerivedState] = useState<Record<string, unknown>>({});
+  const [streamingTokens, setStreamingTokens] = useState<Map<string, { tokens: string; count: number; startedAt: number }>>(new Map());
 
   const wsRef = useRef<WebSocket | null>(null);
   const urlRef = useRef<string | null>(null);
@@ -53,6 +104,43 @@ export function useDevToolsConnection(): DevToolsConnection {
   const reconnectAttemptsRef = useRef(0);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS);
   const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamCleanupTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Event buffer for batched appends (M6: avoid O(n) copy per event)
+  const eventBufferRef = useRef<DebugEvent[]>([]);
+  const flushRafRef = useRef<number | null>(null);
+
+  // Pending fork state (C3: replace setTimeout with message-based)
+  const pendingForkRef = useRef(false);
+  const forkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Send helper (declared early for use in handleMessage)
+  const sendRef = useRef<(message: ClientMessage) => void>(() => {});
+  // DX#6: Store handleMessage in a ref to break connect → handleMessage dependency chain
+  const handleMessageRef = useRef<(msg: ServerMessage) => void>(() => {});
+
+  /** Flush buffered events into state on animation frame */
+  const flushEventBuffer = useCallback(() => {
+    flushRafRef.current = null;
+    const buffered = eventBufferRef.current;
+    if (buffered.length === 0) {
+      return;
+    }
+
+    eventBufferRef.current = [];
+    setEvents((prev) => {
+      const next = prev.concat(buffered);
+
+      return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
+    });
+  }, []);
+
+  /** Schedule a buffer flush on the next animation frame */
+  const scheduleFlush = useCallback(() => {
+    if (flushRafRef.current == null) {
+      flushRafRef.current = requestAnimationFrame(flushEventBuffer);
+    }
+  }, [flushEventBuffer]);
 
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
@@ -65,19 +153,13 @@ export function useDevToolsConnection(): DevToolsConnection {
         break;
 
       case "event":
-        setEvents((prev) => {
-          const next = [...prev, msg.event];
-
-          return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
-        });
+        eventBufferRef.current.push(msg.event);
+        scheduleFlush();
         break;
 
       case "event_batch":
-        setEvents((prev) => {
-          const next = [...prev, ...msg.events];
-
-          return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
-        });
+        eventBufferRef.current.push(...msg.events);
+        scheduleFlush();
         break;
 
       case "snapshot":
@@ -92,6 +174,94 @@ export function useDevToolsConnection(): DevToolsConnection {
         setBreakpointState(msg.state);
         break;
 
+      // Phase 2: Scratchpad
+      case "scratchpad_state": {
+        const safe: Record<string, unknown> = Object.create(null);
+        for (const [k, v] of Object.entries(msg.data)) {
+          if (!BLOCKED_KEYS.has(k)) {
+            safe[k] = v;
+          }
+        }
+        setScratchpadState(safe);
+        break;
+      }
+
+      case "scratchpad_update":
+        if (typeof msg.key === "string" && !BLOCKED_KEYS.has(msg.key)) {
+          setScratchpadState((prev) => ({ ...prev, [msg.key]: msg.value }));
+        }
+        break;
+
+      // Phase 2: Derived
+      case "derived_state": {
+        const safe: Record<string, unknown> = Object.create(null);
+        for (const [k, v] of Object.entries(msg.data)) {
+          if (!BLOCKED_KEYS.has(k)) {
+            safe[k] = v;
+          }
+        }
+        setDerivedState(safe);
+        break;
+      }
+
+      case "derived_update":
+        if (typeof msg.id === "string" && !BLOCKED_KEYS.has(msg.id)) {
+          setDerivedState((prev) => ({ ...prev, [msg.id]: msg.value }));
+        }
+        break;
+
+      // Phase 2: Fork (C3: handle fork_complete properly)
+      case "fork_complete":
+        if (pendingForkRef.current) {
+          pendingForkRef.current = false;
+          // M15: Clear the fallback timeout since we got a response
+          if (forkTimeoutRef.current) {
+            clearTimeout(forkTimeoutRef.current);
+            forkTimeoutRef.current = null;
+          }
+          sendRef.current({ type: "request_events" });
+        }
+        break;
+
+      // Phase 2: Token streaming
+      // M7: Validate message fields before processing
+      case "token_stream":
+        if (typeof msg.agentId !== "string" || !msg.agentId || typeof msg.tokens !== "string" || typeof msg.tokenCount !== "number") {
+          break;
+        }
+        setStreamingTokens((prev) => {
+          // Cap max concurrent streams
+          if (!prev.has(msg.agentId) && prev.size >= MAX_STREAMING_AGENTS) {
+            return prev;
+          }
+
+          const next = new Map(prev);
+          const existing = next.get(msg.agentId);
+          const tokens = (existing?.tokens ?? "") + msg.tokens;
+
+          // Cap token buffer at 10KB per agent
+          next.set(msg.agentId, {
+            tokens: tokens.length > 10_000 ? tokens.slice(-10_000) : tokens,
+            count: msg.tokenCount,
+            startedAt: existing?.startedAt ?? Date.now(),
+          });
+
+          return next;
+        });
+        break;
+
+      case "stream_done":
+        if (typeof msg.agentId !== "string" || !msg.agentId) {
+          break;
+        }
+        setStreamingTokens((prev) => {
+          const next = new Map(prev);
+          next.delete(msg.agentId);
+
+          return next;
+        });
+        break;
+
       case "pong":
         // Keepalive response — no action needed
         break;
@@ -99,8 +269,17 @@ export function useDevToolsConnection(): DevToolsConnection {
       case "error":
         setError(`${msg.code}: ${msg.message}`);
         break;
+
+      default: {
+        // M8: Exhaustive switch — catches unhandled message types at compile time
+        const _exhaustive: never = msg;
+        console.warn("[DevTools] Unhandled message type:", (_exhaustive as { type: string }).type);
+      }
     }
-  }, []);
+  }, [scheduleFlush]);
+
+  // Keep handleMessage ref in sync
+  useEffect(() => { handleMessageRef.current = handleMessage; }, [handleMessage]);
 
   const connect = useCallback((url: string) => {
     // Clean up existing connection
@@ -139,10 +318,16 @@ export function useDevToolsConnection(): DevToolsConnection {
 
     ws.onmessage = (e) => {
       try {
-        const msg = JSON.parse(e.data as string) as ServerMessage;
-        handleMessage(msg);
+        const parsed = JSON.parse(e.data as string);
+        if (!isValidServerMessage(parsed)) {
+          console.warn("[DevTools] Received unknown WebSocket message type:", parsed?.type);
+
+          return;
+        }
+        // DX#6: Use ref to avoid connect depending on handleMessage identity
+        handleMessageRef.current(parsed);
       } catch {
-        // Ignore malformed messages
+        console.warn("[DevTools] Received malformed WebSocket message");
       }
     };
 
@@ -186,7 +371,9 @@ export function useDevToolsConnection(): DevToolsConnection {
         setStatus("disconnected");
       }
     };
-  }, [handleMessage]);
+  // DX#6: No deps on handleMessage — we read from handleMessageRef.current
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const disconnect = useCallback(() => {
     shouldReconnectRef.current = false;
@@ -202,6 +389,8 @@ export function useDevToolsConnection(): DevToolsConnection {
       wsRef.current.close();
       wsRef.current = null;
     }
+    // E10/M13: Clear stale streaming tokens on disconnect
+    setStreamingTokens(new Map());
     setStatus("disconnected");
     setSessionId(null);
   }, []);
@@ -210,6 +399,35 @@ export function useDevToolsConnection(): DevToolsConnection {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
     }
+  }, []);
+
+  // Keep sendRef in sync for use in handleMessage
+  useEffect(() => { sendRef.current = send; }, [send]);
+
+  // M3: Clean up stale streaming tokens periodically
+  useEffect(() => {
+    streamCleanupTimerRef.current = setInterval(() => {
+      setStreamingTokens((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next = new Map(prev);
+
+        for (const [agentId, data] of next) {
+          if (now - data.startedAt > STREAM_TIMEOUT_MS) {
+            next.delete(agentId);
+            changed = true;
+          }
+        }
+
+        return changed ? next : prev;
+      });
+    }, 30_000);
+
+    return () => {
+      if (streamCleanupTimerRef.current) {
+        clearInterval(streamCleanupTimerRef.current);
+      }
+    };
   }, []);
 
   // Cleanup on unmount
@@ -225,6 +443,13 @@ export function useDevToolsConnection(): DevToolsConnection {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      if (flushRafRef.current != null) {
+        cancelAnimationFrame(flushRafRef.current);
+      }
+      // M15: Clean up fork timeout
+      if (forkTimeoutRef.current) {
+        clearTimeout(forkTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -236,6 +461,9 @@ export function useDevToolsConnection(): DevToolsConnection {
     healthMetrics,
     breakpointState,
     error,
+    scratchpadState,
+    derivedState,
+    streamingTokens,
     connect,
     disconnect,
     send,
@@ -256,7 +484,15 @@ export function useDevToolsConnection(): DevToolsConnection {
       try {
         const parsed = JSON.parse(data);
         if (parsed && Array.isArray(parsed.events)) {
-          setEvents(parsed.events);
+          const valid = validateEvents(parsed.events);
+          if (valid.length === 0) {
+            setError("Invalid session file: no valid events found");
+          } else {
+            setEvents(valid);
+            if (valid.length < parsed.events.length) {
+              setError(`Imported ${valid.length}/${parsed.events.length} events (${parsed.events.length - valid.length} invalid events skipped)`);
+            }
+          }
         } else {
           setError("Invalid session file: missing events array");
         }
@@ -265,5 +501,31 @@ export function useDevToolsConnection(): DevToolsConnection {
       }
     }, []),
     clearEvents: useCallback(() => setEvents([]), []),
+    // Phase 2 methods
+    requestScratchpad: useCallback(() => send({ type: "request_scratchpad" }), [send]),
+    requestDerived: useCallback(() => send({ type: "request_derived" }), [send]),
+    // C3: Fixed — uses fork_complete message instead of setTimeout
+    // M12: Validate eventId is a finite positive integer
+    forkFromSnapshot: useCallback((eventId: number) => {
+      if (!Number.isFinite(eventId) || eventId < 0) {
+        setError("Invalid event ID for fork");
+
+        return;
+      }
+      pendingForkRef.current = true;
+      send({ type: "fork_from_snapshot", eventId });
+      // M15: Store timeout ref for cleanup on unmount
+      if (forkTimeoutRef.current) {
+        clearTimeout(forkTimeoutRef.current);
+      }
+      forkTimeoutRef.current = setTimeout(() => {
+        forkTimeoutRef.current = null;
+        if (pendingForkRef.current) {
+          pendingForkRef.current = false;
+          send({ type: "request_events" });
+          setError("Fork may have failed — no confirmation received");
+        }
+      }, 10_000);
+    }, [send]),
   };
 }

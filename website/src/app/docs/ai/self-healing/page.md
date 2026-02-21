@@ -228,3 +228,13 @@ All self-healing setup is gated behind configuration checks. When `selfHealing` 
 - No extra facts in the Directive system
 - No extra constraints or resolvers
 - The existing `circuitBreaker` option works exactly as before
+
+---
+
+## Next Steps
+
+- [Multi-Agent Orchestrator](/docs/ai/multi-agent) &ndash; Setup and configuration
+- [Execution Patterns](/docs/ai/patterns) &ndash; Coordinating agent execution
+- [Resilience & Routing](/docs/ai/resilience-routing) &ndash; Retry and fallback strategies
+- [DevTools](/docs/ai/devtools) &ndash; Visualize health metrics in the Health view
+- [Testing](/docs/ai/testing) &ndash; `assertAgentHealth` and `assertRerouted` helpers

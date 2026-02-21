@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DebugEvent } from "../lib/types";
 
 export type ReplaySpeed = 1 | 2 | 5 | 10;
@@ -37,40 +37,76 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
   const [cursorIndex, setCursorIndex] = useState(0);
   const [speed, setSpeedState] = useState<ReplaySpeed>(1);
 
-  const playingRef = useRef(false);
-  const cursorRef = useRef(0);
-  const speedRef = useRef<ReplaySpeed>(1);
+  // M7: Single ref object to avoid stale closures in rAF
+  const stateRef = useRef({
+    playing: false,
+    cursorIndex: 0,
+    speed: 1 as ReplaySpeed,
+    eventsLength: events.length,
+  });
+
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
 
-  // Keep refs in sync
-  useEffect(() => { playingRef.current = playing; }, [playing]);
-  useEffect(() => { cursorRef.current = cursorIndex; }, [cursorIndex]);
-  useEffect(() => { speedRef.current = speed; }, [speed]);
+  // Keep ref in sync
+  useEffect(() => {
+    stateRef.current.playing = playing;
+    stateRef.current.cursorIndex = cursorIndex;
+    stateRef.current.speed = speed;
+    stateRef.current.eventsLength = events.length;
+  }, [playing, cursorIndex, speed, events.length]);
 
-  // Animation loop for playback
+  // Animation loop for playback — M7: reads from stateRef for up-to-date values
   const animate = useCallback((now: number) => {
-    if (!playingRef.current) {
+    const { playing: isPlaying, cursorIndex: idx, speed: spd, eventsLength } = stateRef.current;
+
+    if (!isPlaying) {
       return;
     }
 
-    const idx = cursorRef.current;
-    if (idx >= events.length - 1) {
+    // Clamp cursor to bounds
+    if (idx >= eventsLength - 1) {
       setPlaying(false);
 
       return;
     }
 
     const elapsed = now - lastFrameTimeRef.current;
-    const currentEvent = events[idx]!;
-    const nextEvent = events[idx + 1]!;
+    const currentEvent = events[idx];
+    const nextEvent = events[idx + 1];
+
+    // Safety: if events array changed and our index is invalid, stop
+    if (!currentEvent || !nextEvent) {
+      setPlaying(false);
+
+      return;
+    }
+
     const gap = nextEvent.timestamp - currentEvent.timestamp;
     // Scale gap by speed — wait real-time gap / speed
-    const scaledGap = gap / speedRef.current;
+    const scaledGap = gap / spd;
 
     if (elapsed >= scaledGap) {
-      const next = idx + 1;
-      cursorRef.current = next;
+      // Frame-skip: advance by multiple events if we're behind
+      let next = idx + 1;
+      let accumulatedGap = gap;
+
+      while (next < eventsLength - 1) {
+        const peekNext = events[next + 1];
+        if (!peekNext) {
+          break;
+        }
+
+        const nextGap = peekNext.timestamp - events[next]!.timestamp;
+        if (accumulatedGap + nextGap > elapsed * spd) {
+          break;
+        }
+
+        accumulatedGap += nextGap;
+        next++;
+      }
+
+      stateRef.current.cursorIndex = next;
       setCursorIndex(next);
       lastFrameTimeRef.current = now;
     }
@@ -95,9 +131,10 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
 
   const enter = useCallback(() => {
     setActive(true);
-    setCursorIndex(events.length > 0 ? events.length - 1 : 0);
+    setCursorIndex(0);
+    stateRef.current.cursorIndex = 0;
     setPlaying(false);
-  }, [events.length]);
+  }, []);
 
   const exit = useCallback(() => {
     setActive(false);
@@ -109,10 +146,10 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
   }, []);
 
   const play = useCallback(() => {
-    if (cursorRef.current >= events.length - 1) {
+    if (stateRef.current.cursorIndex >= events.length - 1) {
       // If at end, restart from beginning
       setCursorIndex(0);
-      cursorRef.current = 0;
+      stateRef.current.cursorIndex = 0;
     }
     setPlaying(true);
   }, [events.length]);
@@ -123,22 +160,35 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
 
   const stepForward = useCallback(() => {
     setPlaying(false);
-    setCursorIndex((i) => Math.min(i + 1, events.length - 1));
+    setCursorIndex((i) => {
+      const next = Math.min(i + 1, events.length - 1);
+      stateRef.current.cursorIndex = next;
+
+      return next;
+    });
   }, [events.length]);
 
   const stepBack = useCallback(() => {
     setPlaying(false);
-    setCursorIndex((i) => Math.max(i - 1, 0));
+    setCursorIndex((i) => {
+      const next = Math.max(i - 1, 0);
+      stateRef.current.cursorIndex = next;
+
+      return next;
+    });
   }, []);
 
   const goToStart = useCallback(() => {
     setPlaying(false);
     setCursorIndex(0);
+    stateRef.current.cursorIndex = 0;
   }, []);
 
   const goToEnd = useCallback(() => {
     setPlaying(false);
-    setCursorIndex(Math.max(events.length - 1, 0));
+    const idx = Math.max(events.length - 1, 0);
+    setCursorIndex(idx);
+    stateRef.current.cursorIndex = idx;
   }, [events.length]);
 
   const setSpeed = useCallback((s: ReplaySpeed) => {
@@ -146,22 +196,29 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
   }, []);
 
   const seekTo = useCallback((index: number) => {
-    setCursorIndex(Math.max(0, Math.min(index, events.length - 1)));
+    const clamped = Math.max(0, Math.min(index, events.length - 1));
+    setCursorIndex(clamped);
+    stateRef.current.cursorIndex = clamped;
   }, [events.length]);
 
-  const cursorTimestamp = active && events.length > 0 && cursorIndex < events.length
-    ? events[cursorIndex]!.timestamp
+  // Clamp cursor when events array shrinks
+  const clampedIndex = active ? Math.min(cursorIndex, Math.max(events.length - 1, 0)) : cursorIndex;
+
+  const cursorTimestamp = active && events.length > 0 && clampedIndex < events.length
+    ? events[clampedIndex]!.timestamp
     : null;
 
-  const visibleEvents = active
-    ? events.slice(0, cursorIndex + 1)
-    : events;
+  // H1: Memoize to avoid new array reference on every render during replay
+  const visibleEvents = useMemo(
+    () => active ? events.slice(0, clampedIndex + 1) : events,
+    [active, events, clampedIndex],
+  );
 
   return {
     state: {
       active,
       playing,
-      cursorIndex,
+      cursorIndex: clampedIndex,
       speed,
       cursorTimestamp,
     },

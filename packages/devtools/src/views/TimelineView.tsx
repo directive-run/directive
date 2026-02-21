@@ -1,9 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import type { DebugEvent, DebugEventType } from "../lib/types";
+import { useMemo, useState } from "react";
+import { ERROR_EVENT_TYPES, type DebugEvent, type DebugEventType } from "../lib/types";
+import type { Anomaly } from "../hooks/use-anomalies";
 import { EVENT_COLORS } from "../lib/colors";
 import { EventDetail } from "../components/EventDetail";
 import { TimelineBar } from "../components/TimelineBar";
 import { TimelineMinimap } from "../components/TimelineMinimap";
+import { SearchBar } from "../components/SearchBar";
+import { useTimelineZoom } from "../hooks/use-timeline-zoom";
+import { useTimelineFilters } from "../hooks/use-timeline-filters";
 
 interface TimelineViewProps {
   events: DebugEvent[];
@@ -13,6 +17,8 @@ interface TimelineViewProps {
   onForkFromSnapshot?: (eventId: number) => void;
   /** Optional token stream data */
   streamingTokens?: Map<string, { tokens: string; count: number }>;
+  /** Optional anomalies detected */
+  anomalies?: Anomaly[];
 }
 
 const EVENT_TYPE_LABELS: Partial<Record<DebugEventType, string>> = {
@@ -44,88 +50,61 @@ const EVENT_TYPE_LABELS: Partial<Record<DebugEventType, string>> = {
   debate_round: "Debate",
 };
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 20;
+/** Compute row packing for overlapping events in a lane */
+function computeRows(laneEvts: DebugEvent[], range: { start: number; duration: number }): Map<number, number> {
+  const rowMap = new Map<number, number>();
+  const getLeft = (e: DebugEvent) => ((e.timestamp - range.start) / range.duration) * 100;
+  const getRight = (e: DebugEvent) => {
+    const dur = (e as Record<string, unknown>).durationMs;
+    const w = typeof dur === "number" && dur > 0 ? (dur / range.duration) * 100 : 0.5;
 
-export function TimelineView({ events, replayCursor, onForkFromSnapshot, streamingTokens }: TimelineViewProps) {
+    return getLeft(e) + w;
+  };
+
+  const rowRightEdges: number[] = [];
+
+  for (const event of laneEvts) {
+    const myLeft = getLeft(event);
+    const myRight = getRight(event);
+
+    let row = 0;
+    while (row < rowRightEdges.length && rowRightEdges[row]! > myLeft) {
+      row++;
+    }
+
+    rowMap.set(event.id, row);
+    rowRightEdges[row] = myRight;
+  }
+
+  return rowMap;
+}
+
+export function TimelineView({ events, replayCursor, onForkFromSnapshot, streamingTokens, anomalies }: TimelineViewProps) {
   const [selectedEvent, setSelectedEvent] = useState<DebugEvent | null>(null);
-  const [typeFilter, setTypeFilter] = useState<Set<DebugEventType>>(new Set());
-  const [agentFilter, setAgentFilter] = useState<string | null>(null);
 
-  // Zoom/pan state
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [panOffset, setPanOffset] = useState(0); // ms offset from start
+  // M5: Extracted hooks
+  const zoom = useTimelineZoom(events);
+  const filters = useTimelineFilters(events);
 
-  // Pan drag state
-  const panDragRef = useRef<{ startX: number; startOffset: number } | null>(null);
-  const laneContainerRef = useRef<HTMLDivElement>(null);
-
-  // Compute unique agents
-  const agents = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of events) {
-      if (e.agentId) {
-        set.add(e.agentId);
-      }
+  // Build anomaly lookup set for quick highlight checks
+  const anomalyEventIds = useMemo(() => {
+    if (!anomalies || anomalies.length === 0) {
+      return new Set<number>();
     }
 
-    return Array.from(set).sort();
-  }, [events]);
+    return new Set(anomalies.map((a) => a.eventId));
+  }, [anomalies]);
 
-  // Compute time range (full, unzoomed)
-  const timeRange = useMemo(() => {
-    if (events.length === 0) {
-      return { start: 0, end: 1, duration: 1 };
-    }
-
-    const start = events[0]!.timestamp;
-    const end = events[events.length - 1]!.timestamp;
-    const duration = Math.max(end - start, 1);
-
-    return { start, end, duration };
-  }, [events]);
-
-  // Visible time range (zoomed/panned)
-  const visibleRange = useMemo(() => {
-    const visibleDuration = timeRange.duration / zoomLevel;
-    const maxOffset = timeRange.duration - visibleDuration;
-    const clampedOffset = Math.max(0, Math.min(panOffset, maxOffset));
-    const visibleStart = timeRange.start + clampedOffset;
-
-    return {
-      start: visibleStart,
-      duration: visibleDuration,
-      end: visibleStart + visibleDuration,
-    };
-  }, [timeRange, zoomLevel, panOffset]);
-
-  // Minimap fractions
-  const viewStart = timeRange.duration > 0 ? (visibleRange.start - timeRange.start) / timeRange.duration : 0;
-  const viewEnd = timeRange.duration > 0 ? (visibleRange.end - timeRange.start) / timeRange.duration : 1;
-
-  // Filter events
-  const filteredEvents = useMemo(() => {
-    let filtered = events;
-    if (typeFilter.size > 0) {
-      filtered = filtered.filter((e) => typeFilter.has(e.type));
-    }
-    if (agentFilter) {
-      filtered = filtered.filter((e) => e.agentId === agentFilter);
-    }
-
-    return filtered;
-  }, [events, typeFilter, agentFilter]);
-
-  // Group events by agent for lane display
-  const lanes = useMemo(() => {
+  // H3: Group events by agent and pre-compute row packing (memoized together)
+  const lanesWithRows = useMemo(() => {
     const laneMap = new Map<string, DebugEvent[]>();
     laneMap.set("__global__", []);
 
-    for (const agent of agents) {
+    for (const agent of filters.agents) {
       laneMap.set(agent, []);
     }
 
-    for (const event of filteredEvents) {
+    for (const event of filters.filteredEvents) {
       const lane = event.agentId ?? "__global__";
       if (!laneMap.has(lane)) {
         laneMap.set(lane, []);
@@ -133,177 +112,29 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
       laneMap.get(lane)!.push(event);
     }
 
-    // Remove empty lanes
-    for (const [key, value] of laneMap) {
-      if (value.length === 0) {
-        laneMap.delete(key);
+    // Remove empty lanes, compute rows
+    const result = new Map<string, { events: DebugEvent[]; rowMap: Map<number, number>; maxRow: number }>();
+
+    for (const [key, laneEvents] of laneMap) {
+      if (laneEvents.length === 0) {
+        continue;
       }
+
+      const rowMap = computeRows(laneEvents, zoom.visibleRange);
+      let maxRow = 0;
+      for (const r of rowMap.values()) {
+        if (r > maxRow) {
+          maxRow = r;
+        }
+      }
+      result.set(key, { events: laneEvents, rowMap, maxRow });
     }
 
-    return laneMap;
-  }, [filteredEvents, agents]);
-
-  // Toggle type filter
-  const toggleType = (type: DebugEventType) => {
-    setTypeFilter((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-
-      return next;
-    });
-  };
-
-  // Get unique event types present
-  const presentTypes = useMemo(() => {
-    const set = new Set<DebugEventType>();
-    for (const e of events) {
-      set.add(e.type);
-    }
-
-    return Array.from(set);
-  }, [events]);
-
-  // Compute rows for all events in a lane
-  function computeRows(laneEvts: DebugEvent[], range: { start: number; duration: number }): Map<number, number> {
-    const rowMap = new Map<number, number>();
-    const getLeft = (e: DebugEvent) => ((e.timestamp - range.start) / range.duration) * 100;
-    const getRight = (e: DebugEvent) => {
-      const dur = (e as Record<string, unknown>).durationMs;
-      const w = typeof dur === "number" && dur > 0 ? (dur / range.duration) * 100 : 0.5;
-
-      return getLeft(e) + w;
-    };
-
-    const rowRightEdges: number[] = [];
-
-    for (const event of laneEvts) {
-      const myLeft = getLeft(event);
-      const myRight = getRight(event);
-
-      let row = 0;
-      while (row < rowRightEdges.length && rowRightEdges[row]! > myLeft) {
-        row++;
-      }
-
-      rowMap.set(event.id, row);
-      rowRightEdges[row] = myRight;
-    }
-
-    return rowMap;
-  }
-
-  // Zoom handlers
-  const handleZoomIn = useCallback(() => {
-    setZoomLevel((z) => Math.min(z + 1, MAX_ZOOM));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoomLevel((z) => {
-      const next = Math.max(z - 1, MIN_ZOOM);
-      if (next === 1) {
-        setPanOffset(0);
-      }
-
-      return next;
-    });
-  }, []);
-
-  const handleZoomReset = useCallback(() => {
-    setZoomLevel(1);
-    setPanOffset(0);
-  }, []);
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -1 : 1;
-        setZoomLevel((z) => {
-          const next = Math.max(MIN_ZOOM, Math.min(z + delta, MAX_ZOOM));
-          if (next === 1) {
-            setPanOffset(0);
-          }
-
-          return next;
-        });
-      } else if (zoomLevel > 1) {
-        // Horizontal scroll to pan
-        const panDelta = (e.deltaX || e.deltaY) * (timeRange.duration / zoomLevel / 500);
-        setPanOffset((p) => {
-          const maxOffset = timeRange.duration - timeRange.duration / zoomLevel;
-
-          return Math.max(0, Math.min(p + panDelta, maxOffset));
-        });
-      }
-    },
-    [zoomLevel, timeRange.duration],
-  );
-
-  // Pan drag handlers
-  const handlePanMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (zoomLevel <= 1) {
-        return;
-      }
-      // Only pan on middle-click or when clicking empty space
-      if (e.button === 1 || (e.target === e.currentTarget)) {
-        e.preventDefault();
-        panDragRef.current = { startX: e.clientX, startOffset: panOffset };
-      }
-    },
-    [zoomLevel, panOffset],
-  );
-
-  const handlePanMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!panDragRef.current || !laneContainerRef.current) {
-        return;
-      }
-
-      const containerWidth = laneContainerRef.current.clientWidth;
-      const pxDelta = panDragRef.current.startX - e.clientX;
-      const msDelta = (pxDelta / containerWidth) * (timeRange.duration / zoomLevel);
-      const maxOffset = timeRange.duration - timeRange.duration / zoomLevel;
-      setPanOffset(Math.max(0, Math.min(panDragRef.current.startOffset + msDelta, maxOffset)));
-    },
-    [timeRange.duration, zoomLevel],
-  );
-
-  const handlePanMouseUp = useCallback(() => {
-    panDragRef.current = null;
-  }, []);
-
-  // Minimap pan
-  const handleMinimapPan = useCallback(
-    (fraction: number) => {
-      const visibleDuration = timeRange.duration / zoomLevel;
-      const maxOffset = timeRange.duration - visibleDuration;
-      // Center the visible window on the clicked fraction
-      const targetOffset = fraction * timeRange.duration - visibleDuration / 2;
-      setPanOffset(Math.max(0, Math.min(targetOffset, maxOffset)));
-    },
-    [timeRange.duration, zoomLevel],
-  );
-
-  // Time axis labels for visible range
-  const timeAxisLabels = useMemo(() => {
-    const labels: string[] = [];
-    for (let i = 0; i <= 4; i++) {
-      const ms = (visibleRange.start - timeRange.start) + (visibleRange.duration * i / 4);
-      labels.push(`${Math.round(ms)}ms`);
-    }
-
-    return labels;
-  }, [visibleRange, timeRange.start]);
+    return result;
+  }, [filters.filteredEvents, filters.agents, zoom.visibleRange]);
 
   // Replay cursor position
-  const replayCursorPct = replayCursor != null
-    ? ((replayCursor - visibleRange.start) / visibleRange.duration) * 100
-    : null;
+  const replayCursorPct = zoom.getReplayCursorPct(replayCursor);
 
   if (events.length === 0) {
     return (
@@ -323,59 +154,89 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
       <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-2">
         {/* Agent filter */}
         <select
-          value={agentFilter ?? ""}
-          onChange={(e) => setAgentFilter(e.target.value || null)}
+          value={filters.agentFilter ?? ""}
+          onChange={(e) => filters.setAgentFilter(e.target.value || null)}
           aria-label="Filter by agent"
           className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200"
         >
           <option value="">All agents</option>
-          {agents.map((a) => (
+          {filters.agents.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
         </select>
 
         {/* Type filter chips */}
-        <div className="flex flex-wrap gap-1">
-          {presentTypes.map((type) => (
-            <button
-              key={type}
-              onClick={() => toggleType(type)}
-              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                typeFilter.size === 0 || typeFilter.has(type)
-                  ? ""
-                  : "!bg-zinc-800 !text-zinc-500 !border-zinc-700"
-              }`}
-              style={{
-                backgroundColor: `${EVENT_COLORS[type]}20`,
-                color: EVENT_COLORS[type],
-                border: `1px solid ${EVENT_COLORS[type]}40`,
-              }}
-            >
-              {EVENT_TYPE_LABELS[type] ?? type}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by event type">
+          {filters.presentTypes.map((type) => {
+            const isActive = filters.typeFilter.size === 0 || filters.typeFilter.has(type);
+
+            return (
+              <button
+                key={type}
+                onClick={() => filters.toggleType(type)}
+                aria-pressed={filters.typeFilter.size > 0 ? filters.typeFilter.has(type) : undefined}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  isActive
+                    ? ""
+                    : "!bg-zinc-800 !text-zinc-400 !border-zinc-600"
+                }`}
+                style={{
+                  backgroundColor: `${EVENT_COLORS[type]}20`,
+                  color: EVENT_COLORS[type],
+                  border: `1px solid ${EVENT_COLORS[type]}40`,
+                }}
+              >
+                {EVENT_TYPE_LABELS[type] ?? type}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* M7/E1/E15: Error filter shortcut — uses ERROR_EVENT_TYPES constant */}
+        <button
+          onClick={() => {
+            const isErrorOnly = filters.typeFilter.size === ERROR_EVENT_TYPES.size &&
+              [...ERROR_EVENT_TYPES].every((t) => filters.typeFilter.has(t));
+
+            if (isErrorOnly) {
+              // Clear filter — show all types again
+              filters.setTypeFilter(new Set());
+            } else {
+              // Set filter to only error types
+              filters.setTypeFilter(new Set(ERROR_EVENT_TYPES));
+            }
+          }}
+          className="rounded border border-red-800/50 bg-red-950/30 px-2 py-0.5 text-[10px] font-medium text-red-400 hover:bg-red-950/50"
+          title="Show only error events"
+        >
+          Errors
+        </button>
+
+        {/* Search */}
+        <div className="min-w-[180px] max-w-[260px]">
+          <SearchBar events={events} onResults={filters.setSearchMatchIds} />
         </div>
 
         {/* Zoom controls */}
         <div className="ml-auto flex items-center gap-1">
           <button
-            onClick={handleZoomOut}
-            disabled={zoomLevel <= MIN_ZOOM}
+            onClick={zoom.handleZoomOut}
+            disabled={zoom.zoomLevel <= 1}
             className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
             aria-label="Zoom out"
           >
             -
           </button>
           <button
-            onClick={handleZoomReset}
+            onClick={zoom.handleZoomReset}
             className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-700"
             aria-label="Reset zoom"
           >
-            {zoomLevel}x
+            {zoom.zoomLevel}x
           </button>
           <button
-            onClick={handleZoomIn}
-            disabled={zoomLevel >= MAX_ZOOM}
+            onClick={zoom.handleZoomIn}
+            disabled={zoom.zoomLevel >= 20}
             className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
             aria-label="Zoom in"
           >
@@ -385,7 +246,7 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
 
         {/* Event count */}
         <span className="text-xs text-zinc-500">
-          {filteredEvents.length}/{events.length} events
+          {filters.filteredEvents.length}/{events.length} events
         </span>
       </div>
 
@@ -393,26 +254,17 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
       <div className="flex flex-1 overflow-hidden">
         {/* Lanes */}
         <div
-          ref={laneContainerRef}
+          ref={zoom.laneContainerRef}
           className="flex-1 overflow-auto"
-          onWheel={handleWheel}
-          onMouseDown={handlePanMouseDown}
-          onMouseMove={handlePanMouseMove}
-          onMouseUp={handlePanMouseUp}
-          onMouseLeave={handlePanMouseUp}
-          style={{ cursor: zoomLevel > 1 ? "grab" : undefined }}
+          onWheel={zoom.handleWheel}
+          onMouseDown={zoom.handlePanMouseDown}
+          onMouseMove={zoom.handlePanMouseMove}
+          onMouseUp={zoom.handlePanMouseUp}
+          onMouseLeave={zoom.handlePanMouseUp}
+          style={{ cursor: zoom.zoomLevel > 1 ? "grab" : undefined }}
         >
           <div className="min-w-[600px]">
-            {Array.from(lanes).map(([laneId, laneEvents]) => {
-              const rowMap = computeRows(laneEvents, visibleRange);
-              let maxRow = 0;
-              for (const r of rowMap.values()) {
-                if (r > maxRow) {
-                  maxRow = r;
-                }
-              }
-
-              return (
+            {Array.from(lanesWithRows).map(([laneId, { events: laneEvents, rowMap, maxRow }]) => (
                 <div key={laneId} className="flex border-b border-zinc-800/50">
                   {/* Lane label */}
                   <div className="sticky left-0 z-10 flex w-32 shrink-0 items-center border-r border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-400">
@@ -425,12 +277,13 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
                       <TimelineBar
                         key={event.id}
                         event={event}
-                        timeRange={visibleRange}
+                        timeRange={zoom.visibleRange}
                         isSelected={selectedEvent?.id === event.id}
                         onClick={() => setSelectedEvent(
                           selectedEvent?.id === event.id ? null : event,
                         )}
                         row={rowMap.get(event.id) ?? 0}
+                        isAnomaly={anomalyEventIds.has(event.id)}
                       />
                     ))}
 
@@ -443,8 +296,7 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
                     )}
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         </div>
 
@@ -478,16 +330,16 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
       )}
 
       {/* Minimap (only when zoomed) */}
-      {zoomLevel > 1 && (
+      {zoom.zoomLevel > 1 && (
         <div className="border-t border-zinc-800 bg-zinc-900 px-4 py-1">
           <div className="flex items-center gap-2">
             <div className="w-32 shrink-0" />
             <TimelineMinimap
-              events={filteredEvents}
-              timeRange={timeRange}
-              viewStart={viewStart}
-              viewEnd={viewEnd}
-              onPan={handleMinimapPan}
+              events={filters.filteredEvents}
+              timeRange={zoom.timeRange}
+              viewStart={zoom.viewStart}
+              viewEnd={zoom.viewEnd}
+              onPan={zoom.handleMinimapPan}
             />
           </div>
         </div>
@@ -496,8 +348,8 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
       {/* Time axis */}
       <div className="flex border-t border-zinc-800 bg-zinc-900 px-4 py-1">
         <div className="w-32 shrink-0" />
-        <div className="flex flex-1 justify-between text-[10px] text-zinc-600">
-          {timeAxisLabels.map((label, i) => (
+        <div className="flex flex-1 justify-between text-[10px] text-zinc-500">
+          {zoom.timeAxisLabels.map((label, i) => (
             <span key={i}>{label}</span>
           ))}
         </div>
