@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ReplayControls as ReplayControlsType, ReplaySpeed } from "../hooks/use-replay";
 
 interface ReplayControlsProps {
@@ -8,7 +9,56 @@ interface ReplayControlsProps {
 const SPEEDS: ReplaySpeed[] = [1, 2, 5, 10];
 
 export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
-  const { state } = replay;
+  const { state, play, pause, stepBack, stepForward, goToStart, goToEnd, exit } = replay;
+
+  // E3: Global keyboard shortcuts for replay
+  // C3: Destructure stable callbacks to avoid listener re-attachment on every render
+  useEffect(() => {
+    if (!state.active) {
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return;
+      }
+
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          if (state.playing) {
+            pause();
+          } else {
+            play();
+          }
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          stepBack();
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          stepForward();
+          break;
+        case "Home":
+          e.preventDefault();
+          goToStart();
+          break;
+        case "End":
+          e.preventDefault();
+          goToEnd();
+          break;
+        case "Escape":
+          exit();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [state.active, state.playing, play, pause, stepBack, stepForward, goToStart, goToEnd, exit]);
 
   if (!state.active) {
     return (
@@ -30,16 +80,16 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
       <button
         onClick={replay.goToStart}
         className="rounded px-1 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-        aria-label="Go to start"
-        title="Go to start"
+        aria-label="Go to start (Home)"
+        title="Go to start (Home)"
       >
         ⏮
       </button>
       <button
         onClick={replay.stepBack}
         className="rounded px-1 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-        aria-label="Step back"
-        title="Step back"
+        aria-label="Step back (Left arrow)"
+        title="Step back (←)"
       >
         ⏪
       </button>
@@ -48,8 +98,8 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
         <button
           onClick={replay.pause}
           className="rounded px-1 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-          aria-label="Pause"
-          title="Pause"
+          aria-label="Pause (Space)"
+          title="Pause (Space)"
         >
           ⏸
         </button>
@@ -57,8 +107,8 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
         <button
           onClick={replay.play}
           className="rounded px-1 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-          aria-label="Play"
-          title="Play"
+          aria-label="Play (Space)"
+          title="Play (Space)"
         >
           ▶
         </button>
@@ -67,16 +117,16 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
       <button
         onClick={replay.stepForward}
         className="rounded px-1 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-        aria-label="Step forward"
-        title="Step forward"
+        aria-label="Step forward (Right arrow)"
+        title="Step forward (→)"
       >
         ⏩
       </button>
       <button
         onClick={replay.goToEnd}
         className="rounded px-1 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-        aria-label="Go to end"
-        title="Go to end"
+        aria-label="Go to end (End)"
+        title="Go to end (End)"
       >
         ⏭
       </button>
@@ -112,8 +162,8 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
       <button
         onClick={replay.exit}
         className="ml-1 rounded px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-zinc-700 hover:text-red-300"
-        aria-label="Exit replay"
-        title="Exit replay mode"
+        aria-label="Exit replay (Esc)"
+        title="Exit replay (Esc)"
       >
         ✕
       </button>

@@ -81,6 +81,16 @@ export type DevToolsServerMessage =
   | { type: "health"; metrics: Record<string, AgentHealthMetrics> }
   | { type: "breakpoints"; state: BreakpointState }
   | { type: "pong"; timestamp: number }
+  // Scratchpad & derived state
+  | { type: "scratchpad_state"; data: Record<string, unknown> }
+  | { type: "scratchpad_update"; key: string; value: unknown }
+  | { type: "derived_state"; data: Record<string, unknown> }
+  | { type: "derived_update"; id: string; value: unknown }
+  // Fork
+  | { type: "fork_complete"; eventId: number; newEventCount: number }
+  // Token streaming
+  | { type: "token_stream"; agentId: string; tokens: string; tokenCount: number }
+  | { type: "stream_done"; agentId: string; totalTokens: number }
   | { type: "error"; code: string; message: string };
 
 /** Messages sent FROM clients TO the server */
@@ -93,6 +103,11 @@ export type DevToolsClientMessage =
   | { type: "cancel_breakpoint"; breakpointId: string; reason?: string }
   | { type: "export_session" }
   | { type: "import_session"; data: string }
+  // Scratchpad & derived requests
+  | { type: "request_scratchpad" }
+  | { type: "request_derived" }
+  // Fork
+  | { type: "fork_from_snapshot"; eventId: number }
   | { type: "ping" };
 
 /** System snapshot sent to clients on demand */
@@ -130,6 +145,12 @@ export interface DevToolsServerConfig {
   onResumeBreakpoint?: (id: string, modifications?: { input?: string; skip?: boolean }) => void;
   /** Callback to cancel a breakpoint */
   onCancelBreakpoint?: (id: string, reason?: string) => void;
+  /** Callback to get current scratchpad state */
+  getScratchpadState?: () => Record<string, unknown>;
+  /** Callback to get current derived state */
+  getDerivedState?: () => Record<string, unknown>;
+  /** Callback to fork from a snapshot event */
+  onForkFromSnapshot?: (eventId: number) => { newEventCount: number };
   /** Maximum events to batch before flushing. Default: 1 (no batching) */
   batchSize?: number;
   /** Flush interval for batched events (ms). Default: 50 */
@@ -154,6 +175,14 @@ export interface DevToolsServer {
   pushHealth(): void;
   /** Push current breakpoint state to all clients */
   pushBreakpoints(): void;
+  /** Push a scratchpad key update to all clients */
+  pushScratchpadUpdate(key: string, value: unknown): void;
+  /** Push a derived value update to all clients */
+  pushDerivedUpdate(id: string, value: unknown): void;
+  /** Push streaming tokens to all clients */
+  pushTokenStream(agentId: string, tokens: string, tokenCount: number): void;
+  /** Signal stream completion to all clients */
+  pushStreamDone(agentId: string, totalTokens: number): void;
   /** Shut down the server and disconnect all clients */
   close(): void;
 }
@@ -185,6 +214,9 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     getBreakpointState,
     onResumeBreakpoint,
     onCancelBreakpoint,
+    getScratchpadState,
+    getDerivedState,
+    onForkFromSnapshot,
     batchSize = 1,
     batchIntervalMs = 50,
     healthPushIntervalMs = 0,
@@ -380,6 +412,37 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
         break;
       }
 
+      case "request_scratchpad":
+        if (getScratchpadState) {
+          sendToClient(client, { type: "scratchpad_state", data: getScratchpadState() });
+        } else {
+          sendToClient(client, { type: "error", code: "NO_SCRATCHPAD", message: "Scratchpad provider not configured" });
+        }
+        break;
+
+      case "request_derived":
+        if (getDerivedState) {
+          sendToClient(client, { type: "derived_state", data: getDerivedState() });
+        } else {
+          sendToClient(client, { type: "error", code: "NO_DERIVED", message: "Derived state provider not configured" });
+        }
+        break;
+
+      case "fork_from_snapshot": {
+        if (onForkFromSnapshot && typeof msg.eventId === "number") {
+          try {
+            const result = onForkFromSnapshot(msg.eventId);
+            sendToClient(client, { type: "fork_complete", eventId: msg.eventId, newEventCount: result.newEventCount });
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            sendToClient(client, { type: "error", code: "FORK_FAILED", message: errMsg });
+          }
+        } else {
+          sendToClient(client, { type: "error", code: "NO_FORK", message: "Fork provider not configured" });
+        }
+        break;
+      }
+
       default:
         sendToClient(client, { type: "error", code: "UNKNOWN_COMMAND", message: `Unknown message type: ${String((msg as { type: string }).type).slice(0, 100)}` });
     }
@@ -448,6 +511,30 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
       }
     },
 
+    pushScratchpadUpdate(key: string, value: unknown): void {
+      if (clients.size > 0) {
+        broadcastMessage({ type: "scratchpad_update", key, value });
+      }
+    },
+
+    pushDerivedUpdate(id: string, value: unknown): void {
+      if (clients.size > 0) {
+        broadcastMessage({ type: "derived_update", id, value });
+      }
+    },
+
+    pushTokenStream(agentId: string, tokens: string, tokenCount: number): void {
+      if (clients.size > 0) {
+        broadcastMessage({ type: "token_stream", agentId, tokens, tokenCount });
+      }
+    },
+
+    pushStreamDone(agentId: string, totalTokens: number): void {
+      if (clients.size > 0) {
+        broadcastMessage({ type: "stream_done", agentId, totalTokens });
+      }
+    },
+
     close(): void {
       unsubscribeTimeline();
 
@@ -496,12 +583,16 @@ export interface ConnectDevToolsOptions {
 
 /** Minimal orchestrator interface for DevTools connection */
 export interface DevToolsCompatibleOrchestrator {
-  timeline: { subscribe: (listener: (event: DebugEvent) => void) => () => void; getEvents: () => DebugEvent[]; import: (json: string) => void; export: () => string } | null;
+  timeline: { subscribe: (listener: (event: DebugEvent) => void) => () => void; getEvents: () => DebugEvent[]; import: (json: string) => void; export: () => string; forkFrom?: (eventId: number) => void } | null;
   healthMonitor?: { getAllMetrics: () => Record<string, AgentHealthMetrics> } | null;
   getPendingBreakpoints?: () => Array<{ id: string; type: string; agentId: string; input: string; label?: string; requestedAt: number }>;
   resumeBreakpoint?: (id: string, modifications?: { input?: string; skip?: boolean }) => void;
   cancelBreakpoint?: (id: string, reason?: string) => void;
   getAllAgentStates?: () => Record<string, { status: string; lastInput?: string; lastOutput?: unknown; totalTokens: number; runCount: number }>;
+  /** Get current scratchpad state (multi-agent only) */
+  getScratchpadState?: () => Record<string, unknown>;
+  /** Get current derived values (multi-agent only) */
+  getDerivedState?: () => Record<string, unknown>;
 }
 
 /**
@@ -563,6 +654,16 @@ export async function connectDevTools(
       : undefined,
     onResumeBreakpoint: orchestrator.resumeBreakpoint,
     onCancelBreakpoint: orchestrator.cancelBreakpoint,
+    getScratchpadState: orchestrator.getScratchpadState,
+    getDerivedState: orchestrator.getDerivedState,
+    onForkFromSnapshot: orchestrator.timeline?.forkFrom
+      ? (eventId: number) => {
+        orchestrator.timeline!.forkFrom!(eventId);
+        const newEventCount = orchestrator.timeline!.getEvents().length;
+
+        return { newEventCount };
+      }
+      : undefined,
   });
 }
 

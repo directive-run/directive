@@ -640,8 +640,39 @@ class ChatStream extends LitElement {
 
 ---
 
+## Stream Channels
+
+Low-level primitives for custom agent-to-agent streaming:
+
+```typescript
+import { createStreamChannel, createBidirectionalStream, pipeThrough } from '@directive-run/ai';
+
+// Unidirectional channel (producer → consumer)
+const channel = createStreamChannel<string>({ bufferSize: 100 });
+channel.send('hello');
+channel.close();
+
+for await (const value of channel) {
+  console.log(value);  // 'hello'
+}
+
+// Bidirectional stream (two-way communication)
+const { sideA, sideB } = createBidirectionalStream<string, number>();
+sideA.send('question');    // sideB receives 'question'
+sideB.send(42);            // sideA receives 42
+
+// Pipe streams through a transform
+const transformed = pipeThrough(sourceStream, async function* (chunks) {
+  for await (const chunk of chunks) {
+    yield chunk.toUpperCase();
+  }
+});
+```
+
+---
+
 ## Next Steps
 
-- [Agent Orchestrator](/docs/ai/orchestrator) – Full orchestrator API
-- [Guardrails](/docs/ai/guardrails) – Input/output validation
-- [Multi-Agent](/docs/ai/multi-agent) – Parallel and sequential patterns
+- [Agent Orchestrator](/docs/ai/orchestrator) &ndash; Full orchestrator API
+- [Guardrails](/docs/ai/guardrails) &ndash; Input/output validation
+- [Multi-Agent Orchestrator](/docs/ai/multi-agent) &ndash; Multi-agent streaming

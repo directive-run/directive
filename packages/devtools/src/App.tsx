@@ -1,30 +1,42 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useDevToolsConnection } from "./hooks/use-devtools-connection";
+import { useReplay } from "./hooks/use-replay";
+import { useRunSessions } from "./hooks/use-run-sessions";
+import { useAnomalies } from "./hooks/use-anomalies";
 import { TimelineView } from "./views/TimelineView";
 import { DagView } from "./views/DagView";
 import { HealthView } from "./views/HealthView";
 import { BreakpointView } from "./views/BreakpointView";
+import { StateView } from "./views/StateView";
+import { CompareView } from "./views/CompareView";
+import { FlamechartView } from "./views/FlamechartView";
+import { CostView } from "./views/CostView";
 import { SessionPanel } from "./components/SessionPanel";
+import { ReplayControls } from "./components/ReplayControls";
 import type { ConnectionStatus } from "./lib/types";
 
-type View = "timeline" | "dag" | "health" | "breakpoints";
+type View = "timeline" | "dag" | "health" | "breakpoints" | "state" | "compare" | "flamechart" | "cost";
 
 const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
   { id: "timeline", label: "Timeline", icon: "⏱" },
+  { id: "flamechart", label: "Flamechart", icon: "🔥" },
   { id: "dag", label: "DAG", icon: "⬡" },
   { id: "health", label: "Health", icon: "♥" },
+  { id: "cost", label: "Cost", icon: "💰" },
   { id: "breakpoints", label: "Breakpoints", icon: "⏸" },
+  { id: "state", label: "State", icon: "📋" },
+  { id: "compare", label: "Compare", icon: "🔀" },
 ];
 
-function StatusDot({ status }: { status: ConnectionStatus }) {
-  const colors: Record<ConnectionStatus, string> = {
-    connected: "bg-emerald-400",
-    connecting: "bg-amber-400 animate-pulse",
-    disconnected: "bg-zinc-500",
-    error: "bg-red-400",
-  };
+const STATUS_DOT_COLORS: Record<ConnectionStatus, string> = {
+  connected: "bg-emerald-400",
+  connecting: "bg-amber-400 animate-pulse",
+  disconnected: "bg-zinc-500",
+  error: "bg-red-400",
+};
 
-  return <span className={`inline-block h-2 w-2 rounded-full ${colors[status]}`} role="status" aria-label={`Connection ${status}`} />;
+function StatusDot({ status }: { status: ConnectionStatus }) {
+  return <span className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT_COLORS[status]}`} role="status" aria-label={`Connection ${status}`} />;
 }
 
 class ViewErrorBoundary extends React.Component<
@@ -64,6 +76,15 @@ export function App() {
   const [view, setView] = useState<View>("timeline");
   const [wsUrl, setWsUrl] = useState("ws://localhost:4040");
   const conn = useDevToolsConnection();
+  const replay = useReplay(conn.events);
+  const runSessions = useRunSessions();
+
+  // Events visible to downstream views (replay-filtered or live)
+  const visibleEvents = replay.visibleEvents;
+
+  // H2: Anomaly detection runs against full events (not replay-filtered)
+  // to avoid recomputing on every rAF frame during replay playback
+  const anomalyResult = useAnomalies(conn.events);
 
   // Auto-connect on mount
   useEffect(() => {
@@ -78,8 +99,10 @@ export function App() {
       conn.requestHealth();
       conn.requestBreakpoints();
       conn.requestSnapshot();
+      conn.requestScratchpad();
+      conn.requestDerived();
     }
-  }, [conn.status, conn.requestEvents, conn.requestHealth, conn.requestBreakpoints, conn.requestSnapshot]);
+  }, [conn.status, conn.requestEvents, conn.requestHealth, conn.requestBreakpoints, conn.requestSnapshot, conn.requestScratchpad, conn.requestDerived]);
 
   const handleConnect = useCallback(() => {
     conn.disconnect();
@@ -99,7 +122,7 @@ export function App() {
             <StatusDot status={conn.status} />
             <span>{conn.status}</span>
             {conn.sessionId && (
-              <span className="truncate text-zinc-600">
+              <span className="truncate text-zinc-500">
                 {conn.sessionId.slice(0, 16)}
               </span>
             )}
@@ -128,11 +151,12 @@ export function App() {
         </div>
 
         {/* Nav items */}
-        <div className="flex-1 py-2">
+        <div className="flex-1 py-2" role="navigation" aria-label="DevTools views">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               onClick={() => setView(item.id)}
+              aria-current={view === item.id ? "page" : undefined}
               className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors ${
                 view === item.id
                   ? "bg-zinc-800 text-white"
@@ -146,6 +170,24 @@ export function App() {
                   {conn.breakpointState.pending.length}
                 </span>
               )}
+              {item.id === "state" && (Object.keys(conn.scratchpadState).length + Object.keys(conn.derivedState).length) > 0 && (
+                <span className="ml-auto rounded-full bg-fuchsia-500/30 px-1.5 text-[10px] text-fuchsia-400">
+                  {Object.keys(conn.scratchpadState).length + Object.keys(conn.derivedState).length}
+                </span>
+              )}
+              {item.id === "compare" && runSessions.runs.length > 0 && (
+                <span className="ml-auto rounded-full bg-blue-500/30 px-1.5 text-[10px] text-blue-400">
+                  {runSessions.runs.length}
+                </span>
+              )}
+              {item.id === "timeline" && anomalyResult.severityCounts.critical > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white"
+                  title={`${anomalyResult.severityCounts.critical} critical anomal${anomalyResult.severityCounts.critical === 1 ? "y" : "ies"} detected`}
+                >
+                  {anomalyResult.severityCounts.critical}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -155,12 +197,24 @@ export function App() {
           events={conn.events}
           onImport={conn.importSession}
           onClear={conn.clearEvents}
+          onSaveRun={runSessions.saveRun}
+          onImportRun={runSessions.importRun}
         />
 
         {/* Stats footer */}
-        <div className="border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500">
-          <div>Events: {conn.events.length}</div>
+        <div className="overflow-y-auto border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500" style={{ maxHeight: "120px" }}>
+          <div>Events: {replay.state.active ? `${visibleEvents.length}/${conn.events.length}` : conn.events.length}</div>
           <div>Agents: {Object.keys(conn.healthMetrics).length}</div>
+          {replay.state.active && (
+            <div className="text-blue-400">Replay: {replay.state.cursorIndex + 1}/{conn.events.length}</div>
+          )}
+          {anomalyResult.anomalies.length > 0 && (
+            <div className="text-amber-400">
+              Anomalies: {anomalyResult.severityCounts.critical > 0 && <span className="text-red-400">{anomalyResult.severityCounts.critical} critical</span>}
+              {anomalyResult.severityCounts.critical > 0 && anomalyResult.severityCounts.warning > 0 && ", "}
+              {anomalyResult.severityCounts.warning > 0 && `${anomalyResult.severityCounts.warning} warn`}
+            </div>
+          )}
           {conn.error && (
             <div className="mt-1 text-red-400">{conn.error.length > 200 ? `${conn.error.slice(0, 200)}...` : conn.error}</div>
           )}
@@ -168,8 +222,15 @@ export function App() {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden">
-        {conn.status !== "connected" ? (
+      <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Replay controls bar (when on timeline view) */}
+        {view === "timeline" && conn.status === "connected" && (
+          <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900/50 px-4 py-1.5">
+            <ReplayControls replay={replay} totalEvents={conn.events.length} />
+          </div>
+        )}
+
+        {conn.status !== "connected" && view !== "compare" ? (
           <div className="flex h-full items-center justify-center text-zinc-500">
             <div className="text-center">
               {conn.status === "error" ? (
@@ -177,6 +238,14 @@ export function App() {
                   <div className="mb-2 text-4xl">⚠</div>
                   <p className="text-red-400">Connection failed</p>
                   {conn.error && <p className="mt-1 text-xs text-red-400/70">{conn.error}</p>}
+                  <div className="mt-3 rounded border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-left text-xs text-zinc-400">
+                    <p className="mb-1 font-medium text-zinc-300">Troubleshooting:</p>
+                    <ul className="list-inside list-disc space-y-0.5">
+                      <li>Is the orchestrator running?</li>
+                      <li>Check the port matches (current: <code className="text-zinc-300">{wsUrl}</code>)</li>
+                      <li>Ensure <code className="text-zinc-300">connectDevTools()</code> is called before agent runs</li>
+                    </ul>
+                  </div>
                   <button
                     onClick={handleConnect}
                     className="mt-3 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
@@ -200,24 +269,54 @@ export function App() {
                       await connectDevTools(orchestrator, {"{ port: 4040 }"})
                     </code>
                   </p>
+                  <p className="mt-2 text-[10px] text-zinc-500">
+                    Default port is 4040. Change the Server URL in the sidebar if needed.
+                  </p>
                 </>
               )}
             </div>
           </div>
         ) : (
-          <ViewErrorBoundary key={view}>
-            {view === "timeline" && <TimelineView events={conn.events} />}
-            {view === "dag" && <DagView events={conn.events} snapshot={conn.snapshot} />}
-            {view === "health" && <HealthView metrics={conn.healthMetrics} events={conn.events} />}
-            {view === "breakpoints" && (
-              <BreakpointView
-                state={conn.breakpointState}
-                onResume={conn.resumeBreakpoint}
-                onCancel={conn.cancelBreakpoint}
-                onRefresh={conn.requestBreakpoints}
-              />
-            )}
-          </ViewErrorBoundary>
+          <div className="flex-1 overflow-hidden">
+            <ViewErrorBoundary key={view}>
+              {view === "timeline" && (
+                <TimelineView
+                  events={visibleEvents}
+                  replayCursor={replay.state.cursorTimestamp}
+                  onForkFromSnapshot={conn.forkFromSnapshot}
+                  streamingTokens={conn.streamingTokens}
+                  anomalies={anomalyResult.anomalies}
+                />
+              )}
+              {view === "flamechart" && <FlamechartView events={visibleEvents} />}
+              {view === "dag" && <DagView events={visibleEvents} snapshot={conn.snapshot} />}
+              {view === "health" && <HealthView metrics={conn.healthMetrics} events={visibleEvents} />}
+              {view === "cost" && <CostView events={visibleEvents} />}
+              {view === "breakpoints" && (
+                <BreakpointView
+                  state={conn.breakpointState}
+                  onResume={conn.resumeBreakpoint}
+                  onCancel={conn.cancelBreakpoint}
+                  onRefresh={conn.requestBreakpoints}
+                />
+              )}
+              {view === "state" && (
+                <StateView
+                  scratchpadState={conn.scratchpadState}
+                  derivedState={conn.derivedState}
+                  onRequestScratchpad={conn.requestScratchpad}
+                  onRequestDerived={conn.requestDerived}
+                />
+              )}
+              {view === "compare" && (
+                <CompareView
+                  runs={runSessions.runs}
+                  onDeleteRun={runSessions.deleteRun}
+                  onExportRun={runSessions.exportRun}
+                />
+              )}
+            </ViewErrorBoundary>
+          </div>
         )}
       </main>
     </div>
