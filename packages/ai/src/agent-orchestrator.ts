@@ -18,8 +18,10 @@ import type { StreamChunk as StreamChunkBase } from "./streaming.js";
 import {
   createCallbackPlugin,
   requirementGuard,
+  setBridgeFact,
+  getBridgeFact,
 } from "@directive-run/core/adapter-utils";
-import { createModule } from "@directive-run/core";
+import { createModule, t } from "@directive-run/core";
 import { createSystem } from "@directive-run/core";
 
 import type {
@@ -148,6 +150,10 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
    * ```
    */
   maxTokenBudget?: number;
+  /** Fires when token usage reaches this percentage of maxTokenBudget (0-1). @default 0.8 */
+  budgetWarningThreshold?: number;
+  /** Callback when budget warning threshold is reached */
+  onBudgetWarning?: (event: { currentTokens: number; maxBudget: number; percentage: number }) => void;
   /** Plugins */
   plugins?: Plugin[];
   /**
@@ -268,8 +274,12 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   resume(): void;
   /** Reset conversation state */
   reset(): void;
+  /** Total tokens consumed across all agent runs */
+  readonly totalTokens: number;
   /** Debug timeline (null when debug is false) */
   readonly timeline: DebugTimeline | null;
+  /** Wait until agent is idle. Resolves immediately if already idle. */
+  waitForIdle(timeoutMs?: number): Promise<void>;
   /** Create a checkpoint of the current orchestrator state. Only valid when agent is not running. */
   checkpoint(options?: { label?: string }): Promise<Checkpoint>;
   /** Restore orchestrator state from a checkpoint. */
@@ -345,6 +355,8 @@ export function createAgentOrchestrator<
     onApprovalRequest,
     autoApproveToolCalls = true,
     maxTokenBudget,
+    budgetWarningThreshold = 0.8,
+    onBudgetWarning,
     plugins = [],
     debug: rawDebug = false,
     approvalTimeoutMs = 300000,
@@ -372,6 +384,11 @@ export function createAgentOrchestrator<
       "[Directive] selfHealing config has no effect without a circuitBreaker — " +
       "fallback behavior requires the circuit breaker to detect failures."
     );
+  }
+
+  // Validate budget warning threshold
+  if (budgetWarningThreshold < 0 || budgetWarningThreshold > 1) {
+    throw new Error(`[Directive Orchestrator] budgetWarningThreshold must be between 0 and 1, got ${budgetWarningThreshold}`);
   }
 
   // Enforce approval workflow configuration - require either auto-approve or callback
@@ -415,6 +432,7 @@ export function createAgentOrchestrator<
     facts: {
       ...orchestratorBridgeSchema.facts,
       ...factsSchema,
+      __budgetWarningFired: t.boolean(),
     },
     derivations: {},
     events: {},
@@ -522,6 +540,7 @@ export function createAgentOrchestrator<
       setConversation(facts, []);
       setToolCalls(facts, []);
       setBreakpointState(facts, { pending: [], resolved: [], cancelled: [] });
+      setBridgeFact(facts, "__budgetWarningFired", false);
       if (init) {
         const state = getOrchestratorState(facts);
         const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
@@ -734,6 +753,7 @@ export function createAgentOrchestrator<
       );
       // Call onGuardrailCheck hook
       fireHook("onGuardrailCheck",{
+        agentId: agent.name,
         guardrailName: name,
         guardrailType: "input",
         passed: result.passed,
@@ -831,6 +851,7 @@ export function createAgentOrchestrator<
             context
           );
           fireHook("onGuardrailCheck",{
+            agentId: agent.name,
             guardrailName: name,
             guardrailType: "toolCall",
             passed: guardResult.passed,
@@ -941,6 +962,7 @@ export function createAgentOrchestrator<
         context
       );
       fireHook("onGuardrailCheck",{
+        agentId: agent.name,
         guardrailName: name,
         guardrailType: "output",
         passed: guardResult.passed,
@@ -965,17 +987,41 @@ export function createAgentOrchestrator<
     }
 
     // Update state
+    let shouldFireBudgetWarning = false;
+    let budgetPercentage = 0;
     system.batch(() => {
       const currentAgent = getAgentState(system.facts);
+      const newTokenUsage = currentAgent.tokenUsage + result.totalTokens;
       setAgentState(system.facts, {
         ...currentAgent,
         status: "completed",
         output: result.output,
-        tokenUsage: currentAgent.tokenUsage + result.totalTokens,
+        tokenUsage: newTokenUsage,
         turnCount: currentAgent.turnCount + result.messages.length,
         completedAt: Date.now(),
       });
+
+      // Check budget warning threshold
+      if (maxTokenBudget && onBudgetWarning) {
+        budgetPercentage = newTokenUsage / maxTokenBudget;
+        const warningFired = getBridgeFact<boolean>(system.facts, "__budgetWarningFired");
+        if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
+          setBridgeFact(system.facts, "__budgetWarningFired", true);
+          shouldFireBudgetWarning = true;
+        }
+      }
     });
+
+    // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
+    if (shouldFireBudgetWarning) {
+      try {
+        onBudgetWarning!({ currentTokens: getAgentState(system.facts).tokenUsage, maxBudget: maxTokenBudget!, percentage: budgetPercentage });
+      } catch (callbackError) {
+        if (debug) {
+          console.debug("[Directive Orchestrator] onBudgetWarning threw:", callbackError);
+        }
+      }
+    }
 
     // Store messages in memory if configured (best-effort)
     if (memory && result.messages.length > 0) {
@@ -1259,6 +1305,9 @@ export function createAgentOrchestrator<
     system: system as unknown as System<any>,
     get facts() {
       return getCombinedFacts();
+    },
+    get totalTokens() {
+      return getAgentState(system.facts).tokenUsage;
     },
     get timeline() {
       return timeline;
@@ -1585,6 +1634,21 @@ export function createAgentOrchestrator<
       };
     },
 
+    async waitForIdle(timeoutMs?: number): Promise<void> {
+      const isIdle = () => getAgentState(system.facts).status !== "running";
+      if (isIdle()) {
+        return;
+      }
+
+      const start = Date.now();
+      while (!isIdle()) {
+        if (timeoutMs !== undefined && Date.now() - start > timeoutMs) {
+          throw new Error("[Directive Orchestrator] waitForIdle timed out");
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    },
+
     approve(requestId: string): void {
       system.batch(() => {
         const approval = getApprovalState(system.facts);
@@ -1668,6 +1732,7 @@ export function createAgentOrchestrator<
         setConversation(system.facts, []);
         setToolCalls(system.facts, []);
         setBreakpointState(system.facts, { pending: [], resolved: [], cancelled: [] });
+        setBridgeFact(system.facts, "__budgetWarningFired", false);
       });
       breakpointModifications.clear();
       breakpointCancelReasons.clear();

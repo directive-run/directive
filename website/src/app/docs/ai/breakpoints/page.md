@@ -123,6 +123,24 @@ interface BreakpointModifications {
 }
 ```
 
+### Multi-Agent Breakpoints
+
+The multi-agent orchestrator supports two additional breakpoint types (`pre_handoff` and `pre_pattern_step`) and can filter by agent or pattern ID:
+
+```typescript
+import { createMultiAgentOrchestrator } from '@directive-run/ai';
+
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  breakpoints: [
+    { type: 'pre_handoff', agentIds: ['researcher'] },
+    { type: 'pre_pattern_step', patternIds: ['pipeline'] },
+  ],
+  onBreakpoint: (req) => console.log('Breakpoint:', req.type, req.id),
+});
+```
+
 ### Configuration Options
 
 | Option | Type | Default | Description |

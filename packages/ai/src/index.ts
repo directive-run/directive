@@ -286,6 +286,14 @@ export {
   type MultiAgentRunCallOptions,
 } from "./multi-agent-orchestrator.js";
 
+// Pattern visualization
+export {
+  patternToMermaid,
+  type MermaidOptions,
+  type MermaidDirection,
+  type MermaidNodeShapes,
+} from "./pattern-mermaid.js";
+
 // Agent communication
 export {
   createMessageBus,

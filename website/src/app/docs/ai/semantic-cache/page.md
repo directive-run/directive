@@ -150,9 +150,16 @@ import { createSemanticCacheGuardrail } from '@directive-run/ai';
 
 const guardrail = createSemanticCacheGuardrail(cache);
 
-// Use with either orchestrator
+// Single-agent
 const orchestrator = createAgentOrchestrator({
   runner,
+  guardrails: { input: [guardrail] },
+});
+
+// Multi-agent — cache guardrail at orchestrator level applies to all agents
+const multi = createMultiAgentOrchestrator({
+  runner,
+  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
   guardrails: { input: [guardrail] },
 });
 ```

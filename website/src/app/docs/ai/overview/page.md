@@ -82,6 +82,9 @@ Both are backed by a Directive System with reactive state, constraints, guardrai
 | **Scratchpad** | &ndash; | [Shared scratchpad](/docs/ai/cross-agent-state#shared-scratchpad) |
 | **Communication** | &ndash; | [Message bus, agent network, handoffs](/docs/ai/communication) |
 | **Breakpoints** | 4 types | 6 types (+ `pre_handoff`, `pre_pattern_step`) |
+| **`totalTokens`** | `orchestrator.totalTokens` | `orchestrator.totalTokens` |
+| **`waitForIdle()`** | `orchestrator.waitForIdle()` | `orchestrator.waitForIdle()` |
+| **Budget warning** | `budgetWarningThreshold` + `onBudgetWarning` | `budgetWarningThreshold` + `onBudgetWarning` |
 | **Use when** | Simple chatbot, single-purpose agent | Pipelines, fan-out, delegation, routing |
 
 ```typescript

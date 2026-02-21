@@ -658,6 +658,36 @@ const restored = patternFromJSON<string>(json, {
 });
 ```
 
+### Pattern Visualization
+
+Convert any pattern to a [Mermaid](https://mermaid.js.org/) diagram:
+
+```typescript
+import { patternToMermaid, dag } from '@directive-run/ai';
+
+const pipeline = dag({
+  fetch: { agent: 'fetcher' },
+  analyze: { agent: 'analyzer', deps: ['fetch'] },
+  report: { agent: 'reporter', deps: ['analyze'] },
+});
+
+console.log(patternToMermaid(pipeline, { direction: 'TD' }));
+```
+
+Works with serialized patterns too:
+
+```typescript
+const json = patternToJSON(myPattern);
+const diagram = patternToMermaid(json);
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `direction` | `"LR" \| "TD" \| "TB" \| "RL" \| "BT"` | `"LR"` | Graph flow direction |
+| `theme` | `"default" \| "dark" \| "forest" \| "neutral"` | — | Mermaid theme hint |
+| `shapes.agent` | `"square" \| "round" \| "stadium" \| "hexagon"` | `"square"` | Agent node shape |
+| `shapes.virtual` | `"circle" \| "square" \| "round" \| "stadium"` | `"circle"` | Virtual node shape |
+
 ---
 
 ## Next Steps
