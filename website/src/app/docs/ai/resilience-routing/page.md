@@ -5,13 +5,37 @@ description: Retry, fallback, budget guards, model selection, structured outputs
 
 Composable wrappers that make any `AgentRunner` production-ready. {% .lead %}
 
-Each feature follows the same pattern: wrap a runner, get a runner back. Stack them in any order – compose middleware on your runner.
+Each feature follows the same pattern: wrap a runner, get a runner back. Stack them with care &ndash; order determines behavior.
 
 ---
 
 ## Composition Model
 
-Every wrapper has the signature `(runner, config) => AgentRunner`. Chain them like middleware.
+Every wrapper has the signature `(runner, config) => AgentRunner` — except `withFallback`, which takes an array of runners: `([runners...], config) => AgentRunner`. Chain them like middleware.
+
+{% callout title="Composition order matters" %}
+Apply wrappers from inside out:
+
+**Model Selection → Fallback → Retry → Budget → Structured Output**
+
+Model selection runs closest to the provider. Budget checks happen before retries. Structured output validates after everything else.
+
+**Watch for retry multiplication.** `withRetry({ maxRetries: 3 })` wrapping `withStructuredOutput({ maxRetries: 2 })` means up to **12 LLM calls** (4 retry attempts × 3 parse retries each). Similarly, `withFallback` with retried runners multiplies: two runners with `maxRetries: 2` each = up to **6 total attempts**.
+{% /callout %}
+
+The examples below assume these runners are set up. See [Running Agents](/docs/ai/running-agents) for all provider options.
+
+```typescript
+import { createOpenAIRunner } from '@directive-run/ai/openai';
+import { createAnthropicRunner } from '@directive-run/ai/anthropic';
+
+const baseRunner = createOpenAIRunner({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+const backupRunner = createAnthropicRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+```
 
 ### Using `pipe()`
 
@@ -192,7 +216,7 @@ const runner = withBudget(baseRunner, {
   maxCostPerCall: 0.10,
   pricing,
 
-  // Rolling windows
+  // Rolling windows – each tracked independently, resets on a rolling basis (not calendar)
   budgets: [
     { window: 'hour', maxCost: 5.00, pricing },
     { window: 'day', maxCost: 50.00, pricing },
@@ -221,6 +245,7 @@ try {
 Access the `getSpent()` method to build dashboards or preemptive alerts:
 
 ```typescript
+// Cast needed because getSpent() is added by withBudget, not on the base AgentRunner type
 const spent = (runner as BudgetRunner).getSpent('hour');
 const limit = 5.00;
 
@@ -243,6 +268,18 @@ import {
   byPattern,
 } from '@directive-run/ai';
 
+// Shorthand – pass a rules array directly
+const runner = withModelSelection(baseRunner, [
+  byInputLength(200, 'gpt-4o-mini'),
+  byAgentName('summarizer', 'gpt-4o-mini'),
+]);
+```
+
+### Config Object
+
+For callbacks and advanced options, pass a config object:
+
+```typescript
 const runner = withModelSelection(baseRunner, {
   rules: [
     byInputLength(200, 'gpt-4o-mini'),                // Short inputs → mini
@@ -255,17 +292,6 @@ const runner = withModelSelection(baseRunner, {
     }
   },
 });
-```
-
-### Shorthand (Rules Array)
-
-For simple cases, pass the rules array directly:
-
-```typescript
-const runner = withModelSelection(baseRunner, [
-  byInputLength(200, 'gpt-4o-mini'),
-  byAgentName('summarizer', 'gpt-4o-mini'),
-]);
 ```
 
 ### Custom Rules
@@ -289,7 +315,7 @@ const runner = withModelSelection(baseRunner, {
 
 ## Structured Outputs
 
-Parse and validate LLM responses against a schema. Retries with error feedback on parse failure. Works with any Zod-compatible schema.
+Parse and validate LLM responses against a schema. If validation fails, automatically retries up to `maxRetries` times with the validation error sent back to the LLM as feedback. Works with any Zod-compatible schema.
 
 ```typescript
 import { z } from 'zod';
@@ -364,7 +390,7 @@ console.log(results.map(r => r.output));
 // Force immediate flush
 await queue.flush();
 
-// Check queue depth
+// Check queue depth (queued + in-flight)
 console.log(`${queue.pending} calls pending`);
 
 // Clean up (flushes remaining calls before disposing)
@@ -379,7 +405,6 @@ Use runtime state to select providers dynamically. Track cost, latency, and erro
 
 ```typescript
 import { createConstraintRouter } from '@directive-run/ai';
-import type { ConstraintRouterRunner } from '@directive-run/ai';
 
 const router = createConstraintRouter({
   providers: [
@@ -417,6 +442,7 @@ const router = createConstraintRouter({
   preferCheapest: true,
   // Error cooldown: skip a provider for 30s after an error
   errorCooldownMs: 30000,
+  // reason: "constraint" | "cheapest" | "default" | "cooldown-skip"
   onProviderSelected: (name, reason) => {
     console.log(`Using ${name} (${reason})`);
   },
@@ -505,10 +531,6 @@ const runner = pipe(
 const orchestrator = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 const result = await orchestrator.run(myAgent, 'Hello!');
 ```
-
-{% callout title="Composition order" %}
-Apply wrappers from inside out: **Model Selection → Fallback → Retry → Budget → Structured Output**. Budget checks happen before any retries, and model selection runs closest to the provider.
-{% /callout %}
 
 ---
 

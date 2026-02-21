@@ -336,6 +336,28 @@ Throws with a detailed error message if assertions fail.
 
 ---
 
+## Evaluating Orchestrator-Wrapped Agents
+
+Run evals through an orchestrator to test guardrails, budget limits, and constraints alongside agent quality:
+
+```typescript
+import { createAgentOrchestrator } from '@directive-run/ai';
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  guardrails: { input: [piiGuardrail] },
+});
+
+const suite = createEvalSuite({
+  criteria: { safe: evalSafety() },
+  agents: [researcher],
+  runner: (agent, input, opts) => orchestrator.run(agent, input, { signal: opts?.signal }),
+  dataset,
+});
+```
+
+---
+
 ## Next Steps
 
 - [Testing](/docs/ai/testing) &ndash; Mock runners and test utilities
