@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SavedRun } from "../hooks/use-run-sessions";
 import { EVENT_COLORS } from "../lib/colors";
+import { extractAgentStats, computeEventTypeBreakdown, type AgentStats } from "../lib/compare-utils";
+import type { DebugEventType } from "../lib/types";
 
 interface CompareViewProps {
   runs: SavedRun[];
@@ -26,6 +28,14 @@ export function CompareView({ runs, onDeleteRun, onExportRun }: CompareViewProps
   const leftRun = useMemo(() => runs.find((r) => r.id === leftId) ?? null, [runs, leftId]);
   const rightRun = useMemo(() => runs.find((r) => r.id === rightId) ?? null, [runs, rightId]);
 
+  // E11: Rich comparison data
+  const leftStats = useMemo(() => leftRun ? extractAgentStats(leftRun.events) : [], [leftRun]);
+  const rightStats = useMemo(() => rightRun ? extractAgentStats(rightRun.events) : [], [rightRun]);
+  const eventTypeBreakdown = useMemo(
+    () => leftRun && rightRun ? computeEventTypeBreakdown(leftRun.events, rightRun.events) : [],
+    [leftRun, rightRun],
+  );
+
   if (runs.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
@@ -39,7 +49,7 @@ export function CompareView({ runs, onDeleteRun, onExportRun }: CompareViewProps
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-auto">
       {/* Selector bar */}
       <div className="flex items-center gap-4 border-b border-zinc-800 px-6 py-3">
         <div className="flex items-center gap-2">
@@ -52,7 +62,10 @@ export function CompareView({ runs, onDeleteRun, onExportRun }: CompareViewProps
           >
             <option value="">Select run...</option>
             {runs.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
+              <option key={r.id} value={r.id}>
+                {r.name}
+                {r.isAutoSave ? " (auto)" : ""}
+              </option>
             ))}
           </select>
         </div>
@@ -69,7 +82,10 @@ export function CompareView({ runs, onDeleteRun, onExportRun }: CompareViewProps
           >
             <option value="">Select run...</option>
             {runs.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
+              <option key={r.id} value={r.id}>
+                {r.name}
+                {r.isAutoSave ? " (auto)" : ""}
+              </option>
             ))}
           </select>
         </div>
@@ -111,6 +127,113 @@ export function CompareView({ runs, onDeleteRun, onExportRun }: CompareViewProps
           <DiffSummary left={leftRun} right={rightRun} />
         </div>
       )}
+
+      {/* E11: Agent-by-Agent comparison table */}
+      {leftRun && rightRun && (leftStats.length > 0 || rightStats.length > 0) && (
+        <div className="border-t border-zinc-800 px-6 py-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Agent Comparison</h3>
+          <AgentComparisonTable leftStats={leftStats} rightStats={rightStats} />
+        </div>
+      )}
+
+      {/* E11: Event type breakdown */}
+      {leftRun && rightRun && eventTypeBreakdown.length > 0 && (
+        <div className="border-t border-zinc-800 px-6 py-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Event Type Breakdown</h3>
+          <EventTypeBreakdownChart breakdown={eventTypeBreakdown} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** E11: Agent-by-agent comparison table */
+function AgentComparisonTable({ leftStats, rightStats }: { leftStats: AgentStats[]; rightStats: AgentStats[] }) {
+  // Merge agents from both sides
+  const allAgents = useMemo(() => {
+    const agents = new Map<string, { left?: AgentStats; right?: AgentStats }>();
+    for (const s of leftStats) {
+      agents.set(s.agentId, { left: s });
+    }
+    for (const s of rightStats) {
+      const existing = agents.get(s.agentId) ?? {};
+      agents.set(s.agentId, { ...existing, right: s });
+    }
+
+    return Array.from(agents).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [leftStats, rightStats]);
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-zinc-500">
+            <th className="pb-2 text-left font-medium">Agent</th>
+            <th className="pb-2 text-right font-medium">Tokens (A)</th>
+            <th className="pb-2 text-right font-medium">Tokens (B)</th>
+            <th className="pb-2 text-right font-medium">Delta</th>
+            <th className="pb-2 text-right font-medium">Duration (A)</th>
+            <th className="pb-2 text-right font-medium">Duration (B)</th>
+            <th className="pb-2 text-right font-medium">Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {allAgents.map(([agentId, { left, right }]) => {
+            const tokenDelta = (right?.totalTokens ?? 0) - (left?.totalTokens ?? 0);
+            const durationDelta = (right?.totalDurationMs ?? 0) - (left?.totalDurationMs ?? 0);
+
+            return (
+              <tr key={agentId} className="border-t border-zinc-800/50">
+                <td className="py-1.5 font-mono text-zinc-200">{agentId}</td>
+                <td className="py-1.5 text-right text-zinc-300">{(left?.totalTokens ?? 0).toLocaleString()}</td>
+                <td className="py-1.5 text-right text-zinc-300">{(right?.totalTokens ?? 0).toLocaleString()}</td>
+                <td className={`py-1.5 text-right font-medium ${tokenDelta > 0 ? "text-red-400" : tokenDelta < 0 ? "text-emerald-400" : "text-zinc-500"}`}>
+                  {tokenDelta > 0 ? "+" : ""}{tokenDelta.toLocaleString()}
+                </td>
+                <td className="py-1.5 text-right text-zinc-300">{Math.round(left?.totalDurationMs ?? 0)}ms</td>
+                <td className="py-1.5 text-right text-zinc-300">{Math.round(right?.totalDurationMs ?? 0)}ms</td>
+                <td className={`py-1.5 text-right font-medium ${durationDelta > 0 ? "text-red-400" : durationDelta < 0 ? "text-emerald-400" : "text-zinc-500"}`}>
+                  {durationDelta > 0 ? "+" : ""}{Math.round(durationDelta)}ms
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** E11: Event type breakdown stacked bars */
+function EventTypeBreakdownChart({ breakdown }: { breakdown: { type: DebugEventType; countA: number; countB: number }[] }) {
+  const maxCount = Math.max(1, ...breakdown.map((b) => Math.max(b.countA, b.countB)));
+
+  return (
+    <div className="space-y-2">
+      {breakdown.slice(0, 15).map(({ type, countA, countB }) => (
+        <div key={type} className="text-xs">
+          <div className="mb-0.5 flex items-center gap-2">
+            <span
+              className="h-2 w-2 rounded-sm shrink-0"
+              style={{ backgroundColor: EVENT_COLORS[type] ?? "#666" }}
+            />
+            <span className="text-zinc-400">{type.replace(/_/g, " ")}</span>
+            <span className="ml-auto text-zinc-500">{countA} / {countB}</span>
+          </div>
+          <div className="flex gap-1">
+            <div className="h-2 rounded" style={{
+              width: `${(countA / maxCount) * 100}%`,
+              minWidth: countA > 0 ? "2px" : "0",
+              backgroundColor: `${EVENT_COLORS[type] ?? "#666"}80`,
+            }} />
+            <div className="h-2 rounded" style={{
+              width: `${(countB / maxCount) * 100}%`,
+              minWidth: countB > 0 ? "2px" : "0",
+              backgroundColor: EVENT_COLORS[type] ?? "#666",
+            }} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -128,7 +251,12 @@ function RunSummary({ run, onDelete, onExport }: { run: SavedRun; onDelete: (id:
   return (
     <div className="p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-200">{run.name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-zinc-200">{run.name}</h3>
+          {run.isAutoSave && (
+            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500">auto</span>
+          )}
+        </div>
         <div className="flex gap-1">
           <button
             onClick={() => onExport(run.id)}

@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DebugEvent, DebugEventType } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
+import { useTimelineZoom } from "../hooks/use-timeline-zoom";
+import type { TimeFormat } from "../lib/time-format";
+import { formatTimestamp, formatDuration } from "../lib/time-format";
 
 interface FlamechartViewProps {
   events: DebugEvent[];
+  timeFormat?: TimeFormat;
 }
 
 /** A single bar in the flamechart */
@@ -144,9 +148,124 @@ function buildFlameStacks(events: DebugEvent[]): FlameBar[] {
   return bars;
 }
 
-export function FlamechartView({ events }: FlamechartViewProps) {
+/** E8: Compute performance summary stats from flame bars */
+function computePerfSummary(flameBars: FlameBar[], timeRange: { start: number; duration: number }) {
+  const agentBars = flameBars.filter((b) => b.depth === 1 && b.durationMs > 0);
+  if (agentBars.length === 0) {
+    return null;
+  }
+
+  const totalWallTime = timeRange.duration;
+  const sumAgentDurations = agentBars.reduce((sum, b) => sum + b.durationMs, 0);
+
+  // Slowest agent
+  let slowest = agentBars[0]!;
+  for (const bar of agentBars) {
+    if (bar.durationMs > slowest.durationMs) {
+      slowest = bar;
+    }
+  }
+
+  // Parallelism ratio
+  const parallelismRatio = totalWallTime > 0 ? sumAgentDurations / totalWallTime : 1;
+
+  // Critical path: longest single bar (simplified)
+  const criticalPathMs = slowest.durationMs;
+
+  return {
+    totalDurationMs: totalWallTime,
+    criticalPathMs,
+    parallelismRatio,
+    slowestAgent: slowest.agentId ?? "unknown",
+    slowestMs: slowest.durationMs,
+  };
+}
+
+/** Canvas-based minimap for flamechart zoom */
+function FlamechartMinimap({
+  flameBars,
+  timeRange,
+  viewStart,
+  viewEnd,
+  onPan,
+}: {
+  flameBars: FlameBar[];
+  timeRange: { start: number; duration: number };
+  viewStart: number;
+  viewEnd: number;
+  onPan: (fraction: number) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw bars
+    for (const bar of flameBars) {
+      if (bar.durationMs <= 0) {
+        continue;
+      }
+
+      const x = ((bar.startMs - timeRange.start) / timeRange.duration) * w;
+      const barW = Math.max(1, (bar.durationMs / timeRange.duration) * w);
+      const y = (bar.depth / 3) * h;
+      const barH = h / 3 - 1;
+
+      ctx.fillStyle = EVENT_COLORS[bar.type] ?? "#666";
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(x, y, barW, barH);
+    }
+
+    // Draw viewport
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
+    const vx = viewStart * w;
+    const vw = (viewEnd - viewStart) * w;
+    ctx.fillRect(vx, 0, vw, h);
+    ctx.strokeRect(vx, 0, vw, h);
+  }, [flameBars, timeRange, viewStart, viewEnd]);
+
+  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = (e.clientX - rect.left) / rect.width;
+    onPan(fraction);
+  };
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="h-8 w-full cursor-pointer rounded border border-zinc-800"
+      onClick={handleClick}
+      aria-label="Flamechart minimap"
+    />
+  );
+}
+
+export function FlamechartView({ events, timeFormat = "elapsed" }: FlamechartViewProps) {
   const [selectedBar, setSelectedBar] = useState<FlameBar | null>(null);
   const [hoveredBar, setHoveredBar] = useState<FlameBar | null>(null);
+
+  // E4: Use shared zoom hook
+  const zoom = useTimelineZoom(events);
+  const baseTimestamp = events[0]?.timestamp;
 
   // D2: Escape key closes detail panel
   useEffect(() => {
@@ -165,18 +284,6 @@ export function FlamechartView({ events }: FlamechartViewProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedBar]);
 
-  const timeRange = useMemo(() => {
-    if (events.length === 0) {
-      return { start: 0, end: 1, duration: 1 };
-    }
-
-    const start = events[0]!.timestamp;
-    const end = events[events.length - 1]!.timestamp;
-    const duration = Math.max(end - start, 1);
-
-    return { start, end, duration };
-  }, [events]);
-
   const flameBars = useMemo(() => buildFlameStacks(events), [events]);
 
   const maxDepth = useMemo(() => {
@@ -192,16 +299,22 @@ export function FlamechartView({ events }: FlamechartViewProps) {
 
   const chartHeight = (maxDepth + 1) * (BAR_HEIGHT + BAR_GAP) + BAR_GAP;
 
-  // Time axis labels
+  // E8: Performance summary
+  const perfSummary = useMemo(
+    () => computePerfSummary(flameBars, zoom.timeRange),
+    [flameBars, zoom.timeRange],
+  );
+
+  // Time axis labels using time format
   const timeAxisLabels = useMemo(() => {
     const labels: string[] = [];
     for (let i = 0; i <= 5; i++) {
-      const ms = (timeRange.duration * i) / 5;
-      labels.push(`${Math.round(ms)}ms`);
+      const ts = zoom.visibleRange.start + (zoom.visibleRange.duration * i) / 5;
+      labels.push(formatTimestamp(ts, timeFormat, baseTimestamp));
     }
 
     return labels;
-  }, [timeRange]);
+  }, [zoom.visibleRange, timeFormat, baseTimestamp]);
 
   if (events.length === 0) {
     return (
@@ -216,8 +329,67 @@ export function FlamechartView({ events }: FlamechartViewProps) {
 
   return (
     <div className="flex h-full flex-col bg-zinc-950">
+      {/* E8: Performance summary */}
+      {perfSummary && (
+        <div className="flex items-center gap-6 border-b border-zinc-800 px-6 py-2.5">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500">Total Duration</div>
+            <div className="text-sm font-bold text-zinc-100">{formatDuration(perfSummary.totalDurationMs)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500">Critical Path</div>
+            <div className="text-sm font-bold text-zinc-100">{formatDuration(perfSummary.criticalPathMs)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500">Parallelism</div>
+            <div className="text-sm font-bold text-zinc-100">{perfSummary.parallelismRatio.toFixed(2)}x</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500">Slowest Agent</div>
+            <div className="text-sm font-bold text-zinc-100">
+              {perfSummary.slowestAgent} ({formatDuration(perfSummary.slowestMs)})
+            </div>
+          </div>
+
+          {/* E4: Zoom controls */}
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={zoom.handleZoomOut}
+              disabled={zoom.zoomLevel <= 1}
+              className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
+              aria-label="Zoom out"
+            >
+              -
+            </button>
+            <button
+              onClick={zoom.handleZoomReset}
+              className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-700"
+              aria-label="Reset zoom"
+            >
+              {zoom.zoomLevel}x
+            </button>
+            <button
+              onClick={zoom.handleZoomIn}
+              disabled={zoom.zoomLevel >= 20}
+              className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Chart area */}
-      <div className="flex flex-1 overflow-auto">
+      <div
+        className="flex flex-1 overflow-auto"
+        onWheel={zoom.handleWheel}
+        onMouseDown={zoom.handlePanMouseDown}
+        onMouseMove={zoom.handlePanMouseMove}
+        onMouseUp={zoom.handlePanMouseUp}
+        onMouseLeave={zoom.handlePanMouseUp}
+        style={{ cursor: zoom.zoomLevel > 1 ? "grab" : undefined }}
+      >
         {/* Depth labels */}
         <div className="sticky left-0 z-10 flex w-28 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900">
           {Array.from({ length: maxDepth + 1 }, (_, depth) => (
@@ -231,13 +403,19 @@ export function FlamechartView({ events }: FlamechartViewProps) {
           ))}
         </div>
 
-        {/* Flame bars */}
-        <div className="relative flex-1" style={{ minHeight: chartHeight }}>
+        {/* Flame bars — E4: zoom-aware positioning */}
+        <div ref={zoom.laneContainerRef} className="relative flex-1" style={{ minHeight: chartHeight }}>
           {flameBars.map((bar) => {
-            const leftPct = ((bar.startMs - timeRange.start) / timeRange.duration) * 100;
+            const leftPct = ((bar.startMs - zoom.visibleRange.start) / zoom.visibleRange.duration) * 100;
             const widthPct = bar.durationMs > 0
-              ? (bar.durationMs / timeRange.duration) * 100
+              ? (bar.durationMs / zoom.visibleRange.duration) * 100
               : 0;
+
+            // Skip bars fully outside visible range
+            if (leftPct + widthPct < -5 || leftPct > 105) {
+              return null;
+            }
+
             const top = bar.depth * (BAR_HEIGHT + BAR_GAP) + BAR_GAP;
             const color = EVENT_COLORS[bar.type];
             const isSelected = selectedBar?.id === bar.id;
@@ -247,7 +425,7 @@ export function FlamechartView({ events }: FlamechartViewProps) {
               <button
                 key={`${bar.id}-${bar.type}`}
                 className="absolute cursor-pointer transition-opacity"
-                aria-label={`${bar.label}${bar.durationMs > 0 ? ` — ${bar.durationMs.toFixed(1)}ms` : ""}`}
+                aria-label={`${bar.label}${bar.durationMs > 0 ? ` — ${formatDuration(bar.durationMs)}` : ""}`}
                 style={{
                   left: `${leftPct}%`,
                   width: widthPct > 0 ? `max(${MIN_BAR_WIDTH_PX}px, ${widthPct}%)` : `${MIN_BAR_WIDTH_PX}px`,
@@ -283,7 +461,7 @@ export function FlamechartView({ events }: FlamechartViewProps) {
               className="pointer-events-none absolute z-50 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-lg"
               style={{
                 left: `${Math.min(
-                  ((hoveredBar.startMs - timeRange.start) / timeRange.duration) * 100,
+                  ((hoveredBar.startMs - zoom.visibleRange.start) / zoom.visibleRange.duration) * 100,
                   85,
                 )}%`,
                 top: hoveredBar.depth * (BAR_HEIGHT + BAR_GAP) + BAR_HEIGHT + BAR_GAP + 4,
@@ -301,7 +479,7 @@ export function FlamechartView({ events }: FlamechartViewProps) {
               <div className="text-zinc-400">
                 Duration:{" "}
                 <span className="text-zinc-300">
-                  {hoveredBar.durationMs > 0 ? `${hoveredBar.durationMs.toFixed(1)}ms` : "instant"}
+                  {hoveredBar.durationMs > 0 ? formatDuration(hoveredBar.durationMs) : "instant"}
                 </span>
               </div>
             </div>
@@ -345,7 +523,7 @@ export function FlamechartView({ events }: FlamechartViewProps) {
                 <span className="text-zinc-500">Duration</span>
                 <div className="mt-0.5 text-zinc-200">
                   {selectedBar.durationMs > 0
-                    ? `${selectedBar.durationMs.toFixed(1)}ms`
+                    ? formatDuration(selectedBar.durationMs)
                     : "instant (point event)"}
                 </div>
               </div>
@@ -353,7 +531,7 @@ export function FlamechartView({ events }: FlamechartViewProps) {
               <div>
                 <span className="text-zinc-500">Start</span>
                 <div className="mt-0.5 text-zinc-200">
-                  +{(selectedBar.startMs - timeRange.start).toFixed(1)}ms
+                  {formatTimestamp(selectedBar.startMs, timeFormat, baseTimestamp)}
                 </div>
               </div>
 
@@ -381,6 +559,22 @@ export function FlamechartView({ events }: FlamechartViewProps) {
           </div>
         )}
       </div>
+
+      {/* E4: Minimap (only when zoomed) */}
+      {zoom.zoomLevel > 1 && (
+        <div className="border-t border-zinc-800 bg-zinc-900 px-4 py-1">
+          <div className="flex items-center gap-2">
+            <div className="w-28 shrink-0" />
+            <FlamechartMinimap
+              flameBars={flameBars}
+              timeRange={zoom.timeRange}
+              viewStart={zoom.viewStart}
+              viewEnd={zoom.viewEnd}
+              onPan={zoom.handleMinimapPan}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Time axis */}
       <div className="flex border-t border-zinc-800 bg-zinc-900 px-4 py-1">

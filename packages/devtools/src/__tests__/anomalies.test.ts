@@ -298,6 +298,72 @@ describe("detectAnomalies", () => {
     const anomalies = detectAnomalies(events);
     expect(anomalies[0]!.message).toContain("Unknown error");
   });
+
+  it("does NOT flag duration exactly at 2x mean (boundary: > not >=)", () => {
+    // 3 events: 100, 100, 200. Mean = (100+100+200)/3 = 133.3
+    // 2x mean = 266.6. 200 < 266.6 → not flagged
+    const events = [
+      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100, totalTokens: 50 }),
+      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 100, totalTokens: 50 }),
+      makeEvent({ id: 3, type: "agent_complete", timestamp: 3000, agentId: "a", durationMs: 200, totalTokens: 50 }),
+    ];
+    const anomalies = detectAnomalies(events);
+    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+  });
+
+  it("does NOT flag when only a single event per agent (value == mean)", () => {
+    const events = [
+      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 500, totalTokens: 100 }),
+    ];
+    const anomalies = detectAnomalies(events);
+    // Mean = 500, 500 is NOT > 2*500=1000 → not flagged
+    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+    expect(anomalies.filter((a) => a.type === "token_spike")).toHaveLength(0);
+  });
+
+  it("detects guardrail rejection via 'result' field (not just 'status')", () => {
+    const events = [
+      makeEvent({ id: 1, type: "guardrail_check", timestamp: 1000, agentId: "a", result: "REJECTED" }),
+    ];
+    const anomalies = detectAnomalies(events);
+    expect(anomalies).toHaveLength(1);
+    expect(anomalies[0]!.type).toBe("guardrail_rejection");
+  });
+
+  it("handles reroute with missing from/to gracefully", () => {
+    const events = [
+      makeEvent({ id: 1, type: "reroute", timestamp: 1000 }),
+    ];
+    const anomalies = detectAnomalies(events);
+    expect(anomalies).toHaveLength(1);
+    expect(anomalies[0]!.message).toContain("unknown");
+  });
+
+  it("detects multiple anomaly types on the same agent", () => {
+    const events = [
+      makeEvent({ id: 1, type: "agent_error", timestamp: 1000, agentId: "a", errorMessage: "fail" }),
+      makeEvent({ id: 2, type: "agent_retry", timestamp: 2000, agentId: "a" }),
+      makeEvent({ id: 3, type: "resolver_error", timestamp: 3000, agentId: "a" }),
+    ];
+    const anomalies = detectAnomalies(events);
+    expect(anomalies).toHaveLength(3);
+    expect(anomalies.filter((a) => a.severity === "critical")).toHaveLength(2);
+    expect(anomalies.filter((a) => a.severity === "warning")).toHaveLength(1);
+  });
+
+  it("computes means per agent independently", () => {
+    // Agent "a": durations 100, 100. Mean = 100.
+    // Agent "b": durations 100, 500. Mean = 300. 500 > 2*300=600? No.
+    // No outliers expected
+    const events = [
+      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100, totalTokens: 50 }),
+      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 100, totalTokens: 50 }),
+      makeEvent({ id: 3, type: "agent_complete", timestamp: 3000, agentId: "b", durationMs: 100, totalTokens: 50 }),
+      makeEvent({ id: 4, type: "agent_complete", timestamp: 4000, agentId: "b", durationMs: 500, totalTokens: 50 }),
+    ];
+    const anomalies = detectAnomalies(events);
+    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+  });
 });
 
 // ============================================================================

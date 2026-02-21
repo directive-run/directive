@@ -1,8 +1,13 @@
 import type { AgentHealthMetrics } from "../lib/types";
 import { CIRCUIT_STATE_COLORS } from "../lib/colors";
+import { Sparkline } from "./Sparkline";
 
 interface HealthCardProps {
   metrics: AgentHealthMetrics;
+  /** E5: Duration time series for sparkline */
+  durationSeries?: number[];
+  /** E5: Token time series for sparkline */
+  tokenSeries?: number[];
 }
 
 function HealthBar({ score }: { score: number }) {
@@ -25,7 +30,7 @@ function HealthBar({ score }: { score: number }) {
   );
 }
 
-export function HealthCard({ metrics }: HealthCardProps) {
+export function HealthCard({ metrics, durationSeries, tokenSeries }: HealthCardProps) {
   const circuit = CIRCUIT_STATE_COLORS[metrics.circuitState];
 
   return (
@@ -68,6 +73,24 @@ export function HealthCard({ metrics }: HealthCardProps) {
           </div>
         </div>
       </div>
+
+      {/* E5: Sparklines */}
+      {((durationSeries && durationSeries.length >= 2) || (tokenSeries && tokenSeries.length >= 2)) && (
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-800 pt-2">
+          {durationSeries && durationSeries.length >= 2 && (
+            <div>
+              <div className="text-[10px] text-zinc-500">Duration</div>
+              <Sparkline data={durationSeries} width={100} height={20} color="#3b82f6" />
+            </div>
+          )}
+          {tokenSeries && tokenSeries.length >= 2 && (
+            <div>
+              <div className="text-[10px] text-zinc-500">Tokens</div>
+              <Sparkline data={tokenSeries} width={100} height={20} color="#a855f7" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recent errors */}
       {metrics.lastErrors.length > 0 && (

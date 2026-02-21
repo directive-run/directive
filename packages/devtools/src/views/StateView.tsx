@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScratchpadPanel } from "../components/ScratchpadPanel";
 import { DerivedPanel } from "../components/DerivedPanel";
+import type { DevToolsSnapshot } from "../lib/types";
 
 interface StateViewProps {
   scratchpadState: Record<string, unknown>;
   derivedState: Record<string, unknown>;
   onRequestScratchpad: () => void;
   onRequestDerived: () => void;
+  /** I2: Current snapshot for time-travel editing */
+  snapshot?: DevToolsSnapshot | null;
+  onEditSnapshot?: () => void;
 }
 
 type SubTab = "scratchpad" | "derived";
 
-export function StateView({ scratchpadState, derivedState, onRequestScratchpad, onRequestDerived }: StateViewProps) {
+export function StateView({ scratchpadState, derivedState, onRequestScratchpad, onRequestDerived, snapshot, onEditSnapshot }: StateViewProps) {
   const [subTab, setSubTab] = useState<SubTab>("scratchpad");
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,11 +89,21 @@ export function StateView({ scratchpadState, derivedState, onRequestScratchpad, 
           )}
         </button>
 
+        {/* I2: Edit & Fork button */}
+        {snapshot && onEditSnapshot && (
+          <button
+            onClick={onEditSnapshot}
+            className="ml-auto rounded border border-amber-500/30 bg-amber-950/20 px-2 py-0.5 text-xs text-amber-400 hover:bg-amber-950/40"
+          >
+            Edit & Fork
+          </button>
+        )}
+
         {/* Refresh button */}
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="ml-auto rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 disabled:opacity-50"
+          className={`${!snapshot || !onEditSnapshot ? "ml-auto" : ""} rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 disabled:opacity-50`}
         >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
