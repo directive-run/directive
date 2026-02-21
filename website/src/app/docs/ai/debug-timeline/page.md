@@ -65,6 +65,59 @@ The timeline records the following event types covering the full agent lifecycle
 
 Every event includes `id`, `type`, `timestamp`, and `snapshotId` (for time-travel correlation). Agent-scoped events also include `agentId`.
 
+### Event Data Shapes
+
+Each event type carries specific data fields beyond the common base:
+
+**Agent lifecycle events:**
+- `agent_start` &ndash; `inputLength`
+- `agent_complete` &ndash; `outputLength`, `totalTokens`, `durationMs`
+- `agent_error` &ndash; `errorMessage`, `durationMs`
+- `agent_retry` &ndash; `attempt`, `errorMessage`, `delayMs`
+
+**Guardrail and constraint events:**
+- `guardrail_check` &ndash; `guardrailName`, `guardrailType` (`input`/`output`/`toolCall`), `passed`, `reason?`
+- `constraint_evaluate` &ndash; `constraintId`, `fired`
+
+**Resolver events:**
+- `resolver_start` &ndash; `resolverId`, `requirementType`
+- `resolver_complete` &ndash; `resolverId`, `requirementType`, `durationMs`
+- `resolver_error` &ndash; `resolverId`, `requirementType`, `errorMessage`
+
+**Approval events:**
+- `approval_request` &ndash; `requestId`, `toolName?`
+- `approval_response` &ndash; `requestId`, `approved`, `reason?`
+
+**Pattern events:**
+- `pattern_start` &ndash; `patternId`, `patternType`
+- `pattern_complete` &ndash; `patternId`, `patternType`, `durationMs`, `error?`
+
+**Handoff events:**
+- `handoff_start` &ndash; `fromAgent`, `toAgent`, `handoffId`
+- `handoff_complete` &ndash; `fromAgent`, `toAgent`, `handoffId`, `durationMs`
+
+**DAG events:**
+- `dag_node_update` &ndash; `nodeId`, `status`, `durationMs?`
+
+**Breakpoint events:**
+- `breakpoint_hit` &ndash; `breakpointId`, `breakpointType`, `label?`
+- `breakpoint_resumed` &ndash; `breakpointId`, `modified`, `skipped`
+
+**Cross-agent state events:**
+- `derivation_update` &ndash; `derivationId`, `value`
+- `scratchpad_update` &ndash; `key`, `value`
+
+**Reflection events:**
+- `reflection_iteration` &ndash; `iteration`, `score`, `feedback?`, `durationMs`
+
+**Race events:**
+- `race_start` &ndash; `agents` (string array)
+- `race_winner` &ndash; `winnerId`, `durationMs`
+- `race_cancelled` &ndash; `cancelledAgents` (string array)
+
+**Debate events:**
+- `debate_round` &ndash; `round`, `winnerId`, `score?`, `agentCount`
+
 ---
 
 ## Querying Events
@@ -203,3 +256,12 @@ const patternStarts = multi.timeline!.getEventsByType('pattern_start');
 ## Privacy
 
 Events store `inputLength` and `outputLength`, never full content. Error messages are included since they are developer-facing. Token usage is recorded as `totalTokens`.
+
+---
+
+## Next Steps
+
+- [Breakpoints & Checkpoints](/docs/ai/breakpoints) &ndash; Pause execution and save state
+- [DevTools](/docs/ai/devtools) &ndash; Visual timeline, flamechart, and 6 more views
+- [OpenTelemetry](/docs/ai/otel) &ndash; Export timeline events as OTEL spans
+- [Testing](/docs/ai/testing) &ndash; Test timeline utilities and assertions

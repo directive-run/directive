@@ -43,9 +43,12 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
       </div>
 
       {/* Tabs */}
-      <div className="mt-2 flex gap-1 border-b border-zinc-800">
+      <div className="mt-2 flex gap-1 border-b border-zinc-800" role="tablist" aria-label="Prompt and completion">
         {hasInput && (
           <button
+            role="tab"
+            aria-selected={activeTab === "input"}
+            aria-controls="prompt-panel-input"
             onClick={() => setActiveTab("input")}
             className={`px-2 py-1 text-[10px] font-medium transition-colors ${
               activeTab === "input"
@@ -61,6 +64,9 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
         )}
         {hasOutput && (
           <button
+            role="tab"
+            aria-selected={activeTab === "output"}
+            aria-controls="prompt-panel-output"
             onClick={() => setActiveTab("output")}
             className={`px-2 py-1 text-[10px] font-medium transition-colors ${
               activeTab === "output"
@@ -84,7 +90,11 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
       )}
 
       {/* Content */}
-      <div className="mt-2 max-h-64 overflow-auto rounded bg-zinc-800/60 p-2">
+      <div
+        role="tabpanel"
+        id={`prompt-panel-${activeTab}`}
+        className="mt-2 max-h-64 overflow-auto rounded bg-zinc-800/60 p-2"
+      >
         <pre className="whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-zinc-300">
           {content}
         </pre>

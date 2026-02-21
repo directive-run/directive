@@ -82,20 +82,53 @@ export const navigation: NavigationSection[] = [
     ],
   },
   {
-    title: 'AI & Agents',
+    title: 'AI Foundations',
     links: [
       { title: 'Overview', href: '/docs/ai/overview' },
       { title: 'Running Agents', href: '/docs/ai/running-agents' },
       { title: 'Resilience & Routing', href: '/docs/ai/resilience-routing' },
-      { title: 'Orchestrator', href: '/docs/ai/orchestrator' },
+      { title: 'Comparison', href: '/docs/ai/comparison' },
+      { title: 'Tutorial', href: '/docs/ai/tutorial' },
+    ],
+  },
+  {
+    title: 'Agent Orchestrator',
+    links: [
+      { title: 'Overview', href: '/docs/ai/orchestrator' },
       { title: 'Guardrails', href: '/docs/ai/guardrails' },
       { title: 'Streaming', href: '/docs/ai/streaming' },
-      { title: 'Multi-Agent', href: '/docs/ai/multi-agent' },
-      { title: 'MCP Integration', href: '/docs/ai/mcp' },
-      { title: 'SSE Transport', href: '/docs/ai/sse-transport' },
-      { title: 'RAG Enricher', href: '/docs/ai/rag' },
-      { title: 'Debug Timeline', href: '/docs/ai/debug-timeline' },
+      { title: 'Memory', href: '/docs/ai/memory' },
+    ],
+  },
+  {
+    title: 'Multi-Agent Orchestrator',
+    links: [
+      { title: 'Overview', href: '/docs/ai/multi-agent' },
+      { title: 'Execution Patterns', href: '/docs/ai/patterns' },
+      { title: 'Communication', href: '/docs/ai/communication' },
+      { title: 'Cross-Agent State', href: '/docs/ai/cross-agent-state' },
       { title: 'Self-Healing', href: '/docs/ai/self-healing' },
+      { title: 'Goal Engine', href: '/docs/ai/goals' },
+    ],
+  },
+  {
+    title: 'AI Infrastructure',
+    links: [
+      { title: 'MCP Integration', href: '/docs/ai/mcp' },
+      { title: 'RAG Enricher', href: '/docs/ai/rag' },
+      { title: 'SSE Transport', href: '/docs/ai/sse-transport' },
+      { title: 'Semantic Cache', href: '/docs/ai/semantic-cache' },
+    ],
+  },
+  {
+    title: 'AI Observability',
+    links: [
+      { title: 'Debug Timeline', href: '/docs/ai/debug-timeline' },
+      { title: 'Breakpoints & Checkpoints', href: '/docs/ai/breakpoints' },
+      { title: 'DevTools', href: '/docs/ai/devtools' },
+      { title: 'Evals', href: '/docs/ai/evals' },
+      { title: 'OpenTelemetry', href: '/docs/ai/otel' },
+      { title: 'Testing', href: '/docs/ai/testing' },
     ],
   },
   {

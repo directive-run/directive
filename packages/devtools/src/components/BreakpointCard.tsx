@@ -67,10 +67,12 @@ export function BreakpointCard({ breakpoint, onResume, onCancel }: BreakpointCar
       {/* Input editor */}
       {showEditor && (
         <div className="mt-3">
-          <label className="text-[10px] text-zinc-500">Modify Input</label>
+          <label htmlFor={`bp-input-${breakpoint.id}`} className="text-[10px] text-zinc-500">Modify Input</label>
           <textarea
+            id={`bp-input-${breakpoint.id}`}
             value={modifiedInput}
             onChange={(e) => setModifiedInput(e.target.value)}
+            maxLength={50000}
             className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 p-2 text-xs text-zinc-200 font-mono outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/50"
             rows={4}
           />
@@ -80,11 +82,13 @@ export function BreakpointCard({ breakpoint, onResume, onCancel }: BreakpointCar
       {/* Cancel dialog */}
       {showCancelDialog && (
         <div className="mt-3">
-          <label className="text-[10px] text-zinc-500">Cancel Reason (optional)</label>
+          <label htmlFor={`bp-cancel-${breakpoint.id}`} className="text-[10px] text-zinc-500">Cancel Reason (optional)</label>
           <input
+            id={`bp-cancel-${breakpoint.id}`}
             type="text"
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
+            maxLength={500}
             className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-red-500 focus-visible:ring-2 focus-visible:ring-red-500/50"
             placeholder="Reason for cancelling..."
           />

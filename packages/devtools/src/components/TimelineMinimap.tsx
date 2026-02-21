@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
 
@@ -12,17 +12,66 @@ interface TimelineMinimapProps {
   onPan: (fraction: number) => void;
 }
 
+/**
+ * M4: Canvas-based minimap for performance.
+ * Renders event ticks on a <canvas> instead of one DOM element per event.
+ */
 export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }: TimelineMinimapProps) {
-  const barRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
+
+  // Draw event ticks on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) {
+      return;
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw event ticks (sample if too many)
+    const maxTicks = 500;
+    const step = events.length > maxTicks ? Math.ceil(events.length / maxTicks) : 1;
+
+    for (let i = 0; i < events.length; i += step) {
+      const event = events[i]!;
+      const pos = ((event.timestamp - timeRange.start) / timeRange.duration);
+      const x = Math.min(pos * w, w - 1);
+      const color = EVENT_COLORS[event.type] ?? "#666";
+
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(x, 4, 2, h - 8);
+    }
+
+    ctx.globalAlpha = 1;
+  }, [events, timeRange]);
 
   const handlePointer = useCallback(
     (e: React.PointerEvent) => {
-      if (!barRef.current) {
+      if (!containerRef.current) {
         return;
       }
 
-      const rect = barRef.current.getBoundingClientRect();
+      const rect = containerRef.current.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       onPan(fraction);
     },
@@ -51,36 +100,52 @@ export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }
     dragging.current = false;
   }, []);
 
+  // H10: Keyboard handling for WCAG 4.1.2 slider semantics
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = 0.05;
+    switch (e.key) {
+      case "ArrowLeft":
+      case "ArrowDown":
+        e.preventDefault();
+        onPan(Math.max(0, viewStart - step));
+        break;
+      case "ArrowRight":
+      case "ArrowUp":
+        e.preventDefault();
+        onPan(Math.min(1, viewStart + step));
+        break;
+      case "Home":
+        e.preventDefault();
+        onPan(0);
+        break;
+      case "End":
+        e.preventDefault();
+        onPan(1);
+        break;
+    }
+  }, [onPan, viewStart]);
+
   return (
     <div
-      ref={barRef}
+      ref={containerRef}
       className="relative h-5 cursor-pointer rounded bg-zinc-800/80"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onKeyDown={onKeyDown}
+      tabIndex={0}
       role="slider"
       aria-label="Timeline minimap"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(viewStart * 100)}
     >
-      {/* Event ticks */}
-      {events.map((event) => {
-        const pos = ((event.timestamp - timeRange.start) / timeRange.duration) * 100;
-
-        return (
-          <div
-            key={event.id}
-            className="absolute top-1 h-3"
-            style={{
-              left: `${Math.min(pos, 99.5)}%`,
-              width: "2px",
-              backgroundColor: EVENT_COLORS[event.type],
-              opacity: 0.6,
-            }}
-          />
-        );
-      })}
+      {/* Canvas for event ticks */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0"
+        style={{ pointerEvents: "none" }}
+      />
 
       {/* Visible window highlight */}
       <div

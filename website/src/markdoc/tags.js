@@ -4,6 +4,7 @@ import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 import { UseCaseCards } from '@/components/UseCaseCards'
+import { DevToolsDemo } from '@/components/DevToolsDemo'
 
 const tags = {
   'comparison-table': {
@@ -75,6 +76,10 @@ const tags = {
   },
   'use-case-cards': {
     render: UseCaseCards,
+    selfClosing: true,
+  },
+  'devtools-demo': {
+    render: DevToolsDemo,
     selfClosing: true,
   },
 }

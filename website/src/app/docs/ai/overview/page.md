@@ -1,6 +1,6 @@
 ---
 title: AI & Agents Overview
-description: Constraint-driven AI agent orchestration – guardrails, streaming, multi-agent patterns, and memory.
+description: Constraint-driven AI agent orchestration – guardrails, streaming, multi-agent patterns, memory, evals, and devtools.
 ---
 
 The AI adapter brings Directive's constraint system to AI agent orchestration. Wrap any LLM framework with safety guardrails, approval workflows, token budgets, and state persistence. {% .lead %}
@@ -9,7 +9,7 @@ The AI adapter brings Directive's constraint system to AI agent orchestration. W
 
 ## Architecture
 
-Directive doesn't replace your agent framework – it wraps it:
+Directive doesn't replace your agent framework &ndash; it wraps it:
 
 ```
 Your Agent Framework (OpenAI, Anthropic, LangChain, etc.)
@@ -19,31 +19,54 @@ Directive AI Adapter (guardrails, constraints, state)
 Your Application
 ```
 
+The AI adapter is organized into five sections:
+
+| Section | What's Inside |
+|---------|---------------|
+| **[AI Foundations](#reading-paths)** | Entry ramp &ndash; running agents, resilience, routing |
+| **[Agent Orchestrator](#two-orchestrators)** | Single-agent deep dive &ndash; guardrails, streaming, memory |
+| **[Multi-Agent Orchestrator](#two-orchestrators)** | Multi-agent deep dive &ndash; patterns, communication, goals |
+| **[AI Infrastructure](#infrastructure)** | Integrations &ndash; MCP, RAG, SSE, semantic cache |
+| **[AI Observability](#observability)** | Debugging &ndash; timeline, devtools, evals, OTEL, testing |
+
 ---
 
-## Learning Path
+## Reading Paths
 
-Build up from simple to complex:
+### Quick Start Path
 
-| Level | Page | What You Learn |
-|-------|------|---------------|
-| 1 | [Running Agents](/docs/ai/running-agents) | End-to-end examples and deployment patterns |
-| 2 | [Resilience & Routing](/docs/ai/resilience-routing) | `pipe()` composition, retry, fallback, budgets, model selection, structured outputs |
-| 3 | [Orchestrator](/docs/ai/orchestrator) | Single-agent runs with guardrails and constraints |
-| 4 | [Guardrails](/docs/ai/guardrails) | Input/output/tool-call validation, PII detection, moderation |
-| 5 | [Streaming](/docs/ai/streaming) | Real-time token streaming with backpressure and stream guardrails |
-| 6 | [Multi-Agent](/docs/ai/multi-agent) | Parallel, sequential, supervisor patterns with per-agent guardrails and streaming |
-| 7 | [MCP Integration](/docs/ai/mcp) | Model Context Protocol tool servers |
-| 8 | [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events streaming for HTTP endpoints |
-| 9 | [RAG Enricher](/docs/ai/rag) | Embedding-based retrieval-augmented generation |
-| 10 | [Debug Timeline](/docs/ai/debug-timeline) | Trace and inspect agent execution events |
-| 11 | [Self-Healing](/docs/ai/self-healing) | Automatic error recovery and agent rerouting |
+Build a working agent system step by step:
+
+1. [Running Agents](/docs/ai/running-agents) &ndash; End-to-end examples
+2. [Agent Orchestrator](/docs/ai/orchestrator) &ndash; Single-agent with guardrails
+3. [Multi-Agent Orchestrator](/docs/ai/multi-agent) &ndash; Full multi-agent setup
+4. [Execution Patterns](/docs/ai/patterns) &ndash; Parallel, sequential, supervisor
+
+### Production Path
+
+Harden for production after the basics:
+
+1. [Resilience & Routing](/docs/ai/resilience-routing) &ndash; Retry, fallback, budgets
+2. [Guardrails](/docs/ai/guardrails) &ndash; Input/output validation and PII detection
+3. [Self-Healing](/docs/ai/self-healing) &ndash; Automatic error recovery
+4. [Evals](/docs/ai/evals) &ndash; Quality measurement in CI
+5. [OpenTelemetry](/docs/ai/otel) &ndash; Production observability
+
+### Advanced Path
+
+Unlock the full power of the system:
+
+1. [Goal Engine](/docs/ai/goals) &ndash; Desired-state convergence
+2. [Communication](/docs/ai/communication) &ndash; Decentralized agent messaging
+3. [Cross-Agent State](/docs/ai/cross-agent-state) &ndash; Shared derivations and scratchpad
+4. [Breakpoints & Checkpoints](/docs/ai/breakpoints) &ndash; Human-in-the-loop debugging
+5. [DevTools](/docs/ai/devtools) &ndash; Real-time visual debugging (8 views)
 
 ---
 
 ## Two Orchestrators
 
-Directive ships two orchestrators. Both are backed by a Directive System with reactive state, constraints, guardrails, streaming, approval, memory, retry, budget, hooks, and time-travel debugging. The multi-agent orchestrator has full feature parity with the single-agent orchestrator &mdash; each registered agent becomes a namespaced Directive module with its own reactive state and constraint evaluation.
+Both are backed by a Directive System with reactive state, constraints, guardrails, streaming, approval, memory, retry, budget, hooks, and time-travel debugging. The multi-agent orchestrator has full feature parity &mdash; each registered agent becomes a namespaced Directive module.
 
 | | Single-Agent | Multi-Agent |
 |---|---|---|
@@ -51,10 +74,14 @@ Directive ships two orchestrators. Both are backed by a Directive System with re
 | **Scope** | One agent at a time | Multiple named agents with concurrency control |
 | **State** | `orchestrator.facts.agent` | `orchestrator.facts` (namespaced per agent) |
 | **Streaming** | `orchestrator.runStream()` | `orchestrator.runAgentStream()` |
-| **Patterns** | &ndash; | `parallel()`, `sequential()`, `supervisor()` |
+| **Patterns** | &ndash; | `parallel()`, `sequential()`, `supervisor()`, `dag()`, `race()`, `reflect()`, `debate()` |
 | **Guardrails** | Orchestrator-level | Orchestrator-level + per-agent |
 | **Constraints** | Orchestrator-level | Orchestrator-level + per-agent |
 | **Approval** | `approve()` / `reject()` | `approve()` / `reject()` (routes to correct agent) |
+| **Derivations** | &ndash; | [Cross-agent derivations](/docs/ai/cross-agent-state) |
+| **Scratchpad** | &ndash; | [Shared scratchpad](/docs/ai/cross-agent-state#shared-scratchpad) |
+| **Communication** | &ndash; | [Message bus, agent network, handoffs](/docs/ai/communication) |
+| **Breakpoints** | 4 types | 6 types (+ `pre_handoff`, `pre_pattern_step`) |
 | **Use when** | Simple chatbot, single-purpose agent | Pipelines, fan-out, delegation, routing |
 
 ```typescript
@@ -81,12 +108,15 @@ const result = await multi.runAgent('researcher', 'What is WASM?');
 | **Orchestrator** | Wraps an `AgentRunner` with constraints, guardrails, and state tracking |
 | **Multi-Agent Orchestrator** | Coordinates multiple named agents with concurrency, patterns, and per-agent configuration |
 | **`pipe()`** | Left-to-right middleware composition: `pipe(runner, withRetry(...), withBudget(...))` |
-| **Middleware** | Composable `with*` wrappers (`withRetry`, `withFallback`, `withBudget`) that stack on any runner |
+| **Middleware** | Composable `with*` wrappers (`withRetry`, `withFallback`, `withBudget`) |
 | **Guardrails** | Input, output, and tool-call validators that block or transform data |
 | **Constraints** | Declarative rules (e.g., "if confidence < 0.7, escalate to expert") |
 | **Memory** | Sliding window, token-based, or hybrid conversation management |
 | **Resilience** | Intelligent retry, provider fallback chains, and cost budget guards |
 | **Circuit Breaker** | Automatic fault isolation for failing agent calls |
+| **Goal Engine** | Desired-state convergence &ndash; declare goals, engine resolves them |
+| **Evals** | Dataset-driven quality evaluation with built-in and LLM-as-judge criteria |
+| **DevTools** | Real-time debugging UI with 8 specialized views |
 
 ---
 
@@ -98,12 +128,10 @@ import { createAgentOrchestrator, createPIIGuardrail } from '@directive-run/ai';
 const orchestrator = createAgentOrchestrator({
   runner: myAgentRunner,
 
-  // Block any user input that contains personal information
   guardrails: {
     input: [createPIIGuardrail()],
   },
 
-  // Pause agents automatically when token spend exceeds the budget
   constraints: {
     budgetLimit: {
       when: (facts) => facts.agent.tokenUsage > 10000,
@@ -114,15 +142,36 @@ const orchestrator = createAgentOrchestrator({
   maxTokenBudget: 10000,
 });
 
-// Run the agent – guardrails and constraints are applied automatically
 const result = await orchestrator.run(myAgent, 'Hello!');
 ```
 
 ---
 
+## Infrastructure
+
+| Feature | Page | Description |
+|---------|------|-------------|
+| [MCP Integration](/docs/ai/mcp) | Model Context Protocol | Connect to MCP tool servers |
+| [RAG Enricher](/docs/ai/rag) | Retrieval-Augmented Generation | Embedding-based document retrieval |
+| [SSE Transport](/docs/ai/sse-transport) | Server-Sent Events | HTTP streaming endpoints |
+| [Semantic Cache](/docs/ai/semantic-cache) | Response Caching | Embedding-based cache with ANN indexes |
+
+## Observability
+
+| Feature | Page | Description |
+|---------|------|-------------|
+| [Debug Timeline](/docs/ai/debug-timeline) | Event Recording | 25+ event types with time-travel correlation |
+| [Breakpoints & Checkpoints](/docs/ai/breakpoints) | Pausing & State | Human-in-the-loop debugging, persistent snapshots |
+| [DevTools](/docs/ai/devtools) | Visual Debugging | 8 views: Timeline, Flamechart, DAG, Health, Cost, Breakpoints, State, Compare |
+| [Evals](/docs/ai/evals) | Quality Measurement | 10 built-in criteria, LLM-as-judge, CI assertions |
+| [OpenTelemetry](/docs/ai/otel) | Production Tracing | OTEL spans with GenAI semantic conventions |
+| [Testing](/docs/ai/testing) | Test Utilities | Mock runners, test orchestrators, assertion helpers |
+
+---
+
 ## Safety & Compliance
 
-Directive provides security guardrails and compliance tooling for AI agent systems. See the [Security & Compliance](/docs/security/overview) section for full details. Apply multiple layers of protection:
+Directive provides security guardrails and compliance tooling for AI agent systems. See [Security & Compliance](/docs/security/overview) for full details.
 
 ```
 User Input
@@ -133,25 +182,19 @@ User Input
   → Audit Trail                 (log every operation for compliance)
 ```
 
-| Feature | Page | Threat Addressed |
-|---------|------|-----------------|
-| [PII Detection](/docs/security/pii) | Input/output scanning | Personally identifiable information leaking to/from agents |
-| [Prompt Injection](/docs/security/prompt-injection) | Input validation | Jailbreaks, instruction overrides, encoding evasion |
-| [Audit Trail](/docs/security/audit) | Observability | Tamper-evident logging of every system operation |
-| [GDPR/CCPA](/docs/security/compliance) | Data governance | Right to erasure, data export, consent tracking, retention |
-
-| Scenario | Features |
-|----------|---------|
-| User-facing chatbot | PII detection + prompt injection + audit trail |
-| Internal tool | Audit trail + GDPR compliance |
-| Healthcare/finance | All four features |
-| Development/testing | Audit trail only |
+| Feature | Threat Addressed |
+|---------|-----------------|
+| [PII Detection](/docs/security/pii) | Personal information leaking to/from agents |
+| [Prompt Injection](/docs/security/prompt-injection) | Jailbreaks, instruction overrides |
+| [Audit Trail](/docs/security/audit) | Tamper-evident logging |
+| [GDPR/CCPA](/docs/security/compliance) | Right to erasure, data export, consent |
 
 ---
 
 ## Next Steps
 
 - **New to AI adapter?** Start with [Running Agents](/docs/ai/running-agents)
-- **Need resilience?** See [Resilience & Routing](/docs/ai/resilience-routing) for retry, fallback, and budgets
+- **Need resilience?** See [Resilience & Routing](/docs/ai/resilience-routing)
 - **Want streaming?** See [Streaming](/docs/ai/streaming)
 - **Need safety?** See [Guardrails](/docs/ai/guardrails) and [Security & Compliance](/docs/security/overview)
+- **Production debugging?** See [DevTools](/docs/ai/devtools) and [Evals](/docs/ai/evals)

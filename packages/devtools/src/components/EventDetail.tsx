@@ -29,6 +29,34 @@ function getEventProperties(event: DebugEvent): [string, unknown][] {
   return entries;
 }
 
+/** M9: String value with "show more" for truncated content */
+function StringValue({ value }: { value: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const truncated = value.length > 200 && !expanded;
+
+  return (
+    <span className="text-amber-300 break-all">
+      {truncated ? value.slice(0, 200) : value}
+      {truncated && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="ml-1 text-[10px] text-blue-400 hover:text-blue-300"
+        >
+          ...show more
+        </button>
+      )}
+      {expanded && value.length > 200 && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="ml-1 text-[10px] text-blue-400 hover:text-blue-300"
+        >
+          show less
+        </button>
+      )}
+    </span>
+  );
+}
+
 const MAX_RENDER_DEPTH = 5;
 
 function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
@@ -45,11 +73,7 @@ function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number })
   }
 
   if (typeof value === "string") {
-    return (
-      <span className="text-amber-300 break-all">
-        {value.length > 200 ? `${value.slice(0, 200)}...` : value}
-      </span>
-    );
+    return <StringValue value={value} />;
   }
 
   if (Array.isArray(value)) {
@@ -76,6 +100,30 @@ function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number })
   return <span className="text-zinc-400">{JSON.stringify(value)}</span>;
 }
 
+/** M10: Copy text to clipboard with visual feedback */
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {
+      // Clipboard unavailable (non-HTTPS or permission denied)
+    });
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-1 text-[10px] text-zinc-500 hover:text-zinc-300"
+      title={`Copy ${label}`}
+    >
+      {copied ? "✓" : "📋"}
+    </button>
+  );
+}
+
 export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailProps) {
   const properties = getEventProperties(event);
   const color = EVENT_COLORS[event.type];
@@ -100,8 +148,9 @@ export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailP
               {event.type.replace(/_/g, " ")}
             </span>
           </div>
-          <div className="mt-1 text-xs text-zinc-500">
+          <div className="mt-1 flex items-center text-xs text-zinc-500">
             {category} &middot; ID #{event.id}
+            <CopyButton text={String(event.id)} label="event ID" />
           </div>
         </div>
         <button
@@ -123,7 +172,10 @@ export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailP
         {event.agentId && (
           <div className="flex justify-between">
             <span className="text-zinc-500">Agent</span>
-            <span className="text-zinc-300 font-mono">{event.agentId}</span>
+            <span className="flex items-center text-zinc-300 font-mono">
+              {event.agentId}
+              <CopyButton text={event.agentId} label="agent ID" />
+            </span>
           </div>
         )}
 
@@ -158,6 +210,16 @@ export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailP
           totalTokens={typeof event.totalTokens === "number" ? event.totalTokens : undefined}
         />
       )}
+
+      {/* M14: Copy event as JSON */}
+      <div className="mt-4">
+        <button
+          onClick={() => navigator.clipboard.writeText(JSON.stringify(event, null, 2)).catch(() => {})}
+          className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700"
+        >
+          Copy event as JSON
+        </button>
+      </div>
 
       {/* Fork from snapshot button */}
       {canFork && (
