@@ -6,6 +6,7 @@ import { CostChart } from "../components/CostChart";
 interface HealthViewProps {
   metrics: Record<string, AgentHealthMetrics>;
   events: DebugEvent[];
+  onRequestHealth?: () => void;
 }
 
 /** Extract token cost data from events for chart */
@@ -39,7 +40,7 @@ function extractReroutes(events: DebugEvent[]): { from: string; to: string; time
   return reroutes;
 }
 
-export function HealthView({ metrics, events }: HealthViewProps) {
+export function HealthView({ metrics, events, onRequestHealth }: HealthViewProps) {
   const agents = useMemo(() => Object.values(metrics).sort((a, b) => a.agentId.localeCompare(b.agentId)), [metrics]);
   const costData = useMemo(() => buildCostData(events), [events]);
   const reroutes = useMemo(() => extractReroutes(events), [events]);
@@ -48,7 +49,7 @@ export function HealthView({ metrics, events }: HealthViewProps) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-4xl">♥</div>
+          <div className="mb-2 text-4xl" aria-hidden="true">♥</div>
           <p>No health data available</p>
           <p className="mt-1 text-xs">Agent health metrics appear after runs</p>
         </div>
@@ -85,6 +86,14 @@ export function HealthView({ metrics, events }: HealthViewProps) {
             <div className="text-xl font-bold text-red-400">{openCircuits}</div>
           </div>
         )}
+        {onRequestHealth && (
+          <button
+            onClick={onRequestHealth}
+            className="ml-auto rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700"
+          >
+            Refresh
+          </button>
+        )}
       </div>
 
       <div className="flex-1 p-6">
@@ -109,10 +118,11 @@ export function HealthView({ metrics, events }: HealthViewProps) {
           <div className="mt-8">
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Reroute Events</h2>
             <div className="space-y-2">
-              {reroutes.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs">
+              {reroutes.map((r) => (
+                <div key={`${r.from}-${r.to}-${r.timestamp}`} className="flex items-center gap-2 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs">
                   <span className="text-red-400">{r.from}</span>
-                  <span className="text-zinc-600">→</span>
+                  <span className="text-zinc-600" aria-hidden="true">→</span>
+                  <span className="sr-only">rerouted to</span>
                   <span className="text-emerald-400">{r.to}</span>
                   <span className="ml-auto text-zinc-500">{r.reason}</span>
                 </div>

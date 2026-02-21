@@ -30,7 +30,7 @@ export function CompareView({ runs, onDeleteRun, onExportRun }: CompareViewProps
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-4xl">🔀</div>
+          <div className="mb-2 text-4xl" aria-hidden="true">🔀</div>
           <p>No saved runs to compare</p>
           <p className="mt-1 text-xs">Save a run from the Session panel to enable comparison</p>
         </div>
@@ -177,7 +177,7 @@ function RunSummary({ run, onDelete, onExport }: { run: SavedRun; onDelete: (id:
       {/* Mini timeline bar */}
       <div className="mt-4">
         <h4 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Timeline</h4>
-        <div className="relative h-6 rounded bg-zinc-800">
+        <div className="relative h-6 rounded bg-zinc-800" aria-hidden="true">
           {run.events.length > 0 && (() => {
             const start = run.events[0]!.timestamp;
             const end = run.events[run.events.length - 1]!.timestamp;

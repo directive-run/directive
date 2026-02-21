@@ -66,6 +66,8 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
         onClick={replay.enter}
         disabled={totalEvents === 0}
         className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
+        title={totalEvents === 0 ? "No events to replay" : "Enter replay mode"}
+        aria-label={totalEvents === 0 ? "Replay (no events available)" : "Enter replay mode"}
       >
         Replay
       </button>

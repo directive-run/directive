@@ -99,7 +99,7 @@ export function CostView({ events }: CostViewProps) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-4xl">$</div>
+          <div className="mb-2 text-4xl" aria-hidden="true">$</div>
           <p>No token usage data available</p>
           <p className="mt-1 text-xs">Cost data appears after agent runs with token tracking</p>
         </div>
@@ -130,7 +130,7 @@ export function CostView({ events }: CostViewProps) {
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
           Token Distribution
         </h2>
-        <div className="mb-2 flex h-8 w-full overflow-hidden rounded">
+        <div className="mb-2 flex h-8 w-full overflow-hidden rounded" aria-hidden="true">
           {rows.map((row, i) => (
             <div
               key={row.agentId}
@@ -140,6 +140,7 @@ export function CostView({ events }: CostViewProps) {
             />
           ))}
         </div>
+        <span className="sr-only">Token distribution chart. See Cost Breakdown table below for details.</span>
         {/* Legend */}
         <div className="mb-6 flex flex-wrap gap-3">
           {rows.map((row, i) => (

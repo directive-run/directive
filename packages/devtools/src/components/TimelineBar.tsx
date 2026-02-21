@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
 
@@ -6,16 +6,16 @@ interface TimelineBarProps {
   event: DebugEvent;
   timeRange: { start: number; duration: number };
   isSelected: boolean;
-  onClick: () => void;
+  /** D1: Stable callback — receives event, parent toggles selection */
+  onSelect: (event: DebugEvent) => void;
   row?: number;
   isAnomaly?: boolean;
 }
 
 /** Get duration from event if available */
 function getEventDuration(event: DebugEvent): number {
-  const dur = (event as Record<string, unknown>).durationMs;
-  if (typeof dur === "number" && dur > 0) {
-    return dur;
+  if (typeof event.durationMs === "number" && event.durationMs > 0) {
+    return event.durationMs;
   }
 
   // Point events get minimum width
@@ -23,7 +23,9 @@ function getEventDuration(event: DebugEvent): number {
 }
 
 // M11: React.memo prevents re-rendering all bars when only selection changes
-export const TimelineBar = React.memo(function TimelineBar({ event, timeRange, isSelected, onClick, row = 0, isAnomaly = false }: TimelineBarProps) {
+// D1: onSelect is a stable callback ref — memo comparison succeeds when only
+//     a different bar's isSelected changes, preventing O(n) re-renders.
+export const TimelineBar = React.memo(function TimelineBar({ event, timeRange, isSelected, onSelect, row = 0, isAnomaly = false }: TimelineBarProps) {
   const offset = event.timestamp - timeRange.start;
   const leftPct = (offset / timeRange.duration) * 100;
   const duration = getEventDuration(event);
@@ -34,9 +36,13 @@ export const TimelineBar = React.memo(function TimelineBar({ event, timeRange, i
   const color = EVENT_COLORS[event.type];
   const isPoint = widthPct === 0;
 
+  const handleClick = useCallback(() => {
+    onSelect(event);
+  }, [onSelect, event]);
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       aria-label={`${event.type.replace(/_/g, " ")}${event.agentId ? ` (${event.agentId})` : ""}${duration ? ` — ${duration}ms` : ""}`}
       className={`absolute transition-all ${
         isSelected

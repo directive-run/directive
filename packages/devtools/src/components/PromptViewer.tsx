@@ -47,6 +47,7 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
         {hasInput && (
           <button
             role="tab"
+            id="prompt-tab-input"
             aria-selected={activeTab === "input"}
             aria-controls="prompt-panel-input"
             onClick={() => setActiveTab("input")}
@@ -65,6 +66,7 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
         {hasOutput && (
           <button
             role="tab"
+            id="prompt-tab-output"
             aria-selected={activeTab === "output"}
             aria-controls="prompt-panel-output"
             onClick={() => setActiveTab("output")}
@@ -93,6 +95,7 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
       <div
         role="tabpanel"
         id={`prompt-panel-${activeTab}`}
+        aria-labelledby={`prompt-tab-${activeTab}`}
         className="mt-2 max-h-64 overflow-auto rounded bg-zinc-800/60 p-2"
       >
         <pre className="whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-zinc-300">
