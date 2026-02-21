@@ -53,6 +53,7 @@ const MAX_RECONNECT_ATTEMPTS = 20;
 const MAX_EVENTS = 5000;
 const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_STREAMING_AGENTS = 50;
+const MAX_PENDING_WHILE_PAUSED = 10_000;
 /** Keys that must never be set via dynamic property assignment */
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -142,6 +143,10 @@ export function useDevToolsConnection(): DevToolsConnection {
     // E12: When paused, buffer events instead of appending
     if (pausedRef.current) {
       pendingWhilePausedRef.current.push(...buffered);
+      // D2: Cap pending buffer to prevent unbounded growth
+      if (pendingWhilePausedRef.current.length > MAX_PENDING_WHILE_PAUSED) {
+        pendingWhilePausedRef.current = pendingWhilePausedRef.current.slice(-MAX_PENDING_WHILE_PAUSED);
+      }
       setPendingCount(pendingWhilePausedRef.current.length);
 
       return;
@@ -367,6 +372,8 @@ export function useDevToolsConnection(): DevToolsConnection {
         pingTimerRef.current = null;
       }
       if (shouldReconnectRef.current && urlRef.current) {
+        // D3: Clear stale streaming tokens before reconnect
+        setStreamingTokens(new Map());
         reconnectAttemptsRef.current++;
         if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
           setStatus("error");
@@ -567,7 +574,7 @@ export function useDevToolsConnection(): DevToolsConnection {
         if (pendingForkRef.current) {
           pendingForkRef.current = false;
           send({ type: "request_events" });
-          setError("Fork may have failed — no confirmation received");
+          setError("Fork may have failed — no confirmation received. Try reconnecting or forking from a more recent event.");
         }
       }, 10_000);
     }, [send]),

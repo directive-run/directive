@@ -395,7 +395,7 @@ import {
   byInputLength,
 } from '@directive-run/ai';
 
-// pipe() applies middleware left to right — innermost first
+// pipe() applies middleware left to right – innermost first
 const runner = pipe(
   baseRunner,
   (r) => withModelSelection(r, [byInputLength(200, 'gpt-4o-mini')]),

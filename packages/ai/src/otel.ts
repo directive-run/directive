@@ -47,6 +47,9 @@ const DEFAULT_SPAN_TTL_MS = 300_000;
 /** Maximum active spans before triggering cleanup */
 const MAX_ACTIVE_SPANS = 10_000;
 
+/** Maximum depth of the pattern span stack */
+const MAX_PATTERN_STACK = 100;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -245,6 +248,8 @@ interface ActiveSpanEntry {
   spanId: string;
   traceId: string;
   startTime: number;
+  /** A13: Pre-computed index key to avoid parsing from span key */
+  indexKey?: string;
 }
 
 // ============================================================================
@@ -320,6 +325,9 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
    */
   const patternStack: ActiveSpanEntry[] = [];
 
+  // A7: Track attached timeline to prevent double-attach
+  let attachedTimeline: DebugTimeline | null = null;
+
   // Dev warning dedup
   let warnedExternalGetSpans = false;
 
@@ -355,8 +363,10 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   }
 
   function registerSpan(type: string, id: string, key: string, entry: ActiveSpanEntry): void {
-    activeSpans.set(key, entry);
+    // A13: Store indexKey explicitly to avoid parsing from key later
     const indexKey = `${type}:${id}`;
+    entry.indexKey = indexKey;
+    activeSpans.set(key, entry);
     const existing = spanKeyIndex.get(indexKey);
     if (existing) {
       existing.push(key);
@@ -366,12 +376,12 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   }
 
   function removeSpan(key: string): void {
+    // A13: Use stored indexKey instead of parsing from key string
+    const entry = activeSpans.get(key);
     activeSpans.delete(key);
 
-    // Remove from index array
-    const lastColon = key.lastIndexOf(":");
-    if (lastColon > 0) {
-      const indexKey = key.substring(0, lastColon);
+    const indexKey = entry?.indexKey;
+    if (indexKey) {
       const keys = spanKeyIndex.get(indexKey);
       if (keys) {
         const idx = keys.indexOf(key);
@@ -386,11 +396,31 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   }
 
   function cleanupStaleSpans(): void {
+    // A3: Always run TTL-based pruning (not gated behind size check)
+    const now = Date.now();
     if (activeSpans.size < MAX_ACTIVE_SPANS) {
+      // Below hard cap: only prune spans that exceeded TTL
+      let hasPruned = false;
+      for (const [key, entry] of activeSpans) {
+        if (now - entry.startTime > spanTtlMs) {
+          setAttributeTracked(entry, "directive.stale", true);
+          setStatusTracked(entry, {
+            code: OtelStatusCode.ERROR,
+            message: "Span TTL exceeded — cleaned up",
+          });
+          endSpan(entry);
+          removeSpan(key);
+          hasPruned = true;
+        }
+      }
+
+      if (hasPruned) {
+        return;
+      }
+
       return;
     }
 
-    const now = Date.now();
     for (const [key, entry] of activeSpans) {
       if (now - entry.startTime > spanTtlMs) {
         setAttributeTracked(entry, "directive.stale", true);
@@ -723,7 +753,10 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
 
     const key = makeSpanKey("pattern", event.patternId);
     registerSpan("pattern", event.patternId, key, entry);
-    patternStack.push(entry);
+    // A3: Cap pattern stack to prevent overflow
+    if (patternStack.length < MAX_PATTERN_STACK) {
+      patternStack.push(entry);
+    }
   }
 
   function handlePatternComplete(event: PatternCompleteEvent): void {
@@ -749,10 +782,19 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
 
   return {
     attach(timeline: DebugTimeline): () => void {
+      // A7: Prevent attaching to multiple timelines simultaneously
+      if (attachedTimeline && attachedTimeline !== timeline) {
+        throw new Error("[Directive OTEL] Plugin already attached to a different timeline. Create a new plugin instance.");
+      }
+
+      attachedTimeline = timeline;
       const unsub = timeline.subscribe(handleEvent);
+      const cleanupInterval = setInterval(cleanupStaleSpans, Math.min(spanTtlMs, 60_000));
 
       return () => {
         unsub();
+        clearInterval(cleanupInterval);
+        attachedTimeline = null;
 
         // Cleanup: end all active spans on detach
         for (const [_key, entry] of activeSpans) {

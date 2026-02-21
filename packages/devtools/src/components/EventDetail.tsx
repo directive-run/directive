@@ -17,12 +17,14 @@ interface EventDetailProps {
 }
 
 /** Extract all meaningful properties from an event */
+/** D5: Keys to skip including prototype pollution vectors */
+const SKIP_PROPS = new Set(["id", "type", "timestamp", "snapshotId", "agentId", "input", "output", "__proto__", "constructor", "prototype"]);
+
 function getEventProperties(event: DebugEvent): [string, unknown][] {
-  const skip = new Set(["id", "type", "timestamp", "snapshotId", "agentId", "input", "output"]);
   const entries: [string, unknown][] = [];
 
   for (const [key, value] of Object.entries(event)) {
-    if (!skip.has(key) && value !== undefined && value !== null) {
+    if (!SKIP_PROPS.has(key) && value !== undefined && value !== null) {
       entries.push([key, value]);
     }
   }
@@ -94,8 +96,29 @@ function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number })
     );
   }
 
-  if (typeof value === "object" && value !== null && depth >= MAX_RENDER_DEPTH) {
-    return <span className="text-zinc-500">{"{...}"}</span>;
+  if (typeof value === "object" && value !== null) {
+    if (depth >= MAX_RENDER_DEPTH) {
+      return <span className="text-zinc-500">{"{...}"}</span>;
+    }
+
+    // D5: Filter prototype pollution keys from nested objects
+    const safeEntries = Object.entries(value as Record<string, unknown>).filter(
+      ([k]) => !SKIP_PROPS.has(k),
+    );
+
+    return (
+      <span className="text-zinc-400">
+        {"{"}
+        {safeEntries.map(([k, v], i) => (
+          <span key={k}>
+            {i > 0 && ", "}
+            <span className="text-zinc-500">{k}: </span>
+            <PropertyValue value={v} depth={depth + 1} />
+          </span>
+        ))}
+        {"}"}
+      </span>
+    );
   }
 
   return <span className="text-zinc-400">{JSON.stringify(value)}</span>;

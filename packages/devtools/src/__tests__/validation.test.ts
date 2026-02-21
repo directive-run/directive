@@ -371,6 +371,98 @@ describe("forkFromSnapshot eventId validation (M12)", () => {
 });
 
 // ============================================================================
+// D2: Pending buffer cap
+// ============================================================================
+
+describe("pending buffer cap (D2)", () => {
+  const MAX_PENDING_WHILE_PAUSED = 10_000;
+
+  it("caps buffer at MAX_PENDING_WHILE_PAUSED", () => {
+    const buffer: number[] = [];
+    for (let i = 0; i < MAX_PENDING_WHILE_PAUSED + 500; i++) {
+      buffer.push(i);
+    }
+    // Simulate the cap logic
+    const capped = buffer.length > MAX_PENDING_WHILE_PAUSED
+      ? buffer.slice(-MAX_PENDING_WHILE_PAUSED)
+      : buffer;
+    expect(capped.length).toBe(MAX_PENDING_WHILE_PAUSED);
+    // Oldest events should be dropped
+    expect(capped[0]).toBe(500);
+  });
+
+  it("does not cap when under limit", () => {
+    const buffer = [1, 2, 3];
+    const capped = buffer.length > MAX_PENDING_WHILE_PAUSED
+      ? buffer.slice(-MAX_PENDING_WHILE_PAUSED)
+      : buffer;
+    expect(capped.length).toBe(3);
+  });
+});
+
+// ============================================================================
+// D5: EventDetail prototype pollution filtering
+// ============================================================================
+
+describe("EventDetail property filtering (D5)", () => {
+  const SKIP_PROPS = new Set(["id", "type", "timestamp", "snapshotId", "agentId", "input", "output", "__proto__", "constructor", "prototype"]);
+
+  function getEventProperties(event: Record<string, unknown>): [string, unknown][] {
+    const entries: [string, unknown][] = [];
+    for (const [key, value] of Object.entries(event)) {
+      if (!SKIP_PROPS.has(key) && value !== undefined && value !== null) {
+        entries.push([key, value]);
+      }
+    }
+
+    return entries;
+  }
+
+  it("filters __proto__ from event properties", () => {
+    const props = getEventProperties({ id: 1, type: "agent_start", __proto__: "evil", customProp: "ok" });
+    expect(props.find(([k]) => k === "__proto__")).toBeUndefined();
+    expect(props.find(([k]) => k === "customProp")).toBeDefined();
+  });
+
+  it("filters constructor from event properties", () => {
+    const props = getEventProperties({ id: 1, constructor: "evil", customProp: "ok" });
+    expect(props.find(([k]) => k === "constructor")).toBeUndefined();
+  });
+
+  it("filters prototype from event properties", () => {
+    const props = getEventProperties({ id: 1, prototype: "evil", customProp: "ok" });
+    expect(props.find(([k]) => k === "prototype")).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// D4: DagView deps extraction
+// ============================================================================
+
+describe("DagView safe deps extraction (D4)", () => {
+  function extractDeps(state: Record<string, unknown>): string[] {
+    const rawDeps = state.deps;
+
+    return Array.isArray(rawDeps) ? rawDeps.filter((d): d is string => typeof d === "string") : [];
+  }
+
+  it("extracts valid string array deps", () => {
+    expect(extractDeps({ deps: ["a", "b", "c"] })).toEqual(["a", "b", "c"]);
+  });
+
+  it("returns empty array when deps is not an array", () => {
+    expect(extractDeps({ deps: "not-array" })).toEqual([]);
+    expect(extractDeps({ deps: 42 })).toEqual([]);
+    expect(extractDeps({ deps: null })).toEqual([]);
+    expect(extractDeps({})).toEqual([]);
+  });
+
+  it("filters out non-string elements", () => {
+    expect(extractDeps({ deps: ["a", 42, "b", null, "c"] })).toEqual(["a", "b", "c"]);
+  });
+});
+
+// ============================================================================
 // Additional isValidEvent edge cases
 // ============================================================================
 

@@ -64,7 +64,7 @@ const orchestrator = createAgentOrchestrator({
 const pending = orchestrator.getPendingBreakpoints();
 
 for (const bp of pending) {
-  console.log(`${bp.id}: ${bp.type} — ${bp.label}`);
+  console.log(`${bp.id}: ${bp.type} – ${bp.label}`);
 }
 
 // Resume with optional modifications
@@ -82,7 +82,7 @@ orchestrator.cancelBreakpoint(bp.id, 'User cancelled');
 ```typescript
 interface BreakpointConfig<T extends BreakpointType = BreakpointType> {
   type: T;
-  when?: (context: BreakpointContext) => boolean;  // Conditional — fires only when true
+  when?: (context: BreakpointContext) => boolean;  // Conditional – fires only when true
   label?: string;                                   // Human-readable label
 }
 ```

@@ -32,6 +32,11 @@ function executeSearch(
     return { matches: new Set(), isInvalid: true };
   }
 
+  // D1: Reject patterns with nested quantifiers (ReDoS prevention)
+  if (/([+*}])\)([+*{])/.test(term) || /([+*}])\]([+*{])/.test(term)) {
+    return { matches: new Set(), isInvalid: true };
+  }
+
   let regex: RegExp;
   try {
     regex = new RegExp(term, "i");
@@ -165,6 +170,22 @@ describe("executeSearch", () => {
   it("handles empty search index", () => {
     const result = executeSearch("test", []);
     expect(result!.matches.size).toBe(0);
+    expect(result!.isInvalid).toBe(false);
+  });
+
+  it("rejects ReDoS patterns with nested quantifiers (D1)", () => {
+    const result = executeSearch("(a+)+$", index);
+    expect(result!.isInvalid).toBe(true);
+    expect(result!.matches.size).toBe(0);
+  });
+
+  it("rejects (a*)*b ReDoS pattern (D1)", () => {
+    const result = executeSearch("(a*)*b", index);
+    expect(result!.isInvalid).toBe(true);
+  });
+
+  it("accepts safe regex patterns after D1 filter", () => {
+    const result = executeSearch("agent_(start|end)", index);
     expect(result!.isInvalid).toBe(false);
   });
 

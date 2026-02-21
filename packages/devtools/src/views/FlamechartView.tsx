@@ -129,7 +129,8 @@ function buildFlameStacks(events: DebugEvent[]): FlameBar[] {
   for (const [key, start] of openSpans) {
     const startType = key.split("::")[0] as DebugEventType;
     const depth = pairings.find((p) => p.startType === startType)?.depth ?? 1;
-    const lastTimestamp = events.length > 0 ? events[events.length - 1]!.timestamp : start.timestamp;
+    // D9: Null-safe access to last event timestamp
+    const lastTimestamp = events.length > 0 ? (events[events.length - 1]?.timestamp ?? start.timestamp) : start.timestamp;
 
     bars.push({
       id: start.id,

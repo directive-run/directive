@@ -5,7 +5,7 @@ description: Record agent lifecycle events correlated with time-travel snapshots
 
 AI-specific event log with snapshot correlation for time-travel debugging. {% .lead %}
 
-The debug timeline records agent lifecycle events (start, complete, error, guardrails, approvals, handoffs, patterns) and correlates them with core time-travel snapshots. Zero-cost when `debug: false` — the timeline is simply `null`.
+The debug timeline records agent lifecycle events (start, complete, error, guardrails, approvals, handoffs, patterns) and correlates them with core time-travel snapshots. Zero-cost when `debug: false` – the timeline is simply `null`.
 
 ---
 
@@ -133,7 +133,7 @@ const agentEvents = timeline.getEventsForAgent('researcher');
 
 // Events by type (type-narrowed)
 const errors = timeline.getEventsByType('agent_error');
-// errors[0].errorMessage — TypeScript knows the shape
+// errors[0].errorMessage – TypeScript knows the shape
 
 // Events at a specific snapshot
 const atSnapshot = timeline.getEventsAtSnapshot(5);
@@ -164,11 +164,11 @@ const grouped = Object.groupBy(allEvents, (e) => e.snapshotId ?? 'no-snapshot');
 Truncate the timeline at a snapshot point and replay from there:
 
 ```typescript
-// Fork from snapshot 5 — truncates events after that point
+// Fork from snapshot 5 – truncates events after that point
 // and navigates the system back to snapshot 5
 timeline.forkFrom(5);
 
-// Re-run the agent — new events append automatically
+// Re-run the agent – new events append automatically
 await orchestrator.run(agent, 'Try a different approach');
 ```
 
@@ -247,9 +247,9 @@ const patternStarts = multi.timeline!.getEventsByType('pattern_start');
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `maxEvents` | 2000 | Ring buffer size — oldest events evicted first |
-| `getSnapshotId` | — | Callback to read current snapshot ID |
-| `goToSnapshot` | — | Callback for `forkFrom()` navigation |
+| `maxEvents` | 2000 | Ring buffer size – oldest events evicted first |
+| `getSnapshotId` | – | Callback to read current snapshot ID |
+| `goToSnapshot` | – | Callback for `forkFrom()` navigation |
 
 ---
 

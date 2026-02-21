@@ -51,6 +51,11 @@ class ViewErrorBoundary extends React.Component<
     return { error };
   }
 
+  // D6: Log view crashes for debugging
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[DevTools] View crashed:", error, info.componentStack);
+  }
+
   render() {
     if (this.state.error) {
       return (
@@ -82,8 +87,29 @@ export function App() {
   const replay = useReplay(conn.events);
   const runSessions = useRunSessions();
 
-  // E7: Time format state
-  const [timeFormat, setTimeFormat] = useState<TimeFormat>("elapsed");
+  // E7: Time format state — D13: persist to localStorage
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>(() => {
+    try {
+      const saved = localStorage.getItem("directive-devtools-time-format");
+      if (saved === "clock" || saved === "elapsed" || saved === "ms") {
+        return saved as TimeFormat;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    return "elapsed" as TimeFormat;
+  });
+
+  // D13: Persist time format changes to localStorage
+  const handleTimeFormatChange = useCallback((fmt: TimeFormat) => {
+    setTimeFormat(fmt);
+    try {
+      localStorage.setItem("directive-devtools-time-format", fmt);
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   // I2: Time-travel editor state
   const [editingSnapshot, setEditingSnapshot] = useState<DevToolsSnapshot | null>(null);
@@ -346,7 +372,7 @@ export function App() {
                     streamingTokens={conn.streamingTokens}
                     anomalies={anomalyResult.anomalies}
                     timeFormat={timeFormat}
-                    onTimeFormatChange={setTimeFormat}
+                    onTimeFormatChange={handleTimeFormatChange}
                     isPaused={conn.isPaused}
                     pendingCount={conn.pendingCount}
                     onTogglePause={conn.togglePause}

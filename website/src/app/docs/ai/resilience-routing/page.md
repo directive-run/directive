@@ -5,7 +5,7 @@ description: Retry, fallback, budget guards, model selection, structured outputs
 
 Composable wrappers that make any `AgentRunner` production-ready. {% .lead %}
 
-Each feature follows the same pattern: wrap a runner, get a runner back. Stack them in any order — compose middleware on your runner.
+Each feature follows the same pattern: wrap a runner, get a runner back. Stack them in any order – compose middleware on your runner.
 
 ---
 
@@ -79,7 +79,7 @@ const runner = pipe(
 const single = createAgentOrchestrator({ runner, autoApproveToolCalls: true });
 const result = await single.run(agent, 'Hello!');
 
-// Multi-agent — the same composed runner is shared across all agents
+// Multi-agent – the same composed runner is shared across all agents
 const multi = createMultiAgentOrchestrator({
   runner,
   agents: {

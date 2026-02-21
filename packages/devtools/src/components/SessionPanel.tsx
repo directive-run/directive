@@ -62,6 +62,13 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
       return;
     }
 
+    // D8: Validate file extension and MIME type
+    if (!file.name.endsWith(".json") && file.type !== "application/json") {
+      e.target.value = "";
+
+      return;
+    }
+
     setImporting(true);
     const reader = new FileReader();
     reader.onload = () => {
@@ -97,6 +104,13 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
     }
 
     if (file.size > MAX_IMPORT_SIZE_BYTES) {
+      e.target.value = "";
+
+      return;
+    }
+
+    // D8: Validate file extension and MIME type
+    if (!file.name.endsWith(".json") && file.type !== "application/json") {
       e.target.value = "";
 
       return;

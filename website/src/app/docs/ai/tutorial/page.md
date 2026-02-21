@@ -195,7 +195,7 @@ import { connectDevTools } from '@directive-run/ai';
 const devtools = await connectDevTools(orchestrator, { port: 4040 });
 console.log('DevTools: ws://localhost:4040');
 
-// Run your pipeline — events stream to the DevTools UI in real time
+// Run your pipeline – events stream to the DevTools UI in real time
 await orchestrator.runPattern('pipeline', 'Explain WebAssembly');
 
 // Clean up
@@ -231,7 +231,7 @@ const orchestrator = createMultiAgentOrchestrator({
     revisionNeeded: {
       requirement: requirementGuard('REVISION_NEEDED'),
       resolve: async (req, context) => {
-        console.log('Reviewer requested revisions — re-running writer');
+        console.log('Reviewer requested revisions – re-running writer');
       },
     },
   },

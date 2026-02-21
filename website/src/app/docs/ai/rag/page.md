@@ -74,7 +74,7 @@ const enrichedInput = await enricher.enrich('How do constraints work?', {
   filter: (chunk) => chunk.metadata.section === 'constraints',
 });
 
-// Pass the enriched input to any agent runner — returns RunResult<T>
+// Pass the enriched input to any agent runner – returns RunResult<T>
 const result = await orchestrator.run(docsAgent, enrichedInput);
 ```
 
