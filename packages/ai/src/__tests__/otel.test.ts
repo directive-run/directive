@@ -824,6 +824,65 @@ describe("createOtelPlugin", () => {
   // M9: Instance-scoped counters (separate plugin instances don't share IDs)
   // ==========================================================================
 
+  // ==========================================================================
+  // L3: Periodic stale span cleanup via setInterval
+  // ==========================================================================
+
+  it("cleans up stale spans via periodic timer", () => {
+    vi.useFakeTimers();
+
+    try {
+      const timeline = createDebugTimeline({ maxEvents: 500 });
+      const otel = createOtelPlugin({ serviceName: "test", spanTtlMs: 1000 });
+      const unsub = otel.attach(timeline);
+
+      // Start an agent but don't complete it
+      timeline.record({
+        type: "agent_start",
+        timestamp: Date.now(),
+        agentId: "stale_agent",
+        inputLength: 50,
+        snapshotId: null,
+      });
+
+      expect(otel.getActiveSpanCount()).toBe(1);
+
+      // Advance past the TTL + one more interval tick (TTL check uses strict >)
+      vi.advanceTimersByTime(2100);
+
+      // The periodic cleanup should have fired and cleaned up the stale span
+      expect(otel.getActiveSpanCount()).toBe(0);
+
+      const spans = otel.getSpans();
+
+      expect(spans).toHaveLength(1);
+      expect(spans[0]!.attributes["directive.stale"]).toBe(true);
+
+      unsub();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clearInterval on detach prevents further cleanup", () => {
+    vi.useFakeTimers();
+
+    try {
+      const timeline = createDebugTimeline({ maxEvents: 500 });
+      const otel = createOtelPlugin({ serviceName: "test", spanTtlMs: 1000 });
+      const unsub = otel.attach(timeline);
+
+      unsub();
+
+      // After detach, advancing timers should not throw or cause issues
+      vi.advanceTimersByTime(5000);
+
+      expect(otel.getActiveSpanCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("separate plugin instances produce independent span IDs", () => {
     const timeline1 = createDebugTimeline({ maxEvents: 500 });
     const otel1 = createOtelPlugin({ serviceName: "app1" });
