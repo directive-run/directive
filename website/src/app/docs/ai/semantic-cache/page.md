@@ -21,7 +21,7 @@ import {
 
 const cache = createSemanticCache({
   embedder: async (texts) => {
-    // Your embedding function — returns number[][] of vectors
+    // Your embedding function – returns number[][] of vectors
     const response = await openai.embeddings.create({
       model: 'text-embedding-3-small',
       input: texts,
@@ -37,7 +37,7 @@ const cache = createSemanticCache({
   onMiss: (key) => console.log('Cache miss:', key),
 });
 
-// Use as a guardrail — short-circuits the agent call on cache hit
+// Use as a guardrail – short-circuits the agent call on cache hit
 const guardrail = createSemanticCacheGuardrail(cache);
 
 const orchestrator = createAgentOrchestrator({
@@ -166,7 +166,7 @@ On a cache miss, the agent runs normally and the result is cached for future que
 ```typescript
 import { createTestEmbedder } from '@directive-run/ai';
 
-// Deterministic embedder for tests — consistent vectors for same input
+// Deterministic embedder for tests – consistent vectors for same input
 const testEmbedder = createTestEmbedder();
 ```
 

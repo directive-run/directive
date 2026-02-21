@@ -100,6 +100,13 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     throw new Error("[Directive HealthMonitor] maxEventsPerAgent must be >= 1");
   }
 
+  // A14: Validate individual weight bounds
+  for (const [key, value] of Object.entries(weights)) {
+    if (value < 0 || value > 1) {
+      throw new Error(`[Directive HealthMonitor] weight "${key}" must be between 0 and 1 (got ${value})`);
+    }
+  }
+
   // Validate weights sum approximately to 1.0
   const weightSum = weights.successRate + weights.latency + weights.circuitState;
   if (Math.abs(weightSum - 1.0) > 0.01) {
@@ -108,6 +115,11 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
 
   const events = new Map<string, HealthEvent[]>();
   const circuitStates = new Map<string, HealthCircuitState>();
+
+  // L4: Generation counter for getAllMetrics caching
+  let generation = 0;
+  let cachedAll: Record<string, AgentHealthMetrics> | null = null;
+  let cachedGen = -1;
 
   function getAgentEvents(agentId: string): HealthEvent[] {
     let agentEvents = events.get(agentId);
@@ -205,6 +217,9 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     recordSuccess(agentId: string, latencyMs: number): void {
       const agentEvents = getAgentEvents(agentId);
       agentEvents.push({ success: true, latencyMs, timestamp: Date.now() });
+      // A9: Prune on write path to prevent unbounded growth between reads
+      pruneAndCap(agentEvents, Date.now());
+      generation++;
     },
 
     recordFailure(agentId: string, latencyMs: number, error?: Error): void {
@@ -215,6 +230,9 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
         timestamp: Date.now(),
         errorMessage: error?.message,
       });
+      // A9: Prune on write path to prevent unbounded growth between reads
+      pruneAndCap(agentEvents, Date.now());
+      generation++;
     },
 
     getMetrics(agentId: string): AgentHealthMetrics {
@@ -222,10 +240,18 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     },
 
     getAllMetrics(): Record<string, AgentHealthMetrics> {
+      // L4: Return cached result when no writes have occurred
+      if (generation === cachedGen && cachedAll) {
+        return cachedAll;
+      }
+
       const result: Record<string, AgentHealthMetrics> = Object.create(null);
       for (const agentId of events.keys()) {
         result[agentId] = buildMetrics(agentId);
       }
+
+      cachedAll = result;
+      cachedGen = generation;
 
       return result;
     },
@@ -236,11 +262,15 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
 
     updateCircuitState(agentId: string, state: HealthCircuitState): void {
       circuitStates.set(agentId, state);
+      generation++;
     },
 
     reset(): void {
       events.clear();
       circuitStates.clear();
+      generation++;
+      cachedAll = null;
+      cachedGen = -1;
     },
   };
 }

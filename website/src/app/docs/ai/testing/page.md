@@ -17,10 +17,19 @@ Create a mock `AgentRunner` with per-agent response configuration:
 import { createMockAgentRunner } from '@directive-run/ai/testing';
 
 const mock = createMockAgentRunner({
-  defaultResponse: { output: 'Default response', totalTokens: 10 },
+  defaultResponse: {
+    output: 'Default response',
+    totalTokens: 10,
+  },
   responses: {
-    researcher: { output: 'Research findings...', totalTokens: 150 },
-    writer: { output: 'Draft article...', totalTokens: 200 },
+    researcher: {
+      output: 'Research findings...',
+      totalTokens: 150,
+    },
+    writer: {
+      output: 'Draft article...',
+      totalTokens: 200,
+    },
   },
 });
 
@@ -50,7 +59,10 @@ mock.setResponse('flaky', {
 
 // Reset
 mock.clearCalls();
-mock.setDefaultResponse({ output: 'New default', totalTokens: 5 });
+mock.setDefaultResponse({
+  output: 'New default',
+  totalTokens: 5,
+});
 ```
 
 ---
@@ -63,7 +75,12 @@ mock.setDefaultResponse({ output: 'New default', totalTokens: 5 });
 import { createTestOrchestrator } from '@directive-run/ai/testing';
 
 const test = createTestOrchestrator({
-  mockResponses: { default: { output: 'OK', totalTokens: 10 } },
+  mockResponses: {
+    default: {
+      output: 'OK',
+      totalTokens: 10,
+    },
+  },
   guardrails: { /* ... */ },
   debug: true,
 });
@@ -82,14 +99,32 @@ import { parallel, sequential, concatResults } from '@directive-run/ai';
 
 const test = createTestMultiAgentOrchestrator({
   agents: {
-    researcher: { agent: { name: 'researcher' }, maxConcurrent: 3 },
-    writer: { agent: { name: 'writer' }, maxConcurrent: 1 },
-    reviewer: { agent: { name: 'reviewer' }, maxConcurrent: 1 },
+    researcher: {
+      agent: { name: 'researcher' },
+      maxConcurrent: 3,
+    },
+    writer: {
+      agent: { name: 'writer' },
+      maxConcurrent: 1,
+    },
+    reviewer: {
+      agent: { name: 'reviewer' },
+      maxConcurrent: 1,
+    },
   },
   mockResponses: {
-    researcher: { output: 'Research findings...', totalTokens: 150 },
-    writer: { output: 'Draft article...', totalTokens: 200 },
-    reviewer: { output: 'APPROVED', totalTokens: 50 },
+    researcher: {
+      output: 'Research findings...',
+      totalTokens: 150,
+    },
+    writer: {
+      output: 'Draft article...',
+      totalTokens: 200,
+    },
+    reviewer: {
+      output: 'APPROVED',
+      totalTokens: 50,
+    },
   },
   patterns: {
     research: parallel(
@@ -378,7 +413,7 @@ Record constraint evaluations for snapshot testing:
 import { createConstraintRecorder } from '@directive-run/ai/testing';
 
 const recorder = createConstraintRecorder();
-// Use as a plugin — records all constraint/resolver events
+// Use as a plugin – records all constraint/resolver events
 ```
 
 ### Time Controller

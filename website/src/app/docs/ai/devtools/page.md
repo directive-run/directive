@@ -24,10 +24,10 @@ const orchestrator = createMultiAgentOrchestrator({
   debug: true,
 });
 
-// One-liner — creates WebSocket server and wires everything up
+// One-liner – creates WebSocket server and wires everything up
 const server = await connectDevTools(orchestrator, { port: 4040 });
 
-console.log(`DevTools server on ws://localhost:${9229}`);
+console.log(`DevTools server on ws://localhost:${4040}`);
 ```
 
 Or wire up manually for full control:
@@ -66,29 +66,42 @@ const server = createDevToolsServer({
 
 ## Views
 
-The DevTools UI has 8 specialized views, accessible as tabs.
+The DevTools UI has 8 specialized views, accessible as tabs. A time format selector (ms / elapsed / clock) applies across all views.
 
 ### 1. Timeline
 
-Horizontal lanes per agent with bar-per-event rendering.
+Horizontal lanes per agent with bar-per-event rendering and row packing to prevent overlap.
 
-**Features:**
+**Filtering:**
 - Agent filter chips &ndash; show/hide specific agents
 - Event type filter chips &ndash; filter by event type
-- Search across event details
+- Regex search across all event properties (150ms debounce, ReDoS-safe)
+- Error-only quick filter &ndash; show only error events
+- AND/OR filter mode toggle &ndash; combine filters with intersection or union
+
+**Navigation:**
 - Zoom (1x&ndash;20x) with Ctrl+Scroll
-- Pan with click-and-drag
-- Canvas minimap for navigation
-- Replay cursor for stepping through events
-- Anomaly highlighting (errors, warnings, info)
-- Live token streaming panel
+- Pan with click-and-drag (grab cursor when zoomed)
+- Canvas minimap for navigation (high-DPI, click-to-pan)
+- Time axis labels with configurable format
+
+**Live features:**
+- Replay cursor line (red vertical) for stepping through events
+- Anomaly highlighting with red rings on anomalous events
+- Live token streaming panel &ndash; per-agent token preview (up to 500 chars) with count
+- Pause/resume button with pending event count badge
 
 ### 2. Flamechart
 
-Hierarchical flame graph visualization. Pairs start/end events into nested bars: Patterns &rarr; Agents &rarr; Resolvers.
+Hierarchical flame graph visualization. Pairs start/end events into nested bars at three depth levels: Patterns &rarr; Agents &rarr; Resolvers.
 
-- Hover for tooltips with duration and token usage
-- Click to select and view detail panel
+- Performance summary &ndash; total duration, critical path, parallelism ratio, slowest agent
+- Zoom and pan (shared 1x&ndash;20x zoom with Ctrl+Scroll)
+- Canvas minimap with viewport rectangle
+- Hover for tooltips with type, agent, and duration
+- Click to select and view detail panel (type, agent, duration, tokens, depth)
+- Point events (0ms) shown as thin vertical lines
+- Unclosed spans marked "(running)"
 
 ### 3. DAG
 
@@ -115,8 +128,9 @@ Agent health monitoring cards.
 Token usage and estimated cost breakdown.
 
 - Total tokens and estimated cost ($0.01/1K tokens)
-- Stacked bar chart per agent
+- Stacked bar chart per agent with hover tooltips (golden-angle hue for unlimited agents)
 - Cost breakdown table: Agent, Runs, Total Tokens, Avg Tokens, Duration, % of Total
+- Sorted by highest token usage
 
 ### 6. Breakpoints
 
@@ -129,33 +143,52 @@ Interactive breakpoint management.
 
 ### 7. State
 
-Two sub-tabs: **Scratchpad** and **Derived**.
+Two sub-tabs with key count badges: **Scratchpad** and **Derived**.
 
-- Key-value display with syntax highlighting
+- Key-value display with syntax highlighting and search/filter
 - Live updates as values change
+- Refresh button with 600ms debounce feedback
+- "Edit & Fork" button &ndash; modify state values and fork the timeline from that point
 
 ### 8. Compare
 
 Side-by-side comparison of saved session runs.
 
-- Run selectors (dropdown)
-- Summary stats comparison
-- Event type breakdown
+- Run selectors (dropdown) with stale-selection cleanup when runs are deleted
+- Summary stats comparison (events, tokens, duration, agents)
+- Agent comparison table with color-coded deltas (red = increase, green = decrease)
+- Event type breakdown chart (stacked bars)
 - Mini timeline bars
-- Diff summary
+- Diff summary with delta calculations
+
+---
+
+## Event Detail Panel
+
+Clicking any event in the Timeline or Flamechart opens a detail panel (right sidebar, 320px). Press Escape to close.
+
+**Features:**
+- **Prompt/Completion viewer** &ndash; Tabbed input/output display with token counts (`inputTokens`, `outputTokens`, `totalTokens`)
+- **Copy to clipboard** &ndash; Copy event ID or full event JSON
+- **Replay from here** &ndash; Start replay from the selected event
+- **Fork from snapshot** &ndash; Fork the timeline at this event's snapshot (with confirmation dialog)
+- **Property rendering** &ndash; Syntax-highlighted values (booleans, numbers, strings, objects) with depth-limiting
+- **String expansion** &ndash; "Show more/less" toggle for truncated content (>200 chars)
 
 ---
 
 ## Replay Mode
 
-Step through recorded events with playback controls.
+Step through recorded events with playback controls. Uses frame-skipping to maintain real-time accuracy at faster speeds.
 
 **Controls:**
 - Play/Pause (Space)
 - Step forward/backward (Arrow keys)
+- Seek to any position (cursor slider)
 - Jump to start/end (Home/End)
 - Exit replay (Escape)
 - Speed: 1x, 2x, 5x, 10x
+- Replay from event &ndash; right-click or use "Replay from here" in the detail panel
 
 ---
 
@@ -175,10 +208,12 @@ Anomalies are highlighted in the timeline view and can be filtered.
 
 ## Session Management
 
-- **Export** &ndash; Save a session to JSON for sharing or archival
-- **Import** &ndash; Load a saved session for replay
-- **Compare** &ndash; Save multiple runs and compare them side-by-side
-- **Fork** &ndash; Truncate timeline to a past point and replay from there
+- **Export JSON** &ndash; Save a session to JSON with version and timestamp metadata
+- **Export HTML** &ndash; Generate a standalone HTML trace viewer (no dependencies, no WebSocket &ndash; share with anyone)
+- **Import** &ndash; Load a saved session for replay (validates event types and structure, 50MB limit)
+- **Auto-save** &ndash; Toggle automatic saving to localStorage (5-second debounce, up to 5 runs, 10MB limit)
+- **Compare** &ndash; Save multiple runs and compare them side-by-side in the Compare view
+- **Fork** &ndash; Truncate timeline to a past point, optionally edit state, and replay from there
 
 ---
 
@@ -218,12 +253,29 @@ Anomalies are highlighted in the timeline view and can be filtered.
 
 ---
 
+## Supported Event Types
+
+The DevTools UI recognizes 25 event types grouped by category:
+
+| Category | Event Types |
+|----------|-------------|
+| **Agent lifecycle** | `agent_start`, `agent_complete`, `agent_error`, `agent_retry` |
+| **Constraints** | `constraint_evaluate`, `resolver_start`, `resolver_complete`, `resolver_error` |
+| **Governance** | `guardrail_check`, `approval_request`, `approval_response`, `breakpoint_hit`, `breakpoint_resumed` |
+| **Patterns** | `pattern_start`, `pattern_complete`, `race_start`, `race_winner`, `race_cancelled`, `debate_round`, `reflection_iteration` |
+| **State** | `derivation_update`, `scratchpad_update` |
+| **Infrastructure** | `handoff_start`, `handoff_complete`, `reroute`, `dag_node_update` |
+
+---
+
 ## Connection Details
 
 - **Auto-reconnect:** Exponential backoff up to 30s, max 20 attempts
 - **Keepalive:** Ping every 30 seconds
 - **Event buffer:** Max 5,000 events in memory, `requestAnimationFrame` flushing
-- **Token streaming:** Buffers up to 10KB per agent, 50 concurrent agents max
+- **Token streaming:** Buffers up to 10KB per agent, 50 concurrent agents max, 5-minute inactivity timeout
+- **Prototype pollution defense:** `__proto__`, `constructor`, `prototype` blocked on all inbound messages
+- **Input validation:** All server messages validated against typed discriminator union before processing
 
 ---
 

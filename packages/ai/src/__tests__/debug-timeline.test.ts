@@ -830,6 +830,141 @@ describe("createDebugTimelinePlugin bridges core events", () => {
 });
 
 // ============================================================================
+// A6: Listener errors logged in dev mode
+// ============================================================================
+
+describe("listener error handling (A6)", () => {
+  it("does not throw when a listener throws", () => {
+    const timeline = createDebugTimeline();
+
+    timeline.subscribe(() => {
+      throw new Error("Listener boom");
+    });
+
+    // Should not throw — error is caught and logged
+    expect(() =>
+      timeline.record(makeEvent("agent_start", { agentId: "a" } as any)),
+    ).not.toThrow();
+
+    expect(timeline.length).toBe(1);
+  });
+
+  it("logs error to console.error in dev mode", () => {
+    const timeline = createDebugTimeline();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    timeline.subscribe(() => {
+      throw new Error("Listener failure");
+    });
+
+    timeline.record(makeEvent("agent_start", { agentId: "a" } as any));
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[Directive DebugTimeline] Listener threw:",
+      "Listener failure",
+    );
+
+    errorSpy.mockRestore();
+  });
+
+  it("continues notifying other listeners after one throws", () => {
+    const timeline = createDebugTimeline();
+    const secondListenerCalled = vi.fn();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    timeline.subscribe(() => {
+      throw new Error("First listener throws");
+    });
+    timeline.subscribe(secondListenerCalled);
+
+    timeline.record(makeEvent("agent_start", { agentId: "a" } as any));
+
+    expect(secondListenerCalled).toHaveBeenCalledTimes(1);
+
+    errorSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// A12: Import with unknown event type filters correctly
+// ============================================================================
+
+describe("import event type validation (A12)", () => {
+  it("filters out events with unknown types during import", () => {
+    const timeline = createDebugTimeline();
+    const json = JSON.stringify({
+      version: 1,
+      events: [
+        { id: 0, type: "agent_start", timestamp: 1000, agentId: "a", snapshotId: null },
+        { id: 1, type: "unknown_type", timestamp: 2000, agentId: "a", snapshotId: null },
+        { id: 2, type: "agent_complete", timestamp: 3000, agentId: "a", snapshotId: null },
+      ],
+      nextId: 3,
+    });
+
+    timeline.import(json);
+
+    // Only the 2 events with known types should be imported
+    expect(timeline.length).toBe(2);
+    const events = timeline.getEvents();
+    expect(events[0]!.type).toBe("agent_start");
+    expect(events[1]!.type).toBe("agent_complete");
+  });
+
+  it("filters all events when all have unknown types", () => {
+    const timeline = createDebugTimeline();
+    const json = JSON.stringify({
+      version: 1,
+      events: [
+        { id: 0, type: "made_up_event", timestamp: 1000, agentId: "a", snapshotId: null },
+        { id: 1, type: "another_fake", timestamp: 2000, agentId: "a", snapshotId: null },
+      ],
+      nextId: 2,
+    });
+
+    timeline.import(json);
+
+    expect(timeline.length).toBe(0);
+  });
+
+  it("accepts all known event types during import", () => {
+    const knownTypes: DebugEventType[] = [
+      "agent_start", "agent_complete", "agent_error", "agent_retry",
+      "guardrail_check", "constraint_evaluate",
+      "resolver_start", "resolver_complete", "resolver_error",
+      "approval_request", "approval_response",
+      "handoff_start", "handoff_complete",
+      "pattern_start", "pattern_complete",
+      "dag_node_update",
+      "breakpoint_hit", "breakpoint_resumed",
+      "derivation_update", "scratchpad_update",
+      "reflection_iteration",
+      "race_start", "race_winner", "race_cancelled",
+      "reroute", "debate_round",
+    ];
+
+    const events = knownTypes.map((type, i) => ({
+      id: i,
+      type,
+      timestamp: 1000 + i,
+      agentId: "a",
+      snapshotId: null,
+    }));
+
+    const timeline = createDebugTimeline();
+    const json = JSON.stringify({
+      version: 1,
+      events,
+      nextId: knownTypes.length,
+    });
+
+    timeline.import(json);
+
+    expect(timeline.length).toBe(knownTypes.length);
+  });
+});
+
+// ============================================================================
 // clear() and length
 // ============================================================================
 

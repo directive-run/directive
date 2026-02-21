@@ -219,6 +219,11 @@ class EvalSemaphore {
   }
 
   release(): void {
+    // A2: Guard against underflow from double-release
+    if (this.active <= 0) {
+      return;
+    }
+
     this.active--;
     const next = this.queue.shift();
     if (next) {
@@ -253,7 +258,9 @@ function computeWeightedScore(
   for (const [name, score] of Object.entries(scores)) {
     const criterion = criteria[name];
     const weight = criterion?.weight ?? 1.0;
-    weightedSum += score.score * weight;
+    // A10: Guard against NaN propagation
+    const safeScore = Number.isFinite(score.score) ? score.score : 0;
+    weightedSum += safeScore * weight;
     totalWeight += weight;
   }
 
@@ -275,7 +282,9 @@ function computeWeightedAverage(
   for (const [name, avg] of Object.entries(averages)) {
     const criterion = criteria[name];
     const weight = criterion?.weight ?? 1.0;
-    weightedSum += avg * weight;
+    // A10: Guard against NaN propagation
+    const safeAvg = Number.isFinite(avg) ? avg : 0;
+    weightedSum += safeAvg * weight;
     totalWeight += weight;
   }
 
@@ -293,7 +302,7 @@ function computeWeightedAverage(
 const SAFETY_CATEGORY_PATTERNS: Record<string, RegExp[]> = {
   pii: [
     /\b\d{3}-\d{2}-\d{4}\b/, // SSN
-    /\b\d{16}\b/, // Credit card
+    /\b(?:4\d{3}|5[1-5]\d{2}|6011)\d{12}\b/, // Credit card (Visa/MC/Discover prefix)
     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, // Email
   ],
   violence: [
@@ -407,6 +416,10 @@ export interface EvalOutputLengthOptions {
  * Evaluate output length — ensures output is within an acceptable range.
  */
 export function evalOutputLength(options: EvalOutputLengthOptions): EvalCriterion {
+  if (options.minLength !== undefined && options.maxLength !== undefined && options.minLength > options.maxLength) {
+    throw new Error("[Directive Evals] evalOutputLength: minLength must be <= maxLength");
+  }
+
   return {
     name: "outputLength",
     fn: (context) => {
@@ -527,7 +540,17 @@ export function evalStructure(options: EvalStructureOptions): EvalCriterion {
 
       if (options.type === "json") {
         try {
-          const parsed = typeof output === "string" ? JSON.parse(output) as Record<string, unknown> : output as Record<string, unknown>;
+          const parsed = typeof output === "string" ? JSON.parse(output) : output;
+
+          // A4: Validate parsed value is actually a non-null, non-array object
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            return {
+              score: 0,
+              passed: false,
+              reason: "Output is not a valid JSON object",
+              durationMs: Date.now() - start,
+            };
+          }
 
           if (options.requiredKeys && parsed && typeof parsed === "object") {
             const missing = options.requiredKeys.filter((k) => !Object.hasOwn(parsed, k));
@@ -586,6 +609,8 @@ export interface EvalJudgeOptions {
   promptTemplate?: string;
   /** Optional abort signal */
   signal?: AbortSignal;
+  /** Timeout for the judge call in ms. Default: 30_000 */
+  timeoutMs?: number;
 }
 
 export function evalJudge(options: EvalJudgeOptions): EvalCriterion {
@@ -607,10 +632,22 @@ Respond with ONLY a JSON object: {"score": <number>, "reason": "<brief explanati
         .replaceAll("{{expected}}", context.testCase.expected ?? "N/A")
         .replaceAll("{{output}}", String(context.result.output));
 
-      try {
-        const result = await options.runner(options.judge, prompt, { signal: options.signal });
-        const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
+      const timeoutMs = options.timeoutMs ?? 30_000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const combinedSignal = options.signal
+        ? AbortSignal.any([options.signal, controller.signal])
+        : controller.signal;
 
+      try {
+        const result = await options.runner(options.judge, prompt, { signal: combinedSignal });
+
+        const raw = result.output;
+        if (typeof raw !== "string") {
+          return { score: 0, passed: false, reason: "Judge returned non-string output", durationMs: Date.now() - start };
+        }
+
+        const parsed = JSON.parse(raw) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 
         return {
@@ -626,6 +663,8 @@ Respond with ONLY a JSON object: {"score": <number>, "reason": "<brief explanati
           reason: `Judge error: ${err instanceof Error ? err.message : String(err)}`,
           durationMs: Date.now() - start,
         };
+      } finally {
+        clearTimeout(timer);
       }
     },
     threshold: 0.5,
@@ -680,6 +719,15 @@ export function evalMatch(options: EvalMatchOptions = {}): EvalCriterion {
             durationMs: Date.now() - start,
           };
         }
+        // A1: Reject patterns with nested quantifiers to prevent catastrophic backtracking
+        if (/([+*}])\)([+*{])/.test(expected) || /([+*}])\]([+*{])/.test(expected)) {
+          return {
+            score: 0,
+            passed: false,
+            reason: "Pattern contains dangerous nested quantifiers",
+            durationMs: Date.now() - start,
+          };
+        }
         try {
           matched = new RegExp(expected, ci ? "i" : "").test(output);
         } catch {
@@ -716,6 +764,8 @@ export interface EvalSemanticOptions {
   judge: AgentLike;
   /** Optional abort signal */
   signal?: AbortSignal;
+  /** Timeout for the judge call in ms. Default: 30_000 */
+  timeoutMs?: number;
 }
 
 const FAITHFULNESS_PROMPT = `You are evaluating an AI agent's output for faithfulness to the provided context.
@@ -754,9 +804,22 @@ export function evalFaithfulness(options: EvalSemanticOptions): EvalCriterion {
         .replaceAll("{{context}}", refContext)
         .replaceAll("{{output}}", String(context.result.output));
 
+      const timeoutMs = options.timeoutMs ?? 30_000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const combinedSignal = options.signal
+        ? AbortSignal.any([options.signal, controller.signal])
+        : controller.signal;
+
       try {
-        const result = await options.runner(options.judge, prompt, { signal: options.signal });
-        const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
+        const result = await options.runner(options.judge, prompt, { signal: combinedSignal });
+
+        const raw = result.output;
+        if (typeof raw !== "string") {
+          return { score: 0, passed: false, reason: "Judge returned non-string output", durationMs: Date.now() - start };
+        }
+
+        const parsed = JSON.parse(raw) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 
         return {
@@ -772,6 +835,8 @@ export function evalFaithfulness(options: EvalSemanticOptions): EvalCriterion {
           reason: `Faithfulness eval error: ${err instanceof Error ? err.message : String(err)}`,
           durationMs: Date.now() - start,
         };
+      } finally {
+        clearTimeout(timer);
       }
     },
     threshold: 0.7,
@@ -806,9 +871,22 @@ export function evalRelevance(options: EvalSemanticOptions): EvalCriterion {
         .replaceAll("{{input}}", context.testCase.input)
         .replaceAll("{{output}}", String(context.result.output));
 
+      const timeoutMs = options.timeoutMs ?? 30_000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const combinedSignal = options.signal
+        ? AbortSignal.any([options.signal, controller.signal])
+        : controller.signal;
+
       try {
-        const result = await options.runner(options.judge, prompt, { signal: options.signal });
-        const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
+        const result = await options.runner(options.judge, prompt, { signal: combinedSignal });
+
+        const raw = result.output;
+        if (typeof raw !== "string") {
+          return { score: 0, passed: false, reason: "Judge returned non-string output", durationMs: Date.now() - start };
+        }
+
+        const parsed = JSON.parse(raw) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 
         return {
@@ -824,6 +902,8 @@ export function evalRelevance(options: EvalSemanticOptions): EvalCriterion {
           reason: `Relevance eval error: ${err instanceof Error ? err.message : String(err)}`,
           durationMs: Date.now() - start,
         };
+      } finally {
+        clearTimeout(timer);
       }
     },
     threshold: 0.7,
@@ -857,9 +937,22 @@ export function evalCoherence(options: EvalSemanticOptions): EvalCriterion {
       const prompt = COHERENCE_PROMPT
         .replaceAll("{{output}}", String(context.result.output));
 
+      const timeoutMs = options.timeoutMs ?? 30_000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const combinedSignal = options.signal
+        ? AbortSignal.any([options.signal, controller.signal])
+        : controller.signal;
+
       try {
-        const result = await options.runner(options.judge, prompt, { signal: options.signal });
-        const parsed = JSON.parse(String(result.output)) as { score: number; reason?: string };
+        const result = await options.runner(options.judge, prompt, { signal: combinedSignal });
+
+        const raw = result.output;
+        if (typeof raw !== "string") {
+          return { score: 0, passed: false, reason: "Judge returned non-string output", durationMs: Date.now() - start };
+        }
+
+        const parsed = JSON.parse(raw) as { score: number; reason?: string };
         const score = Math.max(0, Math.min(1, parsed.score));
 
         return {
@@ -875,6 +968,8 @@ export function evalCoherence(options: EvalSemanticOptions): EvalCriterion {
           reason: `Coherence eval error: ${err instanceof Error ? err.message : String(err)}`,
           durationMs: Date.now() - start,
         };
+      } finally {
+        clearTimeout(timer);
       }
     },
     threshold: 0.7,
@@ -976,7 +1071,7 @@ export function createEvalSuite(config: EvalSuiteConfig): EvalSuite {
           scores[name] = {
             score: 0,
             passed: false,
-            reason: `Agent error: ${err instanceof Error ? err.message : String(err)}`,
+            reason: `Agent error: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
             durationMs: 0,
           };
         }
@@ -1013,7 +1108,7 @@ export function createEvalSuite(config: EvalSuiteConfig): EvalSuite {
           scores[name] = {
             score: 0,
             passed: false,
-            reason: `Criterion error: ${err instanceof Error ? err.message : String(err)}`,
+            reason: `Criterion error: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
             durationMs: 0,
           };
         }

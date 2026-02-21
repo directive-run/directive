@@ -509,7 +509,7 @@ const orchestrator = createMultiAgentOrchestrator({
     },
   },
 
-  // Global guardrails — applied to ALL agents before per-agent guardrails
+  // Global guardrails – applied to ALL agents before per-agent guardrails
   guardrails: {
     input: [createPIIGuardrail({ redact: true })],
     toolCall: [createToolGuardrail({ denylist: ['shell', 'eval'] })],

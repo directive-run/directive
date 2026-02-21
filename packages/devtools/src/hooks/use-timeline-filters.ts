@@ -16,6 +16,8 @@ export interface TimelineFilters {
   setAgentFilter: (agent: string | null) => void;
   setSearchMatchIds: (ids: Set<number> | null) => void;
   setFilterMode: (mode: FilterMode) => void;
+  /** D11: Reset all filters to defaults */
+  resetFilters: () => void;
 }
 
 export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
@@ -89,6 +91,14 @@ export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
     return filtered;
   }, [events, typeFilter, agentFilter, searchMatchIds, filterMode]);
 
+  // D11: Reset all filters to defaults
+  const resetFilters = useCallback(() => {
+    setTypeFilter(new Set());
+    setAgentFilter(null);
+    setSearchMatchIds(null);
+    setFilterMode("and");
+  }, []);
+
   // Toggle type filter
   const toggleType = useCallback((type: DebugEventType) => {
     setTypeFilter((prev) => {
@@ -116,5 +126,6 @@ export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
     setAgentFilter,
     setSearchMatchIds,
     setFilterMode,
+    resetFilters,
   };
 }

@@ -56,6 +56,15 @@ export function SearchBar({ events, onResults }: SearchBarProps) {
         return;
       }
 
+      // D1: Reject patterns with nested quantifiers to prevent catastrophic backtracking
+      if (/([+*}])\)([+*{])/.test(term) || /([+*}])\]([+*{])/.test(term)) {
+        setIsInvalidRegex(true);
+        setMatchCount(null);
+        onResults(new Set());
+
+        return;
+      }
+
       let regex: RegExp;
       try {
         regex = new RegExp(term, "i");

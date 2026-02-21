@@ -66,7 +66,7 @@ Unlock the full power of the system:
 
 ## Two Orchestrators
 
-Both are backed by a Directive System with reactive state, constraints, guardrails, streaming, approval, memory, retry, budget, hooks, and time-travel debugging. The multi-agent orchestrator has full feature parity &mdash; each registered agent becomes a namespaced Directive module.
+Both are backed by a Directive System with reactive state, constraints, guardrails, streaming, approval, memory, retry, budget, hooks, and time-travel debugging. The multi-agent orchestrator has full feature parity &ndash; each registered agent becomes a namespaced Directive module.
 
 | | Single-Agent | Multi-Agent |
 |---|---|---|
@@ -124,25 +124,41 @@ const result = await multi.runAgent('researcher', 'What is WASM?');
 
 ```typescript
 import { createAgentOrchestrator, createPIIGuardrail } from '@directive-run/ai';
+import { createOpenAIRunner } from '@directive-run/ai/openai';
+
+const runner = createOpenAIRunner({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+const agent = {
+  name: 'assistant',
+  instructions: 'You are a helpful assistant.',
+};
 
 const orchestrator = createAgentOrchestrator({
-  runner: myAgentRunner,
+  runner,
 
+  // Block PII in user input
   guardrails: {
     input: [createPIIGuardrail()],
   },
 
+  // Auto-enforce a 10K token budget
+  maxTokenBudget: 10000,
+
+  // React to agent state with declarative rules
   constraints: {
-    budgetLimit: {
-      when: (facts) => facts.agent.tokenUsage > 10000,
-      require: { type: 'PAUSE_AGENTS' },
+    escalateOnLowConfidence: {
+      when: (facts) => facts.agent.output?.confidence < 0.7,
+      require: (facts) => ({
+        type: 'RUN_EXPERT_AGENT',
+        query: facts.agent.input,
+      }),
     },
   },
-
-  maxTokenBudget: 10000,
 });
 
-const result = await orchestrator.run(myAgent, 'Hello!');
+const result = await orchestrator.run(agent, 'Hello!');
 ```
 
 ---

@@ -153,7 +153,7 @@ while (true) {
   const { done, value } = await reader.read();
   if (done) break;
 
-  // Append new bytes — a single SSE frame may split across two reads
+  // Append new bytes – a single SSE frame may split across two reads
   buffer += decoder.decode(value, { stream: true });
 
   const lines = buffer.split('\n');
