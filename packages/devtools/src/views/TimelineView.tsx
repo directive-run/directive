@@ -8,6 +8,8 @@ import { TimelineMinimap } from "../components/TimelineMinimap";
 import { SearchBar } from "../components/SearchBar";
 import { useTimelineZoom } from "../hooks/use-timeline-zoom";
 import { useTimelineFilters } from "../hooks/use-timeline-filters";
+import type { TimeFormat } from "../lib/time-format";
+import { formatTimestamp } from "../lib/time-format";
 
 interface TimelineViewProps {
   events: DebugEvent[];
@@ -19,6 +21,15 @@ interface TimelineViewProps {
   streamingTokens?: Map<string, { tokens: string; count: number }>;
   /** Optional anomalies detected */
   anomalies?: Anomaly[];
+  /** E7: Time format */
+  timeFormat?: TimeFormat;
+  onTimeFormatChange?: (format: TimeFormat) => void;
+  /** E12: Pause live updates */
+  isPaused?: boolean;
+  pendingCount?: number;
+  onTogglePause?: () => void;
+  /** E9: Replay from event */
+  onReplayFromHere?: (eventId: number) => void;
 }
 
 const EVENT_TYPE_LABELS: Partial<Record<DebugEventType, string>> = {
@@ -78,7 +89,19 @@ function computeRows(laneEvts: DebugEvent[], range: { start: number; duration: n
   return rowMap;
 }
 
-export function TimelineView({ events, replayCursor, onForkFromSnapshot, streamingTokens, anomalies }: TimelineViewProps) {
+export function TimelineView({
+  events,
+  replayCursor,
+  onForkFromSnapshot,
+  streamingTokens,
+  anomalies,
+  timeFormat = "elapsed",
+  onTimeFormatChange,
+  isPaused,
+  pendingCount,
+  onTogglePause,
+  onReplayFromHere,
+}: TimelineViewProps) {
   const [selectedEvent, setSelectedEvent] = useState<DebugEvent | null>(null);
 
   // D1: Stable callback for TimelineBar — toggles selection without creating new closures per bar
@@ -237,6 +260,19 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
           Errors
         </button>
 
+        {/* E10: AND/OR filter mode toggle */}
+        <button
+          onClick={() => filters.setFilterMode(filters.filterMode === "and" ? "or" : "and")}
+          className={`rounded border px-2 py-0.5 text-[10px] font-medium ${
+            filters.filterMode === "or"
+              ? "border-blue-500/50 bg-blue-950/30 text-blue-400"
+              : "border-zinc-700 bg-zinc-800 text-zinc-400"
+          }`}
+          title={`Filter mode: ${filters.filterMode.toUpperCase()} — click to toggle`}
+        >
+          {filters.filterMode.toUpperCase()}
+        </button>
+
         {/* Search */}
         <div className="min-w-[180px] max-w-[260px]">
           <SearchBar events={events} onResults={filters.setSearchMatchIds} />
@@ -268,6 +304,45 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
             +
           </button>
         </div>
+
+        {/* E7: Time format toggle */}
+        {onTimeFormatChange && (
+          <div className="flex rounded border border-zinc-700" role="group" aria-label="Time format">
+            {(["ms", "elapsed", "clock"] as const).map((fmt) => (
+              <button
+                key={fmt}
+                onClick={() => onTimeFormatChange(fmt)}
+                className={`px-1.5 py-0.5 text-[10px] ${
+                  timeFormat === fmt
+                    ? "bg-zinc-700 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {fmt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* E12: Pause button */}
+        {onTogglePause && (
+          <button
+            onClick={onTogglePause}
+            className={`flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-medium ${
+              isPaused
+                ? "border-amber-500/50 bg-amber-950/30 text-amber-400"
+                : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+            }`}
+            title={isPaused ? "Resume live updates" : "Pause live updates"}
+          >
+            {isPaused ? "▶" : "⏸"}
+            {isPaused && pendingCount != null && pendingCount > 0 && (
+              <span className="rounded-full bg-amber-500/30 px-1 text-amber-300">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        )}
 
         {/* Event count */}
         <span className="text-xs text-zinc-500">
@@ -330,6 +405,9 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
               event={selectedEvent}
               onClose={handleCloseDetail}
               onForkFromSnapshot={onForkFromSnapshot}
+              onReplayFromHere={onReplayFromHere}
+              timeFormat={timeFormat}
+              baseTimestamp={events[0]?.timestamp}
             />
           </div>
         )}
@@ -368,13 +446,15 @@ export function TimelineView({ events, replayCursor, onForkFromSnapshot, streami
         </div>
       )}
 
-      {/* Time axis */}
+      {/* Time axis — E7: use formatTimestamp */}
       <div className="flex border-t border-zinc-800 bg-zinc-900 px-4 py-1">
         <div className="w-32 shrink-0" />
         <div className="flex flex-1 justify-between text-[10px] text-zinc-500">
-          {zoom.timeAxisLabels.map((label, i) => (
-            <span key={i}>{label}</span>
-          ))}
+          {Array.from({ length: 5 }, (_, i) => {
+            const ts = zoom.visibleRange.start + (zoom.visibleRange.duration * i) / 4;
+
+            return <span key={i}>{formatTimestamp(ts, timeFormat, events[0]?.timestamp)}</span>;
+          })}
         </div>
       </div>
     </div>

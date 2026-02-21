@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { VALID_EVENT_TYPES } from "../lib/types";
+import {
+  VALID_EVENT_TYPES,
+  VALID_SERVER_MESSAGE_TYPES as EXPORTED_SERVER_MESSAGE_TYPES,
+} from "../lib/types";
 import type { DebugEvent, DebugEventType } from "../lib/types";
 
 // Re-implement the validation functions from use-devtools-connection
@@ -22,6 +25,31 @@ const VALID_SERVER_MESSAGE_TYPES = new Set([
   "stream_done",
   "error",
 ]);
+
+/** BLOCKED_KEYS from use-devtools-connection.ts (P1 fix) */
+const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Simulates the scratchpad_state/derived_state processing from the hook */
+function processBulkState(data: Record<string, unknown>): Record<string, unknown> {
+  const safe: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(data)) {
+    if (!BLOCKED_KEYS.has(k)) {
+      safe[k] = v;
+    }
+  }
+
+  return safe;
+}
+
+/** Simulates the scratchpad_update/derived_update key validation */
+function isAllowedKey(key: string): boolean {
+  return typeof key === "string" && !BLOCKED_KEYS.has(key);
+}
+
+/** Simulates the forkFromSnapshot eventId validation (M12 fix) */
+function isValidForkEventId(eventId: number): boolean {
+  return Number.isFinite(eventId) && eventId >= 0;
+}
 
 function isValidServerMessage(value: unknown): boolean {
   if (typeof value !== "object" || value === null) {
@@ -232,5 +260,145 @@ describe("VALID_EVENT_TYPES", () => {
     for (const type of expectedTypes) {
       expect(VALID_EVENT_TYPES.has(type)).toBe(true);
     }
+  });
+});
+
+// ============================================================================
+// P7: VALID_SERVER_MESSAGE_TYPES exported from types.ts
+// ============================================================================
+
+describe("VALID_SERVER_MESSAGE_TYPES (P7: exported from types.ts)", () => {
+  it("local test set matches the exported set from types.ts", () => {
+    expect(VALID_SERVER_MESSAGE_TYPES.size).toBe(EXPORTED_SERVER_MESSAGE_TYPES.size);
+    for (const type of VALID_SERVER_MESSAGE_TYPES) {
+      expect(EXPORTED_SERVER_MESSAGE_TYPES.has(type)).toBe(true);
+    }
+    for (const type of EXPORTED_SERVER_MESSAGE_TYPES) {
+      expect(VALID_SERVER_MESSAGE_TYPES.has(type)).toBe(true);
+    }
+  });
+
+  it("contains all 15 expected server message types", () => {
+    expect(EXPORTED_SERVER_MESSAGE_TYPES.size).toBe(15);
+  });
+});
+
+// ============================================================================
+// P1: BLOCKED_KEYS filtering for scratchpad/derived state
+// ============================================================================
+
+describe("BLOCKED_KEYS filtering (P1)", () => {
+  it("filters __proto__ from bulk state", () => {
+    const data = { legit: "value", __proto__: "polluted" };
+    const result = processBulkState(data);
+    expect(result.legit).toBe("value");
+    expect("__proto__" in result).toBe(false);
+  });
+
+  it("filters constructor from bulk state", () => {
+    const data = { constructor: "polluted", name: "test" };
+    const result = processBulkState(data);
+    expect(result.name).toBe("test");
+    expect("constructor" in result).toBe(false);
+  });
+
+  it("filters prototype from bulk state", () => {
+    const data = { prototype: "polluted", value: 42 };
+    const result = processBulkState(data);
+    expect(result.value).toBe(42);
+    expect("prototype" in result).toBe(false);
+  });
+
+  it("allows normal keys through", () => {
+    const data = { status: "ok", count: 5, agent_name: "test" };
+    const result = processBulkState(data);
+    expect(Object.keys(result)).toHaveLength(3);
+    expect(result.status).toBe("ok");
+  });
+
+  it("returns Object.create(null) — no inherited properties", () => {
+    const result = processBulkState({ key: "value" });
+    expect(Object.getPrototypeOf(result)).toBeNull();
+  });
+
+  it("rejects blocked keys for update messages", () => {
+    expect(isAllowedKey("__proto__")).toBe(false);
+    expect(isAllowedKey("constructor")).toBe(false);
+    expect(isAllowedKey("prototype")).toBe(false);
+  });
+
+  it("accepts normal keys for update messages", () => {
+    expect(isAllowedKey("status")).toBe(true);
+    expect(isAllowedKey("agent_memory")).toBe(true);
+    expect(isAllowedKey("")).toBe(true);
+  });
+});
+
+// ============================================================================
+// M12: Fork eventId validation
+// ============================================================================
+
+describe("forkFromSnapshot eventId validation (M12)", () => {
+  it("accepts valid positive integers", () => {
+    expect(isValidForkEventId(0)).toBe(true);
+    expect(isValidForkEventId(1)).toBe(true);
+    expect(isValidForkEventId(999)).toBe(true);
+  });
+
+  it("rejects negative numbers", () => {
+    expect(isValidForkEventId(-1)).toBe(false);
+    expect(isValidForkEventId(-100)).toBe(false);
+  });
+
+  it("rejects NaN", () => {
+    expect(isValidForkEventId(NaN)).toBe(false);
+  });
+
+  it("rejects Infinity", () => {
+    expect(isValidForkEventId(Infinity)).toBe(false);
+    expect(isValidForkEventId(-Infinity)).toBe(false);
+  });
+
+  it("accepts zero (valid event ID)", () => {
+    expect(isValidForkEventId(0)).toBe(true);
+  });
+
+  it("accepts floating point (isFinite passes)", () => {
+    // Note: The real implementation only checks isFinite + >= 0
+    // Floating point eventIds pass validation but are unusual
+    expect(isValidForkEventId(1.5)).toBe(true);
+  });
+});
+
+// ============================================================================
+// Additional isValidEvent edge cases
+// ============================================================================
+
+describe("isValidEvent edge cases", () => {
+  it("rejects arrays", () => {
+    expect(isValidEvent([1, "agent_start", 1000])).toBe(false);
+  });
+
+  it("rejects functions", () => {
+    expect(isValidEvent(() => {})).toBe(false);
+  });
+
+  it("accepts NaN id (typeof NaN === 'number' — no range check)", () => {
+    // Note: typeof NaN === "number", so isValidEvent passes. This is a known
+    // limitation — the validator checks typeof, not Number.isFinite.
+    expect(isValidEvent({ id: NaN, type: "agent_start", timestamp: 1000, snapshotId: null })).toBe(true);
+  });
+
+  it("accepts NaN timestamp (typeof NaN === 'number' — no range check)", () => {
+    expect(isValidEvent({ id: 1, type: "agent_start", timestamp: NaN, snapshotId: null })).toBe(true);
+  });
+
+  it("accepts events with negative id (no range check)", () => {
+    // id is just typeof "number" — no range validation
+    expect(isValidEvent({ id: -1, type: "agent_start", timestamp: 1000, snapshotId: null })).toBe(true);
+  });
+
+  it("accepts events with zero timestamp", () => {
+    expect(isValidEvent({ id: 1, type: "agent_start", timestamp: 0, snapshotId: null })).toBe(true);
   });
 });

@@ -148,4 +148,66 @@ describe("executeSearch", () => {
     expect(result!.matches.size).toBe(0);
     expect(result!.isInvalid).toBe(false);
   });
+
+  it("handles regex special characters gracefully", () => {
+    // Unescaped special chars that are valid regex
+    const result = executeSearch("agent.*start", index);
+    expect(result!.isInvalid).toBe(false);
+    expect(result!.matches.has(1)).toBe(true);
+  });
+
+  it("rejects patterns at exactly 201 chars", () => {
+    const pattern = "a".repeat(201);
+    const result = executeSearch(pattern, index);
+    expect(result!.isInvalid).toBe(true);
+  });
+
+  it("handles empty search index", () => {
+    const result = executeSearch("test", []);
+    expect(result!.matches.size).toBe(0);
+    expect(result!.isInvalid).toBe(false);
+  });
+
+  it("handles backslash in pattern", () => {
+    const indexWithBackslash = [
+      { id: 1, text: "path\\to\\file" },
+    ];
+    // Double backslash is valid regex matching literal backslash
+    const result = executeSearch("path\\\\to", indexWithBackslash);
+    expect(result!.isInvalid).toBe(false);
+    expect(result!.matches.has(1)).toBe(true);
+  });
+});
+
+// ============================================================================
+// buildSearchString edge cases
+// ============================================================================
+
+describe("buildSearchString edge cases", () => {
+  it("handles null values in object", () => {
+    const result = buildSearchString({ name: "test", value: null });
+    // null is not string or number, so only "test" should be present
+    expect(result).toBe("test");
+  });
+
+  it("handles undefined values in object", () => {
+    const result = buildSearchString({ name: "test", value: undefined });
+    expect(result).toBe("test");
+  });
+
+  it("handles boolean values (excluded)", () => {
+    const result = buildSearchString({ flag: true, name: "test" });
+    expect(result).toBe("test");
+    expect(result).not.toContain("true");
+  });
+
+  it("handles zero as a number value", () => {
+    const result = buildSearchString({ count: 0 });
+    expect(result).toBe("0");
+  });
+
+  it("handles negative numbers", () => {
+    const result = buildSearchString({ offset: -100 });
+    expect(result).toBe("-100");
+  });
 });
