@@ -10,9 +10,12 @@ interface SessionPanelProps {
   onClear: () => void;
   onSaveRun?: (events: DebugEvent[], name?: string) => void;
   onImportRun?: (json: string) => void;
+  /** E6: Auto-save controls */
+  autoSaveEnabled?: boolean;
+  onToggleAutoSave?: () => void;
 }
 
-export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun }: SessionPanelProps) {
+export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun, autoSaveEnabled, onToggleAutoSave }: SessionPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const runFileInputRef = useRef<HTMLInputElement>(null);
   // E1: Loading states to prevent double-clicks
@@ -116,9 +119,25 @@ export function SessionPanel({ events, onImport, onClear, onSaveRun, onImportRun
 
   return (
     <div className="border-t border-zinc-800 px-4 py-3">
-      <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-        Session
-      </h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          Session
+        </h3>
+        {/* E6: Auto-save toggle */}
+        {onToggleAutoSave && (
+          <button
+            onClick={onToggleAutoSave}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+              autoSaveEnabled
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
+            title={autoSaveEnabled ? "Auto-save enabled" : "Auto-save disabled"}
+          >
+            {autoSaveEnabled ? "Auto ✓" : "Auto"}
+          </button>
+        )}
+      </div>
 
       <div className="space-y-1.5">
         <button

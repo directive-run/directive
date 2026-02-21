@@ -27,6 +27,8 @@ export interface ReplayControls {
   setSpeed: (speed: ReplaySpeed) => void;
   /** Jump to a specific event index */
   seekTo: (index: number) => void;
+  /** E9: Start replay from a specific event index */
+  replayFromIndex: (index: number) => void;
   /** Events visible in current replay state (sliced to cursor) */
   visibleEvents: DebugEvent[];
 }
@@ -201,6 +203,17 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
     stateRef.current.cursorIndex = clamped;
   }, [events.length]);
 
+  // E9: Start replay from a specific event index
+  const replayFromIndex = useCallback((index: number) => {
+    const clamped = Math.max(0, Math.min(index, events.length - 1));
+    setCursorIndex(clamped);
+    stateRef.current.cursorIndex = clamped;
+    if (!active) {
+      setActive(true);
+    }
+    setPlaying(true);
+  }, [events.length, active]);
+
   // Clamp cursor when events array shrinks
   const clampedIndex = active ? Math.min(cursorIndex, Math.max(events.length - 1, 0)) : cursorIndex;
 
@@ -232,6 +245,7 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
     goToEnd,
     setSpeed,
     seekTo,
+    replayFromIndex,
     visibleEvents,
   };
 }

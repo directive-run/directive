@@ -13,7 +13,9 @@ import { FlamechartView } from "./views/FlamechartView";
 import { CostView } from "./views/CostView";
 import { SessionPanel } from "./components/SessionPanel";
 import { ReplayControls } from "./components/ReplayControls";
-import type { ConnectionStatus } from "./lib/types";
+import { TimeTravelEditor } from "./components/TimeTravelEditor";
+import type { ConnectionStatus, DevToolsSnapshot } from "./lib/types";
+import type { TimeFormat } from "./lib/time-format";
 
 type View = "timeline" | "dag" | "health" | "breakpoints" | "state" | "compare" | "flamechart" | "cost";
 
@@ -80,6 +82,12 @@ export function App() {
   const replay = useReplay(conn.events);
   const runSessions = useRunSessions();
 
+  // E7: Time format state
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>("elapsed");
+
+  // I2: Time-travel editor state
+  const [editingSnapshot, setEditingSnapshot] = useState<DevToolsSnapshot | null>(null);
+
   // Events visible to downstream views (replay-filtered or live)
   const visibleEvents = replay.visibleEvents;
 
@@ -105,10 +113,40 @@ export function App() {
     }
   }, [conn.status, conn.requestEvents, conn.requestHealth, conn.requestBreakpoints, conn.requestSnapshot, conn.requestScratchpad, conn.requestDerived]);
 
+  // E6: Auto-save when events change and auto-save is enabled
+  useEffect(() => {
+    if (runSessions.autoSaveEnabled && conn.events.length > 0) {
+      runSessions.autoSave(conn.events);
+    }
+  }, [runSessions.autoSaveEnabled, runSessions.autoSave, conn.events]);
+
   const handleConnect = useCallback(() => {
     conn.disconnect();
     conn.connect(wsUrl);
   }, [conn.disconnect, conn.connect, wsUrl]);
+
+  // E9: Replay from event handler
+  const handleReplayFromEvent = useCallback((eventId: number) => {
+    const index = conn.events.findIndex((e) => e.id === eventId);
+    if (index !== -1) {
+      replay.replayFromIndex(index);
+    }
+  }, [conn.events, replay.replayFromIndex]);
+
+  // I2: Time-travel editor handlers
+  const handleEditSnapshot = useCallback(() => {
+    setEditingSnapshot(conn.snapshot);
+  }, [conn.snapshot]);
+
+  const handleForkFromEditor = useCallback((snapshot: DevToolsSnapshot) => {
+    // Send modified snapshot to server via fork mechanism
+    conn.send({ type: "fork_from_snapshot", eventId: snapshot.eventCount });
+    setEditingSnapshot(null);
+  }, [conn.send]);
+
+  const handleCloseEditor = useCallback(() => {
+    setEditingSnapshot(null);
+  }, []);
 
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100">
@@ -201,6 +239,8 @@ export function App() {
           onClear={conn.clearEvents}
           onSaveRun={runSessions.saveRun}
           onImportRun={runSessions.importRun}
+          autoSaveEnabled={runSessions.autoSaveEnabled}
+          onToggleAutoSave={runSessions.toggleAutoSave}
         />
 
         {/* Stats footer */}
@@ -209,6 +249,10 @@ export function App() {
           <div>Agents: {Object.keys(conn.healthMetrics).length}</div>
           {replay.state.active && (
             <div className="text-blue-400">Replay: {replay.state.cursorIndex + 1}/{conn.events.length}</div>
+          )}
+          {/* E12: Pause indicator */}
+          {conn.isPaused && (
+            <div className="text-amber-400">Paused ({conn.pendingCount} pending)</div>
           )}
           {anomalyResult.anomalies.length > 0 && (
             <div className="text-amber-400">
@@ -282,45 +326,64 @@ export function App() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden">
-            <ViewErrorBoundary key={view}>
-              {view === "timeline" && (
-                <TimelineView
-                  events={visibleEvents}
-                  replayCursor={replay.state.cursorTimestamp}
-                  onForkFromSnapshot={conn.forkFromSnapshot}
-                  streamingTokens={conn.streamingTokens}
-                  anomalies={anomalyResult.anomalies}
+          <div className="flex flex-1 overflow-hidden">
+            {/* I2: Time-travel editor panel */}
+            {editingSnapshot ? (
+              <div className="w-full">
+                <TimeTravelEditor
+                  snapshot={editingSnapshot}
+                  onFork={handleForkFromEditor}
+                  onClose={handleCloseEditor}
                 />
-              )}
-              {view === "flamechart" && <FlamechartView events={visibleEvents} />}
-              {view === "dag" && <DagView events={visibleEvents} snapshot={conn.snapshot} />}
-              {view === "health" && <HealthView metrics={conn.healthMetrics} events={visibleEvents} onRequestHealth={conn.requestHealth} />}
-              {view === "cost" && <CostView events={visibleEvents} />}
-              {view === "breakpoints" && (
-                <BreakpointView
-                  state={conn.breakpointState}
-                  onResume={conn.resumeBreakpoint}
-                  onCancel={conn.cancelBreakpoint}
-                  onRefresh={conn.requestBreakpoints}
-                />
-              )}
-              {view === "state" && (
-                <StateView
-                  scratchpadState={conn.scratchpadState}
-                  derivedState={conn.derivedState}
-                  onRequestScratchpad={conn.requestScratchpad}
-                  onRequestDerived={conn.requestDerived}
-                />
-              )}
-              {view === "compare" && (
-                <CompareView
-                  runs={runSessions.runs}
-                  onDeleteRun={runSessions.deleteRun}
-                  onExportRun={runSessions.exportRun}
-                />
-              )}
-            </ViewErrorBoundary>
+              </div>
+            ) : (
+              <ViewErrorBoundary key={view}>
+                {view === "timeline" && (
+                  <TimelineView
+                    events={visibleEvents}
+                    replayCursor={replay.state.cursorTimestamp}
+                    onForkFromSnapshot={conn.forkFromSnapshot}
+                    streamingTokens={conn.streamingTokens}
+                    anomalies={anomalyResult.anomalies}
+                    timeFormat={timeFormat}
+                    onTimeFormatChange={setTimeFormat}
+                    isPaused={conn.isPaused}
+                    pendingCount={conn.pendingCount}
+                    onTogglePause={conn.togglePause}
+                    onReplayFromHere={handleReplayFromEvent}
+                  />
+                )}
+                {view === "flamechart" && <FlamechartView events={visibleEvents} timeFormat={timeFormat} />}
+                {view === "dag" && <DagView events={visibleEvents} snapshot={conn.snapshot} />}
+                {view === "health" && <HealthView metrics={conn.healthMetrics} events={visibleEvents} onRequestHealth={conn.requestHealth} />}
+                {view === "cost" && <CostView events={visibleEvents} />}
+                {view === "breakpoints" && (
+                  <BreakpointView
+                    state={conn.breakpointState}
+                    onResume={conn.resumeBreakpoint}
+                    onCancel={conn.cancelBreakpoint}
+                    onRefresh={conn.requestBreakpoints}
+                  />
+                )}
+                {view === "state" && (
+                  <StateView
+                    scratchpadState={conn.scratchpadState}
+                    derivedState={conn.derivedState}
+                    onRequestScratchpad={conn.requestScratchpad}
+                    onRequestDerived={conn.requestDerived}
+                    snapshot={conn.snapshot}
+                    onEditSnapshot={handleEditSnapshot}
+                  />
+                )}
+                {view === "compare" && (
+                  <CompareView
+                    runs={runSessions.runs}
+                    onDeleteRun={runSessions.deleteRun}
+                    onExportRun={runSessions.exportRun}
+                  />
+                )}
+              </ViewErrorBoundary>
+            )}
           </div>
         )}
       </main>

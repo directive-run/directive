@@ -3,6 +3,29 @@ import { isAgentComplete, isReroute, type AgentHealthMetrics, type DebugEvent } 
 import { HealthCard } from "../components/HealthCard";
 import { CostChart } from "../components/CostChart";
 
+/** E5: Extract per-agent time series for sparklines */
+function buildAgentTimeSeries(events: DebugEvent[]): Map<string, { durations: number[]; tokens: number[] }> {
+  const map = new Map<string, { durations: number[]; tokens: number[] }>();
+
+  for (const event of events) {
+    if (isAgentComplete(event) && event.agentId) {
+      let series = map.get(event.agentId);
+      if (!series) {
+        series = { durations: [], tokens: [] };
+        map.set(event.agentId, series);
+      }
+      if (typeof event.durationMs === "number") {
+        series.durations.push(event.durationMs);
+      }
+      if (typeof event.totalTokens === "number") {
+        series.tokens.push(event.totalTokens);
+      }
+    }
+  }
+
+  return map;
+}
+
 interface HealthViewProps {
   metrics: Record<string, AgentHealthMetrics>;
   events: DebugEvent[];
@@ -44,6 +67,8 @@ export function HealthView({ metrics, events, onRequestHealth }: HealthViewProps
   const agents = useMemo(() => Object.values(metrics).sort((a, b) => a.agentId.localeCompare(b.agentId)), [metrics]);
   const costData = useMemo(() => buildCostData(events), [events]);
   const reroutes = useMemo(() => extractReroutes(events), [events]);
+  // E5: Time series for sparklines
+  const agentTimeSeries = useMemo(() => buildAgentTimeSeries(events), [events]);
 
   if (agents.length === 0) {
     return (
@@ -100,9 +125,18 @@ export function HealthView({ metrics, events, onRequestHealth }: HealthViewProps
         {/* Agent health cards */}
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Agent Health</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {agents.map((agent) => (
-            <HealthCard key={agent.agentId} metrics={agent} />
-          ))}
+          {agents.map((agent) => {
+            const series = agentTimeSeries.get(agent.agentId);
+
+            return (
+              <HealthCard
+                key={agent.agentId}
+                metrics={agent}
+                durationSeries={series?.durations}
+                tokenSeries={series?.tokens}
+              />
+            );
+          })}
         </div>
 
         {/* Cost chart */}

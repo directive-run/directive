@@ -186,4 +186,84 @@ describe("replay frame-skip logic", () => {
     // accumulated: 10, 20, 30, 40 — all < 160, so we go to index 4 (end)
     expect(next).toBe(4);
   });
+
+  it("handles single-event array", () => {
+    const events = [{ timestamp: 1000 }];
+    const currentIdx = 0;
+    const speed = 1;
+    const elapsed = 100;
+
+    // Already at end, no advancement possible
+    let next = currentIdx;
+    if (events.length > 1) {
+      const gap = events[1]!.timestamp - events[0]!.timestamp;
+      const scaledGap = gap / speed;
+      if (elapsed >= scaledGap) {
+        next = currentIdx + 1;
+      }
+    }
+
+    expect(next).toBe(0);
+  });
+
+  it("handles events with identical timestamps (zero gap)", () => {
+    const events = [
+      { timestamp: 1000 },
+      { timestamp: 1000 },
+      { timestamp: 1000 },
+    ];
+
+    const currentIdx = 0;
+    const speed = 1;
+    const elapsed = 16;
+
+    const gap = events[1]!.timestamp - events[0]!.timestamp;
+    const scaledGap = gap / speed;
+
+    // Zero gap means elapsed (16) >= scaledGap (0) → should advance
+    expect(elapsed >= scaledGap).toBe(true);
+
+    let next = currentIdx + 1;
+    let accumulatedGap = gap;
+
+    while (next < events.length - 1) {
+      const nextGap = events[next + 1]!.timestamp - events[next]!.timestamp;
+      if (accumulatedGap + nextGap > elapsed * speed) {
+        break;
+      }
+      accumulatedGap += nextGap;
+      next++;
+    }
+
+    // All gaps are 0, accumulated stays 0, always < elapsed*speed=16 → jump to end
+    expect(next).toBe(2);
+  });
+});
+
+describe("replay cursor timestamp computation", () => {
+  it("computes cursor percentage within visible range", () => {
+    const visibleRange = { start: 1000, duration: 2000 };
+    const cursorTimestamp = 1500;
+
+    const pct = ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
+    expect(pct).toBe(25);
+  });
+
+  it("returns null-like when cursor is outside range", () => {
+    const visibleRange = { start: 1000, duration: 2000 };
+    const cursorTimestamp = 500; // before range
+
+    const pct = ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
+    // pct is -25, which is < 0, so the UI check (pct >= 0 && pct <= 100) would exclude it
+    expect(pct < 0).toBe(true);
+  });
+
+  it("handles zero-duration range", () => {
+    const visibleRange = { start: 1000, duration: 0 };
+    const cursorTimestamp = 1000;
+
+    // Division by zero → NaN or Infinity
+    const pct = ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
+    expect(Number.isFinite(pct)).toBe(false);
+  });
 });

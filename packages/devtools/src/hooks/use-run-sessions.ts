@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { VALID_EVENT_TYPES, type DebugEvent } from "../lib/types";
 
 const STORAGE_KEY = "directive-devtools-runs";
+const AUTOSAVE_KEY = "directive-devtools-autosave";
 const MAX_RUNS = 5;
+const MAX_AUTO_SAVES = 3;
+const AUTO_SAVE_DEBOUNCE_MS = 5000;
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 export interface SavedRun {
@@ -10,6 +13,7 @@ export interface SavedRun {
   name: string;
   savedAt: string;
   events: DebugEvent[];
+  isAutoSave?: boolean;
   metadata: {
     eventCount: number;
     totalTokens: number;
@@ -22,6 +26,10 @@ export interface RunSessionsState {
   runs: SavedRun[];
   /** Error from last localStorage persist attempt, or null */
   saveError: string | null;
+  /** E6: Auto-save toggle */
+  autoSaveEnabled: boolean;
+  toggleAutoSave: () => void;
+  autoSave: (events: DebugEvent[]) => void;
   saveRun: (events: DebugEvent[], name?: string) => void;
   deleteRun: (id: string) => void;
   exportRun: (id: string) => void;
@@ -113,15 +121,93 @@ function persistRuns(runs: SavedRun[]): string | null {
   }
 }
 
+function loadAutoSavePreference(): boolean {
+  try {
+    return localStorage.getItem(AUTOSAVE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function useRunSessions(): RunSessionsState {
   const [runs, setRuns] = useState<SavedRun[]>(loadRuns);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(loadAutoSavePreference);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Persist on change
   useEffect(() => {
     const err = persistRuns(runs);
     setSaveError(err);
   }, [runs]);
+
+  // Cleanup auto-save timer
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  const toggleAutoSave = useCallback(() => {
+    setAutoSaveEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, String(next));
+      } catch {
+        // Ignore storage errors
+      }
+
+      return next;
+    });
+  }, []);
+
+  // E6: Debounced auto-save
+  const autoSave = useCallback((events: DebugEvent[]) => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      if (events.length === 0) {
+        return;
+      }
+
+      setRuns((prev) => {
+        const autoSaveRun: SavedRun = {
+          id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          name: `Auto-save ${new Date().toLocaleTimeString()}`,
+          savedAt: new Date().toISOString(),
+          events,
+          isAutoSave: true,
+          metadata: computeMetadata(events),
+        };
+
+        let next = [...prev, autoSaveRun];
+
+        // Cap auto-saves at MAX_AUTO_SAVES — evict oldest auto-save
+        const autoSaves = next.filter((r) => r.isAutoSave);
+        while (autoSaves.length > MAX_AUTO_SAVES) {
+          const oldest = autoSaves.shift()!;
+          next = next.filter((r) => r.id !== oldest.id);
+        }
+
+        // Cap total runs at MAX_RUNS — evict oldest auto-save first, then oldest manual
+        while (next.length > MAX_RUNS) {
+          const autoIdx = next.findIndex((r) => r.isAutoSave);
+          if (autoIdx !== -1) {
+            next.splice(autoIdx, 1);
+          } else {
+            next.shift();
+          }
+        }
+
+        return next;
+      });
+    }, AUTO_SAVE_DEBOUNCE_MS);
+  }, []);
 
   const saveRun = useCallback((events: DebugEvent[], name?: string) => {
     if (events.length === 0) {
@@ -203,5 +289,5 @@ export function useRunSessions(): RunSessionsState {
     }
   }, []);
 
-  return { runs, saveError, saveRun, deleteRun, exportRun, importRun };
+  return { runs, saveError, autoSaveEnabled, toggleAutoSave, autoSave, saveRun, deleteRun, exportRun, importRun };
 }

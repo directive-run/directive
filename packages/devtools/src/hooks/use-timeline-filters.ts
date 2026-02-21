@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import type { DebugEvent, DebugEventType } from "../lib/types";
 
+export type FilterMode = "and" | "or";
+
 export interface TimelineFilters {
   typeFilter: Set<DebugEventType>;
   agentFilter: string | null;
   searchMatchIds: Set<number> | null;
+  filterMode: FilterMode;
   agents: string[];
   presentTypes: DebugEventType[];
   filteredEvents: DebugEvent[];
@@ -12,12 +15,14 @@ export interface TimelineFilters {
   setTypeFilter: (filter: Set<DebugEventType>) => void;
   setAgentFilter: (agent: string | null) => void;
   setSearchMatchIds: (ids: Set<number> | null) => void;
+  setFilterMode: (mode: FilterMode) => void;
 }
 
 export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
   const [typeFilter, setTypeFilter] = useState<Set<DebugEventType>>(new Set());
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
   const [searchMatchIds, setSearchMatchIds] = useState<Set<number> | null>(null);
+  const [filterMode, setFilterMode] = useState<FilterMode>("and");
 
   // Compute unique agents
   const agents = useMemo(() => {
@@ -41,21 +46,48 @@ export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
     return Array.from(set);
   }, [events]);
 
-  // Filter events
+  // Filter events (E10: supports AND/OR composite modes)
   const filteredEvents = useMemo(() => {
+    const hasTypeFilter = typeFilter.size > 0;
+    const hasAgentFilter = agentFilter != null;
+    const hasSearchFilter = searchMatchIds != null;
+
+    // No active filters — return all
+    if (!hasTypeFilter && !hasAgentFilter && !hasSearchFilter) {
+      return events;
+    }
+
+    if (filterMode === "or") {
+      return events.filter((e) => {
+        const passes: boolean[] = [];
+        if (hasTypeFilter) {
+          passes.push(typeFilter.has(e.type));
+        }
+        if (hasAgentFilter) {
+          passes.push(e.agentId === agentFilter);
+        }
+        if (hasSearchFilter) {
+          passes.push(searchMatchIds.has(e.id));
+        }
+
+        return passes.some(Boolean);
+      });
+    }
+
+    // AND mode (default — original behavior)
     let filtered = events;
-    if (typeFilter.size > 0) {
+    if (hasTypeFilter) {
       filtered = filtered.filter((e) => typeFilter.has(e.type));
     }
-    if (agentFilter) {
+    if (hasAgentFilter) {
       filtered = filtered.filter((e) => e.agentId === agentFilter);
     }
-    if (searchMatchIds) {
+    if (hasSearchFilter) {
       filtered = filtered.filter((e) => searchMatchIds.has(e.id));
     }
 
     return filtered;
-  }, [events, typeFilter, agentFilter, searchMatchIds]);
+  }, [events, typeFilter, agentFilter, searchMatchIds, filterMode]);
 
   // Toggle type filter
   const toggleType = useCallback((type: DebugEventType) => {
@@ -75,6 +107,7 @@ export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
     typeFilter,
     agentFilter,
     searchMatchIds,
+    filterMode,
     agents,
     presentTypes,
     filteredEvents,
@@ -82,5 +115,6 @@ export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
     setTypeFilter,
     setAgentFilter,
     setSearchMatchIds,
+    setFilterMode,
   };
 }

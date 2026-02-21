@@ -2,17 +2,18 @@ import { useState } from "react";
 import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS, getEventCategory } from "../lib/colors";
 import { PromptViewer } from "./PromptViewer";
+import type { TimeFormat } from "../lib/time-format";
+import { formatTimestamp as formatTs, formatDuration } from "../lib/time-format";
 
 interface EventDetailProps {
   event: DebugEvent;
   onClose: () => void;
   onForkFromSnapshot?: (eventId: number) => void;
-}
-
-function formatTimestamp(ts: number): string {
-  const date = new Date(ts);
-
-  return date.toLocaleTimeString(undefined, { hour12: false, fractionalSecondDigits: 3 });
+  /** E9: Replay from this event */
+  onReplayFromHere?: (eventId: number) => void;
+  /** E7: Time format */
+  timeFormat?: TimeFormat;
+  baseTimestamp?: number;
 }
 
 /** Extract all meaningful properties from an event */
@@ -124,7 +125,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailProps) {
+export function EventDetail({ event, onClose, onForkFromSnapshot, onReplayFromHere, timeFormat = "clock", baseTimestamp }: EventDetailProps) {
   const properties = getEventProperties(event);
   const color = EVENT_COLORS[event.type];
   const category = getEventCategory(event.type);
@@ -166,8 +167,15 @@ export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailP
       <div className="mt-4 space-y-2 text-xs">
         <div className="flex justify-between">
           <span className="text-zinc-500">Time</span>
-          <span className="text-zinc-300 font-mono">{formatTimestamp(event.timestamp)}</span>
+          <span className="text-zinc-300 font-mono">{formatTs(event.timestamp, timeFormat, baseTimestamp)}</span>
         </div>
+
+        {typeof event.durationMs === "number" && (
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Duration</span>
+            <span className="text-zinc-300 font-mono">{formatDuration(event.durationMs)}</span>
+          </div>
+        )}
 
         {event.agentId && (
           <div className="flex justify-between">
@@ -220,6 +228,18 @@ export function EventDetail({ event, onClose, onForkFromSnapshot }: EventDetailP
           Copy event as JSON
         </button>
       </div>
+
+      {/* E9: Replay from here */}
+      {onReplayFromHere && (
+        <div className="mt-2">
+          <button
+            onClick={() => onReplayFromHere(event.id)}
+            className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:border-blue-500/40 hover:bg-zinc-700"
+          >
+            ▶ Replay from here
+          </button>
+        </div>
+      )}
 
       {/* Fork from snapshot button */}
       {canFork && (

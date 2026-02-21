@@ -24,6 +24,10 @@ export interface DevToolsConnection {
   derivedState: Record<string, unknown>;
   // Phase 2: Token streaming
   streamingTokens: Map<string, { tokens: string; count: number; startedAt: number }>;
+  // E12: Pause live updates
+  isPaused: boolean;
+  pendingCount: number;
+  togglePause: () => void;
   connect: (url: string) => void;
   disconnect: () => void;
   send: (message: ClientMessage) => void;
@@ -97,6 +101,12 @@ export function useDevToolsConnection(): DevToolsConnection {
   const [derivedState, setDerivedState] = useState<Record<string, unknown>>({});
   const [streamingTokens, setStreamingTokens] = useState<Map<string, { tokens: string; count: number; startedAt: number }>>(new Map());
 
+  // E12: Pause live updates
+  const [isPaused, setIsPaused] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const pausedRef = useRef(false);
+  const pendingWhilePausedRef = useRef<DebugEvent[]>([]);
+
   const wsRef = useRef<WebSocket | null>(null);
   const urlRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,6 +138,15 @@ export function useDevToolsConnection(): DevToolsConnection {
     }
 
     eventBufferRef.current = [];
+
+    // E12: When paused, buffer events instead of appending
+    if (pausedRef.current) {
+      pendingWhilePausedRef.current.push(...buffered);
+      setPendingCount(pendingWhilePausedRef.current.length);
+
+      return;
+    }
+
     setEvents((prev) => {
       const next = prev.concat(buffered);
 
@@ -453,6 +472,28 @@ export function useDevToolsConnection(): DevToolsConnection {
     };
   }, []);
 
+  // E12: Toggle pause
+  const togglePause = useCallback(() => {
+    const wasPaused = pausedRef.current;
+    const nowPaused = !wasPaused;
+    pausedRef.current = nowPaused;
+    setIsPaused(nowPaused);
+
+    if (wasPaused) {
+      // Unpause: merge buffered events
+      const pending = pendingWhilePausedRef.current;
+      pendingWhilePausedRef.current = [];
+      setPendingCount(0);
+      if (pending.length > 0) {
+        setEvents((prev) => {
+          const next = prev.concat(pending);
+
+          return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
+        });
+      }
+    }
+  }, []);
+
   return {
     status,
     sessionId,
@@ -464,6 +505,9 @@ export function useDevToolsConnection(): DevToolsConnection {
     scratchpadState,
     derivedState,
     streamingTokens,
+    isPaused,
+    pendingCount,
+    togglePause,
     connect,
     disconnect,
     send,
