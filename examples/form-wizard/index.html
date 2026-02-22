@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Step Form Wizard - Directive Example</title>
+  <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--brand-surface);
+      color: var(--brand-text);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .fw-container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ===== Main Layout ===== */
+    .fw-main {
+      display: grid;
+      grid-template-columns: 1fr 260px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 700px) {
+      .fw-main { grid-template-columns: 1fr; }
+    }
+
+    /* ===== Panel ===== */
+    .fw-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .fw-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+    }
+
+    .fw-panel-body {
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* ===== Progress Bar ===== */
+    .fw-progress-area {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .fw-progress-track {
+      width: 100%;
+      height: 6px;
+      background: var(--brand-surface);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .fw-progress-fill {
+      height: 100%;
+      background: var(--brand-primary);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .fw-progress-text {
+      font-size: 0.7rem;
+      color: var(--brand-text-muted);
+      text-align: center;
+    }
+
+    /* ===== Step Indicators ===== */
+    .fw-step-indicators {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .fw-step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-faint);
+      transition: color 0.2s;
+    }
+
+    .fw-step-indicator .fw-step-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--brand-surface);
+      border: 2px solid var(--brand-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--brand-text-faint);
+      transition: all 0.2s;
+    }
+
+    .fw-step-indicator.active { color: var(--brand-primary); }
+    .fw-step-indicator.active .fw-step-dot {
+      border-color: var(--brand-primary);
+      background: rgba(91, 163, 163, 0.15);
+      color: var(--brand-primary);
+    }
+
+    .fw-step-indicator.completed { color: var(--brand-success); }
+    .fw-step-indicator.completed .fw-step-dot {
+      border-color: var(--brand-success);
+      background: rgba(109, 171, 114, 0.15);
+      color: var(--brand-success);
+    }
+
+    /* ===== Step Content ===== */
+    .fw-step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--brand-text);
+      margin-bottom: 0.1rem;
+    }
+
+    .fw-step-subtitle {
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.5rem;
+    }
+
+    /* ===== Inputs ===== */
+    .fw-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .fw-input-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+    }
+
+    .fw-input {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      color: var(--brand-text);
+      font-size: 0.8rem;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    .fw-input:focus { border-color: var(--brand-primary); }
+    .fw-input::placeholder { color: var(--brand-text-faint); }
+
+    /* ===== Field Status / Hints ===== */
+    .fw-field-status {
+      font-size: 0.65rem;
+      min-height: 1rem;
+      transition: color 0.15s;
+    }
+
+    .fw-field-status.checking { color: var(--brand-warning); }
+    .fw-field-status.available { color: var(--brand-success); }
+    .fw-field-status.taken { color: var(--brand-error); }
+
+    .fw-field-hint {
+      font-size: 0.65rem;
+      min-height: 1rem;
+    }
+
+    .fw-field-hint.valid { color: var(--brand-success); }
+    .fw-field-hint.invalid { color: var(--brand-error); }
+
+    /* ===== Radio Group ===== */
+    .fw-radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .fw-radio-option {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .fw-radio-option:hover { border-color: var(--brand-border-strong); }
+
+    .fw-radio-option input[type="radio"] {
+      accent-color: var(--brand-primary);
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    .fw-radio-label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      cursor: pointer;
+    }
+
+    .fw-radio-label-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--brand-text);
+    }
+
+    .fw-radio-label-desc {
+      font-size: 0.6rem;
+      color: var(--brand-text-dim);
+    }
+
+    /* ===== Checkbox ===== */
+    .fw-checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+    }
+
+    .fw-checkbox-group input[type="checkbox"] {
+      accent-color: var(--brand-primary);
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    .fw-checkbox-group label {
+      font-size: 0.75rem;
+      color: var(--brand-text-muted);
+      cursor: pointer;
+    }
+
+    /* ===== Navigation ===== */
+    .fw-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--brand-border);
+    }
+
+    .fw-btn {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.5rem 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .fw-btn:hover:not(:disabled) { background: var(--brand-border); }
+    .fw-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .fw-btn.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #fff;
+    }
+
+    .fw-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); }
+
+    .fw-nav-spacer { flex: 1; }
+
+    /* ===== Inspector ===== */
+    .fw-inspector-section {
+      margin-bottom: 0.5rem;
+    }
+
+    .fw-inspector-section:last-child { margin-bottom: 0; }
+
+    .fw-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.35rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .fw-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.15rem 0;
+      font-size: 0.65rem;
+    }
+
+    .fw-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .fw-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+    }
+
+    .fw-bool-indicator {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 0.25rem;
+      vertical-align: middle;
+    }
+
+    .fw-bool-indicator.true { background: var(--brand-success); }
+    .fw-bool-indicator.false { background: var(--brand-text-faint); }
+
+    /* ===== Success Screen ===== */
+    .fw-success {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    .fw-success-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(109, 171, 114, 0.15);
+      border: 2px solid var(--brand-success);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: var(--brand-success);
+    }
+
+    .fw-success-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--brand-text);
+    }
+
+    .fw-success-text {
+      font-size: 0.75rem;
+      color: var(--brand-text-muted);
+      max-width: 320px;
+    }
+
+    /* ===== How it works ===== */
+    .fw-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .fw-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .fw-how-it-works ul { padding-left: 1.2rem; }
+    .fw-how-it-works li { margin-bottom: 0.2rem; }
+
+    .fw-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--brand-border);
+      font-style: italic;
+      color: var(--brand-text-faint);
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="fw-container">
+    <!-- Form Card + Inspector -->
+    <div class="fw-main">
+      <!-- Left: Form Card -->
+      <div class="fw-panel">
+        <div class="fw-panel-header">Multi-Step Form Wizard</div>
+
+        <div id="fw-form-container" class="fw-panel-body">
+          <!-- Progress Bar -->
+          <div class="fw-progress-area" data-testid="fw-progress">
+            <div class="fw-progress-track">
+              <div id="fw-progress-fill" class="fw-progress-fill" style="width: 33%"></div>
+            </div>
+            <span id="fw-progress-text" class="fw-progress-text">Step 1 of 3</span>
+          </div>
+
+          <!-- Step Indicators -->
+          <div class="fw-step-indicators">
+            <div class="fw-step-indicator active">
+              <span class="fw-step-dot">1</span>
+              Account
+            </div>
+            <div class="fw-step-indicator">
+              <span class="fw-step-dot">2</span>
+              Profile
+            </div>
+            <div class="fw-step-indicator">
+              <span class="fw-step-dot">3</span>
+              Preferences
+            </div>
+          </div>
+
+          <!-- Step 0: Account -->
+          <div id="fw-step-0" data-testid="fw-step-0">
+            <div class="fw-step-title">Create Your Account</div>
+            <div class="fw-step-subtitle">Enter your email and choose a password</div>
+
+            <div class="fw-input-group">
+              <label class="fw-input-label" for="fw-email">Email</label>
+              <input
+                id="fw-email"
+                data-testid="fw-email"
+                class="fw-input"
+                type="email"
+                placeholder="you@example.com"
+                autocomplete="off"
+              />
+              <span id="fw-email-status" class="fw-field-status" data-testid="fw-email-status"></span>
+            </div>
+
+            <div class="fw-input-group">
+              <label class="fw-input-label" for="fw-password">Password</label>
+              <input
+                id="fw-password"
+                data-testid="fw-password"
+                class="fw-input"
+                type="password"
+                placeholder="At least 8 characters"
+                autocomplete="off"
+              />
+              <span id="fw-password-hint" class="fw-field-hint"></span>
+            </div>
+          </div>
+
+          <!-- Step 1: Profile -->
+          <div id="fw-step-1" data-testid="fw-step-1" style="display: none">
+            <div class="fw-step-title">Your Profile</div>
+            <div class="fw-step-subtitle">Tell us about yourself</div>
+
+            <div class="fw-input-group">
+              <label class="fw-input-label" for="fw-name">Name</label>
+              <input
+                id="fw-name"
+                data-testid="fw-name"
+                class="fw-input"
+                type="text"
+                placeholder="Your full name"
+                autocomplete="off"
+              />
+              <span id="fw-name-hint" class="fw-field-hint"></span>
+            </div>
+
+            <div class="fw-input-group">
+              <label class="fw-input-label" for="fw-company">Company (optional)</label>
+              <input
+                id="fw-company"
+                data-testid="fw-company"
+                class="fw-input"
+                type="text"
+                placeholder="Company name"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <!-- Step 2: Preferences -->
+          <div id="fw-step-2" data-testid="fw-step-2" style="display: none">
+            <div class="fw-step-title">Choose Your Plan</div>
+            <div class="fw-step-subtitle">Select a plan and set your preferences</div>
+
+            <div class="fw-radio-group">
+              <label class="fw-radio-option">
+                <input type="radio" id="fw-plan-free" data-testid="fw-plan-free" name="fw-plan" value="free" checked />
+                <span class="fw-radio-label">
+                  <span class="fw-radio-label-title">Free</span>
+                  <span class="fw-radio-label-desc">Basic features, 1 project</span>
+                </span>
+              </label>
+              <label class="fw-radio-option">
+                <input type="radio" id="fw-plan-pro" data-testid="fw-plan-pro" name="fw-plan" value="pro" />
+                <span class="fw-radio-label">
+                  <span class="fw-radio-label-title">Pro</span>
+                  <span class="fw-radio-label-desc">Unlimited projects, priority support</span>
+                </span>
+              </label>
+              <label class="fw-radio-option">
+                <input type="radio" id="fw-plan-enterprise" data-testid="fw-plan-enterprise" name="fw-plan" value="enterprise" />
+                <span class="fw-radio-label">
+                  <span class="fw-radio-label-title">Enterprise</span>
+                  <span class="fw-radio-label-desc">Custom limits, SLA, dedicated support</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="fw-checkbox-group">
+              <input type="checkbox" id="fw-newsletter" data-testid="fw-newsletter" />
+              <label for="fw-newsletter">Subscribe to product updates</label>
+            </div>
+          </div>
+
+          <!-- Navigation -->
+          <div class="fw-nav">
+            <button id="fw-back-btn" data-testid="fw-back-btn" class="fw-btn" style="display: none">Back</button>
+            <div class="fw-nav-spacer"></div>
+            <button id="fw-next-btn" data-testid="fw-next-btn" class="fw-btn primary" disabled>Next</button>
+            <button id="fw-submit-btn" data-testid="fw-submit-btn" class="fw-btn primary" style="display: none" disabled>Submit</button>
+          </div>
+        </div>
+
+        <!-- Success Screen -->
+        <div id="fw-success" class="fw-success" data-testid="fw-success">
+          <div class="fw-success-icon">&#10003;</div>
+          <div class="fw-success-title">Account Created</div>
+          <div class="fw-success-text">
+            Your account has been set up successfully. You can now start using the platform.
+          </div>
+          <button id="fw-start-over" class="fw-btn primary">Start Over</button>
+        </div>
+      </div>
+
+      <!-- Right: State Inspector -->
+      <div class="fw-panel">
+        <div class="fw-panel-header">State Inspector</div>
+        <div class="fw-panel-body">
+          <!-- Wizard Facts -->
+          <div class="fw-inspector-section">
+            <div class="fw-inspector-title">Wizard</div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">currentStep</span>
+              <span id="fw-insp-currentStep" class="fw-inspector-value">0</span>
+            </div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">progress</span>
+              <span id="fw-insp-progress" class="fw-inspector-value">33%</span>
+            </div>
+          </div>
+
+          <!-- Derivations -->
+          <div class="fw-inspector-section">
+            <div class="fw-inspector-title">Step Validity</div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">step0Valid</span>
+              <span id="fw-insp-step0Valid" class="fw-inspector-value">
+                <span class="fw-bool-indicator false"></span> false
+              </span>
+            </div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">step1Valid</span>
+              <span id="fw-insp-step1Valid" class="fw-inspector-value">
+                <span class="fw-bool-indicator false"></span> false
+              </span>
+            </div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">step2Valid</span>
+              <span id="fw-insp-step2Valid" class="fw-inspector-value">
+                <span class="fw-bool-indicator true"></span> true
+              </span>
+            </div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">currentStepValid</span>
+              <span id="fw-insp-currentStepValid" class="fw-inspector-value">
+                <span class="fw-bool-indicator false"></span> false
+              </span>
+            </div>
+          </div>
+
+          <!-- Navigation Derivations -->
+          <div class="fw-inspector-section">
+            <div class="fw-inspector-title">Navigation</div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">canAdvance</span>
+              <span id="fw-insp-canAdvance" class="fw-inspector-value">
+                <span class="fw-bool-indicator false"></span> false
+              </span>
+            </div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">isLastStep</span>
+              <span id="fw-insp-isLastStep" class="fw-inspector-value">
+                <span class="fw-bool-indicator false"></span> false
+              </span>
+            </div>
+          </div>
+
+          <!-- Validation Module -->
+          <div class="fw-inspector-section">
+            <div class="fw-inspector-title">Email Validation</div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">emailAvailable</span>
+              <span id="fw-insp-emailAvailable" class="fw-inspector-value">
+                <span class="fw-bool-indicator true"></span> true
+              </span>
+            </div>
+            <div class="fw-inspector-row">
+              <span class="fw-inspector-key">checkingEmail</span>
+              <span id="fw-insp-checkingEmail" class="fw-inspector-value">
+                <span class="fw-bool-indicator false"></span> false
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="fw-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>wizard module</strong> &ndash; Facts: currentStep, email, password, name, company, plan, newsletter, submitted. Derivations: step0/1/2Valid, currentStepValid, canAdvance, progress, isLastStep.</li>
+        <li><strong>validation module</strong> &ndash; Cross-module constraint watches wizard.email, triggers async availability check via CHECK_EMAIL requirement.</li>
+        <li><strong>Constraints</strong> &ndash; submit (60) fires on last step, advance (50) fires on other steps &mdash; both gated by currentStepValid.</li>
+        <li><strong>Resolvers</strong> &ndash; advanceStep increments step, submitForm simulates 800ms API call. checkEmail simulates 500ms availability lookup.</li>
+        <li><strong>Persistence</strong> &ndash; Draft data (email, name, company, plan, currentStep) persisted to localStorage via persistencePlugin.</li>
+      </ul>
+      <p class="directive-note">The <code>crossModuleDeps</code> on the validation module gives type-safe access to <code>facts.wizard.email</code> for the email availability constraint.</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

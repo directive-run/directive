@@ -4,8 +4,8 @@ import { BrandGuide } from '@/components/BrandGuide'
 export const metadata = buildPageMetadata({
   title: 'Brand Guide',
   description: 'Brand identity options and color system for Directive',
-  path: '/docs/branding',
-  section: 'Docs',
+  path: '/branding',
+  section: 'Brand',
 })
 
 export default function BrandGuidePage() {
