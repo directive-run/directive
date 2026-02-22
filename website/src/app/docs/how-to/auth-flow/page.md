@@ -226,6 +226,7 @@ const cart = createModule('cart', {
 
 ## Related
 
+- [Interactive Example](/docs/examples/auth-flow) – try it in your browser
 - [Constraints](/docs/constraints) – `after`, priority, and cross-module deps
 - [Resolvers](/docs/resolvers) – retry policies
 - [Multi-Module](/docs/advanced/multi-module) – cross-module composition

@@ -155,6 +155,7 @@ function StatusIndicator({ system }) {
 
 ## Related
 
+- [Interactive Example](/docs/examples/dashboard-loader) – try it in your browser
 - [Constraints](/docs/constraints) – how `when` and `require` work
 - [Resolvers](/docs/resolvers) – retry policies and execution model
 - [React Hooks](/docs/api/react) – full hook API reference

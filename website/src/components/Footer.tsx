@@ -39,6 +39,7 @@ export function Footer() {
                 <li><Link href="/ai/overview" className={footerLinkClass}>AI Docs</Link></li>
                 <li><Link href="/blog" className={footerLinkClass}>Blog</Link></li>
                 <li><Link href="/labs" className={footerLinkClass}>Labs</Link></li>
+                <li><Link href="/branding" className={footerLinkClass}>Brand Guide</Link></li>
               </ul>
             </div>
             <div>

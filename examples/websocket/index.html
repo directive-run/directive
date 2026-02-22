@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebSocket Connections - Directive Example</title>
+  <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--brand-surface);
+      color: var(--brand-text);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .ws-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ===== Status Bar ===== */
+    .ws-status-bar {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .ws-status-badge {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .ws-status-badge.disconnected {
+      background: rgba(100, 116, 139, 0.2);
+      color: var(--brand-text-dim);
+    }
+
+    .ws-status-badge.connecting {
+      background: rgba(91, 163, 163, 0.2);
+      color: var(--brand-primary);
+    }
+
+    .ws-status-badge.connected {
+      background: rgba(109, 171, 114, 0.2);
+      color: var(--brand-success);
+    }
+
+    .ws-status-badge.reconnecting {
+      background: rgba(196, 192, 122, 0.2);
+      color: var(--brand-warning);
+    }
+
+    .ws-status-badge.error {
+      background: rgba(232, 131, 111, 0.2);
+      color: var(--brand-error);
+    }
+
+    .ws-url-display {
+      font-size: 0.75rem;
+      color: var(--brand-text-muted);
+      flex: 1;
+      font-family: ui-monospace, monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ws-reconnect-area {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .ws-reconnect-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand-warning);
+      animation: ws-pulse 0.8s ease-in-out infinite;
+    }
+
+    .ws-reconnect-text {
+      font-size: 0.7rem;
+      color: var(--brand-warning);
+      font-variant-numeric: tabular-nums;
+    }
+
+    @keyframes ws-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ===== Main 3-column Layout ===== */
+    .ws-main {
+      display: grid;
+      grid-template-columns: 220px 1fr 280px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 800px) {
+      .ws-main { grid-template-columns: 1fr; }
+    }
+
+    /* Panel base */
+    .ws-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ws-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+    }
+
+    .ws-panel-body {
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* ===== Connection & Send (Left) ===== */
+    .ws-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .ws-input-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+    }
+
+    .ws-input {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      color: var(--brand-text);
+      font-size: 0.8rem;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    .ws-input:focus {
+      border-color: var(--brand-primary);
+    }
+
+    .ws-input::placeholder {
+      color: var(--brand-text-faint);
+    }
+
+    /* Buttons */
+    .ws-btn {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+      width: 100%;
+    }
+
+    .ws-btn:hover:not(:disabled) { background: var(--brand-border); }
+    .ws-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .ws-btn.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #fff;
+    }
+
+    .ws-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); }
+
+    .ws-btn.danger {
+      color: var(--brand-error);
+      border-color: rgba(232, 131, 111, 0.3);
+    }
+
+    .ws-btn.danger:hover:not(:disabled) {
+      background: rgba(232, 131, 111, 0.1);
+    }
+
+    .ws-btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .ws-btn-row .ws-btn { flex: 1; }
+
+    .ws-connect-error {
+      font-size: 0.7rem;
+      color: var(--brand-error);
+      padding: 0.3rem 0;
+      display: none;
+    }
+
+    .ws-connect-error.visible { display: block; }
+
+    .ws-separator {
+      border: none;
+      border-top: 1px solid var(--brand-border);
+      margin: 0.2rem 0;
+    }
+
+    /* ===== Messages (Center) ===== */
+    .ws-message-feed {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 200px;
+      max-height: 400px;
+      padding: 0.5rem;
+    }
+
+    .ws-message-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .ws-message-item {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.65rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.4rem;
+      align-items: baseline;
+    }
+
+    .ws-message-item.system { border-left: 3px solid var(--brand-primary); }
+    .ws-message-item.chat { border-left: 3px solid var(--brand-success); }
+    .ws-message-item.data { border-left: 3px solid var(--brand-warning); }
+
+    .ws-message-item .ws-msg-echo {
+      border-left: 3px solid var(--brand-text-dim);
+    }
+
+    .ws-msg-type {
+      font-weight: 600;
+      font-size: 0.55rem;
+      text-transform: uppercase;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+
+    .ws-msg-type.system { color: var(--brand-primary); background: rgba(91, 163, 163, 0.1); }
+    .ws-msg-type.chat { color: var(--brand-success); background: rgba(109, 171, 114, 0.1); }
+    .ws-msg-type.data { color: var(--brand-warning); background: rgba(196, 192, 122, 0.1); }
+
+    .ws-msg-from {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 40px;
+    }
+
+    .ws-msg-text {
+      color: var(--brand-text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ws-msg-time {
+      color: var(--brand-text-faint);
+      font-size: 0.55rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .ws-message-footer {
+      padding: 0.4rem 0.85rem;
+      border-top: 1px solid var(--brand-border);
+      font-size: 0.65rem;
+      color: var(--brand-text-dim);
+    }
+
+    /* ===== Config + Inspector + Timeline (Right) ===== */
+    .ws-slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .ws-slider-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .ws-slider-value {
+      color: var(--brand-text-muted);
+      font-weight: 400;
+    }
+
+    .ws-slider-group input[type="range"] {
+      width: 100%;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+    }
+
+    .ws-config-separator {
+      border: none;
+      border-top: 1px solid var(--brand-border);
+      margin: 0.3rem 0;
+    }
+
+    .ws-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.3rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .ws-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.15rem 0;
+      font-size: 0.65rem;
+    }
+
+    .ws-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .ws-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+    }
+
+    .ws-deriv-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .ws-deriv-indicator.true {
+      background: var(--brand-success);
+    }
+
+    .ws-deriv-indicator.false {
+      background: var(--brand-text-faint);
+    }
+
+    .ws-deriv-indicator.reconnect {
+      background: var(--brand-error);
+      animation: ws-pulse 0.8s ease-in-out infinite;
+    }
+
+    .ws-timeline-header {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.3rem;
+    }
+
+    .ws-timeline {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 100px;
+      max-height: 200px;
+    }
+
+    .ws-timeline-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .ws-timeline-entry {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.55rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.3rem;
+      align-items: baseline;
+    }
+
+    .ws-timeline-entry.connect,
+    .ws-timeline-entry.connected { border-left: 3px solid var(--brand-primary); }
+
+    .ws-timeline-entry.reconnect { border-left: 3px solid var(--brand-warning); }
+
+    .ws-timeline-entry.connect-error,
+    .ws-timeline-entry.error { border-left: 3px solid var(--brand-error); }
+
+    .ws-timeline-entry.close { border-left: 3px solid var(--brand-text-dim); }
+    .ws-timeline-entry.status { border-left: 3px solid var(--brand-success); }
+
+    .ws-timeline-time {
+      color: var(--brand-text-faint);
+      font-size: 0.5rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .ws-timeline-event {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 45px;
+    }
+
+    .ws-timeline-detail {
+      color: var(--brand-text-dim);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== How it works ===== */
+    .ws-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .ws-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .ws-how-it-works ul { padding-left: 1.2rem; }
+    .ws-how-it-works li { margin-bottom: 0.2rem; }
+
+    .ws-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--brand-border);
+      font-style: italic;
+      color: var(--brand-text-faint);
+    }
+
+    @media (max-width: 800px) {
+      body { padding: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ws-container">
+    <!-- Status Bar -->
+    <div class="ws-status-bar">
+      <span id="ws-status-badge" class="ws-status-badge disconnected" data-testid="ws-status-badge">disconnected</span>
+      <span id="ws-url-display" class="ws-url-display">wss://demo.directive.run/chat</span>
+      <div id="ws-reconnect-area" class="ws-reconnect-area" style="display: none">
+        <span class="ws-reconnect-indicator"></span>
+        <span id="ws-reconnect-countdown" class="ws-reconnect-text" data-testid="ws-reconnect-countdown"></span>
+      </div>
+    </div>
+
+    <!-- Main 3-column -->
+    <div class="ws-main">
+      <!-- Left: Connection & Send -->
+      <div class="ws-panel">
+        <div class="ws-panel-header">Connection &amp; Send</div>
+        <div class="ws-panel-body">
+          <div class="ws-input-group">
+            <label class="ws-input-label">URL</label>
+            <input
+              id="ws-url-input"
+              data-testid="ws-url-input"
+              class="ws-input"
+              type="text"
+              placeholder="wss://..."
+              value="wss://demo.directive.run/chat"
+              autocomplete="off"
+            />
+          </div>
+          <div id="ws-connect-error" class="ws-connect-error" data-testid="ws-connect-error"></div>
+          <button id="ws-connect-btn" class="ws-btn primary" data-testid="ws-connect-btn">Connect</button>
+          <div class="ws-btn-row">
+            <button id="ws-disconnect-btn" class="ws-btn" data-testid="ws-disconnect-btn" disabled>Disconnect</button>
+            <button id="ws-force-error-btn" class="ws-btn danger" data-testid="ws-force-error-btn" disabled>Force Error</button>
+          </div>
+          <hr class="ws-separator" />
+          <div class="ws-input-group">
+            <label class="ws-input-label">Message</label>
+            <input
+              id="ws-message-input"
+              data-testid="ws-message-input"
+              class="ws-input"
+              type="text"
+              placeholder="Type a message..."
+              autocomplete="off"
+            />
+          </div>
+          <button id="ws-send-btn" class="ws-btn" data-testid="ws-send-btn" disabled>Send</button>
+          <button id="ws-clear-btn" class="ws-btn" data-testid="ws-clear-btn">Clear Messages</button>
+        </div>
+      </div>
+
+      <!-- Center: Messages -->
+      <div class="ws-panel">
+        <div class="ws-panel-header">Messages</div>
+        <div id="ws-message-feed" class="ws-message-feed" data-testid="ws-message-feed">
+          <div class="ws-message-empty">Messages will appear here after connecting</div>
+        </div>
+        <div id="ws-message-footer" class="ws-message-footer" data-testid="ws-message-count">0 messages</div>
+      </div>
+
+      <!-- Right: Config + Inspector + Timeline -->
+      <div class="ws-panel">
+        <div class="ws-panel-header">Configuration</div>
+        <div class="ws-panel-body">
+          <div class="ws-slider-group">
+            <label class="ws-slider-label">
+              Message Rate <span id="ws-rate-val" class="ws-slider-value">3s</span>
+            </label>
+            <input type="range" id="ws-message-rate" data-testid="ws-message-rate" min="1" max="10" step="1" value="3" />
+          </div>
+          <div class="ws-slider-group">
+            <label class="ws-slider-label">
+              Connect Fail Rate <span id="ws-connect-fail-val" class="ws-slider-value">0%</span>
+            </label>
+            <input type="range" id="ws-connect-failrate" data-testid="ws-connect-failrate" min="0" max="100" step="5" value="0" />
+          </div>
+          <div class="ws-slider-group">
+            <label class="ws-slider-label">
+              Reconnect Fail Rate <span id="ws-reconnect-fail-val" class="ws-slider-value">0%</span>
+            </label>
+            <input type="range" id="ws-reconnect-failrate" data-testid="ws-reconnect-failrate" min="0" max="100" step="5" value="0" />
+          </div>
+          <div class="ws-slider-group">
+            <label class="ws-slider-label">
+              Max Retries <span id="ws-max-retries-val" class="ws-slider-value">5</span>
+            </label>
+            <input type="range" id="ws-max-retries" data-testid="ws-max-retries" min="0" max="10" step="1" value="5" />
+          </div>
+          <hr class="ws-config-separator" />
+          <div class="ws-inspector-title">Derivations</div>
+          <div class="ws-inspector-row">
+            <span class="ws-inspector-key">isConnected</span>
+            <span id="ws-deriv-connected" class="ws-inspector-value" data-testid="ws-deriv-connected">
+              <span class="ws-deriv-indicator false"></span> false
+            </span>
+          </div>
+          <div class="ws-inspector-row">
+            <span class="ws-inspector-key">shouldReconnect</span>
+            <span id="ws-deriv-should-reconnect" class="ws-inspector-value" data-testid="ws-deriv-should-reconnect">
+              <span class="ws-deriv-indicator false"></span> false
+            </span>
+          </div>
+          <div class="ws-inspector-row">
+            <span class="ws-inspector-key">reconnectDelay</span>
+            <span id="ws-deriv-reconnect-delay" class="ws-inspector-value" data-testid="ws-deriv-reconnect-delay">1000ms</span>
+          </div>
+          <div class="ws-inspector-row">
+            <span class="ws-inspector-key">reconnectCountdown</span>
+            <span id="ws-deriv-reconnect-countdown" class="ws-inspector-value" data-testid="ws-deriv-reconnect-countdown">0s</span>
+          </div>
+          <div class="ws-inspector-row">
+            <span class="ws-inspector-key">canSend</span>
+            <span id="ws-deriv-can-send" class="ws-inspector-value" data-testid="ws-deriv-can-send">
+              <span class="ws-deriv-indicator false"></span> false
+            </span>
+          </div>
+          <div class="ws-inspector-row">
+            <span class="ws-inspector-key">messageCount</span>
+            <span id="ws-deriv-message-count" class="ws-inspector-value" data-testid="ws-deriv-message-count">0</span>
+          </div>
+          <hr class="ws-config-separator" />
+          <div class="ws-timeline-header">Event Timeline</div>
+          <div id="ws-timeline" class="ws-timeline" data-testid="ws-timeline">
+            <div class="ws-timeline-empty">Events will appear here after connecting</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="ws-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>Facts</strong> &ndash; url, status, connectRequested, messages, retryCount, maxRetries, now (ticking timer)</li>
+        <li><strong>Derivations</strong> &ndash; isConnected, shouldReconnect, reconnectDelay, reconnectCountdown, canSend, messageCount (all auto-tracked)</li>
+        <li><strong>Constraints</strong> &ndash; needsConnection (100) fires on connect, needsReconnect (90) fires on error with exponential backoff</li>
+        <li><strong>Resolvers</strong> &ndash; connect creates MockWebSocket, reconnect waits backoff delay then retriggers connection</li>
+        <li><strong>Effects</strong> &ndash; logStatusChange logs transitions to the timeline</li>
+      </ul>
+      <p class="directive-note">The reconnect constraint drives automatic retry with exponential backoff. The ticking <code>now</code> fact drives the reactive countdown display.</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

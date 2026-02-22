@@ -185,6 +185,7 @@ const chat = createModule('chat', {
 
 ## Related
 
+- [Interactive Example](/docs/examples/websocket) – try it in your browser
 - [Effects](/docs/effects) – cleanup functions and dependency tracking
 - [Batch Mutations](/docs/how-to/batch-mutations) – atomic multi-field updates
 - [Multi-Module](/docs/advanced/multi-module) – cross-module dependencies
