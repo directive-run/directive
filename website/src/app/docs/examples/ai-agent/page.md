@@ -214,6 +214,6 @@ function ChatInterface() {
 
 ## Next Steps
 
-- [OpenAI Agents](/docs/ai/orchestrator) – More patterns
-- [Guardrails](/docs/ai/guardrails) – Safety
-- [Streaming](/docs/ai/streaming) – Real-time responses
+- [OpenAI Agents](/ai/orchestrator) – More patterns
+- [Guardrails](/ai/guardrails) – Safety
+- [Streaming](/ai/streaming) – Real-time responses

@@ -450,7 +450,7 @@ Every module built with Directive inherits runtime behaviors that you'd otherwis
 
 - You have **complex async coordination** &ndash; multiple API calls that depend on each other, with retry, timeout, and cancellation requirements.
 - Your domain has **interacting business rules** &ndash; five or more constraints that reference overlapping state and change independently.
-- You're building **AI agent orchestration** &ndash; budget enforcement, guardrails, approval workflows, and multi-agent coordination. See [AI Overview](/docs/ai/overview).
+- You're building **AI agent orchestration** &ndash; budget enforcement, guardrails, approval workflows, and multi-agent coordination. See [AI Overview](/ai/overview).
 - You need **multi-module systems** &ndash; independent modules that compose into a single runtime with cross-module constraints. See [Multi-Module](/docs/advanced/multi-module).
 
 **Directive is overkill when:**

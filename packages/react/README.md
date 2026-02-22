@@ -114,7 +114,6 @@ function Summary() {
 | `useDirectiveRef(module)` | Scoped system lifecycle (start on mount, destroy on unmount) |
 | `useSuspenseRequirement(plugin, type)` | Suspense-compatible requirement status |
 | `useHydratedSystem(module)` | Client-side system hydrated from server snapshot |
-| `DirectiveDevTools` | Floating dev panel (tree-shaken in production) |
 | `DirectiveHydrator` | SSR/RSC snapshot provider |
 | `shallowEqual` | Shallow equality helper for selectors |
 

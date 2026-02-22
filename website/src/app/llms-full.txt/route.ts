@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import glob from 'fast-glob'
 
-import { navigation } from '@/lib/navigation'
+import { docsNavigation, aiNavigation } from '@/lib/navigation'
 
 function parseFrontmatter(raw: string): { data: Record<string, string>; content: string } {
   const data: Record<string, string> = {}
@@ -30,28 +30,13 @@ function parseFrontmatter(raw: string): { data: Record<string, string>; content:
   return { data, content }
 }
 
-export function GET() {
-  const pagesDir = path.resolve('./src/app')
-  const files = glob.sync('**/page.md', { cwd: pagesDir })
-
-  const lines: string[] = [
-    '# Directive – Full Documentation',
-    '',
-    '> Constraint-driven state management for TypeScript',
-    '',
-    'This document contains the complete documentation for Directive, suitable for AI ingestion.',
-    '',
-  ]
-
-  // Build a map of href → file path for ordered output
-  const hrefToFile = new Map<string, string>()
-  for (const file of files) {
-    const href = file === 'page.md' ? '/' : '/' + file.replace(/\/page\.md$/, '')
-    hrefToFile.set(href, path.join(pagesDir, file))
-  }
-
-  // Output docs in navigation order
-  for (const section of navigation) {
+function emitSections(
+  lines: string[],
+  nav: { title: string; links: { title: string; href: string }[] }[],
+  pagesDir: string,
+  hrefToFile: Map<string, string>,
+) {
+  for (const section of nav) {
     lines.push(`## ${section.title}`)
     lines.push('')
 
@@ -77,6 +62,37 @@ export function GET() {
       lines.push('')
     }
   }
+}
+
+export function GET() {
+  const pagesDir = path.resolve('./src/app')
+  const files = glob.sync('**/page.md', { cwd: pagesDir })
+
+  const lines: string[] = [
+    '# Directive – Full Documentation',
+    '',
+    '> Constraint-driven state management for TypeScript',
+    '',
+    'This document contains the complete documentation for Directive, suitable for AI ingestion.',
+    '',
+  ]
+
+  // Build a map of href → file path for ordered output
+  const hrefToFile = new Map<string, string>()
+  for (const file of files) {
+    const href = file === 'page.md' ? '/' : '/' + file.replace(/\/page\.md$/, '')
+    hrefToFile.set(href, path.join(pagesDir, file))
+  }
+
+  // Documentation section
+  lines.push('# Documentation')
+  lines.push('')
+  emitSections(lines, docsNavigation, pagesDir, hrefToFile)
+
+  // AI section
+  lines.push('# AI')
+  lines.push('')
+  emitSections(lines, aiNavigation, pagesDir, hrefToFile)
 
   // Append blog posts
   const blogFiles = glob.sync('blog/*/page.md', { cwd: pagesDir })

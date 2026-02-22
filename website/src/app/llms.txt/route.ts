@@ -1,4 +1,4 @@
-import { navigation } from '@/lib/navigation'
+import { docsNavigation, aiNavigation } from '@/lib/navigation'
 import { getPublishedPosts } from '@/lib/blog'
 
 export function GET() {
@@ -15,7 +15,18 @@ export function GET() {
     '',
   ]
 
-  for (const section of navigation) {
+  for (const section of docsNavigation) {
+    lines.push(`### ${section.title}`)
+    for (const link of section.links) {
+      lines.push(`- [${link.title}](${baseUrl}${link.href})`)
+    }
+    lines.push('')
+  }
+
+  lines.push('## AI')
+  lines.push('')
+
+  for (const section of aiNavigation) {
     lines.push(`### ${section.title}`)
     for (const link of section.links) {
       lines.push(`- [${link.title}](${baseUrl}${link.href})`)

@@ -629,4 +629,4 @@ pnpm build:embeddings   # Embeds docs + API reference → public/embeddings.json
 pnpm build              # Next.js site build
 ```
 
-See the [AI & Agents docs](/docs/ai/overview) for the full AI adapter API, [SSE Transport](/docs/ai/sse-transport) for streaming setup, and [RAG Enricher](/docs/ai/rag) for the embedding pipeline.
+See the [AI & Agents docs](/ai/overview) for the full AI adapter API, [SSE Transport](/ai/sse-transport) for streaming setup, and [RAG Enricher](/ai/rag) for the embedding pipeline.

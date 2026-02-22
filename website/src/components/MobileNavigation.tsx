@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Dialog, DialogPanel } from '@headlessui/react'
 
-import { Heart, List, X } from '@phosphor-icons/react'
+import { List, X } from '@phosphor-icons/react'
 
 import { Logomark } from '@/components/Logo'
 import { Navigation } from '@/components/Navigation'
+import { aiNavigation, docsNavigation } from '@/lib/navigation'
 
 function CloseOnNavigation({ close }: { close: () => void }) {
   let pathname = usePathname()
@@ -77,6 +78,13 @@ export function MobileNavigation() {
               Docs
             </Link>
             <Link
+              href="/ai/overview"
+              onClick={onLinkClick}
+              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+            >
+              AI
+            </Link>
+            <Link
               href="/blog"
               onClick={onLinkClick}
               className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
@@ -90,16 +98,15 @@ export function MobileNavigation() {
             >
               About
             </Link>
-            <Link
-              href="/support"
-              onClick={onLinkClick}
-              className="flex items-center gap-1.5 text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
-            >
-              <Heart weight="fill" className="h-3.5 w-3.5 text-slate-400" />
-              Support
-            </Link>
           </div>
-          <Navigation className="mt-5 px-1" onLinkClick={onLinkClick} />
+          <h3 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Documentation
+          </h3>
+          <Navigation className="px-1" onLinkClick={onLinkClick} navigationOverride={docsNavigation} />
+          <h3 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            AI
+          </h3>
+          <Navigation className="px-1" onLinkClick={onLinkClick} navigationOverride={aiNavigation} />
         </DialogPanel>
       </Dialog>
     </>

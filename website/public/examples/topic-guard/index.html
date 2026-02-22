@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Topic Guard - Directive Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #161412;
+      color: #c8bfb4;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    /* Layout */
+    .topic-guard-container {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr 260px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      .topic-guard-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Panel base */
+    .tg-panel {
+      background: #1f1b17;
+      border: 1px solid #2a2520;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tg-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid #2a2520;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #9a8e80;
+    }
+
+    /* ===== Chat Panel (Left) ===== */
+    .tg-chat { min-height: 400px; }
+
+    .tg-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 300px;
+      max-height: 400px;
+    }
+
+    .tg-message {
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      max-width: 90%;
+      word-wrap: break-word;
+    }
+
+    .tg-message.user {
+      background: #262220;
+      align-self: flex-end;
+      color: #c8bfb4;
+    }
+
+    .tg-message.user.blocked {
+      background: rgba(200, 60, 50, 0.15);
+      border: 1px solid rgba(200, 60, 50, 0.3);
+      color: #e8836f;
+    }
+
+    .tg-message.agent {
+      background: #1a2a2a;
+      border: 1px solid #2a3a3a;
+      align-self: flex-start;
+      color: #9ac8c8;
+    }
+
+    .tg-message.system {
+      background: rgba(200, 60, 50, 0.1);
+      border: 1px solid rgba(200, 60, 50, 0.2);
+      align-self: flex-start;
+      color: #e8836f;
+      font-style: italic;
+    }
+
+    .tg-guardrail-badge {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(200, 60, 50, 0.2);
+      color: #e8836f;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      margin-top: 0.3rem;
+    }
+
+    .tg-empty-state {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4a4035;
+      font-size: 0.8rem;
+      font-style: italic;
+    }
+
+    /* Input row */
+    .tg-input-row {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      border-top: 1px solid #2a2520;
+    }
+
+    .tg-input-row input {
+      flex: 1;
+      background: #161412;
+      border: 1px solid #2a2520;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      color: #c8bfb4;
+      font-size: 0.8rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .tg-input-row input:focus {
+      border-color: #5ba3a3;
+    }
+
+    .tg-input-row input::placeholder {
+      color: #4a4035;
+    }
+
+    /* Buttons */
+    .tg-btn {
+      background: #1f1b17;
+      border: 1px solid #2a2520;
+      color: #c8bfb4;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .tg-btn:hover:not(:disabled) { background: #2a2520; }
+    .tg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .tg-btn.primary {
+      background: #5ba3a3;
+      border-color: #5ba3a3;
+      color: #fff;
+    }
+
+    .tg-btn.primary:hover:not(:disabled) { background: #4d8f8f; }
+
+    .tg-btn.danger {
+      color: #e8836f;
+      border-color: rgba(200, 60, 50, 0.3);
+    }
+
+    .tg-btn.danger:hover:not(:disabled) {
+      background: rgba(200, 60, 50, 0.1);
+    }
+
+    /* ===== Guardrail Log (Center) ===== */
+    .tg-log-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      min-height: 300px;
+      max-height: 400px;
+    }
+
+    .tg-log-entry {
+      background: #161412;
+      border: 1px solid #2a2520;
+      border-radius: 6px;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.7rem;
+      line-height: 1.4;
+    }
+
+    .tg-log-entry.allowed {
+      border-left: 3px solid #6dab72;
+    }
+
+    .tg-log-entry.blocked {
+      border-left: 3px solid #e8836f;
+    }
+
+    .tg-log-time {
+      color: #4a4035;
+      font-size: 0.6rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tg-log-input {
+      color: #9a8e80;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+      display: block;
+      margin: 0.15rem 0;
+    }
+
+    .tg-log-result {
+      font-weight: 600;
+    }
+
+    .tg-log-result.allowed { color: #6dab72; }
+    .tg-log-result.blocked { color: #e8836f; }
+
+    .tg-log-guardrail {
+      color: #6b6055;
+      font-size: 0.6rem;
+    }
+
+    .tg-log-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4a4035;
+      font-size: 0.75rem;
+      font-style: italic;
+    }
+
+    /* ===== Config Panel (Right) ===== */
+    .tg-config { gap: 0; }
+
+    .tg-config-section {
+      padding: 0.75rem 0.85rem;
+      border-bottom: 1px solid #2a2520;
+    }
+
+    .tg-config-section:last-child {
+      border-bottom: none;
+    }
+
+    .tg-config-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #6b6055;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Topic checkboxes */
+    .tg-topic-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .tg-topic-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .tg-topic-item input[type="checkbox"] {
+      accent-color: #5ba3a3;
+      cursor: pointer;
+    }
+
+    /* Stats */
+    .tg-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .tg-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+    }
+
+    .tg-stat-label { color: #6b6055; }
+
+    .tg-stat-value {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tg-stat-value.blocked-val { color: #e8836f; }
+    .tg-stat-value.allowed-val { color: #6dab72; }
+
+    /* Example chips */
+    .tg-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .tg-chip {
+      background: #161412;
+      border: 1px solid #2a2520;
+      border-radius: 20px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.65rem;
+      color: #9a8e80;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .tg-chip:hover {
+      background: #2a2520;
+      color: #c8bfb4;
+    }
+
+    .tg-chip.on-topic {
+      border-color: rgba(109, 171, 114, 0.3);
+    }
+
+    .tg-chip.off-topic {
+      border-color: rgba(200, 60, 50, 0.3);
+    }
+
+    /* How it works footer */
+    .tg-how-it-works {
+      grid-column: 1 / -1;
+      background: #1f1b17;
+      border: 1px solid #2a2520;
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: #6b6055;
+    }
+
+    .tg-how-it-works h3 {
+      color: #9a8e80;
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .tg-how-it-works ul {
+      padding-left: 1.2rem;
+    }
+
+    .tg-how-it-works li {
+      margin-bottom: 0.2rem;
+    }
+
+    .tg-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid #2a2520;
+      font-style: italic;
+      color: #4a4035;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      body { padding: 0.75rem; }
+      .tg-messages, .tg-log-list { max-height: 280px; }
+    }
+  </style>
+  <script type="module" crossorigin src="/examples/topic-guard/assets/index-OIFxV55V.js"></script>
+</head>
+<body>
+  <div class="topic-guard-container">
+    <!-- Chat Panel -->
+    <div class="tg-panel tg-chat">
+      <div class="tg-panel-header">Chat</div>
+      <div id="topic-guard-messages" class="tg-messages" data-testid="topic-guard-messages">
+        <div class="tg-empty-state">Send a message to see guardrails in action</div>
+      </div>
+      <div class="tg-input-row">
+        <input
+          id="topic-guard-input"
+          data-testid="topic-guard-input"
+          type="text"
+          placeholder="Type a message..."
+          autocomplete="off"
+        />
+        <button id="topic-guard-send" class="tg-btn primary" data-testid="topic-guard-send-btn" disabled>
+          Send
+        </button>
+        <button id="topic-guard-clear" class="tg-btn danger" data-testid="topic-guard-clear-btn">
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <!-- Guardrail Log -->
+    <div class="tg-panel">
+      <div class="tg-panel-header">Guardrail Log</div>
+      <div id="topic-guard-log" class="tg-log-list" data-testid="topic-guard-log">
+        <div class="tg-log-empty">No guardrail evaluations yet</div>
+      </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="tg-panel tg-config">
+      <div class="tg-panel-header">Configuration</div>
+
+      <div class="tg-config-section">
+        <div class="tg-config-label">Allowed Topics</div>
+        <div id="topic-guard-topics" class="tg-topic-list">
+          <label class="tg-topic-item">
+            <input type="checkbox" data-topic="product" checked /> Product
+          </label>
+          <label class="tg-topic-item">
+            <input type="checkbox" data-topic="billing" checked /> Billing
+          </label>
+          <label class="tg-topic-item">
+            <input type="checkbox" data-topic="support" checked /> Support
+          </label>
+          <label class="tg-topic-item">
+            <input type="checkbox" data-topic="technical" checked /> Technical
+          </label>
+        </div>
+      </div>
+
+      <div class="tg-config-section">
+        <div class="tg-config-label">Stats</div>
+        <div id="topic-guard-stats" class="tg-stats" data-testid="topic-guard-stats">
+          <div class="tg-stat">
+            <span class="tg-stat-label">Allowed</span>
+            <span id="topic-guard-allowed-count" class="tg-stat-value allowed-val" data-testid="topic-guard-allowed-count">0</span>
+          </div>
+          <div class="tg-stat">
+            <span class="tg-stat-label">Blocked</span>
+            <span id="topic-guard-blocked-count" class="tg-stat-value blocked-val" data-testid="topic-guard-blocked-count">0</span>
+          </div>
+          <div class="tg-stat">
+            <span class="tg-stat-label">Block Rate</span>
+            <span id="topic-guard-block-rate" class="tg-stat-value" data-testid="topic-guard-block-rate">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tg-config-section">
+        <div class="tg-config-label">Try These</div>
+        <div class="tg-chips">
+          <button class="tg-chip on-topic" data-testid="topic-guard-example-chip-0" data-example="How do I reset my password?">Reset password</button>
+          <button class="tg-chip on-topic" data-testid="topic-guard-example-chip-1" data-example="What is my billing status?">Billing status</button>
+          <button class="tg-chip on-topic" data-testid="topic-guard-example-chip-2" data-example="How do I integrate the API?">API integration</button>
+          <button class="tg-chip off-topic" data-testid="topic-guard-example-chip-3" data-example="How do I make pasta?">Make pasta</button>
+          <button class="tg-chip off-topic" data-testid="topic-guard-example-chip-4" data-example="Who won the NBA game?">NBA scores</button>
+          <button class="tg-chip off-topic" data-testid="topic-guard-example-chip-5" data-example="Tell me about the election">Election info</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="tg-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>Facts</strong> &ndash; Input text, chat history, processing state, guardrail results, allowed topics</li>
+        <li><strong>Derivations</strong> &ndash; Message count, blocked/allowed count, block rate, canSend (auto-tracked)</li>
+        <li><strong>Events</strong> &ndash; send (runs guardrails), clear (reset), setInput, toggleTopic</li>
+        <li><strong>Constraints</strong> &ndash; offTopicDetected (priority 100) &rarr; BLOCK_MESSAGE, onTopicConfirmed (90) &rarr; ALLOW_MESSAGE</li>
+        <li><strong>Resolvers</strong> &ndash; blockMessage (reject + badge), allowMessage (mock agent response)</li>
+        <li><strong>Effects</strong> &ndash; Guardrail audit log updated on every result change</li>
+      </ul>
+      <p class="directive-note">Input guardrails intercept messages BEFORE they reach the agent. The constraint&rarr;resolver flow handles the outcome.</p>
+    </div>
+  </div>
+
+</body>
+</html>
