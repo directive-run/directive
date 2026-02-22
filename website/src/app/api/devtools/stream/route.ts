@@ -2,8 +2,8 @@
  * SSE endpoint for live DevTools timeline events.
  *
  * Replays all existing events then streams new ones as they arrive.
- * The chat orchestrator must have handled at least one request (so the
- * singleton is initialized) before this endpoint returns events.
+ * If the orchestrator hasn't been initialized yet (no chat messages sent),
+ * the stream stays open and polls until the timeline becomes available.
  */
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,22 +11,8 @@ export const dynamic = 'force-dynamic'
 import { getTimeline } from '../../chat/orchestrator-singleton'
 
 export async function GET(request: Request) {
-  const timeline = getTimeline()
-
-  if (!timeline) {
-    return new Response(
-      JSON.stringify({ error: 'No active timeline. Send a chat message first.' }),
-      {
-        status: 503,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': '3',
-        },
-      },
-    )
-  }
-
   let unsubscribe: (() => void) | null = null
+  let pollTimer: ReturnType<typeof setInterval> | null = null
 
   const stream = new ReadableStream({
     start(controller) {
@@ -40,21 +26,48 @@ export async function GET(request: Request) {
         }
       }
 
-      // Replay existing events
-      const existing = timeline.getEvents()
-      for (const event of existing) {
-        send(event)
+      const attachToTimeline = () => {
+        const timeline = getTimeline()
+        if (!timeline) {
+          return false
+        }
+
+        // Stop polling
+        if (pollTimer) {
+          clearInterval(pollTimer)
+          pollTimer = null
+        }
+
+        // Replay existing events
+        const existing = timeline.getEvents()
+        for (const event of existing) {
+          send(event)
+        }
+
+        // Subscribe to new events
+        unsubscribe = timeline.subscribe((event) => {
+          send(event)
+        })
+
+        return true
       }
 
-      // Subscribe to new events
-      unsubscribe = timeline.subscribe((event) => {
-        send(event)
-      })
+      // Try immediately
+      if (!attachToTimeline()) {
+        // Poll every second until the orchestrator is initialized
+        pollTimer = setInterval(() => {
+          attachToTimeline()
+        }, 1000)
+      }
 
       // Clean up on client disconnect
       request.signal.addEventListener('abort', () => {
         unsubscribe?.()
         unsubscribe = null
+        if (pollTimer) {
+          clearInterval(pollTimer)
+          pollTimer = null
+        }
         try {
           controller.close()
         } catch {
@@ -66,6 +79,10 @@ export async function GET(request: Request) {
     cancel() {
       unsubscribe?.()
       unsubscribe = null
+      if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
     },
   })
 

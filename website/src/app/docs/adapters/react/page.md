@@ -557,34 +557,6 @@ Manual rollback is also available via `rollback()`.
 
 ---
 
-## DevTools
-
-### DirectiveDevTools
-
-Dev-only floating panel (tree-shaken in production):
-
-```tsx
-import { DirectiveDevTools } from '@directive-run/react';
-
-function App() {
-  return (
-    <>
-      <MyApp />
-      {/* Floating debug panel – tree-shaken in production */}
-      <DirectiveDevTools system={system} position="bottom-right" defaultOpen={false} />
-    </>
-  );
-}
-```
-
-Features:
-- Facts and derivations tables with live values
-- Unmet requirements and inflight resolver counts
-- Keyboard shortcut: press `Escape` to close
-- Accessible: proper table headers, focus management
-
----
-
 ## Writing Facts
 
 Write facts through the system directly:
@@ -652,7 +624,6 @@ test('displays user name', async () => {
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
-| `DirectiveDevTools` | Component | Floating debug panel |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
 | `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |

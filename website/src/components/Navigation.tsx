@@ -26,7 +26,7 @@ export const Navigation = memo(function Navigation({
   )
 
   return (
-    <nav className={clsx('text-base lg:text-sm', className)}>
+    <nav aria-label="Sidebar" className={clsx('text-base lg:text-sm', className)}>
       <ul role="list" className="space-y-9">
         {sections.map((section) => (
           <li key={section.title}>
@@ -42,6 +42,7 @@ export const Navigation = memo(function Navigation({
                   <Link
                     href={link.href}
                     onClick={onLinkClick}
+                    aria-current={link.href === pathname ? 'page' : undefined}
                     className={clsx(
                       'block w-full pl-3.5 before:pointer-events-none before:absolute before:top-1/2 before:-left-1 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full',
                       link.href === pathname

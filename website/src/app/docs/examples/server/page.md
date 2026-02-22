@@ -249,6 +249,6 @@ const deleteResult = await compliance.deleteData({
 
 - [SSR & Hydration](/docs/advanced/ssr) &ndash; Server rendering patterns
 - [Snapshots](/docs/advanced/snapshots) &ndash; Snapshot API reference
-- [Audit Trail](/docs/security/audit) &ndash; Full audit trail docs
-- [GDPR/CCPA](/docs/security/compliance) &ndash; Full compliance docs
+- [Audit Trail](/ai/security/audit) &ndash; Full audit trail docs
+- [GDPR/CCPA](/ai/security/compliance) &ndash; Full compliance docs
 - [Directive on the Server](/blog/directive-on-the-server) &ndash; Blog post walkthrough

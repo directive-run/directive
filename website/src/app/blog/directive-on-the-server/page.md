@@ -272,7 +272,7 @@ Directive isn't a frontend library that happens to work on the server. It's a ru
 
 Distributable snapshots replace ad-hoc caching. Signed verification replaces trust assumptions. Audit trails replace bolted-on logging. Compliance tooling replaces manual data subject request handling.
 
-The [server example](https://github.com/directive-run/directive/tree/main/examples/server) ties all four together in a runnable Express API. The [SSR & Hydration docs](/docs/advanced/ssr) cover the patterns for server-rendered frontends. And the [security docs](/docs/security/overview) cover each feature in depth.
+The [server example](https://github.com/directive-run/directive/tree/main/examples/server) ties all four together in a runnable Express API. The [SSR & Hydration docs](/docs/advanced/ssr) cover the patterns for server-rendered frontends. And the [security docs](/ai/security/overview) cover each feature in depth.
 
 ---
 
@@ -281,5 +281,5 @@ The [server example](https://github.com/directive-run/directive/tree/main/exampl
 - [Server (Node.js) Example](/docs/examples/server) &ndash; full Express API walkthrough
 - [SSR & Hydration](/docs/advanced/ssr) &ndash; server rendering and client hydration
 - [Snapshots](/docs/advanced/snapshots) &ndash; distributable snapshots, signing, TTL
-- [Audit Trail](/docs/security/audit) &ndash; hash-chained logging and SIEM export
-- [GDPR/CCPA Compliance](/docs/security/compliance) &ndash; data export, deletion, consent
+- [Audit Trail](/ai/security/audit) &ndash; hash-chained logging and SIEM export
+- [GDPR/CCPA Compliance](/ai/security/compliance) &ndash; data export, deletion, consent

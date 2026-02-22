@@ -381,9 +381,9 @@ function InlineChat() {
 
 export default function DevToolsPage() {
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-7xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="text-center">
+      <div className="shrink-0 text-center">
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white sm:text-3xl">
           DevTools — Live Demo
         </h1>
@@ -393,25 +393,23 @@ export default function DevToolsPage() {
       </div>
 
       {/* Event type legend */}
-      <div className="mx-auto flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <div className="mx-auto mt-6 flex shrink-0 flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
         <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-sky-500" /> agent_start</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-amber-500" /> guardrail_check</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" /> agent_complete</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-red-500" /> error</span>
       </div>
 
-      {/* Split layout */}
-      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-5">
+      {/* Split layout — fills remaining viewport height */}
+      <div className="mt-6 grid min-h-0 flex-1 gap-6 lg:grid-cols-5">
         {/* DevTools panel — 60% */}
-        <div className="lg:col-span-3">
+        <div className="min-h-0 lg:col-span-3">
           <LiveDevTools />
         </div>
 
-        {/* Chat panel — 40% */}
-        <div className="lg:col-span-2">
-          <div className="sticky top-8 h-[600px]">
-            <InlineChat />
-          </div>
+        {/* Chat panel — 40%, stretches to match DevTools */}
+        <div className="min-h-0 lg:col-span-2">
+          <InlineChat />
         </div>
       </div>
     </div>

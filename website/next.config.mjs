@@ -18,6 +18,21 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/ai/devtools-live',
+        destination: '/devtools',
+        permanent: true,
+      },
+      {
+        source: '/docs',
+        destination: '/docs/quick-start',
+        permanent: false,
+      },
+      {
+        source: '/ai',
+        destination: '/ai/overview',
+        permanent: false,
+      },
+      {
         source: '/articles',
         destination: '/blog',
         permanent: true,
@@ -49,7 +64,19 @@ const nextConfig = {
       },
       {
         source: '/docs/ai/production-features',
-        destination: '/docs/ai/resilience-routing',
+        destination: '/ai/resilience-routing',
+        permanent: true,
+      },
+      // AI section moved from /docs/ai/* to /ai/*
+      {
+        source: '/docs/ai/:slug*',
+        destination: '/ai/:slug*',
+        permanent: true,
+      },
+      // Security section moved from /docs/security/* to /ai/security/*
+      {
+        source: '/docs/security/:slug*',
+        destination: '/ai/security/:slug*',
         permanent: true,
       },
       {

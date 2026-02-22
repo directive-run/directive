@@ -205,8 +205,10 @@ function SearchResult({
 }) {
   let id = useId()
 
+  let resultPath = result.url.split('#')[0]
+  let isAIResult = resultPath.startsWith('/ai')
   let sectionTitle = navigation.find((section) =>
-    section.links.find((link) => link.href === result.url.split('#')[0]),
+    section.links.find((link) => link.href === resultPath),
   )?.title
   let hierarchy = [sectionTitle, result.pageTitle].filter(
     (x): x is string => typeof x === 'string',
@@ -224,9 +226,19 @@ function SearchResult({
       <div
         id={`${id}-title`}
         aria-hidden="true"
-        className="text-sm font-medium text-slate-700 group-aria-selected:text-brand-primary-600 dark:text-slate-300 dark:group-aria-selected:text-brand-primary-400"
+        className="flex items-center gap-2 text-sm font-medium text-slate-700 group-aria-selected:text-brand-primary-600 dark:text-slate-300 dark:group-aria-selected:text-brand-primary-400"
       >
         <HighlightQuery text={result.title} query={query} />
+        <span
+          className={clsx(
+            'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none',
+            isAIResult
+              ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+              : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+          )}
+        >
+          {isAIResult ? 'AI' : 'Docs'}
+        </span>
       </div>
       {result.preview && (
         <div

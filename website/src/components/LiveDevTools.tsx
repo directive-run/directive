@@ -130,7 +130,7 @@ function useDevToolsStream() {
 
   const clear = useCallback(() => {
     setEvents([])
-    maxIdRef.current = 0
+    maxIdRef.current = -1
   }, [])
 
   return { events, status, clear }
@@ -245,7 +245,7 @@ function TimelineView({ events }: { events: DebugEvent[] }) {
       </div>
 
       {/* Selected event detail */}
-      {selected && (() => {
+      {selected !== null && (() => {
         const e = events.find((ev) => ev.id === selected)
         if (!e) return null
 
