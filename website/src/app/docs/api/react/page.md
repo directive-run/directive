@@ -25,7 +25,6 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 | `useExplain` | Hook | Reactive requirement explanation |
 | `useConstraintStatus` | Hook | Reactive constraint inspection |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
-| `DirectiveDevTools` | Component | Floating debug panel |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
 | `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
@@ -583,30 +582,6 @@ function CounterFull() {
       <p>{derived.doubled}</p>
       <button onClick={events.increment}>+</button>
     </div>
-  );
-}
-```
-
----
-
-## DirectiveDevTools
-
-Component that renders a floating debug panel showing facts, derivations, constraints, and requirements.
-
-```typescript
-function DirectiveDevTools(props: { system: SingleModuleSystem<any> }): JSX.Element
-```
-
-```tsx
-import { DirectiveDevTools } from '@directive-run/react';
-
-function App() {
-  return (
-    <>
-      <MyApp />
-      {/* Floating debug panel showing facts, derivations, and constraints */}
-      <DirectiveDevTools system={system} />
-    </>
   );
 }
 ```

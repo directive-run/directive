@@ -11,29 +11,10 @@ export interface NavigationSection {
 }
 
 /**
- * Return the navigation tree with all hrefs prefixed for a given version.
- * For latest (pathPrefix: ""), this returns the original navigation unchanged.
+ * Docs-only navigation (no AI/Security/Examples/Resources sections).
+ * Used for the sidebar when browsing /docs/* pages.
  */
-export function getNavigationForVersion(
-  version: DocsVersion,
-): NavigationSection[] {
-  if (!version.pathPrefix) {
-    return navigation
-  }
-
-  return navigation.map((section) => ({
-    ...section,
-    links: section.links.map((link) => ({
-      ...link,
-      href: link.href.replace('/docs', `/docs${version.pathPrefix}`),
-    })),
-  }))
-}
-
-/** Set of all valid doc hrefs derived from the navigation tree. */
-export const validDocRoutes: Set<string> = new Set()
-
-export const navigation: NavigationSection[] = [
+export const docsNavigation: NavigationSection[] = [
   {
     title: 'Getting Started',
     links: [
@@ -83,70 +64,10 @@ export const navigation: NavigationSection[] = [
       { title: 'Overview', href: '/docs/plugins/overview' },
       { title: 'Logging', href: '/docs/plugins/logging' },
       { title: 'DevTools', href: '/docs/plugins/devtools' },
+      { title: 'DevTools Live', href: '/devtools' },
       { title: 'Persistence', href: '/docs/plugins/persistence' },
       { title: 'Performance', href: '/docs/plugins/performance' },
       { title: 'Custom Plugins', href: '/docs/plugins/custom' },
-    ],
-  },
-  {
-    title: 'AI Foundations',
-    links: [
-      { title: 'Overview', href: '/docs/ai/overview' },
-      { title: 'Running Agents', href: '/docs/ai/running-agents' },
-      { title: 'Resilience & Routing', href: '/docs/ai/resilience-routing' },
-      { title: 'Comparison', href: '/docs/ai/comparison' },
-      { title: 'Tutorial', href: '/docs/ai/tutorial' },
-    ],
-  },
-  {
-    title: 'Agent Orchestrator',
-    links: [
-      { title: 'Overview', href: '/docs/ai/orchestrator' },
-      { title: 'Guardrails', href: '/docs/ai/guardrails' },
-      { title: 'Streaming', href: '/docs/ai/streaming' },
-      { title: 'Memory', href: '/docs/ai/memory' },
-    ],
-  },
-  {
-    title: 'Multi-Agent Orchestrator',
-    links: [
-      { title: 'Overview', href: '/docs/ai/multi-agent' },
-      { title: 'Execution Patterns', href: '/docs/ai/patterns' },
-      { title: 'Communication', href: '/docs/ai/communication' },
-      { title: 'Cross-Agent State', href: '/docs/ai/cross-agent-state' },
-      { title: 'Self-Healing', href: '/docs/ai/self-healing' },
-      { title: 'Goal Engine', href: '/docs/ai/goals' },
-    ],
-  },
-  {
-    title: 'AI Infrastructure',
-    links: [
-      { title: 'MCP Integration', href: '/docs/ai/mcp' },
-      { title: 'RAG Enricher', href: '/docs/ai/rag' },
-      { title: 'SSE Transport', href: '/docs/ai/sse-transport' },
-      { title: 'Semantic Cache', href: '/docs/ai/semantic-cache' },
-    ],
-  },
-  {
-    title: 'AI Observability',
-    links: [
-      { title: 'Debug Timeline', href: '/docs/ai/debug-timeline' },
-      { title: 'Breakpoints & Checkpoints', href: '/docs/ai/breakpoints' },
-      { title: 'DevTools', href: '/docs/ai/devtools' },
-      { title: 'Evals', href: '/docs/ai/evals' },
-      { title: 'OpenTelemetry', href: '/docs/ai/otel' },
-      { title: 'Testing', href: '/docs/ai/testing' },
-      { title: 'DevTools Live', href: '/devtools' },
-    ],
-  },
-  {
-    title: 'Security & Compliance',
-    links: [
-      { title: 'Overview', href: '/docs/security/overview' },
-      { title: 'PII Detection', href: '/docs/security/pii' },
-      { title: 'Prompt Injection', href: '/docs/security/prompt-injection' },
-      { title: 'Audit Trail', href: '/docs/security/audit' },
-      { title: 'GDPR/CCPA', href: '/docs/security/compliance' },
     ],
   },
   {
@@ -155,7 +76,6 @@ export const navigation: NavigationSection[] = [
       { title: 'Overview', href: '/docs/advanced/overview' },
       { title: 'Multi-Module', href: '/docs/advanced/multi-module' },
       { title: 'Time-Travel & Snapshots', href: '/docs/advanced/time-travel' },
-      { title: 'Snapshots', href: '/docs/advanced/snapshots' },
       { title: 'SSR & Hydration', href: '/docs/advanced/ssr' },
       { title: 'Error Boundaries', href: '/docs/advanced/errors' },
     ],
@@ -182,25 +102,6 @@ export const navigation: NavigationSection[] = [
     ],
   },
   {
-    title: 'Examples',
-    links: [
-      { title: 'Overview', href: '/docs/examples/overview' },
-      { title: 'Sudoku', href: '/docs/examples/sudoku' },
-      // Individual examples hidden while verifying each one works.
-      // Add back one at a time after confirming.
-      // { title: 'Checkers', href: '/docs/examples/checkers' },
-      // { title: 'Counter', href: '/docs/examples/counter' },
-      // { title: 'Data Fetching', href: '/docs/examples/data-fetching' },
-      // { title: 'Form Validation', href: '/docs/examples/form-validation' },
-      // { title: 'Multi-Module App', href: '/docs/examples/multi-module' },
-      // { title: 'AI Agent', href: '/docs/examples/ai-agent' },
-      // { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
-      // { title: 'A/B Testing', href: '/docs/examples/ab-testing' },
-      // { title: 'Contact Form', href: '/docs/examples/contact-form' },
-      // { title: 'Server (Node.js)', href: '/docs/examples/server' },
-    ],
-  },
-  {
     title: 'Guides',
     links: [
       { title: 'Loading & Error States', href: '/docs/how-to/loading-states' },
@@ -216,21 +117,159 @@ export const navigation: NavigationSection[] = [
       { title: 'Debug with Time-Travel', href: '/docs/how-to/debug-time-travel' },
     ],
   },
+]
+
+/**
+ * AI-specific navigation. Used for the sidebar when browsing /ai/* pages.
+ * Section titles drop redundant "AI" prefix since the /ai/ path provides context.
+ */
+export const aiNavigation: NavigationSection[] = [
   {
-    title: 'Resources',
+    title: 'Foundations',
     links: [
-      { title: 'Glossary', href: '/docs/glossary' },
-      { title: 'FAQ', href: '/docs/faq' },
-      { title: 'Troubleshooting', href: '/docs/troubleshooting' },
-      { title: 'Brand Guide', href: '/docs/branding' },
-      { title: 'Roadmap', href: '/docs/roadmap' },
+      { title: 'Overview', href: '/ai/overview' },
+      { title: 'Running Agents', href: '/ai/running-agents' },
+      { title: 'Resilience & Routing', href: '/ai/resilience-routing' },
+      { title: 'Comparison', href: '/ai/comparison' },
+      { title: 'Tutorial', href: '/ai/tutorial' },
+    ],
+  },
+  {
+    title: 'Agent Orchestrator',
+    links: [
+      { title: 'Overview', href: '/ai/orchestrator' },
+      { title: 'Guardrails', href: '/ai/guardrails' },
+      { title: 'Streaming', href: '/ai/streaming' },
+      { title: 'Memory', href: '/ai/memory' },
+    ],
+  },
+  {
+    title: 'Multi-Agent Orchestrator',
+    links: [
+      { title: 'Overview', href: '/ai/multi-agent' },
+      { title: 'Execution Patterns', href: '/ai/patterns' },
+      { title: 'Communication', href: '/ai/communication' },
+      { title: 'Cross-Agent State', href: '/ai/cross-agent-state' },
+      { title: 'Self-Healing', href: '/ai/self-healing' },
+      { title: 'Goal Engine', href: '/ai/goals' },
+    ],
+  },
+  {
+    title: 'Infrastructure',
+    links: [
+      { title: 'MCP Integration', href: '/ai/mcp' },
+      { title: 'RAG Enricher', href: '/ai/rag' },
+      { title: 'SSE Transport', href: '/ai/sse-transport' },
+      { title: 'Semantic Cache', href: '/ai/semantic-cache' },
+    ],
+  },
+  {
+    title: 'Observability',
+    links: [
+      { title: 'Debug Timeline', href: '/ai/debug-timeline' },
+      { title: 'Breakpoints & Checkpoints', href: '/ai/breakpoints' },
+      { title: 'DevTools', href: '/ai/devtools' },
+      { title: 'DevTools Live', href: '/devtools' },
+      { title: 'Evals', href: '/ai/evals' },
+      { title: 'OpenTelemetry', href: '/ai/otel' },
+      { title: 'Testing', href: '/ai/testing' },
+    ],
+  },
+  {
+    title: 'Security & Compliance',
+    links: [
+      { title: 'Overview', href: '/ai/security/overview' },
+      { title: 'PII Detection', href: '/ai/security/pii' },
+      { title: 'Prompt Injection', href: '/ai/security/prompt-injection' },
+      { title: 'Audit Trail', href: '/ai/security/audit' },
+      { title: 'GDPR/CCPA', href: '/ai/security/compliance' },
+    ],
+  },
+  {
+    title: 'Guides',
+    links: [
+      { title: 'Prevent Off-Topic Responses', href: '/ai/guides/prevent-off-topic-responses' },
+      { title: 'Human Approval Workflows', href: '/ai/guides/human-approval-workflows' },
+      { title: 'Control AI Costs', href: '/ai/guides/control-ai-costs' },
+      { title: 'Customer Support Bot', href: '/ai/guides/customer-support-bot' },
+      { title: 'Validate Structured Output', href: '/ai/guides/validate-structured-output' },
+      { title: 'Add Chatbot Memory', href: '/ai/guides/chatbot-memory' },
+      { title: 'Handle Agent Errors', href: '/ai/guides/handle-agent-errors' },
+      { title: 'Stream Agent Responses', href: '/ai/guides/stream-agent-responses' },
+      { title: 'Multi-Step Pipeline', href: '/ai/guides/multi-step-pipeline' },
+      { title: 'Test Without LLM Calls', href: '/ai/guides/test-agents-without-llm' },
+      { title: 'Smart Model Routing', href: '/ai/guides/smart-model-routing' },
+      { title: 'DAG Pipeline', href: '/ai/guides/dag-pipeline' },
+      { title: 'Self-Improving Agents', href: '/ai/guides/self-improving-agents' },
     ],
   },
 ]
 
-// Populate the valid routes Set from the navigation tree
-for (const section of navigation) {
+/**
+ * Combined navigation for backward compat (search, llms.txt).
+ * Uses the new /ai/* hrefs for AI sections.
+ */
+export const navigation: NavigationSection[] = [
+  ...docsNavigation,
+  ...aiNavigation,
+]
+
+/**
+ * Return the navigation tree with all hrefs prefixed for a given version.
+ * For latest (pathPrefix: ""), this returns the original navigation unchanged.
+ */
+export function getNavigationForVersion(
+  version: DocsVersion,
+  nav: NavigationSection[] = docsNavigation,
+): NavigationSection[] {
+  if (!version.pathPrefix) {
+    return nav
+  }
+
+  return nav.map((section) => ({
+    ...section,
+    links: section.links.map((link) => ({
+      ...link,
+      href: link.href.replace('/docs', `/docs${version.pathPrefix}`),
+    })),
+  }))
+}
+
+/** Determine which top-level site section a pathname belongs to. */
+export type SiteSection = 'home' | 'docs' | 'ai' | 'blog' | 'other'
+
+export function getSiteSection(pathname: string): SiteSection {
+  if (pathname === '/') {
+    return 'home'
+  }
+  if (pathname.startsWith('/docs')) {
+    return 'docs'
+  }
+  if (pathname.startsWith('/ai')) {
+    return 'ai'
+  }
+  if (pathname.startsWith('/blog')) {
+    return 'blog'
+  }
+
+  return 'other'
+}
+
+/** Set of all valid doc hrefs derived from the docs navigation tree. */
+export const validDocRoutes: Set<string> = new Set()
+
+/** Set of all valid AI hrefs derived from the AI navigation tree. */
+export const validAIRoutes: Set<string> = new Set()
+
+// Populate the valid routes Sets
+for (const section of docsNavigation) {
   for (const link of section.links) {
     validDocRoutes.add(link.href)
+  }
+}
+
+for (const section of aiNavigation) {
+  for (const link of section.links) {
+    validAIRoutes.add(link.href)
   }
 }

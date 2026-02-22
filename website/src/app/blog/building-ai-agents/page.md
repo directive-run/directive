@@ -297,7 +297,7 @@ const final = await orchestrator.runPattern(
 console.log(final.output);  // The reviewed article
 ```
 
-For more dynamic coordination, the `supervisor` pattern lets a manager agent delegate to workers in a loop, deciding what to do next based on worker results. See the [multi-agent documentation](/docs/ai/multi-agent) for the full pattern.
+For more dynamic coordination, the `supervisor` pattern lets a manager agent delegate to workers in a loop, deciding what to do next based on worker results. See the [multi-agent documentation](/ai/multi-agent) for the full pattern.
 
 ---
 
@@ -409,7 +409,7 @@ const orchestrator = createAgentOrchestrator({
 
 The composition order matters: budget checks run first (reject before spending), then retry wraps the call, then fallback catches provider-level failures. Each `with*` wrapper returns a new runner, so you can compose them in the order that makes sense for your use case.
 
-See the [Resilience & Routing documentation](/docs/ai/resilience-routing) for the full API including model selection, structured outputs, and constraint-driven provider routing.
+See the [Resilience & Routing documentation](/ai/resilience-routing) for the full API including model selection, structured outputs, and constraint-driven provider routing.
 
 ---
 
@@ -423,12 +423,12 @@ npm install @directive-run/core
 
 Explore the full AI documentation:
 
-- **[AI & Agents Overview](/docs/ai/overview)** &ndash; architecture and learning path
-- **[Running Agents](/docs/ai/running-agents)** &ndash; provider setup for OpenAI, Anthropic, and Ollama
-- **[Resilience & Routing](/docs/ai/resilience-routing)** &ndash; retry, fallback, budgets, and model selection
-- **[Agent Orchestrator](/docs/ai/orchestrator)** &ndash; single-agent patterns, constraints, and approval workflows
-- **[Guardrails & Safety](/docs/ai/guardrails)** &ndash; input, output, and streaming validation
-- **[Multi-Agent Patterns](/docs/ai/multi-agent)** &ndash; parallel, sequential, and supervisor coordination
+- **[AI & Agents Overview](/ai/overview)** &ndash; architecture and learning path
+- **[Running Agents](/ai/running-agents)** &ndash; provider setup for OpenAI, Anthropic, and Ollama
+- **[Resilience & Routing](/ai/resilience-routing)** &ndash; retry, fallback, budgets, and model selection
+- **[Agent Orchestrator](/ai/orchestrator)** &ndash; single-agent patterns, constraints, and approval workflows
+- **[Guardrails & Safety](/ai/guardrails)** &ndash; input, output, and streaming validation
+- **[Multi-Agent Patterns](/ai/multi-agent)** &ndash; parallel, sequential, and supervisor coordination
 
 If you haven't read the first article in this series, **[Constraint-Driven Architecture](/blog/constraint-driven-architecture)** explains the paradigm from scratch &ndash; why declaring "what must be true" beats writing imperative handlers.
 

@@ -370,7 +370,7 @@ const article = await orchestrator.runPattern(
 
 **`sequential`** chains agents in order. Each agent's output is transformed and passed as input to the next. Use `transform` to shape the handoff.
 
-**`supervisor`** lets a manager agent delegate to workers dynamically, deciding what to do next based on results. See the [multi-agent documentation](/docs/ai/multi-agent) for the full pattern.
+**`supervisor`** lets a manager agent delegate to workers dynamically, deciding what to do next based on results. See the [multi-agent documentation](/ai/multi-agent) for the full pattern.
 
 Constraints apply to the entire orchestrator, not individual agents. A budget constraint covers all agents' cumulative token usage. A PII guardrail scans all agents' inputs and outputs. The safety layer is system-wide.
 
@@ -421,11 +421,11 @@ const result = await orchestrator.run(agent, 'Help me with my account');
 
 Explore the AI documentation:
 
-- **[AI & Agents Overview](/docs/ai/overview)** &ndash; architecture and learning path
-- **[Agent Orchestrator](/docs/ai/orchestrator)** &ndash; single-agent patterns, constraints, and approval workflows
-- **[Guardrails & Safety](/docs/ai/guardrails)** &ndash; built-in and custom guardrails
-- **[Multi-Agent Patterns](/docs/ai/multi-agent)** &ndash; parallel, sequential, and supervisor coordination
-- **[Resilience & Routing](/docs/ai/resilience-routing)** &ndash; retry, fallback, budgets, and model selection
+- **[AI & Agents Overview](/ai/overview)** &ndash; architecture and learning path
+- **[Agent Orchestrator](/ai/orchestrator)** &ndash; single-agent patterns, constraints, and approval workflows
+- **[Guardrails & Safety](/ai/guardrails)** &ndash; built-in and custom guardrails
+- **[Multi-Agent Patterns](/ai/multi-agent)** &ndash; parallel, sequential, and supervisor coordination
+- **[Resilience & Routing](/ai/resilience-routing)** &ndash; retry, fallback, budgets, and model selection
 - **[Building AI Agents](/blog/building-ai-agents)** &ndash; the full tutorial
 - **[Declarative AI Guardrails](/blog/declarative-ai-guardrails)** &ndash; building guardrails with `createModule`
 

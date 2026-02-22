@@ -1,6 +1,9 @@
 import { Callout } from '@/components/Callout'
 import { ComparisonTable } from '@/components/ComparisonTable'
 import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
+import { DagFlowDiagram } from '@/components/DagFlowDiagram'
+import { ReflectLoopDiagram } from '@/components/ReflectLoopDiagram'
+import { ResilienceCascadeDiagram } from '@/components/ResilienceCascadeDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 import { UseCaseCards } from '@/components/UseCaseCards'
@@ -13,6 +16,18 @@ const tags = {
   },
   'constraint-flow-diagram': {
     render: ConstraintFlowDiagram,
+    selfClosing: true,
+  },
+  'dag-flow-diagram': {
+    render: DagFlowDiagram,
+    selfClosing: true,
+  },
+  'reflect-loop-diagram': {
+    render: ReflectLoopDiagram,
+    selfClosing: true,
+  },
+  'resilience-cascade-diagram': {
+    render: ResilienceCascadeDiagram,
     selfClosing: true,
   },
   callout: {

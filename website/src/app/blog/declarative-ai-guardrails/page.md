@@ -461,8 +461,8 @@ npm install @directive-run/core
 
 Explore the AI safety documentation:
 
-- **[Guardrails & Safety](/docs/ai/guardrails)** &ndash; built-in guardrails for PII, tool access, content moderation, and rate limiting
-- **[Agent Orchestrator](/docs/ai/orchestrator)** &ndash; the orchestrator API with approval workflows and budget enforcement
+- **[Guardrails & Safety](/ai/guardrails)** &ndash; built-in guardrails for PII, tool access, content moderation, and rate limiting
+- **[Agent Orchestrator](/ai/orchestrator)** &ndash; the orchestrator API with approval workflows and budget enforcement
 - **[Building AI Agents](/blog/building-ai-agents)** &ndash; the full tutorial on orchestrating agents with Directive
 - **[Constraint-Driven Architecture](/blog/constraint-driven-architecture)** &ndash; the paradigm behind all of this
 

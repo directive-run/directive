@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { ArrowRight } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
-import { getNavigationForVersion } from '@/lib/navigation'
+import { aiNavigation, getSiteSection, getNavigationForVersion } from '@/lib/navigation'
 import { useDocsVersion } from '@/lib/hooks/useDocsVersion'
 
 const PageLink = memo(function PageLink({
@@ -49,11 +49,15 @@ const PageLink = memo(function PageLink({
 export const PrevNextLinks = memo(function PrevNextLinks() {
   const pathname = usePathname()
   const { version } = useDocsVersion()
+  const isAIPage = getSiteSection(pathname) === 'ai'
 
-  const allLinks = useMemo(
-    () => getNavigationForVersion(version).flatMap((section) => section.links),
-    [version],
-  )
+  const allLinks = useMemo(() => {
+    if (isAIPage) {
+      return aiNavigation.flatMap((section) => section.links)
+    }
+
+    return getNavigationForVersion(version).flatMap((section) => section.links)
+  }, [version, isAIPage])
 
   const { previousPage, nextPage } = useMemo(() => {
     const linkIndex = allLinks.findIndex((link) => link.href === pathname)

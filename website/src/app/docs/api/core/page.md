@@ -498,7 +498,7 @@ const resetResolver = typedResolver<typeof schema, { type: "RESET" }>({
 ```
 
 {% callout title="AI Orchestrator" %}
-For AI agent orchestrators, see `createAgentOrchestrator()` in `@directive-run/ai`. See [Orchestrator](/docs/ai/orchestrator).
+For AI agent orchestrators, see `createAgentOrchestrator()` in `@directive-run/ai`. See [Orchestrator](/ai/orchestrator).
 {% /callout %}
 
 ---
