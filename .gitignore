@@ -40,6 +40,10 @@ website/docs/generated/
 # Claude Code local settings (may contain API keys)
 .claude/settings.local.json
 
+# Playwright
+playwright-report/
+test-results/
+
 # Temporary
 tmp/
 temp/

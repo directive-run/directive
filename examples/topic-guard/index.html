@@ -5,11 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Topic Guard - Directive Example</title>
   <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: var(--brand-primary);
+      --brand-primary-hover: var(--brand-primary-hover);
+      --brand-error: var(--brand-error);
+      --brand-success: var(--brand-success);
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #161412;
-      color: #c8bfb4;
+      background: var(--brand-surface);
+      color: var(--brand-text);
       display: flex;
       justify-content: center;
       align-items: flex-start;
@@ -33,8 +46,8 @@
 
     /* Panel base */
     .tg-panel {
-      background: #1f1b17;
-      border: 1px solid #2a2520;
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
       border-radius: 10px;
       display: flex;
       flex-direction: column;
@@ -43,12 +56,12 @@
 
     .tg-panel-header {
       padding: 0.6rem 0.85rem;
-      border-bottom: 1px solid #2a2520;
+      border-bottom: 1px solid var(--brand-border);
       font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: #9a8e80;
+      color: var(--brand-text-muted);
     }
 
     /* ===== Chat Panel (Left) ===== */
@@ -75,15 +88,15 @@
     }
 
     .tg-message.user {
-      background: #262220;
+      background: #283548;
       align-self: flex-end;
-      color: #c8bfb4;
+      color: var(--brand-text);
     }
 
     .tg-message.user.blocked {
       background: rgba(200, 60, 50, 0.15);
       border: 1px solid rgba(200, 60, 50, 0.3);
-      color: #e8836f;
+      color: var(--brand-error);
     }
 
     .tg-message.agent {
@@ -97,7 +110,7 @@
       background: rgba(200, 60, 50, 0.1);
       border: 1px solid rgba(200, 60, 50, 0.2);
       align-self: flex-start;
-      color: #e8836f;
+      color: var(--brand-error);
       font-style: italic;
     }
 
@@ -108,7 +121,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
       background: rgba(200, 60, 50, 0.2);
-      color: #e8836f;
+      color: var(--brand-error);
       padding: 0.15rem 0.4rem;
       border-radius: 4px;
       margin-top: 0.3rem;
@@ -119,7 +132,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #4a4035;
+      color: var(--brand-text-faint);
       font-size: 0.8rem;
       font-style: italic;
     }
@@ -129,34 +142,34 @@
       display: flex;
       gap: 0.5rem;
       padding: 0.75rem;
-      border-top: 1px solid #2a2520;
+      border-top: 1px solid var(--brand-border);
     }
 
     .tg-input-row input {
       flex: 1;
-      background: #161412;
-      border: 1px solid #2a2520;
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
       border-radius: 8px;
       padding: 0.5rem 0.75rem;
-      color: #c8bfb4;
+      color: var(--brand-text);
       font-size: 0.8rem;
       outline: none;
       transition: border-color 0.15s;
     }
 
     .tg-input-row input:focus {
-      border-color: #5ba3a3;
+      border-color: var(--brand-primary);
     }
 
     .tg-input-row input::placeholder {
-      color: #4a4035;
+      color: var(--brand-text-faint);
     }
 
     /* Buttons */
     .tg-btn {
-      background: #1f1b17;
-      border: 1px solid #2a2520;
-      color: #c8bfb4;
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
       padding: 0.45rem 0.85rem;
       border-radius: 8px;
       cursor: pointer;
@@ -166,19 +179,19 @@
       white-space: nowrap;
     }
 
-    .tg-btn:hover:not(:disabled) { background: #2a2520; }
+    .tg-btn:hover:not(:disabled) { background: var(--brand-border); }
     .tg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
     .tg-btn.primary {
-      background: #5ba3a3;
-      border-color: #5ba3a3;
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
       color: #fff;
     }
 
-    .tg-btn.primary:hover:not(:disabled) { background: #4d8f8f; }
+    .tg-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); }
 
     .tg-btn.danger {
-      color: #e8836f;
+      color: var(--brand-error);
       border-color: rgba(200, 60, 50, 0.3);
     }
 
@@ -199,8 +212,8 @@
     }
 
     .tg-log-entry {
-      background: #161412;
-      border: 1px solid #2a2520;
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
       border-radius: 6px;
       padding: 0.45rem 0.65rem;
       font-size: 0.7rem;
@@ -208,21 +221,21 @@
     }
 
     .tg-log-entry.allowed {
-      border-left: 3px solid #6dab72;
+      border-left: 3px solid var(--brand-success);
     }
 
     .tg-log-entry.blocked {
-      border-left: 3px solid #e8836f;
+      border-left: 3px solid var(--brand-error);
     }
 
     .tg-log-time {
-      color: #4a4035;
+      color: var(--brand-text-faint);
       font-size: 0.6rem;
       font-variant-numeric: tabular-nums;
     }
 
     .tg-log-input {
-      color: #9a8e80;
+      color: var(--brand-text-muted);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -235,11 +248,11 @@
       font-weight: 600;
     }
 
-    .tg-log-result.allowed { color: #6dab72; }
-    .tg-log-result.blocked { color: #e8836f; }
+    .tg-log-result.allowed { color: var(--brand-success); }
+    .tg-log-result.blocked { color: var(--brand-error); }
 
     .tg-log-guardrail {
-      color: #6b6055;
+      color: var(--brand-text-dim);
       font-size: 0.6rem;
     }
 
@@ -248,7 +261,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #4a4035;
+      color: var(--brand-text-faint);
       font-size: 0.75rem;
       font-style: italic;
     }
@@ -258,7 +271,7 @@
 
     .tg-config-section {
       padding: 0.75rem 0.85rem;
-      border-bottom: 1px solid #2a2520;
+      border-bottom: 1px solid var(--brand-border);
     }
 
     .tg-config-section:last-child {
@@ -270,7 +283,7 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: #6b6055;
+      color: var(--brand-text-dim);
       margin-bottom: 0.5rem;
     }
 
@@ -290,7 +303,7 @@
     }
 
     .tg-topic-item input[type="checkbox"] {
-      accent-color: #5ba3a3;
+      accent-color: var(--brand-primary);
       cursor: pointer;
     }
 
@@ -308,15 +321,15 @@
       font-size: 0.75rem;
     }
 
-    .tg-stat-label { color: #6b6055; }
+    .tg-stat-label { color: var(--brand-text-dim); }
 
     .tg-stat-value {
       font-weight: 600;
       font-variant-numeric: tabular-nums;
     }
 
-    .tg-stat-value.blocked-val { color: #e8836f; }
-    .tg-stat-value.allowed-val { color: #6dab72; }
+    .tg-stat-value.blocked-val { color: var(--brand-error); }
+    .tg-stat-value.allowed-val { color: var(--brand-success); }
 
     /* Example chips */
     .tg-chips {
@@ -326,20 +339,20 @@
     }
 
     .tg-chip {
-      background: #161412;
-      border: 1px solid #2a2520;
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
       border-radius: 20px;
       padding: 0.3rem 0.6rem;
       font-size: 0.65rem;
-      color: #9a8e80;
+      color: var(--brand-text-muted);
       cursor: pointer;
       transition: all 0.15s;
       white-space: nowrap;
     }
 
     .tg-chip:hover {
-      background: #2a2520;
-      color: #c8bfb4;
+      background: var(--brand-border);
+      color: var(--brand-text);
     }
 
     .tg-chip.on-topic {
@@ -353,16 +366,16 @@
     /* How it works footer */
     .tg-how-it-works {
       grid-column: 1 / -1;
-      background: #1f1b17;
-      border: 1px solid #2a2520;
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
       border-radius: 10px;
       padding: 0.75rem 0.85rem;
       font-size: 0.7rem;
-      color: #6b6055;
+      color: var(--brand-text-dim);
     }
 
     .tg-how-it-works h3 {
-      color: #9a8e80;
+      color: var(--brand-text-muted);
       font-size: 0.75rem;
       margin-bottom: 0.4rem;
     }
@@ -378,9 +391,9 @@
     .tg-how-it-works .directive-note {
       margin-top: 0.4rem;
       padding-top: 0.4rem;
-      border-top: 1px solid #2a2520;
+      border-top: 1px solid var(--brand-border);
       font-style: italic;
-      color: #4a4035;
+      color: var(--brand-text-faint);
     }
 
     /* Responsive */
