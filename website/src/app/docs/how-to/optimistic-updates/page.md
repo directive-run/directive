@@ -171,6 +171,7 @@ resolve: async (req, context) => {
 
 ## Related
 
+- [Interactive Example](/docs/examples/optimistic-updates) – try it in your browser
 - [Resolvers](/docs/resolvers) – `key`, retry policies, and `context.snapshot()`
 - [Loading & Error States](/docs/how-to/loading-states) – tracking pending operations
 - [Batch Mutations](/docs/how-to/batch-mutations) – atomic multi-field updates

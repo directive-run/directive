@@ -23,6 +23,7 @@ export const docsNavigation: NavigationSection[] = [
       { title: 'Core Concepts', href: '/docs/core-concepts' },
       { title: 'Why Directive', href: '/docs/why-directive' },
       { title: 'Comparison', href: '/docs/comparison' },
+      { title: 'Choosing Primitives', href: '/docs/choosing-primitives' },
     ],
   },
   {
@@ -104,17 +105,66 @@ export const docsNavigation: NavigationSection[] = [
   {
     title: 'Guides',
     links: [
+      // Every-App Essentials
+      { title: 'Global UI State', href: '/docs/how-to/global-ui-state' },
       { title: 'Loading & Error States', href: '/docs/how-to/loading-states' },
       { title: 'Authentication Flow', href: '/docs/how-to/auth-flow' },
-      { title: 'WebSocket Connections', href: '/docs/how-to/websockets' },
+      { title: 'Pagination & Infinite Scroll', href: '/docs/how-to/pagination' },
+      { title: 'Sync State with URL', href: '/docs/how-to/url-sync' },
       { title: 'Optimistic Updates', href: '/docs/how-to/optimistic-updates' },
-      { title: 'Organize Modules', href: '/docs/how-to/organize-modules' },
-      { title: 'Optimize Re-Renders', href: '/docs/how-to/optimize-rerenders' },
-      { title: 'Debounce Constraints', href: '/docs/how-to/debounce-constraints' },
-      { title: 'Dynamic Modules', href: '/docs/how-to/dynamic-modules' },
+      { title: 'Notifications & Toasts', href: '/docs/how-to/notifications' },
       { title: 'Persist State', href: '/docs/how-to/persist-state' },
+      // Multi-Module & Architecture
+      { title: 'Async Chains Across Modules', href: '/docs/how-to/async-chains' },
+      { title: 'Organize Modules', href: '/docs/how-to/organize-modules' },
+      { title: 'Multi-Step Form Wizard', href: '/docs/how-to/form-wizard' },
+      { title: 'Shopping Cart Rules', href: '/docs/how-to/shopping-cart' },
+      { title: 'Role-Based Permissions', href: '/docs/how-to/permissions' },
+      { title: 'Dynamic Modules', href: '/docs/how-to/dynamic-modules' },
+      // Performance & Real-Time
+      { title: 'Optimize Re-Renders', href: '/docs/how-to/optimize-rerenders' },
       { title: 'Batch Mutations', href: '/docs/how-to/batch-mutations' },
+      { title: 'WebSocket Connections', href: '/docs/how-to/websockets' },
+      { title: 'Debounce Constraints', href: '/docs/how-to/debounce-constraints' },
+      // Testing & Debugging
+      { title: 'Test Async Chains', href: '/docs/how-to/test-async-chains' },
       { title: 'Debug with Time-Travel', href: '/docs/how-to/debug-time-travel' },
+    ],
+  },
+  {
+    title: 'Examples',
+    links: [
+      // Beginner
+      { title: 'Counter', href: '/docs/examples/counter' },
+      { title: 'Data Fetching', href: '/docs/examples/data-fetching' },
+      { title: 'Form Validation', href: '/docs/examples/form-validation' },
+      { title: 'Contact Form', href: '/docs/examples/contact-form' },
+      // Everyday patterns
+      { title: 'Theme & Locale', href: '/docs/examples/theme-locale' },
+      { title: 'Auth Flow', href: '/docs/examples/auth-flow' },
+      { title: 'Pagination', href: '/docs/examples/pagination' },
+      { title: 'URL Sync', href: '/docs/examples/url-sync' },
+      { title: 'Notifications', href: '/docs/examples/notifications' },
+      { title: 'Dashboard Loader', href: '/docs/examples/dashboard-loader' },
+      { title: 'Optimistic Updates', href: '/docs/examples/optimistic-updates' },
+      { title: 'WebSocket', href: '/docs/examples/websocket' },
+      // Multi-module & advanced
+      { title: 'Async Chains', href: '/docs/examples/async-chains' },
+      { title: 'Form Wizard', href: '/docs/examples/form-wizard' },
+      { title: 'Shopping Cart', href: '/docs/examples/shopping-cart' },
+      { title: 'Permissions', href: '/docs/examples/permissions' },
+      { title: 'Multi-Module', href: '/docs/examples/multi-module' },
+      { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
+      { title: 'A/B Testing', href: '/docs/examples/ab-testing' },
+      { title: 'Topic Guard', href: '/docs/examples/topic-guard' },
+      { title: 'Debounce Constraints', href: '/docs/examples/debounce-constraints' },
+      { title: 'Dynamic Modules', href: '/docs/examples/dynamic-modules' },
+      // Showcases
+      { title: 'Sudoku', href: '/docs/examples/sudoku' },
+      { title: 'Checkers', href: '/docs/examples/checkers' },
+      // Specialized
+      { title: 'Server-Side', href: '/docs/examples/server' },
+      { title: 'AI Agent', href: '/docs/examples/ai-agent' },
     ],
   },
 ]

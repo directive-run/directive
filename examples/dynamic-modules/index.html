@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic Modules - Directive Example</title>
+  <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--brand-surface);
+      color: var(--brand-text);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .dm-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ===== Status Bar ===== */
+    .dm-status-bar {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dm-status-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--brand-text);
+    }
+
+    .dm-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      background: rgba(91, 163, 163, 0.15);
+      color: var(--brand-primary);
+    }
+
+    .dm-status-badge.active {
+      background: rgba(109, 171, 114, 0.2);
+      color: var(--brand-success);
+    }
+
+    .dm-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand-text-faint);
+    }
+
+    .dm-status-badge.active .dm-status-dot {
+      background: var(--brand-success);
+      animation: dm-pulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes dm-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ===== Main 2-column Layout ===== */
+    .dm-main {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 700px) {
+      .dm-main { grid-template-columns: 1fr; }
+    }
+
+    /* Panel base */
+    .dm-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dm-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+    }
+
+    .dm-panel-body {
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* ===== Widget Dashboard ===== */
+    .dm-widgets-area {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      min-height: 120px;
+    }
+
+    .dm-widgets-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+      min-height: 120px;
+    }
+
+    /* Widget cards */
+    .dm-widget-card {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      min-width: 180px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .dm-widget-header {
+      padding: 0.45rem 0.6rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-muted);
+    }
+
+    .dm-widget-card.counter .dm-widget-header { border-left: 3px solid var(--brand-primary); }
+    .dm-widget-card.weather .dm-widget-header { border-left: 3px solid var(--brand-warning); }
+    .dm-widget-card.dice .dm-widget-header { border-left: 3px solid var(--brand-success); }
+
+    .dm-widget-body {
+      padding: 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex: 1;
+    }
+
+    /* ===== Counter Widget ===== */
+    .dm-counter-display {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+
+    .dm-counter-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .dm-counter-near-max {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      text-align: center;
+      color: var(--brand-warning);
+      letter-spacing: 0.04em;
+    }
+
+    .dm-step-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.6rem;
+      color: var(--brand-text-dim);
+    }
+
+    .dm-step-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+    }
+
+    .dm-step-val {
+      color: var(--brand-text-muted);
+      font-variant-numeric: tabular-nums;
+      min-width: 1.2em;
+      text-align: right;
+    }
+
+    /* ===== Weather Widget ===== */
+    .dm-weather-input-row {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .dm-weather-data {
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .dm-weather-temp {
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .dm-weather-condition {
+      color: var(--brand-text-muted);
+    }
+
+    .dm-weather-humidity {
+      font-size: 0.65rem;
+      color: var(--brand-text-dim);
+    }
+
+    .dm-weather-empty {
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+      text-align: center;
+      padding: 0.5rem 0;
+    }
+
+    .dm-weather-loading {
+      color: var(--brand-primary);
+      font-size: 0.7rem;
+      text-align: center;
+      padding: 0.5rem 0;
+      animation: dm-pulse 0.8s ease-in-out infinite;
+    }
+
+    /* ===== Dice Widget ===== */
+    .dm-dice-faces {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      font-size: 2.5rem;
+      line-height: 1;
+    }
+
+    .dm-dice-info {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-muted);
+      align-items: center;
+    }
+
+    .dm-doubles-badge {
+      font-size: 0.55rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+      background: rgba(109, 171, 114, 0.15);
+      color: var(--brand-success);
+    }
+
+    .dm-dice-roll-count {
+      font-size: 0.6rem;
+      color: var(--brand-text-dim);
+      text-align: center;
+    }
+
+    /* ===== Buttons ===== */
+    .dm-btn {
+      background: var(--brand-primary);
+      border: 1px solid var(--brand-primary);
+      color: #fff;
+      padding: 0.35rem 0.65rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .dm-btn:hover:not(:disabled) { background: var(--brand-primary-hover); }
+    .dm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .dm-btn-sm {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.65rem;
+      border-radius: 6px;
+    }
+
+    .dm-btn-secondary {
+      background: transparent;
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text-muted);
+    }
+
+    .dm-btn-secondary:hover:not(:disabled) {
+      background: var(--brand-surface);
+      border-color: var(--brand-border-strong);
+    }
+
+    .dm-input {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.35rem 0.5rem;
+      color: var(--brand-text);
+      font-size: 0.7rem;
+      outline: none;
+      transition: border-color 0.15s;
+      flex: 1;
+    }
+
+    .dm-input:focus { border-color: var(--brand-primary); }
+    .dm-input::placeholder { color: var(--brand-text-faint); }
+
+    /* ===== Module Manager ===== */
+    .dm-module-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.3rem 0;
+      gap: 0.5rem;
+    }
+
+    .dm-module-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    .dm-module-name {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--brand-text);
+    }
+
+    .dm-module-desc {
+      font-size: 0.55rem;
+      color: var(--brand-text-dim);
+    }
+
+    .dm-module-loaded {
+      font-size: 0.55rem;
+      font-weight: 600;
+      color: var(--brand-success);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .dm-config-separator {
+      border: none;
+      border-top: 1px solid var(--brand-border);
+      margin: 0.3rem 0;
+    }
+
+    /* ===== Inspector ===== */
+    .dm-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.3rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .dm-inspector-scroll {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .dm-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.12rem 0;
+      font-size: 0.6rem;
+    }
+
+    .dm-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .dm-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dm-inspector-empty {
+      font-size: 0.6rem;
+      color: var(--brand-text-faint);
+      font-style: italic;
+      padding: 0.3rem 0;
+    }
+
+    /* ===== Timeline ===== */
+    .dm-timeline-header {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.3rem;
+    }
+
+    .dm-timeline {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 80px;
+      max-height: 200px;
+    }
+
+    .dm-timeline-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .dm-timeline-entry {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.55rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.3rem;
+      align-items: baseline;
+    }
+
+    .dm-timeline-entry.loaded { border-left: 3px solid var(--brand-primary); }
+    .dm-timeline-entry.counter { border-left: 3px solid var(--brand-primary); }
+    .dm-timeline-entry.weather { border-left: 3px solid var(--brand-warning); }
+    .dm-timeline-entry.dice { border-left: 3px solid var(--brand-success); }
+
+    .dm-timeline-time {
+      color: var(--brand-text-faint);
+      font-size: 0.5rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .dm-timeline-event {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 50px;
+    }
+
+    .dm-timeline-detail {
+      color: var(--brand-text-dim);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== How it works ===== */
+    .dm-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .dm-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .dm-how-it-works ul { padding-left: 1.2rem; }
+    .dm-how-it-works li { margin-bottom: 0.2rem; }
+
+    .dm-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--brand-border);
+      font-style: italic;
+      color: var(--brand-text-faint);
+    }
+
+    /* ===== Reset row ===== */
+    .dm-reset-row {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 0.3rem;
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dm-container">
+    <!-- Status Bar -->
+    <div class="dm-status-bar">
+      <span class="dm-status-title">Dynamic Modules</span>
+      <span id="dm-status-badge" class="dm-status-badge" data-testid="dm-status-badge">
+        <span class="dm-status-dot"></span>
+        <span id="dm-status-text">0 / 3 loaded</span>
+      </span>
+    </div>
+
+    <!-- Main 2-column -->
+    <div class="dm-main">
+      <!-- Left: Widget Dashboard -->
+      <div class="dm-panel">
+        <div class="dm-panel-header">Widget Dashboard</div>
+        <div class="dm-panel-body">
+          <div id="dm-widgets-area" class="dm-widgets-area" data-testid="dm-widgets-area">
+            <div class="dm-widgets-empty">Load a module to get started</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Module Manager + Inspector + Timeline -->
+      <div style="display:flex;flex-direction:column;gap:1rem;">
+        <!-- Module Manager -->
+        <div class="dm-panel">
+          <div class="dm-panel-header">Modules</div>
+          <div class="dm-panel-body" id="dm-module-manager">
+            <div class="dm-module-row">
+              <div class="dm-module-info">
+                <span class="dm-module-name">Counter</span>
+                <span class="dm-module-desc">Increment, step, overflow reset</span>
+              </div>
+              <button id="dm-load-counter" class="dm-btn dm-btn-sm" data-testid="dm-load-counter">Load</button>
+            </div>
+            <div class="dm-module-row">
+              <div class="dm-module-info">
+                <span class="dm-module-name">Weather</span>
+                <span class="dm-module-desc">City lookup, async resolver</span>
+              </div>
+              <button id="dm-load-weather" class="dm-btn dm-btn-sm" data-testid="dm-load-weather">Load</button>
+            </div>
+            <div class="dm-module-row">
+              <div class="dm-module-info">
+                <span class="dm-module-name">Dice</span>
+                <span class="dm-module-desc">Roll, doubles, derivations</span>
+              </div>
+              <button id="dm-load-dice" class="dm-btn dm-btn-sm" data-testid="dm-load-dice">Load</button>
+            </div>
+            <div class="dm-reset-row">
+              <button id="dm-reset-btn" class="dm-btn dm-btn-sm dm-btn-secondary" data-testid="dm-reset-btn">Reset Demo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inspector -->
+        <div class="dm-panel">
+          <div class="dm-panel-header">System Facts</div>
+          <div class="dm-panel-body">
+            <div id="dm-inspector" class="dm-inspector-scroll" data-testid="dm-inspector">
+              <div class="dm-inspector-empty">No modules loaded</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="dm-panel">
+          <div class="dm-panel-header">Event Timeline</div>
+          <div class="dm-panel-body">
+            <div id="dm-timeline" class="dm-timeline" data-testid="dm-timeline">
+              <div class="dm-timeline-empty">Events will appear here</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="dm-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>createSystem</strong> &ndash; starts with only the <code>dashboard</code> module (multi-module mode)</li>
+        <li><strong>registerModule</strong> &ndash; dynamically adds modules at runtime with full constraint/resolver integration</li>
+        <li><strong>subscribeModule</strong> &ndash; subscribes to all fact changes in a specific namespace</li>
+        <li><strong>Namespaced access</strong> &ndash; <code>system.facts.counter.count</code>, <code>system.events.counter.increment()</code></li>
+        <li><strong>Independent lifecycles</strong> &ndash; each module has its own constraints, resolvers, and derivations</li>
+      </ul>
+      <p class="directive-note">Modules are permanent once loaded &mdash; no <code>unregisterModule</code>. The Reset button recreates the entire system from scratch.</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

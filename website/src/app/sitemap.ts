@@ -46,6 +46,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/about', priority: 0.7, changeFrequency: 'monthly' as const },
     { path: '/support', priority: 0.6, changeFrequency: 'monthly' as const },
     { path: '/devtools', priority: 0.7, changeFrequency: 'monthly' as const },
+    { path: '/branding', priority: 0.5, changeFrequency: 'monthly' as const },
   ]
 
   for (const page of tsxPages) {

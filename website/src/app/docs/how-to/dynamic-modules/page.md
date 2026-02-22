@@ -164,3 +164,4 @@ useEffect(() => {
 - [Organize Modules](/docs/how-to/organize-modules) – module structure patterns
 - [Multi-Module](/docs/advanced/multi-module) – composition and namespacing
 - [SSR & Hydration](/docs/advanced/ssr) – server-side module setup
+- [Interactive Example](/docs/examples/dynamic-modules) – try it in your browser

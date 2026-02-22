@@ -89,7 +89,7 @@ export function ExampleEmbed({
       ref={hostRef}
       role="application"
       aria-label={`Interactive ${name} example`}
-      className="min-h-[200px] overflow-hidden rounded-xl border border-[#4a4035] bg-[#161412]"
+      className="min-h-[200px] overflow-hidden rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)]"
     >
       <div className="flex min-h-[200px] items-center justify-center text-sm text-slate-500">
         Loading example&hellip;

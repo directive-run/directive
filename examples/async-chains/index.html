@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Async Chains - Directive Example</title>
+  <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--brand-surface);
+      color: var(--brand-text);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .ac-container {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ===== Chain Visualization ===== */
+    .ac-chain {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .ac-chain-box {
+      background: var(--brand-surface);
+      border: 2px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      min-width: 180px;
+      text-align: center;
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .ac-chain-box.idle {
+      border-color: var(--brand-border);
+    }
+
+    .ac-chain-box.running {
+      border-color: var(--brand-primary);
+      background: rgba(91, 163, 163, 0.06);
+    }
+
+    .ac-chain-box.success {
+      border-color: var(--brand-success);
+      background: rgba(109, 171, 114, 0.06);
+    }
+
+    .ac-chain-box.error {
+      border-color: var(--brand-error);
+      background: rgba(232, 131, 111, 0.06);
+    }
+
+    .ac-chain-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .ac-chain-badge {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.15rem 0.5rem;
+      border-radius: 20px;
+      margin-bottom: 0.35rem;
+    }
+
+    .ac-chain-badge.idle {
+      background: rgba(100, 116, 139, 0.2);
+      color: var(--brand-text-dim);
+    }
+
+    .ac-chain-badge.running {
+      background: rgba(91, 163, 163, 0.2);
+      color: var(--brand-primary);
+    }
+
+    .ac-chain-badge.success {
+      background: rgba(109, 171, 114, 0.2);
+      color: var(--brand-success);
+    }
+
+    .ac-chain-badge.error {
+      background: rgba(232, 131, 111, 0.2);
+      color: var(--brand-error);
+    }
+
+    .ac-chain-detail {
+      font-size: 0.65rem;
+      color: var(--brand-text-dim);
+      min-height: 1em;
+    }
+
+    /* ===== Arrows ===== */
+    .ac-arrow {
+      display: flex;
+      align-items: center;
+      padding: 0 0.5rem;
+      color: var(--brand-border-strong);
+      font-size: 1.2rem;
+      letter-spacing: -3px;
+      transition: color 0.3s;
+      position: relative;
+    }
+
+    .ac-arrow.active {
+      color: var(--brand-primary);
+    }
+
+    .ac-arrow.active::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: var(--brand-primary);
+      border-radius: 50%;
+      animation: ac-pulse-dot 1s ease-in-out infinite;
+    }
+
+    .ac-arrow.done {
+      color: var(--brand-success);
+    }
+
+    @keyframes ac-pulse-dot {
+      0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.3; transform: translate(-50%, -50%) scale(1.5); }
+    }
+
+    /* ===== Main Layout ===== */
+    .ac-main {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 700px) {
+      .ac-main { grid-template-columns: 1fr; }
+      .ac-chain { flex-direction: column; gap: 0.5rem; }
+      .ac-arrow { transform: rotate(90deg); }
+    }
+
+    /* ===== Panel base ===== */
+    .ac-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ac-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+    }
+
+    .ac-panel-body {
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* ===== Controls ===== */
+    .ac-btn {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+      width: 100%;
+    }
+
+    .ac-btn:hover:not(:disabled) { background: var(--brand-border); }
+    .ac-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .ac-btn.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #fff;
+    }
+
+    .ac-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); }
+
+    .ac-btn.danger {
+      color: var(--brand-error);
+      border-color: rgba(232, 131, 111, 0.3);
+    }
+
+    .ac-btn.danger:hover:not(:disabled) {
+      background: rgba(232, 131, 111, 0.1);
+    }
+
+    .ac-btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .ac-btn-row .ac-btn { flex: 1; }
+
+    .ac-separator {
+      border: none;
+      border-top: 1px solid var(--brand-border);
+      margin: 0.2rem 0;
+    }
+
+    /* ===== Sliders ===== */
+    .ac-slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .ac-slider-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .ac-slider-value {
+      color: var(--brand-text-muted);
+      font-weight: 400;
+    }
+
+    .ac-slider-group input[type="range"] {
+      width: 100%;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+    }
+
+    /* ===== Inspector ===== */
+    .ac-inspector-section {
+      margin-bottom: 0.5rem;
+    }
+
+    .ac-inspector-section:last-child { margin-bottom: 0; }
+
+    .ac-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.4rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .ac-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.2rem 0;
+      font-size: 0.7rem;
+    }
+
+    .ac-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .ac-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ac-deriv-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .ac-deriv-indicator.true {
+      background: var(--brand-success);
+    }
+
+    .ac-deriv-indicator.false {
+      background: var(--brand-text-faint);
+    }
+
+    /* ===== Timeline ===== */
+    .ac-timeline {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 120px;
+      max-height: 300px;
+    }
+
+    .ac-timeline-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .ac-timeline-entry {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.6rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.4rem;
+      align-items: baseline;
+    }
+
+    .ac-timeline-entry.auth { border-left: 3px solid var(--brand-primary); }
+    .ac-timeline-entry.permissions { border-left: 3px solid var(--brand-warning); }
+    .ac-timeline-entry.dashboard { border-left: 3px solid var(--brand-success); }
+    .ac-timeline-entry.system { border-left: 3px solid var(--brand-text-dim); }
+
+    .ac-timeline-time {
+      color: var(--brand-text-faint);
+      font-size: 0.55rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .ac-timeline-module {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 65px;
+    }
+
+    .ac-timeline-event {
+      font-weight: 500;
+      color: var(--brand-text-dim);
+      min-width: 50px;
+    }
+
+    .ac-timeline-detail {
+      color: var(--brand-text-dim);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== How it works ===== */
+    .ac-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .ac-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .ac-how-it-works ul { padding-left: 1.2rem; }
+    .ac-how-it-works li { margin-bottom: 0.2rem; }
+
+    .ac-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--brand-border);
+      font-style: italic;
+      color: var(--brand-text-faint);
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ac-container">
+    <!-- Chain Visualization -->
+    <div class="ac-chain">
+      <div id="ac-auth-box" class="ac-chain-box idle">
+        <div class="ac-chain-label">Auth</div>
+        <div><span id="ac-auth-status" class="ac-chain-badge idle" data-testid="ac-auth-status">idle</span></div>
+        <div id="ac-auth-detail" class="ac-chain-detail">Waiting for token</div>
+      </div>
+
+      <div id="ac-arrow-1" class="ac-arrow">&mdash;&rsaquo;</div>
+
+      <div id="ac-perms-box" class="ac-chain-box idle">
+        <div class="ac-chain-label">Permissions</div>
+        <div><span id="ac-perms-status" class="ac-chain-badge idle" data-testid="ac-perms-status">idle</span></div>
+        <div id="ac-perms-detail" class="ac-chain-detail">Waiting for auth</div>
+      </div>
+
+      <div id="ac-arrow-2" class="ac-arrow">&mdash;&rsaquo;</div>
+
+      <div id="ac-dash-box" class="ac-chain-box idle">
+        <div class="ac-chain-label">Dashboard</div>
+        <div><span id="ac-dash-status" class="ac-chain-badge idle" data-testid="ac-dash-status">idle</span></div>
+        <div id="ac-dash-detail" class="ac-chain-detail">Waiting for permissions</div>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="ac-main">
+      <!-- Left: Controls + Timeline -->
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <!-- Controls -->
+        <div class="ac-panel">
+          <div class="ac-panel-header">Controls</div>
+          <div class="ac-panel-body">
+            <div class="ac-btn-row">
+              <button id="ac-start-btn" class="ac-btn primary" data-testid="ac-start-btn">Start Chain</button>
+              <button id="ac-reset-btn" class="ac-btn danger" data-testid="ac-reset-btn" disabled>Reset All</button>
+            </div>
+            <hr class="ac-separator" />
+            <div class="ac-slider-group">
+              <label class="ac-slider-label">
+                Auth Fail Rate <span id="ac-auth-fail-val" class="ac-slider-value">0%</span>
+              </label>
+              <input type="range" id="ac-auth-fail-rate" data-testid="ac-auth-fail-rate" min="0" max="100" step="5" value="0" />
+            </div>
+            <div class="ac-slider-group">
+              <label class="ac-slider-label">
+                Perms Fail Rate <span id="ac-perms-fail-val" class="ac-slider-value">0%</span>
+              </label>
+              <input type="range" id="ac-perms-fail-rate" data-testid="ac-perms-fail-rate" min="0" max="100" step="5" value="0" />
+            </div>
+            <div class="ac-slider-group">
+              <label class="ac-slider-label">
+                Dash Fail Rate <span id="ac-dash-fail-val" class="ac-slider-value">0%</span>
+              </label>
+              <input type="range" id="ac-dash-fail-rate" data-testid="ac-dash-fail-rate" min="0" max="100" step="5" value="0" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="ac-panel" style="flex: 1;">
+          <div class="ac-panel-header">Event Timeline</div>
+          <div class="ac-panel-body" style="flex: 1;">
+            <div id="ac-timeline" class="ac-timeline" data-testid="ac-timeline">
+              <div class="ac-timeline-empty">Events will appear here after starting the chain</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: State Inspector -->
+      <div class="ac-panel">
+        <div class="ac-panel-header">State Inspector</div>
+        <div id="ac-inspector" class="ac-panel-body">
+          <!-- Rendered by main.ts -->
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="ac-how-it-works">
+      <h3>How It Works (Directive Async Chains)</h3>
+      <ul>
+        <li><strong>3 Modules</strong> &ndash; auth, permissions, dashboard &mdash; each with their own facts, derivations, constraints, and resolvers</li>
+        <li><strong>Constraint Chaining</strong> &ndash; <code>after: ["auth::validateSession"]</code> ensures permissions only load after auth resolves</li>
+        <li><strong>Cross-Module Deps</strong> &ndash; <code>crossModuleDeps</code> gives type-safe access to other modules' facts and derivations</li>
+        <li><strong>Retry Policies</strong> &ndash; each resolver has exponential backoff (2 attempts) &mdash; use the fail rate sliders to test</li>
+        <li><strong>Automatic Resolution</strong> &ndash; setting a token triggers the entire chain: validate &rarr; load permissions &rarr; load dashboard</li>
+      </ul>
+      <p class="directive-note">The <code>after</code> ordering creates a dependency chain. Each step's constraint only evaluates once its predecessor's resolver has completed successfully.</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -31,7 +31,7 @@ export function SudokuDemo({
             scriptSrc={build.scriptSrc}
           />
         ) : (
-          <div className="rounded-xl border border-[#4a4035] bg-[#161412] p-8 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)] p-8 text-center text-sm text-slate-400">
             Example not built yet. Run{' '}
             <code className="text-slate-300">
               pnpm build:example sudoku
