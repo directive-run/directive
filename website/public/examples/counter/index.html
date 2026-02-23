@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Number Match - Directive Example</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .app { text-align: center; max-width: 500px; padding: 2rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #94a3b8; }
+    .subtitle { color: #64748b; margin-bottom: 1.5rem; font-size: 0.875rem; }
+    .stats {
+      display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem;
+    }
+    .stat {
+      background: #1e293b; padding: 0.5rem 1rem; border-radius: 8px;
+      border: 1px solid #334155;
+    }
+    .stat-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 1.2rem; font-weight: 600; }
+    .grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem; margin-bottom: 1.5rem;
+    }
+    .tile {
+      aspect-ratio: 1; background: #1e293b; border: 2px solid #334155;
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: bold; cursor: pointer; transition: all 0.15s;
+    }
+    .tile:hover { border-color: #475569; background: #334155; }
+    .tile.selected { border-color: #3b82f6; background: #1e3a5f; transform: scale(1.05); }
+    .tile.empty { background: #0f172a; border-style: dashed; border-color: #1e293b; cursor: default; }
+    .message {
+      background: #1e293b; padding: 0.75rem; border-radius: 8px;
+      border: 1px solid #334155; font-size: 0.875rem; color: #94a3b8;
+      margin-bottom: 1rem; min-height: 2.5rem;
+    }
+    .controls { display: flex; gap: 0.75rem; justify-content: center; }
+    button {
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;
+      font-size: 1rem; transition: all 0.15s;
+    }
+    button:hover { background: #334155; }
+    button.primary { background: #3b82f6; border-color: #3b82f6; }
+    #log {
+      margin-top: 1.5rem; background: #0f172a; border: 1px solid #1e293b;
+      border-radius: 8px; padding: 0.75rem; text-align: left;
+      font-family: monospace; font-size: 0.7rem; color: #64748b;
+      max-height: 200px; overflow-y: auto;
+    }
+  </style>
+  <script type="module" crossorigin src="/examples/counter/assets/index-BWVgeBln.js"></script>
+</head>
+<body>
+  <div class="app">
+    <h1>Number Match</h1>
+    <p class="subtitle">Select two numbers that add to 10 — same pattern as Eleven Up</p>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Pool</div>
+        <div id="pool" class="stat-value" data-testid="nm-pool">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Removed</div>
+        <div id="removed" class="stat-value" data-testid="nm-removed">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Moves</div>
+        <div id="moves" class="stat-value" data-testid="nm-moves">0</div>
+      </div>
+    </div>
+
+    <div id="message" class="message" data-testid="nm-message">Select two numbers that add to 10</div>
+    <div id="grid" class="grid" data-testid="nm-grid"></div>
+
+    <div class="controls">
+      <button id="clear" data-testid="nm-clear">Clear Selection</button>
+      <button id="newgame" class="primary" data-testid="nm-newgame">New Game</button>
+    </div>
+
+    <div id="log"></div>
+  </div>
+
+</body>
+</html>

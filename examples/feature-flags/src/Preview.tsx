@@ -61,11 +61,11 @@ export function Preview({ system }: PreviewProps) {
   const inspectData = system.inspect();
 
   return (
-    <div className="preview">
+    <div className="preview" data-testid="ff-preview">
       <h2>Live Preview</h2>
 
       <div className="stats-bar">
-        <div className="stat">
+        <div className="stat" data-testid="ff-enabled-count">
           Enabled: <strong>{enabledCount}/8</strong>
         </div>
         <div className="stat">

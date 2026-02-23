@@ -62,7 +62,15 @@ const wizard = createModule('wizard', {
   constraints: {
     advance: {
       priority: 50,
-      when: (facts, derive) => facts.advanceRequested && derive.currentStepValid,
+      when: (facts) => {
+        const step0Valid = facts.email.includes('@') && facts.password.length >= 8;
+        const step1Valid = facts.name.trim().length > 0;
+        const step2Valid = facts.plan !== '';
+        const validators = [step0Valid, step1Valid, step2Valid];
+        const currentStepValid = validators[facts.currentStep] ?? false;
+
+        return facts.advanceRequested && currentStepValid;
+      },
       require: { type: 'ADVANCE_STEP' },
     },
   },
@@ -108,12 +116,12 @@ const validation = createModule('validation', {
     checkEmail: {
       crossModuleDeps: ['wizard.email'],
       after: ['wizard::advance'],
-      when: (facts, derive, cross) => {
-        return cross.wizard.email.includes('@') && !facts.checkingEmail;
+      when: (facts) => {
+        return facts.wizard.email.includes('@') && !facts.checkingEmail;
       },
-      require: (facts, derive, cross) => ({
+      require: (facts) => ({
         type: 'CHECK_EMAIL',
-        email: cross.wizard.email,
+        email: facts.wizard.email,
       }),
     },
   },
@@ -199,9 +207,9 @@ derive: {
   shouldSkipShipping: (facts) => facts.productType === 'digital',
 },
 events: {
-  requestAdvance: (facts, derive) => {
+  requestAdvance: (facts) => {
     let nextStep = facts.currentStep + 1;
-    if (nextStep === 2 && derive.shouldSkipShipping) {
+    if (nextStep === 2 && facts.productType === 'digital') {
       nextStep = 3;
     }
     facts.currentStep = nextStep;

@@ -32,10 +32,10 @@ const system = createSystem({
 
       // Only persist specific facts
       include: [
-        'settings.theme',
-        'settings.locale',
-        'settings.sidebarCollapsed',
-        'auth.refreshToken',
+        'settings::theme',
+        'settings::locale',
+        'settings::sidebarCollapsed',
+        'auth::refreshToken',
       ],
 
       // Or exclude transient facts
@@ -75,7 +75,7 @@ function App() {
 
 function ThemeWrapper() {
   // This reads the persisted theme – no manual localStorage.getItem needed
-  const theme = useDerived(system, 'settings.theme');
+  const theme = useDerived(system, 'settings::theme');
 
   return <div data-theme={theme}><Router /></div>;
 }
@@ -132,7 +132,7 @@ const system = createSystem({
     persistencePlugin({
       storage: localStorage,
       key: 'directive-state',
-      include: ['settings.theme'],
+      include: ['settings::theme'],
       // Don't restore during SSR – let hydration handle it
       enabled: typeof window !== 'undefined',
     }),

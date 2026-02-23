@@ -60,17 +60,20 @@ const preferences = createModule('preferences', {
 
   effects: {
     applyTheme: {
-      run: (facts, prev, { derived }) => {
-        document.documentElement.setAttribute('data-theme', derived.effectiveTheme);
+      run: (facts) => {
+        const theme = facts.theme !== 'system'
+          ? facts.theme
+          : (facts.systemPrefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
       },
     },
     detectSystemTheme: {
-      run: (facts, prev, { dispatch }) => {
+      run: (facts) => {
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        dispatch({ type: 'SET_SYSTEM_PREFERENCE', dark: mq.matches });
+        facts.systemPrefersDark = mq.matches;
 
         const handler = (e: MediaQueryListEvent) => {
-          dispatch({ type: 'SET_SYSTEM_PREFERENCE', dark: e.matches });
+          facts.systemPrefersDark = e.matches;
         };
         mq.addEventListener('change', handler);
 
@@ -97,11 +100,10 @@ const layout = createModule('layout', {
 
   effects: {
     detectBreakpoint: {
-      run: (facts, prev, { dispatch }) => {
+      run: (facts) => {
         const check = () => {
           const w = window.innerWidth;
-          const bp = w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';
-          dispatch({ type: 'SET_BREAKPOINT', value: bp });
+          facts.breakpoint = w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';
         };
         check();
         window.addEventListener('resize', check);

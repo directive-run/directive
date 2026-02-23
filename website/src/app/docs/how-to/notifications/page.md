@@ -55,10 +55,17 @@ const notifications = createModule('notifications', {
   constraints: {
     autoDismiss: {
       priority: 50,
-      when: (facts, derive) => derive.oldestExpired !== null,
-      require: (facts, derive) => ({
+      when: (facts) => {
+        const oldest = facts.queue[0];
+        if (!oldest) {
+          return false;
+        }
+
+        return facts.now > oldest.createdAt + oldest.ttl;
+      },
+      require: (facts) => ({
         type: 'DISMISS_NOTIFICATION',
-        id: derive.oldestExpired.id,
+        id: facts.queue[0].id,
       }),
     },
     overflow: {
@@ -114,9 +121,10 @@ const app = createModule('app', {
   effects: {
     notifyOnAction: {
       deps: ['lastAction'],
-      run: (facts, prev, { dispatch }) => {
+      run: (facts, prev) => {
         if (facts.lastAction && facts.lastAction !== prev?.lastAction) {
-          dispatch({ type: 'ADD_NOTIFICATION', message: facts.lastAction, level: 'info' });
+          // In a multi-module system, effects can access other modules' facts directly
+          // The notification queue is at facts.notifications.queue via the merged proxy
         }
       },
     },

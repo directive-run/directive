@@ -52,13 +52,11 @@ const checkout = createModule('checkout', {
         });
         const data = await res.json();
 
-        // Batch the completion update
-        context.system.batch(() => {
-          context.facts.status = 'complete';
-          context.facts.orderId = data.orderId;
-          context.facts.items = [];
-          context.facts.total = 0;
-        });
+        // Resolver mutations are already batched by the engine
+        context.facts.status = 'complete';
+        context.facts.orderId = data.orderId;
+        context.facts.items = [];
+        context.facts.total = 0;
       },
     },
   },

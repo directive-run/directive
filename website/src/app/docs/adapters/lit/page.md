@@ -914,9 +914,10 @@ import { counterModule } from './modules/counter';
 import './my-counter';
 
 it('displays the count', async () => {
-  // Create a test system with mock data
-  const system = createTestSystem({ module: counterModule });
-  system.facts.count = 5;
+  // Create a test system with namespaced modules
+  const system = createTestSystem({ modules: { counter: counterModule } });
+  system.start();
+  system.facts.counter.count = 5;
 
   const el = await fixture(html`<my-counter></my-counter>`);
   expect(el.shadowRoot?.textContent).to.contain('5');

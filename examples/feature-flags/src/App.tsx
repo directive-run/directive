@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createSystem } from "@directive-run/core";
 import { persistencePlugin } from "@directive-run/core/plugins";
 import { featureFlagsModule } from "./module";
@@ -21,6 +21,10 @@ const engine = system as unknown as {
 };
 
 export function App() {
+  useEffect(() => {
+    document.body.setAttribute("data-feature-flags-ready", "true");
+  }, []);
+
   const [effectsDisabled, setEffectsDisabled] = useState<Set<string>>(new Set());
   const [constraintsDisabled, setConstraintsDisabled] = useState<Set<string>>(new Set());
 

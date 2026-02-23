@@ -74,7 +74,7 @@ resolvers: {
     requirement: "FETCH_USER",
 
     // Dedupe by user ID so concurrent requests for the same user collapse
-    key: (req) => `fetch-user-${req.payload.userId}`,
+    key: (req) => `fetch-user-${req.userId}`,
 
     resolve: async (req, context) => {
       // ...
@@ -141,7 +141,7 @@ const myModule = createModule("app", {
     facts: {
       userId: t.number(),
       user: t.object<User>().nullable(),
-      status: t.literal("idle", "loading", "error"),  // Union of string literals
+      status: t.enum("idle", "loading", "error"),  // Union of string literals
     },
   },
   // Types flow automatically to constraints, resolvers, and hooks

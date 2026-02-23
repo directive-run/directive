@@ -9,7 +9,7 @@ Directive provides testing utilities for unit and integration testing. {% .lead 
 
 ## Test Setup
 
-For a single module, pass it directly with `module`:
+Pass a `modules` map where keys become namespaces:
 
 ```typescript
 import { createTestSystem } from '@directive-run/core/testing';
@@ -20,7 +20,7 @@ describe('MyModule', () => {
 
   // Spin up a fresh test system before each test
   beforeEach(() => {
-    system = createTestSystem({ module: myModule });
+    system = createTestSystem({ modules: { app: myModule } });
     system.start();
   });
 
@@ -31,11 +31,11 @@ describe('MyModule', () => {
 });
 ```
 
-Facts and derivations are accessed directly: `system.facts.count`, `system.derive.fullName`.
+Facts and derivations are namespaced: `system.facts.app.count`, `system.derive.app.fullName`.
 
 ### Multi-Module Setup
 
-For multi-module systems, pass a `modules` map where keys become namespaces:
+For multi-module systems, add more entries to the `modules` map:
 
 ```typescript
 const system = createTestSystem({ modules: { app: myModule, auth: authModule } });
@@ -51,16 +51,16 @@ system.start();
 ```typescript
 test('initial facts', () => {
   // Facts start at the values set in init()
-  expect(system.facts.count).toBe(0);
-  expect(system.facts.user).toBeNull();
+  expect(system.facts.app.count).toBe(0);
+  expect(system.facts.app.user).toBeNull();
 });
 
 test('updating facts', () => {
   // Mutate a fact directly on the proxy
-  system.facts.count = 5;
+  system.facts.app.count = 5;
 
   // The change is immediately reflected
-  expect(system.facts.count).toBe(5);
+  expect(system.facts.app.count).toBe(5);
 });
 ```
 
@@ -96,19 +96,19 @@ const userModule = createModule("user", {
 });
 
 test('derivations update automatically', () => {
-  const system = createTestSystem({ module: userModule });
+  const system = createTestSystem({ modules: { user: userModule } });
   system.start();
 
   // Set the underlying facts
-  system.facts.firstName = 'John';
-  system.facts.lastName = 'Doe';
+  system.facts.user.firstName = 'John';
+  system.facts.user.lastName = 'Doe';
 
   // The derivation recomputes automatically – no manual refresh needed
-  expect(system.derive.fullName).toBe('John Doe');
+  expect(system.derive.user.fullName).toBe('John Doe');
 });
 ```
 
-Derivations are accessed via `system.derive.derivationName` (or `system.derive.namespace.derivationName` in multi-module systems).
+Derivations are accessed via `system.derive.namespace.derivationName` (e.g. `system.derive.user.fullName`).
 
 ---
 
@@ -123,7 +123,7 @@ test('mock resolver with manual control', async () => {
 
   // Wire the mock handler into the test system
   const system = createTestSystem({
-    module: userModule,
+    modules: { user: userModule },
     mocks: {
       resolvers: {
         FETCH_USER: { resolve: fetchMock.handler },
@@ -133,7 +133,7 @@ test('mock resolver with manual control', async () => {
   system.start();
 
   // Trigger the constraint that emits a FETCH_USER requirement
-  system.facts.userId = 123;
+  system.facts.user.userId = 123;
   await flushMicrotasks();
 
   // The requirement was captured but not yet resolved
@@ -154,12 +154,12 @@ Use `assertRequirement` and `allRequirements` on the test system to verify const
 ```typescript
 test('constraint triggers requirement', async () => {
   const system = createTestSystem({
-    module: userModule,
+    modules: { user: userModule },
   });
   system.start();
 
   // Change a fact that satisfies a constraint's `when` condition
-  system.facts.userId = 123;
+  system.facts.user.userId = 123;
   await system.waitForIdle();
 
   // Verify the constraint produced the expected requirement
@@ -168,11 +168,11 @@ test('constraint triggers requirement', async () => {
 
 test('check all generated requirements', async () => {
   const system = createTestSystem({
-    module: userModule,
+    modules: { user: userModule },
   });
   system.start();
 
-  system.facts.userId = 123;
+  system.facts.user.userId = 123;
   await system.waitForIdle();
 
   // Inspect the full requirements array for detailed payload checks
@@ -210,11 +210,11 @@ test('settle with Vitest fake timers', async () => {
   // Switch Vitest into fake-timer mode
   vi.useFakeTimers();
 
-  const system = createTestSystem({ module: myModule });
+  const system = createTestSystem({ modules: { app: myModule } });
   system.start();
 
   // Trigger a debounced search constraint
-  system.facts.query = 'test';
+  system.facts.app.query = 'test';
 
   // Step through time in 10ms increments until all resolvers finish
   await settleWithFakeTimers(system, vi.advanceTimersByTime.bind(vi), {
@@ -223,7 +223,7 @@ test('settle with Vitest fake timers', async () => {
   });
 
   // The resolver should have populated search results by now
-  expect(system.facts.searchResults).toBeDefined();
+  expect(system.facts.app.searchResults).toBeDefined();
 
   // Always restore real timers to avoid polluting other tests
   vi.useRealTimers();
@@ -260,15 +260,15 @@ test('effect runs on fact change', async () => {
     events: {},
   });
 
-  const system = createTestSystem({ module: moduleWithEffect });
+  const system = createTestSystem({ modules: { test: moduleWithEffect } });
   system.start();
 
   // First mutation – the effect should log "first"
-  system.facts.value = 'first';
+  system.facts.test.value = 'first';
   await system.waitForIdle();
 
   // Second mutation – the effect should log "second"
-  system.facts.value = 'second';
+  system.facts.test.value = 'second';
   await system.waitForIdle();
 
   // Both changes were captured in order
@@ -284,13 +284,13 @@ The test system tracks all fact changes automatically:
 
 ```typescript
 test('track fact changes', () => {
-  const system = createTestSystem({ module: myModule });
+  const system = createTestSystem({ modules: { app: myModule } });
   system.start();
 
   // Every fact mutation is recorded automatically
-  system.facts.count = 1;
-  system.facts.count = 2;
-  system.facts.count = 3;
+  system.facts.app.count = 1;
+  system.facts.app.count = 2;
+  system.facts.app.count = 3;
 
   // Retrieve the full change log
   const history = system.getFactsHistory();
@@ -314,14 +314,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 
 test('component with Directive', async () => {
   // Set up a test system the same way as a unit test
-  const system = createTestSystem({ module: userModule });
+  const system = createTestSystem({ modules: { user: userModule } });
   system.start();
 
   // Pass the system directly – no DirectiveProvider wrapper needed
   render(<UserProfile system={system} />);
 
   // Simulate a user action that triggers a resolver
-  system.facts.userId = 123;
+  system.facts.user.userId = 123;
   await system.waitForIdle();
 
   // Verify the component renders data from the resolved fact

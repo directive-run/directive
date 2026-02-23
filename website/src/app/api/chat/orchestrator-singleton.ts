@@ -256,8 +256,8 @@ export function getOrchestrator() {
 
   const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [
     rateLimitGuardrail,
-    createPromptInjectionGuardrail({ strictMode: true }),
-    createEnhancedPIIGuardrail({ redact: true }),
+    { name: 'prompt-injection', fn: createPromptInjectionGuardrail({ strictMode: true }) },
+    { name: 'pii-detection', fn: createEnhancedPIIGuardrail({ redact: true }) },
   ]
 
   const orchestrator = createAgentOrchestrator({
@@ -314,7 +314,10 @@ export function getOrchestrator() {
       for (const guardrail of inputGuardrails) {
         const gStart = Date.now()
         try {
-          const res = guardrail.fn({ input, agentName: docsAgent.name })
+          const res = guardrail.fn(
+            { input, agentName: docsAgent.name },
+            { agentName: docsAgent.name, input, facts: {} },
+          )
           if (res && typeof res === 'object' && 'passed' in res && tl) {
             tl.record({
               type: 'guardrail_check',

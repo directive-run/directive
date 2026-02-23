@@ -468,8 +468,8 @@ import { useFact, useSelector, useInspect } from '@directive-run/react';
 
 function MultiAgentPanel({ orchestrator }: { orchestrator: MultiAgentOrchestrator }) {
   const { system } = orchestrator;
-  const researcherAgent = useFact(system, 'researcher.__agent');
-  const writerAgent = useFact(system, 'writer.__agent');
+  const researcherAgent = useFact(system, 'researcher::__agent');
+  const writerAgent = useFact(system, 'writer::__agent');
   const { isSettled } = useInspect(system);
 
   return (

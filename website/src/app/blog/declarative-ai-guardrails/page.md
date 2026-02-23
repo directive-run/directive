@@ -193,12 +193,12 @@ const piiGuardrail = createModule('pii-guardrail', {
   constraints: {
     inputPII: {
       priority: 90,
-      when: (_facts, derive) => derive.inputHasPII,
+      when: (facts) => scanForPII(facts.lastInput).found,
       require: { type: 'REDACT_PII', target: 'input' },
     },
     outputPII: {
       priority: 90,
-      when: (_facts, derive) => derive.outputHasPII,
+      when: (facts) => scanForPII(facts.lastOutput).found,
       require: { type: 'REDACT_PII', target: 'output' },
     },
   },
@@ -393,7 +393,7 @@ import { createSystem } from '@directive-run/core';
 import { loggingPlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
-  modules: [agentSafety, piiGuardrail, toolGuardrail, approvalGuardrail],
+  modules: { safety: agentSafety, pii: piiGuardrail, tool: toolGuardrail, approval: approvalGuardrail },
   plugins: [
     loggingPlugin({
       logConstraints: true,

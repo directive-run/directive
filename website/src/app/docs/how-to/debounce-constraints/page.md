@@ -35,9 +35,9 @@ const search = createModule('search', {
     // Debounce: copy query → debouncedQuery after 300ms of inactivity
     debounceQuery: {
       deps: ['query'],
-      run: (facts, prev, context) => {
+      run: (facts) => {
         const timer = setTimeout(() => {
-          context.facts.debouncedQuery = facts.query;
+          facts.debouncedQuery = facts.query;
         }, 300);
 
         // Cleanup cancels the timer if query changes again
@@ -123,9 +123,9 @@ function SearchBox({ system }) {
 effects: {
   throttleQuery: {
     deps: ['query'],
-    run: (facts, prev, context) => {
+    run: (facts) => {
       // Fire immediately, then ignore for 500ms
-      context.facts.debouncedQuery = facts.query;
+      facts.debouncedQuery = facts.query;
       let blocked = true;
       const timer = setTimeout(() => { blocked = false; }, 500);
 

@@ -86,12 +86,17 @@ const list = createModule('list', {
     },
     filterChanged: {
       crossModuleDeps: ['filters.search', 'filters.sortBy', 'filters.category'],
-      when: (facts, derive, cross) => {
-        const hash = `${cross.filters.search}|${cross.filters.sortBy}|${cross.filters.category}`;
+      when: (facts) => {
+        const hash = `${facts.filters.search}|${facts.filters.sortBy}|${facts.filters.category}`;
 
         return hash !== facts.lastFilterHash;
       },
-      require: { type: 'RESET_AND_LOAD' },
+      require: (facts) => ({
+        type: 'RESET_AND_LOAD',
+        search: facts.filters.search,
+        sortBy: facts.filters.sortBy,
+        category: facts.filters.category,
+      }),
     },
   },
 
@@ -116,7 +121,7 @@ const list = createModule('list', {
         context.facts.cursor = '';
         context.facts.hasMore = true;
         context.facts.isLoadingMore = true;
-        context.facts.lastFilterHash = `${context.facts.search}|${context.facts.sortBy}|${context.facts.category}`;
+        context.facts.lastFilterHash = `${req.search}|${req.sortBy}|${req.category}`;
 
         const res = await fetch('/api/items?cursor=&limit=20');
         const data = await res.json();
@@ -131,7 +136,7 @@ const list = createModule('list', {
 
   effects: {
     observeScroll: {
-      run: (facts, prev, { dispatch }) => {
+      run: (facts) => {
         const sentinel = document.getElementById('scroll-sentinel');
         if (!sentinel) {
           return;
@@ -139,7 +144,7 @@ const list = createModule('list', {
 
         const observer = new IntersectionObserver(
           ([entry]) => {
-            dispatch({ type: 'SET_SCROLL_NEAR_BOTTOM', value: entry.isIntersecting });
+            facts.scrollNearBottom = entry.isIntersecting;
           },
           { rootMargin: '200px' },
         );
