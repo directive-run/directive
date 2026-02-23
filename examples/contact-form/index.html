@@ -60,46 +60,46 @@
     <h1>Contact Form</h1>
     <p class="subtitle">Directive example — facts, derivations, constraints, resolvers, effects</p>
 
-    <div id="status-banner" class="status-banner hidden"></div>
+    <div id="status-banner" class="status-banner hidden" data-testid="cf-status"></div>
 
     <div class="form">
       <div class="field-row">
         <div>
           <label for="name">Name</label>
-          <input id="name" type="text" placeholder="Your name" />
-          <div id="name-error" class="error-text"></div>
+          <input id="name" type="text" placeholder="Your name" data-testid="cf-name" />
+          <div id="name-error" class="error-text" data-testid="cf-name-error"></div>
         </div>
         <div>
           <label for="email">Email</label>
-          <input id="email" type="email" placeholder="you@example.com" />
-          <div id="email-error" class="error-text"></div>
+          <input id="email" type="email" placeholder="you@example.com" data-testid="cf-email" />
+          <div id="email-error" class="error-text" data-testid="cf-email-error"></div>
         </div>
       </div>
 
       <div>
         <label for="subject">Subject</label>
-        <select id="subject">
+        <select id="subject" data-testid="cf-subject">
           <option value="">Select a subject</option>
           <option value="general">General inquiry</option>
           <option value="bug">Bug report</option>
           <option value="feature">Feature request</option>
           <option value="partnership">Partnership</option>
         </select>
-        <div id="subject-error" class="error-text"></div>
+        <div id="subject-error" class="error-text" data-testid="cf-subject-error"></div>
       </div>
 
       <div>
         <label for="message">Message</label>
-        <textarea id="message" placeholder="What can we help with?"></textarea>
+        <textarea id="message" placeholder="What can we help with?" data-testid="cf-message"></textarea>
         <div style="display: flex; justify-content: space-between;">
-          <div id="message-error" class="error-text"></div>
-          <div id="char-count" class="char-count">0 / 10 min</div>
+          <div id="message-error" class="error-text" data-testid="cf-message-error"></div>
+          <div id="char-count" class="char-count" data-testid="cf-char-count">0 / 10 min</div>
         </div>
       </div>
 
       <div class="controls">
-        <button id="submit-btn">Send Message</button>
-        <button id="clear-btn" class="secondary">Clear</button>
+        <button id="submit-btn" data-testid="cf-submit">Send Message</button>
+        <button id="clear-btn" class="secondary" data-testid="cf-clear">Clear</button>
       </div>
     </div>
 

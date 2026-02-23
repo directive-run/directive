@@ -244,10 +244,10 @@ function render(): void {
 // ============================================================================
 
 const allCartKeys = [
-  ...Object.keys(cartSchema.facts).map((k) => `cart_${k}`),
-  ...Object.keys(cartSchema.derivations).map((k) => `cart_${k}`),
-  ...Object.keys(authSchema.facts).map((k) => `auth_${k}`),
-  ...Object.keys(authSchema.derivations).map((k) => `auth_${k}`),
+  ...Object.keys(cartSchema.facts).map((k) => `cart::${k}`),
+  ...Object.keys(cartSchema.derivations).map((k) => `cart::${k}`),
+  ...Object.keys(authSchema.facts).map((k) => `auth::${k}`),
+  ...Object.keys(authSchema.derivations).map((k) => `auth::${k}`),
 ];
 
 system.subscribe(allCartKeys, render);

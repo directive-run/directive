@@ -139,7 +139,7 @@ export const permissionsModule = createModule("permissions", {
     loadPermissions: {
       when: (facts) => {
         return (
-          facts.auth.isAuthenticated === true &&
+          (facts.auth.token as string) !== "" &&
           !(facts.self.loaded as boolean)
         );
       },
@@ -205,7 +205,7 @@ export const contentModule = createModule("content", {
     loadContent: {
       when: (facts) => {
         return (
-          facts.auth.isAuthenticated === true &&
+          (facts.auth.token as string) !== "" &&
           !(facts.self.loaded as boolean)
         );
       },
@@ -216,7 +216,7 @@ export const contentModule = createModule("content", {
       when: (facts) => {
         return (
           (facts.self.publishRequested as string) !== "" &&
-          facts.permissions.canPublish === true
+          (facts.permissions.permissions as string[]).includes("content.publish")
         );
       },
       require: (facts) => ({
@@ -229,7 +229,7 @@ export const contentModule = createModule("content", {
       when: (facts) => {
         return (
           (facts.self.deleteRequested as string) !== "" &&
-          facts.permissions.canDelete === true
+          (facts.permissions.permissions as string[]).includes("content.delete")
         );
       },
       require: (facts) => ({

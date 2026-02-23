@@ -77,28 +77,28 @@
     <div class="stats">
       <div class="stat">
         <div class="stat-label">Experiments</div>
-        <div id="experiment-count" class="stat-value">0</div>
+        <div id="experiment-count" class="stat-value" data-testid="ab-experiment-count">0</div>
       </div>
       <div class="stat">
         <div class="stat-label">Assigned</div>
-        <div id="assigned-count" class="stat-value">0</div>
+        <div id="assigned-count" class="stat-value" data-testid="ab-assigned-count">0</div>
       </div>
       <div class="stat">
         <div class="stat-label">Exposed</div>
-        <div id="exposed-count" class="stat-value">0</div>
+        <div id="exposed-count" class="stat-value" data-testid="ab-exposed-count">0</div>
       </div>
       <div class="stat">
         <div class="stat-label">User ID</div>
-        <div id="user-id" class="stat-value" style="font-size:0.85rem">-</div>
+        <div id="user-id" class="stat-value" data-testid="ab-user-id" style="font-size:0.85rem">-</div>
       </div>
     </div>
 
     <h2>Experiments</h2>
-    <div id="experiments"></div>
+    <div id="experiments" data-testid="ab-experiments"></div>
 
     <div class="controls">
-      <button id="btn-pause" class="primary">Pause All</button>
-      <button id="btn-reset" class="danger">Reset</button>
+      <button id="btn-pause" class="primary" data-testid="ab-btn-pause">Pause All</button>
+      <button id="btn-reset" class="danger" data-testid="ab-btn-reset">Reset</button>
     </div>
 
     <h2>Event Log</h2>

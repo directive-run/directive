@@ -394,3 +394,6 @@ system.subscribe(
 // Initial render
 render();
 log("Contact form ready. Fill in all fields and submit.");
+
+// Signal to tests that initialization is complete
+document.body.setAttribute("data-contact-form-ready", "true");
