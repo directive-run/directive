@@ -10,11 +10,12 @@ interface FlagRowProps {
   description: string;
   checked: boolean;
   onChange: (enabled: boolean) => void;
+  testId?: string;
 }
 
-function FlagRow({ label, description, checked, onChange }: FlagRowProps) {
+function FlagRow({ label, description, checked, onChange, testId }: FlagRowProps) {
   return (
-    <div className="flag-row">
+    <div className="flag-row" data-testid={testId}>
       <div>
         <div className="flag-label">{label}</div>
         <div className="flag-desc">{description}</div>
@@ -92,24 +93,28 @@ export function FlagPanel({
           description="AI chat assistant"
           checked={chatEnabled}
           onChange={(v) => toggle("chatEnabled", v)}
+          testId="ff-flag-chat"
         />
         <FlagRow
           label="Search"
           description="Documentation search"
           checked={searchEnabled}
           onChange={(v) => toggle("searchEnabled", v)}
+          testId="ff-flag-search"
         />
         <FlagRow
           label="Playground"
           description="Interactive code playground"
           checked={playgroundEnabled}
           onChange={(v) => toggle("playgroundEnabled", v)}
+          testId="ff-flag-playground"
         />
         <FlagRow
           label="Vote API"
           description="Page helpfulness voting"
           checked={voteApiEnabled}
           onChange={(v) => toggle("voteApiEnabled", v)}
+          testId="ff-flag-vote-api"
         />
       </div>
 
@@ -120,18 +125,21 @@ export function FlagPanel({
           description="Switch between brand themes"
           checked={brandSwitcherEnabled}
           onChange={(v) => toggle("brandSwitcherEnabled", v)}
+          testId="ff-flag-brand-switcher"
         />
         <FlagRow
           label="Theme Selector"
           description="Light / dark theme toggle"
           checked={themeSelectorEnabled}
           onChange={(v) => toggle("themeSelectorEnabled", v)}
+          testId="ff-flag-theme-selector"
         />
         <FlagRow
           label="Version Selector"
           description="API version picker"
           checked={versionSelectorEnabled}
           onChange={(v) => toggle("versionSelectorEnabled", v)}
+          testId="ff-flag-version-selector"
         />
       </div>
 
@@ -142,6 +150,7 @@ export function FlagPanel({
           description="Welcome toast (requires Brand Switcher)"
           checked={onboardingToastEnabled}
           onChange={(v) => toggle("onboardingToastEnabled", v)}
+          testId="ff-flag-onboarding-toast"
         />
       </div>
 
@@ -152,6 +161,7 @@ export function FlagPanel({
           description="Disables chat, search, playground, vote API"
           checked={maintenanceMode}
           onChange={(v) => events.setMaintenanceMode({ enabled: v })}
+          testId="ff-maintenance"
         />
         <div className="flag-row">
           <div>

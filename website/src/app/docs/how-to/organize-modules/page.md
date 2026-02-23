@@ -87,8 +87,8 @@ export const cartModule = createModule('cart', {
     // Cross-module: require auth before checkout
     checkout: {
       crossModuleDeps: ['auth.isAuthenticated'],
-      when: (facts, derive, cross) =>
-        !derive.isEmpty && cross.auth.isAuthenticated,
+      when: (facts) =>
+        facts.items.length > 0 && facts.auth.isAuthenticated,
       require: { type: 'CHECKOUT' },
     },
   },

@@ -184,6 +184,7 @@ interface ConstraintDef<S, R extends Requirement> {
   async?: boolean;      // enable async precondition evaluation
   timeout?: number;     // max time for async constraints (ms)
   after?: string[];     // constraint IDs that must evaluate before this one
+  deps?: string[];      // explicit fact dependencies (recommended for async constraints)
 
   // Precondition: when should this constraint fire?
   when: (facts: Facts<S>) => boolean | Promise<boolean>;

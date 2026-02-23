@@ -132,6 +132,5 @@ schema: {
 
 ## Next Steps
 
-- **[Schema & Types](/docs/schema-overview)** – Built-in `t.*` types
-- **[Schema Overview](/docs/schema-overview)** – Schema structure
+- **[Schema & Types](/docs/schema-overview)** – Full `t.*` API reference and Zod integration
 - **[Facts](/docs/facts)** – Working with state

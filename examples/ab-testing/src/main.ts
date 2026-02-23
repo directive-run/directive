@@ -390,3 +390,6 @@ log("event", "Registered experiment: cta-color");
 
 // Initial render
 render();
+
+// Signal to tests that initialization is complete
+document.body.setAttribute("data-ab-testing-ready", "true");

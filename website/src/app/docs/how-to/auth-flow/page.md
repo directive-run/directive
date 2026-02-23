@@ -48,7 +48,12 @@ const auth = createModule('auth', {
   constraints: {
     // Auto-refresh when token is about to expire
     refreshNeeded: {
-      when: (facts, derive) => derive.isExpiringSoon && derive.canRefresh,
+      when: (facts) => {
+        const isExpiringSoon = !!facts.expiresAt && Date.now() > facts.expiresAt - 60_000;
+        const canRefresh = !!facts.refreshToken;
+
+        return isExpiringSoon && canRefresh;
+      },
       require: (facts) => ({
         type: 'REFRESH_TOKEN',
         refreshToken: facts.refreshToken!,

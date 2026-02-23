@@ -460,13 +460,13 @@ Test constraint-driven prefetching with Directive's test utilities:
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('prefetch constraint fires on dashboard route', async () => {
-  const testSystem = createTestSystem({ module: dashboardModule });
+  const testSystem = createTestSystem({ modules: { dashboard: dashboardModule } });
   testSystem.start();
 
   testSystem.batch(() => {
-    testSystem.facts.currentRoute = '/dashboard';
-    testSystem.facts.userId = 'user-123';
-    testSystem.facts.profilePrefetched = false;
+    testSystem.facts.dashboard.currentRoute = '/dashboard';
+    testSystem.facts.dashboard.userId = 'user-123';
+    testSystem.facts.dashboard.profilePrefetched = false;
   });
 
   await testSystem.waitForIdle();
@@ -481,13 +481,13 @@ test('prefetch constraint fires on dashboard route', async () => {
 });
 
 test('prefetch does not re-fire after completion', async () => {
-  const testSystem = createTestSystem({ module: dashboardModule });
+  const testSystem = createTestSystem({ modules: { dashboard: dashboardModule } });
   testSystem.start();
 
   testSystem.batch(() => {
-    testSystem.facts.currentRoute = '/dashboard';
-    testSystem.facts.userId = 'user-123';
-    testSystem.facts.profilePrefetched = true;
+    testSystem.facts.dashboard.currentRoute = '/dashboard';
+    testSystem.facts.dashboard.userId = 'user-123';
+    testSystem.facts.dashboard.profilePrefetched = true;
   });
 
   await testSystem.waitForIdle();

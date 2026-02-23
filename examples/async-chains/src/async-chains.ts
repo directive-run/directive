@@ -166,7 +166,9 @@ export const permissionsModule = createModule("permissions", {
     loadPermissions: {
       after: ["auth::validateSession"],
       when: (facts) => {
-        return facts.auth.isValid === true && !facts.self.loaded;
+        // Use the fact directly — derivation values aren't available in the
+        // facts proxy passed to constraints (they live in the derive layer).
+        return facts.auth.status === "valid" && !facts.self.loaded;
       },
       require: { type: "LOAD_PERMISSIONS" },
     },

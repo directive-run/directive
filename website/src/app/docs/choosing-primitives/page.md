@@ -84,12 +84,20 @@ effects: {
   },
 },
 
-// Right — use an event dispatched from the effect
-effects: {
+// Right — use a constraint + resolver to read the system preference
+constraints: {
+  needsThemeDetection: {
+    when: (facts) => !facts.themeDetected,
+    require: { type: 'DETECT_THEME' },
+  },
+},
+resolvers: {
   detectTheme: {
-    run: (facts, prev, { dispatch }) => {
+    requirement: 'DETECT_THEME',
+    resolve: async (req, context) => {
       const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      dispatch({ type: 'SET_THEME', theme: dark ? 'dark' : 'light' });
+      context.facts.theme = dark ? 'dark' : 'light';
+      context.facts.themeDetected = true;
     },
   },
 },
@@ -242,8 +250,9 @@ derive: {
 },
 effects: {
   syncTitle: {
-    run: (facts, prev, { derived }) => {
-      document.title = derived.pageTitle;
+    deps: ["currentPage"],
+    run: (facts) => {
+      document.title = `${facts.currentPage} - MyApp`;
     },
   },
 },

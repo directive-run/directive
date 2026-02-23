@@ -481,15 +481,15 @@ Test machine-as-resolver patterns with Directive's test utilities:
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('multi-machine constraint fires when all ready', async () => {
-  const testSystem = createTestSystem({ module: orderModule });
+  const testSystem = createTestSystem({ modules: { order: orderModule } });
   testSystem.start();
 
   testSystem.batch(() => {
-    testSystem.facts.authState = 'authenticated';
-    testSystem.facts.cartState = 'confirmed';
-    testSystem.facts.paymentState = 'paid';
-    testSystem.facts.authUser = { id: 'user-1' };
-    testSystem.facts.cartItems = [{ id: 'item-1' }];
+    testSystem.facts.order.authState = 'authenticated';
+    testSystem.facts.order.cartState = 'confirmed';
+    testSystem.facts.order.paymentState = 'paid';
+    testSystem.facts.order.authUser = { id: 'user-1' };
+    testSystem.facts.order.cartItems = [{ id: 'item-1' }];
   });
 
   await testSystem.waitForIdle();

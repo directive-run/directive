@@ -670,9 +670,10 @@ import { userModule } from './modules/user';
 import UserProfile from './UserProfile.vue';
 
 test('displays user name', async () => {
-  // Create a test system with mock data
-  const system = createTestSystem({ module: userModule });
-  system.facts.user = { id: 1, name: 'Test User' };
+  // Create a test system with namespaced modules
+  const system = createTestSystem({ modules: { user: userModule } });
+  system.start();
+  system.facts.user.user = { id: 1, name: 'Test User' };
 
   // Components receive system explicitly – no plugin needed
   const wrapper = mount(UserProfile, {

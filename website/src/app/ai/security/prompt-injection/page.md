@@ -129,9 +129,9 @@ Wire injection detection into an orchestrator as a guardrail:
 ```typescript
 import {
   createAgentOrchestrator,
-  createOpenAIRunner,
   createPromptInjectionGuardrail,
 } from '@directive-run/ai';
+import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 

@@ -436,26 +436,31 @@ resolvers: {
 Mock resolvers in tests:
 
 ```typescript
-import { createTestSystem, mockResolver } from "@directive-run/core/testing";
+import { createTestSystem, flushMicrotasks } from "@directive-run/core/testing";
 
 test("fetches user data", async () => {
   // Create a test system with a mocked resolver
   const system = createTestSystem({
-    module: userModule,
+    modules: { user: userModule },
     mocks: {
-      fetchUser: mockResolver((req) => ({
-        id: req.userId,
-        name: "Test User",
-      })),
+      resolvers: {
+        FETCH_USER: {
+          resolve: (req, ctx) => {
+            ctx.facts.user = { id: req.userId, name: "Test User" };
+          },
+        },
+      },
     },
   });
 
+  system.start();
+
   // Trigger the constraint by setting userId
-  system.facts.userId = 123;
+  system.facts.user.userId = 123;
   await system.settle();
 
   // Verify the resolver populated the fact
-  expect(system.facts.user.name).toBe("Test User");
+  expect(system.facts.user.user?.name).toBe("Test User");
 });
 ```
 

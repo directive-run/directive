@@ -78,16 +78,13 @@ const orchestrator = createMultiAgentOrchestrator({
   runner: smartRunner,
   agents: {
     classifier: {
-      name: 'classifier',
-      instructions: 'Classify the intent of user messages.',
+      agent: { name: 'classifier', instructions: 'Classify the intent of user messages.' },
     },
     'code-reviewer': {
-      name: 'code-reviewer',
-      instructions: 'Review code for bugs, security issues, and best practices.',
+      agent: { name: 'code-reviewer', instructions: 'Review code for bugs, security issues, and best practices.' },
     },
     assistant: {
-      name: 'assistant',
-      instructions: 'General-purpose assistant for user queries.',
+      agent: { name: 'assistant', instructions: 'General-purpose assistant for user queries.' },
     },
   },
 });

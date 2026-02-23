@@ -12,11 +12,8 @@ Embed a query, search a chunk store, and build context-enriched agent inputs aut
 `createRAGEnricher` pairs an embedder with a storage backend to retrieve relevant document chunks by cosine similarity and assemble them into a single enriched input string. The enricher is storage-agnostic – plug in the built-in JSON file store or bring your own vector database.
 
 ```typescript
-import {
-  createRAGEnricher,
-  createJSONFileStore,
-  createOpenAIEmbedder,
-} from '@directive-run/ai';
+import { createRAGEnricher, createJSONFileStore } from '@directive-run/ai';
+import { createOpenAIEmbedder } from '@directive-run/ai/openai';
 
 const enricher = createRAGEnricher({
   embedder: createOpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY! }),
@@ -172,7 +169,7 @@ The store uses dynamic `import('node:fs')` so it can be imported isomorphically 
 `createOpenAIEmbedder` creates an `EmbedderFn` that calls the OpenAI embeddings API directly (no SDK dependency).
 
 ```typescript
-import { createOpenAIEmbedder } from '@directive-run/ai';
+import { createOpenAIEmbedder } from '@directive-run/ai/openai';
 
 const embedder = createOpenAIEmbedder({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -283,9 +280,9 @@ import {
   createMultiAgentOrchestrator,
   createRAGEnricher,
   createJSONFileStore,
-  createOpenAIEmbedder,
-  createAnthropicRunner,
 } from '@directive-run/ai';
+import { createOpenAIEmbedder } from '@directive-run/ai/openai';
+import { createAnthropicRunner } from '@directive-run/ai/anthropic';
 
 const enricher = createRAGEnricher({
   embedder: createOpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY! }),

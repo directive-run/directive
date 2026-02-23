@@ -45,7 +45,7 @@ const ws = createModule('ws', {
     // Manages the WebSocket lifecycle
     connection: {
       deps: ['url', 'status'],
-      run: (facts, prev, context) => {
+      run: (facts) => {
         if (facts.url === '' || facts.status !== 'connecting') {
           return;
         }
@@ -53,22 +53,20 @@ const ws = createModule('ws', {
         const socket = new WebSocket(facts.url);
 
         socket.onopen = () => {
-          context.system.batch(() => {
-            context.facts.status = 'connected';
-            context.facts.retryCount = 0;
-          });
+          facts.status = 'connected';
+          facts.retryCount = 0;
         };
 
         socket.onmessage = (event) => {
-          context.facts.lastMessage = JSON.parse(event.data);
+          facts.lastMessage = JSON.parse(event.data);
         };
 
         socket.onclose = () => {
-          context.facts.status = 'error';
+          facts.status = 'error';
         };
 
         socket.onerror = () => {
-          context.facts.status = 'error';
+          facts.status = 'error';
         };
 
         // Cleanup: close socket when effect re-runs or system stops
@@ -82,7 +80,10 @@ const ws = createModule('ws', {
   constraints: {
     // Auto-reconnect with backoff
     reconnect: {
-      when: (facts, derive) => derive.shouldReconnect,
+      when: (facts) =>
+        facts.status === 'error' &&
+        facts.retryCount < facts.maxRetries &&
+        facts.url !== '',
       require: (facts) => ({
         type: 'RECONNECT',
         delay: Math.min(1000 * 2 ** facts.retryCount, 30_000),
@@ -95,10 +96,8 @@ const ws = createModule('ws', {
       requirement: 'RECONNECT',
       resolve: async (req, context) => {
         await new Promise((r) => setTimeout(r, req.delay));
-        context.system.batch(() => {
-          context.facts.retryCount = context.facts.retryCount + 1;
-          context.facts.status = 'connecting';
-        });
+        context.facts.retryCount = context.facts.retryCount + 1;
+        context.facts.status = 'connecting';
       },
     },
   },
@@ -133,7 +132,7 @@ function Chat({ system }) {
 
 1. **Effect manages the socket** – the `connection` effect runs when `url` or `status` changes. It only opens a socket when status is `'connecting'`, and the cleanup return closes it when the effect re-runs or the system stops.
 
-2. **`system.batch()` prevents glitches** – when `onopen` fires, both `status` and `retryCount` update atomically. Without batch, constraints would evaluate between the two updates.
+2. **Facts proxy in callbacks** – the effect captures the `facts` proxy in a closure. Socket callbacks like `onopen` and `onmessage` mutate facts directly through this proxy, triggering constraint re-evaluation.
 
 3. **Constraint triggers reconnect** – `shouldReconnect` derivation checks if we're in error state and haven't exceeded retries. The constraint emits `RECONNECT` with exponential backoff delay.
 
@@ -172,11 +171,11 @@ const chat = createModule('chat', {
   constraints: {
     handleMessage: {
       crossModuleDeps: ['ws.lastMessage'],
-      when: (facts, derive, cross) =>
-        cross.ws.lastMessage?.type === 'CHAT_MESSAGE',
-      require: (facts, derive, cross) => ({
+      when: (facts) =>
+        facts.ws.lastMessage?.type === 'CHAT_MESSAGE',
+      require: (facts) => ({
         type: 'PROCESS_CHAT',
-        message: cross.ws.lastMessage,
+        message: facts.ws.lastMessage,
       }),
     },
   },

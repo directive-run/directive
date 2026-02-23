@@ -16,7 +16,7 @@ Your agent tests are slow (each call takes 1-3 seconds), expensive (every test r
 Use `createMockAgentRunner` for deterministic responses and `createTestOrchestrator` for full orchestrator testing:
 
 ```typescript
-import { createMockAgentRunner } from '@directive-run/ai';
+import { createMockAgentRunner } from '@directive-run/ai/testing';
 
 // Mock runner with canned responses
 const mock = createMockAgentRunner({
@@ -63,7 +63,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createMockAgentRunner,
   createTestOrchestrator,
-} from '@directive-run/ai';
+} from '@directive-run/ai/testing';
 
 describe('content pipeline', () => {
   it('runs research -> write -> review in sequence', async () => {

@@ -622,8 +622,7 @@ const userModule = createModule("user", {
   constraints: {
     needsUser: {
       when: (facts) => facts.userId > 0 && !facts.user && !facts.loading,
-      require: { type: "FETCH_USER", userId: 0 },
-      bind: (facts) => ({ userId: facts.userId }),
+      require: (facts) => ({ type: "FETCH_USER", userId: facts.userId }),
     },
   },
   resolvers: {
@@ -683,9 +682,10 @@ import UserProfile from './UserProfile.svelte';
 import { userModule } from './modules/user';
 
 test('displays user name', async () => {
-  // Create a test system with mock data
-  const system = createTestSystem({ module: userModule });
-  system.facts.user = { id: 1, name: 'Test User' };
+  // Create a test system with namespaced modules
+  const system = createTestSystem({ modules: { user: userModule } });
+  system.start();
+  system.facts.user.user = { id: 1, name: 'Test User' };
 
   // Pass system as a prop – component uses it with hooks directly
   render(UserProfile, {

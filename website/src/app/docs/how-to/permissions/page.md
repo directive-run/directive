@@ -84,10 +84,10 @@ const permissions = createModule('permissions', {
     loadPermissions: {
       after: ['auth::validateSession'],
       crossModuleDeps: ['auth.role'],
-      when: (facts, derive, cross) => cross.auth.role !== '' && !facts.loaded,
-      require: (facts, derive, cross) => ({
+      when: (facts) => facts.auth.role !== '' && !facts.loaded,
+      require: (facts) => ({
         type: 'FETCH_PERMISSIONS',
-        role: cross.auth.role,
+        role: facts.auth.role,
       }),
     },
   },
@@ -127,8 +127,8 @@ const content = createModule('content', {
     },
     publishArticle: {
       crossModuleDeps: ['permissions.canPublish'],
-      when: (facts, derive, cross) => {
-        return facts.publishRequested !== '' && cross.permissions.canPublish;
+      when: (facts) => {
+        return facts.publishRequested !== '' && facts.permissions.canPublish;
       },
       require: (facts) => ({
         type: 'PUBLISH_ARTICLE',
@@ -212,7 +212,7 @@ function AdminPanel({ system }) {
 
 2. **Constraint ordering** — `loadPermissions` uses `after: ['auth::validateSession']` to wait for auth. `loadContent` uses `after: ['permissions::loadPermissions']` to wait for permissions. The chain: auth → permissions → content.
 
-3. **Cross-module gating** — `publishArticle` checks `cross.permissions.canPublish` in its `when` clause. If the user doesn't have publish permission, the constraint never fires even if `publishRequested` is set.
+3. **Cross-module gating** — `publishArticle` checks `facts.permissions.canPublish` in its `when` clause. If the user doesn't have publish permission, the constraint never fires even if `publishRequested` is set.
 
 4. **Dynamic constraint disable** — for more aggressive gating, use `system.constraints.disable('content::publishArticle')` when the user lacks permissions. This is more efficient than `when` returning false because it removes the constraint from evaluation entirely.
 
@@ -238,11 +238,10 @@ constraints: {
 effects: {
   gateFeatures: {
     deps: ['loaded'],
-    run: (facts, prev, { system }) => {
-      if (!facts.permissions.includes('analytics.view')) {
-        system.constraints.disable('analytics::loadData');
-        system.constraints.disable('analytics::refreshData');
-      }
+    run: (facts) => {
+      // Constraint gating is handled by crossModuleDeps — constraints that
+      // read permissions facts automatically skip when permissions are absent.
+      // For explicit disable, call system.constraints.disable() from outside the effect.
     },
   },
 },

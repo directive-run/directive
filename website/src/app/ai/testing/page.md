@@ -324,8 +324,8 @@ Auto-approve or reject tool call approvals in tests:
 import { createApprovalSimulator } from '@directive-run/ai/testing';
 
 const simulator = createApprovalSimulator({
-  autoApprove: true,   // Approve everything by default
-  delay: 100,          // Simulate human delay (ms)
+  autoApprove: () => true,  // Approve everything by default
+  delay: 100,               // Simulate human delay (ms)
 });
 
 // Or manual control
@@ -345,8 +345,7 @@ Auto-resolve breakpoints in tests:
 import { createBreakpointSimulator } from '@directive-run/ai/testing';
 
 const simulator = createBreakpointSimulator({
-  autoResume: true,
-  delay: 50,
+  autoResumeDelay: 50,
   modifications: { skip: false },
 });
 ```
@@ -359,8 +358,8 @@ Test reflection patterns with deterministic pass/fail:
 import { createTestReflectionEvaluator } from '@directive-run/ai/testing';
 
 const evaluator = createTestReflectionEvaluator({
-  passAfter: 2,  // Pass on the 2nd iteration
-  scores: [0.3, 0.7, 0.95],
+  passAfter: 2,   // Pass on the 2nd evaluation
+  score: 0.95,    // Score to assign
 });
 ```
 
@@ -376,10 +375,9 @@ import { createFailingRunner } from '@directive-run/ai/testing';
 // Always throws
 const runner = createFailingRunner(new Error('LLM down'));
 
-// Fails N times then succeeds
+// Succeeds for first 2 calls, then always fails
 const flakyRunner = createFailingRunner(new Error('Timeout'), {
-  failCount: 2,
-  thenReturn: { output: 'Success', totalTokens: 10 },
+  failAfter: 2,
 });
 ```
 

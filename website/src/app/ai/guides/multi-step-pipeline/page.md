@@ -22,16 +22,13 @@ const orchestrator = createMultiAgentOrchestrator({
   runner, // See Running Agents (/ai/running-agents) for setup
   agents: {
     researcher: {
-      name: 'researcher',
-      instructions: 'Research the given topic thoroughly. Return key findings as bullet points.',
+      agent: { name: 'researcher', instructions: 'Research the given topic thoroughly. Return key findings as bullet points.' },
     },
     writer: {
-      name: 'writer',
-      instructions: 'Write a blog post based on the research provided.',
+      agent: { name: 'writer', instructions: 'Write a blog post based on the research provided.' },
     },
     reviewer: {
-      name: 'reviewer',
-      instructions: 'Review the draft for accuracy, clarity, and tone. Return feedback.',
+      agent: { name: 'reviewer', instructions: 'Review the draft for accuracy, clarity, and tone. Return feedback.' },
     },
   },
 });
@@ -67,8 +64,7 @@ const orchestrator = createMultiAgentOrchestrator({
   runner, // See Running Agents (/ai/running-agents) for setup
   agents: {
     researcher: {
-      name: 'researcher',
-      instructions: 'Research the topic. Return structured findings with sources.',
+      agent: { name: 'researcher', instructions: 'Research the topic. Return structured findings with sources.' },
       guardrails: {
         output: [
           createLengthGuardrail({ maxTokens: 2000 }),
@@ -76,8 +72,7 @@ const orchestrator = createMultiAgentOrchestrator({
       },
     },
     writer: {
-      name: 'writer',
-      instructions: 'Write a 500-word blog post based on the research.',
+      agent: { name: 'writer', instructions: 'Write a 500-word blog post based on the research.' },
       guardrails: {
         output: [
           createLengthGuardrail({ maxTokens: 1500 }),
@@ -85,8 +80,7 @@ const orchestrator = createMultiAgentOrchestrator({
       },
     },
     editor: {
-      name: 'editor',
-      instructions: 'Edit for clarity, grammar, and tone. Return the final version.',
+      agent: { name: 'editor', instructions: 'Edit for clarity, grammar, and tone. Return the final version.' },
     },
   },
   guardrails: {
@@ -100,18 +94,12 @@ const orchestrator = createMultiAgentOrchestrator({
 async function runContentPipeline(topic: string) {
   // Step 1: Research
   const research = await orchestrator.runAgent('researcher', topic);
-  if (research.status !== 'completed') {
-    throw new Error(`Research failed: ${research.status}`);
-  }
 
   // Step 2: Write
   const draft = await orchestrator.runAgent(
     'writer',
     `Topic: ${topic}\n\nResearch:\n${research.output}`
   );
-  if (draft.status !== 'completed') {
-    throw new Error(`Writing failed: ${draft.status}`);
-  }
 
   // Step 3: Edit
   const final = await orchestrator.runAgent(

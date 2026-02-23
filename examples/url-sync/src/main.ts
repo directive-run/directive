@@ -15,9 +15,9 @@ import type { Product } from "./mock-products.js";
 system.start();
 
 const allKeys = [
-  ...Object.keys(urlSchema.facts).map((k) => `url_${k}`),
-  ...Object.keys(productsSchema.facts).map((k) => `products_${k}`),
-  ...Object.keys(productsSchema.derivations).map((k) => `products_${k}`),
+  ...Object.keys(urlSchema.facts).map((k) => `url::${k}`),
+  ...Object.keys(productsSchema.facts).map((k) => `products::${k}`),
+  ...Object.keys(productsSchema.derivations).map((k) => `products::${k}`),
 ];
 
 // ============================================================================
