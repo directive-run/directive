@@ -30,15 +30,14 @@ const cache = createSemanticCache({
     return response.data.map((d) => d.embedding);
   },
   storage: createInMemoryStorage(),
-  index: createBruteForceIndex(),
-  similarity: 0.85,    // Cosine similarity threshold (0–1)
-  maxAge: 3600000,      // Cache entries expire after 1 hour
-  onHit: (key, cached) => console.log('Cache hit:', key),
-  onMiss: (key) => console.log('Cache miss:', key),
+  similarityThreshold: 0.85,  // Cosine similarity threshold (0–1)
+  ttlMs: 3600000,             // Cache entries expire after 1 hour
+  onHit: (entry, similarity) => console.log('Cache hit:', entry.query, similarity),
+  onMiss: (query) => console.log('Cache miss:', query),
 });
 
 // Use as a guardrail – short-circuits the agent call on cache hit
-const guardrail = createSemanticCacheGuardrail(cache);
+const guardrail = createSemanticCacheGuardrail({ cache });
 
 const orchestrator = createAgentOrchestrator({
   runner,
@@ -55,12 +54,15 @@ const orchestrator = createAgentOrchestrator({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `embedder` | `EmbedderFn` | *required* | `(texts: string[]) => Promise<number[][]>` |
-| `storage` | `CacheStorage` | *required* | Where to store cached entries |
-| `index` | `ANNIndex` | *required* | Nearest-neighbor index |
-| `similarity` | `number` | `0.85` | Cosine similarity threshold (0&ndash;1) |
-| `maxAge` | `number` | &ndash; | Cache entry TTL (ms) |
-| `onHit` | `(key, cached) => void` | &ndash; | Cache hit callback |
-| `onMiss` | `(key) => void` | &ndash; | Cache miss callback |
+| `similarityThreshold` | `number` | `0.9` | Cosine similarity threshold (0&ndash;1) |
+| `maxCacheSize` | `number` | `1000` | Maximum number of entries to cache |
+| `ttlMs` | `number` | `3600000` | Cache entry TTL (ms) |
+| `namespace` | `string` | &ndash; | Cache namespace for multi-tenant scenarios |
+| `storage` | `SemanticCacheStorage` | &ndash; | Custom storage backend (defaults to in-memory) |
+| `perAgent` | `boolean` | &ndash; | Include agent name in cache key |
+| `onHit` | `(entry, similarity) => void` | &ndash; | Cache hit callback |
+| `onMiss` | `(query) => void` | &ndash; | Cache miss callback |
+| `onError` | `(error) => void` | &ndash; | Cache lookup error callback |
 
 ---
 
@@ -127,15 +129,15 @@ const storage = createInMemoryStorage();
 
 ### Custom Storage
 
-Implement the `CacheStorage` interface for persistent backends:
+Implement the `SemanticCacheStorage` interface for persistent backends:
 
 ```typescript
 const storage = {
-  get: async (key: string) => { /* ... */ },
-  set: async (key: string, value: CacheEntry) => { /* ... */ },
-  delete: async (key: string) => { /* ... */ },
-  clear: async () => { /* ... */ },
-  entries: async () => { /* ... */ },
+  getEntries: async (namespace: string) => { /* ... */ },
+  addEntry: async (namespace: string, entry: CacheEntry) => { /* ... */ },
+  updateEntry: async (namespace: string, id: string, updates: Partial<CacheEntry>) => { /* ... */ },
+  removeEntry: async (namespace: string, id: string) => { /* ... */ },
+  clear: async (namespace: string) => { /* ... */ },
 };
 ```
 
@@ -148,7 +150,7 @@ const storage = {
 ```typescript
 import { createSemanticCacheGuardrail } from '@directive-run/ai';
 
-const guardrail = createSemanticCacheGuardrail(cache);
+const guardrail = createSemanticCacheGuardrail({ cache });
 
 // Single-agent
 const orchestrator = createAgentOrchestrator({

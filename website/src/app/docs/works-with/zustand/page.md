@@ -379,12 +379,12 @@ Test the integration with Directive's test utilities:
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('pricing constraint fires when plan selected', async () => {
-  const testSystem = createTestSystem({ module: pricingModule });
+  const testSystem = createTestSystem({ modules: { pricing: pricingModule } });
   testSystem.start();
 
   testSystem.batch(() => {
-    testSystem.facts.selectedPlan = 'pro';
-    testSystem.facts.billingCycle = 'annual';
+    testSystem.facts.pricing.selectedPlan = 'pro';
+    testSystem.facts.pricing.billingCycle = 'annual';
   });
 
   await testSystem.waitForIdle();

@@ -109,7 +109,7 @@ controller.abort();
 Stream from a specific agent in a multi-agent orchestrator with `runAgentStream()`. All guardrails, approval checks, and state tracking apply:
 
 ```typescript
-import { createMultiAgentOrchestrator } from '@directive-run/ai';
+import { createMultiAgentOrchestrator, createPIIGuardrail } from '@directive-run/ai';
 
 const orchestrator = createMultiAgentOrchestrator({
   runner,

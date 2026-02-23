@@ -145,7 +145,7 @@ const checkout = createModule("checkout", {
       require: { type: "VERIFY_ACCOUNT" },
     },
     guestSpendingCap: {
-      when: (_facts, derive) => derive.guestOverLimit,
+      when: (facts) => facts.userRole === "guest" && facts.cartTotal > 500,
       require: { type: "BLOCK_CHECKOUT", reason: "Guests cannot place orders over $500" },
     },
     fraudReview: {
@@ -162,11 +162,11 @@ const checkout = createModule("checkout", {
       require: { type: "BLOCK_CHECKOUT", reason: "Overseas items not eligible for overnight" },
     },
     creditLimitCheck: {
-      when: (_facts, derive) => derive.creditExceeded,
+      when: (facts) => facts.paymentMethod === "credit" && facts.cartTotal > facts.creditLimit,
       require: { type: "BLOCK_CHECKOUT", reason: "Order exceeds credit limit" },
     },
     invoiceRequiresEnterprise: {
-      when: (_facts, derive) => derive.invoiceNotAllowed,
+      when: (facts) => facts.paymentMethod === "invoice" && facts.userRole !== "enterprise",
       require: { type: "BLOCK_CHECKOUT", reason: "Invoice requires enterprise account" },
     },
     internationalPermission: {

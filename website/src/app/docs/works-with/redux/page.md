@@ -362,14 +362,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import { createTestSystem } from '@directive-run/core/testing';
 
 test('constraint fires when Redux state synced', async () => {
-  const testSystem = createTestSystem({ module: cartModule });
+  const testSystem = createTestSystem({ modules: { cart: cartModule } });
   testSystem.start();
 
   // Simulate Redux state arriving
   testSystem.batch(() => {
-    testSystem.facts.cartTotal = 150;
-    testSystem.facts.user = { tier: 'premium' };
-    testSystem.facts.discountApplied = false;
+    testSystem.facts.cart.cartTotal = 150;
+    testSystem.facts.cart.user = { tier: 'premium' };
+    testSystem.facts.cart.discountApplied = false;
   });
 
   // Constraint should fire and produce a requirement

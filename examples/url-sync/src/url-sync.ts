@@ -263,9 +263,7 @@ export const productsModule = createModule("products", {
   constraints: {
     fetchProducts: {
       priority: 100,
-      when: (facts) => {
-        return !facts.self.isLoading;
-      },
+      when: () => true,
       require: (facts) => ({
         type: "FETCH_PRODUCTS",
         search: facts.url.search,

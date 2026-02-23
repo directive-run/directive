@@ -221,6 +221,7 @@ const result = await orchestrator.run(agent, input);
 | `@directive-run/ai/openai` | OpenAI, Azure, Together, any OpenAI-compatible API |
 | `@directive-run/ai/anthropic` | Anthropic Claude models |
 | `@directive-run/ai/ollama` | Local Ollama inference |
+| `@directive-run/ai/gemini` | Google Gemini models |
 
 ---
 

@@ -338,7 +338,7 @@ You don't have to rewrite your app in a weekend. Directive can run alongside Red
 ```typescript
 import { configureStore } from "@reduxjs/toolkit";
 import { createSystem } from "@directive-run/core";
-import { useDirective } from "@directive-run/react";
+import { useFact, useDerived } from "@directive-run/react";
 import { useSelector } from "react-redux";
 import { authModule } from "./authModule"; // The Directive module from above
 
@@ -358,13 +358,14 @@ authSystem.start();
 // Components use both stores in the same render tree
 function Header() {
   const cartCount = useSelector((s: RootState) => s.cart.items.length);
-  const { facts, derived } = useDirective(authSystem);
+  const user = useFact(authSystem, 'user');
+  const isAuthenticated = useDerived(authSystem, 'isAuthenticated');
 
   return (
     <header>
       <span>Cart: {cartCount}</span>
-      {derived.isAuthenticated ? (
-        <span>{facts.user?.email}</span>
+      {isAuthenticated ? (
+        <span>{user?.email}</span>
       ) : (
         <LoginButton />
       )}

@@ -344,3 +344,6 @@ document.getElementById("newgame")!.addEventListener("click", () => {
 // Initial render
 render();
 log("Game started. Select two numbers that add to 10.");
+
+// Signal to tests that initialization is complete
+document.body.setAttribute("data-counter-ready", "true");

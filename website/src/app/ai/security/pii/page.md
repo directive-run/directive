@@ -152,7 +152,12 @@ This version uses regex patterns directly without the full detection pipeline.
 Wire PII detection into an orchestrator as input and output guardrails:
 
 ```typescript
-import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
+import {
+  createAgentOrchestrator,
+  createEnhancedPIIGuardrail,
+  createOutputPIIGuardrail,
+} from '@directive-run/ai';
+import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 const runner = createOpenAIRunner({ apiKey: process.env.OPENAI_API_KEY! });
 

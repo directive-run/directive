@@ -16,9 +16,9 @@ import type { ListItem } from "./mock-api.js";
 system.start();
 
 const allKeys = [
-  ...Object.keys(filtersSchema.facts).map((k) => `filters_${k}`),
-  ...Object.keys(listSchema.facts).map((k) => `list_${k}`),
-  ...Object.keys(listSchema.derivations ?? {}).map((k) => `list_${k}`),
+  ...Object.keys(filtersSchema.facts).map((k) => `filters::${k}`),
+  ...Object.keys(listSchema.facts).map((k) => `list::${k}`),
+  ...Object.keys(listSchema.derivations ?? {}).map((k) => `list::${k}`),
 ];
 
 // ============================================================================

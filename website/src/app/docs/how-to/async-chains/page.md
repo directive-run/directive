@@ -86,7 +86,7 @@ const permissions = createModule('permissions', {
     loadPermissions: {
       after: ['auth::validateSession'],
       crossModuleDeps: ['auth.isValid'],
-      when: (facts, derive, cross) => cross.auth.isValid && !facts.loaded,
+      when: (facts) => facts.auth.isValid && !facts.loaded,
       require: { type: 'LOAD_PERMISSIONS' },
     },
   },
@@ -120,11 +120,11 @@ const dashboard = createModule('dashboard', {
     loadDashboard: {
       after: ['permissions::loadPermissions'],
       crossModuleDeps: ['permissions.canEdit', 'permissions.role'],
-      when: (facts, derive, cross) => cross.permissions.role !== '' && !facts.loaded,
-      require: (facts, derive, cross) => ({
+      when: (facts) => facts.permissions.role !== '' && !facts.loaded,
+      require: (facts) => ({
         type: 'LOAD_DASHBOARD',
-        role: cross.permissions.role,
-        canEdit: cross.permissions.canEdit,
+        role: facts.permissions.role,
+        canEdit: facts.permissions.canEdit,
       }),
     },
   },
@@ -200,7 +200,7 @@ function App({ system }) {
 constraints: {
   loadPermissions: {
     after: ['auth::validateSession'],
-    when: (facts, derive, cross) => cross.auth.isValid && !facts.loaded,
+    when: (facts) => facts.auth.isValid && !facts.loaded,
     require: { type: 'LOAD_PERMISSIONS' },
   },
 },
@@ -208,7 +208,7 @@ constraints: {
 constraints: {
   loadNotifications: {
     after: ['auth::validateSession'],
-    when: (facts, derive, cross) => cross.auth.isValid && !facts.loaded,
+    when: (facts) => facts.auth.isValid && !facts.loaded,
     require: { type: 'LOAD_NOTIFICATIONS' },
   },
 },

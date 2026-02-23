@@ -217,7 +217,8 @@ const storage: ComplianceStorage = {
 Block AI processing when consent is missing by wiring the consent guardrail into an orchestrator:
 
 ```typescript
-import { createAgentOrchestrator, createOpenAIRunner } from '@directive-run/ai';
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 // Block AI processing unless the user has granted the 'ai_processing' consent
 const consentGuardrail = compliance.createConsentGuardrail('ai_processing');

@@ -20,8 +20,8 @@ import {
   createAgentOrchestrator,
   createStreamingRunner,
   createSSETransport,
-  createAnthropicStreamingRunner,
 } from '@directive-run/ai';
+import { createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
 
 const streamingRunner = createStreamingRunner(
   createAnthropicStreamingRunner({ model: 'claude-sonnet-4-5-20250514' })
@@ -59,10 +59,10 @@ import {
   createAgentOrchestrator,
   createStreamingRunner,
   createSSETransport,
-  createAnthropicStreamingRunner,
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
 } from '@directive-run/ai';
+import { createAnthropicStreamingRunner } from '@directive-run/ai/anthropic';
 
 const streamingRunner = createStreamingRunner(
   createAnthropicStreamingRunner({ model: 'claude-sonnet-4-5-20250514' })

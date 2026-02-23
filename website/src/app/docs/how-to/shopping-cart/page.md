@@ -58,7 +58,7 @@ const cart = createModule('cart', {
   constraints: {
     quantityLimit: {
       priority: 80,
-      when: (facts, derive) => derive.hasOverstockedItem,
+      when: (facts) => facts.items.some((item) => item.quantity > item.maxStock),
       require: { type: 'ADJUST_QUANTITY' },
     },
     couponValidation: {
@@ -73,12 +73,12 @@ const cart = createModule('cart', {
       priority: 60,
       after: ['quantityLimit', 'couponValidation'],
       crossModuleDeps: ['auth.isAuthenticated'],
-      when: (facts, derive, cross) => {
+      when: (facts) => {
         return (
           facts.checkoutRequested &&
-          !derive.isEmpty &&
-          !derive.hasOverstockedItem &&
-          cross.auth.isAuthenticated
+          facts.items.length > 0 &&
+          !facts.items.some((item) => item.quantity > item.maxStock) &&
+          facts.auth.isAuthenticated
         );
       },
       require: { type: 'PROCESS_CHECKOUT' },
@@ -249,9 +249,9 @@ derive: {
 ```typescript
 constraints: {
   checkoutReady: {
-    when: (facts, derive, cross) => {
-      return facts.checkoutRequested && !derive.isEmpty && (
-        cross.auth.isAuthenticated || facts.guestEmail !== ''
+    when: (facts) => {
+      return facts.checkoutRequested && facts.items.length > 0 && (
+        facts.auth.isAuthenticated || facts.guestEmail !== ''
       );
     },
     require: { type: 'PROCESS_CHECKOUT' },

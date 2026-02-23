@@ -742,10 +742,10 @@ const hooks = createTypedHooks<typeof appModule>();
 
 class MyElement extends LitElement {
   // Fully typed – fact key autocompletes, return type inferred
-  private count = hooks.createFact(this, "count");
+  private count = hooks.createFact(this, system, "count");
 
   // Derivation types are also fully inferred
-  private total = hooks.createDerived(this, "total");
+  private total = hooks.createDerived(this, system, "total");
 }
 ```
 

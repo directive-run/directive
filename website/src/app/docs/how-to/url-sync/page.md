@@ -70,18 +70,16 @@ const url = createModule('url', {
 
   effects: {
     urlToState: {
-      run: (facts, prev, { dispatch }) => {
+      run: (facts) => {
         const handler = () => {
           const params = new URLSearchParams(window.location.search);
-          dispatch({
-            type: 'SYNC_FROM_URL',
-            search: params.get('q') || '',
-            category: params.get('cat') || 'all',
-            sortBy: params.get('sort') || 'newest',
-            page: parseInt(params.get('page') || '1', 10),
-          });
-          // Break the loop: mark sync complete after dispatching
-          setTimeout(() => dispatch({ type: 'SYNC_COMPLETE' }), 0);
+          facts.syncingFromUrl = true;
+          facts.search = params.get('q') || '';
+          facts.category = params.get('cat') || 'all';
+          facts.sortBy = params.get('sort') || 'newest';
+          facts.page = parseInt(params.get('page') || '1', 10);
+          // Break the loop: mark sync complete after mutations settle
+          setTimeout(() => { facts.syncingFromUrl = false; }, 0);
         };
         window.addEventListener('popstate', handler);
 

@@ -54,12 +54,12 @@ const orchestrator = createMultiAgentOrchestrator({
   runner, // See Running Agents (/ai/running-agents) for setup
   agents: {
     writer: {
-      name: 'writer',
-      instructions: `Write engaging blog posts. When given feedback, revise your draft to address each point.`,
+      agent: { name: 'writer', instructions: `Write engaging blog posts. When given feedback, revise your draft to address each point.` },
     },
     reviewer: {
-      name: 'reviewer',
-      instructions: `Review blog posts. Return a JSON evaluation:
+      agent: {
+        name: 'reviewer',
+        instructions: `Review blog posts. Return a JSON evaluation:
 {
   "passed": true/false,
   "score": 0.0-1.0,
@@ -70,6 +70,7 @@ Score criteria:
 - 0.9+: Publish-ready
 - 0.7-0.9: Good but needs minor fixes
 - Below 0.7: Needs significant revision`,
+      },
     },
   },
   patterns: {
