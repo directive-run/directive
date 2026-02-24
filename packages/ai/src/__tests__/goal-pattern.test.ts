@@ -1470,4 +1470,131 @@ describe("goal pattern", () => {
       ),
     ).rejects.toThrow("Invalid goal checkpoint state");
   });
+
+  // ==========================================================================
+  // Migration shims — accept legacy "converge" type
+  // ==========================================================================
+
+  it("M2: patternFromJSON accepts legacy converge type and normalizes to goal", () => {
+    const legacy = {
+      type: "converge" as any,
+      nodes: {
+        fetch: { agent: "fetcher", produces: ["data"], requires: [] },
+      },
+    };
+
+    const pattern = patternFromJSON(legacy);
+
+    expect(pattern.type).toBe("goal");
+    expect((pattern as any).nodes.fetch.agent).toBe("fetcher");
+  });
+
+  it("M2: patternFromJSON does not mutate the original input", () => {
+    const legacy = {
+      type: "converge" as any,
+      nodes: {
+        a: { agent: "alpha", produces: ["x"], requires: [] },
+      },
+    };
+
+    patternFromJSON(legacy);
+
+    // Original should still say "converge"
+    expect(legacy.type).toBe("converge");
+  });
+
+  it("M2: patternFromJSON still works with native goal type", () => {
+    const nativeGoal = patternToJSON(
+      goal({ a: { agent: "alpha", produces: ["x"] } }, () => true),
+    );
+
+    expect(nativeGoal.type).toBe("goal");
+
+    const pattern = patternFromJSON(nativeGoal);
+
+    expect(pattern.type).toBe("goal");
+  });
+
+  it("M2: resumeGoal accepts legacy converge checkpoint state", async () => {
+    const orchestrator = createTestMultiAgentOrchestrator({
+      agents: { worker: { agent: { name: "worker" } } },
+      mockResponses: {
+        worker: {
+          output: "dynamic",
+          totalTokens: 10,
+          generate: () => ({
+            output: JSON.stringify({ done: true }),
+            totalTokens: 10,
+          }),
+        },
+      },
+    });
+
+    const legacyCheckpoint = {
+      type: "converge" as any,
+      version: 1 as const,
+      patternId: "test-pattern",
+      step: 0,
+      facts: {},
+      completedNodes: [],
+      failedNodes: {},
+      nodeInputHashes: {},
+      nodeOutputs: {},
+      executionOrder: [],
+      stepMetrics: [],
+      relaxations: [],
+      agentMetrics: {},
+    };
+
+    const pattern = goal(
+      { worker: { agent: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
+      (facts) => facts.done === true,
+    );
+
+    const result = await orchestrator.resumeGoal(legacyCheckpoint as any, pattern);
+
+    expect(result.achieved).toBe(true);
+  });
+
+  it("M2: resumeGoal does not mutate the legacy checkpoint input", async () => {
+    const orchestrator = createTestMultiAgentOrchestrator({
+      agents: { worker: { agent: { name: "worker" } } },
+      mockResponses: {
+        worker: {
+          output: "dynamic",
+          totalTokens: 10,
+          generate: () => ({
+            output: JSON.stringify({ done: true }),
+            totalTokens: 10,
+          }),
+        },
+      },
+    });
+
+    const legacyCheckpoint = {
+      type: "converge" as any,
+      version: 1 as const,
+      patternId: "test-pattern",
+      step: 0,
+      facts: {},
+      completedNodes: [],
+      failedNodes: {},
+      nodeInputHashes: {},
+      nodeOutputs: {},
+      executionOrder: [],
+      stepMetrics: [],
+      relaxations: [],
+      agentMetrics: {},
+    };
+
+    const pattern = goal(
+      { worker: { agent: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
+      (facts) => facts.done === true,
+    );
+
+    await orchestrator.resumeGoal(legacyCheckpoint as any, pattern);
+
+    // Original checkpoint should not be mutated
+    expect(legacyCheckpoint.type).toBe("converge");
+  });
 });
