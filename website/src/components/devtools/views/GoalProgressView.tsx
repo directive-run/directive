@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import type { DebugEvent } from '../types'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
 
 // ---------------------------------------------------------------------------
@@ -276,7 +278,9 @@ function SatisfactionSparkline({ steps, relaxations }: {
 // Component
 // ---------------------------------------------------------------------------
 
-export function GoalView({ events }: { events: DebugEvent[] }) {
+export function GoalView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   const executions = useMemo(() => extractGoalExecutions(events), [events])
   const [selectedIdx, setSelectedIdx] = useState(-1)
 

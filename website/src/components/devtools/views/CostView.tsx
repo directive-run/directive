@@ -2,12 +2,16 @@
 
 import { useMemo, useState } from 'react'
 import type { DebugEvent } from '../types'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { DEFAULT_MODEL_PRICING, getDefaultPricing, formatCost } from '../constants'
 import { EmptyState } from '../EmptyState'
 
 // C3: Expensive computations wrapped in useMemo
 
-export function CostView({ events }: { events: DebugEvent[] }) {
+export function CostView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   const [modelPricing, setModelPricing] = useState<Record<string, { input: number; output: number }>>({})
 
   // C3: Memoize filtering and aggregation

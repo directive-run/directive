@@ -2,10 +2,14 @@
 
 import { useState } from 'react'
 import type { DebugEvent } from '../types'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EVENT_COLORS } from '../constants'
 import { EmptyState } from '../EmptyState'
 
-export function EventsView({ events }: { events: DebugEvent[] }) {
+export function EventsView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   const [filter, setFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
 

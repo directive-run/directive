@@ -2,12 +2,16 @@
 
 import { useMemo, useState } from 'react'
 import type { DebugEvent } from '../types'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { GUARDRAIL_INFO } from '../constants'
 import { EmptyState } from '../EmptyState'
 
 // C3: Guardrail aggregation wrapped in useMemo
 
-export function GuardrailsView({ events }: { events: DebugEvent[] }) {
+export function GuardrailsView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   // C3: Memoize guardrail filtering and aggregation
