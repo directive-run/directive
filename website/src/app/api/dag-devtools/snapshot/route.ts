@@ -94,7 +94,7 @@ export async function GET() {
     memoryMessages = contextMsgs.map((m) => ({
       role: m.role,
       contentLength: m.content.length,
-      preview: m.content.slice(0, 120) + (m.content.length > 120 ? '…' : ''),
+      preview: m.content.slice(0, 2000) + (m.content.length > 2000 ? '…' : ''),
     }))
   } catch {
     // Memory not yet populated

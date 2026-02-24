@@ -71,7 +71,7 @@ export const SettlementStateMachineDiagram = memo(function SettlementStateMachin
     <>
       <AnimationController isPlaying={isPlaying} onToggle={toggle} hint="Cycles through settlement states" />
       <DiagramWrapper
-        height={250}
+        height={370}
         nodes={nodes}
         edges={edges}
         nodeTypes={diagramNodeTypes}

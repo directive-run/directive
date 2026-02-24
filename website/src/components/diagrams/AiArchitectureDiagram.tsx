@@ -59,7 +59,7 @@ export const AiArchitectureDiagram = memo(function AiArchitectureDiagram() {
 
   return (
     <DiagramWrapper
-      height={200}
+      height={300}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

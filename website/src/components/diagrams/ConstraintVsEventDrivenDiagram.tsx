@@ -84,7 +84,7 @@ export const ConstraintVsEventDrivenDiagram = memo(function ConstraintVsEventDri
 
   return (
     <DiagramWrapper
-      height={230}
+      height={340}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

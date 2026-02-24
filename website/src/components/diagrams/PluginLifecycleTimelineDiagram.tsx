@@ -50,7 +50,7 @@ export const PluginLifecycleTimelineDiagram = memo(function PluginLifecycleTimel
 
   return (
     <DiagramWrapper
-      height={150}
+      height={220}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

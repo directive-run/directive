@@ -50,7 +50,7 @@ export const ConstraintCompositionDiagram = memo(function ConstraintCompositionD
 
   return (
     <DiagramWrapper
-      height={280}
+      height={420}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

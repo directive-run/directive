@@ -69,7 +69,7 @@ export const DerivationDependencyGraphDiagram = memo(function DerivationDependen
 
   return (
     <DiagramWrapper
-      height={300}
+      height={440}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

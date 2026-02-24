@@ -90,7 +90,7 @@ export const BatchedNotificationsDiagram = memo(function BatchedNotificationsDia
 
   return (
     <DiagramWrapper
-      height={300}
+      height={440}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

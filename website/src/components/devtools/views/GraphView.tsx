@@ -70,6 +70,8 @@ interface GraphNodeState {
   lastError: string | null
   retries: number
   isVirtual: boolean
+  lastInput: string | null
+  lastOutput: string | null
 }
 
 interface GraphEdgeState {
@@ -180,6 +182,8 @@ function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; dep
     lastError: null,
     retries: 0,
     isVirtual: opts?.isVirtual ?? false,
+    lastInput: null,
+    lastOutput: null,
   }
 }
 
@@ -214,6 +218,9 @@ function enrichFromAgentEvents(
 
     if (e.type === 'agent_start') {
       matched.status = 'running'
+      if (typeof e.input === 'string') {
+        matched.lastInput = e.input
+      }
     } else if (e.type === 'agent_complete') {
       matched.status = 'completed'
       matched.tokens += e.totalTokens ?? 0
@@ -224,6 +231,9 @@ function enrichFromAgentEvents(
       matched.runs++
       if (e.modelId) {
         matched.modelId = e.modelId
+      }
+      if (typeof e.output === 'string') {
+        matched.lastOutput = e.output
       }
     } else if (e.type === 'agent_error') {
       matched.status = 'error'
@@ -669,6 +679,7 @@ function layoutGraph(
       id: `${edge.source}->${edge.target}${edge.label ? `-${edge.label}` : ''}`,
       source: edge.source,
       target: edge.target,
+      type: 'smoothstep',
       animated: isRunning,
       label: edge.label,
       style: {
@@ -683,6 +694,29 @@ function layoutGraph(
   })
 
   return { flowNodes, flowEdges }
+}
+
+// ---------------------------------------------------------------------------
+// AutoFit — smoothly re-fits viewport when node count changes
+// ---------------------------------------------------------------------------
+
+function AutoFit({ nodeCount }: { nodeCount: number }) {
+  const { fitView } = useReactFlow()
+  const prevCount = useRef(nodeCount)
+
+  useEffect(() => {
+    if (nodeCount !== prevCount.current) {
+      prevCount.current = nodeCount
+      // Small delay to let ReactFlow layout the new nodes first
+      const timer = setTimeout(() => {
+        fitView({ duration: 400, padding: 0.15 })
+      }, 50)
+
+      return () => clearTimeout(timer)
+    }
+  }, [nodeCount, fitView])
+
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -849,12 +883,18 @@ function DrawingOverlay() {
                 <button
                   key={c.value}
                   onClick={() => events.setColor({ color: c.value })}
-                  className={`h-4 w-4 rounded-full border-2 transition-transform ${
-                    strokeColor === c.value ? 'scale-125 border-white' : 'border-transparent hover:scale-110'
+                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    strokeColor === c.value
+                      ? 'bg-zinc-700 text-zinc-100'
+                      : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
                   }`}
-                  style={{ backgroundColor: c.value }}
-                  title={c.label}
-                />
+                >
+                  <span
+                    className="inline-block h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: c.value }}
+                  />
+                  {c.label}
+                </button>
               ))}
 
               <div className="mx-1 h-4 w-px bg-zinc-700" />
@@ -933,17 +973,62 @@ function DrawingOverlay() {
 }
 
 // ---------------------------------------------------------------------------
+// Run splitting — split events into separate runs by pattern_start boundaries
+// ---------------------------------------------------------------------------
+
+function splitIntoRuns(events: DebugEvent[]): DebugEvent[][] {
+  const runs: DebugEvent[][] = []
+  let current: DebugEvent[] = []
+  let seenStart = false
+
+  for (const e of events) {
+    if (e.type === 'pattern_start') {
+      // Only split when we've already seen a pattern_start before.
+      // Pre-start events fold into the first run.
+      if (seenStart && current.length > 0) {
+        runs.push(current)
+        current = []
+      }
+      seenStart = true
+    }
+    current.push(e)
+  }
+
+  if (current.length > 0) {
+    runs.push(current)
+  }
+
+  return runs
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function GraphView({ events }: { events: DebugEvent[] }) {
+  const runs = useMemo(() => splitIntoRuns(events), [events])
+  const [selectedRun, setSelectedRun] = useState<number | null>(null)
+  const prevRunCountRef = useRef(runs.length)
+
+  // Auto-advance to latest run when a new run starts
+  useEffect(() => {
+    if (runs.length > prevRunCountRef.current) {
+      setSelectedRun(runs.length - 1)
+    }
+    prevRunCountRef.current = runs.length
+  }, [runs.length])
+
+  // Active run index: default to latest
+  const activeRunIndex = selectedRun ?? runs.length - 1
+  const activeEvents = runs[activeRunIndex] ?? []
+
   const graphData = useMemo(() => {
-    if (events.length === 0) {
+    if (activeEvents.length === 0) {
       return null
     }
 
-    return buildGraphFromEvents(events)
-  }, [events])
+    return buildGraphFromEvents(activeEvents)
+  }, [activeEvents])
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
 
@@ -952,7 +1037,9 @@ export function GraphView({ events }: { events: DebugEvent[] }) {
       return { initialNodes: [] as Node[], initialEdges: [] as Edge[] }
     }
 
-    return layoutGraph(graphData.nodes, graphData.edges)
+    const { flowNodes, flowEdges } = layoutGraph(graphData.nodes, graphData.edges)
+
+    return { initialNodes: flowNodes, initialEdges: flowEdges }
   }, [graphData])
 
   const [nodes, setNodes] = useState(initialNodes)
@@ -973,18 +1060,49 @@ export function GraphView({ events }: { events: DebugEvent[] }) {
     [],
   )
 
+  const hasGraph = graphData && graphData.nodes.size > 0
+  const selected = hasGraph && selectedNode ? graphData.nodes.get(selectedNode) : null
+
+  // Run pager — rendered outside ReactFlow so it's always visible
+  const runPager = runs.length > 1 && (
+    <div className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+      <button
+        onClick={() => setSelectedRun(Math.max(0, activeRunIndex - 1))}
+        disabled={activeRunIndex === 0}
+        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        Prev
+      </button>
+      <span className="px-1 text-[10px] font-medium text-zinc-300">
+        Run {activeRunIndex + 1} / {runs.length}
+      </span>
+      <button
+        onClick={() => setSelectedRun(Math.min(runs.length - 1, activeRunIndex + 1))}
+        disabled={activeRunIndex === runs.length - 1}
+        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        Next
+      </button>
+    </div>
+  )
+
   if (events.length === 0) {
     return <EmptyState message="No events recorded yet." />
   }
 
-  if (!graphData || graphData.nodes.size === 0) {
-    return <EmptyState message="No execution graph detected. Run a query to see the graph." />
+  if (!hasGraph) {
+    return (
+      <div className="-mx-4 -mt-4 -mb-4 flex flex-col" style={{ height: 'calc(100% + 2rem)' }}>
+        {runPager && <div className="flex justify-end p-2">{runPager}</div>}
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState message="No execution graph detected. Select a different run or run a query." />
+        </div>
+      </div>
+    )
   }
 
-  const selected = selectedNode ? graphData.nodes.get(selectedNode) : null
-
   return (
-    <div className="-mx-4 -mb-4 flex" style={{ height: 'calc(100% + 1rem)' }}>
+    <div className="-mx-4 -mt-4 -mb-4 flex" style={{ height: 'calc(100% + 2rem)' }}>
       <div className="flex-1">
         <ReactFlow
           nodes={nodes}
@@ -993,12 +1111,19 @@ export function GraphView({ events }: { events: DebugEvent[] }) {
           onEdgesChange={onEdgesChange}
           onNodeClick={(_e, node) => setSelectedNode(selectedNode === node.id ? null : node.id)}
           nodeTypes={nodeTypes}
+          nodesConnectable={false}
           fitView
+          fitViewOptions={{ padding: 0.15 }}
           proOptions={{ hideAttribution: true }}
           className="bg-zinc-950"
         >
           <Background color="#27272a" gap={20} />
           <Controls className="[&>button]:!border-zinc-700 [&>button]:!bg-zinc-800 [&>button]:!text-zinc-300" />
+          <AutoFit nodeCount={nodes.length} />
+          <DrawingOverlay />
+
+          {/* Run pager */}
+          {runPager && <Panel position="top-right" className="!m-2">{runPager}</Panel>}
         </ReactFlow>
       </div>
 
@@ -1083,6 +1208,30 @@ export function GraphView({ events }: { events: DebugEvent[] }) {
               </>
             )}
           </div>
+
+          {/* Agent input */}
+          {selected.lastInput && (
+            <div className="mt-3 border-t border-zinc-700 pt-3">
+              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                Input
+              </div>
+              <pre className="max-h-[200px] overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300">
+                {selected.lastInput}
+              </pre>
+            </div>
+          )}
+
+          {/* Agent output */}
+          {selected.lastOutput && (
+            <div className="mt-3 border-t border-zinc-700 pt-3">
+              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                Output
+              </div>
+              <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300">
+                {selected.lastOutput}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

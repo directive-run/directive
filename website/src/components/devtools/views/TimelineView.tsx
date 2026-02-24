@@ -204,7 +204,7 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
   return (
     <div
       ref={containerRef}
-      className="space-y-2 outline-none"
+      className="flex h-full flex-col gap-2 outline-none"
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >

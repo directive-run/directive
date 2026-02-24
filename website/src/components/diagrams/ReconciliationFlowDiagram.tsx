@@ -41,7 +41,7 @@ export const ReconciliationFlowDiagram = memo(function ReconciliationFlowDiagram
 
   return (
     <DiagramWrapper
-      height={300}
+      height={440}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

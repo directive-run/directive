@@ -201,42 +201,42 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       news: {
         agent: {
           name: 'news-researcher',
-          instructions: 'You find recent news on a topic. Respond in 1-2 sentences with a key finding.',
+          instructions: 'You are a news research agent. Find and report recent news on the given topic. Use your knowledge to provide specific, concrete findings with dates and sources when possible. Never say you lack internet access — respond with your best knowledge. Respond in 1-2 sentences with a key finding.',
         },
         capabilities: ['research', 'news'],
       },
       academic: {
         agent: {
           name: 'academic-researcher',
-          instructions: 'You find academic research on a topic. Respond in 1-2 sentences citing a study.',
+          instructions: 'You are an academic research agent. Find and cite relevant academic research on the given topic. Reference specific studies, authors, journals, and years when possible. Never say you lack internet access — respond with your best knowledge. Respond in 1-2 sentences citing a study.',
         },
         capabilities: ['research', 'academic'],
       },
       sentiment: {
         agent: {
           name: 'sentiment-analyzer',
-          instructions: 'Analyze the sentiment and public opinion of the provided news finding. Respond in 1-2 sentences.',
+          instructions: 'You are a sentiment analysis agent. Analyze the sentiment and public opinion of the provided finding. Classify as positive, negative, neutral, or mixed with specific reasoning. Respond in 1-2 sentences.',
         },
         capabilities: ['analysis', 'sentiment'],
       },
       'fact-checker': {
         agent: {
           name: 'fact-checker',
-          instructions: 'Verify the accuracy of the provided academic claim. Respond in 1-2 sentences.',
+          instructions: 'You are a fact-checking agent. Verify the accuracy of the provided claim by cross-referencing with known facts. Rate accuracy and note any caveats. Respond in 1-2 sentences.',
         },
         capabilities: ['analysis', 'verification'],
       },
       synthesizer: {
         agent: {
           name: 'synthesizer',
-          instructions: 'Combine the sentiment analysis and fact-check into a coherent summary. Respond in 2-3 sentences.',
+          instructions: 'You are a synthesis agent. Combine the sentiment analysis and fact-check into a coherent, well-structured summary. Highlight key themes and conclusions. Respond in 2-3 sentences.',
         },
         capabilities: ['synthesis'],
       },
       reviewer: {
         agent: {
           name: 'reviewer',
-          instructions: 'Review the synthesized research for quality and completeness. Provide a final 2-3 sentence research brief.',
+          instructions: 'You are a quality review agent. Review the synthesized research for accuracy, completeness, and balance. Provide a final polished research brief. Respond in 2-3 sentences.',
         },
         capabilities: ['review', 'quality'],
       },

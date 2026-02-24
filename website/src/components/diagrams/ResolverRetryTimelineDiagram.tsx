@@ -62,7 +62,7 @@ export const ResolverRetryTimelineDiagram = memo(function ResolverRetryTimelineD
 
   return (
     <DiagramWrapper
-      height={150}
+      height={220}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

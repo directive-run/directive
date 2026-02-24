@@ -1,0 +1,215 @@
+/* Turbo Flow Theme for Directive Diagrams
+   Always-dark diagram surfaces with conic-gradient node borders */
+
+/* === Base Surface === */
+.directive-diagram {
+  --surface: #0f172a;
+  --surface-raised: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-subtle: #334155;
+  color: var(--text-primary);
+}
+
+/* === Color Scheme Variables === */
+.scheme-primary {
+  --gradient-a: #0ea5e9;
+  --gradient-b: #6366f1;
+  --gradient-c: #0ea5e9;
+  --glow-a: rgba(14, 165, 233, 0.3);
+  --glow-b: rgba(99, 102, 241, 0.3);
+  --accent: #38bdf8;
+}
+
+.scheme-amber {
+  --gradient-a: #f59e0b;
+  --gradient-b: #ef4444;
+  --gradient-c: #f59e0b;
+  --glow-a: rgba(245, 158, 11, 0.3);
+  --glow-b: rgba(239, 68, 68, 0.3);
+  --accent: #fbbf24;
+}
+
+.scheme-violet {
+  --gradient-a: #8b5cf6;
+  --gradient-b: #6366f1;
+  --gradient-c: #8b5cf6;
+  --glow-a: rgba(139, 92, 246, 0.3);
+  --glow-b: rgba(99, 102, 241, 0.3);
+  --accent: #a78bfa;
+}
+
+.scheme-emerald {
+  --gradient-a: #10b981;
+  --gradient-b: #0ea5e9;
+  --gradient-c: #10b981;
+  --glow-a: rgba(16, 185, 129, 0.3);
+  --glow-b: rgba(14, 165, 233, 0.3);
+  --accent: #34d399;
+}
+
+.scheme-red {
+  --gradient-a: #ef4444;
+  --gradient-b: #f59e0b;
+  --gradient-c: #ef4444;
+  --glow-a: rgba(239, 68, 68, 0.3);
+  --glow-b: rgba(245, 158, 11, 0.3);
+  --accent: #f87171;
+}
+
+.scheme-slate {
+  --gradient-a: #64748b;
+  --gradient-b: #94a3b8;
+  --gradient-c: #64748b;
+  --glow-a: rgba(100, 116, 139, 0.2);
+  --glow-b: rgba(148, 163, 184, 0.2);
+  --accent: #94a3b8;
+}
+
+/* === Conic Gradient Border Wrapper === */
+.turbo-gradient {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.turbo-gradient::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 141.42%;
+  height: 141.42%;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a),
+    var(--gradient-b),
+    var(--gradient-c)
+  );
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+  animation: turbo-spin 4s linear infinite;
+}
+
+@keyframes turbo-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.turbo-gradient-idle::before {
+  opacity: 0.25;
+  animation-duration: 8s;
+}
+
+/* Inner content sits above the pseudo-element */
+.turbo-inner {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  margin: 2px;
+  padding: 16px 20px;
+}
+
+/* === Active Glow (dual-direction) === */
+.turbo-node-active {
+  box-shadow:
+    10px 0 15px var(--glow-a),
+    -10px 0 15px var(--glow-b);
+}
+
+.turbo-node-active::before {
+  opacity: 0.85;
+}
+
+/* === Node Type Shapes === */
+.turbo-step {
+  border-radius: 8px;
+  min-width: 150px;
+  min-height: 70px;
+}
+
+.turbo-step .turbo-inner {
+  border-radius: 6px;
+}
+
+.turbo-status {
+  border-radius: 6px;
+}
+
+.turbo-status .turbo-inner {
+  border-radius: 4.5px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.turbo-circle {
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+}
+
+.turbo-circle .turbo-inner {
+  border-radius: 50%;
+  margin: 2px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+}
+
+.turbo-badge {
+  border-radius: 9999px;
+}
+
+.turbo-badge .turbo-inner {
+  border-radius: 9999px;
+  padding: 6px 16px;
+}
+
+/* === Layer Node (no gradient) === */
+.turbo-layer {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.turbo-layer-active {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+/* === Edge Labels === */
+.turbo-edge-label {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* === Handle Overrides (invisible) === */
+.directive-diagram .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  opacity: 0;
+  background: transparent;
+  border: none;
+}
+
+/* === Background / Grid (always dark) === */
+.directive-diagram .react-flow__background {
+  background: var(--surface);
+}
+
+/* === Smooth Transitions === */
+.turbo-gradient,
+.turbo-inner,
+.turbo-layer {
+  transition: all 0.3s ease;
+}

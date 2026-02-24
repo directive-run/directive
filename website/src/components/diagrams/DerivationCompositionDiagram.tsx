@@ -69,7 +69,7 @@ export const DerivationCompositionDiagram = memo(function DerivationCompositionD
 
   return (
     <DiagramWrapper
-      height={280}
+      height={420}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

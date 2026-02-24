@@ -76,7 +76,7 @@ export const SecurityPipelineDiagram = memo(function SecurityPipelineDiagram() {
 
   return (
     <DiagramWrapper
-      height={350}
+      height={500}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

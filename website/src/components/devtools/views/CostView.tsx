@@ -82,7 +82,7 @@ export function CostView({ events }: { events: DebugEvent[] }) {
     .join(', ')
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Summary stats */}
       <div className="flex flex-wrap gap-6 text-xs">
         <div>

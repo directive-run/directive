@@ -1,5 +1,7 @@
 import type { Node } from '@xyflow/react'
 
+const SCALE = 1.5
+
 /** Create a node positioned at an explicit (x, y). */
 export function positionNode<T extends Record<string, unknown>>(
   id: string,
@@ -8,7 +10,7 @@ export function positionNode<T extends Record<string, unknown>>(
   y: number,
   data: T,
 ): Node<T> {
-  return { id, type, position: { x, y }, data }
+  return { id, type, position: { x: x * SCALE, y: y * SCALE }, data }
 }
 
 /** Arrange nodes in a horizontal row, evenly spaced. */
@@ -20,7 +22,7 @@ export function horizontalRow<T extends Record<string, unknown>>(
 ): Node<T>[] {
   return nodes.map((n, i) => ({
     ...n,
-    position: { x: startX + i * spacing, y },
+    position: { x: (startX + i * spacing) * SCALE, y: y * SCALE },
   }))
 }
 
@@ -33,7 +35,7 @@ export function verticalColumn<T extends Record<string, unknown>>(
 ): Node<T>[] {
   return nodes.map((n, i) => ({
     ...n,
-    position: { x, y: startY + i * spacing },
+    position: { x: x * SCALE, y: (startY + i * spacing) * SCALE },
   }))
 }
 

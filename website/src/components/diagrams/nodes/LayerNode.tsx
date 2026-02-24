@@ -3,22 +3,27 @@
 import { type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import type { LayerNodeData } from '../types'
-import { LAYER_COLORS } from '../theme'
+import { ACCENT_COLORS } from '../theme'
 
 export function LayerNode({ data }: NodeProps) {
   const { label, active, colorScheme, width, height } = data as LayerNodeData
-  const colors = LAYER_COLORS[colorScheme]
 
   return (
     <div
       className={clsx(
-        'rounded-xl border-[1.5px] transition-all duration-300',
-        active ? colors.bgActive : colors.bg,
-        active ? colors.borderActive : colors.border,
+        'turbo-layer',
+        active && 'turbo-layer-active',
       )}
-      style={{ width, height }}
+      style={{
+        width,
+        height,
+        borderColor: active ? ACCENT_COLORS[colorScheme] : undefined,
+      }}
     >
-      <div className="px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <div
+        className="px-3 pt-2 text-xs font-semibold uppercase tracking-wide"
+        style={{ color: active ? ACCENT_COLORS[colorScheme] : '#94a3b8' }}
+      >
         {label}
       </div>
     </div>

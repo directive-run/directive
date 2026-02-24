@@ -113,7 +113,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
       />
 
       <DiagramWrapper
-        height={200}
+        height={300}
         nodes={nodes}
         edges={edges}
         nodeTypes={diagramNodeTypes}
