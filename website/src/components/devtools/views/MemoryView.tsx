@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { usePolledSnapshot } from '../hooks/usePolledSnapshot'
 import { EmptyState } from '../EmptyState'
 import { Skeleton } from '../Skeleton'
@@ -9,6 +10,7 @@ import { Skeleton } from '../Skeleton'
 
 export function MemoryView() {
   const { data, error } = usePolledSnapshot()
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
 
   if (error) {
     return <EmptyState message={error} />
@@ -29,8 +31,21 @@ export function MemoryView() {
   const prunedCount = Math.max(0, totalMessages - contextMessages)
   const usagePct = maxHistory > 0 ? Math.min(100, (totalMessages / maxHistory) * 100) : 0
 
+  const toggleExpand = (index: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+
+      return next
+    })
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Summary stats */}
       <div className="flex flex-wrap gap-6 text-xs">
         <div>
@@ -70,30 +85,42 @@ export function MemoryView() {
 
       {/* Message list */}
       {messages.length > 0 && (
-        <div>
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             Context messages
           </div>
-          <div className="max-h-[300px] space-y-1 overflow-y-auto">
-            {messages.map((m, i) => (
-              <div key={i} className="rounded border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 dark:border-zinc-700 dark:bg-zinc-800/50">
-                <div className="flex items-center gap-2">
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                    m.role === 'user'
-                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
-                      : m.role === 'assistant'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                        : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400'
-                  }`}>
-                    {m.role}
-                  </span>
-                  <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{m.contentLength} chars</span>
-                </div>
-                {m.preview && (
-                  <div className="mt-1 truncate text-[11px] text-zinc-600 dark:text-zinc-400">{m.preview}</div>
-                )}
-              </div>
-            ))}
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+            {messages.map((m, i) => {
+              const isExpanded = expanded.has(i)
+
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggleExpand(i)}
+                  className="w-full cursor-pointer rounded border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-left dark:border-zinc-700 dark:bg-zinc-800/50"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      m.role === 'user'
+                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
+                        : m.role === 'assistant'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400'
+                    }`}>
+                      {m.role}
+                    </span>
+                    <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{m.contentLength} chars</span>
+                    <span className={`ml-auto text-[10px] text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                  </div>
+                  {m.preview && (
+                    <div className={`mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 ${isExpanded ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                      {m.preview}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}

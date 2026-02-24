@@ -289,7 +289,7 @@ export function GoalView({ events }: { events: DebugEvent[] }) {
   const latest = executions[idx]
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Execution selector (E11: when multiple executions exist) */}
       {executions.length > 1 && (
         <div className="flex items-center gap-2 text-xs">

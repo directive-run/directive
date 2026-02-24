@@ -72,7 +72,7 @@ export const ErrorBoundaryRecoveryDiagram = memo(function ErrorBoundaryRecoveryD
 
   return (
     <DiagramWrapper
-      height={300}
+      height={440}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

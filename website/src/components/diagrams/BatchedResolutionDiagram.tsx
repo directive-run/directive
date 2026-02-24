@@ -81,7 +81,7 @@ export const BatchedResolutionDiagram = memo(function BatchedResolutionDiagram()
 
   return (
     <DiagramWrapper
-      height={250}
+      height={370}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

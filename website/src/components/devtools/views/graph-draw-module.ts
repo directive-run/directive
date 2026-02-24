@@ -49,9 +49,9 @@ export const graphDraw = createModule('graph-draw', {
   },
 
   derive: {
-    strokeCount: (facts) => facts.strokes.length,
-    hasStrokes: (facts) => facts.strokes.length > 0,
-    canUndo: (facts) => facts.strokes.length > 0,
+    strokeCount: (facts) => (facts.strokes ?? []).length,
+    hasStrokes: (facts) => (facts.strokes ?? []).length > 0,
+    canUndo: (facts) => (facts.strokes ?? []).length > 0,
   },
 
   events: {
@@ -59,10 +59,10 @@ export const graphDraw = createModule('graph-draw', {
       facts.drawMode = !facts.drawMode
     },
     addStroke: (facts, { stroke }) => {
-      facts.strokes = [...facts.strokes, stroke]
+      facts.strokes = [...(facts.strokes ?? []), stroke]
     },
     undoStroke: (facts) => {
-      facts.strokes = facts.strokes.slice(0, -1)
+      facts.strokes = (facts.strokes ?? []).slice(0, -1)
     },
     clearStrokes: (facts) => {
       facts.strokes = []

@@ -59,7 +59,7 @@ export const ConstraintOrderingDagDiagram = memo(function ConstraintOrderingDagD
 
   return (
     <DiagramWrapper
-      height={300}
+      height={440}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

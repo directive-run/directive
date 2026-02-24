@@ -59,7 +59,7 @@ export const DagFlowDiagram = memo(function DagFlowDiagram() {
 
   return (
     <DiagramWrapper
-      height={340}
+      height={500}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

@@ -47,7 +47,7 @@ export const GuardrailsPipelineDiagram = memo(function GuardrailsPipelineDiagram
 
   return (
     <DiagramWrapper
-      height={150}
+      height={220}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

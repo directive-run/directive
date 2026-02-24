@@ -71,7 +71,7 @@ export const ReconciliationCycleDiagram = memo(function ReconciliationCycleDiagr
     <>
       <AnimationController isPlaying={isPlaying} onToggle={toggle} hint="Cycles through reconciliation phases" />
       <DiagramWrapper
-        height={300}
+        height={440}
         nodes={nodes}
         edges={edges}
         nodeTypes={diagramNodeTypes}

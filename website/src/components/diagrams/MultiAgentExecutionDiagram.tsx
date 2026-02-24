@@ -99,7 +99,7 @@ export const MultiAgentExecutionDiagram = memo(function MultiAgentExecutionDiagr
 
   return (
     <DiagramWrapper
-      height={250}
+      height={370}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

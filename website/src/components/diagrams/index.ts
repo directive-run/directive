@@ -13,7 +13,15 @@ export type {
 } from './types'
 
 // Theme
-export { getNodeColors, getEdgeColor, getEdgeColorDark, LAYER_COLORS } from './theme'
+export {
+  getNodeColors,
+  getEdgeColor,
+  getEdgeColorDark,
+  LAYER_COLORS,
+  SCHEME_CLASS,
+  ACCENT_COLORS,
+  EDGE_GRADIENTS,
+} from './theme'
 
 // Wrapper & Controls
 export { DiagramWrapper } from './DiagramWrapper'

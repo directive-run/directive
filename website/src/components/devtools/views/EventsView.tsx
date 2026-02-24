@@ -33,7 +33,7 @@ export function EventsView({ events }: { events: DebugEvent[] }) {
   const baseTs = events[0]?.timestamp ?? 0
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col gap-3">
       {/* Search + type filter */}
       <div className="flex items-center gap-2">
         <input
@@ -63,20 +63,21 @@ export function EventsView({ events }: { events: DebugEvent[] }) {
         {eventTypes.map((t) => (
           <button
             key={t}
-            className={`cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] transition ${
+            className={`flex cursor-pointer items-center gap-1 rounded px-2 py-0.5 font-mono text-[10px] transition ${
               typeFilter === t
                 ? 'bg-sky-500/20 text-sky-500'
                 : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
             }`}
             onClick={() => setTypeFilter(typeFilter === t ? null : t)}
           >
+            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${EVENT_COLORS[t] ?? 'bg-zinc-400'}`} />
             {t}
           </button>
         ))}
       </div>
 
       {/* Event list — M8: sticky header with border+shadow */}
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <table className="w-full text-[11px]">
           <thead className="sticky top-0 border-b border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
             <tr className="text-zinc-500 dark:text-zinc-400">
