@@ -18,6 +18,7 @@ import type {
 	CreateSystemOptionsSingle,
 	ModuleSchema,
 	ModuleDef,
+	ModulesMap,
 	Plugin,
 	DebugConfig,
 	ErrorBoundaryConfig,
@@ -25,6 +26,7 @@ import type {
 	InferDerivations,
 	InferEvents,
 	SingleModuleSystem,
+	NamespacedSystem,
 	SystemSnapshot,
 	TimeTravelState,
 } from "@directive-run/core";
@@ -952,5 +954,70 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			callback: (newValue: unknown, previousValue: unknown) => void,
 		) => createWatch<unknown>(host, system, key, callback),
 	};
+}
+
+// ============================================================================
+// NamespacedSelectorController — select from a NamespacedSystem
+// ============================================================================
+
+/**
+ * Reactive controller that selects from a NamespacedSystem.
+ * Subscribes to specified keys and triggers host updates.
+ *
+ * @example
+ * ```typescript
+ * class MyElement extends LitElement {
+ *   private token = new NamespacedSelectorController(
+ *     this, system, ["auth.token"], (s) => s.facts.auth.token,
+ *   );
+ *   render() {
+ *     return html`<span>${this.token.value}</span>`;
+ *   }
+ * }
+ * ```
+ */
+export class NamespacedSelectorController<Modules extends ModulesMap, R> implements ReactiveController {
+	private host: ReactiveControllerHost;
+	private system: NamespacedSystem<Modules>;
+	private keys: string[];
+	private selector: (system: NamespacedSystem<Modules>) => R;
+	private unsubscribe?: () => void;
+	value: R;
+
+	constructor(
+		host: ReactiveControllerHost,
+		system: NamespacedSystem<Modules>,
+		keys: string[],
+		selector: (system: NamespacedSystem<Modules>) => R,
+	) {
+		this.host = host;
+		this.system = system;
+		this.keys = keys;
+		this.selector = selector;
+		this.value = selector(system);
+		host.addController(this);
+	}
+
+	hostConnected(): void {
+		this.value = this.selector(this.system);
+		this.unsubscribe = this.system.subscribe(this.keys, () => {
+			this.value = this.selector(this.system);
+			this.host.requestUpdate();
+		});
+	}
+
+	hostDisconnected(): void {
+		this.unsubscribe?.();
+		this.unsubscribe = undefined;
+	}
+}
+
+export function createNamespacedSelector<Modules extends ModulesMap, R>(
+	host: ReactiveControllerHost,
+	system: NamespacedSystem<Modules>,
+	keys: string[],
+	selector: (system: NamespacedSystem<Modules>) => R,
+): NamespacedSelectorController<Modules, R> {
+	return new NamespacedSelectorController(host, system, keys, selector);
 }
 

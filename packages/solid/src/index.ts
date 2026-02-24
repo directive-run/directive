@@ -17,6 +17,7 @@ import {
 import type {
 	ModuleSchema,
 	ModuleDef,
+	ModulesMap,
 	Plugin,
 	DebugConfig,
 	ErrorBoundaryConfig,
@@ -25,6 +26,7 @@ import type {
 	InferSelectorState,
 	InferEvents,
 	SingleModuleSystem,
+	NamespacedSystem,
 	SystemSnapshot,
 } from "@directive-run/core";
 import {
@@ -791,4 +793,35 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
 			useWatch(system as SingleModuleSystem<any>, key, callback),
 	};
+}
+
+// ============================================================================
+// useNamespacedSelector — select from a NamespacedSystem
+// ============================================================================
+
+/**
+ * SolidJS accessor that selects from a NamespacedSystem.
+ * Subscribes to specified keys and provides reactive updates.
+ *
+ * @param system - The namespaced system
+ * @param keys - Namespaced keys to subscribe to (e.g., ["auth.token", "data.count"])
+ * @param selector - Function that reads from system.facts / system.derive
+ *
+ * @example
+ * ```tsx
+ * const token = useNamespacedSelector(system, ["auth.token"], (s) => s.facts.auth.token);
+ * ```
+ */
+export function useNamespacedSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules>,
+	keys: string[],
+	selector: (system: NamespacedSystem<Modules>) => R,
+): Accessor<R> {
+	const [value, setValue] = createSignal<R>(selector(system));
+	const unsubscribe = system.subscribe(keys, () => {
+		setValue(() => selector(system));
+	});
+	onCleanup(unsubscribe);
+
+	return value as Accessor<R>;
 }
