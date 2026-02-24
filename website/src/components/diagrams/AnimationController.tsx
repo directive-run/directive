@@ -18,7 +18,7 @@ export function AnimationController({ isPlaying, onToggle, hint }: AnimationCont
           'flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition',
           isPlaying
             ? 'bg-sky-500 text-white hover:bg-sky-600'
-            : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
+            : 'bg-slate-700 text-slate-300 hover:bg-slate-600',
         )}
       >
         {isPlaying ? (
@@ -34,7 +34,7 @@ export function AnimationController({ isPlaying, onToggle, hint }: AnimationCont
         )}
       </button>
       {hint && (
-        <span className="text-xs text-slate-500 dark:text-slate-400">{hint}</span>
+        <span className="text-xs text-slate-400">{hint}</span>
       )}
     </div>
   )

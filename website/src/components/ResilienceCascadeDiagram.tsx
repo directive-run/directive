@@ -83,7 +83,7 @@ export const ResilienceCascadeDiagram = memo(function ResilienceCascadeDiagram()
 
   return (
     <DiagramWrapper
-      height={380}
+      height={550}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

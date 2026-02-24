@@ -42,7 +42,7 @@ export function GuardrailsView({ events }: { events: DebugEvent[] }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Summary */}
       <div className="flex flex-wrap gap-6 text-xs">
         <div>
@@ -189,11 +189,11 @@ export function GuardrailsView({ events }: { events: DebugEvent[] }) {
       </div>
 
       {/* Recent guardrail events (all) */}
-      <div>
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           All recent checks
         </div>
-        <div className="max-h-48 space-y-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {[...guardrailEvents].reverse().slice(0, 20).map((e) => (
             <div key={e.id} className="flex items-center gap-2 font-mono text-[11px]">
               <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${e.passed !== false ? 'bg-emerald-500' : 'bg-red-500'}`} />

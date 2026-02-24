@@ -76,7 +76,7 @@ export const RequestLifecycleDiagram = memo(function RequestLifecycleDiagram() {
 
   return (
     <DiagramWrapper
-      height={500}
+      height={700}
       interactive
       nodes={nodes}
       edges={edges}

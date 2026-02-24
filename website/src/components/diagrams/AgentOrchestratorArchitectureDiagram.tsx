@@ -87,7 +87,7 @@ export const AgentOrchestratorArchitectureDiagram = memo(function AgentOrchestra
 
   return (
     <DiagramWrapper
-      height={380}
+      height={550}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

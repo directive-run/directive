@@ -99,7 +99,7 @@ export async function GET(request: Request) {
         role: m.role,
         contentLength: typeof m.content === 'string' ? m.content.length : 0,
         preview: tokenEnv
-          ? (typeof m.content === 'string' ? m.content.slice(0, 120) : '')
+          ? (typeof m.content === 'string' ? m.content.slice(0, 2000) + (m.content.length > 2000 ? '…' : '') : '')
           : '',
       })),
     },

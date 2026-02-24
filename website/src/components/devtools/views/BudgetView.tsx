@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { DebugEvent } from '../types'
 import { usePolledSnapshot } from '../hooks/usePolledSnapshot'
 import { getDefaultPricing, formatCost } from '../constants'
@@ -8,8 +8,12 @@ import { getDefaultPricing, formatCost } from '../constants'
 // C1: Uses shared usePolledSnapshot
 // m10: Uses getDefaultPricing instead of hardcoded Haiku pricing
 
+type SortKey = 'time' | 'cost' | 'tokens'
+
 export function BudgetView({ events }: { events: DebugEvent[] }) {
   const { data } = usePolledSnapshot()
+  const [agentFilter, setAgentFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<SortKey>('time')
 
   const budgets = data?.config.budgets ?? [
     { window: 'hour', maxCost: 5.00 },
@@ -21,7 +25,7 @@ export function BudgetView({ events }: { events: DebugEvent[] }) {
   const pricing = getDefaultPricing(modelId)
 
   // C3: Memoize cost calculations
-  const { hourlyCost, dailyCost, totalCost, hourlyEvents, dailyEvents, completeEvents, budgetData } = useMemo(() => {
+  const { hourlyCost, dailyCost, totalCost, hourlyEvents, dailyEvents, completeEvents, agentIds, budgetData } = useMemo(() => {
     const complete = events.filter((e) => e.type === 'agent_complete')
     const now = Date.now()
     const oneHourAgo = now - 3_600_000
@@ -44,6 +48,14 @@ export function BudgetView({ events }: { events: DebugEvent[] }) {
     const dCost = estimateCost(daily)
     const tCost = estimateCost(complete)
 
+    // Collect unique agent IDs
+    const ids = new Set<string>()
+    for (const e of complete) {
+      if (e.agentId) {
+        ids.add(e.agentId)
+      }
+    }
+
     const bData = budgets.map((b) => {
       const spent = b.window === 'hour' ? hCost : dCost
       const pct = b.maxCost > 0 ? Math.min(100, (spent / b.maxCost) * 100) : 0
@@ -51,12 +63,44 @@ export function BudgetView({ events }: { events: DebugEvent[] }) {
       return { ...b, spent, pct }
     })
 
-    return { hourlyCost: hCost, dailyCost: dCost, totalCost: tCost, hourlyEvents: hourly, dailyEvents: daily, completeEvents: complete, budgetData: bData }
+    return { hourlyCost: hCost, dailyCost: dCost, totalCost: tCost, hourlyEvents: hourly, dailyEvents: daily, completeEvents: complete, agentIds: Array.from(ids).sort(), budgetData: bData }
   }, [events, budgets, pricing])
 
+  // Filter and sort the recent spend list
+  const { filteredEvents, filteredTotalCost, filteredTotalTokens } = useMemo(() => {
+    let filtered = completeEvents
+    if (agentFilter !== 'all') {
+      filtered = filtered.filter((e) => e.agentId === agentFilter)
+    }
+
+    // Compute totals across all filtered (before slicing)
+    let fCost = 0
+    let fTokens = 0
+    for (const e of filtered) {
+      fCost += ((e.inputTokens ?? 0) / 1_000_000) * pricing.input + ((e.outputTokens ?? 0) / 1_000_000) * pricing.output
+      fTokens += e.totalTokens ?? 0
+    }
+
+    const sorted = [...filtered]
+    if (sortBy === 'cost') {
+      sorted.sort((a, b) => {
+        const costA = ((a.inputTokens ?? 0) * pricing.input + (a.outputTokens ?? 0) * pricing.output)
+        const costB = ((b.inputTokens ?? 0) * pricing.input + (b.outputTokens ?? 0) * pricing.output)
+
+        return costB - costA
+      })
+    } else if (sortBy === 'tokens') {
+      sorted.sort((a, b) => (b.totalTokens ?? 0) - (a.totalTokens ?? 0))
+    } else {
+      sorted.reverse()
+    }
+
+    return { filteredEvents: sorted.slice(0, 30), filteredTotalCost: fCost, filteredTotalTokens: fTokens }
+  }, [completeEvents, agentFilter, sortBy, pricing])
+
   return (
-    <div className="space-y-4">
-      {/* Summary — m5: added daily runs count */}
+    <div className="flex h-full flex-col gap-4">
+      {/* Summary */}
       <div className="flex flex-wrap gap-6 text-xs">
         <div>
           <span className="text-zinc-500 dark:text-zinc-400">Total spend</span>
@@ -109,14 +153,41 @@ export function BudgetView({ events }: { events: DebugEvent[] }) {
         ))}
       </div>
 
-      {/* Spend over time */}
+      {/* Spend list with filters */}
       {completeEvents.length > 0 && (
-        <div>
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Recent spend
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Recent spend
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Agent filter */}
+              <select
+                value={agentFilter}
+                onChange={(e) => setAgentFilter(e.target.value)}
+                className="rounded border border-zinc-600 bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none focus:border-zinc-500"
+              >
+                <option value="all">All agents</option>
+                {agentIds.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+              </select>
+
+              {/* Sort */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                className="rounded border border-zinc-600 bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none focus:border-zinc-500"
+              >
+                <option value="time">Newest</option>
+                <option value="cost">Highest cost</option>
+                <option value="tokens">Most tokens</option>
+              </select>
+            </div>
           </div>
-          <div className="max-h-48 space-y-0.5 overflow-y-auto">
-            {[...completeEvents].reverse().slice(0, 15).map((e) => {
+
+          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+            {filteredEvents.map((e) => {
               const cost = ((e.inputTokens ?? 0) / 1_000_000) * pricing.input + ((e.outputTokens ?? 0) / 1_000_000) * pricing.output
 
               return (
@@ -129,7 +200,23 @@ export function BudgetView({ events }: { events: DebugEvent[] }) {
                 </div>
               )
             })}
+            {filteredEvents.length === 0 && (
+              <div className="py-2 text-center text-[11px] text-zinc-500">
+                No events for this agent.
+              </div>
+            )}
           </div>
+
+          {/* Totals footer */}
+          {filteredEvents.length > 0 && (
+            <div className="flex items-center justify-between border-t border-zinc-700 pt-1.5 font-mono text-[11px]">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-zinc-300">Total</span>
+                <span className="text-zinc-400 dark:text-zinc-500">{filteredTotalTokens.toLocaleString()} tokens</span>
+              </div>
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">{formatCost(filteredTotalCost)}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ConnectionStatus } from './devtools/types'
 import { VIEWS } from './devtools/constants'
 import { DevToolsUrlContext, type DevToolsUrls } from './devtools/DevToolsUrlContext'
@@ -73,6 +73,7 @@ function LiveDevToolsInner() {
   const { events, status, clear, reconnect, exhaustedRetries } = useDevToolsStream()
   const [view, setView] = useState<(typeof VIEWS)[number]>('Timeline')
   const [confirmClear, setConfirmClear] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const totalTokens = events
@@ -114,8 +115,74 @@ function LiveDevToolsInner() {
     }
   }, [view])
 
+  // Export events as JSON file
+  const handleExport = useCallback(() => {
+    const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `devtools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [events])
+
+  // Import events from JSON file
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handleImport = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const imported = JSON.parse(reader.result as string)
+        if (Array.isArray(imported)) {
+          clear()
+          // Small delay so clear finishes first
+          setTimeout(() => {
+            // Re-inject via the stream hook isn't possible directly,
+            // so we dispatch a custom event the stream hook can pick up
+            window.dispatchEvent(new CustomEvent('devtools-import', { detail: imported }))
+          }, 50)
+        }
+      } catch {
+        console.warn('[DevTools] Failed to parse import file')
+      }
+    }
+    reader.readAsText(file)
+    // Reset so same file can be re-imported
+    e.target.value = ''
+  }, [clear])
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) {
+      return
+    }
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEsc)
+
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [isFullscreen])
+
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+    <div className={`flex flex-col overflow-hidden border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 ${
+      isFullscreen
+        ? 'fixed inset-0 z-50 rounded-none'
+        : 'h-full rounded-lg'
+    }`}>
       <style>{`
         .devtools-timeline-scroll::-webkit-scrollbar {
           height: 6px;
@@ -179,6 +246,51 @@ function LiveDevToolsInner() {
           >
             {confirmClear ? 'Confirm?' : 'Clear'}
           </button>
+          <button
+            onClick={handleExport}
+            aria-label="Export events"
+            title="Export"
+            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+              <path d="M8 1a.5.5 0 0 1 .5.5v9.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 11.293V1.5A.5.5 0 0 1 8 1z" />
+              <path d="M2 13.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
+            </svg>
+          </button>
+          <button
+            onClick={handleImport}
+            aria-label="Import events"
+            title="Import"
+            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+              <path d="M8 15a.5.5 0 0 1-.5-.5V4.707L5.354 6.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 4.707V14.5A.5.5 0 0 1 8 15z" />
+              <path d="M2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
+            </svg>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            onClick={() => setIsFullscreen((f) => !f)}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            {isFullscreen ? (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M5.5 1a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1 0-1H4.3L1.15 1.15a.5.5 0 1 1 .7-.7L5 3.7V1.5a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v2.2l3.15-3.15a.5.5 0 1 1 .7.7L11.7 4.5h2.3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-2.3l-3.15 3.15a.5.5 0 0 1-.7-.7L3.3 11H1.5a.5.5 0 0 1-.5-.5zm9 0a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-2.3l3.15 3.15a.5.5 0 0 1-.7.7L10.5 11.7v2.3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0V2.707l3.146 3.147a.5.5 0 1 0 .708-.708L2.707 2H4.5a.5.5 0 0 0 0-1h-3zm13 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V2.707l-3.146 3.147a.5.5 0 1 1-.708-.708L13.293 2H11.5a.5.5 0 0 1 0-1h3zM1.5 15a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 1 0v1.793l3.146-3.147a.5.5 0 1 1 .708.708L2.707 14H4.5a.5.5 0 0 1 0 1h-3zm13 0a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v1.793l-3.146-3.147a.5.5 0 0 0-.708.708L13.293 14H11.5a.5.5 0 0 0 0 1h3z" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
@@ -215,7 +327,7 @@ function LiveDevToolsInner() {
 
       {/* Content */}
       <div
-        className="flex-1 overflow-y-auto p-4"
+        className="min-h-0 flex-1 overflow-y-auto p-4"
         role="tabpanel"
         id={`devtools-tabpanel-${view.toLowerCase()}`}
         aria-label={`${view} view`}

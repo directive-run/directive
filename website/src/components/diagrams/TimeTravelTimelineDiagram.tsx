@@ -67,7 +67,7 @@ export const TimeTravelTimelineDiagram = memo(function TimeTravelTimelineDiagram
 
   return (
     <DiagramWrapper
-      height={180}
+      height={270}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

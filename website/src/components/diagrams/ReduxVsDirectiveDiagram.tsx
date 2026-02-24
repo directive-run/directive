@@ -87,7 +87,7 @@ export const ReduxVsDirectiveDiagram = memo(function ReduxVsDirectiveDiagram() {
 
   return (
     <DiagramWrapper
-      height={260}
+      height={380}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

@@ -47,7 +47,7 @@ export const MessagePipelineDiagram = memo(function MessagePipelineDiagram() {
 
   return (
     <DiagramWrapper
-      height={350}
+      height={500}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

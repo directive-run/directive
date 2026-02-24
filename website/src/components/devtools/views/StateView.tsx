@@ -25,7 +25,7 @@ export function StateView() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       <div className="flex font-mono text-xs">
         <span className="w-40 shrink-0 text-sky-600 dark:text-sky-400">eventCount</span>
         <span className="text-zinc-700 dark:text-zinc-300">{data.eventCount}</span>
@@ -42,7 +42,7 @@ export function StateView() {
           </h4>
           <div className="space-y-1">
             {Object.entries(value).map(([k, v]) => {
-              const strVal = String(v)
+              const isObject = v !== null && typeof v === 'object'
               const isBoolean = typeof v === 'boolean'
               const highlight = isBoolean
                 ? v ? 'text-emerald-500' : 'text-red-500'
@@ -51,7 +51,11 @@ export function StateView() {
               return (
                 <div key={k} className="flex font-mono text-xs">
                   <span className="w-40 shrink-0 text-sky-600 dark:text-sky-400">{k}</span>
-                  <span className={highlight ?? 'text-zinc-700 dark:text-zinc-300'}>{strVal}</span>
+                  {isObject ? (
+                    <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap rounded border border-zinc-200 bg-zinc-100 px-3 py-2 text-[10px] leading-relaxed text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{JSON.stringify(v, null, 2)}</pre>
+                  ) : (
+                    <span className={highlight ?? 'text-zinc-700 dark:text-zinc-300'}>{String(v)}</span>
+                  )}
                 </div>
               )
             })}

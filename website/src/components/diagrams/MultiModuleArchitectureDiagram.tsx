@@ -60,7 +60,7 @@ export const MultiModuleArchitectureDiagram = memo(function MultiModuleArchitect
 
   return (
     <DiagramWrapper
-      height={280}
+      height={420}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

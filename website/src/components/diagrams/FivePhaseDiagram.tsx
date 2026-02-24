@@ -47,7 +47,7 @@ export const FivePhaseDiagram = memo(function FivePhaseDiagram() {
 
   return (
     <DiagramWrapper
-      height={200}
+      height={300}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

@@ -52,7 +52,7 @@ export const ReflectLoopDiagram = memo(function ReflectLoopDiagram() {
 
   return (
     <DiagramWrapper
-      height={260}
+      height={380}
       nodes={nodes}
       edges={edges}
       nodeTypes={diagramNodeTypes}

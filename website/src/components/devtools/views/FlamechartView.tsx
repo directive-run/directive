@@ -98,7 +98,7 @@ export function FlamechartView({ events }: { events: DebugEvent[] }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between text-xs">
         <span className="text-zinc-500 dark:text-zinc-400">{spans.length} spans across {agentIds.length} agents</span>
         <span className="font-mono text-zinc-400 dark:text-zinc-500">{totalDuration.toFixed(1)}s total</span>

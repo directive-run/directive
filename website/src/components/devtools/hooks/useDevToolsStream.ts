@@ -110,6 +110,25 @@ export function useDevToolsStream() {
     setEvents([])
     maxIdRef.current = -1
     pendingRef.current = []
+
+    // Also clear server-side timeline + memory
+    const resetUrl = streamUrl.replace(/\/stream$/, '/reset')
+    fetch(resetUrl, { method: 'POST' }).catch(() => {})
+  }, [streamUrl])
+
+  // Listen for imported events
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const imported = (e as CustomEvent).detail as DebugEvent[]
+      if (Array.isArray(imported) && imported.length > 0) {
+        setEvents(imported)
+        maxIdRef.current = Math.max(...imported.map((ev) => ev.id))
+      }
+    }
+
+    window.addEventListener('devtools-import', handler)
+
+    return () => window.removeEventListener('devtools-import', handler)
   }, [])
 
   const exhaustedRetries = retryCountRef.current >= MAX_RECONNECT_RETRIES && status === 'disconnected'

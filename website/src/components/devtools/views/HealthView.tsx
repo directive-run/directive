@@ -44,7 +44,7 @@ export function HealthView() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Overall health indicator */}
       <div className="flex items-center gap-3">
         <div className={`h-4 w-4 rounded-full ${healthBg[healthStatus]}`} />
