@@ -19,27 +19,30 @@ export function StatusNode({ data }: NodeProps) {
   const isActive = status === 'active'
 
   return (
-    <>
-      <Handle type="target" position={Position.Left} />
-
-      <div
-        className={clsx(
-          'turbo-gradient turbo-status',
-          SCHEME_CLASS[colorScheme],
-          isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
-        )}
-      >
-        <div className="turbo-inner">
+    <div
+      className={clsx(
+        'turbo-status',
+        SCHEME_CLASS[colorScheme],
+        isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
+      )}
+    >
+      <div className="wrapper gradient">
+        <div className="inner">
           <div
-            className="text-base font-semibold"
-            style={{ color: isActive ? ACCENT_COLORS[colorScheme] : '#f1f5f9' }}
+            style={{
+              fontSize: '16px',
+              fontWeight: 600,
+              color: isActive ? ACCENT_COLORS[colorScheme] : '#f1f5f9',
+            }}
           >
             {label}
           </div>
           {displayIcon && (
             <div
-              className="mt-1 text-sm font-bold"
               style={{
+                marginTop: '4px',
+                fontSize: '14px',
+                fontWeight: 700,
                 color: status === 'error' ? '#f87171'
                   : status === 'success' ? '#34d399'
                   : ACCENT_COLORS[colorScheme],
@@ -48,10 +51,10 @@ export function StatusNode({ data }: NodeProps) {
               {displayIcon}
             </div>
           )}
+          <Handle type="target" position={Position.Left} />
+          <Handle type="source" position={Position.Right} />
         </div>
       </div>
-
-      <Handle type="source" position={Position.Right} />
-    </>
+    </div>
   )
 }

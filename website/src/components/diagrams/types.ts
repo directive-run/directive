@@ -5,6 +5,7 @@ export type NodeStatus = 'idle' | 'active' | 'past' | 'success' | 'error'
 export interface StepNodeData {
   label: string
   subtitle?: string
+  icon?: React.ReactNode
   tooltip?: { description: string; example?: string }
   status: NodeStatus
   colorScheme: ColorScheme

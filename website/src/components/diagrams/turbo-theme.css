@@ -1,14 +1,14 @@
 /* Turbo Flow Theme for Directive Diagrams
-   Always-dark diagram surfaces with conic-gradient node borders */
+   Based on React Flow's Turbo Flow example. */
 
 /* === Base Surface === */
 .directive-diagram {
-  --surface: #0f172a;
-  --surface-raised: #1e293b;
-  --text-primary: #f1f5f9;
+  --bg-color: #0f172a;
+  --text-color: #f1f5f9;
   --text-muted: #94a3b8;
   --border-subtle: #334155;
-  color: var(--text-primary);
+  --node-border-radius: 10px;
+  color: var(--text-color);
 }
 
 /* === Color Scheme Variables === */
@@ -16,8 +16,8 @@
   --gradient-a: #0ea5e9;
   --gradient-b: #6366f1;
   --gradient-c: #0ea5e9;
-  --glow-a: rgba(14, 165, 233, 0.3);
-  --glow-b: rgba(99, 102, 241, 0.3);
+  --node-box-shadow: 10px 0 15px rgba(14, 165, 233, 0.3),
+    -10px 0 15px rgba(99, 102, 241, 0.3);
   --accent: #38bdf8;
 }
 
@@ -25,8 +25,8 @@
   --gradient-a: #f59e0b;
   --gradient-b: #ef4444;
   --gradient-c: #f59e0b;
-  --glow-a: rgba(245, 158, 11, 0.3);
-  --glow-b: rgba(239, 68, 68, 0.3);
+  --node-box-shadow: 10px 0 15px rgba(245, 158, 11, 0.3),
+    -10px 0 15px rgba(239, 68, 68, 0.3);
   --accent: #fbbf24;
 }
 
@@ -34,8 +34,8 @@
   --gradient-a: #8b5cf6;
   --gradient-b: #6366f1;
   --gradient-c: #8b5cf6;
-  --glow-a: rgba(139, 92, 246, 0.3);
-  --glow-b: rgba(99, 102, 241, 0.3);
+  --node-box-shadow: 10px 0 15px rgba(139, 92, 246, 0.3),
+    -10px 0 15px rgba(99, 102, 241, 0.3);
   --accent: #a78bfa;
 }
 
@@ -43,8 +43,8 @@
   --gradient-a: #10b981;
   --gradient-b: #0ea5e9;
   --gradient-c: #10b981;
-  --glow-a: rgba(16, 185, 129, 0.3);
-  --glow-b: rgba(14, 165, 233, 0.3);
+  --node-box-shadow: 10px 0 15px rgba(16, 185, 129, 0.3),
+    -10px 0 15px rgba(14, 165, 233, 0.3);
   --accent: #34d399;
 }
 
@@ -52,8 +52,8 @@
   --gradient-a: #ef4444;
   --gradient-b: #f59e0b;
   --gradient-c: #ef4444;
-  --glow-a: rgba(239, 68, 68, 0.3);
-  --glow-b: rgba(245, 158, 11, 0.3);
+  --node-box-shadow: 10px 0 15px rgba(239, 68, 68, 0.3),
+    -10px 0 15px rgba(245, 158, 11, 0.3);
   --accent: #f87171;
 }
 
@@ -61,117 +61,309 @@
   --gradient-a: #64748b;
   --gradient-b: #94a3b8;
   --gradient-c: #64748b;
-  --glow-a: rgba(100, 116, 139, 0.2);
-  --glow-b: rgba(148, 163, 184, 0.2);
+  --node-box-shadow: 10px 0 15px rgba(100, 116, 139, 0.15),
+    -10px 0 15px rgba(148, 163, 184, 0.15);
   --accent: #94a3b8;
 }
 
-/* === Conic Gradient Border Wrapper === */
-.turbo-gradient {
+/* === Step Node (main node type) === */
+.turbo-step {
+  border-radius: var(--node-border-radius);
+  display: flex;
   position: relative;
-  overflow: hidden;
-  background: var(--surface);
+  height: 120px;
+  min-width: 150px;
+  font-weight: 500;
+  box-shadow: var(--node-box-shadow);
 }
 
-.turbo-gradient::before {
+/* === Wrapper (gradient border container) === */
+.turbo-step .wrapper {
+  overflow: hidden;
+  display: flex;
+  padding: 2px;
+  position: relative;
+  border-radius: var(--node-border-radius);
+  width: 100%;
+  height: 100%;
+}
+
+/* === Static Gradient (default state) === */
+.turbo-step .gradient::before {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 141.42%;
-  height: 141.42%;
-  transform: translate(-50%, -50%);
+  padding-bottom: calc(100% * 1.41421356237);
+  width: calc(100% * 1.41421356237);
   background: conic-gradient(
     from -160deg at 50% 50%,
-    var(--gradient-a),
-    var(--gradient-b),
-    var(--gradient-c)
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    var(--gradient-a) 360deg
   );
-  opacity: 0.6;
-  transition: opacity 0.3s ease;
-  animation: turbo-spin 4s linear infinite;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 100%;
+}
+
+/* === Animated Gradient (active state — transparent gap for visible spin) === */
+.turbo-step.turbo-node-active .wrapper.gradient::before {
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    transparent 360deg
+  );
+  animation: turbo-spin 6s linear infinite;
+  transform: translate(-50%, -50%) rotate(0deg);
+  z-index: -1;
 }
 
 @keyframes turbo-spin {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
+  100% {
+    transform: translate(-50%, -50%) rotate(-360deg);
   }
 }
 
-.turbo-gradient-idle::before {
-  opacity: 0.25;
-  animation-duration: 8s;
-}
-
-/* Inner content sits above the pseudo-element */
-.turbo-inner {
-  position: relative;
-  z-index: 1;
-  background: var(--surface);
-  margin: 2px;
-  padding: 16px 20px;
-}
-
-/* === Active Glow (dual-direction) === */
-.turbo-node-active {
-  box-shadow:
-    10px 0 15px var(--glow-a),
-    -10px 0 15px var(--glow-b);
-}
-
-.turbo-node-active::before {
-  opacity: 0.85;
-}
-
-/* === Node Type Shapes === */
-.turbo-step {
-  border-radius: 8px;
-  min-width: 150px;
-  min-height: 70px;
-}
-
-.turbo-step .turbo-inner {
-  border-radius: 6px;
-}
-
-.turbo-status {
-  border-radius: 6px;
-}
-
-.turbo-status .turbo-inner {
-  border-radius: 4.5px;
-  padding: 12px 16px;
-  text-align: center;
-}
-
-.turbo-circle {
-  border-radius: 50%;
-  width: 64px;
-  height: 64px;
-}
-
-.turbo-circle .turbo-inner {
-  border-radius: 50%;
-  margin: 2px;
-  padding: 0;
+/* === Inner Content === */
+.turbo-step .inner {
+  background: var(--bg-color);
+  padding: 32px 32px;
+  border-radius: var(--node-border-radius);
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  width: calc(100% - 4px);
-  height: calc(100% - 4px);
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 
+.turbo-step .body {
+  display: flex;
+  align-items: center;
+}
+
+.turbo-step .title {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+
+.turbo-step .subtitle {
+  font-size: 18px;
+  color: #777;
+}
+
+/* === Cloud (circle at top-right with icon) === */
+.turbo-step .cloud {
+  border-radius: 100%;
+  width: 56px;
+  height: 56px;
+  right: 0;
+  position: absolute;
+  top: 0;
+  transform: translate(50%, -50%);
+  display: flex;
+  transform-origin: center center;
+  padding: 2px;
+  overflow: hidden;
+  box-shadow: var(--node-box-shadow);
+  z-index: 1;
+}
+
+.turbo-step .cloud div {
+  background-color: var(--bg-color);
+  flex-grow: 1;
+  border-radius: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  color: var(--accent);
+  font-size: 28px;
+}
+
+/* === Status Node === */
+.turbo-status {
+  border-radius: var(--node-border-radius);
+  display: flex;
+  min-width: 100px;
+  font-weight: 500;
+  box-shadow: var(--node-box-shadow);
+}
+
+.turbo-status .wrapper {
+  overflow: hidden;
+  display: flex;
+  padding: 2px;
+  position: relative;
+  border-radius: var(--node-border-radius);
+  flex-grow: 1;
+}
+
+.turbo-status .gradient::before {
+  content: '';
+  position: absolute;
+  padding-bottom: calc(100% * 1.41421356237);
+  width: calc(100% * 1.41421356237);
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    var(--gradient-a) 360deg
+  );
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 100%;
+}
+
+.turbo-status.turbo-node-active .wrapper.gradient::before {
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    transparent 360deg
+  );
+  animation: turbo-spin 6s linear infinite;
+  transform: translate(-50%, -50%) rotate(0deg);
+  z-index: -1;
+}
+
+.turbo-status .inner {
+  background: var(--bg-color);
+  padding: 12px 16px;
+  border-radius: var(--node-border-radius);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+  position: relative;
+}
+
+/* === Circle Node === */
+.turbo-circle {
+  width: 64px;
+  height: 64px;
+  box-shadow: var(--node-box-shadow);
+}
+
+.turbo-circle .wrapper {
+  overflow: hidden;
+  display: flex;
+  padding: 2px;
+  position: relative;
+  border-radius: 50%;
+  flex-grow: 1;
+}
+
+.turbo-circle .gradient::before {
+  content: '';
+  position: absolute;
+  padding-bottom: calc(100% * 1.41421356237);
+  width: calc(100% * 1.41421356237);
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    var(--gradient-a) 360deg
+  );
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 100%;
+}
+
+.turbo-circle.turbo-node-active .wrapper.gradient::before {
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    transparent 360deg
+  );
+  animation: turbo-spin 6s linear infinite;
+  transform: translate(-50%, -50%) rotate(0deg);
+  z-index: -1;
+}
+
+.turbo-circle .inner {
+  background: var(--bg-color);
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+  position: relative;
+}
+
+/* === Badge Node === */
 .turbo-badge {
-  border-radius: 9999px;
+  display: flex;
+  box-shadow: var(--node-box-shadow);
 }
 
-.turbo-badge .turbo-inner {
+.turbo-badge .wrapper {
+  overflow: hidden;
+  display: flex;
+  padding: 2px;
+  position: relative;
   border-radius: 9999px;
+  flex-grow: 1;
+}
+
+.turbo-badge .gradient::before {
+  content: '';
+  position: absolute;
+  padding-bottom: calc(100% * 1.41421356237);
+  width: calc(100% * 1.41421356237);
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    var(--gradient-a) 360deg
+  );
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 100%;
+}
+
+.turbo-badge.turbo-node-active .wrapper.gradient::before {
+  background: conic-gradient(
+    from -160deg at 50% 50%,
+    var(--gradient-a) 0deg,
+    var(--gradient-b) 120deg,
+    var(--gradient-c) 240deg,
+    transparent 360deg
+  );
+  animation: turbo-spin 6s linear infinite;
+  transform: translate(-50%, -50%) rotate(0deg);
+  z-index: -1;
+}
+
+.turbo-badge .inner {
+  background: var(--bg-color);
   padding: 6px 16px;
+  border-radius: 9999px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+  position: relative;
 }
 
-/* === Layer Node (no gradient) === */
+/* === Layer Node (no gradient — dashed border) === */
 .turbo-layer {
   background: rgba(30, 41, 59, 0.5);
   border: 1.5px solid var(--border-subtle);
@@ -187,29 +379,56 @@
 .turbo-edge-label {
   background: rgba(15, 23, 42, 0.9);
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 16px;
   color: var(--text-muted);
 }
 
-/* === Handle Overrides (invisible) === */
+/* === Handles (invisible, offset outward for edge gap) === */
 .directive-diagram .react-flow__handle {
-  width: 8px;
-  height: 8px;
-  opacity: 0;
-  background: transparent;
-  border: none;
+  opacity: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  min-width: 1px !important;
+  min-height: 1px !important;
 }
 
-/* === Background / Grid (always dark) === */
+.directive-diagram .react-flow__handle-right {
+  right: -12px !important;
+}
+
+.directive-diagram .react-flow__handle-left {
+  left: -12px !important;
+}
+
+.directive-diagram .react-flow__handle-top {
+  top: -12px !important;
+}
+
+.directive-diagram .react-flow__handle-bottom {
+  bottom: -12px !important;
+}
+
+/* === React Flow Overrides === */
+.directive-diagram .react-flow__node:focus {
+  outline: none;
+}
+
+.directive-diagram .react-flow__node {
+  outline: none !important;
+}
+
+.directive-diagram .react-flow__node.selected {
+  outline: none !important;
+}
+
+/* === Background / Grid === */
 .directive-diagram .react-flow__background {
-  background: var(--surface);
+  background: var(--bg-color);
 }
 
-/* === Smooth Transitions === */
-.turbo-gradient,
-.turbo-inner,
-.turbo-layer {
-  transition: all 0.3s ease;
+/* === Idle State (no box-shadow when not active) === */
+.turbo-gradient-idle {
+  box-shadow: none;
 }

@@ -73,18 +73,17 @@ export function LabeledEdge({
       <BaseEdge
         path={edgePath}
         markerEnd={markerEnd}
-        markerStart={active ? `url(#edge-circle-${colorScheme})` : undefined}
         style={{
           stroke: active ? `url(#${gradientId})` : '#334155',
-          strokeWidth: active ? 2 : 1.5,
+          strokeWidth: active ? 4 : 3.5,
           strokeDasharray: dashed ? '6 3' : undefined,
           opacity: active ? 0.8 : 0.5,
           transition: 'stroke 0.3s, stroke-width 0.3s, opacity 0.3s',
         }}
       />
       {active && (
-        <circle r="3" fill={ACCENT_COLORS[colorScheme]}>
-          <animateMotion dur="0.6s" repeatCount="1" fill="freeze" path={edgePath} />
+        <circle r="6" fill={ACCENT_COLORS[colorScheme]}>
+          <animateMotion dur="1.2s" repeatCount="1" fill="freeze" path={edgePath} />
         </circle>
       )}
       {label && (
