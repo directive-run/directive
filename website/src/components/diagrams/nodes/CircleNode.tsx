@@ -10,34 +10,32 @@ export function CircleNode({ data }: NodeProps) {
   const isActive = status === 'active'
 
   return (
-    <>
-      <Handle type="target" position={Position.Left} />
-      <Handle id="top" type="target" position={Position.Top} />
-
-      <div
-        className={clsx(
-          'turbo-gradient turbo-circle',
-          SCHEME_CLASS[colorScheme],
-          isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
-        )}
-      >
-        <div className="turbo-inner">
-          <div className="text-[10px] font-medium leading-tight" style={{ color: '#f1f5f9' }}>
+    <div
+      className={clsx(
+        'turbo-circle',
+        SCHEME_CLASS[colorScheme],
+        isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
+      )}
+    >
+      <div className="wrapper gradient">
+        <div className="inner">
+          <div style={{ fontSize: '10px', fontWeight: 500, lineHeight: 1.2, color: '#f1f5f9' }}>
             {label}
           </div>
           {sublabel && (
-            <div className="text-[10px] leading-tight" style={{ color: '#94a3b8' }}>
+            <div style={{ fontSize: '10px', lineHeight: 1.2, color: '#94a3b8' }}>
               {sublabel}
             </div>
           )}
-          <div className="text-xs" style={{ color: ACCENT_COLORS[colorScheme] }}>
+          <div style={{ fontSize: '12px', color: ACCENT_COLORS[colorScheme] }}>
             {'\u25CF'}
           </div>
+          <Handle type="target" position={Position.Left} />
+          <Handle id="top" type="target" position={Position.Top} />
+          <Handle type="source" position={Position.Right} />
+          <Handle id="bottom" type="source" position={Position.Bottom} />
         </div>
       </div>
-
-      <Handle type="source" position={Position.Right} />
-      <Handle id="bottom" type="source" position={Position.Bottom} />
-    </>
+    </div>
   )
 }
