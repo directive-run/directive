@@ -21,13 +21,7 @@ This article is a technical deep-dive into that loop. If you're evaluating Direc
 
 Every reconciliation cycle follows five phases. Here's the simplified model:
 
-```
-Phase 1: Fact mutation triggers tracking
-Phase 2: Derivations invalidated and recomputed
-Phase 3: Constraints re-evaluated against new state
-Phase 4: Requirements diffed and deduplicated
-Phase 5: Resolvers dispatched, effects scheduled
-```
+{% five-phase-diagram /%}
 
 These phases don't map to five sequential function calls – the actual implementation interleaves them through callbacks and microtask scheduling. But conceptually, every cycle follows this order.
 
@@ -162,6 +156,8 @@ This ordering guarantee – invalidate all derivations, then fire listeners – 
 
 There's a third place batching plays a role that's easy to overlook: **event handlers.** When you dispatch an event via `system.dispatch()` or `system.events.someEvent()`, the handler runs inside `store.batch()`. An event handler that updates five facts produces one reconciliation cycle. This is the same pattern React uses with its event handler batching – group the state updates, flush once.
 
+{% batched-notifications-diagram /%}
+
 ---
 
 ## Re-entrance protection
@@ -247,6 +243,8 @@ One guard worth noting: the derivation proxy blocks access to `__proto__`, `cons
 ---
 
 ## Settlement
+
+{% settlement-state-machine-diagram /%}
 
 A system is **settled** when three conditions are met:
 

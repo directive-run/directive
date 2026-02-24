@@ -749,6 +749,25 @@ goal(nodes, when, {
 | `stepMetrics` | `GoalStepMetrics[]` | Per-step satisfaction and timing |
 | `relaxations` | `RelaxationRecord[]` | Applied relaxation events |
 
+### Explaining Results
+
+`explainGoal()` converts a `GoalResult` into a human-readable step-by-step summary — useful for logging, LLM context, or debugging:
+
+```typescript
+import { explainGoal } from '@directive-run/ai';
+
+const result = await orchestrator.runGoal(nodes, input, when);
+const explanation = explainGoal(result);
+
+console.log(explanation.summary);
+// "Goal achieved in 3 steps (550 tokens, 5200ms, final satisfaction: 1.000)"
+
+for (const step of explanation.steps) {
+  console.log(step.text);
+  // "Step 1: Ran fetcher → satisfaction 0.000 → 0.330 (+0.330), produced: data (1800ms, 150 tokens)"
+}
+```
+
 ### Checkpoint & Resume
 
 Save goal resolution state at intervals for fault tolerance in long-running workflows:
@@ -777,7 +796,7 @@ const result = await orchestrator.resumeGoal(state, pattern);
 The checkpoint captures facts, completed nodes, failure counts, step metrics, and relaxation state — everything needed to continue exactly where you left off.
 
 {% callout title="All patterns support checkpoints" %}
-Checkpointing works with all 6 multi-step patterns (sequential, supervisor, reflect, debate, DAG, goal). See the [Pattern Checkpoints](/ai/checkpoints) page for per-pattern examples, progress tracking, diffing, forking, and the full API reference.
+Checkpointing works with all multi-step patterns (sequential, supervisor, reflect, debate, DAG, goal). See the [Pattern Checkpoints](/ai/checkpoints) page for per-pattern examples, progress tracking, diffing, forking, and the full API reference.
 {% /callout %}
 
 ---

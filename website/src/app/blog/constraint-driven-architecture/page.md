@@ -196,14 +196,7 @@ Read more about this pattern in the [module system documentation](/docs/module-s
 
 At the heart of Directive is a **reconciliation loop** – a cycle that continuously ensures all constraints are satisfied. Here's how it works:
 
-```
-Facts change
-  → Constraints evaluate (which rules are unsatisfied?)
-    → Requirements emitted (what needs to happen?)
-      → Resolvers execute (make it happen)
-        → Facts update
-          → Loop repeats until settled
-```
+{% reconciliation-flow-diagram /%}
 
 The engine runs this loop after every fact mutation. It evaluates all active constraints, collects any unsatisfied requirements, deduplicates them (using typed identity keys), and dispatches them to the matching resolvers. When resolvers complete, they update facts, which may trigger new constraint evaluations.
 
@@ -218,6 +211,8 @@ The key insight is that the loop is **goal-oriented**. Each iteration brings the
 ## Why this is better
 
 Constraint-driven architecture isn't just a different syntax for the same thing. It changes the properties of your system in meaningful ways.
+
+{% constraint-vs-event-driven-diagram /%}
 
 ### Declarative
 

@@ -11,6 +11,8 @@ The orchestrator is **LLM-agnostic** – provide any `runner` function that acce
 For parallel, sequential, or supervisor execution with per-agent guardrails and concurrency control, see [Multi-Agent Orchestration](/ai/multi-agent). The multi-agent orchestrator has full feature parity with the single-agent orchestrator documented here.
 {% /callout %}
 
+{% agent-orchestrator-architecture-diagram /%}
+
 ---
 
 ## Setup
@@ -102,6 +104,8 @@ const orchestrator = createAgentOrchestrator({
 ## Approval Workflow
 
 Require human approval before tool calls execute. When the agent wants to call a tool, the orchestrator **pauses the run**, fires your callback, and waits for you to call `approve()` or `reject()` before continuing.
+
+{% approval-workflow-diagram /%}
 
 Here's the flow:
 

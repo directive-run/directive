@@ -144,9 +144,13 @@ constraints: {
 
 Higher priority constraints are evaluated first. Default priority is 0.
 
+{% constraint-ordering-dag-diagram /%}
+
 ---
 
 ## Constraint Dependencies (`after`)
+
+{% constraint-composition-diagram /%}
 
 Use `after` to ensure one constraint's resolver completes before another constraint evaluates:
 

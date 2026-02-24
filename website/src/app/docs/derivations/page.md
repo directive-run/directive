@@ -71,6 +71,8 @@ This derivation:
 - Recomputes when either changes
 - Ignores changes to `age`
 
+{% derivation-dependency-graph-diagram /%}
+
 ---
 
 ## Accessing Derivations
@@ -178,6 +180,8 @@ unsub();
 ---
 
 ## Composed Derivations
+
+{% derivation-composition-diagram /%}
 
 Derivations can depend on other derivations via the second parameter (`derive`):
 

@@ -17,13 +17,7 @@ The Directive documentation site has an AI chatbot. You can open it from the flo
 
 Every chat message flows through a five-stage pipeline:
 
-```text
-User Question
-  → RAG Enrichment    (embed query, find relevant doc chunks)
-  → Agent Orchestrator (guardrails, circuit breaker, streaming runner)
-  → SSE Transport     (tokens → Server-Sent Events frames)
-  → Browser Widget    (parse SSE, render markdown)
-```
+{% message-pipeline-diagram /%}
 
 The first three stages use Directive's AI adapter (`@directive-run/ai`). The server-side operational state &ndash; request counting, token budget tracking, health monitoring &ndash; uses the core Directive runtime (`createModule`, `createSystem`).
 
@@ -74,13 +68,7 @@ The chatbot draws from two complementary knowledge sources, each chunked and emb
 
 **Phase 2 &ndash; API reference.** A second script uses `ts-morph` to walk every exported symbol in the Directive source code, extract JSDoc comments, parameter types, return types, and `@example` blocks, then outputs a structured JSON file. Each symbol becomes one embedding chunk with `sourceType: "api-reference"` and metadata like `symbolName` and `symbolKind`.
 
-```text
-Phase 1: Markdoc pages ─→ parse AST ─→ section chunks ─→ embed
-                                                              ╲
-                                                                → combined embeddings.json
-                                                              ╱
-Phase 2: TypeScript src ─→ ts-morph  ─→ function chunks ─→ embed
-```
+{% rag-pipeline-diagram /%}
 
 When a symbol appears in both the generated API reference and a hand-written `/docs/api/*` page, the pipeline deduplicates and keeps only the generated version (it's canonical, since it comes directly from the source code).
 
@@ -527,63 +515,7 @@ Five numbered comments, five phases &ndash; the same flow as the diagram below, 
 
 Here's the full path a message takes, from the user clicking "Send" to the streamed response appearing in the widget:
 
-```
-CLIENT (AIChatWidget)
-  │
-  │  POST /api/chat { message, history, pageUrl }
-  │
-  ▼
-SERVER (Next.js API Route)
-  │
-  ├─ Origin check ··········· 403
-  ├─ Directive module event
-  ├─ Rate limit ············· 429
-  ├─ Daily cap ·············· 429
-  ├─ Health gate ············ 503
-  ├─ Input validation ······· 400
-  │
-  ▼
-RAG Enricher
-  │
-  ├─ Classify intent (api / conceptual)
-  ├─ Embed query (OpenAI)
-  ├─ Cosine similarity search (top 7)
-  ├─ Re-rank with source-type boost
-  ├─ Diversity cap + top 5
-  ├─ Assemble enriched input
-  ├─ 5s timeout fallback
-  │
-  ▼
-Agent Orchestrator + Middleware
-  │
-  ├─ Input guardrails
-  │   ├─ Prompt injection
-  │   └─ PII redaction
-  ├─ Cost budget guard ($5/hr, $50/day)
-  ├─ Intelligent retry (429/503 → backoff)
-  ├─ Provider fallback (Anthropic → OpenAI)
-  ├─ Circuit breaker (3 fails → open)
-  ├─ Streaming LLM (Claude Haiku 4.5)
-  │
-  ▼
-SSE Transport
-  │
-  ├─ Token → data: frame
-  ├─ Truncation at 3k chars
-  ├─ done / error event
-  │
-  ▼
-CLIENT (response stream)
-  │
-  ├─ SSE reader + markdown renderer
-  ├─ X-Daily-Remaining header
-  │
-  ▼
-Post-Response Hooks
-  │
-  ├─ onAgentComplete → requestCompleted event
-  └─ onAgentError → requestFailed event
-```
+{% request-lifecycle-diagram /%}
 
 ### Validation and gating
 

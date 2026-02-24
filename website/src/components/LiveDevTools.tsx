@@ -12,10 +12,11 @@ import { GuardrailsView } from './devtools/views/GuardrailsView'
 import { EventsView } from './devtools/views/EventsView'
 import { HealthView } from './devtools/views/HealthView'
 import { FlamechartView } from './devtools/views/FlamechartView'
-import { DAGView } from './devtools/views/DAGView'
+import { GraphView } from './devtools/views/GraphView'
 import { MemoryView } from './devtools/views/MemoryView'
 import { BudgetView } from './devtools/views/BudgetView'
 import { ConfigView } from './devtools/views/ConfigView'
+import { GoalView } from './devtools/views/GoalProgressView'
 
 // ---------------------------------------------------------------------------
 // StatusDot — m6: amber-500 for WCAG contrast (was amber-400)
@@ -184,6 +185,7 @@ function LiveDevToolsInner() {
       {/* C2: Tab bar with horizontal scroll for mobile overflow */}
       <div className="relative border-b border-zinc-200 dark:border-zinc-700">
         {/* Gradient fade indicators for scroll overflow */}
+        <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-white dark:from-zinc-900 sm:hidden" />
         <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-white dark:from-zinc-900 sm:hidden" />
         <div
           className="flex gap-0 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -225,7 +227,8 @@ function LiveDevToolsInner() {
         {view === 'Events' && <EventsView events={events} />}
         {view === 'Health' && <HealthView />}
         {view === 'Flamechart' && <FlamechartView events={events} />}
-        {view === 'DAG' && <DAGView events={events} />}
+        {view === 'Graph' && <GraphView events={events} />}
+        {view === 'Goal' && <GoalView events={events} />}
         {view === 'Memory' && <MemoryView />}
         {view === 'Budget' && <BudgetView events={events} />}
         {view === 'Config' && <ConfigView />}
