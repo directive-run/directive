@@ -12,16 +12,22 @@ export function BadgeNode({ data }: NodeProps) {
   return (
     <div
       className={clsx(
-        'turbo-gradient turbo-badge',
+        'turbo-badge',
         SCHEME_CLASS[scheme],
         active ? 'turbo-node-active' : 'turbo-gradient-idle',
       )}
     >
-      <div
-        className="turbo-inner text-sm font-medium"
-        style={{ color: active ? '#f1f5f9' : '#94a3b8' }}
-      >
-        {text}
+      <div className="wrapper gradient">
+        <div
+          className="inner"
+          style={{
+            fontSize: '14px',
+            fontWeight: 500,
+            color: active ? '#f1f5f9' : '#94a3b8',
+          }}
+        >
+          {text}
+        </div>
       </div>
     </div>
   )

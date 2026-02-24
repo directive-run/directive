@@ -5,10 +5,6 @@ import '@xyflow/react/dist/style.css'
 import './turbo-theme.css'
 import clsx from 'clsx'
 import { useDiagramTheme } from './hooks/useDiagramTheme'
-import { EDGE_GRADIENTS } from './theme'
-
-const MARKER_SCHEMES = Object.entries(EDGE_GRADIENTS)
-
 interface DiagramWrapperProps extends Omit<ReactFlowProps, 'children' | 'height'> {
   height?: number | string
   className?: string
@@ -52,23 +48,6 @@ export function DiagramWrapper({
         {...flowProps}
       >
         <Background color={gridColor} gap={20} />
-        <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-          <defs>
-            {MARKER_SCHEMES.map(([scheme, g]) => (
-              <marker
-                key={scheme}
-                id={`edge-circle-${scheme}`}
-                viewBox="-5 -5 10 10"
-                refX="0"
-                refY="0"
-                markerWidth="5"
-                markerHeight="5"
-              >
-                <circle r="3" stroke={g.to} fill={g.to} strokeOpacity="0.75" />
-              </marker>
-            ))}
-          </defs>
-        </svg>
         {children}
       </ReactFlow>
     </div>
