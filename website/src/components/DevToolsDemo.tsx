@@ -1,24 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 // Pre-loaded demo session: a research pipeline with 3 agents
+// Field names match real DebugEvent shape (E7)
 const DEMO_EVENTS = [
-  { id: 1, type: 'pattern_start', agent: null, label: 'pipeline', time: 0, duration: 5200 },
-  { id: 2, type: 'agent_start', agent: 'researcher', label: 'Start', time: 50, duration: 0 },
-  { id: 3, type: 'guardrail_check', agent: 'researcher', label: 'PII check (pass)', time: 80, duration: 30 },
-  { id: 4, type: 'agent_complete', agent: 'researcher', label: '150 tokens', time: 1800, duration: 1750 },
-  { id: 5, type: 'agent_start', agent: 'writer', label: 'Start', time: 1850, duration: 0 },
-  { id: 6, type: 'guardrail_check', agent: 'writer', label: 'PII check (pass)', time: 1870, duration: 20 },
-  { id: 7, type: 'agent_complete', agent: 'writer', label: '320 tokens', time: 3900, duration: 2050 },
-  { id: 8, type: 'agent_start', agent: 'reviewer', label: 'Start', time: 3950, duration: 0 },
-  { id: 9, type: 'agent_complete', agent: 'reviewer', label: '80 tokens', time: 5100, duration: 1150 },
-  { id: 10, type: 'pattern_complete', agent: null, label: 'pipeline (5.2s)', time: 5200, duration: 0 },
+  { id: 1, type: 'pattern_start', agentId: null, label: 'pipeline', timestamp: 0, durationMs: 5200 },
+  { id: 2, type: 'agent_start', agentId: 'researcher', label: 'Start', timestamp: 50, durationMs: 0 },
+  { id: 3, type: 'guardrail_check', agentId: 'researcher', label: 'PII check (pass)', timestamp: 80, durationMs: 30 },
+  { id: 4, type: 'agent_complete', agentId: 'researcher', label: '150 tokens', timestamp: 1800, durationMs: 1750 },
+  { id: 5, type: 'agent_start', agentId: 'writer', label: 'Start', timestamp: 1850, durationMs: 0 },
+  { id: 6, type: 'guardrail_check', agentId: 'writer', label: 'PII check (pass)', timestamp: 1870, durationMs: 20 },
+  { id: 7, type: 'agent_complete', agentId: 'writer', label: '320 tokens', timestamp: 3900, durationMs: 2050 },
+  { id: 8, type: 'agent_start', agentId: 'reviewer', label: 'Start', timestamp: 3950, durationMs: 0 },
+  { id: 9, type: 'agent_complete', agentId: 'reviewer', label: '80 tokens', timestamp: 5100, durationMs: 1150 },
+  { id: 10, type: 'pattern_complete', agentId: null, label: 'pipeline (5.2s)', timestamp: 5200, durationMs: 0 },
 ] as const
 
 const AGENTS = ['researcher', 'writer', 'reviewer'] as const
 
 const VIEWS = ['Timeline', 'Cost', 'State'] as const
+const DISABLED_VIEWS = ['Flamechart', 'DAG', 'Health', 'Breakpoints', 'Compare'] as const
 
 const EVENT_COLORS: Record<string, string> = {
   agent_start: 'bg-sky-500',
@@ -36,26 +38,52 @@ function TimelineView() {
   return (
     <div className="space-y-3">
       {/* Agent lanes */}
-      {AGENTS.map((agent) => {
-        const events = DEMO_EVENTS.filter((e) => e.agent === agent)
+      {AGENTS.map((agentId) => {
+        const events = DEMO_EVENTS.filter((e) => e.agentId === agentId)
+
+        // Build runtime spans by pairing agent_start → agent_complete
+        const runtimeSpans: { startTs: number; endTs: number; durationMs: number }[] = []
+        const starts: number[] = []
+        for (const e of events) {
+          if (e.type === 'agent_start') {
+            starts.push(e.timestamp)
+          } else if (e.type === 'agent_complete' && starts.length > 0) {
+            const startTs = starts.shift()!
+            runtimeSpans.push({ startTs, endTs: e.timestamp, durationMs: e.timestamp - startTs })
+          }
+        }
 
         return (
-          <div key={agent} className="flex items-center gap-3">
+          <div key={agentId} className="flex items-center gap-3">
             <span className="w-20 shrink-0 text-xs font-mono text-zinc-400 dark:text-zinc-500 text-right">
-              {agent}
+              {agentId}
             </span>
             <div className="relative h-7 flex-1 rounded bg-zinc-100 dark:bg-zinc-800/50">
+              {/* Runtime span bars (background) */}
+              {runtimeSpans.map((span, i) => {
+                const left = (span.startTs / totalMs) * 100
+                const width = (span.durationMs / totalMs) * 100
+
+                return (
+                  <div
+                    key={`span-${i}`}
+                    className="pointer-events-none absolute top-1 h-5 rounded-sm bg-emerald-500/15 dark:bg-emerald-400/10"
+                    style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, minWidth: '4px' }}
+                  />
+                )
+              })}
+
+              {/* Event markers (foreground, z-10) — all thin markers */}
               {events.map((e) => {
-                const left = (e.time / totalMs) * 100
-                const width = Math.max((e.duration / totalMs) * 100, 1.5)
+                const left = (e.timestamp / totalMs) * 100
 
                 return (
                   <button
                     key={e.id}
-                    className={`absolute top-1 h-5 rounded-sm ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'} opacity-80 hover:opacity-100 transition-opacity cursor-pointer`}
-                    style={{ left: `${left}%`, width: `${width}%`, minWidth: '6px' }}
+                    className={`absolute top-1 z-10 h-5 rounded-sm ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'} opacity-80 hover:opacity-100 transition-opacity cursor-pointer`}
+                    style={{ left: `${left}%`, width: '6px' }}
                     onClick={() => setSelected(e.id === selected ? null : e.id)}
-                    title={`${e.type}: ${e.label}`}
+                    aria-label={`${e.type}: ${e.agentId ?? 'system'}${e.durationMs ? `, ${e.durationMs}ms` : ''}`}
                   />
                 )
               })}
@@ -104,20 +132,20 @@ function TimelineView() {
                 <div>
                   <span className="text-zinc-500">type:</span> {e.type}
                 </div>
-                {e.agent && (
+                {e.agentId && (
                   <div>
-                    <span className="text-zinc-500">agent:</span> {e.agent}
+                    <span className="text-zinc-500">agentId:</span> {e.agentId}
                   </div>
                 )}
                 <div>
                   <span className="text-zinc-500">detail:</span> {e.label}
                 </div>
                 <div>
-                  <span className="text-zinc-500">time:</span> {e.time}ms
+                  <span className="text-zinc-500">timestamp:</span> {e.timestamp}ms
                 </div>
-                {e.duration > 0 && (
+                {e.durationMs > 0 && (
                   <div>
-                    <span className="text-zinc-500">duration:</span> {e.duration}ms
+                    <span className="text-zinc-500">durationMs:</span> {e.durationMs}ms
                   </div>
                 )}
               </div>
@@ -131,11 +159,12 @@ function TimelineView() {
 
 function CostView() {
   const costs = [
-    { agent: 'researcher', runs: 1, tokens: 150, pct: 27 },
-    { agent: 'writer', runs: 1, tokens: 320, pct: 58 },
-    { agent: 'reviewer', runs: 1, tokens: 80, pct: 15 },
+    { agentId: 'researcher', runs: 1, tokens: 150, pct: 27 },
+    { agentId: 'writer', runs: 1, tokens: 320, pct: 58 },
+    { agentId: 'reviewer', runs: 1, tokens: 80, pct: 15 },
   ]
   const total = 550
+  const barSummary = costs.map((c) => `${c.agentId}: ${c.pct}%`).join(', ')
 
   return (
     <div className="space-y-4">
@@ -144,19 +173,13 @@ function CostView() {
           <span className="text-zinc-500 dark:text-zinc-400">Total tokens</span>
           <div className="text-lg font-semibold text-zinc-900 dark:text-white">{total}</div>
         </div>
-        <div>
-          <span className="text-zinc-500 dark:text-zinc-400">Est. cost</span>
-          <div className="text-lg font-semibold text-zinc-900 dark:text-white">
-            ${(total * 0.00001).toFixed(4)}
-          </div>
-        </div>
       </div>
 
       {/* Stacked bar */}
-      <div className="flex h-6 rounded overflow-hidden">
-        <div className="bg-sky-500" style={{ width: '27%' }} title="researcher: 27%" />
-        <div className="bg-emerald-500" style={{ width: '58%' }} title="writer: 58%" />
-        <div className="bg-amber-500" style={{ width: '15%' }} title="reviewer: 15%" />
+      <div className="flex h-6 rounded overflow-hidden" role="img" aria-label={`Token distribution: ${barSummary}`}>
+        <div className="bg-sky-500" style={{ width: '27%' }} aria-hidden="true" />
+        <div className="bg-emerald-500" style={{ width: '58%' }} aria-hidden="true" />
+        <div className="bg-amber-500" style={{ width: '15%' }} aria-hidden="true" />
       </div>
 
       {/* Table */}
@@ -171,8 +194,8 @@ function CostView() {
         </thead>
         <tbody className="text-zinc-700 dark:text-zinc-300">
           {costs.map((c) => (
-            <tr key={c.agent} className="border-b border-zinc-100 dark:border-zinc-800">
-              <td className="py-1.5 font-mono">{c.agent}</td>
+            <tr key={c.agentId} className="border-b border-zinc-100 dark:border-zinc-800">
+              <td className="py-1.5 font-mono">{c.agentId}</td>
               <td className="py-1.5 text-right">{c.runs}</td>
               <td className="py-1.5 text-right">{c.tokens}</td>
               <td className="py-1.5 text-right">{c.pct}%</td>
@@ -231,15 +254,34 @@ function StateView() {
 export function DevToolsDemo() {
   const [view, setView] = useState<(typeof VIEWS)[number]>('Timeline')
 
+  const handleTabKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const allTabs = [...VIEWS]
+      const idx = allTabs.indexOf(view)
+      let next = idx
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        next = (idx + 1) % allTabs.length
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        next = (idx - 1 + allTabs.length) % allTabs.length
+      } else {
+        return
+      }
+
+      e.preventDefault()
+      setView(allTabs[next])
+    },
+    [view],
+  )
+
   return (
     <div className="not-prose my-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50">
         <div className="flex items-center gap-2">
           <div className="flex gap-1.5">
-            <div className="h-3 w-3 rounded-full bg-red-400" />
-            <div className="h-3 w-3 rounded-full bg-amber-400" />
-            <div className="h-3 w-3 rounded-full bg-emerald-400" />
+            <div className="h-3 w-3 rounded-full bg-red-400" aria-hidden="true" />
+            <div className="h-3 w-3 rounded-full bg-amber-400" aria-hidden="true" />
+            <div className="h-3 w-3 rounded-full bg-emerald-400" aria-hidden="true" />
           </div>
           <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300 ml-2">
             Directive DevTools
@@ -250,11 +292,16 @@ export function DevToolsDemo() {
         </span>
       </div>
 
-      {/* View tabs */}
-      <div className="flex border-b border-zinc-200 dark:border-zinc-700 px-4 gap-0">
+      {/* View tabs — ARIA tab pattern (M8) */}
+      <div className="flex border-b border-zinc-200 dark:border-zinc-700 px-4 gap-0" role="tablist" aria-label="DevTools views">
         {VIEWS.map((v) => (
           <button
             key={v}
+            role="tab"
+            aria-selected={v === view}
+            aria-controls={`demo-tabpanel-${v.toLowerCase()}`}
+            tabIndex={v === view ? 0 : -1}
+            onKeyDown={handleTabKeyDown}
             className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
               v === view
                 ? 'border-sky-500 text-sky-600 dark:text-sky-400'
@@ -265,10 +312,15 @@ export function DevToolsDemo() {
             {v}
           </button>
         ))}
-        {/* Disabled tabs */}
-        {['Flamechart', 'DAG', 'Health', 'Breakpoints', 'Compare'].map((v) => (
+        {/* Disabled tabs — aria-disabled + title */}
+        {DISABLED_VIEWS.map((v) => (
           <span
             key={v}
+            role="tab"
+            aria-disabled="true"
+            aria-selected={false}
+            tabIndex={-1}
+            title="Coming soon"
             className="px-3 py-2 text-xs font-medium text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
           >
             {v}
@@ -277,7 +329,12 @@ export function DevToolsDemo() {
       </div>
 
       {/* Content */}
-      <div className="p-4 min-h-[200px]">
+      <div
+        className="p-4 min-h-[200px]"
+        role="tabpanel"
+        id={`demo-tabpanel-${view.toLowerCase()}`}
+        aria-label={`${view} view`}
+      >
         {view === 'Timeline' && <TimelineView />}
         {view === 'Cost' && <CostView />}
         {view === 'State' && <StateView />}

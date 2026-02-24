@@ -1,0 +1,171 @@
+/**
+ * DAG research pipeline chat route.
+ *
+ * Runs input guardrails (with timeline recording), feeds memory,
+ * updates scratchpad, then executes runPattern("research") → SSE stream.
+ */
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+import { getDagOrchestrator, getDagInputGuardrails } from './orchestrator-singleton'
+
+interface HistoryMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => null)
+  const message = body?.message
+  if (!message || typeof message !== 'string' || message.length > 2000) {
+    return Response.json({ error: 'Invalid message' }, { status: 400 })
+  }
+
+  const history: HistoryMessage[] = Array.isArray(body?.history) ? body.history : []
+
+  const instance = getDagOrchestrator()
+  if (!instance) {
+    return Response.json(
+      { error: 'ANTHROPIC_API_KEY not configured' },
+      { status: 503 },
+    )
+  }
+
+  const { orchestrator, memory } = instance
+  const timeline = orchestrator.timeline
+  const inputGuardrails = getDagInputGuardrails()
+
+  // -------------------------------------------------------------------------
+  // Feed history into memory (first request with history seeds it)
+  // -------------------------------------------------------------------------
+
+  for (const msg of history) {
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      memory.addMessage({ role: msg.role, content: msg.content })
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Run input guardrails manually (recorded to timeline for DevTools)
+  // -------------------------------------------------------------------------
+
+  for (const guardrail of inputGuardrails) {
+    const gStart = Date.now()
+    try {
+      const resultOrPromise = guardrail.fn(
+        { input: message, agentName: 'dag-pipeline' },
+        { agentName: 'dag-pipeline', input: message, facts: {} },
+      )
+
+      // Handle async guardrails (PII/injection can be async)
+      const res = resultOrPromise && typeof resultOrPromise === 'object' && 'then' in resultOrPromise
+        ? await resultOrPromise
+        : resultOrPromise
+
+      if (res && typeof res === 'object' && 'passed' in res) {
+        if (timeline) {
+          timeline.record({
+            type: 'guardrail_check',
+            timestamp: gStart,
+            snapshotId: null,
+            guardrailName: guardrail.name,
+            guardrailType: 'input',
+            passed: res.passed,
+            reason: res.reason,
+            durationMs: Date.now() - gStart,
+          })
+        }
+
+        if (!res.passed) {
+          // Blocked — return error SSE event immediately
+          const encoder = new TextEncoder()
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: 'error', message: res.reason || `Blocked by ${guardrail.name}` })}\n\n`,
+                ),
+              )
+              controller.close()
+            },
+          })
+
+          return new Response(stream, {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache, no-transform',
+              Connection: 'keep-alive',
+              'X-Accel-Buffering': 'no',
+            },
+          })
+        }
+      }
+    } catch {
+      // Don't block pipeline on guardrail errors
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Update scratchpad
+  // -------------------------------------------------------------------------
+
+  if (orchestrator.scratchpad) {
+    orchestrator.scratchpad.update({
+      topic: message.slice(0, 200),
+      sources: [],
+      confidence: 0,
+    })
+  }
+
+  // -------------------------------------------------------------------------
+  // Add user message to memory
+  // -------------------------------------------------------------------------
+
+  memory.addMessage({ role: 'user', content: message })
+
+  // -------------------------------------------------------------------------
+  // Run pipeline → stream result as SSE
+  // -------------------------------------------------------------------------
+
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (data: Record<string, unknown>) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+        } catch {
+          // Stream closed
+        }
+      }
+
+      try {
+        const result = await orchestrator.runPattern<string>('research', message)
+        send({ type: 'text', text: result })
+        send({ type: 'done' })
+
+        // Add assistant message to memory
+        memory.addMessage({ role: 'assistant', content: result })
+      } catch (err) {
+        send({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Pipeline failed',
+        })
+      } finally {
+        try {
+          controller.close()
+        } catch {
+          // Already closed
+        }
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
+}

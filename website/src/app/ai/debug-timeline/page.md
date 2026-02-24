@@ -62,6 +62,8 @@ The timeline records the following event types covering the full agent lifecycle
 | `race_winner` | Race pattern winner selected |
 | `race_cancelled` | Race pattern loser cancelled |
 | `debate_round` | Debate round completed |
+| `checkpoint_save` | Pattern checkpoint saved |
+| `checkpoint_restore` | Pattern checkpoint restored |
 
 Every event includes `id`, `type`, `timestamp`, and `snapshotId` (for time-travel correlation). Agent-scoped events also include `agentId`.
 
@@ -117,6 +119,10 @@ Each event type carries specific data fields beyond the common base:
 
 **Debate events:**
 - `debate_round` &ndash; `round`, `winnerId`, `score?`, `agentCount`
+
+**Checkpoint events:**
+- `checkpoint_save` &ndash; `checkpointId`, `patternType`, `step`
+- `checkpoint_restore` &ndash; `checkpointId`, `patternType`, `step`
 
 ---
 
@@ -262,6 +268,6 @@ Events store `inputLength` and `outputLength`, never full content. Error message
 ## Next Steps
 
 - [Breakpoints & Checkpoints](/ai/breakpoints) &ndash; Pause execution and save state
-- [DevTools](/ai/devtools) &ndash; Visual timeline, flamechart, and 6 more views
+- [DevTools](/ai/devtools) &ndash; Visual Timeline, Cost, and State views
 - [OpenTelemetry](/ai/otel) &ndash; Export timeline events as OTEL spans
 - [Testing](/ai/testing) &ndash; Test timeline utilities and assertions

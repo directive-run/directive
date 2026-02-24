@@ -68,10 +68,11 @@ let _abortController: AbortController | null = null
 // handleSend — module-level async function, operates on the external store
 // ---------------------------------------------------------------------------
 
+// M5: Prompts that trigger visible DevTools events
 const EXAMPLE_PROMPTS = [
-  'How do constraints work?',
-  'Show me a data fetching example',
-  'What are guardrails?',
+  "Tell me about Directive's constraint system",
+  'What happens if I send personal data?',
+  'Compare resolvers and effects',
 ]
 
 async function handleSend(messageText?: string) {
@@ -360,11 +361,13 @@ function InlineChat() {
               }
             }}
             placeholder="Ask about Directive..."
+            aria-label="Ask about Directive"
             className="flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-400"
           />
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isLoading}
+            aria-label="Send message"
             className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500 text-white transition hover:bg-sky-600 disabled:opacity-50"
           >
             <PaperPlaneTilt weight="fill" className="h-5 w-5" />
@@ -392,23 +395,17 @@ export default function DevToolsPage() {
         </p>
       </div>
 
-      {/* Event type legend */}
-      <div className="mx-auto mt-6 flex shrink-0 flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-        <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-sky-500" /> agent_start</span>
-        <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-amber-500" /> guardrail_check</span>
-        <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" /> agent_complete</span>
-        <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-red-500" /> error</span>
-      </div>
-
-      {/* Split layout — fills remaining viewport height */}
-      <div className="mt-6 grid min-h-0 flex-1 gap-6 lg:grid-cols-5">
-        {/* DevTools panel — 60% */}
-        <div className="min-h-0 lg:col-span-3">
+      {/* Split layout — fills remaining viewport height.
+          Mobile: stacked with 50vh DevTools + 50vh Chat.
+          Desktop (lg+): side-by-side 60/40 grid. */}
+      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-6 lg:grid lg:grid-cols-5">
+        {/* DevTools panel — 60% on desktop, 50vh on mobile */}
+        <div className="min-h-[50vh] lg:col-span-3 lg:min-h-0">
           <LiveDevTools />
         </div>
 
-        {/* Chat panel — 40%, stretches to match DevTools */}
-        <div className="min-h-0 lg:col-span-2">
+        {/* Chat panel — 40% on desktop, 50vh on mobile */}
+        <div className="min-h-[50vh] lg:col-span-2 lg:min-h-0">
           <InlineChat />
         </div>
       </div>

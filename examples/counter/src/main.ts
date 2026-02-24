@@ -1,13 +1,8 @@
 /**
- * Number Match - Vanilla Directive Example
+ * Number Match — DOM Rendering & System Wiring
  *
- * Mirrors the exact same pattern as the Eleven Up card game:
- * - Pool of items, 9 displayed on a grid
- * - Select items, constraint fires when pair adds to 10
- * - Resolver removes matched items + modifies multiple facts
- * - Refill constraint/resolver chain refills grid from pool
- *
- * This is a minimal repro to test whether the freeze bug occurs.
+ * Creates the Directive system, subscribes to state changes,
+ * renders the game grid, state inspector, and event timeline.
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
@@ -19,6 +14,13 @@ import { createModule, createSystem, t, type ModuleSchema } from "@directive-run
 interface Tile {
   id: string;
   value: number;
+}
+
+interface TimelineEntry {
+  time: number;
+  event: string;
+  detail: string;
+  type: string;
 }
 
 // Create a pool of numbered tiles (1-9, four of each = 36 tiles)
@@ -35,7 +37,57 @@ function createPool(): Tile[] {
     const j = Math.floor(Math.random() * (i + 1));
     [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
   }
+
   return tiles;
+}
+
+// ============================================================================
+// Timeline
+// ============================================================================
+
+const timeline: TimelineEntry[] = [];
+
+function log(msg: string) {
+  console.log(`[NumberMatch] ${msg}`);
+
+  // Classify and add significant events to the timeline
+  let event = "";
+  let detail = "";
+  let type = "info";
+
+  if (msg.startsWith("EVENT selectTile")) {
+    event = "tile selected";
+    const match = msg.match(/selectTile: (t\d+)/);
+    detail = match ? match[1] : "";
+    type = "selection";
+  } else if (msg.includes("pairAddsTen: TRUE")) {
+    event = "match found";
+    const match = msg.match(/\((.+)\)/);
+    detail = match ? match[1] : "";
+    type = "match";
+  } else if (msg === "RESOLVER removeTiles: DONE") {
+    event = "tiles removed";
+    detail = "";
+    type = "match";
+  } else if (msg.includes("refillTable: DONE")) {
+    event = "refill";
+    const match = msg.match(/table now: (\d+)/);
+    detail = match ? `table: ${match[1]} tiles` : "";
+    type = "refill";
+  } else if (msg.startsWith("RESOLVER endGame:")) {
+    event = "game over";
+    detail = msg.replace("RESOLVER endGame: ", "");
+    type = "gameover";
+  } else if (msg.includes("New game") || msg.includes("Game started")) {
+    event = "new game";
+    detail = msg;
+    type = "newgame";
+  } else {
+    // Skip verbose intermediate messages (RESOLVER steps, CONSTRAINT produce)
+    return;
+  }
+
+  timeline.unshift({ time: Date.now(), event, detail, type });
 }
 
 // ============================================================================
@@ -134,7 +186,7 @@ const numberMatch = createModule("number-match", {
   // Constraints - same pattern as eleven-up
   // ============================================================================
   constraints: {
-    // When two selected tiles add to 10 → remove them
+    // When two selected tiles add to 10 -> remove them
     pairAddsTen: {
       priority: 100,
       when: (facts) => {
@@ -171,7 +223,7 @@ const numberMatch = createModule("number-match", {
       },
     },
 
-    // No moves left → game over
+    // No moves left -> game over
     noMovesLeft: {
       priority: 190,
       when: (facts) => {
@@ -220,7 +272,7 @@ const numberMatch = createModule("number-match", {
           req.tileIds.includes(tile.id)
         );
 
-        // Multiple fact mutations — this is what causes the freeze in eleven-up
+        // Multiple fact mutations
         log("RESOLVER removeTiles: setting table");
         context.facts.table = context.facts.table.filter(
           (tile: Tile) => !req.tileIds.includes(tile.id)
@@ -267,40 +319,64 @@ const system = createSystem({ module: numberMatch });
 system.start();
 
 // ============================================================================
-// Logging helper
+// DOM References
 // ============================================================================
 
-const logEl = document.getElementById("log")!;
-function log(msg: string) {
-  console.log(`[NumberMatch] ${msg}`);
-  const line = document.createElement("div");
-  line.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-  logEl.appendChild(line);
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-// ============================================================================
-// DOM Bindings
-// ============================================================================
-
+// Stats
 const poolEl = document.getElementById("pool")!;
 const removedEl = document.getElementById("removed")!;
 const movesEl = document.getElementById("moves")!;
 const messageEl = document.getElementById("message")!;
 const gridEl = document.getElementById("grid")!;
 
+// Inspector
+const factPool = document.getElementById("nm-fact-pool")!;
+const factTable = document.getElementById("nm-fact-table")!;
+const factRemoved = document.getElementById("nm-fact-removed")!;
+const factSelected = document.getElementById("nm-fact-selected")!;
+const factMoveCount = document.getElementById("nm-fact-movecount")!;
+const factGameOver = document.getElementById("nm-fact-gameover")!;
+const factMessage = document.getElementById("nm-fact-message")!;
+const derivPoolCount = document.getElementById("nm-deriv-poolcount")!;
+const derivRemovedCount = document.getElementById("nm-deriv-removedcount")!;
+const derivSelectedTiles = document.getElementById("nm-deriv-selectedtiles")!;
+const derivHasValidMoves = document.getElementById("nm-deriv-hasvalidmoves")!;
+
+// Timeline
+const timelineEl = document.getElementById("nm-timeline")!;
+
+// ============================================================================
+// Render
+// ============================================================================
+
+function renderBoolIndicator(el: HTMLElement, value: boolean): void {
+  const cls = value ? "true" : "false";
+  el.innerHTML = `<span class="nm-deriv-indicator ${cls}"></span> ${value}`;
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+
+  return div.innerHTML;
+}
+
 function render() {
   const table = system.facts.table as Tile[];
   const selected = system.facts.selected as string[];
   const poolCount = system.read("poolCount") as number;
   const removedCount = system.read("removedCount") as number;
+  const selectedTiles = system.read("selectedTiles") as Tile[];
+  const hasValidMoves = system.read("hasValidMoves") as boolean;
+  const msg = system.facts.message as string;
 
+  // --- Stats ---
   poolEl.textContent = String(poolCount);
   removedEl.textContent = String(removedCount);
   movesEl.textContent = String(system.facts.moveCount);
-  messageEl.textContent = system.facts.message;
+  messageEl.textContent = msg;
 
-  // Render grid
+  // --- Grid ---
   gridEl.innerHTML = "";
   for (const tile of table) {
     const div = document.createElement("div");
@@ -322,9 +398,53 @@ function render() {
     div.className = "tile empty";
     gridEl.appendChild(div);
   }
+
+  // --- Inspector: Facts ---
+  factPool.textContent = `${(system.facts.pool as Tile[]).length} tiles`;
+  factTable.textContent = `${table.length} tiles`;
+  factRemoved.textContent = `${(system.facts.removed as Tile[]).length} tiles`;
+  factSelected.textContent = selected.length > 0 ? `[${selected.join(", ")}]` : "[]";
+  factMoveCount.textContent = String(system.facts.moveCount);
+  renderBoolIndicator(factGameOver, system.facts.gameOver as boolean);
+  factMessage.textContent = msg.length > 40 ? msg.slice(0, 40) + "\u2026" : msg;
+
+  // --- Inspector: Derivations ---
+  derivPoolCount.textContent = String(poolCount);
+  derivRemovedCount.textContent = String(removedCount);
+  derivSelectedTiles.textContent = `${selectedTiles.length} tiles`;
+  renderBoolIndicator(derivHasValidMoves, hasValidMoves);
+
+  // --- Timeline ---
+  if (timeline.length === 0) {
+    timelineEl.innerHTML = '<div class="nm-timeline-empty">Events appear after interactions</div>';
+  } else {
+    timelineEl.innerHTML = "";
+    for (const entry of timeline) {
+      const el = document.createElement("div");
+      el.className = `nm-timeline-entry ${entry.type}`;
+
+      const time = new Date(entry.time);
+      const timeStr = time.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      el.innerHTML = `
+        <span class="nm-timeline-time">${timeStr}</span>
+        <span class="nm-timeline-event">${escapeHtml(entry.event)}</span>
+        <span class="nm-timeline-detail">${escapeHtml(entry.detail)}</span>
+      `;
+
+      timelineEl.appendChild(el);
+    }
+  }
 }
 
-// Subscribe to changes
+// ============================================================================
+// Subscribe
+// ============================================================================
+
 system.subscribe(
   ["table", "selected", "pool", "removed", "moveCount", "message", "gameOver",
    "poolCount", "removedCount", "selectedTiles", "hasValidMoves"],
@@ -337,7 +457,7 @@ document.getElementById("clear")!.addEventListener("click", () => {
 });
 
 document.getElementById("newgame")!.addEventListener("click", () => {
-  logEl.innerHTML = "";
+  timeline.length = 0;
   system.events.newGame();
 });
 

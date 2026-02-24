@@ -51,6 +51,10 @@ export interface Checkpoint {
   localState: CheckpointLocalState;
   memoryExport: unknown | null;
   orchestratorType: "single" | "multi";
+  /** Associated time-travel snapshot ID */
+  snapshotId?: number;
+  /** Arbitrary metadata */
+  metadata?: Record<string, unknown>;
 }
 
 /** Checkpoint store interface */
@@ -60,6 +64,8 @@ export interface CheckpointStore {
   list(): Promise<Array<{ id: string; label?: string; createdAt: string }>>;
   delete(checkpointId: string): Promise<boolean>;
   clear(): Promise<void>;
+  /** Prune old checkpoints based on retention policy. Returns number pruned. */
+  prune(): Promise<number>;
 }
 
 // ============================================================================
@@ -149,26 +155,38 @@ export function validateCheckpoint(data: unknown): data is Checkpoint {
 export interface InMemoryCheckpointStoreOptions {
   /** Maximum checkpoints to retain before FIFO eviction. @default 100 */
   maxCheckpoints?: number;
+  /** Time-based retention: prune checkpoints older than this (ms). @default Infinity */
+  retentionMs?: number;
+  /** When true, labeled checkpoints are exempt from auto-prune. @default false */
+  preserveLabeled?: boolean;
 }
 
 /**
- * In-memory checkpoint store with FIFO eviction.
+ * In-memory checkpoint store with FIFO eviction and time-based retention.
  *
  * @example
  * ```typescript
- * const store = new InMemoryCheckpointStore({ maxCheckpoints: 50 });
+ * const store = new InMemoryCheckpointStore({
+ *   maxCheckpoints: 50,
+ *   retentionMs: 3600000, // 1 hour
+ *   preserveLabeled: true,
+ * });
  *
  * const id = await store.save(checkpoint);
- * const loaded = await store.load(id);
+ * const pruned = await store.prune();
  * ```
  */
 export class InMemoryCheckpointStore implements CheckpointStore {
   private readonly store = new Map<string, Checkpoint>();
   private readonly order: string[] = [];
   private readonly maxCheckpoints: number;
+  private readonly retentionMs: number;
+  private readonly preserveLabeled: boolean;
 
   constructor(options?: InMemoryCheckpointStoreOptions) {
     this.maxCheckpoints = options?.maxCheckpoints ?? 100;
+    this.retentionMs = options?.retentionMs ?? Infinity;
+    this.preserveLabeled = options?.preserveLabeled ?? false;
 
     if (!Number.isFinite(this.maxCheckpoints) || this.maxCheckpoints < 1) {
       throw new Error(
@@ -182,11 +200,11 @@ export class InMemoryCheckpointStore implements CheckpointStore {
       throw new Error("[Directive Checkpoint] Invalid checkpoint data");
     }
 
-    // FIFO eviction
+    // FIFO eviction (respects preserveLabeled)
     while (this.order.length >= this.maxCheckpoints) {
-      const oldest = this.order.shift();
-      if (oldest) {
-        this.store.delete(oldest);
+      const evicted = this.evictOldest();
+      if (!evicted) {
+        break;
       }
     }
 
@@ -231,5 +249,74 @@ export class InMemoryCheckpointStore implements CheckpointStore {
   async clear(): Promise<void> {
     this.store.clear();
     this.order.length = 0;
+  }
+
+  async prune(): Promise<number> {
+    if (!Number.isFinite(this.retentionMs)) {
+      return 0;
+    }
+
+    const cutoff = Date.now() - this.retentionMs;
+    let pruned = 0;
+
+    // Iterate from oldest to newest
+    const toRemove: string[] = [];
+    for (const id of this.order) {
+      const cp = this.store.get(id);
+      if (!cp) {
+        continue;
+      }
+
+      const createdAtMs = new Date(cp.createdAt).getTime();
+      if (createdAtMs >= cutoff) {
+        break; // Remaining are newer
+      }
+
+      // Skip labeled checkpoints if preserveLabeled
+      if (this.preserveLabeled && cp.label) {
+        continue;
+      }
+
+      toRemove.push(id);
+    }
+
+    for (const id of toRemove) {
+      this.store.delete(id);
+      const idx = this.order.indexOf(id);
+      if (idx >= 0) {
+        this.order.splice(idx, 1);
+      }
+      pruned++;
+    }
+
+    return pruned;
+  }
+
+  /** Evict the oldest non-labeled checkpoint. Returns true if one was evicted. */
+  private evictOldest(): boolean {
+    if (this.preserveLabeled) {
+      // Find first non-labeled checkpoint
+      for (let i = 0; i < this.order.length; i++) {
+        const id = this.order[i]!;
+        const cp = this.store.get(id);
+        if (cp && !cp.label) {
+          this.order.splice(i, 1);
+          this.store.delete(id);
+
+          return true;
+        }
+      }
+
+      // All are labeled — evict oldest anyway to make room
+    }
+
+    const oldest = this.order.shift();
+    if (oldest) {
+      this.store.delete(oldest);
+
+      return true;
+    }
+
+    return false;
   }
 }

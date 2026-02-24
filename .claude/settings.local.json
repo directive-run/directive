@@ -89,7 +89,12 @@
       "Bash(gh pr diff:*)",
       "Bash(gh run list:*)",
       "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive log --oneline -5)",
-      "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive diff --stat HEAD)"
+      "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive diff --stat HEAD)",
+      "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/goal-engine/tsconfig.json:*)",
+      "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/goal-engine/vite.config.ts:*)",
+      "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/tsconfig.json:*)",
+      "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/vite.config.ts:*)",
+      "WebFetch(domain:reactflow.dev)"
     ]
   }
 }

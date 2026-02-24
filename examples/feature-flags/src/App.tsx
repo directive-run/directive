@@ -3,7 +3,9 @@ import { createSystem } from "@directive-run/core";
 import { persistencePlugin } from "@directive-run/core/plugins";
 import { featureFlagsModule } from "./module";
 import { FlagPanel } from "./FlagPanel";
+import { Inspector } from "./Inspector";
 import { Preview } from "./Preview";
+import { Timeline, type TimelineEntry } from "./Timeline";
 
 // Create the system with persistence
 const system = createSystem({
@@ -27,11 +29,17 @@ export function App() {
 
   const [effectsDisabled, setEffectsDisabled] = useState<Set<string>>(new Set());
   const [constraintsDisabled, setConstraintsDisabled] = useState<Set<string>>(new Set());
+  const [timelineEntries, setTimelineEntries] = useState<TimelineEntry[]>([]);
+
+  const addTimelineEntry = useCallback((event: string, detail: string, type: string) => {
+    setTimelineEntries((prev) => [{ time: Date.now(), event, detail, type }, ...prev]);
+  }, []);
 
   const handleDisableEffect = useCallback((effectId: string) => {
     engine.effects.disable(effectId);
     setEffectsDisabled((prev) => new Set([...prev, effectId]));
-  }, []);
+    addTimelineEntry("effect off", effectId, "system");
+  }, [addTimelineEntry]);
 
   const handleEnableEffect = useCallback((effectId: string) => {
     engine.effects.enable(effectId);
@@ -41,12 +49,14 @@ export function App() {
 
       return next;
     });
-  }, []);
+    addTimelineEntry("effect on", effectId, "system");
+  }, [addTimelineEntry]);
 
   const handleDisableConstraint = useCallback((constraintId: string) => {
     engine.constraints.disable(constraintId);
     setConstraintsDisabled((prev) => new Set([...prev, constraintId]));
-  }, []);
+    addTimelineEntry("constraint off", constraintId, "system");
+  }, [addTimelineEntry]);
 
   const handleEnableConstraint = useCallback((constraintId: string) => {
     engine.constraints.enable(constraintId);
@@ -56,18 +66,13 @@ export function App() {
 
       return next;
     });
-  }, []);
+    addTimelineEntry("constraint on", constraintId, "system");
+  }, [addTimelineEntry]);
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Feature Flags on directive.run</h1>
-        <p>
-          The same 8 flags that gate features on the real doc site. Constraints enforce dependencies automatically.
-        </p>
-      </header>
-
-      <div className="split-pane">
+    <div className="ff-container">
+      <div className="ff-main">
+        {/* Left: Flag Toggles */}
         <FlagPanel
           system={system}
           onDisableEffect={handleDisableEffect}
@@ -76,8 +81,34 @@ export function App() {
           onEnableConstraint={handleEnableConstraint}
           effectsDisabled={effectsDisabled}
           constraintsDisabled={constraintsDisabled}
+          onTimelineEvent={addTimelineEntry}
         />
-        <Preview system={system} />
+
+        {/* Center: Live State Inspector */}
+        <Inspector system={system} />
+
+        {/* Right: Preview + Timeline */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Preview system={system} />
+          <div className="ff-panel">
+            <div className="ff-panel-body" style={{ flex: 1 }}>
+              <Timeline entries={timelineEntries} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* How It Works */}
+      <div className="ff-how-it-works">
+        <h3>How It Works (Directive Flow)</h3>
+        <ul>
+          <li><strong>Facts</strong> &ndash; chatEnabled, searchEnabled, playgroundEnabled, brandSwitcherEnabled, themeSelectorEnabled, onboardingToastEnabled, versionSelectorEnabled, voteApiEnabled, maintenanceMode</li>
+          <li><strong>Derivations</strong> &ndash; canUseChat...canUseVoteApi (8 boolean), enabledCount, allFeaturesEnabled (all auto-tracked)</li>
+          <li><strong>Constraints</strong> &ndash; onboardingRequiresBrandSwitcher (auto-enables Brand Switcher), maintenanceWarning</li>
+          <li><strong>Resolvers</strong> &ndash; enableBrandSwitcher, logMaintenanceWarning</li>
+          <li><strong>Effects</strong> &ndash; logChanges (logs every flag toggle to console)</li>
+        </ul>
+        <p className="directive-note">The <code>onboardingRequiresBrandSwitcher</code> constraint automatically re-enables Brand Switcher whenever Onboarding Toast is toggled on. Maintenance mode gates chat, search, playground, and vote API via derivations.</p>
       </div>
     </div>
   );

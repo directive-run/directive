@@ -56,11 +56,11 @@ Harden for production after the basics:
 
 Unlock the full power of the system:
 
-1. [Goal Engine](/ai/goals) &ndash; Desired-state convergence
-2. [Communication](/ai/communication) &ndash; Decentralized agent messaging
-3. [Cross-Agent State](/ai/cross-agent-state) &ndash; Shared derivations and scratchpad
-4. [Breakpoints & Checkpoints](/ai/breakpoints) &ndash; Human-in-the-loop debugging
-5. [DevTools](/ai/devtools) &ndash; Real-time visual debugging (8 views)
+1. [Pattern Checkpoints](/ai/checkpoints) &ndash; Save/resume, fork, progress tracking
+3. [Communication](/ai/communication) &ndash; Decentralized agent messaging
+4. [Cross-Agent State](/ai/cross-agent-state) &ndash; Shared derivations and scratchpad
+5. [Breakpoints & Checkpoints](/ai/breakpoints) &ndash; Human-in-the-loop debugging
+6. [DevTools](/ai/devtools) &ndash; Real-time visual debugging (Timeline, Cost, State &plus; 5 more planned)
 
 ---
 
@@ -117,7 +117,8 @@ const result = await multi.runAgent('researcher', 'What is WASM?');
 | **Memory** | Sliding window, token-based, or hybrid conversation management |
 | **Resilience** | Intelligent retry, provider fallback chains, and cost budget guards |
 | **Circuit Breaker** | Automatic fault isolation for failing agent calls |
-| **Goal Engine** | Desired-state convergence &ndash; declare goals, engine resolves them |
+| **Converge Pattern** | Desired-state convergence &ndash; declare produces/requires, runtime resolves |
+| **Checkpoints** | Save/resume mid-pattern state for fault tolerance, forking, and progress tracking |
 | **Evals** | Dataset-driven quality evaluation with built-in and LLM-as-judge criteria |
 | **DevTools** | Real-time debugging UI with 8 specialized views |
 
@@ -180,8 +181,9 @@ const result = await orchestrator.run(agent, 'Hello!');
 | Feature | Page | Description |
 |---------|------|-------------|
 | [Debug Timeline](/ai/debug-timeline) | Event Recording | 25+ event types with time-travel correlation |
+| [Pattern Checkpoints](/ai/checkpoints) | Fault Tolerance | Save/resume all 6 patterns, progress tracking, forking |
 | [Breakpoints & Checkpoints](/ai/breakpoints) | Pausing & State | Human-in-the-loop debugging, persistent snapshots |
-| [DevTools](/ai/devtools) | Visual Debugging | 8 views: Timeline, Flamechart, DAG, Health, Cost, Breakpoints, State, Compare |
+| [DevTools](/ai/devtools) | Visual Debugging | 3 active views (Timeline, Cost, State) &plus; 5 planned (Flamechart, DAG, Health, Breakpoints, Compare) |
 | [Evals](/ai/evals) | Quality Measurement | 10 built-in criteria, LLM-as-judge, CI assertions |
 | [OpenTelemetry](/ai/otel) | Production Tracing | OTEL spans with GenAI semantic conventions |
 | [Testing](/ai/testing) | Test Utilities | Mock runners, test orchestrators, assertion helpers |
