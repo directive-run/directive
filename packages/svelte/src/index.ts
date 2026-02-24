@@ -14,6 +14,7 @@ import { readable, type Readable } from "svelte/store";
 import type {
 	ModuleSchema,
 	ModuleDef,
+	ModulesMap,
 	Plugin,
 	DebugConfig,
 	ErrorBoundaryConfig,
@@ -22,6 +23,7 @@ import type {
 	InferSelectorState,
 	InferEvents,
 	SingleModuleSystem,
+	NamespacedSystem,
 	SystemInspection,
 	SystemSnapshot,
 	TimeTravelState,
@@ -790,4 +792,35 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			// biome-ignore lint/suspicious/noExplicitAny: Cast for overload compatibility
 			useWatch(system as SingleModuleSystem<any>, key, callback),
 	};
+}
+
+// ============================================================================
+// useNamespacedSelector — select from a NamespacedSystem
+// ============================================================================
+
+/**
+ * Svelte readable store that selects from a NamespacedSystem.
+ * Subscribes to specified keys and provides reactive updates.
+ *
+ * @param system - The namespaced system
+ * @param keys - Namespaced keys to subscribe to (e.g., ["auth.token", "data.count"])
+ * @param selector - Function that reads from system.facts / system.derive
+ *
+ * @example
+ * ```svelte
+ * const token$ = useNamespacedSelector(system, ["auth.token"], (s) => s.facts.auth.token);
+ * ```
+ */
+export function useNamespacedSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules>,
+	keys: string[],
+	selector: (system: NamespacedSystem<Modules>) => R,
+): Readable<R> {
+	return readable<R>(selector(system), (set) => {
+		const unsubscribe = system.subscribe(keys, () => {
+			set(selector(system));
+		});
+
+		return unsubscribe;
+	});
 }

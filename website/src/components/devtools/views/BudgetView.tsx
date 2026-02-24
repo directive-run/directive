@@ -2,16 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import type { DebugEvent } from '../types'
-import { usePolledSnapshot } from '../hooks/usePolledSnapshot'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { getDefaultPricing, formatCost } from '../constants'
 
-// C1: Uses shared usePolledSnapshot
 // m10: Uses getDefaultPricing instead of hardcoded Haiku pricing
 
 type SortKey = 'time' | 'cost' | 'tokens'
 
-export function BudgetView({ events }: { events: DebugEvent[] }) {
-  const { data } = usePolledSnapshot()
+export function BudgetView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
+  const data = useSelector(system, (s) => s.facts.snapshot.data)
   const [agentFilter, setAgentFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortKey>('time')
 
