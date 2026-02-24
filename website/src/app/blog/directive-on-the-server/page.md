@@ -42,7 +42,7 @@ function createUserSystem(userId: string) {
 
 Never use a module-level singleton. Two concurrent requests would mutate the same facts, and you'd get race conditions that are nearly impossible to debug.
 
-The factory function creates a fresh system, starts it, and seeds it with request-specific data. Constraints fire, resolvers execute, and the system converges on a settled state &ndash; all scoped to a single request lifecycle.
+The factory function creates a fresh system, starts it, and seeds it with request-specific data. Constraints fire, resolvers execute, and the system resolves to a settled state &ndash; all scoped to a single request lifecycle.
 
 The server-side equivalent of "wait for loading" is `system.settle()`:
 

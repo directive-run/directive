@@ -211,7 +211,7 @@ The loop continues until the system reaches a **settled state** – a point wher
 
 This is similar to how React's reconciliation works: you declare what the UI should look like, and React figures out the minimal DOM updates. Directive does the same thing for application state – you declare what must be true, and the engine figures out the minimal set of actions to make it so.
 
-The key insight is that the loop is **convergent**. Each iteration brings the system closer to its constraints. Unlike event-driven systems where a missed handler leaves the system in an inconsistent state, the reconciliation loop will keep trying until constraints are satisfied or an error boundary intervenes.
+The key insight is that the loop is **goal-oriented**. Each iteration brings the system closer to its constraints. Unlike event-driven systems where a missed handler leaves the system in an inconsistent state, the reconciliation loop will keep trying until constraints are satisfied or an error boundary intervenes.
 
 ---
 

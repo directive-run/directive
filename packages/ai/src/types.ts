@@ -390,13 +390,13 @@ export interface MultiAgentLifecycleHooks {
   onHandoffComplete?: (result: { request: { id: string; fromAgent: string; toAgent: string }; completedAt: number }) => void;
   onPatternStart?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
+    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
     input: string;
     timestamp: number;
   }) => void;
   onPatternComplete?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
+    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
     durationMs: number;
     timestamp: number;
     error?: Error;
@@ -783,14 +783,14 @@ export interface HandoffCompleteEvent extends DebugEventBase {
 export interface PatternStartEvent extends DebugEventBase {
   type: "pattern_start";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
+  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
 }
 
 /** Pattern complete event */
 export interface PatternCompleteEvent extends DebugEventBase {
   type: "pattern_complete";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
+  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
   durationMs: number;
   error?: string;
 }
@@ -800,6 +800,7 @@ export interface DagNodeUpdateEvent extends DebugEventBase {
   type: "dag_node_update";
   nodeId: string;
   status: DagNodeStatus;
+  deps?: string[];
 }
 
 /** Breakpoint hit event */
@@ -1074,11 +1075,11 @@ export interface Scratchpad<T extends Record<string, unknown> = Record<string, u
 }
 
 // ============================================================================
-// Converge Pattern Types
+// Goal Pattern Types
 // ============================================================================
 
-/** A node in a converge execution pattern */
-export interface ConvergeNode {
+/** A node in a goal execution pattern */
+export interface GoalNode {
   /** Agent ID (registered on the orchestrator) */
   agent: string;
   /** Fact keys this node can produce */
@@ -1095,8 +1096,8 @@ export interface ConvergeNode {
   extractOutput?: (result: RunResult<unknown>) => Record<string, unknown>;
 }
 
-/** Convergence step metrics */
-export interface ConvergeStepMetrics {
+/** Goal step metrics */
+export interface GoalStepMetrics {
   step: number;
   durationMs: number;
   nodesRun: string[];
@@ -1106,20 +1107,29 @@ export interface ConvergeStepMetrics {
   tokensConsumed: number;
 }
 
-/** Convergence progress metrics */
-export interface ConvergeMetrics {
+/** Goal progress metrics */
+export interface GoalMetrics {
   satisfaction: number;
-  convergenceRate: number;
+  progressRate: number;
   estimatedStepsRemaining: number | null;
   decelerating: boolean;
 }
 
-/** Agent selection strategy for converge pattern */
+/** Agent selection strategy for goal pattern */
 export interface AgentSelectionStrategy {
+  /**
+   * Select which ready agents to run this step.
+   *
+   * @param readyAgents - Agent IDs whose `requires` are satisfied
+   * @param metrics - Per-agent performance metrics (runs, avgSatisfactionDelta, tokens)
+   * @param goalMetrics - Global goal progress metrics. Built-in strategies use per-agent
+   *   metrics only; this parameter enables custom strategies that account for overall goal
+   *   progress (e.g., switching to cheaper agents as satisfaction approaches 1.0).
+   */
   select: (
     readyAgents: string[],
     metrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number }>,
-    convergence: ConvergeMetrics,
+    goalMetrics: GoalMetrics,
   ) => string[];
 }
 
@@ -1127,20 +1137,20 @@ export interface AgentSelectionStrategy {
 export interface RelaxationContext {
   step: number;
   facts: Record<string, unknown>;
-  metrics: ConvergeMetrics;
+  metrics: GoalMetrics;
   completedNodes: Set<string>;
   failedNodes: Map<string, number>;
 }
 
-/** Relaxation strategy for when convergence stalls */
+/** Relaxation strategy for when goal pursuit stalls */
 export type RelaxationStrategy =
   | { type: "allow_rerun"; nodes: string[] }
-  | { type: "alternative_nodes"; nodes: ConvergeNode[] }
+  | { type: "alternative_nodes"; nodes: GoalNode[] }
   | { type: "inject_facts"; facts: Record<string, unknown> }
   | { type: "accept_partial" }
   | { type: "custom"; apply: (context: RelaxationContext) => void | Promise<void> };
 
-/** Relaxation tier — progressively applied when convergence stalls */
+/** Relaxation tier — progressively applied when goal pursuit stalls */
 export interface RelaxationTier {
   label: string;
   /** Steps of no progress before applying. @default 3 */
@@ -1156,19 +1166,19 @@ export interface RelaxationRecord {
   strategy: RelaxationStrategy["type"];
 }
 
-/** Converge execution pattern — declare desired state, let the runtime resolve */
-export interface ConvergePattern<T = unknown> {
-  type: "converge";
+/** Goal execution pattern — declare desired state, let the runtime resolve */
+export interface GoalPattern<T = unknown> {
+  type: "goal";
   /** Nodes with produces/requires declarations */
-  nodes: Record<string, ConvergeNode>;
-  /** Convergence condition — when this returns true, convergence is complete */
+  nodes: Record<string, GoalNode>;
+  /** Goal condition — when this returns true, the goal is achieved */
   when: (facts: Record<string, unknown>) => boolean;
   /** Quantitative satisfaction: 0.0 to 1.0. Enables progress tracking.
    *  If omitted, binary: 0.0 when when() is false, 1.0 when true. */
   satisfaction?: (facts: Record<string, unknown>) => number;
-  /** Max convergence steps. @default 50 */
+  /** Max goal steps. @default 50 */
   maxSteps?: number;
-  /** Extract final result from converged facts */
+  /** Extract final result from achieved facts */
   extract?: (facts: Record<string, unknown>) => T;
   /** Timeout in ms. @default 300000 */
   timeout?: number;
@@ -1176,19 +1186,19 @@ export interface ConvergePattern<T = unknown> {
   signal?: AbortSignal;
   /** Agent selection strategy. @default "all-ready" */
   selectionStrategy?: AgentSelectionStrategy;
-  /** Relaxation tiers — progressively applied when convergence stalls */
+  /** Relaxation tiers — progressively applied when goal pursuit stalls */
   relaxation?: RelaxationTier[];
   /** Lifecycle hooks */
   onStep?: (step: number, facts: Record<string, unknown>, readyAgents: string[]) => void;
-  onStall?: (step: number, metrics: ConvergeMetrics) => void;
-  /** Checkpoint configuration for mid-convergence fault tolerance */
+  onStall?: (step: number, metrics: GoalMetrics) => void;
+  /** Checkpoint configuration for mid-execution fault tolerance */
   checkpoint?: PatternCheckpointConfig;
 }
 
-/** Result of a converge pattern execution */
-export interface ConvergeResult<T = unknown> {
+/** Result of a goal pattern execution */
+export interface GoalResult<T = unknown> {
   /** Whether the when() condition was satisfied */
-  converged: boolean;
+  achieved: boolean;
   /** Final value (from extract, or raw facts) */
   result: T;
   /** Final facts state */
@@ -1197,17 +1207,17 @@ export interface ConvergeResult<T = unknown> {
   executionOrder: string[];
   /** Per-node results */
   nodeResults: Record<string, RunResult<unknown>>;
-  /** Total convergence steps taken */
+  /** Total goal steps taken */
   steps: number;
   /** Total tokens consumed */
   totalTokens: number;
   /** Total duration (ms) */
   durationMs: number;
   /** Per-step metrics (satisfaction, nodes run, etc.) */
-  stepMetrics: ConvergeStepMetrics[];
+  stepMetrics: GoalStepMetrics[];
   /** Relaxation events applied */
   relaxations: RelaxationRecord[];
-  /** Error message if convergence failed */
+  /** Error message if goal was not achieved */
   error?: string;
 }
 
@@ -1233,16 +1243,16 @@ export interface CheckpointContext {
   step: number;
   /** Pattern type identifier */
   patternType: string;
-  /** Pattern-specific facts (converge only) */
+  /** Pattern-specific facts (goal only) */
   facts?: Record<string, unknown>;
-  /** Satisfaction score 0-1 (converge only) */
+  /** Satisfaction score 0-1 (goal only) */
   satisfaction?: number;
 }
 
 /**
- * @deprecated Use `PatternCheckpointConfig` instead. This alias exists for backward compatibility.
+ * @deprecated Use `PatternCheckpointConfig` instead. Alias kept for backward compatibility.
  */
-export type ConvergeCheckpointConfig = PatternCheckpointConfig;
+export type GoalCheckpointConfig = PatternCheckpointConfig;
 
 // ---- Common checkpoint state fields ----
 
@@ -1348,10 +1358,10 @@ export interface DagCheckpointState extends PatternCheckpointBase {
   input: string;
 }
 
-/** Serializable mid-convergence state for save/resume */
-export interface ConvergeCheckpointState extends PatternCheckpointBase {
+/** Serializable mid-goal state for save/resume */
+export interface GoalCheckpointState extends PatternCheckpointBase {
   /** Pattern type discriminator */
-  type: "converge";
+  type: "goal";
   /** Current step */
   step: number;
   /** Current facts snapshot */
@@ -1367,7 +1377,7 @@ export interface ConvergeCheckpointState extends PatternCheckpointBase {
   /** Execution order so far */
   executionOrder: string[];
   /** Step metrics collected so far */
-  stepMetrics: ConvergeStepMetrics[];
+  stepMetrics: GoalStepMetrics[];
   /** Relaxations applied so far */
   relaxations: RelaxationRecord[];
   /** Applied relaxation tier index */
@@ -1387,7 +1397,7 @@ export type PatternCheckpointState =
   | ReflectCheckpointState
   | DebateCheckpointState
   | DagCheckpointState
-  | ConvergeCheckpointState;
+  | GoalCheckpointState;
 
 // ---- Checkpoint utilities ----
 
@@ -1415,13 +1425,13 @@ export interface CheckpointDiff {
   stepDelta: number;
   /** Token difference */
   tokensDelta: number;
-  /** Fact changes (converge only) */
+  /** Fact changes (goal only) */
   facts?: {
     added: string[];
     removed: string[];
     changed: Array<{ key: string; before: unknown; after: unknown }>;
   };
-  /** Nodes completed between checkpoints (DAG/converge) */
+  /** Nodes completed between checkpoints (DAG/goal) */
   nodesCompleted?: string[];
 }
 

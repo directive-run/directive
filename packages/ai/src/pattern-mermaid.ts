@@ -179,12 +179,25 @@ function isSerializedPattern(
   if (obj.type === "debate" && typeof obj.extract === "function") {
     return false;
   }
+  if (obj.type === "goal" && (typeof obj.when === "function" || typeof obj.satisfaction === "function" || typeof obj.extract === "function")) {
+    return false;
+  }
 
   // Also check: if a dag node has `when` or `transform` functions, not serialized
   if (obj.type === "dag" && obj.nodes) {
     for (const node of Object.values(obj.nodes as Record<string, unknown>)) {
       const n = node as Record<string, unknown>;
       if (typeof n.when === "function" || typeof n.transform === "function") {
+        return false;
+      }
+    }
+  }
+
+  // Also check: if a goal node has `buildInput` or `extractOutput` functions, not serialized
+  if (obj.type === "goal" && obj.nodes) {
+    for (const node of Object.values(obj.nodes as Record<string, unknown>)) {
+      const n = node as Record<string, unknown>;
+      if (typeof n.buildInput === "function" || typeof n.extractOutput === "function") {
         return false;
       }
     }
@@ -212,6 +225,7 @@ const ALLOWED_TYPES = new Set([
   "reflect",
   "race",
   "debate",
+  "goal",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -345,6 +359,69 @@ function renderReflect(
   ];
 }
 
+function renderGoal(
+  p: Extract<SerializedPattern, { type: "goal" }>,
+  shapes?: MermaidNodeShapes,
+): string[] {
+  const nodeEntries = Object.entries(p.nodes);
+  const lines: string[] = [];
+
+  // Build a map: factKey → nodeId that produces it
+  const producerMap = new Map<string, string>();
+  for (const [nodeId, node] of nodeEntries) {
+    for (const key of node.produces) {
+      producerMap.set(key, nodeId);
+    }
+  }
+
+  // Build edges from produces/requires declarations
+  const rendered = new Set<string>();
+  const edgeSet = new Set<string>();
+
+  // Sort node entries for determinism
+  const sortedEntries = [...nodeEntries].sort(([a], [b]) => a.localeCompare(b));
+
+  for (const [nodeId, node] of sortedEntries) {
+    const id = sanitizeId(nodeId);
+    const requires = [...(node.requires ?? [])].sort();
+
+    if (requires.length === 0) {
+      if (!rendered.has(id)) {
+        lines.push(`  ${wrapNode(id, node.agent, "agent", shapes)}`);
+        rendered.add(id);
+      }
+    }
+
+    for (const key of requires) {
+      const producer = producerMap.get(key);
+      if (producer && producer !== nodeId) {
+        const edgeKey = `${producer}->${nodeId}`;
+        if (!edgeSet.has(edgeKey)) {
+          const fromId = sanitizeId(producer);
+          const fromNode = p.nodes[producer]!;
+          const from = wrapNode(fromId, fromNode.agent, "agent", shapes);
+          const to = wrapNode(id, node.agent, "agent", shapes);
+          lines.push(`  ${from} -->|${sanitizeLabel(key)}| ${to}`);
+          rendered.add(fromId);
+          rendered.add(id);
+          edgeSet.add(edgeKey);
+        }
+      }
+    }
+  }
+
+  // Render any isolated nodes (no incoming or outgoing edges)
+  for (const [nodeId, node] of sortedEntries) {
+    const id = sanitizeId(nodeId);
+    if (!rendered.has(id)) {
+      lines.push(`  ${wrapNode(id, node.agent, "agent", shapes)}`);
+      rendered.add(id);
+    }
+  }
+
+  return lines;
+}
+
 function renderDebate(
   p: Extract<SerializedPattern, { type: "debate" }>,
   shapes?: MermaidNodeShapes,
@@ -386,7 +463,7 @@ function renderDebate(
  * //   fetch[fetcher] --> report[reporter]
  * ```
  *
- * @throws {Error} If pattern type is not one of the 7 known types.
+ * @throws {Error} If pattern type is not one of the 8 known types.
  */
 export function patternToMermaid(
   pattern: ExecutionPattern<unknown> | SerializedPattern,
@@ -430,6 +507,9 @@ export function patternToMermaid(
       break;
     case "debate":
       body = renderDebate(serialized, shapes);
+      break;
+    case "goal":
+      body = renderGoal(serialized, shapes);
       break;
   }
 

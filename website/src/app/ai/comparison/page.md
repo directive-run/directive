@@ -17,7 +17,7 @@ Directive's AI adapter doesn't replace your LLM framework &ndash; it wraps it wi
 | **Framework lock-in** | None &ndash; wraps any runner | LangChain ecosystem | CrewAI agents | AutoGen agents | Vercel ecosystem |
 | **Reactive state** | Directive System backbone | LangGraph state | Shared memory | Chat history | React state |
 | **Guardrails** | Input + output + tool-call | LangSmith eval | &ndash; | &ndash; | &ndash; |
-| **Execution patterns** | 7 built-in (parallel, DAG, race, reflect, debate, ...) | LangGraph nodes/edges | Sequential/parallel | Round-robin chat | &ndash; |
+| **Execution patterns** | 8 built-in (parallel, sequential, supervisor, DAG, race, reflect, debate, goal) | LangGraph nodes/edges | Sequential/parallel | Round-robin chat | &ndash; |
 | **Constraints** | Declarative `when`/`require` | &ndash; | &ndash; | &ndash; | &ndash; |
 | **Time-travel debug** | Built-in snapshots + fork | LangSmith tracing | &ndash; | &ndash; | &ndash; |
 | **DevTools** | Visual debugger (3 active views, 5 planned) | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
@@ -25,7 +25,7 @@ Directive's AI adapter doesn't replace your LLM framework &ndash; it wraps it wi
 | **Memory** | 3 strategies + summarizers | LangChain memory | Crew memory | Chat history | &ndash; |
 | **Evals** | 10 built-in criteria + LLM judge | LangSmith evals | &ndash; | &ndash; | &ndash; |
 | **Self-healing** | Circuit breaker + auto-reroute | &ndash; | &ndash; | &ndash; | &ndash; |
-| **Converge pattern** | Declarative convergence | &ndash; | Goal-oriented tasks | &ndash; | &ndash; |
+| **Goal pattern** | Desired-state goal resolution | &ndash; | Goal-oriented tasks | &ndash; | &ndash; |
 | **Pattern checkpoints** | Save/resume all 6 patterns | LangGraph checkpointing | &ndash; | &ndash; | &ndash; |
 | **TypeScript** | First-class, fully typed | Python-first, TS port | Python only | Python-first, TS port | First-class |
 | **Bundle size** | Tree-shakeable, zero-cost debug | Large dependency tree | N/A (Python) | N/A (Python) | Small |
@@ -70,9 +70,11 @@ CrewAI provides role-based agent teams with tasks, tools, and process flows. Age
 
 - You need TypeScript-native orchestration
 - You want per-agent and orchestrator-level guardrails (input, output, tool-call)
-- You need 7 execution patterns beyond sequential and parallel
+- You need 8 execution patterns beyond sequential and parallel (including goal-directed resolution)
 - You want reactive cross-agent derivations and shared scratchpad
 - You need breakpoints, checkpoints, and time-travel debugging
+
+Directive's goal pattern goes beyond CrewAI's role-based goals. CrewAI goals are natural-language descriptions that guide agent behavior (`goal="Identify trending topics"`). Directive goals are machine-checkable conditions with dependency resolution, quantitative satisfaction tracking, and progressive relaxation &ndash; the runtime knows exactly how close you are to done and can self-correct when progress stalls.
 
 ---
 
@@ -112,7 +114,7 @@ Vercel AI SDK provides streaming-first UI primitives for React, with excellent D
 - You want framework-agnostic state (works with React, Vue, Svelte, Solid, Lit)
 - You need time-travel debugging and visual DevTools (Timeline, Cost, State)
 - You want declarative agent routing based on runtime state
-- You need production features: evals, OTEL, self-healing, converge pattern
+- You need production features: evals, OTEL, self-healing, goal pattern
 
 ### Using Together
 
@@ -125,12 +127,12 @@ Use Vercel AI SDK for the streaming UI layer and Directive for backend orchestra
 Features no other framework provides:
 
 1. **Constraint-driven orchestration** &ndash; Declare `when`/`require` rules; the runtime resolves them automatically
-2. **Reactive Directive System backbone** &ndash; Every agent is a namespaced module with reactive facts, derivations, and effects
-3. **Cross-agent derivations** &ndash; Compute values across all agent states reactively
-4. **Visual DevTools** &ndash; Timeline, Cost, State (plus 5 more views planned: Flamechart, DAG, Health, Breakpoints, Compare)
-5. **Self-healing** &ndash; Circuit breakers with automatic agent rerouting and health scoring
-6. **Converge pattern** &ndash; Declare desired end-state, runtime converges through dependency-ordered agent runs
-7. **Pattern checkpoints** &ndash; Save/resume mid-execution for all 6 multi-step patterns with progress tracking, forking, and diffing
+2. **Goal pattern** &ndash; Declare desired end-state with `produces`/`requires` declarations; runtime resolves through dependency-ordered agent runs with satisfaction scoring and progressive relaxation
+3. **Reactive Directive System backbone** &ndash; Every agent is a namespaced module with reactive facts, derivations, and effects
+4. **Cross-agent derivations** &ndash; Compute values across all agent states reactively
+5. **Visual DevTools** &ndash; Timeline, Cost, State (plus 5 more views planned: Flamechart, DAG, Health, Breakpoints, Compare)
+6. **Self-healing** &ndash; Circuit breakers with automatic agent rerouting and health scoring
+7. **Pattern checkpoints** &ndash; Save/resume mid-execution for all 8 pattern types with progress tracking, forking, and diffing
 8. **Framework-agnostic** &ndash; Wraps any `AgentRunner` function, no LLM SDK lock-in
 
 ---
@@ -139,4 +141,4 @@ Features no other framework provides:
 
 - [Overview](/ai/overview) &ndash; Full feature map and reading paths
 - [Running Agents](/ai/running-agents) &ndash; Get started with Directive AI
-- [Execution Patterns](/ai/patterns) &ndash; See all 7 patterns in action
+- [Execution Patterns](/ai/patterns) &ndash; See all 8 patterns in action

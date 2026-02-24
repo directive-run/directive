@@ -31,6 +31,13 @@ export const EVENT_COLORS: Record<string, string> = {
   resolver_complete: 'bg-indigo-500',
   resolver_error: 'bg-red-500',
   reroute: 'bg-orange-500',
+  pattern_start: 'bg-teal-500',
+  pattern_complete: 'bg-teal-400',
+  dag_node_update: 'bg-cyan-500',
+  breakpoint_hit: 'bg-rose-500',
+  breakpoint_resumed: 'bg-emerald-400',
+  derivation_update: 'bg-purple-500',
+  scratchpad_update: 'bg-fuchsia-500',
 }
 
 export const EVENT_LABELS: Record<string, string> = {
@@ -44,6 +51,13 @@ export const EVENT_LABELS: Record<string, string> = {
   resolver_complete: 'Resolver Done',
   resolver_error: 'Resolver Error',
   reroute: 'Reroute',
+  pattern_start: 'Pattern Start',
+  pattern_complete: 'Pattern Done',
+  dag_node_update: 'DAG Update',
+  breakpoint_hit: 'Breakpoint',
+  breakpoint_resumed: 'Resumed',
+  derivation_update: 'Derivation',
+  scratchpad_update: 'Scratchpad',
 }
 
 export const VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Flamechart', 'DAG', 'Memory', 'Budget', 'Config'] as const
