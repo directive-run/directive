@@ -5,105 +5,510 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Contact Form - Directive Example</title>
   <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--brand-surface);
+      color: var(--brand-text);
       display: flex;
       justify-content: center;
+      align-items: flex-start;
       min-height: 100vh;
-      padding: 2rem;
+      padding: 1.5rem;
     }
-    .app { max-width: 480px; width: 100%; }
-    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-    .subtitle { color: #64748b; margin-bottom: 1.5rem; font-size: 0.875rem; }
-    .form { display: flex; flex-direction: column; gap: 1rem; }
-    label { display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    input, select, textarea {
-      width: 100%; background: #1e293b; border: 1px solid #334155;
-      border-radius: 8px; padding: 0.625rem 0.75rem; color: #e2e8f0;
-      font-size: 0.875rem; outline: none; transition: border-color 0.15s;
+
+    .cf-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
-    input:focus, select:focus, textarea:focus { border-color: #3b82f6; }
-    textarea { resize: none; min-height: 100px; }
-    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .error-text { color: #f87171; font-size: 0.75rem; margin-top: 0.25rem; min-height: 1rem; }
-    .char-count { text-align: right; font-size: 0.7rem; color: #64748b; margin-top: 0.25rem; }
-    .controls { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; }
-    button {
-      background: #3b82f6; border: none; color: white;
-      padding: 0.625rem 1.25rem; border-radius: 8px; cursor: pointer;
-      font-size: 0.875rem; font-weight: 600; transition: all 0.15s;
+
+    /* ===== Main 3-column Layout ===== */
+    .cf-main {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: 1rem;
     }
-    button:hover { background: #2563eb; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    button.secondary { background: transparent; border: 1px solid #334155; color: #94a3b8; font-weight: 400; }
-    button.secondary:hover { background: #1e293b; }
-    .status-banner {
-      padding: 0.75rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem;
+
+    @media (max-width: 800px) {
+      .cf-main { grid-template-columns: 1fr; }
     }
-    .status-success { background: #064e3b; border: 1px solid #065f46; color: #6ee7b7; }
-    .status-error { background: #450a0a; border: 1px solid #7f1d1d; color: #fca5a5; }
-    .status-submitting { background: #1e3a5f; border: 1px solid #1e40af; color: #93c5fd; }
-    .hidden { display: none; }
-    #log {
-      margin-top: 1.5rem; background: #0f172a; border: 1px solid #1e293b;
-      border-radius: 8px; padding: 0.75rem; text-align: left;
-      font-family: monospace; font-size: 0.7rem; color: #64748b;
-      max-height: 150px; overflow-y: auto;
+
+    /* Panel base */
+    .cf-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cf-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+    }
+
+    .cf-panel-body {
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* ===== Status Banner ===== */
+    .cf-status-banner {
+      font-size: 0.7rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .cf-status-banner.visible { display: block; }
+    .cf-status-banner.submitting { background: rgba(91, 163, 163, 0.15); color: var(--brand-primary); border: 1px solid rgba(91, 163, 163, 0.3); }
+    .cf-status-banner.success { background: rgba(109, 171, 114, 0.15); color: var(--brand-success); border: 1px solid rgba(109, 171, 114, 0.3); }
+    .cf-status-banner.error { background: rgba(232, 131, 111, 0.15); color: var(--brand-error); border: 1px solid rgba(232, 131, 111, 0.3); }
+
+    /* ===== Form Fields ===== */
+    .cf-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .cf-input-label {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+    }
+
+    .cf-input {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.45rem 0.6rem;
+      color: var(--brand-text);
+      font-size: 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    .cf-input:focus { border-color: var(--brand-primary); }
+    .cf-input::placeholder { color: var(--brand-text-faint); }
+
+    .cf-select {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.45rem 0.6rem;
+      color: var(--brand-text);
+      font-size: 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    .cf-select:focus { border-color: var(--brand-primary); }
+
+    .cf-textarea {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.45rem 0.6rem;
+      color: var(--brand-text);
+      font-size: 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+      resize: none;
+      min-height: 60px;
+    }
+
+    .cf-textarea:focus { border-color: var(--brand-primary); }
+
+    .cf-error-text {
+      font-size: 0.6rem;
+      color: var(--brand-error);
+      min-height: 0.8rem;
+    }
+
+    .cf-char-count {
+      font-size: 0.6rem;
+      color: var(--brand-text-dim);
+      text-align: right;
+    }
+
+    .cf-field-footer {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ===== Buttons ===== */
+    .cf-btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .cf-btn {
+      flex: 1;
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .cf-btn:hover:not(:disabled) { background: var(--brand-border); }
+    .cf-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .cf-btn.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #fff;
+    }
+
+    .cf-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); }
+
+    /* ===== Live State Inspector (Center) ===== */
+    .cf-inspector-section {
+      margin-bottom: 0.5rem;
+    }
+
+    .cf-inspector-section:last-child { margin-bottom: 0; }
+
+    .cf-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.4rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .cf-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.2rem 0;
+      font-size: 0.7rem;
+    }
+
+    .cf-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .cf-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cf-status-badge {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.1rem 0.4rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .cf-status-badge.idle { background: rgba(100, 116, 139, 0.2); color: var(--brand-text-dim); }
+    .cf-status-badge.submitting { background: rgba(91, 163, 163, 0.2); color: var(--brand-primary); }
+    .cf-status-badge.success { background: rgba(109, 171, 114, 0.2); color: var(--brand-success); }
+    .cf-status-badge.error { background: rgba(232, 131, 111, 0.2); color: var(--brand-error); }
+
+    .cf-deriv-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .cf-deriv-indicator.true { background: var(--brand-success); }
+    .cf-deriv-indicator.false { background: var(--brand-text-faint); }
+
+    /* ===== Event Timeline (Right) ===== */
+    .cf-timeline {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 120px;
+      max-height: 400px;
+    }
+
+    .cf-timeline-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .cf-timeline-entry {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.6rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.4rem;
+      align-items: baseline;
+    }
+
+    .cf-timeline-entry.field { border-left: 3px solid var(--brand-primary); }
+    .cf-timeline-entry.submit { border-left: 3px solid var(--brand-success); }
+    .cf-timeline-entry.error { border-left: 3px solid var(--brand-error); }
+    .cf-timeline-entry.reset { border-left: 3px solid var(--brand-warning); }
+
+    .cf-timeline-time {
+      color: var(--brand-text-faint);
+      font-size: 0.55rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .cf-timeline-event {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 65px;
+    }
+
+    .cf-timeline-detail {
+      color: var(--brand-text-dim);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== How It Works ===== */
+    .cf-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .cf-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .cf-how-it-works ul { padding-left: 1.2rem; }
+    .cf-how-it-works li { margin-bottom: 0.2rem; }
+
+    .cf-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--brand-border);
+      font-style: italic;
+      color: var(--brand-text-faint);
+    }
+
+    @media (max-width: 800px) {
+      body { padding: 0.75rem; }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <h1>Contact Form</h1>
-    <p class="subtitle">Directive example — facts, derivations, constraints, resolvers, effects</p>
+  <div class="cf-container">
+    <!-- Main 3-column -->
+    <div class="cf-main">
+      <!-- Left: Form -->
+      <div class="cf-panel">
+        <div class="cf-panel-header">Contact Form</div>
+        <div class="cf-panel-body">
+          <div id="status-banner" class="cf-status-banner" data-testid="cf-status"></div>
 
-    <div id="status-banner" class="status-banner hidden" data-testid="cf-status"></div>
+          <div class="cf-input-group">
+            <label class="cf-input-label">Name</label>
+            <input id="name" class="cf-input" type="text" placeholder="Your name" data-testid="cf-name" />
+            <div id="name-error" class="cf-error-text" data-testid="cf-name-error"></div>
+          </div>
 
-    <div class="form">
-      <div class="field-row">
-        <div>
-          <label for="name">Name</label>
-          <input id="name" type="text" placeholder="Your name" data-testid="cf-name" />
-          <div id="name-error" class="error-text" data-testid="cf-name-error"></div>
-        </div>
-        <div>
-          <label for="email">Email</label>
-          <input id="email" type="email" placeholder="you@example.com" data-testid="cf-email" />
-          <div id="email-error" class="error-text" data-testid="cf-email-error"></div>
+          <div class="cf-input-group">
+            <label class="cf-input-label">Email</label>
+            <input id="email" class="cf-input" type="email" placeholder="you@example.com" data-testid="cf-email" />
+            <div id="email-error" class="cf-error-text" data-testid="cf-email-error"></div>
+          </div>
+
+          <div class="cf-input-group">
+            <label class="cf-input-label">Subject</label>
+            <select id="subject" class="cf-select" data-testid="cf-subject">
+              <option value="">Select a subject</option>
+              <option value="general">General inquiry</option>
+              <option value="bug">Bug report</option>
+              <option value="feature">Feature request</option>
+              <option value="partnership">Partnership</option>
+            </select>
+            <div id="subject-error" class="cf-error-text" data-testid="cf-subject-error"></div>
+          </div>
+
+          <div class="cf-input-group">
+            <label class="cf-input-label">Message</label>
+            <textarea id="message" class="cf-textarea" placeholder="What can we help with?" data-testid="cf-message"></textarea>
+            <div class="cf-field-footer">
+              <div id="message-error" class="cf-error-text" data-testid="cf-message-error"></div>
+              <div id="char-count" class="cf-char-count" data-testid="cf-char-count">0 / 10 min</div>
+            </div>
+          </div>
+
+          <div class="cf-btn-row">
+            <button id="submit-btn" class="cf-btn primary" data-testid="cf-submit">Send Message</button>
+            <button id="clear-btn" class="cf-btn" data-testid="cf-clear">Clear</button>
+          </div>
         </div>
       </div>
 
-      <div>
-        <label for="subject">Subject</label>
-        <select id="subject" data-testid="cf-subject">
-          <option value="">Select a subject</option>
-          <option value="general">General inquiry</option>
-          <option value="bug">Bug report</option>
-          <option value="feature">Feature request</option>
-          <option value="partnership">Partnership</option>
-        </select>
-        <div id="subject-error" class="error-text" data-testid="cf-subject-error"></div>
-      </div>
-
-      <div>
-        <label for="message">Message</label>
-        <textarea id="message" placeholder="What can we help with?" data-testid="cf-message"></textarea>
-        <div style="display: flex; justify-content: space-between;">
-          <div id="message-error" class="error-text" data-testid="cf-message-error"></div>
-          <div id="char-count" class="char-count" data-testid="cf-char-count">0 / 10 min</div>
+      <!-- Center: Live State Inspector -->
+      <div class="cf-panel">
+        <div class="cf-panel-header">Live State Inspector</div>
+        <div class="cf-panel-body">
+          <div class="cf-inspector-section">
+            <div class="cf-inspector-title">Facts</div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">name</span>
+              <span id="cf-fact-name" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">email</span>
+              <span id="cf-fact-email" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">subject</span>
+              <span id="cf-fact-subject" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">message</span>
+              <span id="cf-fact-message" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">status</span>
+              <span id="cf-fact-status" class="cf-inspector-value">
+                <span class="cf-status-badge idle">idle</span>
+              </span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">touched</span>
+              <span id="cf-fact-touched" class="cf-inspector-value">0 fields</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">submissionCount</span>
+              <span id="cf-fact-submissions" class="cf-inspector-value">0</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">lastSubmittedAt</span>
+              <span id="cf-fact-lastsubmit" class="cf-inspector-value">&mdash;</span>
+            </div>
+          </div>
+          <div class="cf-inspector-section">
+            <div class="cf-inspector-title">Derivations</div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">isValid</span>
+              <span id="cf-deriv-isvalid" class="cf-inspector-value">
+                <span class="cf-deriv-indicator false"></span> false
+              </span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">canSubmit</span>
+              <span id="cf-deriv-cansubmit" class="cf-inspector-value">
+                <span class="cf-deriv-indicator false"></span> false
+              </span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">nameError</span>
+              <span id="cf-deriv-nameerror" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">emailError</span>
+              <span id="cf-deriv-emailerror" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">subjectError</span>
+              <span id="cf-deriv-subjecterror" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">messageError</span>
+              <span id="cf-deriv-messageerror" class="cf-inspector-value">&mdash;</span>
+            </div>
+            <div class="cf-inspector-row">
+              <span class="cf-inspector-key">messageCharCount</span>
+              <span id="cf-deriv-charcount" class="cf-inspector-value">0</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="controls">
-        <button id="submit-btn" data-testid="cf-submit">Send Message</button>
-        <button id="clear-btn" class="secondary" data-testid="cf-clear">Clear</button>
+      <!-- Right: Event Timeline -->
+      <div class="cf-panel">
+        <div class="cf-panel-header">Event Timeline</div>
+        <div class="cf-panel-body" style="flex: 1;">
+          <div id="cf-timeline" class="cf-timeline">
+            <div class="cf-timeline-empty">Events appear after interactions</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div id="log"></div>
+    <!-- How It Works -->
+    <div class="cf-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>Facts</strong> &ndash; name, email, subject, message, touched, status, errorMessage, lastSubmittedAt, submissionCount</li>
+        <li><strong>Derivations</strong> &ndash; nameError, emailError, subjectError, messageError, isValid, canSubmit, messageCharCount (all auto-tracked)</li>
+        <li><strong>Constraints</strong> &ndash; submitForm (status === &ldquo;submitting&rdquo;), resetAfterSuccess (status === &ldquo;success&rdquo;)</li>
+        <li><strong>Resolvers</strong> &ndash; sendMessage (simulated async submit, 20% fail rate), resetAfterDelay (3s auto-reset)</li>
+        <li><strong>Effects</strong> &ndash; logSubmission (logs status transitions)</li>
+      </ul>
+      <p class="directive-note">Validation derivations re-compute automatically when any field changes. The <code>canSubmit</code> derivation composes <code>isValid</code> with status and rate-limit checks. Constraints trigger the resolver chain: submit &rarr; success &rarr; auto-reset.</p>
+    </div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

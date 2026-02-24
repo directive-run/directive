@@ -54,10 +54,25 @@ export interface Streamable {
 
 // ---------------------------------------------------------------------------
 // Directive System (singleton — server-side operational state)
+// Persisted on globalThis to survive HMR re-evaluations.
 // ---------------------------------------------------------------------------
 
-export const chatbotSystem = createSystem({ module: docsChatbot })
-chatbotSystem.start()
+const SYSTEM_KEY = '__directive_chatbot_system' as const
+
+function initChatbotSystem() {
+  const sys = createSystem({ module: docsChatbot })
+  sys.start()
+
+  return sys
+}
+
+const gs = globalThis as typeof globalThis & { [SYSTEM_KEY]?: ReturnType<typeof initChatbotSystem> }
+
+if (!gs[SYSTEM_KEY]) {
+  gs[SYSTEM_KEY] = initChatbotSystem()
+}
+
+export const chatbotSystem = gs[SYSTEM_KEY]
 
 // ---------------------------------------------------------------------------
 // System Prompt
@@ -176,12 +191,19 @@ export const transport = createSSETransport({
 
 // ---------------------------------------------------------------------------
 // Directive Agent Orchestrator (singleton)
+//
+// Persisted on globalThis so that Next.js dev-mode HMR cannot split the
+// chat route and SSE stream route into separate module evaluations that
+// each hold their own (disconnected) orchestrator instance.
 // ---------------------------------------------------------------------------
 
-let orchestratorInstance: { orchestrator: ReturnType<typeof createAgentOrchestrator>; streamable: Streamable } | null = null
+type OrchestratorInstance = { orchestrator: ReturnType<typeof createAgentOrchestrator>; streamable: Streamable; memory: ReturnType<typeof createAgentMemory> }
+
+const GLOBAL_KEY = '__directive_orchestrator' as const
+const g = globalThis as typeof globalThis & { [GLOBAL_KEY]?: OrchestratorInstance }
 
 export function getOrchestrator() {
-  if (orchestratorInstance) return orchestratorInstance
+  if (g[GLOBAL_KEY]) return g[GLOBAL_KEY]
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY
   if (!anthropicKey) return null
@@ -306,6 +328,7 @@ export function getOrchestrator() {
           timestamp: startTime,
           snapshotId: null,
           agentId: docsAgent.name,
+          modelId: 'claude-haiku-4-5',
           inputLength: input.length,
         })
       }
@@ -342,21 +365,29 @@ export function getOrchestrator() {
       // Wrap result to record agent_complete when stream finishes
       const result = rawResult.then(
         (res) => {
+          const tokens = res.totalTokens ?? 0
           if (tl) {
             tl.record({
               type: 'agent_complete',
               timestamp: Date.now(),
               snapshotId: null,
               agentId: docsAgent.name,
-              totalTokens: res.totalTokens ?? 0,
+              modelId: 'claude-haiku-4-5',
+              totalTokens: tokens,
+              inputTokens: res.tokenUsage?.inputTokens ?? 0,
+              outputTokens: res.tokenUsage?.outputTokens ?? 0,
               durationMs: Date.now() - startTime,
               outputLength: typeof res.output === 'string' ? res.output.length : 0,
             })
           }
 
+          // Update chatbot system (streamable bypasses orchestrator.run())
+          chatbotSystem.events.requestCompleted({ tokens })
+
           return res
         },
         (err) => {
+          chatbotSystem.events.requestFailed()
           if (tl) {
             tl.record({
               type: 'agent_error',
@@ -397,9 +428,9 @@ export function getOrchestrator() {
     },
   }
 
-  orchestratorInstance = { orchestrator, streamable }
+  g[GLOBAL_KEY] = { orchestrator, streamable, memory }
 
-  return orchestratorInstance
+  return g[GLOBAL_KEY]
 }
 
 // ---------------------------------------------------------------------------
@@ -407,5 +438,5 @@ export function getOrchestrator() {
 // ---------------------------------------------------------------------------
 
 export function getTimeline() {
-  return orchestratorInstance?.orchestrator.timeline ?? null
+  return g[GLOBAL_KEY]?.orchestrator.timeline ?? null
 }

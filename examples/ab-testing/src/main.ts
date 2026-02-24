@@ -1,11 +1,8 @@
 /**
- * A/B Testing Engine — Directive Example
+ * A/B Testing Engine — DOM Rendering & System Wiring
  *
- * Demonstrates:
- * - Deterministic hash-based variant assignment
- * - Automatic exposure tracking via constraint chain
- * - Pause/resume all experiments
- * - Full constraint → resolver lifecycle
+ * Creates the Directive system, subscribes to state changes,
+ * renders experiment cards, state inspector, and event timeline.
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
@@ -25,6 +22,13 @@ interface Experiment {
   name: string;
   variants: Variant[];
   active: boolean;
+}
+
+interface TimelineEntry {
+  time: number;
+  event: string;
+  detail: string;
+  type: string;
 }
 
 // ============================================================================
@@ -54,6 +58,49 @@ function pickVariant(userId: string, experimentId: string, variants: Variant[]):
   }
 
   return variants[variants.length - 1].id;
+}
+
+// ============================================================================
+// Timeline
+// ============================================================================
+
+const timeline: TimelineEntry[] = [];
+
+function log(type: "event" | "constraint" | "resolver", msg: string) {
+  console.log(`[AB] [${type}] ${msg}`);
+
+  // Classify for timeline
+  let event = "";
+  let detail = msg;
+  let tlType = "register";
+
+  if (msg.startsWith("Registered")) {
+    event = "registered";
+    detail = msg.replace("Registered experiment: ", "");
+    tlType = "register";
+  } else if (msg.startsWith("Assigned") || msg.includes("→")) {
+    event = "assigned";
+    detail = msg;
+    tlType = "assign";
+  } else if (msg.includes("Exposure tracked")) {
+    event = "exposure";
+    detail = msg.replace("Exposure tracked: ", "");
+    tlType = "exposure";
+  } else if (msg.includes("Manual assignment")) {
+    event = "manual";
+    detail = msg.replace("Manual assignment: ", "");
+    tlType = "assign";
+  } else if (msg.includes("Paused") || msg.includes("Resumed") || msg.includes("Reset")) {
+    event = msg.toLowerCase().split(" ")[0];
+    detail = msg;
+    tlType = "control";
+  } else {
+    event = type;
+    detail = msg;
+    tlType = "register";
+  }
+
+  timeline.unshift({ time: Date.now(), event, detail, type: tlType });
 }
 
 // ============================================================================
@@ -139,12 +186,7 @@ const abTesting = createModule("ab-testing", {
     },
   },
 
-  // ============================================================================
-  // Constraints — the declarative engine
-  // ============================================================================
-
   constraints: {
-    // Active experiment + no assignment → needs assignment
     needsAssignment: {
       priority: 100,
       when: (facts) => {
@@ -169,7 +211,6 @@ const abTesting = createModule("ab-testing", {
       },
     },
 
-    // Assigned + not yet exposed → track exposure
     needsExposure: {
       priority: 50,
       when: (facts) => {
@@ -196,10 +237,6 @@ const abTesting = createModule("ab-testing", {
       },
     },
   },
-
-  // ============================================================================
-  // Resolvers — how requirements get fulfilled
-  // ============================================================================
 
   resolvers: {
     assignVariant: {
@@ -252,24 +289,10 @@ const system = createSystem({ module: abTesting });
 system.start();
 
 // ============================================================================
-// Logging
+// DOM References
 // ============================================================================
 
-const logEl = document.getElementById("log")!;
-
-function log(type: "event" | "constraint" | "resolver", msg: string) {
-  console.log(`[AB] [${type}] ${msg}`);
-  const line = document.createElement("div");
-  line.className = type;
-  line.textContent = `${new Date().toLocaleTimeString()} [${type}] ${msg}`;
-  logEl.appendChild(line);
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-// ============================================================================
-// DOM Bindings
-// ============================================================================
-
+// Stats
 const experimentCountEl = document.getElementById("experiment-count")!;
 const assignedCountEl = document.getElementById("assigned-count")!;
 const exposedCountEl = document.getElementById("exposed-count")!;
@@ -278,21 +301,53 @@ const experimentsEl = document.getElementById("experiments")!;
 const pauseBtn = document.getElementById("btn-pause")!;
 const resetBtn = document.getElementById("btn-reset")!;
 
+// Inspector
+const factUserId = document.getElementById("ab-fact-userid")!;
+const factPaused = document.getElementById("ab-fact-paused")!;
+const factExperiments = document.getElementById("ab-fact-experiments")!;
+const factAssignments = document.getElementById("ab-fact-assignments")!;
+const factExposures = document.getElementById("ab-fact-exposures")!;
+const derivActive = document.getElementById("ab-deriv-active")!;
+const derivAssigned = document.getElementById("ab-deriv-assigned")!;
+const derivExposed = document.getElementById("ab-deriv-exposed")!;
+
+// Timeline
+const timelineEl = document.getElementById("ab-timeline")!;
+
+// ============================================================================
+// Render
+// ============================================================================
+
+function renderBoolIndicator(el: HTMLElement, value: boolean): void {
+  const cls = value ? "true" : "false";
+  el.innerHTML = `<span class="ab-deriv-indicator ${cls}"></span> ${value}`;
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+
+  return div.innerHTML;
+}
+
 function render() {
   const experiments = system.facts.experiments as Experiment[];
   const assignments = system.facts.assignments as Record<string, string>;
   const exposures = system.facts.exposures as Record<string, number>;
   const assignedCount = system.read("assignedCount") as number;
   const exposedCount = system.read("exposedCount") as number;
+  const activeExperiments = system.read("activeExperiments") as Experiment[];
 
+  // --- Stats ---
   experimentCountEl.textContent = String(experiments.length);
   assignedCountEl.textContent = String(assignedCount);
   exposedCountEl.textContent = String(exposedCount);
   userIdEl.textContent = system.facts.userId;
 
   pauseBtn.textContent = system.facts.paused ? "Resume All" : "Pause All";
-  pauseBtn.className = system.facts.paused ? "" : "primary";
+  pauseBtn.className = system.facts.paused ? "ab-btn" : "ab-btn primary";
 
+  // --- Experiment cards ---
   experimentsEl.innerHTML = "";
   for (const exp of experiments) {
     const div = document.createElement("div");
@@ -302,12 +357,12 @@ function render() {
     const exposed = exposures[exp.id];
 
     div.innerHTML = `
-      <div class="experiment-name">${exp.name}</div>
+      <div class="experiment-name">${escapeHtml(exp.name)}</div>
       <div class="experiment-meta">
-        ID: ${exp.id} &nbsp;|&nbsp;
+        ID: ${escapeHtml(exp.id)} &nbsp;|&nbsp;
         Status: ${exp.active ? (system.facts.paused ? "Paused" : "Active") : "Inactive"} &nbsp;|&nbsp;
-        Assigned: ${assigned ?? "–"} &nbsp;|&nbsp;
-        Exposed: ${exposed ? new Date(exposed).toLocaleTimeString() : "–"}
+        Assigned: ${assigned ?? "\u2013"} &nbsp;|&nbsp;
+        Exposed: ${exposed ? new Date(exposed).toLocaleTimeString() : "\u2013"}
       </div>
       <div class="experiment-variants"></div>
     `;
@@ -329,9 +384,53 @@ function render() {
 
     experimentsEl.appendChild(div);
   }
+
+  // --- Inspector: Facts ---
+  factUserId.textContent = system.facts.userId;
+  renderBoolIndicator(factPaused, system.facts.paused as boolean);
+  factExperiments.textContent = `${experiments.length} experiments`;
+  const assignKeys = Object.keys(assignments);
+  factAssignments.textContent = assignKeys.length > 0
+    ? assignKeys.map((k) => `${k}: ${assignments[k]}`).join(", ")
+    : "{}";
+  factExposures.textContent = `${Object.keys(exposures).length} tracked`;
+
+  // --- Inspector: Derivations ---
+  derivActive.textContent = `${activeExperiments.length} active`;
+  derivAssigned.textContent = String(assignedCount);
+  derivExposed.textContent = String(exposedCount);
+
+  // --- Timeline ---
+  if (timeline.length === 0) {
+    timelineEl.innerHTML = '<div class="ab-timeline-empty">Events appear after interactions</div>';
+  } else {
+    timelineEl.innerHTML = "";
+    for (const entry of timeline) {
+      const el = document.createElement("div");
+      el.className = `ab-timeline-entry ${entry.type}`;
+
+      const time = new Date(entry.time);
+      const timeStr = time.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      el.innerHTML = `
+        <span class="ab-timeline-time">${timeStr}</span>
+        <span class="ab-timeline-event">${escapeHtml(entry.event)}</span>
+        <span class="ab-timeline-detail">${escapeHtml(entry.detail)}</span>
+      `;
+
+      timelineEl.appendChild(el);
+    }
+  }
 }
 
-// Subscribe to all changes
+// ============================================================================
+// Subscribe
+// ============================================================================
+
 system.subscribe(
   [
     "experiments",
@@ -359,7 +458,7 @@ pauseBtn.addEventListener("click", () => {
 
 resetBtn.addEventListener("click", () => {
   system.events.reset();
-  logEl.innerHTML = "";
+  timeline.length = 0;
   log("event", "Reset all assignments and exposures");
 });
 

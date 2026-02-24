@@ -1,11 +1,11 @@
 ---
 title: DevTools
-description: Real-time visual debugging with 8 specialized views connected via WebSocket.
+description: Real-time visual debugging for AI agent orchestration via WebSocket or SSE transport.
 ---
 
-A standalone DevTools UI with 8 views for debugging agent orchestration in real time. {% .lead %}
+A transport-agnostic debugging interface for agent orchestration with 3 active views and 5 more planned. {% .lead %}
 
-The DevTools package (`@directive-run/devtools`) connects to a WebSocket server that bridges your orchestrator's timeline, health, breakpoints, and state into a visual debugging interface.
+The DevTools server (`@directive-run/ai`) bridges your orchestrator's timeline, health, breakpoints, and state into a visual debugging interface via WebSocket, SSE, or any custom transport.
 
 {% devtools-demo /%}
 
@@ -68,6 +68,10 @@ const server = createDevToolsServer({
 
 The DevTools UI has 8 specialized views, accessible as tabs. A time format selector (ms / elapsed / clock) applies across all views.
 
+{% callout type="warning" title="Implementation status" %}
+3 of 8 views are currently implemented (Timeline, Cost, State). The remaining 5 are planned — see the [Roadmap](#roadmap) section below.
+{% /callout %}
+
 ### 1. Timeline
 
 Horizontal lanes per agent with bar-per-event rendering and row packing to prevent overlap.
@@ -91,7 +95,31 @@ Horizontal lanes per agent with bar-per-event rendering and row packing to preve
 - Live token streaming panel &ndash; per-agent token preview (up to 500 chars) with count
 - Pause/resume button with pending event count badge
 
-### 2. Flamechart
+### 2. Cost
+
+Token usage and estimated cost breakdown.
+
+- Total tokens and estimated cost ($0.01/1K tokens)
+- Stacked bar chart per agent with hover tooltips (golden-angle hue for unlimited agents)
+- Cost breakdown table: Agent, Runs, Total Tokens, Avg Tokens, Duration, % of Total
+- Sorted by highest token usage
+
+### 3. State
+
+Two sub-tabs with key count badges: **Scratchpad** and **Derived**.
+
+- Key-value display with syntax highlighting and search/filter
+- Live updates as values change
+- Refresh button with 600ms debounce feedback
+- "Edit & Fork" button &ndash; modify state values and fork the timeline from that point
+
+---
+
+## Roadmap
+
+These views are planned for future releases. The server protocol and data structures are in place — the rendering is not yet built.
+
+### Flamechart
 
 Hierarchical flame graph visualization. Pairs start/end events into nested bars at three depth levels: Patterns &rarr; Agents &rarr; Resolvers.
 
@@ -103,7 +131,7 @@ Hierarchical flame graph visualization. Pairs start/end events into nested bars 
 - Point events (0ms) shown as thin vertical lines
 - Unclosed spans marked "(running)"
 
-### 3. DAG
+### DAG
 
 Directed acyclic graph using React Flow.
 
@@ -111,7 +139,7 @@ Directed acyclic graph using React Flow.
 - Click nodes for detail panel (status, tokens, run count)
 - Cycle detection with visual indication
 
-### 4. Health
+### Health
 
 Agent health monitoring cards.
 
@@ -123,16 +151,7 @@ Agent health monitoring cards.
 - Token usage chart
 - Reroute event log
 
-### 5. Cost
-
-Token usage and estimated cost breakdown.
-
-- Total tokens and estimated cost ($0.01/1K tokens)
-- Stacked bar chart per agent with hover tooltips (golden-angle hue for unlimited agents)
-- Cost breakdown table: Agent, Runs, Total Tokens, Avg Tokens, Duration, % of Total
-- Sorted by highest token usage
-
-### 6. Breakpoints
+### Breakpoints
 
 Interactive breakpoint management.
 
@@ -141,16 +160,7 @@ Interactive breakpoint management.
 - "Resume All" button
 - Resolved/cancelled history
 
-### 7. State
-
-Two sub-tabs with key count badges: **Scratchpad** and **Derived**.
-
-- Key-value display with syntax highlighting and search/filter
-- Live updates as values change
-- Refresh button with 600ms debounce feedback
-- "Edit & Fork" button &ndash; modify state values and fork the timeline from that point
-
-### 8. Compare
+### Compare
 
 Side-by-side comparison of saved session runs.
 
@@ -264,6 +274,7 @@ The DevTools UI recognizes 25 event types grouped by category:
 | **Governance** | `guardrail_check`, `approval_request`, `approval_response`, `breakpoint_hit`, `breakpoint_resumed` |
 | **Patterns** | `pattern_start`, `pattern_complete`, `race_start`, `race_winner`, `race_cancelled`, `debate_round`, `reflection_iteration` |
 | **State** | `derivation_update`, `scratchpad_update` |
+| **Checkpoints** | `checkpoint_save`, `checkpoint_restore` |
 | **Infrastructure** | `handoff_start`, `handoff_complete`, `reroute`, `dag_node_update` |
 
 ---

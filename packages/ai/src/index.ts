@@ -124,6 +124,22 @@ export type {
   RaceWinnerEvent,
   RaceCancelledEvent,
   DebateRoundEvent,
+  // Checkpoint state types
+  PatternCheckpointConfig,
+  CheckpointContext,
+  PatternCheckpointBase,
+  SequentialCheckpointState,
+  SupervisorCheckpointState,
+  ReflectCheckpointState,
+  DebateCheckpointState,
+  DagCheckpointState,
+  PatternCheckpointState,
+  CheckpointProgress,
+  CheckpointDiff,
+  CheckpointSaveEvent,
+  CheckpointRestoreEvent,
+  ConvergeCheckpointConfig,
+  ConvergeCheckpointState,
 } from "./types.js";
 
 export { GuardrailError, isGuardrailError } from "./types.js";
@@ -244,6 +260,10 @@ export {
   reflect,
   race,
   debate,
+  converge,
+  allReadyStrategy,
+  highestImpactStrategy,
+  costEfficientStrategy,
   runDebate,
   selectAgent,
   runAgentRequirement,
@@ -259,6 +279,10 @@ export {
   spawnPool,
   patternToJSON,
   patternFromJSON,
+  getPatternStep,
+  getCheckpointProgress,
+  diffCheckpoints,
+  forkFromCheckpoint,
   type MultiAgentOrchestrator,
   type MultiAgentOrchestratorOptions,
   type MultiAgentState,
@@ -276,10 +300,21 @@ export {
   type DebateConfig,
   type DebateResult,
   type DebatePattern,
+  type ConvergePattern,
+  type ConvergeNode,
+  type ConvergeResult,
+  type ConvergeStepMetrics,
+  type ConvergeMetrics,
+  type AgentSelectionStrategy,
+  type RelaxationTier,
+  type RelaxationStrategy,
+  type RelaxationRecord,
+  type RelaxationContext,
   type SpawnOnConditionOptions,
   type SpawnPoolConfig,
   type SerializedPattern,
   type SerializedDagNode,
+  type SerializedConvergeNode,
   type HandoffRequest,
   type HandoffResult,
   type RunAgentRequirement,
@@ -360,6 +395,7 @@ export {
   createAgentAuditHandlers,
   type AuditPluginConfig,
   type AuditInstance,
+  type AuditEventType,
 } from "./plugins/audit.js";
 
 // Prompt Injection Guardrails
@@ -588,21 +624,18 @@ export {
   type ReflectionEvaluator,
 } from "./reflection.js";
 
-// Goal-Driven Coordination
+// Convergence Utilities (standalone plan, validate, dependency graph)
 export {
-  createGoalEngine,
-  buildDependencyGraph,
-  type GoalAgentDeclaration,
-  type GoalDefinition,
-  type ConvergenceResult,
-  type DependencyEdge,
-  type DependencyGraph,
-  type GoalEngineConfig,
-  type GoalEngine,
-  type GoalValidationResult,
-  type PlanStep,
-  type ExecutionPlan,
-} from "./goals.js";
+  planConvergence,
+  validateConvergence,
+  getDependencyGraph,
+  type ConvergeAgentDeclaration,
+  type ConvergeDependencyEdge,
+  type ConvergeDependencyGraph,
+  type ConvergeValidationResult,
+  type ConvergePlanStep,
+  type ConvergenceExecutionPlan,
+} from "./converge-utils.js";
 
 // MCP (Model Context Protocol)
 export {

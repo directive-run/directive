@@ -374,7 +374,7 @@ export function updateTimeline(
 	refs: PanelRefs,
 	timeline: TimelineState,
 ) {
-	const entries = timeline.entries;
+	const entries = timeline.entries.toArray();
 	if (entries.length === 0) {
 		return;
 	}

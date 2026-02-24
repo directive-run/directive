@@ -1,15 +1,8 @@
 /**
- * Contact Form - Vanilla Directive Example
+ * Contact Form — DOM Rendering & System Wiring
  *
- * Demonstrates all six primitives:
- * - Facts: form field values, touched state, status
- * - Derivations: per-field validation, isValid, canSubmit, charCount
- * - Events: updateField, touchField, submit, reset
- * - Constraints: submitForm (status === 'submitting'), resetAfterSuccess
- * - Resolvers: simulated async submit, auto-reset after delay
- * - Effects: logging status transitions
- *
- * Uses a simulated setTimeout instead of Formspree so no account is needed.
+ * Creates the Directive system, subscribes to state changes,
+ * renders the form, state inspector, and event timeline.
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
@@ -20,6 +13,44 @@ import { createModule, createSystem, t, type ModuleSchema } from "@directive-run
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RATE_LIMIT_MS = 10_000; // 10 seconds (shorter for demo)
+
+// ============================================================================
+// Timeline
+// ============================================================================
+
+interface TimelineEntry {
+  time: number;
+  event: string;
+  detail: string;
+  type: string;
+}
+
+const timeline: TimelineEntry[] = [];
+
+function addTimelineEntry(event: string, detail: string, type: string) {
+  timeline.unshift({ time: Date.now(), event, detail, type });
+}
+
+function log(msg: string) {
+  console.log(`[contact-form] ${msg}`);
+
+  // Classify and add to timeline
+  if (msg.startsWith("Sending:")) {
+    addTimelineEntry("submit", msg.replace("Sending: ", ""), "submit");
+  } else if (msg.includes("succeeded")) {
+    addTimelineEntry("success", msg, "submit");
+  } else if (msg.includes("failed")) {
+    addTimelineEntry("error", msg, "error");
+  } else if (msg.startsWith("Status:")) {
+    addTimelineEntry("status", msg.replace("Status: ", ""), "field");
+  } else if (msg.includes("Auto-resetting")) {
+    addTimelineEntry("auto-reset", msg, "reset");
+  } else if (msg === "Form reset") {
+    addTimelineEntry("reset", "Form cleared", "reset");
+  } else if (msg.includes("ready")) {
+    addTimelineEntry("init", msg, "field");
+  }
+}
 
 // ============================================================================
 // Schema
@@ -198,7 +229,6 @@ const contactForm = createModule("contact-form", {
   },
 
   resolvers: {
-    // Simulated submission — no Formspree account needed
     sendMessage: {
       requirement: "SEND_MESSAGE",
       resolve: async (req, context) => {
@@ -206,10 +236,8 @@ const contactForm = createModule("contact-form", {
           `Sending: ${context.facts.name} <${context.facts.email}> [${context.facts.subject}]`,
         );
 
-        // Simulate network delay
         await new Promise((resolve) => setTimeout(resolve, 1500));
 
-        // Simulate occasional failure (20% chance)
         if (Math.random() < 0.2) {
           context.facts.status = "error";
           context.facts.errorMessage =
@@ -269,22 +297,10 @@ const system = createSystem({ module: contactForm });
 system.start();
 
 // ============================================================================
-// Logging helper
+// DOM References
 // ============================================================================
 
-const logEl = document.getElementById("log")!;
-function log(msg: string) {
-  console.log(`[contact-form] ${msg}`);
-  const line = document.createElement("div");
-  line.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-  logEl.appendChild(line);
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-// ============================================================================
-// DOM Bindings
-// ============================================================================
-
+// Form inputs
 const nameInput = document.getElementById("name") as HTMLInputElement;
 const emailInput = document.getElementById("email") as HTMLInputElement;
 const subjectInput = document.getElementById("subject") as HTMLSelectElement;
@@ -298,7 +314,30 @@ const subjectErrorEl = document.getElementById("subject-error")!;
 const messageErrorEl = document.getElementById("message-error")!;
 const charCountEl = document.getElementById("char-count")!;
 
-// Input handlers
+// Inspector
+const factName = document.getElementById("cf-fact-name")!;
+const factEmail = document.getElementById("cf-fact-email")!;
+const factSubject = document.getElementById("cf-fact-subject")!;
+const factMessage = document.getElementById("cf-fact-message")!;
+const factStatus = document.getElementById("cf-fact-status")!;
+const factTouched = document.getElementById("cf-fact-touched")!;
+const factSubmissions = document.getElementById("cf-fact-submissions")!;
+const factLastSubmit = document.getElementById("cf-fact-lastsubmit")!;
+const derivIsValid = document.getElementById("cf-deriv-isvalid")!;
+const derivCanSubmit = document.getElementById("cf-deriv-cansubmit")!;
+const derivNameError = document.getElementById("cf-deriv-nameerror")!;
+const derivEmailError = document.getElementById("cf-deriv-emailerror")!;
+const derivSubjectError = document.getElementById("cf-deriv-subjecterror")!;
+const derivMessageError = document.getElementById("cf-deriv-messageerror")!;
+const derivCharCount = document.getElementById("cf-deriv-charcount")!;
+
+// Timeline
+const timelineEl = document.getElementById("cf-timeline")!;
+
+// ============================================================================
+// Input Handlers
+// ============================================================================
+
 for (const [el, field] of [
   [nameInput, "name"],
   [emailInput, "email"],
@@ -307,6 +346,7 @@ for (const [el, field] of [
 ] as const) {
   el.addEventListener("input", () => {
     system.events.updateField({ field, value: el.value });
+    addTimelineEntry("field", `${field} updated`, "field");
   });
   el.addEventListener("blur", () => {
     system.events.touchField({ field });
@@ -319,11 +359,24 @@ submitBtn.addEventListener("click", () => {
 
 clearBtn.addEventListener("click", () => {
   system.events.reset({});
+  addTimelineEntry("clear", "Form cleared", "reset");
 });
 
 // ============================================================================
 // Render
 // ============================================================================
+
+function renderBoolIndicator(el: HTMLElement, value: boolean): void {
+  const cls = value ? "true" : "false";
+  el.innerHTML = `<span class="cf-deriv-indicator ${cls}"></span> ${value}`;
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+
+  return div.innerHTML;
+}
 
 function render() {
   // Sync input values (for reset)
@@ -339,7 +392,9 @@ function render() {
   const messageError = system.read("messageError") as string;
   const charCount = system.read("messageCharCount") as number;
   const canSubmit = system.read("canSubmit") as boolean;
+  const isValid = system.read("isValid") as boolean;
 
+  // Form errors
   nameErrorEl.textContent = nameError;
   emailErrorEl.textContent = emailError;
   subjectErrorEl.textContent = subjectError;
@@ -348,23 +403,71 @@ function render() {
 
   submitBtn.disabled = !canSubmit;
 
-  const status = system.facts.status;
+  const status = system.facts.status as string;
   if (status === "submitting") {
     submitBtn.textContent = "Sending...";
-    statusBanner.className = "status-banner status-submitting";
+    statusBanner.className = "cf-status-banner visible submitting";
     statusBanner.textContent = "Submitting your message...";
   } else if (status === "success") {
     submitBtn.textContent = "Send Message";
-    statusBanner.className = "status-banner status-success";
+    statusBanner.className = "cf-status-banner visible success";
     statusBanner.textContent = "Message sent! Form will reset shortly.";
   } else if (status === "error") {
     submitBtn.textContent = "Send Message";
-    statusBanner.className = "status-banner status-error";
+    statusBanner.className = "cf-status-banner visible error";
     statusBanner.textContent = system.facts.errorMessage;
   } else {
     submitBtn.textContent = "Send Message";
-    statusBanner.className = "status-banner hidden";
+    statusBanner.className = "cf-status-banner";
     statusBanner.textContent = "";
+  }
+
+  // --- Inspector: Facts ---
+  factName.textContent = system.facts.name || "\u2014";
+  factEmail.textContent = system.facts.email || "\u2014";
+  factSubject.textContent = system.facts.subject || "\u2014";
+  const msg = system.facts.message as string;
+  factMessage.textContent = msg ? (msg.length > 30 ? msg.slice(0, 30) + "\u2026" : msg) : "\u2014";
+  factStatus.innerHTML = `<span class="cf-status-badge ${status}">${escapeHtml(status)}</span>`;
+  const touched = system.facts.touched as Record<string, boolean>;
+  factTouched.textContent = `${Object.keys(touched).length} fields`;
+  factSubmissions.textContent = String(system.facts.submissionCount);
+  const lastAt = system.facts.lastSubmittedAt as number;
+  factLastSubmit.textContent = lastAt > 0 ? new Date(lastAt).toLocaleTimeString() : "\u2014";
+
+  // --- Inspector: Derivations ---
+  renderBoolIndicator(derivIsValid, isValid);
+  renderBoolIndicator(derivCanSubmit, canSubmit);
+  derivNameError.textContent = nameError || "\u2014";
+  derivEmailError.textContent = emailError || "\u2014";
+  derivSubjectError.textContent = subjectError || "\u2014";
+  derivMessageError.textContent = messageError || "\u2014";
+  derivCharCount.textContent = String(charCount);
+
+  // --- Timeline ---
+  if (timeline.length === 0) {
+    timelineEl.innerHTML = '<div class="cf-timeline-empty">Events appear after interactions</div>';
+  } else {
+    timelineEl.innerHTML = "";
+    for (const entry of timeline) {
+      const el = document.createElement("div");
+      el.className = `cf-timeline-entry ${entry.type}`;
+
+      const time = new Date(entry.time);
+      const timeStr = time.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      el.innerHTML = `
+        <span class="cf-timeline-time">${timeStr}</span>
+        <span class="cf-timeline-event">${escapeHtml(entry.event)}</span>
+        <span class="cf-timeline-detail">${escapeHtml(entry.detail)}</span>
+      `;
+
+      timelineEl.appendChild(el);
+    }
   }
 }
 

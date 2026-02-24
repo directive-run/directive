@@ -111,10 +111,21 @@ declare global {
 /** Safe check for dev mode. Returns false when process is unavailable. */
 export function isDevMode(): boolean {
 	try {
-		return typeof process !== "undefined" && process.env?.NODE_ENV !== "production";
+		if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") {
+			return false;
+		}
 	} catch {
-		return false;
+		// process not available
 	}
+	try {
+		// @ts-expect-error — import.meta.env is Vite-specific
+		if (typeof import.meta !== "undefined" && import.meta.env?.MODE === "production") {
+			return false;
+		}
+	} catch {
+		// import.meta.env not available
+	}
+	return true;
 }
 
 export function formatValue(value: unknown): string {
@@ -168,8 +179,8 @@ export function safeInspect(system: System<ModuleSchema>) {
 	}
 }
 
-/** E15: Deep-clone event data to prevent reference sharing */
-export function structuredCloneData(data: unknown): unknown {
+/** E15: Deep-clone event data via JSON round-trip to prevent reference sharing */
+export function cloneViaJSON(data: unknown): unknown {
 	try {
 		if (data === null || data === undefined || typeof data !== "object") {
 			return data;
@@ -187,6 +198,10 @@ export function validateMaxEvents(value: number | undefined): number {
 		return 1000;
 	}
 	if (!Number.isFinite(value) || value < 1) {
+		if (isDevMode()) {
+			console.warn(`[directive:devtools] Invalid maxEvents value (${value}), using default 1000`);
+		}
+
 		return 1000;
 	}
 
@@ -236,14 +251,14 @@ export interface TimelineEntry {
 }
 
 export interface TimelineState {
-	entries: TimelineEntry[];
+	entries: CircularBuffer<TimelineEntry>;
 	/** Map of resolver → startMs for inflight resolvers */
 	inflight: Map<string, number>;
 }
 
 export function createTimelineState(): TimelineState {
 	return {
-		entries: [],
+		entries: new CircularBuffer<TimelineEntry>(MAX_TIMELINE_ENTRIES),
 		inflight: new Map(),
 	};
 }
@@ -305,6 +320,7 @@ export function createRecordingState(): RecordingState {
 // ============================================================================
 
 export const MAX_PANEL_EVENTS = 50;
+export const MAX_RESOLVER_STATS = 200;
 
 // Style constants — WCAG AA contrast ratios verified against #1a1a2e bg
 export const S = {
@@ -329,7 +345,7 @@ export const FLOW = {
 	startY: 16,
 	columns: 5, // facts, derivations, constraints, requirements, resolvers
 	colGap: 20,
-	fontSize: 8,
+	fontSize: 10,
 	labelMaxChars: 11,
 } as const;
 

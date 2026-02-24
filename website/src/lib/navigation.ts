@@ -201,7 +201,6 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Communication', href: '/ai/communication' },
       { title: 'Cross-Agent State', href: '/ai/cross-agent-state' },
       { title: 'Self-Healing', href: '/ai/self-healing' },
-      { title: 'Goal Engine', href: '/ai/goals' },
     ],
   },
   {
@@ -217,6 +216,7 @@ export const aiNavigation: NavigationSection[] = [
     title: 'Observability',
     links: [
       { title: 'Debug Timeline', href: '/ai/debug-timeline' },
+      { title: 'Pattern Checkpoints', href: '/ai/checkpoints' },
       { title: 'Breakpoints & Checkpoints', href: '/ai/breakpoints' },
       { title: 'DevTools', href: '/ai/devtools' },
       { title: 'DevTools Live', href: '/devtools' },

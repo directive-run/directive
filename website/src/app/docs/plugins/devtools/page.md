@@ -388,7 +388,7 @@ The floating panel is framework-agnostic (vanilla DOM), so it works the same way
 
 For richer debugging beyond the console and floating panel:
 
-- **[AI DevTools](/ai/devtools)** — 8-view visual debugger for multi-agent orchestration (Timeline, Flamechart, DAG, Health, Cost, Breakpoints, State, Compare). Connects via WebSocket.
+- **[AI DevTools](/ai/devtools)** — Visual debugger for multi-agent orchestration with Timeline, Cost, and State views. Connects via WebSocket or SSE transport.
 - **[DevTools Live](/devtools)** — Try the visual debugger in your browser right now — no installation required.
 
 ---

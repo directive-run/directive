@@ -407,7 +407,7 @@ export function patternToMermaid(
   }
 
   const preamble = buildPreamble(direction, options?.theme);
-  let body: string[];
+  let body: string[] = [];
 
   switch (serialized.type) {
     case "parallel":

@@ -4,7 +4,7 @@ import {
 	formatValue,
 	truncate,
 	validateMaxEvents,
-	structuredCloneData,
+	cloneViaJSON,
 	isDevMode,
 	createPerfMetrics,
 	createDepGraph,
@@ -207,21 +207,21 @@ describe("validateMaxEvents", () => {
 });
 
 // ============================================================================
-// structuredCloneData
+// cloneViaJSON
 // ============================================================================
 
-describe("structuredCloneData", () => {
+describe("cloneViaJSON", () => {
 	it("returns primitives unchanged", () => {
-		expect(structuredCloneData(null)).toBeNull();
-		expect(structuredCloneData(undefined)).toBeUndefined();
-		expect(structuredCloneData(42)).toBe(42);
-		expect(structuredCloneData("hello")).toBe("hello");
-		expect(structuredCloneData(true)).toBe(true);
+		expect(cloneViaJSON(null)).toBeNull();
+		expect(cloneViaJSON(undefined)).toBeUndefined();
+		expect(cloneViaJSON(42)).toBe(42);
+		expect(cloneViaJSON("hello")).toBe("hello");
+		expect(cloneViaJSON(true)).toBe(true);
 	});
 
 	it("deep-clones objects", () => {
 		const original = { a: { b: 1 } };
-		const cloned = structuredCloneData(original) as typeof original;
+		const cloned = cloneViaJSON(original) as typeof original;
 		expect(cloned).toEqual({ a: { b: 1 } });
 		expect(cloned).not.toBe(original);
 		expect(cloned.a).not.toBe(original.a);
@@ -229,7 +229,7 @@ describe("structuredCloneData", () => {
 
 	it("deep-clones arrays", () => {
 		const original = [{ x: 1 }, { x: 2 }];
-		const cloned = structuredCloneData(original) as typeof original;
+		const cloned = cloneViaJSON(original) as typeof original;
 		expect(cloned).toEqual([{ x: 1 }, { x: 2 }]);
 		expect(cloned[0]).not.toBe(original[0]);
 	});
@@ -237,12 +237,12 @@ describe("structuredCloneData", () => {
 	it("returns null for circular references", () => {
 		const obj: Record<string, unknown> = {};
 		obj.self = obj;
-		expect(structuredCloneData(obj)).toBeNull();
+		expect(cloneViaJSON(obj)).toBeNull();
 	});
 
 	it("strips functions (via JSON serialization)", () => {
 		const obj = { a: 1, fn: () => {} };
-		const cloned = structuredCloneData(obj) as Record<string, unknown>;
+		const cloned = cloneViaJSON(obj) as Record<string, unknown>;
 		expect(cloned).toEqual({ a: 1 });
 		expect(cloned.fn).toBeUndefined();
 	});
@@ -282,7 +282,7 @@ describe("factory functions", () => {
 
 	it("createTimelineState returns empty state", () => {
 		const tl = createTimelineState();
-		expect(tl.entries).toEqual([]);
+		expect(tl.entries.toArray()).toEqual([]);
 		expect(tl.inflight.size).toBe(0);
 	});
 });
