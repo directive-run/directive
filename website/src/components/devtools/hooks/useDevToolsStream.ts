@@ -1,21 +1,24 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DebugEvent, ConnectionStatus } from '../types'
-import { MAX_EVENTS, RECONNECT_DELAY, MAX_RECONNECT_RETRIES, FLUSH_INTERVAL_MS } from '../constants'
-import { useDevToolsUrls } from '../DevToolsUrlContext'
+import { useCallback, useEffect, useRef } from 'react'
+import type { DebugEvent } from '../types'
+import { FLUSH_INTERVAL_MS } from '../constants'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 
+/**
+ * Thin EventSource bridge — all state lives in the Directive system.
+ *
+ * Creates/closes EventSource, dispatches events into the system.
+ * Reconnection timing is handled by the connection module's
+ * reconnectNeeded constraint + reconnect resolver.
+ * Server reset is handled by the serverReset effect.
+ */
 export function useDevToolsStream() {
-  const { streamUrl } = useDevToolsUrls()
-  const [events, setEvents] = useState<DebugEvent[]>([])
-  const [status, setStatus] = useState<ConnectionStatus>('connecting')
-  const maxIdRef = useRef(-1)
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const system = useDevToolsSystem()
   const esRef = useRef<EventSource | null>(null)
+  const maxIdRef = useRef(-1)
   const pendingRef = useRef<DebugEvent[]>([])
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // M1: Track reconnect attempts to avoid infinite loop
-  const retryCountRef = useRef(0)
 
   const flushPending = useCallback(() => {
     flushTimerRef.current = null
@@ -24,36 +27,30 @@ export function useDevToolsStream() {
       return
     }
     pendingRef.current = []
-
-    setEvents((prev) => {
-      const next = [...prev, ...batch]
-      if (next.length > MAX_EVENTS) {
-        return next.slice(next.length - MAX_EVENTS)
-      }
-
-      return next
-    })
-  }, [])
+    system.events.connection.pushEvents({ batch })
+  }, [system])
 
   const connect = useCallback(() => {
     if (esRef.current) {
       esRef.current.close()
     }
 
-    setStatus('connecting')
+    const streamUrl = system.facts.connection.streamUrl
+    system.events.connection.connecting()
     const es = new EventSource(streamUrl)
     esRef.current = es
 
     es.onopen = () => {
-      setStatus('connected')
-      retryCountRef.current = 0 // Reset on successful connection
+      system.events.connection.connected()
     }
 
     es.onmessage = (msg) => {
       try {
         const event: DebugEvent = JSON.parse(msg.data)
         // Deduplicate on reconnect
-        if (event.id <= maxIdRef.current) return
+        if (event.id <= maxIdRef.current) {
+          return
+        }
         maxIdRef.current = event.id
 
         pendingRef.current.push(event)
@@ -71,57 +68,42 @@ export function useDevToolsStream() {
     es.onerror = () => {
       es.close()
       esRef.current = null
-      setStatus('disconnected')
-
-      // M1: Stop retrying after max attempts
-      if (retryCountRef.current >= MAX_RECONNECT_RETRIES) {
-        return
-      }
-
-      retryCountRef.current++
-      retryTimerRef.current = setTimeout(() => {
-        connect()
-      }, RECONNECT_DELAY)
+      system.events.connection.disconnected()
+      system.events.connection.incrementRetry()
+      // Reconnection delay is handled by the constraint + resolver
     }
-  }, [flushPending, streamUrl])
+  }, [system, flushPending])
 
-  // M1: Manual reconnect (exposed for "click to retry" after max retries)
-  const reconnect = useCallback(() => {
-    retryCountRef.current = 0
-    connect()
-  }, [connect])
+  // Watch connection.status — when resolver sets it to 'connecting', create new EventSource
+  useEffect(() => {
+    const unsub = system.watch('connection.status', (newStatus: unknown) => {
+      if (newStatus === 'connecting' && !esRef.current) {
+        connect()
+      }
+    })
 
+    return unsub
+  }, [system, connect])
+
+  // Initial connection
   useEffect(() => {
     connect()
 
     return () => {
       esRef.current?.close()
       esRef.current = null
-      if (retryTimerRef.current) {
-        clearTimeout(retryTimerRef.current)
-      }
       if (flushTimerRef.current) {
         clearTimeout(flushTimerRef.current)
       }
     }
   }, [connect])
 
-  const clear = useCallback(() => {
-    setEvents([])
-    maxIdRef.current = -1
-    pendingRef.current = []
-
-    // Also clear server-side timeline + memory
-    const resetUrl = streamUrl.replace(/\/stream$/, '/reset')
-    fetch(resetUrl, { method: 'POST' }).catch(() => {})
-  }, [streamUrl])
-
-  // Listen for imported events
+  // Listen for imported events (from file import)
   useEffect(() => {
     const handler = (e: Event) => {
       const imported = (e as CustomEvent).detail as DebugEvent[]
       if (Array.isArray(imported) && imported.length > 0) {
-        setEvents(imported)
+        system.events.connection.importEvents({ imported })
         maxIdRef.current = Math.max(...imported.map((ev) => ev.id))
       }
     }
@@ -129,9 +111,14 @@ export function useDevToolsStream() {
     window.addEventListener('devtools-import', handler)
 
     return () => window.removeEventListener('devtools-import', handler)
-  }, [])
+  }, [system])
 
-  const exhaustedRetries = retryCountRef.current >= MAX_RECONNECT_RETRIES && status === 'disconnected'
+  // M1: Manual reconnect (exposed for "click to retry" after max retries)
+  const reconnect = useCallback(() => {
+    system.events.connection.resetRetries()
+    maxIdRef.current = -1
+    connect()
+  }, [system, connect])
 
-  return { events, status, clear, reconnect, exhaustedRetries }
+  return { reconnect }
 }

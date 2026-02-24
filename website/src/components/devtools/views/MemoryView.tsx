@@ -1,15 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { usePolledSnapshot } from '../hooks/usePolledSnapshot'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
 import { Skeleton } from '../Skeleton'
 
-// C1: Uses shared usePolledSnapshot instead of independent fetch
 // M4: preview field still displayed — server-side sanitization handles redaction
 
 export function MemoryView() {
-  const { data, error } = usePolledSnapshot()
+  const system = useDevToolsSystem()
+  const data = useSelector(system, (s) => s.facts.snapshot.data)
+  const error = useSelector(system, (s) => s.facts.snapshot.error)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
 
   if (error) {

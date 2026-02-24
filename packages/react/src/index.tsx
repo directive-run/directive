@@ -44,6 +44,7 @@ import {
 import type {
 	ModuleSchema,
 	ModuleDef,
+	ModulesMap,
 	Plugin,
 	DebugConfig,
 	ErrorBoundaryConfig,
@@ -52,6 +53,7 @@ import type {
 	InferSelectorState,
 	InferEvents,
 	SingleModuleSystem,
+	NamespacedSystem,
 	SystemSnapshot,
 	DistributableSnapshot,
 	TimeTravelState,
@@ -363,6 +365,32 @@ export function useSelector<S extends ModuleSchema, R>(
 	equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
+// --- Namespaced system overloads ---
+
+// Namespaced system, no default
+export function useSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules>,
+	selector: (state: NamespacedSystem<Modules>) => R,
+): R;
+
+// Namespaced system, with default value and optional equality
+export function useSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules>,
+	selector: (state: NamespacedSystem<Modules>) => R,
+	defaultValue: R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
+// Nullable namespaced system, default REQUIRED
+export function useSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules> | null | undefined,
+	selector: (state: NamespacedSystem<Modules>) => R,
+	defaultValue: R,
+	equalityFn?: (a: R, b: R) => boolean,
+): R;
+
+// --- Generic fallbacks ---
+
 // Generic fallback: non-null system
 export function useSelector<R>(
 	// biome-ignore lint/suspicious/noExplicitAny: Generic fallback
@@ -384,13 +412,22 @@ export function useSelector<R>(
 ): R;
 
 export function useSelector(
-	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
-	system: SingleModuleSystem<any> | null | undefined,
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature accepts both system types
+	systemArg: SingleModuleSystem<any> | NamespacedSystem<any> | null | undefined,
 	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature
 	selector: (state: any) => unknown,
 	defaultValueArg?: unknown,
 	equalityFnArg?: (a: unknown, b: unknown) => boolean,
 ): unknown {
+	// Route to namespaced implementation if system is a NamespacedSystem
+	// biome-ignore lint/suspicious/noExplicitAny: Runtime type check
+	if (systemArg && (systemArg as any)._mode === "namespaced") {
+		// biome-ignore lint/suspicious/noExplicitAny: Delegate to namespaced impl
+		return _useNamespacedSelectorImpl(systemArg as NamespacedSystem<any>, selector, defaultValueArg, equalityFnArg);
+	}
+
+	// After the namespaced check, system is a SingleModuleSystem
+	const system = systemArg as SingleModuleSystem<any> | null | undefined;
 	let defaultValue: unknown;
 	let hasDefault = false;
 	const equalityFn: (a: unknown, b: unknown) => boolean = equalityFnArg ?? defaultEquality;
@@ -516,6 +553,70 @@ export function useSelector(
 
 		return effectiveValue;
 	}, [runWithTracking, system, hasDefault]);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+// ============================================================================
+// _useNamespacedSelectorImpl — internal namespaced useSelector
+// ============================================================================
+
+/**
+ * Internal implementation for useSelector with NamespacedSystem.
+ * Subscribes to all module namespaces and runs the selector against the system.
+ * Uses equality comparison to prevent unnecessary re-renders.
+ */
+function _useNamespacedSelectorImpl(
+	// biome-ignore lint/suspicious/noExplicitAny: Internal impl
+	system: NamespacedSystem<any>,
+	// biome-ignore lint/suspicious/noExplicitAny: Internal impl
+	selector: (state: any) => unknown,
+	defaultValueArg?: unknown,
+	equalityFnArg?: (a: unknown, b: unknown) => boolean,
+): unknown {
+	const hasDefault = defaultValueArg !== undefined;
+	const equalityFn = equalityFnArg ?? defaultEquality;
+
+	const selectorRef = useRef(selector);
+	const eqRef = useRef(equalityFn);
+	const defaultValueRef = useRef(defaultValueArg);
+	selectorRef.current = selector;
+	eqRef.current = equalityFn;
+	defaultValueRef.current = defaultValueArg;
+
+	const cachedValue = useRef<unknown>(UNINITIALIZED);
+
+	// Get all module namespace names for wildcard subscription
+	const moduleNames = useMemo(
+		() => Object.keys(system.facts),
+		[system],
+	);
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			// Subscribe to all modules using wildcard keys
+			const wildcardKeys = moduleNames.map((ns) => `${ns}.*`);
+
+			return system.subscribe(wildcardKeys, onStoreChange);
+		},
+		[system, moduleNames],
+	);
+
+	const getSnapshot = useCallback(() => {
+		const newValue = selectorRef.current(system);
+		const effectiveValue = newValue === undefined && hasDefault ? defaultValueRef.current : newValue;
+
+		if (
+			cachedValue.current !== UNINITIALIZED &&
+			eqRef.current(cachedValue.current, effectiveValue)
+		) {
+			return cachedValue.current;
+		}
+
+		cachedValue.current = effectiveValue;
+
+		return effectiveValue;
+	}, [system, hasDefault]);
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
@@ -1007,6 +1108,12 @@ export type UseDirectiveRefOptions<M extends ModuleSchema> =
 	| ModuleDef<M>
 	| (DirectiveRefBaseConfig & { module: ModuleDef<M> });
 
+/** Options for useDirectiveRef with namespaced modules */
+export type UseDirectiveRefNamespacedOptions<Modules extends ModulesMap> =
+	DirectiveRefBaseConfig & { modules: { [K in keyof Modules]: Modules[K] } };
+
+// --- Single-module overloads ---
+
 /** Without status (no config): returns system directly */
 export function useDirectiveRef<M extends ModuleSchema>(
 	options: UseDirectiveRefOptions<M>,
@@ -1024,46 +1131,84 @@ export function useDirectiveRef<M extends ModuleSchema>(
 	config: { status: true } & DirectiveRefBaseConfig,
 ): { system: SingleModuleSystem<M>; statusPlugin: StatusPlugin };
 
+// --- Namespaced (multi-module) overloads ---
+
+/** Namespaced: returns NamespacedSystem directly */
+export function useDirectiveRef<const Modules extends ModulesMap>(
+	options: UseDirectiveRefNamespacedOptions<Modules>,
+): NamespacedSystem<Modules>;
+
+/** Namespaced with config: returns NamespacedSystem directly */
+export function useDirectiveRef<const Modules extends ModulesMap>(
+	options: UseDirectiveRefNamespacedOptions<Modules>,
+	config: DirectiveRefBaseConfig,
+): NamespacedSystem<Modules>;
+
 /** Implementation */
-export function useDirectiveRef<M extends ModuleSchema>(
-	options: UseDirectiveRefOptions<M>,
+export function useDirectiveRef(
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation signature handles both modes
+	options: any,
 	config?: { status?: boolean } & DirectiveRefBaseConfig,
-): SingleModuleSystem<M> | { system: SingleModuleSystem<M>; statusPlugin: StatusPlugin } {
-	const systemRef = useRef<SingleModuleSystem<M> | null>(null);
+	// biome-ignore lint/suspicious/noExplicitAny: Implementation return varies by overload
+): any {
+	// biome-ignore lint/suspicious/noExplicitAny: System ref holds either system type
+	const systemRef = useRef<any>(null);
 	const statusPluginRef = useRef<StatusPlugin | null>(null);
 	const wantStatus = config?.status === true;
+	const isNamespaced = "modules" in options;
 
 	if (!systemRef.current) {
-		const isModule = "id" in options && "schema" in options;
-		const mod = isModule ? (options as ModuleDef<M>) : (options as { module: ModuleDef<M> }).module;
-		const baseOpts = isModule ? {} : (options as DirectiveRefBaseConfig);
-		// Merge config-level options over options-level (config takes precedence)
-		const plugins = config?.plugins ?? baseOpts.plugins ?? [];
-		const debug = config?.debug ?? baseOpts.debug;
-		const errorBoundary = config?.errorBoundary ?? baseOpts.errorBoundary;
-		const tickMs = config?.tickMs ?? baseOpts.tickMs;
-		const zeroConfig = config?.zeroConfig ?? baseOpts.zeroConfig;
-		const initialFacts = config?.initialFacts ?? baseOpts.initialFacts;
+		if (isNamespaced) {
+			// --- Namespaced mode: { modules: { ... } } ---
+			const { modules, ...rest } = options;
+			const plugins = config?.plugins ?? rest.plugins ?? [];
+			const debug = config?.debug ?? rest.debug;
+			const errorBoundary = config?.errorBoundary ?? rest.errorBoundary;
+			const tickMs = config?.tickMs ?? rest.tickMs;
+			const zeroConfig = config?.zeroConfig ?? rest.zeroConfig;
+			const initialFacts = config?.initialFacts ?? rest.initialFacts;
 
-		let allPlugins = [...plugins];
+			systemRef.current = createSystem({
+				modules,
+				plugins: plugins.length > 0 ? plugins : undefined,
+				debug,
+				errorBoundary,
+				tickMs,
+				zeroConfig,
+				initialFacts,
+				// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+			} as any);
+		} else {
+			// --- Single-module mode ---
+			const isModule = "id" in options && "schema" in options;
+			const mod = isModule ? options : options.module;
+			const baseOpts = isModule ? {} : (options as DirectiveRefBaseConfig);
+			const plugins = config?.plugins ?? baseOpts.plugins ?? [];
+			const debug = config?.debug ?? baseOpts.debug;
+			const errorBoundary = config?.errorBoundary ?? baseOpts.errorBoundary;
+			const tickMs = config?.tickMs ?? baseOpts.tickMs;
+			const zeroConfig = config?.zeroConfig ?? baseOpts.zeroConfig;
+			const initialFacts = config?.initialFacts ?? baseOpts.initialFacts;
 
-		if (wantStatus) {
-			statusPluginRef.current = createRequirementStatusPlugin();
-			// biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
-			allPlugins = [...allPlugins, statusPluginRef.current.plugin as Plugin<any>];
+			let allPlugins = [...plugins];
+
+			if (wantStatus) {
+				statusPluginRef.current = createRequirementStatusPlugin();
+				// biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
+				allPlugins = [...allPlugins, statusPluginRef.current.plugin as Plugin<any>];
+			}
+
+			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+			systemRef.current = createSystem({
+				module: mod,
+				plugins: allPlugins.length > 0 ? allPlugins : undefined,
+				debug,
+				errorBoundary,
+				tickMs,
+				zeroConfig,
+				initialFacts,
+			} as any);
 		}
-
-		// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-		systemRef.current = createSystem({
-			module: mod,
-			plugins: allPlugins.length > 0 ? allPlugins : undefined,
-			debug,
-			errorBoundary,
-			tickMs,
-			zeroConfig,
-			initialFacts,
-		} as any) as unknown as SingleModuleSystem<M>;
-
 	}
 
 	useEffect(() => {
@@ -1076,7 +1221,7 @@ export function useDirectiveRef<M extends ModuleSchema>(
 		};
 	}, []);
 
-	if (wantStatus) {
+	if (wantStatus && !isNamespaced) {
 		return {
 			system: systemRef.current!,
 			statusPlugin: statusPluginRef.current!,
@@ -1084,6 +1229,48 @@ export function useDirectiveRef<M extends ModuleSchema>(
 	}
 
 	return systemRef.current!;
+}
+
+// ============================================================================
+// useNamespacedSelector — select from a NamespacedSystem with useSyncExternalStore
+// ============================================================================
+
+/**
+ * React hook to select derived values from a NamespacedSystem.
+ * Uses useSyncExternalStore for tear-free reads.
+ *
+ * @param system - The namespaced system to read from
+ * @param keys - Namespaced keys to subscribe to (e.g., ["auth.token", "data.count"])
+ * @param selector - Function that reads from system.facts / system.derive
+ *
+ * @example
+ * ```tsx
+ * const system = useDirectiveRef({ modules: { auth, data } });
+ * const token = useNamespacedSelector(system, ["auth.token"], (s) => s.facts.auth.token);
+ * const count = useNamespacedSelector(system, ["data.*"], (s) => s.derive.data.total);
+ * ```
+ */
+export function useNamespacedSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules>,
+	keys: string[],
+	selector: (system: NamespacedSystem<Modules>) => R,
+): R {
+	const keysRef = useRef(keys);
+	keysRef.current = keys;
+	const selectorRef = useRef(selector);
+	selectorRef.current = selector;
+
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => system.subscribe(keysRef.current, onStoreChange),
+		[system],
+	);
+
+	const getSnapshot = useCallback(
+		() => selectorRef.current(system),
+		[system],
+	);
+
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 // ============================================================================

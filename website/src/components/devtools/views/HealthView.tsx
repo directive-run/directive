@@ -1,13 +1,14 @@
 'use client'
 
-import { usePolledSnapshot } from '../hooks/usePolledSnapshot'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
 import { Skeleton } from '../Skeleton'
 
-// C1: Uses shared usePolledSnapshot instead of independent fetch
-
 export function HealthView() {
-  const { data, error } = usePolledSnapshot()
+  const system = useDevToolsSystem()
+  const data = useSelector(system, (s) => s.facts.snapshot.data)
+  const error = useSelector(system, (s) => s.facts.snapshot.error)
 
   if (error) {
     return <EmptyState message={error} />

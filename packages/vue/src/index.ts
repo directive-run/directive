@@ -19,6 +19,7 @@ import {
 import type {
 	ModuleSchema,
 	ModuleDef,
+	ModulesMap,
 	Plugin,
 	DebugConfig,
 	ErrorBoundaryConfig,
@@ -27,6 +28,7 @@ import type {
 	InferSelectorState,
 	InferEvents,
 	SingleModuleSystem,
+	NamespacedSystem,
 	SystemSnapshot,
 } from "@directive-run/core";
 import {
@@ -708,4 +710,36 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 			// biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
 			useWatch(system as SingleModuleSystem<any>, key, callback),
 	};
+}
+
+// ============================================================================
+// useNamespacedSelector — select from a NamespacedSystem
+// ============================================================================
+
+/**
+ * Reactive composable to select from a NamespacedSystem.
+ * Subscribes to specified keys and returns a Vue ref.
+ *
+ * @param system - The namespaced system
+ * @param keys - Namespaced keys to subscribe to (e.g., ["auth.token", "data.count"])
+ * @param selector - Function that reads from system.facts / system.derive
+ *
+ * @example
+ * ```vue
+ * const system = useDirectiveRef({ modules: { auth, data } });
+ * const token = useNamespacedSelector(system, ["auth.token"], (s) => s.facts.auth.token);
+ * ```
+ */
+export function useNamespacedSelector<Modules extends ModulesMap, R>(
+	system: NamespacedSystem<Modules>,
+	keys: string[],
+	selector: (system: NamespacedSystem<Modules>) => R,
+): Ref<R> {
+	const value = ref(selector(system)) as Ref<R>;
+	const unsubscribe = system.subscribe(keys, () => {
+		value.value = selector(system) as R;
+	});
+	onScopeDispose(unsubscribe);
+
+	return value;
 }

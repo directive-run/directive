@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react'
 import type { DebugEvent } from '../types'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { FLAMECHART_COLORS } from '../constants'
 import { EmptyState } from '../EmptyState'
 
@@ -16,7 +18,9 @@ interface Span {
   modelId: string | null
 }
 
-export function FlamechartView({ events }: { events: DebugEvent[] }) {
+export function FlamechartView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   // C3: Memoize span building, sorting, and row assignment
   const { spans, agentIds, colorMap, rows, totalDuration, range, baseTs } = useMemo(() => {
     if (events.length === 0) {

@@ -22,6 +22,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import getStroke from 'perfect-freehand'
 import { useDirectiveRef, useSelector, useEvents } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import type { DebugEvent } from '../types'
 import { EmptyState } from '../EmptyState'
 import { getDefaultPricing, formatCost } from '../constants'
@@ -1005,7 +1006,9 @@ function splitIntoRuns(events: DebugEvent[]): DebugEvent[][] {
 // Component
 // ---------------------------------------------------------------------------
 
-export function GraphView({ events }: { events: DebugEvent[] }) {
+export function GraphView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   const runs = useMemo(() => splitIntoRuns(events), [events])
   const [selectedRun, setSelectedRun] = useState<number | null>(null)
   const prevRunCountRef = useRef(runs.length)

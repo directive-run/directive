@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DebugEvent } from '../types'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EVENT_COLORS, EVENT_LABELS, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '../constants'
 import { EmptyState } from '../EmptyState'
 
-export function TimelineView({ events }: { events: DebugEvent[] }) {
+export function TimelineView() {
+  const system = useDevToolsSystem()
+  const events = useSelector(system, (s) => s.facts.connection.events)
   const [selected, setSelected] = useState<number | null>(null)
   const [zoom, setZoom] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)

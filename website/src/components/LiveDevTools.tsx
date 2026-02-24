@@ -1,9 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useDirectiveRef, useSelector } from '@directive-run/react'
 import type { ConnectionStatus } from './devtools/types'
 import { VIEWS } from './devtools/constants'
 import { DevToolsUrlContext, type DevToolsUrls } from './devtools/DevToolsUrlContext'
+import { DevToolsSystemContext, useDevToolsSystem } from './devtools/DevToolsSystemContext'
+import { devtoolsShell } from './devtools/modules/devtools-shell'
+import { devtoolsConnection } from './devtools/modules/devtools-connection'
+import { devtoolsSnapshot } from './devtools/modules/devtools-snapshot'
 import { useDevToolsStream } from './devtools/hooks/useDevToolsStream'
 import { TimelineView } from './devtools/views/TimelineView'
 import { CostView } from './devtools/views/CostView'
@@ -62,38 +67,58 @@ export function LiveDevTools({ streamUrl, snapshotUrl }: LiveDevToolsProps = {})
     snapshotUrl: snapshotUrl ?? '/api/devtools/snapshot',
   }), [streamUrl, snapshotUrl])
 
+  // One namespaced Directive system for all DevTools state
+  const system = useDirectiveRef({
+    modules: {
+      shell: devtoolsShell,
+      connection: devtoolsConnection,
+      snapshot: devtoolsSnapshot,
+    },
+  })
+
+  // Initialize URLs into system facts
+  useEffect(() => {
+    system.events.connection.setStreamUrl({ url: urls.streamUrl })
+    system.events.snapshot.setSnapshotUrl({ url: urls.snapshotUrl })
+  }, [system, urls])
+
   return (
     <DevToolsUrlContext.Provider value={urls}>
-      <LiveDevToolsInner />
+      <DevToolsSystemContext.Provider value={system}>
+        <LiveDevToolsInner />
+      </DevToolsSystemContext.Provider>
     </DevToolsUrlContext.Provider>
   )
 }
 
 function LiveDevToolsInner() {
-  const { events, status, clear, reconnect, exhaustedRetries } = useDevToolsStream()
-  const [view, setView] = useState<(typeof VIEWS)[number]>('Timeline')
-  const [confirmClear, setConfirmClear] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const system = useDevToolsSystem()
 
-  const totalTokens = events
-    .filter((e) => e.type === 'agent_complete')
-    .reduce((s, e) => s + (e.totalTokens ?? 0), 0)
+  // Thin EventSource bridge — all state lives in the system
+  const { reconnect } = useDevToolsStream()
 
-  // m4: extended clear confirmation from 3s to 5s
+  // Read shell state from system (defaults for pre-init render)
+  const view = useSelector(system, (s) => s.facts.shell.activeView) ?? 'Timeline'
+  const confirmClear = useSelector(system, (s) => s.facts.shell.confirmClear) ?? false
+  const isFullscreen = useSelector(system, (s) => s.facts.shell.isFullscreen) ?? false
+
+  // Read connection state from system
+  const status = useSelector(system, (s) => s.facts.connection.status) ?? 'connecting'
+  const exhaustedRetries = useSelector(system, (s) => s.derive.connection.exhaustedRetries) ?? false
+  const events = useSelector(system, (s) => s.facts.connection.events) ?? []
+  const totalTokens = useSelector(system, (s) => s.derive.connection.totalTokens) ?? 0
+
+  // m4: extended clear confirmation from 3s to 5s (now handled by constraint + resolver)
   const handleClear = useCallback(() => {
     if (!confirmClear) {
-      setConfirmClear(true)
-      clearTimerRef.current = setTimeout(() => setConfirmClear(false), 5000)
+      system.events.shell.startClear()
 
       return
     }
-    clear()
-    setConfirmClear(false)
-    if (clearTimerRef.current) {
-      clearTimeout(clearTimerRef.current)
-    }
-  }, [confirmClear, clear])
+    system.events.shell.executeClear()
+    system.events.connection.clearEvents()
+    system.events.snapshot.clearSnapshot()
+  }, [confirmClear, system])
 
   // Arrow key navigation between tabs
   const handleTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -101,19 +126,19 @@ function LiveDevToolsInner() {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault()
       const next = VIEWS[(idx + 1) % VIEWS.length]
-      setView(next)
+      system.events.shell.setView({ view: next })
       const container = e.currentTarget.parentElement
       const buttons = container?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
       buttons?.[(idx + 1) % VIEWS.length]?.focus()
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault()
       const prev = VIEWS[(idx - 1 + VIEWS.length) % VIEWS.length]
-      setView(prev)
+      system.events.shell.setView({ view: prev })
       const container = e.currentTarget.parentElement
       const buttons = container?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
       buttons?.[(idx - 1 + VIEWS.length) % VIEWS.length]?.focus()
     }
-  }, [view])
+  }, [view, system])
 
   // Export events as JSON file
   const handleExport = useCallback(() => {
@@ -143,12 +168,10 @@ function LiveDevToolsInner() {
       try {
         const imported = JSON.parse(reader.result as string)
         if (Array.isArray(imported)) {
-          clear()
+          system.events.connection.clearEvents()
           // Small delay so clear finishes first
           setTimeout(() => {
-            // Re-inject via the stream hook isn't possible directly,
-            // so we dispatch a custom event the stream hook can pick up
-            window.dispatchEvent(new CustomEvent('devtools-import', { detail: imported }))
+            system.events.connection.importEvents({ imported })
           }, 50)
         }
       } catch {
@@ -158,7 +181,7 @@ function LiveDevToolsInner() {
     reader.readAsText(file)
     // Reset so same file can be re-imported
     e.target.value = ''
-  }, [clear])
+  }, [system])
 
   // Escape key exits fullscreen
   useEffect(() => {
@@ -168,14 +191,14 @@ function LiveDevToolsInner() {
 
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsFullscreen(false)
+        system.events.shell.exitFullscreen()
       }
     }
 
     document.addEventListener('keydown', handleEsc)
 
     return () => document.removeEventListener('keydown', handleEsc)
-  }, [isFullscreen])
+  }, [isFullscreen, system])
 
   return (
     <div className={`flex flex-col overflow-hidden border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 ${
@@ -276,7 +299,7 @@ function LiveDevToolsInner() {
             className="hidden"
           />
           <button
-            onClick={() => setIsFullscreen((f) => !f)}
+            onClick={() => system.events.shell.toggleFullscreen()}
             aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -317,7 +340,7 @@ function LiveDevToolsInner() {
                   ? 'border-sky-500 text-sky-600 dark:text-sky-400'
                   : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
               }`}
-              onClick={() => setView(v)}
+              onClick={() => system.events.shell.setView({ view: v })}
             >
               {v}
             </button>
@@ -332,17 +355,17 @@ function LiveDevToolsInner() {
         id={`devtools-tabpanel-${view.toLowerCase()}`}
         aria-label={`${view} view`}
       >
-        {view === 'Timeline' && <TimelineView events={events} />}
-        {view === 'Cost' && <CostView events={events} />}
+        {view === 'Timeline' && <TimelineView />}
+        {view === 'Cost' && <CostView />}
         {view === 'State' && <StateView />}
-        {view === 'Guardrails' && <GuardrailsView events={events} />}
-        {view === 'Events' && <EventsView events={events} />}
+        {view === 'Guardrails' && <GuardrailsView />}
+        {view === 'Events' && <EventsView />}
         {view === 'Health' && <HealthView />}
-        {view === 'Flamechart' && <FlamechartView events={events} />}
-        {view === 'Graph' && <GraphView events={events} />}
-        {view === 'Goal' && <GoalView events={events} />}
+        {view === 'Flamechart' && <FlamechartView />}
+        {view === 'Graph' && <GraphView />}
+        {view === 'Goal' && <GoalView />}
         {view === 'Memory' && <MemoryView />}
-        {view === 'Budget' && <BudgetView events={events} />}
+        {view === 'Budget' && <BudgetView />}
         {view === 'Config' && <ConfigView />}
       </div>
 
