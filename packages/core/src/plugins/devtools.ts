@@ -30,7 +30,7 @@ import {
 	CircularBuffer,
 	isDevMode,
 	safeInspect,
-	structuredCloneData,
+	cloneViaJSON,
 	validateMaxEvents,
 	createPerfMetrics,
 	createDepGraph,
@@ -38,7 +38,7 @@ import {
 	createTimelineState,
 	MAX_RECORDED_EVENTS,
 	MAX_RECORDED_SNAPSHOTS,
-	MAX_TIMELINE_ENTRIES,
+	MAX_RESOLVER_STATS,
 	S,
 } from "./devtools-types.js";
 
@@ -186,11 +186,11 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 		};
 
 		// C2: Non-writable global — prevent casual script overwriting
-		// configurable: true allows test cleanup and plugin re-initialization
+		// configurable in dev mode for test cleanup and plugin re-initialization
 		Object.defineProperty(window, "__DIRECTIVE__", {
 			value: api,
 			writable: false,
-			configurable: true,
+			configurable: isDevMode(),
 			enumerable: true,
 		});
 
@@ -361,7 +361,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 	// Record event if recording (C3: capped)
 	function recordEvent(type: string, data: unknown) {
 		if (recording.isRecording && recording.recordedEvents.length < MAX_RECORDED_EVENTS) {
-			recording.recordedEvents.push({ timestamp: Date.now(), type, data: structuredCloneData(data) });
+			recording.recordedEvents.push({ timestamp: Date.now(), type, data: cloneViaJSON(data) });
 		}
 	}
 
@@ -640,15 +640,16 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 			stats.count++;
 			stats.totalMs += duration;
 			perf.resolverStats.set(resolver, stats);
+			if (perf.resolverStats.size > MAX_RESOLVER_STATS) {
+				const oldest = perf.resolverStats.keys().next().value;
+				if (oldest !== undefined) perf.resolverStats.delete(oldest);
+			}
 
 			// Complete timeline entry
 			const startMs = timeline.inflight.get(resolver);
 			timeline.inflight.delete(resolver);
 			if (startMs !== undefined) {
 				timeline.entries.push({ resolver, startMs, endMs: performance.now(), error: false });
-				if (timeline.entries.length > MAX_TIMELINE_ENTRIES) {
-					timeline.entries.splice(0, timeline.entries.length - MAX_TIMELINE_ENTRIES);
-				}
 			}
 
 			if (panel && state.system) {
@@ -664,15 +665,16 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 			const stats = perf.resolverStats.get(resolver) ?? { count: 0, totalMs: 0, errors: 0 };
 			stats.errors++;
 			perf.resolverStats.set(resolver, stats);
+			if (perf.resolverStats.size > MAX_RESOLVER_STATS) {
+				const oldest = perf.resolverStats.keys().next().value;
+				if (oldest !== undefined) perf.resolverStats.delete(oldest);
+			}
 
 			// Complete timeline entry as error
 			const startMs = timeline.inflight.get(resolver);
 			timeline.inflight.delete(resolver);
 			if (startMs !== undefined) {
 				timeline.entries.push({ resolver, startMs, endMs: performance.now(), error: true });
-				if (timeline.entries.length > MAX_TIMELINE_ENTRIES) {
-					timeline.entries.splice(0, timeline.entries.length - MAX_TIMELINE_ENTRIES);
-				}
 			}
 
 			if (panel && state.system) {
@@ -734,6 +736,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 					// ignore
 				}
 				derivRowMap.clear();
+				depGraph.derivationDeps.clear();
 				panel.refs.derivBody.replaceChildren();
 				lastResult = null;
 				schedulePanelUpdate(D_DERIV | D_STATUS | D_REQS | D_FLOW | D_TT);

@@ -20,12 +20,13 @@ Directive's AI adapter doesn't replace your LLM framework &ndash; it wraps it wi
 | **Execution patterns** | 7 built-in (parallel, DAG, race, reflect, debate, ...) | LangGraph nodes/edges | Sequential/parallel | Round-robin chat | &ndash; |
 | **Constraints** | Declarative `when`/`require` | &ndash; | &ndash; | &ndash; | &ndash; |
 | **Time-travel debug** | Built-in snapshots + fork | LangSmith tracing | &ndash; | &ndash; | &ndash; |
-| **DevTools** | 8-view visual debugger | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
+| **DevTools** | Visual debugger (3 active views, 5 planned) | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
 | **Streaming** | Token-level with backpressure | LangChain streaming | &ndash; | &ndash; | Core strength |
 | **Memory** | 3 strategies + summarizers | LangChain memory | Crew memory | Chat history | &ndash; |
 | **Evals** | 10 built-in criteria + LLM judge | LangSmith evals | &ndash; | &ndash; | &ndash; |
 | **Self-healing** | Circuit breaker + auto-reroute | &ndash; | &ndash; | &ndash; | &ndash; |
-| **Goal engine** | Declarative convergence | &ndash; | Goal-oriented tasks | &ndash; | &ndash; |
+| **Converge pattern** | Declarative convergence | &ndash; | Goal-oriented tasks | &ndash; | &ndash; |
+| **Pattern checkpoints** | Save/resume all 6 patterns | LangGraph checkpointing | &ndash; | &ndash; | &ndash; |
 | **TypeScript** | First-class, fully typed | Python-first, TS port | Python only | Python-first, TS port | First-class |
 | **Bundle size** | Tree-shakeable, zero-cost debug | Large dependency tree | N/A (Python) | N/A (Python) | Small |
 
@@ -46,7 +47,7 @@ LangChain provides a comprehensive toolkit for building LLM applications with ch
 - You want framework-agnostic orchestration that wraps any LLM SDK
 - You need declarative constraints that automatically trigger agent runs
 - You want reactive state (derivations, scratchpad) that drives UI updates
-- You need 8-view visual debugging without a hosted service
+- You need visual debugging (Timeline, Cost, State) without a hosted service
 - You want self-healing with automatic agent rerouting
 
 ### Using Together
@@ -109,9 +110,9 @@ Vercel AI SDK provides streaming-first UI primitives for React, with excellent D
 
 - You need multi-agent orchestration with patterns, constraints, and guardrails
 - You want framework-agnostic state (works with React, Vue, Svelte, Solid, Lit)
-- You need time-travel debugging and 8-view DevTools
+- You need time-travel debugging and visual DevTools (Timeline, Cost, State)
 - You want declarative agent routing based on runtime state
-- You need production features: evals, OTEL, self-healing, goal engine
+- You need production features: evals, OTEL, self-healing, converge pattern
 
 ### Using Together
 
@@ -126,10 +127,11 @@ Features no other framework provides:
 1. **Constraint-driven orchestration** &ndash; Declare `when`/`require` rules; the runtime resolves them automatically
 2. **Reactive Directive System backbone** &ndash; Every agent is a namespaced module with reactive facts, derivations, and effects
 3. **Cross-agent derivations** &ndash; Compute values across all agent states reactively
-4. **8-view DevTools** &ndash; Timeline, Flamechart, DAG, Health, Cost, Breakpoints, State, Compare
+4. **Visual DevTools** &ndash; Timeline, Cost, State (plus 5 more views planned: Flamechart, DAG, Health, Breakpoints, Compare)
 5. **Self-healing** &ndash; Circuit breakers with automatic agent rerouting and health scoring
-6. **Goal engine** &ndash; Declare desired end-state, engine converges through dependency-ordered agent runs
-7. **Framework-agnostic** &ndash; Wraps any `AgentRunner` function, no LLM SDK lock-in
+6. **Converge pattern** &ndash; Declare desired end-state, runtime converges through dependency-ordered agent runs
+7. **Pattern checkpoints** &ndash; Save/resume mid-execution for all 6 multi-step patterns with progress tracking, forking, and diffing
+8. **Framework-agnostic** &ndash; Wraps any `AgentRunner` function, no LLM SDK lock-in
 
 ---
 

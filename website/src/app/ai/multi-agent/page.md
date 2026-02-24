@@ -492,5 +492,5 @@ Framework adapters for Vue, Svelte, Solid, and Lit follow the same pattern &ndas
 - [Communication](/ai/communication) &ndash; Message bus, agent network, handoffs
 - [Cross-Agent State](/ai/cross-agent-state) &ndash; Derivations and scratchpad
 - [Self-Healing](/ai/self-healing) &ndash; Automatic error recovery
-- [Goal Engine](/ai/goals) &ndash; Desired-state convergence
+- [Pattern Checkpoints](/ai/checkpoints) &ndash; Save/resume, fork, progress tracking
 - [Memory](/ai/memory) &ndash; Conversation context management

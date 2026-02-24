@@ -5,91 +5,433 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Number Match - Directive Example</title>
   <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--brand-surface);
+      color: var(--brand-text);
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       min-height: 100vh;
+      padding: 1.5rem;
     }
-    .app { text-align: center; max-width: 500px; padding: 2rem; }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #94a3b8; }
-    .subtitle { color: #64748b; margin-bottom: 1.5rem; font-size: 0.875rem; }
-    .stats {
-      display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem;
+
+    .nm-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
-    .stat {
-      background: #1e293b; padding: 0.5rem 1rem; border-radius: 8px;
-      border: 1px solid #334155;
+
+    /* ===== Main 3-column Layout ===== */
+    .nm-main {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: 1rem;
     }
-    .stat-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; }
-    .stat-value { font-size: 1.2rem; font-weight: 600; }
+
+    @media (max-width: 800px) {
+      .nm-main { grid-template-columns: 1fr; }
+    }
+
+    /* Panel base */
+    .nm-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nm-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+    }
+
+    .nm-panel-body {
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* ===== Stats ===== */
+    .nm-stats {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .nm-stat {
+      flex: 1;
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.35rem 0.5rem;
+      text-align: center;
+    }
+
+    .nm-stat-label {
+      font-size: 0.55rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+    }
+
+    .nm-stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    /* ===== Message ===== */
+    .nm-message {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-muted);
+      min-height: 2rem;
+      display: flex;
+      align-items: center;
+    }
+
+    /* ===== Game Grid ===== */
     .grid {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 0.75rem; margin-bottom: 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
     }
+
     .tile {
-      aspect-ratio: 1; background: #1e293b; border: 2px solid #334155;
-      border-radius: 12px; display: flex; align-items: center; justify-content: center;
-      font-size: 2rem; font-weight: bold; cursor: pointer; transition: all 0.15s;
+      aspect-ratio: 1;
+      background: var(--brand-surface);
+      border: 2px solid var(--brand-border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    .tile:hover { border-color: #475569; background: #334155; }
-    .tile.selected { border-color: #3b82f6; background: #1e3a5f; transform: scale(1.05); }
-    .tile.empty { background: #0f172a; border-style: dashed; border-color: #1e293b; cursor: default; }
-    .message {
-      background: #1e293b; padding: 0.75rem; border-radius: 8px;
-      border: 1px solid #334155; font-size: 0.875rem; color: #94a3b8;
-      margin-bottom: 1rem; min-height: 2.5rem;
+
+    .tile:hover { border-color: var(--brand-border-strong); background: var(--brand-border); }
+    .tile.selected { border-color: var(--brand-primary); background: rgba(91, 163, 163, 0.15); transform: scale(1.05); }
+    .tile.empty { background: var(--brand-surface); border-style: dashed; border-color: var(--brand-border); cursor: default; opacity: 0.3; }
+
+    /* ===== Buttons ===== */
+    .nm-btn-row {
+      display: flex;
+      gap: 0.5rem;
     }
-    .controls { display: flex; gap: 0.75rem; justify-content: center; }
-    button {
-      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
-      padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;
-      font-size: 1rem; transition: all 0.15s;
+
+    .nm-btn {
+      flex: 1;
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 500;
+      transition: all 0.15s;
     }
-    button:hover { background: #334155; }
-    button.primary { background: #3b82f6; border-color: #3b82f6; }
-    #log {
-      margin-top: 1.5rem; background: #0f172a; border: 1px solid #1e293b;
-      border-radius: 8px; padding: 0.75rem; text-align: left;
-      font-family: monospace; font-size: 0.7rem; color: #64748b;
-      max-height: 200px; overflow-y: auto;
+
+    .nm-btn:hover { background: var(--brand-border); }
+    .nm-btn.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #fff;
+    }
+    .nm-btn.primary:hover { background: var(--brand-primary-hover); }
+
+    /* ===== Live State Inspector (Center) ===== */
+    .nm-inspector-section {
+      margin-bottom: 0.5rem;
+    }
+
+    .nm-inspector-section:last-child { margin-bottom: 0; }
+
+    .nm-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.4rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .nm-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.2rem 0;
+      font-size: 0.7rem;
+    }
+
+    .nm-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .nm-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nm-deriv-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .nm-deriv-indicator.true { background: var(--brand-success); }
+    .nm-deriv-indicator.false { background: var(--brand-text-faint); }
+
+    /* ===== Event Timeline (Right) ===== */
+    .nm-timeline {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 120px;
+      max-height: 400px;
+    }
+
+    .nm-timeline-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .nm-timeline-entry {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.6rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.4rem;
+      align-items: baseline;
+    }
+
+    .nm-timeline-entry.selection { border-left: 3px solid var(--brand-primary); }
+    .nm-timeline-entry.match { border-left: 3px solid var(--brand-success); }
+    .nm-timeline-entry.refill { border-left: 3px solid var(--brand-warning); }
+    .nm-timeline-entry.gameover { border-left: 3px solid var(--brand-error); }
+    .nm-timeline-entry.newgame { border-left: 3px solid var(--brand-primary); }
+
+    .nm-timeline-time {
+      color: var(--brand-text-faint);
+      font-size: 0.55rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .nm-timeline-event {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 70px;
+    }
+
+    .nm-timeline-detail {
+      color: var(--brand-text-dim);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== How It Works ===== */
+    .nm-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .nm-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .nm-how-it-works ul { padding-left: 1.2rem; }
+    .nm-how-it-works li { margin-bottom: 0.2rem; }
+
+    .nm-how-it-works .directive-note {
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--brand-border);
+      font-style: italic;
+      color: var(--brand-text-faint);
+    }
+
+    @media (max-width: 800px) {
+      body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/counter/assets/index-BWVgeBln.js"></script>
+  <script type="module" crossorigin src="/examples/counter/assets/index-DLnMURW3.js"></script>
 </head>
 <body>
-  <div class="app">
-    <h1>Number Match</h1>
-    <p class="subtitle">Select two numbers that add to 10 — same pattern as Eleven Up</p>
+  <div class="nm-container">
+    <!-- Main 3-column -->
+    <div class="nm-main">
+      <!-- Left: Game -->
+      <div class="nm-panel">
+        <div class="nm-panel-header">Number Match</div>
+        <div class="nm-panel-body">
+          <div class="nm-stats">
+            <div class="nm-stat">
+              <div class="nm-stat-label">Pool</div>
+              <div id="pool" class="nm-stat-value" data-testid="nm-pool">0</div>
+            </div>
+            <div class="nm-stat">
+              <div class="nm-stat-label">Removed</div>
+              <div id="removed" class="nm-stat-value" data-testid="nm-removed">0</div>
+            </div>
+            <div class="nm-stat">
+              <div class="nm-stat-label">Moves</div>
+              <div id="moves" class="nm-stat-value" data-testid="nm-moves">0</div>
+            </div>
+          </div>
+          <div id="message" class="nm-message" data-testid="nm-message">Select two numbers that add to 10</div>
+          <div id="grid" class="grid" data-testid="nm-grid"></div>
+          <div class="nm-btn-row">
+            <button id="clear" class="nm-btn" data-testid="nm-clear">Clear Selection</button>
+            <button id="newgame" class="nm-btn primary" data-testid="nm-newgame">New Game</button>
+          </div>
+        </div>
+      </div>
 
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-label">Pool</div>
-        <div id="pool" class="stat-value" data-testid="nm-pool">0</div>
+      <!-- Center: Live State Inspector -->
+      <div class="nm-panel">
+        <div class="nm-panel-header">Live State Inspector</div>
+        <div class="nm-panel-body">
+          <div class="nm-inspector-section">
+            <div class="nm-inspector-title">Facts</div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">pool</span>
+              <span id="nm-fact-pool" class="nm-inspector-value">0 tiles</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">table</span>
+              <span id="nm-fact-table" class="nm-inspector-value">0 tiles</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">removed</span>
+              <span id="nm-fact-removed" class="nm-inspector-value">0 tiles</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">selected</span>
+              <span id="nm-fact-selected" class="nm-inspector-value">[]</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">moveCount</span>
+              <span id="nm-fact-movecount" class="nm-inspector-value">0</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">gameOver</span>
+              <span id="nm-fact-gameover" class="nm-inspector-value">
+                <span class="nm-deriv-indicator false"></span> false
+              </span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">message</span>
+              <span id="nm-fact-message" class="nm-inspector-value">&mdash;</span>
+            </div>
+          </div>
+          <div class="nm-inspector-section">
+            <div class="nm-inspector-title">Derivations</div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">poolCount</span>
+              <span id="nm-deriv-poolcount" class="nm-inspector-value">0</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">removedCount</span>
+              <span id="nm-deriv-removedcount" class="nm-inspector-value">0</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">selectedTiles</span>
+              <span id="nm-deriv-selectedtiles" class="nm-inspector-value">0 tiles</span>
+            </div>
+            <div class="nm-inspector-row">
+              <span class="nm-inspector-key">hasValidMoves</span>
+              <span id="nm-deriv-hasvalidmoves" class="nm-inspector-value">
+                <span class="nm-deriv-indicator true"></span> true
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="stat">
-        <div class="stat-label">Removed</div>
-        <div id="removed" class="stat-value" data-testid="nm-removed">0</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Moves</div>
-        <div id="moves" class="stat-value" data-testid="nm-moves">0</div>
+
+      <!-- Right: Event Timeline -->
+      <div class="nm-panel">
+        <div class="nm-panel-header">Event Timeline</div>
+        <div class="nm-panel-body" style="flex: 1;">
+          <div id="nm-timeline" class="nm-timeline">
+            <div class="nm-timeline-empty">Events appear after interactions</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div id="message" class="message" data-testid="nm-message">Select two numbers that add to 10</div>
-    <div id="grid" class="grid" data-testid="nm-grid"></div>
-
-    <div class="controls">
-      <button id="clear" data-testid="nm-clear">Clear Selection</button>
-      <button id="newgame" class="primary" data-testid="nm-newgame">New Game</button>
+    <!-- How It Works -->
+    <div class="nm-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>Facts</strong> &ndash; pool, table, removed, selected, moveCount, gameOver, message</li>
+        <li><strong>Derivations</strong> &ndash; poolCount, removedCount, selectedTiles, hasValidMoves (all auto-tracked)</li>
+        <li><strong>Constraints</strong> &ndash; pairAddsTen (100), refillTable (50), noMovesLeft (190), allCleared (200)</li>
+        <li><strong>Resolvers</strong> &ndash; removeTiles (multi-fact mutation), refillTable, endGame</li>
+        <li><strong>Events</strong> &ndash; newGame, selectTile, deselectTile, clearSelection</li>
+      </ul>
+      <p class="directive-note">Constraints fire by priority: a matching pair triggers <code>pairAddsTen</code> &rarr; <code>removeTiles</code> resolver. Then <code>refillTable</code> fires to replenish the grid from the pool. When no valid moves remain, <code>noMovesLeft</code> ends the game.</p>
     </div>
-
-    <div id="log"></div>
   </div>
 
 </body>

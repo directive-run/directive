@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resilient API Dashboard - Directive Example</title>
+  <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: #5ba3a3;
+      --brand-primary-hover: #4d8f8f;
+      --brand-error: #e8836f;
+      --brand-success: #6dab72;
+      --brand-warning: #c4c07a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--brand-surface);
+      color: var(--brand-text);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .eb-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ===== Top Bar ===== */
+    .eb-top-bar {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+
+    .eb-top-bar-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      margin-right: auto;
+    }
+
+    /* ===== Main 3-column Layout ===== */
+    .eb-main {
+      display: grid;
+      grid-template-columns: 260px 1fr 280px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 800px) {
+      .eb-main { grid-template-columns: 1fr; }
+    }
+
+    /* Panel base */
+    .eb-panel {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .eb-panel-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--brand-border);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .eb-panel-body {
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    /* ===== Service Cards ===== */
+    .eb-service-card {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+    }
+
+    .eb-service-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.3rem;
+    }
+
+    .eb-service-name {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--brand-text);
+    }
+
+    .eb-service-status {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+    }
+
+    .eb-service-status.idle { background: rgba(100, 116, 139, 0.2); color: var(--brand-text-dim); }
+    .eb-service-status.loading { background: rgba(91, 163, 163, 0.2); color: var(--brand-primary); }
+    .eb-service-status.success { background: rgba(109, 171, 114, 0.2); color: var(--brand-success); }
+    .eb-service-status.error { background: rgba(232, 131, 111, 0.2); color: var(--brand-error); }
+
+    .eb-service-result {
+      font-size: 0.65rem;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.15rem;
+    }
+
+    .eb-service-error {
+      font-size: 0.6rem;
+      color: var(--brand-error);
+      display: none;
+    }
+
+    .eb-service-actions {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
+
+    /* ===== Buttons ===== */
+    .eb-btn {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.35rem 0.7rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.65rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .eb-btn:hover { background: var(--brand-border); }
+
+    .eb-btn.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #fff;
+    }
+
+    .eb-btn.primary:hover { background: var(--brand-primary-hover); }
+
+    .eb-btn.danger {
+      color: var(--brand-error);
+      border-color: rgba(232, 131, 111, 0.3);
+    }
+
+    .eb-btn.danger:hover { background: rgba(232, 131, 111, 0.1); }
+
+    .eb-btn-row {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    /* ===== Sliders ===== */
+    .eb-slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .eb-slider-label {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .eb-slider-value {
+      color: var(--brand-text-muted);
+      font-weight: 400;
+    }
+
+    .eb-slider-group input[type="range"] {
+      width: 100%;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+    }
+
+    /* ===== Select ===== */
+    .eb-select {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      color: var(--brand-text);
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      cursor: pointer;
+    }
+
+    /* ===== Inspector ===== */
+    .eb-inspector-section {
+      margin-bottom: 0.5rem;
+    }
+
+    .eb-inspector-section:last-child { margin-bottom: 0; }
+
+    .eb-inspector-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.4rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--brand-border);
+    }
+
+    .eb-inspector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.2rem 0;
+      font-size: 0.7rem;
+    }
+
+    .eb-inspector-key {
+      color: var(--brand-text-dim);
+      font-family: ui-monospace, monospace;
+    }
+
+    .eb-inspector-value {
+      color: var(--brand-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .eb-deriv-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .eb-deriv-indicator.true { background: var(--brand-success); }
+    .eb-deriv-indicator.false { background: var(--brand-text-faint); }
+
+    /* ===== Circuit Breaker Badge ===== */
+    .eb-circuit-badge {
+      font-size: 0.55rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+      letter-spacing: 0.03em;
+    }
+
+    .eb-circuit-badge.closed { background: rgba(109, 171, 114, 0.2); color: var(--brand-success); }
+    .eb-circuit-badge.open { background: rgba(232, 131, 111, 0.2); color: var(--brand-error); }
+    .eb-circuit-badge.half-open { background: rgba(196, 192, 122, 0.2); color: var(--brand-warning); }
+
+    /* ===== Separator ===== */
+    .eb-separator {
+      border: none;
+      border-top: 1px solid var(--brand-border);
+      margin: 0.2rem 0;
+    }
+
+    /* ===== Timeline ===== */
+    .eb-timeline-header {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--brand-text-dim);
+      margin-bottom: 0.3rem;
+    }
+
+    .eb-timeline {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-height: 120px;
+      max-height: 300px;
+    }
+
+    .eb-timeline-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-text-faint);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    .eb-timeline-entry {
+      background: var(--brand-surface);
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.6rem;
+      line-height: 1.4;
+      display: flex;
+      gap: 0.4rem;
+      align-items: baseline;
+    }
+
+    .eb-timeline-entry.success { border-left: 3px solid var(--brand-success); }
+    .eb-timeline-entry.error { border-left: 3px solid var(--brand-error); }
+    .eb-timeline-entry.retry { border-left: 3px solid var(--brand-warning); }
+    .eb-timeline-entry.circuit { border-left: 3px solid #a78bfa; }
+    .eb-timeline-entry.recovery { border-left: 3px solid var(--brand-primary); }
+    .eb-timeline-entry.info { border-left: 3px solid var(--brand-text-dim); }
+
+    .eb-timeline-time {
+      color: var(--brand-text-faint);
+      font-size: 0.55rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .eb-timeline-event {
+      font-weight: 600;
+      color: var(--brand-text-muted);
+      min-width: 50px;
+    }
+
+    .eb-timeline-detail {
+      color: var(--brand-text-dim);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== How it works ===== */
+    .eb-how-it-works {
+      background: var(--brand-surface-raised);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.7rem;
+      color: var(--brand-text-dim);
+    }
+
+    .eb-how-it-works h3 {
+      color: var(--brand-text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .eb-how-it-works ul { padding-left: 1.2rem; }
+    .eb-how-it-works li { margin-bottom: 0.2rem; }
+
+    @media (max-width: 800px) {
+      body { padding: 0.75rem; }
+    }
+  </style>
+  <script type="module" crossorigin src="/examples/error-boundaries/assets/index--YustHe5.js"></script>
+</head>
+<body>
+  <div class="eb-container">
+    <!-- Top Bar -->
+    <div class="eb-top-bar">
+      <span class="eb-top-bar-title">Resilient API Dashboard</span>
+      <label class="eb-slider-label" style="font-size:0.6rem;gap:0.3rem;align-items:center">
+        Strategy
+        <select id="eb-strategy" class="eb-select" data-testid="eb-strategy">
+          <option value="retry-later">retry-later</option>
+          <option value="skip">skip</option>
+          <option value="retry">retry</option>
+          <option value="throw">throw</option>
+        </select>
+      </label>
+      <button id="eb-fetch-all" class="eb-btn primary" data-testid="eb-fetch-all">Fetch All</button>
+      <button id="eb-reset" class="eb-btn danger" data-testid="eb-reset">Reset</button>
+    </div>
+
+    <!-- Main 3-column -->
+    <div class="eb-main">
+      <!-- Left: Services & Controls -->
+      <div class="eb-panel">
+        <div class="eb-panel-header">Services</div>
+        <div class="eb-panel-body">
+          <!-- Users -->
+          <div class="eb-service-card" data-testid="eb-card-users">
+            <div class="eb-service-card-header">
+              <span class="eb-service-name">Users API</span>
+              <span id="eb-users-status" class="eb-service-status idle" data-testid="eb-users-status">idle</span>
+            </div>
+            <div id="eb-users-result" class="eb-service-result" data-testid="eb-users-result">&mdash;</div>
+            <div id="eb-users-error" class="eb-service-error" data-testid="eb-users-error"></div>
+            <div class="eb-service-actions">
+              <button id="eb-fetch-users" class="eb-btn" data-testid="eb-fetch-users">Fetch</button>
+            </div>
+            <div class="eb-slider-group" style="margin-top: 0.4rem">
+              <label class="eb-slider-label">
+                Fail Rate <span id="eb-users-fail-val" class="eb-slider-value">0%</span>
+              </label>
+              <input type="range" id="eb-users-failrate" data-testid="eb-users-failrate" min="0" max="100" step="10" value="0" />
+            </div>
+          </div>
+
+          <!-- Orders -->
+          <div class="eb-service-card" data-testid="eb-card-orders">
+            <div class="eb-service-card-header">
+              <span class="eb-service-name">Orders API</span>
+              <span id="eb-orders-status" class="eb-service-status idle" data-testid="eb-orders-status">idle</span>
+            </div>
+            <div id="eb-orders-result" class="eb-service-result" data-testid="eb-orders-result">&mdash;</div>
+            <div id="eb-orders-error" class="eb-service-error" data-testid="eb-orders-error"></div>
+            <div class="eb-service-actions">
+              <button id="eb-fetch-orders" class="eb-btn" data-testid="eb-fetch-orders">Fetch</button>
+            </div>
+            <div class="eb-slider-group" style="margin-top: 0.4rem">
+              <label class="eb-slider-label">
+                Fail Rate <span id="eb-orders-fail-val" class="eb-slider-value">0%</span>
+              </label>
+              <input type="range" id="eb-orders-failrate" data-testid="eb-orders-failrate" min="0" max="100" step="10" value="0" />
+            </div>
+          </div>
+
+          <!-- Analytics -->
+          <div class="eb-service-card" data-testid="eb-card-analytics">
+            <div class="eb-service-card-header">
+              <span class="eb-service-name">Analytics API</span>
+              <span id="eb-analytics-status" class="eb-service-status idle" data-testid="eb-analytics-status">idle</span>
+            </div>
+            <div id="eb-analytics-result" class="eb-service-result" data-testid="eb-analytics-result">&mdash;</div>
+            <div id="eb-analytics-error" class="eb-service-error" data-testid="eb-analytics-error"></div>
+            <div class="eb-service-actions">
+              <button id="eb-fetch-analytics" class="eb-btn" data-testid="eb-fetch-analytics">Fetch</button>
+            </div>
+            <div class="eb-slider-group" style="margin-top: 0.4rem">
+              <label class="eb-slider-label">
+                Fail Rate <span id="eb-analytics-fail-val" class="eb-slider-value">0%</span>
+              </label>
+              <input type="range" id="eb-analytics-failrate" data-testid="eb-analytics-failrate" min="0" max="100" step="10" value="0" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Live State Inspector -->
+      <div class="eb-panel">
+        <div class="eb-panel-header">Live State Inspector</div>
+        <div class="eb-panel-body">
+          <div class="eb-inspector-section">
+            <div class="eb-inspector-title">Circuit Breakers</div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">users</span>
+              <span id="eb-insp-users-circuit" class="eb-inspector-value" data-testid="eb-circuit-users"><span class="eb-circuit-badge closed">CLOSED</span></span>
+            </div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">orders</span>
+              <span id="eb-insp-orders-circuit" class="eb-inspector-value" data-testid="eb-circuit-orders"><span class="eb-circuit-badge closed">CLOSED</span></span>
+            </div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">analytics</span>
+              <span id="eb-insp-analytics-circuit" class="eb-inspector-value" data-testid="eb-circuit-analytics"><span class="eb-circuit-badge closed">CLOSED</span></span>
+            </div>
+          </div>
+
+          <div class="eb-inspector-section">
+            <div class="eb-inspector-title">Error Metrics</div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">retryQueue</span>
+              <span id="eb-insp-retry-queue" class="eb-inspector-value" data-testid="eb-retry-queue">0</span>
+            </div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">errorRate</span>
+              <span id="eb-insp-error-rate" class="eb-inspector-value" data-testid="eb-error-rate">0%</span>
+            </div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">totalErrors</span>
+              <span id="eb-insp-total-errors" class="eb-inspector-value" data-testid="eb-total-errors">0</span>
+            </div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">totalRecoveries</span>
+              <span id="eb-insp-total-recoveries" class="eb-inspector-value" data-testid="eb-total-recoveries">0</span>
+            </div>
+          </div>
+
+          <div class="eb-inspector-section">
+            <div class="eb-inspector-title">Performance</div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">resolvers</span>
+              <span id="eb-insp-perf-resolvers" class="eb-inspector-value" data-testid="eb-perf-resolvers">&mdash;</span>
+            </div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">reconcile</span>
+              <span id="eb-insp-perf-reconcile" class="eb-inspector-value" data-testid="eb-perf-reconcile">0 runs / 0ms avg</span>
+            </div>
+          </div>
+
+          <div class="eb-inspector-section">
+            <div class="eb-inspector-title">Derivations</div>
+            <div class="eb-inspector-row">
+              <span class="eb-inspector-key">allServicesHealthy</span>
+              <span id="eb-insp-all-healthy" class="eb-inspector-value" data-testid="eb-all-healthy">
+                <span class="eb-deriv-indicator true"></span> true
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Timeline -->
+      <div class="eb-panel">
+        <div class="eb-panel-header">Event Timeline</div>
+        <div class="eb-panel-body" style="padding-top: 0.5rem">
+          <div id="eb-timeline" class="eb-timeline" data-testid="eb-timeline">
+            <div class="eb-timeline-empty">Events appear after interactions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="eb-how-it-works">
+      <h3>How It Works (Directive Flow)</h3>
+      <ul>
+        <li><strong>Error Boundary</strong> &ndash; configurable per-source recovery: skip, retry, retry-later, throw</li>
+        <li><strong>Circuit Breaker</strong> &ndash; CLOSED &rarr; OPEN after 3 failures, auto-recovers to HALF_OPEN after 5s</li>
+        <li><strong>Retry-Later</strong> &ndash; exponential backoff (1s, 2s, 4s) with max 3 retries</li>
+        <li><strong>Performance Plugin</strong> &ndash; tracks resolver latency, reconciliation cost, slow operation warnings</li>
+      </ul>
+    </div>
+  </div>
+
+</body>
+</html>
