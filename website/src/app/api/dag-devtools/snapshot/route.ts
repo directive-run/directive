@@ -212,6 +212,17 @@ export async function GET() {
       summaries: 0,
       messages: memoryMessages,
     },
+    dag: {
+      nodes: {
+        news: { agent: 'news', deps: [] },
+        academic: { agent: 'academic', deps: [] },
+        sentiment: { agent: 'sentiment', deps: ['news'] },
+        'fact-checker': { agent: 'fact-checker', deps: ['academic'] },
+        synthesizer: { agent: 'synthesizer', deps: ['sentiment', 'fact-checker'] },
+        reviewer: { agent: 'reviewer', deps: ['synthesizer'] },
+      },
+      pattern: 'research',
+    },
     config: {
       model: 'claude-haiku-4-5-20251001',
       maxTokenBudget: 50000,

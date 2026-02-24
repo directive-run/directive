@@ -76,7 +76,7 @@ export const DagFlowDiagram = memo(function DagFlowDiagram() {
         aria-labelledby="dag-flow-title"
         role="img"
       >
-        <title id="dag-flow-title">DAG Pipeline Flow — parallel nodes converge into sequential stages</title>
+        <title id="dag-flow-title">DAG Pipeline Flow — parallel nodes merge into sequential stages</title>
 
         <defs>
           <marker

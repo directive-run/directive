@@ -10,6 +10,12 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
   const [zoom, setZoom] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [follow, setFollow] = useState(true)
+  const [tooltip, setTooltip] = useState<{
+    x: number
+    y: number
+    events: DebugEvent[]
+    laneId: string
+  } | null>(null)
 
   const { agentIds, agentEventsMap, noAgentEvents, minTs, range } = useMemo(() => {
     if (events.length === 0) {
@@ -59,11 +65,38 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
   // Disable follow when user manually scrolls left
   const handleScroll = useCallback(() => {
     const el = scrollRef.current
-    if (!el) return
+    if (!el) {
+      return
+    }
     const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10
-    if (!atEnd && follow) setFollow(false)
-    if (atEnd && !follow) setFollow(true)
+    if (!atEnd && follow) {
+      setFollow(false)
+    }
+    if (atEnd && !follow) {
+      setFollow(true)
+    }
   }, [follow])
+
+  // Hover tooltip: find events near cursor position in a lane
+  const handleLaneMouseMove = useCallback((e: React.MouseEvent, laneEvents: DebugEvent[], laneId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const xRatio = (e.clientX - rect.left) / rect.width
+    const cursorTs = minTs + xRatio * range
+    // Threshold: 1.5% of total range or 100ms, whichever is larger
+    const threshold = Math.max(range * 0.015, 100)
+
+    const nearby = laneEvents.filter((ev) => Math.abs(ev.timestamp - cursorTs) <= threshold)
+
+    if (nearby.length > 0) {
+      setTooltip({ x: e.clientX, y: e.clientY, events: nearby, laneId })
+    } else {
+      setTooltip(null)
+    }
+  }, [minTs, range])
+
+  const handleLaneMouseLeave = useCallback(() => {
+    setTooltip(null)
+  }, [])
 
   if (events.length === 0) {
     return <EmptyState message="Waiting for first message..." />
@@ -91,7 +124,11 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
     }
 
     return (
-      <div className="relative h-7 w-full rounded bg-zinc-100 dark:bg-zinc-800/50">
+      <div
+        className="relative h-7 w-full rounded bg-zinc-100 dark:bg-zinc-800/50"
+        onMouseMove={(e) => handleLaneMouseMove(e, laneEvents, laneId)}
+        onMouseLeave={handleLaneMouseLeave}
+      >
         {/* Runtime spans */}
         {runtimeSpans.map((span, i) => {
           const left = ((span.startTs - minTs) / range) * 100
@@ -239,7 +276,9 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
       {/* Selected event detail */}
       {selected !== null && (() => {
         const idx = events.findIndex((ev) => ev.id === selected)
-        if (idx === -1) return null
+        if (idx === -1) {
+          return null
+        }
         const e = events[idx]
 
         return (
@@ -335,6 +374,46 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
           </div>
         ))}
       </div>
+
+      {/* Hover tooltip — shows all events near cursor position */}
+      {tooltip && tooltip.events.length > 0 && (
+        <div
+          className="pointer-events-none fixed z-50 max-w-xs rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 shadow-xl"
+          style={{
+            left: `${tooltip.x + 12}px`,
+            top: `${tooltip.y - 8}px`,
+            transform: 'translateY(-100%)',
+          }}
+        >
+          <div className="mb-1.5 font-mono text-[10px] font-medium text-zinc-400">
+            {tooltip.laneId} · {tooltip.events.length} event{tooltip.events.length !== 1 ? 's' : ''}
+          </div>
+          <div className="space-y-1">
+            {tooltip.events.slice(0, 8).map((e) => (
+              <div key={e.id} className="flex items-center gap-2 font-mono text-[10px]">
+                <div className={`h-2 w-2 shrink-0 rounded-sm ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'}`} />
+                <span className="text-zinc-300">{EVENT_LABELS[e.type] ?? e.type}</span>
+                {e.guardrailName && (
+                  <span className="text-zinc-500">({e.guardrailName})</span>
+                )}
+                {e.passed !== undefined && (
+                  <span className={e.passed ? 'text-emerald-400' : 'text-red-400'}>
+                    {e.passed ? '✓' : '✗'}
+                  </span>
+                )}
+                {e.durationMs !== undefined && (
+                  <span className="text-zinc-500">{e.durationMs}ms</span>
+                )}
+              </div>
+            ))}
+            {tooltip.events.length > 8 && (
+              <div className="font-mono text-[10px] text-zinc-500">
+                +{tooltip.events.length - 8} more
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,7 +11,7 @@ categories: [Architecture, Engineering]
 
 React taught the frontend world a powerful idea: declare what the UI should look like, and let a reconciliation algorithm figure out the minimal DOM updates. You don't manually insert and remove nodes. You describe the desired state, and the reconciler diffs the previous virtual tree against the new one, producing the smallest set of mutations needed.
 
-Directive applies the same idea to application state. You declare constraints – what must be true – and the reconciliation loop figures out the minimal set of resolver executions needed to satisfy them. When facts change, the loop re-evaluates, diffs, and dispatches. When resolvers complete, facts update, and the loop runs again. It converges on a settled state where all constraints are satisfied and no work remains.
+Directive applies the same idea to application state. You declare constraints – what must be true – and the reconciliation loop figures out the minimal set of resolver executions needed to satisfy them. When facts change, the loop re-evaluates, diffs, and dispatches. When resolvers complete, facts update, and the loop runs again. It resolves to a settled state where all constraints are satisfied and no work remains.
 
 This article is a technical deep-dive into that loop. If you're evaluating Directive for a production system, understanding the reconciliation cycle will help you write better constraints, debug unexpected behavior, and reason about performance characteristics.
 
@@ -342,7 +342,7 @@ Understanding the reconciliation loop helps in three practical ways.
 
 **Avoiding common traps.** Knowing how the loop works helps you avoid patterns that fight it. A resolver that sets a fact but doesn't satisfy the constraint that triggered it will cause infinite re-evaluation – the constraint stays active, the resolver fires again, and the loop hits `MAX_RECONCILE_DEPTH`. A derivation that reads `Date.now()` will produce a different value on every computation, defeating memoization. An effect that calls `store.set()` unconditionally will trigger a new cycle on every run. Each of these patterns becomes obvious once you understand the five-phase cycle.
 
-The reconciliation loop is Directive's core contribution – the mechanism that makes declarative state management work. React proved that diffing a virtual tree is a viable approach to UI updates. Directive extends the same principle to application logic: diff the constraints, patch the resolvers, converge on the desired state.
+The reconciliation loop is Directive's core contribution – the mechanism that makes declarative state management work. React proved that diffing a virtual tree is a viable approach to UI updates. Directive extends the same principle to application logic: diff the constraints, patch the resolvers, resolve to the desired state.
 
 ---
 

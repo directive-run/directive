@@ -57,6 +57,7 @@ Harden for production after the basics:
 Unlock the full power of the system:
 
 1. [Pattern Checkpoints](/ai/checkpoints) &ndash; Save/resume, fork, progress tracking
+2. [Goal Pattern](/ai/patterns#goal) &ndash; Desired-state resolution with satisfaction scoring and relaxation
 3. [Communication](/ai/communication) &ndash; Decentralized agent messaging
 4. [Cross-Agent State](/ai/cross-agent-state) &ndash; Shared derivations and scratchpad
 5. [Breakpoints & Checkpoints](/ai/breakpoints) &ndash; Human-in-the-loop debugging
@@ -74,7 +75,7 @@ Both are backed by a Directive System with reactive state, constraints, guardrai
 | **Scope** | One agent at a time | Multiple named agents with concurrency control |
 | **State** | `orchestrator.facts.agent` | `orchestrator.facts` (namespaced per agent) |
 | **Streaming** | `orchestrator.runStream()` | `orchestrator.runAgentStream()` |
-| **Patterns** | &ndash; | `parallel()`, `sequential()`, `supervisor()`, `dag()`, `race()`, `reflect()`, `debate()` |
+| **Patterns** | &ndash; | `parallel()`, `sequential()`, `supervisor()`, `dag()`, `race()`, `reflect()`, `debate()`, `goal()` |
 | **Guardrails** | Orchestrator-level | Orchestrator-level + per-agent |
 | **Constraints** | Orchestrator-level | Orchestrator-level + per-agent |
 | **Approval** | `approve()` / `reject()` | `approve()` / `reject()` (routes to correct agent) |
@@ -117,7 +118,7 @@ const result = await multi.runAgent('researcher', 'What is WASM?');
 | **Memory** | Sliding window, token-based, or hybrid conversation management |
 | **Resilience** | Intelligent retry, provider fallback chains, and cost budget guards |
 | **Circuit Breaker** | Automatic fault isolation for failing agent calls |
-| **Converge Pattern** | Desired-state convergence &ndash; declare produces/requires, runtime resolves |
+| **Goal Pattern** | Desired-state goal resolution &ndash; declare produces/requires, runtime resolves |
 | **Checkpoints** | Save/resume mid-pattern state for fault tolerance, forking, and progress tracking |
 | **Evals** | Dataset-driven quality evaluation with built-in and LLM-as-judge criteria |
 | **DevTools** | Real-time debugging UI with 8 specialized views |
@@ -181,7 +182,7 @@ const result = await orchestrator.run(agent, 'Hello!');
 | Feature | Page | Description |
 |---------|------|-------------|
 | [Debug Timeline](/ai/debug-timeline) | Event Recording | 25+ event types with time-travel correlation |
-| [Pattern Checkpoints](/ai/checkpoints) | Fault Tolerance | Save/resume all 6 patterns, progress tracking, forking |
+| [Pattern Checkpoints](/ai/checkpoints) | Fault Tolerance | Save/resume all 8 patterns, progress tracking, forking |
 | [Breakpoints & Checkpoints](/ai/breakpoints) | Pausing & State | Human-in-the-loop debugging, persistent snapshots |
 | [DevTools](/ai/devtools) | Visual Debugging | 3 active views (Timeline, Cost, State) &plus; 5 planned (Flamechart, DAG, Health, Breakpoints, Compare) |
 | [Evals](/ai/evals) | Quality Measurement | 10 built-in criteria, LLM-as-judge, CI assertions |

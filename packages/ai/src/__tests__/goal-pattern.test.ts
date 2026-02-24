@@ -3,7 +3,7 @@ import {
   createTestMultiAgentOrchestrator,
 } from "../testing.js";
 import {
-  converge,
+  goal,
   allReadyStrategy,
   highestImpactStrategy,
   costEfficientStrategy,
@@ -12,15 +12,15 @@ import {
   patternToJSON,
   patternFromJSON,
 } from "../multi-agent-orchestrator.js";
-import type { ConvergeResult, ConvergeMetrics, ConvergeCheckpointState } from "../types.js";
+import type { GoalResult, GoalMetrics, GoalCheckpointState } from "../types.js";
 import { InMemoryCheckpointStore } from "../checkpoint.js";
 
 // ============================================================================
 // Tests
 // ============================================================================
 
-describe("converge pattern", () => {
-  it("basic convergence — 3 nodes with linear dependencies converge", async () => {
+describe("goal pattern", () => {
+  it("basic goal achievement — 3 nodes with linear dependencies achieve goal", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         researcher: { agent: { name: "researcher" } },
@@ -55,7 +55,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         researcher: {
           agent: "researcher",
@@ -88,7 +88,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     expect(result.result).toBe("A great article about AI Safety");
     expect(result.executionOrder).toContain("researcher");
     expect(result.executionOrder).toContain("writer");
@@ -137,7 +137,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         a: {
           agent: "a",
@@ -161,7 +161,7 @@ describe("converge pattern", () => {
       { maxSteps: 5 },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     // a and b should both run before merger (since they have no deps)
     const aIdx = callOrder.indexOf("a");
     const bIdx = callOrder.indexOf("b");
@@ -203,7 +203,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         writer: {
           agent: "writer",
@@ -224,7 +224,7 @@ describe("converge pattern", () => {
       { maxSteps: 10 },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     expect(reviewerCalls).toBeGreaterThanOrEqual(2);
   });
 
@@ -252,7 +252,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         flaky: {
           agent: "flaky",
@@ -280,7 +280,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     // Flaky should have been called 3 times (MAX_CONSECUTIVE_FAILURES) before being excluded
     expect(failCount).toBe(3);
   });
@@ -295,7 +295,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         a: {
           agent: "a",
@@ -314,12 +314,12 @@ describe("converge pattern", () => {
       { maxSteps: 10 },
     );
 
-    expect(result.converged).toBe(false);
+    expect(result.achieved).toBe(false);
     expect(result.error).toBeDefined();
     expect(result.error).toContain("stalled");
   });
 
-  it("relaxation — stall triggers tier, convergence resumes", async () => {
+  it("relaxation — stall triggers tier, goal achievement resumes", async () => {
     let injected = false;
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -338,7 +338,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -364,7 +364,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     expect(result.relaxations).toHaveLength(1);
     expect(result.relaxations[0]!.label).toBe("inject-data");
     expect(result.relaxations[0]!.strategy).toBe("inject_facts");
@@ -383,7 +383,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -411,7 +411,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(false);
+    expect(result.achieved).toBe(false);
     expect(result.error).toContain("accept");
     expect(result.facts.partial).toBe("data");
   });
@@ -432,7 +432,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         a: {
           agent: "a",
@@ -461,7 +461,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     // First step should have limited to 2 agents
     if (selectedAgents.length > 0 && selectedAgents[0]!.length > 0) {
       expect(selectedAgents[0]!.length).toBeLessThanOrEqual(2);
@@ -486,7 +486,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         a: {
           agent: "a",
@@ -518,7 +518,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     expect(result.stepMetrics.length).toBeGreaterThanOrEqual(1);
 
     // Satisfaction should progress from 0 toward 1
@@ -526,7 +526,7 @@ describe("converge pattern", () => {
     expect(lastMetric.satisfaction).toBeGreaterThan(0);
   });
 
-  it("timeout support — returns non-converged on timeout", async () => {
+  it("timeout support — returns non-achieved on timeout", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         slow: { agent: { name: "slow" } },
@@ -540,7 +540,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         slow: {
           agent: "slow",
@@ -557,11 +557,11 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(false);
+    expect(result.achieved).toBe(false);
     expect(result.error).toBeDefined();
   });
 
-  it("abort signal — returns non-converged on abort", async () => {
+  it("abort signal — returns non-achieved on abort", async () => {
     const controller = new AbortController();
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -582,7 +582,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -599,7 +599,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(false);
+    expect(result.achieved).toBe(false);
     expect(result.error).toContain("Abort");
   });
 
@@ -620,7 +620,7 @@ describe("converge pattern", () => {
         },
       },
       patterns: {
-        myPipeline: converge(
+        myPipeline: goal(
           {
             fetcher: {
               agent: "fetcher",
@@ -645,7 +645,7 @@ describe("converge pattern", () => {
     expect(result).toBe("done");
   });
 
-  it("composePatterns integration — converge + debate", async () => {
+  it("composePatterns integration — goal + debate", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         worker: { agent: { name: "worker" } },
@@ -668,7 +668,7 @@ describe("converge pattern", () => {
     });
 
     const pipeline = composePatterns(
-      converge(
+      goal(
         {
           worker: {
             agent: "worker",
@@ -691,8 +691,8 @@ describe("converge pattern", () => {
     expect(result).toBe("critique 1");
   });
 
-  it("converge factory creates valid ConvergePattern", () => {
-    const pattern = converge(
+  it("goal factory creates valid GoalPattern", () => {
+    const pattern = goal(
       {
         a: { agent: "a", produces: ["x"] },
       },
@@ -700,7 +700,7 @@ describe("converge pattern", () => {
       { maxSteps: 5 },
     );
 
-    expect(pattern.type).toBe("converge");
+    expect(pattern.type).toBe("goal");
     expect(pattern.nodes.a).toBeDefined();
     expect(pattern.maxSteps).toBe(5);
     expect(typeof pattern.when).toBe("function");
@@ -711,7 +711,7 @@ describe("converge pattern", () => {
     const selected = strategy.select(
       ["a", "b", "c"],
       {},
-      { satisfaction: 0, convergenceRate: 0, estimatedStepsRemaining: null, decelerating: false },
+      { satisfaction: 0, progressRate: 0, estimatedStepsRemaining: null, decelerating: false },
     );
 
     expect(selected).toEqual(["a", "b", "c"]);
@@ -726,7 +726,7 @@ describe("converge pattern", () => {
         b: { runs: 3, avgSatisfactionDelta: 0.3, tokens: 100 },
         c: { runs: 3, avgSatisfactionDelta: 0.2, tokens: 100 },
       },
-      { satisfaction: 0.5, convergenceRate: 0, estimatedStepsRemaining: null, decelerating: false },
+      { satisfaction: 0.5, progressRate: 0, estimatedStepsRemaining: null, decelerating: false },
     );
 
     expect(selected).toHaveLength(2);
@@ -742,15 +742,15 @@ describe("converge pattern", () => {
         expensive: { runs: 5, avgSatisfactionDelta: 0.1, tokens: 1000 },
         cheap: { runs: 5, avgSatisfactionDelta: 0.1, tokens: 100 },
       },
-      { satisfaction: 0.5, convergenceRate: 0, estimatedStepsRemaining: null, decelerating: false },
+      { satisfaction: 0.5, progressRate: 0, estimatedStepsRemaining: null, decelerating: false },
     );
 
     // Cheap should come first
     expect(selected[0]).toBe("cheap");
   });
 
-  it("patternToJSON/patternFromJSON round-trip for converge", () => {
-    const pattern = converge(
+  it("patternToJSON/patternFromJSON round-trip for goal", () => {
+    const pattern = goal(
       {
         a: { agent: "a", produces: ["x"], requires: ["y"], priority: 10 },
         b: { agent: "b", produces: ["z"], allowRerun: true },
@@ -760,8 +760,8 @@ describe("converge pattern", () => {
     );
 
     const json = patternToJSON(pattern);
-    expect(json.type).toBe("converge");
-    if (json.type === "converge") {
+    expect(json.type).toBe("goal");
+    if (json.type === "goal") {
       expect(json.nodes.a.agent).toBe("a");
       expect(json.nodes.a.produces).toEqual(["x"]);
       expect(json.nodes.a.requires).toEqual(["y"]);
@@ -774,7 +774,7 @@ describe("converge pattern", () => {
     const restored = patternFromJSON(json, {
       when: (facts: Record<string, unknown>) => facts.x != null,
     });
-    expect(restored.type).toBe("converge");
+    expect(restored.type).toBe("goal");
   });
 
   it("onStep callback fires with correct arguments", async () => {
@@ -792,7 +792,7 @@ describe("converge pattern", () => {
       },
     });
 
-    await orchestrator.runConverge(
+    await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -815,7 +815,7 @@ describe("converge pattern", () => {
     expect(steps[0]!.readyAgents).toContain("worker");
   });
 
-  it("max steps exhausted returns non-converged result", async () => {
+  it("max steps exhausted returns non-achieved result", async () => {
     let callCount = 0;
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -835,7 +835,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -850,7 +850,7 @@ describe("converge pattern", () => {
       { maxSteps: 3 },
     );
 
-    expect(result.converged).toBe(false);
+    expect(result.achieved).toBe(false);
     expect(result.steps).toBe(3);
     expect(result.error).toContain("Max steps");
   });
@@ -885,7 +885,7 @@ describe("converge pattern", () => {
       },
     });
 
-    await orchestrator.runConverge(
+    await orchestrator.runGoal(
       {
         low: {
           agent: "low",
@@ -930,7 +930,7 @@ describe("converge pattern", () => {
       },
     });
 
-    await orchestrator.runConverge(
+    await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -958,7 +958,7 @@ describe("converge pattern", () => {
     });
 
     await expect(
-      orchestrator.runConverge(
+      orchestrator.runGoal(
         {
           ghost: {
             agent: "nonexistent",
@@ -995,7 +995,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         writer: {
           agent: "writer",
@@ -1017,7 +1017,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     expect(writerCalls).toBeGreaterThanOrEqual(2);
     expect(result.relaxations.length).toBeGreaterThanOrEqual(1);
   });
@@ -1039,7 +1039,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -1059,8 +1059,8 @@ describe("converge pattern", () => {
       { maxSteps: 5 },
     );
 
-    // Should still converge after the first when() throw is caught
-    expect(result.converged).toBe(true);
+    // Should still achieve goal after the first when() throw is caught
+    expect(result.achieved).toBe(true);
     expect(whenCalls).toBeGreaterThanOrEqual(2);
   });
 
@@ -1084,7 +1084,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -1105,7 +1105,7 @@ describe("converge pattern", () => {
       { maxSteps: 5 },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     expect(extractCalls).toBeGreaterThanOrEqual(1);
   });
 
@@ -1122,7 +1122,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -1140,7 +1140,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
   });
 
   // ---- C2: Cycle detection ----
@@ -1158,7 +1158,7 @@ describe("converge pattern", () => {
     });
 
     await expect(
-      orchestrator.runConverge(
+      orchestrator.runGoal(
         {
           a: {
             agent: "a",
@@ -1193,7 +1193,7 @@ describe("converge pattern", () => {
     });
 
     let callIdx = 0;
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -1219,7 +1219,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     // Step metrics should have valid satisfaction values
     for (const sm of result.stepMetrics) {
       expect(Number.isFinite(sm.satisfaction)).toBe(true);
@@ -1243,7 +1243,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -1261,14 +1261,14 @@ describe("converge pattern", () => {
       },
     );
 
-    // Should still converge because fallback kicks in
-    expect(result.converged).toBe(true);
+    // Should still achieve goal because fallback kicks in
+    expect(result.achieved).toBe(true);
   });
 
   // ---- M7: estimatedStepsRemaining computed ----
 
-  it("M7: ConvergeMetrics includes estimatedStepsRemaining and decelerating", async () => {
-    const metricsReceived: ConvergeMetrics[] = [];
+  it("M7: GoalMetrics includes estimatedStepsRemaining and decelerating", async () => {
+    const metricsReceived: GoalMetrics[] = [];
 
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
@@ -1283,7 +1283,7 @@ describe("converge pattern", () => {
       },
     });
 
-    await orchestrator.runConverge(
+    await orchestrator.runGoal(
       {
         a: { agent: "a", produces: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
         b: { agent: "b", produces: ["b.done"], requires: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
@@ -1308,8 +1308,8 @@ describe("converge pattern", () => {
           return score;
         },
         selectionStrategy: {
-          select: (ready, _metrics, convergence) => {
-            metricsReceived.push({ ...convergence });
+          select: (ready, _metrics, goalMetrics) => {
+            metricsReceived.push({ ...goalMetrics });
 
             return ready;
           },
@@ -1321,8 +1321,8 @@ describe("converge pattern", () => {
     if (metricsReceived.length >= 2) {
       const m = metricsReceived[metricsReceived.length - 1]!;
       expect(typeof m.decelerating).toBe("boolean");
-      // convergenceRate should be non-zero after progress
-      expect(m.convergenceRate).toBeGreaterThanOrEqual(0);
+      // progressRate should be non-zero after progress
+      expect(m.progressRate).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -1349,7 +1349,7 @@ describe("converge pattern", () => {
       },
     });
 
-    const result = await orchestrator.runConverge(
+    const result = await orchestrator.runGoal(
       {
         worker: {
           agent: "worker",
@@ -1371,7 +1371,7 @@ describe("converge pattern", () => {
       },
     );
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
 
     // Should have saved checkpoints every 2 steps
     const checkpoints = await store.list();
@@ -1383,7 +1383,7 @@ describe("converge pattern", () => {
     }
   });
 
-  it("P5: resume from checkpoint continues convergence", async () => {
+  it("P5: resume from checkpoint continues goal achievement", async () => {
     let callCount = 0;
 
     const makeOrchestrator = () =>
@@ -1404,10 +1404,10 @@ describe("converge pattern", () => {
         },
       });
 
-    // Build a synthetic checkpoint state as if we stopped mid-convergence at step 3
+    // Build a synthetic checkpoint state as if we stopped mid-goal achievement at step 3
     // nodeInputHashes stores the input the worker LAST ran with (counter=2 produced counter=3)
-    const checkpointState: ConvergeCheckpointState = {
-      type: "converge",
+    const checkpointState: GoalCheckpointState = {
+      type: "goal",
       version: 1,
       id: "ckpt_test_resume",
       createdAt: new Date().toISOString(),
@@ -1434,7 +1434,7 @@ describe("converge pattern", () => {
 
     const orchestrator = makeOrchestrator();
 
-    const pattern = converge<number>(
+    const pattern = goal<number>(
       {
         worker: {
           agent: "worker",
@@ -1448,26 +1448,26 @@ describe("converge pattern", () => {
       { maxSteps: 10 },
     );
 
-    const result = await orchestrator.resumeConverge(checkpointState, pattern);
+    const result = await orchestrator.resumeGoal(checkpointState, pattern);
 
-    expect(result.converged).toBe(true);
+    expect(result.achieved).toBe(true);
     // Should have started from step 3, not step 0
     expect(result.executionOrder.length).toBeGreaterThan(3); // 3 from checkpoint + more runs
     // Step metrics should include the restored ones + new ones
     expect(result.stepMetrics.length).toBeGreaterThan(3);
   });
 
-  it("P5: resumeConverge rejects invalid checkpoint", async () => {
+  it("P5: resumeGoal rejects invalid checkpoint", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: { a: { agent: { name: "a" } } },
       mockResponses: { a: { output: "ok", totalTokens: 5 } },
     });
 
     await expect(
-      orchestrator.resumeConverge(
+      orchestrator.resumeGoal(
         { version: 2 } as any,
-        converge({ a: { agent: "a", produces: ["x"] } }, () => true),
+        goal({ a: { agent: "a", produces: ["x"] } }, () => true),
       ),
-    ).rejects.toThrow("Invalid converge checkpoint state");
+    ).rejects.toThrow("Invalid goal checkpoint state");
   });
 });

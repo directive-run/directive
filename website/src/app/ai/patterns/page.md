@@ -1,6 +1,6 @@
 ---
 title: Execution Patterns
-description: Parallel, sequential, supervisor, DAG, race, reflect, debate, and converge patterns for multi-agent orchestration.
+description: 8 built-in execution patterns for goal-directed agent orchestration — parallel, sequential, supervisor, DAG, race, reflect, debate, and goal. Declarative dependency resolution with satisfaction scoring.
 ---
 
 Declarative and imperative execution patterns for coordinating multiple agents. {% .lead %}
@@ -50,7 +50,7 @@ const result = await orchestrator.runPattern('pipeline', 'Write about WASM');
 | `race` | Fastest wins | Competing agents | Winner's output |
 | `reflect` | Self-improvement | Agent + evaluator | Best iteration |
 | `debate` | Adversarial refinement | Multiple + judge | Winner per round |
-| `converge` | Desired-state reconciliation | Any topology | Converged facts |
+| `goal` | Desired-state goal resolution | Any topology | Achieved facts |
 
 ---
 
@@ -609,18 +609,22 @@ Timeline events: `debate_round` with round number, `winnerId`, `score`, and `age
 
 ---
 
-## Converge
+## Goal
 
-Declare the desired end-state and let the runtime figure out which agents to run. Nodes declare what they `produce` and `require` — the runtime resolves the dependency graph and drives agents to convergence.
+Declare the desired end-state and let the runtime figure out which agents to run. Nodes declare what they `produce` and `require` — the runtime resolves the dependency graph and drives agents to goal achievement.
+
+{% callout title="Goal vs DAG" %}
+**DAG** requires you to wire the execution graph manually with explicit `deps` edges — it's a static topology. **Goal** infers the graph from `produces`/`requires` declarations and drives toward a `when()` condition — it's dynamic, adaptive pursuit. Use DAG when you know the exact execution order upfront. Use Goal when you want the runtime to figure out ordering, handle stalls with relaxation, and track satisfaction progress toward a desired end-state.
+{% /callout %}
 
 {% callout title="Standalone utilities" %}
-Need convergence planning without an orchestrator? Use `planConvergence()`, `validateConvergence()`, and `getDependencyGraph()` from `@directive-run/ai`. These work with the same `produces`/`requires` declarations. All 6 multi-step patterns support [checkpointing](/ai/checkpoints) for fault tolerance.
+Need goal planning without an orchestrator? Use `planGoal()`, `validateGoal()`, and `getDependencyGraph()` from `@directive-run/ai`. These work with the same `produces`/`requires` declarations. All 6 multi-step patterns support [checkpointing](/ai/checkpoints) for fault tolerance.
 {% /callout %}
 
 ### Quick Start
 
 ```typescript
-const result = await orchestrator.runConverge(
+const result = await orchestrator.runGoal(
   {
     fetcher: {
       agent: 'fetcher',
@@ -640,14 +644,14 @@ const result = await orchestrator.runConverge(
 );
 ```
 
-Each node declares `produces` (fact keys it writes) and `requires` (fact keys it needs). The `when` callback defines the convergence condition. The runtime iterates: find ready nodes, run them in parallel, merge output facts, check convergence.
+Each node declares `produces` (fact keys it writes) and `requires` (fact keys it needs). The `when` callback defines the goal condition. The runtime iterates: find ready nodes, run them in parallel, merge output facts, check goal achievement.
 
 ### Named Pattern
 
-Register a converge pattern for reuse:
+Register a goal pattern for reuse:
 
 ```typescript
-import { converge } from '@directive-run/ai';
+import { goal } from '@directive-run/ai';
 
 const orchestrator = createMultiAgentOrchestrator({
   runner,
@@ -657,7 +661,7 @@ const orchestrator = createMultiAgentOrchestrator({
     reviewer: { agent: reviewer },
   },
   patterns: {
-    articlePipeline: converge(
+    articlePipeline: goal(
       {
         researcher: {
           agent: 'researcher',
@@ -699,21 +703,21 @@ Control which ready nodes run each step:
 import { allReadyStrategy, highestImpactStrategy, costEfficientStrategy } from '@directive-run/ai';
 
 // Run all ready nodes (default)
-converge(nodes, when, { selectionStrategy: allReadyStrategy() });
+goal(nodes, when, { selectionStrategy: allReadyStrategy() });
 
 // Pick top N by historical satisfaction impact
-converge(nodes, when, { selectionStrategy: highestImpactStrategy({ topN: 2 }) });
+goal(nodes, when, { selectionStrategy: highestImpactStrategy({ topN: 2 }) });
 
 // Prefer agents with lower token cost per satisfaction delta
-converge(nodes, when, { selectionStrategy: costEfficientStrategy() });
+goal(nodes, when, { selectionStrategy: costEfficientStrategy() });
 ```
 
 ### Relaxation Tiers
 
-When convergence stalls, progressively apply recovery strategies:
+When goal resolution stalls, progressively apply recovery strategies:
 
 ```typescript
-converge(nodes, when, {
+goal(nodes, when, {
   relaxation: [
     { label: 'retry-reviewer', afterStallSteps: 3, strategy: { type: 'allow_rerun', nodes: ['reviewer'] } },
     { label: 'inject-defaults', afterStallSteps: 5, strategy: { type: 'inject_facts', facts: { 'article.approved': true } } },
@@ -730,27 +734,27 @@ converge(nodes, when, {
 | `alternative_nodes` | Add new nodes to the graph |
 | `custom` | Run arbitrary async logic |
 
-### ConvergeResult
+### GoalResult
 
-`runConverge()` returns a `ConvergeResult<T>` with convergence metadata:
+`runGoal()` returns a `GoalResult<T>` with goal achievement metadata:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `converged` | `boolean` | Whether `when()` was satisfied |
+| `achieved` | `boolean` | Whether `when()` was satisfied |
 | `result` | `T` | Extracted result (from `extract`, or raw facts) |
 | `facts` | `Record<string, unknown>` | Final facts state |
 | `executionOrder` | `string[]` | Nodes that ran, in order |
-| `steps` | `number` | Total convergence steps |
+| `steps` | `number` | Total goal resolution steps |
 | `totalTokens` | `number` | Tokens consumed |
-| `stepMetrics` | `ConvergeStepMetrics[]` | Per-step satisfaction and timing |
+| `stepMetrics` | `GoalStepMetrics[]` | Per-step satisfaction and timing |
 | `relaxations` | `RelaxationRecord[]` | Applied relaxation events |
 
 ### Checkpoint & Resume
 
-Save convergence state at intervals for fault tolerance in long-running workflows:
+Save goal resolution state at intervals for fault tolerance in long-running workflows:
 
 ```typescript
-const result = await orchestrator.runConverge(nodes, input, when, {
+const result = await orchestrator.runGoal(nodes, input, when, {
   checkpoint: {
     everyN: 5,
     store: myCheckpointStore, // or uses orchestrator's store
@@ -764,16 +768,16 @@ Resume from a saved checkpoint:
 ```typescript
 // Load the checkpoint (stored as systemExport JSON)
 const checkpoint = await store.load(checkpointId);
-const state = JSON.parse(checkpoint.systemExport) as ConvergeCheckpointState;
+const state = JSON.parse(checkpoint.systemExport) as GoalCheckpointState;
 
 // Resume with the same pattern definition
-const result = await orchestrator.resumeConverge(state, pattern);
+const result = await orchestrator.resumeGoal(state, pattern);
 ```
 
 The checkpoint captures facts, completed nodes, failure counts, step metrics, and relaxation state — everything needed to continue exactly where you left off.
 
 {% callout title="All patterns support checkpoints" %}
-Checkpointing works with all 6 multi-step patterns (sequential, supervisor, reflect, debate, DAG, converge). See the [Pattern Checkpoints](/ai/checkpoints) page for per-pattern examples, progress tracking, diffing, forking, and the full API reference.
+Checkpointing works with all 6 multi-step patterns (sequential, supervisor, reflect, debate, DAG, goal). See the [Pattern Checkpoints](/ai/checkpoints) page for per-pattern examples, progress tracking, diffing, forking, and the full API reference.
 {% /callout %}
 
 ---

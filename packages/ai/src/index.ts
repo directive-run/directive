@@ -138,8 +138,9 @@ export type {
   CheckpointDiff,
   CheckpointSaveEvent,
   CheckpointRestoreEvent,
-  ConvergeCheckpointConfig,
-  ConvergeCheckpointState,
+  /** @deprecated Use PatternCheckpointConfig instead */
+  GoalCheckpointConfig,
+  GoalCheckpointState,
 } from "./types.js";
 
 export { GuardrailError, isGuardrailError } from "./types.js";
@@ -260,7 +261,7 @@ export {
   reflect,
   race,
   debate,
-  converge,
+  goal,
   allReadyStrategy,
   highestImpactStrategy,
   costEfficientStrategy,
@@ -300,11 +301,11 @@ export {
   type DebateConfig,
   type DebateResult,
   type DebatePattern,
-  type ConvergePattern,
-  type ConvergeNode,
-  type ConvergeResult,
-  type ConvergeStepMetrics,
-  type ConvergeMetrics,
+  type GoalPattern,
+  type GoalNode,
+  type GoalResult,
+  type GoalStepMetrics,
+  type GoalMetrics,
   type AgentSelectionStrategy,
   type RelaxationTier,
   type RelaxationStrategy,
@@ -314,7 +315,7 @@ export {
   type SpawnPoolConfig,
   type SerializedPattern,
   type SerializedDagNode,
-  type SerializedConvergeNode,
+  type SerializedGoalNode,
   type HandoffRequest,
   type HandoffResult,
   type RunAgentRequirement,
@@ -624,18 +625,21 @@ export {
   type ReflectionEvaluator,
 } from "./reflection.js";
 
-// Convergence Utilities (standalone plan, validate, dependency graph)
+// Goal Utilities (standalone plan, validate, dependency graph, explain)
 export {
-  planConvergence,
-  validateConvergence,
+  planGoal,
+  validateGoal,
   getDependencyGraph,
-  type ConvergeAgentDeclaration,
-  type ConvergeDependencyEdge,
-  type ConvergeDependencyGraph,
-  type ConvergeValidationResult,
-  type ConvergePlanStep,
-  type ConvergenceExecutionPlan,
-} from "./converge-utils.js";
+  explainGoal,
+  type GoalAgentDeclaration,
+  type GoalDependencyEdge,
+  type GoalDependencyGraph,
+  type GoalValidationResult,
+  type GoalPlanStep,
+  type GoalExecutionPlan,
+  type GoalExplanation,
+  type GoalExplanationStep,
+} from "./goal-utils.js";
 
 // MCP (Model Context Protocol)
 export {
