@@ -57,7 +57,7 @@ All 6 multi-step patterns support checkpointing:
 | `reflect` | Every N iterations | Iteration count, history (scores, feedback), producer outputs |
 | `debate` | Every N rounds | Round number, proposals, judgements, tokens consumed |
 | `dag` | Every N completed nodes | Per-node statuses, outputs, errors, results |
-| `converge` | Every N steps | Facts, completed nodes, failure counts, step metrics, relaxation state |
+| `goal` | Every N steps | Facts, completed nodes, failure counts, step metrics, relaxation state |
 
 ---
 
@@ -84,8 +84,8 @@ The `when` predicate receives a `CheckpointContext`:
 interface CheckpointContext {
   step: number;            // Current step/round/iteration
   patternType: string;     // "sequential", "supervisor", "reflect", etc.
-  facts?: Record<string, unknown>;  // Converge pattern only
-  satisfaction?: number;            // Converge pattern only (0-1)
+  facts?: Record<string, unknown>;  // Goal pattern only
+  satisfaction?: number;            // Goal pattern only (0-1)
 }
 ```
 
@@ -176,10 +176,10 @@ const result = await orchestrator.runDag(
 
 Captures: per-node statuses, outputs, errors, node results, completed count, original input.
 
-### Converge
+### Goal
 
 ```typescript
-const result = await orchestrator.runConverge(
+const result = await orchestrator.runGoal(
   {
     fetcher: { agent: 'fetcher', produces: ['data'] },
     analyzer: { agent: 'analyzer', produces: ['analysis'], requires: ['data'] },
@@ -278,8 +278,8 @@ switch (state.type) {
   case 'dag':
     await orchestrator.resumeDag(state, pattern);
     break;
-  case 'converge':
-    await orchestrator.resumeConverge(state, pattern);
+  case 'goal':
+    await orchestrator.resumeGoal(state, pattern);
     break;
 }
 ```
@@ -315,7 +315,7 @@ const forked = await forkFromCheckpoint(
 );
 
 // The forked orchestrator is fully independent — changes don't affect the original
-const result = await forked.runConverge(nodes, newInput, when);
+const result = await forked.runGoal(nodes, newInput, when);
 ```
 
 The forked orchestrator receives a deep clone of the checkpoint state, so mutations in the fork never affect the original.
@@ -361,7 +361,7 @@ Get the current step number from any checkpoint state:
 import { getPatternStep } from '@directive-run/ai';
 
 const step = getPatternStep(checkpointState);
-// Returns: step (sequential/converge), round (supervisor/debate),
+// Returns: step (sequential/goal), round (supervisor/debate),
 //          iteration (reflect), completedCount (dag)
 ```
 
@@ -380,14 +380,14 @@ console.log(diff.patternType);    // Pattern type
 console.log(diff.stepDelta);      // Steps advanced
 console.log(diff.tokensDelta);    // Tokens consumed between checkpoints
 
-// Converge-specific: fact changes
+// Goal-specific: fact changes
 if (diff.facts) {
   console.log(diff.facts.added);   // New fact keys
   console.log(diff.facts.removed); // Removed fact keys
   console.log(diff.facts.changed); // Changed values: [{ key, before, after }]
 }
 
-// DAG/converge: nodes completed between checkpoints
+// DAG/goal: nodes completed between checkpoints
 if (diff.nodesCompleted) {
   console.log(diff.nodesCompleted); // Node IDs completed between A and B
 }
@@ -417,7 +417,7 @@ checkpoint: {
 // Combine with everyN: check every 3 steps, but only save if condition met
 checkpoint: {
   everyN: 3,
-  when: (context) => context.patternType === 'converge',
+  when: (context) => context.patternType === 'goal',
 }
 ```
 
@@ -478,7 +478,7 @@ const restores = timeline.getEventsByType('checkpoint_restore');
 | `resumeReflect(state, pattern, options?)` | Reflect |
 | `resumeDebate(state, pattern)` | Debate |
 | `resumeDag(state, pattern, options?)` | DAG |
-| `resumeConverge(state, pattern)` | Converge |
+| `resumeGoal(state, pattern)` | Goal |
 | `replay(checkpointId, pattern, options?)` | Auto-detect |
 
 ### Types
@@ -493,7 +493,7 @@ const restores = timeline.getEventsByType('checkpoint_restore');
 | `ReflectCheckpointState` | Reflect checkpoint |
 | `DebateCheckpointState` | Debate checkpoint |
 | `DagCheckpointState` | DAG checkpoint |
-| `ConvergeCheckpointState` | Converge checkpoint |
+| `GoalCheckpointState` | Goal checkpoint |
 | `CheckpointProgress` | Progress computed from state |
 | `CheckpointDiff` | Diff between two states |
 | `CheckpointStore` | Store interface |
