@@ -149,6 +149,8 @@ resolvers: {
 }
 ```
 
+{% resolver-retry-backoff-timeline-diagram /%}
+
 ### Retry Options
 
 | Option | Type | Default | Description |
@@ -288,6 +290,8 @@ When a constraint's `when()` becomes false while its resolver is running, the re
 ---
 
 ## Batched Resolution
+
+{% batched-resolution-diagram /%}
 
 Prevent N+1 problems by collecting requirements that match the same resolver over a time window, then resolving them in a single call:
 

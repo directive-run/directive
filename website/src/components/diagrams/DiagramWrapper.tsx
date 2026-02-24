@@ -5,7 +5,7 @@ import '@xyflow/react/dist/style.css'
 import clsx from 'clsx'
 import { useDiagramTheme } from './hooks/useDiagramTheme'
 
-interface DiagramWrapperProps extends Omit<ReactFlowProps, 'children'> {
+interface DiagramWrapperProps extends Omit<ReactFlowProps, 'children' | 'height'> {
   height?: number | string
   className?: string
   interactive?: boolean

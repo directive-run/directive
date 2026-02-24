@@ -20,13 +20,13 @@ Directive's AI adapter doesn't replace your LLM framework &ndash; it wraps it wi
 | **Execution patterns** | 8 built-in (parallel, sequential, supervisor, DAG, race, reflect, debate, goal) | LangGraph nodes/edges | Sequential/parallel | Round-robin chat | &ndash; |
 | **Constraints** | Declarative `when`/`require` | &ndash; | &ndash; | &ndash; | &ndash; |
 | **Time-travel debug** | Built-in snapshots + fork | LangSmith tracing | &ndash; | &ndash; | &ndash; |
-| **DevTools** | Visual debugger (3 active views, 5 planned) | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
+| **DevTools** | Visual debugger (12 views) | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
 | **Streaming** | Token-level with backpressure | LangChain streaming | &ndash; | &ndash; | Core strength |
 | **Memory** | 3 strategies + summarizers | LangChain memory | Crew memory | Chat history | &ndash; |
 | **Evals** | 10 built-in criteria + LLM judge | LangSmith evals | &ndash; | &ndash; | &ndash; |
 | **Self-healing** | Circuit breaker + auto-reroute | &ndash; | &ndash; | &ndash; | &ndash; |
 | **Goal pattern** | Desired-state goal resolution | &ndash; | Goal-oriented tasks | &ndash; | &ndash; |
-| **Pattern checkpoints** | Save/resume all 6 patterns | LangGraph checkpointing | &ndash; | &ndash; | &ndash; |
+| **Pattern checkpoints** | Save/resume all 8 patterns | LangGraph checkpointing | &ndash; | &ndash; | &ndash; |
 | **TypeScript** | First-class, fully typed | Python-first, TS port | Python only | Python-first, TS port | First-class |
 | **Bundle size** | Tree-shakeable, zero-cost debug | Large dependency tree | N/A (Python) | N/A (Python) | Small |
 

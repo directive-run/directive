@@ -2611,6 +2611,7 @@ export function createMultiAgentOrchestrator(
           inputTokens: result.tokenUsage?.inputTokens ?? 0,
           outputTokens: result.tokenUsage?.outputTokens ?? 0,
           durationMs: Date.now() - startTime,
+          modelId: registration.agent.model ?? undefined,
           ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
         });
       }
@@ -6221,16 +6222,16 @@ export function createMultiAgentOrchestrator(
       if (!checkpointState || checkpointState.version !== 1 || (checkpointState.type !== "goal" && (checkpointState as unknown as Record<string, unknown>).type !== "converge")) {
         throw new Error("[Directive MultiAgent] Invalid goal checkpoint state");
       }
-      // Migration shim: accept legacy "converge" checkpoint states
-      if ((checkpointState as unknown as Record<string, unknown>).type === "converge") {
-        (checkpointState as unknown as Record<string, unknown>).type = "goal";
-      }
+      // Migration shim: accept legacy "converge" checkpoint states (shallow copy to avoid mutating input)
+      const normalizedState = (checkpointState as unknown as Record<string, unknown>).type === "converge"
+        ? { ...checkpointState, type: "goal" as const }
+        : checkpointState;
 
       return runGoalInternal<T>(
         pattern,
         {}, // initialInput ignored when resumeFrom is provided
-        checkpointState.patternId,
-        checkpointState,
+        normalizedState.patternId,
+        normalizedState,
       );
     },
 
@@ -7794,15 +7795,15 @@ export function patternFromJSON<T = unknown>(
   json: SerializedPattern,
   overrides?: Partial<ExecutionPattern<T>>,
 ): ExecutionPattern<T> {
-  // Migration shim: accept legacy "converge" serialized patterns
-  if (json && typeof json === "object" && (json as Record<string, unknown>).type === "converge") {
-    (json as Record<string, unknown>).type = "goal";
-  }
-  if (!json || typeof json !== "object" || !ALLOWED_PATTERN_TYPES.has((json as SerializedPattern).type)) {
+  // Migration shim: accept legacy "converge" serialized patterns (shallow copy to avoid mutating input)
+  const normalized = (json && typeof json === "object" && (json as Record<string, unknown>).type === "converge")
+    ? { ...json, type: "goal" as const } as SerializedPattern
+    : json;
+  if (!normalized || typeof normalized !== "object" || !ALLOWED_PATTERN_TYPES.has((normalized as SerializedPattern).type)) {
     throw new Error(`[Directive] patternFromJSON: invalid or unknown pattern type "${(json as Record<string, unknown>)?.type}"`);
   }
   const safe: Record<string, unknown> = Object.create(null);
-  for (const [k, v] of Object.entries(json)) {
+  for (const [k, v] of Object.entries(normalized)) {
     if (k !== "__proto__" && k !== "constructor" && k !== "prototype") {
       safe[k] = v;
     }

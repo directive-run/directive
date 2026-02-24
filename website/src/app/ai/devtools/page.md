@@ -3,7 +3,7 @@ title: DevTools
 description: Real-time visual debugging for AI agent orchestration via WebSocket or SSE transport.
 ---
 
-A transport-agnostic debugging interface for agent orchestration with 3 active views and 5 more planned. {% .lead %}
+A transport-agnostic debugging interface for agent orchestration with 12 specialized views. {% .lead %}
 
 The DevTools server (`@directive-run/ai`) bridges your orchestrator's timeline, health, breakpoints, and state into a visual debugging interface via WebSocket, SSE, or any custom transport.
 
@@ -66,11 +66,7 @@ const server = createDevToolsServer({
 
 ## Views
 
-The DevTools UI has 8 specialized views, accessible as tabs. A time format selector (ms / elapsed / clock) applies across all views.
-
-{% callout type="warning" title="Implementation status" %}
-3 of 8 views are currently implemented (Timeline, Cost, State). The remaining 5 are planned — see the [Roadmap](#roadmap) section below.
-{% /callout %}
+The DevTools UI has 12 specialized views, accessible as tabs. A time format selector (ms / elapsed / clock) applies across all views.
 
 ### 1. Timeline
 

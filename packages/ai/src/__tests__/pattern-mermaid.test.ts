@@ -294,6 +294,95 @@ describe("patternToMermaid", () => {
     expect(result).toContain("__output([Output])");
   });
 
+  // ---------- goal ----------
+
+  it("renders goal pattern with produces/requires edges", () => {
+    const json: SerializedPattern = {
+      type: "goal",
+      nodes: {
+        fetch: { agent: "fetcher", produces: ["data"], requires: [] },
+        analyze: { agent: "analyzer", produces: ["analysis"], requires: ["data"] },
+        report: { agent: "reporter", produces: ["report"], requires: ["analysis"] },
+      },
+    };
+    const result = patternToMermaid(json, { direction: "TD" });
+
+    // fetch has no requires but IS referenced by edges, so renderGoal
+    // emits it as part of the edge lines (not as a standalone node)
+    expect(result).toBe(
+      [
+        "graph TD",
+        "  fetch[fetcher] -->|data| analyze[analyzer]",
+        "  analyze[analyzer] -->|analysis| report[reporter]",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("goal pattern — isolated nodes still appear", () => {
+    const json: SerializedPattern = {
+      type: "goal",
+      nodes: {
+        standalone: { agent: "loner", produces: ["x"], requires: [] },
+        another: { agent: "solo", produces: ["y"], requires: [] },
+      },
+    };
+    const result = patternToMermaid(json);
+
+    expect(result).toContain("standalone[loner]");
+    expect(result).toContain("another[solo]");
+  });
+
+  it("goal pattern — deduplicates edges (same producer→consumer pair)", () => {
+    const json: SerializedPattern = {
+      type: "goal",
+      nodes: {
+        source: { agent: "source-agent", produces: ["x", "y"], requires: [] },
+        sink: { agent: "sink-agent", produces: ["z"], requires: ["x", "y"] },
+      },
+    };
+    const result = patternToMermaid(json);
+
+    // renderGoal deduplicates by producer→consumer pair via edgeSet,
+    // so only the first factKey edge is emitted for a given pair
+    expect(result).toContain("source[source-agent] -->|x| sink[sink-agent]");
+    // Second edge (y) is deduplicated because source→sink already exists
+    expect(result).not.toContain("-->|y|");
+  });
+
+  it("goal pattern — diamond dependency", () => {
+    const json: SerializedPattern = {
+      type: "goal",
+      nodes: {
+        root: { agent: "root-agent", produces: ["raw"], requires: [] },
+        left: { agent: "left-agent", produces: ["left-out"], requires: ["raw"] },
+        right: { agent: "right-agent", produces: ["right-out"], requires: ["raw"] },
+        merge: { agent: "merge-agent", produces: ["final"], requires: ["left-out", "right-out"] },
+      },
+    };
+    const result = patternToMermaid(json);
+
+    expect(result).toContain("root[root-agent]");
+    expect(result).toContain("root[root-agent] -->|raw| left[left-agent]");
+    expect(result).toContain("root[root-agent] -->|raw| right[right-agent]");
+    expect(result).toContain("left[left-agent] -->|left-out| merge[merge-agent]");
+    expect(result).toContain("right[right-agent] -->|right-out| merge[merge-agent]");
+  });
+
+  it("goal pattern — missing producer gracefully skipped", () => {
+    const json: SerializedPattern = {
+      type: "goal",
+      nodes: {
+        analyzer: { agent: "analyzer", produces: ["analysis"], requires: ["external-data"] },
+      },
+    };
+    const result = patternToMermaid(json);
+
+    // No edge for external-data (no producer), but node still appears
+    expect(result).toContain("analyzer[analyzer]");
+    expect(result).not.toContain("external-data");
+  });
+
   // ---------- edge cases ----------
 
   it("throws on unknown pattern type", () => {

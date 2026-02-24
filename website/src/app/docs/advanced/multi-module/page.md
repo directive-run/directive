@@ -24,6 +24,8 @@ const system = createSystem({
 });
 ```
 
+{% multi-module-architecture-diagram /%}
+
 ---
 
 ## Namespaced Access
