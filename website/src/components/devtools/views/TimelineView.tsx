@@ -54,11 +54,48 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
     }
   }, [events, follow, zoom])
 
-  // M2: Wheel zoom + touch support via CSS touch-action
+  // Cmd/Ctrl + scroll wheel = zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
       setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z - e.deltaY * ZOOM_STEP * 0.01)))
+    }
+  }, [])
+
+  // Keyboard shortcuts: +/- zoom, 0 reset, arrow keys pan
+  const containerRef = useRef<HTMLDivElement>(null)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't capture when typing in inputs
+    if (e.target instanceof HTMLInputElement) {
+      return
+    }
+
+    switch (e.key) {
+      case '=':
+      case '+':
+        e.preventDefault()
+        setZoom((z) => Math.min(ZOOM_MAX, z * 1.5))
+        break
+      case '-':
+        e.preventDefault()
+        setZoom((z) => Math.max(ZOOM_MIN, z / 1.5))
+        break
+      case '0':
+        e.preventDefault()
+        setZoom(1)
+        break
+      case 'ArrowLeft':
+        e.preventDefault()
+        if (scrollRef.current) {
+          scrollRef.current.scrollLeft -= 100
+        }
+        break
+      case 'ArrowRight':
+        e.preventDefault()
+        if (scrollRef.current) {
+          scrollRef.current.scrollLeft += 100
+        }
+        break
     }
   }, [])
 
@@ -165,8 +202,13 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
   }
 
   return (
-    <div className="space-y-2">
-      {/* Zoom controls — M2: dedicated +/- buttons for mobile */}
+    <div
+      ref={containerRef}
+      className="space-y-2 outline-none"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
+      {/* Zoom controls */}
       <div className="flex items-center gap-2">
         <button
           className="cursor-pointer rounded px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
@@ -193,6 +235,9 @@ export function TimelineView({ events }: { events: DebugEvent[] }) {
           +
         </button>
         <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{zoom.toFixed(1)}x</span>
+        <span className="font-mono text-[9px] text-zinc-400/50 dark:text-zinc-600" title="Cmd/Ctrl+scroll to zoom · +/- keys · Arrow keys to pan · 0 to reset">
+          +/- zoom · arrows pan · 0 reset
+        </span>
         <div className="flex-1" />
         {/* m2: Renamed "Following" to "Auto-scroll" for clarity */}
         <button

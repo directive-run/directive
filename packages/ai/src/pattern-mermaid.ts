@@ -395,10 +395,13 @@ function renderGoal(
     for (const key of requires) {
       const producer = producerMap.get(key);
       if (producer && producer !== nodeId) {
+        const fromNode = p.nodes[producer];
+        if (!fromNode) {
+          continue;
+        }
         const edgeKey = `${producer}->${nodeId}`;
         if (!edgeSet.has(edgeKey)) {
           const fromId = sanitizeId(producer);
-          const fromNode = p.nodes[producer]!;
           const from = wrapNode(fromId, fromNode.agent, "agent", shapes);
           const to = wrapNode(id, node.agent, "agent", shapes);
           lines.push(`  ${from} -->|${sanitizeLabel(key)}| ${to}`);

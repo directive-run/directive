@@ -13,6 +13,8 @@ Redux, Zustand, XState, and React Query are excellent libraries &ndash; each sol
 
 {% comparison-table /%}
 
+{% redux-vs-directive-diagram /%}
+
 ---
 
 ## Redux

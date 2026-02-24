@@ -11,13 +11,7 @@ The AI adapter brings Directive's constraint system to AI agent orchestration. W
 
 Directive doesn't replace your agent framework &ndash; it wraps it:
 
-```
-Your Agent Framework (OpenAI, Anthropic, LangChain, etc.)
-    ↕
-Directive AI Adapter (guardrails, constraints, state)
-    ↕
-Your Application
-```
+{% ai-architecture-diagram /%}
 
 The AI adapter is organized into five sections:
 
@@ -121,7 +115,7 @@ const result = await multi.runAgent('researcher', 'What is WASM?');
 | **Goal Pattern** | Desired-state goal resolution &ndash; declare produces/requires, runtime resolves |
 | **Checkpoints** | Save/resume mid-pattern state for fault tolerance, forking, and progress tracking |
 | **Evals** | Dataset-driven quality evaluation with built-in and LLM-as-judge criteria |
-| **DevTools** | Real-time debugging UI with 8 specialized views |
+| **DevTools** | Real-time debugging UI with 12 specialized views |
 
 ---
 
@@ -184,7 +178,7 @@ const result = await orchestrator.run(agent, 'Hello!');
 | [Debug Timeline](/ai/debug-timeline) | Event Recording | 25+ event types with time-travel correlation |
 | [Pattern Checkpoints](/ai/checkpoints) | Fault Tolerance | Save/resume all 8 patterns, progress tracking, forking |
 | [Breakpoints & Checkpoints](/ai/breakpoints) | Pausing & State | Human-in-the-loop debugging, persistent snapshots |
-| [DevTools](/ai/devtools) | Visual Debugging | 3 active views (Timeline, Cost, State) &plus; 5 planned (Flamechart, DAG, Health, Breakpoints, Compare) |
+| [DevTools](/ai/devtools) | Visual Debugging | 12 views: Timeline, Cost, State, Guardrails, Events, Health, Flamechart, DAG, Goal, Memory, Budget, Config |
 | [Evals](/ai/evals) | Quality Measurement | 10 built-in criteria, LLM-as-judge, CI assertions |
 | [OpenTelemetry](/ai/otel) | Production Tracing | OTEL spans with GenAI semantic conventions |
 | [Testing](/ai/testing) | Test Utilities | Mock runners, test orchestrators, assertion helpers |
@@ -195,14 +189,7 @@ const result = await orchestrator.run(agent, 'Hello!');
 
 Directive provides security guardrails and compliance tooling for AI agent systems. See [Security & Compliance](/ai/security/overview) for full details.
 
-```
-User Input
-  → Prompt Injection Detection  (block attacks before they reach agents)
-  → PII Detection               (redact sensitive data from input)
-  → Agent Execution              (safe to process after filtering)
-  → Output PII Scan             (catch any data leaks in responses)
-  → Audit Trail                 (log every operation for compliance)
-```
+{% security-pipeline-diagram /%}
 
 | Feature | Threat Addressed |
 |---------|-----------------|

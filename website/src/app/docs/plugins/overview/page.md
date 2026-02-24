@@ -60,6 +60,8 @@ plugins: [
 
 If two plugins with the same `name` are registered, the second replaces the first with a warning.
 
+{% plugin-lifecycle-timeline-diagram /%}
+
 ---
 
 ## Conditional Plugins

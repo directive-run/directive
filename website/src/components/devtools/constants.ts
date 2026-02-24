@@ -60,7 +60,7 @@ export const EVENT_LABELS: Record<string, string> = {
   scratchpad_update: 'Scratchpad',
 }
 
-export const VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Flamechart', 'DAG', 'Memory', 'Budget', 'Config'] as const
+export const VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Flamechart', 'Graph', 'Goal', 'Memory', 'Budget', 'Config'] as const
 
 // Known model pricing defaults (per 1M tokens)
 export const DEFAULT_MODEL_PRICING: Record<string, { input: number; output: number; label: string }> = {

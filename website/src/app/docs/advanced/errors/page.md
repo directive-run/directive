@@ -147,6 +147,8 @@ const system = createSystem({
 });
 ```
 
+{% error-boundary-recovery-diagram /%}
+
 ### Recovery Strategies
 
 | Strategy | Behavior |

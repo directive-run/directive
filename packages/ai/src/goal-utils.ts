@@ -30,6 +30,16 @@
 
 import type { GoalResult, GoalStepMetrics, RelaxationRecord } from "./types.js";
 
+/** Clamp non-finite satisfaction values to 0 */
+function safeSatisfaction(val: number): number {
+  if (!Number.isFinite(val)) {
+    return 0;
+  }
+
+  return val;
+}
+
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -449,27 +459,29 @@ export function explainGoal<T = unknown>(
 ): GoalExplanation {
   const steps: GoalExplanationStep[] = result.stepMetrics.map(
     (metric: GoalStepMetrics) => {
+      const sat = safeSatisfaction(metric.satisfaction);
+      const satDelta = safeSatisfaction(metric.satisfactionDelta);
       const agentList = metric.nodesRun.join(", ");
       const factList = metric.factsProduced.length > 0
         ? metric.factsProduced.join(", ")
         : "none";
-      const prevSatisfaction = +(metric.satisfaction - metric.satisfactionDelta).toFixed(3);
-      const delta = metric.satisfactionDelta >= 0
-        ? `+${metric.satisfactionDelta.toFixed(3)}`
-        : metric.satisfactionDelta.toFixed(3);
+      const prevSatisfaction = +safeSatisfaction(sat - satDelta).toFixed(3);
+      const delta = satDelta >= 0
+        ? `+${satDelta.toFixed(3)}`
+        : satDelta.toFixed(3);
 
       const description =
         `Step ${metric.step}: Ran ${agentList}. ` +
         `Produced: ${factList}. ` +
-        `Satisfaction: ${prevSatisfaction} → ${metric.satisfaction.toFixed(3)} (${delta}). ` +
+        `Satisfaction: ${prevSatisfaction} → ${sat.toFixed(3)} (${delta}). ` +
         `${metric.tokensConsumed} tokens, ${metric.durationMs}ms.`;
 
       return {
         step: metric.step,
         agents: metric.nodesRun,
         factsProduced: metric.factsProduced,
-        satisfaction: metric.satisfaction,
-        satisfactionDelta: metric.satisfactionDelta,
+        satisfaction: sat,
+        satisfactionDelta: satDelta,
         durationMs: metric.durationMs,
         tokensConsumed: metric.tokensConsumed,
         description,
@@ -508,10 +520,10 @@ export function explainGoal<T = unknown>(
   });
 
   const firstSatisfaction = result.stepMetrics.length > 0
-    ? (result.stepMetrics[0]!.satisfaction - result.stepMetrics[0]!.satisfactionDelta).toFixed(1)
+    ? safeSatisfaction(result.stepMetrics[0]!.satisfaction - result.stepMetrics[0]!.satisfactionDelta).toFixed(3)
     : "0";
   const lastSatisfaction = result.stepMetrics.length > 0
-    ? result.stepMetrics[result.stepMetrics.length - 1]!.satisfaction.toFixed(1)
+    ? safeSatisfaction(result.stepMetrics[result.stepMetrics.length - 1]!.satisfaction).toFixed(3)
     : "0";
 
   const status = result.achieved ? "Goal achieved" : "Goal not achieved";

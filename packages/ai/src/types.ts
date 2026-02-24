@@ -688,7 +688,10 @@ export interface AgentCompleteEvent extends DebugEventBase {
   agentId: string;
   outputLength: number;
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   durationMs: number;
+  modelId?: string;
   /** Truncated output text (only when verboseTimeline is enabled) */
   output?: string;
 }

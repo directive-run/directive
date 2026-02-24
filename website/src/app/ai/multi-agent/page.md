@@ -7,6 +7,8 @@ Coordinate multiple agents with concurrency control, per-agent configuration, an
 
 The multi-agent orchestrator has **full feature parity** with the [single-agent orchestrator](/ai/orchestrator): guardrails (orchestrator-level + per-agent), streaming, approval workflows, pause/resume, memory, hooks, retry, budget, plugins, time-travel debugging, constraints, and resolvers. Each registered agent becomes a namespaced module in a Directive System.
 
+{% multi-agent-execution-diagram /%}
+
 ---
 
 ## Setup

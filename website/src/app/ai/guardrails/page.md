@@ -11,6 +11,8 @@ audit trails, and GDPR/CCPA compliance &ndash; see
 [Security & Compliance](/ai/security/overview).
 {% /callout %}
 
+{% guardrails-pipeline-diagram /%}
+
 ---
 
 ## Built-in Guardrails

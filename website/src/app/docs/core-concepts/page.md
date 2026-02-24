@@ -56,6 +56,8 @@ This shift has profound implications:
 | You coordinate async | System coordinates async |
 | Changes require rewiring | Changes require updating rules |
 
+{% reconciliation-cycle-diagram /%}
+
 ---
 
 ## The Four Pillars
@@ -97,6 +99,8 @@ resolve: async (req, context) => {
   context.facts.loading = false;
 }
 ```
+
+{% effect-vs-resolver-diagram /%}
 
 {% callout type="warning" title="Nested Object Mutations" %}
 Mutations to nested objects are not tracked. Always replace the entire object:
