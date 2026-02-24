@@ -70,6 +70,25 @@ import type {
   CrossAgentSnapshot,
   CrossAgentDerivationFn,
   Scratchpad,
+  ConvergePattern,
+  ConvergeNode,
+  ConvergeResult,
+  ConvergeStepMetrics,
+  ConvergeMetrics,
+  AgentSelectionStrategy,
+  RelaxationTier,
+  RelaxationRecord,
+  RelaxationContext,
+  ConvergeCheckpointState,
+  PatternCheckpointConfig,
+  PatternCheckpointState,
+  SequentialCheckpointState,
+  SupervisorCheckpointState,
+  ReflectCheckpointState,
+  DebateCheckpointState,
+  DagCheckpointState,
+  CheckpointProgress,
+  CheckpointDiff,
 } from "./types.js";
 import {
   GuardrailError,
@@ -168,6 +187,255 @@ function shallowEqual(a: unknown, b: unknown): boolean {
 
 // Async Semaphore (for slot acquisition without polling)
 // ============================================================================
+
+// ============================================================================
+// Checkpoint Utility Functions
+// ============================================================================
+
+/** Get the current step/round/iteration count from a pattern checkpoint state */
+export function getPatternStep(state: PatternCheckpointState): number {
+  switch (state.type) {
+    case "sequential": return state.step;
+    case "supervisor": return state.round;
+    case "reflect": return state.iteration;
+    case "debate": return state.round;
+    case "dag": return state.completedCount;
+    case "converge": return state.step;
+  }
+}
+
+/** Compute progress from a pattern checkpoint state */
+export function getCheckpointProgress(state: PatternCheckpointState): CheckpointProgress {
+  const stepsCompleted = getPatternStep(state);
+  const stepsTotal = state.stepsTotal ?? null;
+
+  switch (state.type) {
+    case "sequential": {
+      const tokensConsumed = state.results.reduce((sum, r) => sum + r.totalTokens, 0);
+      const avgTokens = state.results.length > 0 ? tokensConsumed / state.results.length : 0;
+      const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
+
+      return {
+        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        stepsCompleted,
+        stepsTotal,
+        tokensConsumed,
+        estimatedTokensRemaining: avgTokens > 0 && remaining != null ? Math.round(avgTokens * remaining) : null,
+        estimatedStepsRemaining: remaining,
+      };
+    }
+
+    case "supervisor": {
+      const tokensConsumed = state.workerResults.reduce((sum, r) => sum + r.totalTokens, 0);
+      const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
+
+      return {
+        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        stepsCompleted,
+        stepsTotal,
+        tokensConsumed,
+        estimatedTokensRemaining: null,
+        estimatedStepsRemaining: remaining,
+      };
+    }
+
+    case "reflect": {
+      const tokensConsumed = state.history.reduce(
+        (sum, h) => sum + h.producerTokens + h.evaluatorTokens, 0
+      );
+      const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
+
+      return {
+        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        stepsCompleted,
+        stepsTotal,
+        tokensConsumed,
+        estimatedTokensRemaining: null,
+        estimatedStepsRemaining: remaining,
+      };
+    }
+
+    case "debate": {
+      const tokensConsumed = state.tokensConsumed;
+      const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
+
+      return {
+        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        stepsCompleted,
+        stepsTotal,
+        tokensConsumed,
+        estimatedTokensRemaining: null,
+        estimatedStepsRemaining: remaining,
+      };
+    }
+
+    case "dag": {
+      const total = stepsTotal ?? Object.keys(state.statuses).length;
+      const completed = state.completedCount;
+      const tokensConsumed = Object.values(state.nodeResults).reduce(
+        (sum, r) => sum + r.totalTokens, 0
+      );
+      const avgTokens = completed > 0 ? tokensConsumed / completed : 0;
+      const remaining = total - completed;
+
+      return {
+        percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+        stepsCompleted: completed,
+        stepsTotal: total,
+        tokensConsumed,
+        estimatedTokensRemaining: remaining > 0 ? Math.round(avgTokens * remaining) : 0,
+        estimatedStepsRemaining: remaining,
+      };
+    }
+
+    case "converge": {
+      const tokensConsumed = Object.values(state.nodeOutputs).reduce(
+        (sum, r) => sum + r.totalTokens, 0
+      );
+      const satisfaction = state.lastSatisfaction;
+
+      return {
+        percentage: Math.round(satisfaction * 100),
+        stepsCompleted,
+        stepsTotal: stepsTotal ?? null,
+        tokensConsumed,
+        estimatedTokensRemaining: null,
+        estimatedStepsRemaining: state.stepMetrics.length > 0
+          ? estimateConvergeSteps(state)
+          : null,
+      };
+    }
+  }
+}
+
+function estimateConvergeSteps(state: ConvergeCheckpointState): number | null {
+  const metrics = state.stepMetrics;
+  if (metrics.length < 2) {
+    return null;
+  }
+
+  const remaining = 1.0 - state.lastSatisfaction;
+  if (remaining <= 0) {
+    return 0;
+  }
+
+  // Average satisfaction delta
+  const totalDelta = metrics.reduce((sum, m) => sum + Math.max(0, m.satisfactionDelta), 0);
+  const avgDelta = totalDelta / metrics.length;
+  if (avgDelta <= 0) {
+    return null;
+  }
+
+  return Math.ceil(remaining / avgDelta);
+}
+
+/** Compute the diff between two checkpoint states */
+export function diffCheckpoints(
+  a: PatternCheckpointState,
+  b: PatternCheckpointState,
+): CheckpointDiff {
+  if (a.type !== b.type) {
+    throw new Error(`[Directive Checkpoint] Cannot diff different pattern types: ${a.type} vs ${b.type}`);
+  }
+
+  const getTokens = (s: PatternCheckpointState): number => {
+    switch (s.type) {
+      case "sequential": return s.results.reduce((sum, r) => sum + r.totalTokens, 0);
+      case "supervisor": return s.workerResults.reduce((sum, r) => sum + r.totalTokens, 0);
+      case "reflect": return s.history.reduce((sum, h) => sum + h.producerTokens + h.evaluatorTokens, 0);
+      case "debate": return s.tokensConsumed;
+      case "dag": return Object.values(s.nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+      case "converge": return Object.values(s.nodeOutputs).reduce((sum, r) => sum + r.totalTokens, 0);
+    }
+  };
+
+  const diff: CheckpointDiff = {
+    patternType: a.type,
+    stepDelta: getPatternStep(b) - getPatternStep(a),
+    tokensDelta: getTokens(b) - getTokens(a),
+  };
+
+  // Add facts diff for converge pattern
+  if (a.type === "converge" && b.type === "converge") {
+    const aKeys = new Set(Object.keys(a.facts));
+    const bKeys = new Set(Object.keys(b.facts));
+    const added: string[] = [];
+    const removed: string[] = [];
+    const changed: Array<{ key: string; before: unknown; after: unknown }> = [];
+
+    for (const key of bKeys) {
+      if (!aKeys.has(key)) {
+        added.push(key);
+      } else if (JSON.stringify(a.facts[key]) !== JSON.stringify(b.facts[key])) {
+        changed.push({ key, before: a.facts[key], after: b.facts[key] });
+      }
+    }
+    for (const key of aKeys) {
+      if (!bKeys.has(key)) {
+        removed.push(key);
+      }
+    }
+
+    diff.facts = { added, removed, changed };
+  }
+
+  // Add nodes completed for DAG/converge
+  if (a.type === "dag" && b.type === "dag") {
+    const aCompleted = new Set(
+      Object.entries(a.statuses)
+        .filter(([, s]) => s === "completed")
+        .map(([id]) => id)
+    );
+    diff.nodesCompleted = Object.entries(b.statuses)
+      .filter(([id, s]) => s === "completed" && !aCompleted.has(id))
+      .map(([id]) => id);
+  }
+
+  if (a.type === "converge" && b.type === "converge") {
+    const aCompleted = new Set(a.completedNodes);
+    diff.nodesCompleted = b.completedNodes.filter((id) => !aCompleted.has(id));
+  }
+
+  return diff;
+}
+
+/**
+ * Fork an orchestrator from a checkpoint — creates a new independent orchestrator
+ * restored to the checkpoint's state, ready to diverge from that point.
+ *
+ * @param options - The original orchestrator options used to create the orchestrator
+ * @param checkpointStore - The checkpoint store containing the checkpoint
+ * @param checkpointId - The ID of the checkpoint to fork from
+ * @returns A new independent MultiAgentOrchestrator restored to checkpoint state
+ *
+ * @example
+ * ```typescript
+ * const forked = await forkFromCheckpoint(orchestratorOptions, store, "ckpt_abc123");
+ * const result = await forked.replay("ckpt_abc123", pattern, { input: "new input" });
+ * ```
+ */
+export async function forkFromCheckpoint(
+  options: MultiAgentOrchestratorOptions,
+  checkpointStore: CheckpointStore,
+  checkpointId: string,
+): Promise<MultiAgentOrchestrator> {
+  const checkpoint = await checkpointStore.load(checkpointId);
+  if (!checkpoint) {
+    throw new Error(`[Directive MultiAgent] Checkpoint not found: ${checkpointId}`);
+  }
+
+  // Deep-clone the checkpoint so the forked orchestrator is fully independent
+  const cloned = structuredClone(checkpoint);
+
+  const forked = createMultiAgentOrchestrator({
+    ...options,
+    checkpointStore,
+  });
+
+  forked.restore(cloned);
+
+  return forked;
+}
 
 /**
  * Async semaphore for controlling concurrent access.
@@ -376,6 +644,8 @@ export interface SequentialPattern<T = unknown> {
   extract?: (output: unknown) => T;
   /** Continue on error. @default false */
   continueOnError?: boolean;
+  /** Checkpoint configuration for mid-execution fault tolerance */
+  checkpoint?: PatternCheckpointConfig;
 }
 
 /** Supervisor pattern - one agent directs others */
@@ -389,6 +659,8 @@ export interface SupervisorPattern<T = unknown> {
   maxRounds?: number;
   /** Extract final result */
   extract?: (supervisorOutput: unknown, workerResults: RunResult<unknown>[]) => T;
+  /** Checkpoint configuration for mid-execution fault tolerance */
+  checkpoint?: PatternCheckpointConfig;
 }
 
 /** Record of a single reflection iteration (for score history) */
@@ -431,6 +703,8 @@ export interface ReflectPattern<T = unknown> {
   timeout?: number;
   /** Score threshold for acceptance. Number or function of iteration. When set, evaluator score >= threshold is treated as passed. */
   threshold?: number | ((iteration: number) => number);
+  /** Checkpoint configuration for mid-execution fault tolerance */
+  checkpoint?: PatternCheckpointConfig;
 }
 
 /**
@@ -497,10 +771,15 @@ export interface DebatePattern<T = unknown> {
   signal?: AbortSignal;
   /** Overall timeout (ms). Creates an internal AbortSignal. */
   timeout?: number;
+  /** Checkpoint configuration for mid-execution fault tolerance */
+  checkpoint?: PatternCheckpointConfig;
 }
 
 /** Re-export types consumed by tests / external consumers */
 export type { DagPattern, DagExecutionContext } from "./types.js";
+
+/** Re-export converge types consumed by tests / external consumers */
+export type { ConvergePattern, ConvergeNode, ConvergeResult, ConvergeStepMetrics, ConvergeMetrics, AgentSelectionStrategy, RelaxationTier, RelaxationStrategy, RelaxationRecord, RelaxationContext } from "./types.js";
 
 /** Union of all patterns */
 export type ExecutionPattern<T = unknown> =
@@ -510,7 +789,8 @@ export type ExecutionPattern<T = unknown> =
   | DagPattern<T>
   | ReflectPattern<T>
   | RacePattern<T>
-  | DebatePattern<T>;
+  | DebatePattern<T>
+  | ConvergePattern<T>;
 
 // ============================================================================
 // Handoff Types
@@ -648,7 +928,7 @@ export interface MultiAgentOrchestrator {
    * Use `runRace()` or `runDebate()` to access full results including `winnerId` and `allResults`.
    */
   runPattern<T>(patternId: string, input: string): Promise<T>;
-  /** Run agents in parallel */
+  /** Run agents in parallel. Note: parallel does not support checkpoint/resume (single-step pattern). */
   runParallel<T>(
     agentIds: string[],
     inputs: string | string[],
@@ -714,7 +994,7 @@ export interface MultiAgentOrchestrator {
   cancelBreakpoint(id: string, reason?: string): void;
   /** Get pending breakpoints */
   getPendingBreakpoints(): BreakpointRequest[];
-  /** Race multiple agents — first successful result wins, rest cancelled */
+  /** Race multiple agents — first successful result wins, rest cancelled. Note: race does not support checkpoint/resume (single-step pattern). */
   runRace<T>(
     agentIds: string[],
     input: string,
@@ -750,6 +1030,63 @@ export interface MultiAgentOrchestrator {
       timeout?: number;
     }
   ): Promise<DebateResult<T>>;
+  /** Run a converge pattern imperatively — declare desired state, let the runtime resolve */
+  runConverge<T>(
+    nodes: Record<string, ConvergeNode>,
+    initialInput: string | Record<string, unknown>,
+    when: (facts: Record<string, unknown>) => boolean,
+    options?: {
+      satisfaction?: (facts: Record<string, unknown>) => number;
+      maxSteps?: number;
+      extract?: (facts: Record<string, unknown>) => T;
+      timeout?: number;
+      signal?: AbortSignal;
+      selectionStrategy?: AgentSelectionStrategy;
+      relaxation?: RelaxationTier[];
+      onStep?: ConvergePattern["onStep"];
+      onStall?: ConvergePattern["onStall"];
+      checkpoint?: PatternCheckpointConfig;
+    },
+  ): Promise<ConvergeResult<T>>;
+  /** Resume a converge pattern from a saved checkpoint */
+  resumeConverge<T>(
+    checkpointState: ConvergeCheckpointState,
+    pattern: ConvergePattern<T>,
+  ): Promise<ConvergeResult<T>>;
+  /** Resume a sequential pattern from a saved checkpoint */
+  resumeSequential<T>(
+    checkpointState: SequentialCheckpointState,
+    pattern: SequentialPattern<T>,
+  ): Promise<T>;
+  /** Resume a supervisor pattern from a saved checkpoint */
+  resumeSupervisor<T>(
+    checkpointState: SupervisorCheckpointState,
+    pattern: SupervisorPattern<T>,
+    options?: { input?: string },
+  ): Promise<T>;
+  /** Resume a reflect pattern from a saved checkpoint */
+  resumeReflect<T>(
+    checkpointState: ReflectCheckpointState,
+    pattern: ReflectPattern<T>,
+    options?: { input?: string },
+  ): Promise<T>;
+  /** Resume a debate pattern from a saved checkpoint */
+  resumeDebate<T>(
+    checkpointState: DebateCheckpointState,
+    pattern: DebatePattern<T>,
+  ): Promise<DebateResult<T>>;
+  /** Resume a DAG pattern from a saved checkpoint */
+  resumeDag<T>(
+    checkpointState: DagCheckpointState,
+    pattern: DagPattern<T>,
+    options?: { input?: string },
+  ): Promise<T>;
+  /** Replay from a saved checkpoint (auto-detects pattern type) */
+  replay<T>(
+    checkpointId: string,
+    pattern: ExecutionPattern,
+    options?: { input?: string },
+  ): Promise<T>;
   /**
    * Get reflection iteration history from last runReflectPattern call.
    * @deprecated Use the `history` field on the return value from `runReflect()` instead.
@@ -2271,6 +2608,8 @@ export function createMultiAgentOrchestrator(
           snapshotId: null,
           outputLength: outputStr.length,
           totalTokens: result.totalTokens,
+          inputTokens: result.tokenUsage?.inputTokens ?? 0,
+          outputTokens: result.tokenUsage?.outputTokens ?? 0,
           durationMs: Date.now() - startTime,
           ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
         });
@@ -2559,12 +2898,103 @@ export function createMultiAgentOrchestrator(
     }
   }
 
+  // ---- Shared checkpoint helper ----
+
+  /** Save a pattern checkpoint state to the configured store */
+  async function savePatternCheckpoint(
+    state: PatternCheckpointState,
+    store: CheckpointStore,
+    config?: PatternCheckpointConfig,
+  ): Promise<string | null> {
+    const step = getPatternStep(state);
+
+    // Conditional: evaluate when() predicate
+    if (config?.when) {
+      try {
+        const shouldSave = config.when({
+          step,
+          patternType: state.type,
+          facts: state.type === "converge" ? (state as ConvergeCheckpointState).facts : undefined,
+          satisfaction: state.type === "converge" ? (state as ConvergeCheckpointState).lastSatisfaction : undefined,
+        });
+        if (!shouldSave) {
+          return null;
+        }
+      } catch {
+        // If when() throws, skip this checkpoint
+        return null;
+      }
+    }
+
+    try {
+      const checkpoint: Checkpoint = {
+        version: 1,
+        id: state.id,
+        createdAt: state.createdAt,
+        label: state.label,
+        systemExport: JSON.stringify(state),
+        timelineExport: null,
+        localState: {
+          type: "multi",
+          globalTokenCount: 0,
+          globalStatus: "idle",
+          agentStates: {},
+          handoffCounter: 0,
+          pendingHandoffs: [],
+          handoffResults: [],
+          roundRobinCounters: null,
+        },
+        memoryExport: null,
+        orchestratorType: "multi",
+        metadata: { patternType: state.type },
+      };
+      await store.save(checkpoint);
+
+      // Record timeline event
+      if (timeline) {
+        timeline.record({
+          type: "checkpoint_save",
+          timestamp: Date.now(),
+          snapshotId: null,
+          checkpointId: state.id,
+          patternType: state.type,
+          step,
+        });
+      }
+
+      fireHook("onCheckpointSave", {
+        checkpointId: state.id,
+        patternType: state.type,
+        step,
+        timestamp: Date.now(),
+      });
+
+      return state.id;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error(`[Directive MultiAgent] ${state.type}: checkpoint save failed:`, error);
+
+      fireHook("onCheckpointError", {
+        patternType: state.type,
+        step,
+        error,
+        timestamp: Date.now(),
+      });
+
+      return null;
+    }
+  }
+
+  // ---- Pattern Runners ----
+
   async function runSequentialPattern<T>(
     pattern: SequentialPattern<T>,
     initialInput: string,
-    patternId?: string
+    patternId?: string,
+    resumeFrom?: SequentialCheckpointState,
   ): Promise<T> {
     const patternStartTime = Date.now();
+    const pId = patternId ?? "__inline_sequential";
     if (patternId) {
       fireHook("onPatternStart",{
         patternId,
@@ -2574,12 +3004,27 @@ export function createMultiAgentOrchestrator(
       });
     }
 
-    let currentInput = initialInput;
+    // Checkpoint config
+    const ckptConfig = pattern.checkpoint;
+    const ckptStore = ckptConfig?.store ?? checkpointStore;
+    const ckptEveryN = ckptConfig?.everyN ?? 5;
+    const ckptPrefix = ckptConfig?.labelPrefix ?? "sequential";
+
+    // Resume state
+    let currentInput = resumeFrom?.currentInput ?? initialInput;
     let lastResult: RunResult<unknown> | undefined;
+    const collectedResults: Array<{ agentId: string; output: unknown; totalTokens: number }> = resumeFrom?.results ? [...resumeFrom.results] : [];
+    const startIdx = resumeFrom?.step ?? 0;
     let patternError: Error | undefined;
 
+    // Restore lastResult from checkpoint
+    if (resumeFrom && collectedResults.length > 0) {
+      const last = collectedResults[collectedResults.length - 1]!;
+      lastResult = { output: last.output, totalTokens: last.totalTokens, messages: [], toolCalls: [] };
+    }
+
     try {
-      for (let i = 0; i < pattern.agents.length; i++) {
+      for (let i = startIdx; i < pattern.agents.length; i++) {
         const agentId = pattern.agents[i]!;
 
         // ---- Breakpoint: pre_pattern_step ----
@@ -2595,6 +3040,7 @@ export function createMultiAgentOrchestrator(
 
         try {
           lastResult = await runSingleAgent(agentId, currentInput);
+          collectedResults.push({ agentId, output: lastResult.output, totalTokens: lastResult.totalTokens });
 
           if (i < pattern.agents.length - 1) {
             if (pattern.transform) {
@@ -2605,6 +3051,23 @@ export function createMultiAgentOrchestrator(
                   ? lastResult.output
                   : safeStringify(lastResult.output);
             }
+          }
+
+          // Save checkpoint after each agent
+          if (ckptConfig && ckptStore && i > startIdx && (i - startIdx) % ckptEveryN === 0) {
+            const nextInput = i < pattern.agents.length - 1 ? currentInput : initialInput;
+            await savePatternCheckpoint({
+              type: "sequential",
+              version: 1,
+              id: createCheckpointId(),
+              createdAt: new Date().toISOString(),
+              label: `${ckptPrefix}:step-${i + 1}`,
+              patternId: pId,
+              stepsTotal: pattern.agents.length,
+              step: i + 1,
+              currentInput: nextInput,
+              results: [...collectedResults],
+            }, ckptStore, ckptConfig);
           }
         } catch (error) {
           if (!pattern.continueOnError) {
@@ -2639,9 +3102,11 @@ export function createMultiAgentOrchestrator(
   async function runSupervisorPattern<T>(
     pattern: SupervisorPattern<T>,
     input: string,
-    patternId?: string
+    patternId?: string,
+    resumeFrom?: SupervisorCheckpointState,
   ): Promise<T> {
     const patternStartTime = Date.now();
+    const pId = patternId ?? "__inline_supervisor";
     if (patternId) {
       fireHook("onPatternStart",{
         patternId,
@@ -2651,17 +3116,41 @@ export function createMultiAgentOrchestrator(
       });
     }
 
+    // Checkpoint config
+    const ckptConfig = pattern.checkpoint;
+    const ckptStore = ckptConfig?.store ?? checkpointStore;
+    const ckptEveryN = ckptConfig?.everyN ?? 5;
+    const ckptPrefix = ckptConfig?.labelPrefix ?? "supervisor";
+
     const workerResults: RunResult<unknown>[] = [];
+    const serializedWorkerResults: Array<{ output: unknown; totalTokens: number }> =
+      resumeFrom?.workerResults ? [...resumeFrom.workerResults] : [];
     const maxRounds = pattern.maxRounds ?? 5;
     if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
       throw new Error("[Directive MultiAgent] supervisor maxRounds must be >= 1");
     }
     let patternError: Error | undefined;
 
-    try {
-      let supervisorResult = await runSingleAgent<unknown>(pattern.supervisor, input);
+    // Restore worker results from checkpoint
+    if (resumeFrom) {
+      for (const wr of resumeFrom.workerResults) {
+        workerResults.push({ output: wr.output, totalTokens: wr.totalTokens, messages: [], toolCalls: [] });
+      }
+    }
 
-      for (let round = 0; round < maxRounds; round++) {
+    const startRound = resumeFrom?.round ?? 0;
+
+    try {
+      let supervisorResult: RunResult<unknown>;
+      if (resumeFrom) {
+        supervisorResult = { output: resumeFrom.supervisorOutput, totalTokens: 0, messages: [], toolCalls: [] };
+      } else {
+        supervisorResult = await runSingleAgent<unknown>(pattern.supervisor, input);
+      }
+
+      let currentInput = resumeFrom?.currentInput ?? input;
+
+      for (let round = startRound; round < maxRounds; round++) {
         // M9: Validate supervisor output shape
         const raw = supervisorResult.output;
         let action: { action: string; worker?: string; workerInput?: string; output?: unknown };
@@ -2701,11 +3190,30 @@ export function createMultiAgentOrchestrator(
           action.workerInput ?? ""
         );
         workerResults.push(workerResult);
+        serializedWorkerResults.push({ output: workerResult.output, totalTokens: workerResult.totalTokens });
 
+        currentInput = `Worker ${action.worker} completed with result: ${safeStringify(workerResult.output)}`;
         supervisorResult = await runSingleAgent(
           pattern.supervisor,
-          `Worker ${action.worker} completed with result: ${safeStringify(workerResult.output)}`
+          currentInput,
         );
+
+        // Save checkpoint after each round
+        if (ckptConfig && ckptStore && round > startRound && (round - startRound) % ckptEveryN === 0) {
+          await savePatternCheckpoint({
+            type: "supervisor",
+            version: 1,
+            id: createCheckpointId(),
+            createdAt: new Date().toISOString(),
+            label: `${ckptPrefix}:round-${round + 1}`,
+            patternId: pId,
+            stepsTotal: pattern.maxRounds ?? 10,
+            round: round + 1,
+            supervisorOutput: supervisorResult.output,
+            workerResults: [...serializedWorkerResults],
+            currentInput,
+          }, ckptStore, ckptConfig);
+        }
       }
 
       return pattern.extract
@@ -2731,7 +3239,8 @@ export function createMultiAgentOrchestrator(
   async function runDagPattern<T>(
     pattern: DagPattern<T>,
     input: string,
-    patternId?: string
+    patternId?: string,
+    resumeFrom?: DagCheckpointState,
   ): Promise<T> {
     const patternStartTime = Date.now();
     const pId = patternId ?? "__inline_dag";
@@ -2745,8 +3254,19 @@ export function createMultiAgentOrchestrator(
       });
     }
 
+    // Checkpoint config
+    const dagCkptConfig = pattern.checkpoint;
+    const dagCkptStore = dagCkptConfig?.store ?? checkpointStore;
+    const dagCkptEveryN = dagCkptConfig?.everyN ?? 5;
+    const dagCkptPrefix = dagCkptConfig?.labelPrefix ?? "dag";
+    let dagCompletedCount = resumeFrom?.completedCount ?? 0;
+    let dagLastCheckpointCount = 0;
+    // Serialize concurrent checkpoint saves to prevent race conditions
+    let dagCheckpointChain: Promise<unknown> = Promise.resolve();
+    const dagTotalNodes = Object.keys(pattern.nodes).length;
+
     const context: DagExecutionContext = {
-      input,
+      input: resumeFrom?.input ?? input,
       outputs: Object.create(null),
       statuses: Object.create(null),
       errors: Object.create(null),
@@ -2756,6 +3276,22 @@ export function createMultiAgentOrchestrator(
     // Initialize all nodes as pending
     for (const nodeId of Object.keys(pattern.nodes)) {
       context.statuses[nodeId] = "pending";
+    }
+
+    // Restore from checkpoint
+    if (resumeFrom) {
+      for (const [nodeId, status] of Object.entries(resumeFrom.statuses)) {
+        context.statuses[nodeId] = status;
+      }
+      for (const [nodeId, output] of Object.entries(resumeFrom.outputs)) {
+        context.outputs[nodeId] = output;
+      }
+      for (const [nodeId, error] of Object.entries(resumeFrom.errors)) {
+        context.errors[nodeId] = error;
+      }
+      for (const [nodeId, nr] of Object.entries(resumeFrom.nodeResults)) {
+        context.results[nodeId] = { output: nr.output, totalTokens: nr.totalTokens, messages: [], toolCalls: [] };
+      }
     }
 
     const onNodeError = pattern.onNodeError ?? "fail";
@@ -2769,10 +3305,12 @@ export function createMultiAgentOrchestrator(
     }
 
     try {
-      // Mark root nodes as ready
-      for (const [nodeId, node] of Object.entries(pattern.nodes)) {
-        if (!node.deps || node.deps.length === 0) {
-          context.statuses[nodeId] = "ready";
+      // Mark root nodes as ready (skip if restoring from checkpoint)
+      if (!resumeFrom) {
+        for (const [nodeId, node] of Object.entries(pattern.nodes)) {
+          if (!node.deps || node.deps.length === 0) {
+            context.statuses[nodeId] = "ready";
+          }
         }
       }
 
@@ -2932,6 +3470,35 @@ export function createMultiAgentOrchestrator(
             durationMs: Date.now() - nodeStartTime,
             timestamp: Date.now(),
           });
+
+          // Save checkpoint after node completion (serialized to prevent concurrent race)
+          dagCompletedCount++;
+          if (dagCkptConfig && dagCkptStore && dagCompletedCount > dagLastCheckpointCount && (dagCompletedCount - dagLastCheckpointCount) >= dagCkptEveryN) {
+            dagLastCheckpointCount = dagCompletedCount;
+            const nodeResults: Record<string, { output: unknown; totalTokens: number }> = Object.create(null);
+            for (const [nid, r] of Object.entries(context.results)) {
+              nodeResults[nid] = { output: r.output, totalTokens: r.totalTokens };
+            }
+            const ckptState = {
+              type: "dag" as const,
+              version: 1 as const,
+              id: createCheckpointId(),
+              createdAt: new Date().toISOString(),
+              label: `${dagCkptPrefix}:node-${dagCompletedCount}`,
+              patternId: pId,
+              stepsTotal: dagTotalNodes,
+              statuses: { ...context.statuses },
+              outputs: { ...context.outputs },
+              errors: { ...context.errors },
+              completedCount: dagCompletedCount,
+              nodeResults,
+              input: context.input,
+            };
+            dagCheckpointChain = dagCheckpointChain.then(() =>
+              savePatternCheckpoint(ckptState, dagCkptStore!, dagCkptConfig)
+            );
+            await dagCheckpointChain;
+          }
         } catch (error) {
           context.statuses[nodeId] = "error";
           context.errors[nodeId] = error instanceof Error ? error.message : String(error);
@@ -3039,7 +3606,8 @@ export function createMultiAgentOrchestrator(
   async function runReflectPattern<T>(
     pattern: ReflectPattern<T>,
     input: string,
-    patternId?: string
+    patternId?: string,
+    resumeFrom?: ReflectCheckpointState,
   ): Promise<T> {
     const patternStartTime = Date.now();
     const pId = patternId ?? "__inline_reflect";
@@ -3097,16 +3665,28 @@ export function createMultiAgentOrchestrator(
       });
     }
 
+    // Checkpoint config
+    const reflectCkptConfig = pattern.checkpoint;
+    const reflectCkptStore = reflectCkptConfig?.store ?? checkpointStore;
+    const reflectCkptEveryN = reflectCkptConfig?.everyN ?? 5;
+    const reflectCkptPrefix = reflectCkptConfig?.labelPrefix ?? "reflect";
+
     let patternError: Error | undefined;
     let lastProducerResult: RunResult<unknown> | undefined;
-    const history: ReflectIterationRecord[] = [];
+    const history: ReflectIterationRecord[] = resumeFrom?.history ? [...resumeFrom.history] : [];
     // Track per-iteration producer outputs for accept-best
-    const producerOutputs: Array<{ output: unknown; score?: number }> = [];
+    const producerOutputs: Array<{ output: unknown; score?: number }> = resumeFrom?.producerOutputs ? [...resumeFrom.producerOutputs] : [];
+    const startIteration = resumeFrom?.iteration ?? 0;
+
+    // Restore last producer result from checkpoint
+    if (resumeFrom?.lastProducerOutput != null) {
+      lastProducerResult = { output: resumeFrom.lastProducerOutput, totalTokens: 0, messages: [], toolCalls: [] };
+    }
 
     try {
-      let effectiveInput = input;
+      let effectiveInput = resumeFrom?.effectiveInput ?? input;
 
-      for (let iteration = 0; iteration < maxIterations; iteration++) {
+      for (let iteration = startIteration; iteration < maxIterations; iteration++) {
         // Check abort signal at top of each iteration
         if (effectiveSignal?.aborted) {
           if (lastProducerResult) {
@@ -3221,6 +3801,24 @@ export function createMultiAgentOrchestrator(
             }
             effectiveInput = `${input}\n\nFeedback on your previous response:\n${evaluation.feedback}\n\nPlease improve your response.`;
           }
+        }
+
+        // Save checkpoint after each iteration
+        if (reflectCkptConfig && reflectCkptStore && iteration >= startIteration && (iteration - startIteration + 1) % reflectCkptEveryN === 0) {
+          await savePatternCheckpoint({
+            type: "reflect",
+            version: 1,
+            id: createCheckpointId(),
+            createdAt: new Date().toISOString(),
+            label: `${reflectCkptPrefix}:iter-${iteration + 1}`,
+            patternId: pId,
+            stepsTotal: maxIterations,
+            iteration: iteration + 1,
+            effectiveInput,
+            history: [...history],
+            producerOutputs: [...producerOutputs],
+            lastProducerOutput: producerResult.output,
+          }, reflectCkptStore, reflectCkptConfig);
         }
       }
 
@@ -3515,6 +4113,7 @@ export function createMultiAgentOrchestrator(
     pattern: DebatePattern<T>,
     input: string,
     patternId?: string,
+    resumeFrom?: DebateCheckpointState,
   ): Promise<DebateResult<T>> {
     const { agents: debateAgents, evaluator, maxRounds = 2, extract, parseJudgement } = pattern;
 
@@ -3574,13 +4173,21 @@ export function createMultiAgentOrchestrator(
     };
 
     const parseJudge = parseJudgement ?? defaultParseJudgement;
-    const rounds: DebateResult<T>["rounds"] = [];
-    let currentInput = input;
-    let lastWinnerId = debateAgents[0]!;
-    let lastWinnerOutput: unknown = undefined;
+    const rounds: DebateResult<T>["rounds"] = resumeFrom?.rounds ? [...resumeFrom.rounds] : [];
+    let currentInput = resumeFrom?.currentInput ?? input;
+    let lastWinnerId = resumeFrom?.lastWinnerId ?? debateAgents[0]!;
+    let lastWinnerOutput: unknown = resumeFrom?.lastWinnerOutput ?? undefined;
+    const startRound = resumeFrom?.round ?? 0;
+
+    // Checkpoint config
+    const debateCkptConfig = pattern.checkpoint;
+    const debateCkptStore = debateCkptConfig?.store ?? checkpointStore;
+    const debateCkptEveryN = debateCkptConfig?.everyN ?? 5;
+    const debateCkptPrefix = debateCkptConfig?.labelPrefix ?? "debate";
 
     const pId = patternId ?? "__inline_debate";
     const patternStartTime = Date.now();
+    let debateTotalTokens = resumeFrom?.tokensConsumed ?? 0;
 
     if (patternId) {
       fireHook("onPatternStart", {
@@ -3593,13 +4200,14 @@ export function createMultiAgentOrchestrator(
 
     let patternError: Error | undefined;
     try {
-      for (let round = 0; round < maxRounds; round++) {
+      for (let round = startRound; round < maxRounds; round++) {
         if (effectiveSignal?.aborted) {
           break;
         }
 
         const proposalPromises = debateAgents.map(async (agentId) => {
           const result = await runSingleAgent(agentId, currentInput, { signal: effectiveSignal });
+          debateTotalTokens += result.totalTokens;
 
           return { agentId, output: result.output };
         });
@@ -3619,6 +4227,7 @@ export function createMultiAgentOrchestrator(
         });
 
         const evalResult = await runSingleAgent(evaluator, evalInput, { signal: effectiveSignal });
+        debateTotalTokens += evalResult.totalTokens;
         const judgement = parseJudge(evalResult.output);
 
         // Validate winnerId
@@ -3646,6 +4255,26 @@ export function createMultiAgentOrchestrator(
         lastWinnerId = judgement.winnerId;
         const winnerProposal = proposals.find((p) => p.agentId === judgement.winnerId);
         lastWinnerOutput = winnerProposal?.output ?? proposals[0]!.output;
+
+        // Save checkpoint at configured intervals
+        if (debateCkptConfig && debateCkptStore && round > startRound && (round - startRound) % debateCkptEveryN === 0) {
+          const ckptState: DebateCheckpointState = {
+            type: "debate",
+            version: 1,
+            id: createCheckpointId(),
+            createdAt: new Date().toISOString(),
+            label: `${debateCkptPrefix}:round-${round + 1}`,
+            patternId: pId,
+            stepsTotal: maxRounds,
+            round: round + 1,
+            currentInput,
+            rounds: [...rounds],
+            lastWinnerId,
+            lastWinnerOutput,
+            tokensConsumed: debateTotalTokens,
+          };
+          await savePatternCheckpoint(ckptState, debateCkptStore, debateCkptConfig);
+        }
 
         if (round < maxRounds - 1 && judgement.feedback) {
           currentInput = `Previous round feedback: ${judgement.feedback}\n\nOriginal task: ${input}`;
@@ -3678,6 +4307,755 @@ export function createMultiAgentOrchestrator(
           error: patternError,
         });
       }
+    }
+  }
+
+  // ---- Converge Pattern Implementation ----
+
+  /** Keys that must never appear in converge facts (prototype pollution guard) */
+  const CONVERGE_BLOCKED_KEYS = new Set([
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
+
+  function convergeSafeMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+    for (const key of Object.keys(source)) {
+      if (!CONVERGE_BLOCKED_KEYS.has(key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+
+  /**
+   * Detect cycles in converge node dependency graph.
+   * Builds an implicit DAG from produces/requires and applies Kahn's algorithm.
+   */
+  function validateConvergeAcyclic(pId: string, nodes: Record<string, ConvergeNode>): void {
+    // Build producer map: factKey → nodeId(s) that produce it
+    const producerMap: Record<string, string[]> = Object.create(null);
+    for (const [nodeId, node] of Object.entries(nodes)) {
+      for (const key of node.produces) {
+        if (!producerMap[key]) {
+          producerMap[key] = [];
+        }
+        producerMap[key]!.push(nodeId);
+      }
+    }
+
+    // Build adjacency from requires → produces edges
+    const nodeIds = Object.keys(nodes);
+    const inDegree: Record<string, number> = Object.create(null);
+    const adjacency: Record<string, string[]> = Object.create(null);
+    for (const id of nodeIds) {
+      inDegree[id] = 0;
+      adjacency[id] = [];
+    }
+
+    for (const [nodeId, node] of Object.entries(nodes)) {
+      for (const reqKey of node.requires ?? []) {
+        const producers = producerMap[reqKey];
+        if (producers) {
+          for (const producerId of producers) {
+            if (producerId !== nodeId) {
+              adjacency[producerId]!.push(nodeId);
+              inDegree[nodeId] = (inDegree[nodeId] ?? 0) + 1;
+            }
+          }
+        }
+      }
+    }
+
+    // Kahn's algorithm
+    const queue: string[] = [];
+    for (const id of nodeIds) {
+      if (inDegree[id] === 0) {
+        queue.push(id);
+      }
+    }
+
+    let visited = 0;
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      visited++;
+      for (const dependent of adjacency[current] ?? []) {
+        inDegree[dependent]!--;
+        if (inDegree[dependent] === 0) {
+          queue.push(dependent);
+        }
+      }
+    }
+
+    if (visited !== nodeIds.length) {
+      throw new Error(
+        `[Directive MultiAgent] converge pattern "${pId}": cycle detected in produces/requires graph. Visited ${visited}/${nodeIds.length} nodes.`
+      );
+    }
+  }
+
+  /**
+   * Validate that no two nodes produce the same fact key (M1: producer conflict detection).
+   * Logs a dev-mode warning rather than throwing, since some use cases intentionally overlap.
+   */
+  function validateProducerConflicts(pId: string, nodes: Record<string, ConvergeNode>): void {
+    const producerMap: Record<string, string[]> = Object.create(null);
+    for (const [nodeId, node] of Object.entries(nodes)) {
+      for (const key of node.produces) {
+        if (!producerMap[key]) {
+          producerMap[key] = [];
+        }
+        producerMap[key]!.push(nodeId);
+      }
+    }
+
+    for (const [key, producers] of Object.entries(producerMap)) {
+      if (producers.length > 1) {
+        console.warn(
+          `[Directive MultiAgent] converge pattern "${pId}": fact key "${key}" is produced by multiple nodes: ${producers.join(", ")}. Last writer wins.`
+        );
+      }
+    }
+  }
+
+  /** Safe wrapper for user-provided callbacks (C1). */
+  function safeCall<A extends unknown[], R>(fn: ((...args: A) => R) | undefined, ...args: A): R | undefined {
+    if (!fn) {
+      return undefined;
+    }
+
+    try {
+      return fn(...args);
+    } catch (err) {
+      console.error("[Directive MultiAgent] converge: user callback threw:", err);
+
+      return undefined;
+    }
+  }
+
+  /** Safe wrapper for async user-provided callbacks (C1). */
+  async function safeCallAsync<A extends unknown[], R>(fn: ((...args: A) => R | Promise<R>) | undefined, ...args: A): Promise<R | undefined> {
+    if (!fn) {
+      return undefined;
+    }
+
+    try {
+      return await fn(...args);
+    } catch (err) {
+      console.error("[Directive MultiAgent] converge: user callback threw:", err);
+
+      return undefined;
+    }
+  }
+
+  /** Compute estimatedStepsRemaining and decelerating from step history (M7). */
+  function computeConvergeMetrics(
+    currentSatisfaction: number,
+    stepMetrics: ConvergeStepMetrics[],
+    _step: number,
+  ): ConvergeMetrics {
+    // Calculate recent convergence rate (average delta over last 3 steps)
+    const recentSteps = stepMetrics.slice(-3);
+    const avgDelta = recentSteps.length > 0
+      ? recentSteps.reduce((sum, s) => sum + s.satisfactionDelta, 0) / recentSteps.length
+      : 0;
+
+    let estimatedStepsRemaining: number | null = null;
+    if (avgDelta > 0 && currentSatisfaction < 1.0) {
+      estimatedStepsRemaining = Math.ceil((1.0 - currentSatisfaction) / avgDelta);
+    }
+
+    // Decelerating: compare last 3 deltas to prior 3 deltas
+    let decelerating = false;
+    if (stepMetrics.length >= 6) {
+      const recent3 = stepMetrics.slice(-3);
+      const prior3 = stepMetrics.slice(-6, -3);
+      const recentAvg = recent3.reduce((s, m) => s + m.satisfactionDelta, 0) / 3;
+      const priorAvg = prior3.reduce((s, m) => s + m.satisfactionDelta, 0) / 3;
+      decelerating = recentAvg < priorAvg * 0.5;
+    }
+
+    return {
+      satisfaction: currentSatisfaction,
+      convergenceRate: avgDelta,
+      estimatedStepsRemaining,
+      decelerating,
+    };
+  }
+
+  /** Clamp satisfaction to [0, 1] and guard against NaN/Infinity (M4). */
+  function clampSatisfaction(value: number | undefined): number {
+    if (value == null || !Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(1, value));
+  }
+
+  async function runConvergeInternal<T>(
+    pattern: ConvergePattern<T>,
+    initialInput: string | Record<string, unknown>,
+    patternId?: string,
+    resumeFrom?: ConvergeCheckpointState,
+  ): Promise<ConvergeResult<T>> {
+    const {
+      nodes: originalNodes,
+      when: convergenceWhen,
+      satisfaction: satisfactionFn,
+      maxSteps = 50,
+      extract,
+      selectionStrategy,
+      relaxation,
+      onStep,
+      onStall,
+    } = pattern;
+
+    // Shadow copy of nodes so relaxation mutations don't affect the original (M2)
+    const nodes: Record<string, ConvergeNode> = Object.create(null);
+    for (const [id, node] of Object.entries(originalNodes)) {
+      nodes[id] = { ...node };
+    }
+
+    const nodeIds = Object.keys(nodes);
+    if (nodeIds.length === 0) {
+      throw new Error("[Directive MultiAgent] converge requires at least one node");
+    }
+
+    const pId = patternId ?? "__converge";
+
+    // Validate all node agents are registered
+    for (const [nodeId, node] of Object.entries(nodes)) {
+      if (!agents[node.agent]) {
+        throw new Error(`[Directive MultiAgent] converge node "${nodeId}" references unregistered agent "${node.agent}"`);
+      }
+    }
+
+    // C2: Cycle detection
+    validateConvergeAcyclic(pId, nodes);
+
+    // M1: Producer conflict warnings
+    validateProducerConflicts(pId, nodes);
+
+    // M3: Warn if extractOutput is missing (dev guidance)
+    for (const [nodeId, node] of Object.entries(nodes)) {
+      if (!node.extractOutput) {
+        console.warn(
+          `[Directive MultiAgent] converge node "${nodeId}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`
+        );
+      }
+    }
+
+    // Signal/timeout composition
+    let effectiveSignal = pattern.signal;
+    let convergeTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let externalOnAbort: (() => void) | undefined;
+    const timeoutMs = pattern.timeout ?? 300_000;
+    if (timeoutMs && !effectiveSignal) {
+      const ctrl = new AbortController();
+      convergeTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
+      effectiveSignal = ctrl.signal;
+    } else if (timeoutMs && effectiveSignal) {
+      const ctrl = new AbortController();
+      convergeTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
+      externalOnAbort = () => ctrl.abort();
+      effectiveSignal.addEventListener("abort", externalOnAbort, { once: true });
+      effectiveSignal = ctrl.signal;
+    }
+
+    const patternStartTime = Date.now();
+
+    if (timeline) {
+      timeline.record({
+        type: "pattern_start",
+        timestamp: patternStartTime,
+        snapshotId: null,
+        patternId: pId,
+        patternType: "converge",
+      });
+    }
+    fireHook("onPatternStart", {
+      patternId: pId,
+      patternType: "converge",
+      input: typeof initialInput === "string" ? initialInput : JSON.stringify(initialInput),
+      timestamp: patternStartTime,
+    });
+
+    // Initialize facts
+    const facts: Record<string, unknown> = Object.create(null);
+    if (resumeFrom) {
+      convergeSafeMerge(facts, resumeFrom.facts);
+    } else if (typeof initialInput === "string") {
+      facts.input = initialInput;
+    } else {
+      convergeSafeMerge(facts, initialInput);
+    }
+
+    // Tracking state — restore from checkpoint or start fresh
+    const executionOrder: string[] = resumeFrom ? [...resumeFrom.executionOrder] : [];
+    const nodeResults: Record<string, RunResult<unknown>> = Object.create(null);
+    if (resumeFrom) {
+      for (const [id, out] of Object.entries(resumeFrom.nodeOutputs)) {
+        nodeResults[id] = { output: out.output, totalTokens: out.totalTokens } as RunResult<unknown>;
+      }
+    }
+    const stepMetrics: ConvergeStepMetrics[] = resumeFrom ? [...resumeFrom.stepMetrics] : [];
+    const relaxations: RelaxationRecord[] = resumeFrom ? [...resumeFrom.relaxations] : [];
+    const completedNodes = new Set<string>(resumeFrom?.completedNodes ?? []);
+    const failedNodes = new Map<string, number>(
+      resumeFrom ? Object.entries(resumeFrom.failedNodes).map(([k, v]) => [k, v]) : []
+    );
+    const nodeInputHashes = new Map<string, string>(
+      resumeFrom ? Object.entries(resumeFrom.nodeInputHashes) : []
+    );
+    const agentMetrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number; totalDelta: number }> = Object.create(null);
+    if (resumeFrom) {
+      for (const [id, m] of Object.entries(resumeFrom.agentMetrics)) {
+        agentMetrics[id] = { runs: m.runs, avgSatisfactionDelta: m.runs > 0 ? m.totalDelta / m.runs : 0, tokens: m.tokens, totalDelta: m.totalDelta };
+      }
+    }
+    let stallSteps = resumeFrom?.stallSteps ?? 0;
+    let appliedRelaxationTiers = resumeFrom?.appliedRelaxationTiers ?? 0;
+    let lastSatisfaction = resumeFrom?.lastSatisfaction ?? 0;
+    let patternError: Error | undefined;
+    const startStep = resumeFrom?.step ?? 0;
+
+    // Checkpoint config
+    const checkpointConfig = pattern.checkpoint;
+    const checkpointEveryN = checkpointConfig?.everyN ?? 5;
+    const checkpointStoreRef = checkpointConfig?.store ?? checkpointStore;
+    const checkpointLabelPrefix = checkpointConfig?.labelPrefix ?? "converge";
+    let lastCheckpointId: string | undefined;
+    void lastCheckpointId; // Used later in checkpoint save
+
+    const MAX_CONSECUTIVE_FAILURES = 3;
+
+    try {
+      for (let step = startStep; step < maxSteps; step++) {
+        // Check convergence (C1: safe-wrap user callback)
+        if (safeCall(convergenceWhen, facts) === true) {
+          const durationMs = Date.now() - patternStartTime;
+          const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+
+          return {
+            converged: true,
+            result: safeCall(extract, facts) ?? facts as unknown as T,
+            facts: { ...facts },
+            executionOrder,
+            nodeResults,
+            steps: step,
+            totalTokens,
+            durationMs,
+            stepMetrics,
+            relaxations,
+          };
+        }
+
+        // Check abort
+        if (effectiveSignal?.aborted) {
+          const durationMs = Date.now() - patternStartTime;
+          const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+
+          return {
+            converged: false,
+            result: safeCall(extract, facts) ?? facts as unknown as T,
+            facts: { ...facts },
+            executionOrder,
+            nodeResults,
+            steps: step,
+            totalTokens,
+            durationMs,
+            stepMetrics,
+            relaxations,
+            error: "Aborted or timed out",
+          };
+        }
+
+        // Find ready nodes
+        const readyNodes: string[] = [];
+        for (const [nodeId, node] of Object.entries(nodes)) {
+          // Skip permanently failed nodes
+          if ((failedNodes.get(nodeId) ?? 0) >= MAX_CONSECUTIVE_FAILURES) {
+            continue;
+          }
+
+          // Check requires satisfied
+          const requires = node.requires ?? [];
+          const requiresSatisfied = requires.every((key) => facts[key] != null);
+          if (!requiresSatisfied) {
+            continue;
+          }
+
+          // Check if already completed
+          if (completedNodes.has(nodeId)) {
+            if (!node.allowRerun) {
+              continue;
+            }
+
+            // Check if inputs changed
+            const inputHash = JSON.stringify(requires.map((key) => facts[key]));
+            if (nodeInputHashes.get(nodeId) === inputHash) {
+              continue;
+            }
+          }
+
+          readyNodes.push(nodeId);
+        }
+
+        // Apply selection strategy
+        let selectedNodes = readyNodes;
+        if (selectionStrategy && readyNodes.length > 0) {
+          const rawSatisfaction = satisfactionFn
+            ? safeCall(satisfactionFn, facts) ?? 0
+            : (safeCall(convergenceWhen, facts) === true ? 1.0 : 0.0);
+          const currentSatisfaction = clampSatisfaction(rawSatisfaction);
+          const convergenceMetrics = computeConvergeMetrics(currentSatisfaction, stepMetrics, step);
+
+          // Build per-agent metrics for the strategy
+          const strategyMetrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number }> = Object.create(null);
+          for (const [id, m] of Object.entries(agentMetrics)) {
+            strategyMetrics[id] = {
+              runs: m.runs,
+              avgSatisfactionDelta: m.runs > 0 ? m.totalDelta / m.runs : 0,
+              tokens: m.tokens,
+            };
+          }
+
+          const strategyResult = selectionStrategy.select(readyNodes, strategyMetrics, convergenceMetrics);
+          // M5: Guard against empty selection strategy result — fall back to readyNodes
+          selectedNodes = (strategyResult && strategyResult.length > 0) ? strategyResult : readyNodes;
+        }
+
+        // Sort by priority (higher first)
+        selectedNodes.sort((a, b) => (nodes[b]!.priority ?? 0) - (nodes[a]!.priority ?? 0));
+
+        // Fire onStep hook (C1: safe-wrap)
+        safeCall(onStep, step, { ...facts }, selectedNodes);
+
+        // Handle no ready nodes
+        if (selectedNodes.length === 0) {
+          // Check relaxation tiers
+          stallSteps++;
+          let relaxationApplied = false;
+
+          if (relaxation) {
+            for (let tierIdx = appliedRelaxationTiers; tierIdx < relaxation.length; tierIdx++) {
+              const tier = relaxation[tierIdx]!;
+              const threshold = tier.afterStallSteps ?? 3;
+              if (stallSteps >= threshold) {
+                // Apply relaxation
+                const strategy = tier.strategy;
+                switch (strategy.type) {
+                  case "allow_rerun":
+                    for (const nid of strategy.nodes) {
+                      completedNodes.delete(nid);
+                      nodeInputHashes.delete(nid);
+                    }
+                    break;
+                  case "alternative_nodes":
+                    // M2: Use shadow copy — don't mutate original pattern nodes
+                    for (const altNode of strategy.nodes) {
+                      const altId = `__relaxation_${tierIdx}_${altNode.agent}`;
+                      nodes[altId] = { ...altNode };
+                    }
+                    break;
+                  case "inject_facts":
+                    convergeSafeMerge(facts, strategy.facts);
+                    break;
+                  case "accept_partial": {
+                    const durationMs = Date.now() - patternStartTime;
+                    const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+
+                    return {
+                      converged: false,
+                      result: safeCall(extract, facts) ?? facts as unknown as T,
+                      facts: { ...facts },
+                      executionOrder,
+                      nodeResults,
+                      steps: step,
+                      totalTokens,
+                      durationMs,
+                      stepMetrics,
+                      relaxations,
+                      error: `Accepted partial result via relaxation tier "${tier.label}"`,
+                    };
+                  }
+                  case "custom": {
+                    const rawSat = safeCall(satisfactionFn, facts) ?? 0;
+                    const ctx: RelaxationContext = {
+                      step,
+                      facts: { ...facts },
+                      metrics: computeConvergeMetrics(clampSatisfaction(rawSat), stepMetrics, step),
+                      completedNodes: new Set(completedNodes),
+                      failedNodes: new Map(failedNodes),
+                    };
+                    // C1: safe-wrap custom strategy callback
+                    await safeCallAsync(strategy.apply, ctx);
+                    break;
+                  }
+                }
+
+                relaxations.push({
+                  step,
+                  tierIndex: tierIdx,
+                  label: tier.label,
+                  strategy: strategy.type,
+                });
+                appliedRelaxationTiers = tierIdx + 1;
+                stallSteps = 0;
+                relaxationApplied = true;
+                break;
+              }
+            }
+          }
+
+          if (!relaxationApplied) {
+            // Fire onStall hook (C1: safe-wrap, M7: computed metrics)
+            const rawSat = safeCall(satisfactionFn, facts) ?? 0;
+            const stallMetrics = computeConvergeMetrics(clampSatisfaction(rawSat), stepMetrics, step);
+            safeCall(onStall, step, stallMetrics);
+
+            // If we've exhausted all relaxation tiers and still stalled, fail
+            if (!relaxation || appliedRelaxationTiers >= relaxation.length) {
+              const durationMs = Date.now() - patternStartTime;
+              const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+
+              return {
+                converged: false,
+                result: safeCall(extract, facts) ?? facts as unknown as T,
+                facts: { ...facts },
+                executionOrder,
+                nodeResults,
+                steps: step,
+                totalTokens,
+                durationMs,
+                stepMetrics,
+                relaxations,
+                error: "Convergence stalled: no ready nodes and no remaining relaxation tiers",
+              };
+            }
+          }
+
+          continue;
+        }
+
+        // Reset stall counter since we have ready nodes
+        stallSteps = 0;
+
+        // Run selected nodes in parallel
+        const stepStart = Date.now();
+        const rawPreSat = satisfactionFn
+          ? safeCall(satisfactionFn, facts) ?? 0
+          : (safeCall(convergenceWhen, facts) === true ? 1.0 : 0.0);
+        const preSatisfaction = clampSatisfaction(rawPreSat);
+        let stepTokens = 0;
+        const factsProduced: string[] = [];
+
+        const nodePromises = selectedNodes.map(async (nodeId) => {
+          const node = nodes[nodeId]!;
+
+          // Record input hash for allowRerun detection
+          const requires = node.requires ?? [];
+          const inputHash = JSON.stringify(requires.map((key) => facts[key]));
+          nodeInputHashes.set(nodeId, inputHash);
+
+          // Build input (C1: safe-wrap buildInput)
+          let nodeInput: string;
+          const customInput = safeCall(node.buildInput, facts);
+          if (customInput != null) {
+            nodeInput = customInput;
+          } else {
+            const relevantFacts: Record<string, unknown> = Object.create(null);
+            for (const key of requires) {
+              if (facts[key] != null) {
+                relevantFacts[key] = facts[key];
+              }
+            }
+            if (Object.keys(relevantFacts).length > 0) {
+              nodeInput = JSON.stringify(relevantFacts);
+            } else if (facts.input != null) {
+              nodeInput = String(facts.input);
+            } else {
+              nodeInput = JSON.stringify(facts);
+            }
+          }
+
+          try {
+            const result = await runSingleAgent(node.agent, nodeInput, {
+              signal: effectiveSignal ?? undefined,
+            });
+            nodeResults[nodeId] = result;
+            executionOrder.push(nodeId);
+            completedNodes.add(nodeId);
+            failedNodes.delete(nodeId);
+
+            // Extract output facts (C1: safe-wrap extractOutput)
+            if (node.extractOutput) {
+              const outputFacts = safeCall(node.extractOutput, result);
+              if (outputFacts) {
+                convergeSafeMerge(facts, outputFacts);
+                factsProduced.push(...Object.keys(outputFacts));
+              }
+            } else {
+              // Default: try JSON parse of output
+              const rawOutput = result.output;
+              if (rawOutput && typeof rawOutput === "object") {
+                convergeSafeMerge(facts, rawOutput as Record<string, unknown>);
+                factsProduced.push(...Object.keys(rawOutput as Record<string, unknown>));
+              } else if (typeof rawOutput === "string") {
+                try {
+                  const parsed = JSON.parse(rawOutput);
+                  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                    convergeSafeMerge(facts, parsed);
+                    factsProduced.push(...Object.keys(parsed));
+                  } else {
+                    // Store under produce keys
+                    for (const key of node.produces) {
+                      facts[key] = rawOutput;
+                      factsProduced.push(key);
+                    }
+                  }
+                } catch {
+                  for (const key of node.produces) {
+                    facts[key] = rawOutput;
+                    factsProduced.push(key);
+                  }
+                }
+              }
+            }
+
+            stepTokens += result.totalTokens;
+
+            return { nodeId, success: true };
+          } catch (error) {
+            const failures = (failedNodes.get(nodeId) ?? 0) + 1;
+            failedNodes.set(nodeId, failures);
+
+            return { nodeId, success: false, error };
+          }
+        });
+
+        await Promise.allSettled(nodePromises);
+
+        // Compute step metrics (M4: clamp satisfaction)
+        const rawPostSat = satisfactionFn
+          ? safeCall(satisfactionFn, facts) ?? 0
+          : (safeCall(convergenceWhen, facts) === true ? 1.0 : 0.0);
+        const postSatisfaction = clampSatisfaction(rawPostSat);
+        const satisfactionDelta = postSatisfaction - preSatisfaction;
+
+        stepMetrics.push({
+          step,
+          durationMs: Date.now() - stepStart,
+          nodesRun: [...selectedNodes],
+          factsProduced,
+          satisfaction: postSatisfaction,
+          satisfactionDelta,
+          tokensConsumed: stepTokens,
+        });
+
+        // Update per-agent metrics
+        for (const nodeId of selectedNodes) {
+          const node = nodes[nodeId]!;
+          if (!agentMetrics[node.agent]) {
+            agentMetrics[node.agent] = { runs: 0, avgSatisfactionDelta: 0, tokens: 0, totalDelta: 0 };
+          }
+          const m = agentMetrics[node.agent]!;
+          m.runs++;
+          m.totalDelta += satisfactionDelta;
+          m.tokens += nodeResults[nodeId]?.totalTokens ?? 0;
+        }
+
+        lastSatisfaction = postSatisfaction;
+
+        // Track stall (no satisfaction change)
+        if (satisfactionDelta <= 0) {
+          stallSteps++;
+        } else {
+          stallSteps = 0;
+        }
+
+        // P5: Save checkpoint at configured intervals
+        if (checkpointConfig && checkpointStoreRef && step > startStep && (step - startStep) % checkpointEveryN === 0) {
+          const ckptState: ConvergeCheckpointState = {
+            type: "converge",
+            version: 1,
+            id: createCheckpointId(),
+            createdAt: new Date().toISOString(),
+            label: `${checkpointLabelPrefix}:step-${step}`,
+            patternId: pId,
+            stepsTotal: maxSteps,
+            step: step + 1, // Next step to run
+            facts: structuredClone(facts),
+            completedNodes: [...completedNodes],
+            failedNodes: Object.fromEntries(failedNodes),
+            nodeInputHashes: Object.fromEntries(nodeInputHashes),
+            nodeOutputs: Object.fromEntries(
+              Object.entries(nodeResults).map(([id, r]) => [id, { output: r.output, totalTokens: r.totalTokens }])
+            ),
+            executionOrder: [...executionOrder],
+            stepMetrics: [...stepMetrics],
+            relaxations: [...relaxations],
+            appliedRelaxationTiers,
+            stallSteps,
+            lastSatisfaction,
+            agentMetrics: Object.fromEntries(
+              Object.entries(agentMetrics).map(([id, m]) => [id, { runs: m.runs, totalDelta: m.totalDelta, tokens: m.tokens }])
+            ),
+          };
+          const savedId = await savePatternCheckpoint(ckptState, checkpointStoreRef, checkpointConfig);
+          if (savedId) {
+            lastCheckpointId = savedId;
+          }
+        }
+      }
+
+      // Max steps exhausted
+      const durationMs = Date.now() - patternStartTime;
+      const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+
+      return {
+        converged: false,
+        result: safeCall(extract, facts) ?? facts as unknown as T,
+        facts: { ...facts },
+        executionOrder,
+        nodeResults,
+        steps: maxSteps,
+        totalTokens,
+        durationMs,
+        stepMetrics,
+        relaxations,
+        error: `Max steps (${maxSteps}) exhausted without convergence`,
+      };
+    } catch (error) {
+      patternError = error instanceof Error ? error : new Error(String(error));
+      throw error;
+    } finally {
+      if (convergeTimeoutId != null) {
+        clearTimeout(convergeTimeoutId);
+      }
+      if (externalOnAbort && pattern.signal) {
+        pattern.signal.removeEventListener("abort", externalOnAbort);
+      }
+      if (timeline) {
+        timeline.record({
+          type: "pattern_complete",
+          timestamp: Date.now(),
+          snapshotId: null,
+          patternId: pId,
+          patternType: "converge",
+          durationMs: Date.now() - patternStartTime,
+          ...(patternError ? { error: patternError.message } : {}),
+        });
+      }
+      fireHook("onPatternComplete", {
+        patternId: pId,
+        patternType: "converge",
+        durationMs: Date.now() - patternStartTime,
+        timestamp: Date.now(),
+        error: patternError,
+      });
     }
   }
 
@@ -3849,6 +5227,12 @@ export function createMultiAgentOrchestrator(
             const debateResult = await runDebateInternal<T>(debatePattern, input, patternId);
 
             return debateResult.result;
+          }
+          case "converge": {
+            const convergePattern = pattern as ConvergePattern<T>;
+            const convergeResult = await runConvergeInternal<T>(convergePattern, input, patternId);
+
+            return convergeResult.result;
           }
           default:
             throw new Error(`[Directive MultiAgent] Unknown pattern type: ${(pattern as { type: string }).type}`);
@@ -4781,6 +6165,245 @@ export function createMultiAgentOrchestrator(
       );
     },
 
+    // ---- Converge Pattern ----
+
+    async runConverge<T>(
+      nodes: Record<string, ConvergeNode>,
+      initialInput: string | Record<string, unknown>,
+      when: (facts: Record<string, unknown>) => boolean,
+      convergeOpts?: {
+        satisfaction?: (facts: Record<string, unknown>) => number;
+        maxSteps?: number;
+        extract?: (facts: Record<string, unknown>) => T;
+        timeout?: number;
+        signal?: AbortSignal;
+        selectionStrategy?: AgentSelectionStrategy;
+        relaxation?: RelaxationTier[];
+        onStep?: ConvergePattern["onStep"];
+        onStall?: ConvergePattern["onStall"];
+        checkpoint?: PatternCheckpointConfig;
+      },
+    ): Promise<ConvergeResult<T>> {
+      assertNotDisposed();
+
+      return runConvergeInternal<T>(
+        {
+          type: "converge",
+          nodes,
+          when,
+          satisfaction: convergeOpts?.satisfaction,
+          maxSteps: convergeOpts?.maxSteps,
+          extract: convergeOpts?.extract,
+          timeout: convergeOpts?.timeout,
+          signal: convergeOpts?.signal,
+          selectionStrategy: convergeOpts?.selectionStrategy,
+          relaxation: convergeOpts?.relaxation,
+          onStep: convergeOpts?.onStep,
+          onStall: convergeOpts?.onStall,
+          checkpoint: convergeOpts?.checkpoint,
+        },
+        initialInput,
+        "__imperative_converge",
+      );
+    },
+
+    async resumeConverge<T>(
+      checkpointState: ConvergeCheckpointState,
+      pattern: ConvergePattern<T>,
+    ): Promise<ConvergeResult<T>> {
+      assertNotDisposed();
+
+      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "converge") {
+        throw new Error("[Directive MultiAgent] Invalid converge checkpoint state");
+      }
+
+      return runConvergeInternal<T>(
+        pattern,
+        {}, // initialInput ignored when resumeFrom is provided
+        checkpointState.patternId,
+        checkpointState,
+      );
+    },
+
+    async resumeSequential<T>(
+      checkpointState: SequentialCheckpointState,
+      pattern: SequentialPattern<T>,
+    ): Promise<T> {
+      assertNotDisposed();
+
+      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "sequential") {
+        throw new Error("[Directive MultiAgent] Invalid sequential checkpoint state");
+      }
+
+      return runSequentialPattern<T>(
+        pattern,
+        checkpointState.currentInput,
+        checkpointState.patternId,
+        checkpointState,
+      );
+    },
+
+    async resumeSupervisor<T>(
+      checkpointState: SupervisorCheckpointState,
+      pattern: SupervisorPattern<T>,
+      options?: { input?: string },
+    ): Promise<T> {
+      assertNotDisposed();
+
+      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "supervisor") {
+        throw new Error("[Directive MultiAgent] Invalid supervisor checkpoint state");
+      }
+
+      const input = options?.input ?? checkpointState.currentInput;
+
+      return runSupervisorPattern<T>(
+        pattern,
+        input,
+        checkpointState.patternId,
+        checkpointState,
+      );
+    },
+
+    async resumeReflect<T>(
+      checkpointState: ReflectCheckpointState,
+      pattern: ReflectPattern<T>,
+      options?: { input?: string },
+    ): Promise<T> {
+      assertNotDisposed();
+
+      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "reflect") {
+        throw new Error("[Directive MultiAgent] Invalid reflect checkpoint state");
+      }
+
+      const input = options?.input ?? checkpointState.effectiveInput;
+
+      return runReflectPattern<T>(
+        pattern,
+        input,
+        checkpointState.patternId,
+        checkpointState,
+      );
+    },
+
+    async resumeDebate<T>(
+      checkpointState: DebateCheckpointState,
+      pattern: DebatePattern<T>,
+    ): Promise<DebateResult<T>> {
+      assertNotDisposed();
+
+      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "debate") {
+        throw new Error("[Directive MultiAgent] Invalid debate checkpoint state");
+      }
+
+      return runDebateInternal<T>(
+        pattern,
+        checkpointState.currentInput,
+        checkpointState.patternId,
+        checkpointState,
+      );
+    },
+
+    async resumeDag<T>(
+      checkpointState: DagCheckpointState,
+      pattern: DagPattern<T>,
+      options?: { input?: string },
+    ): Promise<T> {
+      assertNotDisposed();
+
+      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "dag") {
+        throw new Error("[Directive MultiAgent] Invalid DAG checkpoint state");
+      }
+
+      const input = options?.input ?? checkpointState.input;
+
+      return runDagPattern<T>(
+        pattern,
+        input,
+        checkpointState.patternId,
+        checkpointState,
+      );
+    },
+
+    async replay<T>(
+      checkpointId: string,
+      pattern: ExecutionPattern,
+      options?: { input?: string },
+    ): Promise<T> {
+      assertNotDisposed();
+
+      if (!checkpointStore) {
+        throw new Error("[Directive MultiAgent] No checkpoint store configured");
+      }
+
+      const checkpoint = await checkpointStore.load(checkpointId);
+      if (!checkpoint) {
+        throw new Error(`[Directive MultiAgent] Checkpoint not found: ${checkpointId}`);
+      }
+
+      // Validate parsed state — prototype pollution defense + structure check
+      let state: PatternCheckpointState;
+      try {
+        const parsed = JSON.parse(checkpoint.systemExport);
+        if (!parsed || typeof parsed !== "object") {
+          throw new Error("Parsed checkpoint state is not an object");
+        }
+
+        const BLOCKED = new Set(["__proto__", "constructor", "prototype"]);
+        for (const key of Object.keys(parsed)) {
+          if (BLOCKED.has(key)) {
+            throw new Error(`Checkpoint state contains blocked key: ${key}`);
+          }
+        }
+
+        const validTypes = new Set(["sequential", "supervisor", "reflect", "debate", "dag", "converge"]);
+        if (!validTypes.has(parsed.type)) {
+          throw new Error(`Unknown checkpoint pattern type: ${parsed.type}`);
+        }
+        if (parsed.version !== 1) {
+          throw new Error(`Unsupported checkpoint version: ${parsed.version}`);
+        }
+
+        state = parsed as PatternCheckpointState;
+      } catch (err) {
+        throw new Error(`[Directive MultiAgent] Invalid checkpoint state: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      const step = getPatternStep(state);
+      const replayInput = options?.input ?? (("currentInput" in state) ? (state as { currentInput: string }).currentInput : "");
+
+      // Record timeline event
+      if (timeline) {
+        timeline.record({
+          type: "checkpoint_restore",
+          timestamp: Date.now(),
+          snapshotId: null,
+          checkpointId,
+          patternType: state.type,
+          step,
+        });
+      }
+
+      switch (state.type) {
+        case "sequential":
+          return runSequentialPattern<T>(pattern as SequentialPattern<T>, replayInput, state.patternId, state);
+        case "supervisor":
+          return runSupervisorPattern<T>(pattern as SupervisorPattern<T>, replayInput, state.patternId, state);
+        case "reflect":
+          return runReflectPattern<T>(pattern as ReflectPattern<T>, replayInput, state.patternId, state);
+        case "debate":
+          return runDebateInternal(pattern as DebatePattern<T>, replayInput, state.patternId, state) as Promise<T>;
+        case "dag":
+          return runDagPattern<T>(pattern as DagPattern<T>, replayInput, state.patternId, state);
+        case "converge":
+          return runConvergeInternal(
+            pattern as ConvergePattern<T>,
+            state.facts,
+            state.patternId,
+            state,
+          ) as Promise<T>;
+      }
+    },
+
     // ---- Breakpoint Methods ----
 
     resumeBreakpoint(id: string, modifications?: BreakpointModifications): void {
@@ -5078,6 +6701,124 @@ export function race<T>(
     type: "race",
     agents,
     ...options,
+  };
+}
+
+// ============================================================================
+// Converge Pattern Factory & Selection Strategies
+// ============================================================================
+
+/**
+ * Create a converge execution pattern.
+ *
+ * Declare what each agent produces and requires. The runtime automatically
+ * infers the execution graph from dependency analysis and drives agents
+ * to convergence.
+ *
+ * @example
+ * ```typescript
+ * const pipeline = converge(
+ *   {
+ *     researcher: {
+ *       agent: "researcher",
+ *       produces: ["research.findings"],
+ *       requires: ["research.topic"],
+ *       extractOutput: (r) => ({ "research.findings": r.output }),
+ *     },
+ *     writer: {
+ *       agent: "writer",
+ *       produces: ["article.draft"],
+ *       requires: ["research.findings"],
+ *       extractOutput: (r) => ({ "article.draft": r.output }),
+ *     },
+ *   },
+ *   (facts) => facts["article.draft"] != null,
+ *   { maxSteps: 10, extract: (facts) => facts["article.draft"] },
+ * );
+ * ```
+ */
+export function converge<T = Record<string, unknown>>(
+  nodes: Record<string, ConvergeNode>,
+  when: (facts: Record<string, unknown>) => boolean,
+  options?: {
+    satisfaction?: (facts: Record<string, unknown>) => number;
+    maxSteps?: number;
+    extract?: (facts: Record<string, unknown>) => T;
+    timeout?: number;
+    signal?: AbortSignal;
+    selectionStrategy?: AgentSelectionStrategy;
+    relaxation?: RelaxationTier[];
+    onStep?: (step: number, facts: Record<string, unknown>, readyNodes: string[]) => void;
+    onStall?: (step: number, metrics: ConvergeMetrics) => void;
+    checkpoint?: PatternCheckpointConfig;
+  },
+): ConvergePattern<T> {
+  return {
+    type: "converge",
+    nodes,
+    when,
+    ...options,
+  };
+}
+
+/**
+ * Selection strategy: run all ready agents (default).
+ */
+export function allReadyStrategy(): AgentSelectionStrategy {
+  return {
+    select: (readyAgents) => readyAgents,
+  };
+}
+
+/**
+ * Selection strategy: pick agents with the highest historical impact.
+ *
+ * Sorts by average satisfaction delta (descending) and picks the top N.
+ */
+export function highestImpactStrategy(opts?: { topN?: number }): AgentSelectionStrategy {
+  const topN = opts?.topN ?? 3;
+
+  return {
+    select: (readyAgents, metrics) => {
+      const sorted = [...readyAgents].sort((a, b) => {
+        const aAvg = metrics[a]?.avgSatisfactionDelta ?? 0;
+        const bAvg = metrics[b]?.avgSatisfactionDelta ?? 0;
+
+        return bAvg - aAvg;
+      });
+
+      return sorted.slice(0, topN);
+    },
+  };
+}
+
+/**
+ * Selection strategy: prefer agents that consume fewer tokens per satisfaction delta.
+ */
+export function costEfficientStrategy(): AgentSelectionStrategy {
+  return {
+    select: (readyAgents, metrics) => {
+      const sorted = [...readyAgents].sort((a, b) => {
+        const aM = metrics[a];
+        const bM = metrics[b];
+
+        // Agents without metrics go first (need data)
+        if (!aM || aM.runs === 0) {
+          return -1;
+        }
+        if (!bM || bM.runs === 0) {
+          return 1;
+        }
+
+        // Cost per delta: lower is better
+        const aCost = aM.avgSatisfactionDelta > 0 ? aM.tokens / aM.runs / aM.avgSatisfactionDelta : Infinity;
+        const bCost = bM.avgSatisfactionDelta > 0 ? bM.tokens / bM.runs / bM.avgSatisfactionDelta : Infinity;
+
+        return aCost - bCost;
+      });
+
+      return sorted;
+    },
   };
 }
 
@@ -5503,6 +7244,31 @@ export function composePatterns(
           break;
         }
 
+        case "converge": {
+          const cp = pattern as ConvergePattern<unknown>;
+          const initialFacts = typeof currentInput === "string"
+            ? { input: currentInput }
+            : (() => { try { return JSON.parse(currentInput); } catch { return { input: currentInput }; } })();
+          const convergeResult = await orchestrator.runConverge(
+            cp.nodes,
+            initialFacts,
+            cp.when,
+            {
+              satisfaction: cp.satisfaction,
+              maxSteps: cp.maxSteps,
+              extract: cp.extract,
+              timeout: cp.timeout,
+              signal: cp.signal,
+              selectionStrategy: cp.selectionStrategy,
+              relaxation: cp.relaxation,
+              onStep: cp.onStep,
+              onStall: cp.onStall,
+            },
+          );
+          lastOutput = convergeResult.result;
+          break;
+        }
+
         default:
           throw new Error(`[Directive MultiAgent] composePatterns: unknown pattern type "${(pattern as ExecutionPattern).type}"`);
       }
@@ -5920,7 +7686,17 @@ export type SerializedPattern =
   | { type: "dag"; nodes: Record<string, SerializedDagNode>; timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" }
   | { type: "reflect"; agent: string; evaluator: string; maxIterations?: number; onExhausted?: "accept-last" | "accept-best" | "throw"; timeout?: number; threshold?: number }
   | { type: "race"; agents: string[]; timeout?: number; minSuccess?: number }
-  | { type: "debate"; agents: string[]; evaluator: string; maxRounds?: number; timeout?: number };
+  | { type: "debate"; agents: string[]; evaluator: string; maxRounds?: number; timeout?: number }
+  | { type: "converge"; nodes: Record<string, SerializedConvergeNode>; maxSteps?: number; timeout?: number };
+
+/** Serialized converge node (functions stripped) */
+export interface SerializedConvergeNode {
+  agent: string;
+  produces: string[];
+  requires?: string[];
+  allowRerun?: boolean;
+  priority?: number;
+}
 
 /**
  * Serialize an execution pattern to a JSON-safe object.
@@ -5973,10 +7749,18 @@ export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPat
       return { type: "race", agents: pattern.agents, timeout: pattern.timeout, minSuccess: pattern.minSuccess };
     case "debate":
       return { type: "debate", agents: pattern.agents, evaluator: pattern.evaluator, maxRounds: pattern.maxRounds, timeout: pattern.timeout };
+    case "converge": {
+      const cnodes: Record<string, SerializedConvergeNode> = Object.create(null);
+      for (const [id, node] of Object.entries(pattern.nodes)) {
+        cnodes[id] = { agent: node.agent, produces: node.produces, requires: node.requires, allowRerun: node.allowRerun, priority: node.priority };
+      }
+
+      return { type: "converge", nodes: cnodes, maxSteps: pattern.maxSteps, timeout: pattern.timeout };
+    }
   }
 }
 
-const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "dag", "reflect", "race", "debate"]);
+const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "dag", "reflect", "race", "debate", "converge"]);
 
 /**
  * Restore an execution pattern from its serialized form.

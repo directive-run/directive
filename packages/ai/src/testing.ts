@@ -1390,6 +1390,7 @@ export function createTestCheckpointStore(maxCheckpoints = 100): CheckpointStore
     list: () => inner.list(),
     delete: (id: string) => inner.delete(id),
     clear: () => inner.clear(),
+    prune: () => inner.prune(),
   };
 }
 

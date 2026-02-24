@@ -66,7 +66,12 @@ export type AuditEventType =
 	| "fact.batch"
 	// Error handling
 	| "error.occurred"
-	| "error.recovery";
+	| "error.recovery"
+	// Checkpoint operations
+	| "checkpoint.save"
+	| "checkpoint.restore"
+	| "checkpoint.fork"
+	| "checkpoint.replay";
 
 /** Single audit entry with hash chain linking */
 export interface AuditEntry {

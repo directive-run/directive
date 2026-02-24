@@ -27,6 +27,7 @@ const KNOWN_EVENT_TYPES: Set<string> = new Set([
   "reflection_iteration",
   "race_start", "race_winner", "race_cancelled",
   "debate_round", "reroute",
+  "checkpoint_save", "checkpoint_restore",
 ]);
 
 // ============================================================================

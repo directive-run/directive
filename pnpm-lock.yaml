@@ -156,6 +156,38 @@ importers:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
 
+  examples/ai-checkpoint:
+    dependencies:
+      '@directive-run/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
+  examples/ai-guardrails:
+    dependencies:
+      '@directive-run/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
   examples/async-chains:
     dependencies:
       '@directive-run/core':
@@ -170,6 +202,19 @@ importers:
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
 
   examples/auth-flow:
+    dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
+  examples/batch-resolver:
     dependencies:
       '@directive-run/core':
         specifier: workspace:*
@@ -297,6 +342,19 @@ importers:
         specifier: ^5.0.10
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
 
+  examples/error-boundaries:
+    dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
   examples/feature-flags:
     dependencies:
       '@directive-run/core':
@@ -330,6 +388,22 @@ importers:
 
   examples/form-wizard:
     dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
+  examples/goal-engine:
+    dependencies:
+      '@directive-run/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -419,6 +493,22 @@ importers:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
 
+  examples/provider-routing:
+    dependencies:
+      '@directive-run/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
   examples/schema-patterns:
     dependencies:
       '@directive-run/core':
@@ -484,6 +574,19 @@ importers:
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
 
   examples/theme-locale:
+    dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
+
+  examples/time-machine:
     dependencies:
       '@directive-run/core':
         specifier: workspace:*

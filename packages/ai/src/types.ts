@@ -390,13 +390,13 @@ export interface MultiAgentLifecycleHooks {
   onHandoffComplete?: (result: { request: { id: string; fromAgent: string; toAgent: string }; completedAt: number }) => void;
   onPatternStart?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
+    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
     input: string;
     timestamp: number;
   }) => void;
   onPatternComplete?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
+    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
     durationMs: number;
     timestamp: number;
     error?: Error;
@@ -444,6 +444,20 @@ export interface MultiAgentLifecycleHooks {
   onDerivationError?: (event: { derivationId: string; error: Error; timestamp: number }) => void;
   /** Called when scratchpad values are updated */
   onScratchpadUpdate?: (event: { keys: string[]; timestamp: number }) => void;
+  /** Called when a pattern checkpoint is saved */
+  onCheckpointSave?: (event: {
+    checkpointId: string;
+    patternType: string;
+    step: number;
+    timestamp: number;
+  }) => void;
+  /** Called when a checkpoint save fails */
+  onCheckpointError?: (event: {
+    patternType: string;
+    step: number;
+    error: Error;
+    timestamp: number;
+  }) => void;
 }
 
 // ============================================================================
@@ -601,6 +615,8 @@ export interface DagPattern<T = unknown> {
   maxConcurrent?: number;
   /** Error handling strategy. @default "fail" */
   onNodeError?: "fail" | "skip-downstream" | "continue";
+  /** Checkpoint configuration for mid-execution fault tolerance */
+  checkpoint?: PatternCheckpointConfig;
 }
 
 // ============================================================================
@@ -644,7 +660,9 @@ export type DebugEventType =
   | "race_winner"
   | "race_cancelled"
   | "debate_round"
-  | "reroute";
+  | "reroute"
+  | "checkpoint_save"
+  | "checkpoint_restore";
 
 /** Base debug event */
 export interface DebugEventBase {
@@ -765,14 +783,14 @@ export interface HandoffCompleteEvent extends DebugEventBase {
 export interface PatternStartEvent extends DebugEventBase {
   type: "pattern_start";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
+  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
 }
 
 /** Pattern complete event */
 export interface PatternCompleteEvent extends DebugEventBase {
   type: "pattern_complete";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate";
+  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "converge";
   durationMs: number;
   error?: string;
 }
@@ -867,6 +885,22 @@ export interface RerouteDebugEvent extends DebugEventBase {
   reason: string;
 }
 
+/** Checkpoint save event */
+export interface CheckpointSaveEvent extends DebugEventBase {
+  type: "checkpoint_save";
+  checkpointId: string;
+  patternType: string;
+  step: number;
+}
+
+/** Checkpoint restore event */
+export interface CheckpointRestoreEvent extends DebugEventBase {
+  type: "checkpoint_restore";
+  checkpointId: string;
+  patternType: string;
+  step: number;
+}
+
 /** Union of all debug event types */
 export type DebugEvent =
   | AgentStartEvent
@@ -894,7 +928,9 @@ export type DebugEvent =
   | RaceWinnerEvent
   | RaceCancelledEvent
   | DebateRoundEvent
-  | RerouteDebugEvent;
+  | RerouteDebugEvent
+  | CheckpointSaveEvent
+  | CheckpointRestoreEvent;
 
 // ============================================================================
 // Self-Healing Types
@@ -1035,6 +1071,358 @@ export interface Scratchpad<T extends Record<string, unknown> = Record<string, u
   subscribe(keys: (keyof T)[], callback: (key: keyof T, value: unknown) => void): () => void;
   onChange(callback: (key: string, value: unknown) => void): () => void;
   reset(): void;
+}
+
+// ============================================================================
+// Converge Pattern Types
+// ============================================================================
+
+/** A node in a converge execution pattern */
+export interface ConvergeNode {
+  /** Agent ID (registered on the orchestrator) */
+  agent: string;
+  /** Fact keys this node can produce */
+  produces: string[];
+  /** Fact keys this node needs (must be satisfied before running) */
+  requires?: string[];
+  /** Allow re-run if input facts change after completion */
+  allowRerun?: boolean;
+  /** Priority for selection when multiple nodes are ready. Higher = first */
+  priority?: number;
+  /** Build the input string from current facts */
+  buildInput?: (facts: Record<string, unknown>) => string;
+  /** Extract output facts from the agent's result */
+  extractOutput?: (result: RunResult<unknown>) => Record<string, unknown>;
+}
+
+/** Convergence step metrics */
+export interface ConvergeStepMetrics {
+  step: number;
+  durationMs: number;
+  nodesRun: string[];
+  factsProduced: string[];
+  satisfaction: number;
+  satisfactionDelta: number;
+  tokensConsumed: number;
+}
+
+/** Convergence progress metrics */
+export interface ConvergeMetrics {
+  satisfaction: number;
+  convergenceRate: number;
+  estimatedStepsRemaining: number | null;
+  decelerating: boolean;
+}
+
+/** Agent selection strategy for converge pattern */
+export interface AgentSelectionStrategy {
+  select: (
+    readyAgents: string[],
+    metrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number }>,
+    convergence: ConvergeMetrics,
+  ) => string[];
+}
+
+/** Relaxation context passed to custom relaxation strategies */
+export interface RelaxationContext {
+  step: number;
+  facts: Record<string, unknown>;
+  metrics: ConvergeMetrics;
+  completedNodes: Set<string>;
+  failedNodes: Map<string, number>;
+}
+
+/** Relaxation strategy for when convergence stalls */
+export type RelaxationStrategy =
+  | { type: "allow_rerun"; nodes: string[] }
+  | { type: "alternative_nodes"; nodes: ConvergeNode[] }
+  | { type: "inject_facts"; facts: Record<string, unknown> }
+  | { type: "accept_partial" }
+  | { type: "custom"; apply: (context: RelaxationContext) => void | Promise<void> };
+
+/** Relaxation tier — progressively applied when convergence stalls */
+export interface RelaxationTier {
+  label: string;
+  /** Steps of no progress before applying. @default 3 */
+  afterStallSteps?: number;
+  strategy: RelaxationStrategy;
+}
+
+/** Record of a relaxation event */
+export interface RelaxationRecord {
+  step: number;
+  tierIndex: number;
+  label: string;
+  strategy: RelaxationStrategy["type"];
+}
+
+/** Converge execution pattern — declare desired state, let the runtime resolve */
+export interface ConvergePattern<T = unknown> {
+  type: "converge";
+  /** Nodes with produces/requires declarations */
+  nodes: Record<string, ConvergeNode>;
+  /** Convergence condition — when this returns true, convergence is complete */
+  when: (facts: Record<string, unknown>) => boolean;
+  /** Quantitative satisfaction: 0.0 to 1.0. Enables progress tracking.
+   *  If omitted, binary: 0.0 when when() is false, 1.0 when true. */
+  satisfaction?: (facts: Record<string, unknown>) => number;
+  /** Max convergence steps. @default 50 */
+  maxSteps?: number;
+  /** Extract final result from converged facts */
+  extract?: (facts: Record<string, unknown>) => T;
+  /** Timeout in ms. @default 300000 */
+  timeout?: number;
+  /** Abort signal */
+  signal?: AbortSignal;
+  /** Agent selection strategy. @default "all-ready" */
+  selectionStrategy?: AgentSelectionStrategy;
+  /** Relaxation tiers — progressively applied when convergence stalls */
+  relaxation?: RelaxationTier[];
+  /** Lifecycle hooks */
+  onStep?: (step: number, facts: Record<string, unknown>, readyAgents: string[]) => void;
+  onStall?: (step: number, metrics: ConvergeMetrics) => void;
+  /** Checkpoint configuration for mid-convergence fault tolerance */
+  checkpoint?: PatternCheckpointConfig;
+}
+
+/** Result of a converge pattern execution */
+export interface ConvergeResult<T = unknown> {
+  /** Whether the when() condition was satisfied */
+  converged: boolean;
+  /** Final value (from extract, or raw facts) */
+  result: T;
+  /** Final facts state */
+  facts: Record<string, unknown>;
+  /** Nodes that ran, in execution order */
+  executionOrder: string[];
+  /** Per-node results */
+  nodeResults: Record<string, RunResult<unknown>>;
+  /** Total convergence steps taken */
+  steps: number;
+  /** Total tokens consumed */
+  totalTokens: number;
+  /** Total duration (ms) */
+  durationMs: number;
+  /** Per-step metrics (satisfaction, nodes run, etc.) */
+  stepMetrics: ConvergeStepMetrics[];
+  /** Relaxation events applied */
+  relaxations: RelaxationRecord[];
+  /** Error message if convergence failed */
+  error?: string;
+}
+
+// ============================================================================
+// Pattern Checkpoint Types (Universal)
+// ============================================================================
+
+/** Universal checkpoint configuration for all execution patterns */
+export interface PatternCheckpointConfig {
+  /** Save a checkpoint every N steps/rounds/iterations. @default 5 */
+  everyN?: number;
+  /** Checkpoint store. Uses the orchestrator's store if not provided. */
+  store?: import("./checkpoint.js").CheckpointStore;
+  /** Label prefix for checkpoints. @default pattern type name */
+  labelPrefix?: string;
+  /** Conditional: only save when this returns true */
+  when?: (context: CheckpointContext) => boolean;
+}
+
+/** Context passed to conditional checkpoint predicates */
+export interface CheckpointContext {
+  /** Current step/round/iteration number */
+  step: number;
+  /** Pattern type identifier */
+  patternType: string;
+  /** Pattern-specific facts (converge only) */
+  facts?: Record<string, unknown>;
+  /** Satisfaction score 0-1 (converge only) */
+  satisfaction?: number;
+}
+
+/**
+ * @deprecated Use `PatternCheckpointConfig` instead. This alias exists for backward compatibility.
+ */
+export type ConvergeCheckpointConfig = PatternCheckpointConfig;
+
+// ---- Common checkpoint state fields ----
+
+/** Common fields present on all pattern checkpoint states */
+export interface PatternCheckpointBase {
+  /** Checkpoint format version */
+  version: 1;
+  /** Unique ID */
+  id: string;
+  /** ISO timestamp */
+  createdAt: string;
+  /** User label */
+  label?: string;
+  /** Pattern ID */
+  patternId: string;
+  /** Total expected steps/rounds/iterations (null for unbounded) */
+  stepsTotal?: number | null;
+}
+
+// ---- Per-pattern checkpoint states ----
+
+/** Checkpoint state for sequential pattern */
+export interface SequentialCheckpointState extends PatternCheckpointBase {
+  type: "sequential";
+  /** Next agent index to run */
+  step: number;
+  /** Current input for the next agent */
+  currentInput: string;
+  /** Results collected so far (output + tokens) */
+  results: Array<{ agentId: string; output: unknown; totalTokens: number }>;
+}
+
+/** Checkpoint state for supervisor pattern */
+export interface SupervisorCheckpointState extends PatternCheckpointBase {
+  type: "supervisor";
+  /** Next round number */
+  round: number;
+  /** Last supervisor output */
+  supervisorOutput: unknown;
+  /** Worker results so far */
+  workerResults: Array<{ output: unknown; totalTokens: number }>;
+  /** Current input to supervisor */
+  currentInput: string;
+}
+
+/** Checkpoint state for reflect pattern */
+export interface ReflectCheckpointState extends PatternCheckpointBase {
+  type: "reflect";
+  /** Next iteration number */
+  iteration: number;
+  /** Current effective input */
+  effectiveInput: string;
+  /** Iteration history */
+  history: Array<{
+    iteration: number;
+    passed: boolean;
+    score?: number;
+    feedback?: string;
+    durationMs: number;
+    producerTokens: number;
+    evaluatorTokens: number;
+  }>;
+  /** Producer outputs so far */
+  producerOutputs: Array<{ output: unknown; score?: number }>;
+  /** Last producer output */
+  lastProducerOutput: unknown | null;
+}
+
+/** Checkpoint state for debate pattern */
+export interface DebateCheckpointState extends PatternCheckpointBase {
+  type: "debate";
+  /** Next round number */
+  round: number;
+  /** Current input for the round */
+  currentInput: string;
+  /** Completed rounds */
+  rounds: Array<{
+    proposals: Array<{ agentId: string; output: unknown }>;
+    judgement: { winnerId: string; feedback?: string; score?: number };
+  }>;
+  /** Last winning agent ID */
+  lastWinnerId: string;
+  /** Last winning output */
+  lastWinnerOutput: unknown;
+  /** Tokens consumed so far */
+  tokensConsumed: number;
+}
+
+/** Checkpoint state for DAG pattern */
+export interface DagCheckpointState extends PatternCheckpointBase {
+  type: "dag";
+  /** Per-node statuses */
+  statuses: Record<string, DagNodeStatus>;
+  /** Per-node outputs */
+  outputs: Record<string, unknown>;
+  /** Per-node errors */
+  errors: Record<string, string>;
+  /** Number of completed nodes */
+  completedCount: number;
+  /** Full results (output + tokens per node) */
+  nodeResults: Record<string, { output: unknown; totalTokens: number }>;
+  /** Original input */
+  input: string;
+}
+
+/** Serializable mid-convergence state for save/resume */
+export interface ConvergeCheckpointState extends PatternCheckpointBase {
+  /** Pattern type discriminator */
+  type: "converge";
+  /** Current step */
+  step: number;
+  /** Current facts snapshot */
+  facts: Record<string, unknown>;
+  /** Completed node IDs */
+  completedNodes: string[];
+  /** Failed node IDs with consecutive failure counts */
+  failedNodes: Record<string, number>;
+  /** Node input hashes (for allowRerun detection) */
+  nodeInputHashes: Record<string, string>;
+  /** Per-node results (serialized — output only, not the full RunResult) */
+  nodeOutputs: Record<string, { output: unknown; totalTokens: number }>;
+  /** Execution order so far */
+  executionOrder: string[];
+  /** Step metrics collected so far */
+  stepMetrics: ConvergeStepMetrics[];
+  /** Relaxations applied so far */
+  relaxations: RelaxationRecord[];
+  /** Applied relaxation tier index */
+  appliedRelaxationTiers: number;
+  /** Stall step counter */
+  stallSteps: number;
+  /** Last satisfaction value */
+  lastSatisfaction: number;
+  /** Per-agent metrics */
+  agentMetrics: Record<string, { runs: number; totalDelta: number; tokens: number }>;
+}
+
+/** Discriminated union of all pattern checkpoint states */
+export type PatternCheckpointState =
+  | SequentialCheckpointState
+  | SupervisorCheckpointState
+  | ReflectCheckpointState
+  | DebateCheckpointState
+  | DagCheckpointState
+  | ConvergeCheckpointState;
+
+// ---- Checkpoint utilities ----
+
+/** Progress computed from a checkpoint state */
+export interface CheckpointProgress {
+  /** 0-100 percentage complete */
+  percentage: number;
+  /** Steps/rounds/iterations completed */
+  stepsCompleted: number;
+  /** Total expected steps (null for unbounded patterns) */
+  stepsTotal: number | null;
+  /** Tokens consumed so far */
+  tokensConsumed: number;
+  /** Estimated tokens remaining (null when unknowable) */
+  estimatedTokensRemaining: number | null;
+  /** Estimated steps remaining (null when unknowable) */
+  estimatedStepsRemaining: number | null;
+}
+
+/** Diff between two checkpoint states */
+export interface CheckpointDiff {
+  /** Pattern type */
+  patternType: string;
+  /** Step/round/iteration difference */
+  stepDelta: number;
+  /** Token difference */
+  tokensDelta: number;
+  /** Fact changes (converge only) */
+  facts?: {
+    added: string[];
+    removed: string[];
+    changed: Array<{ key: string; before: unknown; after: unknown }>;
+  };
+  /** Nodes completed between checkpoints (DAG/converge) */
+  nodesCompleted?: string[];
 }
 
 /** Bridge schema for orchestrator (internal plumbing — types cast to bypass t.object constraint) */
