@@ -399,22 +399,6 @@ importers:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
 
-  examples/goal-engine:
-    dependencies:
-      '@directive-run/ai':
-        specifier: workspace:*
-        version: link:../../packages/ai
-      '@directive-run/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-    devDependencies:
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
-      vite:
-        specifier: ^5.0.0
-        version: 5.4.21(@types/node@25.2.0)(lightningcss@1.30.2)
-
   examples/multi-module:
     dependencies:
       '@directive-run/core':
@@ -495,9 +479,6 @@ importers:
 
   examples/provider-routing:
     dependencies:
-      '@directive-run/ai':
-        specifier: workspace:*
-        version: link:../../packages/ai
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -848,6 +829,9 @@ importers:
       '@types/react-highlight-words':
         specifier: ^0.20.0
         version: 0.20.1
+      '@xyflow/react':
+        specifier: ^12.4.4
+        version: 12.10.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

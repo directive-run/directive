@@ -1,13 +1,13 @@
 /**
- * Standalone utilities for convergence planning and validation.
+ * Standalone utilities for goal planning and validation.
  *
  * These functions work with the same `produces` / `requires` agent
- * declarations used by the converge pattern, without requiring an
+ * declarations used by the goal pattern, without requiring an
  * orchestrator instance.
  *
  * @example
  * ```typescript
- * import { validateConvergence, planConvergence, getDependencyGraph } from '@directive-run/ai';
+ * import { validateGoal, planGoal, getDependencyGraph } from '@directive-run/ai';
  *
  * const agents = {
  *   fetcher: { produces: ['data'], requires: [] },
@@ -16,10 +16,10 @@
  * };
  *
  * // Validate — cycle detection, missing deps, warnings
- * const validation = validateConvergence(agents);
+ * const validation = validateGoal(agents);
  *
  * // Plan — dry-run without executing agents
- * const plan = planConvergence(agents, ['query']);
+ * const plan = planGoal(agents, ['query']);
  *
  * // Graph — topological order, roots, leaves, edges
  * const graph = getDependencyGraph(agents);
@@ -28,12 +28,14 @@
  * @module
  */
 
+import type { GoalResult, GoalStepMetrics, RelaxationRecord } from "./types.js";
+
 // ============================================================================
 // Types
 // ============================================================================
 
-/** Minimal agent declaration for convergence utilities (subset of ConvergeNode) */
-export interface ConvergeAgentDeclaration {
+/** Minimal agent declaration for goal utilities (subset of GoalNode) */
+export interface GoalAgentDeclaration {
   /** Fact keys this agent writes as output */
   produces: string[];
   /** Fact keys this agent reads as input */
@@ -41,7 +43,7 @@ export interface ConvergeAgentDeclaration {
 }
 
 /** Edge in the inferred dependency graph */
-export interface ConvergeDependencyEdge {
+export interface GoalDependencyEdge {
   from: string;
   to: string;
   /** Fact key that creates this dependency */
@@ -49,11 +51,11 @@ export interface ConvergeDependencyEdge {
 }
 
 /** Inferred dependency graph from produces/requires analysis */
-export interface ConvergeDependencyGraph {
+export interface GoalDependencyGraph {
   /** Agent IDs in topological order (roots first) */
   order: string[];
   /** Edges between agents */
-  edges: ConvergeDependencyEdge[];
+  edges: GoalDependencyEdge[];
   /** Root agents (no unfulfilled requires from other agents) */
   roots: string[];
   /** Leaf agents (nothing depends on their produces) */
@@ -63,14 +65,14 @@ export interface ConvergeDependencyGraph {
 }
 
 /** Validation result */
-export interface ConvergeValidationResult {
+export interface GoalValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
 }
 
 /** A single step in an execution plan */
-export interface ConvergePlanStep {
+export interface GoalPlanStep {
   /** Step number (1-based) */
   step: number;
   /** Agent IDs that would run in this step (parallel) */
@@ -81,10 +83,10 @@ export interface ConvergePlanStep {
   producedFacts: string[];
 }
 
-/** Result of a planConvergence() dry-run */
-export interface ConvergenceExecutionPlan {
+/** Result of a planGoal() dry-run */
+export interface GoalExecutionPlan {
   /** Ordered steps showing which agents run when */
-  steps: ConvergePlanStep[];
+  steps: GoalPlanStep[];
   /** Agents that can never run (requires never satisfiable) */
   unreachableAgents: string[];
   /** Required fact keys that no agent produces (must be in initial facts) */
@@ -98,8 +100,8 @@ export interface ConvergenceExecutionPlan {
 // ============================================================================
 
 function buildGraph(
-  agents: Record<string, ConvergeAgentDeclaration>,
-): ConvergeDependencyGraph {
+  agents: Record<string, GoalAgentDeclaration>,
+): GoalDependencyGraph {
   const agentIds = Object.keys(agents);
 
   // Build a map: factKey → agentId that produces it
@@ -108,7 +110,7 @@ function buildGraph(
     for (const key of decl.produces) {
       if (producerMap.has(key)) {
         throw new Error(
-          `[Directive Converge] Fact key "${key}" is produced by both "${producerMap.get(key)}" and "${agentId}". Each fact key must have exactly one producer.`,
+          `[Directive Goal] Fact key "${key}" is produced by both "${producerMap.get(key)}" and "${agentId}". Each fact key must have exactly one producer.`,
         );
       }
       producerMap.set(key, agentId);
@@ -116,7 +118,7 @@ function buildGraph(
   }
 
   // Build edges: agent B requires fact X → agent A produces fact X → edge A→B
-  const edges: ConvergeDependencyEdge[] = [];
+  const edges: GoalDependencyEdge[] = [];
   const inDegree = new Map<string, number>();
   const adjacency = new Map<string, string[]>();
 
@@ -164,7 +166,7 @@ function buildGraph(
     const inCycle = agentIds.filter((id) => !orderSet.has(id));
 
     throw new Error(
-      `[Directive Converge] Circular dependency detected among agents: ${inCycle.join(", ")}. ` +
+      `[Directive Goal] Circular dependency detected among agents: ${inCycle.join(", ")}. ` +
       `Review their produces/requires declarations.`,
     );
   }
@@ -211,8 +213,8 @@ function buildGraph(
  * ```
  */
 export function getDependencyGraph(
-  agents: Record<string, ConvergeAgentDeclaration>,
-): ConvergeDependencyGraph {
+  agents: Record<string, GoalAgentDeclaration>,
+): GoalDependencyGraph {
   const graph = buildGraph(agents);
 
   return {
@@ -225,7 +227,7 @@ export function getDependencyGraph(
 }
 
 /**
- * Validate a set of agent declarations for convergence.
+ * Validate a set of agent declarations for goal execution.
  *
  * Checks for:
  * - Circular dependencies
@@ -235,7 +237,7 @@ export function getDependencyGraph(
  *
  * @example
  * ```typescript
- * const result = validateConvergence({
+ * const result = validateGoal({
  *   fetcher: { produces: ['data'] },
  *   analyzer: { produces: ['analysis'], requires: ['data'] },
  * });
@@ -245,9 +247,9 @@ export function getDependencyGraph(
  * }
  * ```
  */
-export function validateConvergence(
-  agents: Record<string, ConvergeAgentDeclaration>,
-): ConvergeValidationResult {
+export function validateGoal(
+  agents: Record<string, GoalAgentDeclaration>,
+): GoalValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -286,7 +288,7 @@ export function validateConvergence(
 }
 
 /**
- * Dry-run convergence to preview the execution plan without running agents.
+ * Dry-run goal execution to preview the plan without running agents.
  *
  * Shows which agents would run in each step, which facts would be produced,
  * and whether any agents are unreachable.
@@ -297,7 +299,7 @@ export function validateConvergence(
  *
  * @example
  * ```typescript
- * const plan = planConvergence(
+ * const plan = planGoal(
  *   {
  *     fetcher: { produces: ['data'] },
  *     analyzer: { produces: ['analysis'], requires: ['data'] },
@@ -310,11 +312,11 @@ export function validateConvergence(
  * console.log(plan.steps);     // 3 steps: fetcher → analyzer → reporter
  * ```
  */
-export function planConvergence(
-  agents: Record<string, ConvergeAgentDeclaration>,
+export function planGoal(
+  agents: Record<string, GoalAgentDeclaration>,
   initialFactKeys: string[] = [],
   maxSteps = 50,
-): ConvergenceExecutionPlan {
+): GoalExecutionPlan {
   const graph = buildGraph(agents);
 
   const allProduced = new Set<string>();
@@ -336,7 +338,7 @@ export function planConvergence(
 
   const availableFacts = new Set(initialFactKeys);
   const completedAgents = new Set<string>();
-  const steps: ConvergePlanStep[] = [];
+  const steps: GoalPlanStep[] = [];
 
   for (let stepNum = 1; stepNum <= maxSteps; stepNum++) {
     const readyAgents = graph.order.filter((agentId) => {
@@ -381,5 +383,155 @@ export function planConvergence(
     unreachableAgents,
     externalDeps: [...new Set(externalDeps)],
     feasible: unreachableAgents.length === 0,
+  };
+}
+
+// ============================================================================
+// Explain Goal
+// ============================================================================
+
+/** A single line in a goal execution explanation */
+export interface GoalExplanationStep {
+  step: number;
+  agents: string[];
+  factsProduced: string[];
+  satisfaction: number;
+  satisfactionDelta: number;
+  durationMs: number;
+  tokensConsumed: number;
+  /** Human-readable description of what happened */
+  description: string;
+}
+
+/** Structured explanation of a goal execution */
+export interface GoalExplanation {
+  /** Whether the goal was achieved */
+  achieved: boolean;
+  /** Human-readable summary */
+  summary: string;
+  /** Per-step explanations */
+  steps: GoalExplanationStep[];
+  /** Relaxation events with descriptions */
+  relaxations: Array<{
+    step: number;
+    label: string;
+    strategy: string;
+    description: string;
+  }>;
+  /** Total tokens consumed */
+  totalTokens: number;
+  /** Total duration (ms) */
+  durationMs: number;
+}
+
+/**
+ * Generate a human-readable explanation of a goal execution result.
+ *
+ * Takes a `GoalResult` and returns a structured explanation of why each
+ * agent ran, how satisfaction progressed, and what relaxations were applied.
+ *
+ * @example
+ * ```typescript
+ * const result = await orchestrator.runGoal(nodes, input, when, options);
+ * const explanation = explainGoal(result);
+ *
+ * console.log(explanation.summary);
+ * // "Goal achieved in 3 steps (1,247 tokens, 892ms). Satisfaction: 0 → 1."
+ *
+ * for (const step of explanation.steps) {
+ *   console.log(step.description);
+ *   // "Step 1: Ran fetcher. Produced: data. Satisfaction: 0 → 0.3 (+0.3)."
+ * }
+ * ```
+ */
+export function explainGoal<T = unknown>(
+  result: GoalResult<T>,
+): GoalExplanation {
+  const steps: GoalExplanationStep[] = result.stepMetrics.map(
+    (metric: GoalStepMetrics) => {
+      const agentList = metric.nodesRun.join(", ");
+      const factList = metric.factsProduced.length > 0
+        ? metric.factsProduced.join(", ")
+        : "none";
+      const prevSatisfaction = +(metric.satisfaction - metric.satisfactionDelta).toFixed(3);
+      const delta = metric.satisfactionDelta >= 0
+        ? `+${metric.satisfactionDelta.toFixed(3)}`
+        : metric.satisfactionDelta.toFixed(3);
+
+      const description =
+        `Step ${metric.step}: Ran ${agentList}. ` +
+        `Produced: ${factList}. ` +
+        `Satisfaction: ${prevSatisfaction} → ${metric.satisfaction.toFixed(3)} (${delta}). ` +
+        `${metric.tokensConsumed} tokens, ${metric.durationMs}ms.`;
+
+      return {
+        step: metric.step,
+        agents: metric.nodesRun,
+        factsProduced: metric.factsProduced,
+        satisfaction: metric.satisfaction,
+        satisfactionDelta: metric.satisfactionDelta,
+        durationMs: metric.durationMs,
+        tokensConsumed: metric.tokensConsumed,
+        description,
+      };
+    },
+  );
+
+  const relaxations = result.relaxations.map((r: RelaxationRecord) => {
+    let description: string;
+    switch (r.strategy) {
+      case "allow_rerun":
+        description = `Step ${r.step}: Applied relaxation "${r.label}" — re-enabled completed nodes for another run.`;
+        break;
+      case "inject_facts":
+        description = `Step ${r.step}: Applied relaxation "${r.label}" — injected fact values to unblock dependencies.`;
+        break;
+      case "accept_partial":
+        description = `Step ${r.step}: Applied relaxation "${r.label}" — accepted current facts as partial result.`;
+        break;
+      case "alternative_nodes":
+        description = `Step ${r.step}: Applied relaxation "${r.label}" — added alternative nodes to the graph.`;
+        break;
+      case "custom":
+        description = `Step ${r.step}: Applied relaxation "${r.label}" — ran custom recovery logic.`;
+        break;
+      default:
+        description = `Step ${r.step}: Applied relaxation "${r.label}" (${r.strategy}).`;
+    }
+
+    return {
+      step: r.step,
+      label: r.label,
+      strategy: r.strategy,
+      description,
+    };
+  });
+
+  const firstSatisfaction = result.stepMetrics.length > 0
+    ? (result.stepMetrics[0]!.satisfaction - result.stepMetrics[0]!.satisfactionDelta).toFixed(1)
+    : "0";
+  const lastSatisfaction = result.stepMetrics.length > 0
+    ? result.stepMetrics[result.stepMetrics.length - 1]!.satisfaction.toFixed(1)
+    : "0";
+
+  const status = result.achieved ? "Goal achieved" : "Goal not achieved";
+  const relaxationNote = result.relaxations.length > 0
+    ? ` ${result.relaxations.length} relaxation(s) applied.`
+    : "";
+  const errorNote = result.error ? ` Error: ${result.error}` : "";
+
+  const summary =
+    `${status} in ${result.steps} step(s) (${result.totalTokens.toLocaleString()} tokens, ${result.durationMs}ms). ` +
+    `Satisfaction: ${firstSatisfaction} → ${lastSatisfaction}.` +
+    relaxationNote +
+    errorNote;
+
+  return {
+    achieved: result.achieved,
+    summary,
+    steps,
+    relaxations,
+    totalTokens: result.totalTokens,
+    durationMs: result.durationMs,
   };
 }

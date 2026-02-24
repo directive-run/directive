@@ -70,16 +70,16 @@ import type {
   CrossAgentSnapshot,
   CrossAgentDerivationFn,
   Scratchpad,
-  ConvergePattern,
-  ConvergeNode,
-  ConvergeResult,
-  ConvergeStepMetrics,
-  ConvergeMetrics,
+  GoalPattern,
+  GoalNode,
+  GoalResult,
+  GoalStepMetrics,
+  GoalMetrics,
   AgentSelectionStrategy,
   RelaxationTier,
   RelaxationRecord,
   RelaxationContext,
-  ConvergeCheckpointState,
+  GoalCheckpointState,
   PatternCheckpointConfig,
   PatternCheckpointState,
   SequentialCheckpointState,
@@ -200,7 +200,7 @@ export function getPatternStep(state: PatternCheckpointState): number {
     case "reflect": return state.iteration;
     case "debate": return state.round;
     case "dag": return state.completedCount;
-    case "converge": return state.step;
+    case "goal": return state.step;
   }
 }
 
@@ -288,7 +288,7 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
       };
     }
 
-    case "converge": {
+    case "goal": {
       const tokensConsumed = Object.values(state.nodeOutputs).reduce(
         (sum, r) => sum + r.totalTokens, 0
       );
@@ -301,14 +301,14 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
         tokensConsumed,
         estimatedTokensRemaining: null,
         estimatedStepsRemaining: state.stepMetrics.length > 0
-          ? estimateConvergeSteps(state)
+          ? estimateGoalSteps(state)
           : null,
       };
     }
   }
 }
 
-function estimateConvergeSteps(state: ConvergeCheckpointState): number | null {
+function estimateGoalSteps(state: GoalCheckpointState): number | null {
   const metrics = state.stepMetrics;
   if (metrics.length < 2) {
     return null;
@@ -345,7 +345,7 @@ export function diffCheckpoints(
       case "reflect": return s.history.reduce((sum, h) => sum + h.producerTokens + h.evaluatorTokens, 0);
       case "debate": return s.tokensConsumed;
       case "dag": return Object.values(s.nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
-      case "converge": return Object.values(s.nodeOutputs).reduce((sum, r) => sum + r.totalTokens, 0);
+      case "goal": return Object.values(s.nodeOutputs).reduce((sum, r) => sum + r.totalTokens, 0);
     }
   };
 
@@ -355,8 +355,8 @@ export function diffCheckpoints(
     tokensDelta: getTokens(b) - getTokens(a),
   };
 
-  // Add facts diff for converge pattern
-  if (a.type === "converge" && b.type === "converge") {
+  // Add facts diff for goal pattern
+  if (a.type === "goal" && b.type === "goal") {
     const aKeys = new Set(Object.keys(a.facts));
     const bKeys = new Set(Object.keys(b.facts));
     const added: string[] = [];
@@ -379,7 +379,7 @@ export function diffCheckpoints(
     diff.facts = { added, removed, changed };
   }
 
-  // Add nodes completed for DAG/converge
+  // Add nodes completed for DAG/goal
   if (a.type === "dag" && b.type === "dag") {
     const aCompleted = new Set(
       Object.entries(a.statuses)
@@ -391,7 +391,7 @@ export function diffCheckpoints(
       .map(([id]) => id);
   }
 
-  if (a.type === "converge" && b.type === "converge") {
+  if (a.type === "goal" && b.type === "goal") {
     const aCompleted = new Set(a.completedNodes);
     diff.nodesCompleted = b.completedNodes.filter((id) => !aCompleted.has(id));
   }
@@ -778,8 +778,8 @@ export interface DebatePattern<T = unknown> {
 /** Re-export types consumed by tests / external consumers */
 export type { DagPattern, DagExecutionContext } from "./types.js";
 
-/** Re-export converge types consumed by tests / external consumers */
-export type { ConvergePattern, ConvergeNode, ConvergeResult, ConvergeStepMetrics, ConvergeMetrics, AgentSelectionStrategy, RelaxationTier, RelaxationStrategy, RelaxationRecord, RelaxationContext } from "./types.js";
+/** Re-export goal types consumed by tests / external consumers */
+export type { GoalPattern, GoalNode, GoalResult, GoalStepMetrics, GoalMetrics, AgentSelectionStrategy, RelaxationTier, RelaxationStrategy, RelaxationRecord, RelaxationContext } from "./types.js";
 
 /** Union of all patterns */
 export type ExecutionPattern<T = unknown> =
@@ -790,7 +790,7 @@ export type ExecutionPattern<T = unknown> =
   | ReflectPattern<T>
   | RacePattern<T>
   | DebatePattern<T>
-  | ConvergePattern<T>;
+  | GoalPattern<T>;
 
 // ============================================================================
 // Handoff Types
@@ -1030,9 +1030,9 @@ export interface MultiAgentOrchestrator {
       timeout?: number;
     }
   ): Promise<DebateResult<T>>;
-  /** Run a converge pattern imperatively — declare desired state, let the runtime resolve */
-  runConverge<T>(
-    nodes: Record<string, ConvergeNode>,
+  /** Run a goal pattern imperatively — declare desired state, let the runtime resolve */
+  runGoal<T>(
+    nodes: Record<string, GoalNode>,
     initialInput: string | Record<string, unknown>,
     when: (facts: Record<string, unknown>) => boolean,
     options?: {
@@ -1043,16 +1043,16 @@ export interface MultiAgentOrchestrator {
       signal?: AbortSignal;
       selectionStrategy?: AgentSelectionStrategy;
       relaxation?: RelaxationTier[];
-      onStep?: ConvergePattern["onStep"];
-      onStall?: ConvergePattern["onStall"];
+      onStep?: GoalPattern["onStep"];
+      onStall?: GoalPattern["onStall"];
       checkpoint?: PatternCheckpointConfig;
     },
-  ): Promise<ConvergeResult<T>>;
-  /** Resume a converge pattern from a saved checkpoint */
-  resumeConverge<T>(
-    checkpointState: ConvergeCheckpointState,
-    pattern: ConvergePattern<T>,
-  ): Promise<ConvergeResult<T>>;
+  ): Promise<GoalResult<T>>;
+  /** Resume a goal pattern from a saved checkpoint */
+  resumeGoal<T>(
+    checkpointState: GoalCheckpointState,
+    pattern: GoalPattern<T>,
+  ): Promise<GoalResult<T>>;
   /** Resume a sequential pattern from a saved checkpoint */
   resumeSequential<T>(
     checkpointState: SequentialCheckpointState,
@@ -2914,8 +2914,8 @@ export function createMultiAgentOrchestrator(
         const shouldSave = config.when({
           step,
           patternType: state.type,
-          facts: state.type === "converge" ? (state as ConvergeCheckpointState).facts : undefined,
-          satisfaction: state.type === "converge" ? (state as ConvergeCheckpointState).lastSatisfaction : undefined,
+          facts: state.type === "goal" ? (state as GoalCheckpointState).facts : undefined,
+          satisfaction: state.type === "goal" ? (state as GoalCheckpointState).lastSatisfaction : undefined,
         });
         if (!shouldSave) {
           return null;
@@ -3349,6 +3349,7 @@ export function createMultiAgentOrchestrator(
                   snapshotId: null,
                   nodeId,
                   status: "skipped",
+                  deps: node.deps ?? [],
                 });
               }
               fireHook("onDagNodeSkipped", {
@@ -3375,6 +3376,7 @@ export function createMultiAgentOrchestrator(
                     snapshotId: null,
                     nodeId,
                     status: "skipped",
+                    deps: node.deps ?? [],
                   });
                 }
                 fireHook("onDagNodeSkipped", {
@@ -3409,6 +3411,7 @@ export function createMultiAgentOrchestrator(
             snapshotId: null,
             nodeId,
             status: "running",
+            deps: node.deps ?? [],
           });
         }
         fireHook("onDagNodeStart", {
@@ -3461,6 +3464,7 @@ export function createMultiAgentOrchestrator(
               snapshotId: null,
               nodeId,
               status: "completed",
+              deps: node.deps ?? [],
             });
           }
           fireHook("onDagNodeComplete", {
@@ -3510,6 +3514,7 @@ export function createMultiAgentOrchestrator(
               snapshotId: null,
               nodeId,
               status: "error",
+              deps: node.deps ?? [],
             });
           }
           fireHook("onDagNodeError", {
@@ -4310,10 +4315,10 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  // ---- Converge Pattern Implementation ----
+  // ---- Goal Pattern Implementation ----
 
-  /** Keys that must never appear in converge facts (prototype pollution guard) */
-  const CONVERGE_BLOCKED_KEYS = new Set([
+  /** Keys that must never appear in goal facts (prototype pollution guard) */
+  const GOAL_BLOCKED_KEYS = new Set([
     "__proto__",
     "constructor",
     "prototype",
@@ -4322,19 +4327,19 @@ export function createMultiAgentOrchestrator(
     "hasOwnProperty",
   ]);
 
-  function convergeSafeMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  function goalSafeMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const key of Object.keys(source)) {
-      if (!CONVERGE_BLOCKED_KEYS.has(key)) {
+      if (!GOAL_BLOCKED_KEYS.has(key)) {
         target[key] = source[key];
       }
     }
   }
 
   /**
-   * Detect cycles in converge node dependency graph.
+   * Detect cycles in goal node dependency graph.
    * Builds an implicit DAG from produces/requires and applies Kahn's algorithm.
    */
-  function validateConvergeAcyclic(pId: string, nodes: Record<string, ConvergeNode>): void {
+  function validateGoalAcyclic(pId: string, nodes: Record<string, GoalNode>): void {
     // Build producer map: factKey → nodeId(s) that produce it
     const producerMap: Record<string, string[]> = Object.create(null);
     for (const [nodeId, node] of Object.entries(nodes)) {
@@ -4391,7 +4396,7 @@ export function createMultiAgentOrchestrator(
 
     if (visited !== nodeIds.length) {
       throw new Error(
-        `[Directive MultiAgent] converge pattern "${pId}": cycle detected in produces/requires graph. Visited ${visited}/${nodeIds.length} nodes.`
+        `[Directive MultiAgent] goal pattern "${pId}": cycle detected in produces/requires graph. Visited ${visited}/${nodeIds.length} nodes.`
       );
     }
   }
@@ -4400,7 +4405,7 @@ export function createMultiAgentOrchestrator(
    * Validate that no two nodes produce the same fact key (M1: producer conflict detection).
    * Logs a dev-mode warning rather than throwing, since some use cases intentionally overlap.
    */
-  function validateProducerConflicts(pId: string, nodes: Record<string, ConvergeNode>): void {
+  function validateProducerConflicts(pId: string, nodes: Record<string, GoalNode>): void {
     const producerMap: Record<string, string[]> = Object.create(null);
     for (const [nodeId, node] of Object.entries(nodes)) {
       for (const key of node.produces) {
@@ -4414,7 +4419,7 @@ export function createMultiAgentOrchestrator(
     for (const [key, producers] of Object.entries(producerMap)) {
       if (producers.length > 1) {
         console.warn(
-          `[Directive MultiAgent] converge pattern "${pId}": fact key "${key}" is produced by multiple nodes: ${producers.join(", ")}. Last writer wins.`
+          `[Directive MultiAgent] goal pattern "${pId}": fact key "${key}" is produced by multiple nodes: ${producers.join(", ")}. Last writer wins.`
         );
       }
     }
@@ -4429,7 +4434,7 @@ export function createMultiAgentOrchestrator(
     try {
       return fn(...args);
     } catch (err) {
-      console.error("[Directive MultiAgent] converge: user callback threw:", err);
+      console.error("[Directive MultiAgent] goal: user callback threw:", err);
 
       return undefined;
     }
@@ -4444,19 +4449,19 @@ export function createMultiAgentOrchestrator(
     try {
       return await fn(...args);
     } catch (err) {
-      console.error("[Directive MultiAgent] converge: user callback threw:", err);
+      console.error("[Directive MultiAgent] goal: user callback threw:", err);
 
       return undefined;
     }
   }
 
   /** Compute estimatedStepsRemaining and decelerating from step history (M7). */
-  function computeConvergeMetrics(
+  function computeGoalMetrics(
     currentSatisfaction: number,
-    stepMetrics: ConvergeStepMetrics[],
+    stepMetrics: GoalStepMetrics[],
     _step: number,
-  ): ConvergeMetrics {
-    // Calculate recent convergence rate (average delta over last 3 steps)
+  ): GoalMetrics {
+    // Calculate recent progress rate (average delta over last 3 steps)
     const recentSteps = stepMetrics.slice(-3);
     const avgDelta = recentSteps.length > 0
       ? recentSteps.reduce((sum, s) => sum + s.satisfactionDelta, 0) / recentSteps.length
@@ -4479,7 +4484,7 @@ export function createMultiAgentOrchestrator(
 
     return {
       satisfaction: currentSatisfaction,
-      convergenceRate: avgDelta,
+      progressRate: avgDelta,
       estimatedStepsRemaining,
       decelerating,
     };
@@ -4494,15 +4499,15 @@ export function createMultiAgentOrchestrator(
     return Math.max(0, Math.min(1, value));
   }
 
-  async function runConvergeInternal<T>(
-    pattern: ConvergePattern<T>,
+  async function runGoalInternal<T>(
+    pattern: GoalPattern<T>,
     initialInput: string | Record<string, unknown>,
     patternId?: string,
-    resumeFrom?: ConvergeCheckpointState,
-  ): Promise<ConvergeResult<T>> {
+    resumeFrom?: GoalCheckpointState,
+  ): Promise<GoalResult<T>> {
     const {
       nodes: originalNodes,
-      when: convergenceWhen,
+      when: goalWhen,
       satisfaction: satisfactionFn,
       maxSteps = 50,
       extract,
@@ -4513,27 +4518,27 @@ export function createMultiAgentOrchestrator(
     } = pattern;
 
     // Shadow copy of nodes so relaxation mutations don't affect the original (M2)
-    const nodes: Record<string, ConvergeNode> = Object.create(null);
+    const nodes: Record<string, GoalNode> = Object.create(null);
     for (const [id, node] of Object.entries(originalNodes)) {
       nodes[id] = { ...node };
     }
 
     const nodeIds = Object.keys(nodes);
     if (nodeIds.length === 0) {
-      throw new Error("[Directive MultiAgent] converge requires at least one node");
+      throw new Error("[Directive MultiAgent] goal requires at least one node");
     }
 
-    const pId = patternId ?? "__converge";
+    const pId = patternId ?? "__goal";
 
     // Validate all node agents are registered
     for (const [nodeId, node] of Object.entries(nodes)) {
       if (!agents[node.agent]) {
-        throw new Error(`[Directive MultiAgent] converge node "${nodeId}" references unregistered agent "${node.agent}"`);
+        throw new Error(`[Directive MultiAgent] goal node "${nodeId}" references unregistered agent "${node.agent}"`);
       }
     }
 
     // C2: Cycle detection
-    validateConvergeAcyclic(pId, nodes);
+    validateGoalAcyclic(pId, nodes);
 
     // M1: Producer conflict warnings
     validateProducerConflicts(pId, nodes);
@@ -4542,23 +4547,23 @@ export function createMultiAgentOrchestrator(
     for (const [nodeId, node] of Object.entries(nodes)) {
       if (!node.extractOutput) {
         console.warn(
-          `[Directive MultiAgent] converge node "${nodeId}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`
+          `[Directive MultiAgent] goal node "${nodeId}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`
         );
       }
     }
 
     // Signal/timeout composition
     let effectiveSignal = pattern.signal;
-    let convergeTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let goalTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let externalOnAbort: (() => void) | undefined;
     const timeoutMs = pattern.timeout ?? 300_000;
     if (timeoutMs && !effectiveSignal) {
       const ctrl = new AbortController();
-      convergeTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
+      goalTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
       effectiveSignal = ctrl.signal;
     } else if (timeoutMs && effectiveSignal) {
       const ctrl = new AbortController();
-      convergeTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
+      goalTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
       externalOnAbort = () => ctrl.abort();
       effectiveSignal.addEventListener("abort", externalOnAbort, { once: true });
       effectiveSignal = ctrl.signal;
@@ -4572,12 +4577,12 @@ export function createMultiAgentOrchestrator(
         timestamp: patternStartTime,
         snapshotId: null,
         patternId: pId,
-        patternType: "converge",
+        patternType: "goal",
       });
     }
     fireHook("onPatternStart", {
       patternId: pId,
-      patternType: "converge",
+      patternType: "goal",
       input: typeof initialInput === "string" ? initialInput : JSON.stringify(initialInput),
       timestamp: patternStartTime,
     });
@@ -4585,11 +4590,11 @@ export function createMultiAgentOrchestrator(
     // Initialize facts
     const facts: Record<string, unknown> = Object.create(null);
     if (resumeFrom) {
-      convergeSafeMerge(facts, resumeFrom.facts);
+      goalSafeMerge(facts, resumeFrom.facts);
     } else if (typeof initialInput === "string") {
       facts.input = initialInput;
     } else {
-      convergeSafeMerge(facts, initialInput);
+      goalSafeMerge(facts, initialInput);
     }
 
     // Tracking state — restore from checkpoint or start fresh
@@ -4600,7 +4605,7 @@ export function createMultiAgentOrchestrator(
         nodeResults[id] = { output: out.output, totalTokens: out.totalTokens } as RunResult<unknown>;
       }
     }
-    const stepMetrics: ConvergeStepMetrics[] = resumeFrom ? [...resumeFrom.stepMetrics] : [];
+    const stepMetrics: GoalStepMetrics[] = resumeFrom ? [...resumeFrom.stepMetrics] : [];
     const relaxations: RelaxationRecord[] = resumeFrom ? [...resumeFrom.relaxations] : [];
     const completedNodes = new Set<string>(resumeFrom?.completedNodes ?? []);
     const failedNodes = new Map<string, number>(
@@ -4625,7 +4630,7 @@ export function createMultiAgentOrchestrator(
     const checkpointConfig = pattern.checkpoint;
     const checkpointEveryN = checkpointConfig?.everyN ?? 5;
     const checkpointStoreRef = checkpointConfig?.store ?? checkpointStore;
-    const checkpointLabelPrefix = checkpointConfig?.labelPrefix ?? "converge";
+    const checkpointLabelPrefix = checkpointConfig?.labelPrefix ?? "goal";
     let lastCheckpointId: string | undefined;
     void lastCheckpointId; // Used later in checkpoint save
 
@@ -4633,13 +4638,13 @@ export function createMultiAgentOrchestrator(
 
     try {
       for (let step = startStep; step < maxSteps; step++) {
-        // Check convergence (C1: safe-wrap user callback)
-        if (safeCall(convergenceWhen, facts) === true) {
+        // Check goal condition (C1: safe-wrap user callback)
+        if (safeCall(goalWhen, facts) === true) {
           const durationMs = Date.now() - patternStartTime;
           const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
 
           return {
-            converged: true,
+            achieved: true,
             result: safeCall(extract, facts) ?? facts as unknown as T,
             facts: { ...facts },
             executionOrder,
@@ -4658,7 +4663,7 @@ export function createMultiAgentOrchestrator(
           const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
 
           return {
-            converged: false,
+            achieved: false,
             result: safeCall(extract, facts) ?? facts as unknown as T,
             facts: { ...facts },
             executionOrder,
@@ -4708,9 +4713,9 @@ export function createMultiAgentOrchestrator(
         if (selectionStrategy && readyNodes.length > 0) {
           const rawSatisfaction = satisfactionFn
             ? safeCall(satisfactionFn, facts) ?? 0
-            : (safeCall(convergenceWhen, facts) === true ? 1.0 : 0.0);
+            : (safeCall(goalWhen, facts) === true ? 1.0 : 0.0);
           const currentSatisfaction = clampSatisfaction(rawSatisfaction);
-          const convergenceMetrics = computeConvergeMetrics(currentSatisfaction, stepMetrics, step);
+          const goalProgressMetrics = computeGoalMetrics(currentSatisfaction, stepMetrics, step);
 
           // Build per-agent metrics for the strategy
           const strategyMetrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number }> = Object.create(null);
@@ -4722,7 +4727,7 @@ export function createMultiAgentOrchestrator(
             };
           }
 
-          const strategyResult = selectionStrategy.select(readyNodes, strategyMetrics, convergenceMetrics);
+          const strategyResult = selectionStrategy.select(readyNodes, strategyMetrics, goalProgressMetrics);
           // M5: Guard against empty selection strategy result — fall back to readyNodes
           selectedNodes = (strategyResult && strategyResult.length > 0) ? strategyResult : readyNodes;
         }
@@ -4761,14 +4766,14 @@ export function createMultiAgentOrchestrator(
                     }
                     break;
                   case "inject_facts":
-                    convergeSafeMerge(facts, strategy.facts);
+                    goalSafeMerge(facts, strategy.facts);
                     break;
                   case "accept_partial": {
                     const durationMs = Date.now() - patternStartTime;
                     const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
 
                     return {
-                      converged: false,
+                      achieved: false,
                       result: safeCall(extract, facts) ?? facts as unknown as T,
                       facts: { ...facts },
                       executionOrder,
@@ -4786,7 +4791,7 @@ export function createMultiAgentOrchestrator(
                     const ctx: RelaxationContext = {
                       step,
                       facts: { ...facts },
-                      metrics: computeConvergeMetrics(clampSatisfaction(rawSat), stepMetrics, step),
+                      metrics: computeGoalMetrics(clampSatisfaction(rawSat), stepMetrics, step),
                       completedNodes: new Set(completedNodes),
                       failedNodes: new Map(failedNodes),
                     };
@@ -4813,7 +4818,7 @@ export function createMultiAgentOrchestrator(
           if (!relaxationApplied) {
             // Fire onStall hook (C1: safe-wrap, M7: computed metrics)
             const rawSat = safeCall(satisfactionFn, facts) ?? 0;
-            const stallMetrics = computeConvergeMetrics(clampSatisfaction(rawSat), stepMetrics, step);
+            const stallMetrics = computeGoalMetrics(clampSatisfaction(rawSat), stepMetrics, step);
             safeCall(onStall, step, stallMetrics);
 
             // If we've exhausted all relaxation tiers and still stalled, fail
@@ -4822,7 +4827,7 @@ export function createMultiAgentOrchestrator(
               const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
 
               return {
-                converged: false,
+                achieved: false,
                 result: safeCall(extract, facts) ?? facts as unknown as T,
                 facts: { ...facts },
                 executionOrder,
@@ -4832,7 +4837,7 @@ export function createMultiAgentOrchestrator(
                 durationMs,
                 stepMetrics,
                 relaxations,
-                error: "Convergence stalled: no ready nodes and no remaining relaxation tiers",
+                error: "Goal stalled: no ready nodes and no remaining relaxation tiers",
               };
             }
           }
@@ -4847,7 +4852,7 @@ export function createMultiAgentOrchestrator(
         const stepStart = Date.now();
         const rawPreSat = satisfactionFn
           ? safeCall(satisfactionFn, facts) ?? 0
-          : (safeCall(convergenceWhen, facts) === true ? 1.0 : 0.0);
+          : (safeCall(goalWhen, facts) === true ? 1.0 : 0.0);
         const preSatisfaction = clampSatisfaction(rawPreSat);
         let stepTokens = 0;
         const factsProduced: string[] = [];
@@ -4894,20 +4899,20 @@ export function createMultiAgentOrchestrator(
             if (node.extractOutput) {
               const outputFacts = safeCall(node.extractOutput, result);
               if (outputFacts) {
-                convergeSafeMerge(facts, outputFacts);
+                goalSafeMerge(facts, outputFacts);
                 factsProduced.push(...Object.keys(outputFacts));
               }
             } else {
               // Default: try JSON parse of output
               const rawOutput = result.output;
               if (rawOutput && typeof rawOutput === "object") {
-                convergeSafeMerge(facts, rawOutput as Record<string, unknown>);
+                goalSafeMerge(facts, rawOutput as Record<string, unknown>);
                 factsProduced.push(...Object.keys(rawOutput as Record<string, unknown>));
               } else if (typeof rawOutput === "string") {
                 try {
                   const parsed = JSON.parse(rawOutput);
                   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                    convergeSafeMerge(facts, parsed);
+                    goalSafeMerge(facts, parsed);
                     factsProduced.push(...Object.keys(parsed));
                   } else {
                     // Store under produce keys
@@ -4941,7 +4946,7 @@ export function createMultiAgentOrchestrator(
         // Compute step metrics (M4: clamp satisfaction)
         const rawPostSat = satisfactionFn
           ? safeCall(satisfactionFn, facts) ?? 0
-          : (safeCall(convergenceWhen, facts) === true ? 1.0 : 0.0);
+          : (safeCall(goalWhen, facts) === true ? 1.0 : 0.0);
         const postSatisfaction = clampSatisfaction(rawPostSat);
         const satisfactionDelta = postSatisfaction - preSatisfaction;
 
@@ -4978,8 +4983,8 @@ export function createMultiAgentOrchestrator(
 
         // P5: Save checkpoint at configured intervals
         if (checkpointConfig && checkpointStoreRef && step > startStep && (step - startStep) % checkpointEveryN === 0) {
-          const ckptState: ConvergeCheckpointState = {
-            type: "converge",
+          const ckptState: GoalCheckpointState = {
+            type: "goal",
             version: 1,
             id: createCheckpointId(),
             createdAt: new Date().toISOString(),
@@ -5016,7 +5021,7 @@ export function createMultiAgentOrchestrator(
       const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
 
       return {
-        converged: false,
+        achieved: false,
         result: safeCall(extract, facts) ?? facts as unknown as T,
         facts: { ...facts },
         executionOrder,
@@ -5026,14 +5031,14 @@ export function createMultiAgentOrchestrator(
         durationMs,
         stepMetrics,
         relaxations,
-        error: `Max steps (${maxSteps}) exhausted without convergence`,
+        error: `Max steps (${maxSteps}) exhausted without achieving goal`,
       };
     } catch (error) {
       patternError = error instanceof Error ? error : new Error(String(error));
       throw error;
     } finally {
-      if (convergeTimeoutId != null) {
-        clearTimeout(convergeTimeoutId);
+      if (goalTimeoutId != null) {
+        clearTimeout(goalTimeoutId);
       }
       if (externalOnAbort && pattern.signal) {
         pattern.signal.removeEventListener("abort", externalOnAbort);
@@ -5044,14 +5049,14 @@ export function createMultiAgentOrchestrator(
           timestamp: Date.now(),
           snapshotId: null,
           patternId: pId,
-          patternType: "converge",
+          patternType: "goal",
           durationMs: Date.now() - patternStartTime,
           ...(patternError ? { error: patternError.message } : {}),
         });
       }
       fireHook("onPatternComplete", {
         patternId: pId,
-        patternType: "converge",
+        patternType: "goal",
         durationMs: Date.now() - patternStartTime,
         timestamp: Date.now(),
         error: patternError,
@@ -5228,11 +5233,11 @@ export function createMultiAgentOrchestrator(
 
             return debateResult.result;
           }
-          case "converge": {
-            const convergePattern = pattern as ConvergePattern<T>;
-            const convergeResult = await runConvergeInternal<T>(convergePattern, input, patternId);
+          case "goal": {
+            const goalPattern = pattern as GoalPattern<T>;
+            const goalResult = await runGoalInternal<T>(goalPattern, input, patternId);
 
-            return convergeResult.result;
+            return goalResult.result;
           }
           default:
             throw new Error(`[Directive MultiAgent] Unknown pattern type: ${(pattern as { type: string }).type}`);
@@ -6165,13 +6170,13 @@ export function createMultiAgentOrchestrator(
       );
     },
 
-    // ---- Converge Pattern ----
+    // ---- Goal Pattern ----
 
-    async runConverge<T>(
-      nodes: Record<string, ConvergeNode>,
+    async runGoal<T>(
+      nodes: Record<string, GoalNode>,
       initialInput: string | Record<string, unknown>,
       when: (facts: Record<string, unknown>) => boolean,
-      convergeOpts?: {
+      goalOpts?: {
         satisfaction?: (facts: Record<string, unknown>) => number;
         maxSteps?: number;
         extract?: (facts: Record<string, unknown>) => T;
@@ -6179,45 +6184,49 @@ export function createMultiAgentOrchestrator(
         signal?: AbortSignal;
         selectionStrategy?: AgentSelectionStrategy;
         relaxation?: RelaxationTier[];
-        onStep?: ConvergePattern["onStep"];
-        onStall?: ConvergePattern["onStall"];
+        onStep?: GoalPattern["onStep"];
+        onStall?: GoalPattern["onStall"];
         checkpoint?: PatternCheckpointConfig;
       },
-    ): Promise<ConvergeResult<T>> {
+    ): Promise<GoalResult<T>> {
       assertNotDisposed();
 
-      return runConvergeInternal<T>(
+      return runGoalInternal<T>(
         {
-          type: "converge",
+          type: "goal",
           nodes,
           when,
-          satisfaction: convergeOpts?.satisfaction,
-          maxSteps: convergeOpts?.maxSteps,
-          extract: convergeOpts?.extract,
-          timeout: convergeOpts?.timeout,
-          signal: convergeOpts?.signal,
-          selectionStrategy: convergeOpts?.selectionStrategy,
-          relaxation: convergeOpts?.relaxation,
-          onStep: convergeOpts?.onStep,
-          onStall: convergeOpts?.onStall,
-          checkpoint: convergeOpts?.checkpoint,
+          satisfaction: goalOpts?.satisfaction,
+          maxSteps: goalOpts?.maxSteps,
+          extract: goalOpts?.extract,
+          timeout: goalOpts?.timeout,
+          signal: goalOpts?.signal,
+          selectionStrategy: goalOpts?.selectionStrategy,
+          relaxation: goalOpts?.relaxation,
+          onStep: goalOpts?.onStep,
+          onStall: goalOpts?.onStall,
+          checkpoint: goalOpts?.checkpoint,
         },
         initialInput,
-        "__imperative_converge",
+        "__imperative_goal",
       );
     },
 
-    async resumeConverge<T>(
-      checkpointState: ConvergeCheckpointState,
-      pattern: ConvergePattern<T>,
-    ): Promise<ConvergeResult<T>> {
+    async resumeGoal<T>(
+      checkpointState: GoalCheckpointState,
+      pattern: GoalPattern<T>,
+    ): Promise<GoalResult<T>> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "converge") {
-        throw new Error("[Directive MultiAgent] Invalid converge checkpoint state");
+      if (!checkpointState || checkpointState.version !== 1 || (checkpointState.type !== "goal" && (checkpointState as unknown as Record<string, unknown>).type !== "converge")) {
+        throw new Error("[Directive MultiAgent] Invalid goal checkpoint state");
+      }
+      // Migration shim: accept legacy "converge" checkpoint states
+      if ((checkpointState as unknown as Record<string, unknown>).type === "converge") {
+        (checkpointState as unknown as Record<string, unknown>).type = "goal";
       }
 
-      return runConvergeInternal<T>(
+      return runGoalInternal<T>(
         pattern,
         {}, // initialInput ignored when resumeFrom is provided
         checkpointState.patternId,
@@ -6355,7 +6364,7 @@ export function createMultiAgentOrchestrator(
           }
         }
 
-        const validTypes = new Set(["sequential", "supervisor", "reflect", "debate", "dag", "converge"]);
+        const validTypes = new Set(["sequential", "supervisor", "reflect", "debate", "dag", "goal", "converge"]);
         if (!validTypes.has(parsed.type)) {
           throw new Error(`Unknown checkpoint pattern type: ${parsed.type}`);
         }
@@ -6394,9 +6403,9 @@ export function createMultiAgentOrchestrator(
           return runDebateInternal(pattern as DebatePattern<T>, replayInput, state.patternId, state) as Promise<T>;
         case "dag":
           return runDagPattern<T>(pattern as DagPattern<T>, replayInput, state.patternId, state);
-        case "converge":
-          return runConvergeInternal(
-            pattern as ConvergePattern<T>,
+        case "goal":
+          return runGoalInternal(
+            pattern as GoalPattern<T>,
             state.facts,
             state.patternId,
             state,
@@ -6705,19 +6714,19 @@ export function race<T>(
 }
 
 // ============================================================================
-// Converge Pattern Factory & Selection Strategies
+// Goal Pattern Factory & Selection Strategies
 // ============================================================================
 
 /**
- * Create a converge execution pattern.
+ * Create a goal execution pattern.
  *
  * Declare what each agent produces and requires. The runtime automatically
  * infers the execution graph from dependency analysis and drives agents
- * to convergence.
+ * to goal achievement.
  *
  * @example
  * ```typescript
- * const pipeline = converge(
+ * const pipeline = goal(
  *   {
  *     researcher: {
  *       agent: "researcher",
@@ -6737,8 +6746,8 @@ export function race<T>(
  * );
  * ```
  */
-export function converge<T = Record<string, unknown>>(
-  nodes: Record<string, ConvergeNode>,
+export function goal<T = Record<string, unknown>>(
+  nodes: Record<string, GoalNode>,
   when: (facts: Record<string, unknown>) => boolean,
   options?: {
     satisfaction?: (facts: Record<string, unknown>) => number;
@@ -6749,12 +6758,12 @@ export function converge<T = Record<string, unknown>>(
     selectionStrategy?: AgentSelectionStrategy;
     relaxation?: RelaxationTier[];
     onStep?: (step: number, facts: Record<string, unknown>, readyNodes: string[]) => void;
-    onStall?: (step: number, metrics: ConvergeMetrics) => void;
+    onStall?: (step: number, metrics: GoalMetrics) => void;
     checkpoint?: PatternCheckpointConfig;
   },
-): ConvergePattern<T> {
+): GoalPattern<T> {
   return {
-    type: "converge",
+    type: "goal",
     nodes,
     when,
     ...options,
@@ -7244,12 +7253,12 @@ export function composePatterns(
           break;
         }
 
-        case "converge": {
-          const cp = pattern as ConvergePattern<unknown>;
+        case "goal": {
+          const cp = pattern as GoalPattern<unknown>;
           const initialFacts = typeof currentInput === "string"
             ? { input: currentInput }
             : (() => { try { return JSON.parse(currentInput); } catch { return { input: currentInput }; } })();
-          const convergeResult = await orchestrator.runConverge(
+          const goalResult = await orchestrator.runGoal(
             cp.nodes,
             initialFacts,
             cp.when,
@@ -7265,7 +7274,7 @@ export function composePatterns(
               onStall: cp.onStall,
             },
           );
-          lastOutput = convergeResult.result;
+          lastOutput = goalResult.result;
           break;
         }
 
@@ -7687,10 +7696,10 @@ export type SerializedPattern =
   | { type: "reflect"; agent: string; evaluator: string; maxIterations?: number; onExhausted?: "accept-last" | "accept-best" | "throw"; timeout?: number; threshold?: number }
   | { type: "race"; agents: string[]; timeout?: number; minSuccess?: number }
   | { type: "debate"; agents: string[]; evaluator: string; maxRounds?: number; timeout?: number }
-  | { type: "converge"; nodes: Record<string, SerializedConvergeNode>; maxSteps?: number; timeout?: number };
+  | { type: "goal"; nodes: Record<string, SerializedGoalNode>; maxSteps?: number; timeout?: number };
 
-/** Serialized converge node (functions stripped) */
-export interface SerializedConvergeNode {
+/** Serialized goal node (functions stripped) */
+export interface SerializedGoalNode {
   agent: string;
   produces: string[];
   requires?: string[];
@@ -7749,18 +7758,18 @@ export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPat
       return { type: "race", agents: pattern.agents, timeout: pattern.timeout, minSuccess: pattern.minSuccess };
     case "debate":
       return { type: "debate", agents: pattern.agents, evaluator: pattern.evaluator, maxRounds: pattern.maxRounds, timeout: pattern.timeout };
-    case "converge": {
-      const cnodes: Record<string, SerializedConvergeNode> = Object.create(null);
+    case "goal": {
+      const cnodes: Record<string, SerializedGoalNode> = Object.create(null);
       for (const [id, node] of Object.entries(pattern.nodes)) {
         cnodes[id] = { agent: node.agent, produces: node.produces, requires: node.requires, allowRerun: node.allowRerun, priority: node.priority };
       }
 
-      return { type: "converge", nodes: cnodes, maxSteps: pattern.maxSteps, timeout: pattern.timeout };
+      return { type: "goal", nodes: cnodes, maxSteps: pattern.maxSteps, timeout: pattern.timeout };
     }
   }
 }
 
-const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "dag", "reflect", "race", "debate", "converge"]);
+const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "dag", "reflect", "race", "debate", "goal"]);
 
 /**
  * Restore an execution pattern from its serialized form.
@@ -7785,6 +7794,10 @@ export function patternFromJSON<T = unknown>(
   json: SerializedPattern,
   overrides?: Partial<ExecutionPattern<T>>,
 ): ExecutionPattern<T> {
+  // Migration shim: accept legacy "converge" serialized patterns
+  if (json && typeof json === "object" && (json as Record<string, unknown>).type === "converge") {
+    (json as Record<string, unknown>).type = "goal";
+  }
   if (!json || typeof json !== "object" || !ALLOWED_PATTERN_TYPES.has((json as SerializedPattern).type)) {
     throw new Error(`[Directive] patternFromJSON: invalid or unknown pattern type "${(json as Record<string, unknown>)?.type}"`);
   }
