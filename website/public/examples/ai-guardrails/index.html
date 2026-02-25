@@ -74,14 +74,6 @@
     .gs-flag.pii { background: rgba(196, 192, 122, 0.2); color: var(--brand-warning); }
     .gs-flag.blocked { background: rgba(232, 131, 111, 0.3); color: var(--brand-error); }
 
-    /* ===== Inspector ===== */
-    .gs-inspector-section { margin-bottom: 0.5rem; }
-    .gs-inspector-section:last-child { margin-bottom: 0; }
-    .gs-inspector-title { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--brand-text-dim); margin-bottom: 0.4rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--brand-border); }
-    .gs-inspector-row { display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0; font-size: 0.7rem; }
-    .gs-inspector-key { color: var(--brand-text-dim); font-family: ui-monospace, monospace; }
-    .gs-inspector-value { color: var(--brand-text); font-family: ui-monospace, monospace; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
     /* ===== Timeline ===== */
     .gs-timeline { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; min-height: 120px; max-height: 350px; }
     .gs-timeline-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--brand-text-faint); font-size: 0.7rem; font-style: italic; }
@@ -100,7 +92,7 @@
     .gs-how-it-works ul { padding-left: 1.2rem; }
     .gs-how-it-works li { margin-bottom: 0.2rem; }
   </style>
-  <script type="module" crossorigin src="/examples/ai-guardrails/assets/index-DslaCLDb.js"></script>
+  <script type="module" crossorigin src="/examples/ai-guardrails/assets/index-BHI64SJK.js"></script>
 </head>
 <body>
   <div class="gs-container">
@@ -130,7 +122,7 @@
         </div>
       </div>
 
-      <!-- Center: Chat + Inspector -->
+      <!-- Center: Chat -->
       <div class="gs-panel">
         <div class="gs-panel-header">Chat</div>
         <div class="gs-panel-body">
@@ -140,38 +132,6 @@
           </div>
           <div id="gs-chat-log" class="gs-chat-log" data-testid="gs-chat-log">
             <div class="gs-empty">Send a message to test guardrails</div>
-          </div>
-          <hr class="gs-separator" />
-          <div class="gs-inspector-section">
-            <div class="gs-inspector-title">Guardrail Metrics</div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">blockedCount</span>
-              <span id="gs-insp-blocked" class="gs-inspector-value" data-testid="gs-blocked-count">0</span>
-            </div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">injectionAttempts</span>
-              <span id="gs-insp-injections" class="gs-inspector-value" data-testid="gs-injection-count">0</span>
-            </div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">piiDetections</span>
-              <span id="gs-insp-pii" class="gs-inspector-value" data-testid="gs-pii-count">0</span>
-            </div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">complianceBlocks</span>
-              <span id="gs-insp-compliance-blocks" class="gs-inspector-value" data-testid="gs-compliance-blocks">0</span>
-            </div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">complianceMode</span>
-              <span id="gs-insp-mode" class="gs-inspector-value" data-testid="gs-mode">standard</span>
-            </div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">blockRate</span>
-              <span id="gs-insp-block-rate" class="gs-inspector-value" data-testid="gs-block-rate">0%</span>
-            </div>
-            <div class="gs-inspector-row">
-              <span class="gs-inspector-key">piiTypes</span>
-              <span id="gs-insp-pii-types" class="gs-inspector-value" data-testid="gs-pii-types">none</span>
-            </div>
           </div>
         </div>
       </div>

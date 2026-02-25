@@ -89,19 +89,6 @@ test.describe("Theme & Locale example", () => {
     await expect(tid(page, "tl-sidebar-toggle")).toHaveClass(/tl-btn-active/);
   });
 
-  test("inspector shows facts and derivations", async ({ page }) => {
-    // Facts inspector has expected keys
-    const factsInspector = page.locator("#tl-inspector-facts");
-    await expect(factsInspector).toContainText("theme");
-    await expect(factsInspector).toContainText("locale");
-    await expect(factsInspector).toContainText("sidebarOpen");
-
-    // Derivations inspector has expected keys
-    const deriveInspector = page.locator("#tl-inspector-derive");
-    await expect(deriveInspector).toContainText("effectiveTheme");
-    await expect(deriveInspector).toContainText("isRTL");
-  });
-
   test("code tabs visible below example", async ({ page }) => {
     const codeTabs = page.locator("[data-testid='code-tabs-bar']");
     await expect(codeTabs).toBeVisible();

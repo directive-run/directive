@@ -417,13 +417,6 @@ const progressBar = document.getElementById("cp-progress-fill")!;
 const progressLabel = document.getElementById("cp-progress-label")!;
 const stageIndicators = document.querySelectorAll<HTMLElement>(".cp-stage-dot");
 
-const inspStage = document.getElementById("cp-insp-stage")!;
-const inspCompletion = document.getElementById("cp-insp-completion")!;
-const inspTokens = document.getElementById("cp-insp-tokens")!;
-const inspRetries = document.getElementById("cp-insp-retries")!;
-const inspError = document.getElementById("cp-insp-error")!;
-const inspResults = document.getElementById("cp-insp-results")!;
-
 const checkpointList = document.getElementById("cp-checkpoint-list")!;
 const timelineEl = document.getElementById("cp-timeline")!;
 
@@ -463,25 +456,6 @@ function render(): void {
       dot.classList.add("error");
     }
   });
-
-  // Inspector
-  inspStage.textContent = stage;
-  inspCompletion.textContent = `${completion}%`;
-  inspTokens.textContent = String(system.facts.totalTokens);
-  inspRetries.textContent = String(system.facts.retryCount);
-  inspError.textContent = (system.facts.lastError as string) || "\u2014";
-
-  // Stage results
-  if (results.length === 0) {
-    inspResults.innerHTML = '<div style="color:var(--brand-text-faint);font-size:0.65rem;font-style:italic">No results yet</div>';
-  } else {
-    inspResults.innerHTML = results.map((r) =>
-      `<div class="cp-result-item">
-        <span class="cp-result-stage">${escapeHtml(r.stage)}</span>
-        <span class="cp-result-detail">${r.tokens}tok, ${r.durationMs}ms</span>
-      </div>`
-    ).join("");
-  }
 
   // Checkpoints
   const checkpoints = system.facts.checkpoints as CheckpointEntry[];

@@ -3,7 +3,7 @@
  *
  * Creates the Directive system with two modules (notifications + app),
  * subscribes to state changes, and renders the toast stack, control panel,
- * config panel, and state inspector.
+ * and config panel.
  */
 
 import { createSystem } from "@directive-run/core";
@@ -38,11 +38,8 @@ const allKeys = [
 // ============================================================================
 
 const toastStack = document.getElementById("nt-toast-stack")!;
-const queueCount = document.getElementById("nt-queue-count")!;
-const visibleCount = document.getElementById("nt-visible-count")!;
 const maxVisibleSlider = document.getElementById("nt-max-visible") as HTMLInputElement;
 const maxVisibleVal = document.getElementById("nt-max-visible-val")!;
-const inspectorList = document.getElementById("nt-inspector-list")!;
 const actionLogEl = document.getElementById("nt-action-log")!;
 
 const addInfoBtn = document.getElementById("nt-add-info") as HTMLButtonElement;
@@ -102,7 +99,6 @@ function render(): void {
   const facts = system.facts as any;
   const derive = system.derive as any;
 
-  const queue = facts.notifications.queue as Notification[];
   const visible = derive.notifications.visibleNotifications as Notification[];
   const maxVisible = facts.notifications.maxVisible as number;
   const actionLog = facts.app.actionLog as string[];
@@ -153,39 +149,8 @@ function render(): void {
 
   renderedIds = currentIds;
 
-  // --- Queue count ---
-  queueCount.textContent = `${queue.length}`;
-
-  // --- Visible count ---
-  visibleCount.textContent = `${visible.length}`;
-
   // --- Max visible slider ---
   maxVisibleVal.textContent = `${maxVisible}`;
-
-  // --- Inspector: individual notifications ---
-  if (queue.length === 0) {
-    inspectorList.innerHTML =
-      '<div class="nt-inspector-empty">No notifications in queue</div>';
-  } else {
-    inspectorList.innerHTML = "";
-    for (const notification of queue) {
-      const now = (facts.notifications.now as number) || Date.now();
-      const remaining = Math.max(
-        0,
-        Math.ceil((notification.createdAt + notification.ttl - now) / 1000),
-      );
-      const el = document.createElement("div");
-      el.className = `nt-inspector-item nt-inspector-${notification.level}`;
-      el.innerHTML = `
-        <span class="nt-inspector-id">${escapeHtml(notification.id)}</span>
-        <span class="nt-inspector-level">${notification.level}</span>
-        <span class="nt-inspector-msg">${escapeHtml(notification.message)}</span>
-        <span class="nt-inspector-ttl">${remaining}s</span>
-      `;
-
-      inspectorList.appendChild(el);
-    }
-  }
 
   // --- Action log ---
   if (actionLog.length === 0) {

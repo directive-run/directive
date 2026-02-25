@@ -100,7 +100,7 @@ export function OptimisticUpdatesDemo({
             <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
             A todo list with instant optimistic mutations (toggle, delete, add),
             configurable server delay and failure rate, automatic rollback with
-            toast notifications, and a live state inspector.
+            toast notifications, and live DevTools debugging.
           </p>
           <p>
             <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}

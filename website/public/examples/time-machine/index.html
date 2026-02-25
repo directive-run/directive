@@ -192,48 +192,6 @@
       max-height: 120px;
     }
 
-    /* ===== Inspector ===== */
-    .tm-inspector-section { margin-bottom: 0.5rem; }
-    .tm-inspector-section:last-child { margin-bottom: 0; }
-
-    .tm-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .tm-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .tm-inspector-key { color: var(--brand-text-dim); font-family: ui-monospace, monospace; }
-    .tm-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-    }
-
-    .tm-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .tm-deriv-indicator.true { background: var(--brand-success); }
-    .tm-deriv-indicator.false { background: var(--brand-text-faint); }
-
     /* ===== Timeline ===== */
     .tm-timeline {
       flex: 1;
@@ -292,7 +250,7 @@
     .tm-how-it-works ul { padding-left: 1.2rem; }
     .tm-how-it-works li { margin-bottom: 0.2rem; }
   </style>
-  <script type="module" crossorigin src="/examples/time-machine/assets/index-BKIBhl5e.js"></script>
+  <script type="module" crossorigin src="/examples/time-machine/assets/index-CiFlGiI_.js"></script>
 </head>
 <body>
   <div class="tm-container">
@@ -343,49 +301,12 @@
         </div>
       </div>
 
-      <!-- Center: Canvas + Inspector -->
+      <!-- Center: Canvas -->
       <div class="tm-panel">
         <div class="tm-panel-header">Canvas</div>
         <div class="tm-panel-body">
           <div class="tm-canvas-wrap">
             <canvas id="tm-canvas" data-testid="tm-canvas" width="600" height="300"></canvas>
-          </div>
-          <div class="tm-inspector-section">
-            <div class="tm-inspector-title">State Inspector</div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">strokes</span>
-              <span id="tm-insp-strokes" class="tm-inspector-value" data-testid="tm-stroke-count">0</span>
-            </div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">currentColor</span>
-              <span id="tm-insp-color" class="tm-inspector-value" data-testid="tm-current-color">#5ba3a3</span>
-            </div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">canUndo</span>
-              <span id="tm-insp-can-undo" class="tm-inspector-value" data-testid="tm-can-undo">
-                <span class="tm-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">canRedo</span>
-              <span id="tm-insp-can-redo" class="tm-inspector-value" data-testid="tm-can-redo">
-                <span class="tm-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">currentIndex</span>
-              <span id="tm-insp-index" class="tm-inspector-value" data-testid="tm-current-index">0</span>
-            </div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">totalSnapshots</span>
-              <span id="tm-insp-total" class="tm-inspector-value" data-testid="tm-total-snapshots">0</span>
-            </div>
-            <div class="tm-inspector-row">
-              <span class="tm-inspector-key">changeset</span>
-              <span id="tm-insp-changeset" class="tm-inspector-value" data-testid="tm-insp-changeset">
-                <span class="tm-deriv-indicator false"></span> false
-              </span>
-            </div>
           </div>
         </div>
       </div>

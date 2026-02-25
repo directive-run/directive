@@ -351,57 +351,6 @@
       text-align: right;
     }
 
-    /* ===== Inspector ===== */
-    .dc-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.3rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .dc-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.15rem 0;
-      font-size: 0.65rem;
-    }
-
-    .dc-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .dc-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-    }
-
-    .dc-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .dc-deriv-indicator.true { background: var(--brand-success); }
-    .dc-deriv-indicator.false { background: var(--brand-text-faint); }
-    .dc-deriv-indicator.debouncing {
-      background: var(--brand-warning);
-      animation: dc-pulse 0.8s ease-in-out infinite;
-    }
-    .dc-deriv-indicator.searching {
-      background: var(--brand-primary);
-      animation: dc-pulse 0.8s ease-in-out infinite;
-    }
-
     /* ===== Timeline ===== */
     .dc-timeline-header {
       font-size: 0.65rem;
@@ -502,7 +451,7 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/debounce-constraints/assets/index-D5biqyqQ.js"></script>
+  <script type="module" crossorigin src="/examples/debounce-constraints/assets/index-D1Xvwm7F.js"></script>
 </head>
 <body>
   <div class="dc-container">
@@ -546,7 +495,7 @@
         <div id="dc-results-footer" class="dc-results-footer" data-testid="dc-results-footer">0 results &middot; 0 keystrokes &middot; 0 API calls (0 saved)</div>
       </div>
 
-      <!-- Right: Config + Stats + Inspector + Timeline -->
+      <!-- Right: Config + Stats + Timeline -->
       <div class="dc-panel">
         <div class="dc-panel-header">Configuration</div>
         <div class="dc-panel-body">
@@ -582,29 +531,6 @@
           <div class="dc-stats-row">
             <span class="dc-stats-key">Calls Saved</span>
             <span id="dc-stat-saved" class="dc-stats-value" data-testid="dc-stat-saved">0 (0%)</span>
-          </div>
-          <hr class="dc-config-separator" />
-
-          <div class="dc-inspector-title">Derivations</div>
-          <div class="dc-inspector-row">
-            <span class="dc-inspector-key">isDebouncing</span>
-            <span id="dc-deriv-debouncing" class="dc-inspector-value" data-testid="dc-deriv-debouncing">
-              <span class="dc-deriv-indicator false"></span> false
-            </span>
-          </div>
-          <div class="dc-inspector-row">
-            <span class="dc-inspector-key">debounceProgress</span>
-            <span id="dc-deriv-progress" class="dc-inspector-value" data-testid="dc-deriv-progress">0</span>
-          </div>
-          <div class="dc-inspector-row">
-            <span class="dc-inspector-key">isSearching</span>
-            <span id="dc-deriv-searching" class="dc-inspector-value" data-testid="dc-deriv-searching">
-              <span class="dc-deriv-indicator false"></span> false
-            </span>
-          </div>
-          <div class="dc-inspector-row">
-            <span class="dc-inspector-key">resultCount</span>
-            <span id="dc-deriv-result-count" class="dc-inspector-value" data-testid="dc-deriv-result-count">0</span>
           </div>
           <hr class="dc-config-separator" />
 

@@ -264,19 +264,43 @@ function ResizeHandle({ position }: { position: 'bottom' | 'right' }) {
     }
   }, [])
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 40 : 10
+    const currentHeight = system.facts.shell.drawerHeight
+    const currentWidth = system.facts.shell.drawerWidth
+
+    if (isBottom && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault()
+      const delta = e.key === 'ArrowUp' ? step : -step
+      const newHeight = Math.max(200, Math.min(currentHeight + delta, window.innerHeight * 0.8))
+      system.events.shell.setDrawerSize({ height: Math.round(newHeight), width: currentWidth })
+    } else if (!isBottom && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault()
+      const delta = e.key === 'ArrowLeft' ? step : -step
+      const newWidth = Math.max(320, Math.min(currentWidth + delta, window.innerWidth * 0.8))
+      system.events.shell.setDrawerSize({ height: currentHeight, width: Math.round(newWidth) })
+    }
+  }, [isBottom, system])
+
   return (
     <div
       ref={elementRef}
+      role="separator"
+      aria-orientation={isBottom ? 'horizontal' : 'vertical'}
+      aria-label={isBottom ? 'Resize panel height' : 'Resize panel width'}
+      aria-valuenow={isBottom ? system.facts.shell.drawerHeight : system.facts.shell.drawerWidth}
+      tabIndex={0}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       onLostPointerCapture={handlePointerEnd}
+      onKeyDown={handleKeyDown}
       className={`shrink-0 group ${
         isBottom
           ? 'h-4 w-full cursor-row-resize'
           : 'w-4 h-full absolute left-0 top-0 cursor-col-resize'
-      }`}
+      } focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}
       style={!isBottom ? { zIndex: 1 } : undefined}
     >
       {/* Visible indicator line (2px) centered in the 16px hit area */}

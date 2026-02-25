@@ -44,12 +44,8 @@
     /* ===== Main Layout ===== */
     .fw-main {
       display: grid;
-      grid-template-columns: 1fr 260px;
+      grid-template-columns: 1fr;
       gap: 1rem;
-    }
-
-    @media (max-width: 700px) {
-      .fw-main { grid-template-columns: 1fr; }
     }
 
     /* ===== Panel ===== */
@@ -321,55 +317,6 @@
 
     .fw-nav-spacer { flex: 1; }
 
-    /* ===== Inspector ===== */
-    .fw-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .fw-inspector-section:last-child { margin-bottom: 0; }
-
-    .fw-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.35rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .fw-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.15rem 0;
-      font-size: 0.65rem;
-    }
-
-    .fw-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .fw-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-    }
-
-    .fw-bool-indicator {
-      display: inline-block;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      margin-right: 0.25rem;
-      vertical-align: middle;
-    }
-
-    .fw-bool-indicator.true { background: var(--brand-success); }
-    .fw-bool-indicator.false { background: var(--brand-text-faint); }
-
     /* ===== Success Screen ===== */
     .fw-success {
       display: none;
@@ -440,7 +387,7 @@
 </head>
 <body>
   <div class="fw-container">
-    <!-- Form Card + Inspector -->
+    <!-- Form Card -->
     <div class="fw-main">
       <!-- Left: Form Card -->
       <div class="fw-panel">
@@ -589,87 +536,6 @@
         </div>
       </div>
 
-      <!-- Right: State Inspector -->
-      <div class="fw-panel">
-        <div class="fw-panel-header">State Inspector</div>
-        <div class="fw-panel-body">
-          <!-- Wizard Facts -->
-          <div class="fw-inspector-section">
-            <div class="fw-inspector-title">Wizard</div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">currentStep</span>
-              <span id="fw-insp-currentStep" class="fw-inspector-value">0</span>
-            </div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">progress</span>
-              <span id="fw-insp-progress" class="fw-inspector-value">33%</span>
-            </div>
-          </div>
-
-          <!-- Derivations -->
-          <div class="fw-inspector-section">
-            <div class="fw-inspector-title">Step Validity</div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">step0Valid</span>
-              <span id="fw-insp-step0Valid" class="fw-inspector-value">
-                <span class="fw-bool-indicator false"></span> false
-              </span>
-            </div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">step1Valid</span>
-              <span id="fw-insp-step1Valid" class="fw-inspector-value">
-                <span class="fw-bool-indicator false"></span> false
-              </span>
-            </div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">step2Valid</span>
-              <span id="fw-insp-step2Valid" class="fw-inspector-value">
-                <span class="fw-bool-indicator true"></span> true
-              </span>
-            </div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">currentStepValid</span>
-              <span id="fw-insp-currentStepValid" class="fw-inspector-value">
-                <span class="fw-bool-indicator false"></span> false
-              </span>
-            </div>
-          </div>
-
-          <!-- Navigation Derivations -->
-          <div class="fw-inspector-section">
-            <div class="fw-inspector-title">Navigation</div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">canAdvance</span>
-              <span id="fw-insp-canAdvance" class="fw-inspector-value">
-                <span class="fw-bool-indicator false"></span> false
-              </span>
-            </div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">isLastStep</span>
-              <span id="fw-insp-isLastStep" class="fw-inspector-value">
-                <span class="fw-bool-indicator false"></span> false
-              </span>
-            </div>
-          </div>
-
-          <!-- Validation Module -->
-          <div class="fw-inspector-section">
-            <div class="fw-inspector-title">Email Validation</div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">emailAvailable</span>
-              <span id="fw-insp-emailAvailable" class="fw-inspector-value">
-                <span class="fw-bool-indicator true"></span> true
-              </span>
-            </div>
-            <div class="fw-inspector-row">
-              <span class="fw-inspector-key">checkingEmail</span>
-              <span id="fw-insp-checkingEmail" class="fw-inspector-value">
-                <span class="fw-bool-indicator false"></span> false
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- How it works -->

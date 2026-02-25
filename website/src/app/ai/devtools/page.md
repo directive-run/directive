@@ -307,7 +307,7 @@ interface DevToolsServer {
 ## Related
 
 - **[DevTools Plugin](/docs/plugins/devtools)** — Console API and floating panel for debugging any Directive system's facts, derivations, and events.
-- **[DevTools Live](/devtools)** — Try the visual debugger in your browser.
+- **[AI Chat Demo](/ai/examples/ai-chat)** — Try the visual debugger in your browser.
 
 ---
 
@@ -317,4 +317,4 @@ interface DevToolsServer {
 - [Breakpoints & Checkpoints](/ai/breakpoints) &ndash; Pausing and restoring state
 - [Cross-Agent State](/ai/cross-agent-state) &ndash; Scratchpad and derivations
 - [Self-Healing](/ai/self-healing) &ndash; Health monitoring and rerouting
-- [DevTools Live](/devtools) &ndash; Interactive visual debugger
+- [AI Chat Demo](/ai/examples/ai-chat) &ndash; Interactive visual debugger

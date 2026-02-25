@@ -41,7 +41,7 @@ export function PaginationDemo({
 
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Scroll the list to trigger infinite loading. Change filters or search
-          to reset to page 1. Watch the state inspector to see constraints fire.
+          to reset to page 1. Open DevTools to see constraints fire.
         </p>
       </section>
 

@@ -96,7 +96,7 @@
     /* ===== Main Layout ===== */
     .tl-main {
       display: grid;
-      grid-template-columns: 240px 1fr 280px;
+      grid-template-columns: 240px 1fr;
       gap: 1rem;
     }
 
@@ -231,69 +231,6 @@
 
     .tl-preview-icon { font-size: 1.1rem; }
 
-    /* ===== Inspector (right panel) ===== */
-    .tl-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .tl-inspector-section:last-child { margin-bottom: 0; }
-
-    .tl-inspector-heading {
-      font-size: 0.6rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--brand-primary);
-      margin-bottom: 0.3rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .tl-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 0.15rem 0;
-      font-size: 0.65rem;
-      gap: 0.5rem;
-    }
-
-    .tl-inspector-key {
-      color: var(--brand-text-dim);
-      font-weight: 500;
-      flex-shrink: 0;
-    }
-
-    .tl-inspector-val {
-      color: var(--brand-text);
-      text-align: right;
-      word-break: break-all;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .tl-inspector-obj {
-      font-size: 0.55rem;
-      color: var(--brand-text-muted);
-      max-height: 2.5rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .tl-inspector-divider {
-      height: 1px;
-      background: var(--brand-border);
-      margin: 0.5rem 0;
-    }
-
-    .tl-inspector-group-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-muted);
-      margin-bottom: 0.25rem;
-    }
-
     /* ===== How it works ===== */
     .tl-how-it-works {
       background: var(--brand-surface-raised);
@@ -345,7 +282,7 @@
       </div>
     </div>
 
-    <!-- Main 3-column layout -->
+    <!-- Main 2-column layout -->
     <div class="tl-main">
       <!-- Left: Controls -->
       <div class="tl-panel">
@@ -393,23 +330,6 @@
         </div>
       </div>
 
-      <!-- Right: Inspector -->
-      <div class="tl-panel">
-        <div class="tl-panel-header">State Inspector</div>
-        <div class="tl-panel-body">
-          <div class="tl-inspector-group-title">Facts</div>
-          <div id="tl-inspector-facts">
-            <!-- Rendered by JS -->
-          </div>
-
-          <div class="tl-inspector-divider"></div>
-
-          <div class="tl-inspector-group-title">Derivations</div>
-          <div id="tl-inspector-derive">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- How it works -->

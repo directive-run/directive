@@ -131,10 +131,10 @@
       text-align: right;
     }
 
-    /* ===== Main 3-column Layout ===== */
+    /* ===== Main 2-column Layout ===== */
     .af-main {
       display: grid;
-      grid-template-columns: 240px 1fr 280px;
+      grid-template-columns: 240px 1fr;
       gap: 1rem;
     }
 
@@ -288,74 +288,6 @@
     .af-chip:hover {
       border-color: var(--brand-primary);
       color: var(--brand-primary);
-    }
-
-    /* ===== Live State Inspector (Center) ===== */
-    .af-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .af-inspector-section:last-child { margin-bottom: 0; }
-
-    .af-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .af-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .af-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .af-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .af-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .af-deriv-indicator.true {
-      background: var(--brand-success);
-    }
-
-    .af-deriv-indicator.false {
-      background: var(--brand-text-faint);
-    }
-
-    .af-deriv-indicator.expiring {
-      background: var(--brand-error);
-      animation: af-pulse 0.8s ease-in-out infinite;
-    }
-
-    @keyframes af-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
     }
 
     /* ===== Config + Timeline (Right) ===== */
@@ -514,7 +446,7 @@
       </div>
     </div>
 
-    <!-- Main 3-column -->
+    <!-- Main 2-column -->
     <div class="af-main">
       <!-- Left: Login & Actions -->
       <div class="af-panel">
@@ -555,60 +487,6 @@
           <div class="af-chip-row">
             <span class="af-chip" data-email="alice@test.com" data-password="password">Alice (admin)</span>
             <span class="af-chip" data-email="bob@test.com" data-password="secret">Bob (viewer)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center: Live State Inspector -->
-      <div class="af-panel">
-        <div class="af-panel-header">Live State Inspector</div>
-        <div id="af-inspector" class="af-panel-body">
-          <!-- Facts -->
-          <div class="af-inspector-section">
-            <div class="af-inspector-title">Facts</div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">status</span>
-              <span id="af-fact-status" class="af-inspector-value">idle</span>
-            </div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">token</span>
-              <span id="af-fact-token" class="af-inspector-value">&mdash;</span>
-            </div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">expiresAt</span>
-              <span id="af-fact-expires" class="af-inspector-value">&mdash;</span>
-            </div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">user</span>
-              <span id="af-fact-user" class="af-inspector-value">&mdash;</span>
-            </div>
-          </div>
-
-          <!-- Derivations -->
-          <div class="af-inspector-section">
-            <div class="af-inspector-title">Derivations</div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">isAuthenticated</span>
-              <span id="af-deriv-authenticated" class="af-inspector-value" data-testid="auth-flow-deriv-authenticated">
-                <span class="af-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">isExpiringSoon</span>
-              <span id="af-deriv-expiring" class="af-inspector-value" data-testid="auth-flow-deriv-expiring-soon">
-                <span class="af-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">canRefresh</span>
-              <span id="af-deriv-can-refresh" class="af-inspector-value" data-testid="auth-flow-deriv-can-refresh">
-                <span class="af-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="af-inspector-row">
-              <span class="af-inspector-key">tokenTimeRemaining</span>
-              <span id="af-deriv-remaining" class="af-inspector-value" data-testid="auth-flow-deriv-time-remaining">0s</span>
-            </div>
           </div>
         </div>
       </div>

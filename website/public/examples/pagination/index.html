@@ -64,15 +64,11 @@
       flex: 1;
     }
 
-    /* ===== Main 2-column Layout ===== */
+    /* ===== Main Layout ===== */
     .pg-main {
       display: grid;
-      grid-template-columns: 1fr 280px;
+      grid-template-columns: 1fr;
       gap: 1rem;
-    }
-
-    @media (max-width: 800px) {
-      .pg-main { grid-template-columns: 1fr; }
     }
 
     /* Panel base */
@@ -300,64 +296,6 @@
       width: 100%;
     }
 
-    /* ===== State Inspector ===== */
-    .pg-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .pg-inspector-section:last-child { margin-bottom: 0; }
-
-    .pg-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .pg-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .pg-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .pg-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 55%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .pg-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .pg-indicator.true {
-      background: var(--brand-success);
-    }
-
-    .pg-indicator.false {
-      background: var(--brand-text-faint);
-    }
-
     /* ===== How it works ===== */
     .pg-how-it-works {
       background: var(--brand-surface-raised);
@@ -389,7 +327,7 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/pagination/assets/index-Du3vZx1L.js"></script>
+  <script type="module" crossorigin src="/examples/pagination/assets/index-AH_IokkZ.js"></script>
 </head>
 <body>
   <div class="pg-container">
@@ -454,78 +392,6 @@
         <div id="pg-scroll-sentinel" data-testid="pg-scroll-sentinel" class="pg-scroll-sentinel"></div>
       </div>
 
-      <!-- Right: State Inspector -->
-      <div class="pg-panel" style="align-self: start;">
-        <div class="pg-panel-header">Live State Inspector</div>
-        <div class="pg-panel-body">
-          <!-- List Facts -->
-          <div class="pg-inspector-section">
-            <div class="pg-inspector-title">List Facts</div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">items</span>
-              <span id="pg-fact-items-count" class="pg-inspector-value">0 items</span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">cursor</span>
-              <span id="pg-fact-cursor" class="pg-inspector-value">&mdash;</span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">hasMore</span>
-              <span id="pg-fact-has-more" class="pg-inspector-value">
-                <span class="pg-indicator true"></span> true
-              </span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">isLoadingMore</span>
-              <span id="pg-fact-is-loading" class="pg-inspector-value">
-                <span class="pg-indicator false"></span> false
-              </span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">scrollNearBottom</span>
-              <span id="pg-fact-scroll-near" class="pg-inspector-value">
-                <span class="pg-indicator false"></span> false
-              </span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">lastFilterHash</span>
-              <span id="pg-fact-filter-hash" class="pg-inspector-value">&mdash;</span>
-            </div>
-          </div>
-
-          <!-- Filter Facts -->
-          <div class="pg-inspector-section">
-            <div class="pg-inspector-title">Filter Facts</div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">search</span>
-              <span id="pg-fact-search" class="pg-inspector-value">&mdash;</span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">sortBy</span>
-              <span id="pg-fact-sort-by" class="pg-inspector-value">newest</span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">category</span>
-              <span id="pg-fact-category" class="pg-inspector-value">all</span>
-            </div>
-          </div>
-
-          <!-- Derivations -->
-          <div class="pg-inspector-section">
-            <div class="pg-inspector-title">Derivations</div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">totalLoaded</span>
-              <span id="pg-total-loaded" data-testid="pg-total-loaded" class="pg-inspector-value">0</span>
-            </div>
-            <div class="pg-inspector-row">
-              <span class="pg-inspector-key">isEmpty</span>
-              <span id="pg-deriv-is-empty" class="pg-inspector-value">
-                <span class="pg-indicator false"></span> false
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- How it works -->

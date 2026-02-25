@@ -161,52 +161,6 @@
       color: var(--brand-primary);
     }
 
-    /* ===== Inspector ===== */
-    .bl-inspector-section { margin-bottom: 0.5rem; }
-    .bl-inspector-section:last-child { margin-bottom: 0; }
-
-    .bl-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .bl-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .bl-inspector-key { color: var(--brand-text-dim); font-family: ui-monospace, monospace; }
-    .bl-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .bl-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .bl-deriv-indicator.true { background: var(--brand-error); }
-    .bl-deriv-indicator.false { background: var(--brand-success); }
-
     /* ===== Config ===== */
     .bl-slider-group { display: flex; flex-direction: column; gap: 0.2rem; }
 
@@ -291,7 +245,7 @@
     .bl-how-it-works ul { padding-left: 1.2rem; }
     .bl-how-it-works li { margin-bottom: 0.2rem; }
   </style>
-  <script type="module" crossorigin src="/examples/batch-resolver/assets/index-CDGdcPQd.js"></script>
+  <script type="module" crossorigin src="/examples/batch-resolver/assets/index-DM_-mdoQ.js"></script>
 </head>
 <body>
   <div class="bl-container">
@@ -338,7 +292,7 @@
         </div>
       </div>
 
-      <!-- Center: User List + Inspector -->
+      <!-- Center: User List -->
       <div class="bl-panel">
         <div class="bl-panel-header">
           User Directory
@@ -347,32 +301,6 @@
         <div class="bl-panel-body">
           <div id="bl-user-list" class="bl-user-list" data-testid="bl-user-list">
             <div class="bl-empty">No users loaded. Click a button to start.</div>
-          </div>
-          <hr class="bl-separator" />
-          <div class="bl-inspector-section">
-            <div class="bl-inspector-title">Facts</div>
-            <div class="bl-inspector-row">
-              <span class="bl-inspector-key">loadingCount</span>
-              <span id="bl-insp-loading-count" class="bl-inspector-value" data-testid="bl-loading-count">0</span>
-            </div>
-            <div class="bl-inspector-row">
-              <span class="bl-inspector-key">batchCount</span>
-              <span id="bl-insp-batch-count" class="bl-inspector-value" data-testid="bl-batch-count">0</span>
-            </div>
-            <div class="bl-inspector-row">
-              <span class="bl-inspector-key">batchEfficiency</span>
-              <span id="bl-insp-efficiency" class="bl-inspector-value" data-testid="bl-efficiency">N/A</span>
-            </div>
-            <div class="bl-inspector-row">
-              <span class="bl-inspector-key">validationErrors</span>
-              <span id="bl-insp-validation-errors" class="bl-inspector-value" data-testid="bl-validation-errors">&mdash;</span>
-            </div>
-            <div class="bl-inspector-row">
-              <span class="bl-inspector-key">hasErrors</span>
-              <span id="bl-insp-has-errors" class="bl-inspector-value" data-testid="bl-has-errors">
-                <span class="bl-deriv-indicator false"></span> false
-              </span>
-            </div>
           </div>
         </div>
       </div>

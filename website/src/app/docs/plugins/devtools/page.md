@@ -389,7 +389,7 @@ The floating panel is framework-agnostic (vanilla DOM), so it works the same way
 For richer debugging beyond the console and floating panel:
 
 - **[AI DevTools](/ai/devtools)** — Visual debugger for multi-agent orchestration with Timeline, Cost, and State views. Connects via WebSocket or SSE transport.
-- **[DevTools Live](/devtools)** — Try the visual debugger in your browser right now — no installation required.
+- **[AI Chat Demo](/ai/examples/ai-chat)** — Try the visual debugger in your browser right now — no installation required.
 
 ---
 
@@ -398,4 +398,4 @@ For richer debugging beyond the console and floating panel:
 - [Logging](/docs/plugins/logging) – Console output
 - [Time-Travel](/docs/advanced/time-travel) – Snapshot debugging
 - [Plugin Overview](/docs/plugins/overview) – All plugins
-- [DevTools Live](/devtools) – Interactive visual debugger
+- [AI Chat Demo](/ai/examples/ai-chat) – Interactive visual debugger

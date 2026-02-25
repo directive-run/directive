@@ -40,10 +40,10 @@
       gap: 1rem;
     }
 
-    /* ===== Main 3-column Layout ===== */
+    /* ===== Main 2-column Layout ===== */
     .ab-main {
       display: grid;
-      grid-template-columns: 260px 1fr 280px;
+      grid-template-columns: 260px 1fr;
       gap: 1rem;
     }
 
@@ -191,60 +191,7 @@
       font-weight: 700;
     }
 
-    /* ===== Live State Inspector (Center) ===== */
-    .ab-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .ab-inspector-section:last-child { margin-bottom: 0; }
-
-    .ab-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .ab-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .ab-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .ab-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .ab-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .ab-deriv-indicator.true { background: var(--brand-success); }
-    .ab-deriv-indicator.false { background: var(--brand-text-faint); }
-
-    /* ===== Event Timeline (Right) ===== */
+    /* ===== Event Timeline ===== */
     .ab-timeline {
       flex: 1;
       overflow-y: auto;
@@ -334,11 +281,11 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/ab-testing/assets/index-DJT63OKr.js"></script>
+  <script type="module" crossorigin src="/examples/ab-testing/assets/index-CWHACUOg.js"></script>
 </head>
 <body>
   <div class="ab-container">
-    <!-- Main 3-column -->
+    <!-- Main 2-column -->
     <div class="ab-main">
       <!-- Left: Controls & Experiments -->
       <div class="ab-panel">
@@ -370,53 +317,6 @@
 
           <div style="font-size: 0.55rem; color: var(--brand-text-faint); text-align: center;">
             User: <span id="user-id" data-testid="ab-user-id">&mdash;</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center: Live State Inspector -->
-      <div class="ab-panel">
-        <div class="ab-panel-header">Live State Inspector</div>
-        <div class="ab-panel-body">
-          <div class="ab-inspector-section">
-            <div class="ab-inspector-title">Facts</div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">userId</span>
-              <span id="ab-fact-userid" class="ab-inspector-value">&mdash;</span>
-            </div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">paused</span>
-              <span id="ab-fact-paused" class="ab-inspector-value">
-                <span class="ab-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">experiments</span>
-              <span id="ab-fact-experiments" class="ab-inspector-value">0</span>
-            </div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">assignments</span>
-              <span id="ab-fact-assignments" class="ab-inspector-value">{}</span>
-            </div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">exposures</span>
-              <span id="ab-fact-exposures" class="ab-inspector-value">0</span>
-            </div>
-          </div>
-          <div class="ab-inspector-section">
-            <div class="ab-inspector-title">Derivations</div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">activeExperiments</span>
-              <span id="ab-deriv-active" class="ab-inspector-value">0</span>
-            </div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">assignedCount</span>
-              <span id="ab-deriv-assigned" class="ab-inspector-value">0</span>
-            </div>
-            <div class="ab-inspector-row">
-              <span class="ab-inspector-key">exposedCount</span>
-              <span id="ab-deriv-exposed" class="ab-inspector-value">0</span>
-            </div>
           </div>
         </div>
       </div>

@@ -41,10 +41,10 @@
       gap: 1rem;
     }
 
-    /* ===== Layout: 3 columns ===== */
+    /* ===== Layout: 2 columns ===== */
     .nt-layout {
       display: grid;
-      grid-template-columns: 280px 1fr 300px;
+      grid-template-columns: 280px 1fr;
       gap: 1rem;
       align-items: start;
     }
@@ -296,96 +296,6 @@
       }
     }
 
-    /* ===== State inspector ===== */
-    .nt-stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.75rem;
-    }
-
-    .nt-stat-label {
-      color: var(--brand-text-dim);
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-    }
-
-    .nt-stat-value {
-      color: var(--brand-text);
-      font-variant-numeric: tabular-nums;
-      font-weight: 600;
-    }
-
-    .nt-divider {
-      border: none;
-      border-top: 1px solid var(--brand-border);
-      margin: 0.3rem 0;
-    }
-
-    .nt-inspector-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-      max-height: 240px;
-      overflow-y: auto;
-    }
-
-    .nt-inspector-item {
-      display: grid;
-      grid-template-columns: auto auto 1fr auto;
-      gap: 0.4rem;
-      align-items: center;
-      background: var(--brand-surface);
-      border: 1px solid var(--brand-border);
-      border-radius: 6px;
-      padding: 0.3rem 0.5rem;
-      font-size: 0.6rem;
-    }
-
-    .nt-inspector-info { border-left: 3px solid var(--brand-primary); }
-    .nt-inspector-success { border-left: 3px solid var(--brand-success); }
-    .nt-inspector-warning { border-left: 3px solid var(--brand-warning); }
-    .nt-inspector-error { border-left: 3px solid var(--brand-error); }
-
-    .nt-inspector-id {
-      color: var(--brand-text-faint);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .nt-inspector-level {
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-
-    .nt-inspector-info .nt-inspector-level { color: var(--brand-primary); }
-    .nt-inspector-success .nt-inspector-level { color: var(--brand-success); }
-    .nt-inspector-warning .nt-inspector-level { color: var(--brand-warning); }
-    .nt-inspector-error .nt-inspector-level { color: var(--brand-error); }
-
-    .nt-inspector-msg {
-      color: var(--brand-text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .nt-inspector-ttl {
-      color: var(--brand-text-dim);
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-    }
-
-    .nt-inspector-empty {
-      color: var(--brand-text-faint);
-      font-size: 0.7rem;
-      font-style: italic;
-      text-align: center;
-      padding: 1rem 0;
-    }
-
     /* ===== Action log ===== */
     .nt-action-log {
       display: flex;
@@ -441,11 +351,11 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/notifications/assets/index-DXjaXCTI.js"></script>
+  <script type="module" crossorigin src="/examples/notifications/assets/index-DiujL1XL.js"></script>
 </head>
 <body>
   <div class="nt-container">
-    <!-- Main layout: controls | toast preview | inspector -->
+    <!-- Main layout: controls | toast preview -->
     <div class="nt-layout">
       <!-- Left: Control panel -->
       <div style="display: flex; flex-direction: column; gap: 1rem;">
@@ -509,24 +419,6 @@
         </div>
       </div>
 
-      <!-- Right: State inspector -->
-      <div class="nt-panel">
-        <div class="nt-panel-header">State Inspector</div>
-        <div class="nt-panel-body">
-          <div class="nt-stat-row">
-            <span class="nt-stat-label">Queue Length</span>
-            <span id="nt-queue-count" class="nt-stat-value" data-testid="nt-queue-count">0</span>
-          </div>
-          <div class="nt-stat-row">
-            <span class="nt-stat-label">Visible</span>
-            <span id="nt-visible-count" class="nt-stat-value">0</span>
-          </div>
-          <hr class="nt-divider" />
-          <div id="nt-inspector-list" class="nt-inspector-list">
-            <div class="nt-inspector-empty">No notifications in queue</div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- How it works -->
