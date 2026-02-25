@@ -2,6 +2,12 @@
 import { createModule, t } from '@directive-run/core'
 
 // ---------------------------------------------------------------------------
+// Module-level cleanup registry (avoids `any` cast on context)
+// ---------------------------------------------------------------------------
+
+const _runtimeUnsubs = new Map<string, () => void>()
+
+// ---------------------------------------------------------------------------
 // Types for runtime bridge data
 // ---------------------------------------------------------------------------
 
@@ -87,6 +93,11 @@ export const devtoolsRuntime = createModule('runtime', {
       facts.systemName = systemName
     },
     detach: (facts) => {
+      // Clean up runtime subscription
+      const key = facts.systemName ?? '__default'
+      _runtimeUnsubs.get(key)?.()
+      _runtimeUnsubs.delete(key)
+
       facts.connected = false
       facts.systemName = null
       facts.facts = {}
@@ -157,8 +168,10 @@ export const devtoolsRuntime = createModule('runtime', {
               // Debounced re-inspection happens via effect
             }, systemName)
 
-            // Store unsubscribe for cleanup (via destroy lifecycle)
-            ;(context as any).__runtimeUnsub = unsub
+            // Store unsubscribe keyed by system name for cleanup on detach
+            const key = context.facts.systemName ?? '__default'
+            _runtimeUnsubs.get(key)?.()
+            _runtimeUnsubs.set(key, unsub)
 
             return
           }

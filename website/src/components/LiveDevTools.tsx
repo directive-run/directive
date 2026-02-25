@@ -1,14 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDirectiveRef, useSelector } from '@directive-run/react'
-import type { DebugEvent, ConnectionStatus } from './devtools/types'
+import { useSelector } from '@directive-run/react'
+import type { ConnectionStatus } from './devtools/types'
 import { SYSTEM_VIEWS, AI_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
-import { DevToolsSystemContext, useDevToolsSystem } from './devtools/DevToolsSystemContext'
-import { devtoolsShell } from './devtools/modules/devtools-shell'
-import { devtoolsConnection } from './devtools/modules/devtools-connection'
-import { devtoolsSnapshot } from './devtools/modules/devtools-snapshot'
-import { devtoolsRuntime } from './devtools/modules/devtools-runtime'
+import { useDevToolsSystem } from './devtools/DevToolsSystemContext'
+import { DevToolsProvider } from './devtools/DevToolsProvider'
 import { useDevToolsStream } from './devtools/hooks/useDevToolsStream'
 import { TimelineView } from './devtools/views/TimelineView'
 import { CostView } from './devtools/views/CostView'
@@ -27,7 +24,11 @@ import { DerivationsView } from './devtools/views/DerivationsView'
 import { ConstraintsView } from './devtools/views/ConstraintsView'
 import { SystemGraphView } from './devtools/views/SystemGraphView'
 import { TimeTravelView } from './devtools/views/TimeTravelView'
+import { DirectiveLogomark } from './devtools/DirectiveLogomark'
+import { DevToolsErrorBoundary } from './devtools/DevToolsErrorBoundary'
+import { Z_FULLSCREEN } from './devtools/z-index'
 import { encodeReplay } from './devtools/utils/replay-codec'
+import type { DebugEvent } from './devtools/types'
 
 // ---------------------------------------------------------------------------
 // StatusDot — m6: amber-500 for WCAG contrast (was amber-400)
@@ -59,80 +60,15 @@ function StatusDot({ status }: { status: ConnectionStatus }) {
 }
 
 // ---------------------------------------------------------------------------
-// Main Component
+// DevToolsContent — the tab bar + views + footer
 // ---------------------------------------------------------------------------
 
-interface LiveDevToolsProps {
-  streamUrl?: string
-  snapshotUrl?: string
-  replayData?: DebugEvent[]
-  /** Connect to a Directive runtime system via window.__DIRECTIVE__ */
-  runtimeSystemName?: string | null
+interface DevToolsContentProps {
+  /** 'standalone' renders full header/footer/border. 'drawer' hides header (drawer provides its own). */
+  mode?: 'standalone' | 'drawer'
 }
 
-export function LiveDevTools({ streamUrl, snapshotUrl, replayData, runtimeSystemName }: LiveDevToolsProps = {}) {
-  const urls = useMemo(() => ({
-    streamUrl: streamUrl ?? '/api/devtools/stream',
-    snapshotUrl: snapshotUrl ?? '/api/devtools/snapshot',
-    resetUrl: (streamUrl ?? '/api/devtools/stream').replace(/\/stream$/, '/reset'),
-  }), [streamUrl, snapshotUrl])
-
-  // Auto-detect runtime: check for window.__DIRECTIVE__ on mount
-  const [detectedRuntime, setDetectedRuntime] = useState<string | null>(null)
-  useEffect(() => {
-    if (runtimeSystemName !== undefined) {
-      return
-    }
-
-    if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
-      const systems = window.__DIRECTIVE__.getSystems()
-      if (systems.length > 0) {
-        setDetectedRuntime(systems[0])
-      }
-    }
-  }, [runtimeSystemName])
-
-  const effectiveRuntimeName = runtimeSystemName !== undefined ? runtimeSystemName : detectedRuntime
-
-  // C2: Use initialFacts instead of useEffect to avoid URL init race
-  const system = useDirectiveRef({
-    modules: {
-      shell: devtoolsShell,
-      connection: devtoolsConnection,
-      snapshot: devtoolsSnapshot,
-      runtime: devtoolsRuntime,
-    },
-    initialFacts: {
-      connection: {
-        streamUrl: urls.streamUrl,
-        resetUrl: urls.resetUrl,
-        ...(replayData ? {
-          events: replayData,
-          status: 'disconnected' as const,
-          replayMode: true,
-        } : {}),
-      },
-      snapshot: {
-        snapshotUrl: urls.snapshotUrl,
-      },
-    },
-  })
-
-  // Attach runtime when system name is available
-  useEffect(() => {
-    if (effectiveRuntimeName !== null && effectiveRuntimeName !== undefined) {
-      system.events.runtime.attach({ systemName: effectiveRuntimeName })
-    }
-  }, [effectiveRuntimeName, system])
-
-  return (
-    <DevToolsSystemContext.Provider value={system}>
-      <LiveDevToolsInner />
-    </DevToolsSystemContext.Provider>
-  )
-}
-
-function LiveDevToolsInner() {
+export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   const system = useDevToolsSystem()
 
   // Thin EventSource bridge — all state lives in the system
@@ -277,17 +213,23 @@ function LiveDevToolsInner() {
     try {
       const encoded = encodeReplay(events)
       const shareUrl = `${window.location.origin}${window.location.pathname}#replay=${encoded}`
-      navigator.clipboard.writeText(shareUrl)
-      setShareToast(true)
-      setTimeout(() => setShareToast(false), 2000)
+      navigator.clipboard.writeText(shareUrl).then(
+        () => {
+          setShareToast(true)
+          setTimeout(() => setShareToast(false), 2000)
+        },
+        () => {
+          console.warn('[DevTools] Clipboard write failed')
+        },
+      )
     } catch {
       console.warn('[DevTools] Failed to encode replay URL')
     }
   }, [events])
 
-  // Escape key exits fullscreen
+  // Escape key exits fullscreen (standalone mode only)
   useEffect(() => {
-    if (!isFullscreen) {
+    if (mode !== 'standalone' || !isFullscreen) {
       return
     }
 
@@ -300,14 +242,23 @@ function LiveDevToolsInner() {
     document.addEventListener('keydown', handleEsc)
 
     return () => document.removeEventListener('keydown', handleEsc)
-  }, [isFullscreen, system])
+  }, [mode, isFullscreen, system])
+
+  const isDrawer = mode === 'drawer'
 
   return (
-    <div className={`flex flex-col overflow-hidden border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 ${
-      isFullscreen
-        ? 'fixed inset-0 z-50 rounded-none'
-        : 'h-full rounded-lg'
-    }`}>
+    <div
+      className={`flex flex-col overflow-hidden ${
+        isDrawer
+          ? 'h-full bg-white dark:bg-zinc-900'
+          : `border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 ${
+              isFullscreen
+                ? 'fixed inset-0 rounded-none'
+                : 'h-full rounded-lg'
+            }`
+      }`}
+      style={isFullscreen && !isDrawer ? { zIndex: Z_FULLSCREEN } : undefined}
+    >
       <style>{`
         .devtools-timeline-scroll::-webkit-scrollbar {
           height: 6px;
@@ -336,123 +287,120 @@ function LiveDevToolsInner() {
         }
       `}</style>
 
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
-        <div className="flex items-center gap-2">
-          <svg aria-hidden="true" viewBox="0 0 36 36" fill="none" className="h-5 w-5">
-            <g fill="none" strokeLinejoin="round" strokeLinecap="round">
-              <path d="M6 8 L16 18 L6 28" stroke="var(--brand-primary)" strokeWidth={3} />
-              <path d="M24 8 L24 28" stroke="var(--brand-accent)" strokeWidth={3} />
-            </g>
-          </svg>
-          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
-            DevTools
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Runtime connection status */}
-          {runtimeConnected && (
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-              <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
-                {runtimeSystemName ?? 'System'}
-              </span>
-            </div>
-          )}
-          {/* AI stream status */}
-          <StatusDot status={status} />
-          {/* Phase 5: Paused badge */}
-          {isPaused && (
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              Paused
+      {/* Header — hidden in drawer mode (drawer provides its own) */}
+      {!isDrawer && (
+        <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+          <div className="flex items-center gap-2">
+            <DirectiveLogomark />
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+              DevTools
             </span>
-          )}
-          {/* M1: Show retry button when max retries exhausted */}
-          {exhaustedRetries && (
-            <button
-              onClick={reconnect}
-              className="cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30"
-            >
-              Retry
-            </button>
-          )}
-          <button
-            onClick={handleClear}
-            aria-label={confirmClear ? 'Confirm clear all events' : 'Clear all events'}
-            className={`cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] transition ${
-              confirmClear
-                ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                : 'text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300'
-            }`}
-          >
-            {confirmClear ? 'Confirm?' : 'Clear'}
-          </button>
-          <button
-            onClick={handleExport}
-            aria-label="Export events"
-            title="Export"
-            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-              <path d="M8 1a.5.5 0 0 1 .5.5v9.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 11.293V1.5A.5.5 0 0 1 8 1z" />
-              <path d="M2 13.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
-            </svg>
-          </button>
-          <button
-            onClick={handleImport}
-            aria-label="Import events"
-            title="Import"
-            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-              <path d="M8 15a.5.5 0 0 1-.5-.5V4.707L5.354 6.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 4.707V14.5A.5.5 0 0 1 8 15z" />
-              <path d="M2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
-            </svg>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          {/* Phase 4: Share replay URL button */}
-          <div className="relative">
-            <button
-              onClick={handleShare}
-              disabled={events.length === 0}
-              aria-label="Share replay URL"
-              title="Share"
-              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-                <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z" />
-              </svg>
-            </button>
-            {shareToast && (
-              <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-white dark:bg-zinc-200 dark:text-zinc-800">
-                Copied!
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Runtime connection status */}
+            {runtimeConnected && (
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+                  {runtimeSystemName ?? 'System'}
+                </span>
+              </div>
+            )}
+            {/* AI stream status */}
+            <StatusDot status={status} />
+            {/* Phase 5: Paused badge */}
+            {isPaused && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                Paused
               </span>
             )}
-          </div>
-          <button
-            onClick={() => system.events.shell.toggleFullscreen()}
-            aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            {isFullscreen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-                <path d="M5.5 1a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1 0-1H4.3L1.15 1.15a.5.5 0 1 1 .7-.7L5 3.7V1.5a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v2.2l3.15-3.15a.5.5 0 1 1 .7.7L11.7 4.5h2.3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-2.3l-3.15 3.15a.5.5 0 0 1-.7-.7L3.3 11H1.5a.5.5 0 0 1-.5-.5zm9 0a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-2.3l3.15 3.15a.5.5 0 0 1-.7.7L10.5 11.7v2.3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5z" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-                <path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0V2.707l3.146 3.147a.5.5 0 1 0 .708-.708L2.707 2H4.5a.5.5 0 0 0 0-1h-3zm13 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V2.707l-3.146 3.147a.5.5 0 1 1-.708-.708L13.293 2H11.5a.5.5 0 0 1 0-1h3zM1.5 15a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 1 0v1.793l3.146-3.147a.5.5 0 1 1 .708.708L2.707 14H4.5a.5.5 0 0 1 0 1h-3zm13 0a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v1.793l-3.146-3.147a.5.5 0 0 0-.708.708L13.293 14H11.5a.5.5 0 0 0 0 1h3z" />
-              </svg>
+            {/* M1: Show retry button when max retries exhausted */}
+            {exhaustedRetries && (
+              <button
+                onClick={reconnect}
+                className="cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30"
+              >
+                Retry
+              </button>
             )}
-          </button>
+            <button
+              onClick={handleClear}
+              aria-label={confirmClear ? 'Confirm clear all events' : 'Clear all events'}
+              className={`cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] transition ${
+                confirmClear
+                  ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                  : 'text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300'
+              }`}
+            >
+              {confirmClear ? 'Confirm?' : 'Clear'}
+            </button>
+            <button
+              onClick={handleExport}
+              aria-label="Export events"
+              title="Export"
+              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M8 1a.5.5 0 0 1 .5.5v9.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 11.293V1.5A.5.5 0 0 1 8 1z" />
+                <path d="M2 13.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
+              </svg>
+            </button>
+            <button
+              onClick={handleImport}
+              aria-label="Import events"
+              title="Import"
+              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M8 15a.5.5 0 0 1-.5-.5V4.707L5.354 6.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 4.707V14.5A.5.5 0 0 1 8 15z" />
+                <path d="M2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
+              </svg>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {/* Phase 4: Share replay URL button */}
+            <div className="relative">
+              <button
+                onClick={handleShare}
+                disabled={events.length === 0}
+                aria-label="Share replay URL"
+                title="Share"
+                className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                  <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z" />
+                </svg>
+              </button>
+              {shareToast && (
+                <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-white dark:bg-zinc-200 dark:text-zinc-800">
+                  Copied!
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => system.events.shell.toggleFullscreen()}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                  <path d="M5.5 1a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1 0-1H4.3L1.15 1.15a.5.5 0 1 1 .7-.7L5 3.7V1.5a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v2.2l3.15-3.15a.5.5 0 1 1 .7.7L11.7 4.5h2.3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-2.3l-3.15 3.15a.5.5 0 0 1-.7-.7L3.3 11H1.5a.5.5 0 0 1-.5-.5zm9 0a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-2.3l3.15 3.15a.5.5 0 0 1-.7.7L10.5 11.7v2.3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                  <path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0V2.707l3.146 3.147a.5.5 0 1 0 .708-.708L2.707 2H4.5a.5.5 0 0 0 0-1h-3zm13 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V2.707l-3.146 3.147a.5.5 0 1 1-.708-.708L13.293 2H11.5a.5.5 0 0 1 0-1h3zM1.5 15a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 1 0v1.793l3.146-3.147a.5.5 0 1 1 .708.708L2.707 14H4.5a.5.5 0 0 1 0 1h-3zm13 0a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v1.793l-3.146-3.147a.5.5 0 0 0-.708.708L13.293 14H11.5a.5.5 0 0 0 0 1h3z" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tab bar with grouped sections and horizontal scroll */}
       <div className="relative border-b border-zinc-200 dark:border-zinc-700">
@@ -502,6 +450,21 @@ function LiveDevToolsInner() {
         id={`devtools-tabpanel-${view.toLowerCase().replace(/\s+/g, '-')}`}
         aria-label={`${view} view`}
       >
+        {/* #14: Empty/welcome state when nothing is connected */}
+        {!showSystemTabs && !showAiTabs && events.length === 0 && (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <DirectiveLogomark className="h-8 w-8 opacity-30" />
+            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              No data sources connected
+            </p>
+            <div className="max-w-xs space-y-1 text-xs text-zinc-500 dark:text-zinc-500">
+              <p>Connect a Directive runtime or AI stream to see live data.</p>
+              <code className="mt-2 block rounded bg-zinc-100 px-2 py-1 font-mono text-[11px] dark:bg-zinc-800">
+                {`import { devtoolsPlugin } from 'directive/plugins'`}
+              </code>
+            </div>
+          </div>
+        )}
         {/* System views */}
         {view === 'Facts' && <FactsView />}
         {view === 'Derivations' && <DerivationsView />}
@@ -538,5 +501,31 @@ function LiveDevToolsInner() {
         </span>
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// LiveDevTools — thin wrapper for standalone usage (e.g. /devtools page)
+// ---------------------------------------------------------------------------
+
+interface LiveDevToolsProps {
+  streamUrl?: string
+  snapshotUrl?: string
+  replayData?: DebugEvent[]
+  runtimeSystemName?: string | null
+}
+
+export function LiveDevTools({ streamUrl, snapshotUrl, replayData, runtimeSystemName }: LiveDevToolsProps = {}) {
+  return (
+    <DevToolsProvider
+      streamUrl={streamUrl}
+      snapshotUrl={snapshotUrl}
+      replayData={replayData}
+      runtimeSystemName={runtimeSystemName}
+    >
+      <DevToolsErrorBoundary>
+        <DevToolsContent mode="standalone" />
+      </DevToolsErrorBoundary>
+    </DevToolsProvider>
   )
 }
