@@ -94,7 +94,8 @@
       "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/goal-engine/vite.config.ts:*)",
       "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/tsconfig.json:*)",
       "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/vite.config.ts:*)",
-      "WebFetch(domain:reactflow.dev)"
+      "WebFetch(domain:reactflow.dev)",
+      "WebFetch(domain:docs.excalidraw.com)"
     ]
   }
 }

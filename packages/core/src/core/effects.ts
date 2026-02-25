@@ -40,8 +40,8 @@ import { withTracking } from "./tracking.js";
 import type {
 	EffectsDef,
 	Facts,
-	FactsSnapshot,
 	FactsStore,
+	InferSchema,
 	Schema,
 } from "./types.js";
 
@@ -73,7 +73,6 @@ interface EffectState {
 	enabled: boolean;
 	hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
 	dependencies: Set<string> | null; // null = not yet tracked
-	lastSnapshot: FactsSnapshot<Schema> | null;
 	cleanup: (() => void) | null; // cleanup function returned by last run()
 }
 
@@ -109,8 +108,8 @@ export function createEffectsManager<S extends Schema>(
 	// Internal state for each effect
 	const states = new Map<string, EffectState>();
 
-	// Previous facts snapshot for comparison
-	let previousSnapshot: FactsSnapshot<Schema> | null = null;
+	// Previous facts snapshot for comparison (plain object for bracket-style proxy access)
+	let previousSnapshot: Record<string, unknown> | null = null;
 
 	// Track whether cleanupAll has been called (system stopped/destroyed).
 	// If an async effect resolves after stop, its cleanup is invoked immediately.
@@ -128,7 +127,6 @@ export function createEffectsManager<S extends Schema>(
 			enabled: true,
 			hasExplicitDeps: !!def.deps,
 			dependencies: def.deps ? new Set(def.deps as string[]) : null,
-			lastSnapshot: null,
 			cleanup: null,
 		};
 
@@ -141,9 +139,12 @@ export function createEffectsManager<S extends Schema>(
 		return states.get(id) ?? initState(id);
 	}
 
-	/** Create a snapshot of current facts */
-	function createSnapshot(): FactsSnapshot<Schema> {
-		return facts.$snapshot() as FactsSnapshot<Schema>;
+	/** Create a plain-object snapshot of current facts.
+	 *  Effects receive `prev` through module-scoped proxies (system.ts) that use
+	 *  bracket-style property access, so the snapshot must be a plain object —
+	 *  NOT a FactsSnapshot (which only exposes .get()/.has()). */
+	function createSnapshot(): Record<string, unknown> {
+		return store.toObject();
 	}
 
 	/** Check if an effect should run based on changed keys */
@@ -213,7 +214,7 @@ export function createEffectsManager<S extends Schema>(
 				let effectPromise: unknown;
 				const trackingResult = withTracking(() => {
 					store.batch(() => {
-						effectPromise = def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
+						effectPromise = def.run(facts, previousSnapshot as InferSchema<S> | null);
 					});
 					return effectPromise;
 				});
@@ -232,7 +233,7 @@ export function createEffectsManager<S extends Schema>(
 				// Has explicit deps, batch synchronous mutations and run
 				let effectPromise: unknown;
 				store.batch(() => {
-					effectPromise = def.run(facts, previousSnapshot as FactsSnapshot<S> | null);
+					effectPromise = def.run(facts, previousSnapshot as InferSchema<S> | null);
 				});
 				if (effectPromise instanceof Promise) {
 					const result = await effectPromise;

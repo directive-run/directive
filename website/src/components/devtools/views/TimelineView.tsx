@@ -14,6 +14,7 @@ export function TimelineView() {
   const [zoom, setZoom] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [follow, setFollow] = useState(true)
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
   const [tooltip, setTooltip] = useState<{
     x: number
     y: number
@@ -185,7 +186,7 @@ export function TimelineView() {
         })}
 
         {/* Event markers */}
-        {laneEvents.map((e) => {
+        {laneEvents.filter((e) => !hiddenTypes.has(e.type)).map((e) => {
           const left = ((e.timestamp - minTs) / range) * 100
           const label = EVENT_LABELS[e.type] ?? e.type
           const isSelected = e.id === selected
@@ -377,6 +378,9 @@ export function TimelineView() {
               {e.modelId && (
                 <div><span className="text-zinc-500">model:</span> {String(e.modelId)}</div>
               )}
+              {e.breakpointLabel && (
+                <div><span className="text-zinc-500">breakpoint:</span> {String(e.breakpointLabel)}</div>
+              )}
               {e.guardrailName && (
                 <div><span className="text-zinc-500">guardrail:</span> {e.guardrailName}</div>
               )}
@@ -412,16 +416,48 @@ export function TimelineView() {
         )
       })()}
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 pt-1">
-        {Object.entries(EVENT_COLORS).map(([type, color]) => (
-          <div key={type} className="flex items-center gap-1.5">
-            <div className={`h-2.5 w-2.5 rounded-sm ${color}`} aria-hidden="true" />
-            <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
-              {EVENT_LABELS[type] ?? type}
-            </span>
-          </div>
-        ))}
+      {/* Legend — click labels to show/hide event types */}
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        <button
+          onClick={() => {
+            const allTypes = Object.keys(EVENT_COLORS)
+            setHiddenTypes((prev) => prev.size > 0 ? new Set() : new Set(allTypes))
+          }}
+          className="cursor-pointer rounded px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          aria-label={hiddenTypes.size > 0 ? 'Show all event types' : 'Hide all event types'}
+        >
+          {hiddenTypes.size > 0 ? 'All' : 'None'}
+        </button>
+        <div className="h-3 w-px bg-zinc-200 dark:bg-zinc-700" />
+        {Object.entries(EVENT_COLORS).map(([type, color]) => {
+          const hidden = hiddenTypes.has(type)
+
+          return (
+            <button
+              key={type}
+              className={`flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 transition-opacity hover:bg-zinc-100 dark:hover:bg-zinc-800 ${hidden ? 'opacity-30' : 'opacity-100'}`}
+              onClick={() => {
+                setHiddenTypes((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(type)) {
+                    next.delete(type)
+                  } else {
+                    next.add(type)
+                  }
+
+                  return next
+                })
+              }}
+              aria-label={`${hidden ? 'Show' : 'Hide'} ${EVENT_LABELS[type] ?? type} events`}
+              aria-pressed={!hidden}
+            >
+              <div className={`h-2.5 w-2.5 rounded-sm ${color}`} aria-hidden="true" />
+              <span className={`font-mono text-[10px] ${hidden ? 'text-zinc-500 line-through dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                {EVENT_LABELS[type] ?? type}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Hover tooltip — shows all events near cursor position */}

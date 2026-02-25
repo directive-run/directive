@@ -3,67 +3,21 @@
 
 /* === Base Surface === */
 .directive-diagram {
-  --bg-color: #0f172a;
+  --bg-color: var(--brand-diagram-bg, #0a1120);
   --text-color: #f1f5f9;
   --text-muted: #94a3b8;
   --border-subtle: #334155;
   --node-border-radius: 10px;
   color: var(--text-color);
-}
 
-/* === Color Scheme Variables === */
-.scheme-primary {
-  --gradient-a: #0ea5e9;
-  --gradient-b: #6366f1;
-  --gradient-c: #0ea5e9;
-  --node-box-shadow: 10px 0 15px rgba(14, 165, 233, 0.3),
-    -10px 0 15px rgba(99, 102, 241, 0.3);
-  --accent: #38bdf8;
-}
-
-.scheme-amber {
-  --gradient-a: #f59e0b;
-  --gradient-b: #ef4444;
-  --gradient-c: #f59e0b;
-  --node-box-shadow: 10px 0 15px rgba(245, 158, 11, 0.3),
-    -10px 0 15px rgba(239, 68, 68, 0.3);
-  --accent: #fbbf24;
-}
-
-.scheme-violet {
-  --gradient-a: #8b5cf6;
-  --gradient-b: #6366f1;
-  --gradient-c: #8b5cf6;
-  --node-box-shadow: 10px 0 15px rgba(139, 92, 246, 0.3),
-    -10px 0 15px rgba(99, 102, 241, 0.3);
-  --accent: #a78bfa;
-}
-
-.scheme-emerald {
-  --gradient-a: #10b981;
-  --gradient-b: #0ea5e9;
-  --gradient-c: #10b981;
-  --node-box-shadow: 10px 0 15px rgba(16, 185, 129, 0.3),
-    -10px 0 15px rgba(14, 165, 233, 0.3);
-  --accent: #34d399;
-}
-
-.scheme-red {
-  --gradient-a: #ef4444;
-  --gradient-b: #f59e0b;
-  --gradient-c: #ef4444;
-  --node-box-shadow: 10px 0 15px rgba(239, 68, 68, 0.3),
-    -10px 0 15px rgba(245, 158, 11, 0.3);
-  --accent: #f87171;
-}
-
-.scheme-slate {
-  --gradient-a: #64748b;
-  --gradient-b: #94a3b8;
-  --gradient-c: #64748b;
-  --node-box-shadow: 10px 0 15px rgba(100, 116, 139, 0.15),
-    -10px 0 15px rgba(148, 163, 184, 0.15);
-  --accent: #94a3b8;
+  /* Brand preset colors — fallbacks match "Blueprint" preset (Sky + Indigo) */
+  --gradient-a: var(--brand-primary, #0ea5e9);
+  --gradient-b: var(--brand-accent, #6366f1);
+  --gradient-c: var(--brand-primary, #0ea5e9);
+  --accent: var(--brand-primary-400, #38bdf8);
+  --node-box-shadow:
+    10px 0 15px color-mix(in srgb, var(--brand-primary, #0ea5e9) 30%, transparent),
+    -10px 0 15px color-mix(in srgb, var(--brand-accent, #6366f1) 30%, transparent);
 }
 
 /* === Step Node (main node type) === */
@@ -377,7 +331,7 @@
 
 /* === Edge Labels === */
 .turbo-edge-label {
-  background: rgba(15, 23, 42, 0.9);
+  background: var(--brand-code-bg, rgba(15, 23, 42, 0.9));
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 6px 12px;

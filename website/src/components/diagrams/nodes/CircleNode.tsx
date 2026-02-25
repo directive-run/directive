@@ -3,17 +3,15 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import type { CircleNodeData } from '../types'
-import { SCHEME_CLASS, ACCENT_COLORS } from '../theme'
 
 export function CircleNode({ data }: NodeProps) {
-  const { label, sublabel, status, colorScheme } = data as CircleNodeData
+  const { label, sublabel, status } = data as CircleNodeData
   const isActive = status === 'active'
 
   return (
     <div
       className={clsx(
         'turbo-circle',
-        SCHEME_CLASS[colorScheme],
         isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
       )}
     >
@@ -27,7 +25,7 @@ export function CircleNode({ data }: NodeProps) {
               {sublabel}
             </div>
           )}
-          <div style={{ fontSize: '12px', color: ACCENT_COLORS[colorScheme] }}>
+          <div style={{ fontSize: '12px', color: 'var(--accent)' }}>
             {'\u25CF'}
           </div>
           <Handle type="target" position={Position.Left} />

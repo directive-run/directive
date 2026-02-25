@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck — createModule generic inference doesn't resolve for complex schemas
 import { createModule, t } from '@directive-run/core'
 import { VIEWS } from '../constants'
 
@@ -59,6 +59,8 @@ export const devtoolsShell = createModule('shell', {
   resolvers: {
     cancelStaleClear: {
       requirement: 'CANCEL_STALE_CLEAR',
+      // M2: Dedupe key prevents duplicate resolvers when constraint re-fires
+      key: () => 'cancel-stale-clear',
       resolve: async (req, context) => {
         await new Promise((r) => setTimeout(r, 5000))
         if (context.facts.confirmClear) {

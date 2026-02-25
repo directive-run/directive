@@ -3,31 +3,30 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import type { StepNodeData } from '../types'
-import { SCHEME_CLASS, ACCENT_COLORS } from '../theme'
 
 export function StepNode({ data }: NodeProps) {
-  const { label, subtitle, icon, status, colorScheme } = data as StepNodeData
+  const { label, subtitle, icon, status } = data as StepNodeData
   const isActive = status === 'active'
-  const accent = ACCENT_COLORS[colorScheme]
 
   return (
     <div
       className={clsx(
         'turbo-step',
-        SCHEME_CLASS[colorScheme],
         isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
       )}
     >
-      <div className="cloud gradient">
-        <div>{icon}</div>
-      </div>
+      {icon && (
+        <div className="cloud gradient">
+          <div>{icon}</div>
+        </div>
+      )}
       <div className="wrapper gradient">
         <div className="inner">
           <div className="body">
             <div>
               <div
                 className="title"
-                style={{ color: isActive ? accent : '#f1f5f9' }}
+                style={{ color: isActive ? 'var(--accent)' : '#f1f5f9' }}
               >
                 {label}
               </div>

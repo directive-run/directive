@@ -1,24 +1,11 @@
 'use client'
 
 import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from '@xyflow/react'
-import type { ColorScheme } from '../types'
-import { EDGE_GRADIENTS, ACCENT_COLORS } from '../theme'
-
-const HEX_TO_SCHEME: Record<string, ColorScheme> = {
-  '#0ea5e9': 'primary', '#38bdf8': 'primary',
-  '#f59e0b': 'amber', '#fbbf24': 'amber',
-  '#8b5cf6': 'violet', '#a78bfa': 'violet',
-  '#10b981': 'emerald', '#34d399': 'emerald',
-  '#ef4444': 'red', '#f87171': 'red',
-  '#64748b': 'slate', '#94a3b8': 'slate',
-}
 
 interface FeedbackEdgeData {
   label?: string
   sublabel?: string
   active?: boolean
-  colorScheme?: ColorScheme
-  colorActive?: string
   direction?: 'below' | 'above'
 }
 
@@ -35,13 +22,8 @@ export function FeedbackEdge({
     label,
     sublabel,
     active = false,
-    colorActive,
     direction = 'below',
   } = (data ?? {}) as FeedbackEdgeData
-  const colorScheme = (data as FeedbackEdgeData)?.colorScheme
-    ?? (colorActive ? HEX_TO_SCHEME[colorActive] : undefined)
-    ?? 'primary'
-  const gradient = EDGE_GRADIENTS[colorScheme]
   const gradientId = `edge-grad-${id}`
 
   const midX = (sourceX + targetX) / 2
@@ -63,8 +45,8 @@ export function FeedbackEdge({
             x2={targetX}
             y2={targetY}
           >
-            <stop offset="0%" stopColor={gradient.from} />
-            <stop offset="100%" stopColor={gradient.to} />
+            <stop offset="0%" stopColor="var(--gradient-a)" />
+            <stop offset="100%" stopColor="var(--gradient-b)" />
           </linearGradient>
         </defs>
       )}
@@ -80,7 +62,7 @@ export function FeedbackEdge({
         }}
       />
       {active && (
-        <circle r="6" fill={ACCENT_COLORS[colorScheme]}>
+        <circle r="6" fill="var(--accent)">
           <animateMotion dur="2s" repeatCount="1" fill="freeze" path={edgePath} />
         </circle>
       )}
@@ -96,7 +78,7 @@ export function FeedbackEdge({
           >
             <div
               className="turbo-edge-label"
-              style={active ? { color: ACCENT_COLORS[colorScheme], fontWeight: 600 } : undefined}
+              style={active ? { color: 'var(--accent)', fontWeight: 600 } : undefined}
             >
               {label}
             </div>

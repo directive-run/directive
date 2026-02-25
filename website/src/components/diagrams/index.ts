@@ -18,9 +18,6 @@ export {
   getEdgeColor,
   getEdgeColorDark,
   LAYER_COLORS,
-  SCHEME_CLASS,
-  ACCENT_COLORS,
-  EDGE_GRADIENTS,
 } from './theme'
 
 // Wrapper & Controls

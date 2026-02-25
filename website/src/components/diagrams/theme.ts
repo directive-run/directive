@@ -2,33 +2,6 @@ import type { ColorScheme, NodeStatus } from './types'
 
 // Turbo Flow theme constants
 
-export const SCHEME_CLASS: Record<ColorScheme, string> = {
-  primary: 'scheme-primary',
-  amber: 'scheme-amber',
-  violet: 'scheme-violet',
-  emerald: 'scheme-emerald',
-  red: 'scheme-red',
-  slate: 'scheme-slate',
-}
-
-export const ACCENT_COLORS: Record<ColorScheme, string> = {
-  primary: '#38bdf8',
-  amber: '#fbbf24',
-  violet: '#a78bfa',
-  emerald: '#34d399',
-  red: '#f87171',
-  slate: '#94a3b8',
-}
-
-export const EDGE_GRADIENTS: Record<ColorScheme, { from: string; to: string }> = {
-  primary: { from: '#0ea5e9', to: '#6366f1' },
-  amber: { from: '#f59e0b', to: '#ef4444' },
-  violet: { from: '#8b5cf6', to: '#6366f1' },
-  emerald: { from: '#10b981', to: '#0ea5e9' },
-  red: { from: '#ef4444', to: '#f59e0b' },
-  slate: { from: '#64748b', to: '#94a3b8' },
-}
-
 interface ColorSet {
   bg: string
   bgActive: string

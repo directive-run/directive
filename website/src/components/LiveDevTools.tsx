@@ -1,10 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDirectiveRef, useSelector } from '@directive-run/react'
-import type { ConnectionStatus } from './devtools/types'
-import { VIEWS } from './devtools/constants'
-import { DevToolsUrlContext, type DevToolsUrls } from './devtools/DevToolsUrlContext'
+import type { DebugEvent, ConnectionStatus } from './devtools/types'
+import { VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
 import { DevToolsSystemContext, useDevToolsSystem } from './devtools/DevToolsSystemContext'
 import { devtoolsShell } from './devtools/modules/devtools-shell'
 import { devtoolsConnection } from './devtools/modules/devtools-connection'
@@ -16,12 +15,13 @@ import { StateView } from './devtools/views/StateView'
 import { GuardrailsView } from './devtools/views/GuardrailsView'
 import { EventsView } from './devtools/views/EventsView'
 import { HealthView } from './devtools/views/HealthView'
-import { FlamechartView } from './devtools/views/FlamechartView'
+import { BreakpointsView } from './devtools/views/BreakpointsView'
 import { GraphView } from './devtools/views/GraphView'
 import { MemoryView } from './devtools/views/MemoryView'
 import { BudgetView } from './devtools/views/BudgetView'
 import { ConfigView } from './devtools/views/ConfigView'
 import { GoalView } from './devtools/views/GoalProgressView'
+import { encodeReplay } from './devtools/utils/replay-codec'
 
 // ---------------------------------------------------------------------------
 // StatusDot — m6: amber-500 for WCAG contrast (was amber-400)
@@ -59,35 +59,43 @@ function StatusDot({ status }: { status: ConnectionStatus }) {
 interface LiveDevToolsProps {
   streamUrl?: string
   snapshotUrl?: string
+  replayData?: DebugEvent[]
 }
 
-export function LiveDevTools({ streamUrl, snapshotUrl }: LiveDevToolsProps = {}) {
-  const urls = useMemo<DevToolsUrls>(() => ({
+export function LiveDevTools({ streamUrl, snapshotUrl, replayData }: LiveDevToolsProps = {}) {
+  const urls = useMemo(() => ({
     streamUrl: streamUrl ?? '/api/devtools/stream',
     snapshotUrl: snapshotUrl ?? '/api/devtools/snapshot',
+    resetUrl: (streamUrl ?? '/api/devtools/stream').replace(/\/stream$/, '/reset'),
   }), [streamUrl, snapshotUrl])
 
-  // One namespaced Directive system for all DevTools state
+  // C2: Use initialFacts instead of useEffect to avoid URL init race
   const system = useDirectiveRef({
     modules: {
       shell: devtoolsShell,
       connection: devtoolsConnection,
       snapshot: devtoolsSnapshot,
     },
+    initialFacts: {
+      connection: {
+        streamUrl: urls.streamUrl,
+        resetUrl: urls.resetUrl,
+        ...(replayData ? {
+          events: replayData,
+          status: 'disconnected' as const,
+          replayMode: true,
+        } : {}),
+      },
+      snapshot: {
+        snapshotUrl: urls.snapshotUrl,
+      },
+    },
   })
 
-  // Initialize URLs into system facts
-  useEffect(() => {
-    system.events.connection.setStreamUrl({ url: urls.streamUrl })
-    system.events.snapshot.setSnapshotUrl({ url: urls.snapshotUrl })
-  }, [system, urls])
-
   return (
-    <DevToolsUrlContext.Provider value={urls}>
-      <DevToolsSystemContext.Provider value={system}>
-        <LiveDevToolsInner />
-      </DevToolsSystemContext.Provider>
-    </DevToolsUrlContext.Provider>
+    <DevToolsSystemContext.Provider value={system}>
+      <LiveDevToolsInner />
+    </DevToolsSystemContext.Provider>
   )
 }
 
@@ -97,16 +105,30 @@ function LiveDevToolsInner() {
   // Thin EventSource bridge — all state lives in the system
   const { reconnect } = useDevToolsStream()
 
-  // Read shell state from system (defaults for pre-init render)
-  const view = useSelector(system, (s) => s.facts.shell.activeView) ?? 'Timeline'
-  const confirmClear = useSelector(system, (s) => s.facts.shell.confirmClear) ?? false
-  const isFullscreen = useSelector(system, (s) => s.facts.shell.isFullscreen) ?? false
+  // C3: Periodic poll bump to make snapshot constraint reactive
+  useEffect(() => {
+    const interval = setInterval(() => {
+      system.events.snapshot.bumpPoll()
+    }, SNAPSHOT_POLL_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, [system])
+
+  // Read shell state from system
+  const view = useSelector(system, (s) => s.facts.shell.activeView)
+  const confirmClear = useSelector(system, (s) => s.facts.shell.confirmClear)
+  const isFullscreen = useSelector(system, (s) => s.facts.shell.isFullscreen)
 
   // Read connection state from system
-  const status = useSelector(system, (s) => s.facts.connection.status) ?? 'connecting'
-  const exhaustedRetries = useSelector(system, (s) => s.derive.connection.exhaustedRetries) ?? false
-  const events = useSelector(system, (s) => s.facts.connection.events) ?? []
-  const totalTokens = useSelector(system, (s) => s.derive.connection.totalTokens) ?? 0
+  const status = useSelector(system, (s) => s.facts.connection.status)
+  const exhaustedRetries = useSelector(system, (s) => s.derive.connection.exhaustedRetries)
+  const events = useSelector(system, (s) => s.facts.connection.events)
+  const totalTokens = useSelector(system, (s) => s.derive.connection.totalTokens)
+  const isPaused = useSelector(system, (s) => s.facts.connection.isPaused)
+  const pausedOnEvent = useSelector(system, (s) => s.facts.connection.pausedOnEvent)
+
+  // Share button toast state
+  const [shareToast, setShareToast] = useState(false)
 
   // m4: extended clear confirmation from 3s to 5s (now handled by constraint + resolver)
   const handleClear = useCallback(() => {
@@ -148,7 +170,8 @@ function LiveDevToolsInner() {
     a.href = url
     a.download = `devtools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`
     a.click()
-    URL.revokeObjectURL(url)
+    // M7: Delay revocation so browsers can start the download
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }, [events])
 
   // Import events from JSON file
@@ -157,6 +180,7 @@ function LiveDevToolsInner() {
     fileInputRef.current?.click()
   }, [])
 
+  // C4: Use replaceEvents for atomic import (no intermediate empty state)
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) {
@@ -168,11 +192,7 @@ function LiveDevToolsInner() {
       try {
         const imported = JSON.parse(reader.result as string)
         if (Array.isArray(imported)) {
-          system.events.connection.clearEvents()
-          // Small delay so clear finishes first
-          setTimeout(() => {
-            system.events.connection.importEvents({ imported })
-          }, 50)
+          system.events.connection.replaceEvents({ events: imported })
         }
       } catch {
         console.warn('[DevTools] Failed to parse import file')
@@ -182,6 +202,23 @@ function LiveDevToolsInner() {
     // Reset so same file can be re-imported
     e.target.value = ''
   }, [system])
+
+  // Phase 4: Share replay URL
+  const handleShare = useCallback(() => {
+    if (events.length === 0) {
+      return
+    }
+
+    try {
+      const encoded = encodeReplay(events)
+      const shareUrl = `${window.location.origin}${window.location.pathname}#replay=${encoded}`
+      navigator.clipboard.writeText(shareUrl)
+      setShareToast(true)
+      setTimeout(() => setShareToast(false), 2000)
+    } catch {
+      console.warn('[DevTools] Failed to encode replay URL')
+    }
+  }, [events])
 
   // Escape key exits fullscreen
   useEffect(() => {
@@ -249,6 +286,12 @@ function LiveDevToolsInner() {
         </div>
         <div className="flex items-center gap-3">
           <StatusDot status={status} />
+          {/* Phase 5: Paused badge */}
+          {isPaused && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              Paused
+            </span>
+          )}
           {/* M1: Show retry button when max retries exhausted */}
           {exhaustedRetries && (
             <button
@@ -298,6 +341,25 @@ function LiveDevToolsInner() {
             onChange={handleFileChange}
             className="hidden"
           />
+          {/* Phase 4: Share replay URL button */}
+          <div className="relative">
+            <button
+              onClick={handleShare}
+              disabled={events.length === 0}
+              aria-label="Share replay URL"
+              title="Share"
+              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z" />
+              </svg>
+            </button>
+            {shareToast && (
+              <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-white dark:bg-zinc-200 dark:text-zinc-800">
+                Copied!
+              </span>
+            )}
+          </div>
           <button
             onClick={() => system.events.shell.toggleFullscreen()}
             aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -317,7 +379,7 @@ function LiveDevToolsInner() {
         </div>
       </div>
 
-      {/* C2: Tab bar with horizontal scroll for mobile overflow */}
+      {/* Tab bar with horizontal scroll for mobile overflow */}
       <div className="relative border-b border-zinc-200 dark:border-zinc-700">
         {/* Gradient fade indicators for scroll overflow */}
         <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-white dark:from-zinc-900 sm:hidden" />
@@ -361,7 +423,7 @@ function LiveDevToolsInner() {
         {view === 'Guardrails' && <GuardrailsView />}
         {view === 'Events' && <EventsView />}
         {view === 'Health' && <HealthView />}
-        {view === 'Flamechart' && <FlamechartView />}
+        {view === 'Breakpoints' && <BreakpointsView />}
         {view === 'Graph' && <GraphView />}
         {view === 'Goal' && <GoalView />}
         {view === 'Memory' && <MemoryView />}
@@ -375,9 +437,11 @@ function LiveDevToolsInner() {
           {events.length} events | {totalTokens.toLocaleString()} tokens
         </span>
         <span>
-          {exhaustedRetries
-            ? 'Connection lost — click Retry'
-            : status === 'connected' ? 'Streaming' : status}
+          {isPaused && pausedOnEvent
+            ? `Paused on: ${pausedOnEvent.type}`
+            : exhaustedRetries
+              ? 'Connection lost — click Retry'
+              : status === 'connected' ? 'Streaming' : status}
         </span>
       </div>
     </div>

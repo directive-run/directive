@@ -174,13 +174,13 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
               key={step.id}
               className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-all ${
                 stepActive
-                  ? 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300'
+                  ? 'bg-brand-primary-100 text-brand-primary-700 dark:bg-brand-primary-900 dark:text-brand-primary-300'
                   : 'text-slate-400 dark:text-slate-500'
               }`}
             >
               <span
                 className={`h-2 w-2 rounded-full transition-all ${
-                  stepActive ? 'bg-sky-500' : 'bg-slate-300 dark:bg-slate-600'
+                  stepActive ? 'bg-brand-primary' : 'bg-slate-300 dark:bg-slate-600'
                 }`}
               />
               {step.label}

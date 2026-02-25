@@ -3,7 +3,6 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import type { StatusNodeData } from '../types'
-import { SCHEME_CLASS, ACCENT_COLORS } from '../theme'
 
 const STATUS_ICONS: Record<string, string> = {
   idle: '',
@@ -14,7 +13,7 @@ const STATUS_ICONS: Record<string, string> = {
 }
 
 export function StatusNode({ data }: NodeProps) {
-  const { label, status, icon, colorScheme } = data as StatusNodeData
+  const { label, status, icon } = data as StatusNodeData
   const displayIcon = icon ?? STATUS_ICONS[status] ?? ''
   const isActive = status === 'active'
 
@@ -22,7 +21,6 @@ export function StatusNode({ data }: NodeProps) {
     <div
       className={clsx(
         'turbo-status',
-        SCHEME_CLASS[colorScheme],
         isActive ? 'turbo-node-active' : 'turbo-gradient-idle',
       )}
     >
@@ -32,7 +30,7 @@ export function StatusNode({ data }: NodeProps) {
             style={{
               fontSize: '16px',
               fontWeight: 600,
-              color: isActive ? ACCENT_COLORS[colorScheme] : '#f1f5f9',
+              color: isActive ? 'var(--accent)' : '#f1f5f9',
             }}
           >
             {label}
@@ -45,7 +43,7 @@ export function StatusNode({ data }: NodeProps) {
                 fontWeight: 700,
                 color: status === 'error' ? '#f87171'
                   : status === 'success' ? '#34d399'
-                  : ACCENT_COLORS[colorScheme],
+                  : 'var(--accent)',
               }}
             >
               {displayIcon}

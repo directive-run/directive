@@ -83,9 +83,9 @@ export const BatchedNotificationsDiagram = memo(function BatchedNotificationsDia
     edge('unbatched-b', 'unbatched-c', { sourceHandle: 'bottom', targetHandle: 'top' }),
 
     // Batched: all three feed into one notify
-    edge('batched-a', 'batched-notify', { sourceHandle: 'right', targetHandle: 'left' }),
-    edge('batched-b', 'batched-notify', { sourceHandle: 'right', targetHandle: 'left' }),
-    edge('batched-c', 'batched-notify', { sourceHandle: 'right', targetHandle: 'left' }),
+    edge('batched-a', 'batched-notify'),
+    edge('batched-b', 'batched-notify'),
+    edge('batched-c', 'batched-notify'),
   ], [])
 
   return (
