@@ -3,6 +3,8 @@ import { ComparisonTable } from '@/components/ComparisonTable'
 import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
 import { ModuleLifecycleDiagram } from '@/components/ModuleLifecycleDiagram'
 import { PluginLifecycleDiagram } from '@/components/PluginLifecycleDiagram'
+import { ConstraintPriorityDiagram } from '@/components/ConstraintPriorityDiagram'
+import { ConstraintDependencyDiagram } from '@/components/ConstraintDependencyDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 import { UseCaseCards } from '@/components/UseCaseCards'
@@ -90,6 +92,14 @@ const tags = {
   },
   'plugin-lifecycle-diagram': {
     render: PluginLifecycleDiagram,
+    selfClosing: true,
+  },
+  'constraint-priority-diagram': {
+    render: ConstraintPriorityDiagram,
+    selfClosing: true,
+  },
+  'constraint-dependency-diagram': {
+    render: ConstraintDependencyDiagram,
     selfClosing: true,
   },
 }
