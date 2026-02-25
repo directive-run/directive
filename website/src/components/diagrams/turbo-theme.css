@@ -386,3 +386,21 @@
 .turbo-gradient-idle {
   box-shadow: none;
 }
+
+/* === Compact Pipeline Variant (vertical single-column diagrams) === */
+.diagram-compact .turbo-step .title {
+  font-size: 23px;
+}
+
+.diagram-compact .turbo-step .subtitle {
+  font-size: 15px;
+}
+
+.diagram-compact .turbo-step .cloud {
+  width: 44px;
+  height: 44px;
+}
+
+.diagram-compact .turbo-step .cloud div {
+  font-size: 22px;
+}
