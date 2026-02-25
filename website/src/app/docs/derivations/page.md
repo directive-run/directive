@@ -71,7 +71,15 @@ This derivation:
 - Recomputes when either changes
 - Ignores changes to `age`
 
-{% derivation-dependency-graph-diagram /%}
+```
+    Facts:        user        cart        promo
+                    \          |          /
+                     \         |         /
+    Derivations:   isEligible  |   itemCount
+                        \      |      /
+                         \     |     /
+    Composed:        checkoutReady
+```
 
 ---
 
@@ -181,7 +189,15 @@ unsub();
 
 ## Composed Derivations
 
-{% derivation-composition-diagram /%}
+```
+    Facts:         items       tax      shipping
+                     │          │          │
+    Derivations:  subtotal     fees ◄──────┘
+                     │          │
+                     └────┬─────┘
+                          ▼
+    Composed:          total
+```
 
 Derivations can depend on other derivations via the second parameter (`derive`):
 

@@ -24,7 +24,20 @@ const system = createSystem({
 });
 ```
 
-{% multi-module-architecture-diagram /%}
+```
+    ┌─────────────────── createSystem ───────────────────┐
+    │                                                    │
+    │  ┌──────────┐   ┌──────────┐   ┌──────────┐       │
+    │  │   auth   │   │   cart   │   │    ui    │       │
+    │  │  module   │   │  module   │   │  module   │       │
+    │  └──────────┘   └──────────┘   └──────────┘       │
+    │                                                    │
+    └────────────────────────┬───────────────────────────┘
+                             ▼
+                  system.facts.auth.token
+                  system.facts.cart.items
+                  system.facts.ui.theme
+```
 
 ---
 

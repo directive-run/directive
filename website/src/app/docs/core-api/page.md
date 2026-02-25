@@ -24,7 +24,19 @@ They compose inside a **module**, which is created and run as a **system**. See 
 
 ## How They Relate
 
-{% core-api-primitives-diagram /%}
+```
+                         ┌──────────────┐
+              ┌─────────►│  Derivations │
+              │          └──────────────┘
+              │
+    ┌─────────┴─────────┐          ┌──────────────┐         ┌──────────────┐
+    │       Facts       │─────────►│  Constraints │────────►│  Resolvers   │
+    └─────────┬─────────┘          └──────────────┘         └──────┬───────┘
+              │                                                    │
+              │          ┌──────────────┐                          │
+              └─────────►│   Effects    │            mutate facts ◄┘
+                         └──────────────┘
+```
 
 1. **Facts** hold state. When facts change, everything downstream re-evaluates.
 2. **Derivations** are auto-tracked computed values – they re-run only when their dependencies change.

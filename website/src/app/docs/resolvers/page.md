@@ -149,7 +149,11 @@ resolvers: {
 }
 ```
 
-{% resolver-retry-backoff-timeline-diagram /%}
+```
+    Attempt 1     wait 1s     Attempt 2     wait 2s     Attempt 3
+    ─────────── ─ ─ ─ ─ ─── ─────────── ─ ─ ─ ─ ─── ───────────
+       ✗ fail                   ✗ fail                   ✓ success
+```
 
 ### Retry Options
 
@@ -291,7 +295,14 @@ When a constraint's `when()` becomes false while its resolver is running, the re
 
 ## Batched Resolution
 
-{% batched-resolution-diagram /%}
+```
+    Without Batching               With Batching
+    ────────────────               ─────────────
+    fetch(1) ──► response          id:1 ─┐
+    fetch(2) ──► response          id:2 ─┼──► fetchBatch([1,2,3])
+    fetch(3) ──► response          id:3 ─┘
+       3 requests                     1 request
+```
 
 Prevent N+1 problems by collecting requirements that match the same resolver over a time window, then resolving them in a single call:
 

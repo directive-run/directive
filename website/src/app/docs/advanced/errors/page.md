@@ -147,7 +147,18 @@ const system = createSystem({
 });
 ```
 
-{% error-boundary-recovery-diagram /%}
+```
+                    ┌──────────────┐
+                    │ Error Occurs │
+                    └──────┬───────┘
+               ┌───────────┼───────────┐
+               ▼           ▼           ▼
+          ┌────────┐  ┌────────┐  ┌──────────┐
+          │  retry │  │  skip  │  │ escalate │
+          └───┬────┘  └───┬────┘  └────┬─────┘
+              ▼           ▼            ▼
+         Re-execute   Mark Skipped   System Error
+```
 
 ### Recovery Strategies
 

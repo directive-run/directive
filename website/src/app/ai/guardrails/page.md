@@ -11,7 +11,14 @@ audit trails, and GDPR/CCPA compliance &ndash; see
 [Security & Compliance](/ai/security/overview).
 {% /callout %}
 
-{% guardrails-pipeline-diagram /%}
+```
+    Raw Input ──validate──► Injection Check ──redact──► PII Redaction
+                                                            │
+                                                         execute
+                                                            │
+                                                            ▼
+                                          Output Validation ◄── Agent Execution
+```
 
 ---
 

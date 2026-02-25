@@ -144,13 +144,46 @@ constraints: {
 
 Higher priority constraints are evaluated first. Default priority is 0.
 
-{% constraint-ordering-dag-diagram /%}
+```
+    ┌──────────────────┐     ┌──────────────────┐
+    │  loadUser (p:100)│     │ checkAuth (p:90) │
+    └────────┬─────────┘     └────────┬─────────┘
+             │                        │
+             └───────────┬────────────┘
+                         ▼
+              ┌──────────────────┐
+              │validateCart (p:50)│
+              └────────┬─────────┘
+                       ▼
+              ┌──────────────────┐
+              │ applyPromo (p:40)│
+              └────────┬─────────┘
+                       ▼
+              ┌──────────────────┐
+              │  checkout (p:10) │
+              └──────────────────┘
+```
 
 ---
 
 ## Constraint Dependencies (`after`)
 
-{% constraint-composition-diagram /%}
+```
+    ┌────────────┐     ┌──────────────┐
+    │ loadConfig │     │ authenticate │
+    └──────┬─────┘     └──────┬───────┘
+           │    after         │ after
+           └────────┬─────────┘
+                    ▼
+           ┌────────────────┐
+           │ validateInput  │
+           └───────┬────────┘
+                   │ after
+                   ▼
+           ┌────────────────┐
+           │ processRequest │
+           └────────────────┘
+```
 
 Use `after` to ensure one constraint's resolver completes before another constraint evaluates:
 

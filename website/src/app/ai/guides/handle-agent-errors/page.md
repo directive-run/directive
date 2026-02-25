@@ -49,7 +49,22 @@ const fallbackRunner = withFallback(
 
 ## How It Works
 
-{% resilience-cascade-diagram /%}
+```
+    Retry
+    ─────────────────────────────────────────────
+    Attempt 1 ──wait──► Attempt 2 ──wait──► Attempt 3
+       ✗                   ✗                  ✗ exhaust
+                                               │
+    Fallback                                   ▼
+    ─────────────────────────────────────────────
+    Primary ──fail──► Backup
+                        │
+    Circuit Breaker      ▼
+    ─────────────────────────────────────────────
+    Closed ──failures──► Open ──cooldown──► Half-Open
+       ▲                                      │
+       └────────────── success ───────────────┘
+```
 
 - **`withRetry`** catches errors and retries with exponential backoff. `isRetryable` controls which errors trigger retries vs. immediate failure.
 - **`withFallback`** tries runners in order. When one fails all retries, it moves to the next. Useful for provider failover (OpenAI -> Anthropic -> local model).

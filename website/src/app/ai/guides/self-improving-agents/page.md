@@ -32,7 +32,19 @@ const editorialReview = reflect('writer', 'reviewer', {
 
 ## How It Works
 
-{% reflect-loop-diagram /%}
+```
+                      iteration N/3
+                    ┌───────────────┐
+                    ▼               │
+              ┌──────────┐   ┌─────┴─────┐
+              │ Producer │──►│ Evaluator  │
+              └──────────┘   └─────┬─────┘
+                                   │ pass
+                                   ▼
+                              ┌──────────┐
+                              │  Accept  │
+                              └──────────┘
+```
 
 - **`reflect(agent, evaluator, options)`** creates a pattern where the `agent` produces output and the `evaluator` judges it.
 - **The evaluator returns a `ReflectionEvaluation`** with `passed` (boolean), optional `feedback` (string), and optional `score` (number 0-1).

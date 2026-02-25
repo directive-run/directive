@@ -59,7 +59,25 @@ const contentPipeline = dag(
 
 ## How It Works
 
-{% dag-flow-diagram /%}
+```
+    ┌────────────┐   ┌──────────────┐
+    │ researcher │   │ factChecker  │
+    └──────┬─────┘   └──────┬───────┘
+           └────────┬───────┘
+                    ▼
+             ┌────────────┐
+             │   writer   │
+             └──────┬─────┘
+                    ▼
+             ┌────────────┐
+             │   editor   │
+             └──────┬─────┘
+                    ╎ conditional
+                    ▼
+             ┌────────────┐
+             │    seo     │
+             └────────────┘
+```
 
 - **Nodes** define agents and their dependencies. Nodes with no `deps` run immediately. Nodes with `deps` wait for all dependencies to complete.
 - **`transform`** shapes the input for a node based on upstream outputs. The `context` object has `outputs`, `statuses`, `errors`, and the original `input`.
