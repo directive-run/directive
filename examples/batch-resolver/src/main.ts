@@ -265,11 +265,6 @@ system.start();
 
 const userListEl = document.getElementById("bl-user-list")!;
 const inspUserCount = document.getElementById("bl-insp-user-count")!;
-const inspLoadingCount = document.getElementById("bl-insp-loading-count")!;
-const inspBatchCount = document.getElementById("bl-insp-batch-count")!;
-const inspEfficiency = document.getElementById("bl-insp-efficiency")!;
-const inspValidationErrors = document.getElementById("bl-insp-validation-errors")!;
-const inspHasErrors = document.getElementById("bl-insp-has-errors")!;
 const batchWindowVal = document.getElementById("bl-batch-window-val")!;
 const failItemSelect = document.getElementById("bl-fail-item") as HTMLSelectElement;
 const timelineEl = document.getElementById("bl-timeline")!;
@@ -283,11 +278,6 @@ function escapeHtml(text: string): string {
   div.textContent = text;
 
   return div.innerHTML;
-}
-
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="bl-deriv-indicator ${cls}"></span> ${value}`;
 }
 
 function render(): void {
@@ -323,14 +313,8 @@ function render(): void {
     }
   }
 
-  // Inspector
+  // User count in header
   inspUserCount.textContent = String(system.read("userCount"));
-  inspLoadingCount.textContent = String(system.read("loadingCount"));
-  inspBatchCount.textContent = String(facts.batchCount);
-  inspEfficiency.textContent = system.read("batchEfficiency") as string;
-  const errors = facts.validationErrors as string[];
-  inspValidationErrors.textContent = errors.length > 0 ? errors[errors.length - 1]! : "\u2014";
-  renderBoolIndicator(inspHasErrors, system.read("hasValidationErrors") as boolean);
 
   // Slider label
   batchWindowVal.textContent = `${facts.batchWindowMs}ms`;

@@ -1,11 +1,13 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from './DevToolsSystemContext'
 import { DirectiveLogomark } from './DirectiveLogomark'
 import { Z_FAB } from './z-index'
 import type { ConnectionStatus } from './types'
+
+const FAB_SEEN_KEY = 'directive-devtools-fab-seen'
 
 interface FloatingFabProps {
   offset?: { bottom?: number; left?: number }
@@ -24,6 +26,22 @@ export function FloatingFab({ offset }: FloatingFabProps) {
     }
 
     return navigator.platform?.includes('Mac') ? 'Cmd+Shift+D' : 'Ctrl+Shift+D'
+  }, [])
+
+  // First-visit pulse hint — show once per browser
+  const [showPulse, setShowPulse] = useState(false)
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(FAB_SEEN_KEY)) {
+        setShowPulse(true)
+        localStorage.setItem(FAB_SEEN_KEY, '1')
+        const timer = setTimeout(() => setShowPulse(false), 4000)
+
+        return () => clearTimeout(timer)
+      }
+    } catch {
+      // localStorage unavailable (SSR, private mode)
+    }
   }, [])
 
   // Hide FAB when drawer is open — after all hooks
@@ -65,6 +83,15 @@ export function FloatingFab({ offset }: FloatingFabProps) {
         className={`absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white transition-colors duration-300 dark:border-zinc-900 ${badgeClass}`}
         aria-hidden="true"
       />
+
+      {/* First-visit pulse ring */}
+      {showPulse && (
+        <span
+          className="absolute inset-0 animate-ping rounded-full bg-brand-primary-400 opacity-75"
+          aria-hidden="true"
+          style={{ animationDuration: '1.5s', animationIterationCount: 3 }}
+        />
+      )}
     </button>
   )
 }

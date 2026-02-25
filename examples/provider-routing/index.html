@@ -38,7 +38,7 @@
     .pr-top-bar { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
     .pr-top-bar .pr-btn { width: auto; }
 
-    .pr-main { display: grid; grid-template-columns: 240px 1fr 280px; gap: 1rem; }
+    .pr-main { display: grid; grid-template-columns: 240px 1fr; gap: 1rem; }
     @media (max-width: 800px) { .pr-main { grid-template-columns: 1fr; } }
 
     .pr-panel { background: var(--brand-surface-raised); border: 1px solid var(--brand-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
@@ -69,18 +69,6 @@
     .pr-circuit-badge.closed { background: rgba(109, 171, 114, 0.2); color: var(--brand-success); }
     .pr-circuit-badge.open { background: rgba(232, 131, 111, 0.2); color: var(--brand-error); }
     .pr-circuit-badge.half-open { background: rgba(196, 192, 122, 0.2); color: var(--brand-warning); }
-
-    /* Inspector */
-    .pr-inspector-section { margin-bottom: 0.5rem; }
-    .pr-inspector-section:last-child { margin-bottom: 0; }
-    .pr-inspector-title { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--brand-text-dim); margin-bottom: 0.4rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--brand-border); }
-    .pr-inspector-row { display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0; font-size: 0.7rem; }
-    .pr-inspector-key { color: var(--brand-text-dim); font-family: ui-monospace, monospace; }
-    .pr-inspector-value { color: var(--brand-text); font-family: ui-monospace, monospace; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-    .pr-deriv-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 0.2rem; vertical-align: middle; }
-    .pr-deriv-indicator.true { background: var(--brand-error); }
-    .pr-deriv-indicator.false { background: var(--brand-success); }
 
     /* Timeline */
     .pr-timeline { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; min-height: 120px; max-height: 400px; }
@@ -152,43 +140,6 @@
           <div class="pr-toggle-row">
             <input type="checkbox" id="pr-prefer-cheapest" data-testid="pr-prefer-cheapest" />
             <label for="pr-prefer-cheapest">Prefer Cheapest</label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center: Inspector -->
-      <div class="pr-panel">
-        <div class="pr-panel-header">State Inspector</div>
-        <div class="pr-panel-body">
-          <div class="pr-inspector-section">
-            <div class="pr-inspector-title">Facts</div>
-            <div class="pr-inspector-row">
-              <span class="pr-inspector-key">budgetRemaining</span>
-              <span id="pr-insp-budget" class="pr-inspector-value" data-testid="pr-budget-remaining">$1</span>
-            </div>
-            <div class="pr-inspector-row">
-              <span class="pr-inspector-key">lastProvider</span>
-              <span id="pr-insp-last" class="pr-inspector-value" data-testid="pr-last-provider">&mdash;</span>
-            </div>
-            <div class="pr-inspector-row">
-              <span class="pr-inspector-key">totalRequests</span>
-              <span id="pr-insp-total" class="pr-inspector-value" data-testid="pr-total-requests">0</span>
-            </div>
-            <div class="pr-inspector-row">
-              <span class="pr-inspector-key">lastError</span>
-              <span id="pr-insp-error" class="pr-inspector-value" data-testid="pr-last-error">&mdash;</span>
-            </div>
-          </div>
-          <div class="pr-inspector-section">
-            <div class="pr-inspector-title">Derivations</div>
-            <div class="pr-inspector-row">
-              <span class="pr-inspector-key">cheapestAvailable</span>
-              <span id="pr-insp-cheapest" class="pr-inspector-value" data-testid="pr-cheapest">ollama</span>
-            </div>
-            <div class="pr-inspector-row">
-              <span class="pr-inspector-key">allDown</span>
-              <span id="pr-insp-all-down" class="pr-inspector-value" data-testid="pr-all-down">false</span>
-            </div>
           </div>
         </div>
       </div>

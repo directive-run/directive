@@ -19,7 +19,17 @@ const nextConfig = {
     return [
       {
         source: '/ai/devtools-live',
-        destination: '/devtools',
+        destination: '/ai/examples/ai-chat',
+        permanent: true,
+      },
+      {
+        source: '/devtools',
+        destination: '/ai/examples/ai-chat',
+        permanent: true,
+      },
+      {
+        source: '/devtools-2',
+        destination: '/ai/examples/ai-research-pipeline',
         permanent: true,
       },
       {
@@ -78,6 +88,27 @@ const nextConfig = {
         source: '/docs/security/:slug*',
         destination: '/ai/security/:slug*',
         permanent: true,
+      },
+      // AI-themed examples: canonical URL under /ai/examples, actual page under /docs/examples
+      {
+        source: '/ai/examples/ai-guardrails',
+        destination: '/docs/examples/ai-guardrails',
+        permanent: false,
+      },
+      {
+        source: '/ai/examples/ai-checkpoint',
+        destination: '/docs/examples/ai-checkpoint',
+        permanent: false,
+      },
+      {
+        source: '/ai/examples/fraud-analysis',
+        destination: '/docs/examples/fraud-analysis',
+        permanent: false,
+      },
+      {
+        source: '/ai/examples/goal-heist',
+        destination: '/docs/examples/goal-heist',
+        permanent: false,
       },
       {
         source: '/docs/how-to/overview',

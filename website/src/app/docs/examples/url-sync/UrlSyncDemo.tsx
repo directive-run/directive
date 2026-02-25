@@ -41,8 +41,8 @@ export function UrlSyncDemo({
 
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Change filters, search, or sort &ndash; watch the URL update. Only
-          non-default values appear in the query string. The state inspector
-          shows the guard flag preventing sync loops.
+          non-default values appear in the query string. Open DevTools to see
+          the guard flag preventing sync loops.
         </p>
       </section>
 

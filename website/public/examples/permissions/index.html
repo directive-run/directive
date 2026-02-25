@@ -340,77 +340,6 @@
       justify-content: space-between;
     }
 
-    /* ===== State Inspector ===== */
-    .pm-inspector {
-      background: var(--brand-surface-raised);
-      border: 1px solid var(--brand-border);
-      border-radius: 10px;
-      padding: 0.75rem 1rem;
-    }
-
-    .pm-inspector-label {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.5rem;
-    }
-
-    .pm-inspector-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.75rem;
-    }
-
-    @media (max-width: 800px) {
-      .pm-inspector-grid { grid-template-columns: 1fr; }
-    }
-
-    .pm-inspector-section {
-      background: var(--brand-surface);
-      border: 1px solid var(--brand-border);
-      border-radius: 8px;
-      padding: 0.6rem 0.75rem;
-    }
-
-    .pm-inspector-title {
-      font-size: 0.6rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .pm-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.15rem 0;
-      font-size: 0.65rem;
-    }
-
-    .pm-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .pm-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 55%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .pm-inspector-value.true { color: var(--brand-success); }
-    .pm-inspector-value.false { color: var(--brand-text-faint); }
-
     /* ===== Toast ===== */
     .pm-toast {
       position: fixed;
@@ -473,7 +402,7 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/permissions/assets/index-Chi9GFNx.js"></script>
+  <script type="module" crossorigin src="/examples/permissions/assets/index-wCtR9J38.js"></script>
 </head>
 <body>
   <div class="pm-container">
@@ -526,25 +455,6 @@
 
       <!-- Admin Panel (right side, conditional) -->
       <div id="pm-admin-panel" class="pm-admin-panel pm-panel" data-testid="pm-admin-panel"></div>
-    </div>
-
-    <!-- State Inspector -->
-    <div class="pm-inspector">
-      <div class="pm-inspector-label">State Inspector</div>
-      <div class="pm-inspector-grid">
-        <div class="pm-inspector-section">
-          <div class="pm-inspector-title">auth</div>
-          <div id="pm-inspector-auth"></div>
-        </div>
-        <div class="pm-inspector-section">
-          <div class="pm-inspector-title">permissions</div>
-          <div id="pm-inspector-perm"></div>
-        </div>
-        <div class="pm-inspector-section">
-          <div class="pm-inspector-title">content</div>
-          <div id="pm-inspector-content"></div>
-        </div>
-      </div>
     </div>
 
     <!-- How It Works -->

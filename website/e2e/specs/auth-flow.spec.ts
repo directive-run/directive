@@ -138,31 +138,6 @@ test.describe("Auth Flow example", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("derivations update in real-time", async ({ page }) => {
-    // Before login: isAuthenticated should be false
-    await expect(tid(page, "auth-flow-deriv-authenticated")).toContainText("false");
-    await expect(tid(page, "auth-flow-deriv-time-remaining")).toHaveText("0s");
-
-    await tid(page, "auth-flow-login-btn").click();
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
-
-    // After login: isAuthenticated flips to true
-    await expect(tid(page, "auth-flow-deriv-authenticated")).toContainText("true", { timeout: 5_000 });
-    // canRefresh should be true (refreshToken exists)
-    await expect(tid(page, "auth-flow-deriv-can-refresh")).toContainText("true", { timeout: 5_000 });
-
-    // tokenTimeRemaining should be counting down (not 0)
-    const remaining = await tid(page, "auth-flow-deriv-time-remaining").textContent();
-    const seconds = parseInt(remaining || "0", 10);
-    expect(seconds).toBeGreaterThan(0);
-
-    // Wait 2s and verify it decreased
-    await page.waitForTimeout(2000);
-    const remaining2 = await tid(page, "auth-flow-deriv-time-remaining").textContent();
-    const seconds2 = parseInt(remaining2 || "0", 10);
-    expect(seconds2).toBeLessThan(seconds);
-  });
-
   test("code tabs visible below example", async ({ page }) => {
 
     const codeTabs = page.locator("[data-testid='code-tabs-bar']");

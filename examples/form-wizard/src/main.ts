@@ -3,7 +3,7 @@
  *
  * Creates the Directive system, subscribes to state changes,
  * renders the multi-step form with progress bar, step content,
- * navigation buttons, validation feedback, and state inspector.
+ * navigation buttons, and validation feedback.
  */
 
 import { system, wizardSchema, validationSchema } from "./form-wizard.js";
@@ -55,18 +55,6 @@ const emailStatus = document.getElementById("fw-email-status")!;
 const passwordHint = document.getElementById("fw-password-hint")!;
 const nameHint = document.getElementById("fw-name-hint")!;
 
-// Inspector
-const inspCurrentStep = document.getElementById("fw-insp-currentStep")!;
-const inspProgress = document.getElementById("fw-insp-progress")!;
-const inspStep0Valid = document.getElementById("fw-insp-step0Valid")!;
-const inspStep1Valid = document.getElementById("fw-insp-step1Valid")!;
-const inspStep2Valid = document.getElementById("fw-insp-step2Valid")!;
-const inspCurrentStepValid = document.getElementById("fw-insp-currentStepValid")!;
-const inspCanAdvance = document.getElementById("fw-insp-canAdvance")!;
-const inspIsLastStep = document.getElementById("fw-insp-isLastStep")!;
-const inspEmailAvailable = document.getElementById("fw-insp-emailAvailable")!;
-const inspCheckingEmail = document.getElementById("fw-insp-checkingEmail")!;
-
 // Success
 const successScreen = document.getElementById("fw-success")!;
 const formContainer = document.getElementById("fw-form-container")!;
@@ -74,11 +62,6 @@ const formContainer = document.getElementById("fw-form-container")!;
 // ============================================================================
 // Render
 // ============================================================================
-
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const indicatorClass = value ? "true" : "false";
-  el.innerHTML = `<span class="fw-bool-indicator ${indicatorClass}"></span> ${value}`;
-}
 
 function render(): void {
   const facts = system.facts;
@@ -187,17 +170,6 @@ function render(): void {
   nextBtn.disabled = !canAdvance;
   submitBtn.disabled = !currentStepValid;
 
-  // --- Inspector ---
-  inspCurrentStep.textContent = String(currentStep);
-  inspProgress.textContent = `${progress}%`;
-  renderBoolIndicator(inspStep0Valid, derive.wizard.step0Valid);
-  renderBoolIndicator(inspStep1Valid, derive.wizard.step1Valid);
-  renderBoolIndicator(inspStep2Valid, derive.wizard.step2Valid);
-  renderBoolIndicator(inspCurrentStepValid, currentStepValid);
-  renderBoolIndicator(inspCanAdvance, canAdvance);
-  renderBoolIndicator(inspIsLastStep, isLastStep);
-  renderBoolIndicator(inspEmailAvailable, emailAvailable);
-  renderBoolIndicator(inspCheckingEmail, checkingEmail);
 }
 
 // ============================================================================

@@ -3,7 +3,7 @@
  *
  * Creates the Directive system with two modules (preferences + layout),
  * subscribes to state changes, and renders theme controls, locale selector,
- * sidebar toggle, translated preview area, and live state inspector.
+ * sidebar toggle, and translated preview area.
  */
 
 import { createSystem } from "@directive-run/core";
@@ -84,8 +84,6 @@ const headerLocaleEl = document.getElementById("tl-header-locale")!;
 const headerBreakpointEl = document.getElementById("tl-header-breakpoint")!;
 
 const previewEl = document.getElementById("tl-preview")!;
-const inspectorFactsEl = document.getElementById("tl-inspector-facts")!;
-const inspectorDeriveEl = document.getElementById("tl-inspector-derive")!;
 
 // ============================================================================
 // Render
@@ -98,8 +96,6 @@ function render(): void {
   const theme = facts.preferences.theme as ThemeChoice;
   const locale = facts.preferences.locale as string;
   const sidebarOpen = facts.preferences.sidebarOpen as boolean;
-  const systemPrefersDark = facts.preferences.systemPrefersDark as boolean;
-  const loadedLocale = facts.preferences.loadedLocale as string;
   const translations = facts.preferences.translations as Translations;
   const effectiveTheme = derive.preferences.effectiveTheme as string;
   const isRTL = derive.preferences.isRTL as boolean;
@@ -161,58 +157,6 @@ function render(): void {
     </div>
   `;
 
-  // --- Inspector: Facts ---
-  inspectorFactsEl.innerHTML = `
-    <div class="tl-inspector-section">
-      <div class="tl-inspector-heading">preferences</div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">theme</span>
-        <span class="tl-inspector-val">"${escapeHtml(theme)}"</span>
-      </div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">locale</span>
-        <span class="tl-inspector-val">"${escapeHtml(locale)}"</span>
-      </div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">sidebarOpen</span>
-        <span class="tl-inspector-val">${sidebarOpen}</span>
-      </div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">systemPrefersDark</span>
-        <span class="tl-inspector-val">${systemPrefersDark}</span>
-      </div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">loadedLocale</span>
-        <span class="tl-inspector-val">"${escapeHtml(loadedLocale)}"</span>
-      </div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">translations</span>
-        <span class="tl-inspector-val tl-inspector-obj">${escapeHtml(JSON.stringify(translations))}</span>
-      </div>
-    </div>
-    <div class="tl-inspector-section">
-      <div class="tl-inspector-heading">layout</div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">breakpoint</span>
-        <span class="tl-inspector-val">"${escapeHtml(breakpoint)}"</span>
-      </div>
-    </div>
-  `;
-
-  // --- Inspector: Derivations ---
-  inspectorDeriveEl.innerHTML = `
-    <div class="tl-inspector-section">
-      <div class="tl-inspector-heading">preferences</div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">effectiveTheme</span>
-        <span class="tl-inspector-val">"${escapeHtml(effectiveTheme)}"</span>
-      </div>
-      <div class="tl-inspector-row">
-        <span class="tl-inspector-key">isRTL</span>
-        <span class="tl-inspector-val">${isRTL}</span>
-      </div>
-    </div>
-  `;
 }
 
 // ============================================================================

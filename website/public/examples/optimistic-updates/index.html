@@ -331,53 +331,6 @@
       margin: 0.3rem 0;
     }
 
-    /* ===== Inspector ===== */
-    .ou-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.3rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .ou-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.15rem 0;
-      font-size: 0.65rem;
-    }
-
-    .ou-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .ou-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-    }
-
-    .ou-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .ou-deriv-indicator.true { background: var(--brand-success); }
-    .ou-deriv-indicator.false { background: var(--brand-text-faint); }
-    .ou-deriv-indicator.syncing {
-      background: var(--brand-warning);
-      animation: ou-pulse 0.8s ease-in-out infinite;
-    }
-
     /* ===== Timeline ===== */
     .ou-timeline-header {
       font-size: 0.65rem;
@@ -478,7 +431,7 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/optimistic-updates/assets/index-57DN-LZ6.js"></script>
+  <script type="module" crossorigin src="/examples/optimistic-updates/assets/index-DArwl-JC.js"></script>
 </head>
 <body>
   <div class="ou-container">
@@ -521,7 +474,7 @@
         </div>
       </div>
 
-      <!-- Right: Config + Inspector + Timeline -->
+      <!-- Right: Config + Timeline -->
       <div class="ou-panel">
         <div class="ou-panel-header">Configuration</div>
         <div class="ou-panel-body">
@@ -536,32 +489,6 @@
               Fail Rate <span id="ou-fail-val" class="ou-slider-value">30%</span>
             </label>
             <input type="range" id="ou-fail-rate" data-testid="ou-fail-rate" min="0" max="100" step="5" value="30" />
-          </div>
-          <hr class="ou-config-separator" />
-          <div class="ou-inspector-title">Derivations</div>
-          <div class="ou-inspector-row">
-            <span class="ou-inspector-key">totalCount</span>
-            <span id="ou-deriv-total" class="ou-inspector-value" data-testid="ou-deriv-total">0</span>
-          </div>
-          <div class="ou-inspector-row">
-            <span class="ou-inspector-key">doneCount</span>
-            <span id="ou-deriv-done" class="ou-inspector-value" data-testid="ou-deriv-done">0</span>
-          </div>
-          <div class="ou-inspector-row">
-            <span class="ou-inspector-key">pendingCount</span>
-            <span id="ou-deriv-pending" class="ou-inspector-value" data-testid="ou-deriv-pending">0</span>
-          </div>
-          <div class="ou-inspector-row">
-            <span class="ou-inspector-key">canAdd</span>
-            <span id="ou-deriv-can-add" class="ou-inspector-value" data-testid="ou-deriv-can-add">
-              <span class="ou-deriv-indicator false"></span> false
-            </span>
-          </div>
-          <div class="ou-inspector-row">
-            <span class="ou-inspector-key">isSyncing</span>
-            <span id="ou-deriv-syncing" class="ou-inspector-value" data-testid="ou-deriv-syncing">
-              <span class="ou-deriv-indicator false"></span> false
-            </span>
           </div>
           <hr class="ou-config-separator" />
           <div class="ou-timeline-header">Event Timeline</div>

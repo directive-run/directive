@@ -3,7 +3,7 @@
  *
  * Creates the Directive system, subscribes to state changes,
  * renders the todo list, status bar, toast notifications,
- * state inspector, config sliders, and event timeline.
+ * config sliders, and event timeline.
  */
 
 import { createSystem } from "@directive-run/core";
@@ -52,13 +52,6 @@ const toastEl = document.getElementById("ou-toast")!;
 const toastText = document.getElementById("ou-toast-text")!;
 const toastDismiss = document.getElementById("ou-toast-dismiss")!;
 
-// Inspector
-const derivTotal = document.getElementById("ou-deriv-total")!;
-const derivDone = document.getElementById("ou-deriv-done")!;
-const derivPending = document.getElementById("ou-deriv-pending")!;
-const derivCanAdd = document.getElementById("ou-deriv-can-add")!;
-const derivSyncing = document.getElementById("ou-deriv-syncing")!;
-
 // Config sliders
 const serverDelaySlider = document.getElementById("ou-server-delay") as HTMLInputElement;
 const delayVal = document.getElementById("ou-delay-val")!;
@@ -79,13 +72,6 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 // Render
 // ============================================================================
 
-function renderBoolDeriv(el: HTMLElement, value: boolean, pulseClass?: string): void {
-  const indicator = value
-    ? `<span class="ou-deriv-indicator ${pulseClass || "true"}"></span>`
-    : '<span class="ou-deriv-indicator false"></span>';
-  el.innerHTML = `${indicator} ${value}`;
-}
-
 function render(): void {
   const facts = system.facts;
   const derive = system.derive;
@@ -98,7 +84,6 @@ function render(): void {
   const doneCount = derive.doneCount as number;
   const pendingCount = derive.pendingCount as number;
   const canAdd = derive.canAdd as boolean;
-  const isSyncing = derive.isSyncing as boolean;
   const eventLog = facts.eventLog as EventLogEntry[];
 
   // Build set of pending item IDs
@@ -220,13 +205,6 @@ function render(): void {
   } else {
     toastEl.className = "ou-toast";
   }
-
-  // --- Inspector ---
-  derivTotal.textContent = `${totalCount}`;
-  derivDone.textContent = `${doneCount}`;
-  derivPending.textContent = `${pendingCount}`;
-  renderBoolDeriv(derivCanAdd, canAdd);
-  renderBoolDeriv(derivSyncing, isSyncing, isSyncing ? "syncing" : undefined);
 
   // --- Slider labels ---
   delayVal.textContent = `${facts.serverDelay}ms`;

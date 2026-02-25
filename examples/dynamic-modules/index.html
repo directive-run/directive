@@ -398,53 +398,6 @@
       margin: 0.3rem 0;
     }
 
-    /* ===== Inspector ===== */
-    .dm-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.3rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .dm-inspector-scroll {
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    .dm-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.12rem 0;
-      font-size: 0.6rem;
-    }
-
-    .dm-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .dm-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 120px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .dm-inspector-empty {
-      font-size: 0.6rem;
-      color: var(--brand-text-faint);
-      font-style: italic;
-      padding: 0.3rem 0;
-    }
-
     /* ===== Timeline ===== */
     .dm-timeline-header {
       font-size: 0.65rem;
@@ -575,7 +528,7 @@
         </div>
       </div>
 
-      <!-- Right: Module Manager + Inspector + Timeline -->
+      <!-- Right: Module Manager + Timeline -->
       <div style="display:flex;flex-direction:column;gap:1rem;">
         <!-- Module Manager -->
         <div class="dm-panel">
@@ -604,16 +557,6 @@
             </div>
             <div class="dm-reset-row">
               <button id="dm-reset-btn" class="dm-btn dm-btn-sm dm-btn-secondary" data-testid="dm-reset-btn">Reset Demo</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Inspector -->
-        <div class="dm-panel">
-          <div class="dm-panel-header">System Facts</div>
-          <div class="dm-panel-body">
-            <div id="dm-inspector" class="dm-inspector-scroll" data-testid="dm-inspector">
-              <div class="dm-inspector-empty">No modules loaded</div>
             </div>
           </div>
         </div>

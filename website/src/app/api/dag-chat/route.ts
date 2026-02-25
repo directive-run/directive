@@ -14,14 +14,37 @@ interface HistoryMessage {
   content: string
 }
 
+const MAX_MESSAGE_LENGTH = 2000
+const MAX_HISTORY_MESSAGES = 20
+
+function validateHistory(history: unknown[]): HistoryMessage[] {
+  const valid: HistoryMessage[] = []
+  for (const entry of history) {
+    if (
+      entry != null &&
+      typeof entry === 'object' &&
+      'role' in entry &&
+      'content' in entry &&
+      ((entry as HistoryMessage).role === 'user' || (entry as HistoryMessage).role === 'assistant') &&
+      typeof (entry as HistoryMessage).content === 'string' &&
+      (entry as HistoryMessage).content.length > 0 &&
+      (entry as HistoryMessage).content.length <= MAX_MESSAGE_LENGTH
+    ) {
+      valid.push({ role: (entry as HistoryMessage).role, content: (entry as HistoryMessage).content })
+    }
+  }
+
+  return valid.slice(-MAX_HISTORY_MESSAGES)
+}
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   const message = body?.message
-  if (!message || typeof message !== 'string' || message.length > 2000) {
+  if (!message || typeof message !== 'string' || message.length > MAX_MESSAGE_LENGTH) {
     return Response.json({ error: 'Invalid message' }, { status: 400 })
   }
 
-  const history: HistoryMessage[] = Array.isArray(body?.history) ? body.history : []
+  const history = validateHistory(Array.isArray(body?.history) ? body.history : [])
 
   const instance = getDagOrchestrator()
   if (!instance) {

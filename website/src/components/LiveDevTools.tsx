@@ -102,8 +102,10 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   const runtimeSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
 
   // Determine which tab groups to show
+  // System tabs: when a Directive runtime is connected via devtoolsPlugin
   const showSystemTabs = runtimeConnected
-  const showAiTabs = status !== 'disconnected' || events.length > 0
+  // AI tabs: only when there are actual AI events (not just an SSE connection attempt)
+  const showAiTabs = events.length > 0
 
   // Visible views based on which groups are connected
   const visibleViews = useMemo(() => {
@@ -114,13 +116,20 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     if (showAiTabs) {
       views.push(...AI_VIEWS)
     }
-    // Fallback: always show AI tabs if nothing is connected
+    // Fallback: show system tabs if runtime is present, otherwise AI tabs
     if (views.length === 0) {
-      views.push(...AI_VIEWS)
+      views.push(...(runtimeConnected ? SYSTEM_VIEWS : AI_VIEWS))
     }
 
     return views
-  }, [showSystemTabs, showAiTabs])
+  }, [showSystemTabs, showAiTabs, runtimeConnected])
+
+  // Auto-switch active view when it's not in the visible set
+  useEffect(() => {
+    if (visibleViews.length > 0 && !visibleViews.includes(view as typeof visibleViews[number])) {
+      system.events.shell.setView({ view: visibleViews[0] })
+    }
+  }, [visibleViews, view, system])
 
   // Check if a view belongs to system group
   const isSystemView = (v: string) => (SYSTEM_VIEWS as readonly string[]).includes(v)

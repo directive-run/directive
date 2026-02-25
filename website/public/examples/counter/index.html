@@ -40,10 +40,10 @@
       gap: 1rem;
     }
 
-    /* ===== Main 3-column Layout ===== */
+    /* ===== Main 2-column Layout ===== */
     .nm-main {
       display: grid;
-      grid-template-columns: 280px 1fr 280px;
+      grid-template-columns: 280px 1fr;
       gap: 1rem;
     }
 
@@ -171,60 +171,7 @@
     }
     .nm-btn.primary:hover { background: var(--brand-primary-hover); }
 
-    /* ===== Live State Inspector (Center) ===== */
-    .nm-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .nm-inspector-section:last-child { margin-bottom: 0; }
-
-    .nm-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .nm-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .nm-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .nm-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .nm-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .nm-deriv-indicator.true { background: var(--brand-success); }
-    .nm-deriv-indicator.false { background: var(--brand-text-faint); }
-
-    /* ===== Event Timeline (Right) ===== */
+    /* ===== Event Timeline ===== */
     .nm-timeline {
       flex: 1;
       overflow-y: auto;
@@ -315,11 +262,11 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/counter/assets/index-DLnMURW3.js"></script>
+  <script type="module" crossorigin src="/examples/counter/assets/index-DqcQKXNJ.js"></script>
 </head>
 <body>
   <div class="nm-container">
-    <!-- Main 3-column -->
+    <!-- Main 2-column -->
     <div class="nm-main">
       <!-- Left: Game -->
       <div class="nm-panel">
@@ -348,68 +295,7 @@
         </div>
       </div>
 
-      <!-- Center: Live State Inspector -->
-      <div class="nm-panel">
-        <div class="nm-panel-header">Live State Inspector</div>
-        <div class="nm-panel-body">
-          <div class="nm-inspector-section">
-            <div class="nm-inspector-title">Facts</div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">pool</span>
-              <span id="nm-fact-pool" class="nm-inspector-value">0 tiles</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">table</span>
-              <span id="nm-fact-table" class="nm-inspector-value">0 tiles</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">removed</span>
-              <span id="nm-fact-removed" class="nm-inspector-value">0 tiles</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">selected</span>
-              <span id="nm-fact-selected" class="nm-inspector-value">[]</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">moveCount</span>
-              <span id="nm-fact-movecount" class="nm-inspector-value">0</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">gameOver</span>
-              <span id="nm-fact-gameover" class="nm-inspector-value">
-                <span class="nm-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">message</span>
-              <span id="nm-fact-message" class="nm-inspector-value">&mdash;</span>
-            </div>
-          </div>
-          <div class="nm-inspector-section">
-            <div class="nm-inspector-title">Derivations</div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">poolCount</span>
-              <span id="nm-deriv-poolcount" class="nm-inspector-value">0</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">removedCount</span>
-              <span id="nm-deriv-removedcount" class="nm-inspector-value">0</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">selectedTiles</span>
-              <span id="nm-deriv-selectedtiles" class="nm-inspector-value">0 tiles</span>
-            </div>
-            <div class="nm-inspector-row">
-              <span class="nm-inspector-key">hasValidMoves</span>
-              <span id="nm-deriv-hasvalidmoves" class="nm-inspector-value">
-                <span class="nm-deriv-indicator true"></span> true
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Event Timeline -->
+      <!-- Event Timeline -->
       <div class="nm-panel">
         <div class="nm-panel-header">Event Timeline</div>
         <div class="nm-panel-body" style="flex: 1;">

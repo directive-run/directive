@@ -246,5 +246,5 @@ export const listModule = createModule("list", {
 
 export const system = createSystem({
   modules: { filters: filtersModule, list: listModule },
-  plugins: [loggingPlugin()],
+  plugins: [loggingPlugin(), devtoolsPlugin({ name: "pagination" })],
 });
