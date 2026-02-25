@@ -11,6 +11,7 @@ import {
   t,
   type ModuleSchema,
 } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -126,6 +127,7 @@ const canvasModule = createModule("canvas", {
 const system = createSystem({
   module: canvasModule,
   debug: { timeTravel: true, maxSnapshots: 200 },
+  plugins: [devtoolsPlugin({ name: "time-machine" })],
 });
 system.start();
 

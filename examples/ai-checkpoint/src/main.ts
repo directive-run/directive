@@ -6,6 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   InMemoryCheckpointStore,
   createCheckpointId,
@@ -186,7 +187,7 @@ const pipelineModule = createModule("pipeline", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: pipelineModule });
+const system = createSystem({ module: pipelineModule, plugins: [devtoolsPlugin({ name: "ai-checkpoint" })] });
 system.start();
 
 // ============================================================================

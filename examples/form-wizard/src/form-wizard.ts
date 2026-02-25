@@ -12,7 +12,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { persistencePlugin } from "@directive-run/core/plugins";
+import {persistencePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -316,6 +316,7 @@ export const system = createSystem({
     validation: validationModule,
   },
   plugins: [
+    devtoolsPlugin({ name: "form-wizard" }),
     persistencePlugin({
       storage: localStorage,
       key: "form-wizard-draft",
