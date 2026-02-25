@@ -91,6 +91,22 @@ Two-player checkers with move validation, king promotion, and forced captures &n
 
 ---
 
+## Full-Feature Showcases
+
+### [Fraud Case Analysis](/docs/examples/fraud-analysis)
+
+Multi-stage fraud detection pipeline combining every major Directive feature: 6 constraints with priority + `after` ordering, 6 resolvers with retry and custom keys, 3 effects, 9 derivations with composition, PII detection from `@directive-run/ai`, checkpoints, and DevTools with time-travel.
+
+**Directive features:** competing constraints, user-adjustable constraint thresholds, `devtoolsPlugin({ panel: true })`, `detectPII`, checkpoints, retry + exponential backoff, dynamic requirements
+
+### [Goal Heist](/docs/examples/goal-heist)
+
+A heist crew pulls off a museum job using the multi-agent goal execution pattern. Six specialist agents with dependency-driven execution, satisfaction scoring, stall detection, and relaxation tiers &ndash; with real AI or mock fallback.
+
+**Directive features:** facts, derivations, events, effects, constraint priority, constraint&ndash;resolver reconciliation loop, goal pattern, selection strategies, relaxation tiers, real AI + mock fallback
+
+---
+
 ## Next Steps
 
 - **[Quick Start](/docs/quick-start)** &ndash; Guided tutorial for your first module
