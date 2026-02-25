@@ -378,7 +378,7 @@ export function TimelineView() {
               {e.modelId && (
                 <div><span className="text-zinc-500">model:</span> {String(e.modelId)}</div>
               )}
-              {e.breakpointLabel && (
+              {!!e.breakpointLabel && (
                 <div><span className="text-zinc-500">breakpoint:</span> {String(e.breakpointLabel)}</div>
               )}
               {e.guardrailName && (

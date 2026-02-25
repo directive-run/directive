@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDirectiveRef, useSelector } from '@directive-run/react'
 import type { DebugEvent, ConnectionStatus } from './devtools/types'
-import { VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
+import { SYSTEM_VIEWS, AI_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
 import { DevToolsSystemContext, useDevToolsSystem } from './devtools/DevToolsSystemContext'
 import { devtoolsShell } from './devtools/modules/devtools-shell'
 import { devtoolsConnection } from './devtools/modules/devtools-connection'
 import { devtoolsSnapshot } from './devtools/modules/devtools-snapshot'
+import { devtoolsRuntime } from './devtools/modules/devtools-runtime'
 import { useDevToolsStream } from './devtools/hooks/useDevToolsStream'
 import { TimelineView } from './devtools/views/TimelineView'
 import { CostView } from './devtools/views/CostView'
@@ -21,6 +22,11 @@ import { MemoryView } from './devtools/views/MemoryView'
 import { BudgetView } from './devtools/views/BudgetView'
 import { ConfigView } from './devtools/views/ConfigView'
 import { GoalView } from './devtools/views/GoalProgressView'
+import { FactsView } from './devtools/views/FactsView'
+import { DerivationsView } from './devtools/views/DerivationsView'
+import { ConstraintsView } from './devtools/views/ConstraintsView'
+import { SystemGraphView } from './devtools/views/SystemGraphView'
+import { TimeTravelView } from './devtools/views/TimeTravelView'
 import { encodeReplay } from './devtools/utils/replay-codec'
 
 // ---------------------------------------------------------------------------
@@ -60,14 +66,33 @@ interface LiveDevToolsProps {
   streamUrl?: string
   snapshotUrl?: string
   replayData?: DebugEvent[]
+  /** Connect to a Directive runtime system via window.__DIRECTIVE__ */
+  runtimeSystemName?: string | null
 }
 
-export function LiveDevTools({ streamUrl, snapshotUrl, replayData }: LiveDevToolsProps = {}) {
+export function LiveDevTools({ streamUrl, snapshotUrl, replayData, runtimeSystemName }: LiveDevToolsProps = {}) {
   const urls = useMemo(() => ({
     streamUrl: streamUrl ?? '/api/devtools/stream',
     snapshotUrl: snapshotUrl ?? '/api/devtools/snapshot',
     resetUrl: (streamUrl ?? '/api/devtools/stream').replace(/\/stream$/, '/reset'),
   }), [streamUrl, snapshotUrl])
+
+  // Auto-detect runtime: check for window.__DIRECTIVE__ on mount
+  const [detectedRuntime, setDetectedRuntime] = useState<string | null>(null)
+  useEffect(() => {
+    if (runtimeSystemName !== undefined) {
+      return
+    }
+
+    if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
+      const systems = window.__DIRECTIVE__.getSystems()
+      if (systems.length > 0) {
+        setDetectedRuntime(systems[0])
+      }
+    }
+  }, [runtimeSystemName])
+
+  const effectiveRuntimeName = runtimeSystemName !== undefined ? runtimeSystemName : detectedRuntime
 
   // C2: Use initialFacts instead of useEffect to avoid URL init race
   const system = useDirectiveRef({
@@ -75,6 +100,7 @@ export function LiveDevTools({ streamUrl, snapshotUrl, replayData }: LiveDevTool
       shell: devtoolsShell,
       connection: devtoolsConnection,
       snapshot: devtoolsSnapshot,
+      runtime: devtoolsRuntime,
     },
     initialFacts: {
       connection: {
@@ -91,6 +117,13 @@ export function LiveDevTools({ streamUrl, snapshotUrl, replayData }: LiveDevTool
       },
     },
   })
+
+  // Attach runtime when system name is available
+  useEffect(() => {
+    if (effectiveRuntimeName !== null && effectiveRuntimeName !== undefined) {
+      system.events.runtime.attach({ systemName: effectiveRuntimeName })
+    }
+  }, [effectiveRuntimeName, system])
 
   return (
     <DevToolsSystemContext.Provider value={system}>
@@ -127,6 +160,34 @@ function LiveDevToolsInner() {
   const isPaused = useSelector(system, (s) => s.facts.connection.isPaused)
   const pausedOnEvent = useSelector(system, (s) => s.facts.connection.pausedOnEvent)
 
+  // Read runtime state
+  const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
+  const runtimeSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
+
+  // Determine which tab groups to show
+  const showSystemTabs = runtimeConnected
+  const showAiTabs = status !== 'disconnected' || events.length > 0
+
+  // Visible views based on which groups are connected
+  const visibleViews = useMemo(() => {
+    const views: Array<typeof VIEWS[number]> = []
+    if (showSystemTabs) {
+      views.push(...SYSTEM_VIEWS)
+    }
+    if (showAiTabs) {
+      views.push(...AI_VIEWS)
+    }
+    // Fallback: always show AI tabs if nothing is connected
+    if (views.length === 0) {
+      views.push(...AI_VIEWS)
+    }
+
+    return views
+  }, [showSystemTabs, showAiTabs])
+
+  // Check if a view belongs to system group
+  const isSystemView = (v: string) => (SYSTEM_VIEWS as readonly string[]).includes(v)
+
   // Share button toast state
   const [shareToast, setShareToast] = useState(false)
 
@@ -142,25 +203,29 @@ function LiveDevToolsInner() {
     system.events.snapshot.clearSnapshot()
   }, [confirmClear, system])
 
-  // Arrow key navigation between tabs
+  // Arrow key navigation between visible tabs
   const handleTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
-    const idx = VIEWS.indexOf(view)
+    const idx = visibleViews.indexOf(view as typeof visibleViews[number])
+    if (idx === -1) {
+      return
+    }
+
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault()
-      const next = VIEWS[(idx + 1) % VIEWS.length]
+      const next = visibleViews[(idx + 1) % visibleViews.length]
       system.events.shell.setView({ view: next })
       const container = e.currentTarget.parentElement
       const buttons = container?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-      buttons?.[(idx + 1) % VIEWS.length]?.focus()
+      buttons?.[(idx + 1) % visibleViews.length]?.focus()
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault()
-      const prev = VIEWS[(idx - 1 + VIEWS.length) % VIEWS.length]
+      const prev = visibleViews[(idx - 1 + visibleViews.length) % visibleViews.length]
       system.events.shell.setView({ view: prev })
       const container = e.currentTarget.parentElement
       const buttons = container?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-      buttons?.[(idx - 1 + VIEWS.length) % VIEWS.length]?.focus()
+      buttons?.[(idx - 1 + visibleViews.length) % visibleViews.length]?.focus()
     }
-  }, [view, system])
+  }, [view, visibleViews, system])
 
   // Export events as JSON file
   const handleExport = useCallback(() => {
@@ -285,6 +350,16 @@ function LiveDevToolsInner() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          {/* Runtime connection status */}
+          {runtimeConnected && (
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+              <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+                {runtimeSystemName ?? 'System'}
+              </span>
+            </div>
+          )}
+          {/* AI stream status */}
           <StatusDot status={status} />
           {/* Phase 5: Paused badge */}
           {isPaused && (
@@ -379,34 +454,44 @@ function LiveDevToolsInner() {
         </div>
       </div>
 
-      {/* Tab bar with horizontal scroll for mobile overflow */}
+      {/* Tab bar with grouped sections and horizontal scroll */}
       <div className="relative border-b border-zinc-200 dark:border-zinc-700">
         {/* Gradient fade indicators for scroll overflow */}
         <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-white dark:from-zinc-900 sm:hidden" />
         <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-white dark:from-zinc-900 sm:hidden" />
         <div
-          className="flex gap-0 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex items-stretch gap-0 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label="DevTools views"
         >
-          {VIEWS.map((v) => (
-            <button
-              key={v}
-              role="tab"
-              aria-selected={v === view}
-              aria-controls={`devtools-tabpanel-${v.toLowerCase()}`}
-              tabIndex={v === view ? 0 : -1}
-              onKeyDown={handleTabKeyDown}
-              className={`shrink-0 cursor-pointer border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
-                v === view
-                  ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-              }`}
-              onClick={() => system.events.shell.setView({ view: v })}
-            >
-              {v}
-            </button>
-          ))}
+          {visibleViews.map((v, i) => {
+            // Insert divider between system and AI groups
+            const prevView = i > 0 ? visibleViews[i - 1] : null
+            const needsDivider = prevView && isSystemView(prevView) && !isSystemView(v)
+
+            return (
+              <div key={v} className="flex items-stretch">
+                {needsDivider && (
+                  <div className="mx-1 my-2 w-px bg-zinc-300 dark:bg-zinc-600" />
+                )}
+                <button
+                  role="tab"
+                  aria-selected={v === view}
+                  aria-controls={`devtools-tabpanel-${v.toLowerCase().replace(/\s+/g, '-')}`}
+                  tabIndex={v === view ? 0 : -1}
+                  onKeyDown={handleTabKeyDown}
+                  className={`shrink-0 cursor-pointer border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
+                    v === view
+                      ? 'border-sky-500 text-sky-600 dark:text-sky-400'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                  }`}
+                  onClick={() => system.events.shell.setView({ view: v })}
+                >
+                  {v}
+                </button>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -414,9 +499,16 @@ function LiveDevToolsInner() {
       <div
         className="min-h-0 flex-1 overflow-y-auto p-4"
         role="tabpanel"
-        id={`devtools-tabpanel-${view.toLowerCase()}`}
+        id={`devtools-tabpanel-${view.toLowerCase().replace(/\s+/g, '-')}`}
         aria-label={`${view} view`}
       >
+        {/* System views */}
+        {view === 'Facts' && <FactsView />}
+        {view === 'Derivations' && <DerivationsView />}
+        {view === 'Constraints' && <ConstraintsView />}
+        {view === 'System Graph' && <SystemGraphView />}
+        {view === 'Time Travel' && <TimeTravelView />}
+        {/* AI views */}
         {view === 'Timeline' && <TimelineView />}
         {view === 'Cost' && <CostView />}
         {view === 'State' && <StateView />}
@@ -435,6 +527,7 @@ function LiveDevToolsInner() {
       <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-4 py-1.5 font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-500">
         <span>
           {events.length} events | {totalTokens.toLocaleString()} tokens
+          {runtimeConnected && ` | System: ${runtimeSystemName ?? 'connected'}`}
         </span>
         <span>
           {isPaused && pausedOnEvent

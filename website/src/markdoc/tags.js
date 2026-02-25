@@ -1,6 +1,7 @@
 import { Callout } from '@/components/Callout'
 import { ComparisonTable } from '@/components/ComparisonTable'
 import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
+import { ModuleLifecycleDiagram } from '@/components/ModuleLifecycleDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 import { UseCaseCards } from '@/components/UseCaseCards'
@@ -80,6 +81,10 @@ const tags = {
   },
   'devtools-demo': {
     render: DevToolsDemo,
+    selfClosing: true,
+  },
+  'module-lifecycle-diagram': {
+    render: ModuleLifecycleDiagram,
     selfClosing: true,
   },
 }

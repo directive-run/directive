@@ -5,11 +5,13 @@ import type { NamespacedSystem } from '@directive-run/core'
 import type { devtoolsShell } from './modules/devtools-shell'
 import type { devtoolsConnection } from './modules/devtools-connection'
 import type { devtoolsSnapshot } from './modules/devtools-snapshot'
+import type { devtoolsRuntime } from './modules/devtools-runtime'
 
 export type DevToolsModules = {
   shell: typeof devtoolsShell
   connection: typeof devtoolsConnection
   snapshot: typeof devtoolsSnapshot
+  runtime: typeof devtoolsRuntime
 }
 
 export type DevToolsSystem = NamespacedSystem<DevToolsModules>
