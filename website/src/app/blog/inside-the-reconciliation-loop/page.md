@@ -21,7 +21,16 @@ This article is a technical deep-dive into that loop. If you're evaluating Direc
 
 Every reconciliation cycle follows five phases. Here's the simplified model:
 
-{% five-phase-diagram /%}
+```
+    Phase 1        Phase 2        Phase 3        Phase 4        Phase 5
+    ─────────── ──────────── ──────────── ──────────── ────────────
+    Tracking   ──invalidate──► Recomputed ──evaluate──► Re-evaluated
+                                                            │
+                                                          diff
+                                                            │
+                                                            ▼
+                                              Dispatched ◄──deduplicate── Deduplicated
+```
 
 These phases don't map to five sequential function calls – the actual implementation interleaves them through callbacks and microtask scheduling. But conceptually, every cycle follows this order.
 
@@ -156,7 +165,14 @@ This ordering guarantee – invalidate all derivations, then fire listeners – 
 
 There's a third place batching plays a role that's easy to overlook: **event handlers.** When you dispatch an event via `system.dispatch()` or `system.events.someEvent()`, the handler runs inside `store.batch()`. An event handler that updates five facts produces one reconciliation cycle. This is the same pattern React uses with its event handler batching – group the state updates, flush once.
 
-{% batched-notifications-diagram /%}
+```
+    Without Batching                 With Batching
+    ────────────────                 ─────────────
+    A ──► notify ──► reconcile       A ─┐
+    B ──► notify ──► reconcile       B ─┼──► batch notify ──► reconcile
+    C ──► notify ──► reconcile       C ─┘
+       3 separate cycles                1 cycle
+```
 
 ---
 
@@ -244,7 +260,15 @@ One guard worth noting: the derivation proxy blocks access to `__proto__`, `cons
 
 ## Settlement
 
-{% settlement-state-machine-diagram /%}
+```
+                   requirements resolved       no pending requirements
+    ┌─────────────┐ ──────────────────► ┌─────────┐ ──────────────► ┌─────────┐
+    │ Reconciling │                     │ Pending │                 │ Settled │
+    └─────────────┘ ◄────────────────── └─────────┘                └────┬────┘
+                     new facts changed                                  │
+         ▲                                                              │
+         └──────────────────── fact mutation ────────────────────────────┘
+```
 
 A system is **settled** when three conditions are met:
 

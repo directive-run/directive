@@ -17,7 +17,35 @@ The Directive documentation site has an AI chatbot. You can open it from the flo
 
 Every chat message flows through a five-stage pipeline:
 
-{% message-pipeline-diagram /%}
+```
+    ┌─────────────────────────────┐
+    │       User Question         │
+    │    Natural language input   │
+    └──────────────┬──────────────┘
+                   │ embed query
+                   ▼
+    ┌─────────────────────────────┐
+    │      RAG Enrichment         │
+    │   Find relevant doc chunks  │
+    └──────────────┬──────────────┘
+                   │ enriched context
+                   ▼
+    ┌─────────────────────────────┐
+    │    Agent Orchestrator       │
+    │  Guardrails + LLM call     │
+    └──────────────┬──────────────┘
+                   │ stream tokens
+                   ▼
+    ┌─────────────────────────────┐
+    │      SSE Transport          │
+    │   Server-sent events        │
+    └──────────────┬──────────────┘
+                   │ SSE frames
+                   ▼
+    ┌─────────────────────────────┐
+    │      Browser Widget         │
+    └─────────────────────────────┘
+```
 
 The first three stages use Directive's AI adapter (`@directive-run/ai`). The server-side operational state &ndash; request counting, token budget tracking, health monitoring &ndash; uses the core Directive runtime (`createModule`, `createSystem`).
 
@@ -68,7 +96,11 @@ The chatbot draws from two complementary knowledge sources, each chunked and emb
 
 **Phase 2 &ndash; API reference.** A second script uses `ts-morph` to walk every exported symbol in the Directive source code, extract JSDoc comments, parameter types, return types, and `@example` blocks, then outputs a structured JSON file. Each symbol becomes one embedding chunk with `sourceType: "api-reference"` and metadata like `symbolName` and `symbolKind`.
 
-{% rag-pipeline-diagram /%}
+```
+    Markdoc Pages ──► Parse AST ──► Section Chunks ──┐
+                                                      ├──► embeddings.json
+    TypeScript Src ──► ts-morph ──► Function Chunks ──┘
+```
 
 When a symbol appears in both the generated API reference and a hand-written `/docs/api/*` page, the pipeline deduplicates and keeps only the generated version (it's canonical, since it comes directly from the source code).
 
@@ -515,7 +547,37 @@ Five numbered comments, five phases &ndash; the same flow as the diagram below, 
 
 Here's the full path a message takes, from the user clicking "Send" to the streamed response appearing in the widget:
 
-{% request-lifecycle-diagram /%}
+```
+    ┌─────────────────────────────┐
+    │          Client             │
+    │  Widget sends POST request  │
+    └──────────────┬──────────────┘
+                   ▼
+    ┌─────────────────────────────┐
+    │          Server             │
+    │  Validate origin + rate     │
+    └──────────────┬──────────────┘
+                   ▼
+    ┌─────────────────────────────┐
+    │       RAG Enricher          │
+    │   Embed query + retrieve    │
+    └──────────────┬──────────────┘
+                   ▼
+    ┌─────────────────────────────┐
+    │   Agent Orchestrator        │
+    │   + Middleware pipeline     │
+    └──────────────┬──────────────┘
+                   ▼
+    ┌─────────────────────────────┐
+    │      SSE Transport          │
+    │  Stream response chunks     │
+    └──────────────┬──────────────┘
+                   ▼
+    ┌─────────────────────────────┐
+    │   Post-Response Hooks       │
+    │  Log usage, update budget   │
+    └─────────────────────────────┘
+```
 
 ### Validation and gating
 

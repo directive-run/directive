@@ -56,7 +56,12 @@ This shift has profound implications:
 | You coordinate async | System coordinates async |
 | Changes require rewiring | Changes require updating rules |
 
-{% reconciliation-cycle-diagram /%}
+```
+        Facts change ──────────► Constraints evaluate
+             ▲                            │
+             │                            ▼
+        Facts updated ◄──────── Resolvers execute
+```
 
 ---
 
@@ -100,7 +105,15 @@ resolve: async (req, context) => {
 }
 ```
 
-{% effect-vs-resolver-diagram /%}
+```
+    Effects                          Resolvers
+    ───────                          ─────────
+    Fact Change                      Requirement
+        │                                │
+        ▼                                ▼
+    Fire & Forget                    Async Fulfill
+    (logging, analytics)             (API calls, state)
+```
 
 {% callout type="warning" title="Nested Object Mutations" %}
 Mutations to nested objects are not tracked. Always replace the entire object:

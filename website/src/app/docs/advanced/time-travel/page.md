@@ -5,7 +5,12 @@ description: Debug your application with time-travel state navigation, and captu
 
 Navigate through state history for debugging, and save or restore complete system state with snapshots. {% .lead %}
 
-{% time-travel-timeline-diagram /%}
+```
+    t=0          t=1          t=2          t=3          t=4
+    ─────────────────────────────────────────────────────────
+    Snapshot 1   Snapshot 2   Current ▼    Snapshot 4   Snapshot 5
+                              ◄─ back │ forward ─►
+```
 
 ---
 

@@ -12,40 +12,9 @@ export interface StepNodeData {
   [key: string]: unknown
 }
 
-export interface StatusNodeData {
-  label: string
-  status: NodeStatus
-  icon?: string
-  colorScheme: ColorScheme
-  [key: string]: unknown
-}
-
-export interface LayerNodeData {
-  label: string
-  active: boolean
-  colorScheme: ColorScheme
-  width: number
-  height: number
-  [key: string]: unknown
-}
-
-export interface CircleNodeData {
-  label: string
-  sublabel?: string
-  status: NodeStatus
-  colorScheme: ColorScheme
-  [key: string]: unknown
-}
-
-export interface BadgeNodeData {
-  text: string
-  active: boolean
-  [key: string]: unknown
-}
-
 export type ColorScheme = 'primary' | 'amber' | 'violet' | 'emerald' | 'red' | 'slate'
 
-export type DiagramNode = Node<StepNodeData | StatusNodeData | LayerNodeData | CircleNodeData | BadgeNodeData>
+export type DiagramNode = Node<StepNodeData>
 export type DiagramEdge = Edge
 
 export interface AnimationConfig {
