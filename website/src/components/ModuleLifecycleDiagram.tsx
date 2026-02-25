@@ -12,8 +12,8 @@ import {
 } from './diagrams'
 
 const STEPS = [
-  { id: 'define', label: 'Define', subtitle: 'createModule()', colorScheme: 'slate' as const },
-  { id: 'init', label: 'Init', subtitle: 'schema + init()', colorScheme: 'primary' as const },
+  { id: 'define', label: 'Define', subtitle: 'createModule', colorScheme: 'slate' as const },
+  { id: 'init', label: 'Init', subtitle: 'schema + init', colorScheme: 'primary' as const },
   { id: 'start', label: 'Start', subtitle: 'constraints activate', colorScheme: 'amber' as const },
   { id: 'running', label: 'Running', subtitle: 'reconciliation loop', colorScheme: 'emerald' as const },
   { id: 'stopping', label: 'Stopping', subtitle: 'teardown effects', colorScheme: 'violet' as const },
@@ -55,7 +55,7 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
   //   Row 0:  Define (left)    →  Init (right)
   //   Row 1:  Start (left)     ←
   //   Row 2:                      Running (right)
-  //   Row 3:  Stopped (left)   ←  Stopping (right)
+  //   Row 3:  Stopping (left)  →  Stopped (right)
   const nodes = useMemo<Node[]>(() => [
     {
       id: 'define',
@@ -108,7 +108,7 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
     {
       id: 'stopping',
       type: 'step',
-      position: { x: COL_GAP, y: ROW_GAP * 2 },
+      position: { x: 0, y: ROW_GAP * 2 },
       style: { width: NODE_WIDTH },
       data: {
         label: STEPS[4].label,
@@ -120,7 +120,7 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
     {
       id: 'stopped',
       type: 'step',
-      position: { x: 0, y: ROW_GAP * 2 },
+      position: { x: COL_GAP, y: ROW_GAP * 2 },
       style: { width: NODE_WIDTH },
       data: {
         label: STEPS[5].label,
@@ -159,7 +159,7 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
       data: { label: 'activate', active: isArrowActive('arrow3') },
     },
     {
-      // Running → Stopping (down)
+      // Running → Stopping (down-left)
       id: 'running->stopping',
       source: 'running',
       sourceHandle: 'bottom',
@@ -169,12 +169,10 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
       data: { label: 'stop()', active: isArrowActive('arrow4') },
     },
     {
-      // Stopping → Stopped (left)
+      // Stopping → Stopped (right)
       id: 'stopping->stopped',
       source: 'stopping',
-      sourceHandle: 'left-source',
       target: 'stopped',
-      targetHandle: 'right-target',
       type: 'labeled',
       data: { label: 'done', active: isArrowActive('arrow5') },
     },
@@ -188,6 +186,7 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
         edges={edges}
         nodeTypes={diagramNodeTypes}
         edgeTypes={diagramEdgeTypes}
+        fitViewOptions={{ padding: 0.2 }}
       />
 
       <DiagramToolbar

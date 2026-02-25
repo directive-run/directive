@@ -404,3 +404,21 @@
 .diagram-compact .turbo-step .cloud div {
   font-size: 22px;
 }
+
+/* === Semi-Compact Variant (slightly smaller than default) === */
+.diagram-semi-compact .turbo-step .title {
+  font-size: 25px;
+}
+
+.diagram-semi-compact .turbo-step .subtitle {
+  font-size: 16px;
+}
+
+.diagram-semi-compact .turbo-step .cloud {
+  width: 48px;
+  height: 48px;
+}
+
+.diagram-semi-compact .turbo-step .cloud div {
+  font-size: 24px;
+}
