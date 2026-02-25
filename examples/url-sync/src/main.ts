@@ -2,7 +2,7 @@
  * URL Sync — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
- * and renders the product grid, filters, pagination, and state inspector.
+ * and renders the product grid, filters, and pagination.
  */
 
 import { system, urlSchema, productsSchema } from "./url-sync.js";
@@ -35,8 +35,6 @@ const currentUrl = document.getElementById("us-current-url")!;
 const totalItems = document.getElementById("us-total-items")!;
 const pageDisplay = document.getElementById("us-page-display")!;
 const loadingIndicator = document.getElementById("us-loading")!;
-const inspectorUrl = document.getElementById("us-inspector-url")!;
-const inspectorProducts = document.getElementById("us-inspector-products")!;
 
 // ============================================================================
 // Render
@@ -159,31 +157,6 @@ function render(): void {
   const search = window.location.search || "(no params)";
   currentUrl.textContent = `${window.location.pathname}${search}`;
 
-  // State inspector
-  inspectorUrl.textContent = JSON.stringify(
-    {
-      search: urlFacts.search,
-      category: urlFacts.category,
-      sortBy: urlFacts.sortBy,
-      page: urlFacts.page,
-      syncingFromUrl: urlFacts.syncingFromUrl,
-    },
-    null,
-    2,
-  );
-
-  inspectorProducts.textContent = JSON.stringify(
-    {
-      totalItems: productFacts.totalItems,
-      isLoading: productFacts.isLoading,
-      itemsPerPage: productFacts.itemsPerPage,
-      itemCount: items.length,
-      totalPages: productDerive.totalPages,
-      currentPageDisplay: productDerive.currentPageDisplay,
-    },
-    null,
-    2,
-  );
 }
 
 function makePageBtn(page: number, currentPage: number): HTMLButtonElement {

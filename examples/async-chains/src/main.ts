@@ -5,7 +5,7 @@
  *   Auth → Permissions → Dashboard
  *
  * Subscribes to state changes, renders the chain visualization,
- * controls, state inspector, and event timeline.
+ * controls, and event timeline.
  */
 
 import { createSystem } from "@directive-run/core";
@@ -111,9 +111,6 @@ const permsFailVal = document.getElementById("ac-perms-fail-val")!;
 const dashFailSlider = document.getElementById("ac-dash-fail-rate") as HTMLInputElement;
 const dashFailVal = document.getElementById("ac-dash-fail-val")!;
 
-// Inspector
-const inspectorEl = document.getElementById("ac-inspector")!;
-
 // Timeline
 const timelineEl = document.getElementById("ac-timeline")!;
 
@@ -209,8 +206,6 @@ function render(): void {
   const authFacts = system.facts.auth;
   const permsFacts = system.facts.permissions;
   const dashFacts = system.facts.dashboard;
-  const authDeriv = system.derive.auth;
-  const permsDeriv = system.derive.permissions;
   const dashDeriv = system.derive.dashboard;
 
   const authStatus = getStepStatus("auth");
@@ -306,104 +301,6 @@ function render(): void {
     !currentPermsLoaded &&
     !currentDashLoaded;
 
-  // Inspector
-  renderInspector();
-}
-
-function renderInspector(): void {
-  const authFacts = system.facts.auth;
-  const permsFacts = system.facts.permissions;
-  const dashFacts = system.facts.dashboard;
-  const authDeriv = system.derive.auth;
-  const permsDeriv = system.derive.permissions;
-  const dashDeriv = system.derive.dashboard;
-
-  const widgets = dashFacts.widgets as DashboardWidget[];
-  const permissions = permsFacts.permissions as string[];
-
-  inspectorEl.innerHTML = `
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">auth (facts)</div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">token</span>
-        <span class="ac-inspector-value">${escapeHtml(authFacts.token as string || "\u2014")}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">status</span>
-        <span class="ac-inspector-value">${escapeHtml(authFacts.status as string)}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">userId</span>
-        <span class="ac-inspector-value">${escapeHtml(authFacts.userId as string || "\u2014")}</span>
-      </div>
-    </div>
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">auth (derive)</div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">isValid</span>
-        <span class="ac-inspector-value">${renderBoolIndicator(authDeriv.isValid as boolean)}</span>
-      </div>
-    </div>
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">permissions (facts)</div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">role</span>
-        <span class="ac-inspector-value">${escapeHtml(permsFacts.role as string || "\u2014")}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">permissions</span>
-        <span class="ac-inspector-value">${permissions.length > 0 ? escapeHtml(permissions.join(", ")) : "\u2014"}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">loaded</span>
-        <span class="ac-inspector-value">${renderBoolIndicator(permsFacts.loaded as boolean)}</span>
-      </div>
-    </div>
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">permissions (derive)</div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">canEdit</span>
-        <span class="ac-inspector-value">${renderBoolIndicator(permsDeriv.canEdit as boolean)}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">canPublish</span>
-        <span class="ac-inspector-value">${renderBoolIndicator(permsDeriv.canPublish as boolean)}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">canManageUsers</span>
-        <span class="ac-inspector-value">${renderBoolIndicator(permsDeriv.canManageUsers as boolean)}</span>
-      </div>
-    </div>
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">dashboard (facts)</div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">loaded</span>
-        <span class="ac-inspector-value">${renderBoolIndicator(dashFacts.loaded as boolean)}</span>
-      </div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">widgets</span>
-        <span class="ac-inspector-value">${widgets.length > 0 ? `${widgets.length} items` : "\u2014"}</span>
-      </div>
-    </div>
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">dashboard (derive)</div>
-      <div class="ac-inspector-row">
-        <span class="ac-inspector-key">widgetCount</span>
-        <span class="ac-inspector-value">${dashDeriv.widgetCount}</span>
-      </div>
-    </div>
-    ${widgets.length > 0 ? `
-    <div class="ac-inspector-section">
-      <div class="ac-inspector-title">widgets preview</div>
-      ${widgets.map((w) => `
-        <div class="ac-inspector-row">
-          <span class="ac-inspector-key">${escapeHtml(w.title)}</span>
-          <span class="ac-inspector-value">${escapeHtml(w.value)}</span>
-        </div>
-      `).join("")}
-    </div>
-    ` : ""}
-  `;
 }
 
 function renderTimeline(): void {
@@ -492,12 +389,6 @@ function escapeHtml(text: string): string {
   div.textContent = text;
 
   return div.innerHTML;
-}
-
-function renderBoolIndicator(value: boolean): string {
-  const cls = value ? "true" : "false";
-
-  return `<span class="ac-deriv-indicator ${cls}"></span> ${value}`;
 }
 
 // ============================================================================

@@ -2,7 +2,7 @@
  * Number Match — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
- * renders the game grid, state inspector, and event timeline.
+ * renders the game grid and event timeline.
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
@@ -333,30 +333,12 @@ const movesEl = document.getElementById("moves")!;
 const messageEl = document.getElementById("message")!;
 const gridEl = document.getElementById("grid")!;
 
-// Inspector
-const factPool = document.getElementById("nm-fact-pool")!;
-const factTable = document.getElementById("nm-fact-table")!;
-const factRemoved = document.getElementById("nm-fact-removed")!;
-const factSelected = document.getElementById("nm-fact-selected")!;
-const factMoveCount = document.getElementById("nm-fact-movecount")!;
-const factGameOver = document.getElementById("nm-fact-gameover")!;
-const factMessage = document.getElementById("nm-fact-message")!;
-const derivPoolCount = document.getElementById("nm-deriv-poolcount")!;
-const derivRemovedCount = document.getElementById("nm-deriv-removedcount")!;
-const derivSelectedTiles = document.getElementById("nm-deriv-selectedtiles")!;
-const derivHasValidMoves = document.getElementById("nm-deriv-hasvalidmoves")!;
-
 // Timeline
 const timelineEl = document.getElementById("nm-timeline")!;
 
 // ============================================================================
 // Render
 // ============================================================================
-
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="nm-deriv-indicator ${cls}"></span> ${value}`;
-}
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
@@ -402,21 +384,6 @@ function render() {
     div.className = "tile empty";
     gridEl.appendChild(div);
   }
-
-  // --- Inspector: Facts ---
-  factPool.textContent = `${(system.facts.pool as Tile[]).length} tiles`;
-  factTable.textContent = `${table.length} tiles`;
-  factRemoved.textContent = `${(system.facts.removed as Tile[]).length} tiles`;
-  factSelected.textContent = selected.length > 0 ? `[${selected.join(", ")}]` : "[]";
-  factMoveCount.textContent = String(system.facts.moveCount);
-  renderBoolIndicator(factGameOver, system.facts.gameOver as boolean);
-  factMessage.textContent = msg.length > 40 ? msg.slice(0, 40) + "\u2026" : msg;
-
-  // --- Inspector: Derivations ---
-  derivPoolCount.textContent = String(poolCount);
-  derivRemovedCount.textContent = String(removedCount);
-  derivSelectedTiles.textContent = `${selectedTiles.length} tiles`;
-  renderBoolIndicator(derivHasValidMoves, hasValidMoves);
 
   // --- Timeline ---
   if (timeline.length === 0) {

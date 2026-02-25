@@ -3,7 +3,7 @@
  *
  * Creates the Directive system, subscribes to state changes,
  * renders the search input, debounce progress bar, results list,
- * stats, state inspector, config sliders, and event timeline.
+ * stats, config sliders, and event timeline.
  * A 100ms timer drives reactive debounce countdown.
  */
 
@@ -60,12 +60,6 @@ const statKeystrokes = document.getElementById("dc-stat-keystrokes")!;
 const statApiCalls = document.getElementById("dc-stat-api-calls")!;
 const statSaved = document.getElementById("dc-stat-saved")!;
 
-// Inspector
-const derivDebouncing = document.getElementById("dc-deriv-debouncing")!;
-const derivProgress = document.getElementById("dc-deriv-progress")!;
-const derivSearching = document.getElementById("dc-deriv-searching")!;
-const derivResultCount = document.getElementById("dc-deriv-result-count")!;
-
 // Config sliders
 const debounceDelaySlider = document.getElementById("dc-debounce-delay") as HTMLInputElement;
 const debounceVal = document.getElementById("dc-debounce-val")!;
@@ -80,13 +74,6 @@ const timelineEl = document.getElementById("dc-timeline")!;
 // ============================================================================
 // Render
 // ============================================================================
-
-function renderBoolDeriv(el: HTMLElement, value: boolean, pulseClass?: string): void {
-  const indicator = value
-    ? `<span class="dc-deriv-indicator ${pulseClass || "true"}"></span>`
-    : '<span class="dc-deriv-indicator false"></span>';
-  el.innerHTML = `${indicator} ${value}`;
-}
 
 function render(): void {
   const facts = system.facts;
@@ -161,12 +148,6 @@ function render(): void {
   statKeystrokes.textContent = `${keystrokeCount}`;
   statApiCalls.textContent = `${apiCallCount}`;
   statSaved.textContent = `${savedCalls} (${savedPct}%)`;
-
-  // --- Inspector ---
-  renderBoolDeriv(derivDebouncing, isDebouncing, isDebouncing ? "debouncing" : undefined);
-  derivProgress.textContent = debounceProgress.toFixed(2);
-  renderBoolDeriv(derivSearching, isSearching, isSearching ? "searching" : undefined);
-  derivResultCount.textContent = `${resultCount}`;
 
   // --- Slider labels ---
   debounceVal.textContent = `${facts.debounceDelay}ms`;

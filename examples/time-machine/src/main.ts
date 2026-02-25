@@ -155,15 +155,6 @@ const beginChangesetBtn = document.getElementById("tm-begin-changeset") as HTMLB
 const endChangesetBtn = document.getElementById("tm-end-changeset") as HTMLButtonElement;
 const changesetStatus = document.getElementById("tm-changeset-status")!;
 
-// Inspector
-const inspStrokeCount = document.getElementById("tm-insp-strokes")!;
-const inspColor = document.getElementById("tm-insp-color")!;
-const inspCanUndo = document.getElementById("tm-insp-can-undo")!;
-const inspCanRedo = document.getElementById("tm-insp-can-redo")!;
-const inspIndex = document.getElementById("tm-insp-index")!;
-const inspTotal = document.getElementById("tm-insp-total")!;
-const inspChangeset = document.getElementById("tm-insp-changeset")!;
-
 // Timeline
 const timelineEl = document.getElementById("tm-timeline")!;
 
@@ -195,27 +186,12 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="tm-deriv-indicator ${cls}"></span> ${value}`;
-}
-
 function render(): void {
   drawCanvas();
 
   const history = tt.getHistory();
   const canUndo = history.currentIndex > 0;
   const canRedo = history.currentIndex < history.snapshots.length - 1;
-
-  // Inspector
-  inspStrokeCount.textContent = String((system.facts.strokes as Stroke[]).length);
-  const color = String(system.facts.currentColor).replace(/[^#a-fA-F0-9]/g, "");
-  inspColor.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};vertical-align:middle;margin-right:4px"></span>${escapeHtml(String(system.facts.currentColor))}`;
-  renderBoolIndicator(inspCanUndo, canUndo);
-  renderBoolIndicator(inspCanRedo, canRedo);
-  inspIndex.textContent = String(history.currentIndex);
-  inspTotal.textContent = String(history.snapshots.length);
-  renderBoolIndicator(inspChangeset, system.facts.changesetActive as boolean);
 
   // Buttons
   undoBtn.disabled = !canUndo;

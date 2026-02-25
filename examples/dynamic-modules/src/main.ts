@@ -49,7 +49,6 @@ function setupSubscriptions(): void {
 const statusBadge = document.getElementById("dm-status-badge")!;
 const statusText = document.getElementById("dm-status-text")!;
 const widgetsArea = document.getElementById("dm-widgets-area")!;
-const inspectorEl = document.getElementById("dm-inspector")!;
 const timelineEl = document.getElementById("dm-timeline")!;
 
 const loadCounterBtn = document.getElementById("dm-load-counter") as HTMLButtonElement;
@@ -96,9 +95,6 @@ function render(): void {
       }
     }
   }
-
-  // --- Inspector ---
-  renderInspector(loaded);
 
   // --- Timeline ---
   renderTimeline(eventLog);
@@ -249,79 +245,6 @@ function renderDiceWidget(): void {
   card.querySelector('[data-testid="dm-dice-roll"]')!.addEventListener("click", () => {
     system.events.dice.roll();
   });
-}
-
-function renderInspector(loaded: string[]): void {
-  if (loaded.length === 0) {
-    inspectorEl.innerHTML = '<div class="dm-inspector-empty">No modules loaded</div>';
-
-    return;
-  }
-
-  inspectorEl.innerHTML = "";
-
-  // Dashboard facts first
-  const dashFacts = system.facts.dashboard;
-  addInspectorRow("dashboard.loadedModules", `[${(dashFacts.loadedModules as string[]).join(", ")}]`);
-
-  // Dynamic module facts
-  for (const ns of loaded) {
-    const nsFacts = (system.facts as any)[ns];
-    if (!nsFacts) {
-      continue;
-    }
-
-    const entry = moduleRegistry[ns];
-    if (!entry) {
-      continue;
-    }
-
-    // Read each fact key from the module's schema
-    const factKeys = getFactKeys(ns);
-    for (const key of factKeys) {
-      const val = nsFacts[key];
-      const display = formatInspectorValue(val);
-      addInspectorRow(`${ns}.${key}`, display);
-    }
-  }
-}
-
-function addInspectorRow(key: string, value: string): void {
-  const row = document.createElement("div");
-  row.className = "dm-inspector-row";
-  row.innerHTML = `
-    <span class="dm-inspector-key">${escapeHtml(key)}</span>
-    <span class="dm-inspector-value">${escapeHtml(value)}</span>
-  `;
-  inspectorEl.appendChild(row);
-}
-
-function formatInspectorValue(val: unknown): string {
-  if (typeof val === "string") {
-    return `"${val}"`;
-  }
-  if (typeof val === "number" || typeof val === "boolean") {
-    return String(val);
-  }
-  if (Array.isArray(val)) {
-    return `Array(${val.length})`;
-  }
-
-  return String(val);
-}
-
-function getFactKeys(ns: string): string[] {
-  if (ns === "counter") {
-    return ["count", "step"];
-  }
-  if (ns === "weather") {
-    return ["city", "temperature", "condition", "humidity", "isLoading", "lastFetchedCity"];
-  }
-  if (ns === "dice") {
-    return ["die1", "die2", "rollCount"];
-  }
-
-  return [];
 }
 
 function renderTimeline(eventLog: EventLogEntry[]): void {

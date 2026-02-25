@@ -311,12 +311,6 @@ async function sendRequest() {
 const inspOpenai = document.getElementById("pr-insp-openai")!;
 const inspAnthropic = document.getElementById("pr-insp-anthropic")!;
 const inspOllama = document.getElementById("pr-insp-ollama")!;
-const inspBudget = document.getElementById("pr-insp-budget")!;
-const inspLast = document.getElementById("pr-insp-last")!;
-const inspTotal = document.getElementById("pr-insp-total")!;
-const inspCheapest = document.getElementById("pr-insp-cheapest")!;
-const inspError = document.getElementById("pr-insp-error")!;
-const inspAllDown = document.getElementById("pr-insp-all-down")!;
 const timelineEl = document.getElementById("pr-timeline")!;
 
 // ============================================================================
@@ -343,22 +337,10 @@ function renderProvider(el: HTMLElement, stats: ProviderStats, state: CircuitSta
   `;
 }
 
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="pr-deriv-indicator ${cls}"></span> ${value}`;
-}
-
 function render(): void {
   renderProvider(inspOpenai, system.facts.openaiStats as ProviderStats, circuitBreakers.openai.getState());
   renderProvider(inspAnthropic, system.facts.anthropicStats as ProviderStats, circuitBreakers.anthropic.getState());
   renderProvider(inspOllama, system.facts.ollamaStats as ProviderStats, circuitBreakers.ollama.getState());
-
-  inspBudget.textContent = `$${system.facts.budgetRemaining}`;
-  inspLast.textContent = (system.facts.lastProvider as string) || "\u2014";
-  inspTotal.textContent = String(system.facts.totalRequests);
-  inspCheapest.textContent = system.read("cheapestAvailable") as string;
-  inspError.textContent = (system.facts.lastError as string) || "\u2014";
-  renderBoolIndicator(inspAllDown, system.read("allDown") as boolean);
 
   // Error inject checkboxes
   for (const id of ["openai", "anthropic", "ollama"]) {

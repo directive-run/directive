@@ -59,10 +59,10 @@
       margin-right: auto;
     }
 
-    /* ===== Main 3-column Layout ===== */
+    /* ===== Main 2-column Layout ===== */
     .eb-main {
       display: grid;
-      grid-template-columns: 260px 1fr 280px;
+      grid-template-columns: 260px 1fr;
       gap: 1rem;
     }
 
@@ -227,59 +227,6 @@
       cursor: pointer;
     }
 
-    /* ===== Inspector ===== */
-    .eb-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .eb-inspector-section:last-child { margin-bottom: 0; }
-
-    .eb-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .eb-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .eb-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .eb-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .eb-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .eb-deriv-indicator.true { background: var(--brand-success); }
-    .eb-deriv-indicator.false { background: var(--brand-text-faint); }
-
     /* ===== Circuit Breaker Badge ===== */
     .eb-circuit-badge {
       font-size: 0.55rem;
@@ -413,7 +360,7 @@
       <button id="eb-reset" class="eb-btn danger" data-testid="eb-reset">Reset</button>
     </div>
 
-    <!-- Main 3-column -->
+    <!-- Main 2-column -->
     <div class="eb-main">
       <!-- Left: Services & Controls -->
       <div class="eb-panel">
@@ -478,71 +425,7 @@
         </div>
       </div>
 
-      <!-- Center: Live State Inspector -->
-      <div class="eb-panel">
-        <div class="eb-panel-header">Live State Inspector</div>
-        <div class="eb-panel-body">
-          <div class="eb-inspector-section">
-            <div class="eb-inspector-title">Circuit Breakers</div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">users</span>
-              <span id="eb-insp-users-circuit" class="eb-inspector-value" data-testid="eb-circuit-users"><span class="eb-circuit-badge closed">CLOSED</span></span>
-            </div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">orders</span>
-              <span id="eb-insp-orders-circuit" class="eb-inspector-value" data-testid="eb-circuit-orders"><span class="eb-circuit-badge closed">CLOSED</span></span>
-            </div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">analytics</span>
-              <span id="eb-insp-analytics-circuit" class="eb-inspector-value" data-testid="eb-circuit-analytics"><span class="eb-circuit-badge closed">CLOSED</span></span>
-            </div>
-          </div>
-
-          <div class="eb-inspector-section">
-            <div class="eb-inspector-title">Error Metrics</div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">retryQueue</span>
-              <span id="eb-insp-retry-queue" class="eb-inspector-value" data-testid="eb-retry-queue">0</span>
-            </div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">errorRate</span>
-              <span id="eb-insp-error-rate" class="eb-inspector-value" data-testid="eb-error-rate">0%</span>
-            </div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">totalErrors</span>
-              <span id="eb-insp-total-errors" class="eb-inspector-value" data-testid="eb-total-errors">0</span>
-            </div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">totalRecoveries</span>
-              <span id="eb-insp-total-recoveries" class="eb-inspector-value" data-testid="eb-total-recoveries">0</span>
-            </div>
-          </div>
-
-          <div class="eb-inspector-section">
-            <div class="eb-inspector-title">Performance</div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">resolvers</span>
-              <span id="eb-insp-perf-resolvers" class="eb-inspector-value" data-testid="eb-perf-resolvers">&mdash;</span>
-            </div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">reconcile</span>
-              <span id="eb-insp-perf-reconcile" class="eb-inspector-value" data-testid="eb-perf-reconcile">0 runs / 0ms avg</span>
-            </div>
-          </div>
-
-          <div class="eb-inspector-section">
-            <div class="eb-inspector-title">Derivations</div>
-            <div class="eb-inspector-row">
-              <span class="eb-inspector-key">allServicesHealthy</span>
-              <span id="eb-insp-all-healthy" class="eb-inspector-value" data-testid="eb-all-healthy">
-                <span class="eb-deriv-indicator true"></span> true
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Timeline -->
+      <!-- Timeline -->
       <div class="eb-panel">
         <div class="eb-panel-header">Event Timeline</div>
         <div class="eb-panel-body" style="padding-top: 0.5rem">

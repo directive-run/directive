@@ -2,7 +2,7 @@
  * Contact Form — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
- * renders the form, state inspector, and event timeline.
+ * renders the form and event timeline.
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
@@ -315,23 +315,6 @@ const subjectErrorEl = document.getElementById("subject-error")!;
 const messageErrorEl = document.getElementById("message-error")!;
 const charCountEl = document.getElementById("char-count")!;
 
-// Inspector
-const factName = document.getElementById("cf-fact-name")!;
-const factEmail = document.getElementById("cf-fact-email")!;
-const factSubject = document.getElementById("cf-fact-subject")!;
-const factMessage = document.getElementById("cf-fact-message")!;
-const factStatus = document.getElementById("cf-fact-status")!;
-const factTouched = document.getElementById("cf-fact-touched")!;
-const factSubmissions = document.getElementById("cf-fact-submissions")!;
-const factLastSubmit = document.getElementById("cf-fact-lastsubmit")!;
-const derivIsValid = document.getElementById("cf-deriv-isvalid")!;
-const derivCanSubmit = document.getElementById("cf-deriv-cansubmit")!;
-const derivNameError = document.getElementById("cf-deriv-nameerror")!;
-const derivEmailError = document.getElementById("cf-deriv-emailerror")!;
-const derivSubjectError = document.getElementById("cf-deriv-subjecterror")!;
-const derivMessageError = document.getElementById("cf-deriv-messageerror")!;
-const derivCharCount = document.getElementById("cf-deriv-charcount")!;
-
 // Timeline
 const timelineEl = document.getElementById("cf-timeline")!;
 
@@ -366,11 +349,6 @@ clearBtn.addEventListener("click", () => {
 // ============================================================================
 // Render
 // ============================================================================
-
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="cf-deriv-indicator ${cls}"></span> ${value}`;
-}
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
@@ -422,28 +400,6 @@ function render() {
     statusBanner.className = "cf-status-banner";
     statusBanner.textContent = "";
   }
-
-  // --- Inspector: Facts ---
-  factName.textContent = system.facts.name || "\u2014";
-  factEmail.textContent = system.facts.email || "\u2014";
-  factSubject.textContent = system.facts.subject || "\u2014";
-  const msg = system.facts.message as string;
-  factMessage.textContent = msg ? (msg.length > 30 ? msg.slice(0, 30) + "\u2026" : msg) : "\u2014";
-  factStatus.innerHTML = `<span class="cf-status-badge ${status}">${escapeHtml(status)}</span>`;
-  const touched = system.facts.touched as Record<string, boolean>;
-  factTouched.textContent = `${Object.keys(touched).length} fields`;
-  factSubmissions.textContent = String(system.facts.submissionCount);
-  const lastAt = system.facts.lastSubmittedAt as number;
-  factLastSubmit.textContent = lastAt > 0 ? new Date(lastAt).toLocaleTimeString() : "\u2014";
-
-  // --- Inspector: Derivations ---
-  renderBoolIndicator(derivIsValid, isValid);
-  renderBoolIndicator(derivCanSubmit, canSubmit);
-  derivNameError.textContent = nameError || "\u2014";
-  derivEmailError.textContent = emailError || "\u2014";
-  derivSubjectError.textContent = subjectError || "\u2014";
-  derivMessageError.textContent = messageError || "\u2014";
-  derivCharCount.textContent = String(charCount);
 
   // --- Timeline ---
   if (timeline.length === 0) {

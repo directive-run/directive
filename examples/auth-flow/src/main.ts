@@ -2,7 +2,7 @@
  * Auth Flow — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
- * renders the status bar, login form, state inspector, config sliders,
+ * renders the status bar, login form, config sliders,
  * and event timeline. A 500ms timer drives reactive token countdown.
  */
 
@@ -49,16 +49,6 @@ const logoutBtn = document.getElementById("af-logout-btn") as HTMLButtonElement;
 const forceExpireBtn = document.getElementById("af-force-expire-btn") as HTMLButtonElement;
 const loginError = document.getElementById("af-login-error")!;
 
-// Inspector
-const factStatus = document.getElementById("af-fact-status")!;
-const factToken = document.getElementById("af-fact-token")!;
-const factExpires = document.getElementById("af-fact-expires")!;
-const factUser = document.getElementById("af-fact-user")!;
-const derivAuthenticated = document.getElementById("af-deriv-authenticated")!;
-const derivExpiring = document.getElementById("af-deriv-expiring")!;
-const derivCanRefresh = document.getElementById("af-deriv-can-refresh")!;
-const derivRemaining = document.getElementById("af-deriv-remaining")!;
-
 // Config sliders
 const ttlSlider = document.getElementById("af-token-ttl") as HTMLInputElement;
 const ttlVal = document.getElementById("af-ttl-val")!;
@@ -78,24 +68,13 @@ const timelineEl = document.getElementById("af-timeline")!;
 
 let lastLoginError = "";
 
-function renderBoolDeriv(el: HTMLElement, value: boolean, pulseClass?: string): void {
-  const indicator = value
-    ? `<span class="af-deriv-indicator ${pulseClass || "true"}"></span>`
-    : '<span class="af-deriv-indicator false"></span>';
-  el.innerHTML = `${indicator} ${value}`;
-}
-
 function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
   const status = facts.status as AuthStatus;
   const token = facts.token as string;
-  const expiresAt = facts.expiresAt as number;
   const user = facts.user as User | null;
-  const isAuthenticated = derive.isAuthenticated as boolean;
-  const isExpiringSoon = derive.isExpiringSoon as boolean;
-  const canRefresh = derive.canRefresh as boolean;
   const tokenTimeRemaining = derive.tokenTimeRemaining as number;
   const canLogin = derive.canLogin as boolean;
   const eventLog = facts.eventLog as EventLogEntry[];
@@ -144,18 +123,6 @@ function render(): void {
     loginError.textContent = errorMsg;
     loginError.classList.toggle("visible", errorMsg !== "");
   }
-
-  // --- Inspector: Facts ---
-  factStatus.innerHTML = `<span class="af-status-badge ${status}" style="font-size:0.6rem;padding:0.1rem 0.4rem">${escapeHtml(status)}</span>`;
-  factToken.textContent = token ? `${token.slice(0, 12)}...` : "\u2014";
-  factExpires.textContent = expiresAt > 0 ? new Date(expiresAt).toLocaleTimeString() : "\u2014";
-  factUser.textContent = user ? `${user.name}` : "\u2014";
-
-  // --- Inspector: Derivations ---
-  renderBoolDeriv(derivAuthenticated, isAuthenticated);
-  renderBoolDeriv(derivExpiring, isExpiringSoon, isExpiringSoon ? "expiring" : undefined);
-  renderBoolDeriv(derivCanRefresh, canRefresh);
-  derivRemaining.textContent = `${tokenTimeRemaining}s`;
 
   // --- Slider labels ---
   ttlVal.textContent = `${facts.tokenTTL}s`;

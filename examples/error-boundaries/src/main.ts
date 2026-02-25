@@ -346,7 +346,7 @@ let currentStrategy: RecoveryStrategy = "retry-later";
 
 const system = createSystem({
   module: dashboardModule,
-  plugins: [perf],
+  plugins: [perf, devtoolsPlugin({ name: "error-boundaries" })],
   errorBoundary: {
     onResolverError: "retry-later",
     onConstraintError: "skip",
@@ -387,18 +387,6 @@ const analyticsStatusEl = document.getElementById("eb-analytics-status")!;
 const analyticsResultEl = document.getElementById("eb-analytics-result")!;
 const analyticsErrorEl = document.getElementById("eb-analytics-error")!;
 
-// Inspector
-const inspUsersCircuit = document.getElementById("eb-insp-users-circuit")!;
-const inspOrdersCircuit = document.getElementById("eb-insp-orders-circuit")!;
-const inspAnalyticsCircuit = document.getElementById("eb-insp-analytics-circuit")!;
-const inspRetryQueue = document.getElementById("eb-insp-retry-queue")!;
-const inspErrorRate = document.getElementById("eb-insp-error-rate")!;
-const inspTotalErrors = document.getElementById("eb-insp-total-errors")!;
-const inspTotalRecoveries = document.getElementById("eb-insp-total-recoveries")!;
-const inspPerfResolvers = document.getElementById("eb-insp-perf-resolvers")!;
-const inspPerfReconcile = document.getElementById("eb-insp-perf-reconcile")!;
-const inspAllHealthy = document.getElementById("eb-insp-all-healthy")!;
-
 // Sliders
 const usersFailSlider = document.getElementById("eb-users-failrate") as HTMLInputElement;
 const usersFailVal = document.getElementById("eb-users-fail-val")!;
@@ -422,17 +410,6 @@ function escapeHtml(text: string): string {
   div.textContent = text;
 
   return div.innerHTML;
-}
-
-function circuitBadge(state: CircuitState): string {
-  const cls = state === "CLOSED" ? "closed" : state === "OPEN" ? "open" : "half-open";
-
-  return `<span class="eb-circuit-badge ${cls}">${state}</span>`;
-}
-
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="eb-deriv-indicator ${cls}"></span> ${value}`;
 }
 
 function renderServiceCard(
@@ -459,30 +436,6 @@ function render(): void {
   renderServiceCard(usersStatusEl, usersResultEl, usersErrorEl, facts.usersService as ServiceState);
   renderServiceCard(ordersStatusEl, ordersResultEl, ordersErrorEl, facts.ordersService as ServiceState);
   renderServiceCard(analyticsStatusEl, analyticsResultEl, analyticsErrorEl, facts.analyticsService as ServiceState);
-
-  // Inspector: Circuit breaker states
-  inspUsersCircuit.innerHTML = circuitBadge(circuitBreakers.users.getState());
-  inspOrdersCircuit.innerHTML = circuitBadge(circuitBreakers.orders.getState());
-  inspAnalyticsCircuit.innerHTML = circuitBadge(circuitBreakers.analytics.getState());
-
-  // Inspector: Metrics
-  inspRetryQueue.textContent = String(facts.retryQueueCount);
-  inspErrorRate.textContent = `${system.read("errorRate")}%`;
-  inspTotalErrors.textContent = String(facts.totalErrors);
-  inspTotalRecoveries.textContent = String(facts.totalRecoveries);
-
-  // Inspector: Performance
-  const snapshot = perf.getSnapshot();
-  const resolverStats = snapshot.resolvers["fetchService"];
-  if (resolverStats) {
-    inspPerfResolvers.textContent = `${resolverStats.completions} ok / ${resolverStats.errors} err / ${Math.round(resolverStats.avgDurationMs)}ms avg`;
-  } else {
-    inspPerfResolvers.textContent = "\u2014";
-  }
-  inspPerfReconcile.textContent = `${snapshot.reconcile.runs} runs / ${Math.round(snapshot.reconcile.avgDurationMs)}ms avg`;
-
-  // Inspector: Derivations
-  renderBoolIndicator(inspAllHealthy, system.read("allServicesHealthy") as boolean);
 
   // Slider labels
   usersFailVal.textContent = `${facts.usersFailRate}%`;

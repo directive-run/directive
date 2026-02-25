@@ -223,15 +223,6 @@ const chatLog = document.getElementById("gs-chat-log")!;
 const complianceSelect = document.getElementById("gs-compliance") as HTMLSelectElement;
 const redactionToggle = document.getElementById("gs-redaction") as HTMLInputElement;
 
-// Inspector
-const inspBlocked = document.getElementById("gs-insp-blocked")!;
-const inspInjections = document.getElementById("gs-insp-injections")!;
-const inspPii = document.getElementById("gs-insp-pii")!;
-const inspCompliance = document.getElementById("gs-insp-compliance-blocks")!;
-const inspMode = document.getElementById("gs-insp-mode")!;
-const inspBlockRate = document.getElementById("gs-insp-block-rate")!;
-const inspPiiTypes = document.getElementById("gs-insp-pii-types")!;
-
 // Timeline
 const timelineEl = document.getElementById("gs-timeline")!;
 
@@ -287,15 +278,6 @@ function render(): void {
     }
     chatLog.scrollTop = chatLog.scrollHeight;
   }
-
-  // Inspector
-  inspBlocked.textContent = String(system.facts.blockedCount);
-  inspInjections.textContent = String(system.facts.injectionAttempts);
-  inspPii.textContent = String(system.facts.piiDetections);
-  inspCompliance.textContent = String(system.facts.complianceBlocks);
-  inspMode.textContent = system.facts.complianceMode as string;
-  inspBlockRate.textContent = system.read("blockRate") as string;
-  inspPiiTypes.textContent = system.read("piiTypeCounts") as string;
 
   // Timeline
   if (timeline.length === 0) {
