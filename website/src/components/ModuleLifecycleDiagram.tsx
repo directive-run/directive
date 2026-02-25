@@ -4,7 +4,7 @@ import { memo, useMemo, useCallback } from 'react'
 import type { Node, Edge } from '@xyflow/react'
 import {
   DiagramWrapper,
-  AnimationController,
+  DiagramToolbar,
   useAnimationLoop,
   diagramNodeTypes,
   diagramEdgeTypes,
@@ -182,43 +182,20 @@ export const ModuleLifecycleDiagram = memo(function ModuleLifecycleDiagram() {
 
   return (
     <div className="module-lifecycle-diagram">
-      <AnimationController
-        isPlaying={isPlaying}
-        onToggle={toggle}
-      />
-
       <DiagramWrapper
-        height={680}
+        height={640}
         nodes={nodes}
         edges={edges}
         nodeTypes={diagramNodeTypes}
         edgeTypes={diagramEdgeTypes}
       />
 
-      {/* Step indicator */}
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {STEPS.map((step) => {
-          const stepActive = phase >= 0 && ANIMATION_STEPS[phase] === step.id
-
-          return (
-            <div
-              key={step.id}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-all ${
-                stepActive
-                  ? 'bg-brand-primary-100 text-brand-primary-700 dark:bg-brand-primary-900 dark:text-brand-primary-300'
-                  : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full transition-all ${
-                  stepActive ? 'bg-brand-primary' : 'bg-slate-300 dark:bg-slate-600'
-                }`}
-              />
-              {step.label}
-            </div>
-          )
-        })}
-      </div>
+      <DiagramToolbar
+        steps={STEPS}
+        activeStepId={phase >= 0 ? ANIMATION_STEPS[phase] ?? null : null}
+        isPlaying={isPlaying}
+        onToggle={toggle}
+      />
     </div>
   )
 })
