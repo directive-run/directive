@@ -60,7 +60,7 @@ export const EVENT_LABELS: Record<string, string> = {
   scratchpad_update: 'Scratchpad',
 }
 
-export const VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Flamechart', 'Graph', 'Goal', 'Memory', 'Budget', 'Config'] as const
+export const VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Breakpoints', 'Graph', 'Goal', 'Memory', 'Budget', 'Config'] as const
 
 // Known model pricing defaults (per 1M tokens)
 export const DEFAULT_MODEL_PRICING: Record<string, { input: number; output: number; label: string }> = {
@@ -74,10 +74,6 @@ export const DEFAULT_MODEL_PRICING: Record<string, { input: number; output: numb
   'gpt-4o-mini': { input: 0.15, output: 0.60, label: 'GPT-4o Mini' },
 }
 
-export const FLAMECHART_COLORS = [
-  'bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500',
-  'bg-indigo-500', 'bg-rose-500', 'bg-teal-500', 'bg-orange-500',
-]
 
 export const GUARDRAIL_INFO: Record<string, { description: string; type: 'input' | 'output'; icon: string }> = {
   'rate-limit': {

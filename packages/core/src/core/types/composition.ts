@@ -263,6 +263,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	/** Events accessor (union of all module events) */
 	readonly events: NamespacedEventsAccessor<Modules>;
 
+	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
+	initialize(): void;
 	/** Start the system (initialize modules, begin reconciliation) */
 	start(): void;
 	/** Stop the system (cancel resolvers, stop reconciliation) */
@@ -579,6 +581,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	/** Direct events accessor: system.events.increment() */
 	readonly events: SingleModuleEvents<S>;
 
+	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
+	initialize(): void;
 	/** Start the system (initialize modules, begin reconciliation) */
 	start(): void;
 	/** Stop the system (cancel resolvers, stop reconciliation) */
@@ -759,6 +763,7 @@ export interface AnySystem {
 	readonly isSettled: boolean;
 	readonly isInitialized: boolean;
 	readonly isReady: boolean;
+	initialize(): void;
 	start(): void;
 	stop(): void;
 	destroy(): void;

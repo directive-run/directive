@@ -256,6 +256,8 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	readonly constraints: ConstraintsControl;
 	readonly effects: EffectsControl;
 
+	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
+	initialize(): void;
 	start(): void;
 	stop(): void;
 	destroy(): void;

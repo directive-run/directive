@@ -19,36 +19,36 @@ export const EffectVsResolverDiagram = memo(function EffectVsResolverDiagram() {
       label: 'Effects',
       active: true,
       colorScheme: 'amber',
-      width: 220,
-      height: 120,
+      width: 380,
+      height: 130,
     }),
-    positionNode<StepNodeData>('eff-trigger', 'step', 30, 40, {
+    positionNode<StepNodeData>('eff-trigger', 'step', 30, 45, {
       label: 'Fact Change',
       subtitle: 'logging, analytics',
       status: 'idle',
       colorScheme: 'amber',
     }),
-    positionNode<StepNodeData>('eff-action', 'step', 170, 40, {
+    positionNode<StepNodeData>('eff-action', 'step', 230, 45, {
       label: 'Fire & Forget',
       status: 'idle',
       colorScheme: 'amber',
     }),
 
     // Resolvers layer (right)
-    positionNode<LayerNodeData>('layer-resolvers', 'layer', 270, 10, {
+    positionNode<LayerNodeData>('layer-resolvers', 'layer', 430, 10, {
       label: 'Resolvers',
       active: true,
       colorScheme: 'emerald',
-      width: 220,
-      height: 120,
+      width: 380,
+      height: 130,
     }),
-    positionNode<StepNodeData>('res-trigger', 'step', 290, 40, {
+    positionNode<StepNodeData>('res-trigger', 'step', 450, 45, {
       label: 'Requirement',
       subtitle: 'API calls, state updates',
       status: 'idle',
       colorScheme: 'emerald',
     }),
-    positionNode<StepNodeData>('res-action', 'step', 430, 40, {
+    positionNode<StepNodeData>('res-action', 'step', 650, 45, {
       label: 'Async Fulfill',
       status: 'idle',
       colorScheme: 'emerald',

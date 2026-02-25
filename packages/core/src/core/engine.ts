@@ -593,14 +593,11 @@ export function createEngine<S extends Schema>(
 			isEnabled: (id: string) => effectsManager.isEnabled(id),
 		},
 
-		start(): void {
-			if (state.isRunning) return;
-			state.isRunning = true;
-
-			// Mark as initializing to suppress reconciliation during module init
+		initialize(): void {
+			if (state.isInitialized) return;
 			state.isInitializing = true;
 
-			// Initialize modules (reconciliation is suppressed during this phase)
+			// Run module init functions (sets initial fact values)
 			for (const module of config.modules) {
 				if (module.init) {
 					store.batch(() => {
@@ -608,13 +605,9 @@ export function createEngine<S extends Schema>(
 						module.init!(facts as any);
 					});
 				}
-
-				// Call module hooks
-				// biome-ignore lint/suspicious/noExplicitAny: Engine internal type coercion
-				module.hooks?.onStart?.(system as any);
 			}
 
-			// Apply initialFacts/hydrate via callback (still in init phase)
+			// Apply initialFacts/hydrate via callback
 			// This ensures initialFacts are applied AFTER module init but BEFORE reconcile
 			if (config.onAfterModuleInit) {
 				store.batch(() => {
@@ -622,9 +615,32 @@ export function createEngine<S extends Schema>(
 				});
 			}
 
-			// Mark initialization complete
 			state.isInitializing = false;
 			state.isInitialized = true;
+
+			// Eagerly compute all derivations so they're cached before any
+			// external read (e.g. React's useSyncExternalStore). Without this,
+			// derivations can evaluate against uninitialized facts.
+			for (const id of Object.keys(mergedDerive)) {
+				derivationsManager.get(id as keyof DerivationsDef<S>);
+			}
+		},
+
+		start(): void {
+			if (state.isRunning) return;
+
+			// Ensure facts are initialized (no-op if already called)
+			if (!state.isInitialized) {
+				this.initialize();
+			}
+
+			state.isRunning = true;
+
+			// Module onStart hooks (may access browser APIs — only in start())
+			for (const module of config.modules) {
+				// biome-ignore lint/suspicious/noExplicitAny: Engine internal type coercion
+				module.hooks?.onStart?.(system as any);
+			}
 
 			// Emit start event
 			pluginManager.emitStart(system);

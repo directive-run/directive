@@ -62,9 +62,9 @@ export const SettlementStateMachineDiagram = memo(function SettlementStateMachin
 
   const edges = useMemo<Edge[]>(() => [
     edge('reconciling', 'pending', { type: 'labeled', data: { label: 'requirements resolved' } }),
-    edge('pending', 'reconciling', { type: 'labeled', data: { label: 'new facts changed' }, sourceHandle: 'top', targetHandle: 'top' }),
+    edge('pending', 'reconciling', { type: 'feedback', data: { label: 'new facts changed', direction: 'above' } }),
     edge('pending', 'settled', { type: 'labeled', data: { label: 'no pending requirements' } }),
-    edge('settled', 'reconciling', { type: 'labeled', data: { label: 'fact mutation' }, sourceHandle: 'bottom', targetHandle: 'bottom' }),
+    edge('settled', 'reconciling', { type: 'feedback', data: { label: 'fact mutation', direction: 'below' } }),
   ], [])
 
   return (

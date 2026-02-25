@@ -41,6 +41,7 @@ import { EffectVsResolverDiagram } from '@/components/diagrams/EffectVsResolverD
 import { TimeTravelTimelineDiagram } from '@/components/diagrams/TimeTravelTimelineDiagram'
 import { BatchedResolutionDiagram } from '@/components/diagrams/BatchedResolutionDiagram'
 import { ModuleLifecycleDiagram } from '@/components/diagrams/ModuleLifecycleDiagram'
+import { ModuleLifecycleComparison } from '@/components/diagrams/ModuleLifecycleComparison'
 import { ConstraintCompositionDiagram } from '@/components/diagrams/ConstraintCompositionDiagram'
 import { DerivationCompositionDiagram } from '@/components/diagrams/DerivationCompositionDiagram'
 
@@ -244,6 +245,10 @@ const tags = {
   },
   'module-lifecycle-diagram': {
     render: ModuleLifecycleDiagram,
+    selfClosing: true,
+  },
+  'module-lifecycle-comparison': {
+    render: ModuleLifecycleComparison,
     selfClosing: true,
   },
   'constraint-composition-diagram': {

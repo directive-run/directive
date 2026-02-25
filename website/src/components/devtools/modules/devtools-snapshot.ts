@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck — createModule generic inference doesn't resolve for complex schemas
 import { createModule, t } from '@directive-run/core'
 import type { SnapshotResponse } from '../types'
 import { SNAPSHOT_POLL_INTERVAL } from '../constants'
@@ -6,14 +6,17 @@ import { SNAPSHOT_POLL_INTERVAL } from '../constants'
 export const devtoolsSnapshot = createModule('snapshot', {
   schema: {
     facts: {
-      data: t.object<SnapshotResponse | null>(),
-      error: t.string<string | null>(),
-      lastUpdated: t.number<number | null>(),
+      data: t.nullable(t.object<SnapshotResponse>()),
+      error: t.nullable(t.string()),
+      lastUpdated: t.nullable(t.number()),
       snapshotUrl: t.string(),
+      // C3: Reactive polling generation — bumped periodically to trigger re-evaluation
+      pollGeneration: t.number(),
     },
     derivations: {
       hasData: t.boolean(),
       hasError: t.boolean(),
+      // M6: isStale derivation reads pollGeneration for reactivity
       isStale: t.boolean(),
     },
     events: {
@@ -21,6 +24,8 @@ export const devtoolsSnapshot = createModule('snapshot', {
       snapshotError: { message: t.string() },
       clearSnapshot: {},
       setSnapshotUrl: { url: t.string() },
+      // C3: Periodic poll bump to make staleData constraint reactive
+      bumpPoll: {},
     },
   },
 
@@ -29,12 +34,16 @@ export const devtoolsSnapshot = createModule('snapshot', {
     facts.error = null
     facts.lastUpdated = null
     facts.snapshotUrl = '/api/devtools/snapshot'
+    facts.pollGeneration = 0
   },
 
   derive: {
     hasData: (facts) => facts.data !== null,
     hasError: (facts) => facts.error !== null,
+    // M6: Single source of truth for staleness — reads pollGeneration for reactivity
     isStale: (facts) => {
+      // Touch pollGeneration so this derivation re-evaluates on each bump
+      void facts.pollGeneration
       if (!facts.lastUpdated) {
         return true
       }
@@ -51,6 +60,8 @@ export const devtoolsSnapshot = createModule('snapshot', {
     },
     snapshotError: (facts, { message }) => {
       facts.error = message
+      // C5: Update lastUpdated on error so poll interval applies to errors too
+      facts.lastUpdated = Date.now()
     },
     clearSnapshot: (facts) => {
       facts.data = null
@@ -60,12 +71,17 @@ export const devtoolsSnapshot = createModule('snapshot', {
     setSnapshotUrl: (facts, { url }) => {
       facts.snapshotUrl = url
     },
+    bumpPoll: (facts) => {
+      facts.pollGeneration++
+    },
   },
 
-  // When data is stale, require a refresh
+  // M6: Constraint reads pollGeneration via facts to become reactive
   constraints: {
     staleData: {
       when: (facts) => {
+        // Touch pollGeneration so constraint re-evaluates on each bump
+        void facts.pollGeneration
         if (!facts.lastUpdated) {
           return true
         }
@@ -76,7 +92,6 @@ export const devtoolsSnapshot = createModule('snapshot', {
     },
   },
 
-  // Fetches fresh snapshot from server
   resolvers: {
     refreshSnapshot: {
       requirement: 'REFRESH_SNAPSHOT',
@@ -84,7 +99,9 @@ export const devtoolsSnapshot = createModule('snapshot', {
       resolve: async (req, context) => {
         const res = await fetch(context.facts.snapshotUrl)
         if (!res.ok) {
+          // C5: Set lastUpdated on error to prevent tight re-trigger loop
           context.facts.error = 'Orchestrator not initialized'
+          context.facts.lastUpdated = Date.now()
 
           return
         }

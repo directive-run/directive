@@ -2,18 +2,15 @@
 
 import { type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
-import type { BadgeNodeData, ColorScheme } from '../types'
-import { SCHEME_CLASS } from '../theme'
+import type { BadgeNodeData } from '../types'
 
 export function BadgeNode({ data }: NodeProps) {
-  const { text, active, colorScheme } = data as BadgeNodeData & { colorScheme?: ColorScheme }
-  const scheme = colorScheme ?? 'primary'
+  const { text, active } = data as BadgeNodeData
 
   return (
     <div
       className={clsx(
         'turbo-badge',
-        SCHEME_CLASS[scheme],
         active ? 'turbo-node-active' : 'turbo-gradient-idle',
       )}
     >
