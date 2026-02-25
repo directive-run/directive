@@ -24,7 +24,7 @@ export function DiagramWrapper({
   return (
     <div
       className={clsx(
-        'directive-diagram not-prose my-8 w-full rounded-lg border border-slate-700/50 shadow-lg shadow-slate-900/20',
+        'directive-diagram not-prose my-8 w-full overflow-hidden rounded-lg border border-slate-700/50 shadow-lg shadow-slate-900/20',
         className,
       )}
       style={{

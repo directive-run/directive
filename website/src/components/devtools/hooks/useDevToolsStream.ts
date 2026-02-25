@@ -53,6 +53,22 @@ export function useDevToolsStream() {
         }
         maxIdRef.current = event.id
 
+        // Phase 5: Check breakpoints before buffering
+        const activeBreakpoints = system.facts.connection.breakpoints.filter(
+          (b: { enabled: boolean; eventType: string }) => b.enabled && b.eventType === event.type,
+        )
+        if (activeBreakpoints.length > 0) {
+          // Inject breakpoint label into the event for display
+          event.breakpointLabel = (activeBreakpoints[0] as { label: string }).label
+          // Push this event first, then pause
+          system.events.connection.pushEvents({ batch: [event] })
+          system.events.connection.pauseStream({ event })
+          es.close()
+          esRef.current = null
+
+          return
+        }
+
         pendingRef.current.push(event)
         if (!flushTimerRef.current) {
           flushTimerRef.current = setTimeout(flushPending, FLUSH_INTERVAL_MS)
@@ -85,6 +101,19 @@ export function useDevToolsStream() {
     return unsub
   }, [system, connect])
 
+  // Phase 5: Watch isPaused — when resumed, reconnect EventSource
+  useEffect(() => {
+    let prevPaused = system.facts.connection.isPaused
+    const unsub = system.watch('connection.isPaused', (nowPaused: unknown) => {
+      if (prevPaused && !nowPaused && !esRef.current) {
+        connect()
+      }
+      prevPaused = nowPaused as boolean
+    })
+
+    return unsub
+  }, [system, connect])
+
   // Initial connection
   useEffect(() => {
     connect()
@@ -104,7 +133,8 @@ export function useDevToolsStream() {
       const imported = (e as CustomEvent).detail as DebugEvent[]
       if (Array.isArray(imported) && imported.length > 0) {
         system.events.connection.importEvents({ imported })
-        maxIdRef.current = Math.max(...imported.map((ev) => ev.id))
+        // M4: Avoid Math.max(...spread) stack overflow for large imports
+        maxIdRef.current = imported.reduce((max, ev) => Math.max(max, ev.id), -1)
       }
     }
 

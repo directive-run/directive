@@ -1,12 +1,10 @@
 'use client'
 
-import { getBezierPath, type EdgeProps } from '@xyflow/react'
-import type { ColorScheme } from '../types'
-import { EDGE_GRADIENTS, ACCENT_COLORS } from '../theme'
+import { getBezierPath, getStraightPath, type EdgeProps } from '@xyflow/react'
 
 interface AnimatedFlowEdgeData {
   active?: boolean
-  colorScheme?: ColorScheme
+  straight?: boolean
 }
 
 export function AnimatedFlowEdge({
@@ -21,21 +19,22 @@ export function AnimatedFlowEdge({
   style = {},
   markerEnd,
 }: EdgeProps) {
-  const { active = false, colorScheme = 'primary' } = (data ?? {}) as AnimatedFlowEdgeData
-  const gradient = EDGE_GRADIENTS[colorScheme]
+  const { active = false, straight = false } = (data ?? {}) as AnimatedFlowEdgeData
   const gradientId = `edge-grad-${id}`
 
   const xEqual = sourceX === targetX
   const yEqual = sourceY === targetY
 
-  const [edgePath] = getBezierPath({
-    sourceX: xEqual ? sourceX + 0.0001 : sourceX,
-    sourceY: yEqual ? sourceY + 0.0001 : sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  })
+  const [edgePath] = straight
+    ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+    : getBezierPath({
+        sourceX: xEqual ? sourceX + 0.0001 : sourceX,
+        sourceY: yEqual ? sourceY + 0.0001 : sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+      })
 
   return (
     <>
@@ -49,8 +48,8 @@ export function AnimatedFlowEdge({
             x2={targetX}
             y2={targetY}
           >
-            <stop offset="0%" stopColor={gradient.from} />
-            <stop offset="100%" stopColor={gradient.to} />
+            <stop offset="0%" stopColor="var(--gradient-a)" />
+            <stop offset="100%" stopColor="var(--gradient-b)" />
           </linearGradient>
         </defs>
       )}
@@ -68,7 +67,7 @@ export function AnimatedFlowEdge({
         markerEnd={markerEnd}
       />
       {active && (
-        <circle r="6" fill={ACCENT_COLORS[colorScheme]}>
+        <circle r="6" fill="var(--accent)">
           <animateMotion dur="2s" repeatCount="indefinite" path={edgePath} />
         </circle>
       )}

@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { PaperPlaneTilt, Sparkle } from '@phosphor-icons/react'
 import { LiveDevTools } from '@/components/LiveDevTools'
 import { MarkdownContent } from '@/components/ChatMarkdown'
+import { decodeReplay } from '@/components/devtools/utils/replay-codec'
+import type { DebugEvent } from '@/components/devtools/types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -364,6 +366,23 @@ function InlineChat() {
 // ---------------------------------------------------------------------------
 
 export default function DevTools2Page() {
+  // Phase 4: Decode replay data from URL hash fragment (avoids 431 header-too-large)
+  const [replayData, setReplayData] = useState<DebugEvent[] | undefined>(undefined)
+
+  useEffect(() => {
+    const hash = window.location.hash
+    const prefix = '#replay='
+    if (!hash.startsWith(prefix)) {
+      return
+    }
+
+    try {
+      setReplayData(decodeReplay(hash.slice(prefix.length)))
+    } catch {
+      console.warn('[DevTools] Failed to decode replay URL')
+    }
+  }, [])
+
   return (
     <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-7xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
@@ -383,6 +402,7 @@ export default function DevTools2Page() {
           <LiveDevTools
             streamUrl="/api/dag-devtools/stream"
             snapshotUrl="/api/dag-devtools/snapshot"
+            replayData={replayData}
           />
         </div>
 

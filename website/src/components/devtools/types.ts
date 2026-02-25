@@ -24,6 +24,14 @@ export interface DebugEvent {
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'waiting'
 
+// Phase 5: Breakpoint definition for pause-on-event
+export interface BreakpointDef {
+  id: string
+  label: string
+  eventType: string
+  enabled: boolean
+}
+
 // Typed snapshot response — cast once at fetch boundary
 export interface SnapshotResponse {
   timestamp: number

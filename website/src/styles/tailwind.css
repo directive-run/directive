@@ -58,6 +58,7 @@
   --brand-surface-inset: var(--brand-surface);
   --brand-surface-card: color-mix(in oklab, #1e293b 85%, var(--brand-primary-400));
   --brand-code-bg: color-mix(in oklab, #151d2e 92%, var(--brand-primary-400));
+  --brand-diagram-bg: color-mix(in oklab, #0a1120 97%, var(--brand-primary-400));
 }
 
 @theme {

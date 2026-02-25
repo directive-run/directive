@@ -858,8 +858,8 @@ function DrawingOverlay() {
 
   return (
     <>
-      {/* Drawing toolbar */}
-      <Panel position="top-left" className="!m-2">
+      {/* Drawing toolbar — z-30 to stay above the draw overlay (z-20) */}
+      <Panel position="top-left" className="!m-2 !z-30">
         <div className="flex items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
           {/* Draw toggle */}
           <button

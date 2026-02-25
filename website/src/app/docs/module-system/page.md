@@ -5,7 +5,7 @@ description: Learn how to create modules and systems in Directive - the building
 
 Modules encapsulate state and logic. Systems run modules and provide the runtime. {% .lead %}
 
-{% module-lifecycle-diagram /%}
+{% module-lifecycle-comparison /%}
 
 ---
 

@@ -22,13 +22,14 @@ const CYCLE_STEPS = [
   { id: 'update-facts', label: 'Update Facts', colorScheme: 'primary' as const },
 ] as const
 
-// Pentagonal layout: roughly circular arrangement
+// Regular pentagon: flat-top, centered ~(280,185), radius 160
+// Vertex centers computed with exact trig, then offset for node top-left (~85w, 25h)
 const POSITIONS: [number, number][] = [
-  [80, 10],   // top-left
-  [320, 10],  // top-right
-  [400, 130], // right
-  [250, 230], // bottom-right
-  [20, 130],  // bottom-left
+  [100, 30],   // fact-mutation: top-left
+  [290, 30],   // invalidate: top-right
+  [350, 210],  // constraints: mid-right
+  [195, 320],  // resolvers: bottom-center
+  [40, 210],   // update-facts: mid-left
 ]
 
 function getStatus(index: number, phase: number): NodeStatus {
@@ -59,13 +60,24 @@ export const ReconciliationCycleDiagram = memo(function ReconciliationCycleDiagr
     ),
   [phase])
 
-  const edges = useMemo<Edge[]>(() => [
-    edge('fact-mutation', 'invalidate', { type: 'animated' }),
-    edge('invalidate', 'constraints', { type: 'animated', sourceHandle: 'bottom', targetHandle: 'top' }),
-    edge('constraints', 'resolvers', { type: 'animated', sourceHandle: 'bottom', targetHandle: 'right' }),
-    edge('resolvers', 'update-facts', { type: 'animated' }),
-    edge('update-facts', 'fact-mutation', { type: 'animated', sourceHandle: 'top', targetHandle: 'bottom' }),
-  ], [])
+  // Edges: straight lines forming the pentagon, active edge follows the phase
+  const edges = useMemo<Edge[]>(() => {
+    const pairs: [string, string, Record<string, string>][] = [
+      ['fact-mutation', 'invalidate', {}],
+      ['invalidate', 'constraints', { sourceHandle: 'bottom', targetHandle: 'top' }],
+      ['constraints', 'resolvers', { sourceHandle: 'bottom', targetHandle: 'top' }],
+      ['resolvers', 'update-facts', { sourceHandle: 'top-source', targetHandle: 'bottom-target' }],
+      ['update-facts', 'fact-mutation', { sourceHandle: 'top-source', targetHandle: 'bottom-target' }],
+    ]
+
+    return pairs.map(([source, target, handles], i) =>
+      edge(source, target, {
+        type: 'animated',
+        ...handles,
+        data: { straight: true, active: phase >= 0 && i === phase },
+      }),
+    )
+  }, [phase])
 
   return (
     <>

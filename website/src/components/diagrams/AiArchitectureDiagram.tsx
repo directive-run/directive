@@ -53,8 +53,8 @@ export const AiArchitectureDiagram = memo(function AiArchitectureDiagram() {
     edge('framework', 'adapter', { sourceHandle: 'bottom', targetHandle: 'top' }),
     edge('adapter', 'app', { sourceHandle: 'bottom', targetHandle: 'top' }),
     // Upward edges (bidirectional)
-    edge('adapter', 'framework', { sourceHandle: 'top', targetHandle: 'bottom' }),
-    edge('app', 'adapter', { sourceHandle: 'top', targetHandle: 'bottom' }),
+    edge('adapter', 'framework', { sourceHandle: 'top-source', targetHandle: 'bottom-target' }),
+    edge('app', 'adapter', { sourceHandle: 'top-source', targetHandle: 'bottom-target' }),
   ], [])
 
   return (

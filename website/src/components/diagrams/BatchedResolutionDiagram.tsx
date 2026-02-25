@@ -74,9 +74,9 @@ export const BatchedResolutionDiagram = memo(function BatchedResolutionDiagram()
     edge('fetch2', 'fetch3', { sourceHandle: 'bottom', targetHandle: 'top' }),
 
     // Batched: all to one
-    edge('id1', 'batchFetch', { sourceHandle: 'right', targetHandle: 'left', type: 'labeled', data: { label: '1 request' } }),
-    edge('id2', 'batchFetch', { sourceHandle: 'right', targetHandle: 'left' }),
-    edge('id3', 'batchFetch', { sourceHandle: 'right', targetHandle: 'left' }),
+    edge('id1', 'batchFetch', { type: 'labeled', data: { label: '1 request' } }),
+    edge('id2', 'batchFetch'),
+    edge('id3', 'batchFetch'),
   ], [])
 
   return (

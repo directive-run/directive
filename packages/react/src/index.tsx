@@ -1154,31 +1154,46 @@ export function useDirectiveRef(
 	// biome-ignore lint/suspicious/noExplicitAny: System ref holds either system type
 	const systemRef = useRef<any>(null);
 	const statusPluginRef = useRef<StatusPlugin | null>(null);
+	// Factory ref for strict mode re-creation (effects unmount then re-mount)
+	// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+	const factoryRef = useRef<(() => any) | null>(null);
 	const wantStatus = config?.status === true;
 	const isNamespaced = "modules" in options;
 
 	if (!systemRef.current) {
-		if (isNamespaced) {
-			// --- Namespaced mode: { modules: { ... } } ---
-			const { modules, ...rest } = options;
-			const plugins = config?.plugins ?? rest.plugins ?? [];
-			const debug = config?.debug ?? rest.debug;
-			const errorBoundary = config?.errorBoundary ?? rest.errorBoundary;
-			const tickMs = config?.tickMs ?? rest.tickMs;
-			const zeroConfig = config?.zeroConfig ?? rest.zeroConfig;
-			const initialFacts = config?.initialFacts ?? rest.initialFacts;
+		// Build a factory that creates + starts the system.
+		// Called once during render and again on strict-mode re-mount.
+		factoryRef.current = () => {
+			if (isNamespaced) {
+				// --- Namespaced mode: { modules: { ... } } ---
+				const { modules, ...rest } = options;
+				const plugins = config?.plugins ?? rest.plugins ?? [];
+				const debug = config?.debug ?? rest.debug;
+				const errorBoundary = config?.errorBoundary ?? rest.errorBoundary;
+				const tickMs = config?.tickMs ?? rest.tickMs;
+				const zeroConfig = config?.zeroConfig ?? rest.zeroConfig;
+				const initialFacts = config?.initialFacts ?? rest.initialFacts;
 
-			systemRef.current = createSystem({
-				modules,
-				plugins: plugins.length > 0 ? plugins : undefined,
-				debug,
-				errorBoundary,
-				tickMs,
-				zeroConfig,
-				initialFacts,
-				// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			} as any);
-		} else {
+				const sys = createSystem({
+					modules,
+					plugins: plugins.length > 0 ? plugins : undefined,
+					debug,
+					errorBoundary,
+					tickMs,
+					zeroConfig,
+					initialFacts,
+					// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+				} as any);
+				// Always initialize facts/derivations (safe for SSR).
+				// Only start reconciliation on the client.
+				sys.initialize();
+				if (typeof window !== "undefined") {
+					sys.start();
+				}
+
+				return sys;
+			}
+
 			// --- Single-module mode ---
 			const isModule = "id" in options && "schema" in options;
 			const mod = isModule ? options : options.module;
@@ -1199,7 +1214,7 @@ export function useDirectiveRef(
 			}
 
 			// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-			systemRef.current = createSystem({
+			const sys = createSystem({
 				module: mod,
 				plugins: allPlugins.length > 0 ? allPlugins : undefined,
 				debug,
@@ -1208,14 +1223,28 @@ export function useDirectiveRef(
 				zeroConfig,
 				initialFacts,
 			} as any);
-		}
+			// Always initialize facts/derivations (safe for SSR).
+			// Only start reconciliation on the client.
+			sys.initialize();
+			if (typeof window !== "undefined") {
+				sys.start();
+			}
+
+			return sys;
+		};
+
+		// Start synchronously so facts are initialized before the first render
+		systemRef.current = factoryRef.current();
 	}
 
 	useEffect(() => {
-		const sys = systemRef.current;
-		sys?.start();
+		// Strict mode re-mount: system was destroyed in cleanup, recreate it
+		if (!systemRef.current && factoryRef.current) {
+			systemRef.current = factoryRef.current();
+		}
+
 		return () => {
-			sys?.destroy();
+			systemRef.current?.destroy();
 			systemRef.current = null;
 			statusPluginRef.current = null;
 		};

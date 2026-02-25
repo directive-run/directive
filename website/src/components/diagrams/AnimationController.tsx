@@ -17,7 +17,7 @@ export function AnimationController({ isPlaying, onToggle, hint }: AnimationCont
         className={clsx(
           'flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition',
           isPlaying
-            ? 'bg-sky-500 text-white hover:bg-sky-600'
+            ? 'bg-brand-primary text-white hover:bg-brand-primary-600'
             : 'bg-slate-700 text-slate-300 hover:bg-slate-600',
         )}
       >

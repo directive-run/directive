@@ -42,14 +42,10 @@ export const ApprovalWorkflowDiagram = memo(function ApprovalWorkflowDiagram() {
     }),
     edge('pending', 'approved', {
       type: 'labeled',
-      sourceHandle: 'right',
-      targetHandle: 'left',
       data: { label: 'approve' },
     }),
     edge('pending', 'rejected', {
       type: 'labeled',
-      sourceHandle: 'right',
-      targetHandle: 'left',
       data: { label: 'reject' },
     }),
   ], [])

@@ -693,6 +693,10 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 			}
 		},
 
+		initialize(): void {
+			engine.initialize();
+		},
+
 		start(): void {
 			// Engine.start() runs module inits, then applies initialFacts/hydrate via callback
 			engine.start();
@@ -1707,6 +1711,10 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 			if (result && typeof result === "object") {
 				hydratedFacts = result as Record<string, unknown>;
 			}
+		},
+
+		initialize(): void {
+			engine.initialize();
 		},
 
 		start(): void {
