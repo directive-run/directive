@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fraud Case Analysis - Directive Example</title>
+  <style>
+    :root {
+      --fraud-surface: #0f172a;
+      --fraud-surface-raised: #1e293b;
+      --fraud-border: #334155;
+      --fraud-border-strong: #475569;
+      --fraud-text: #cbd5e1;
+      --fraud-text-muted: #94a3b8;
+      --fraud-text-dim: #64748b;
+      --fraud-text-faint: #475569;
+      --fraud-primary: #5ba3a3;
+      --fraud-primary-hover: #4d8f8f;
+      --fraud-error: #e8836f;
+      --fraud-success: #6dab72;
+      --fraud-warning: #c4c07a;
+      --fraud-critical: #e8836f;
+      --fraud-high: #d4956b;
+      --fraud-medium: #c4c07a;
+      --fraud-low: #6dab72;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--fraud-surface);
+      color: var(--fraud-text);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .fraud-container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* ===== Header ===== */
+    .fraud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 1rem;
+      background: var(--fraud-surface-raised);
+      border: 1px solid var(--fraud-border);
+      border-radius: 10px;
+    }
+
+    .fraud-header-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--fraud-text);
+    }
+
+    .fraud-header-badge {
+      font-size: 0.65rem;
+      font-weight: 600;
+      background: rgba(91, 163, 163, 0.2);
+      color: var(--fraud-primary);
+      padding: 0.15rem 0.6rem;
+      border-radius: 20px;
+    }
+
+    /* ===== 3-Column Grid ===== */
+    .fraud-grid {
+      display: grid;
+      grid-template-columns: 240px 1fr 260px;
+      gap: 0.75rem;
+      min-height: 500px;
+    }
+
+    /* ===== Panels ===== */
+    .fraud-panel {
+      background: var(--fraud-surface-raised);
+      border: 1px solid var(--fraud-border);
+      border-radius: 10px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      overflow: hidden;
+    }
+
+    .fraud-panel-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--fraud-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ===== Controls (Left) ===== */
+    .fraud-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .fraud-control-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--fraud-text-muted);
+    }
+
+    .fraud-select {
+      width: 100%;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.75rem;
+      background: var(--fraud-surface);
+      color: var(--fraud-text);
+      border: 1px solid var(--fraud-border);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .fraud-select:focus-visible { border-color: var(--fraud-primary); outline: 2px solid var(--fraud-primary); outline-offset: 1px; }
+
+    .fraud-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .fraud-slider {
+      flex: 1;
+      appearance: none;
+      height: 4px;
+      background: var(--fraud-border);
+      border-radius: 2px;
+    }
+
+    .fraud-slider:focus-visible { outline: 2px solid var(--fraud-primary); outline-offset: 3px; }
+
+    .fraud-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--fraud-primary);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .fraud-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: var(--fraud-primary);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+    }
+
+    .fraud-slider-value {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--fraud-primary);
+      min-width: 28px;
+      text-align: right;
+    }
+
+    .fraud-btn {
+      width: 100%;
+      padding: 0.4rem 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      border: 1px solid var(--fraud-border);
+      border-radius: 6px;
+      cursor: pointer;
+      background: var(--fraud-surface);
+      color: var(--fraud-text);
+      transition: all 0.15s;
+    }
+
+    .fraud-btn:hover:not(:disabled) {
+      border-color: var(--fraud-primary);
+      color: var(--fraud-primary);
+    }
+
+    .fraud-btn:focus-visible { outline: 2px solid var(--fraud-primary); outline-offset: 1px; }
+
+    .fraud-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .fraud-btn-primary {
+      background: var(--fraud-primary);
+      color: #fff;
+      border-color: var(--fraud-primary);
+    }
+
+    .fraud-btn-primary:hover:not(:disabled) {
+      background: var(--fraud-primary-hover);
+      color: #fff;
+    }
+
+    .fraud-btn-danger {
+      border-color: var(--fraud-error);
+      color: var(--fraud-error);
+    }
+
+    .fraud-btn-danger:hover:not(:disabled) {
+      background: rgba(232, 131, 111, 0.1);
+    }
+
+    .fraud-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .fraud-scenario-desc {
+      font-size: 0.65rem;
+      color: var(--fraud-text-dim);
+      line-height: 1.3;
+      margin-top: -0.1rem;
+    }
+
+    /* ===== Progress Bar ===== */
+    .fraud-progress {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+    }
+
+    .fraud-progress-track {
+      flex: 1;
+      height: 6px;
+      background: var(--fraud-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .fraud-progress-fill {
+      height: 100%;
+      background: var(--fraud-primary);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .fraud-progress-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--fraud-text-muted);
+      min-width: 30px;
+      text-align: right;
+    }
+
+    .fraud-stage-dots {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.25rem;
+      padding: 0 0.25rem;
+    }
+
+    .fraud-stage-dot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .fraud-stage-dot-circle {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--fraud-border);
+      border: 2px solid var(--fraud-border-strong);
+      transition: all 0.2s;
+    }
+
+    .fraud-stage-dot-circle.active {
+      background: var(--fraud-primary);
+      border-color: var(--fraud-primary);
+    }
+
+    .fraud-stage-dot-circle.completed {
+      background: var(--fraud-success);
+      border-color: var(--fraud-success);
+    }
+
+    .fraud-stage-dot-label {
+      font-size: 0.55rem;
+      color: var(--fraud-text-dim);
+    }
+
+    /* ===== Case Cards ===== */
+    .fraud-cases {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex: 1;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+
+    .fraud-case-card {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--fraud-border);
+      border-radius: 8px;
+      background: var(--fraud-surface);
+      border-left: 3px solid var(--fraud-border-strong);
+    }
+
+    .fraud-case-card[data-disposition="cleared"] { border-left-color: var(--fraud-success); }
+    .fraud-case-card[data-disposition="flagged"] { border-left-color: var(--fraud-warning); }
+    .fraud-case-card[data-disposition="human_review"] { border-left-color: var(--fraud-high); }
+    .fraud-case-card[data-disposition="escalated"] { border-left-color: var(--fraud-error); }
+
+    .fraud-case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.3rem;
+    }
+
+    .fraud-case-id {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--fraud-text);
+    }
+
+    .fraud-case-badge {
+      font-size: 0.6rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+
+    .fraud-badge-critical { background: rgba(232, 131, 111, 0.2); color: var(--fraud-critical); }
+    .fraud-badge-high { background: rgba(212, 149, 107, 0.2); color: var(--fraud-high); }
+    .fraud-badge-medium { background: rgba(196, 192, 122, 0.2); color: var(--fraud-medium); }
+    .fraud-badge-low { background: rgba(109, 171, 114, 0.2); color: var(--fraud-low); }
+
+    .fraud-case-meta {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.65rem;
+      color: var(--fraud-text-dim);
+    }
+
+    .fraud-case-meta span { display: flex; align-items: center; gap: 0.2rem; }
+
+    .fraud-case-disposition {
+      font-size: 0.6rem;
+      font-weight: 600;
+      margin-top: 0.3rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .fraud-disp-cleared { background: rgba(109, 171, 114, 0.15); color: var(--fraud-success); }
+    .fraud-disp-flagged { background: rgba(196, 192, 122, 0.15); color: var(--fraud-warning); }
+    .fraud-disp-human_review { background: rgba(212, 149, 107, 0.15); color: var(--fraud-high); }
+    .fraud-disp-escalated { background: rgba(232, 131, 111, 0.15); color: var(--fraud-error); }
+    .fraud-disp-pending { background: rgba(148, 163, 184, 0.15); color: var(--fraud-text-muted); }
+
+    .fraud-empty {
+      text-align: center;
+      color: var(--fraud-text-dim);
+      font-size: 0.75rem;
+      padding: 2rem 0;
+    }
+
+    /* ===== Inspector (Right) ===== */
+    .fraud-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem;
+    }
+
+    .fraud-metric {
+      padding: 0.35rem 0.5rem;
+      background: var(--fraud-surface);
+      border: 1px solid var(--fraud-border);
+      border-radius: 6px;
+    }
+
+    .fraud-metric-label {
+      font-size: 0.55rem;
+      color: var(--fraud-text-dim);
+      text-transform: uppercase;
+    }
+
+    .fraud-metric-value {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--fraud-text);
+    }
+
+    /* ===== Timeline ===== */
+    .fraud-timeline {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .fraud-timeline-entry {
+      font-size: 0.6rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      display: flex;
+      gap: 0.35rem;
+      line-height: 1.3;
+    }
+
+    .fraud-timeline-time {
+      color: var(--fraud-text-dim);
+      white-space: nowrap;
+      min-width: 52px;
+    }
+
+    .fraud-timeline-msg { color: var(--fraud-text-muted); }
+
+    .fraud-timeline-entry[data-type="stage"] { background: rgba(91, 163, 163, 0.08); }
+    .fraud-timeline-entry[data-type="pii"] { background: rgba(232, 131, 111, 0.08); }
+    .fraud-timeline-entry[data-type="pii"] .fraud-timeline-msg { color: var(--fraud-error); }
+    .fraud-timeline-entry[data-type="budget"] { background: rgba(196, 192, 122, 0.08); }
+    .fraud-timeline-entry[data-type="budget"] .fraud-timeline-msg { color: var(--fraud-warning); }
+    .fraud-timeline-entry[data-type="error"] { background: rgba(232, 131, 111, 0.12); }
+    .fraud-timeline-entry[data-type="error"] .fraud-timeline-msg { color: var(--fraud-error); }
+    .fraud-timeline-entry[data-type="checkpoint"] { background: rgba(109, 171, 114, 0.08); }
+    .fraud-timeline-entry[data-type="checkpoint"] .fraud-timeline-msg { color: var(--fraud-success); }
+
+    /* ===== Checkpoints ===== */
+    .fraud-checkpoints {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .fraud-checkpoint-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.25rem 0.4rem;
+      background: var(--fraud-surface);
+      border: 1px solid var(--fraud-border);
+      border-radius: 5px;
+      font-size: 0.6rem;
+    }
+
+    .fraud-checkpoint-label {
+      color: var(--fraud-text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .fraud-checkpoint-actions {
+      display: flex;
+      gap: 0.2rem;
+    }
+
+    .fraud-checkpoint-btn {
+      font-size: 0.55rem;
+      padding: 0.1rem 0.3rem;
+      border: 1px solid var(--fraud-border);
+      border-radius: 3px;
+      background: transparent;
+      color: var(--fraud-text-dim);
+      cursor: pointer;
+    }
+
+    .fraud-checkpoint-btn:hover {
+      border-color: var(--fraud-primary);
+      color: var(--fraud-primary);
+    }
+
+    .fraud-checkpoint-btn.delete:hover {
+      border-color: var(--fraud-error);
+      color: var(--fraud-error);
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 800px) {
+      .fraud-grid {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .fraud-metrics {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .fraud-metrics {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* ===== API Key Bar ===== */
+    .fraud-api-key-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 0.6rem 1rem;
+      background: var(--fraud-surface-raised);
+      border: 1px solid var(--fraud-border);
+      border-radius: 10px;
+    }
+
+    .fraud-api-key-bar.hidden { display: none; }
+
+    .fraud-api-key-label {
+      font-size: 0.7rem;
+      color: var(--fraud-text-muted);
+    }
+
+    .fraud-api-key-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .fraud-api-key-input {
+      flex: 1;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.75rem;
+      background: var(--fraud-surface);
+      color: var(--fraud-text);
+      border: 1px solid var(--fraud-border);
+      border-radius: 6px;
+    }
+
+    .fraud-api-key-input:focus-visible { border-color: var(--fraud-primary); outline: 2px solid var(--fraud-primary); outline-offset: 1px; }
+
+    .fraud-api-key-saved {
+      font-size: 0.65rem;
+      color: var(--fraud-success);
+      font-weight: 600;
+    }
+
+    .fraud-ai-badge {
+      font-size: 0.6rem;
+      font-weight: 700;
+      background: rgba(109, 171, 114, 0.2);
+      color: var(--fraud-success);
+      padding: 0.1rem 0.5rem;
+      border-radius: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ===== Separator ===== */
+    .fraud-sep {
+      height: 1px;
+      background: var(--fraud-border);
+      margin: 0.2rem 0;
+    }
+
+    /* ===== Expandable Case Details ===== */
+    .fraud-case-details {
+      border: none;
+      margin-top: 0.4rem;
+    }
+
+    .fraud-case-details summary {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--fraud-primary);
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .fraud-case-details summary::-webkit-details-marker { display: none; }
+
+    .fraud-case-details summary::before {
+      content: "▸ ";
+    }
+
+    .fraud-case-details[open] summary::before {
+      content: "▾ ";
+    }
+
+    .fraud-case-details-body {
+      margin-top: 0.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    /* Transaction Table */
+    .fraud-txn-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.6rem;
+    }
+
+    .fraud-txn-table th {
+      text-align: left;
+      font-weight: 600;
+      color: var(--fraud-text-dim);
+      padding: 0.2rem 0.35rem;
+      border-bottom: 1px solid var(--fraud-border);
+      text-transform: uppercase;
+      font-size: 0.5rem;
+    }
+
+    .fraud-txn-table td {
+      padding: 0.2rem 0.35rem;
+      color: var(--fraud-text-muted);
+      border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    }
+
+    .fraud-txn-table tr:last-child td { border-bottom: none; }
+
+    .fraud-pii-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--fraud-error);
+      margin-left: 0.2rem;
+      vertical-align: middle;
+    }
+
+    /* Enrichment Signals */
+    .fraud-signal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .fraud-signal-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.6rem;
+    }
+
+    .fraud-signal-name {
+      min-width: 90px;
+      color: var(--fraud-text-dim);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .fraud-signal-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--fraud-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .fraud-signal-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .fraud-signal-score {
+      min-width: 24px;
+      text-align: right;
+      color: var(--fraud-text-muted);
+      font-weight: 700;
+      font-size: 0.55rem;
+    }
+
+    .fraud-signal-detail {
+      font-size: 0.55rem;
+      color: var(--fraud-text-dim);
+      margin-left: 94px;
+      margin-top: -0.15rem;
+    }
+
+    /* Analysis Notes */
+    .fraud-analysis-note {
+      font-size: 0.6rem;
+      color: var(--fraud-text-muted);
+      line-height: 1.4;
+      padding-left: 0.5rem;
+      border-left: 2px solid var(--fraud-primary);
+    }
+
+    .fraud-analysis-note .fraud-ai-tag {
+      font-size: 0.5rem;
+      font-weight: 700;
+      background: rgba(109, 171, 114, 0.2);
+      color: var(--fraud-success);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      margin-right: 0.25rem;
+    }
+
+    /* Disposition Reason */
+    .fraud-disposition-reason {
+      font-size: 0.6rem;
+      color: var(--fraud-text-dim);
+      font-style: italic;
+    }
+
+    /* Section Labels inside expanded cards */
+    .fraud-detail-label {
+      font-size: 0.55rem;
+      font-weight: 700;
+      color: var(--fraud-text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* ===== Disposition Breakdown ===== */
+    .fraud-disposition-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.35rem 0.5rem;
+      background: var(--fraud-surface);
+      border: 1px solid var(--fraud-border);
+      border-radius: 6px;
+      grid-column: span 2;
+    }
+
+    .fraud-disposition-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.6rem;
+    }
+
+    .fraud-disposition-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .fraud-disposition-dot.disp-pending { background: var(--fraud-text-muted); }
+    .fraud-disposition-dot.disp-cleared { background: var(--fraud-success); }
+    .fraud-disposition-dot.disp-flagged { background: var(--fraud-warning); }
+    .fraud-disposition-dot.disp-human_review { background: var(--fraud-high); }
+    .fraud-disposition-dot.disp-escalated { background: var(--fraud-error); }
+
+    .fraud-disposition-label {
+      flex: 1;
+      color: var(--fraud-text-muted);
+    }
+
+    .fraud-disposition-count {
+      font-weight: 700;
+      color: var(--fraud-text);
+      min-width: 16px;
+      text-align: right;
+    }
+
+    /* ===== Stage Progress Detail ===== */
+    .fraud-stage-detail {
+      border: none;
+      margin-top: 0.25rem;
+    }
+
+    .fraud-stage-detail summary {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--fraud-primary);
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .fraud-stage-detail summary::-webkit-details-marker { display: none; }
+
+    .fraud-stage-detail summary::before {
+      content: "▸ ";
+    }
+
+    .fraud-stage-detail[open] summary::before {
+      content: "▾ ";
+    }
+
+    .fraud-stage-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.3rem;
+      margin-top: 0.35rem;
+    }
+
+    .fraud-stage-stat {
+      padding: 0.25rem 0.4rem;
+      background: var(--fraud-surface);
+      border: 1px solid var(--fraud-border);
+      border-radius: 5px;
+    }
+
+    .fraud-stage-stat-label {
+      font-size: 0.5rem;
+      color: var(--fraud-text-dim);
+      text-transform: uppercase;
+    }
+
+    .fraud-stage-stat-value {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--fraud-text);
+    }
+
+    /* ===== Mobile: hide location + signal detail ===== */
+    @media (max-width: 800px) {
+      .fraud-txn-col-location { display: none; }
+      .fraud-signal-detail { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="fraud-container">
+    <!-- API Key Bar -->
+    <div id="fraud-api-key-bar" class="fraud-api-key-bar" data-testid="fraud-api-key-bar">
+      <span class="fraud-api-key-label">Anthropic API Key (optional — enables AI analysis)</span>
+      <div class="fraud-api-key-row">
+        <input type="password" id="fraud-api-key-input" class="fraud-api-key-input" placeholder="sk-ant-..." data-testid="fraud-api-key-input" />
+        <button id="fraud-api-key-save" class="fraud-btn fraud-btn-primary" style="width: auto; padding: 0.35rem 0.75rem;" data-testid="fraud-api-key-save">Save</button>
+        <span id="fraud-api-key-saved" class="fraud-api-key-saved" style="display: none;">Saved</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="fraud-header">
+      <span class="fraud-header-title" data-testid="fraud-title">Fraud Case Analysis</span>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span id="fraud-ai-badge" class="fraud-ai-badge" style="display: none;" data-testid="fraud-ai-badge">AI</span>
+        <span class="fraud-header-badge" id="fraud-stage-badge" data-testid="fraud-stage-badge">idle</span>
+      </div>
+    </div>
+
+    <!-- 3-Column Grid -->
+    <div class="fraud-grid">
+      <!-- Left: Controls -->
+      <div class="fraud-panel">
+        <div class="fraud-panel-title">Controls</div>
+
+        <div class="fraud-control-group">
+          <label class="fraud-control-label" for="fraud-scenario-select">Scenario</label>
+          <select id="fraud-scenario-select" class="fraud-select" data-testid="fraud-scenario-select">
+            <optgroup label="Classic Patterns">
+              <option value="card-skimming">Card Skimming (8 txns)</option>
+              <option value="account-takeover">Account Takeover (5 txns)</option>
+              <option value="bust-out">Bust-Out Fraud (12 txns)</option>
+              <option value="mixed-batch">Mixed Batch (15 txns)</option>
+            </optgroup>
+            <optgroup label="Generated Scenarios">
+              <option value="synthetic-identity">Synthetic Identity (60 txns)</option>
+              <option value="friendly-fraud">Friendly Fraud (35 txns)</option>
+              <option value="money-laundering">Money Laundering (80 txns)</option>
+              <option value="credential-stuffing">Credential Stuffing (100 txns)</option>
+              <option value="return-fraud">Return Fraud (45 txns)</option>
+              <option value="first-party-fraud">First-Party Fraud (50 txns)</option>
+              <option value="geo-anomaly">Geographic Anomaly (40 txns)</option>
+              <option value="micro-transaction">Micro Transaction Probe (70 txns)</option>
+            </optgroup>
+          </select>
+          <div id="fraud-scenario-desc" class="fraud-scenario-desc" data-testid="fraud-scenario-desc"></div>
+        </div>
+
+        <div class="fraud-sep"></div>
+
+        <div class="fraud-control-group">
+          <label class="fraud-control-label" for="fraud-threshold-slider">Risk Threshold</label>
+          <div class="fraud-slider-row">
+            <input type="range" id="fraud-threshold-slider" class="fraud-slider" min="50" max="90" value="70" data-testid="fraud-threshold-slider" />
+            <span id="fraud-threshold-value" class="fraud-slider-value" data-testid="fraud-threshold-value">70</span>
+          </div>
+        </div>
+
+        <div class="fraud-control-group">
+          <label class="fraud-control-label" for="fraud-budget-slider">Analysis Budget</label>
+          <div class="fraud-slider-row">
+            <input type="range" id="fraud-budget-slider" class="fraud-slider" min="0" max="500" step="25" value="300" data-testid="fraud-budget-slider" />
+            <span id="fraud-budget-value" class="fraud-slider-value" data-testid="fraud-budget-value">300</span>
+          </div>
+        </div>
+
+        <div class="fraud-sep"></div>
+
+        <div class="fraud-btn-group">
+          <button id="fraud-run-btn" class="fraud-btn fraud-btn-primary" data-testid="fraud-run-btn">Run Pipeline</button>
+          <button id="fraud-auto-btn" class="fraud-btn" data-testid="fraud-auto-btn">Auto-Run All</button>
+          <button id="fraud-save-btn" class="fraud-btn" data-testid="fraud-save-btn">Save Checkpoint</button>
+          <button id="fraud-reset-btn" class="fraud-btn fraud-btn-danger" data-testid="fraud-reset-btn">Reset</button>
+        </div>
+      </div>
+
+      <!-- Center: Pipeline + Cases -->
+      <div class="fraud-panel" style="overflow-y: auto;">
+        <div class="fraud-panel-title">Pipeline</div>
+
+        <!-- Progress Bar -->
+        <div class="fraud-progress">
+          <div class="fraud-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Pipeline completion">
+            <div id="fraud-progress-fill" class="fraud-progress-fill" data-testid="fraud-progress-fill"></div>
+          </div>
+          <span id="fraud-progress-label" class="fraud-progress-label" data-testid="fraud-progress-label">0%</span>
+        </div>
+
+        <!-- Stage Dots -->
+        <div class="fraud-stage-dots" data-testid="fraud-stage-dots" role="list" aria-label="Pipeline stages">
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="idle" title="Idle"></div><span class="fraud-stage-dot-label">Idle</span></div>
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="ingesting" title="Ingesting events"></div><span class="fraud-stage-dot-label">Ingest</span></div>
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="normalizing" title="Normalizing &amp; PII detection"></div><span class="fraud-stage-dot-label">Norm</span></div>
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="grouping" title="Grouping into cases"></div><span class="fraud-stage-dot-label">Group</span></div>
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="enriching" title="Enriching case data"></div><span class="fraud-stage-dot-label">Enrich</span></div>
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="analyzing" title="Analyzing risk scores"></div><span class="fraud-stage-dot-label">Analyze</span></div>
+          <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="complete" title="Pipeline complete"></div><span class="fraud-stage-dot-label">Done</span></div>
+        </div>
+
+        <!-- Stage Progress Detail -->
+        <details class="fraud-stage-detail" data-testid="fraud-stage-detail">
+          <summary>Pipeline Stats</summary>
+          <div id="fraud-stage-stats" class="fraud-stage-stats" data-testid="fraud-stage-stats"></div>
+        </details>
+
+        <div class="fraud-sep"></div>
+
+        <div class="fraud-panel-title">Cases</div>
+        <div id="fraud-cases" class="fraud-cases" data-testid="fraud-cases" aria-live="polite" aria-label="Fraud cases">
+          <div class="fraud-empty">No cases yet. Select a scenario and run the pipeline.</div>
+        </div>
+      </div>
+
+      <!-- Right: Inspector -->
+      <div class="fraud-panel">
+        <div class="fraud-panel-title">Inspector</div>
+
+        <div class="fraud-metrics" data-testid="fraud-metrics">
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">Stage</div>
+            <div id="fraud-metric-stage" class="fraud-metric-value" data-testid="fraud-metric-stage">idle</div>
+          </div>
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">Complete</div>
+            <div id="fraud-metric-completion" class="fraud-metric-value" data-testid="fraud-metric-completion">0%</div>
+          </div>
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">PII Hits</div>
+            <div id="fraud-metric-pii" class="fraud-metric-value" data-testid="fraud-metric-pii">0</div>
+          </div>
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">Budget</div>
+            <div id="fraud-metric-budget" class="fraud-metric-value" data-testid="fraud-metric-budget">300</div>
+          </div>
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">Cases</div>
+            <div id="fraud-metric-cases" class="fraud-metric-value" data-testid="fraud-metric-cases">0</div>
+          </div>
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">Critical</div>
+            <div id="fraud-metric-critical" class="fraud-metric-value" data-testid="fraud-metric-critical">0</div>
+          </div>
+          <div class="fraud-metric">
+            <div class="fraud-metric-label">Avg Risk</div>
+            <div id="fraud-metric-risk" class="fraud-metric-value" data-testid="fraud-metric-risk">0</div>
+          </div>
+          <div id="fraud-disposition-breakdown" class="fraud-disposition-breakdown" data-testid="fraud-disposition-breakdown">
+            <div class="fraud-metric-label">Dispositions</div>
+          </div>
+        </div>
+
+        <div class="fraud-sep"></div>
+
+        <div class="fraud-panel-title">Timeline</div>
+        <div id="fraud-timeline" class="fraud-timeline" data-testid="fraud-timeline" aria-live="polite" aria-label="Activity timeline">
+          <div class="fraud-empty" style="padding: 0.5rem 0; font-size: 0.6rem;">No activity yet</div>
+        </div>
+
+        <div class="fraud-sep"></div>
+
+        <div class="fraud-panel-title">Checkpoints</div>
+        <div id="fraud-checkpoints" class="fraud-checkpoints" data-testid="fraud-checkpoints">
+          <div style="font-size: 0.6rem; color: var(--fraud-text-dim);">No checkpoints saved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

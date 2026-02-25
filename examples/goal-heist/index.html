@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Directive Job</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      background: #0a0e1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── Layout ─── */
+    .heist-app {
+      display: grid;
+      grid-template-rows: auto auto auto auto auto 1fr auto;
+      height: 100vh;
+      max-height: 100vh;
+    }
+
+    /* ─── Header ─── */
+    .heist-header {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      border-bottom: 1px solid #334155;
+    }
+
+    .heist-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #fbbf24;
+      text-transform: uppercase;
+    }
+
+    .heist-subtitle {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* ─── API Key ─── */
+    .api-key-bar {
+      padding: 8px 16px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .api-key-bar.hidden { display: none; }
+
+    .api-key-bar input {
+      flex: 1;
+      max-width: 300px;
+      padding: 4px 8px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      color: #e2e8f0;
+      font-size: 11px;
+      font-family: inherit;
+    }
+
+    .api-key-bar button {
+      padding: 4px 12px;
+      background: #fbbf24;
+      color: #0a0e1a;
+      border: none;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .api-key-saved {
+      color: #4ade80;
+      font-size: 11px;
+    }
+
+    /* ─── Controls ─── */
+    .controls-bar {
+      padding: 8px 16px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .controls-bar button {
+      padding: 5px 12px;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .controls-bar button:hover { border-color: #fbbf24; color: #fbbf24; }
+    .controls-bar button:disabled { opacity: 0.4; cursor: default; }
+    .controls-bar button:disabled:hover { border-color: #475569; color: #e2e8f0; }
+
+    .controls-bar button.primary {
+      background: #fbbf24;
+      color: #0a0e1a;
+      border-color: #fbbf24;
+      font-weight: 600;
+    }
+
+    .controls-bar button.primary:hover { background: #f59e0b; }
+    .controls-bar button.primary:disabled { background: #92400e; color: #78350f; border-color: #92400e; }
+
+    .separator { width: 1px; height: 20px; background: #334155; }
+
+    .controls-bar select {
+      padding: 4px 8px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      color: #e2e8f0;
+      font-size: 11px;
+      font-family: inherit;
+    }
+
+    .controls-bar label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .controls-bar input[type="checkbox"] {
+      accent-color: #ef4444;
+    }
+
+    /* ─── Main area ─── */
+    .heist-main {
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      overflow: hidden;
+    }
+
+    /* ─── Mission Board (SVG area) ─── */
+    .mission-board {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 30% 40%, rgba(251, 191, 36, 0.03), transparent 60%),
+        #0a0e1a;
+    }
+
+    .mission-board svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Node cards in SVG */
+    .node-card {
+      cursor: pointer;
+      transition: filter 0.2s;
+    }
+
+    .node-card:hover { filter: brightness(1.15); }
+
+    /* ─── Sidebar ─── */
+    .sidebar {
+      background: #111827;
+      border-left: 1px solid #334155;
+      padding: 12px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+
+    .sidebar h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .sidebar h3:not(:first-child) { margin-top: 16px; }
+
+    /* Satisfaction meter */
+    .satisfaction-meter {
+      width: 100%;
+      height: 16px;
+      background: #1e293b;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 4px;
+      border: 1px solid #334155;
+    }
+
+    .satisfaction-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e);
+      border-radius: 8px;
+      transition: width 0.5s ease;
+    }
+
+    .satisfaction-label {
+      text-align: right;
+      color: #fbbf24;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    /* Facts list */
+    .facts-list {
+      list-style: none;
+    }
+
+    .facts-list li {
+      padding: 4px 0;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .fact-key {
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+
+    .fact-check {
+      color: #4ade80;
+      font-weight: bold;
+    }
+
+    .fact-empty {
+      color: #475569;
+    }
+
+    /* Agent status */
+    .agent-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 0;
+    }
+
+    .agent-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .agent-dot.pending { background: #475569; }
+    .agent-dot.ready { background: #3b82f6; }
+    .agent-dot.running { background: #fbbf24; animation: pulse 1s infinite; }
+    .agent-dot.completed { background: #4ade80; }
+    .agent-dot.failed { background: #ef4444; }
+
+    .agent-name { flex: 1; }
+
+    .agent-tokens {
+      color: #64748b;
+      font-size: 10px;
+    }
+
+    /* Strategy badge */
+    .strategy-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #1e1b4b;
+      border: 1px solid #4338ca;
+      border-radius: 10px;
+      color: #a5b4fc;
+      font-size: 10px;
+    }
+
+    /* ─── Event Log ─── */
+    .event-log {
+      height: 120px;
+      background: #111827;
+      border-top: 1px solid #334155;
+      padding: 8px 16px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+
+    .event-log h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      position: sticky;
+      top: 0;
+      background: #111827;
+    }
+
+    .log-entry {
+      padding: 2px 0;
+      color: #94a3b8;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .log-entry.relaxation {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    .log-entry.completion {
+      color: #4ade80;
+      font-weight: 600;
+    }
+
+    .log-entry.error {
+      color: #ef4444;
+    }
+
+    .log-step {
+      color: #64748b;
+      margin-right: 6px;
+    }
+
+    .log-delta {
+      color: #4ade80;
+      margin-left: 4px;
+      font-size: 10px;
+    }
+
+    .log-delta.zero { color: #ef4444; }
+
+    /* ─── Animations ─── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-entry { animation: fadeIn 0.2s ease; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-3px); }
+      75% { transform: translateX(3px); }
+    }
+
+    /* ─── Status line ─── */
+    .heist-status {
+      padding: 4px 16px;
+      font-size: 11px;
+      color: #94a3b8;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      min-height: 22px;
+    }
+
+    .heist-status.stalled {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    /* ─── Mobile compact stats ─── */
+    .mobile-stats {
+      display: none;
+      padding: 6px 16px;
+      background: #111827;
+      border-bottom: 1px solid #334155;
+      font-size: 11px;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .mobile-stats span {
+      color: #94a3b8;
+    }
+
+    .mobile-stats .mobile-satisfaction {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 700px) {
+      .heist-main {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar { display: none; }
+      .mobile-stats { display: flex; }
+    }
+  </style>
+</head>
+<body>
+  <div class="heist-app" data-goal-heist-ready>
+    <!-- Header -->
+    <div class="heist-header">
+      <div class="heist-title" data-testid="heist-title">The Directive Job</div>
+      <div class="heist-subtitle">Multi-agent goal execution pattern</div>
+    </div>
+
+    <!-- API Key Bar -->
+    <div class="api-key-bar" id="apiKeyBar" data-testid="heist-api-key-bar">
+      <span>Anthropic API key (optional):</span>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." data-testid="heist-api-key-input" />
+      <button id="apiKeySave" data-testid="heist-api-key-save">Save</button>
+      <span class="api-key-saved" id="apiKeySaved" style="display:none">Saved</span>
+      <span style="color:#64748b">— or run with mock agents</span>
+    </div>
+
+    <!-- Status Line -->
+    <div class="heist-status" id="summaryText" data-testid="heist-summary">Awaiting orders...</div>
+
+    <!-- Mobile Stats (visible on small screens) -->
+    <div class="mobile-stats">
+      <span class="mobile-satisfaction" id="mobileSatisfaction">0%</span>
+      <span id="mobileStep">Step 0</span>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-bar" data-testid="heist-controls">
+      <button class="primary" id="btnRun" data-testid="heist-run-btn">Run Heist</button>
+      <button id="btnStep" data-testid="heist-step-btn">Step</button>
+      <button id="btnReset" data-testid="heist-reset-btn">Reset</button>
+      <div class="separator"></div>
+      <label>
+        Strategy:
+        <select id="strategySelect" data-testid="heist-strategy-select">
+          <option value="allReady">All Ready</option>
+          <option value="highestImpact">Highest Impact</option>
+          <option value="costEfficient">Cost Efficient</option>
+        </select>
+      </label>
+      <div class="separator"></div>
+      <label data-testid="heist-fail-hacker">
+        <input type="checkbox" id="chkFailHacker" />
+        Heightened Security
+      </label>
+      <label data-testid="heist-fail-forger">
+        <input type="checkbox" id="chkFailForger" />
+        Forger Arrested
+      </label>
+    </div>
+
+    <!-- Main: Board + Sidebar -->
+    <div class="heist-main">
+      <div class="mission-board" id="missionBoard" data-testid="heist-mission-board">
+        <svg viewBox="0 0 700 340" xmlns="http://www.w3.org/2000/svg" id="boardSvg" role="img" aria-label="Mission dependency graph showing 6 agents and their dependencies">
+          <title>Mission Board — Agent Dependency Graph</title>
+          <!-- Edges (drawn first, behind nodes) -->
+          <g id="edges">
+            <!-- Gigi → H4X -->
+            <line data-edge="gigi-h4x" x1="140" y1="60" x2="310" y2="60" stroke="#334155" stroke-width="2" stroke-dasharray="6,3" />
+            <!-- Felix → Luca -->
+            <line data-edge="felix-luca" x1="140" y1="170" x2="450" y2="170" stroke="#334155" stroke-width="2" stroke-dasharray="6,3" />
+            <!-- H4X → Luca -->
+            <line data-edge="h4x-luca" x1="420" y1="60" x2="480" y2="140" stroke="#334155" stroke-width="2" stroke-dasharray="6,3" />
+            <!-- Vince → Ollie -->
+            <line data-edge="vince-ollie" x1="140" y1="280" x2="590" y2="250" stroke="#334155" stroke-width="2" stroke-dasharray="6,3" />
+            <!-- Luca → Ollie -->
+            <line data-edge="luca-ollie" x1="560" y1="170" x2="610" y2="220" stroke="#334155" stroke-width="2" stroke-dasharray="6,3" />
+          </g>
+
+          <!-- Agent nodes -->
+          <g id="nodes">
+            <!-- Gigi (root) -->
+            <g class="node-card" data-node="gigi" transform="translate(30, 30)" role="button" aria-label="Gigi - The Grifter, produces guard_schedule">
+              <title>Gigi - The Grifter: Produces guard_schedule</title>
+              <rect width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text x="12" y="22" font-size="18">&#x1F484;</text>
+              <text x="36" y="22" fill="#e2e8f0" font-size="11" font-weight="600" font-family="inherit">Gigi</text>
+              <text x="36" y="36" fill="#94a3b8" font-size="9" font-family="inherit">The Grifter</text>
+              <text x="12" y="48" fill="#64748b" font-size="8" font-family="inherit" data-status-label="gigi">pending</text>
+            </g>
+
+            <!-- Felix (root) -->
+            <g class="node-card" data-node="felix" transform="translate(30, 140)" role="button" aria-label="Felix - The Forger, produces blueprints">
+              <title>Felix - The Forger: Produces blueprints</title>
+              <rect width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text x="12" y="22" font-size="18">&#x1F58A;&#xFE0F;</text>
+              <text x="36" y="22" fill="#e2e8f0" font-size="11" font-weight="600" font-family="inherit">Felix</text>
+              <text x="36" y="36" fill="#94a3b8" font-size="9" font-family="inherit">The Forger</text>
+              <text x="12" y="48" fill="#64748b" font-size="8" font-family="inherit" data-status-label="felix">pending</text>
+            </g>
+
+            <!-- Vince (root) -->
+            <g class="node-card" data-node="vince" transform="translate(30, 250)" role="button" aria-label="Vince - The Wheelman, produces escape_route">
+              <title>Vince - The Wheelman: Produces escape_route</title>
+              <rect width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text x="12" y="22" font-size="18">&#x1F697;</text>
+              <text x="36" y="22" fill="#e2e8f0" font-size="11" font-weight="600" font-family="inherit">Vince</text>
+              <text x="36" y="36" fill="#94a3b8" font-size="9" font-family="inherit">The Wheelman</text>
+              <text x="12" y="48" fill="#64748b" font-size="8" font-family="inherit" data-status-label="vince">pending</text>
+            </g>
+
+            <!-- H4X -->
+            <g class="node-card" data-node="h4x" transform="translate(300, 30)" role="button" aria-label="H4X - The Hacker, produces cameras_disabled, requires guard_schedule">
+              <title>H4X - The Hacker: Produces cameras_disabled (requires guard_schedule)</title>
+              <rect width="130" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text x="12" y="22" font-size="18">&#x1F4BB;</text>
+              <text x="36" y="22" fill="#e2e8f0" font-size="11" font-weight="600" font-family="inherit">H4X</text>
+              <text x="36" y="36" fill="#94a3b8" font-size="9" font-family="inherit">The Hacker</text>
+              <text x="12" y="48" fill="#64748b" font-size="8" font-family="inherit" data-status-label="h4x">pending</text>
+            </g>
+
+            <!-- Luca -->
+            <g class="node-card" data-node="luca" transform="translate(440, 140)" role="button" aria-label="Luca - The Locksmith, produces vault_cracked, requires cameras_disabled and blueprints">
+              <title>Luca - The Locksmith: Produces vault_cracked (requires cameras_disabled, blueprints)</title>
+              <rect width="130" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text x="12" y="22" font-size="18">&#x1F513;</text>
+              <text x="36" y="22" fill="#e2e8f0" font-size="11" font-weight="600" font-family="inherit">Luca</text>
+              <text x="36" y="36" fill="#94a3b8" font-size="9" font-family="inherit">The Locksmith</text>
+              <text x="12" y="48" fill="#64748b" font-size="8" font-family="inherit" data-status-label="luca">pending</text>
+            </g>
+
+            <!-- Ollie -->
+            <g class="node-card" data-node="ollie" transform="translate(570, 220)" role="button" aria-label="Ollie - The Lookout, produces all_clear, requires vault_cracked and escape_route">
+              <title>Ollie - The Lookout: Produces all_clear (requires vault_cracked, escape_route)</title>
+              <rect width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+              <text x="12" y="22" font-size="18">&#x1F441;&#xFE0F;</text>
+              <text x="36" y="22" fill="#e2e8f0" font-size="11" font-weight="600" font-family="inherit">Ollie</text>
+              <text x="36" y="36" fill="#94a3b8" font-size="9" font-family="inherit">The Lookout</text>
+              <text x="12" y="48" fill="#64748b" font-size="8" font-family="inherit" data-status-label="ollie">pending</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar" data-testid="heist-sidebar">
+        <h3>Satisfaction</h3>
+        <div class="satisfaction-meter">
+          <div class="satisfaction-fill" id="satisfactionFill" style="width: 0%"></div>
+        </div>
+        <div class="satisfaction-label" data-testid="heist-satisfaction-label" id="satisfactionLabel">0%</div>
+
+        <h3>Goal Facts</h3>
+        <ul class="facts-list" id="factsList">
+          <li><span class="fact-empty">&#x25CB;</span> <span class="fact-key">guard_schedule</span></li>
+          <li><span class="fact-empty">&#x25CB;</span> <span class="fact-key">blueprints</span></li>
+          <li><span class="fact-empty">&#x25CB;</span> <span class="fact-key">escape_route</span></li>
+          <li><span class="fact-empty">&#x25CB;</span> <span class="fact-key">cameras_disabled</span></li>
+          <li><span class="fact-empty">&#x25CB;</span> <span class="fact-key">vault_cracked</span></li>
+          <li><span class="fact-empty">&#x25CB;</span> <span class="fact-key">all_clear</span></li>
+        </ul>
+
+        <h3>Strategy</h3>
+        <span class="strategy-badge" id="strategyBadge" data-testid="heist-strategy-badge">allReady</span>
+
+        <h3>Crew</h3>
+        <div id="crewList"></div>
+
+        <h3>Stats</h3>
+        <div>
+          <div>Step: <span id="statStep" data-testid="heist-stat-step">0</span></div>
+          <div>Tokens: <span id="statTokens" data-testid="heist-stat-tokens">0</span></div>
+          <div>Avg/step: <span id="statAvg">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="event-log" data-testid="heist-event-log">
+      <h3>Mission Log</h3>
+      <div id="logEntries"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
