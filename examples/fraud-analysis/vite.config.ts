@@ -2,6 +2,20 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "/examples/fraud-analysis/",
+  server: {
+    proxy: {
+      "/api/claude": {
+        target: "https://api.anthropic.com",
+        changeOrigin: true,
+        rewrite: () => "/v1/messages",
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("anthropic-version", "2023-06-01");
+          });
+        },
+      },
+    },
+  },
   build: {
     target: "esnext",
     rollupOptions: {

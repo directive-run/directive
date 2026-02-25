@@ -10,6 +10,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { filterProducts, allProducts, type Product } from "./mock-products.js";
 
 // ============================================================================
@@ -315,4 +316,5 @@ export const system = createSystem({
     url: urlModule,
     products: productsModule,
   },
+  plugins: [devtoolsPlugin({ name: "url-sync" })],
 });

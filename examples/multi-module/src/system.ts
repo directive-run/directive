@@ -13,7 +13,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
-import { loggingPlugin } from "@directive-run/core/plugins";
+import {loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 import { authModule } from "./modules/auth";
 import { dataModule } from "./modules/data";
 import { uiModule } from "./modules/ui";
@@ -27,6 +27,7 @@ export const system = createSystem({
     ui: uiModule,
   },
   plugins: [
+    devtoolsPlugin({ name: "multi-module" }),
     loggingPlugin({ level: "info" }),
   ],
   debug: {

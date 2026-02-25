@@ -6,6 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   detectPromptInjection,
   detectPII,
@@ -139,7 +140,7 @@ const guardrailModule = createModule("guardrails", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: guardrailModule });
+const system = createSystem({ module: guardrailModule, plugins: [devtoolsPlugin({ name: "ai-guardrails" })] });
 system.start();
 
 // ============================================================================

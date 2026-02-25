@@ -12,6 +12,7 @@ import {
   t,
   type ModuleSchema,
 } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -255,7 +256,7 @@ const batchModule = createModule("batch-loader", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: batchModule });
+const system = createSystem({ module: batchModule, plugins: [devtoolsPlugin({ name: "batch-resolver" })] });
 system.start();
 
 // ============================================================================

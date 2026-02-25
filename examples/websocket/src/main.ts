@@ -7,6 +7,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   websocketModule,
   websocketSchema,
@@ -22,6 +23,7 @@ import type { WsMessage } from "./mock-ws.js";
 
 const system = createSystem({
   module: websocketModule,
+  plugins: [devtoolsPlugin({ name: "websocket" })],
 });
 system.start();
 

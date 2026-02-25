@@ -6,7 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { createCircuitBreaker, type CircuitState } from "@directive-run/core/plugins";
+import {createCircuitBreaker, type CircuitState, devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -192,7 +192,7 @@ const routerModule = createModule("router", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: routerModule });
+const system = createSystem({ module: routerModule, plugins: [devtoolsPlugin({ name: "provider-routing" })] });
 system.start();
 
 // ============================================================================

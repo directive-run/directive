@@ -6,6 +6,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { heistModule, advanceStep } from "./goal-module.js";
 import type { NodeStatus, StrategyId } from "./goal-module.js";
 import { AGENTS, AGENT_ORDER, getApiKey } from "./agents.js";
@@ -16,6 +17,7 @@ import { AGENTS, AGENT_ORDER, getApiKey } from "./agents.js";
 
 const system = createSystem({
   module: heistModule,
+  plugins: [devtoolsPlugin({ name: "goal-heist" })],
 });
 system.start();
 

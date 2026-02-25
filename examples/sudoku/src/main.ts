@@ -6,6 +6,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { sudokuGame, sudokuSchema } from "./sudoku.js";
 import type { Grid, Difficulty, Conflict } from "./rules.js";
 import { MAX_HINTS } from "./rules.js";
@@ -17,6 +18,7 @@ import { MAX_HINTS } from "./rules.js";
 const system = createSystem({
   module: sudokuGame,
   debug: { timeTravel: true, maxSnapshots: 200 },
+  plugins: [devtoolsPlugin({ name: "sudoku" })],
 });
 system.start();
 
