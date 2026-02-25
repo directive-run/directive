@@ -25,6 +25,7 @@ import { ConstraintsView } from './devtools/views/ConstraintsView'
 import { SystemGraphView } from './devtools/views/SystemGraphView'
 import { TimeTravelView } from './devtools/views/TimeTravelView'
 import { DirectiveLogomark } from './devtools/DirectiveLogomark'
+import { SystemSelector } from './devtools/SystemSelector'
 import { DevToolsErrorBoundary } from './devtools/DevToolsErrorBoundary'
 import { Z_FULLSCREEN } from './devtools/z-index'
 import { encodeReplay } from './devtools/utils/replay-codec'
@@ -297,15 +298,8 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Runtime connection status */}
-            {runtimeConnected && (
-              <div className="flex items-center gap-1.5">
-                <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
-                  {runtimeSystemName ?? 'System'}
-                </span>
-              </div>
-            )}
+            {/* System selector — switch between multiple Directive systems */}
+            <SystemSelector />
             {/* AI stream status */}
             <StatusDot status={status} />
             {/* Phase 5: Paused badge */}
