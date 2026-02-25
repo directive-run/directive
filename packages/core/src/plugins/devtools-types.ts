@@ -79,6 +79,12 @@ export class CircularBuffer<T> {
 }
 
 // ============================================================================
+// Subscriber
+// ============================================================================
+
+export type DevtoolsSubscriber = (event: TraceEvent) => void;
+
+// ============================================================================
 // Devtools State
 // ============================================================================
 
@@ -86,6 +92,7 @@ export interface DevtoolsState {
 	system: System<ModuleSchema> | null;
 	events: CircularBuffer<TraceEvent>;
 	maxEvents: number;
+	subscribers: Set<DevtoolsSubscriber>;
 }
 
 declare global {
@@ -100,6 +107,8 @@ declare global {
 			exportSession(name?: string): string | null;
 			importSession(json: string, name?: string): boolean;
 			clearEvents(name?: string): void;
+			/** Subscribe to trace events. Returns unsubscribe function. */
+			subscribe(callback: DevtoolsSubscriber, systemName?: string): () => void;
 		};
 	}
 }

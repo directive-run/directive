@@ -2234,26 +2234,6 @@ export function createMultiAgentOrchestrator(
         }
       }
 
-      // Fire onAgentStart hook
-      fireHook("onAgentStart",{
-        agentId,
-        agentName: agent.name,
-        input: processedInput,
-        timestamp: startTime,
-      });
-
-      // Record timeline event
-      if (timeline) {
-        timeline.record({
-          type: "agent_start",
-          timestamp: startTime,
-          agentId,
-          snapshotId: null,
-          inputLength: processedInput.length,
-          ...(verboseTimeline ? { input: processedInput.slice(0, MAX_VERBOSE_LENGTH) } : {}),
-        });
-      }
-
       // ---- Breakpoint: pre_input_guardrails ----
       {
         const bpResult = await handleBreakpoint("pre_input_guardrails", agentId, agent.name, processedInput, opts?.signal);
@@ -2266,7 +2246,7 @@ export function createMultiAgentOrchestrator(
         processedInput = bpResult.input;
       }
 
-      // ---- Input guardrails: orchestrator-level, then per-agent ----
+      // ---- Input guardrails BEFORE agent_start so timeline shows correct order ----
       const allInputGuardrails = [
         ...(guardrails.input ?? []),
         ...(registration.guardrails?.input ?? []),
@@ -2310,6 +2290,27 @@ export function createMultiAgentOrchestrator(
         if (result.transformed !== undefined) {
           processedInput = result.transformed as string;
         }
+      }
+
+      // Fire onAgentStart hook (after guardrails pass)
+      fireHook("onAgentStart",{
+        agentId,
+        agentName: agent.name,
+        input: processedInput,
+        timestamp: startTime,
+      });
+
+      // Record timeline event
+      if (timeline) {
+        timeline.record({
+          type: "agent_start",
+          timestamp: Date.now(),
+          agentId,
+          snapshotId: null,
+          inputLength: processedInput.length,
+          ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+          ...(verboseTimeline ? { input: processedInput.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+        });
       }
 
       // Update per-agent facts
