@@ -1,4 +1,5 @@
 import { buildPageMetadata } from '@/lib/metadata'
+import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
 
 export const metadata = buildPageMetadata({
   title: 'DevTools Live Demo — Directive',
@@ -12,5 +13,5 @@ export default function DevToolsLayout({
 }: {
   children: React.ReactNode
 }) {
-  return <>{children}</>
+  return <DevToolsWithProvider>{children}</DevToolsWithProvider>
 }

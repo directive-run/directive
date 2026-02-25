@@ -35,11 +35,14 @@ export function StateView() {
     return <Skeleton rows={6} />
   }
 
-  // Render sections from typed snapshot
-  const sections: Record<string, Record<string, unknown>> = {
-    orchestrator: data.orchestrator,
-    guardrails: data.guardrails,
-    chatbot: data.chatbot,
+  // Dynamically render all namespaced sections from the snapshot
+  const topLevelScalars = new Set(['timestamp', 'eventCount', 'totalTokens'])
+  const sections: Record<string, Record<string, unknown>> = {}
+  for (const [key, value] of Object.entries(data)) {
+    if (topLevelScalars.has(key)) continue
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      sections[key] = value as Record<string, unknown>
+    }
   }
 
   return (

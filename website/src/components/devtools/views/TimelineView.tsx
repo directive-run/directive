@@ -193,7 +193,7 @@ export function TimelineView() {
 
           return (
             <button
-              key={e.id}
+              key={`evt-${e.id}-${e.timestamp}`}
               aria-label={`${label}: ${laneId}${e.durationMs ? `, ${e.durationMs}ms` : ''}${e.guardrailName ? `, ${e.guardrailName}` : ''}`}
               className={`absolute top-1 z-10 h-5 cursor-pointer rounded-sm ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'} ${isSelected ? 'opacity-100 ring-2 ring-white' : 'opacity-80'} transition-opacity hover:opacity-100`}
               style={{ left: `${left}%`, width: '6px' }}

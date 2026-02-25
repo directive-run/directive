@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { PaperPlaneTilt, Sparkle } from '@phosphor-icons/react'
-import { LiveDevTools } from '@/components/LiveDevTools'
 import { MarkdownContent } from '@/components/ChatMarkdown'
+import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
 import { decodeReplay } from '@/components/devtools/utils/replay-codec'
 import type { DebugEvent } from '@/components/devtools/types'
 
@@ -384,33 +384,28 @@ export default function DevTools2Page() {
   }, [])
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-7xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="shrink-0 text-center">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white sm:text-3xl">
-          DevTools — Multi-Agent DAG Pipeline
-        </h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          6 agents in a research pipeline — news, academic, sentiment, fact-checker, synthesizer, reviewer.
-        </p>
-      </div>
-
-      {/* Split layout */}
-      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-6 lg:grid lg:grid-cols-5">
-        {/* DevTools panel — 60% on desktop */}
-        <div className="min-h-[50vh] lg:col-span-3 lg:min-h-0">
-          <LiveDevTools
-            streamUrl="/api/dag-devtools/stream"
-            snapshotUrl="/api/dag-devtools/snapshot"
-            replayData={replayData}
-          />
+    <DevToolsWithProvider
+      streamUrl="/api/dag-devtools/stream"
+      snapshotUrl="/api/dag-devtools/snapshot"
+      replayData={replayData}
+    >
+      <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-3xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="shrink-0 text-center">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white sm:text-3xl">
+            DevTools — Multi-Agent DAG Pipeline
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            6 agents in a research pipeline — news, academic, sentiment, fact-checker, synthesizer, reviewer.
+            Open DevTools with the button in the bottom-left corner.
+          </p>
         </div>
 
-        {/* Chat panel — 40% on desktop */}
-        <div className="min-h-[50vh] lg:col-span-2 lg:min-h-0">
+        {/* Chat — full-width, DevTools accessible via FAB drawer */}
+        <div className="mt-6 min-h-0 flex-1">
           <InlineChat />
         </div>
       </div>
-    </div>
+    </DevToolsWithProvider>
   )
 }

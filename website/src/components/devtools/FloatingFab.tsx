@@ -1,0 +1,66 @@
+'use client'
+
+import { useMemo } from 'react'
+import { useSelector } from '@directive-run/react'
+import { useDevToolsSystem } from './DevToolsSystemContext'
+import { DirectiveLogomark } from './DirectiveLogomark'
+import { Z_FAB } from './z-index'
+import type { ConnectionStatus } from './types'
+
+interface FloatingFabProps {
+  offset?: { bottom?: number; left?: number }
+}
+
+export function FloatingFab({ offset }: FloatingFabProps) {
+  const system = useDevToolsSystem()
+  const drawerOpen = useSelector(system, (s) => s.facts.shell.drawerOpen)
+  const aiStatus = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
+  const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
+
+  // All hooks MUST be called before any conditional returns
+  const shortcutHint = useMemo(() => {
+    if (typeof navigator === 'undefined') {
+      return 'Ctrl+Shift+D'
+    }
+
+    return navigator.platform?.includes('Mac') ? 'Cmd+Shift+D' : 'Ctrl+Shift+D'
+  }, [])
+
+  // Hide FAB when drawer is open — after all hooks
+  if (drawerOpen) {
+    return null
+  }
+
+  const isConnected = runtimeConnected || aiStatus === 'connected'
+  const isConnecting = aiStatus === 'connecting'
+
+  const badgeClass = isConnected
+    ? 'bg-emerald-500'
+    : isConnecting
+      ? 'bg-amber-500 animate-pulse'
+      : 'bg-zinc-500'
+
+  const statusLabel = isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'
+
+  return (
+    <button
+      onClick={() => system.events.shell.toggleDrawer()}
+      aria-label={`Open DevTools (${statusLabel})`}
+      title={`DevTools (${shortcutHint})`}
+      className="fixed flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-brand-primary shadow-lg ring-1 ring-brand-primary-700 transition hover:scale-105 hover:bg-brand-primary-500 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-brand-primary-400 focus:ring-offset-2 dark:bg-brand-primary-600 dark:ring-brand-primary-500 dark:hover:bg-brand-primary-500"
+      style={{
+        bottom: offset?.bottom ?? 24,
+        left: offset?.left ?? 24,
+        zIndex: Z_FAB,
+      }}
+    >
+      <DirectiveLogomark className="h-5 w-5 brightness-0 invert" />
+
+      {/* Status badge */}
+      <span
+        className={`absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white transition-colors duration-300 dark:border-zinc-900 ${badgeClass}`}
+        aria-hidden="true"
+      />
+    </button>
+  )
+}
