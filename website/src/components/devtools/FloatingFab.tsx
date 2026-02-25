@@ -42,6 +42,10 @@ export function FloatingFab({ offset }: FloatingFabProps) {
 
   const statusLabel = isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'
 
+  // Next.js dev indicator sits at bottom-left — bump FAB up to avoid overlap
+  const isDev = process.env.NODE_ENV === 'development'
+  const defaultBottom = isDev ? 72 : 24
+
   return (
     <button
       onClick={() => system.events.shell.toggleDrawer()}
@@ -49,7 +53,7 @@ export function FloatingFab({ offset }: FloatingFabProps) {
       title={`DevTools (${shortcutHint})`}
       className="fixed flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-brand-primary shadow-lg ring-1 ring-brand-primary-700 transition hover:scale-105 hover:bg-brand-primary-500 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-brand-primary-400 focus:ring-offset-2 dark:bg-brand-primary-600 dark:ring-brand-primary-500 dark:hover:bg-brand-primary-500"
       style={{
-        bottom: offset?.bottom ?? 24,
+        bottom: offset?.bottom ?? defaultBottom,
         left: offset?.left ?? 24,
         zIndex: Z_FAB,
       }}

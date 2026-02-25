@@ -151,18 +151,7 @@ function VirtualNode({ data, selected }: NodeProps) {
 
 const nodeTypes: NodeTypes = { agent: AgentNode, virtual: VirtualNode }
 
-// ---------------------------------------------------------------------------
-// Hardcoded fallback DAG structure for the research pipeline
-// ---------------------------------------------------------------------------
-
-const FALLBACK_DAG: Record<string, string[]> = {
-  news: [],
-  academic: [],
-  sentiment: ['news'],
-  'fact-checker': ['academic'],
-  synthesizer: ['sentiment', 'fact-checker'],
-  reviewer: ['synthesizer'],
-}
+// No hardcoded fallback — graph is built entirely from live events
 
 // ---------------------------------------------------------------------------
 // Helper: create an empty GraphNodeState
@@ -291,9 +280,10 @@ function buildDagGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeStat
       }
     }
   } else {
-    // Fallback: build from known pipeline structure
-    for (const [id, deps] of Object.entries(FALLBACK_DAG)) {
-      nodes.set(id, emptyNode(id, { deps }))
+    // No dag_node_update events — build flat nodes from agent events
+    const agentIds = extractAgentIds(events)
+    for (const id of agentIds) {
+      nodes.set(id, emptyNode(id))
     }
   }
 
@@ -548,7 +538,7 @@ function buildGraphFromEvents(events: DebugEvent[]): {
 } | null {
   const patternType = detectPattern(events)
 
-  // If no pattern detected, check for dag_node_update events or fallback
+  // If no pattern detected, infer from available events
   if (!patternType) {
     const hasDagEvents = events.some((e) => e.type === 'dag_node_update')
     const hasAgentEvents = events.some((e) => e.type === 'agent_start')
@@ -557,9 +547,24 @@ function buildGraphFromEvents(events: DebugEvent[]): {
       return null
     }
 
-    const { nodes, edges } = buildDagGraph(events)
+    if (hasDagEvents) {
+      // DAG events present — build DAG graph with dependency edges
+      const { nodes, edges } = buildDagGraph(events)
 
-    return { nodes, edges, patternType: 'dag' }
+      return { nodes, edges, patternType: 'dag' }
+    }
+
+    // Only agent events, no DAG structure — show flat agent nodes
+    const agentIds = extractAgentIds(events)
+    if (agentIds.length <= 1) {
+      // Single agent — graph isn't useful, show empty state
+      return null
+    }
+
+    // Multiple agents without pattern — show as parallel
+    const { nodes, edges } = buildParallelGraph(events)
+
+    return { nodes, edges, patternType: 'parallel' }
   }
 
   const builders: Record<PatternType, (events: DebugEvent[]) => { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] }> = {
