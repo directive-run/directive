@@ -6,6 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Constants
@@ -293,7 +294,7 @@ const contactForm = createModule("contact-form", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: contactForm });
+const system = createSystem({ module: contactForm, plugins: [devtoolsPlugin({ name: "contact-form" })] });
 system.start();
 
 // ============================================================================

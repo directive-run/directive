@@ -13,7 +13,7 @@ import {
   type ModuleSchema,
   type RecoveryStrategy,
 } from "@directive-run/core";
-import { performancePlugin } from "@directive-run/core/plugins";
+import {performancePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 import { createCircuitBreaker, type CircuitState } from "@directive-run/core/plugins";
 
 // ============================================================================

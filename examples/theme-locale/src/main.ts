@@ -7,7 +7,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
-import { persistencePlugin } from "@directive-run/core/plugins";
+import {persistencePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   preferencesModule,
   layoutModule,
@@ -26,6 +26,7 @@ const system = createSystem({
     layout: layoutModule,
   },
   plugins: [
+    devtoolsPlugin({ name: "theme-locale" }),
     persistencePlugin({
       storage: localStorage,
       key: "directive-theme-locale-example",

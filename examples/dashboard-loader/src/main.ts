@@ -6,6 +6,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   dashboardLoaderModule,
   dashboardLoaderSchema,
@@ -19,6 +20,7 @@ import {
 
 const system = createSystem({
   module: dashboardLoaderModule,
+  plugins: [devtoolsPlugin({ name: "dashboard-loader" })],
 });
 system.start();
 

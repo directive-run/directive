@@ -7,6 +7,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   authFlowModule,
   authFlowSchema,
@@ -21,6 +22,7 @@ import type { User } from "./mock-auth.js";
 
 const system = createSystem({
   module: authFlowModule,
+  plugins: [devtoolsPlugin({ name: "auth-flow" })],
 });
 system.start();
 

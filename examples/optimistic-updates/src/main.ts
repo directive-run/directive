@@ -7,6 +7,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   optimisticUpdatesModule,
   optimisticUpdatesSchema,
@@ -21,6 +22,7 @@ import {
 
 const system = createSystem({
   module: optimisticUpdatesModule,
+  plugins: [devtoolsPlugin({ name: "optimistic-updates" })],
 });
 system.start();
 

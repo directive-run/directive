@@ -10,6 +10,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { checkersGame } from "./game.js";
 import { checkersChat } from "./chat.js";
 import { createCheckersAI } from "./ai-orchestrator.js";
@@ -25,6 +26,7 @@ import { getAllValidMoves, toRowCol } from "./rules.js";
 const system = createSystem({
   modules: { game: checkersGame, chat: checkersChat },
   debug: { timeTravel: true, maxSnapshots: 200 },
+  plugins: [devtoolsPlugin({ name: "checkers" })],
 });
 system.start();
 

@@ -32,7 +32,7 @@ const system = createSystem({
   },
   plugins: [
     loggingPlugin({ level: "info" }),
-    devtoolsPlugin({ trace: true }),
+    devtoolsPlugin({ name: "async-chains", trace: true }),
   ],
   debug: {
     timeTravel: true,

@@ -406,7 +406,7 @@ export const system = createSystem({
     auth: authModule,
   },
   plugins: [
-    devtoolsPlugin({ panel: true }),
+    devtoolsPlugin({ name: "shopping-cart", panel: true }),
   ],
   debug: {
     timeTravel: true,

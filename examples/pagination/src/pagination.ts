@@ -13,7 +13,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { loggingPlugin } from "@directive-run/core/plugins";
+import {loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 import { fetchPage, type ListItem } from "./mock-api.js";
 
 // ============================================================================

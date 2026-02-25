@@ -11,6 +11,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   fetchPermissions as apiFetchPermissions,
   fetchArticles as apiFetchArticles,
@@ -314,4 +315,5 @@ export const system = createSystem({
     permissions: permissionsModule,
     content: contentModule,
   },
+  plugins: [devtoolsPlugin({ name: "permissions" })],
 });

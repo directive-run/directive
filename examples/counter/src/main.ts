@@ -6,6 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -315,7 +316,10 @@ const numberMatch = createModule("number-match", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: numberMatch });
+const system = createSystem({
+  module: numberMatch,
+  plugins: [devtoolsPlugin({ name: "number-match" })],
+});
 system.start();
 
 // ============================================================================
