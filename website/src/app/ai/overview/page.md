@@ -11,24 +11,7 @@ The AI adapter brings Directive's constraint system to AI agent orchestration. W
 
 Directive doesn't replace your agent framework &ndash; it wraps it:
 
-```
-    ┌─────────────────────────────┐
-    │   Your Agent Framework      │
-    │  (OpenAI, Anthropic, etc.)  │
-    └──────────────┬──────────────┘
-                   │
-                   ▼
-    ┌─────────────────────────────┐
-    │   Directive AI Adapter      │
-    │  constraints, guardrails,   │
-    │  orchestration, streaming   │
-    └──────────────┬──────────────┘
-                   │
-                   ▼
-    ┌─────────────────────────────┐
-    │     Your Application        │
-    └─────────────────────────────┘
-```
+{% ai-architecture-diagram /%}
 
 The AI adapter is organized into five sections:
 
@@ -206,31 +189,7 @@ const result = await orchestrator.run(agent, 'Hello!');
 
 Directive provides security guardrails and compliance tooling for AI agent systems. See [Security & Compliance](/ai/security/overview) for full details.
 
-```
-    ┌─────────────────────────────┐
-    │        User Input           │
-    └──────────────┬──────────────┘
-                   ▼
-    ┌─────────────────────────────┐
-    │  Prompt Injection Detection │
-    └──────────────┬──────────────┘
-                   ▼
-    ┌─────────────────────────────┐
-    │       PII Detection         │
-    └──────────────┬──────────────┘
-                   ▼
-    ┌─────────────────────────────┐
-    │     Agent Execution         │
-    └──────────────┬──────────────┘
-                   ▼
-    ┌─────────────────────────────┐
-    │      Output PII Scan        │
-    └──────────────┬──────────────┘
-                   ▼
-    ┌─────────────────────────────┐
-    │       Audit Trail           │
-    └─────────────────────────────┘
-```
+{% security-pipeline-diagram /%}
 
 | Feature | Threat Addressed |
 |---------|-----------------|
