@@ -26,6 +26,7 @@ export type { DevtoolsPluginOptions, TraceEvent } from "./devtools-types.js";
 import {
 	type DevtoolsPluginOptions,
 	type DevtoolsState,
+	type DevtoolsSubscriber,
 	type TraceEvent,
 	CircularBuffer,
 	isDevMode,
@@ -77,6 +78,7 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 			exportSession: () => null,
 			importSession: () => false,
 			clearEvents: () => {},
+			subscribe: () => () => {},
 		};
 	}
 
@@ -113,6 +115,38 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 				const system = this.getSystem(name);
 
 				return system?.explain(requirementId) ?? null;
+			},
+			subscribe(callback: DevtoolsSubscriber, systemName?: string) {
+				const target = systemName ? systems.get(systemName) : systems.values().next().value;
+				if (!target) {
+					// System not registered yet — register a global subscriber
+					// that attaches to the first system that appears
+					let attached = false;
+					const check = () => {
+						const t = systemName ? systems.get(systemName) : systems.values().next().value;
+						if (t && !attached) {
+							attached = true;
+							t.subscribers.add(callback);
+						}
+					};
+					// Poll briefly for system registration
+					const timer = setInterval(check, 100);
+					const stop = setTimeout(() => clearInterval(timer), 10_000);
+
+					return () => {
+						clearInterval(timer);
+						clearTimeout(stop);
+						// Remove from any system that may have been attached
+						for (const s of systems.values()) {
+							s.subscribers.delete(callback);
+						}
+					};
+				}
+				target.subscribers.add(callback);
+
+				return () => {
+					target.subscribers.delete(callback);
+				};
 			},
 			exportSession(name) {
 				const target = name ? systems.get(name) : systems.values().next().value;
@@ -238,15 +272,24 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 		system: null,
 		events: new CircularBuffer<TraceEvent>(maxEventsOpt),
 		maxEvents: maxEventsOpt,
+		subscribers: new Set(),
 	};
 
 	devtools.systems.set(name, state);
 
 	const addEvent = (type: string, data: unknown) => {
-		if (!trace) {
-			return;
+		const event: TraceEvent = { timestamp: Date.now(), type, data };
+		if (trace) {
+			state.events.push(event);
 		}
-		state.events.push({ timestamp: Date.now(), type, data });
+		// Always notify subscribers (even when trace is off — subscribers want all events)
+		for (const sub of state.subscribers) {
+			try {
+				sub(event);
+			} catch {
+				// subscriber errors must not crash the plugin
+			}
+		}
 	};
 
 	// Panel state — initialized lazily in onInit
