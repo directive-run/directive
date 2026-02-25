@@ -13,10 +13,10 @@ import {
 } from './diagrams'
 
 const STEPS = [
-  { id: 'facts', label: 'Facts', subtitle: '(state)', colorScheme: 'primary' as const },
-  { id: 'constraints', label: 'Constraints', subtitle: '(when condition)', colorScheme: 'amber' as const },
-  { id: 'requirements', label: 'Requirements', subtitle: '(what to do)', colorScheme: 'violet' as const },
-  { id: 'resolvers', label: 'Resolvers', subtitle: '(how to do it)', colorScheme: 'emerald' as const },
+  { id: 'facts', label: 'Facts', subtitle: 'state', colorScheme: 'primary' as const },
+  { id: 'constraints', label: 'Constraints', subtitle: 'when condition', colorScheme: 'amber' as const },
+  { id: 'requirements', label: 'Requirements', subtitle: 'what to do', colorScheme: 'violet' as const },
+  { id: 'resolvers', label: 'Resolvers', subtitle: 'how to do it', colorScheme: 'emerald' as const },
 ] as const
 
 const ANIMATION_STEPS = ['facts', 'arrow1', 'constraints', 'arrow2', 'requirements', 'arrow3', 'resolvers', 'return'] as const
