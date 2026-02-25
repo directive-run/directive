@@ -5,7 +5,7 @@ import type { Node, Edge } from '@xyflow/react'
 import { Database, Funnel, ListChecks, GearSix } from '@phosphor-icons/react'
 import {
   DiagramWrapper,
-  AnimationController,
+  DiagramToolbar,
   useAnimationLoop,
   diagramNodeTypes,
   diagramEdgeTypes,
@@ -49,7 +49,7 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
       id: 'facts',
       type: 'step',
       position: { x: 0, y: 0 },
-      style: { width: 340 },
+      style: { width: 280 },
       data: {
         label: STEPS[0].label,
         subtitle: STEPS[0].subtitle,
@@ -62,8 +62,8 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
     {
       id: 'constraints',
       type: 'step',
-      position: { x: 500, y: 0 },
-      style: { width: 340 },
+      position: { x: 440, y: 0 },
+      style: { width: 280 },
       data: {
         label: STEPS[1].label,
         subtitle: STEPS[1].subtitle,
@@ -76,8 +76,8 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
     {
       id: 'requirements',
       type: 'step',
-      position: { x: 500, y: 340 },
-      style: { width: 340 },
+      position: { x: 440, y: 280 },
+      style: { width: 280 },
       data: {
         label: STEPS[2].label,
         subtitle: STEPS[2].subtitle,
@@ -90,8 +90,8 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
     {
       id: 'resolvers',
       type: 'step',
-      position: { x: 0, y: 340 },
-      style: { width: 340 },
+      position: { x: 0, y: 280 },
+      style: { width: 280 },
       data: {
         label: STEPS[3].label,
         subtitle: STEPS[3].subtitle,
@@ -149,45 +149,24 @@ export const ConstraintFlowDiagram = memo(function ConstraintFlowDiagram() {
     },
   ], [isArrowActive])
 
+  const activeStepId = phase >= 0 ? ANIMATION_STEPS[phase] : null
+
   return (
     <div className="constraint-diagram">
-      <AnimationController
-        isPlaying={isPlaying}
-        onToggle={toggle}
-      />
-
       <DiagramWrapper
-        height={580}
+        height={420}
         nodes={nodes}
         edges={edges}
         nodeTypes={diagramNodeTypes}
         edgeTypes={diagramEdgeTypes}
       />
 
-      {/* Step indicator */}
-      <div className="mt-4 flex justify-center gap-2">
-        {STEPS.map((step) => {
-          const stepActive = phase >= 0 && ANIMATION_STEPS[phase] === step.id
-
-          return (
-            <div
-              key={step.id}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-all ${
-                stepActive
-                  ? 'bg-brand-primary-100 text-brand-primary-700 dark:bg-brand-primary-900 dark:text-brand-primary-300'
-                  : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full transition-all ${
-                  stepActive ? 'bg-brand-primary' : 'bg-slate-300 dark:bg-slate-600'
-                }`}
-              />
-              {step.label}
-            </div>
-          )
-        })}
-      </div>
+      <DiagramToolbar
+        steps={STEPS}
+        activeStepId={typeof activeStepId === 'string' && STEPS.some(s => s.id === activeStepId) ? activeStepId : null}
+        isPlaying={isPlaying}
+        onToggle={toggle}
+      />
     </div>
   )
 })

@@ -43,7 +43,7 @@ export function DiagramWrapper({
         panOnScroll={false}
         preventScrolling={false}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.3 }}
         proOptions={{ hideAttribution: true }}
         {...flowProps}
       >
