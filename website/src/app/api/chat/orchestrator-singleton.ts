@@ -321,19 +321,7 @@ export function getOrchestrator() {
       const tl = orchestrator.timeline
       const startTime = Date.now()
 
-      // Record agent_start
-      if (tl) {
-        tl.record({
-          type: 'agent_start',
-          timestamp: startTime,
-          snapshotId: null,
-          agentId: docsAgent.name,
-          modelId: 'claude-haiku-4-5',
-          inputLength: input.length,
-        })
-      }
-
-      // Run input guardrails synchronously and record to timeline
+      // Run input guardrails BEFORE agent_start so timeline shows correct order
       for (const guardrail of inputGuardrails) {
         const gStart = Date.now()
         try {
@@ -356,6 +344,18 @@ export function getOrchestrator() {
         } catch {
           // Don't block streaming on guardrail errors
         }
+      }
+
+      // Record agent_start (after guardrails pass)
+      if (tl) {
+        tl.record({
+          type: 'agent_start',
+          timestamp: Date.now(),
+          snapshotId: null,
+          agentId: docsAgent.name,
+          modelId: 'claude-haiku-4-5',
+          inputLength: input.length,
+        })
       }
 
       const { stream, result: rawResult, abort } = streamRunner(docsAgent, input, {
@@ -383,6 +383,15 @@ export function getOrchestrator() {
 
           // Update chatbot system (streamable bypasses orchestrator.run())
           chatbotSystem.events.requestCompleted({ tokens })
+
+          // Store messages in memory (streamable bypasses orchestrator.run())
+          if (res.messages && res.messages.length > 0) {
+            try {
+              memory.addMessages(res.messages)
+            } catch {
+              // Best-effort — don't break streaming on memory errors
+            }
+          }
 
           return res
         },
