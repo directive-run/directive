@@ -5,6 +5,8 @@ import { ModuleLifecycleDiagram } from '@/components/ModuleLifecycleDiagram'
 import { PluginLifecycleDiagram } from '@/components/PluginLifecycleDiagram'
 import { ConstraintPriorityDiagram } from '@/components/ConstraintPriorityDiagram'
 import { ConstraintDependencyDiagram } from '@/components/ConstraintDependencyDiagram'
+import { AiArchitectureDiagram } from '@/components/AiArchitectureDiagram'
+import { SecurityPipelineDiagram } from '@/components/SecurityPipelineDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 import { UseCaseCards } from '@/components/UseCaseCards'
@@ -100,6 +102,14 @@ const tags = {
   },
   'constraint-dependency-diagram': {
     render: ConstraintDependencyDiagram,
+    selfClosing: true,
+  },
+  'ai-architecture-diagram': {
+    render: AiArchitectureDiagram,
+    selfClosing: true,
+  },
+  'security-pipeline-diagram': {
+    render: SecurityPipelineDiagram,
     selfClosing: true,
   },
 }
