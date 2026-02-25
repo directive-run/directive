@@ -6,6 +6,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   topicGuardModule,
   topicGuardSchema,
@@ -19,6 +20,7 @@ import {
 
 const system = createSystem({
   module: topicGuardModule,
+  plugins: [devtoolsPlugin({ name: "topic-guard" })],
 });
 system.start();
 

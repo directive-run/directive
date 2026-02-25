@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { createSystem } from "@directive-run/core";
-import { persistencePlugin } from "@directive-run/core/plugins";
+import {persistencePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 import { featureFlagsModule } from "./module";
 import { FlagPanel } from "./FlagPanel";
 import { Inspector } from "./Inspector";
@@ -11,6 +11,7 @@ import { Timeline, type TimelineEntry } from "./Timeline";
 const system = createSystem({
   module: featureFlagsModule,
   plugins: [
+    devtoolsPlugin({ name: "feature-flags" }),
     persistencePlugin({ storage: localStorage, key: "directive-feature-flags-example" }),
   ],
 });

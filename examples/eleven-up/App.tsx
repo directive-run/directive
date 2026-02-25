@@ -7,6 +7,7 @@
 import { useCallback } from "react";
 import type React from "react";
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   useFact,
   useDerived,
@@ -254,7 +255,7 @@ function CardComponent({ card, selected, onSelect }: CardProps) {
 // ============================================================================
 
 // Create the system
-const system = createSystem({ module: elevenUpGame });
+const system = createSystem({ module: elevenUpGame, plugins: [devtoolsPlugin({ name: "eleven-up" })] });
 system.start();
 
 /**

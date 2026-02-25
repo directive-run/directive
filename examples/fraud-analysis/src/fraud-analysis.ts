@@ -775,7 +775,7 @@ export const fraudAnalysisModule = createModule("fraud", {
 export const system = createSystem({
   module: fraudAnalysisModule,
   plugins: [
-    devtoolsPlugin({ panel: true }),
+    devtoolsPlugin({ name: "fraud-analysis", panel: true }),
   ],
   debug: {
     timeTravel: true,

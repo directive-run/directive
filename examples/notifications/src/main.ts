@@ -7,6 +7,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   notificationsModule,
   notificationsSchema,
@@ -22,6 +23,7 @@ import {
 const system = createSystem({
   modules: { notifications: notificationsModule, app: appModule },
   tickMs: 1000,
+  plugins: [devtoolsPlugin({ name: "notifications" })],
 });
 system.start();
 

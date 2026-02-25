@@ -7,6 +7,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   dashboardModule,
   moduleRegistry,
@@ -17,7 +18,8 @@ import {
 // System
 // ============================================================================
 
-let system = createSystem({ modules: { dashboard: dashboardModule } });
+let system = createSystem({ modules: { dashboard: dashboardModule },
+  plugins: [devtoolsPlugin({ name: "dynamic-modules" })], });
 system.start();
 
 // ============================================================================
@@ -411,7 +413,8 @@ function resetDemo(): void {
   }
   unsubs.length = 0;
 
-  system = createSystem({ modules: { dashboard: dashboardModule } });
+  system = createSystem({ modules: { dashboard: dashboardModule },
+  plugins: [devtoolsPlugin({ name: "dynamic-modules" })], });
   system.start();
 
   setupSubscriptions();

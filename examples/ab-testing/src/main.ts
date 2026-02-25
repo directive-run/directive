@@ -6,6 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -285,7 +286,7 @@ const abTesting = createModule("ab-testing", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: abTesting });
+const system = createSystem({ module: abTesting, plugins: [devtoolsPlugin({ name: "ab-testing" })] });
 system.start();
 
 // ============================================================================

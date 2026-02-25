@@ -8,6 +8,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
   debounceSearchModule,
   debounceSearchSchema,
@@ -21,6 +22,7 @@ import {
 
 const system = createSystem({
   module: debounceSearchModule,
+  plugins: [devtoolsPlugin({ name: "debounce-constraints" })],
 });
 system.start();
 

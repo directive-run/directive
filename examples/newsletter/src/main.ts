@@ -13,6 +13,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Constants
@@ -186,7 +187,7 @@ const newsletter = createModule("newsletter", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: newsletter });
+const system = createSystem({ module: newsletter, plugins: [devtoolsPlugin({ name: "newsletter" })] });
 system.start();
 
 // ============================================================================
