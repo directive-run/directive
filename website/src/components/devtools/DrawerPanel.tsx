@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from './DevToolsSystemContext'
 import { DirectiveLogomark } from './DirectiveLogomark'
+import { SystemSelector } from './SystemSelector'
 import { Z_DRAWER, DRAWER_OPEN_MS, DRAWER_CLOSE_MS } from './z-index'
 import type { ConnectionStatus } from './types'
 
@@ -19,8 +20,6 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
   const height = useSelector(system, (s) => s.facts.shell.drawerHeight)
   const width = useSelector(system, (s) => s.facts.shell.drawerWidth)
   const aiStatus = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
-  const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
-  const runtimeSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
 
   // Portal mount target
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
@@ -134,16 +133,9 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
           <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
             DevTools
           </span>
-          {/* Connection status dots — #10: bumped text from 9px to 11px */}
+          {/* Connection status — system selector + AI indicator */}
           <div className="flex items-center gap-2 ml-2">
-            {runtimeConnected && (
-              <div className="flex items-center gap-1">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
-                  {runtimeSystemName ?? 'System'}
-                </span>
-              </div>
-            )}
+            <SystemSelector />
             {aiStatus !== 'disconnected' && (
               <div className="flex items-center gap-1">
                 <div className={`h-1.5 w-1.5 rounded-full ${
