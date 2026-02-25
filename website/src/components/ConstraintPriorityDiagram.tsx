@@ -169,6 +169,7 @@ export const ConstraintPriorityDiagram = memo(function ConstraintPriorityDiagram
         edges={edges}
         nodeTypes={diagramNodeTypes}
         edgeTypes={diagramEdgeTypes}
+        fitViewOptions={{ padding: 0.2 }}
       />
 
       <DiagramToolbar
