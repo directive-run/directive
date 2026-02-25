@@ -73,6 +73,7 @@ interface GraphNodeState {
   isVirtual: boolean
   lastInput: string | null
   lastOutput: string | null
+  instructions: string | null
 }
 
 interface GraphEdgeState {
@@ -185,6 +186,7 @@ function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; dep
     isVirtual: opts?.isVirtual ?? false,
     lastInput: null,
     lastOutput: null,
+    instructions: null,
   }
 }
 
@@ -221,6 +223,9 @@ function enrichFromAgentEvents(
       matched.status = 'running'
       if (typeof e.input === 'string') {
         matched.lastInput = e.input
+      }
+      if (typeof e.instructions === 'string') {
+        matched.instructions = e.instructions
       }
     } else if (e.type === 'agent_complete') {
       matched.status = 'completed'
@@ -1211,6 +1216,18 @@ export function GraphView() {
               </>
             )}
           </div>
+
+          {/* Agent instructions */}
+          {selected.instructions && (
+            <div className="mt-3 border-t border-zinc-700 pt-3">
+              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                Instructions
+              </div>
+              <pre className="max-h-[200px] overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300">
+                {selected.instructions}
+              </pre>
+            </div>
+          )}
 
           {/* Agent input */}
           {selected.lastInput && (
