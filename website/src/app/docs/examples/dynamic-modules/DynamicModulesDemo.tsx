@@ -44,7 +44,7 @@ export function DynamicModulesDemo({
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Click &ldquo;Load&rdquo; to register modules at runtime. Each module
           brings its own facts, constraints, resolvers, and derivations into the
-          shared system. Watch the inspector grow as modules load.
+          shared system. Open DevTools to watch the state grow as modules load.
         </p>
       </section>
 
@@ -129,7 +129,7 @@ export function DynamicModulesDemo({
               What:
             </strong>{' '}
             A widget dashboard with 3 dynamically loadable modules (Counter,
-            Weather, Dice), a system inspector showing namespaced facts, and an
+            Weather, Dice), namespaced facts visible in DevTools, and an
             event timeline.
           </p>
           <p>
@@ -149,7 +149,7 @@ export function DynamicModulesDemo({
             Each module is self-contained with its own schema, events, and
             resolution logic. The system handles namespace isolation
             automatically &mdash; modules can&rsquo;t interfere with each
-            other&rsquo;s facts, and the inspector reveals the full namespaced
+            other&rsquo;s facts, and DevTools reveals the full namespaced
             state tree.
           </p>
         </div>

@@ -3,7 +3,7 @@
  *
  * Creates the Directive system, subscribes to state changes,
  * renders user selector, permission badges, article list,
- * admin panel, and state inspector.
+ * and admin panel.
  */
 
 import { system } from "./permissions.js";
@@ -35,10 +35,6 @@ const permSettingsEl = document.getElementById("pm-perm-settings")!;
 const articleListEl = document.getElementById("pm-article-list")!;
 const adminPanelEl = document.getElementById("pm-admin-panel")!;
 const actionStatusEl = document.getElementById("pm-action-status")!;
-
-const inspectorAuthEl = document.getElementById("pm-inspector-auth")!;
-const inspectorPermEl = document.getElementById("pm-inspector-perm")!;
-const inspectorContentEl = document.getElementById("pm-inspector-content")!;
 
 const toastEl = document.getElementById("pm-toast")!;
 
@@ -83,7 +79,6 @@ function render(): void {
   const canDelete = derive.permissions.canDelete as boolean;
   const canManageUsers = derive.permissions.canManageUsers as boolean;
   const canViewAnalytics = derive.permissions.canViewAnalytics as boolean;
-  const permissionsLoaded = facts.permissions.loaded as boolean;
   const permissions = facts.permissions.permissions as string[];
 
   const articles = facts.content.articles as Article[];
@@ -183,52 +178,6 @@ function render(): void {
     adminPanelEl.innerHTML = "";
   }
 
-  // --- State inspector ---
-  inspectorAuthEl.innerHTML = formatInspectorState({
-    role: role || "\u2014",
-    userName: userName || "\u2014",
-    token: facts.auth.token ? `${(facts.auth.token as string).slice(0, 12)}...` : "\u2014",
-    isAuthenticated,
-  });
-
-  inspectorPermEl.innerHTML = formatInspectorState({
-    loaded: permissionsLoaded,
-    count: permissions.length,
-    canEdit,
-    canPublish,
-    canDelete,
-    canManageUsers,
-    canViewAnalytics,
-  });
-
-  inspectorContentEl.innerHTML = formatInspectorState({
-    loaded: contentLoaded,
-    articleCount: articles.length,
-    actionStatus: actionStatus || "idle",
-  });
-}
-
-function formatInspectorState(state: Record<string, unknown>): string {
-  return Object.entries(state)
-    .map(([key, value]) => {
-      let valueStr: string;
-      let valueClass = "";
-
-      if (typeof value === "boolean") {
-        valueStr = String(value);
-        valueClass = value ? "true" : "false";
-      } else {
-        valueStr = String(value);
-      }
-
-      return `
-        <div class="pm-inspector-row">
-          <span class="pm-inspector-key">${escapeHtml(key)}</span>
-          <span class="pm-inspector-value ${valueClass}">${escapeHtml(valueStr)}</span>
-        </div>
-      `;
-    })
-    .join("");
 }
 
 // ============================================================================

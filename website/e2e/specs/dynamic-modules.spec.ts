@@ -137,13 +137,6 @@ test.describe("Dynamic Modules example", () => {
     await expect(tid(page, "dm-status-badge")).toContainText("3 / 3");
   });
 
-  test("inspector shows namespaced facts", async ({ page }) => {
-    await tid(page, "dm-load-counter").click();
-    await expect(tid(page, "dm-widget-counter")).toBeVisible({ timeout: 3_000 });
-
-    await expect(tid(page, "dm-inspector")).toContainText("counter.count", { timeout: 2_000 });
-  });
-
   test("reset demo clears all modules", async ({ page }) => {
     // Load all 3
     await tid(page, "dm-load-counter").click();

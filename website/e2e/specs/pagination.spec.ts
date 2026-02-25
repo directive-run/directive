@@ -132,21 +132,6 @@ test.describe("Pagination example", () => {
     await expect(tid(page, "pg-category-all")).not.toHaveClass(/active/);
   });
 
-  test("inspector shows correct state", async ({ page }) => {
-    // Wait for initial load to complete
-    await expect(tid(page, "pg-item-list").locator(".pg-item").first()).toBeVisible({ timeout: 10_000 });
-    await expect(tid(page, "pg-loading")).not.toHaveClass(/visible/, { timeout: 5_000 });
-
-    // totalLoaded should be > 0
-    const totalText = await tid(page, "pg-total-loaded").textContent();
-    const total = parseInt(totalText || "0", 10);
-    expect(total).toBeGreaterThan(0);
-
-    // hasMore should show "true" (100 items total, 20 per page)
-    const hasMoreEl = page.locator("#pg-fact-has-more");
-    await expect(hasMoreEl).toContainText("true");
-  });
-
   test("code tabs visible below example", async ({ page }) => {
     const codeTabs = page.locator("[data-testid='code-tabs-bar']");
     await expect(codeTabs).toBeVisible();

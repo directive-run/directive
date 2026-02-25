@@ -65,7 +65,6 @@ export const docsNavigation: NavigationSection[] = [
       { title: 'Overview', href: '/docs/plugins/overview' },
       { title: 'Logging', href: '/docs/plugins/logging' },
       { title: 'DevTools', href: '/docs/plugins/devtools' },
-      { title: 'DevTools Live', href: '/devtools' },
       { title: 'Persistence', href: '/docs/plugins/persistence' },
       { title: 'Performance', href: '/docs/plugins/performance' },
       { title: 'Custom Plugins', href: '/docs/plugins/custom' },
@@ -162,9 +161,6 @@ export const docsNavigation: NavigationSection[] = [
       // Showcases
       { title: 'Sudoku', href: '/docs/examples/sudoku' },
       { title: 'Checkers', href: '/docs/examples/checkers' },
-      // Showcases (full-feature)
-      { title: 'Fraud Analysis', href: '/docs/examples/fraud-analysis' },
-      { title: 'Goal Heist', href: '/docs/examples/goal-heist' },
       // Specialized
       { title: 'Server-Side', href: '/docs/examples/server' },
       { title: 'AI Agent', href: '/docs/examples/ai-agent' },
@@ -222,7 +218,6 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Pattern Checkpoints', href: '/ai/checkpoints' },
       { title: 'Breakpoints & Checkpoints', href: '/ai/breakpoints' },
       { title: 'DevTools', href: '/ai/devtools' },
-      { title: 'DevTools Live', href: '/devtools' },
       { title: 'Evals', href: '/ai/evals' },
       { title: 'OpenTelemetry', href: '/ai/otel' },
       { title: 'Testing', href: '/ai/testing' },
@@ -236,6 +231,17 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Prompt Injection', href: '/ai/security/prompt-injection' },
       { title: 'Audit Trail', href: '/ai/security/audit' },
       { title: 'GDPR/CCPA', href: '/ai/security/compliance' },
+    ],
+  },
+  {
+    title: 'Examples',
+    links: [
+      { title: 'AI Chat', href: '/ai/examples/ai-chat' },
+      { title: 'Research Pipeline', href: '/ai/examples/ai-research-pipeline' },
+      { title: 'AI Safety Shield', href: '/ai/examples/ai-guardrails' },
+      { title: 'AI Checkpoint', href: '/ai/examples/ai-checkpoint' },
+      { title: 'Fraud Analysis', href: '/ai/examples/fraud-analysis' },
+      { title: 'Goal Heist', href: '/ai/examples/goal-heist' },
     ],
   },
   {

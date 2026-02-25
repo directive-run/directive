@@ -2,7 +2,7 @@
  * WebSocket Connections — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
- * renders the status bar, message feed, state inspector, config sliders,
+ * renders the status bar, message feed, config sliders,
  * and event timeline. A 500ms timer drives reactive reconnect countdown.
  */
 
@@ -56,14 +56,6 @@ const connectError = document.getElementById("ws-connect-error")!;
 const messageFeed = document.getElementById("ws-message-feed")!;
 const messageFooter = document.getElementById("ws-message-footer")!;
 
-// Inspector
-const derivConnected = document.getElementById("ws-deriv-connected")!;
-const derivShouldReconnect = document.getElementById("ws-deriv-should-reconnect")!;
-const derivReconnectDelay = document.getElementById("ws-deriv-reconnect-delay")!;
-const derivReconnectCountdown = document.getElementById("ws-deriv-reconnect-countdown")!;
-const derivCanSend = document.getElementById("ws-deriv-can-send")!;
-const derivMessageCount = document.getElementById("ws-deriv-message-count")!;
-
 // Config sliders
 const messageRateSlider = document.getElementById("ws-message-rate") as HTMLInputElement;
 const rateVal = document.getElementById("ws-rate-val")!;
@@ -84,13 +76,6 @@ const timelineEl = document.getElementById("ws-timeline")!;
 let lastMessageCount = 0;
 let lastConnectError = "";
 
-function renderBoolDeriv(el: HTMLElement, value: boolean, pulseClass?: string): void {
-  const indicator = value
-    ? `<span class="ws-deriv-indicator ${pulseClass || "true"}"></span>`
-    : '<span class="ws-deriv-indicator false"></span>';
-  el.innerHTML = `${indicator} ${value}`;
-}
-
 function render(): void {
   const facts = system.facts;
   const derive = system.derive;
@@ -98,9 +83,6 @@ function render(): void {
   const status = facts.status as WsStatus;
   const url = facts.url as string;
   const messages = facts.messages as WsMessage[];
-  const isConnected = derive.isConnected as boolean;
-  const shouldReconnect = derive.shouldReconnect as boolean;
-  const reconnectDelay = derive.reconnectDelay as number;
   const reconnectCountdown = derive.reconnectCountdown as number;
   const canSend = derive.canSend as boolean;
   const messageCount = derive.messageCount as number;
@@ -175,14 +157,6 @@ function render(): void {
 
   lastMessageCount = messages.length;
   messageFooter.textContent = `${messageCount} message${messageCount !== 1 ? "s" : ""}`;
-
-  // --- Inspector: Derivations ---
-  renderBoolDeriv(derivConnected, isConnected);
-  renderBoolDeriv(derivShouldReconnect, shouldReconnect, shouldReconnect ? "reconnect" : undefined);
-  derivReconnectDelay.textContent = `${reconnectDelay}ms`;
-  derivReconnectCountdown.textContent = `${reconnectCountdown}s`;
-  renderBoolDeriv(derivCanSend, canSend);
-  derivMessageCount.textContent = `${messageCount}`;
 
   // --- Slider labels ---
   rateVal.textContent = `${facts.messageRate}s`;

@@ -2,7 +2,7 @@
  * A/B Testing Engine — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
- * renders experiment cards, state inspector, and event timeline.
+ * renders experiment cards and event timeline.
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
@@ -302,27 +302,12 @@ const experimentsEl = document.getElementById("experiments")!;
 const pauseBtn = document.getElementById("btn-pause")!;
 const resetBtn = document.getElementById("btn-reset")!;
 
-// Inspector
-const factUserId = document.getElementById("ab-fact-userid")!;
-const factPaused = document.getElementById("ab-fact-paused")!;
-const factExperiments = document.getElementById("ab-fact-experiments")!;
-const factAssignments = document.getElementById("ab-fact-assignments")!;
-const factExposures = document.getElementById("ab-fact-exposures")!;
-const derivActive = document.getElementById("ab-deriv-active")!;
-const derivAssigned = document.getElementById("ab-deriv-assigned")!;
-const derivExposed = document.getElementById("ab-deriv-exposed")!;
-
 // Timeline
 const timelineEl = document.getElementById("ab-timeline")!;
 
 // ============================================================================
 // Render
 // ============================================================================
-
-function renderBoolIndicator(el: HTMLElement, value: boolean): void {
-  const cls = value ? "true" : "false";
-  el.innerHTML = `<span class="ab-deriv-indicator ${cls}"></span> ${value}`;
-}
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
@@ -337,8 +322,6 @@ function render() {
   const exposures = system.facts.exposures as Record<string, number>;
   const assignedCount = system.read("assignedCount") as number;
   const exposedCount = system.read("exposedCount") as number;
-  const activeExperiments = system.read("activeExperiments") as Experiment[];
-
   // --- Stats ---
   experimentCountEl.textContent = String(experiments.length);
   assignedCountEl.textContent = String(assignedCount);
@@ -385,21 +368,6 @@ function render() {
 
     experimentsEl.appendChild(div);
   }
-
-  // --- Inspector: Facts ---
-  factUserId.textContent = system.facts.userId;
-  renderBoolIndicator(factPaused, system.facts.paused as boolean);
-  factExperiments.textContent = `${experiments.length} experiments`;
-  const assignKeys = Object.keys(assignments);
-  factAssignments.textContent = assignKeys.length > 0
-    ? assignKeys.map((k) => `${k}: ${assignments[k]}`).join(", ")
-    : "{}";
-  factExposures.textContent = `${Object.keys(exposures).length} tracked`;
-
-  // --- Inspector: Derivations ---
-  derivActive.textContent = `${activeExperiments.length} active`;
-  derivAssigned.textContent = String(assignedCount);
-  derivExposed.textContent = String(exposedCount);
 
   // --- Timeline ---
   if (timeline.length === 0) {

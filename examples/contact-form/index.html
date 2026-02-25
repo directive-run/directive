@@ -40,10 +40,10 @@
       gap: 1rem;
     }
 
-    /* ===== Main 3-column Layout ===== */
+    /* ===== Main 2-column Layout ===== */
     .cf-main {
       display: grid;
-      grid-template-columns: 280px 1fr 280px;
+      grid-template-columns: 280px 1fr;
       gap: 1rem;
     }
 
@@ -198,75 +198,7 @@
 
     .cf-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); }
 
-    /* ===== Live State Inspector (Center) ===== */
-    .cf-inspector-section {
-      margin-bottom: 0.5rem;
-    }
-
-    .cf-inspector-section:last-child { margin-bottom: 0; }
-
-    .cf-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .cf-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.2rem 0;
-      font-size: 0.7rem;
-    }
-
-    .cf-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .cf-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .cf-status-badge {
-      font-size: 0.6rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 0.1rem 0.4rem;
-      border-radius: 20px;
-      white-space: nowrap;
-    }
-
-    .cf-status-badge.idle { background: rgba(100, 116, 139, 0.2); color: var(--brand-text-dim); }
-    .cf-status-badge.submitting { background: rgba(91, 163, 163, 0.2); color: var(--brand-primary); }
-    .cf-status-badge.success { background: rgba(109, 171, 114, 0.2); color: var(--brand-success); }
-    .cf-status-badge.error { background: rgba(232, 131, 111, 0.2); color: var(--brand-error); }
-
-    .cf-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .cf-deriv-indicator.true { background: var(--brand-success); }
-    .cf-deriv-indicator.false { background: var(--brand-text-faint); }
-
-    /* ===== Event Timeline (Right) ===== */
+    /* ===== Event Timeline ===== */
     .cf-timeline {
       flex: 1;
       overflow-y: auto;
@@ -359,7 +291,7 @@
 </head>
 <body>
   <div class="cf-container">
-    <!-- Main 3-column -->
+    <!-- Main 2-column -->
     <div class="cf-main">
       <!-- Left: Form -->
       <div class="cf-panel">
@@ -407,86 +339,7 @@
         </div>
       </div>
 
-      <!-- Center: Live State Inspector -->
-      <div class="cf-panel">
-        <div class="cf-panel-header">Live State Inspector</div>
-        <div class="cf-panel-body">
-          <div class="cf-inspector-section">
-            <div class="cf-inspector-title">Facts</div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">name</span>
-              <span id="cf-fact-name" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">email</span>
-              <span id="cf-fact-email" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">subject</span>
-              <span id="cf-fact-subject" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">message</span>
-              <span id="cf-fact-message" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">status</span>
-              <span id="cf-fact-status" class="cf-inspector-value">
-                <span class="cf-status-badge idle">idle</span>
-              </span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">touched</span>
-              <span id="cf-fact-touched" class="cf-inspector-value">0 fields</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">submissionCount</span>
-              <span id="cf-fact-submissions" class="cf-inspector-value">0</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">lastSubmittedAt</span>
-              <span id="cf-fact-lastsubmit" class="cf-inspector-value">&mdash;</span>
-            </div>
-          </div>
-          <div class="cf-inspector-section">
-            <div class="cf-inspector-title">Derivations</div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">isValid</span>
-              <span id="cf-deriv-isvalid" class="cf-inspector-value">
-                <span class="cf-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">canSubmit</span>
-              <span id="cf-deriv-cansubmit" class="cf-inspector-value">
-                <span class="cf-deriv-indicator false"></span> false
-              </span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">nameError</span>
-              <span id="cf-deriv-nameerror" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">emailError</span>
-              <span id="cf-deriv-emailerror" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">subjectError</span>
-              <span id="cf-deriv-subjecterror" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">messageError</span>
-              <span id="cf-deriv-messageerror" class="cf-inspector-value">&mdash;</span>
-            </div>
-            <div class="cf-inspector-row">
-              <span class="cf-inspector-key">messageCharCount</span>
-              <span id="cf-deriv-charcount" class="cf-inspector-value">0</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Event Timeline -->
+      <!-- Event Timeline -->
       <div class="cf-panel">
         <div class="cf-panel-header">Event Timeline</div>
         <div class="cf-panel-body" style="flex: 1;">

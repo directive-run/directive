@@ -52,7 +52,7 @@
     .cp-stage-label { font-size: 0.55rem; color: var(--brand-text-dim); text-transform: uppercase; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-    .cp-main { display: grid; grid-template-columns: 220px 1fr 280px; gap: 1rem; }
+    .cp-main { display: grid; grid-template-columns: 220px 1fr; gap: 1rem; }
     @media (max-width: 800px) { .cp-main { grid-template-columns: 1fr; } }
 
     .cp-panel { background: var(--brand-surface-raised); border: 1px solid var(--brand-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
@@ -76,19 +76,6 @@
     .cp-slider-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.65rem; }
     .cp-slider-row input[type="range"] { flex: 1; accent-color: var(--brand-primary); }
     .cp-slider-val { font-family: ui-monospace, monospace; color: var(--brand-text-muted); min-width: 1.5rem; text-align: right; }
-
-    /* Inspector */
-    .cp-inspector-section { margin-bottom: 0.5rem; }
-    .cp-inspector-section:last-child { margin-bottom: 0; }
-    .cp-inspector-title { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--brand-text-dim); margin-bottom: 0.4rem; padding-bottom: 0.2rem; border-bottom: 1px solid var(--brand-border); }
-    .cp-inspector-row { display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0; font-size: 0.7rem; }
-    .cp-inspector-key { color: var(--brand-text-dim); font-family: ui-monospace, monospace; }
-    .cp-inspector-value { color: var(--brand-text); font-family: ui-monospace, monospace; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-    /* Results */
-    .cp-result-item { display: flex; justify-content: space-between; align-items: center; padding: 0.15rem 0; font-size: 0.6rem; }
-    .cp-result-stage { font-weight: 600; color: var(--brand-text-muted); text-transform: uppercase; }
-    .cp-result-detail { color: var(--brand-text-dim); font-family: ui-monospace, monospace; }
 
     /* Checkpoints */
     .cp-checkpoint-entry { background: var(--brand-surface); border: 1px solid var(--brand-border); border-radius: 6px; padding: 0.35rem 0.5rem; margin-bottom: 0.3rem; }
@@ -116,7 +103,7 @@
     .cp-how-it-works ul { padding-left: 1.2rem; }
     .cp-how-it-works li { margin-bottom: 0.2rem; }
   </style>
-  <script type="module" crossorigin src="/examples/ai-checkpoint/assets/index-DbJBEWGV.js"></script>
+  <script type="module" crossorigin src="/examples/ai-checkpoint/assets/index-Cc35GiJb.js"></script>
 </head>
 <body>
   <div class="cp-container">
@@ -165,42 +152,6 @@
           <span class="cp-label">Checkpoints</span>
           <div id="cp-checkpoint-list" data-testid="cp-checkpoint-list">
             <div style="color:var(--brand-text-faint);font-size:0.65rem;font-style:italic">No checkpoints saved</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center: Inspector -->
-      <div class="cp-panel">
-        <div class="cp-panel-header">State Inspector</div>
-        <div class="cp-panel-body">
-          <div class="cp-inspector-section">
-            <div class="cp-inspector-title">Pipeline</div>
-            <div class="cp-inspector-row">
-              <span class="cp-inspector-key">currentStage</span>
-              <span id="cp-insp-stage" class="cp-inspector-value" data-testid="cp-current-stage">idle</span>
-            </div>
-            <div class="cp-inspector-row">
-              <span class="cp-inspector-key">completion</span>
-              <span id="cp-insp-completion" class="cp-inspector-value" data-testid="cp-completion">0%</span>
-            </div>
-            <div class="cp-inspector-row">
-              <span class="cp-inspector-key">totalTokens</span>
-              <span id="cp-insp-tokens" class="cp-inspector-value" data-testid="cp-total-tokens">0</span>
-            </div>
-            <div class="cp-inspector-row">
-              <span class="cp-inspector-key">retryCount</span>
-              <span id="cp-insp-retries" class="cp-inspector-value" data-testid="cp-retry-count">0</span>
-            </div>
-            <div class="cp-inspector-row">
-              <span class="cp-inspector-key">lastError</span>
-              <span id="cp-insp-error" class="cp-inspector-value" data-testid="cp-last-error">&mdash;</span>
-            </div>
-          </div>
-          <div class="cp-inspector-section">
-            <div class="cp-inspector-title">Stage Results</div>
-            <div id="cp-insp-results" data-testid="cp-results">
-              <div style="color:var(--brand-text-faint);font-size:0.65rem;font-style:italic">No results yet</div>
-            </div>
           </div>
         </div>
       </div>

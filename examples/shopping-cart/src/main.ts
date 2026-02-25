@@ -37,8 +37,6 @@ const checkoutStatusEl = document.getElementById("sc-checkout-status")!;
 const authToggleBtn = document.getElementById("sc-auth-toggle") as HTMLButtonElement;
 const authStatusEl = document.getElementById("sc-auth-status")!;
 
-const stateInspectorEl = document.getElementById("sc-state-inspector")!;
-
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -211,32 +209,6 @@ function render(): void {
     authStatusEl.innerHTML = '<span class="sc-auth-badge sc-auth-out">Not signed in</span>';
   }
 
-  // ---- State Inspector ----
-  const state = {
-    "cart.facts": {
-      items: items.map((i) => ({ id: i.id, name: i.name, qty: i.quantity, price: i.price })),
-      couponCode,
-      couponDiscount,
-      couponStatus,
-      checkoutRequested,
-      checkoutStatus,
-      checkoutError: checkoutError || undefined,
-    },
-    "cart.derive": {
-      subtotal: +subtotal.toFixed(2),
-      itemCount,
-      isEmpty,
-      discount: +discount.toFixed(2),
-      tax: +tax.toFixed(2),
-      total: +total.toFixed(2),
-      freeShipping,
-    },
-    "auth.facts": {
-      isAuthenticated,
-      userName,
-    },
-  };
-  stateInspectorEl.textContent = JSON.stringify(state, null, 2);
 }
 
 // ============================================================================

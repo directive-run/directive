@@ -35,8 +35,9 @@
 
     .us-container {
       width: 100%;
-      display: grid;
-      grid-template-columns: 1fr 280px;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
       gap: 1rem;
     }
 
@@ -300,45 +301,6 @@
       padding: 0.35rem 0.7rem;
     }
 
-    /* ===== State Inspector Sidebar ===== */
-    .us-sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .us-panel {
-      background: var(--brand-surface-raised);
-      border: 1px solid var(--brand-border);
-      border-radius: 10px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .us-panel-header {
-      padding: 0.6rem 0.85rem;
-      border-bottom: 1px solid var(--brand-border);
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--brand-text-muted);
-    }
-
-    .us-panel-body {
-      padding: 0.6rem 0.85rem;
-    }
-
-    .us-panel-body pre {
-      font-size: 0.65rem;
-      color: var(--brand-text-dim);
-      font-family: "SF Mono", "Fira Code", monospace;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-
     /* ===== How it works ===== */
     .us-how-it-works {
       background: var(--brand-surface-raised);
@@ -347,7 +309,6 @@
       padding: 0.75rem 0.85rem;
       font-size: 0.7rem;
       color: var(--brand-text-dim);
-      grid-column: 1 / -1;
     }
 
     .us-how-it-works h3 {
@@ -368,8 +329,6 @@
     }
 
     @media (max-width: 800px) {
-      .us-container { grid-template-columns: 1fr; }
-      .us-how-it-works { grid-column: 1; }
       body { padding: 0.75rem; }
     }
   </style>
@@ -437,23 +396,6 @@
         <button id="us-page-prev" class="us-btn us-nav-btn" data-testid="us-page-prev" disabled>Prev</button>
         <div id="us-page-numbers" style="display: flex; gap: 0.35rem;"></div>
         <button id="us-page-next" class="us-btn us-nav-btn" data-testid="us-page-next" disabled>Next</button>
-      </div>
-    </div>
-
-    <!-- State Inspector Sidebar -->
-    <div class="us-sidebar">
-      <div class="us-panel">
-        <div class="us-panel-header">URL Module Facts</div>
-        <div class="us-panel-body">
-          <pre id="us-inspector-url"></pre>
-        </div>
-      </div>
-
-      <div class="us-panel">
-        <div class="us-panel-header">Products Module</div>
-        <div class="us-panel-body">
-          <pre id="us-inspector-products"></pre>
-        </div>
       </div>
     </div>
 

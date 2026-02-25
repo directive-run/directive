@@ -335,7 +335,7 @@
       color: var(--brand-text-dim);
     }
 
-    /* ===== Config + Inspector + Timeline (Right) ===== */
+    /* ===== Config + Timeline (Right) ===== */
     .ws-slider-group {
       display: flex;
       flex-direction: column;
@@ -367,58 +367,6 @@
       border: none;
       border-top: 1px solid var(--brand-border);
       margin: 0.3rem 0;
-    }
-
-    .ws-inspector-title {
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--brand-text-dim);
-      margin-bottom: 0.3rem;
-      padding-bottom: 0.2rem;
-      border-bottom: 1px solid var(--brand-border);
-    }
-
-    .ws-inspector-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.15rem 0;
-      font-size: 0.65rem;
-    }
-
-    .ws-inspector-key {
-      color: var(--brand-text-dim);
-      font-family: ui-monospace, monospace;
-    }
-
-    .ws-inspector-value {
-      color: var(--brand-text);
-      font-family: ui-monospace, monospace;
-      text-align: right;
-    }
-
-    .ws-deriv-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 0.3rem;
-      vertical-align: middle;
-    }
-
-    .ws-deriv-indicator.true {
-      background: var(--brand-success);
-    }
-
-    .ws-deriv-indicator.false {
-      background: var(--brand-text-faint);
-    }
-
-    .ws-deriv-indicator.reconnect {
-      background: var(--brand-error);
-      animation: ws-pulse 0.8s ease-in-out infinite;
     }
 
     .ws-timeline-header {
@@ -525,7 +473,7 @@
       body { padding: 0.75rem; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/websocket/assets/index-Cjo5-whb.js"></script>
+  <script type="module" crossorigin src="/examples/websocket/assets/index-BVCuMHrt.js"></script>
 </head>
 <body>
   <div class="ws-container">
@@ -589,7 +537,7 @@
         <div id="ws-message-footer" class="ws-message-footer" data-testid="ws-message-count">0 messages</div>
       </div>
 
-      <!-- Right: Config + Inspector + Timeline -->
+      <!-- Right: Config + Timeline -->
       <div class="ws-panel">
         <div class="ws-panel-header">Configuration</div>
         <div class="ws-panel-body">
@@ -616,38 +564,6 @@
               Max Retries <span id="ws-max-retries-val" class="ws-slider-value">5</span>
             </label>
             <input type="range" id="ws-max-retries" data-testid="ws-max-retries" min="0" max="10" step="1" value="5" />
-          </div>
-          <hr class="ws-config-separator" />
-          <div class="ws-inspector-title">Derivations</div>
-          <div class="ws-inspector-row">
-            <span class="ws-inspector-key">isConnected</span>
-            <span id="ws-deriv-connected" class="ws-inspector-value" data-testid="ws-deriv-connected">
-              <span class="ws-deriv-indicator false"></span> false
-            </span>
-          </div>
-          <div class="ws-inspector-row">
-            <span class="ws-inspector-key">shouldReconnect</span>
-            <span id="ws-deriv-should-reconnect" class="ws-inspector-value" data-testid="ws-deriv-should-reconnect">
-              <span class="ws-deriv-indicator false"></span> false
-            </span>
-          </div>
-          <div class="ws-inspector-row">
-            <span class="ws-inspector-key">reconnectDelay</span>
-            <span id="ws-deriv-reconnect-delay" class="ws-inspector-value" data-testid="ws-deriv-reconnect-delay">1000ms</span>
-          </div>
-          <div class="ws-inspector-row">
-            <span class="ws-inspector-key">reconnectCountdown</span>
-            <span id="ws-deriv-reconnect-countdown" class="ws-inspector-value" data-testid="ws-deriv-reconnect-countdown">0s</span>
-          </div>
-          <div class="ws-inspector-row">
-            <span class="ws-inspector-key">canSend</span>
-            <span id="ws-deriv-can-send" class="ws-inspector-value" data-testid="ws-deriv-can-send">
-              <span class="ws-deriv-indicator false"></span> false
-            </span>
-          </div>
-          <div class="ws-inspector-row">
-            <span class="ws-inspector-key">messageCount</span>
-            <span id="ws-deriv-message-count" class="ws-inspector-value" data-testid="ws-deriv-message-count">0</span>
           </div>
           <hr class="ws-config-separator" />
           <div class="ws-timeline-header">Event Timeline</div>
