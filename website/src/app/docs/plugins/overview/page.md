@@ -60,14 +60,7 @@ plugins: [
 
 If two plugins with the same `name` are registered, the second replaces the first with a warning.
 
-```
-    onInit ──setup──► onStart ──running──► onFactChange ──recompute──► onDerivation
-                                                                           │
-                                                                       reconcile
-                                                                           │
-                                                                           ▼
-                                                         onStop ◄──────  onResolve
-```
+{% plugin-lifecycle-diagram /%}
 
 ---
 

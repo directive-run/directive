@@ -18,6 +18,7 @@ export {
 // Wrapper & Controls
 export { DiagramWrapper } from './DiagramWrapper'
 export { AnimationController } from './AnimationController'
+export { DiagramToolbar } from './DiagramToolbar'
 
 // Layout
 export { positionNode, horizontalRow, verticalColumn, edge } from './layout-utils'
