@@ -690,24 +690,6 @@ export function createAgentOrchestrator<
       }
     }
 
-    // Call onAgentStart hook
-    fireHook("onAgentStart", {
-      agentName: agent.name,
-      input,
-      timestamp: startTime,
-    });
-
-    if (timeline) {
-      timeline.record({
-        type: "agent_start",
-        timestamp: startTime,
-        agentId: agent.name,
-        snapshotId: null,
-        inputLength: input.length,
-        ...(verboseTimeline ? { input: input.slice(0, MAX_VERBOSE_LENGTH) } : {}),
-      });
-    }
-
     // Breakpoint: pre_input_guardrails
     if (breakpoints && breakpoints.length > 0) {
       const bpContext: BreakpointContext = {
@@ -734,7 +716,7 @@ export function createAgentOrchestrator<
       ? callOptions.outputGuardrails
       : (guardrails.output ?? []);
 
-    // Run input guardrails with retry support
+    // Run input guardrails BEFORE agent_start so timeline shows correct order
     const inputGuardrailsList = effectiveInputGuardrails.map((g, i) =>
       normalizeGuardrail(g, i, "input")
     );
@@ -775,6 +757,26 @@ export function createAgentOrchestrator<
       if (result.transformed !== undefined) {
         input = result.transformed as string;
       }
+    }
+
+    // Call onAgentStart hook (after guardrails pass)
+    fireHook("onAgentStart", {
+      agentName: agent.name,
+      input,
+      timestamp: startTime,
+    });
+
+    if (timeline) {
+      timeline.record({
+        type: "agent_start",
+        timestamp: Date.now(),
+        agentId: agent.name,
+        snapshotId: null,
+        inputLength: input.length,
+        modelId: agent.model ?? undefined,
+        ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+        ...(verboseTimeline ? { input: input.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+      });
     }
 
     // Update state
@@ -1053,7 +1055,10 @@ export function createAgentOrchestrator<
         snapshotId: null,
         outputLength: outputStr?.length ?? 0,
         totalTokens: result.totalTokens,
+        inputTokens: result.tokenUsage?.inputTokens ?? 0,
+        outputTokens: result.tokenUsage?.outputTokens ?? 0,
         durationMs: Date.now() - startTime,
+        modelId: agent.model ?? undefined,
         ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
       });
     }
