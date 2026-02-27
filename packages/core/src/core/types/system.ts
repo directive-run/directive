@@ -189,8 +189,10 @@ export interface RunChangelogEntry {
 export interface SystemInspection {
 	unmet: RequirementWithId[];
 	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
-	constraints: Array<{ id: string; active: boolean; priority: number; hitCount: number; lastActiveAt: number | null }>;
+	constraints: Array<{ id: string; active: boolean; disabled: boolean; priority: number; hitCount: number; lastActiveAt: number | null }>;
 	resolvers: Record<string, ResolverStatus>;
+	/** Whether debug.runHistory is enabled on this system */
+	runHistoryEnabled: boolean;
 	/** Per-run changelog entries (only present if debug.runHistory is enabled) */
 	runHistory?: RunChangelogEntry[];
 }
@@ -284,6 +286,8 @@ export interface ConstraintsControl {
 	disable(id: string): void;
 	/** Enable a previously disabled constraint — it will be re-evaluated on the next cycle */
 	enable(id: string): void;
+	/** Check if a constraint is currently disabled */
+	isDisabled(id: string): boolean;
 }
 
 /** Runtime control for effects */

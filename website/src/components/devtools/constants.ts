@@ -60,8 +60,8 @@ export const EVENT_LABELS: Record<string, string> = {
   scratchpad_update: 'Scratchpad',
 }
 
-export const SYSTEM_VIEWS = ['Facts', 'Derivations', 'Constraints', 'System Graph', 'Time Travel'] as const
-export const AI_VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Breakpoints', 'Graph', 'Goal', 'Memory', 'Budget', 'Config'] as const
+export const SYSTEM_VIEWS = ['Facts', 'Derivations', 'Pipeline', 'System Graph', 'Time Travel', 'Breakpoints'] as const
+export const AI_VIEWS = ['Timeline', 'Cost', 'State', 'Guardrails', 'Events', 'Health', 'Graph', 'Goal', 'Memory', 'Budget', 'Config'] as const
 export const ALL_VIEWS = [...SYSTEM_VIEWS, ...AI_VIEWS] as const
 
 // Keep VIEWS as alias for backward compat in shell module

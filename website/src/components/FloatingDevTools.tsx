@@ -9,7 +9,7 @@ import { DrawerPanel } from './devtools/DrawerPanel'
 import { DevToolsContent } from './LiveDevTools'
 
 interface FloatingDevToolsProps {
-  offset?: { bottom?: number; left?: number }
+  offset?: { bottom?: number; right?: number }
 }
 
 export function FloatingDevTools({ offset }: FloatingDevToolsProps) {
