@@ -915,6 +915,7 @@ export function createEngine<S extends Schema>(
 		constraints: {
 			disable: (id: string) => constraintsManager.disable(id),
 			enable: (id: string) => constraintsManager.enable(id),
+			isDisabled: (id: string) => constraintsManager.isDisabled(id),
 		},
 		effects: {
 			disable: (id: string) => effectsManager.disable(id),
@@ -1178,6 +1179,7 @@ export function createEngine<S extends Schema>(
 				constraints: constraintsManager.getAllStates().map((s) => ({
 					id: s.id,
 					active: s.lastResult ?? false,
+					disabled: constraintsManager.isDisabled(s.id),
 					priority: s.priority,
 					hitCount: s.hitCount,
 					lastActiveAt: s.lastActiveAt,
@@ -1185,6 +1187,7 @@ export function createEngine<S extends Schema>(
 				resolvers: Object.fromEntries(
 					resolversManager.getInflight().map((id) => [id, resolversManager.getStatus(id)]),
 				),
+				runHistoryEnabled,
 				...(runHistoryEnabled ? {
 				runHistory: runHistory.map((r) => ({
 					...r,

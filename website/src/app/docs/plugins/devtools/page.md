@@ -388,6 +388,85 @@ The floating panel is framework-agnostic (vanilla DOM), so it works the same way
 
 ---
 
+## React DevTools UI
+
+For a full-featured visual debugging experience, Directive provides React-based DevTools components with 17 tabs covering both system internals and AI orchestration.
+
+Two components are available:
+
+- **`LiveDevTools`** — Standalone panel you embed directly in your layout
+- **`FloatingDevTools`** — Drawer overlay triggered by a floating action button (the Directive logo)
+
+```tsx
+import { FloatingDevTools } from '@directive-run/react/devtools';
+
+function App() {
+  return (
+    <>
+      <MyApp />
+      <FloatingDevTools />
+    </>
+  );
+}
+```
+
+Both components auto-detect systems registered via `devtoolsPlugin()` and connect to the `window.__DIRECTIVE__` registry.
+
+---
+
+### System Tabs
+
+Six tabs for inspecting core Directive system state:
+
+| Tab | Description |
+|-----|-------------|
+| **Facts** | Live key-value table of all facts with filter, copy, inline editing via REPL, and breakpoint icons |
+| **Derivations** | Live key-value table of all derivations with filter and copy |
+| **Pipeline** | Constraint evaluation status, requirement lifecycle, and inflight resolvers |
+| **System Graph** | Interactive React Flow diagram of facts → derivations → constraints → resolvers |
+| **Time Travel** | Snapshot browser with diff view, undo/redo, and export/import |
+| **Breakpoints** | Fact mutation breakpoints, trace event breakpoints, and pause/resume controls |
+
+### AI Tabs
+
+Eleven tabs for debugging multi-agent AI orchestration:
+
+| Tab | Description |
+|-----|-------------|
+| **Timeline** | Flamechart waterfall of agent events with zoom and pan |
+| **Cost** | Token usage and cost tracking per model |
+| **State** | Live agent state snapshot |
+| **Guardrails** | Guardrail check results with pass/fail status |
+| **Events** | Scrollable event log with type filter chips |
+| **Health** | System health metrics |
+| **Graph** | Agent orchestration DAG |
+| **Goal** | Goal progress tracking |
+| **Memory** | Agent memory inspection |
+| **Budget** | Budget usage and limits |
+| **Config** | Runtime configuration viewer |
+
+---
+
+### Breakpoints
+
+The Breakpoints tab lets you pause execution when specific conditions are met.
+
+**Fact breakpoints** — Click the eye icon next to any fact in the Facts tab to add a breakpoint. You can optionally set a condition expression (e.g., `value > 10`). When the fact mutates and the condition passes, execution pauses and the mutation is logged.
+
+**Event breakpoints** — Break on any trace event type from the [event tracing table](#recorded-event-types) (e.g., `resolver.error`, `constraint.evaluate`). Supports condition expressions and logs every hit. Use the wildcard `*` to break on all events.
+
+**AI event breakpoints** — Break on SSE stream events during AI orchestration. Useful for pausing mid-stream to inspect agent state.
+
+When a breakpoint triggers, the system pauses and the Breakpoints tab shows the hit log. Click **Resume** to continue execution.
+
+---
+
+### SystemSelector
+
+When multiple Directive systems are registered on the page, the DevTools header shows a **SystemSelector** dropdown. It auto-detects systems via `window.__DIRECTIVE__.getSystems()` and lets you switch between them. All tabs update to reflect the selected system.
+
+---
+
 ## Visual Debugging
 
 For richer debugging beyond the console and floating panel:

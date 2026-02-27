@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from '@directive-run/react'
 import type { ConnectionStatus } from './devtools/types'
 import { SYSTEM_VIEWS, AI_VIEWS, ALL_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
+import { CountBadge } from './devtools/CountBadge'
 import { useDevToolsSystem } from './devtools/DevToolsSystemContext'
 import { DevToolsProvider } from './devtools/DevToolsProvider'
 import { useDevToolsStream } from './devtools/hooks/useDevToolsStream'
@@ -21,7 +22,7 @@ import { ConfigView } from './devtools/views/ConfigView'
 import { GoalView } from './devtools/views/GoalProgressView'
 import { FactsView } from './devtools/views/FactsView'
 import { DerivationsView } from './devtools/views/DerivationsView'
-import { ConstraintsView } from './devtools/views/ConstraintsView'
+import { PipelineView } from './devtools/views/ConstraintsView'
 import { SystemGraphView } from './devtools/views/SystemGraphView'
 import { TimeTravelView } from './devtools/views/TimeTravelView'
 import { DirectiveLogomark } from './devtools/DirectiveLogomark'
@@ -40,7 +41,7 @@ const VIEW_REGISTRY: Record<typeof ALL_VIEWS[number], React.ComponentType> = {
   // System views
   'Facts': FactsView,
   'Derivations': DerivationsView,
-  'Constraints': ConstraintsView,
+  'Pipeline': PipelineView,
   'System Graph': SystemGraphView,
   'Time Travel': TimeTravelView,
   // AI views
@@ -167,17 +168,23 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   const constraintCount = useSelector(system, (s) => s.facts.runtime.constraints.length)
   const inflightCount = useSelector(system, (s) => s.derive.runtime.inflightCount)
 
+  // Read breakpoint hit counts for tab badges
+  const factBreakpointHitCount = useSelector(system, (s) => s.derive.runtime.factBreakpointHitCount ?? 0)
+  const eventBreakpointHitCount = useSelector(system, (s) => s.derive.runtime.eventBreakpointHitCount ?? 0)
+
   // Tab badge counts — only show for tabs with data
   const tabBadges: Partial<Record<string, number>> = useMemo(() => {
     const badges: Partial<Record<string, number>> = {}
     if (factCount > 0) badges['Facts'] = factCount
     if (derivationCount > 0) badges['Derivations'] = derivationCount
-    if (constraintCount > 0 || inflightCount > 0) badges['Constraints'] = constraintCount + inflightCount
+    if (constraintCount > 0 || inflightCount > 0) badges['Pipeline'] = constraintCount + inflightCount
     if (eventCount > 0) badges['Events'] = eventCount
     if (eventCount > 0) badges['Timeline'] = eventCount
+    const totalBreakpointHits = factBreakpointHitCount + eventBreakpointHitCount
+    if (totalBreakpointHits > 0) badges['Breakpoints'] = totalBreakpointHits
 
     return badges
-  }, [factCount, derivationCount, constraintCount, inflightCount, eventCount])
+  }, [factCount, derivationCount, constraintCount, inflightCount, eventCount, factBreakpointHitCount, eventBreakpointHitCount])
 
   // Share button toast state
   const [shareToast, setShareToast] = useState(false)
@@ -551,13 +558,11 @@ function DevToolsTabBar({
               >
                 {v}
                 {tabBadges[v] != null && (
-                  <span className={`ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1 py-px text-[9px] font-semibold leading-none ${
-                    v === activeView
-                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
-                  }`}>
-                    {tabBadges[v]}
-                  </span>
+                  <CountBadge
+                    count={tabBadges[v]!}
+                    variant={v === activeView ? 'active' : 'default'}
+                    className="ml-1.5"
+                  />
                 )}
               </button>
             </div>

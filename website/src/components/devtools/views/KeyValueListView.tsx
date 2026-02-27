@@ -86,6 +86,8 @@ interface KeyValueListViewProps {
   noMatchMessage: (filter: string) => string
   /** Optional footer element (e.g. FactRepl) */
   footer?: ReactNode
+  /** Optional per-row action buttons (e.g. breakpoint toggle) */
+  renderRowActions?: (key: string) => ReactNode
 }
 
 export function KeyValueListView({
@@ -97,6 +99,7 @@ export function KeyValueListView({
   emptyMessage,
   noMatchMessage,
   footer,
+  renderRowActions,
 }: KeyValueListViewProps) {
   const [filter, setFilter] = useState('')
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
@@ -215,6 +218,7 @@ export function KeyValueListView({
                   </span>
                 )}
               </div>
+              {renderRowActions?.(key)}
               <CopyButton keyName={key} value={value} />
             </div>
           )

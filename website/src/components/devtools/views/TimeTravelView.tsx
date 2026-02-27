@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
+import { useTimeTravel } from '../hooks/useTimeTravel'
 import { EmptyState } from '../EmptyState'
 
 interface DiffEntry {
@@ -54,7 +55,7 @@ function DiffValue({ value }: { value: unknown }) {
   }
   if (typeof value === 'object') {
     return (
-      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300">
         {JSON.stringify(value, null, 2)}
       </pre>
     )
@@ -66,13 +67,8 @@ function DiffValue({ value }: { value: unknown }) {
 export function TimeTravelView() {
   const system = useDevToolsSystem()
   const connected = useSelector(system, (s) => s.facts.runtime.connected)
-  const timeTravelEnabled = useSelector(system, (s) => s.facts.runtime.timeTravelEnabled)
-  const snapshotIndex = useSelector(system, (s) => s.facts.runtime.snapshotIndex)
-  const snapshotCount = useSelector(system, (s) => s.facts.runtime.snapshotCount)
-  const canUndo = useSelector(system, (s) => s.derive.runtime.canUndo)
-  const canRedo = useSelector(system, (s) => s.derive.runtime.canRedo)
-  const systemName = useSelector(system, (s) => s.facts.runtime.systemName)
   const facts = useSelector(system, (s) => s.facts.runtime.facts)
+  const { timeTravelEnabled, snapshotIndex, snapshotCount, canUndo, canRedo, handleUndo, handleRedo } = useTimeTravel()
 
   const [diff, setDiff] = useState<DiffEntry[]>([])
   const prevFactsRef = useRef<Record<string, unknown>>({})
@@ -89,39 +85,26 @@ export function TimeTravelView() {
       if (newDiff.length > 0) {
         setDiff(newDiff)
       }
+    } else if (Object.keys(facts).length > 0) {
+      // Initial load — show current facts as the baseline
+      setDiff(Object.entries(facts).map(([key, value]) => ({
+        key, type: 'added' as const, newValue: value,
+      })))
     }
 
     prevFactsRef.current = { ...facts }
   }, [facts, timeTravelEnabled])
 
-  const handleUndo = useCallback(() => {
-    if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
-      return
-    }
-
-    // Capture current facts before the operation
+  // Wrap shared hook callbacks with local diff tracking
+  const onUndo = () => {
     prevFactsRef.current = { ...facts }
+    handleUndo()
+  }
 
-    const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
-    if (sys?.debug?.goBack) {
-      sys.debug.goBack(1)
-      system.events.runtime.refresh()
-    }
-  }, [system, systemName, facts])
-
-  const handleRedo = useCallback(() => {
-    if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
-      return
-    }
-
+  const onRedo = () => {
     prevFactsRef.current = { ...facts }
-
-    const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
-    if (sys?.debug?.goForward) {
-      sys.debug.goForward(1)
-      system.events.runtime.refresh()
-    }
-  }, [system, systemName, facts])
+    handleRedo()
+  }
 
   if (!connected) {
     return <EmptyState message="No Directive system connected" />
@@ -142,14 +125,6 @@ export function TimeTravelView() {
 
         {/* Controls */}
         <div className="flex items-center gap-4">
-          <button
-            onClick={handleUndo}
-            disabled={!canUndo}
-            className="cursor-pointer rounded border border-zinc-200 px-3 py-1.5 font-mono text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            ← Undo
-          </button>
-
           <div className="flex flex-col items-center gap-0.5">
             <div className="flex items-center gap-2 font-mono text-sm">
               <span className="text-xs text-zinc-400 dark:text-zinc-500">Step</span>
@@ -167,7 +142,15 @@ export function TimeTravelView() {
           </div>
 
           <button
-            onClick={handleRedo}
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="cursor-pointer rounded border border-zinc-200 px-3 py-1.5 font-mono text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            ← Undo
+          </button>
+
+          <button
+            onClick={onRedo}
             disabled={!canRedo}
             className="cursor-pointer rounded border border-zinc-200 px-3 py-1.5 font-mono text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
@@ -189,7 +172,7 @@ export function TimeTravelView() {
             {diff.map((d) => (
               <div
                 key={d.key}
-                className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-[11px] dark:border-zinc-700 dark:bg-zinc-800/50"
+                className="rounded border border-zinc-200 font-mono text-[11px] dark:border-zinc-700"
               >
                 <div className="flex items-center gap-2">
                   <span className={`inline-block rounded px-1 py-px text-[9px] font-semibold uppercase leading-none ${
@@ -205,21 +188,21 @@ export function TimeTravelView() {
                 </div>
                 {d.type === 'changed' && (
                   <div className="mt-2 space-y-1.5 overflow-x-auto">
-                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] dark:border-red-900/30 dark:bg-red-900/10">
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] dark:border-red-800/50 dark:bg-red-900/30">
                       <DiffValue value={d.oldValue} />
                     </div>
-                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-[11px] dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-[11px] dark:border-emerald-800/50 dark:bg-emerald-900/30">
                       <DiffValue value={d.newValue} />
                     </div>
                   </div>
                 )}
                 {d.type === 'added' && (
-                  <div className="mt-2 overflow-x-auto rounded border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-[11px] dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                  <div className="mt-2 overflow-x-auto rounded border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-[11px] dark:border-emerald-800/50 dark:bg-emerald-900/30">
                     <DiffValue value={d.newValue} />
                   </div>
                 )}
                 {d.type === 'removed' && (
-                  <div className="mt-2 overflow-x-auto rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] dark:border-red-900/30 dark:bg-red-900/10">
+                  <div className="mt-2 overflow-x-auto rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] dark:border-red-800/50 dark:bg-red-900/30">
                     <DiffValue value={d.oldValue} />
                   </div>
                 )}

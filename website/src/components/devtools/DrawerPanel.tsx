@@ -6,6 +6,7 @@ import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from './DevToolsSystemContext'
 import { DirectiveLogomark } from './DirectiveLogomark'
 import { SystemSelector } from './SystemSelector'
+import { useTimeTravel } from './hooks/useTimeTravel'
 import { Z_DRAWER, DRAWER_OPEN_MS, DRAWER_CLOSE_MS } from './z-index'
 import type { ConnectionStatus } from './types'
 
@@ -53,10 +54,8 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
   const width = useSelector(system, (s) => s.facts.shell.drawerWidth)
   const aiStatus = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
   const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled) as boolean
-  const timeTravelEnabled = useSelector(system, (s) => s.facts.runtime.timeTravelEnabled)
-  const canUndo = useSelector(system, (s) => s.derive.runtime.canUndo)
-  const canRedo = useSelector(system, (s) => s.derive.runtime.canRedo)
-  const systemName = useSelector(system, (s) => s.facts.runtime.systemName)
+  const isFullscreen = useSelector(system, (s) => s.facts.shell.isFullscreen)
+  const { timeTravelEnabled, snapshotIndex, snapshotCount, canUndo, canRedo, handleUndo, handleRedo } = useTimeTravel()
 
   // Portal mount target
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
@@ -145,29 +144,22 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [drawerOpen])
 
-  const handleUndo = useCallback(() => {
-    if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen || !drawerOpen) {
       return
     }
 
-    const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
-    if (sys?.debug?.goBack) {
-      sys.debug.goBack(1)
-      system.events.runtime.refresh()
-    }
-  }, [system, systemName])
-
-  const handleRedo = useCallback(() => {
-    if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
-      return
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        system.events.shell.exitFullscreen()
+      }
     }
 
-    const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
-    if (sys?.debug?.goForward) {
-      sys.debug.goForward(1)
-      system.events.runtime.refresh()
-    }
-  }, [system, systemName])
+    document.addEventListener('keydown', handleEsc)
+
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [isFullscreen, drawerOpen, system])
 
   const isMobile = useMediaQuery('(max-width: 639px)')
 
@@ -186,29 +178,40 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
     : width
 
   // #17: Use animation constants, #5 remove willChange when not animating
-  const panelStyle: React.CSSProperties = isBottom
+  const panelStyle: React.CSSProperties = isFullscreen
     ? {
-        bottom: 0,
+        top: 0,
         left: 0,
         right: 0,
-        height: effectiveHeight,
-        transform: isAnimating ? 'translateY(0)' : 'translateY(100%)',
-        transition: isAnimating
-          ? `transform ${DRAWER_OPEN_MS}ms ease-out`
-          : `transform ${DRAWER_CLOSE_MS}ms ease-in`,
-        ...(isAnimating || !isVisible ? {} : { willChange: 'transform' }),
-      }
-    : {
-        top: 0,
-        right: 0,
         bottom: 0,
-        width: effectiveWidth,
-        transform: isAnimating ? 'translateX(0)' : 'translateX(100%)',
+        transform: isAnimating ? 'none' : (isBottom ? 'translateY(100%)' : 'translateX(100%)'),
         transition: isAnimating
           ? `transform ${DRAWER_OPEN_MS}ms ease-out`
           : `transform ${DRAWER_CLOSE_MS}ms ease-in`,
-        ...(isAnimating || !isVisible ? {} : { willChange: 'transform' }),
       }
+    : isBottom
+      ? {
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: effectiveHeight,
+          transform: isAnimating ? 'translateY(0)' : 'translateY(100%)',
+          transition: isAnimating
+            ? `transform ${DRAWER_OPEN_MS}ms ease-out`
+            : `transform ${DRAWER_CLOSE_MS}ms ease-in`,
+          ...(isAnimating || !isVisible ? {} : { willChange: 'transform' }),
+        }
+      : {
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: effectiveWidth,
+          transform: isAnimating ? 'translateX(0)' : 'translateX(100%)',
+          transition: isAnimating
+            ? `transform ${DRAWER_OPEN_MS}ms ease-out`
+            : `transform ${DRAWER_CLOSE_MS}ms ease-in`,
+          ...(isAnimating || !isVisible ? {} : { willChange: 'transform' }),
+        }
 
   return createPortal(
     // #7: role="dialog" + aria-label + aria-modal for screen readers
@@ -221,7 +224,7 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
       style={{ ...panelStyle, zIndex: Z_DRAWER }}
     >
       {/* #5: Resize handle — expanded hit area (16px transparent zone, 2px visible line) */}
-      <ResizeHandle position={position} />
+      {!isFullscreen && <ResizeHandle position={position} />}
 
       {/* Drawer header */}
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
@@ -253,6 +256,11 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
           {/* Snapshot back/forward — only when time-travel is enabled */}
           {timeTravelEnabled && (
             <>
+              {snapshotCount > 0 && (
+                <span className="mr-0.5 font-mono text-[10px] text-zinc-400 dark:text-zinc-500" role="status" aria-label={`Snapshot ${snapshotIndex + 1} of ${snapshotCount}`} title="Snapshot position">
+                  {snapshotIndex + 1}/{snapshotCount}
+                </span>
+              )}
               <button
                 onClick={handleUndo}
                 disabled={!canUndo}
@@ -302,6 +310,24 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
               )}
             </button>
           )}
+
+          {/* Fullscreen toggle */}
+          <button
+            onClick={() => system.events.shell.toggleFullscreen()}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+          >
+            {isFullscreen ? (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M5.5 1a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1 0-1H4.3L1.15 1.15a.5.5 0 1 1 .7-.7L5 3.7V1.5a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v2.2l3.15-3.15a.5.5 0 1 1 .7.7L11.7 4.5h2.3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5zM1 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-2.3l-3.15 3.15a.5.5 0 0 1-.7-.7L3.3 11H1.5a.5.5 0 0 1-.5-.5zm9 0a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-2.3l3.15 3.15a.5.5 0 0 1-.7.7L10.5 11.7v2.3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0V2.707l3.146 3.147a.5.5 0 1 0 .708-.708L2.707 2H4.5a.5.5 0 0 0 0-1h-3zm13 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V2.707l-3.146 3.147a.5.5 0 1 1-.708-.708L13.293 2H11.5a.5.5 0 0 1 0-1h3zM1.5 15a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 1 0v1.793l3.146-3.147a.5.5 0 1 1 .708.708L2.707 14H4.5a.5.5 0 0 1 0 1h-3zm13 0a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v1.793l-3.146-3.147a.5.5 0 0 0-.708.708L13.293 14H11.5a.5.5 0 0 0 0 1h3z" />
+              </svg>
+            )}
+          </button>
 
           {/* Close button — #7: receives focus on open */}
           <button
