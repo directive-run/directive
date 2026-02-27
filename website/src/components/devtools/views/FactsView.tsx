@@ -5,12 +5,18 @@ import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
 import { KeyValueListView } from './KeyValueListView'
+import type { FactBreakpointDef } from '../types'
 
 export function FactsView() {
   const system = useDevToolsSystem()
   const connected = useSelector(system, (s) => s.facts.runtime.connected)
   const facts = useSelector(system, (s) => s.facts.runtime.facts)
   const factCount = useSelector(system, (s) => s.derive.runtime.factCount)
+  const factBreakpoints = useSelector(system, (s) => s.facts.runtime.factBreakpoints) as FactBreakpointDef[]
+
+  const renderRowActions = useCallback((key: string) => {
+    return <BreakpointButton factKey={key} breakpoints={factBreakpoints} system={system} />
+  }, [factBreakpoints, system])
 
   if (!connected) {
     return <EmptyState message="No Directive system connected" />
@@ -26,7 +32,62 @@ export function FactsView() {
       emptyMessage="No facts in system"
       noMatchMessage={(f) => `No facts matching "${f}"`}
       footer={<FactRepl />}
+      renderRowActions={renderRowActions}
     />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// BreakpointButton — eye icon to toggle fact breakpoints
+// ---------------------------------------------------------------------------
+
+function BreakpointButton({
+  factKey,
+  breakpoints,
+  system,
+}: {
+  factKey: string
+  breakpoints: FactBreakpointDef[]
+  system: any
+}) {
+  const existing = breakpoints.find((bp) => bp.factKey === factKey)
+  const isActive = existing?.enabled ?? false
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (existing) {
+      if (existing.enabled) {
+        system.events.runtime.removeFactBreakpoint({ id: existing.id })
+      } else {
+        system.events.runtime.toggleFactBreakpoint({ id: existing.id })
+      }
+    } else {
+      const bp: FactBreakpointDef = {
+        id: `fbp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        factKey,
+        condition: '',
+        enabled: true,
+        createdAt: Date.now(),
+      }
+      system.events.runtime.addFactBreakpoint({ breakpoint: bp })
+    }
+  }, [factKey, existing, system])
+
+  return (
+    <button
+      onClick={handleClick}
+      aria-label={isActive ? `Remove breakpoint on ${factKey}` : `Add breakpoint on ${factKey}`}
+      className={`ml-1 shrink-0 cursor-pointer rounded p-0.5 transition-opacity ${
+        isActive
+          ? 'text-amber-500 opacity-100'
+          : 'text-zinc-300 opacity-0 group-hover:opacity-100 hover:text-amber-400 dark:text-zinc-600 dark:hover:text-amber-400'
+      }`}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3">
+        <path d="M8 2C4.69 2 2 4.69 2 8s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" />
+        {isActive && <circle cx="8" cy="8" r="3" />}
+      </svg>
+    </button>
   )
 }
 

@@ -1,6 +1,8 @@
-// @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
+// @ts-nocheck — createModule inference collapses with complex object/array schema types (t.array<T>, t.object<T>).
+// All errors below cascade from the same root cause. Fix by improving InferSchema for nested generics in core.
 import { createModule, t } from '@directive-run/core'
 import type { RunChangelogEntry } from '@directive-run/core'
+import type { FactBreakpointDef, FactBreakpointHit, EventBreakpointDef, EventBreakpointHit } from '../types'
 
 // ---------------------------------------------------------------------------
 // Types for runtime bridge data
@@ -9,6 +11,7 @@ import type { RunChangelogEntry } from '@directive-run/core'
 export interface RuntimeConstraintInfo {
   id: string
   active: boolean
+  disabled: boolean
   priority: number | undefined
   hitCount: number
   lastActiveAt: number | null
@@ -31,10 +34,11 @@ export interface RuntimeRequirementInfo {
 interface InspectionResult {
   facts?: Record<string, unknown>
   derivations?: Record<string, unknown>
-  constraints?: Array<{ id?: string; active?: boolean; priority?: number; hitCount?: number; lastActiveAt?: number | null }>
+  constraints?: Array<{ id?: string; active?: boolean; disabled?: boolean; priority?: number; hitCount?: number; lastActiveAt?: number | null }>
   inflight?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
   unmet?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
   resolverStats?: Record<string, RuntimeResolverStats>
+  runHistoryEnabled?: boolean
   runHistory?: RunChangelogEntry[]
   timeTravel?: { currentIndex?: number; snapshotCount?: number }
 }
@@ -58,6 +62,9 @@ interface DirectiveSystemRef {
 // ---------------------------------------------------------------------------
 
 const _runtimeUnsubs = new WeakMap<object, () => void>()
+const _breakpointUnsubs = new WeakMap<object, Map<string, { unsub: () => void; condition: string }>>()
+
+const MAX_BREAKPOINT_HITS = 500
 
 // ---------------------------------------------------------------------------
 // Module
@@ -80,13 +87,49 @@ export const devtoolsRuntime = createModule('runtime', {
       lastEventType: t.nullable(t.string()),
       // Per-run changelog from the connected system
       runHistory: t.array<RunChangelogEntry>(),
+      // Whether the connected system has runHistory enabled
+      runHistoryEnabled: t.boolean(),
       // Tick counter bumped on each subscription callback — drives reactivity
       tick: t.number(),
+      // Breakpoint state
+      factBreakpoints: t.array<FactBreakpointDef>(),
+      factBreakpointHits: t.array<FactBreakpointHit>(),
+      eventBreakpoints: t.array<EventBreakpointDef>(),
+      eventBreakpointHits: t.array<EventBreakpointHit>(),
+      breakpointPaused: t.boolean(),
+      pausedOnHit: t.nullable(t.string()),
+    },
+    derivations: {
+      hasTimeTravel: t.boolean(),
+      canUndo: t.boolean(),
+      canRedo: t.boolean(),
+      factCount: t.number(),
+      derivationCount: t.number(),
+      activeConstraintCount: t.number(),
+      inflightCount: t.number(),
+      unmetCount: t.number(),
+      latestRun: t.nullable(t.object<RunChangelogEntry>()),
+      runCount: t.number(),
+      factBreakpointHitCount: t.number(),
+      eventBreakpointHitCount: t.number(),
+      totalBreakpointHitCount: t.number(),
+      activeFactBreakpointCount: t.number(),
+      activeEventBreakpointCount: t.number(),
     },
     events: {
       attach: { systemName: t.nullable(t.string()) },
       detach: {},
       refresh: {},
+      forceSync: {},
+      addFactBreakpoint: { breakpoint: t.object<FactBreakpointDef>() },
+      removeFactBreakpoint: { id: t.string() },
+      toggleFactBreakpoint: { id: t.string() },
+      clearFactBreakpointHits: {},
+      addEventBreakpoint: { breakpoint: t.object<EventBreakpointDef>() },
+      removeEventBreakpoint: { id: t.string() },
+      toggleEventBreakpoint: { id: t.string() },
+      clearEventBreakpointHits: {},
+      resumeFromBreakpoint: {},
     },
   },
 
@@ -104,7 +147,14 @@ export const devtoolsRuntime = createModule('runtime', {
     facts.snapshotCount = 0
     facts.lastEventType = null
     facts.runHistory = []
+    facts.runHistoryEnabled = false
     facts.tick = 0
+    facts.factBreakpoints = []
+    facts.factBreakpointHits = []
+    facts.eventBreakpoints = []
+    facts.eventBreakpointHits = []
+    facts.breakpointPaused = false
+    facts.pausedOnHit = null
   },
 
   derive: {
@@ -116,6 +166,16 @@ export const devtoolsRuntime = createModule('runtime', {
     activeConstraintCount: (facts) => facts.constraints.filter((c) => c.active).length,
     inflightCount: (facts) => facts.inflight.length,
     unmetCount: (facts) => facts.unmet.length,
+    latestRun: (facts) => {
+      const h = facts.runHistory
+      return h && h.length > 0 ? h[h.length - 1] : null
+    },
+    runCount: (facts) => facts.runHistory?.length ?? 0,
+    factBreakpointHitCount: (facts) => facts.factBreakpointHits.length,
+    eventBreakpointHitCount: (facts) => facts.eventBreakpointHits.length,
+    totalBreakpointHitCount: (facts) => facts.factBreakpointHits.length + facts.eventBreakpointHits.length,
+    activeFactBreakpointCount: (facts) => facts.factBreakpoints.filter((bp) => bp.enabled).length,
+    activeEventBreakpointCount: (facts) => facts.eventBreakpoints.filter((bp) => bp.enabled).length,
   },
 
   events: {
@@ -126,6 +186,16 @@ export const devtoolsRuntime = createModule('runtime', {
       // Clean up runtime subscription via WeakMap keyed on facts proxy
       _runtimeUnsubs.get(facts)?.()
       _runtimeUnsubs.delete(facts)
+
+      // Clean up breakpoint watchers
+      const bpMap = _breakpointUnsubs.get(facts)
+      if (bpMap) {
+        for (const entry of bpMap.values()) {
+          entry.unsub()
+        }
+        bpMap.clear()
+      }
+      _breakpointUnsubs.delete(facts)
 
       facts.connected = false
       facts.systemName = null
@@ -140,10 +210,74 @@ export const devtoolsRuntime = createModule('runtime', {
       facts.snapshotCount = 0
       facts.lastEventType = null
       facts.runHistory = []
+      facts.runHistoryEnabled = false
       facts.tick = 0
+      facts.factBreakpoints = []
+      facts.factBreakpointHits = []
+      facts.eventBreakpoints = []
+      facts.eventBreakpointHits = []
+      facts.breakpointPaused = false
+      facts.pausedOnHit = null
     },
     refresh: () => {
       // No-op event — triggers constraint re-evaluation
+    },
+    forceSync: (facts) => {
+      facts.tick++
+    },
+    addFactBreakpoint: (facts, { breakpoint }) => {
+      const idx = facts.factBreakpoints.findIndex((bp) => bp.id === breakpoint.id)
+      if (idx >= 0) {
+        facts.factBreakpoints = facts.factBreakpoints.map((bp) => bp.id === breakpoint.id ? breakpoint : bp)
+      } else {
+        facts.factBreakpoints = [...facts.factBreakpoints, breakpoint]
+      }
+    },
+    removeFactBreakpoint: (facts, { id }) => {
+      facts.factBreakpoints = facts.factBreakpoints.filter((bp) => bp.id !== id)
+    },
+    toggleFactBreakpoint: (facts, { id }) => {
+      facts.factBreakpoints = facts.factBreakpoints.map((bp) =>
+        bp.id === id ? { ...bp, enabled: !bp.enabled } : bp,
+      )
+    },
+    clearFactBreakpointHits: (facts) => {
+      facts.factBreakpointHits = []
+    },
+    addEventBreakpoint: (facts, { breakpoint }) => {
+      const idx = facts.eventBreakpoints.findIndex((bp) => bp.id === breakpoint.id)
+      if (idx >= 0) {
+        facts.eventBreakpoints = facts.eventBreakpoints.map((bp) => bp.id === breakpoint.id ? breakpoint : bp)
+      } else {
+        facts.eventBreakpoints = [...facts.eventBreakpoints, breakpoint]
+      }
+    },
+    removeEventBreakpoint: (facts, { id }) => {
+      facts.eventBreakpoints = facts.eventBreakpoints.filter((bp) => bp.id !== id)
+    },
+    toggleEventBreakpoint: (facts, { id }) => {
+      facts.eventBreakpoints = facts.eventBreakpoints.map((bp) =>
+        bp.id === id ? { ...bp, enabled: !bp.enabled } : bp,
+      )
+    },
+    clearEventBreakpointHits: (facts) => {
+      facts.eventBreakpointHits = []
+    },
+    resumeFromBreakpoint: (facts) => {
+      if (!facts.breakpointPaused) {
+        return
+      }
+
+      facts.breakpointPaused = false
+      facts.pausedOnHit = null
+
+      // Resume time-travel recording if paused
+      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
+        const sys = window.__DIRECTIVE__.getSystem(facts.systemName ?? undefined)
+        if (sys?.debug && typeof (sys.debug as any).resume === 'function') {
+          ;(sys.debug as any).resume()
+        }
+      }
     },
   },
 
@@ -189,6 +323,9 @@ export const devtoolsRuntime = createModule('runtime', {
               context.facts.lastEventType = event.type
               context.facts.tick++
 
+              // Check event breakpoints
+              checkEventBreakpoints(context.facts, event)
+
               // Debounced re-inspection happens via effect
             }, systemName)
 
@@ -225,12 +362,163 @@ export const devtoolsRuntime = createModule('runtime', {
         }
       },
     },
+
+    // Sync fact breakpoint watchers — subscribe/unsubscribe based on breakpoint list
+    syncFactBreakpoints: {
+      deps: ['factBreakpoints', 'connected', 'systemName'],
+      run: (facts) => {
+        if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
+          return
+        }
+
+        if (!facts.connected) {
+          return
+        }
+
+        const sys = window.__DIRECTIVE__.getSystem(facts.systemName ?? undefined)
+        if (!sys || typeof (sys as any).watch !== 'function') {
+          return
+        }
+
+        // Get or create the unsub map for this facts proxy
+        if (!_breakpointUnsubs.has(facts)) {
+          _breakpointUnsubs.set(facts, new Map())
+        }
+        const unsubMap = _breakpointUnsubs.get(facts)!
+
+        // Build map of active breakpoint ID → condition
+        const activeMap = new Map<string, string>()
+        for (const bp of facts.factBreakpoints) {
+          if (bp.enabled) {
+            activeMap.set(bp.id, bp.condition)
+          }
+        }
+
+        // Unsubscribe removed/disabled breakpoints AND those with changed conditions
+        for (const [id, entry] of unsubMap) {
+          const newCondition = activeMap.get(id)
+          if (newCondition === undefined || newCondition !== entry.condition) {
+            entry.unsub()
+            unsubMap.delete(id)
+          }
+        }
+
+        // Subscribe new/enabled breakpoints (including re-subscriptions for changed conditions)
+        for (const bp of facts.factBreakpoints) {
+          if (!bp.enabled || unsubMap.has(bp.id)) {
+            continue
+          }
+
+          const bpId = bp.id
+          const bpFactKey = bp.factKey
+          const bpCondition = bp.condition
+
+          try {
+            const unsub = (sys as any).watch(bpFactKey, (newValue: unknown, oldValue: unknown) => {
+              let conditionMet = true
+              if (bpCondition) {
+                try {
+                  const fn = new Function('newValue', 'oldValue', `return (${bpCondition})`)
+                  conditionMet = !!fn(newValue, oldValue)
+                } catch {
+                  conditionMet = false
+                }
+              }
+
+              const hit: FactBreakpointHit = {
+                id: `fbh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                breakpointId: bpId,
+                factKey: bpFactKey,
+                oldValue,
+                newValue,
+                timestamp: Date.now(),
+                conditionMet,
+              }
+
+              // Append hit (capped at MAX_BREAKPOINT_HITS)
+              const hits = [...facts.factBreakpointHits, hit]
+              facts.factBreakpointHits = hits.length > MAX_BREAKPOINT_HITS
+                ? hits.slice(hits.length - MAX_BREAKPOINT_HITS)
+                : hits
+
+              // Pause if condition met
+              if (conditionMet && !facts.breakpointPaused) {
+                facts.breakpointPaused = true
+                facts.pausedOnHit = 'fact'
+                if (sys?.debug && typeof (sys.debug as any).pause === 'function') {
+                  ;(sys.debug as any).pause()
+                }
+              }
+            })
+
+            unsubMap.set(bpId, { unsub, condition: bpCondition })
+          } catch {
+            // watch() may not be available
+          }
+        }
+      },
+    },
   },
 })
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function checkEventBreakpoints(facts: Record<string, any>, event: { type: string; [key: string]: unknown }) {
+  const breakpoints = facts.eventBreakpoints as EventBreakpointDef[]
+  if (!breakpoints || breakpoints.length === 0) {
+    return
+  }
+
+  for (const bp of breakpoints) {
+    if (!bp.enabled) {
+      continue
+    }
+
+    // Match event type — "*" is wildcard for all events
+    if (bp.eventType !== '*' && bp.eventType !== event.type) {
+      continue
+    }
+
+    let conditionMet = true
+    if (bp.condition) {
+      try {
+        const fn = new Function('data', 'type', `return (${bp.condition})`)
+        conditionMet = !!fn(event, event.type)
+      } catch {
+        conditionMet = false
+      }
+    }
+
+    const hit: EventBreakpointHit = {
+      id: `ebh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      breakpointId: bp.id,
+      eventType: event.type,
+      eventData: event,
+      timestamp: Date.now(),
+      conditionMet,
+    }
+
+    // Append hit (capped)
+    const hits = [...(facts.eventBreakpointHits as EventBreakpointHit[]), hit]
+    facts.eventBreakpointHits = hits.length > MAX_BREAKPOINT_HITS
+      ? hits.slice(hits.length - MAX_BREAKPOINT_HITS)
+      : hits
+
+    // Pause if condition met
+    if (conditionMet && !facts.breakpointPaused) {
+      facts.breakpointPaused = true
+      facts.pausedOnHit = 'event'
+      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
+        const sys = window.__DIRECTIVE__.getSystem(facts.systemName ?? undefined)
+        if (sys?.debug && typeof (sys.debug as any).pause === 'function') {
+          ;(sys.debug as any).pause()
+        }
+      }
+    }
+  }
+}
 
 function applyInspection(facts: Record<string, unknown>, inspection: InspectionResult, system?: DirectiveSystemRef) {
   // Facts — read directly from the system (inspect() doesn't include them)
@@ -268,6 +556,7 @@ function applyInspection(facts: Record<string, unknown>, inspection: InspectionR
     facts.constraints = inspection.constraints.map((c: any) => ({
       id: c.id ?? '',
       active: c.active ?? false,
+      disabled: c.disabled ?? false,
       priority: c.priority,
       hitCount: c.hitCount ?? 0,
       lastActiveAt: c.lastActiveAt ?? null,
@@ -298,6 +587,7 @@ function applyInspection(facts: Record<string, unknown>, inspection: InspectionR
   }
 
   // Run history
+  facts.runHistoryEnabled = inspection.runHistoryEnabled ?? false
   if (Array.isArray(inspection.runHistory)) {
     facts.runHistory = inspection.runHistory
   }

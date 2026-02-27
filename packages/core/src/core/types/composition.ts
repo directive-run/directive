@@ -30,13 +30,15 @@ import type {
 import type { Facts } from "./facts.js";
 import type { ModuleDef } from "./module.js";
 import type {
+	ConstraintsControl,
 	DebugConfig,
-	TimeTravelAPI,
+	DistributableSnapshot,
+	DistributableSnapshotOptions,
+	EffectsControl,
+	RunChangelogEntry,
 	SystemInspection,
 	SystemSnapshot,
-	DistributableSnapshotOptions,
-	DistributableSnapshot,
-	RunChangelogEntry,
+	TimeTravelAPI,
 } from "./system.js";
 import type { Plugin } from "./plugins.js";
 import type { ErrorBoundaryConfig } from "./errors.js";
@@ -263,6 +265,10 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	readonly derive: NamespacedDerivations<Modules>;
 	/** Events accessor (union of all module events) */
 	readonly events: NamespacedEventsAccessor<Modules>;
+	/** Runtime control for constraints (disable/enable/isDisabled) */
+	readonly constraints: ConstraintsControl;
+	/** Runtime control for effects (disable/enable/isEnabled) */
+	readonly effects: EffectsControl;
 	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
 	readonly runHistory: RunChangelogEntry[] | null;
 
@@ -583,6 +589,10 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	readonly derive: InferDerivations<S>;
 	/** Direct events accessor: system.events.increment() */
 	readonly events: SingleModuleEvents<S>;
+	/** Runtime control for constraints (disable/enable/isDisabled) */
+	readonly constraints: ConstraintsControl;
+	/** Runtime control for effects (disable/enable/isEnabled) */
+	readonly effects: EffectsControl;
 	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
 	readonly runHistory: RunChangelogEntry[] | null;
 

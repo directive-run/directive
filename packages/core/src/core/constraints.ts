@@ -46,6 +46,8 @@ export interface ConstraintsManager<_S extends Schema> {
 	getDependencies(id: string): Set<string> | undefined;
 	/** Mark a constraint's resolver as completed (for `after` ordering) */
 	markResolved(constraintId: string): void;
+	/** Check if a constraint is currently disabled */
+	isDisabled(id: string): boolean;
 	/** Check if a constraint has been resolved (for `after` ordering) */
 	isResolved(constraintId: string): boolean;
 	/** Register new constraint definitions (for dynamic module registration) */
@@ -796,6 +798,11 @@ export function createConstraintsManager<S extends Schema>(
 		},
 
 		disable(id: string): void {
+			if (!states.has(id)) {
+				console.warn(`[Directive] constraints.disable("${id}") — no such constraint`);
+
+				return;
+			}
 			disabled.add(id);
 			// Invalidate cache when constraints change
 			sortedConstraintIds = null;
@@ -820,11 +827,20 @@ export function createConstraintsManager<S extends Schema>(
 		},
 
 		enable(id: string): void {
+			if (!states.has(id)) {
+				console.warn(`[Directive] constraints.enable("${id}") — no such constraint`);
+
+				return;
+			}
 			disabled.delete(id);
 			// Invalidate cache when constraints change
 			sortedConstraintIds = null;
 			// Mark as dirty so it gets evaluated on next cycle
 			dirtyConstraints.add(id);
+		},
+
+		isDisabled(id: string): boolean {
+			return disabled.has(id);
 		},
 
 		invalidate(factKey: string): void {
