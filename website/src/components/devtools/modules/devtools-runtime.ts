@@ -1,11 +1,6 @@
-// @ts-nocheck — createModule generic inference doesn't resolve for complex schemas
+// @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
 import { createModule, t } from '@directive-run/core'
-
-// ---------------------------------------------------------------------------
-// Module-level cleanup registry (avoids `any` cast on context)
-// ---------------------------------------------------------------------------
-
-const _runtimeUnsubs = new Map<string, () => void>()
+import type { RunChangelogEntry } from '@directive-run/core'
 
 // ---------------------------------------------------------------------------
 // Types for runtime bridge data
@@ -15,6 +10,8 @@ export interface RuntimeConstraintInfo {
   id: string
   active: boolean
   priority: number | undefined
+  hitCount: number
+  lastActiveAt: number | null
 }
 
 export interface RuntimeResolverStats {
@@ -29,6 +26,38 @@ export interface RuntimeRequirementInfo {
   fromConstraint: string
   status: 'inflight' | 'unmet'
 }
+
+/** Shape returned by window.__DIRECTIVE__.inspect() */
+interface InspectionResult {
+  facts?: Record<string, unknown>
+  derivations?: Record<string, unknown>
+  constraints?: Array<{ id?: string; active?: boolean; priority?: number; hitCount?: number; lastActiveAt?: number | null }>
+  inflight?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
+  unmet?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
+  resolverStats?: Record<string, RuntimeResolverStats>
+  runHistory?: RunChangelogEntry[]
+  timeTravel?: { currentIndex?: number; snapshotCount?: number }
+}
+
+/** Subset of a Directive system instance used for direct proxy reads */
+interface DirectiveSystemRef {
+  facts?: Record<string, unknown>
+  derive?: Record<string, unknown>
+  debug?: {
+    isEnabled?: boolean
+    currentIndex?: number
+    snapshots?: unknown[]
+    goBack?: (steps: number) => void
+    goForward?: (steps: number) => void
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Module-level cleanup registry
+// Uses WeakMap keyed by context to avoid singleton corruption on HMR/dual-mount
+// ---------------------------------------------------------------------------
+
+const _runtimeUnsubs = new WeakMap<object, () => void>()
 
 // ---------------------------------------------------------------------------
 // Module
@@ -49,6 +78,8 @@ export const devtoolsRuntime = createModule('runtime', {
       snapshotIndex: t.number(),
       snapshotCount: t.number(),
       lastEventType: t.nullable(t.string()),
+      // Per-run changelog from the connected system
+      runHistory: t.array<RunChangelogEntry>(),
       // Tick counter bumped on each subscription callback — drives reactivity
       tick: t.number(),
     },
@@ -56,8 +87,6 @@ export const devtoolsRuntime = createModule('runtime', {
       attach: { systemName: t.nullable(t.string()) },
       detach: {},
       refresh: {},
-      undo: {},
-      redo: {},
     },
   },
 
@@ -74,6 +103,7 @@ export const devtoolsRuntime = createModule('runtime', {
     facts.snapshotIndex = -1
     facts.snapshotCount = 0
     facts.lastEventType = null
+    facts.runHistory = []
     facts.tick = 0
   },
 
@@ -93,10 +123,9 @@ export const devtoolsRuntime = createModule('runtime', {
       facts.systemName = systemName
     },
     detach: (facts) => {
-      // Clean up runtime subscription
-      const key = facts.systemName ?? '__default'
-      _runtimeUnsubs.get(key)?.()
-      _runtimeUnsubs.delete(key)
+      // Clean up runtime subscription via WeakMap keyed on facts proxy
+      _runtimeUnsubs.get(facts)?.()
+      _runtimeUnsubs.delete(facts)
 
       facts.connected = false
       facts.systemName = null
@@ -110,16 +139,11 @@ export const devtoolsRuntime = createModule('runtime', {
       facts.snapshotIndex = -1
       facts.snapshotCount = 0
       facts.lastEventType = null
+      facts.runHistory = []
       facts.tick = 0
     },
     refresh: () => {
       // No-op event — triggers constraint re-evaluation
-    },
-    undo: () => {
-      // Handled by effect
-    },
-    redo: () => {
-      // Handled by effect
     },
   },
 
@@ -152,10 +176,10 @@ export const devtoolsRuntime = createModule('runtime', {
               continue
             }
 
-            // Do initial inspection
+            // Do initial inspection (augmented with facts + derivations from the system)
             const inspection = directive.inspect(systemName)
             if (inspection) {
-              applyInspection(context.facts, inspection)
+              applyInspection(context.facts, inspection, system)
             }
 
             context.facts.connected = true
@@ -168,10 +192,9 @@ export const devtoolsRuntime = createModule('runtime', {
               // Debounced re-inspection happens via effect
             }, systemName)
 
-            // Store unsubscribe keyed by system name for cleanup on detach
-            const key = context.facts.systemName ?? '__default'
-            _runtimeUnsubs.get(key)?.()
-            _runtimeUnsubs.set(key, unsub)
+            // Store unsubscribe keyed by facts proxy for cleanup on detach
+            _runtimeUnsubs.get(context.facts)?.()
+            _runtimeUnsubs.set(context.facts, unsub)
 
             return
           }
@@ -194,16 +217,12 @@ export const devtoolsRuntime = createModule('runtime', {
           return
         }
 
-        const inspection = window.__DIRECTIVE__.inspect(facts.systemName ?? undefined)
+        const systemName = facts.systemName ?? undefined
+        const inspection = window.__DIRECTIVE__.inspect(systemName)
+        const system = window.__DIRECTIVE__.getSystem(systemName)
         if (inspection) {
-          applyInspection(facts, inspection)
+          applyInspection(facts, inspection, system)
         }
-      },
-    },
-    handleUndo: {
-      run: (facts, prev) => {
-        // Detect undo event by checking snapshotIndex change request
-        // This is driven by the undo event handler setting a marker
       },
     },
   },
@@ -213,14 +232,34 @@ export const devtoolsRuntime = createModule('runtime', {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function applyInspection(facts: any, inspection: any) {
-  // Facts
-  if (inspection.facts && typeof inspection.facts === 'object') {
+function applyInspection(facts: Record<string, unknown>, inspection: InspectionResult, system?: DirectiveSystemRef) {
+  // Facts — read directly from the system (inspect() doesn't include them)
+  if (system?.facts && typeof system.facts === 'object') {
+    try {
+      const snapshot: Record<string, unknown> = {}
+      for (const key of Object.keys(system.facts)) {
+        snapshot[key] = system.facts[key]
+      }
+      facts.facts = snapshot
+    } catch {
+      // Proxy access may fail
+    }
+  } else if (inspection.facts && typeof inspection.facts === 'object') {
     facts.facts = { ...inspection.facts }
   }
 
-  // Derivations
-  if (inspection.derivations && typeof inspection.derivations === 'object') {
+  // Derivations — read directly from the system
+  if (system?.derive && typeof system.derive === 'object') {
+    try {
+      const snapshot: Record<string, unknown> = {}
+      for (const key of Object.keys(system.derive)) {
+        snapshot[key] = system.derive[key]
+      }
+      facts.derivations = snapshot
+    } catch {
+      // Proxy access may fail
+    }
+  } else if (inspection.derivations && typeof inspection.derivations === 'object') {
     facts.derivations = { ...inspection.derivations }
   }
 
@@ -230,6 +269,8 @@ function applyInspection(facts: any, inspection: any) {
       id: c.id ?? '',
       active: c.active ?? false,
       priority: c.priority,
+      hitCount: c.hitCount ?? 0,
+      lastActiveAt: c.lastActiveAt ?? null,
     }))
   }
 
@@ -256,10 +297,20 @@ function applyInspection(facts: any, inspection: any) {
     facts.resolverStats = { ...inspection.resolverStats }
   }
 
-  // Time-travel
+  // Run history
+  if (Array.isArray(inspection.runHistory)) {
+    facts.runHistory = inspection.runHistory
+  }
+
+  // Time-travel — prefer inspect() data, fall back to system.debug
   if (inspection.timeTravel) {
     facts.timeTravelEnabled = true
     facts.snapshotIndex = inspection.timeTravel.currentIndex ?? -1
     facts.snapshotCount = inspection.timeTravel.snapshotCount ?? 0
+  } else if (system?.debug?.isEnabled) {
+    const debug = system.debug
+    facts.timeTravelEnabled = true
+    facts.snapshotIndex = typeof debug.currentIndex === 'number' ? debug.currentIndex : -1
+    facts.snapshotCount = Array.isArray(debug.snapshots) ? debug.snapshots.length : 0
   }
 }

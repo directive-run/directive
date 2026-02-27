@@ -5,6 +5,10 @@ description: Real-time visual debugging for AI agent orchestration via WebSocket
 
 A transport-agnostic debugging interface for agent orchestration with 12 specialized views. {% .lead %}
 
+{% callout type="note" title="Try it live" %}
+DevTools is active on all example pages. Visit [AI Guardrails](/docs/examples/ai-guardrails) or [AI Checkpoint](/docs/examples/ai-checkpoint) and click the Directive logo button (bottom-left) to inspect the system. For the full AI DevTools experience with streaming events, try the [AI Chat demo](/ai/examples/ai-chat).
+{% /callout %}
+
 The DevTools server (`@directive-run/ai`) bridges your orchestrator's timeline, health, breakpoints, and state into a visual debugging interface via WebSocket, SSE, or any custom transport.
 
 {% devtools-demo /%}

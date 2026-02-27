@@ -17,6 +17,7 @@ export function FloatingFab({ offset }: FloatingFabProps) {
   const system = useDevToolsSystem()
   const drawerOpen = useSelector(system, (s) => s.facts.shell.drawerOpen)
   const aiStatus = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
+  const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled) as boolean
   const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
 
   // All hooks MUST be called before any conditional returns
@@ -49,8 +50,8 @@ export function FloatingFab({ offset }: FloatingFabProps) {
     return null
   }
 
-  const isConnected = runtimeConnected || aiStatus === 'connected'
-  const isConnecting = aiStatus === 'connecting'
+  const isConnected = runtimeConnected || (aiEnabled && aiStatus === 'connected')
+  const isConnecting = aiEnabled && aiStatus === 'connecting'
 
   const badgeClass = isConnected
     ? 'bg-emerald-500'

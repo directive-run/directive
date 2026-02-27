@@ -1,25 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, type FormEvent } from 'react'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
-
-function formatValue(value: unknown): string {
-  if (value === undefined) return 'undefined'
-  if (value === null) return 'null'
-  if (typeof value === 'object') {
-    try {
-      const str = JSON.stringify(value, null, 2)
-
-      return str.length > 200 ? str.slice(0, 197) + '...' : str
-    } catch {
-      return '<error>'
-    }
-  }
-
-  return String(value)
-}
+import { KeyValueListView } from './KeyValueListView'
 
 export function FactsView() {
   const system = useDevToolsSystem()
@@ -27,98 +12,133 @@ export function FactsView() {
   const facts = useSelector(system, (s) => s.facts.runtime.facts)
   const factCount = useSelector(system, (s) => s.derive.runtime.factCount)
 
-  const [filter, setFilter] = useState('')
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
-
-  const toggleExpand = useCallback((key: string) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-
-      return next
-    })
-  }, [])
-
   if (!connected) {
     return <EmptyState message="No Directive system connected" />
   }
 
-  if (factCount === 0) {
-    return <EmptyState message="No facts in system" />
-  }
+  return (
+    <KeyValueListView
+      title="Facts"
+      filterLabel="Filter facts"
+      count={factCount}
+      data={facts}
+      keyColorClass="text-sky-600 dark:text-sky-400"
+      emptyMessage="No facts in system"
+      noMatchMessage={(f) => `No facts matching "${f}"`}
+      footer={<FactRepl />}
+    />
+  )
+}
 
-  const entries = Object.entries(facts)
-  const filtered = filter
-    ? entries.filter(([key]) => key.toLowerCase().includes(filter.toLowerCase()))
-    : entries
+// ---------------------------------------------------------------------------
+// FactRepl — set fact values via window.__DIRECTIVE__
+// ---------------------------------------------------------------------------
+
+const BLOCKED_FACT_KEYS = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty'])
+
+function FactRepl() {
+  const system = useDevToolsSystem()
+  const systemName = useSelector(system, (s) => s.facts.runtime.systemName)
+  const [input, setInput] = useState('')
+  const [feedback, setFeedback] = useState<{ type: 'ok' | 'error'; message: string } | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  const handleSubmit = useCallback((e: FormEvent) => {
+    e.preventDefault()
+    const trimmed = input.trim()
+    if (!trimmed) {
+      return
+    }
+
+    // Parse "key = value" syntax
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx === -1) {
+      setFeedback({ type: 'error', message: 'Use format: factKey = value' })
+
+      return
+    }
+
+    const key = trimmed.slice(0, eqIdx).trim()
+    const valueStr = trimmed.slice(eqIdx + 1).trim()
+
+    if (!key) {
+      setFeedback({ type: 'error', message: 'Missing fact key' })
+
+      return
+    }
+
+    if (BLOCKED_FACT_KEYS.has(key)) {
+      setFeedback({ type: 'error', message: `Cannot set reserved key "${key}"` })
+
+      return
+    }
+
+    try {
+      // Parse value as JSON (supports numbers, booleans, strings, objects)
+      let parsedValue: unknown
+      try {
+        parsedValue = JSON.parse(valueStr)
+      } catch {
+        // If not valid JSON, treat as string
+        parsedValue = valueStr
+      }
+
+      // Set the fact on the runtime system
+      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
+        const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
+        if (sys?.facts) {
+          (sys.facts as Record<string, unknown>)[key] = parsedValue
+          system.events.runtime.refresh()
+          setFeedback({ type: 'ok', message: `${key} = ${JSON.stringify(parsedValue)}` })
+          setInput('')
+        } else {
+          setFeedback({ type: 'error', message: 'System not found' })
+        }
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: String(err) })
+    }
+
+    // Clear feedback after 3s — cancel previous timer to avoid stale clear
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current)
+    }
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 3000)
+  }, [input, systemName, system])
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Facts
-          <span className="ml-2 font-mono font-normal text-zinc-400 dark:text-zinc-500">
-            {factCount}
-          </span>
-        </h4>
+    <div className="mt-auto border-t border-zinc-200 pt-2 dark:border-zinc-700">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{'>'}</span>
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Filter..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="w-40 rounded border border-zinc-200 bg-white px-2 py-1 font-mono text-[11px] text-zinc-700 placeholder-zinc-400 outline-none focus:border-sky-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:placeholder-zinc-500"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="factKey = value"
+          aria-label="Set fact value (format: key = value)"
+          className="flex-1 bg-transparent font-mono text-[11px] text-zinc-700 placeholder-zinc-400 outline-none dark:text-zinc-300 dark:placeholder-zinc-600"
         />
-      </div>
-
-      <div className="space-y-0.5">
-        {filtered.map(([key, value]) => {
-          const isObject = value !== null && typeof value === 'object'
-          const isExpanded = expandedKeys.has(key)
-
-          return (
-            <div
-              key={key}
-              className="flex rounded px-2 py-1.5 font-mono text-xs transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              <span className="w-48 shrink-0 truncate text-sky-600 dark:text-sky-400">
-                {key}
-              </span>
-              {isObject ? (
-                <div className="min-w-0 flex-1">
-                  <button
-                    onClick={() => toggleExpand(key)}
-                    className="cursor-pointer text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                  >
-                    {isExpanded ? '▼' : '▶'} {Array.isArray(value) ? `Array(${(value as unknown[]).length})` : 'Object'}
-                  </button>
-                  {isExpanded && (
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
-                      {formatValue(value)}
-                    </pre>
-                  )}
-                </div>
-              ) : (
-                <span className={
-                  typeof value === 'boolean'
-                    ? value ? 'text-emerald-500' : 'text-red-500'
-                    : typeof value === 'number'
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-zinc-700 dark:text-zinc-300'
-                }>
-                  {formatValue(value)}
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {filter && filtered.length === 0 && (
-        <EmptyState message={`No facts matching "${filter}"`} />
+        <button
+          type="submit"
+          className="cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+        >
+          Set
+        </button>
+      </form>
+      {feedback && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`mt-1 font-mono text-[10px] ${
+            feedback.type === 'ok'
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-red-500 dark:text-red-400'
+          }`}
+        >
+          {feedback.message}
+        </div>
       )}
     </div>
   )

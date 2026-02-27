@@ -95,7 +95,8 @@
       "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/tsconfig.json:*)",
       "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/vite.config.ts:*)",
       "WebFetch(domain:reactflow.dev)",
-      "WebFetch(domain:docs.excalidraw.com)"
+      "WebFetch(domain:docs.excalidraw.com)",
+      "Bash(pnpm exec playwright test --config e2e/playwright.config.ts \"e2e/specs/devtools-all-examples.spec.ts\" -g \"number-match: devtools registered\" --reporter=list 2>&1 | tail -30)"
     ]
   }
 }

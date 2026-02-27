@@ -50,7 +50,7 @@ export interface CreateDerivationsOptions<S extends Schema, D extends Derivation
 	facts: Facts<S>;
 	store: FactsStore<S>;
 	/** Callback when a derivation is computed */
-	onCompute?: (id: string, value: unknown, deps: string[]) => void;
+	onCompute?: (id: string, value: unknown, oldValue: unknown, deps: string[]) => void;
 	/** Callback when a derivation is invalidated */
 	onInvalidate?: (id: string) => void;
 	/** Callback when a derivation errors */
@@ -141,6 +141,9 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 		state.isComputing = true;
 
 		try {
+			// Capture old value before recomputation
+			const oldValue = state.cachedValue;
+
 			// Compute with tracking
 			const { value, deps } = withTracking(() => def(facts, derivedProxy));
 
@@ -152,7 +155,7 @@ export function createDerivationsManager<S extends Schema, D extends Derivations
 			updateDependencies(id, deps);
 
 			// Notify callback
-			onCompute?.(id, value, [...deps]);
+			onCompute?.(id, value, oldValue, [...deps]);
 
 			return value;
 		} catch (error) {

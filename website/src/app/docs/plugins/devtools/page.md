@@ -5,6 +5,10 @@ description: Debug Directive systems with a console API, event tracing, and an o
 
 The devtools plugin exposes your system to the browser console via `window.__DIRECTIVE__` and optionally renders a floating debug panel that shows facts, derivations, requirements, and events in real time. {% .lead %}
 
+{% callout type="note" title="Try it on any example" %}
+DevTools is active on every interactive example in these docs. Open any [example page](/docs/examples/counter) and click the Directive logo button (bottom-left) or press Cmd+Shift+D to inspect facts, derivations, constraints, and more in real time.
+{% /callout %}
+
 ---
 
 ## Basic Usage

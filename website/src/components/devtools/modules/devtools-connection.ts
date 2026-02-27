@@ -1,4 +1,4 @@
-// @ts-nocheck — createModule generic inference doesn't resolve for complex schemas
+// @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
 import { createModule, t } from '@directive-run/core'
 import type { DebugEvent, ConnectionStatus, BreakpointDef } from '../types'
 import { MAX_EVENTS, MAX_RECONNECT_RETRIES, RECONNECT_DELAY } from '../constants'
@@ -14,6 +14,8 @@ export const devtoolsConnection = createModule('connection', {
       resetUrl: t.string(),
       // Phase 4: Replay mode disables reconnection
       replayMode: t.boolean(),
+      // When false, no AI stream connection is attempted (system-only mode)
+      aiEnabled: t.boolean(),
       // Phase 5: Breakpoint-driven pause
       isPaused: t.boolean(),
       breakpoints: t.array<BreakpointDef>(),
@@ -56,6 +58,7 @@ export const devtoolsConnection = createModule('connection', {
     facts.streamUrl = '/api/devtools/stream'
     facts.resetUrl = '/api/devtools/reset'
     facts.replayMode = false
+    facts.aiEnabled = true
     facts.isPaused = false
     facts.breakpoints = []
     facts.pausedOnEvent = null
@@ -136,6 +139,7 @@ export const devtoolsConnection = createModule('connection', {
   constraints: {
     reconnectNeeded: {
       when: (facts) =>
+        facts.aiEnabled &&
         !facts.replayMode &&
         facts.status === 'disconnected' &&
         facts.retryCount < MAX_RECONNECT_RETRIES,

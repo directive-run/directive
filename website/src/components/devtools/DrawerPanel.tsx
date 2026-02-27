@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from './DevToolsSystemContext'
@@ -8,6 +8,38 @@ import { DirectiveLogomark } from './DirectiveLogomark'
 import { SystemSelector } from './SystemSelector'
 import { Z_DRAWER, DRAWER_OPEN_MS, DRAWER_CLOSE_MS } from './z-index'
 import type { ConnectionStatus } from './types'
+
+// ---------------------------------------------------------------------------
+// useMediaQuery — SSR-safe reactive media query hook
+// ---------------------------------------------------------------------------
+
+function useMediaQuery(query: string): boolean {
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (typeof window === 'undefined') {
+        return () => {}
+      }
+
+      const mql = window.matchMedia(query)
+      mql.addEventListener('change', callback)
+
+      return () => mql.removeEventListener('change', callback)
+    },
+    [query],
+  )
+
+  const getSnapshot = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    return window.matchMedia(query).matches
+  }, [query])
+
+  const getServerSnapshot = useCallback(() => false, [])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
 
 interface DrawerPanelProps {
   children: React.ReactNode
@@ -20,6 +52,11 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
   const height = useSelector(system, (s) => s.facts.shell.drawerHeight)
   const width = useSelector(system, (s) => s.facts.shell.drawerWidth)
   const aiStatus = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
+  const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled) as boolean
+  const timeTravelEnabled = useSelector(system, (s) => s.facts.runtime.timeTravelEnabled)
+  const canUndo = useSelector(system, (s) => s.derive.runtime.canUndo)
+  const canRedo = useSelector(system, (s) => s.derive.runtime.canRedo)
+  const systemName = useSelector(system, (s) => s.facts.runtime.systemName)
 
   // Portal mount target
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
@@ -57,6 +94,7 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
   // #7: Focus management — ref for close button, focus on open, restore on close
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (drawerOpen) {
@@ -71,6 +109,68 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
     }
   }, [drawerOpen])
 
+  // Focus trap — Tab/Shift+Tab cycle within the drawer when open
+  useEffect(() => {
+    if (!drawerOpen || !dialogRef.current) {
+      return
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab' || !dialogRef.current) {
+        return
+      }
+
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+
+      if (focusable.length === 0) {
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [drawerOpen])
+
+  const handleUndo = useCallback(() => {
+    if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
+      return
+    }
+
+    const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
+    if (sys?.debug?.goBack) {
+      sys.debug.goBack(1)
+      system.events.runtime.refresh()
+    }
+  }, [system, systemName])
+
+  const handleRedo = useCallback(() => {
+    if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
+      return
+    }
+
+    const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
+    if (sys?.debug?.goForward) {
+      sys.debug.goForward(1)
+      system.events.runtime.refresh()
+    }
+  }, [system, systemName])
+
+  const isMobile = useMediaQuery('(max-width: 639px)')
+
   if (!portalTarget || !isVisible) {
     return null
   }
@@ -78,11 +178,11 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
   const isBottom = position === 'bottom'
 
   // #4: Mobile breakpoints — cap size on small screens
-  const effectiveHeight = typeof window !== 'undefined' && window.innerWidth < 640
-    ? Math.min(height, window.innerHeight * 0.7)
+  const effectiveHeight = isMobile
+    ? Math.min(height, typeof window !== 'undefined' ? window.innerHeight * 0.7 : height)
     : height
-  const effectiveWidth = typeof window !== 'undefined' && window.innerWidth < 640
-    ? window.innerWidth
+  const effectiveWidth = isMobile
+    ? (typeof window !== 'undefined' ? window.innerWidth : width)
     : width
 
   // #17: Use animation constants, #5 remove willChange when not animating
@@ -110,12 +210,10 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
         ...(isAnimating || !isVisible ? {} : { willChange: 'transform' }),
       }
 
-  // #4: On mobile, hide position toggle (right-dock is unusable on phones)
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
-
   return createPortal(
     // #7: role="dialog" + aria-label + aria-modal for screen readers
     <div
+      ref={dialogRef}
       role="dialog"
       aria-label="DevTools panel"
       aria-modal="false"
@@ -136,7 +234,7 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
           {/* Connection status — system selector + AI indicator */}
           <div className="flex items-center gap-2 ml-2">
             <SystemSelector />
-            {aiStatus !== 'disconnected' && (
+            {aiEnabled && aiStatus !== 'disconnected' && (
               <div className="flex items-center gap-1">
                 <div className={`h-1.5 w-1.5 rounded-full ${
                   aiStatus === 'connected' ? 'bg-emerald-500'
@@ -152,6 +250,35 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Snapshot back/forward — only when time-travel is enabled */}
+          {timeTravelEnabled && (
+            <>
+              <button
+                onClick={handleUndo}
+                disabled={!canUndo}
+                aria-label="Go back one snapshot"
+                title="Back"
+                className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                  <path fillRule="evenodd" d="M11.354 3.646a.5.5 0 0 1 0 .708L7.707 8l3.647 3.646a.5.5 0 0 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 0 1 .708 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!canRedo}
+                aria-label="Go forward one snapshot"
+                title="Forward"
+                className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                  <path fillRule="evenodd" d="M4.646 3.646a.5.5 0 0 1 .708 0l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L8.293 8 4.646 4.354a.5.5 0 0 1 0-.708z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <div className="mx-0.5 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+            </>
+          )}
+
           {/* #4: Position toggle — hidden on mobile */}
           {!isMobile && (
             <button

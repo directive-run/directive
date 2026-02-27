@@ -5,6 +5,9 @@ export default defineConfig({
   base: "/examples/checkers/",
   build: {
     target: "esnext",
+    rollupOptions: {
+      external: ["ws", "fs", "path", "http", "https", "net", "tls", "crypto", "stream", "url", "zlib"],
+    },
   },
   plugins: [
     apiProxy({

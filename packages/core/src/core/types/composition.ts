@@ -36,6 +36,7 @@ import type {
 	SystemSnapshot,
 	DistributableSnapshotOptions,
 	DistributableSnapshot,
+	RunChangelogEntry,
 } from "./system.js";
 import type { Plugin } from "./plugins.js";
 import type { ErrorBoundaryConfig } from "./errors.js";
@@ -262,6 +263,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
 	readonly derive: NamespacedDerivations<Modules>;
 	/** Events accessor (union of all module events) */
 	readonly events: NamespacedEventsAccessor<Modules>;
+	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
+	readonly runHistory: RunChangelogEntry[] | null;
 
 	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
 	initialize(): void;
@@ -580,6 +583,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
 	readonly derive: InferDerivations<S>;
 	/** Direct events accessor: system.events.increment() */
 	readonly events: SingleModuleEvents<S>;
+	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
+	readonly runHistory: RunChangelogEntry[] | null;
 
 	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
 	initialize(): void;
