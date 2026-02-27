@@ -13,13 +13,20 @@ export function SystemSelector() {
   const system = useDevToolsSystem()
   const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
   const currentSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
+  const drawerOpen = useSelector(system, (s) => s.facts.shell.drawerOpen)
 
   const [availableSystems, setAvailableSystems] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const focusedIndexRef = useRef(-1)
 
-  // Poll for available systems (systems can register after mount)
+  // Poll for available systems — only while visible (drawer open or standalone mode)
+  // Uses document.hidden to pause when tab is backgrounded
   useEffect(() => {
+    if (!drawerOpen && typeof document !== 'undefined' && document.hidden) {
+      return
+    }
+
     function refresh() {
       if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
         setAvailableSystems(window.__DIRECTIVE__.getSystems())
@@ -27,10 +34,14 @@ export function SystemSelector() {
     }
 
     refresh()
-    const interval = setInterval(refresh, 2000)
+    const interval = setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        refresh()
+      }
+    }, 2000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [drawerOpen])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -49,6 +60,16 @@ export function SystemSelector() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
+  // Reset focused index when dropdown opens/closes
+  useEffect(() => {
+    if (open) {
+      const idx = availableSystems.indexOf(currentSystemName ?? '')
+      focusedIndexRef.current = idx >= 0 ? idx : 0
+    } else {
+      focusedIndexRef.current = -1
+    }
+  }, [open, availableSystems, currentSystemName])
+
   const handleSelect = useCallback((name: string) => {
     setOpen(false)
 
@@ -64,6 +85,66 @@ export function SystemSelector() {
       system.events.runtime.attach({ systemName: name })
     })
   }, [currentSystemName, system])
+
+  // Keyboard navigation for dropdown
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        setOpen(true)
+      }
+
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault()
+        const next = Math.min(focusedIndexRef.current + 1, availableSystems.length - 1)
+        focusedIndexRef.current = next
+        // Focus the option element
+        const options = containerRef.current?.querySelectorAll<HTMLElement>('[role="option"]')
+        options?.[next]?.focus()
+        break
+      }
+      case 'ArrowUp': {
+        e.preventDefault()
+        const prev = Math.max(focusedIndexRef.current - 1, 0)
+        focusedIndexRef.current = prev
+        const options = containerRef.current?.querySelectorAll<HTMLElement>('[role="option"]')
+        options?.[prev]?.focus()
+        break
+      }
+      case 'Enter':
+      case ' ': {
+        e.preventDefault()
+        const idx = focusedIndexRef.current
+        if (idx >= 0 && idx < availableSystems.length) {
+          handleSelect(availableSystems[idx])
+        }
+        break
+      }
+      case 'Escape': {
+        e.preventDefault()
+        setOpen(false)
+        break
+      }
+      case 'Home': {
+        e.preventDefault()
+        focusedIndexRef.current = 0
+        const options = containerRef.current?.querySelectorAll<HTMLElement>('[role="option"]')
+        options?.[0]?.focus()
+        break
+      }
+      case 'End': {
+        e.preventDefault()
+        focusedIndexRef.current = availableSystems.length - 1
+        const options = containerRef.current?.querySelectorAll<HTMLElement>('[role="option"]')
+        options?.[availableSystems.length - 1]?.focus()
+        break
+      }
+    }
+  }, [open, availableSystems, handleSelect])
 
   // Don't render if no systems available
   if (availableSystems.length === 0) {
@@ -89,7 +170,17 @@ export function SystemSelector() {
 
   // Multiple systems — show dropdown
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className="relative"
+      onKeyDown={handleKeyDown}
+      onBlur={(e) => {
+        // Close dropdown when focus leaves the container entirely
+        if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+          setOpen(false)
+        }
+      }}
+    >
       <button
         onClick={() => setOpen(!open)}
         className="flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition hover:bg-zinc-200 dark:hover:bg-zinc-700"
@@ -134,8 +225,9 @@ export function SystemSelector() {
                 key={name}
                 role="option"
                 aria-selected={isActive}
+                tabIndex={-1}
                 onClick={() => handleSelect(name)}
-                className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left font-mono text-[11px] transition ${
+                className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left font-mono text-[11px] transition focus:outline-none focus-visible:bg-zinc-100 dark:focus-visible:bg-zinc-700 ${
                   isActive
                     ? 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400'
                     : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700'

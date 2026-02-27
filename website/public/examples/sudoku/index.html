@@ -5,11 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sudoku - Directive Example</title>
   <style>
+    :root {
+      --brand-surface: #0f172a;
+      --brand-surface-raised: #1e293b;
+      --brand-border: #334155;
+      --brand-border-strong: #475569;
+      --brand-text: #cbd5e1;
+      --brand-text-muted: #94a3b8;
+      --brand-text-dim: #64748b;
+      --brand-text-faint: #475569;
+      --brand-primary: var(--brand-primary);
+      --brand-primary-hover: var(--brand-primary-hover);
+      --brand-error: var(--brand-error);
+      --brand-success: var(--brand-success);
+      --brand-warning: var(--brand-warning);
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #161412;
-      color: #c8bfb4;
+      background: var(--brand-surface);
+      color: var(--brand-text);
       display: flex;
       justify-content: center;
       align-items: flex-start;
@@ -29,12 +44,12 @@
       margin-bottom: 0.75rem; gap: 0.75rem;
     }
     .sudoku-timer {
-      background: #1f1b17; padding: 0.4rem 0.75rem; border-radius: 8px;
-      border: 1px solid #2a2520; font-size: 0.9rem; font-weight: 600;
+      background: var(--brand-surface-raised); padding: 0.4rem 0.75rem; border-radius: 8px;
+      border: 1px solid var(--brand-border); font-size: 0.9rem; font-weight: 600;
       font-variant-numeric: tabular-nums;
     }
-    .sudoku-timer.warning { color: #c4c07a; border-color: #6b5020; }
-    .sudoku-timer.critical { color: #e8836f; border-color: #7a3028; animation: pulse 1s infinite; }
+    .sudoku-timer.warning { color: var(--brand-warning); border-color: #6b5020; }
+    .sudoku-timer.critical { color: var(--brand-error); border-color: #7a3028; animation: pulse 1s infinite; }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.6; }
@@ -44,15 +59,15 @@
       display: flex; align-items: center; gap: 0.5rem;
     }
     .sudoku-progress-track {
-      flex: 1; height: 6px; background: #1f1b17; border-radius: 3px;
-      border: 1px solid #2a2520; overflow: hidden;
+      flex: 1; height: 6px; background: var(--brand-surface-raised); border-radius: 3px;
+      border: 1px solid var(--brand-border); overflow: hidden;
     }
     .sudoku-progress-fill {
-      height: 100%; background: #c4c07a; border-radius: 3px;
+      height: 100%; background: var(--brand-warning); border-radius: 3px;
       transition: width 0.3s ease;
     }
     .sudoku-progress-text {
-      font-size: 0.75rem; color: #6b6055; min-width: 2.5rem; text-align: right;
+      font-size: 0.75rem; color: var(--brand-text-dim); min-width: 2.5rem; text-align: right;
     }
 
     /* Info bar */
@@ -64,17 +79,17 @@
       display: flex; gap: 0.5rem; align-items: center;
     }
     .info-item {
-      background: #1f1b17; padding: 0.35rem 0.65rem; border-radius: 8px;
-      border: 1px solid #2a2520; font-size: 0.75rem; display: flex;
+      background: var(--brand-surface-raised); padding: 0.35rem 0.65rem; border-radius: 8px;
+      border: 1px solid var(--brand-border); font-size: 0.75rem; display: flex;
       align-items: center; gap: 0.35rem;
     }
-    .info-label { color: #6b6055; text-transform: uppercase; font-size: 0.6rem; }
+    .info-label { color: var(--brand-text-dim); text-transform: uppercase; font-size: 0.6rem; }
     .info-value { font-weight: 600; }
 
     /* Message */
     .sudoku-message {
-      background: #1f1b17; padding: 0.5rem; border-radius: 8px;
-      border: 1px solid #2a2520; font-size: 0.8rem; color: #9a8e80;
+      background: var(--brand-surface-raised); padding: 0.5rem; border-radius: 8px;
+      border: 1px solid var(--brand-border); font-size: 0.8rem; color: var(--brand-text-muted);
       margin-bottom: 0.75rem; min-height: 2rem;
       display: flex; align-items: center; justify-content: center;
     }
@@ -87,51 +102,51 @@
       width: 100%;
       margin: 0 auto 1rem;
       aspect-ratio: 1;
-      border: 3px solid #4a4035;
+      border: 3px solid var(--brand-border-strong);
       border-radius: 4px;
       overflow: hidden;
-      background: #2a2520;
+      background: var(--brand-border);
       gap: 1px;
     }
 
     .sudoku-cell {
       aspect-ratio: 1;
       display: flex; align-items: center; justify-content: center;
-      background: #1f1b17;
+      background: var(--brand-surface-raised);
       font-size: clamp(0.9rem, 3vw, 1.3rem);
       font-weight: 500;
       cursor: pointer;
       position: relative;
       transition: background 0.1s;
-      color: #c4c07a;
+      color: var(--brand-warning);
       user-select: none;
       -webkit-user-select: none;
     }
-    .sudoku-cell:hover { background: #262118; }
-    .sudoku-cell:focus { outline: 2px solid #5ba3a3; outline-offset: -2px; z-index: 1; }
+    .sudoku-cell:hover { background: #283548; }
+    .sudoku-cell:focus { outline: 2px solid var(--brand-primary); outline-offset: -2px; z-index: 1; }
     .sudoku-cell.given {
-      color: #c8bfb4;
+      color: var(--brand-text);
       font-weight: 700;
     }
     .sudoku-cell.selected {
       background: #1a2a2a;
-      box-shadow: inset 0 0 0 2px #5ba3a3;
+      box-shadow: inset 0 0 0 2px var(--brand-primary);
     }
-    .sudoku-cell.peer { background: #241f1a; }
-    .sudoku-cell.same-value { background: #2a2215; }
+    .sudoku-cell.peer { background: #1a2840; }
+    .sudoku-cell.same-value { background: #1e2a40; }
     .sudoku-cell.conflict {
       background: rgba(200, 60, 50, 0.18);
-      color: #e8836f;
+      color: var(--brand-error);
     }
 
     /* Notes mode indicator on grid */
     .sudoku-grid.notes-mode {
-      box-shadow: 0 0 0 2px #6dab72;
+      box-shadow: 0 0 0 2px var(--brand-success);
     }
 
     /* Box borders (thick lines every 3 cells) */
-    .sudoku-cell.box-left { border-left: 2px solid #4a4035; margin-left: -1px; }
-    .sudoku-cell.box-top { border-top: 2px solid #4a4035; margin-top: -1px; }
+    .sudoku-cell.box-left { border-left: 2px solid var(--brand-border-strong); margin-left: -1px; }
+    .sudoku-cell.box-top { border-top: 2px solid var(--brand-border-strong); margin-top: -1px; }
 
     /* Pencil marks */
     .notes-grid {
@@ -144,7 +159,7 @@
     .note-digit {
       display: flex; align-items: center; justify-content: center;
       font-size: clamp(0.4rem, 1.2vw, 0.55rem);
-      color: #6b6055;
+      color: var(--brand-text-dim);
       line-height: 1;
     }
 
@@ -153,15 +168,15 @@
       display: inline-flex; gap: 0.4rem;
     }
     .mode-btn {
-      background: rgba(255, 255, 255, 0.08); color: #c8bfb4;
+      background: rgba(255, 255, 255, 0.08); color: var(--brand-text);
       padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600;
       cursor: pointer; transition: all 0.15s;
-      border: 1px solid #2a2520; border-radius: 6px;
+      border: 1px solid var(--brand-border); border-radius: 6px;
     }
     .mode-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.15); }
     .mode-btn.active {
-      background: #5ba3a3; color: #fff;
-      border-color: #5ba3a3;
+      background: var(--brand-primary); color: #fff;
+      border-color: var(--brand-primary);
     }
 
     /* Number pad */
@@ -171,18 +186,18 @@
     }
     .num-btn {
       min-height: 44px;
-      background: #1f1b17; border: 1px solid #2a2520; color: #c8bfb4;
+      background: var(--brand-surface-raised); border: 1px solid var(--brand-border); color: var(--brand-text);
       border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 600;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       transition: all 0.15s; position: relative;
     }
-    .num-btn:hover { background: #2a2520; }
-    .num-btn:active { background: #5ba3a3; }
+    .num-btn:hover { background: var(--brand-border); }
+    .num-btn:active { background: var(--brand-primary); }
     .num-badge {
-      font-size: 0.5rem; color: #6b6055; font-weight: 400;
+      font-size: 0.5rem; color: var(--brand-text-dim); font-weight: 400;
       position: absolute; bottom: 2px; right: 4px;
     }
-    .num-badge.complete { color: #6dab72; }
+    .num-badge.complete { color: var(--brand-success); }
 
     /* Action buttons */
     .sudoku-actions {
@@ -190,16 +205,16 @@
       margin-bottom: 0.75rem;
     }
     button {
-      background: #1f1b17; border: 1px solid #2a2520; color: #c8bfb4;
+      background: var(--brand-surface-raised); border: 1px solid var(--brand-border); color: var(--brand-text);
       padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;
       font-size: 0.8rem; transition: all 0.15s;
     }
-    button:hover:not(:disabled):not(.disabled) { background: #2a2520; }
+    button:hover:not(:disabled):not(.disabled) { background: var(--brand-border); }
     button:disabled, button.disabled { opacity: 0.4; cursor: not-allowed; }
-    button.primary { background: #5ba3a3; border-color: #5ba3a3; }
-    button.primary:hover { background: #4d8f8f; }
+    button.primary { background: var(--brand-primary); border-color: var(--brand-primary); }
+    button.primary:hover { background: var(--brand-primary-hover); }
     button.active {
-      background: #5ba3a3; border-color: #5ba3a3; color: #fff;
+      background: var(--brand-primary); border-color: var(--brand-primary); color: #fff;
     }
     button.notes-active {
       background: #4a8c50; border-color: #4a8c50; color: #fff; font-weight: 600;
@@ -207,7 +222,7 @@
 
     /* Clear button */
     .num-btn.clear-btn {
-      font-size: 0.75rem; color: #9a8e80;
+      font-size: 0.75rem; color: var(--brand-text-muted);
     }
 
     /* Game over modal */
@@ -218,23 +233,23 @@
     }
     .sudoku-modal.hidden { display: none; }
     .sudoku-modal-content {
-      background: #1f1b17; border: 1px solid #4a4035; border-radius: 12px;
+      background: var(--brand-surface-raised); border: 1px solid var(--brand-border-strong); border-radius: 12px;
       padding: 2rem; text-align: center; max-width: 320px;
     }
     .sudoku-modal-content h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    .sudoku-modal-content p { color: #9a8e80; margin-bottom: 1.25rem; font-size: 0.85rem; }
+    .sudoku-modal-content p { color: var(--brand-text-muted); margin-bottom: 1.25rem; font-size: 0.85rem; }
 
     /* Rules summary */
     .sudoku-rules {
-      background: #1f1b17; border: 1px solid #2a2520; border-radius: 8px;
-      padding: 0.75rem; text-align: left; font-size: 0.7rem; color: #6b6055;
+      background: var(--brand-surface-raised); border: 1px solid var(--brand-border); border-radius: 8px;
+      padding: 0.75rem; text-align: left; font-size: 0.7rem; color: var(--brand-text-dim);
     }
-    .sudoku-rules h3 { color: #9a8e80; font-size: 0.75rem; margin-bottom: 0.4rem; }
+    .sudoku-rules h3 { color: var(--brand-text-muted); font-size: 0.75rem; margin-bottom: 0.4rem; }
     .sudoku-rules ul { padding-left: 1.2rem; }
     .sudoku-rules li { margin-bottom: 0.2rem; }
     .sudoku-rules .directive-note {
-      margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid #2a2520;
-      font-style: italic; color: #4a4035;
+      margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--brand-border);
+      font-style: italic; color: var(--brand-border-strong);
     }
 
     /* Responsive – maintain 44px minimum touch targets */
@@ -246,7 +261,7 @@
       .sudoku-actions button { padding: 0.5rem 0.75rem; font-size: 0.75rem; min-height: 44px; }
     }
   </style>
-  <script type="module" crossorigin src="/examples/sudoku/assets/index-BdDLf0Mo.js"></script>
+  <script type="module" crossorigin src="/examples/sudoku/assets/index-DNFAdm0e.js"></script>
 </head>
 <body>
   <div class="sudoku-container">

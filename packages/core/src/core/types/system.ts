@@ -75,6 +75,10 @@ export interface DebugConfig {
 	maxSnapshots?: number;
 	/** Only snapshot events from these modules. Omit to snapshot all modules. Multi-module only. */
 	snapshotModules?: string[];
+	/** Enable per-run changelog (default false) */
+	runHistory?: boolean;
+	/** Ring buffer cap for run history (default 100) */
+	maxRuns?: number;
 }
 
 /** Time-travel API */
@@ -136,6 +140,48 @@ export interface TimeTravelState {
 }
 
 // ============================================================================
+// Run Changelog Types
+// ============================================================================
+
+/** A structured record of one reconciliation run — from facts through resolvers and effects. */
+export interface RunChangelogEntry {
+	/** Monotonic run ID */
+	id: number;
+	/** When the reconcile started */
+	timestamp: number;
+	/** Total duration from reconcile start to all resolvers settled (ms) */
+	duration: number;
+	/** 'pending' while resolvers are inflight, 'settled' when all done */
+	status: "pending" | "settled";
+
+	/** Facts that changed, triggering this run */
+	factChanges: Array<{ key: string; oldValue: unknown; newValue: unknown }>;
+	/** Derivations recomputed during this run, with tracked dependencies and values */
+	derivationsRecomputed: Array<{ id: string; deps: string[]; oldValue: unknown; newValue: unknown }>;
+	/** Constraints that evaluated to active, with tracked dependencies */
+	constraintsHit: Array<{ id: string; priority: number; deps: string[] }>;
+	/** Requirements added from constraint diff */
+	requirementsAdded: Array<{ id: string; type: string; fromConstraint: string }>;
+	/** Requirements removed (no longer active), with originating constraint */
+	requirementsRemoved: Array<{ id: string; type: string; fromConstraint: string }>;
+	/** Resolvers started for new requirements */
+	resolversStarted: Array<{ resolver: string; requirementId: string }>;
+	/** Resolvers that completed (async — populated after reconcile) */
+	resolversCompleted: Array<{ resolver: string; requirementId: string; duration: number }>;
+	/** Resolvers that errored (async — populated after reconcile) */
+	resolversErrored: Array<{ resolver: string; requirementId: string; error: string }>;
+	/** Effects that ran, with their triggering fact keys */
+	effectsRun: Array<{ id: string; triggeredBy: string[] }>;
+	/** Effect errors */
+	effectErrors: Array<{ id: string; error: string }>;
+
+	/** Human-readable causal chain summary (populated when run settles) */
+	causalChain?: string;
+	/** Anomaly flags (populated when run stats deviate significantly) */
+	anomalies?: string[];
+}
+
+// ============================================================================
 // System Inspection Types
 // ============================================================================
 
@@ -143,8 +189,10 @@ export interface TimeTravelState {
 export interface SystemInspection {
 	unmet: RequirementWithId[];
 	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
-	constraints: Array<{ id: string; active: boolean; priority: number }>;
+	constraints: Array<{ id: string; active: boolean; priority: number; hitCount: number; lastActiveAt: number | null }>;
 	resolvers: Record<string, ResolverStatus>;
+	/** Per-run changelog entries (only present if debug.runHistory is enabled) */
+	runHistory?: RunChangelogEntry[];
 }
 
 /** Explanation of why a requirement exists */
@@ -255,6 +303,8 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 	readonly events: EventsAccessorFromSchema<M>;
 	readonly constraints: ConstraintsControl;
 	readonly effects: EffectsControl;
+	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
+	readonly runHistory: RunChangelogEntry[] | null;
 
 	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
 	initialize(): void;

@@ -14,6 +14,7 @@ import type {
 	ReconcileResult,
 	RecoveryStrategy,
 	RequirementWithId,
+	RunChangelogEntry,
 	Schema,
 	Snapshot,
 	System,
@@ -88,6 +89,9 @@ export interface PluginManager<_S extends Schema = any> {
 	// Error boundary hooks
 	emitError(error: DirectiveError): void;
 	emitErrorRecovery(error: DirectiveError, strategy: RecoveryStrategy): void;
+
+	// Run history hooks
+	emitRunComplete(run: RunChangelogEntry): void;
 }
 
 /**
@@ -324,6 +328,13 @@ export function createPluginManager<S extends Schema = any>(): PluginManager<S> 
 		emitErrorRecovery(error: DirectiveError, strategy: RecoveryStrategy): void {
 			for (const plugin of plugins) {
 				safeCall(() => plugin.onErrorRecovery?.(error, strategy));
+			}
+		},
+
+		// Run history hooks
+		emitRunComplete(run: RunChangelogEntry): void {
+			for (const plugin of plugins) {
+				safeCall(() => plugin.onRunComplete?.(run));
 			}
 		},
 	};

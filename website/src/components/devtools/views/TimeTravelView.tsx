@@ -1,9 +1,67 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
+
+interface DiffEntry {
+  key: string
+  type: 'added' | 'removed' | 'changed'
+  oldValue?: unknown
+  newValue?: unknown
+}
+
+function computeDiff(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>,
+): DiffEntry[] {
+  const diffs: DiffEntry[] = []
+  const allKeys = new Set([...Object.keys(prev), ...Object.keys(next)])
+
+  for (const key of allKeys) {
+    const hadKey = key in prev
+    const hasKey = key in next
+
+    if (!hadKey && hasKey) {
+      diffs.push({ key, type: 'added', newValue: next[key] })
+    } else if (hadKey && !hasKey) {
+      diffs.push({ key, type: 'removed', oldValue: prev[key] })
+    } else if (hadKey && hasKey) {
+      const oldStr = JSON.stringify(prev[key])
+      const newStr = JSON.stringify(next[key])
+      if (oldStr !== newStr) {
+        diffs.push({ key, type: 'changed', oldValue: prev[key], newValue: next[key] })
+      }
+    }
+  }
+
+  return diffs
+}
+
+function DiffValue({ value }: { value: unknown }) {
+  if (value === undefined) {
+    return <span className="text-zinc-400 italic">undefined</span>
+  }
+  if (value === null) {
+    return <span className="text-zinc-400 italic">null</span>
+  }
+  if (typeof value === 'boolean') {
+    return <span className={value ? 'text-emerald-500' : 'text-red-500'}>{String(value)}</span>
+  }
+  if (typeof value === 'number') {
+    return <span className="text-amber-600 dark:text-amber-400">{String(value)}</span>
+  }
+  if (typeof value === 'object') {
+    return (
+      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    )
+  }
+
+  return <span className="text-zinc-700 dark:text-zinc-300">{String(value)}</span>
+}
 
 export function TimeTravelView() {
   const system = useDevToolsSystem()
@@ -14,32 +72,56 @@ export function TimeTravelView() {
   const canUndo = useSelector(system, (s) => s.derive.runtime.canUndo)
   const canRedo = useSelector(system, (s) => s.derive.runtime.canRedo)
   const systemName = useSelector(system, (s) => s.facts.runtime.systemName)
+  const facts = useSelector(system, (s) => s.facts.runtime.facts)
+
+  const [diff, setDiff] = useState<DiffEntry[]>([])
+  const prevFactsRef = useRef<Record<string, unknown>>({})
+
+  // Compute diff when facts change after a time-travel operation
+  useEffect(() => {
+    if (!timeTravelEnabled) {
+      return
+    }
+
+    const prev = prevFactsRef.current
+    if (Object.keys(prev).length > 0) {
+      const newDiff = computeDiff(prev, facts)
+      if (newDiff.length > 0) {
+        setDiff(newDiff)
+      }
+    }
+
+    prevFactsRef.current = { ...facts }
+  }, [facts, timeTravelEnabled])
 
   const handleUndo = useCallback(() => {
     if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
       return
     }
 
+    // Capture current facts before the operation
+    prevFactsRef.current = { ...facts }
+
     const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
     if (sys?.debug?.goBack) {
       sys.debug.goBack(1)
-      // Trigger re-inspection
       system.events.runtime.refresh()
     }
-  }, [system, systemName])
+  }, [system, systemName, facts])
 
   const handleRedo = useCallback(() => {
     if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
       return
     }
 
+    prevFactsRef.current = { ...facts }
+
     const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
     if (sys?.debug?.goForward) {
       sys.debug.goForward(1)
-      // Trigger re-inspection
       system.events.runtime.refresh()
     }
-  }, [system, systemName])
+  }, [system, systemName, facts])
 
   if (!connected) {
     return <EmptyState message="No Directive system connected" />
@@ -68,13 +150,19 @@ export function TimeTravelView() {
             ← Undo
           </button>
 
-          <div className="flex items-center gap-2 font-mono text-sm">
-            <span className="text-sky-600 dark:text-sky-400">
-              {snapshotIndex + 1}
-            </span>
-            <span className="text-zinc-400">/</span>
-            <span className="text-zinc-500 dark:text-zinc-400">
-              {snapshotCount}
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-2 font-mono text-sm">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">Step</span>
+              <span className="text-sky-600 dark:text-sky-400">
+                {snapshotIndex + 1}
+              </span>
+              <span className="text-zinc-400">/</span>
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {snapshotCount}
+              </span>
+            </div>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+              Step through state snapshots
             </span>
           </div>
 
@@ -88,27 +176,58 @@ export function TimeTravelView() {
         </div>
       </div>
 
-      {/* Snapshot info */}
-      <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Current Snapshot
-        </h4>
-        <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-          <div className="flex gap-6 font-mono text-xs">
-            <div>
-              <span className="text-zinc-400 dark:text-zinc-500">Index: </span>
-              <span className="text-zinc-700 dark:text-zinc-300">{snapshotIndex}</span>
-            </div>
-            <div>
-              <span className="text-zinc-400 dark:text-zinc-500">Total: </span>
-              <span className="text-zinc-700 dark:text-zinc-300">{snapshotCount}</span>
-            </div>
-          </div>
-          <div className="mt-2 text-[10px] text-zinc-400 dark:text-zinc-500">
-            Use Undo/Redo to step through state snapshots
+      {/* State diff */}
+      {diff.length > 0 && (
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Changes
+            <span className="ml-2 font-mono font-normal text-zinc-400 dark:text-zinc-500">
+              {diff.length}
+            </span>
+          </h4>
+          <div className="space-y-1">
+            {diff.map((d) => (
+              <div
+                key={d.key}
+                className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-[11px] dark:border-zinc-700 dark:bg-zinc-800/50"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block rounded px-1 py-px text-[9px] font-semibold uppercase leading-none ${
+                    d.type === 'added'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      : d.type === 'removed'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                  }`}>
+                    {d.type}
+                  </span>
+                  <span className="text-sky-600 dark:text-sky-400">{d.key}</span>
+                </div>
+                {d.type === 'changed' && (
+                  <div className="mt-2 space-y-1.5 overflow-x-auto">
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] dark:border-red-900/30 dark:bg-red-900/10">
+                      <DiffValue value={d.oldValue} />
+                    </div>
+                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-[11px] dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                      <DiffValue value={d.newValue} />
+                    </div>
+                  </div>
+                )}
+                {d.type === 'added' && (
+                  <div className="mt-2 overflow-x-auto rounded border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-[11px] dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                    <DiffValue value={d.newValue} />
+                  </div>
+                )}
+                {d.type === 'removed' && (
+                  <div className="mt-2 overflow-x-auto rounded border border-red-200 bg-red-50 px-3 py-2 font-mono text-[11px] dark:border-red-900/30 dark:bg-red-900/10">
+                    <DiffValue value={d.oldValue} />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -100,8 +100,13 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 			},
 			inspect(name) {
 				const system = this.getSystem(name);
+				const s = name ? systems.get(name) : systems.values().next().value;
+				const inspection = system?.inspect() ?? null;
+				if (inspection && s) {
+					(inspection as unknown as Record<string, unknown>).resolverStats = Object.fromEntries(s.resolverStats);
+				}
 
-				return system?.inspect() ?? null;
+				return inspection;
 			},
 			getEvents(name) {
 				if (name) {
@@ -273,6 +278,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 		events: new CircularBuffer<TraceEvent>(maxEventsOpt),
 		maxEvents: maxEventsOpt,
 		subscribers: new Set(),
+		resolverStats: new Map(),
 	};
 
 	devtools.systems.set(name, state);
@@ -679,14 +685,16 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 			addEvent("resolver.complete", { resolver, requirementId: req.id, duration });
 			recordEvent("resolver.complete", { resolver, requirementId: req.id, duration });
 
-			const stats = perf.resolverStats.get(resolver) ?? { count: 0, totalMs: 0, errors: 0 };
+			const stats = state.resolverStats.get(resolver) ?? { count: 0, totalMs: 0, errors: 0 };
 			stats.count++;
 			stats.totalMs += duration;
-			perf.resolverStats.set(resolver, stats);
-			if (perf.resolverStats.size > MAX_RESOLVER_STATS) {
-				const oldest = perf.resolverStats.keys().next().value;
-				if (oldest !== undefined) perf.resolverStats.delete(oldest);
+			state.resolverStats.set(resolver, stats);
+			if (state.resolverStats.size > MAX_RESOLVER_STATS) {
+				const oldest = state.resolverStats.keys().next().value;
+				if (oldest !== undefined) state.resolverStats.delete(oldest);
 			}
+			// Mirror to perf for floating panel
+			perf.resolverStats.set(resolver, { ...stats });
 
 			// Complete timeline entry
 			const startMs = timeline.inflight.get(resolver);
@@ -705,13 +713,15 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 			addEvent("resolver.error", { resolver, requirementId: req.id, error: String(error) });
 			recordEvent("resolver.error", { resolver, requirementId: req.id, error: String(error) });
 
-			const stats = perf.resolverStats.get(resolver) ?? { count: 0, totalMs: 0, errors: 0 };
+			const stats = state.resolverStats.get(resolver) ?? { count: 0, totalMs: 0, errors: 0 };
 			stats.errors++;
-			perf.resolverStats.set(resolver, stats);
-			if (perf.resolverStats.size > MAX_RESOLVER_STATS) {
-				const oldest = perf.resolverStats.keys().next().value;
-				if (oldest !== undefined) perf.resolverStats.delete(oldest);
+			state.resolverStats.set(resolver, stats);
+			if (state.resolverStats.size > MAX_RESOLVER_STATS) {
+				const oldest = state.resolverStats.keys().next().value;
+				if (oldest !== undefined) state.resolverStats.delete(oldest);
 			}
+			// Mirror to perf for floating panel
+			perf.resolverStats.set(resolver, { ...stats });
 
 			// Complete timeline entry as error
 			const startMs = timeline.inflight.get(resolver);
@@ -796,6 +806,19 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 		onErrorRecovery: (error, strategy) => {
 			addEvent("error.recovery", { source: error.source, sourceId: error.sourceId, strategy });
 			panelEvent("error.recovery", { source: error.source, strategy });
+		},
+
+		onRunComplete: (run) => {
+			addEvent("run.complete", {
+				id: run.id,
+				status: run.status,
+				facts: run.factChanges.length,
+				constraints: run.constraintsHit.length,
+				requirements: run.requirementsAdded.length,
+				resolvers: run.resolversStarted.length,
+				effects: run.effectsRun.length,
+			});
+			panelEvent("run.complete", { id: run.id });
 		},
 	};
 }

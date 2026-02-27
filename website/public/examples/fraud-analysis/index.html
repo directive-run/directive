@@ -568,8 +568,261 @@
       background: var(--fraud-border);
       margin: 0.2rem 0;
     }
+
+    /* ===== Expandable Case Details ===== */
+    .fraud-case-details {
+      border: none;
+      margin-top: 0.4rem;
+    }
+
+    .fraud-case-details summary {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--fraud-primary);
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .fraud-case-details summary::-webkit-details-marker { display: none; }
+
+    .fraud-case-details summary::before {
+      content: "▸ ";
+    }
+
+    .fraud-case-details[open] summary::before {
+      content: "▾ ";
+    }
+
+    .fraud-case-details-body {
+      margin-top: 0.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    /* Transaction Table */
+    .fraud-txn-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.6rem;
+    }
+
+    .fraud-txn-table th {
+      text-align: left;
+      font-weight: 600;
+      color: var(--fraud-text-dim);
+      padding: 0.2rem 0.35rem;
+      border-bottom: 1px solid var(--fraud-border);
+      text-transform: uppercase;
+      font-size: 0.5rem;
+    }
+
+    .fraud-txn-table td {
+      padding: 0.2rem 0.35rem;
+      color: var(--fraud-text-muted);
+      border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    }
+
+    .fraud-txn-table tr:last-child td { border-bottom: none; }
+
+    .fraud-pii-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--fraud-error);
+      margin-left: 0.2rem;
+      vertical-align: middle;
+    }
+
+    /* Enrichment Signals */
+    .fraud-signal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .fraud-signal-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.6rem;
+    }
+
+    .fraud-signal-name {
+      min-width: 90px;
+      color: var(--fraud-text-dim);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .fraud-signal-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--fraud-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .fraud-signal-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .fraud-signal-score {
+      min-width: 24px;
+      text-align: right;
+      color: var(--fraud-text-muted);
+      font-weight: 700;
+      font-size: 0.55rem;
+    }
+
+    .fraud-signal-detail {
+      font-size: 0.55rem;
+      color: var(--fraud-text-dim);
+      margin-left: 94px;
+      margin-top: -0.15rem;
+    }
+
+    /* Analysis Notes */
+    .fraud-analysis-note {
+      font-size: 0.6rem;
+      color: var(--fraud-text-muted);
+      line-height: 1.4;
+      padding-left: 0.5rem;
+      border-left: 2px solid var(--fraud-primary);
+    }
+
+    .fraud-analysis-note .fraud-ai-tag {
+      font-size: 0.5rem;
+      font-weight: 700;
+      background: rgba(109, 171, 114, 0.2);
+      color: var(--fraud-success);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      margin-right: 0.25rem;
+    }
+
+    /* Disposition Reason */
+    .fraud-disposition-reason {
+      font-size: 0.6rem;
+      color: var(--fraud-text-dim);
+      font-style: italic;
+    }
+
+    /* Section Labels inside expanded cards */
+    .fraud-detail-label {
+      font-size: 0.55rem;
+      font-weight: 700;
+      color: var(--fraud-text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* ===== Disposition Breakdown ===== */
+    .fraud-disposition-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.35rem 0.5rem;
+      background: var(--fraud-surface);
+      border: 1px solid var(--fraud-border);
+      border-radius: 6px;
+      grid-column: span 2;
+    }
+
+    .fraud-disposition-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.6rem;
+    }
+
+    .fraud-disposition-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .fraud-disposition-dot.disp-pending { background: var(--fraud-text-muted); }
+    .fraud-disposition-dot.disp-cleared { background: var(--fraud-success); }
+    .fraud-disposition-dot.disp-flagged { background: var(--fraud-warning); }
+    .fraud-disposition-dot.disp-human_review { background: var(--fraud-high); }
+    .fraud-disposition-dot.disp-escalated { background: var(--fraud-error); }
+
+    .fraud-disposition-label {
+      flex: 1;
+      color: var(--fraud-text-muted);
+    }
+
+    .fraud-disposition-count {
+      font-weight: 700;
+      color: var(--fraud-text);
+      min-width: 16px;
+      text-align: right;
+    }
+
+    /* ===== Stage Progress Detail ===== */
+    .fraud-stage-detail {
+      border: none;
+      margin-top: 0.25rem;
+    }
+
+    .fraud-stage-detail summary {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--fraud-primary);
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .fraud-stage-detail summary::-webkit-details-marker { display: none; }
+
+    .fraud-stage-detail summary::before {
+      content: "▸ ";
+    }
+
+    .fraud-stage-detail[open] summary::before {
+      content: "▾ ";
+    }
+
+    .fraud-stage-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.3rem;
+      margin-top: 0.35rem;
+    }
+
+    .fraud-stage-stat {
+      padding: 0.25rem 0.4rem;
+      background: var(--fraud-surface);
+      border: 1px solid var(--fraud-border);
+      border-radius: 5px;
+    }
+
+    .fraud-stage-stat-label {
+      font-size: 0.5rem;
+      color: var(--fraud-text-dim);
+      text-transform: uppercase;
+    }
+
+    .fraud-stage-stat-value {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--fraud-text);
+    }
+
+    /* ===== Mobile: hide location + signal detail ===== */
+    @media (max-width: 800px) {
+      .fraud-txn-col-location { display: none; }
+      .fraud-signal-detail { display: none; }
+    }
   </style>
-  <script type="module" crossorigin src="/examples/fraud-analysis/assets/index-BCojsfXR.js"></script>
+  <script type="module" crossorigin src="/examples/fraud-analysis/assets/index-DOmzrW1X.js"></script>
 </head>
 <body>
   <div class="fraud-container">
@@ -601,10 +854,22 @@
         <div class="fraud-control-group">
           <label class="fraud-control-label" for="fraud-scenario-select">Scenario</label>
           <select id="fraud-scenario-select" class="fraud-select" data-testid="fraud-scenario-select">
-            <option value="card-skimming">Card Skimming</option>
-            <option value="account-takeover">Account Takeover</option>
-            <option value="bust-out">Bust-Out Fraud</option>
-            <option value="mixed-batch">Mixed Batch</option>
+            <optgroup label="Classic Patterns">
+              <option value="card-skimming">Card Skimming (8 txns)</option>
+              <option value="account-takeover">Account Takeover (5 txns)</option>
+              <option value="bust-out">Bust-Out Fraud (12 txns)</option>
+              <option value="mixed-batch">Mixed Batch (15 txns)</option>
+            </optgroup>
+            <optgroup label="Generated Scenarios">
+              <option value="synthetic-identity">Synthetic Identity (60 txns)</option>
+              <option value="friendly-fraud">Friendly Fraud (35 txns)</option>
+              <option value="money-laundering">Money Laundering (80 txns)</option>
+              <option value="credential-stuffing">Credential Stuffing (100 txns)</option>
+              <option value="return-fraud">Return Fraud (45 txns)</option>
+              <option value="first-party-fraud">First-Party Fraud (50 txns)</option>
+              <option value="geo-anomaly">Geographic Anomaly (40 txns)</option>
+              <option value="micro-transaction">Micro Transaction Probe (70 txns)</option>
+            </optgroup>
           </select>
           <div id="fraud-scenario-desc" class="fraud-scenario-desc" data-testid="fraud-scenario-desc"></div>
         </div>
@@ -660,6 +925,12 @@
           <div class="fraud-stage-dot" role="listitem"><div class="fraud-stage-dot-circle" data-stage="complete" title="Pipeline complete"></div><span class="fraud-stage-dot-label">Done</span></div>
         </div>
 
+        <!-- Stage Progress Detail -->
+        <details class="fraud-stage-detail" data-testid="fraud-stage-detail">
+          <summary>Pipeline Stats</summary>
+          <div id="fraud-stage-stats" class="fraud-stage-stats" data-testid="fraud-stage-stats"></div>
+        </details>
+
         <div class="fraud-sep"></div>
 
         <div class="fraud-panel-title">Cases</div>
@@ -701,9 +972,8 @@
             <div class="fraud-metric-label">Avg Risk</div>
             <div id="fraud-metric-risk" class="fraud-metric-value" data-testid="fraud-metric-risk">0</div>
           </div>
-          <div class="fraud-metric">
-            <div class="fraud-metric-label">Needs Review</div>
-            <div id="fraud-metric-review" class="fraud-metric-value" data-testid="fraud-metric-review">No</div>
+          <div id="fraud-disposition-breakdown" class="fraud-disposition-breakdown" data-testid="fraud-disposition-breakdown">
+            <div class="fraud-metric-label">Dispositions</div>
           </div>
         </div>
 

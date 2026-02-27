@@ -161,6 +161,9 @@ export const docsNavigation: NavigationSection[] = [
       // Showcases
       { title: 'Sudoku', href: '/docs/examples/sudoku' },
       { title: 'Checkers', href: '/docs/examples/checkers' },
+      // DevTools
+      { title: 'Multi-System DevTools', href: '/docs/examples/multi-system-devtools' },
+      { title: 'Mixed DevTools', href: '/docs/examples/mixed-devtools' },
       // Specialized
       { title: 'Server-Side', href: '/docs/examples/server' },
       { title: 'AI Agent', href: '/docs/examples/ai-agent' },

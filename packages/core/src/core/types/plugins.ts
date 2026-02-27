@@ -5,7 +5,7 @@
 import type { ModuleSchema } from "./schema.js";
 import type { FactsSnapshot, FactChange } from "./facts.js";
 import type { RequirementWithId } from "./requirements.js";
-import type { System } from "./system.js";
+import type { System, RunChangelogEntry } from "./system.js";
 import type { DirectiveError, RecoveryStrategy } from "./errors.js";
 
 // ============================================================================
@@ -269,4 +269,15 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
 	 * @param strategy - The recovery strategy used
 	 */
 	onErrorRecovery?: (error: DirectiveError, strategy: RecoveryStrategy) => void;
+
+	// ============================================================================
+	// Run History Hooks
+	// ============================================================================
+
+	/**
+	 * Called when a run finalizes (all resolvers settled or no resolvers started).
+	 * Only fires when debug.runHistory is enabled.
+	 * @param run - The complete run changelog entry
+	 */
+	onRunComplete?: (run: RunChangelogEntry) => void;
 }

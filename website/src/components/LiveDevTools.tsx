@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from '@directive-run/react'
 import type { ConnectionStatus } from './devtools/types'
-import { SYSTEM_VIEWS, AI_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
+import { SYSTEM_VIEWS, AI_VIEWS, ALL_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
 import { useDevToolsSystem } from './devtools/DevToolsSystemContext'
 import { DevToolsProvider } from './devtools/DevToolsProvider'
 import { useDevToolsStream } from './devtools/hooks/useDevToolsStream'
@@ -28,8 +28,35 @@ import { DirectiveLogomark } from './devtools/DirectiveLogomark'
 import { SystemSelector } from './devtools/SystemSelector'
 import { DevToolsErrorBoundary } from './devtools/DevToolsErrorBoundary'
 import { Z_FULLSCREEN } from './devtools/z-index'
+import './devtools/devtools.css'
 import { encodeReplay } from './devtools/utils/replay-codec'
 import type { DebugEvent } from './devtools/types'
+
+// ---------------------------------------------------------------------------
+// View registry — maps view name to its component
+// ---------------------------------------------------------------------------
+
+const VIEW_REGISTRY: Record<typeof ALL_VIEWS[number], React.ComponentType> = {
+  // System views
+  'Facts': FactsView,
+  'Derivations': DerivationsView,
+  'Constraints': ConstraintsView,
+  'System Graph': SystemGraphView,
+  'Time Travel': TimeTravelView,
+  // AI views
+  'Timeline': TimelineView,
+  'Cost': CostView,
+  'State': StateView,
+  'Guardrails': GuardrailsView,
+  'Events': EventsView,
+  'Health': HealthView,
+  'Breakpoints': BreakpointsView,
+  'Graph': GraphView,
+  'Goal': GoalView,
+  'Memory': MemoryView,
+  'Budget': BudgetView,
+  'Config': ConfigView,
+}
 
 // ---------------------------------------------------------------------------
 // StatusDot — m6: amber-500 for WCAG contrast (was amber-400)
@@ -53,7 +80,7 @@ function StatusDot({ status }: { status: ConnectionStatus }) {
   return (
     <div className="flex items-center gap-1.5">
       <div className={`h-2 w-2 rounded-full ${colors[status]}`} aria-hidden="true" />
-      <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+      <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
         {labels[status]}
       </span>
     </div>
@@ -76,10 +103,15 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   const { reconnect } = useDevToolsStream()
 
   // C3: Periodic poll bump to make snapshot constraint reactive
+  // Gated on document.hidden to avoid unnecessary network traffic when tab is backgrounded
   useEffect(() => {
-    const interval = setInterval(() => {
-      system.events.snapshot.bumpPoll()
-    }, SNAPSHOT_POLL_INTERVAL)
+    function bump() {
+      if (!document.hidden) {
+        system.events.snapshot.bumpPoll()
+      }
+    }
+
+    const interval = setInterval(bump, SNAPSHOT_POLL_INTERVAL)
 
     return () => clearInterval(interval)
   }, [system])
@@ -92,20 +124,18 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   // Read connection state from system
   const status = useSelector(system, (s) => s.facts.connection.status)
   const exhaustedRetries = useSelector(system, (s) => s.derive.connection.exhaustedRetries)
-  const events = useSelector(system, (s) => s.facts.connection.events)
-  const totalTokens = useSelector(system, (s) => s.derive.connection.totalTokens)
   const isPaused = useSelector(system, (s) => s.facts.connection.isPaused)
-  const pausedOnEvent = useSelector(system, (s) => s.facts.connection.pausedOnEvent)
 
   // Read runtime state
   const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
-  const runtimeSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
 
   // Determine which tab groups to show
   // System tabs: when a Directive runtime is connected via devtoolsPlugin
   const showSystemTabs = runtimeConnected
-  // AI tabs: only when there are actual AI events (not just an SSE connection attempt)
-  const showAiTabs = events.length > 0
+  // AI tabs: only when AI mode is enabled AND there are actual events
+  const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled)
+  const eventCount = useSelector(system, (s) => s.derive.connection.eventCount)
+  const showAiTabs = aiEnabled && eventCount > 0
 
   // Visible views based on which groups are connected
   const visibleViews = useMemo(() => {
@@ -118,11 +148,11 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     }
     // Fallback: show system tabs if runtime is present, otherwise AI tabs
     if (views.length === 0) {
-      views.push(...(runtimeConnected ? SYSTEM_VIEWS : AI_VIEWS))
+      views.push(...(runtimeConnected ? SYSTEM_VIEWS : (aiEnabled ? AI_VIEWS : SYSTEM_VIEWS)))
     }
 
     return views
-  }, [showSystemTabs, showAiTabs, runtimeConnected])
+  }, [showSystemTabs, showAiTabs, runtimeConnected, aiEnabled])
 
   // Auto-switch active view when it's not in the visible set
   useEffect(() => {
@@ -131,8 +161,23 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     }
   }, [visibleViews, view, system])
 
-  // Check if a view belongs to system group
-  const isSystemView = (v: string) => (SYSTEM_VIEWS as readonly string[]).includes(v)
+  // Read runtime counts for tab badges
+  const factCount = useSelector(system, (s) => s.derive.runtime.factCount)
+  const derivationCount = useSelector(system, (s) => s.derive.runtime.derivationCount)
+  const constraintCount = useSelector(system, (s) => s.facts.runtime.constraints.length)
+  const inflightCount = useSelector(system, (s) => s.derive.runtime.inflightCount)
+
+  // Tab badge counts — only show for tabs with data
+  const tabBadges: Partial<Record<string, number>> = useMemo(() => {
+    const badges: Partial<Record<string, number>> = {}
+    if (factCount > 0) badges['Facts'] = factCount
+    if (derivationCount > 0) badges['Derivations'] = derivationCount
+    if (constraintCount > 0 || inflightCount > 0) badges['Constraints'] = constraintCount + inflightCount
+    if (eventCount > 0) badges['Events'] = eventCount
+    if (eventCount > 0) badges['Timeline'] = eventCount
+
+    return badges
+  }, [factCount, derivationCount, constraintCount, inflightCount, eventCount])
 
   // Share button toast state
   const [shareToast, setShareToast] = useState(false)
@@ -173,9 +218,14 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     }
   }, [view, visibleViews, system])
 
-  // Export events as JSON file
+  // Export events as JSON file — reads events lazily to avoid subscribing to the full array
   const handleExport = useCallback(() => {
-    const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' })
+    const currentEvents = system.read<DebugEvent[]>('connection.events')
+    if (!currentEvents || currentEvents.length === 0) {
+      return
+    }
+
+    const blob = new Blob([JSON.stringify(currentEvents, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -183,7 +233,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     a.click()
     // M7: Delay revocation so browsers can start the download
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  }, [events])
+  }, [system])
 
   // Import events from JSON file
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -192,9 +242,16 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   }, [])
 
   // C4: Use replaceEvents for atomic import (no intermediate empty state)
+  const MAX_IMPORT_SIZE = 10 * 1024 * 1024 // 10 MB
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) {
+      return
+    }
+
+    if (file.size > MAX_IMPORT_SIZE) {
+      console.warn(`[DevTools] Import file too large (${(file.size / 1024 / 1024).toFixed(1)} MB, max 10 MB)`)
+
       return
     }
 
@@ -202,9 +259,25 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     reader.onload = () => {
       try {
         const imported = JSON.parse(reader.result as string)
-        if (Array.isArray(imported)) {
-          system.events.connection.replaceEvents({ events: imported })
+        if (!Array.isArray(imported)) {
+          console.warn('[DevTools] Import must be an array of events')
+
+          return
         }
+        // Validate each event has required shape
+        const valid = imported.every(
+          (item: unknown) =>
+            item != null &&
+            typeof item === 'object' &&
+            typeof (item as Record<string, unknown>).type === 'string' &&
+            typeof (item as Record<string, unknown>).timestamp === 'number',
+        )
+        if (!valid) {
+          console.warn('[DevTools] Import contains invalid events (each must have type:string and timestamp:number)')
+
+          return
+        }
+        system.events.connection.replaceEvents({ events: imported })
       } catch {
         console.warn('[DevTools] Failed to parse import file')
       }
@@ -214,14 +287,15 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     e.target.value = ''
   }, [system])
 
-  // Phase 4: Share replay URL
+  // Phase 4: Share replay URL — reads events lazily
   const handleShare = useCallback(() => {
-    if (events.length === 0) {
+    const currentEvents = system.read<DebugEvent[]>('connection.events')
+    if (!currentEvents || currentEvents.length === 0) {
       return
     }
 
     try {
-      const encoded = encodeReplay(events)
+      const encoded = encodeReplay(currentEvents)
       const shareUrl = `${window.location.origin}${window.location.pathname}#replay=${encoded}`
       navigator.clipboard.writeText(shareUrl).then(
         () => {
@@ -235,7 +309,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     } catch {
       console.warn('[DevTools] Failed to encode replay URL')
     }
-  }, [events])
+  }, [system])
 
   // Escape key exits fullscreen (standalone mode only)
   useEffect(() => {
@@ -269,34 +343,6 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
       }`}
       style={isFullscreen && !isDrawer ? { zIndex: Z_FULLSCREEN } : undefined}
     >
-      <style>{`
-        .devtools-timeline-scroll::-webkit-scrollbar {
-          height: 6px;
-        }
-        .devtools-timeline-scroll::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .devtools-timeline-scroll::-webkit-scrollbar-thumb {
-          background: rgba(161, 161, 170, 0.15);
-          border-radius: 3px;
-        }
-        .devtools-timeline-scroll::-webkit-scrollbar-thumb:hover {
-          background: rgba(161, 161, 170, 0.3);
-        }
-        @media (prefers-color-scheme: dark) {
-          .devtools-timeline-scroll::-webkit-scrollbar-thumb {
-            background: rgba(161, 161, 170, 0.1);
-          }
-          .devtools-timeline-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(161, 161, 170, 0.25);
-          }
-        }
-        .devtools-timeline-scroll {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(161, 161, 170, 0.15) transparent;
-        }
-      `}</style>
-
       {/* Header — hidden in drawer mode (drawer provides its own) */}
       {!isDrawer && (
         <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
@@ -339,9 +385,10 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
             </button>
             <button
               onClick={handleExport}
+              disabled={eventCount === 0}
               aria-label="Export events"
               title="Export"
-              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+              className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
                 <path d="M8 1a.5.5 0 0 1 .5.5v9.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 11.293V1.5A.5.5 0 0 1 8 1z" />
@@ -365,12 +412,13 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
               accept=".json"
               onChange={handleFileChange}
               className="hidden"
+              aria-label="Import events file"
             />
             {/* Phase 4: Share replay URL button */}
             <div className="relative">
               <button
                 onClick={handleShare}
-                disabled={events.length === 0}
+                disabled={eventCount === 0}
                 aria-label="Share replay URL"
                 title="Share"
                 className="cursor-pointer rounded p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
@@ -380,7 +428,11 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
                 </svg>
               </button>
               {shareToast && (
-                <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-white dark:bg-zinc-200 dark:text-zinc-800">
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-white dark:bg-zinc-200 dark:text-zinc-800"
+                >
                   Copied!
                 </span>
               )}
@@ -405,56 +457,22 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
         </div>
       )}
 
-      {/* Tab bar with grouped sections and horizontal scroll */}
-      <div className="relative border-b border-zinc-200 dark:border-zinc-700">
-        {/* Gradient fade indicators for scroll overflow */}
-        <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-white dark:from-zinc-900 sm:hidden" />
-        <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-white dark:from-zinc-900 sm:hidden" />
-        <div
-          className="flex items-stretch gap-0 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          role="tablist"
-          aria-label="DevTools views"
-        >
-          {visibleViews.map((v, i) => {
-            // Insert divider between system and AI groups
-            const prevView = i > 0 ? visibleViews[i - 1] : null
-            const needsDivider = prevView && isSystemView(prevView) && !isSystemView(v)
-
-            return (
-              <div key={v} className="flex items-stretch">
-                {needsDivider && (
-                  <div className="mx-1 my-2 w-px bg-zinc-300 dark:bg-zinc-600" />
-                )}
-                <button
-                  role="tab"
-                  aria-selected={v === view}
-                  aria-controls={`devtools-tabpanel-${v.toLowerCase().replace(/\s+/g, '-')}`}
-                  tabIndex={v === view ? 0 : -1}
-                  onKeyDown={handleTabKeyDown}
-                  className={`shrink-0 cursor-pointer border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
-                    v === view
-                      ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                      : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-                  }`}
-                  onClick={() => system.events.shell.setView({ view: v })}
-                >
-                  {v}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <DevToolsTabBar
+        visibleViews={visibleViews}
+        activeView={view}
+        tabBadges={tabBadges}
+        onTabKeyDown={handleTabKeyDown}
+      />
 
       {/* Content */}
       <div
         className="min-h-0 flex-1 overflow-y-auto p-4"
         role="tabpanel"
         id={`devtools-tabpanel-${view.toLowerCase().replace(/\s+/g, '-')}`}
-        aria-label={`${view} view`}
+        aria-labelledby={`devtools-tab-${view.toLowerCase().replace(/\s+/g, '-')}`}
       >
         {/* #14: Empty/welcome state when nothing is connected */}
-        {!showSystemTabs && !showAiTabs && events.length === 0 && (
+        {!showSystemTabs && !showAiTabs && eventCount === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <DirectiveLogomark className="h-8 w-8 opacity-30" />
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
@@ -468,33 +486,119 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
             </div>
           </div>
         )}
-        {/* System views */}
-        {view === 'Facts' && <FactsView />}
-        {view === 'Derivations' && <DerivationsView />}
-        {view === 'Constraints' && <ConstraintsView />}
-        {view === 'System Graph' && <SystemGraphView />}
-        {view === 'Time Travel' && <TimeTravelView />}
-        {/* AI views */}
-        {view === 'Timeline' && <TimelineView />}
-        {view === 'Cost' && <CostView />}
-        {view === 'State' && <StateView />}
-        {view === 'Guardrails' && <GuardrailsView />}
-        {view === 'Events' && <EventsView />}
-        {view === 'Health' && <HealthView />}
-        {view === 'Breakpoints' && <BreakpointsView />}
-        {view === 'Graph' && <GraphView />}
-        {view === 'Goal' && <GoalView />}
-        {view === 'Memory' && <MemoryView />}
-        {view === 'Budget' && <BudgetView />}
-        {view === 'Config' && <ConfigView />}
+        {/* Render active view from registry */}
+        {(() => {
+          const ViewComponent = VIEW_REGISTRY[view]
+
+          return ViewComponent ? <ViewComponent /> : null
+        })()}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-4 py-1.5 font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-500">
-        <span>
-          {events.length} events | {totalTokens.toLocaleString()} tokens
-          {runtimeConnected && ` | System: ${runtimeSystemName ?? 'connected'}`}
-        </span>
+      <DevToolsFooter />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DevToolsTabBar — extracted for readability
+// ---------------------------------------------------------------------------
+
+function DevToolsTabBar({
+  visibleViews,
+  activeView,
+  tabBadges,
+  onTabKeyDown,
+}: {
+  visibleViews: readonly string[]
+  activeView: string
+  tabBadges: Partial<Record<string, number>>
+  onTabKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>) => void
+}) {
+  const system = useDevToolsSystem()
+  const isSystemView = (v: string) => (SYSTEM_VIEWS as readonly string[]).includes(v)
+
+  return (
+    <div className="relative border-b border-zinc-200 dark:border-zinc-700">
+      <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-white dark:from-zinc-900 sm:hidden" />
+      <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-white dark:from-zinc-900 sm:hidden" />
+      <div
+        className="flex items-stretch gap-1 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label="DevTools views"
+      >
+        {visibleViews.map((v, i) => {
+          const prevView = i > 0 ? visibleViews[i - 1] : null
+          const needsDivider = prevView && isSystemView(prevView) && !isSystemView(v)
+
+          return (
+            <div key={v} className="flex shrink-0 items-stretch">
+              {needsDivider && (
+                <div className="mx-3 my-2 w-px bg-zinc-300 dark:bg-zinc-600" />
+              )}
+              <button
+                id={`devtools-tab-${v.toLowerCase().replace(/\s+/g, '-')}`}
+                role="tab"
+                aria-selected={v === activeView}
+                aria-controls={`devtools-tabpanel-${v.toLowerCase().replace(/\s+/g, '-')}`}
+                tabIndex={v === activeView ? 0 : -1}
+                onKeyDown={onTabKeyDown}
+                className={`shrink-0 whitespace-nowrap cursor-pointer border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
+                  v === activeView
+                    ? 'border-sky-500 text-sky-600 dark:text-sky-400'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                }`}
+                onClick={() => system.events.shell.setView({ view: v as typeof VIEWS[number] })}
+              >
+                {v}
+                {tabBadges[v] != null && (
+                  <span className={`ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1 py-px text-[9px] font-semibold leading-none ${
+                    v === activeView
+                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
+                  }`}>
+                    {tabBadges[v]}
+                  </span>
+                )}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DevToolsFooter — extracted for readability
+// ---------------------------------------------------------------------------
+
+function DevToolsFooter() {
+  const system = useDevToolsSystem()
+  const eventCount = useSelector(system, (s) => s.derive.connection.eventCount)
+  const totalTokens = useSelector(system, (s) => s.derive.connection.totalTokens)
+  const status = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
+  const exhaustedRetries = useSelector(system, (s) => s.derive.connection.exhaustedRetries)
+  const isPaused = useSelector(system, (s) => s.facts.connection.isPaused)
+  const pausedOnEvent = useSelector(system, (s) => s.facts.connection.pausedOnEvent) as DebugEvent | null
+  const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
+  const runtimeSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
+  const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled) as boolean
+
+  // System-only mode: show just the system info, no AI connection status
+  const isSystemOnly = runtimeConnected && !aiEnabled
+
+  return (
+    <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-4 py-1.5 font-mono text-[11px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
+      <span>
+        {isSystemOnly
+          ? `System: ${runtimeSystemName ?? 'connected'}`
+          : <>
+              {eventCount} events | {totalTokens.toLocaleString()} tokens
+              {runtimeConnected && ` | System: ${runtimeSystemName ?? 'connected'}`}
+            </>
+        }
+      </span>
+      {!isSystemOnly && (
         <span>
           {isPaused && pausedOnEvent
             ? `Paused on: ${pausedOnEvent.type}`
@@ -502,7 +606,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
               ? 'Connection lost — click Retry'
               : status === 'connected' ? 'Streaming' : status}
         </span>
-      </div>
+      )}
     </div>
   )
 }
