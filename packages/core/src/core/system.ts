@@ -657,6 +657,10 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 		constraints: engine.constraints,
 		effects: engine.effects,
 
+		get runHistory() {
+			return engine.runHistory;
+		},
+
 		get isRunning() {
 			return engine.isRunning;
 		},
@@ -1678,6 +1682,10 @@ function createSingleModuleSystem<S extends ModuleSchema>(
 		events: eventsProxy as SingleModuleSystem<S>["events"],
 		constraints: engine.constraints,
 		effects: engine.effects,
+
+		get runHistory() {
+			return engine.runHistory;
+		},
 
 		get isRunning() {
 			return engine.isRunning;

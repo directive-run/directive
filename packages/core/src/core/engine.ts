@@ -31,6 +31,7 @@ import type {
 	InferSchema,
 	ReconcileResult,
 	ResolversDef,
+	RunChangelogEntry,
 	Schema,
 	System,
 	SystemConfig,
@@ -206,12 +207,46 @@ export function createEngine<S extends Schema>(
 	// Assigned after createTimeTravelManager() below.
 	let timeTravelRef: TimeTravelManager<S> | null = null;
 
+	// Run history (gated by debug.runHistory)
+	const runHistoryEnabled = config.debug?.runHistory ?? false;
+	const maxRuns = config.debug?.maxRuns ?? 100;
+	const runHistory: RunChangelogEntry[] = [];
+	const runHistoryById = new Map<number, RunChangelogEntry>();
+	let runIdCounter = 0;
+	let currentRun: RunChangelogEntry | null = null;
+	const pendingFactChanges: Array<{ key: string; oldValue: unknown; newValue: unknown }> = [];
+	// Async resolver attribution: requirementId → runId
+	const resolverRunMap = new Map<string, number>();
+	// Track inflight resolvers per run: runId → count of pending resolvers
+	const runInflightCount = new Map<number, number>();
+	// Consistent duration: track start time per run (performance.now() based)
+	const runStartMs = new Map<number, number>();
+	// Cached runHistory getter (E1): avoid spread on every access
+	let runHistoryCache: RunChangelogEntry[] | null = null;
+	let runHistoryCacheVersion = 0;
+	let currentCacheVersion = 0;
+	// Anomaly detection statistics
+	const runStats = {
+		count: 0,
+		totalDuration: 0,
+		avgDuration: 0,
+		maxDuration: 0,
+		avgResolverCount: 0,
+		totalResolverCount: 0,
+		avgFactChangeCount: 0,
+		totalFactChangeCount: 0,
+	};
+
 	const { store, facts } = createFacts<S>({
 		schema: mergedSchema,
 		onChange: (key, value, prev) => {
 			pluginManager.emitFactSet(key, value, prev);
 			// Invalidate derivations so they recompute on read
 			invalidateDerivation(key);
+			// Track fact changes for run history
+			if (runHistoryEnabled) {
+				pendingFactChanges.push({ key: String(key), oldValue: prev, newValue: value });
+			}
 			// During time-travel restore, skip change tracking and reconciliation.
 			// The restored state is already reconciled; re-reconciling would create
 			// spurious snapshots that break undo/redo.
@@ -228,6 +263,16 @@ export function createEngine<S extends Schema>(
 			const keys: string[] = [];
 			for (const change of changes) {
 				keys.push(change.key);
+			}
+			// Track fact changes for run history
+			if (runHistoryEnabled) {
+				for (const change of changes) {
+					if (change.type === "delete") {
+						pendingFactChanges.push({ key: change.key, oldValue: change.prev, newValue: undefined });
+					} else {
+						pendingFactChanges.push({ key: change.key, oldValue: change.prev, newValue: change.value });
+					}
+				}
 			}
 			// Invalidate all affected derivations at once — listeners fire only
 			// after ALL keys are invalidated, so they see consistent state.
@@ -250,7 +295,17 @@ export function createEngine<S extends Schema>(
 		definitions: mergedDerive,
 		facts,
 		store,
-		onCompute: (id, value, deps) => pluginManager.emitDerivationCompute(id, value, deps),
+		onCompute: (id, value, oldValue, deps) => {
+			pluginManager.emitDerivationCompute(id, value, deps);
+			if (currentRun) {
+				currentRun.derivationsRecomputed.push({
+					id,
+					deps: deps ? [...deps] : [],
+					oldValue,
+					newValue: value,
+				});
+			}
+		},
 		onInvalidate: (id) => pluginManager.emitDerivationInvalidate(id),
 		onError: (id, error) => {
 			errorBoundary.handleError("derivation", id, error);
@@ -266,10 +321,21 @@ export function createEngine<S extends Schema>(
 		definitions: mergedEffects,
 		facts,
 		store,
-		onRun: (id) => pluginManager.emitEffectRun(id),
+		onRun: (id, deps) => {
+			pluginManager.emitEffectRun(id);
+			if (currentRun) {
+				currentRun.effectsRun.push({
+					id,
+					triggeredBy: deps,
+				});
+			}
+		},
 		onError: (id, error) => {
 			errorBoundary.handleError("effect", id, error);
 			pluginManager.emitEffectError(id, error);
+			if (currentRun) {
+				currentRun.effectErrors.push({ id, error: String(error) });
+			}
 		},
 	});
 
@@ -284,6 +350,123 @@ export function createEngine<S extends Schema>(
 		},
 	});
 
+	/** Finalize a run when all its resolvers have settled */
+	function finalizeRun(runId: number): void {
+		const run = runHistoryById.get(runId);
+		if (run && run.status === "pending") {
+			run.status = "settled";
+			// Consistent duration: use performance.now() when available
+			const startMs = runStartMs.get(runId);
+			run.duration = startMs !== undefined ? performance.now() - startMs : Date.now() - run.timestamp;
+			runStartMs.delete(runId);
+			runInflightCount.delete(runId);
+			// Build causal chain on settlement
+			run.causalChain = buildCausalChain(run);
+			// Anomaly detection
+			updateRunStats(run);
+			currentCacheVersion++;
+			pluginManager.emitRunComplete(run);
+		}
+	}
+
+	/** Decrement inflight count for a run and finalize if settled */
+	function decrementRunInflight(requirementId: string): void {
+		const runId = resolverRunMap.get(requirementId);
+		resolverRunMap.delete(requirementId);
+		if (runId !== undefined) {
+			const remaining = (runInflightCount.get(runId) ?? 1) - 1;
+			if (remaining <= 0) {
+				finalizeRun(runId);
+			} else {
+				runInflightCount.set(runId, remaining);
+			}
+		}
+	}
+
+	/** Evict the oldest run from the ring buffer, cleaning up associated state (C1) */
+	function evictOldestRun(): void {
+		const evicted = runHistory.shift();
+		if (evicted) {
+			runHistoryById.delete(evicted.id);
+			runStartMs.delete(evicted.id);
+			if (evicted.status === "pending") {
+				runInflightCount.delete(evicted.id);
+				for (const [reqId, rId] of resolverRunMap) {
+					if (rId === evicted.id) {
+						resolverRunMap.delete(reqId);
+					}
+				}
+			}
+		}
+	}
+
+	/** Build a human-readable causal chain summary from a run entry (Part 6) */
+	function buildCausalChain(run: RunChangelogEntry): string {
+		const parts: string[] = [];
+
+		for (const fc of run.factChanges) {
+			parts.push(`${fc.key} changed`);
+		}
+
+		for (const d of run.derivationsRecomputed) {
+			parts.push(`${d.id} recomputed`);
+		}
+
+		for (const c of run.constraintsHit) {
+			parts.push(`${c.id} constraint hit`);
+		}
+
+		for (const r of run.requirementsAdded) {
+			parts.push(`${r.type} requirement added`);
+		}
+
+		for (const rs of run.resolversCompleted) {
+			parts.push(`${rs.resolver} resolved (${rs.duration.toFixed(0)}ms)`);
+		}
+
+		for (const rs of run.resolversErrored) {
+			parts.push(`${rs.resolver} errored`);
+		}
+
+		for (const e of run.effectsRun) {
+			parts.push(`${e.id} effect ran`);
+		}
+
+		return parts.join(" → ");
+	}
+
+	/** Update running statistics and flag anomalies on a finalized run (Part 8) */
+	function updateRunStats(run: RunChangelogEntry): void {
+		runStats.count++;
+		runStats.totalDuration += run.duration;
+		runStats.avgDuration = runStats.totalDuration / runStats.count;
+		if (run.duration > runStats.maxDuration) {
+			runStats.maxDuration = run.duration;
+		}
+
+		const resolverCount = run.resolversStarted.length;
+		runStats.totalResolverCount += resolverCount;
+		runStats.avgResolverCount = runStats.totalResolverCount / runStats.count;
+
+		const factChangeCount = run.factChanges.length;
+		runStats.totalFactChangeCount += factChangeCount;
+		runStats.avgFactChangeCount = runStats.totalFactChangeCount / runStats.count;
+
+		// Flag anomalies (only after enough data)
+		const anomalies: string[] = [];
+		if (runStats.count > 3 && run.duration > runStats.avgDuration * 5) {
+			anomalies.push(`Duration ${run.duration.toFixed(0)}ms is 5x+ above average (${runStats.avgDuration.toFixed(0)}ms)`);
+		}
+
+		if (run.resolversErrored.length > 0) {
+			anomalies.push(`${run.resolversErrored.length} resolver(s) errored`);
+		}
+
+		if (anomalies.length > 0) {
+			run.anomalies = anomalies;
+		}
+	}
+
 	// Create resolvers manager
 	const resolversManager: ResolversManager<S> = createResolversManager({
 		definitions: mergedResolvers,
@@ -295,15 +478,41 @@ export function createEngine<S extends Schema>(
 			pluginManager.emitRequirementMet(req, resolver);
 			// Mark the constraint as resolved for `after` ordering
 			constraintsManager.markResolved(req.fromConstraint);
+			// Attribute to the run that started this resolver
+			if (runHistoryEnabled) {
+				const runId = resolverRunMap.get(req.id);
+				if (runId !== undefined) {
+					const run = runHistoryById.get(runId);
+					if (run) {
+						run.resolversCompleted.push({ resolver, requirementId: req.id, duration });
+					}
+				}
+				decrementRunInflight(req.id);
+			}
 		},
 		onError: (resolver, req, error) => {
 			errorBoundary.handleError("resolver", resolver, error, req);
 			pluginManager.emitResolverError(resolver, req, error);
+			// Attribute error to the run that started this resolver
+			if (runHistoryEnabled) {
+				const runId = resolverRunMap.get(req.id);
+				if (runId !== undefined) {
+					const run = runHistoryById.get(runId);
+					if (run) {
+						run.resolversErrored.push({ resolver, requirementId: req.id, error: String(error) });
+					}
+				}
+				decrementRunInflight(req.id);
+			}
 		},
 		onRetry: (resolver, req, attempt) => pluginManager.emitResolverRetry(resolver, req, attempt),
 		onCancel: (resolver, req) => {
 			pluginManager.emitResolverCancel(resolver, req);
 			pluginManager.emitRequirementCanceled(req);
+			// Decrement inflight for the run
+			if (runHistoryEnabled) {
+				decrementRunInflight(req.id);
+			}
 		},
 		onResolutionComplete: () => {
 			// After a resolver completes, schedule another reconcile
@@ -402,12 +611,40 @@ export function createEngine<S extends Schema>(
 					`Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
 				);
 			}
+			// Drain pending fact changes so they don't leak into the next run (M4)
+			if (runHistoryEnabled) {
+				pendingFactChanges.length = 0;
+			}
 			reconcileDepth = 0;
 			return;
 		}
 
 		state.isReconciling = true;
 		notifySettlementChange();
+
+		const reconcileStartMs = runHistoryEnabled ? performance.now() : 0;
+
+		// Start a new run entry
+		if (runHistoryEnabled) {
+			const runId = ++runIdCounter;
+			runStartMs.set(runId, reconcileStartMs);
+			currentRun = {
+				id: runId,
+				timestamp: Date.now(),
+				duration: 0,
+				status: "pending",
+				factChanges: pendingFactChanges.splice(0), // move + clear
+				derivationsRecomputed: [],
+				constraintsHit: [],
+				requirementsAdded: [],
+				requirementsRemoved: [],
+				resolversStarted: [],
+				resolversCompleted: [],
+				resolversErrored: [],
+				effectsRun: [],
+				effectErrors: [],
+			};
+		}
 
 		try {
 			// Take snapshot before reconciliation (respects snapshotEvents filtering)
@@ -442,8 +679,42 @@ export function createEngine<S extends Schema>(
 				pluginManager.emitRequirementCreated(req);
 			}
 
+			// Capture which constraints produced requirements for run history
+			if (currentRun) {
+				const hitConstraintIds = new Set(currentRequirements.map((r) => r.fromConstraint));
+				for (const cId of hitConstraintIds) {
+					const cState = constraintsManager.getState(cId);
+					if (cState) {
+						const cDeps = constraintsManager.getDependencies(cId);
+						currentRun.constraintsHit.push({
+							id: cId,
+							priority: cState.priority,
+							deps: cDeps ? [...cDeps] : [],
+						});
+					}
+				}
+			}
+
 			// Diff with previous requirements
 			const { added, removed } = currentSet.diff(state.previousRequirements);
+
+			// Capture requirement diff for run history
+			if (currentRun) {
+				for (const req of added) {
+					currentRun.requirementsAdded.push({
+						id: req.id,
+						type: req.requirement.type,
+						fromConstraint: req.fromConstraint,
+					});
+				}
+				for (const req of removed) {
+					currentRun.requirementsRemoved.push({
+						id: req.id,
+						type: req.requirement.type,
+						fromConstraint: req.fromConstraint,
+					});
+				}
+			}
 
 			// Cancel resolvers for removed requirements
 			for (const req of removed) {
@@ -453,6 +724,20 @@ export function createEngine<S extends Schema>(
 			// Start resolvers for new requirements
 			for (const req of added) {
 				resolversManager.resolve(req);
+			}
+
+			// Capture resolver starts for run history
+			if (currentRun) {
+				const inflightNow = resolversManager.getInflightInfo();
+				for (const req of added) {
+					const info = inflightNow.find((i) => i.id === req.id);
+					currentRun.resolversStarted.push({
+						resolver: info?.resolverId ?? "unknown",
+						requirementId: req.id,
+					});
+					// Track attribution for async completion
+					resolverRunMap.set(req.id, currentRun.id);
+				}
 			}
 
 			// Update previous requirements
@@ -481,6 +766,50 @@ export function createEngine<S extends Schema>(
 				}
 			}
 		} finally {
+			// Finalize the current run entry
+			if (currentRun) {
+				currentRun.duration = performance.now() - reconcileStartMs;
+
+				// Skip empty runs
+				const hasActivity = currentRun.factChanges.length > 0
+					|| currentRun.constraintsHit.length > 0
+					|| currentRun.requirementsAdded.length > 0
+					|| currentRun.effectsRun.length > 0;
+
+				if (hasActivity) {
+					const inflightCount = currentRun.resolversStarted.length;
+					if (inflightCount === 0) {
+						// No resolvers — finalize immediately
+						currentRun.status = "settled";
+						// Build causal chain for settled runs
+						currentRun.causalChain = buildCausalChain(currentRun);
+						// Anomaly detection
+						updateRunStats(currentRun);
+						runHistory.push(currentRun);
+						runHistoryById.set(currentRun.id, currentRun);
+						if (runHistory.length > maxRuns) {
+							evictOldestRun();
+						}
+						currentCacheVersion++;
+						pluginManager.emitRunComplete(currentRun);
+					} else {
+						// Has resolvers — stays pending until they settle
+						currentRun.status = "pending";
+						runHistory.push(currentRun);
+						runHistoryById.set(currentRun.id, currentRun);
+						if (runHistory.length > maxRuns) {
+							evictOldestRun();
+						}
+						currentCacheVersion++;
+						runInflightCount.set(currentRun.id, inflightCount);
+					}
+				} else {
+					// Empty run — clean up start time
+					runStartMs.delete(currentRun.id);
+				}
+				currentRun = null;
+			}
+
 			state.isReconciling = false;
 
 			// Schedule next reconcile BEFORE notifying settlement change,
@@ -593,6 +922,19 @@ export function createEngine<S extends Schema>(
 			isEnabled: (id: string) => effectsManager.isEnabled(id),
 		},
 
+		get runHistory(): RunChangelogEntry[] | null {
+			if (!runHistoryEnabled) {
+				return null;
+			}
+
+			if (!runHistoryCache || runHistoryCacheVersion !== currentCacheVersion) {
+				runHistoryCache = [...runHistory];
+				runHistoryCacheVersion = currentCacheVersion;
+			}
+
+			return runHistoryCache;
+		},
+
 		initialize(): void {
 			if (state.isInitialized) return;
 			state.isInitializing = true;
@@ -673,6 +1015,15 @@ export function createEngine<S extends Schema>(
 			state.isDestroyed = true;
 			settlementListeners.clear();
 			timeTravelListeners.clear();
+			// Clean up run history state (C1)
+			runHistory.length = 0;
+			runHistoryById.clear();
+			resolverRunMap.clear();
+			runInflightCount.clear();
+			runStartMs.clear();
+			pendingFactChanges.length = 0;
+			currentRun = null;
+			runHistoryCache = null;
 			pluginManager.emitDestroy(system);
 		},
 
@@ -828,10 +1179,27 @@ export function createEngine<S extends Schema>(
 					id: s.id,
 					active: s.lastResult ?? false,
 					priority: s.priority,
+					hitCount: s.hitCount,
+					lastActiveAt: s.lastActiveAt,
 				})),
 				resolvers: Object.fromEntries(
 					resolversManager.getInflight().map((id) => [id, resolversManager.getStatus(id)]),
 				),
+				...(runHistoryEnabled ? {
+				runHistory: runHistory.map((r) => ({
+					...r,
+					factChanges: r.factChanges.map(fc => ({ ...fc })),
+					derivationsRecomputed: r.derivationsRecomputed.map(d => ({ ...d, deps: [...d.deps] })),
+					constraintsHit: r.constraintsHit.map(c => ({ ...c, deps: [...c.deps] })),
+					requirementsAdded: r.requirementsAdded.map(ra => ({ ...ra })),
+					requirementsRemoved: r.requirementsRemoved.map(rr => ({ ...rr })),
+					resolversStarted: r.resolversStarted.map(rs => ({ ...rs })),
+					resolversCompleted: r.resolversCompleted.map(rc => ({ ...rc })),
+					resolversErrored: r.resolversErrored.map(re => ({ ...re })),
+					effectsRun: r.effectsRun.map(e => ({ ...e, triggeredBy: [...e.triggeredBy] })),
+					effectErrors: r.effectErrors.map(ee => ({ ...ee })),
+				})),
+			} : {}),
 			};
 		},
 

@@ -81,8 +81,8 @@ export interface CreateEffectsOptions<S extends Schema> {
 	definitions: EffectsDef<S>;
 	facts: Facts<S>;
 	store: FactsStore<S>;
-	/** Callback when an effect runs */
-	onRun?: (id: string) => void;
+	/** Callback when an effect runs (deps = the fact keys that triggered it) */
+	onRun?: (id: string, deps: string[]) => void;
 	/** Callback when an effect errors */
 	onError?: (id: string, error: unknown) => void;
 }
@@ -204,7 +204,7 @@ export function createEffectsManager<S extends Schema>(
 		// Run previous cleanup before re-running
 		runCleanup(state);
 
-		onRun?.(id);
+		onRun?.(id, state.dependencies ? [...state.dependencies] : []);
 
 		try {
 			if (!state.hasExplicitDeps) {
