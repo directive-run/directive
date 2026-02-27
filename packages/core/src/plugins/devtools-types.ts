@@ -93,6 +93,7 @@ export interface DevtoolsState {
 	events: CircularBuffer<TraceEvent>;
 	maxEvents: number;
 	subscribers: Set<DevtoolsSubscriber>;
+	resolverStats: Map<string, { count: number; totalMs: number; errors: number }>;
 }
 
 declare global {

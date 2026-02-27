@@ -98,6 +98,7 @@ export type {
 	SystemConfig,
 	SystemInspection,
 	SystemSnapshot,
+	RunChangelogEntry,
 	DistributableSnapshotOptions,
 	DistributableSnapshot,
 	DebugConfig,

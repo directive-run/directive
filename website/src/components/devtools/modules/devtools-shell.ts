@@ -1,4 +1,4 @@
-// @ts-nocheck — createModule generic inference doesn't resolve for complex schemas
+// @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
 import { createModule, t } from '@directive-run/core'
 import { VIEWS } from '../constants'
 
@@ -94,7 +94,7 @@ export const devtoolsShell = createModule('shell', {
 
   init: (facts) => {
     const prefs = loadDrawerPrefs()
-    facts.activeView = 'Timeline'
+    facts.activeView = 'Facts'
     facts.isFullscreen = false
     facts.confirmClear = false
     facts.drawerOpen = false

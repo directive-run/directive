@@ -1,4 +1,4 @@
-// @ts-nocheck — createModule generic inference doesn't resolve for complex schemas
+// @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
 import { createModule, t } from '@directive-run/core'
 import type { SnapshotResponse } from '../types'
 import { SNAPSHOT_POLL_INTERVAL } from '../constants'

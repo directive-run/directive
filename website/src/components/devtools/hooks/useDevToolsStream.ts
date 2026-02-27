@@ -114,9 +114,12 @@ export function useDevToolsStream() {
     return unsub
   }, [system, connect])
 
-  // Initial connection
+  // Initial connection — skip if already disconnected (system-only mode, no AI stream)
   useEffect(() => {
-    connect()
+    const status = system.facts.connection.status
+    if (status !== 'disconnected') {
+      connect()
+    }
 
     return () => {
       esRef.current?.close()
@@ -125,7 +128,7 @@ export function useDevToolsStream() {
         clearTimeout(flushTimerRef.current)
       }
     }
-  }, [connect])
+  }, [connect, system])
 
   // Listen for imported events (from file import)
   useEffect(() => {

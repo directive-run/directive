@@ -140,6 +140,8 @@ export type {
 	// Distributable snapshots
 	DistributableSnapshotOptions,
 	DistributableSnapshot,
+	// Run changelog
+	RunChangelogEntry,
 	// System interfaces
 	System,
 	SystemConfig,

@@ -140,4 +140,8 @@ export interface ConstraintState {
 	lastResolvedAt: number | null;
 	/** Constraint IDs this constraint is waiting on (from `after` property) */
 	after: string[];
+	/** Number of times when() evaluated to true */
+	hitCount: number;
+	/** Timestamp of last when() → true evaluation */
+	lastActiveAt: number | null;
 }

@@ -42,6 +42,8 @@ export interface ConstraintsManager<_S extends Schema> {
 	enable(id: string): void;
 	/** Invalidate constraints that depend on the given fact key */
 	invalidate(factKey: string): void;
+	/** Get the tracked dependencies for a constraint */
+	getDependencies(id: string): Set<string> | undefined;
 	/** Mark a constraint's resolver as completed (for `after` ordering) */
 	markResolved(constraintId: string): void;
 	/** Check if a constraint has been resolved (for `after` ordering) */
@@ -260,6 +262,8 @@ export function createConstraintsManager<S extends Schema>(
 			error: null,
 			lastResolvedAt: null,
 			after: def.after ?? [],
+			hitCount: 0,
+			lastActiveAt: null,
 		};
 
 		states.set(id, state);
@@ -335,6 +339,10 @@ export function createConstraintsManager<S extends Schema>(
 				// Return the promise to be handled as async
 				return result.then((asyncResult) => {
 					state.lastResult = asyncResult;
+					if (asyncResult) {
+						state.hitCount++;
+						state.lastActiveAt = Date.now();
+					}
 					state.isEvaluating = false;
 					onEvaluate?.(id, asyncResult);
 					return asyncResult;
@@ -348,6 +356,10 @@ export function createConstraintsManager<S extends Schema>(
 			}
 
 			state.lastResult = result;
+			if (result) {
+				state.hitCount++;
+				state.lastActiveAt = Date.now();
+			}
 			state.isEvaluating = false;
 			onEvaluate?.(id, result);
 			return result;
@@ -389,6 +401,10 @@ export function createConstraintsManager<S extends Schema>(
 			);
 
 			state.lastResult = result;
+			if (result) {
+				state.hitCount++;
+				state.lastActiveAt = Date.now();
+			}
 			state.isEvaluating = false;
 			onEvaluate?.(id, result);
 			return result;
@@ -769,6 +785,10 @@ export function createConstraintsManager<S extends Schema>(
 
 		getState(id: string): ConstraintState | undefined {
 			return states.get(id);
+		},
+
+		getDependencies(id: string): Set<string> | undefined {
+			return constraintDeps.get(id);
 		},
 
 		getAllStates(): ConstraintState[] {

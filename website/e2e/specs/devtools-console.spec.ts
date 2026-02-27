@@ -45,7 +45,7 @@ test.describe("DevTools Console API", () => {
 
   test("inspect() returns facts and constraint data", async ({ page }) => {
     const inspection = await page.evaluate(() => {
-      const result = window.__DIRECTIVE__?.inspect();
+      const result = window.__DIRECTIVE__?.inspect() as Record<string, unknown> | undefined;
       if (!result) return null;
       return {
         hasUnmet: Array.isArray(result.unmet),

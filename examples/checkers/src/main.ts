@@ -25,7 +25,7 @@ import { getAllValidMoves, toRowCol } from "./rules.js";
 
 const system = createSystem({
   modules: { game: checkersGame, chat: checkersChat },
-  debug: { timeTravel: true, maxSnapshots: 200 },
+  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
   plugins: [devtoolsPlugin({ name: "checkers" })],
 });
 system.start();
