@@ -4,6 +4,7 @@
 
 export { loggingPlugin, type LoggingPluginOptions } from "./logging.js";
 export { devtoolsPlugin, type DevtoolsPluginOptions, type TraceEvent } from "./devtools.js";
+export { emitDevToolsEvent, DEVTOOLS_EVENT_NAME } from "./devtools-ai-bridge.js";
 export { persistencePlugin, type PersistencePluginOptions } from "./persistence.js";
 export {
 	performancePlugin,

@@ -30,6 +30,11 @@ export interface RuntimeRequirementInfo {
   status: 'inflight' | 'unmet'
 }
 
+export interface RuntimeResolverDef {
+  id: string
+  requirement: string
+}
+
 /** Shape returned by window.__DIRECTIVE__.inspect() */
 interface InspectionResult {
   facts?: Record<string, unknown>
@@ -38,6 +43,7 @@ interface InspectionResult {
   inflight?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
   unmet?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
   resolverStats?: Record<string, RuntimeResolverStats>
+  resolverDefs?: Array<{ id?: string; requirement?: string }>
   runHistoryEnabled?: boolean
   runHistory?: RunChangelogEntry[]
   timeTravel?: { currentIndex?: number; snapshotCount?: number }
@@ -81,6 +87,7 @@ export const devtoolsRuntime = createModule('runtime', {
       inflight: t.array<RuntimeRequirementInfo>(),
       unmet: t.array<RuntimeRequirementInfo>(),
       resolverStats: t.object<Record<string, RuntimeResolverStats>>(),
+      resolverDefs: t.array<RuntimeResolverDef>(),
       timeTravelEnabled: t.boolean(),
       snapshotIndex: t.number(),
       snapshotCount: t.number(),
@@ -142,6 +149,7 @@ export const devtoolsRuntime = createModule('runtime', {
     facts.inflight = []
     facts.unmet = []
     facts.resolverStats = {}
+    facts.resolverDefs = []
     facts.timeTravelEnabled = false
     facts.snapshotIndex = -1
     facts.snapshotCount = 0
@@ -205,6 +213,7 @@ export const devtoolsRuntime = createModule('runtime', {
       facts.inflight = []
       facts.unmet = []
       facts.resolverStats = {}
+      facts.resolverDefs = []
       facts.timeTravelEnabled = false
       facts.snapshotIndex = -1
       facts.snapshotCount = 0
@@ -311,9 +320,15 @@ export const devtoolsRuntime = createModule('runtime', {
             }
 
             // Do initial inspection (augmented with facts + derivations from the system)
-            const inspection = directive.inspect(systemName)
-            if (inspection) {
-              applyInspection(context.facts, inspection, system)
+            try {
+              const inspection = directive.inspect(systemName)
+              if (inspection) {
+                applyInspection(context.facts, inspection, system)
+              }
+            } catch (err) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('[DevTools] inspect() failed during initial connection:', err)
+              }
             }
 
             context.facts.connected = true
@@ -355,10 +370,16 @@ export const devtoolsRuntime = createModule('runtime', {
         }
 
         const systemName = facts.systemName ?? undefined
-        const inspection = window.__DIRECTIVE__.inspect(systemName)
-        const system = window.__DIRECTIVE__.getSystem(systemName)
-        if (inspection) {
-          applyInspection(facts, inspection, system)
+        try {
+          const inspection = window.__DIRECTIVE__.inspect(systemName)
+          const system = window.__DIRECTIVE__.getSystem(systemName)
+          if (inspection) {
+            applyInspection(facts, inspection, system)
+          }
+        } catch (err) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[DevTools] inspect() failed during sync:', err)
+          }
         }
       },
     },
@@ -584,6 +605,14 @@ function applyInspection(facts: Record<string, unknown>, inspection: InspectionR
   // Resolver stats
   if (inspection.resolverStats && typeof inspection.resolverStats === 'object') {
     facts.resolverStats = { ...inspection.resolverStats }
+  }
+
+  // Resolver definitions
+  if (Array.isArray(inspection.resolverDefs)) {
+    facts.resolverDefs = inspection.resolverDefs.map((d: any) => ({
+      id: d.id ?? '',
+      requirement: d.requirement ?? '',
+    }))
   }
 
   // Run history

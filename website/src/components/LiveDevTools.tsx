@@ -9,16 +9,12 @@ import { useDevToolsSystem } from './devtools/DevToolsSystemContext'
 import { DevToolsProvider } from './devtools/DevToolsProvider'
 import { useDevToolsStream } from './devtools/hooks/useDevToolsStream'
 import { TimelineView } from './devtools/views/TimelineView'
-import { CostView } from './devtools/views/CostView'
+import { CostBudgetView } from './devtools/views/CostBudgetView'
 import { StateView } from './devtools/views/StateView'
 import { GuardrailsView } from './devtools/views/GuardrailsView'
-import { EventsView } from './devtools/views/EventsView'
-import { HealthView } from './devtools/views/HealthView'
 import { BreakpointsView } from './devtools/views/BreakpointsView'
 import { GraphView } from './devtools/views/GraphView'
 import { MemoryView } from './devtools/views/MemoryView'
-import { BudgetView } from './devtools/views/BudgetView'
-import { ConfigView } from './devtools/views/ConfigView'
 import { GoalView } from './devtools/views/GoalProgressView'
 import { FactsView } from './devtools/views/FactsView'
 import { DerivationsView } from './devtools/views/DerivationsView'
@@ -44,19 +40,15 @@ const VIEW_REGISTRY: Record<typeof ALL_VIEWS[number], React.ComponentType> = {
   'Pipeline': PipelineView,
   'System Graph': SystemGraphView,
   'Time Travel': TimeTravelView,
+  'Breakpoints': BreakpointsView,
   // AI views
   'Timeline': TimelineView,
-  'Cost': CostView,
+  'Cost & Budget': CostBudgetView,
   'State': StateView,
   'Guardrails': GuardrailsView,
-  'Events': EventsView,
-  'Health': HealthView,
-  'Breakpoints': BreakpointsView,
-  'Graph': GraphView,
+  'Agent Graph': GraphView,
   'Goal': GoalView,
   'Memory': MemoryView,
-  'Budget': BudgetView,
-  'Config': ConfigView,
 }
 
 // ---------------------------------------------------------------------------
@@ -165,8 +157,6 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   // Read runtime counts for tab badges
   const factCount = useSelector(system, (s) => s.derive.runtime.factCount)
   const derivationCount = useSelector(system, (s) => s.derive.runtime.derivationCount)
-  const constraintCount = useSelector(system, (s) => s.facts.runtime.constraints.length)
-  const inflightCount = useSelector(system, (s) => s.derive.runtime.inflightCount)
 
   // Read breakpoint hit counts for tab badges
   const factBreakpointHitCount = useSelector(system, (s) => s.derive.runtime.factBreakpointHitCount ?? 0)
@@ -177,14 +167,12 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     const badges: Partial<Record<string, number>> = {}
     if (factCount > 0) badges['Facts'] = factCount
     if (derivationCount > 0) badges['Derivations'] = derivationCount
-    if (constraintCount > 0 || inflightCount > 0) badges['Pipeline'] = constraintCount + inflightCount
-    if (eventCount > 0) badges['Events'] = eventCount
     if (eventCount > 0) badges['Timeline'] = eventCount
     const totalBreakpointHits = factBreakpointHitCount + eventBreakpointHitCount
     if (totalBreakpointHits > 0) badges['Breakpoints'] = totalBreakpointHits
 
     return badges
-  }, [factCount, derivationCount, constraintCount, inflightCount, eventCount, factBreakpointHitCount, eventBreakpointHitCount])
+  }, [factCount, derivationCount, eventCount, factBreakpointHitCount, eventBreakpointHitCount])
 
   // Share button toast state
   const [shareToast, setShareToast] = useState(false)

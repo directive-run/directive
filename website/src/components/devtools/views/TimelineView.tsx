@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { DebugEvent } from '../types'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
@@ -21,6 +22,10 @@ export function TimelineView() {
     events: DebugEvent[]
     laneId: string
   } | null>(null)
+
+  // SSR-safe portal target for tooltip (escapes DrawerPanel's transform containing block)
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
+  useEffect(() => { setPortalTarget(document.body) }, [])
 
   const { agentIds, agentEventsMap, noAgentEvents, minTs, range } = useMemo(() => {
     if (events.length === 0) {
@@ -460,8 +465,8 @@ export function TimelineView() {
         })}
       </div>
 
-      {/* Hover tooltip — shows all events near cursor position */}
-      {tooltip && tooltip.events.length > 0 && (
+      {/* Hover tooltip — portaled to body to escape DrawerPanel's transform containing block */}
+      {tooltip && tooltip.events.length > 0 && portalTarget && createPortal(
         <div
           className="pointer-events-none fixed z-50 max-w-xs rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 shadow-xl"
           style={{
@@ -497,7 +502,8 @@ export function TimelineView() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        portalTarget,
       )}
     </div>
   )

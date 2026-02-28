@@ -77,13 +77,10 @@ export function SystemSelector() {
       return
     }
 
-    // Detach current, then attach new
+    // Detach current, then attach new — both synchronous so the constraint
+    // evaluates once with the final state (connected=false, systemName=name)
     system.events.runtime.detach()
-
-    // Small delay to let detach cleanup finish
-    requestAnimationFrame(() => {
-      system.events.runtime.attach({ systemName: name })
-    })
+    system.events.runtime.attach({ systemName: name })
   }, [currentSystemName, system])
 
   // Keyboard navigation for dropdown

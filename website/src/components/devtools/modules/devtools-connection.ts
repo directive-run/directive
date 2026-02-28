@@ -16,6 +16,8 @@ export const devtoolsConnection = createModule('connection', {
       replayMode: t.boolean(),
       // When false, no AI stream connection is attempted (system-only mode)
       aiEnabled: t.boolean(),
+      // When true, AI events come from client-side bridge only (no SSE reconnection)
+      clientOnly: t.boolean(),
       // Phase 5: Breakpoint-driven pause
       isPaused: t.boolean(),
       breakpoints: t.array<BreakpointDef>(),
@@ -36,6 +38,8 @@ export const devtoolsConnection = createModule('connection', {
       resetRetries: {},
       pushEvents: { batch: t.array<DebugEvent>() },
       clearEvents: {},
+      // Client-side AI bridge: auto-enable AI tabs without SSE
+      enableAi: {},
       importEvents: { imported: t.array<DebugEvent>() },
       // C4: Atomic event replacement — no intermediate empty state
       replaceEvents: { events: t.array<DebugEvent>() },
@@ -59,6 +63,7 @@ export const devtoolsConnection = createModule('connection', {
     facts.resetUrl = '/api/devtools/reset'
     facts.replayMode = false
     facts.aiEnabled = true
+    facts.clientOnly = false
     facts.isPaused = false
     facts.breakpoints = []
     facts.pausedOnEvent = null
@@ -93,11 +98,24 @@ export const devtoolsConnection = createModule('connection', {
       facts.retryCount = 0
     },
     pushEvents: (facts, { batch }) => {
-      const next = [...facts.events, ...batch]
+      // Deduplicate: skip events already in the list (handles SSE replay on remount)
+      const maxId = facts.events.length > 0
+        ? facts.events[facts.events.length - 1].id
+        : -1
+      const fresh = batch.filter((e) => e.id > maxId)
+      if (fresh.length === 0) {
+        return
+      }
+
+      const next = [...facts.events, ...fresh]
       facts.events = next.length > MAX_EVENTS ? next.slice(next.length - MAX_EVENTS) : next
     },
     clearEvents: (facts) => {
       facts.events = []
+    },
+    enableAi: (facts) => {
+      facts.aiEnabled = true
+      facts.clientOnly = true
     },
     importEvents: (facts, { imported }) => {
       facts.events = imported
@@ -140,6 +158,7 @@ export const devtoolsConnection = createModule('connection', {
     reconnectNeeded: {
       when: (facts) =>
         facts.aiEnabled &&
+        !facts.clientOnly &&
         !facts.replayMode &&
         facts.status === 'disconnected' &&
         facts.retryCount < MAX_RECONNECT_RETRIES,
@@ -167,6 +186,10 @@ export const devtoolsConnection = createModule('connection', {
   effects: {
     serverReset: {
       run: (facts, prev) => {
+        if (facts.clientOnly) {
+          return
+        }
+
         if (prev && prev.events.length > 0 && facts.events.length === 0) {
           // M8: Use dedicated resetUrl fact
           fetch(facts.resetUrl, { method: 'POST' }).catch(() => {})

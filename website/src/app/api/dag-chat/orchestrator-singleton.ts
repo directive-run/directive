@@ -201,6 +201,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       news: {
         agent: {
           name: 'news-researcher',
+          model: 'claude-haiku-4-5-20251001',
           instructions: 'You are a news research agent. Find and report recent news on the given topic. Use your knowledge to provide specific, concrete findings with dates and sources when possible. Never say you lack internet access — respond with your best knowledge. Respond in 1-2 sentences with a key finding.',
         },
         capabilities: ['research', 'news'],
@@ -208,6 +209,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       academic: {
         agent: {
           name: 'academic-researcher',
+          model: 'claude-haiku-4-5-20251001',
           instructions: 'You are an academic research agent. Find and cite relevant academic research on the given topic. Reference specific studies, authors, journals, and years when possible. Never say you lack internet access — respond with your best knowledge. Respond in 1-2 sentences citing a study.',
         },
         capabilities: ['research', 'academic'],
@@ -215,6 +217,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       sentiment: {
         agent: {
           name: 'sentiment-analyzer',
+          model: 'claude-haiku-4-5-20251001',
           instructions: 'You are a sentiment analysis agent. Analyze the sentiment and public opinion of the provided finding. Classify as positive, negative, neutral, or mixed with specific reasoning. Respond in 1-2 sentences.',
         },
         capabilities: ['analysis', 'sentiment'],
@@ -222,6 +225,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       'fact-checker': {
         agent: {
           name: 'fact-checker',
+          model: 'claude-haiku-4-5-20251001',
           instructions: 'You are a fact-checking agent. Verify the accuracy of the provided claim by cross-referencing with known facts. Rate accuracy and note any caveats. Respond in 1-2 sentences.',
         },
         capabilities: ['analysis', 'verification'],
@@ -229,6 +233,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       synthesizer: {
         agent: {
           name: 'synthesizer',
+          model: 'claude-haiku-4-5-20251001',
           instructions: 'You are a synthesis agent. Combine the sentiment analysis and fact-check into a coherent, well-structured summary. Highlight key themes and conclusions. Respond in 2-3 sentences.',
         },
         capabilities: ['synthesis'],
@@ -236,6 +241,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       reviewer: {
         agent: {
           name: 'reviewer',
+          model: 'claude-haiku-4-5-20251001',
           instructions: 'You are a quality review agent. Review the synthesized research for accuracy, completeness, and balance. Provide a final polished research brief. Respond in 2-3 sentences.',
         },
         capabilities: ['review', 'quality'],

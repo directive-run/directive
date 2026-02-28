@@ -1044,6 +1044,7 @@ export function GraphView() {
   }, [activeEvents])
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [panelExpanded, setPanelExpanded] = useState(false)
 
   const { initialNodes, initialEdges } = useMemo(() => {
     if (!graphData) {
@@ -1142,16 +1143,25 @@ export function GraphView() {
 
       {/* Detail panel */}
       {selected && (
-        <div className="w-64 shrink-0 overflow-auto border-l border-zinc-700 bg-zinc-900 p-3">
+        <div className={`${panelExpanded ? 'w-1/2' : 'w-64'} shrink-0 overflow-auto border-l border-zinc-700 bg-zinc-900 p-3 transition-[width] duration-200`}>
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold text-zinc-100">{selected.label}</h3>
-            <button
-              onClick={() => setSelectedNode(null)}
-              aria-label="Close detail panel"
-              className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPanelExpanded(!panelExpanded)}
+                aria-label={panelExpanded ? 'Collapse detail panel' : 'Expand detail panel'}
+                className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+              >
+                {panelExpanded ? '⇥' : '⇤'}
+              </button>
+              <button
+                onClick={() => setSelectedNode(null)}
+                aria-label="Close detail panel"
+                className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="mt-3 space-y-2 text-[11px]">
@@ -1210,8 +1220,8 @@ export function GraphView() {
                 {selected.lastError && (
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Last Error</span>
-                    <span className="max-w-[140px] truncate text-red-400" title={selected.lastError}>
-                      {selected.lastError.length > 120 ? selected.lastError.slice(0, 120) + '...' : selected.lastError}
+                    <span className="min-w-0 truncate text-red-400" title={selected.lastError}>
+                      {selected.lastError}
                     </span>
                   </div>
                 )}
