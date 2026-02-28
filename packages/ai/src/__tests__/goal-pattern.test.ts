@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   createTestMultiAgentOrchestrator,
 } from "../testing.js";
@@ -12,7 +12,7 @@ import {
   patternToJSON,
   patternFromJSON,
 } from "../multi-agent-orchestrator.js";
-import type { GoalResult, GoalMetrics, GoalCheckpointState } from "../types.js";
+import type { GoalMetrics, GoalCheckpointState } from "../types.js";
 import { InMemoryCheckpointStore } from "../checkpoint.js";
 
 // ============================================================================
@@ -320,8 +320,6 @@ describe("goal pattern", () => {
   });
 
   it("relaxation — stall triggers tier, goal achievement resumes", async () => {
-    let injected = false;
-
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         worker: { agent: { name: "worker" } },
@@ -359,7 +357,7 @@ describe("goal pattern", () => {
           },
         ],
         onStall: () => {
-          injected = true;
+          // stall callback fired
         },
       },
     );
@@ -762,11 +760,13 @@ describe("goal pattern", () => {
     const json = patternToJSON(pattern);
     expect(json.type).toBe("goal");
     if (json.type === "goal") {
-      expect(json.nodes.a.agent).toBe("a");
-      expect(json.nodes.a.produces).toEqual(["x"]);
-      expect(json.nodes.a.requires).toEqual(["y"]);
-      expect(json.nodes.a.priority).toBe(10);
-      expect(json.nodes.b.allowRerun).toBe(true);
+      const nodeA = json.nodes["a"]!;
+      const nodeB = json.nodes["b"]!;
+      expect(nodeA.agent).toBe("a");
+      expect(nodeA.produces).toEqual(["x"]);
+      expect(nodeA.requires).toEqual(["y"]);
+      expect(nodeA.priority).toBe(10);
+      expect(nodeB.allowRerun).toBe(true);
       expect(json.maxSteps).toBe(25);
       expect(json.timeout).toBe(60000);
     }
