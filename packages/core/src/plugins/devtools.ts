@@ -103,7 +103,9 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 				const s = name ? systems.get(name) : systems.values().next().value;
 				const inspection = system?.inspect() ?? null;
 				if (inspection && s) {
-					(inspection as unknown as Record<string, unknown>).resolverStats = Object.fromEntries(s.resolverStats);
+					(inspection as unknown as Record<string, unknown>).resolverStats = s.resolverStats
+						? Object.fromEntries(s.resolverStats)
+						: {};
 				}
 
 				return inspection;

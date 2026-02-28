@@ -6,7 +6,7 @@
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { devtoolsPlugin, emitDevToolsEvent } from "@directive-run/core/plugins";
 import {
   detectPromptInjection,
   detectPII,
@@ -161,6 +161,14 @@ function analyzeMessage(text: string): ChatMessage {
     }
   }
 
+  emitDevToolsEvent({
+    type: "guardrail_check",
+    guardrailName: "prompt-injection",
+    guardrailType: "input",
+    passed: !injectionResult.detected,
+    inputLength: text.length,
+  });
+
   // 2. PII detection
   const piiResult = detectPII(text, { redact: system.facts.redactionEnabled as boolean, redactionStyle: "typed" });
   if (piiResult.detected) {
@@ -169,6 +177,14 @@ function analyzeMessage(text: string): ChatMessage {
       addTimeline("pii", `${item.type} found`, "pii");
     }
   }
+
+  emitDevToolsEvent({
+    type: "guardrail_check",
+    guardrailName: "pii-detection",
+    guardrailType: "input",
+    passed: !piiResult.detected,
+    inputLength: text.length,
+  });
 
   // 3. Compliance check
   const mode = system.facts.complianceMode as ComplianceMode;
@@ -192,6 +208,14 @@ function analyzeMessage(text: string): ChatMessage {
       addTimeline("compliance", "GDPR: personal data detected", "compliance");
     }
   }
+
+  emitDevToolsEvent({
+    type: "guardrail_check",
+    guardrailName: `compliance-${mode}`,
+    guardrailType: "input",
+    passed: !blocked || !piiResult.detected,
+    inputLength: text.length,
+  });
 
   if (blocked) {
     system.facts.blockedCount = (system.facts.blockedCount as number) + 1;
