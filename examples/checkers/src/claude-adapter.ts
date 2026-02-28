@@ -190,18 +190,19 @@ export async function runClaudeWithCallbacks(
   }
 ): Promise<RunResult<unknown>> {
   const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("No API key set");
-  }
 
   const messages: Message[] = [{ role: "user", content: input }];
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+
   const response = await fetch("/api/claude", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-    },
+    headers,
     body: JSON.stringify({
       model: agent.model ?? "claude-haiku-4-5-20251001",
       max_tokens: 500,

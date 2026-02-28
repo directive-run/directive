@@ -526,10 +526,12 @@ apiKeyInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") apiKeySaveBtn.click();
 });
 
-// Load saved API key indicator
+// Load saved API key indicator (server proxy provides fallback)
 const savedKey = getApiKey();
 if (savedKey) {
   apiKeyInput.placeholder = "Key saved — enter new to replace";
+} else {
+  apiKeyInput.placeholder = "Optional — server key used if empty";
 }
 
 // Chat input
