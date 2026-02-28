@@ -191,6 +191,8 @@ export interface SystemInspection {
 	inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
 	constraints: Array<{ id: string; active: boolean; disabled: boolean; priority: number; hitCount: number; lastActiveAt: number | null }>;
 	resolvers: Record<string, ResolverStatus>;
+	/** All defined resolver names and their requirement types */
+	resolverDefs: Array<{ id: string; requirement: string }>;
 	/** Whether debug.runHistory is enabled on this system */
 	runHistoryEnabled: boolean;
 	/** Per-run changelog entries (only present if debug.runHistory is enabled) */
