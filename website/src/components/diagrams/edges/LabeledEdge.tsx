@@ -1,11 +1,12 @@
 'use client'
 
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, type EdgeProps } from '@xyflow/react'
 
 interface LabeledEdgeData {
   label?: string
   active?: boolean
   dashed?: boolean
+  smooth?: boolean
 }
 
 export function LabeledEdge({
@@ -23,10 +24,12 @@ export function LabeledEdge({
     label,
     active = false,
     dashed = false,
+    smooth = false,
   } = (data ?? {}) as LabeledEdgeData
   const gradientId = `edge-grad-${id}`
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const pathFn = smooth ? getSmoothStepPath : getBezierPath
+  const [edgePath, labelX, labelY] = pathFn({
     sourceX,
     sourceY,
     targetX,

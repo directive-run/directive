@@ -96,7 +96,10 @@
       "Bash(/Users/jasonwcomes/Desktop/Sizls/projects/directive/examples/ai-checkpoint/vite.config.ts:*)",
       "WebFetch(domain:reactflow.dev)",
       "WebFetch(domain:docs.excalidraw.com)",
-      "Bash(pnpm exec playwright test --config e2e/playwright.config.ts \"e2e/specs/devtools-all-examples.spec.ts\" -g \"number-match: devtools registered\" --reporter=list 2>&1 | tail -30)"
+      "Bash(pnpm exec playwright test --config e2e/playwright.config.ts \"e2e/specs/devtools-all-examples.spec.ts\" -g \"number-match: devtools registered\" --reporter=list 2>&1 | tail -30)",
+      "WebFetch(domain:worrydream.com)",
+      "WebFetch(domain:blog.acolyer.org)",
+      "Bash(source /Users/jasonwcomes/Desktop/Sizls/projects/directive/website/.env.local && curl -s -w \"\\\\n%{http_code}\" https://api.anthropic.com/v1/messages -H \"x-api-key: $ANTHROPIC_API_KEY\" -H \"anthropic-version: 2023-06-01\" -H \"Content-Type: application/json\" -d '{\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":5,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}' 2>&1 | tail -5)"
     ]
   }
 }

@@ -11,32 +11,7 @@ The orchestrator is **LLM-agnostic** – provide any `runner` function that acce
 For parallel, sequential, or supervisor execution with per-agent guardrails and concurrency control, see [Multi-Agent Orchestration](/ai/multi-agent). The multi-agent orchestrator has full feature parity with the single-agent orchestrator documented here.
 {% /callout %}
 
-```
-                    ┌──────────────┐
-                    │  User Input  │
-                    └──────┬───────┘
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-    ┌──────────────┐ ┌────────────┐ ┌──────────────┐
-    │   Input      │ │  Approval  │ │    Budget    │
-    │  Guardrails  │ │    Gate    │ │    Check     │
-    └──────┬───────┘ └─────┬──────┘ └──────┬───────┘
-           └───────────────┼───────────────┘
-                           ▼
-                    ┌──────────────┐
-                    │ Agent Runner │
-                    └──────┬───────┘
-              ┌────────────┴────────────┐
-              ▼                         ▼
-    ┌──────────────────┐     ┌──────────────┐
-    │ Output Guardrails│     │ Memory Store │
-    └────────┬─────────┘     └──────┬───────┘
-             └──────────┬───────────┘
-                        ▼
-                 ┌──────────────┐
-                 │   Response   │
-                 └──────────────┘
-```
+{% orchestrator-diagram /%}
 
 ---
 
