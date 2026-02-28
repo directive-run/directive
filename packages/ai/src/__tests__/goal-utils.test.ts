@@ -5,7 +5,7 @@ import {
   getDependencyGraph,
   explainGoal,
 } from "../goal-utils.js";
-import type { GoalResult, GoalStepMetrics, RelaxationRecord } from "../types.js";
+import type { GoalResult, RelaxationRecord } from "../types.js";
 
 // ============================================================================
 // Helper: build a minimal GoalResult for explainGoal tests
