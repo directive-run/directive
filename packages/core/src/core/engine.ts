@@ -1187,6 +1187,10 @@ export function createEngine<S extends Schema>(
 				resolvers: Object.fromEntries(
 					resolversManager.getInflight().map((id) => [id, resolversManager.getStatus(id)]),
 				),
+				resolverDefs: Object.entries(mergedResolvers).map(([id, def]) => ({
+					id,
+					requirement: typeof def.requirement === "string" ? def.requirement : "(predicate)",
+				})),
 				runHistoryEnabled,
 				...(runHistoryEnabled ? {
 				runHistory: runHistory.map((r) => ({

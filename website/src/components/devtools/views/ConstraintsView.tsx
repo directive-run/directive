@@ -5,7 +5,7 @@ import { useSelector } from '@directive-run/react'
 import type { RunChangelogEntry } from '@directive-run/core'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
-import type { RuntimeConstraintInfo, RuntimeRequirementInfo } from '../modules/devtools-runtime'
+import type { RuntimeConstraintInfo, RuntimeRequirementInfo, RuntimeResolverDef } from '../modules/devtools-runtime'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -493,6 +493,7 @@ function ResolverRow({
   stats,
   maxCount,
   latestRun,
+  requirementType,
   isExpanded,
   onToggle,
 }: {
@@ -500,12 +501,14 @@ function ResolverRow({
   stats: { count: number; errors: number; totalMs?: number }
   maxCount: number
   latestRun: RunChangelogEntry | null
+  requirementType?: string
   isExpanded: boolean
   onToggle: (name: string) => void
 }) {
   const avgMs = stats.count > 0 && stats.totalMs != null ? stats.totalMs / stats.count : null
   const successRate = stats.count > 0 ? ((stats.count - stats.errors) / stats.count) * 100 : null
   const durationBarWidth = stats.count > 0 && maxCount > 0 ? Math.max(4, (stats.count / maxCount) * 100) : 0
+  const isIdle = stats.count === 0 && stats.errors === 0
 
   // Get latest error from run history
   const latestError = useMemo(() => {
@@ -519,10 +522,20 @@ function ResolverRow({
   }, [latestRun, name])
 
   return (
-    <div className="rounded bg-indigo-50 font-mono text-xs dark:bg-indigo-900/10">
+    <div className={`rounded font-mono text-xs ${isIdle ? 'bg-zinc-50 dark:bg-zinc-800/30' : 'bg-indigo-50 dark:bg-indigo-900/10'}`}>
       <div className="flex items-center gap-3 px-2 py-1.5">
-        <div className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" aria-hidden="true" />
-        <span className="text-indigo-700 dark:text-indigo-400">{name}</span>
+        <div className={`h-2 w-2 shrink-0 rounded-full ${isIdle ? 'bg-zinc-300 dark:bg-zinc-600' : 'bg-indigo-500'}`} aria-hidden="true" />
+        <span className={isIdle ? 'text-zinc-500 dark:text-zinc-400' : 'text-indigo-700 dark:text-indigo-400'}>{name}</span>
+        {requirementType && (
+          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+            {requirementType}
+          </span>
+        )}
+        {isIdle && (
+          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[9px] text-zinc-400 dark:bg-zinc-700/50 dark:text-zinc-500">
+            idle
+          </span>
+        )}
         {stats.count > 0 && (
           <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
             {stats.count}x
@@ -582,6 +595,7 @@ export function PipelineView() {
   const inflight = useSelector(system, (s) => s.facts.runtime.inflight)
   const unmet = useSelector(system, (s) => s.facts.runtime.unmet)
   const resolverStats = useSelector(system, (s) => s.facts.runtime.resolverStats)
+  const resolverDefs = useSelector(system, (s) => s.facts.runtime.resolverDefs) as RuntimeResolverDef[]
   const runHistory = useSelector(system, (s) => s.facts.runtime.runHistory)
   const systemName = useSelector(system, (s) => s.facts.runtime.systemName)
   const runHistoryEnabled = useSelector(system, (s) => s.facts.runtime.runHistoryEnabled)
@@ -647,20 +661,58 @@ export function PipelineView() {
     }
   }, [systemName, system])
 
-  if (!connected) {
-    return <EmptyState message="No Directive system connected" />
-  }
-
   // Merge inflight + unmet into unified requirements list
   const allRequirements: Requirement[] = [...inflight, ...unmet]
-  const resolverEntries = Object.entries(resolverStats)
+
+  // Merge resolverDefs (all defined resolvers) with resolverStats (runtime stats)
+  // This ensures resolvers always show even before they've executed
+  const resolverEntries = useMemo(() => {
+    const statsEntries = Object.entries(resolverStats)
+    if (resolverDefs.length === 0) {
+      return statsEntries
+    }
+
+    const seen = new Set(statsEntries.map(([name]) => name))
+    const merged = [...statsEntries]
+    for (const def of resolverDefs) {
+      if (!seen.has(def.id)) {
+        merged.push([def.id, { count: 0, totalMs: 0, errors: 0 }])
+      }
+    }
+
+    return merged
+  }, [resolverStats, resolverDefs])
+
+  // Derive requirement types from resolverDefs for display
+  const requirementTypes = useMemo(() => {
+    if (resolverDefs.length === 0) {
+      return []
+    }
+
+    const types = new Set<string>()
+    for (const def of resolverDefs) {
+      if (def.requirement && def.requirement !== '(predicate)') {
+        types.add(def.requirement)
+      }
+    }
+
+    return [...types]
+  }, [resolverDefs])
+
+  // Build resolver-to-requirement mapping for display
+  const resolverRequirementMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const def of resolverDefs) {
+      map.set(def.id, def.requirement)
+    }
+
+    return map
+  }, [resolverDefs])
+
   const totalCount = constraints.length + resolverEntries.length
 
-  if (constraints.length === 0 && allRequirements.length === 0 && resolverEntries.length === 0) {
-    return <EmptyState message="No constraints, requirements, or resolvers" />
-  }
-
   // Filter — memoize to stabilize references for downstream useMemos
+  // (must be called unconditionally to satisfy React's rules of hooks)
   const lowerFilter = filter.toLowerCase()
   const filteredConstraints = useMemo(() =>
     filter ? constraints.filter((c) => c.id.toLowerCase().includes(lowerFilter)) : constraints,
@@ -674,10 +726,6 @@ export function PipelineView() {
     filter ? resolverEntries.filter(([name]) => name.toLowerCase().includes(lowerFilter)) : resolverEntries,
     [resolverEntries, lowerFilter, filter],
   )
-
-  const hasResults = filteredConstraints.length > 0 || filteredRequirements.length > 0 || filteredResolvers.length > 0
-  const maxResolverCount = Math.max(...resolverEntries.map(([, s]) => s.count), 1)
-  const hasRunHistory = runHistory && runHistory.length > 0
 
   // Sort disabled constraints to the bottom
   const sortedConstraints = useMemo(() => {
@@ -693,6 +741,18 @@ export function PipelineView() {
       return a.disabled ? 1 : -1
     })
   }, [filteredConstraints])
+
+  if (!connected) {
+    return <EmptyState message="No Directive system connected" />
+  }
+
+  if (constraints.length === 0 && allRequirements.length === 0 && resolverEntries.length === 0 && requirementTypes.length === 0) {
+    return <EmptyState message="No constraints, requirements, or resolvers" />
+  }
+
+  const hasResults = filteredConstraints.length > 0 || filteredRequirements.length > 0 || filteredResolvers.length > 0
+  const maxResolverCount = Math.max(...resolverEntries.map(([, s]) => s.count), 1)
+  const hasRunHistory = runHistory && runHistory.length > 0
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -762,26 +822,40 @@ export function PipelineView() {
           </div>
         )}
 
-        {/* Requirements (merged inflight + unmet) */}
-        {filteredRequirements.length > 0 && (
+        {/* Requirements (active inflight + unmet, or defined types when idle) */}
+        {(filteredRequirements.length > 0 || requirementTypes.length > 0) && (
           <div>
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
               Requirements
               <span className="ml-2 font-mono font-normal text-amber-500 dark:text-amber-500">
-                {filteredRequirements.length}
+                {filteredRequirements.length > 0 ? filteredRequirements.length : requirementTypes.length}
               </span>
             </h4>
             <div className="space-y-1">
-              {filteredRequirements.map((r, i) => (
-                <RequirementRow
-                  key={`${r.id}:${r.fromConstraint}:${i}`}
-                  r={r}
-                  latestRun={latestRun}
-                  resolverStats={resolverStats}
-                  isExpanded={expandedItems.has(`r:${r.id}`)}
-                  onToggle={(id) => toggleItem(`r:${id}`)}
-                />
-              ))}
+              {filteredRequirements.length > 0 ? (
+                filteredRequirements.map((r, i) => (
+                  <RequirementRow
+                    key={`${r.id}:${r.fromConstraint}:${i}`}
+                    r={r}
+                    latestRun={latestRun}
+                    resolverStats={resolverStats}
+                    isExpanded={expandedItems.has(`r:${r.id}`)}
+                    onToggle={(id) => toggleItem(`r:${id}`)}
+                  />
+                ))
+              ) : (
+                requirementTypes.map((type) => (
+                  <div key={type} className="rounded bg-zinc-50 px-2 py-1.5 font-mono text-xs dark:bg-zinc-800/30">
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-600" aria-hidden="true" />
+                      <span className="text-zinc-500 dark:text-zinc-400">{type}</span>
+                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[9px] text-zinc-400 dark:bg-zinc-700/50 dark:text-zinc-500">
+                        idle
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -803,6 +877,7 @@ export function PipelineView() {
                   stats={stats}
                   maxCount={maxResolverCount}
                   latestRun={latestRun}
+                  requirementType={resolverRequirementMap.get(name)}
                   isExpanded={expandedItems.has(`res:${name}`)}
                   onToggle={(n) => toggleItem(`res:${n}`)}
                 />

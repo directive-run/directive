@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
+import { DEVTOOLS_EVENT_NAME } from '@directive-run/core/plugins'
 import type { DebugEvent } from '../types'
 import { FLUSH_INTERVAL_MS } from '../constants'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
@@ -132,6 +133,10 @@ export function useDevToolsStream() {
 
   // Listen for imported events (from file import)
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
     const handler = (e: Event) => {
       const imported = (e as CustomEvent).detail as DebugEvent[]
       if (Array.isArray(imported) && imported.length > 0) {
@@ -145,6 +150,58 @@ export function useDevToolsStream() {
 
     return () => window.removeEventListener('devtools-import', handler)
   }, [system])
+
+  // Listen for client-side AI events (from emitDevToolsEvent bridge)
+  // Use refs for handler deps to avoid re-registering the event listener
+  const aiEnabledRef = useRef(false)
+  const systemRef = useRef(system)
+  const flushPendingRef = useRef(flushPending)
+  systemRef.current = system
+  flushPendingRef.current = flushPending
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const handler = (e: Event) => {
+      try {
+        const raw = (e as CustomEvent).detail
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+          return
+        }
+
+        // Validate required DebugEvent shape
+        if (typeof raw.type !== 'string' || typeof raw.id !== 'number' || typeof raw.timestamp !== 'number') {
+          return
+        }
+
+        const event = raw as DebugEvent
+
+        // Auto-enable AI tabs when first client-side event arrives (dedup with ref)
+        if (!aiEnabledRef.current) {
+          aiEnabledRef.current = true
+          systemRef.current.events.connection.enableAi()
+        }
+
+        // Push into the same batch pipeline as SSE events
+        pendingRef.current.push(event)
+        if (!flushTimerRef.current) {
+          flushTimerRef.current = setTimeout(flushPendingRef.current, FLUSH_INTERVAL_MS)
+        }
+      } catch {
+        // Bridge listener must never crash DevTools
+      }
+    }
+
+    window.addEventListener(DEVTOOLS_EVENT_NAME, handler)
+
+    return () => {
+      window.removeEventListener(DEVTOOLS_EVENT_NAME, handler)
+      // M3: Reset so remount can re-enable AI for a new system
+      aiEnabledRef.current = false
+    }
+  }, []) // stable — uses refs for all mutable deps
 
   // M1: Manual reconnect (exposed for "click to retry" after max retries)
   const reconnect = useCallback(() => {

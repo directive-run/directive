@@ -260,7 +260,7 @@ interface InlineChatProps {
 // double-mounts and Fast Refresh cycles.
 const stores = new Map<string, ReturnType<typeof createChatStore>>()
 
-function getStore(key: string) {
+export function getStore(key: string) {
   let store = stores.get(key)
   if (!store) {
     store = createChatStore()

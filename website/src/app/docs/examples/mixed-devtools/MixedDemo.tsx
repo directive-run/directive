@@ -22,8 +22,9 @@ export function MixedDemo({
           use the SystemSelector dropdown to switch between
           &ldquo;number-match&rdquo;, &ldquo;ai-guardrails&rdquo;, and
           &ldquo;goal-heist&rdquo;. System-core tabs (Facts, Derivations,
-          Constraints) populate for each system. AI tabs show empty state since
-          there is no SSE backend for embedded examples.
+          Constraints) populate for each system. AI tabs (Timeline, Guardrails,
+          Events) appear automatically for examples that emit AI events via the
+          client-side bridge.
         </p>
 
         <div className="space-y-6">
@@ -93,8 +94,8 @@ export function MixedDemo({
             Switching between systems updates all system-core tabs
           </li>
           <li>
-            AI tabs (Timeline, Cost, etc.) show empty state — expected without
-            an SSE backend
+            AI tabs appear for &ldquo;ai-guardrails&rdquo; after clicking test
+            buttons (events emitted via client-side bridge)
           </li>
         </ul>
       </section>

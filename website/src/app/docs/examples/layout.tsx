@@ -3,15 +3,6 @@
 import { usePathname } from 'next/navigation'
 import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
 
-// Examples that import from @directive-run/ai
-const AI_EXAMPLES = new Set([
-  'ai-checkpoint',
-  'ai-guardrails',
-  'checkers',
-  'fraud-analysis',
-  'goal-heist',
-])
-
 export default function ExamplesLayout({
   children,
 }: {
@@ -19,10 +10,11 @@ export default function ExamplesLayout({
 }) {
   const pathname = usePathname()
   const slug = pathname?.split('/').pop() || ''
-  const mode = AI_EXAMPLES.has(slug) ? 'ai' : 'system'
 
+  // All examples use system mode. AI tabs auto-appear when examples emit
+  // client-side AI events via the emitDevToolsEvent bridge.
   return (
-    <DevToolsWithProvider key={slug} mode={mode}>
+    <DevToolsWithProvider key={slug} mode="system">
       {children}
     </DevToolsWithProvider>
   )

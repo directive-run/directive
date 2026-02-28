@@ -2,6 +2,7 @@
 
 import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
 import { InlineChat } from '@/components/InlineChat'
+import { useChatSystem } from './useChatSystem'
 
 const EXAMPLE_PROMPTS = [
   "Tell me about Directive's constraint system",
@@ -10,8 +11,13 @@ const EXAMPLE_PROMPTS = [
 ]
 
 export default function AIChatPage() {
+  // Create a Directive system that tracks chat metrics.
+  // Registers on window.__DIRECTIVE__ so DevToolsProvider auto-detects it,
+  // enabling System tabs (Facts, Derivations, Pipeline) alongside AI tabs.
+  useChatSystem('/api/chat')
+
   return (
-    <DevToolsWithProvider>
+    <DevToolsWithProvider mode="ai">
       <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-3xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
         <div className="shrink-0 text-center">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white sm:text-3xl">

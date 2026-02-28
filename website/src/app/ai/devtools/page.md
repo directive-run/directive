@@ -3,7 +3,7 @@ title: DevTools
 description: Real-time visual debugging for AI agent orchestration via WebSocket or SSE transport.
 ---
 
-A transport-agnostic debugging interface for agent orchestration with 12 specialized views. {% .lead %}
+A transport-agnostic debugging interface for agent orchestration with 13 specialized views (6 system + 7 AI). {% .lead %}
 
 {% callout type="note" title="Try it live" %}
 DevTools is active on all example pages. Visit [AI Guardrails](/docs/examples/ai-guardrails) or [AI Checkpoint](/docs/examples/ai-checkpoint) and click the Directive logo button (bottom-left) to inspect the system. For the full AI DevTools experience with streaming events, try the [AI Chat demo](/ai/examples/ai-chat).
@@ -70,7 +70,22 @@ const server = createDevToolsServer({
 
 ## Views
 
-The DevTools UI has 12 specialized views, accessible as tabs. A time format selector (ms / elapsed / clock) applies across all views.
+The DevTools UI has 13 specialized views (6 system + 7 AI), accessible as tabs. A time format selector (ms / elapsed / clock) applies across all views.
+
+### System Tabs
+
+Six tabs for inspecting core Directive system state:
+
+| Tab | Description |
+|-----|-------------|
+| **Facts** | Live key-value table of all facts with filter, copy, inline editing, and breakpoint icons |
+| **Derivations** | Live key-value table of all derivations with filter and copy |
+| **Pipeline** | Constraint evaluation status, requirement lifecycle, and inflight resolvers |
+| **System Graph** | Interactive React Flow diagram of facts → derivations → constraints → resolvers |
+| **Time Travel** | Snapshot browser with diff view, undo/redo, and export/import |
+| **Breakpoints** | Fact mutation breakpoints, trace event breakpoints, and pause/resume controls |
+
+### AI Tabs
 
 ### 1. Timeline
 
@@ -91,18 +106,25 @@ Horizontal lanes per agent with bar-per-event rendering and row packing to preve
 
 **Live features:**
 - Replay cursor line (red vertical) for stepping through events
-- Anomaly highlighting with red rings on anomalous events
+- Error highlighting with red rings on error events
 - Live token streaming panel &ndash; per-agent token preview (up to 500 chars) with count
 - Pause/resume button with pending event count badge
 
-### 2. Cost
+### 2. Cost & Budget
 
-Token usage and estimated cost breakdown.
+Combined cost analysis and budget tracking in a single tabbed view.
 
-- Total tokens and estimated cost ($0.01/1K tokens)
-- Stacked bar chart per agent with hover tooltips (golden-angle hue for unlimited agents)
-- Cost breakdown table: Agent, Runs, Total Tokens, Avg Tokens, Duration, % of Total
-- Sorted by highest token usage
+**Cost section:**
+- Total tokens, input/output breakdown, and estimated cost
+- Stacked bar chart per agent with hover tooltips
+- Cost breakdown table: Agent, Runs, Input, Output, Total, Cost, %
+- Per-model pricing editor (local only) with reset to defaults
+
+**Budget section:**
+- Hourly and daily budget bars with color alerts (90% → red, 70% → amber)
+- Remaining budget percentage
+- Recent spend list with agent filter and sort (time, cost, tokens)
+- Totals footer with aggregate cost
 
 ### 3. State
 
@@ -112,6 +134,37 @@ Two sub-tabs with key count badges: **Scratchpad** and **Derived**.
 - Live updates as values change
 - Refresh button with 600ms debounce feedback
 - "Edit & Fork" button &ndash; modify state values and fork the timeline from that point
+
+### 4. Guardrails
+
+Guardrail check results with pass/fail status.
+
+- Guardrail event list with type (input/output), name, and result
+- Pass rate statistics
+- Color-coded results (green for pass, red for fail)
+
+### 5. Agent Graph
+
+Interactive directed acyclic graph using React Flow showing agent execution flow.
+
+- Agent nodes with status colors and icons
+- Execution edges with animated connections
+- Node selection for detail inspection
+- Freehand drawing annotations
+
+### 6. Goal
+
+Goal and target progress tracking.
+
+- Progress indicators for configured goals
+- Completion status per objective
+
+### 7. Memory
+
+Agent memory and context inspection.
+
+- Memory usage per agent
+- Context window utilization
 
 ---
 
@@ -131,35 +184,6 @@ Hierarchical flame graph visualization. Pairs start/end events into nested bars 
 - Point events (0ms) shown as thin vertical lines
 - Unclosed spans marked "(running)"
 
-### DAG
-
-Directed acyclic graph using React Flow.
-
-- Topological layout with animated edges during execution
-- Click nodes for detail panel (status, tokens, run count)
-- Cycle detection with visual indication
-
-### Health
-
-Agent health monitoring cards.
-
-- Circuit state indicator (closed/open/half-open)
-- Success rate percentage
-- Average latency
-- Health score (color-coded: green &ge; 70, amber &ge; 40, red < 40)
-- Summary stats across all agents
-- Token usage chart
-- Reroute event log
-
-### Breakpoints
-
-Interactive breakpoint management.
-
-- Pending breakpoints list
-- Per-breakpoint cards with input modification and skip toggle
-- "Resume All" button
-- Resolved/cancelled history
-
 ### Compare
 
 Side-by-side comparison of saved session runs.
@@ -175,15 +199,13 @@ Side-by-side comparison of saved session runs.
 
 ## Event Detail Panel
 
-Clicking any event in the Timeline or Flamechart opens a detail panel (right sidebar, 320px). Press Escape to close.
+Clicking any event in the Timeline opens a detail panel showing event properties.
 
 **Features:**
-- **Prompt/Completion viewer** &ndash; Tabbed input/output display with token counts (`inputTokens`, `outputTokens`, `totalTokens`)
-- **Copy to clipboard** &ndash; Copy event ID or full event JSON
-- **Replay from here** &ndash; Start replay from the selected event
-- **Fork from snapshot** &ndash; Fork the timeline at this event's snapshot (with confirmation dialog)
 - **Property rendering** &ndash; Syntax-highlighted values (booleans, numbers, strings, objects) with depth-limiting
 - **String expansion** &ndash; "Show more/less" toggle for truncated content (>200 chars)
+- **Copy to clipboard** &ndash; Copy event ID or full event JSON
+- **Token counts** &ndash; Displays `inputTokens`, `outputTokens`, and `totalTokens` when available
 
 ---
 
@@ -202,17 +224,9 @@ Step through recorded events with playback controls. Uses frame-skipping to main
 
 ---
 
-## Anomaly Detection
+## Error Highlighting
 
-The DevTools automatically detects anomalies in agent execution:
-
-| Severity | Examples |
-|----------|---------|
-| **Critical** | Agent errors, guardrail rejections |
-| **Warning** | Retries, duration outliers (>2x mean), token spikes (>2x mean) |
-| **Info** | Reroutes, circuit breaker state changes |
-
-Anomalies are highlighted in the timeline view and can be filtered.
+The DevTools highlights error events in the Timeline view with red rings and distinct coloring. Error events include `agent_error`, `resolver_error`, and failed guardrail checks. Use the error-only quick filter to isolate these events.
 
 ---
 

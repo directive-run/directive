@@ -167,6 +167,19 @@ Imports a previously exported session, replacing the current event buffer. Retur
 const success = __DIRECTIVE__.importSession(json, 'my-app');
 ```
 
+### `__DIRECTIVE__.subscribe(callback, name?)`
+
+Subscribes to real-time events from a system. The callback is invoked for every lifecycle event (fact changes, constraint evaluations, resolver completions, etc.). Returns an unsubscribe function.
+
+```javascript
+const unsub = __DIRECTIVE__.subscribe((event) => {
+  console.log(event.type, event.data);
+}, 'my-app');
+
+// Later: clean up
+unsub();
+```
+
 ### `__DIRECTIVE__.clearEvents(name?)`
 
 Clears all recorded events for a system. Useful for resetting the trace buffer during long debugging sessions.
@@ -216,6 +229,7 @@ Each event has the shape:
 | `effect.error` | An effect throws | `{ id, error }` |
 | `error` | An error boundary catches an error | `{ source, sourceId, message }` |
 | `error.recovery` | An error boundary recovers | `{ source, sourceId, strategy }` |
+| `run.complete` | A full reconciliation run completes | `{ duration, resolvedCount }` |
 | `timetravel.snapshot` | A time-travel snapshot is taken | `{ id, trigger }` |
 | `timetravel.jump` | Time-travel jumps to a snapshot | `{ from, to }` |
 
@@ -388,29 +402,43 @@ The floating panel is framework-agnostic (vanilla DOM), so it works the same way
 
 ---
 
-## React DevTools UI
+## Client-Side AI Event Bridge
 
-For a full-featured visual debugging experience, Directive provides React-based DevTools components with 17 tabs covering both system internals and AI orchestration.
+For client-side AI orchestration (no server-side SSE stream), use `emitDevToolsEvent` to push events directly into DevTools:
 
-Two components are available:
+```typescript
+import { emitDevToolsEvent } from '@directive-run/core/plugins';
 
-- **`LiveDevTools`** — Standalone panel you embed directly in your layout
-- **`FloatingDevTools`** — Drawer overlay triggered by a floating action button (the Directive logo)
-
-```tsx
-import { FloatingDevTools } from '@directive-run/react/devtools';
-
-function App() {
-  return (
-    <>
-      <MyApp />
-      <FloatingDevTools />
-    </>
-  );
-}
+// Emit after a guardrail check
+const result = detectPII(text);
+emitDevToolsEvent({
+  type: 'guardrail_check',
+  guardrailName: 'pii-detection',
+  guardrailType: 'input',
+  passed: !result.detected,
+});
 ```
 
-Both components auto-detect systems registered via `devtoolsPlugin()` and connect to the `window.__DIRECTIVE__` registry.
+The bridge auto-assigns `id`, `timestamp`, and `snapshotId` fields. Events flow into the same pipeline as SSE events, so all DevTools views (Timeline, Cost & Budget, etc.) work identically.
+
+The `DEVTOOLS_EVENT_NAME` constant (`"directive-devtools-event"`) is also exported for custom integrations that need to listen for bridge events directly.
+
+---
+
+## React DevTools UI
+
+{% callout type="warning" title="Website-only components" %}
+The React DevTools UI (`LiveDevTools`, `FloatingDevTools`) is part of the Directive documentation website. These components are not exported from `@directive-run/react`. For your own apps, use the core `devtoolsPlugin()` which provides the framework-agnostic floating panel, or build a custom UI using the `window.__DIRECTIVE__` console API.
+{% /callout %}
+
+The documentation website includes a full-featured React DevTools UI with 13 tabs covering both system internals and AI orchestration.
+
+Two components power the website's DevTools:
+
+- **`LiveDevTools`** — Standalone panel embedded directly in layout
+- **`FloatingDevTools`** — Drawer overlay triggered by a floating action button (the Directive logo)
+
+Both auto-detect systems registered via `devtoolsPlugin()` and connect to the `window.__DIRECTIVE__` registry.
 
 ---
 
@@ -429,21 +457,17 @@ Six tabs for inspecting core Directive system state:
 
 ### AI Tabs
 
-Eleven tabs for debugging multi-agent AI orchestration:
+Seven tabs for debugging multi-agent AI orchestration:
 
 | Tab | Description |
 |-----|-------------|
 | **Timeline** | Flamechart waterfall of agent events with zoom and pan |
-| **Cost** | Token usage and cost tracking per model |
+| **Cost & Budget** | Token usage, cost tracking per model, and budget limits with spend alerts |
 | **State** | Live agent state snapshot |
 | **Guardrails** | Guardrail check results with pass/fail status |
-| **Events** | Scrollable event log with type filter chips |
-| **Health** | System health metrics |
-| **Graph** | Agent orchestration DAG |
+| **Agent Graph** | Agent orchestration DAG with interactive React Flow visualization |
 | **Goal** | Goal progress tracking |
 | **Memory** | Agent memory inspection |
-| **Budget** | Budget usage and limits |
-| **Config** | Runtime configuration viewer |
 
 ---
 

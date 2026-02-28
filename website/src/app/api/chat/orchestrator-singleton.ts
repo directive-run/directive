@@ -310,6 +310,7 @@ export function getOrchestrator() {
 
   const docsAgent: AgentLike = {
     name: 'directive-docs-qa',
+    model: 'claude-haiku-4-5-20251001',
     instructions: BASE_INSTRUCTIONS,
   }
 

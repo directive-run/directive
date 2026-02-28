@@ -80,8 +80,10 @@ export function DevToolsProvider(props: DevToolsProviderProps) {
     resetUrl: (streamUrl ?? '/api/devtools/stream').replace(/\/stream$/, '/reset'),
   }), [streamUrl, snapshotUrl])
 
-  // Auto-detect runtime: poll window.__DIRECTIVE__ until a system appears
-  // (example module scripts load asynchronously after the provider mounts)
+  // Auto-detect runtime: continuously poll window.__DIRECTIVE__ so we notice
+  // when systems appear (async script load) or disappear (page navigation).
+  // If the currently-attached system is no longer available, detach and
+  // re-attach to whatever system is present.
   const [detectedRuntime, setDetectedRuntime] = useState<string | null>(null)
   useEffect(() => {
     if (runtimeSystemName !== undefined) {
@@ -89,27 +91,29 @@ export function DevToolsProvider(props: DevToolsProviderProps) {
     }
 
     function check() {
-      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
-        const systems = window.__DIRECTIVE__.getSystems()
-        if (systems.length > 0) {
-          setDetectedRuntime(systems[0])
+      if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
+        return
+      }
 
-          return true
+      const systems = window.__DIRECTIVE__.getSystems()
+
+      setDetectedRuntime((prev) => {
+        // Currently attached system vanished → detach
+        if (prev !== null && !systems.includes(prev)) {
+          return systems.length > 0 ? systems[0] : null
         }
-      }
 
-      return false
+        // No system attached yet → pick the first available
+        if (prev === null && systems.length > 0) {
+          return systems[0]
+        }
+
+        return prev
+      })
     }
 
-    if (check()) {
-      return
-    }
-
-    const interval = setInterval(() => {
-      if (check()) {
-        clearInterval(interval)
-      }
-    }, 500)
+    check()
+    const interval = setInterval(check, 1000)
 
     return () => clearInterval(interval)
   }, [runtimeSystemName])
