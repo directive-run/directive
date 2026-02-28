@@ -7,6 +7,7 @@ import { ConstraintPriorityDiagram } from '@/components/ConstraintPriorityDiagra
 import { ConstraintDependencyDiagram } from '@/components/ConstraintDependencyDiagram'
 import { AiArchitectureDiagram } from '@/components/AiArchitectureDiagram'
 import { SecurityPipelineDiagram } from '@/components/SecurityPipelineDiagram'
+import { OrchestratorDiagram } from '@/components/OrchestratorDiagram'
 import { QuickLink, QuickLinks } from '@/components/QuickLinks'
 import { Playground, StackBlitzButton } from '@/components/Playground'
 import { UseCaseCards } from '@/components/UseCaseCards'
@@ -110,6 +111,10 @@ const tags = {
   },
   'security-pipeline-diagram': {
     render: SecurityPipelineDiagram,
+    selfClosing: true,
+  },
+  'orchestrator-diagram': {
+    render: OrchestratorDiagram,
     selfClosing: true,
   },
 }
