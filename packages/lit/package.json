@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/lit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lit web components adapter for Directive.",
   "license": "MIT",
   "author": "Jason Comes",
