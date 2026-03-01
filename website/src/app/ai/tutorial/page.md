@@ -53,7 +53,10 @@ The runner is the bridge between Directive and your LLM SDK. Here's one for Open
 import type { AgentRunner } from '@directive-run/ai';
 import OpenAI from 'openai';
 
-const openai = new OpenAI();
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) throw new Error('OPENAI_API_KEY environment variable is required');
+
+const openai = new OpenAI({ apiKey });
 
 const runner: AgentRunner = async (agent, input, options) => {
   const response = await openai.chat.completions.create({
@@ -219,7 +222,7 @@ const orchestrator = createMultiAgentOrchestrator({
   constraints: {
     qualityGate: {
       when: (facts) => {
-        const output = String(facts.reviewer?.__agent?.lastOutput ?? '');
+        const output = String(facts.reviewer?.__agent?.output ?? '');
 
         return !output.includes('APPROVED');
       },
@@ -280,13 +283,54 @@ const orchestrator = createMultiAgentOrchestrator({
 const devtools = await connectDevTools(orchestrator, { port: 4040 });
 
 // Run
-const result = await orchestrator.runPattern('pipeline', 'Explain WebAssembly');
-console.log(result.output);
-
-// Clean up
-devtools.close();
-orchestrator.dispose();
+try {
+  const result = await orchestrator.runPattern('pipeline', 'Explain WebAssembly');
+  console.log(result.output);
+} finally {
+  devtools.close();
+  orchestrator.dispose();
+}
 ```
+
+---
+
+## Common Errors
+
+### `Unknown agent`
+
+```
+[Directive MultiAgent] Unknown agent "reasearcher". Registered agents: researcher, writer, reviewer
+```
+
+The agent ID passed to `runAgent()` or referenced in a pattern must match a key in the `agents` map. Check for typos.
+
+### `API key missing or invalid`
+
+Your `AgentRunner` receives the raw error from your LLM SDK. Ensure the API key is set:
+
+```typescript
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+```
+
+### `Guardrail blocked the request`
+
+```typescript
+import { isGuardrailError } from '@directive-run/ai';
+
+try {
+  await orchestrator.runPattern('pipeline', input);
+} catch (error) {
+  if (isGuardrailError(error)) {
+    console.log(error.guardrailName, error.userMessage);
+  }
+}
+```
+
+See [Guardrails &rarr; Error Handling](/ai/guardrails#error-handling) for the full `GuardrailError` shape.
+
+### `Budget exceeded`
+
+When `maxTokenBudget` is reached, subsequent runs throw. Check `orchestrator.totalTokens` to track usage, and increase the budget or reduce agent calls.
 
 ---
 

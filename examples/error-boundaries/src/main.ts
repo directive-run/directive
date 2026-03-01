@@ -264,7 +264,6 @@ const dashboardModule = createModule("dashboard", {
         const { service, failRate } = req;
         const breaker = circuitBreakers[service as keyof typeof circuitBreakers];
         const serviceKey = `${service}Service` as "usersService" | "ordersService" | "analyticsService";
-        const strategy = context.facts.strategy as RecoveryStrategy;
 
         try {
           await breaker.execute(async () => {
@@ -297,30 +296,7 @@ const dashboardModule = createModule("dashboard", {
           context.facts.totalErrors = context.facts.totalErrors + 1;
           addTimeline("error", `${service}: ${msg.slice(0, 60)}`, "error");
 
-          // Apply the selected recovery strategy
-          if (strategy === "skip") {
-            addTimeline("recovery", `${service}: skipped (strategy=skip)`, "recovery");
-            context.facts.totalRecoveries = context.facts.totalRecoveries + 1;
-
-            return;
-          }
-
-          if (strategy === "retry-later") {
-            addTimeline("recovery", `${service}: queued for retry (strategy=retry-later)`, "recovery");
-            context.facts.retryQueueCount = context.facts.retryQueueCount + 1;
-            context.facts.totalRecoveries = context.facts.totalRecoveries + 1;
-
-            return;
-          }
-
-          if (strategy === "retry") {
-            addTimeline("recovery", `${service}: retrying immediately (strategy=retry)`, "recovery");
-
-            throw error;
-          }
-
-          // strategy === "throw"
-          addTimeline("recovery", `${service}: throwing (strategy=throw)`, "recovery");
+          // Re-throw so the error boundary handles recovery
           throw error;
         }
       },
@@ -348,7 +324,11 @@ const system = createSystem({
   module: dashboardModule,
   plugins: [perf, devtoolsPlugin({ name: "error-boundaries" })],
   errorBoundary: {
-    onResolverError: "retry-later",
+    onResolverError: (_error, resolver) => {
+      addTimeline("recovery", `${resolver}: strategy=${currentStrategy}`, "recovery");
+
+      return currentStrategy;
+    },
     onConstraintError: "skip",
     onEffectError: "skip",
     retryLater: {

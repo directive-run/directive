@@ -6,7 +6,7 @@ description: Real-time visual debugging for AI agent orchestration via WebSocket
 A transport-agnostic debugging interface for agent orchestration with 13 specialized views (6 system + 7 AI). {% .lead %}
 
 {% callout type="note" title="Try it live" %}
-DevTools is active on all example pages. Visit [AI Guardrails](/docs/examples/ai-guardrails) or [AI Checkpoint](/docs/examples/ai-checkpoint) and click the Directive logo button (bottom-left) to inspect the system. For the full AI DevTools experience with streaming events, try the [AI Chat demo](/ai/examples/ai-chat).
+DevTools is active on all example pages. Visit [Safety Shield](/docs/examples/guardrails) or [Checkpoint](/docs/examples/checkpoint) and click the Directive logo button (bottom-left) to inspect the system. For the full AI DevTools experience with streaming events, try the [AI Chat demo](/ai/examples/chat).
 {% /callout %}
 
 The DevTools server (`@directive-run/ai`) bridges your orchestrator's timeline, health, breakpoints, and state into a visual debugging interface via WebSocket, SSE, or any custom transport.
@@ -168,35 +168,6 @@ Agent memory and context inspection.
 
 ---
 
-## Roadmap
-
-These views are planned for future releases. The server protocol and data structures are in place — the rendering is not yet built.
-
-### Flamechart
-
-Hierarchical flame graph visualization. Pairs start/end events into nested bars at three depth levels: Patterns &rarr; Agents &rarr; Resolvers.
-
-- Performance summary &ndash; total duration, critical path, parallelism ratio, slowest agent
-- Zoom and pan (shared 1x&ndash;20x zoom with Ctrl+Scroll)
-- Canvas minimap with viewport rectangle
-- Hover for tooltips with type, agent, and duration
-- Click to select and view detail panel (type, agent, duration, tokens, depth)
-- Point events (0ms) shown as thin vertical lines
-- Unclosed spans marked "(running)"
-
-### Compare
-
-Side-by-side comparison of saved session runs.
-
-- Run selectors (dropdown) with stale-selection cleanup when runs are deleted
-- Summary stats comparison (events, tokens, duration, agents)
-- Agent comparison table with color-coded deltas (red = increase, green = decrease)
-- Event type breakdown chart (stacked bars)
-- Mini timeline bars
-- Diff summary with delta calculations
-
----
-
 ## Event Detail Panel
 
 Clicking any event in the Timeline opens a detail panel showing event properties.
@@ -235,8 +206,6 @@ The DevTools highlights error events in the Timeline view with red rings and dis
 - **Export JSON** &ndash; Save a session to JSON with version and timestamp metadata
 - **Export HTML** &ndash; Generate a standalone HTML trace viewer (no dependencies, no WebSocket &ndash; share with anyone)
 - **Import** &ndash; Load a saved session for replay (validates event types and structure, 50MB limit)
-- **Auto-save** &ndash; Toggle automatic saving to localStorage (5-second debounce, up to 5 runs, 10MB limit)
-- **Compare** &ndash; Save multiple runs and compare them side-by-side in the Compare view
 - **Fork** &ndash; Truncate timeline to a past point, optionally edit state, and replay from there
 
 ---
@@ -325,7 +294,7 @@ interface DevToolsServer {
 ## Related
 
 - **[DevTools Plugin](/docs/plugins/devtools)** — Console API and floating panel for debugging any Directive system's facts, derivations, and events.
-- **[AI Chat Demo](/ai/examples/ai-chat)** — Try the visual debugger in your browser.
+- **[AI Chat Demo](/ai/examples/chat)** — Try the visual debugger in your browser.
 
 ---
 
@@ -335,4 +304,4 @@ interface DevToolsServer {
 - [Breakpoints & Checkpoints](/ai/breakpoints) &ndash; Pausing and restoring state
 - [Cross-Agent State](/ai/cross-agent-state) &ndash; Scratchpad and derivations
 - [Self-Healing](/ai/self-healing) &ndash; Health monitoring and rerouting
-- [AI Chat Demo](/ai/examples/ai-chat) &ndash; Interactive visual debugger
+- [AI Chat Demo](/ai/examples/chat) &ndash; Interactive visual debugger

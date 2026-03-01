@@ -31,7 +31,7 @@ await audit.addEntry('agent.run.start', {
 
 ## What Gets Logged
 
-17 event types across six categories:
+22 event types across eight categories:
 
 | Category | Events |
 |----------|--------|
@@ -40,7 +40,9 @@ await audit.addEntry('agent.run.start', {
 | Human-in-the-loop | `approval.requested`, `approval.granted`, `approval.denied` |
 | Requirements | `requirement.created`, `requirement.met` |
 | Resolvers | `resolver.start`, `resolver.complete`, `resolver.error` |
-| Facts & errors | `fact.set`, `fact.batch`, `error.occurred`, `error.recovery` |
+| Fact mutations | `fact.set`, `fact.batch` |
+| Error handling | `error.occurred`, `error.recovery` |
+| Checkpoint operations | `checkpoint.save`, `checkpoint.restore`, `checkpoint.fork`, `checkpoint.replay` |
 
 ---
 

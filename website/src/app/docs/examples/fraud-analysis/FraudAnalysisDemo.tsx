@@ -86,7 +86,7 @@ export function FraudAnalysisDemo({
                 PII detection
               </strong>{' '}
               &ndash; The normalize resolver runs{' '}
-              <code>detectPII</code> from <code>@directive-run/ai</code> on
+              local <code>detectPII</code> regex scanner on
               merchant names and memo fields, redacting SSNs, credit cards,
               and bank account numbers.
             </li>

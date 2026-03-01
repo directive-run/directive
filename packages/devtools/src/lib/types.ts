@@ -127,17 +127,6 @@ export function isReroute(e: DebugEvent): e is RerouteEvent {
 
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
-export interface AgentHealthMetrics {
-  agentId: string;
-  circuitState: CircuitState;
-  successRate: number;
-  avgLatencyMs: number;
-  recentFailures: number;
-  recentSuccesses: number;
-  healthScore: number;
-  lastErrors: string[];
-}
-
 // ============================================================================
 // Breakpoint Types
 // ============================================================================
@@ -231,7 +220,6 @@ const SERVER_MESSAGE_TYPES = [
   "event",
   "event_batch",
   "snapshot",
-  "health",
   "breakpoints",
   "scratchpad_state",
   "scratchpad_update",
@@ -254,33 +242,31 @@ export type ServerMessage =
   | { type: "event"; event: DebugEvent }
   | { type: "event_batch"; events: DebugEvent[] }
   | { type: "snapshot"; data: DevToolsSnapshot }
-  | { type: "health"; metrics: Record<string, AgentHealthMetrics> }
   | { type: "breakpoints"; state: BreakpointState }
-  // Phase 2: Scratchpad & derived state
+  // Scratchpad & derived state
   | { type: "scratchpad_state"; data: Record<string, unknown> }
   | { type: "scratchpad_update"; key: string; value: unknown }
   | { type: "derived_state"; data: Record<string, unknown> }
   | { type: "derived_update"; id: string; value: unknown }
-  // Phase 2: Fork
+  // Fork
   | { type: "fork_complete"; eventId: number; newEventCount: number }
-  // Phase 2: Token streaming
+  // Token streaming
   | { type: "token_stream"; agentId: string; tokens: string; tokenCount: number }
   | { type: "stream_done"; agentId: string; totalTokens: number }
   | { type: "error"; code: string; message: string };
 
 export type ClientMessage =
   | { type: "request_snapshot" }
-  | { type: "request_health" }
   | { type: "request_events"; since?: number }
   | { type: "request_breakpoints" }
   | { type: "resume_breakpoint"; breakpointId: string; modifications?: { input?: string; skip?: boolean } }
   | { type: "cancel_breakpoint"; breakpointId: string; reason?: string }
   | { type: "export_session" }
   | { type: "import_session"; data: string }
-  // Phase 2: Scratchpad & derived state requests
+  // Scratchpad & derived state requests
   | { type: "request_scratchpad" }
   | { type: "request_derived" }
-  // Phase 2: Fork
+  // Fork
   | { type: "fork_from_snapshot"; eventId: number }
   | { type: "ping" };
 

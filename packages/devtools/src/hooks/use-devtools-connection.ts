@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   VALID_EVENT_TYPES,
   VALID_SERVER_MESSAGE_TYPES,
-  type AgentHealthMetrics,
   type BreakpointState,
   type ClientMessage,
   type ConnectionStatus,
@@ -16,13 +15,12 @@ export interface DevToolsConnection {
   sessionId: string | null;
   events: DebugEvent[];
   snapshot: DevToolsSnapshot | null;
-  healthMetrics: Record<string, AgentHealthMetrics>;
   breakpointState: BreakpointState;
   error: string | null;
-  // Phase 2: Scratchpad & derived state
+  // Scratchpad & derived state
   scratchpadState: Record<string, unknown>;
   derivedState: Record<string, unknown>;
-  // Phase 2: Token streaming
+  // Token streaming
   streamingTokens: Map<string, { tokens: string; count: number; startedAt: number }>;
   // E12: Pause live updates
   isPaused: boolean;
@@ -32,7 +30,6 @@ export interface DevToolsConnection {
   disconnect: () => void;
   send: (message: ClientMessage) => void;
   requestSnapshot: () => void;
-  requestHealth: () => void;
   requestEvents: (since?: number) => void;
   requestBreakpoints: () => void;
   resumeBreakpoint: (id: string, modifications?: { input?: string; skip?: boolean }) => void;
@@ -40,7 +37,7 @@ export interface DevToolsConnection {
   exportSession: () => void;
   importSession: (data: string) => void;
   clearEvents: () => void;
-  // Phase 2: New request methods
+  // New request methods
   requestScratchpad: () => void;
   requestDerived: () => void;
   forkFromSnapshot: (eventId: number) => void;
@@ -94,7 +91,6 @@ export function useDevToolsConnection(): DevToolsConnection {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [events, setEvents] = useState<DebugEvent[]>([]);
   const [snapshot, setSnapshot] = useState<DevToolsSnapshot | null>(null);
-  const [healthMetrics, setHealthMetrics] = useState<Record<string, AgentHealthMetrics>>({});
   const [breakpointState, setBreakpointState] = useState<BreakpointState>(INITIAL_BREAKPOINT_STATE);
   const [error, setError] = useState<string | null>(null);
   // Phase 2 state
@@ -190,15 +186,11 @@ export function useDevToolsConnection(): DevToolsConnection {
         setSnapshot(msg.data);
         break;
 
-      case "health":
-        setHealthMetrics(msg.metrics);
-        break;
-
       case "breakpoints":
         setBreakpointState(msg.state);
         break;
 
-      // Phase 2: Scratchpad
+      // Scratchpad
       case "scratchpad_state": {
         const safe: Record<string, unknown> = Object.create(null);
         for (const [k, v] of Object.entries(msg.data)) {
@@ -216,7 +208,7 @@ export function useDevToolsConnection(): DevToolsConnection {
         }
         break;
 
-      // Phase 2: Derived
+      // Derived
       case "derived_state": {
         const safe: Record<string, unknown> = Object.create(null);
         for (const [k, v] of Object.entries(msg.data)) {
@@ -234,11 +226,11 @@ export function useDevToolsConnection(): DevToolsConnection {
         }
         break;
 
-      // Phase 2: Fork (C3: handle fork_complete properly)
+      // Fork (C3: handle fork_complete properly)
       case "fork_complete":
         if (pendingForkRef.current) {
           pendingForkRef.current = false;
-          // M15: Clear the fallback timeout since we got a response
+          // Clear the fallback timeout since we got a response
           if (forkTimeoutRef.current) {
             clearTimeout(forkTimeoutRef.current);
             forkTimeoutRef.current = null;
@@ -247,8 +239,8 @@ export function useDevToolsConnection(): DevToolsConnection {
         }
         break;
 
-      // Phase 2: Token streaming
-      // M7: Validate message fields before processing
+      // Token streaming
+      // Validate message fields before processing
       case "token_stream":
         if (typeof msg.agentId !== "string" || !msg.agentId || typeof msg.tokens !== "string" || typeof msg.tokenCount !== "number") {
           break;
@@ -295,7 +287,7 @@ export function useDevToolsConnection(): DevToolsConnection {
         break;
 
       default: {
-        // M8: Exhaustive switch — catches unhandled message types at compile time
+        // Exhaustive switch — catches unhandled message types at compile time
         const _exhaustive: never = msg;
         console.warn("[DevTools] Unhandled message type:", (_exhaustive as { type: string }).type);
       }
@@ -430,7 +422,7 @@ export function useDevToolsConnection(): DevToolsConnection {
   // Keep sendRef in sync for use in handleMessage
   useEffect(() => { sendRef.current = send; }, [send]);
 
-  // M3: Clean up stale streaming tokens periodically
+  // Clean up stale streaming tokens periodically
   useEffect(() => {
     streamCleanupTimerRef.current = setInterval(() => {
       setStreamingTokens((prev) => {
@@ -472,7 +464,7 @@ export function useDevToolsConnection(): DevToolsConnection {
       if (flushRafRef.current != null) {
         cancelAnimationFrame(flushRafRef.current);
       }
-      // M15: Clean up fork timeout
+      // Clean up fork timeout
       if (forkTimeoutRef.current) {
         clearTimeout(forkTimeoutRef.current);
       }
@@ -506,7 +498,6 @@ export function useDevToolsConnection(): DevToolsConnection {
     sessionId,
     events,
     snapshot,
-    healthMetrics,
     breakpointState,
     error,
     scratchpadState,
@@ -519,7 +510,6 @@ export function useDevToolsConnection(): DevToolsConnection {
     disconnect,
     send,
     requestSnapshot: useCallback(() => send({ type: "request_snapshot" }), [send]),
-    requestHealth: useCallback(() => send({ type: "request_health" }), [send]),
     requestEvents: useCallback((since?: number) => send({ type: "request_events", since }), [send]),
     requestBreakpoints: useCallback(() => send({ type: "request_breakpoints" }), [send]),
     resumeBreakpoint: useCallback((id: string, modifications?: { input?: string; skip?: boolean }) => {
@@ -555,8 +545,8 @@ export function useDevToolsConnection(): DevToolsConnection {
     // Phase 2 methods
     requestScratchpad: useCallback(() => send({ type: "request_scratchpad" }), [send]),
     requestDerived: useCallback(() => send({ type: "request_derived" }), [send]),
-    // C3: Fixed — uses fork_complete message instead of setTimeout
-    // M12: Validate eventId is a finite positive integer
+    // Fixed — uses fork_complete message instead of setTimeout
+    // Validate eventId is a finite positive integer
     forkFromSnapshot: useCallback((eventId: number) => {
       if (!Number.isFinite(eventId) || eventId < 0) {
         setError("Invalid event ID for fork");
@@ -565,7 +555,7 @@ export function useDevToolsConnection(): DevToolsConnection {
       }
       pendingForkRef.current = true;
       send({ type: "fork_from_snapshot", eventId });
-      // M15: Store timeout ref for cleanup on unmount
+      // Store timeout ref for cleanup on unmount
       if (forkTimeoutRef.current) {
         clearTimeout(forkTimeoutRef.current);
       }

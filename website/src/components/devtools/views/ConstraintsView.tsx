@@ -74,9 +74,9 @@ function LatestRunSummary({ run }: { run: RunChangelogEntry }) {
         className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left font-mono text-[11px]"
         aria-expanded={expanded}
       >
-        <span className="text-zinc-500 dark:text-zinc-400">Run #{run.id}</span>
-        <span className={statusColor}>{run.status}</span>
-        <span className="text-zinc-400 dark:text-zinc-500">{run.duration.toFixed(0)}ms</span>
+        <span className="shrink-0 text-zinc-500 dark:text-zinc-400">Run #{run.id}</span>
+        <span className={`shrink-0 ${statusColor}`}>{run.status}</span>
+        <span className="shrink-0 text-zinc-400 dark:text-zinc-500">{run.duration.toFixed(0)}ms</span>
         {run.causalChain && (
           <span className="truncate text-zinc-500 dark:text-zinc-400">{run.causalChain}</span>
         )}

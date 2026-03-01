@@ -14,7 +14,7 @@ const BAR_COLORS = ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-5
 
 export function CostBudgetView() {
   const [section, setSection] = useState<Section>('cost')
-  // M4: Shared pricing state so both tabs use the same cost estimates
+  // Shared pricing state so both tabs use the same cost estimates
   const [modelPricing, setModelPricing] = useState<Record<string, { input: number; output: number }>>({})
 
   const getPricing = (modelId: string | null) => {
@@ -111,7 +111,7 @@ function CostSection({ getPricing, updateModelPrice, resetPricing, modelPricing 
         tokens: prev.tokens + (e.totalTokens ?? 0),
         inputTokens: prev.inputTokens + (e.inputTokens ?? 0),
         outputTokens: prev.outputTokens + (e.outputTokens ?? 0),
-        // M5: Remove unnecessary `as string` cast
+        // Remove unnecessary `as string` cast
         modelId: e.modelId ?? prev.modelId,
       })
     }
@@ -331,7 +331,7 @@ function BudgetSection({ getPricing }: BudgetSectionProps) {
     { window: 'day', maxCost: 50.00 },
   ]
 
-  // M4: Use shared getPricing (respects user-edited model pricing from Cost tab)
+  // Use shared getPricing (respects user-edited model pricing from Cost tab)
   const modelId = data?.config.model ?? null
   const pricing = getPricing(modelId)
 

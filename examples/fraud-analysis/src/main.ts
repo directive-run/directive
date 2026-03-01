@@ -11,13 +11,12 @@ import {
   addTimeline,
   checkpointStore,
   delay,
-  getApiKey,
 } from "./fraud-analysis.js";
 import {
   createCheckpointId,
   validateCheckpoint,
   type Checkpoint,
-} from "@directive-run/ai";
+} from "./checkpoint.js";
 import {
   scenarios,
   type FraudCase,
@@ -26,6 +25,7 @@ import {
   type CheckpointEntry,
   type PipelineStage,
   type Disposition,
+  type Scenario,
 } from "./mock-data.js";
 
 // ============================================================================
@@ -37,12 +37,6 @@ system.start();
 // ============================================================================
 // DOM References
 // ============================================================================
-
-const apiKeyBar = document.getElementById("fraud-api-key-bar")!;
-const apiKeyInput = document.getElementById("fraud-api-key-input") as HTMLInputElement;
-const apiKeySave = document.getElementById("fraud-api-key-save")!;
-const apiKeySaved = document.getElementById("fraud-api-key-saved")!;
-const aiBadge = document.getElementById("fraud-ai-badge")!;
 
 const stageBadge = document.getElementById("fraud-stage-badge")!;
 const progressFill = document.getElementById("fraud-progress-fill")!;
@@ -65,6 +59,7 @@ const checkpointsEl = document.getElementById("fraud-checkpoints")!;
 
 const scenarioSelect = document.getElementById("fraud-scenario-select") as HTMLSelectElement;
 const scenarioDesc = document.getElementById("fraud-scenario-desc")!;
+const rulesEl = document.getElementById("fraud-rules")!;
 const thresholdSlider = document.getElementById("fraud-threshold-slider") as HTMLInputElement;
 const thresholdValue = document.getElementById("fraud-threshold-value")!;
 const budgetSlider = document.getElementById("fraud-budget-slider") as HTMLInputElement;
@@ -165,12 +160,8 @@ function renderAnalysisNotes(notes: string | undefined): string {
     return "";
   }
 
-  const isAI = notes.startsWith("[AI]");
-  const tag = isAI ? '<span class="fraud-ai-tag">AI</span>' : "";
-  const text = isAI ? notes.slice(5) : notes;
-
   return `<div class="fraud-detail-label">Analysis</div>
-    <div class="fraud-analysis-note">${tag}${escapeHtml(text)}</div>`;
+    <div class="fraud-analysis-note">${escapeHtml(notes)}</div>`;
 }
 
 function renderDispositionReason(reason: string | undefined): string {
@@ -618,26 +609,6 @@ async function deleteCheckpoint(checkpointId: string): Promise<void> {
 // Controls
 // ============================================================================
 
-// API Key
-if (getApiKey()) {
-  apiKeyBar.classList.add("hidden");
-  aiBadge.style.display = "inline";
-}
-
-apiKeySave.addEventListener("click", () => {
-  const key = apiKeyInput.value.trim();
-
-  if (key) {
-    system.events.setApiKey({ key });
-    apiKeySaved.style.display = "inline";
-    apiKeyInput.value = "";
-    aiBadge.style.display = "inline";
-    setTimeout(() => {
-      apiKeyBar.classList.add("hidden");
-    }, 1000);
-  }
-});
-
 // Scenario selector
 scenarioSelect.addEventListener("change", () => {
   system.events.selectScenario({ key: scenarioSelect.value });
@@ -648,6 +619,9 @@ function updateScenarioDesc(): void {
   const scenario = scenarios[scenarioSelect.value];
   if (scenario) {
     scenarioDesc.textContent = scenario.description;
+    rulesEl.innerHTML = scenario.rules.map((r) =>
+      `<div class="fraud-rule"><div class="fraud-rule-header"><span class="fraud-rule-severity fraud-rule-${r.severity}">${r.severity}</span> <strong>${escapeHtml(r.name)}</strong></div><div class="fraud-rule-desc">${escapeHtml(r.description)}</div></div>`,
+    ).join("");
   }
 }
 

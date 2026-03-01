@@ -60,17 +60,6 @@ export const docsNavigation: NavigationSection[] = [
     ],
   },
   {
-    title: 'Plugins',
-    links: [
-      { title: 'Overview', href: '/docs/plugins/overview' },
-      { title: 'Logging', href: '/docs/plugins/logging' },
-      { title: 'DevTools', href: '/docs/plugins/devtools' },
-      { title: 'Persistence', href: '/docs/plugins/persistence' },
-      { title: 'Performance', href: '/docs/plugins/performance' },
-      { title: 'Custom Plugins', href: '/docs/plugins/custom' },
-    ],
-  },
-  {
     title: 'Advanced',
     links: [
       { title: 'Overview', href: '/docs/advanced/overview' },
@@ -81,17 +70,61 @@ export const docsNavigation: NavigationSection[] = [
     ],
   },
   {
+    title: 'Plugins',
+    links: [
+      { title: 'Overview', href: '/docs/plugins/overview' },
+      { title: 'Logging', href: '/docs/plugins/logging' },
+      { title: 'DevTools', href: '/docs/plugins/devtools' },
+      { title: 'Persistence', href: '/docs/plugins/persistence' },
+      { title: 'Performance', href: '/docs/plugins/performance' },
+      { title: 'Circuit Breaker', href: '/docs/plugins/circuit-breaker' },
+      { title: 'Observability', href: '/docs/plugins/observability' },
+      { title: 'Custom Plugins', href: '/docs/plugins/custom' },
+    ],
+  },
+  {
     title: 'Testing',
     links: [
       { title: 'Overview', href: '/docs/testing/overview' },
       { title: 'Mock Resolvers', href: '/docs/testing/mock-resolvers' },
       { title: 'Fake Timers', href: '/docs/testing/fake-timers' },
       { title: 'Assertions', href: '/docs/testing/assertions' },
-      { title: 'Test Async Chains', href: '/docs/how-to/test-async-chains' },
+      { title: 'Test Async Chains', href: '/docs/guides/test-async-chains' },
     ],
   },
   {
-    title: 'Integrations',
+    title: 'Examples',
+    links: [
+      { title: 'Counter', href: '/docs/examples/counter' },
+      { title: 'Auth Flow', href: '/docs/examples/auth-flow' },
+      { title: 'Shopping Cart', href: '/docs/examples/shopping-cart' },
+      { title: 'Async Chains', href: '/docs/examples/async-chains' },
+      { title: 'Form Wizard', href: '/docs/examples/form-wizard' },
+      { title: 'Sudoku', href: '/docs/examples/sudoku' },
+      { title: 'Checkers', href: '/docs/examples/checkers' },
+      { title: 'Time Machine', href: '/docs/examples/time-machine' },
+      { title: 'Error Boundaries', href: '/docs/examples/error-boundaries' },
+      { title: 'Fraud Analysis', href: '/docs/examples/fraud-analysis' },
+      { title: 'Dashboard Loader', href: '/docs/examples/dashboard-loader' },
+    ],
+  },
+  {
+    title: 'Guides',
+    links: [
+      { title: 'Loading & Error States', href: '/docs/guides/loading-states' },
+      { title: 'Authentication Flow', href: '/docs/guides/auth-flow' },
+      { title: 'Optimistic Updates', href: '/docs/guides/optimistic-updates' },
+      { title: 'Shopping Cart Rules', href: '/docs/guides/shopping-cart' },
+      { title: 'Multi-Step Form Wizard', href: '/docs/guides/form-wizard' },
+      { title: 'Async Chains Across Modules', href: '/docs/guides/async-chains' },
+      { title: 'Role-Based Permissions', href: '/docs/guides/permissions' },
+      { title: 'Batch Mutations', href: '/docs/guides/batch-mutations' },
+      { title: 'Debounce Constraints', href: '/docs/guides/debounce-constraints' },
+      { title: 'Debug with Time-Travel', href: '/docs/guides/debug-time-travel' },
+    ],
+  },
+  {
+    title: 'Integration Guides',
     links: [
       { title: 'Overview', href: '/docs/works-with/overview' },
       { title: 'Redux', href: '/docs/works-with/redux' },
@@ -99,74 +132,6 @@ export const docsNavigation: NavigationSection[] = [
       { title: 'XState', href: '/docs/works-with/xstate' },
       { title: 'React Query', href: '/docs/works-with/react-query' },
       { title: 'Web Worker', href: '/docs/works-with/worker' },
-    ],
-  },
-  {
-    title: 'Guides',
-    links: [
-      // Every-App Essentials
-      { title: 'Global UI State', href: '/docs/how-to/global-ui-state' },
-      { title: 'Loading & Error States', href: '/docs/how-to/loading-states' },
-      { title: 'Authentication Flow', href: '/docs/how-to/auth-flow' },
-      { title: 'Pagination & Infinite Scroll', href: '/docs/how-to/pagination' },
-      { title: 'Sync State with URL', href: '/docs/how-to/url-sync' },
-      { title: 'Optimistic Updates', href: '/docs/how-to/optimistic-updates' },
-      { title: 'Notifications & Toasts', href: '/docs/how-to/notifications' },
-      { title: 'Persist State', href: '/docs/how-to/persist-state' },
-      // Multi-Module & Architecture
-      { title: 'Async Chains Across Modules', href: '/docs/how-to/async-chains' },
-      { title: 'Organize Modules', href: '/docs/how-to/organize-modules' },
-      { title: 'Multi-Step Form Wizard', href: '/docs/how-to/form-wizard' },
-      { title: 'Shopping Cart Rules', href: '/docs/how-to/shopping-cart' },
-      { title: 'Role-Based Permissions', href: '/docs/how-to/permissions' },
-      { title: 'Dynamic Modules', href: '/docs/how-to/dynamic-modules' },
-      // Performance & Real-Time
-      { title: 'Optimize Re-Renders', href: '/docs/how-to/optimize-rerenders' },
-      { title: 'Batch Mutations', href: '/docs/how-to/batch-mutations' },
-      { title: 'WebSocket Connections', href: '/docs/how-to/websockets' },
-      { title: 'Debounce Constraints', href: '/docs/how-to/debounce-constraints' },
-      // Testing & Debugging
-      { title: 'Test Async Chains', href: '/docs/how-to/test-async-chains' },
-      { title: 'Debug with Time-Travel', href: '/docs/how-to/debug-time-travel' },
-    ],
-  },
-  {
-    title: 'Examples',
-    links: [
-      // Beginner
-      { title: 'Counter', href: '/docs/examples/counter' },
-      { title: 'Data Fetching', href: '/docs/examples/data-fetching' },
-      { title: 'Form Validation', href: '/docs/examples/form-validation' },
-      { title: 'Contact Form', href: '/docs/examples/contact-form' },
-      // Everyday patterns
-      { title: 'Theme & Locale', href: '/docs/examples/theme-locale' },
-      { title: 'Auth Flow', href: '/docs/examples/auth-flow' },
-      { title: 'Pagination', href: '/docs/examples/pagination' },
-      { title: 'URL Sync', href: '/docs/examples/url-sync' },
-      { title: 'Notifications', href: '/docs/examples/notifications' },
-      { title: 'Dashboard Loader', href: '/docs/examples/dashboard-loader' },
-      { title: 'Optimistic Updates', href: '/docs/examples/optimistic-updates' },
-      { title: 'WebSocket', href: '/docs/examples/websocket' },
-      // Multi-module & advanced
-      { title: 'Async Chains', href: '/docs/examples/async-chains' },
-      { title: 'Form Wizard', href: '/docs/examples/form-wizard' },
-      { title: 'Shopping Cart', href: '/docs/examples/shopping-cart' },
-      { title: 'Permissions', href: '/docs/examples/permissions' },
-      { title: 'Multi-Module', href: '/docs/examples/multi-module' },
-      { title: 'Feature Flags', href: '/docs/examples/feature-flags' },
-      { title: 'A/B Testing', href: '/docs/examples/ab-testing' },
-      { title: 'Topic Guard', href: '/docs/examples/topic-guard' },
-      { title: 'Debounce Constraints', href: '/docs/examples/debounce-constraints' },
-      { title: 'Dynamic Modules', href: '/docs/examples/dynamic-modules' },
-      // Showcases
-      { title: 'Sudoku', href: '/docs/examples/sudoku' },
-      { title: 'Checkers', href: '/docs/examples/checkers' },
-      // DevTools
-      { title: 'Multi-System DevTools', href: '/docs/examples/multi-system-devtools' },
-      { title: 'Mixed DevTools', href: '/docs/examples/mixed-devtools' },
-      // Specialized
-      { title: 'Server-Side', href: '/docs/examples/server' },
-      { title: 'AI Agent', href: '/docs/examples/ai-agent' },
     ],
   },
 ]
@@ -184,6 +149,7 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Resilience & Routing', href: '/ai/resilience-routing' },
       { title: 'Comparison', href: '/ai/comparison' },
       { title: 'Tutorial', href: '/ai/tutorial' },
+      { title: 'Troubleshooting', href: '/ai/troubleshooting' },
     ],
   },
   {
@@ -239,12 +205,12 @@ export const aiNavigation: NavigationSection[] = [
   {
     title: 'Examples',
     links: [
-      { title: 'AI Chat', href: '/ai/examples/ai-chat' },
-      { title: 'Research Pipeline', href: '/ai/examples/ai-research-pipeline' },
-      { title: 'AI Safety Shield', href: '/ai/examples/ai-guardrails' },
-      { title: 'AI Checkpoint', href: '/ai/examples/ai-checkpoint' },
+      { title: 'Chat', href: '/ai/examples/chat' },
+      { title: 'Research Pipeline', href: '/ai/examples/research-pipeline' },
+      { title: 'Safety Shield', href: '/docs/examples/guardrails' },
+      { title: 'Checkpoint', href: '/docs/examples/checkpoint' },
       { title: 'Fraud Analysis', href: '/ai/examples/fraud-analysis' },
-      { title: 'Goal Heist', href: '/ai/examples/goal-heist' },
+      { title: 'Pitch Deck', href: '/ai/examples/pitch-deck' },
     ],
   },
   {
@@ -255,14 +221,11 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Control AI Costs', href: '/ai/guides/control-ai-costs' },
       { title: 'Customer Support Bot', href: '/ai/guides/customer-support-bot' },
       { title: 'Validate Structured Output', href: '/ai/guides/validate-structured-output' },
-      { title: 'Add Chatbot Memory', href: '/ai/guides/chatbot-memory' },
       { title: 'Handle Agent Errors', href: '/ai/guides/handle-agent-errors' },
       { title: 'Stream Agent Responses', href: '/ai/guides/stream-agent-responses' },
       { title: 'Multi-Step Pipeline', href: '/ai/guides/multi-step-pipeline' },
       { title: 'Test Without LLM Calls', href: '/ai/guides/test-agents-without-llm' },
-      { title: 'Smart Model Routing', href: '/ai/guides/smart-model-routing' },
       { title: 'DAG Pipeline', href: '/ai/guides/dag-pipeline' },
-      { title: 'Self-Improving Agents', href: '/ai/guides/self-improving-agents' },
     ],
   },
 ]

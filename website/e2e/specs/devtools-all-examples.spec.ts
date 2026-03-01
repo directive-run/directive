@@ -46,7 +46,6 @@ const EXAMPLES: ExampleSpec[] = [
   { url: "/docs/examples/ai-guardrails", tag: "directive-ai-guardrails", systemName: "ai-guardrails" },
   { url: "/docs/examples/ai-checkpoint", tag: "directive-ai-checkpoint", systemName: "ai-checkpoint" },
   { url: "/docs/examples/fraud-analysis", tag: "directive-fraud-analysis", systemName: "fraud-analysis" },
-  { url: "/docs/examples/goal-heist", tag: "directive-goal-heist", systemName: "goal-heist" },
   { url: "/docs/examples/provider-routing", tag: "directive-provider-routing", systemName: "provider-routing" },
 ];
 
@@ -184,7 +183,7 @@ test.describe("Mixed DevTools page", () => {
     // Wait for all custom elements
     await page.waitForSelector("directive-counter", { state: "attached", timeout: 30_000 });
     await page.waitForSelector("directive-ai-guardrails", { state: "attached", timeout: 30_000 });
-    await page.waitForSelector("directive-goal-heist", { state: "attached", timeout: 30_000 });
+    await page.waitForSelector("directive-fraud-analysis", { state: "attached", timeout: 30_000 });
 
     // Wait for all three systems to register
     await page.waitForFunction(
@@ -193,7 +192,7 @@ test.describe("Mixed DevTools page", () => {
         return (
           systems.includes("number-match") &&
           systems.includes("ai-guardrails") &&
-          systems.includes("goal-heist")
+          systems.includes("fraud-analysis")
         );
       },
       { timeout: 15_000 },
@@ -202,7 +201,7 @@ test.describe("Mixed DevTools page", () => {
     const systems = await page.evaluate(() => window.__DIRECTIVE__?.getSystems() ?? []);
     expect(systems).toContain("number-match");
     expect(systems).toContain("ai-guardrails");
-    expect(systems).toContain("goal-heist");
+    expect(systems).toContain("fraud-analysis");
     expect(systems.length).toBeGreaterThanOrEqual(3);
   });
 });

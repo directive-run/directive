@@ -5,11 +5,11 @@ import { ExampleEmbed } from '@/components/ExampleEmbed'
 export function MixedDemo({
   counterBuild,
   guardrailsBuild,
-  heistBuild,
+  fraudBuild,
 }: {
   counterBuild: import('@/lib/examples').ExampleBuild | null
   guardrailsBuild: import('@/lib/examples').ExampleBuild | null
-  heistBuild: import('@/lib/examples').ExampleBuild | null
+  fraudBuild: import('@/lib/examples').ExampleBuild | null
 }) {
   return (
     <div className="space-y-8">
@@ -21,7 +21,7 @@ export function MixedDemo({
           Three systems from different domains on one page. Open DevTools and
           use the SystemSelector dropdown to switch between
           &ldquo;number-match&rdquo;, &ldquo;ai-guardrails&rdquo;, and
-          &ldquo;goal-heist&rdquo;. System-core tabs (Facts, Derivations,
+          &ldquo;fraud-analysis&rdquo;. System-core tabs (Facts, Derivations,
           Constraints) populate for each system. AI tabs (Timeline, Guardrails,
           Events) appear automatically for examples that emit AI events via the
           client-side bridge.
@@ -62,17 +62,17 @@ export function MixedDemo({
 
           <div>
             <h3 className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-              Goal Heist (AI)
+              Fraud Analysis (AI)
             </h3>
-            {heistBuild ? (
+            {fraudBuild ? (
               <ExampleEmbed
-                name="goal-heist"
-                css={heistBuild.css}
-                html={heistBuild.html}
-                scriptSrc={heistBuild.scriptSrc}
+                name="fraud-analysis"
+                css={fraudBuild.css}
+                html={fraudBuild.html}
+                scriptSrc={fraudBuild.scriptSrc}
               />
             ) : (
-              <BuildPlaceholder name="goal-heist" />
+              <BuildPlaceholder name="fraud-analysis" />
             )}
           </div>
         </div>

@@ -12,7 +12,7 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
   const { state, play, pause, stepBack, stepForward, goToStart, goToEnd, exit } = replay;
 
   // E3: Global keyboard shortcuts for replay
-  // C3: Destructure stable callbacks to avoid listener re-attachment on every render
+  // Destructure stable callbacks to avoid listener re-attachment on every render
   useEffect(() => {
     if (!state.active) {
       return;

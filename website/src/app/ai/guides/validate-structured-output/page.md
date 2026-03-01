@@ -87,8 +87,7 @@ try {
 } catch (error) {
   if (error.name === 'StructuredOutputError') {
     console.error('Agent could not produce valid output after retries');
-    console.error('Last attempt:', error.lastOutput);
-    console.error('Validation errors:', error.validationErrors);
+    console.error('Last result:', error.lastResult);  // RunResult<unknown> | undefined
   }
 }
 ```

@@ -1121,6 +1121,7 @@ export function SystemGraphView() {
   const resolverStats = useSelector(system, (s) => s.facts.runtime.resolverStats)
   const runHistory = useSelector(system, (s) => s.facts.runtime.runHistory) as RunChangelogEntry[]
   const systemName = useSelector(system, (s) => s.facts.runtime.systemName) as string
+  const runHistoryEnabled = useSelector(system, (s) => s.facts.runtime.runHistoryEnabled)
 
   // Run pager: null = live (cumulative), number = specific run ID (M7)
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null)
@@ -1350,9 +1351,13 @@ export function SystemGraphView() {
 
   // Show empty state if no runs yet and no active pipeline (live mode with no constraints hit)
   if (isLive && !hasRunHistory) {
-    const noActivityYet = graphData.totalConstraints > 0 && graphData.shownConstraints === 0 && inflight.length === 0 && unmet.length === 0
-    if (noActivityYet) {
-      return <EmptyState message="No runs yet. Interact with the system to see the pipeline." />
+    if (!runHistoryEnabled) {
+      // Don't fall through to "No runs yet" — the real issue is runHistory isn't enabled
+    } else {
+      const noActivityYet = graphData.totalConstraints > 0 && graphData.shownConstraints === 0 && inflight.length === 0 && unmet.length === 0
+      if (noActivityYet) {
+        return <EmptyState message="No runs yet. Interact with the system to see the pipeline." />
+      }
     }
   }
 
@@ -1378,8 +1383,17 @@ export function SystemGraphView() {
           <AutoFit nodeCount={nodes.length} />
           <DrawingOverlay />
 
+          {/* Run history enable message */}
+          {!runHistoryEnabled && (
+            <Panel position="top-right" className="!m-2">
+              <div className="rounded border border-dashed border-zinc-200 px-3 py-2 text-center font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
+                Enable <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">runHistory: true</code> in debug config for run history timeline
+              </div>
+            </Panel>
+          )}
+
           {/* Run pager (M1: a11y) */}
-          {(hasRunHistory || !isLive) && (
+          {runHistoryEnabled && (hasRunHistory || !isLive) && (
             <Panel position="top-right" className="!m-2">
               <nav aria-label="Run history navigation">
                 <div className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">

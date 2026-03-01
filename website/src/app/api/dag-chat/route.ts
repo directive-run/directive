@@ -8,6 +8,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { getDagOrchestrator, getDagInputGuardrails } from './orchestrator-singleton'
+import { createAnthropicRunner } from '@directive-run/ai/anthropic'
+import { createOpenAIRunner } from '@directive-run/ai/openai'
 
 interface HistoryMessage {
   role: 'user' | 'assistant'
@@ -46,8 +48,79 @@ export async function POST(request: Request) {
 
   const history = validateHistory(Array.isArray(body?.history) ? body.history : [])
 
+  // -------------------------------------------------------------------------
+  // Dual-path: user-provided API key vs server env var
+  // -------------------------------------------------------------------------
+
+  const clientApiKey = (request.headers as Headers).get?.('x-api-key') ?? null
+  const clientProvider = (request.headers as Headers).get?.('x-provider') || 'anthropic'
+
+  if (clientApiKey) {
+    // User-provided key: run a simplified single-pass with the user's key
+    const runner =
+      clientProvider === 'openai'
+        ? createOpenAIRunner({ apiKey: clientApiKey, model: 'gpt-4o-mini' })
+        : createAnthropicRunner({
+            apiKey: clientApiKey,
+            model: 'claude-haiku-4-5-20251001',
+            maxTokens: 2000,
+          })
+
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (data: Record<string, unknown>) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+          } catch {
+            // Stream closed
+          }
+        }
+
+        try {
+          const result = await runner({
+            name: 'research-assistant',
+            model: clientProvider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001',
+            instructions: 'You are a research assistant. Provide a well-structured research brief on the given topic. Include key findings, relevant studies, and a balanced analysis. Respond in 3-5 paragraphs.',
+          }, message)
+
+          send({ type: 'text', text: String(result.output) })
+          send({ type: 'done' })
+        } catch (err) {
+          send({
+            type: 'error',
+            message: err instanceof Error ? err.message : 'Research failed',
+          })
+        } finally {
+          try {
+            controller.close()
+          } catch {
+            // Already closed
+          }
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    })
+  }
+
+  // No user key: require env var (dev fallback, 401 in prod)
   const instance = getDagOrchestrator()
   if (!instance) {
+    if (process.env.NODE_ENV !== 'development') {
+      return Response.json(
+        { error: 'API key required. Enter your key in the provider config above.' },
+        { status: 401 },
+      )
+    }
+
     return Response.json(
       { error: 'ANTHROPIC_API_KEY not configured' },
       { status: 503 },

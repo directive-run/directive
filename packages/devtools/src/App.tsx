@@ -1,15 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useDevToolsConnection } from "./hooks/use-devtools-connection";
 import { useReplay } from "./hooks/use-replay";
-import { useRunSessions } from "./hooks/use-run-sessions";
+
 import { useAnomalies } from "./hooks/use-anomalies";
 import { TimelineView } from "./views/TimelineView";
 import { DagView } from "./views/DagView";
-import { HealthView } from "./views/HealthView";
+
 import { BreakpointView } from "./views/BreakpointView";
 import { StateView } from "./views/StateView";
-import { CompareView } from "./views/CompareView";
-import { FlamechartView } from "./views/FlamechartView";
 import { CostView } from "./views/CostView";
 import { SessionPanel } from "./components/SessionPanel";
 import { ReplayControls } from "./components/ReplayControls";
@@ -17,17 +15,14 @@ import { TimeTravelEditor } from "./components/TimeTravelEditor";
 import type { ConnectionStatus, DevToolsSnapshot } from "./lib/types";
 import type { TimeFormat } from "./lib/time-format";
 
-type View = "timeline" | "dag" | "health" | "breakpoints" | "state" | "compare" | "flamechart" | "cost";
+type View = "timeline" | "dag" | "breakpoints" | "state" | "cost";
 
 const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
   { id: "timeline", label: "Timeline", icon: "⏱" },
-  { id: "flamechart", label: "Flamechart", icon: "🔥" },
   { id: "dag", label: "DAG", icon: "⬡" },
-  { id: "health", label: "Health", icon: "♥" },
   { id: "cost", label: "Cost", icon: "💰" },
   { id: "breakpoints", label: "Breakpoints", icon: "⏸" },
   { id: "state", label: "State", icon: "📋" },
-  { id: "compare", label: "Compare", icon: "🔀" },
 ];
 
 const STATUS_DOT_COLORS: Record<ConnectionStatus, string> = {
@@ -85,8 +80,6 @@ export function App() {
   const [wsUrl, setWsUrl] = useState("ws://localhost:4040");
   const conn = useDevToolsConnection();
   const replay = useReplay(conn.events);
-  const runSessions = useRunSessions();
-
   // E7: Time format state — D13: persist to localStorage
   const [timeFormat, setTimeFormat] = useState<TimeFormat>(() => {
     try {
@@ -117,7 +110,7 @@ export function App() {
   // Events visible to downstream views (replay-filtered or live)
   const visibleEvents = replay.visibleEvents;
 
-  // H2: Anomaly detection runs against full events (not replay-filtered)
+  // Anomaly detection runs against full events (not replay-filtered)
   // to avoid recomputing on every rAF frame during replay playback
   const anomalyResult = useAnomalies(conn.events);
 
@@ -131,20 +124,12 @@ export function App() {
   useEffect(() => {
     if (conn.status === "connected") {
       conn.requestEvents();
-      conn.requestHealth();
       conn.requestBreakpoints();
       conn.requestSnapshot();
       conn.requestScratchpad();
       conn.requestDerived();
     }
-  }, [conn.status, conn.requestEvents, conn.requestHealth, conn.requestBreakpoints, conn.requestSnapshot, conn.requestScratchpad, conn.requestDerived]);
-
-  // E6: Auto-save when events change and auto-save is enabled
-  useEffect(() => {
-    if (runSessions.autoSaveEnabled && conn.events.length > 0) {
-      runSessions.autoSave(conn.events);
-    }
-  }, [runSessions.autoSaveEnabled, runSessions.autoSave, conn.events]);
+  }, [conn.status, conn.requestEvents, conn.requestBreakpoints, conn.requestSnapshot, conn.requestScratchpad, conn.requestDerived]);
 
   const handleConnect = useCallback(() => {
     conn.disconnect();
@@ -241,11 +226,6 @@ export function App() {
                   {Object.keys(conn.scratchpadState).length + Object.keys(conn.derivedState).length}
                 </span>
               )}
-              {item.id === "compare" && runSessions.runs.length > 0 && (
-                <span className="ml-auto rounded-full bg-blue-500/30 px-1.5 text-[10px] text-blue-400">
-                  {runSessions.runs.length}
-                </span>
-              )}
               {item.id === "timeline" && anomalyResult.severityCounts.critical > 0 && (
                 <span
                   className="ml-auto rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white"
@@ -263,16 +243,12 @@ export function App() {
           events={conn.events}
           onImport={conn.importSession}
           onClear={conn.clearEvents}
-          onSaveRun={runSessions.saveRun}
-          onImportRun={runSessions.importRun}
-          autoSaveEnabled={runSessions.autoSaveEnabled}
-          onToggleAutoSave={runSessions.toggleAutoSave}
         />
 
         {/* Stats footer */}
         <div className="overflow-y-auto border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500" style={{ maxHeight: "120px" }} aria-live="polite">
           <div>Events: {replay.state.active ? `${visibleEvents.length}/${conn.events.length}` : conn.events.length}</div>
-          <div>Agents: {Object.keys(conn.healthMetrics).length}</div>
+          <div>Agents: {new Set(conn.events.filter((e) => e.agentId).map((e) => e.agentId)).size}</div>
           {replay.state.active && (
             <div className="text-blue-400">Replay: {replay.state.cursorIndex + 1}/{conn.events.length}</div>
           )}
@@ -290,9 +266,6 @@ export function App() {
           {conn.error && (
             <div className="mt-1 text-red-400">{conn.error.length > 200 ? `${conn.error.slice(0, 200)}...` : conn.error}</div>
           )}
-          {runSessions.saveError && (
-            <div className="mt-1 text-amber-400">{runSessions.saveError}</div>
-          )}
         </div>
       </nav>
 
@@ -305,7 +278,7 @@ export function App() {
           </div>
         )}
 
-        {conn.status !== "connected" && view !== "compare" ? (
+        {conn.status !== "connected" ? (
           <div className="flex h-full items-center justify-center text-zinc-500" role={conn.status === "error" ? "alert" : undefined}>
             <div className="text-center">
               {conn.status === "error" ? (
@@ -379,9 +352,7 @@ export function App() {
                     onReplayFromHere={handleReplayFromEvent}
                   />
                 )}
-                {view === "flamechart" && <FlamechartView events={visibleEvents} timeFormat={timeFormat} />}
                 {view === "dag" && <DagView events={visibleEvents} snapshot={conn.snapshot} />}
-                {view === "health" && <HealthView metrics={conn.healthMetrics} events={visibleEvents} onRequestHealth={conn.requestHealth} />}
                 {view === "cost" && <CostView events={visibleEvents} />}
                 {view === "breakpoints" && (
                   <BreakpointView
@@ -399,13 +370,6 @@ export function App() {
                     onRequestDerived={conn.requestDerived}
                     snapshot={conn.snapshot}
                     onEditSnapshot={handleEditSnapshot}
-                  />
-                )}
-                {view === "compare" && (
-                  <CompareView
-                    runs={runSessions.runs}
-                    onDeleteRun={runSessions.deleteRun}
-                    onExportRun={runSessions.exportRun}
                   />
                 )}
               </ViewErrorBoundary>

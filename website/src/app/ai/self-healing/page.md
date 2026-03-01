@@ -236,5 +236,5 @@ All self-healing setup is gated behind configuration checks. When `selfHealing` 
 - [Multi-Agent Orchestrator](/ai/multi-agent) &ndash; Setup and configuration
 - [Execution Patterns](/ai/patterns) &ndash; Coordinating agent execution
 - [Resilience & Routing](/ai/resilience-routing) &ndash; Retry and fallback strategies
-- [DevTools](/ai/devtools) &ndash; Visualize health metrics in the Health view
+- [DevTools](/ai/devtools) &ndash; Visual debugging and monitoring
 - [Testing](/ai/testing) &ndash; `assertAgentHealth` and `assertRerouted` helpers

@@ -71,6 +71,10 @@ export function scopeExampleCss(rawCss: string, name: string): string {
     }
   }
 
+  // body's min-height: 100vh becomes tag's min-height: 100vh after scoping —
+  // viewport-relative heights don't make sense for embedded examples.
+  css += `\n${tag} { min-height: auto !important; }\n`
+
   return css
 }
 

@@ -353,6 +353,7 @@
           <option value="retry-later">retry-later</option>
           <option value="skip">skip</option>
           <option value="retry">retry</option>
+          <option value="disable">disable</option>
           <option value="throw">throw</option>
         </select>
       </label>
@@ -440,7 +441,7 @@
     <div class="eb-how-it-works">
       <h3>How It Works (Directive Flow)</h3>
       <ul>
-        <li><strong>Error Boundary</strong> &ndash; configurable per-source recovery: skip, retry, retry-later, throw</li>
+        <li><strong>Error Boundary</strong> &ndash; configurable per-source recovery: skip, retry, retry-later, disable, throw</li>
         <li><strong>Circuit Breaker</strong> &ndash; CLOSED &rarr; OPEN after 3 failures, auto-recovers to HALF_OPEN after 5s</li>
         <li><strong>Retry-Later</strong> &ndash; exponential backoff (1s, 2s, 4s) with max 3 retries</li>
         <li><strong>Performance Plugin</strong> &ndash; tracks resolver latency, reconciliation cost, slow operation warnings</li>

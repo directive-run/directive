@@ -496,7 +496,7 @@ When multiple Directive systems are registered on the page, the DevTools header 
 For richer debugging beyond the console and floating panel:
 
 - **[AI DevTools](/ai/devtools)** — Visual debugger for multi-agent orchestration with Timeline, Cost, and State views. Connects via WebSocket or SSE transport.
-- **[AI Chat Demo](/ai/examples/ai-chat)** — Try the visual debugger in your browser right now — no installation required.
+- **[AI Chat Demo](/ai/examples/chat)** — Try the visual debugger in your browser right now — no installation required.
 
 ---
 
@@ -505,4 +505,4 @@ For richer debugging beyond the console and floating panel:
 - [Logging](/docs/plugins/logging) – Console output
 - [Time-Travel](/docs/advanced/time-travel) – Snapshot debugging
 - [Plugin Overview](/docs/plugins/overview) – All plugins
-- [AI Chat Demo](/ai/examples/ai-chat) – Interactive visual debugger
+- [AI Chat Demo](/ai/examples/chat) – Interactive visual debugger

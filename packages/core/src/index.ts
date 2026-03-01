@@ -81,8 +81,6 @@ export type {
 	ErrorSource,
 	ErrorBoundaryConfig,
 	RetryLaterConfig,
-	CircuitBreakerConfig,
-	CircuitBreakerState,
 	// Module
 	ModuleDef,
 	ModuleHooks,

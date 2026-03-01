@@ -100,7 +100,7 @@ export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }
     dragging.current = false;
   }, []);
 
-  // H10: Keyboard handling for WCAG 4.1.2 slider semantics
+  // Keyboard handling for WCAG 4.1.2 slider semantics
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     const step = 0.05;
     switch (e.key) {

@@ -6,7 +6,7 @@ import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { EmptyState } from '../EmptyState'
 import { Skeleton } from '../Skeleton'
 
-// M4: preview field still displayed — server-side sanitization handles redaction
+// preview field still displayed — server-side sanitization handles redaction
 
 export function MemoryView() {
   const system = useDevToolsSystem()
