@@ -267,8 +267,6 @@ derive: {
 
 ## Related
 
-- [Interactive Example](/docs/examples/permissions) — try it in your browser
 - [Authentication Flow](/docs/guides/auth-flow) — login and session management
 - [Async Chains](/docs/guides/async-chains) — cross-module `after` patterns
-- [Dynamic Modules](/docs/guides/dynamic-modules) — loading modules conditionally
 - [Constraints](/docs/constraints) — `disable()` and cross-module deps

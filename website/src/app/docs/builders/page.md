@@ -220,4 +220,4 @@ Both approaches produce identical runtime output – builders are syntax sugar w
 
 - **[Constraints](/docs/constraints)** – How constraints drive the reconciliation loop
 - **[Module & System](/docs/module-system)** – Full module and system API
-- **[Glossary](/docs/glossary)** – All Directive terms defined
+- **[Core API](/docs/core-api)** – Full API overview

@@ -10,7 +10,7 @@ This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Mo
 {% /callout %}
 
 {% callout title="Migrating from Zustand?" %}
-Want to replace Zustand entirely? See the [Zustand to Directive migration guide](/docs/migration/from-zustand) for step-by-step codemods and concept mapping.
+Want to replace Zustand entirely? The sections below show how to incrementally adopt Directive alongside Zustand, or replace it entirely.
 {% /callout %}
 
 ---
@@ -404,7 +404,6 @@ test('pricing constraint fires when plan selected', async () => {
 
 ## Next Steps
 
-- **[Migration from Zustand](/docs/migration/from-zustand)** – Full migration guide if you want to move off Zustand entirely
 - **[Facts](/docs/facts)** – How Directive's proxy-based facts work
 - **[Constraints](/docs/constraints)** – How constraints evaluate and emit requirements
 - **[Plugins](/docs/plugins/overview)** – Build custom plugins for cross-cutting concerns

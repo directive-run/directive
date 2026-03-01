@@ -153,7 +153,6 @@ constraints: {
 
 ## Related
 
-- [Interactive Example](/docs/examples/debounce-constraints) – try it in your browser
 - [Effects](/docs/effects) – cleanup functions and dependency tracking
 - [Constraints](/docs/constraints) – evaluation lifecycle
 - [Resolvers](/docs/resolvers) – `key` for deduplication

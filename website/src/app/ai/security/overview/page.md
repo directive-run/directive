@@ -81,7 +81,7 @@ All security features use `globalThis.crypto.subtle` (Web Crypto API) and work i
 
 Node 18+ is required for `crypto.subtle`. No Node-specific imports are used &ndash; the same code runs in Deno and Bun as well.
 
-Audit trails and compliance tooling are most useful on the server where you control the data layer. PII detection and prompt injection prevention are equally valuable in both environments. See the [Server (Node.js) example](/docs/examples/server) for a full API demonstrating all four features together.
+Audit trails and compliance tooling are most useful on the server where you control the data layer. PII detection and prompt injection prevention are equally valuable in both environments.
 
 ---
 

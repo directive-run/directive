@@ -34,8 +34,8 @@ export const NOTIFICATION_DEFS: NotificationDef[] = [
     icon: 'megaphone',
     message:
       'Directive is in public beta \u2013 the API may change before v1.0.',
-    linkText: 'View the roadmap',
-    linkHref: '/docs/roadmap',
+    linkText: 'View the docs',
+    linkHref: '/docs/quick-start',
     dismissable: true,
   },
   {

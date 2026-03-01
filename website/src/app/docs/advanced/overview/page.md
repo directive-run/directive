@@ -12,8 +12,7 @@ Advanced features for production Directive applications – composition patterns
 | Feature | Page | When to Use |
 |---------|------|------------|
 | [Multi-Module](/docs/advanced/multi-module) | Compose multiple modules into one system | Apps with distinct domains (auth, cart, UI) |
-| [Time-Travel](/docs/advanced/time-travel) | Step through state history, undo/redo | Debugging complex state transitions |
-| [Snapshots](/docs/advanced/snapshots) | Serialize, restore, and distribute system state | Persistence, sharing, migration |
+| [Time-Travel & Snapshots](/docs/advanced/time-travel) | Step through state history, undo/redo, serialize and distribute state | Debugging, persistence, sharing |
 | [SSR & Hydration](/docs/advanced/ssr) | Server-render Directive state, hydrate on client | Next.js, Remix, SvelteKit |
 | [Error Handling](/docs/advanced/errors) | Error boundaries, retry policies, circuit breakers | Production resilience |
 

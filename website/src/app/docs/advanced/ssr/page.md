@@ -113,7 +113,7 @@ app.get('/api/user/:id', async (req, res) => {
 });
 ```
 
-The same pattern works with Fastify, Hono, Koa, or any framework that supports `async` handlers. See the [Server (Node.js) example](/docs/examples/server) for a full API with snapshots, audit trails, and GDPR compliance.
+The same pattern works with Fastify, Hono, Koa, or any framework that supports `async` handlers.
 
 ---
 
@@ -133,7 +133,7 @@ const snapshot = system.getDistributableSnapshot({
 res.json(snapshot);
 ```
 
-The snapshot includes `createdAt` and `expiresAt` timestamps. Use `isSnapshotExpired()` to check validity before serving cached values. See [Snapshots](/docs/advanced/snapshots) for the full API.
+The snapshot includes `createdAt` and `expiresAt` timestamps. Use `isSnapshotExpired()` to check validity before serving cached values. See [Time-Travel & Snapshots](/docs/advanced/time-travel) for the full API.
 
 ---
 
@@ -155,8 +155,6 @@ export function getSystem() {
 
 ## Next Steps
 
-- [Server (Node.js) Example](/docs/examples/server) &ndash; Full Express API example
-- [Snapshots](/docs/advanced/snapshots) &ndash; Distributable snapshots, signing, TTL
-- [Time-Travel & Snapshots](/docs/advanced/time-travel) &ndash; Serialization
+- [Time-Travel & Snapshots](/docs/advanced/time-travel) &ndash; Distributable snapshots, signing, TTL, serialization
 - [React Adapter](/docs/adapters/react) &ndash; Client setup
 - [Module and System](/docs/module-system) &ndash; Basics

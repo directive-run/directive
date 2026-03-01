@@ -182,4 +182,3 @@ console.log('Statuses:', result.statuses);
 - [Execution Patterns](/ai/patterns) — DAG, reflect, and other patterns reference
 - [Multi-Agent Orchestrator](/ai/multi-agent) — orchestrator configuration
 - [Multi-Step Pipeline guide](/ai/guides/multi-step-pipeline) — simpler sequential pipelines
-- [Self-Improving Agents guide](/ai/guides/self-improving-agents) — iterative refinement with reflect

@@ -10,7 +10,7 @@ This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Mo
 {% /callout %}
 
 {% callout title="Migrating from XState?" %}
-Want to replace XState entirely? See the [XState to Directive migration guide](/docs/migration/from-xstate) for step-by-step codemods and concept mapping.
+Want to replace XState entirely? The sections below show how to incrementally adopt Directive alongside XState, or replace it entirely.
 {% /callout %}
 
 ---
@@ -505,7 +505,6 @@ test('multi-machine constraint fires when all ready', async () => {
 
 ## Next Steps
 
-- **[Migration from XState](/docs/migration/from-xstate)** – Full migration guide if you want to move off XState entirely
 - **[Resolvers](/docs/resolvers)** – How resolvers handle async fulfillment with retry and batching
 - **[Constraints](/docs/constraints)** – How constraints evaluate and coordinate requirements
 - **[Plugins](/docs/plugins/overview)** – Build custom plugins for actor lifecycle management

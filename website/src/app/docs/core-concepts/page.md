@@ -515,4 +515,4 @@ console.log(system.derive.isAdmin);      // false
 - [Constraints](/docs/constraints) - Advanced constraint patterns
 - [Resolvers](/docs/resolvers) - Retry, timeout, batching
 - [Derivations](/docs/derivations) - Computed values and composition
-- [Glossary](/docs/glossary) - Key terms reference
+- [Choosing Primitives](/docs/choosing-primitives) - When to use which primitive

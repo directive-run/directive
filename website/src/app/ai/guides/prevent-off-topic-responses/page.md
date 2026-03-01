@@ -111,6 +111,5 @@ const result2 = await orchestrator.run(agent, 'Tell me about the weather');
 
 ## Related
 
-- [Interactive Example](/docs/examples/topic-guard) — try the guardrail in your browser
 - [Guardrails reference](/ai/guardrails) — all built-in guardrails and custom guardrail API
 - [Customer Support Bot guide](/ai/guides/customer-support-bot) — full support agent with PII detection and escalation
