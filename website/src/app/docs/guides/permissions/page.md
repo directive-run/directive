@@ -96,7 +96,10 @@ const permissions = createModule('permissions', {
     fetchPermissions: {
       requirement: 'FETCH_PERMISSIONS',
       resolve: async (req, context) => {
-        const res = await fetch(`/api/permissions?role=${req.role}`);
+        const res = await fetch(`/api/permissions?role=${encodeURIComponent(req.role)}`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch permissions: ${res.status}`);
+        }
         const data = await res.json();
         context.facts.permissions = data.permissions;
         context.facts.loaded = true;

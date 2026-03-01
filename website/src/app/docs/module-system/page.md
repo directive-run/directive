@@ -75,6 +75,7 @@ const system = createSystem({
 | `debug` | Debug options (`{ timeTravel, maxSnapshots }`) |
 | `errorBoundary` | Error handling strategies per subsystem |
 | `initialFacts` | Override initial fact values |
+| `tickMs` | Interval in ms for automatic `tick` event dispatch |
 | `zeroConfig` | Enable sensible defaults for dev mode |
 
 ---
@@ -412,7 +413,7 @@ See **[Multi-Module](/docs/advanced/multi-module)** for dynamic registration and
 
 1. `createModule()` creates the module definition
 2. `createSystem()` creates the runtime with the module (plugins initialized)
-3. `system.start()` runs the `init` function, applies `initialFacts`/`hydrate`, then triggers the first reconciliation
+3. `system.start()` applies `initialFacts`/`hydrate` overrides, then triggers the first reconciliation
 4. Constraints evaluate, requirements are generated, resolvers execute
 5. System settles when all requirements are fulfilled
 

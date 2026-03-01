@@ -6,19 +6,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://directive.run'
   const pagesDir = path.resolve('./src/app')
 
-  // Find all page.md files
-  const files = glob.sync('**/page.md', { cwd: pagesDir })
+  // Find all page files (md and tsx)
+  const files = glob.sync('**/page.{md,tsx}', { cwd: pagesDir })
 
   // Convert file paths to URLs
   const pages = files.map((file) => {
-    // page.md at root becomes /
-    if (file === 'page.md') return ''
-    // Remove /page.md suffix to get path
-    return '/' + file.replace(/\/page\.md$/, '')
+    // page.md or page.tsx at root becomes /
+    if (file === 'page.md' || file === 'page.tsx') return ''
+    // Remove /page.{md,tsx} suffix to get path
+    return '/' + file.replace(/\/page\.(md|tsx)$/, '')
   })
 
-  // Filter out sitemap.xml and robots.txt paths if they exist
-  const validPages = pages.filter(p => !p.includes('sitemap') && !p.includes('robots'))
+  // Filter out sitemap.xml, robots.txt, catch-all routes, and API routes
+  const validPages = pages.filter(p =>
+    !p.includes('sitemap') &&
+    !p.includes('robots') &&
+    !p.includes('[[') &&
+    !p.includes('/api/')
+  )
 
   const entries: MetadataRoute.Sitemap = validPages.map((pagePath) => {
     // Determine priority based on path
