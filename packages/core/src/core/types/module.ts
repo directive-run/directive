@@ -13,7 +13,7 @@ import type {
 	InferEventPayloadFromSchema,
 	InferRequirementPayloadFromSchema,
 } from "./schema.js";
-import type { Facts } from "./facts.js";
+import type { Facts, FactsSnapshot } from "./facts.js";
 import type { EffectsDef, EffectCleanup } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
 import type { RetryPolicy, BatchConfig, BatchResolveResults } from "./resolvers.js";
@@ -254,6 +254,8 @@ export type CrossModuleDerivationsDef<
 export interface TypedResolverContext<M extends ModuleSchema> {
 	readonly facts: Facts<M["facts"]>;
 	readonly signal: AbortSignal;
+	/** Returns a read-only snapshot of the current facts state, useful for before/after comparisons inside resolvers. */
+	readonly snapshot: () => FactsSnapshot<M["facts"]>;
 }
 
 /**
@@ -278,9 +280,9 @@ export interface TypedResolverDef<M extends ModuleSchema, T extends keyof GetReq
 	batch?: BatchConfig;
 	/** Resolve function for single requirement */
 	resolve?: (req: ExtractRequirement<M, T>, ctx: TypedResolverContext<M>) => Promise<void>;
-	/** Resolve function for batched requirements (all-or-nothing) */
+	/** Resolve batched requirements as a group (all-or-nothing). Receives the full array collected during the batch window. If this throws, all items in the batch are considered failed. */
 	resolveBatch?: (reqs: ExtractRequirement<M, T>[], ctx: TypedResolverContext<M>) => Promise<void>;
-	/** Resolve function for batched requirements with per-item results */
+	/** Resolve batched requirements with per-item success/failure results. Return a `BatchResolveResults` array in the same order as the input. Failed items can be individually retried. */
 	resolveBatchWithResults?: (reqs: ExtractRequirement<M, T>[], ctx: TypedResolverContext<M>) => Promise<BatchResolveResults>;
 }
 
