@@ -117,10 +117,17 @@ Derivations are accessed via `system.derive.namespace.derivationName` (e.g. `sys
 ```typescript
 import { createTestSystem, mockResolver, flushMicrotasks } from '@directive-run/core/testing';
 
-test('mock resolver with manual control', async () => {
-  // Create a mock that captures requirements instead of auto-resolving
-  const fetchMock = mockResolver<{ type: 'FETCH_USER'; userId: number }>('FETCH_USER');
+let fetchMock: ReturnType<typeof mockResolver>;
 
+beforeEach(() => {
+  fetchMock = mockResolver<{ type: 'FETCH_USER'; userId: number }>('FETCH_USER');
+});
+
+afterEach(() => {
+  fetchMock.clearCalls();  // Reset call history between tests
+});
+
+test('mock resolver with manual control', async () => {
   // Wire the mock handler into the test system
   const system = createTestSystem({
     modules: { user: userModule },

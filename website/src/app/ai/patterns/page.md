@@ -302,7 +302,7 @@ const orchestrator = createMultiAgentOrchestrator({
         editor: { agent: 'editor', deps: ['analyst', 'writer'], priority: 10 },
       },
       (context) => concatResults(Object.values(context.results).map((r) => String(r.output))),
-      { timeout: 60000, maxConcurrent: 3 }
+      { timeout: 60000, maxConcurrent: 3, onNodeError: 'skip-downstream' }
     ),
   },
 });
