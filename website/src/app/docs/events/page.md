@@ -333,3 +333,5 @@ constraints: {
 - [Derivations](/docs/derivations) – Computed values
 - [Resolvers](/docs/resolvers) – Handling requirements
 - [Effects](/docs/effects) – Side effects on fact changes
+- [Module & System](/docs/module-system) – Composing modules
+- [Choosing Primitives](/docs/choosing-primitives) – When to use what

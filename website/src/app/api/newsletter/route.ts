@@ -1,8 +1,13 @@
 import { NextRequest } from 'next/server'
+import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: NextRequest) {
+  if (!isAllowedOrigin(request)) {
+    return forbiddenResponse(request)
+  }
+
   let body: { email?: string }
   try {
     body = await request.json()

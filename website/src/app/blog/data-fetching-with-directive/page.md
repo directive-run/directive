@@ -644,7 +644,7 @@ npm install @directive-run/core
 
 Explore the patterns used in this tutorial:
 
-- **[Data Fetching Example](/docs/examples/data-fetching)** &ndash; constraints and resolvers for async data
+- **[Dashboard Loader Example](/docs/examples/dashboard-loader)** &ndash; constraints and resolvers for async data
 - **[Resolvers](/docs/resolvers)** &ndash; retry, timeout, batching, and deduplication
 - **[Constraints](/docs/constraints)** &ndash; declaring when to fetch with `when` and `require`
 - **[React Hooks](/docs/api/react)** &ndash; `useFact`, `useDerived`, `useRequirementStatus`, and more

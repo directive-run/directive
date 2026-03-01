@@ -112,13 +112,15 @@ import { createModule, t } from '@directive-run/core';
 
 const userProfile = createModule("user-profile", {
   schema: {
-    userId: t.string().optional(),
-    user: t.object<{
-      id: string; name: string; email: string; role: string;
-    }>().optional(),
-    preferences: t.object<{ theme: string; locale: string }>().optional(),
-    sessionValid: t.boolean(),
-    error: t.string().optional(),
+    facts: {
+      userId: t.string().optional(),
+      user: t.object<{
+        id: string; name: string; email: string; role: string;
+      }>().optional(),
+      preferences: t.object<{ theme: string; locale: string }>().optional(),
+      sessionValid: t.boolean(),
+      error: t.string().optional(),
+    },
   },
 
   init: (facts) => {
@@ -293,8 +295,8 @@ const userProfile = createModule("user-profile", {
 Dispatch events with full type safety:
 
 ```typescript
-system.dispatch('login', { userId: 'user-123' });
-system.dispatch('logout');
+system.events.login({ userId: 'user-123' });
+system.events.logout();
 ```
 
 Events trigger fact mutations, which trigger the reconciliation loop. Dispatching `login` sets `userId`, which satisfies the `needsSession` constraint, which triggers the session verifier, and the cascade begins.
@@ -427,7 +429,7 @@ When `system.start()` runs, here's what happens:
 
 1. `init` sets `sessionValid` to `false`. All other facts are `undefined`.
 2. No constraints fire yet &ndash; `userId` is `undefined`, so `needsSession` is not satisfied.
-3. User dispatches `system.dispatch('login', { userId: 'user-123' })`.
+3. User dispatches `system.events.login({ userId: 'user-123' })`.
 4. The `login` event sets `facts.userId`. The `needsSession` constraint fires because `sessionValid` is `false` and `userId` is defined.
 5. The `VERIFY_SESSION` resolver runs, verifies the session, and sets `sessionValid = true`.
 6. Now `needsUser` fires &ndash; session is valid, user is `undefined`, userId is set.
@@ -490,7 +492,9 @@ import { createModule, createSystem, t } from '@directive-run/core';
 
 const app = createModule("app", {
   schema: {
-    count: t.number(),
+    facts: {
+      count: t.number(),
+    },
   },
   init: (facts) => {
     facts.count = 0;

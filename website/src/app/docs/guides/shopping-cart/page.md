@@ -31,9 +31,6 @@ const authSchema = {
     isAuthenticated: t.boolean(),
     userId: t.string(),
   },
-  derivations: {
-    isAuthenticated: t.boolean(),
-  },
 };
 
 const cart = createModule('cart', {
@@ -202,10 +199,6 @@ const auth = createModule('auth', {
     facts.isAuthenticated = false;
     facts.userId = '';
   },
-
-  derive: {
-    isAuthenticated: (facts) => facts.isAuthenticated,
-  },
 });
 
 const system = createSystem({
@@ -215,21 +208,29 @@ const system = createSystem({
 ```
 
 ```tsx
+import { useSelector } from '@directive-run/react';
+
 function CartSummary({ system }) {
-  const { facts, derived } = useDirective(system);
+  const itemCount = useSelector(system, (s) => s.derive.cart.itemCount);
+  const subtotal = useSelector(system, (s) => s.derive.cart.subtotal);
+  const discount = useSelector(system, (s) => s.derive.cart.discount);
+  const tax = useSelector(system, (s) => s.derive.cart.tax);
+  const total = useSelector(system, (s) => s.derive.cart.total);
+  const freeShipping = useSelector(system, (s) => s.derive.cart.freeShipping);
+  const isEmpty = useSelector(system, (s) => s.derive.cart.isEmpty);
 
   return (
     <div>
-      <p>Items: {derived['cart::itemCount']}</p>
-      <p>Subtotal: ${derived['cart::subtotal'].toFixed(2)}</p>
-      {derived['cart::discount'] > 0 && (
-        <p>Discount: -${derived['cart::discount'].toFixed(2)}</p>
+      <p>Items: {itemCount}</p>
+      <p>Subtotal: ${subtotal.toFixed(2)}</p>
+      {discount > 0 && (
+        <p>Discount: -${discount.toFixed(2)}</p>
       )}
-      <p>Tax: ${derived['cart::tax'].toFixed(2)}</p>
-      <p>Total: ${derived['cart::total'].toFixed(2)}</p>
-      {derived['cart::freeShipping'] && <p>Free shipping!</p>}
+      <p>Tax: ${tax.toFixed(2)}</p>
+      <p>Total: ${total.toFixed(2)}</p>
+      {freeShipping && <p>Free shipping!</p>}
       <button
-        disabled={derived['cart::isEmpty']}
+        disabled={isEmpty}
         onClick={() => system.events.cart.requestCheckout()}
       >
         Checkout

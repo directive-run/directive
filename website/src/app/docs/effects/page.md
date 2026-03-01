@@ -400,3 +400,5 @@ This is useful for suppressing noisy effects during tests, pausing analytics, or
 - [Constraints](/docs/constraints) – Declarative rules
 - [Resolvers](/docs/resolvers) – Handling requirements
 - [Events](/docs/events) – State mutations
+- [Module & System](/docs/module-system) – Composing modules
+- [Choosing Primitives](/docs/choosing-primitives) – When to use what

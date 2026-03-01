@@ -38,7 +38,7 @@ const userModule = createModule("user", {
           context.facts.user = await api.getUser(req.userId);
           context.facts.error = null;
         } catch (error) {
-          context.facts.error = error.message;
+          context.facts.error = error instanceof Error ? error.message : 'Unknown error';
         } finally {
           context.facts.loading = false;
         }
@@ -193,7 +193,8 @@ resolvers: {
 
       // Only retry server errors, not client errors
       shouldRetry: (error, attempt) => {
-        if (error.message.includes("404") || error.message.includes("403")) {
+        const msg = error instanceof Error ? error.message : '';
+        if (msg.includes("404") || msg.includes("403")) {
           return false;  // Don't retry – client error
         }
         return true;  // Retry server errors and network failures
@@ -559,7 +560,7 @@ resolve: async (req, context) => {
     context.facts.data = await api.getData(req.id);
     context.facts.error = null;
   } catch (error) {
-    context.facts.error = error.message;
+    context.facts.error = error instanceof Error ? error.message : 'Unknown error';
     context.facts.data = null;
   }
 }
@@ -586,3 +587,4 @@ resolve: async (req, context) => {
 - [Constraints](/docs/constraints) – Raising requirements
 - [Effects](/docs/effects) – Side effects
 - [Error Handling](/docs/advanced/errors) – Comprehensive error strategies
+- [Choosing Primitives](/docs/choosing-primitives) – When to use what

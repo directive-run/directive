@@ -20,11 +20,35 @@ const todos = createModule('todos', {
   schema: {
     facts: {
       items: t.array<{ id: string; text: string; done: boolean }>(),
+      toggleId: t.string(),
+      deleteId: t.string(),
     },
   },
 
   init: (facts) => {
     facts.items = [];
+    facts.toggleId = '';
+    facts.deleteId = '';
+  },
+
+  events: {
+    toggleTodo: (facts, { id }: { id: string }) => {
+      facts.toggleId = id;
+    },
+    deleteTodo: (facts, { id }: { id: string }) => {
+      facts.deleteId = id;
+    },
+  },
+
+  constraints: {
+    needsToggle: {
+      when: (facts) => facts.toggleId !== '',
+      require: (facts) => ({ type: 'TOGGLE_TODO', id: facts.toggleId }),
+    },
+    needsDelete: {
+      when: (facts) => facts.deleteId !== '',
+      require: (facts) => ({ type: 'DELETE_TODO', id: facts.deleteId }),
+    },
   },
 
   resolvers: {
@@ -43,6 +67,7 @@ const todos = createModule('todos', {
         context.facts.items = context.facts.items.map((i) =>
           i.id === req.id ? { ...i, done: !i.done } : i,
         );
+        context.facts.toggleId = '';
 
         try {
           // 3. Sync with server
@@ -66,6 +91,7 @@ const todos = createModule('todos', {
         const snapshot = context.snapshot();
         // Optimistically remove
         context.facts.items = context.facts.items.filter((i) => i.id !== req.id);
+        context.facts.deleteId = '';
 
         try {
           const res = await fetch(`/api/todos/${req.id}`, {
@@ -85,25 +111,20 @@ const todos = createModule('todos', {
 ```
 
 ```tsx
-import { useDirective, useOptimisticUpdate } from '@directive-run/react';
+import { useSelector } from '@directive-run/react';
 
 function TodoList({ system }) {
-  const { facts } = useDirective(system);
-  const toggleOptimistic = useOptimisticUpdate(system, 'TOGGLE_TODO');
+  const items = useSelector(system, (facts) => facts.items);
 
   return (
     <ul>
-      {facts.items.map((item) => (
-        <li
-          key={item.id}
-          // Visual cue during pending server confirmation
-          style={{ opacity: toggleOptimistic.isPendingFor(item.id) ? 0.6 : 1 }}
-        >
+      {items.map((item) => (
+        <li key={item.id}>
           <input
             type="checkbox"
             checked={item.done}
             onChange={() =>
-              system.dispatch({ type: 'TOGGLE_TODO', id: item.id })
+              system.events.todos.toggleTodo({ id: item.id })
             }
           />
           {item.text}

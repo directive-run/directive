@@ -767,7 +767,8 @@ export function createResolversManager<S extends Schema>(
 		},
 
 		cancelAll(): void {
-			for (const [id] of inflight) {
+			const ids = [...inflight.keys()];
+			for (const id of ids) {
 				this.cancel(id);
 			}
 
