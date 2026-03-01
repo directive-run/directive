@@ -7,7 +7,9 @@ The Core API is the foundation of every Directive application. Six primitives wo
 
 ---
 
-## The Six Primitives
+## Primitives
+
+Directive has four core pillars (Facts, Derivations, Constraints, Resolvers) plus two supporting primitives (Effects, Events):
 
 | Primitive | Role | Analogy |
 |-----------|------|---------|

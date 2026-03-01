@@ -96,6 +96,9 @@ const permissions = createModule('permissions', {
       requirement: 'LOAD_PERMISSIONS',
       resolve: async (req, context) => {
         const res = await fetch('/api/permissions');
+        if (!res.ok) {
+          throw new Error(`Failed to load permissions: ${res.status}`);
+        }
         const data = await res.json();
         context.facts.role = data.role;
         context.facts.permissions = data.permissions;
@@ -133,7 +136,10 @@ const dashboard = createModule('dashboard', {
     loadDashboard: {
       requirement: 'LOAD_DASHBOARD',
       resolve: async (req, context) => {
-        const res = await fetch(`/api/dashboard?role=${req.role}`);
+        const res = await fetch(`/api/dashboard?role=${encodeURIComponent(req.role)}`);
+        if (!res.ok) {
+          throw new Error(`Failed to load dashboard: ${res.status}`);
+        }
         const data = await res.json();
         context.facts.widgets = data.widgets;
         context.facts.loaded = true;

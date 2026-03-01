@@ -96,7 +96,10 @@ const wizard = createModule('wizard', {
       facts.advanceRequested = false;
     },
     setField: (facts, { field, value }: { field: string; value: string | boolean }) => {
-      (facts as any)[field] = value;
+      const allowed = ['email', 'name', 'company', 'plan', 'newsletter'];
+      if (allowed.includes(field)) {
+        facts[field] = value;
+      }
     },
   },
 });
@@ -131,7 +134,10 @@ const validation = createModule('validation', {
       requirement: 'CHECK_EMAIL',
       resolve: async (req, context) => {
         context.facts.checkingEmail = true;
-        const res = await fetch(`/api/check-email?email=${req.email}`);
+        const res = await fetch(`/api/check-email?email=${encodeURIComponent(req.email)}`);
+        if (!res.ok) {
+          throw new Error(`Email check failed: ${res.status}`);
+        }
         const data = await res.json();
         context.facts.emailAvailable = data.available;
         context.facts.checkingEmail = false;
@@ -146,7 +152,7 @@ const system = createSystem({
     persistencePlugin({
       key: 'form-wizard-draft',
       include: [
-        'wizard::email', 'wizard::password', 'wizard::name',
+        'wizard::email', 'wizard::name',
         'wizard::company', 'wizard::plan', 'wizard::currentStep',
       ],
     }),

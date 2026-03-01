@@ -21,6 +21,11 @@ const userModule = createModule("user", {
       lastName: t.string(),
       age: t.number(),
     },
+    derivations: {
+      fullName: t.string(),
+      isAdult: t.boolean(),
+      ageGroup: t.string(),
+    },
   },
 
   init: (facts) => {

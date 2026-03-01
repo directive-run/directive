@@ -20,10 +20,12 @@ import { useDirective, useRequirementStatus } from '@directive-run/react';
 // Module with async data requirements
 const dashboard = createModule('dashboard', {
   schema: {
-    userId: t.string(),
-    profile: t.object<{ name: string; avatar: string }>(),
-    preferences: t.object<{ theme: string; locale: string }>(),
-    error: t.string().optional(),
+    facts: {
+      userId: t.string(),
+      profile: t.object<{ name: string; avatar: string }>(),
+      preferences: t.object<{ theme: string; locale: string }>(),
+      error: t.string().optional(),
+    },
   },
 
   init: (facts) => {

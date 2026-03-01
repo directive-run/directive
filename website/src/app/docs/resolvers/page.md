@@ -63,6 +63,19 @@ const userModule = createModule("user", {
 | `resolveBatch` | `(reqs, context) => Promise<void>` | All-or-nothing batch handler |
 | `resolveBatchWithResults` | `(reqs, context) => Promise<BatchItemResult[]>` | Per-item batch handler |
 
+The `req` parameter (short for **requirement**) is the object emitted by a constraint's `require()`. It always has a `type` string and any additional payload fields:
+
+```typescript
+// Constraint emits:
+require: (facts) => ({ type: "FETCH_USER", userId: facts.selectedId })
+
+// Resolver receives the same object as `req`:
+resolve: async (req, context) => {
+  const user = await api.getUser(req.userId);
+  context.facts.user = user;
+},
+```
+
 ---
 
 ## Requirement Matching
@@ -150,7 +163,7 @@ resolvers: {
 ```
 
 ```
-    Attempt 1     wait 1s     Attempt 2     wait 2s     Attempt 3
+    Attempt 1    wait 100ms   Attempt 2    wait 200ms   Attempt 3
     ─────────── ─ ─ ─ ─ ─── ─────────── ─ ─ ─ ─ ─── ───────────
        ✗ fail                   ✗ fail                   ✓ success
 ```
@@ -201,6 +214,18 @@ If `shouldRetry` is omitted, all errors are retried up to `attempts`.
 - `"none"` – constant delay (`initialDelay` every time)
 - `"linear"` – `initialDelay * attempt` (100ms, 200ms, 300ms...)
 - `"exponential"` – `initialDelay * 2^(attempt-1)` (100ms, 200ms, 400ms...)
+
+For autocomplete-friendly configuration, use the `Backoff` constant:
+
+```typescript
+import { Backoff } from '@directive-run/core';
+
+retry: {
+  attempts: 3,
+  backoff: Backoff.Exponential, // "none" | "linear" | "exponential"
+  initialDelay: 200,
+},
+```
 
 Retries are AbortSignal-aware – cancelling a resolver immediately interrupts retry sleep.
 
@@ -336,6 +361,7 @@ resolvers: {
 | `windowMs` | `number` | `50` | Time window to collect requirements (ms) |
 | `maxSize` | `number` | unlimited | Maximum batch size |
 | `timeoutMs` | `number` | – | Per-batch timeout (overrides resolver `timeout`) |
+| `failureStrategy` | `"all-or-nothing" \| "per-item"` | `"all-or-nothing"` | How to handle failures within a batch |
 
 ### Partial Failure Handling
 
