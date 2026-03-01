@@ -115,6 +115,50 @@ const cartModule = createModule("cart", {
 
 ---
 
+## Cross-Module Constraints
+
+Constraints in one module can reference facts from other modules using `crossModuleDeps`. This is the primary mechanism for inter-module coordination:
+
+```typescript
+const cartModule = createModule("cart", {
+  schema: {
+    facts: {
+      items: t.array(t.object<CartItem>()),
+      checkoutInProgress: t.boolean(),
+    },
+  },
+
+  init: (facts) => {
+    facts.items = [];
+    facts.checkoutInProgress = false;
+  },
+
+  constraints: {
+    blockCheckoutIfNotAuthenticated: {
+      // Access the auth module's facts via crossModuleDeps
+      crossModuleDeps: ["auth"],
+      when: (facts, { auth }) =>
+        facts.checkoutInProgress && !auth.isAuthenticated,
+      require: { type: "REQUIRE_LOGIN" },
+    },
+  },
+});
+```
+
+The `crossModuleDeps` array names other modules whose facts are passed as the second argument to `when()`. Constraint ordering across modules uses the `after` property with the `"moduleName::constraintName"` format:
+
+```typescript
+constraints: {
+  afterAuth: {
+    after: ["auth::validateSession"],  // Wait for auth's constraint to resolve
+    when: (facts) => facts.needsData,
+    require: { type: "FETCH_DATA" },
+  },
+}
+```
+
+---
+
 ## Dynamic Module Registration
 
 Add modules to a running system with `system.registerModule()`. This is useful for code-split features that load on demand:

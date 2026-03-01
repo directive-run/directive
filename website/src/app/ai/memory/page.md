@@ -197,12 +197,16 @@ memory.addMessages([
 // Get messages for context window (includes summaries as system messages)
 const context = memory.getContextMessages();
 
-// Manually trigger memory management
-const result = await memory.manage();
-console.log(result.messagesBefore);         // Messages before management
-console.log(result.messagesAfter);          // Messages after management
-console.log(result.messagesSummarized);     // How many were summarized
-console.log(result.estimatedTokensAfter);   // Token count after management
+// Manually trigger memory management (may call summarizer which uses LLM)
+try {
+  const result = await memory.manage();
+  console.log(result.messagesBefore);         // Messages before management
+  console.log(result.messagesAfter);          // Messages after management
+  console.log(result.messagesSummarized);     // How many were summarized
+  console.log(result.estimatedTokensAfter);   // Token count after management
+} catch (error) {
+  console.error('Memory management failed:', error);
+}
 
 // Check state
 const state = memory.getState();

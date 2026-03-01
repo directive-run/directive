@@ -101,21 +101,28 @@ Plug in an external detection service (like Microsoft Presidio):
 const customDetector = {
   name: 'presidio',
   detect: async (text, types) => {
-    // Send text to your Presidio (or similar) endpoint
-    const response = await fetch('https://presidio.internal/analyze', {
-      method: 'POST',
-      body: JSON.stringify({ text, entities: types }),
-    });
+    // Use AbortSignal to enforce a timeout on the external call
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    // Map the external format to Directive's expected shape
-    const results = await response.json();
+    try {
+      const response = await fetch('https://presidio.internal/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ text, entities: types }),
+        signal: controller.signal,
+      });
 
-    return results.map(r => ({
-      type: r.entity_type,
-      value: r.text,
-      position: { start: r.start, end: r.end },
-      confidence: r.score,
-    }));
+      const results = await response.json();
+
+      return results.map(r => ({
+        type: r.entity_type,
+        value: r.text,
+        position: { start: r.start, end: r.end },
+        confidence: r.score,
+      }));
+    } finally {
+      clearTimeout(timeoutId);
+    }
   },
 };
 

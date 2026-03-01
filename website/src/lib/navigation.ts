@@ -19,9 +19,9 @@ export const docsNavigation: NavigationSection[] = [
     title: 'Getting Started',
     links: [
       { title: 'Quick Start', href: '/docs/quick-start' },
+      { title: 'Why Directive', href: '/docs/why-directive' },
       { title: 'Installation', href: '/docs/installation' },
       { title: 'Core Concepts', href: '/docs/core-concepts' },
-      { title: 'Why Directive', href: '/docs/why-directive' },
       { title: 'Comparison', href: '/docs/comparison' },
       { title: 'Choosing Primitives', href: '/docs/choosing-primitives' },
     ],
@@ -111,6 +111,7 @@ export const docsNavigation: NavigationSection[] = [
   {
     title: 'Guides',
     links: [
+      { title: 'Overview', href: '/docs/guides/overview' },
       { title: 'Loading & Error States', href: '/docs/guides/loading-states' },
       { title: 'Authentication Flow', href: '/docs/guides/auth-flow' },
       { title: 'Optimistic Updates', href: '/docs/guides/optimistic-updates' },
@@ -226,6 +227,7 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Multi-Step Pipeline', href: '/ai/guides/multi-step-pipeline' },
       { title: 'Test Without LLM Calls', href: '/ai/guides/test-agents-without-llm' },
       { title: 'DAG Pipeline', href: '/ai/guides/dag-pipeline' },
+      { title: 'Goal Pipeline', href: '/ai/guides/goal-pipeline' },
     ],
   },
 ]

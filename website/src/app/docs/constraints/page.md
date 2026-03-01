@@ -215,6 +215,35 @@ constraints: {
 
 If you omit `async: true` and `when()` returns a Promise, Directive detects it at runtime and logs a dev warning. Async constraints within the same evaluation cycle run in parallel.
 
+{% callout type="warning" title="Async race conditions" %}
+When `when()` is async, facts can change while the promise is pending. Any fact reads **after** `await` see the latest values, not the values at evaluation start. For stable behavior, read all facts **before** the first `await`, or use explicit `deps` to declare which facts the constraint depends on:
+
+```typescript
+constraints: {
+  asyncSafe: {
+    async: true,
+    deps: ["userId", "hasData"],  // Explicit deps — re-evaluated when these change
+    when: async (facts) => {
+      const allowed = await checkPermissions(facts.userId);
+
+      return allowed && !facts.hasData;
+    },
+    require: { type: "FETCH_DATA" },
+  },
+}
+```
+{% /callout %}
+
+{% callout type="note" title="Namespace syntax in multi-module systems" %}
+Multi-module systems use different separators for different contexts:
+
+- **Constraint `after`:** `"moduleName::constraintName"` (double colon)
+- **Fact access in code:** `system.facts.moduleName.factKey` (dot access)
+- **Constraint `deps`:** `["factKey"]` (auto-prefixed with module namespace)
+
+The `::` separator is used internally and in `after` references. You never need it for fact access or `deps` — those are handled automatically.
+{% /callout %}
+
 ---
 
 ## Complex Conditions

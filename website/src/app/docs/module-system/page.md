@@ -79,6 +79,21 @@ const system = createSystem({
 
 ---
 
+## Initialization Order
+
+Facts are applied in this order, each layer overriding the previous:
+
+```
+createModule()     →  init(facts)          →  Schema defaults
+createSystem()     →  initialFacts         →  Override init() values
+system.hydrate()   →  hydrate callback     →  Override everything (highest precedence)
+system.start()     →  Constraints evaluate →  Reconciliation begins
+```
+
+`init()` runs during `createSystem()`. `hydrate()` must be called before `start()` and its values take highest precedence — use it for SSR restoration or persisted state.
+
+---
+
 ## System API
 
 ### Facts
@@ -98,6 +113,26 @@ system.batch(() => {
   system.facts.loading = true;
 });
 ```
+
+### Batching
+
+`system.batch()` defers notifications until the callback completes. All fact mutations inside a batch trigger a single reconciliation instead of one per mutation:
+
+```typescript
+// Without batch: 3 reconciliation cycles
+system.facts.a = 1;
+system.facts.b = 2;
+system.facts.c = 3;
+
+// With batch: 1 reconciliation cycle
+system.batch(() => {
+  system.facts.a = 1;
+  system.facts.b = 2;
+  system.facts.c = 3;
+});
+```
+
+Batches can nest — only the outermost batch triggers reconciliation. Resolver `resolve()` functions are automatically batched, so multiple fact mutations inside a resolver always coalesce.
 
 ### Derivations
 
