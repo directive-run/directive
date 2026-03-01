@@ -11,6 +11,7 @@ import { getPitchDeckOrchestrator, getPitchDeckInputGuardrails } from './orchest
 import { createAnthropicRunner } from '@directive-run/ai/anthropic'
 import { createOpenAIRunner } from '@directive-run/ai/openai'
 import { checkHourlyRateLimit, isRateLimited, getClientIp, getRateLimitHeaders, getResetMinutes } from '@/lib/rate-limit'
+import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
 
 interface HistoryMessage {
   role: 'user' | 'assistant'
@@ -41,6 +42,10 @@ function validateHistory(history: unknown[]): HistoryMessage[] {
 }
 
 export async function POST(request: Request) {
+  if (!isAllowedOrigin(request)) {
+    return forbiddenResponse(request)
+  }
+
   const body = await request.json().catch(() => null)
   const message = body?.message
   if (!message || typeof message !== 'string' || message.length > MAX_MESSAGE_LENGTH) {

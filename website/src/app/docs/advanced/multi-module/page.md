@@ -127,6 +127,8 @@ const cartModule = createModule("cart", {
       checkoutInProgress: t.boolean(),
     },
   },
+  // Declare cross-module dependencies at the module level
+  crossModuleDeps: { auth: authSchema },
 
   init: (facts) => {
     facts.items = [];
@@ -135,17 +137,16 @@ const cartModule = createModule("cart", {
 
   constraints: {
     blockCheckoutIfNotAuthenticated: {
-      // Access the auth module's facts via crossModuleDeps
-      crossModuleDeps: ["auth"],
-      when: (facts, { auth }) =>
-        facts.checkoutInProgress && !auth.isAuthenticated,
+      // facts.self.* for own module, facts.auth.* for cross-module
+      when: (facts) =>
+        facts.self.checkoutInProgress && !facts.auth.isAuthenticated,
       require: { type: "REQUIRE_LOGIN" },
     },
   },
 });
 ```
 
-The `crossModuleDeps` array names other modules whose facts are passed as the second argument to `when()`. Constraint ordering across modules uses the `after` property with the `"moduleName::constraintName"` format:
+Declare `crossModuleDeps` as a module-level object mapping dependency names to their schemas. Inside `derive`, `constraints`, and `effects`, access own-module facts via `facts.self.*` and cross-module facts via `facts.{dep}.*`. Constraint ordering across modules uses the `after` property with the `"moduleName::constraintName"` format:
 
 ```typescript
 constraints: {
@@ -291,5 +292,5 @@ function App() {
 ## Next Steps
 
 - [Module and System](/docs/module-system) – Basics
-- [Time-Travel](/docs/advanced/time-travel) – Debugging
-- [Time-Travel & Snapshots](/docs/advanced/time-travel) – State management
+- [Time-Travel & Snapshots](/docs/advanced/time-travel) – Debugging
+- [Error Handling](/docs/advanced/errors) – Recovery strategies

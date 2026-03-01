@@ -18,10 +18,12 @@ import { createModule, t } from '@directive-run/core';
 
 const checkout = createModule('checkout', {
   schema: {
-    items: t.array<{ id: string; price: number }>(),
-    status: t.string<'idle' | 'processing' | 'complete' | 'error'>(),
-    total: t.number(),
-    orderId: t.string().optional(),
+    facts: {
+      items: t.array<{ id: string; price: number }>(),
+      status: t.string<'idle' | 'processing' | 'complete' | 'error'>(),
+      total: t.number(),
+      orderId: t.string().optional(),
+    },
   },
 
   init: (facts) => {
@@ -50,6 +52,10 @@ const checkout = createModule('checkout', {
           method: 'POST',
           body: JSON.stringify({ total: req.total, items: req.items }),
         });
+        if (!res.ok) {
+          throw new Error(`Payment failed: ${res.status}`);
+        }
+
         const data = await res.json();
 
         // Resolver mutations are already batched by the engine

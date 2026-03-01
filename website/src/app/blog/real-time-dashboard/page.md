@@ -91,7 +91,7 @@ const historyModule = createModule("history", {
         context.facts.loading = true;
         context.facts.error = null;
         try {
-          const res = await fetch(`/api/sales/history?since=${req.since}`);
+          const res = await fetch(`/api/sales/history?since=${encodeURIComponent(String(req.since))}`);
           if (!res.ok) {
             throw new Error(`HTTP ${res.status}`);
           }

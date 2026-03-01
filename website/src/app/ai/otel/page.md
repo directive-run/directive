@@ -218,6 +218,44 @@ These integrate with the core Directive plugin system and can be combined with t
 
 ---
 
+## OTLP Exporter
+
+Send metrics and traces to any OpenTelemetry-compatible backend (Grafana, Datadog, Jaeger, or any OTLP Collector) using `createOTLPExporter`:
+
+```typescript
+import { createOTLPExporter, createObservability } from '@directive-run/ai';
+
+const exporter = createOTLPExporter({
+  endpoint: 'http://localhost:4318',
+  headers: { 'Authorization': 'Bearer token' },
+  serviceName: 'my-agent-service',
+});
+
+const obs = createObservability({
+  metrics: { exporter: exporter.exportMetrics, exportInterval: 10000 },
+  tracing: { exporter: exporter.exportTraces },
+});
+```
+
+The exporter appends `/v1/metrics` and `/v1/traces` to the endpoint automatically &mdash; pass the base URL only.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `endpoint` | `string` | *required* | OTLP base URL (e.g., `http://localhost:4318`) |
+| `headers` | `Record<string, string>` | `{}` | Auth tokens or custom headers |
+| `serviceName` | `string` | `"directive-agents"` | Service name for resource identification |
+| `serviceVersion` | `string` | &ndash; | Service version |
+| `resourceAttributes` | `Record<string, string>` | &ndash; | Custom resource attributes |
+| `timeoutMs` | `number` | `10000` | Request timeout in ms |
+| `onError` | `(error, type) => void` | console.error | Error callback |
+
+The returned object exposes two methods:
+
+- **`exportMetrics(metrics)`** &mdash; Converts `AggregatedMetric[]` to OTLP JSON and POSTs to `/v1/metrics`
+- **`exportTraces(traces)`** &mdash; Converts `TraceSpan[]` to OTLP JSON and POSTs to `/v1/traces`
+
+---
+
 ## Next Steps
 
 - [Debug Timeline](/ai/debug-timeline) &ndash; Event types the plugin instruments

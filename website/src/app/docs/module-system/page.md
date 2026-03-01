@@ -91,7 +91,7 @@ system.hydrate()   →  hydrate callback     →  Override everything (highest p
 system.start()     →  Constraints evaluate →  Reconciliation begins
 ```
 
-`init()` runs during `createSystem()`. `hydrate()` must be called before `start()` and its values take highest precedence — use it for SSR restoration or persisted state.
+`init()` runs during `system.start()` (or `system.initialize()`), not during `createSystem()`. `hydrate()` must be called before `start()` and its values take highest precedence — use it for SSR restoration or persisted state.
 
 ---
 
@@ -222,6 +222,20 @@ events: {
   // Mutation with payload
   setUser: (facts, { user }) => { facts.user = user; },
 },
+```
+
+### Hydrate
+
+Apply persisted or server-rendered state before starting. Values from `hydrate()` take highest precedence — they override both `init()` and `initialFacts`:
+
+```typescript
+// Must be called before system.start()
+system.hydrate((facts) => {
+  facts.userId = savedState.userId;
+  facts.token = savedState.token;
+});
+
+system.start();
 ```
 
 ### Snapshot / Restore

@@ -288,6 +288,9 @@ const system = createSystem({ module: userModule });
 // Restore persisted state before starting (highest precedence)
 await system.hydrate(async () => {
   const saved = await fetch('/api/state');
+  if (!saved.ok) {
+    throw new Error(`Failed to load state: ${saved.status}`);
+  }
 
   return saved.json();
 });

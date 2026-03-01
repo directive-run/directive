@@ -90,6 +90,57 @@ console.log(system.read('doubled')); // 2
 
 ---
 
+## Helpers & Constants
+
+Beyond the six primitives, the core package exports several helpers:
+
+| Export | Purpose |
+|--------|---------|
+| `t` | Schema type builders (`t.string()`, `t.number()`, `t.object<T>()`, etc.) |
+| `req` / `forType` | Requirement construction helpers |
+| `RequirementSet` | Set-like container for managing requirements |
+| `Backoff` | Constants for retry backoff strategies (`Backoff.Exponential`, etc.) |
+| `constraint` / `when` | Fluent constraint builders |
+| `module` / `system` | Builder-pattern alternatives to `createModule` / `createSystem` |
+| `isSingleModuleSystem` / `isNamespacedSystem` | Type guards for system mode |
+| `constraintFactory` / `resolverFactory` | Factory helpers for typed cross-module constraints and resolvers |
+| `DirectiveError` | Base error class for all Directive errors |
+
+---
+
+## Lower-Level APIs
+
+For advanced use cases (custom tooling, framework adapters, testing infrastructure), the core package also exports the individual manager constructors that `createSystem` composes internally:
+
+| Export | Purpose |
+|--------|---------|
+| `createFacts` / `createFactsStore` / `createFactsProxy` | Raw facts store and proxy creation |
+| `createDerivationsManager` | Auto-tracked derivation layer |
+| `createEffectsManager` | Side-effect scheduling |
+| `createConstraintsManager` | Constraint evaluation engine |
+| `createResolversManager` | Requirement resolution with retry and batching |
+| `createPluginManager` | Plugin lifecycle management |
+| `createErrorBoundaryManager` / `createRetryLaterManager` | Error handling and retry-later scheduling |
+| `createTimeTravelManager` / `createDisabledTimeTravel` | Time-travel snapshot management |
+| `createEngine` | The reconciliation loop that ties everything together |
+
+Most applications should use `createModule` + `createSystem` instead. These lower-level APIs are useful when you need to compose your own system-like abstraction, build framework adapters, or write advanced test harnesses.
+
+---
+
+## Tracking Utilities
+
+The dependency tracking system is also exported for custom derivation-like patterns:
+
+| Export | Purpose |
+|--------|---------|
+| `withTracking(fn)` | Run a function while recording which facts it reads |
+| `withoutTracking(fn)` | Run a function that reads facts without recording dependencies |
+| `isTracking()` | Check whether dependency tracking is currently active |
+| `getCurrentTracker` / `trackAccess` | Low-level tracker access for custom reactive primitives |
+
+---
+
 ## Where to Start
 
 - **New to Directive?** Start with [Facts](/docs/facts) to understand state, then [Derivations](/docs/derivations) for computed values.

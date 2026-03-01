@@ -65,6 +65,10 @@ resolvers: {
     requirement: 'FETCH_USER',
     resolve: async (req, context) => {
       const res = await fetch('/api/user');
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
       context.facts.user = await res.json();
     },
   },
@@ -287,10 +291,13 @@ resolvers: {
   saveDocument: {
     requirement: 'SAVE_DOCUMENT',
     resolve: async (req, context) => {
-      await fetch('/api/save', {
+      const res = await fetch('/api/save', {
         method: 'POST',
         body: JSON.stringify(req.content),
       });
+      if (!res.ok) {
+        throw new Error(`Save failed: ${res.status}`);
+      }
       context.facts.isDirty = false;
     },
   },

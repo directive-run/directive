@@ -177,7 +177,7 @@ const kanban = createModule("kanban", {
         context.facts.loading = true;
         context.facts.error = null;
         try {
-          const res = await fetch(`/api/boards/${req.boardId}`, {
+          const res = await fetch(`/api/boards/${encodeURIComponent(req.boardId)}`, {
             signal: context.signal,
           });
           if (!res.ok) {
@@ -272,7 +272,11 @@ const kanban = createModule("kanban", {
       requirement: "FETCH_ASSIGNEE",
       key: (req) => `assignee-${req.userId}`,
       resolve: async (req, context) => {
-        const res = await fetch(`/api/users/${req.userId}`);
+        const res = await fetch(`/api/users/${encodeURIComponent(req.userId)}`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch user: ${res.status}`);
+        }
+
         const user = await res.json();
         context.facts.assignees = {
           ...context.facts.assignees,
@@ -313,6 +317,10 @@ resolvers: {
         body: JSON.stringify({ userIds }),
         signal: context.signal,
       });
+      if (!res.ok) {
+        throw new Error(`Batch fetch failed: ${res.status}`);
+      }
+
       const users: Assignee[] = await res.json();
       const byId: Record<string, Assignee> = {};
       for (const user of users) byId[user.id] = user;
@@ -340,6 +348,10 @@ resolveBatchWithResults: async (reqs, context) => {
     body: JSON.stringify({ userIds }),
     signal: context.signal,
   });
+  if (!res.ok) {
+    throw new Error(`Batch fetch failed: ${res.status}`);
+  }
+
   const users: Assignee[] = await res.json();
   const byId: Record<string, Assignee> = {};
   for (const user of users) byId[user.id] = user;
@@ -418,7 +430,7 @@ const kanban = createModule("kanban", {
 
         try {
           // 3. Persist to server
-          const res = await fetch(`/api/cards/${req.cardId}/move`, {
+          const res = await fetch(`/api/cards/${encodeURIComponent(req.cardId)}/move`, {
             method: "POST",
             body: JSON.stringify({
               toColumn: req.toColumn,

@@ -16,12 +16,19 @@ The auth guide covers login/logout but not role-based access control. Real apps 
 ```typescript
 import { createModule, createSystem, t } from '@directive-run/core';
 
-const auth = createModule('auth', {
-  schema: {
+const authSchema = {
+  facts: {
     userId: t.string(),
     role: t.string<'admin' | 'editor' | 'viewer' | ''>(),
     token: t.string(),
   },
+  derivations: {
+    isAuthenticated: t.boolean(),
+  },
+};
+
+const auth = createModule('auth', {
+  schema: authSchema,
 
   init: (facts) => {
     facts.userId = '';
@@ -50,6 +57,9 @@ const auth = createModule('auth', {
         const res = await fetch('/api/auth/validate', {
           headers: { Authorization: `Bearer ${req.token}` },
         });
+        if (!res.ok) {
+          throw new Error(`Session validation failed: ${res.status}`);
+        }
         const data = await res.json();
         context.facts.userId = data.userId;
         context.facts.role = data.role;
@@ -58,11 +68,23 @@ const auth = createModule('auth', {
   },
 });
 
-const permissions = createModule('permissions', {
-  schema: {
+const permissionsSchema = {
+  facts: {
     permissions: t.object<string[]>(),
     loaded: t.boolean(),
   },
+  derivations: {
+    canEdit: t.boolean(),
+    canPublish: t.boolean(),
+    canManageUsers: t.boolean(),
+    canViewAnalytics: t.boolean(),
+    isAdmin: t.boolean(),
+  },
+};
+
+const permissions = createModule('permissions', {
+  schema: permissionsSchema,
+  crossModuleDeps: { auth: authSchema },
 
   init: (facts) => {
     facts.permissions = [];
@@ -70,10 +92,10 @@ const permissions = createModule('permissions', {
   },
 
   derive: {
-    canEdit: (facts) => facts.permissions.includes('content.edit'),
-    canPublish: (facts) => facts.permissions.includes('content.publish'),
-    canManageUsers: (facts) => facts.permissions.includes('users.manage'),
-    canViewAnalytics: (facts) => facts.permissions.includes('analytics.view'),
+    canEdit: (facts) => facts.self.permissions.includes('content.edit'),
+    canPublish: (facts) => facts.self.permissions.includes('content.publish'),
+    canManageUsers: (facts) => facts.self.permissions.includes('users.manage'),
+    canViewAnalytics: (facts) => facts.self.permissions.includes('analytics.view'),
     // Composition: admin inherits all permissions
     isAdmin: (facts, derive) => {
       return derive.canManageUsers;
@@ -83,8 +105,7 @@ const permissions = createModule('permissions', {
   constraints: {
     loadPermissions: {
       after: ['auth::validateSession'],
-      crossModuleDeps: ['auth.role'],
-      when: (facts) => facts.auth.role !== '' && !facts.loaded,
+      when: (facts) => facts.auth.role !== '' && !facts.self.loaded,
       require: (facts) => ({
         type: 'FETCH_PERMISSIONS',
         role: facts.auth.role,
@@ -110,10 +131,13 @@ const permissions = createModule('permissions', {
 
 const content = createModule('content', {
   schema: {
-    articles: t.object<Array<{ id: string; title: string; status: string }>>(),
-    loaded: t.boolean(),
-    publishRequested: t.string(),
+    facts: {
+      articles: t.object<Array<{ id: string; title: string; status: string }>>(),
+      loaded: t.boolean(),
+      publishRequested: t.string(),
+    },
   },
+  crossModuleDeps: { permissions: permissionsSchema },
 
   init: (facts) => {
     facts.articles = [];
@@ -124,18 +148,16 @@ const content = createModule('content', {
   constraints: {
     loadContent: {
       after: ['permissions::loadPermissions'],
-      crossModuleDeps: ['permissions.canEdit'],
-      when: (facts) => !facts.loaded,
+      when: (facts) => !facts.self.loaded,
       require: { type: 'LOAD_CONTENT' },
     },
     publishArticle: {
-      crossModuleDeps: ['permissions.canPublish'],
       when: (facts) => {
-        return facts.publishRequested !== '' && facts.permissions.canPublish;
+        return facts.self.publishRequested !== '' && facts.permissions.canPublish;
       },
       require: (facts) => ({
         type: 'PUBLISH_ARTICLE',
-        articleId: facts.publishRequested,
+        articleId: facts.self.publishRequested,
       }),
     },
   },
@@ -145,6 +167,9 @@ const content = createModule('content', {
       requirement: 'LOAD_CONTENT',
       resolve: async (req, context) => {
         const res = await fetch('/api/content');
+        if (!res.ok) {
+          throw new Error(`Failed to load content: ${res.status}`);
+        }
         const data = await res.json();
         context.facts.articles = data.articles;
         context.facts.loaded = true;
@@ -153,7 +178,7 @@ const content = createModule('content', {
     publishArticle: {
       requirement: 'PUBLISH_ARTICLE',
       resolve: async (req, context) => {
-        await fetch(`/api/content/${req.articleId}/publish`, { method: 'POST' });
+        await fetch(`/api/content/${encodeURIComponent(req.articleId)}/publish`, { method: 'POST' });
         context.facts.articles = context.facts.articles.map((a) =>
           a.id === req.articleId ? { ...a, status: 'published' } : a,
         );
@@ -188,7 +213,7 @@ function ContentList({ system }) {
           <span className="badge">{article.status}</span>
           {canEdit && <button>Edit</button>}
           {canPublish && article.status === 'draft' && (
-            <button onClick={() => system.events.requestPublish({ articleId: article.id })}>
+            <button onClick={() => system.events.content.requestPublish({ articleId: article.id })}>
               Publish
             </button>
           )}
@@ -211,15 +236,17 @@ function AdminPanel({ system }) {
 
 ## Step by Step
 
-1. **Permission derivations** — `canEdit`, `canPublish`, `canManageUsers` are computed from the `permissions` array. Components read these derivations to conditionally render UI elements.
+1. **Permission derivations** — `canEdit`, `canPublish`, `canManageUsers` are computed from `facts.self.permissions` (the module's own facts). Components read these derivations to conditionally render UI elements.
 
-2. **Constraint ordering** — `loadPermissions` uses `after: ['auth::validateSession']` to wait for auth. `loadContent` uses `after: ['permissions::loadPermissions']` to wait for permissions. The chain: auth → permissions → content.
+2. **Module-level `crossModuleDeps`** — `permissions` declares `crossModuleDeps: { auth: authSchema }` and `content` declares `crossModuleDeps: { permissions: permissionsSchema }`. This gives constraints and derivations typed access to other modules via `facts.auth.*` and `facts.permissions.*`, while own-module facts use `facts.self.*`.
 
-3. **Cross-module gating** — `publishArticle` checks `facts.permissions.canPublish` in its `when` clause. If the user doesn't have publish permission, the constraint never fires even if `publishRequested` is set.
+3. **Constraint ordering** — `loadPermissions` uses `after: ['auth::validateSession']` to wait for auth. `loadContent` uses `after: ['permissions::loadPermissions']` to wait for permissions. The chain: auth → permissions → content.
 
-4. **Dynamic constraint disable** — for more aggressive gating, use `system.constraints.disable('content::publishArticle')` when the user lacks permissions. This is more efficient than `when` returning false because it removes the constraint from evaluation entirely.
+4. **Cross-module gating** — `publishArticle` checks `facts.permissions.canPublish` and `facts.self.publishRequested` in its `when` clause. If the user doesn't have publish permission, the constraint never fires even if `publishRequested` is set.
 
-5. **Permission inheritance** — the `isAdmin` derivation composes other permission derivations. Admin UI checks `isAdmin` instead of individual permissions.
+5. **Dynamic constraint disable** — for more aggressive gating, use `system.constraints.disable('content::publishArticle')` when the user lacks permissions. This is more efficient than `when` returning false because it removes the constraint from evaluation entirely.
+
+6. **Permission inheritance** — the `isAdmin` derivation composes other permission derivations. Admin UI checks `isAdmin` instead of individual permissions.
 
 ## Common Variations
 

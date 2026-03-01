@@ -146,6 +146,11 @@ function FactRepl() {
       }
 
       // Set the fact on the runtime system
+      const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+      if (BLOCKED_KEYS.has(key)) {
+        setFeedback({ type: 'error', message: `Cannot set reserved property "${key}"` })
+        return
+      }
       if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
         const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined)
         if (sys?.facts) {

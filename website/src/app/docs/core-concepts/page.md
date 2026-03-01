@@ -459,7 +459,11 @@ const userModule = createModule("user", {
         context.facts.error = null;
 
         try {
-          const response = await fetch(`/api/users/${context.facts.userId}`);
+          const response = await fetch(`/api/users/${encodeURIComponent(String(context.facts.userId))}`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch user: ${response.status}`);
+          }
+
           context.facts.user = await response.json();
         } catch (error) {
           context.facts.error = error instanceof Error ? error.message : 'Failed';
