@@ -318,7 +318,7 @@ const unsub = system.watchDistributableSnapshot(
 );
 ```
 
-See [Snapshots](/docs/advanced/snapshots) for full options.
+See [Time-Travel & Snapshots](/docs/advanced/time-travel) for full options.
 
 ### Run History
 

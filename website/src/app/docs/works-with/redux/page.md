@@ -10,7 +10,7 @@ This guide assumes familiarity with [Core Concepts](/docs/core-concepts) and [Mo
 {% /callout %}
 
 {% callout title="Migrating from Redux?" %}
-Want to replace Redux entirely? See the [Redux to Directive migration guide](/docs/migration/from-redux) for step-by-step codemods and concept mapping.
+Want to replace Redux entirely? The sections below show how to incrementally adopt Directive alongside Redux, or replace it entirely.
 {% /callout %}
 
 ---
@@ -386,7 +386,6 @@ test('constraint fires when Redux state synced', async () => {
 
 ## Next Steps
 
-- **[Migration from Redux](/docs/migration/from-redux)** – Full migration guide if you want to move off Redux entirely
 - **[Constraints](/docs/constraints)** – How constraints evaluate and emit requirements
 - **[Resolvers](/docs/resolvers)** – How resolvers fulfill requirements with retry and batching
 - **[Plugins](/docs/plugins/overview)** – Build custom plugins for cross-cutting concerns

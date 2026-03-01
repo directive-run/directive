@@ -508,4 +508,4 @@ For AI agent orchestrators, see `createAgentOrchestrator()` in `@directive-run/a
 - [Types](/docs/api/types) – Type definitions
 - [React Hooks](/docs/api/react) – React API
 - [Module and System](/docs/module-system) – Usage guide
-- [Glossary](/docs/glossary#builders--helpers) – All builder patterns at a glance
+- [Builders](/docs/builders) – Fluent builder patterns
