@@ -6,22 +6,14 @@
  * - 6 resolvers with retry policies and custom dedup keys
  * - 3 effects with explicit deps
  * - 9 derivations with composition
- * - AI package integration (PII detection, checkpoints, AI-powered analysis)
+ * - Local PII detection + checkpoint store
  * - DevTools panel with time-travel debugging
  */
 
 import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import {
-  detectPII,
-  redactPII,
-  InMemoryCheckpointStore,
-  createCheckpointId,
-  validateCheckpoint,
-  createRunner,
-  type Checkpoint,
-  type AgentRunner,
-} from "@directive-run/ai";
+import { detectPII, redactPII } from "./pii.js";
+import { InMemoryCheckpointStore } from "./checkpoint.js";
 
 import {
   type PipelineStage,
@@ -33,66 +25,6 @@ import {
   type Disposition,
   getMockEnrichment,
 } from "./mock-data.js";
-
-// ============================================================================
-// API Key Management (localStorage)
-// ============================================================================
-
-const STORAGE_KEY = "fraud-analysis-api-key";
-
-export function getApiKey(): string | null {
-  return localStorage.getItem(STORAGE_KEY);
-}
-
-export function setApiKey(key: string): void {
-  localStorage.setItem(STORAGE_KEY, key);
-}
-
-// ============================================================================
-// AI Runner
-// ============================================================================
-
-let runner: AgentRunner | null = null;
-
-function getOrCreateRunner(apiKey: string): AgentRunner {
-  if (!runner) {
-    runner = createRunner({
-      buildRequest: (_agent, input) => ({
-        url: "/api/claude",
-        init: {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-          },
-          body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 512,
-            system: "You are a fraud analyst AI. Analyze the provided case data and return a JSON risk assessment.",
-            messages: [{ role: "user", content: input }],
-          }),
-        },
-      }),
-      parseResponse: async (res) => {
-        const data = await res.json();
-        const text = data.content?.[0]?.text ?? "";
-        const inputTokens = data.usage?.input_tokens ?? 0;
-        const outputTokens = data.usage?.output_tokens ?? 0;
-
-        return { text, totalTokens: inputTokens + outputTokens };
-      },
-      parseOutput: (text) => {
-        try {
-          return JSON.parse(text);
-        } catch {
-          return text;
-        }
-      },
-    });
-  }
-
-  return runner;
-}
 
 // ============================================================================
 // Timeline (external mutable array, same pattern as ai-checkpoint)
@@ -169,66 +101,6 @@ function analyzeWithFormula(fraudCase: FraudCase): AnalysisResult {
   return { riskScore, severity, disposition, analysisNotes: notes };
 }
 
-/** AI-powered risk analysis via Claude */
-async function analyzeWithAI(
-  apiKey: string,
-  fraudCase: FraudCase,
-): Promise<AnalysisResult | null> {
-  try {
-    const run = getOrCreateRunner(apiKey);
-
-    const totalAmount = fraudCase.events.reduce((sum, e) => sum + e.amount, 0);
-    const prompt = [
-      `Analyze this fraud case and return JSON with: risk_score (0-100), severity ("low"|"medium"|"high"|"critical"), disposition ("cleared"|"flagged"|"pending"), and notes (string).`,
-      ``,
-      `Case ${fraudCase.id}:`,
-      `- Account: ${fraudCase.accountId}`,
-      `- Transactions: ${fraudCase.events.length} totaling $${totalAmount.toFixed(2)}`,
-      `- PII detected: ${fraudCase.events.some((e) => e.piiFound) ? "yes" : "no"}`,
-      `- Enrichment signals:`,
-      ...fraudCase.signals.map((s) => `  - ${s.source}: risk ${s.risk}/100 — ${s.detail}`),
-      ``,
-      `Return ONLY valid JSON: { "risk_score": number, "severity": string, "disposition": string, "notes": string }`,
-    ].join("\n");
-
-    const agent = { name: "fraud-analyst", instructions: "You are a fraud analyst AI. Analyze cases and return structured risk assessments as JSON." };
-    const result = await run(agent, prompt);
-    const output = result.output as Record<string, unknown>;
-
-    if (typeof output !== "object" || output === null) {
-      return null;
-    }
-
-    const riskScore = Math.min(100, Math.max(0, Number(output.risk_score) || 0));
-
-    let severity: Severity = "low";
-    if (["critical", "high", "medium", "low"].includes(String(output.severity))) {
-      severity = output.severity as Severity;
-    } else if (riskScore >= 80) {
-      severity = "critical";
-    } else if (riskScore >= 60) {
-      severity = "high";
-    } else if (riskScore >= 40) {
-      severity = "medium";
-    }
-
-    let disposition: Disposition = "pending";
-    if (["cleared", "flagged", "pending"].includes(String(output.disposition))) {
-      disposition = output.disposition as Disposition;
-    } else if (riskScore <= 30) {
-      disposition = "cleared";
-    } else if (riskScore <= 50) {
-      disposition = "flagged";
-    }
-
-    const notes = `[AI] ${String(output.notes || `Risk: ${riskScore}/100`)}`;
-
-    return { riskScore, severity, disposition, analysisNotes: notes };
-  } catch {
-    return null;
-  }
-}
-
 // ============================================================================
 // Schema
 // ============================================================================
@@ -247,7 +119,6 @@ export const fraudSchema = {
     lastError: t.string(),
     checkpoints: t.array<CheckpointEntry>(),
     selectedScenario: t.string(),
-    apiKeySet: t.boolean(),
   },
   derivations: {
     ungroupedCount: t.number(),
@@ -265,7 +136,6 @@ export const fraudSchema = {
     setRiskThreshold: { value: t.number() },
     setBudget: { value: t.number() },
     selectScenario: { key: t.string() },
-    setApiKey: { key: t.string() },
     reset: {},
   },
   requirements: {
@@ -298,7 +168,6 @@ export const fraudAnalysisModule = createModule("fraud", {
     facts.lastError = "";
     facts.checkpoints = [];
     facts.selectedScenario = "card-skimming";
-    facts.apiKeySet = getApiKey() !== null;
   },
 
   // ============================================================================
@@ -390,11 +259,6 @@ export const fraudAnalysisModule = createModule("fraud", {
 
     selectScenario: (facts, { key }) => {
       facts.selectedScenario = key;
-    },
-
-    setApiKey: (facts, { key }) => {
-      setApiKey(key);
-      facts.apiKeySet = true;
     },
 
     reset: (facts) => {
@@ -521,7 +385,6 @@ export const fraudAnalysisModule = createModule("fraud", {
     normalizeEvents: {
       requirement: "NORMALIZE_EVENTS",
       resolve: async (_req, context) => {
-        context.facts.stage = "normalizing";
         addTimeline("stage", "normalizing events");
 
         const events = [...context.facts.flagEvents];
@@ -557,19 +420,21 @@ export const fraudAnalysisModule = createModule("fraud", {
           };
         }
 
+        // Simulate processing delay (before fact mutations to avoid
+        // mid-resolver reconcile canceling this resolver)
+        await delay(300);
+
+        // All fact mutations at the end — no more awaits after this
+        context.facts.stage = "normalizing";
         context.facts.flagEvents = events;
         context.facts.totalPiiDetections =
           context.facts.totalPiiDetections + piiCount;
-
-        // Simulate processing delay
-        await delay(300);
       },
     },
 
     groupEvents: {
       requirement: "GROUP_EVENTS",
       resolve: async (_req, context) => {
-        context.facts.stage = "grouping";
         addTimeline("stage", "grouping events into cases");
 
         const events = [...context.facts.flagEvents];
@@ -608,10 +473,12 @@ export const fraudAnalysisModule = createModule("fraud", {
         // Mark all events as grouped
         const markedEvents = events.map((e) => ({ ...e, grouped: true }));
 
+        await delay(200);
+
+        // All fact mutations at the end — no more awaits after this
+        context.facts.stage = "grouping";
         context.facts.flagEvents = markedEvents;
         context.facts.cases = existingCases;
-
-        await delay(200);
       },
     },
 
@@ -620,7 +487,6 @@ export const fraudAnalysisModule = createModule("fraud", {
       key: (req) => `enrich-${req.caseId}`,
       retry: { attempts: 2, backoff: "exponential" },
       resolve: async (req, context) => {
-        context.facts.stage = "enriching";
         addTimeline("stage", `enriching ${req.caseId}`);
 
         const cases = [...context.facts.cases];
@@ -634,11 +500,13 @@ export const fraudAnalysisModule = createModule("fraud", {
         // Simulate API call
         await delay(400);
 
+        // All fact mutations at the end — no more awaits after this
         cases[idx] = {
           ...cases[idx],
           signals,
           enriched: true,
         };
+        context.facts.stage = "enriching";
         context.facts.cases = cases;
       },
     },
@@ -648,7 +516,7 @@ export const fraudAnalysisModule = createModule("fraud", {
       key: (req) => `analyze-${req.caseId}`,
       retry: { attempts: 1, backoff: "none" },
       resolve: async (req, context) => {
-        context.facts.stage = "analyzing";
+        addTimeline("stage", `analyzing ${req.caseId}`);
 
         const cases = [...context.facts.cases];
         const idx = cases.findIndex((c) => c.id === req.caseId);
@@ -660,31 +528,20 @@ export const fraudAnalysisModule = createModule("fraud", {
 
         // Consume budget
         const cost = 25 + Math.floor(fraudCase.events.length * 5);
-        context.facts.analysisBudget =
-          Math.max(0, context.facts.analysisBudget - cost);
 
-        // AI-powered analysis when API key is available
-        const apiKey = getApiKey();
-        if (apiKey && context.facts.apiKeySet) {
-          addTimeline("stage", `AI analyzing ${req.caseId}`);
-          const result = await analyzeWithAI(apiKey, fraudCase);
-
-          if (result) {
-            cases[idx] = { ...fraudCase, ...result, analyzed: true };
-            context.facts.cases = cases;
-
-            return;
-          }
-
-          // Fall through to deterministic on AI failure
-          addTimeline("info", `AI fallback for ${req.caseId} — using formula`);
-        } else {
-          addTimeline("stage", `analyzing ${req.caseId}`);
+        // Deterministic analysis
+        await delay(500);
+        const result = analyzeWithFormula(fraudCase);
+        if (result.disposition === "pending" && result.riskScore <= context.facts.riskThreshold) {
+          result.disposition = "flagged";
+          result.analysisNotes += " Auto-flagged: below human review threshold.";
         }
 
-        // Deterministic analysis (fallback or default)
-        await delay(500);
-        cases[idx] = { ...fraudCase, ...analyzeWithFormula(fraudCase), analyzed: true };
+        // All fact mutations at the end — no more awaits after this
+        cases[idx] = { ...fraudCase, ...result, analyzed: true };
+        context.facts.stage = "analyzing";
+        context.facts.analysisBudget =
+          Math.max(0, context.facts.analysisBudget - cost);
         context.facts.cases = cases;
       },
     },
@@ -700,14 +557,14 @@ export const fraudAnalysisModule = createModule("fraud", {
           return;
         }
 
+        await delay(100);
+
         cases[idx] = {
           ...cases[idx],
           disposition: "human_review",
           dispositionReason: "Risk score exceeds threshold",
         };
         context.facts.cases = cases;
-
-        await delay(100);
       },
     },
 
@@ -722,14 +579,14 @@ export const fraudAnalysisModule = createModule("fraud", {
           return;
         }
 
+        await delay(100);
+
         cases[idx] = {
           ...cases[idx],
           disposition: "escalated",
           dispositionReason: "Analysis budget exhausted",
         };
         context.facts.cases = cases;
-
-        await delay(100);
       },
     },
   },

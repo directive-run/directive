@@ -367,6 +367,32 @@ resolvers: {
 
 The returned results array **must** match the order of the input requirements.
 
+### Batch with resolve() Fallback
+
+You can enable batching with just `resolve()` (no `resolveBatch`). The system falls back to calling `resolve()` individually for each batched requirement. This gives you windowing and deduplication without writing a bulk handler:
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    batch: {
+      enabled: true,
+      windowMs: 50,
+    },
+
+    // Individual resolve — called once per batched requirement
+    resolve: async (req, context) => {
+      context.facts.user = await api.getUser(req.userId);
+    },
+  },
+}
+```
+
+When to upgrade to `resolveBatch`:
+- You have a bulk API (e.g., `GET /users?ids=1,2,3`)
+- You want a single SQL query with `WHERE id IN (...)`
+- Network round-trips are the bottleneck
+
 ---
 
 ## Sequential vs Parallel

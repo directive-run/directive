@@ -63,6 +63,7 @@ function createChatStore() {
     apiEndpoint: string,
     pageUrl: string,
     messageText?: string,
+    extraHeaders?: Record<string, string>,
   ) {
     const text = (messageText ?? _state.input).trim()
     if (!text || _state.isLoading) {
@@ -99,7 +100,7 @@ function createChatStore() {
     try {
       const response = await fetch(apiEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...extraHeaders },
         body: JSON.stringify({
           message: text,
           history,
@@ -254,6 +255,7 @@ interface InlineChatProps {
   emptyTitle: string
   emptySubtitle: string
   pageUrl: string
+  headers?: Record<string, string>
 }
 
 // Module-level store instances keyed by apiEndpoint — survives StrictMode
@@ -279,6 +281,7 @@ export function InlineChat({
   emptyTitle,
   emptySubtitle,
   pageUrl,
+  headers: extraHeaders,
 }: InlineChatProps) {
   const store = getStore(apiEndpoint)
   const { messages, streamingContent, isLoading, error, input } =
@@ -296,7 +299,7 @@ export function InlineChat({
     }
   }, [messages, streamingContent])
 
-  const send = (text?: string) => store.handleSend(apiEndpoint, resolvedPageUrl, text)
+  const send = (text?: string) => store.handleSend(apiEndpoint, resolvedPageUrl, text, extraHeaders)
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">

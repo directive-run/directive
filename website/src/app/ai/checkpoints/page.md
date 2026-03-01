@@ -110,15 +110,7 @@ Captures: agent index, current input, results collected so far.
 ### Supervisor
 
 ```typescript
-const result = await orchestrator.runSupervisor(
-  'manager',
-  ['researcher', 'writer'],
-  'Research and write about AI',
-  {
-    maxRounds: 5,
-    checkpoint: { everyN: 2 },
-  },
-);
+const result = await orchestrator.runPattern('managed', 'Research and write about AI');
 ```
 
 Captures: round number, supervisor output, worker results, current input.
@@ -159,19 +151,7 @@ Captures: round number, current input, proposals and judgements per round, token
 ### DAG
 
 ```typescript
-const result = await orchestrator.runDag(
-  {
-    fetch: { agent: 'fetcher' },
-    analyze: { agent: 'analyzer', deps: ['fetch'] },
-    summarize: { agent: 'summarizer', deps: ['fetch'] },
-    report: { agent: 'reporter', deps: ['analyze', 'summarize'] },
-  },
-  'Research AI safety',
-  (context) => context.outputs.report,
-  {
-    checkpoint: { everyN: 2 },
-  },
-);
+const result = await orchestrator.runPattern('pipeline', 'Research AI safety');
 ```
 
 Captures: per-node statuses, outputs, errors, node results, completed count, original input.
@@ -215,6 +195,7 @@ await store.save(checkpoint);
 const loaded = await store.load(checkpoint.id);
 const all = await store.list();
 await store.delete(checkpoint.id);
+const pruned = await store.prune();  // Remove expired checkpoints; returns number deleted
 await store.clear();
 ```
 
@@ -246,6 +227,12 @@ const store: CheckpointStore = {
   },
   clear: async () => {
     await db.deleteAll('checkpoints');
+  },
+  prune: async () => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7-day retention
+    const deleted = await db.delete('checkpoints', { createdAt: { $lt: new Date(cutoff).toISOString() } });
+
+    return deleted;
   },
 };
 ```
@@ -480,6 +467,17 @@ const restores = timeline.getEventsByType('checkpoint_restore');
 | `resumeDag(state, pattern, options?)` | DAG |
 | `resumeGoal(state, pattern)` | Goal |
 | `replay(checkpointId, pattern, options?)` | Auto-detect |
+
+### `CheckpointStore` Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `save(checkpoint)` | `Promise<string>` | Persist a checkpoint, returns its ID |
+| `load(id)` | `Promise<Checkpoint \| null>` | Load a checkpoint by ID |
+| `list()` | `Promise<Array<{ id, label?, createdAt }>>` | List all stored checkpoints |
+| `delete(id)` | `Promise<boolean>` | Delete a single checkpoint |
+| `prune()` | `Promise<number>` | Remove expired checkpoints based on retention policy; returns count deleted |
+| `clear()` | `Promise<void>` | Delete all checkpoints |
 
 ### Types
 

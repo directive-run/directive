@@ -24,7 +24,7 @@ export interface DebugEvent {
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'waiting'
 
-// Phase 5: Breakpoint definition for pause-on-event
+// Breakpoint definition for pause-on-event
 export interface BreakpointDef {
   id: string
   label: string

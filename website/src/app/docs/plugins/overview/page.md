@@ -39,6 +39,15 @@ system.start();
 | `persistencePlugin(options)` | `@directive-run/core/plugins` | Save and restore facts to storage |
 | `performancePlugin(options?)` | `@directive-run/core/plugins` | Track constraint, resolver, effect, and reconciliation metrics |
 
+## Standalone Utilities
+
+These are standalone utilities imported from `@directive-run/core/plugins`. They integrate with the system but are **not** passed to the `plugins` array.
+
+| Utility | Import | Purpose |
+|---------|--------|---------|
+| `createCircuitBreaker(config?)` | `@directive-run/core/plugins` | Fault isolation with automatic recovery for failing operations |
+| `createObservability(config?)` | `@directive-run/core/plugins` | Metrics collection, dashboards, and alert thresholds |
+
 ---
 
 ## Plugin Order
@@ -165,6 +174,12 @@ Every hook is optional. Implement only the ones you need.
 | `onSnapshot` | `(snapshot: { id, timestamp, facts, trigger })` | A time-travel snapshot is captured |
 | `onTimeTravel` | `(from, to)` | Time-travel navigation occurs |
 
+### Run History Hooks
+
+| Hook | Parameters | When it fires |
+|------|------------|---------------|
+| `onRunComplete` | `(run: RunChangelogEntry)` | A run finalizes (all resolvers settled). Requires `debug.runHistory` to be enabled. |
+
 ### Error Boundary Hooks
 
 | Hook | Parameters | When it fires |
@@ -198,4 +213,6 @@ const flakyPlugin: Plugin = {
 - [DevTools](/docs/plugins/devtools) – Browser integration
 - [Persistence](/docs/plugins/persistence) – State storage
 - [Performance](/docs/plugins/performance) – Runtime metrics
+- [Circuit Breaker](/docs/plugins/circuit-breaker) – Fault isolation and recovery
+- [Observability](/docs/plugins/observability) – Metrics, tracing, and alerts
 - [Custom Plugins](/docs/plugins/custom) – Building your own

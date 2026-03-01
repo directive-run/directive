@@ -198,6 +198,9 @@ export function createEngine<S extends Schema>(
 		onRecovery: (error, strategy) => pluginManager.emitErrorRecovery(error, strategy),
 	});
 
+	// Retry-later polling timer
+	let retryLaterTimer: ReturnType<typeof setInterval> | null = null;
+
 	// Create facts store and proxy
 	// Note: We need to create a local invalidate function that will be set after derivationsManager is created
 	let invalidateDerivation: (key: string) => void = () => {};
@@ -308,7 +311,11 @@ export function createEngine<S extends Schema>(
 		},
 		onInvalidate: (id) => pluginManager.emitDerivationInvalidate(id),
 		onError: (id, error) => {
-			errorBoundary.handleError("derivation", id, error);
+			const strategy = errorBoundary.handleError("derivation", id, error);
+
+			if (strategy === "retry") {
+				derivationsManager.invalidate(id);
+			}
 		},
 	});
 
@@ -331,10 +338,20 @@ export function createEngine<S extends Schema>(
 			}
 		},
 		onError: (id, error) => {
-			errorBoundary.handleError("effect", id, error);
+			const strategy = errorBoundary.handleError("effect", id, error);
 			pluginManager.emitEffectError(id, error);
+
 			if (currentRun) {
 				currentRun.effectErrors.push({ id, error: String(error) });
+			}
+
+			if (strategy === "disable") {
+				effectsManager.disable(id);
+			}
+
+			if (strategy === "retry") {
+				state.changedKeys.add("*");
+				scheduleReconcile();
 			}
 		},
 	});
@@ -345,8 +362,12 @@ export function createEngine<S extends Schema>(
 		facts,
 		onEvaluate: (id, active) => pluginManager.emitConstraintEvaluate(id, active),
 		onError: (id, error) => {
-			errorBoundary.handleError("constraint", id, error);
+			const strategy = errorBoundary.handleError("constraint", id, error);
 			pluginManager.emitConstraintError(id, error);
+
+			if (strategy === "disable") {
+				constraintsManager.disable(id);
+			}
 		},
 	});
 
@@ -474,6 +495,7 @@ export function createEngine<S extends Schema>(
 		store,
 		onStart: (resolver, req) => pluginManager.emitResolverStart(resolver, req),
 		onComplete: (resolver, req, duration) => {
+			errorBoundary.clearRetryAttempts(resolver);
 			pluginManager.emitResolverComplete(resolver, req, duration);
 			pluginManager.emitRequirementMet(req, resolver);
 			// Mark the constraint as resolved for `after` ordering
@@ -491,8 +513,24 @@ export function createEngine<S extends Schema>(
 			}
 		},
 		onError: (resolver, req, error) => {
-			errorBoundary.handleError("resolver", resolver, error, req);
+			const strategy = errorBoundary.handleError("resolver", resolver, error, req);
 			pluginManager.emitResolverError(resolver, req, error);
+
+			if (strategy === "disable") {
+				constraintsManager.disable(req.fromConstraint);
+			}
+
+			if (strategy === "retry-later") {
+				const pending = errorBoundary.getRetryLaterManager().getPendingRetries();
+				const entry = pending.find(p => p.sourceId === resolver);
+
+				if (entry && !entry.callback) {
+					entry.callback = () => {
+						scheduleReconcile();
+					};
+				}
+			}
+
 			// Attribute error to the run that started this resolver
 			if (runHistoryEnabled) {
 				const runId = resolverRunMap.get(req.id);
@@ -988,6 +1026,23 @@ export function createEngine<S extends Schema>(
 			// Emit start event
 			pluginManager.emitStart(system);
 
+			// Start retry-later polling timer if configured
+			if (config.errorBoundary?.retryLater && !retryLaterTimer) {
+				const intervalMs = Math.max(config.errorBoundary.retryLater.delayMs ?? 1000, 250);
+
+				retryLaterTimer = setInterval(() => {
+					const dueRetries = errorBoundary.processDueRetries();
+
+					for (const entry of dueRetries) {
+						if (entry.callback) {
+							entry.callback();
+						} else {
+							scheduleReconcile();
+						}
+					}
+				}, Math.min(intervalMs, 500));
+			}
+
 			// Initial reconcile (now that all modules are initialized)
 			scheduleReconcile();
 		},
@@ -995,6 +1050,13 @@ export function createEngine<S extends Schema>(
 		stop(): void {
 			if (!state.isRunning) return;
 			state.isRunning = false;
+
+			// Stop retry-later timer
+			if (retryLaterTimer !== null) {
+				clearInterval(retryLaterTimer);
+				retryLaterTimer = null;
+			}
+			errorBoundary.getRetryLaterManager().clearAll();
 
 			// Cancel all resolvers
 			resolversManager.cancelAll();

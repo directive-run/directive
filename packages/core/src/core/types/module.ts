@@ -16,6 +16,7 @@ import type {
 import type { Facts } from "./facts.js";
 import type { EffectsDef, EffectCleanup } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
+import type { RetryPolicy, BatchConfig, BatchResolveResults } from "./resolvers.js";
 import type { System } from "./system.js";
 import type {
 	CrossModuleDeps,
@@ -120,7 +121,7 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
 	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
 	 * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
 	 * If a dependency's resolver fails, this constraint remains blocked.
-	 * Cross-module: use "moduleName.constraintName" format.
+	 * Cross-module: use "moduleName::constraintName" format (after references are not auto-prefixed).
 	 */
 	after?: string[];
 	/**
@@ -169,7 +170,7 @@ export interface CrossModuleConstraintDef<
 	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
 	 * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
 	 * If a dependency's resolver fails, this constraint remains blocked.
-	 * Cross-module: use "moduleName.constraintName" format.
+	 * Cross-module: use "moduleName::constraintName" format (after references are not auto-prefixed).
 	 */
 	after?: string[];
 	/**
@@ -248,16 +249,6 @@ export type CrossModuleDerivationsDef<
 // ============================================================================
 
 /**
- * Retry policy configuration.
- */
-export interface RetryPolicy {
-	attempts: number;
-	backoff: "none" | "linear" | "exponential";
-	initialDelay?: number;
-	maxDelay?: number;
-}
-
-/**
  * Resolver context with typed facts.
  */
 export interface TypedResolverContext<M extends ModuleSchema> {
@@ -283,8 +274,14 @@ export interface TypedResolverDef<M extends ModuleSchema, T extends keyof GetReq
 	retry?: RetryPolicy;
 	/** Timeout for resolver execution (ms) */
 	timeout?: number;
-	/** Resolve function */
-	resolve: (req: ExtractRequirement<M, T>, ctx: TypedResolverContext<M>) => Promise<void>;
+	/** Batch configuration */
+	batch?: BatchConfig;
+	/** Resolve function for single requirement */
+	resolve?: (req: ExtractRequirement<M, T>, ctx: TypedResolverContext<M>) => Promise<void>;
+	/** Resolve function for batched requirements (all-or-nothing) */
+	resolveBatch?: (reqs: ExtractRequirement<M, T>[], ctx: TypedResolverContext<M>) => Promise<void>;
+	/** Resolve function for batched requirements with per-item results */
+	resolveBatchWithResults?: (reqs: ExtractRequirement<M, T>[], ctx: TypedResolverContext<M>) => Promise<BatchResolveResults>;
 }
 
 /**

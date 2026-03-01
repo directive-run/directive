@@ -1,4 +1,4 @@
-// M3: Shared empty state component (replaces 8 duplicate patterns)
+// Shared empty state component (replaces 8 duplicate patterns)
 
 interface EmptyStateProps {
   message: string
@@ -8,7 +8,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ message, icon, action }: EmptyStateProps) {
   return (
-    <div className="flex h-48 flex-col items-center justify-center gap-3 text-center">
+    <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-center">
       {icon && (
         <div className="text-zinc-300 dark:text-zinc-600">{icon}</div>
       )}

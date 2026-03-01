@@ -192,7 +192,7 @@ orchestrator.restore(checkpoint, {
 interface Checkpoint {
   version: 1;
   id: string;
-  createdAt: number;
+  createdAt: string;
   label?: string;
   systemExport: string;        // Serialized Directive System state
   timelineExport: string;      // Serialized timeline events

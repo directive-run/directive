@@ -101,7 +101,7 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
 
       {isOpen && (
         <div
-          className="absolute top-full right-0 mt-3 max-h-[calc(100vh-8rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-white p-4 shadow-md ring-1 shadow-black/5 ring-black/5 dark:bg-slate-800 dark:ring-white/5"
+          className="absolute top-full right-0 mt-3 max-h-[calc(100vh-8rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-white p-4 shadow-md ring-1 shadow-black/5 ring-black/5 max-sm:fixed max-sm:top-16 max-sm:right-4 dark:bg-slate-800 dark:ring-white/5"
           role="dialog"
           aria-label="Labs"
         >

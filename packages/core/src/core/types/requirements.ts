@@ -104,7 +104,7 @@ export interface ConstraintDef<S extends Schema, R extends Requirement = Require
 	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
 	 * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
 	 * If a dependency's resolver fails, this constraint remains blocked.
-	 * Cross-module: use "moduleName.constraintName" format.
+	 * Cross-module: use "moduleName::constraintName" format (after references are not auto-prefixed).
 	 */
 	after?: string[];
 	/**

@@ -27,7 +27,7 @@ function executeSearch(
     return null;
   }
 
-  // M4: Reject oversized patterns
+  // Reject oversized patterns
   if (term.length > 200) {
     return { matches: new Set(), isInvalid: true };
   }

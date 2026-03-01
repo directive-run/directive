@@ -52,6 +52,34 @@ const result = await orchestrator.runPattern('pipeline', 'Write about WASM');
 | `debate` | Adversarial refinement | Multiple + judge | Winner per round |
 | `goal` | Desired-state goal resolution | Any topology | Achieved facts |
 
+### Comparison Matrix
+
+| Pattern | Execution | Latency | Cost | Feedback Loop | Fault Recovery | State Sharing |
+|---------|-----------|---------|------|---------------|----------------|---------------|
+| `parallel` | Concurrent | Low | High (N agents) | No | Fail partial | None |
+| `sequential` | Linear | High | Low–Med | No | Fail-stop | Output chaining |
+| `supervisor` | Dynamic | Medium | Medium | Yes (supervisor) | Retry via supervisor | Via supervisor |
+| `dag` | Concurrent + deps | Medium | Medium | No | Per-node retry | Dep outputs |
+| `race` | Concurrent | Lowest | Highest (wasted) | No | First success | None |
+| `reflect` | Iterative | High | Medium | Yes (evaluator) | Score threshold | Agent ↔ evaluator |
+| `debate` | Round-based | High | High | Yes (judge) | Per-round | Proposals shared |
+| `goal` | Adaptive | Variable | Variable | Yes (satisfaction) | Relaxation tiers | Shared facts |
+
+### Decision Tree
+
+{% callout type="note" title="Which pattern should I use?" %}
+- **Do you know the execution order?**
+  - **Yes, linear** → `sequential`
+  - **Yes, with dependencies** → `dag`
+  - **No, agent decides** → `supervisor`
+- **Do you want self-improvement?**
+  - **Score and iterate** → `reflect`
+  - **Adversarial refinement** → `debate`
+- **Do you want the fastest result?** → `race`
+- **Do you want concurrent independent work?** → `parallel`
+- **Do you want to declare a goal and let the runtime figure it out?** → `goal`
+{% /callout %}
+
 ---
 
 ## Parallel
@@ -221,20 +249,10 @@ const result = await orchestrator.runPattern('managed', 'Research and write abou
 
 ### Imperative
 
+Supervisor runs through `runPattern()` (no dedicated imperative method):
+
 ```typescript
-const result = await orchestrator.runSupervisor(
-  'manager',
-  ['researcher', 'writer'],
-  'Research and write about WASM',
-  {
-    maxRounds: 5,
-    extract: (supervisorOutput, workerResults) => ({
-      answer: supervisorOutput,
-      sources: collectOutputs(workerResults),
-      tokens: aggregateTokens(workerResults),
-    }),
-  }
-);
+const result = await orchestrator.runPattern('managed', 'Research and write about WASM');
 ```
 
 ### How the Loop Works
@@ -253,6 +271,7 @@ The supervisor validates worker names. Delegating to an unregistered worker thro
 |--------|------|---------|-------------|
 | `maxRounds` | `number` | `5` | Maximum delegation rounds |
 | `extract` | `(output, workerResults) => T` | identity | Extract final result |
+| `checkpoint` | `PatternCheckpointConfig` | &ndash; | Save/resume mid-pattern state |
 
 ---
 
@@ -293,19 +312,20 @@ const result = await orchestrator.runPattern('pipeline', 'Research, analyze, and
 
 ### Imperative
 
+DAG runs through `runPattern()` (no dedicated imperative method):
+
 ```typescript
-const result = await orchestrator.runDag(
-  {
-    researcher: { agent: 'researcher' },
-    analyst: { agent: 'analyst', deps: ['researcher'] },
-    writer: { agent: 'writer', deps: ['researcher'] },
-    editor: { agent: 'editor', deps: ['analyst', 'writer'] },
-  },
-  'Research, analyze, and write about WASM',
-  (context) => concatResults(Object.values(context.results).map((r) => String(r.output))),
-  { timeout: 60000 }
-);
+const result = await orchestrator.runPattern('pipeline', 'Research, analyze, and write about WASM');
 ```
+
+### DAG Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `timeout` | `number` | &ndash; | Overall DAG timeout (ms) |
+| `maxConcurrent` | `number` | `Infinity` | Maximum nodes running concurrently (helps avoid API rate limits) |
+| `onNodeError` | `'fail' \| 'skip-downstream' \| 'continue'` | `'fail'` | Error handling strategy |
+| `checkpoint` | `PatternCheckpointConfig` | &ndash; | Save/resume mid-pattern state |
 
 ### DagNode
 

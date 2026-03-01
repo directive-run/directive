@@ -401,9 +401,6 @@ importers:
 
   examples/fraud-analysis:
     dependencies:
-      '@directive-run/ai':
-        specifier: workspace:*
-        version: link:../../packages/ai
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core

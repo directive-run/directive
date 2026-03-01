@@ -25,17 +25,17 @@ They compose inside a **module**, which is created and run as a **system**. See 
 ## How They Relate
 
 ```
-                         ┌──────────────┐
-              ┌─────────►│  Derivations │
-              │          └──────────────┘
+                                   ┌──────────────┐
+              ┌───────────────────►│  Derivations │
+              │                    └──────────────┘
               │
-    ┌─────────┴─────────┐          ┌──────────────┐         ┌──────────────┐
-    │       Facts       │─────────►│  Constraints │────────►│  Resolvers   │
-    └─────────┬─────────┘          └──────────────┘         └──────┬───────┘
-              │                                                    │
-              │          ┌──────────────┐                          │
-              └─────────►│   Effects    │            mutate facts ◄┘
-                         └──────────────┘
+    ┌─────────┴─────────┐          ┌──────────────┐             ┌──────────────┐
+    │       Facts       │─────────►│  Constraints │────────────►│  Resolvers   │
+    └─────────┬─────────┘          └──────────────┘             └──────┬───────┘
+              │                                                        │
+              │                    ┌──────────────┐                    │
+              └───────────────────►│   Effects    │      mutate facts ◄┘
+                                   └──────────────┘
 ```
 
 1. **Facts** hold state. When facts change, everything downstream re-evaluates.

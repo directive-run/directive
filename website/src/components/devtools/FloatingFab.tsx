@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from '@directive-run/react'
+import { useCanUseChat } from '@/lib/feature-flags'
 import { useDevToolsSystem } from './DevToolsSystemContext'
 import { DirectiveLogomark } from './DirectiveLogomark'
 import { Z_FAB } from './z-index'
@@ -45,6 +46,8 @@ export function FloatingFab({ offset }: FloatingFabProps) {
     }
   }, [])
 
+  const canUseChat = useCanUseChat()
+
   // Hide FAB when drawer is open — after all hooks
   if (drawerOpen) {
     return null
@@ -61,9 +64,12 @@ export function FloatingFab({ offset }: FloatingFabProps) {
 
   const statusLabel = isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'
 
+  // Chat button: h-14 (56px) at bottom-6 (24px). Add 12px gap.
+  const chatOffset = canUseChat ? 24 + 56 + 12 : 0
+
   // Next.js dev indicator sits at bottom-left — bump FAB up to avoid overlap
   const isDev = process.env.NODE_ENV === 'development'
-  const defaultBottom = isDev ? 72 : 24
+  const defaultBottom = Math.max(isDev ? 72 : 24, chatOffset)
 
   return (
     <button

@@ -201,6 +201,125 @@ const snapshot = system.getSnapshot();
 system.restore(snapshot);
 ```
 
+### Lifecycle
+
+```typescript
+// Initialize facts/derivations without starting reconciliation (SSR-safe)
+system.initialize();
+
+// Start the reconciliation loop
+system.start();
+
+// Wait for the first reconciliation to complete
+await system.whenReady();
+
+// Stop the reconciliation loop (can be restarted)
+system.stop();
+
+// Clean up all resources (irreversible)
+system.destroy();
+```
+
+### State Flags
+
+```typescript
+system.isRunning;      // Whether reconciliation is currently active
+system.isSettled;       // Whether all resolvers have completed
+system.isInitialized;  // Whether all modules completed initialization
+system.isReady;        // Whether system completed first reconciliation
+
+// Subscribe to settled state changes
+const unsub = system.onSettledChange(() => {
+  console.log('Settled:', system.isSettled);
+});
+```
+
+### Runtime Control
+
+Disable or enable individual constraints and effects at runtime:
+
+```typescript
+// Constraints
+system.constraints.disable("expensiveCheck");
+system.constraints.enable("expensiveCheck");
+system.constraints.isDisabled("expensiveCheck"); // boolean
+
+// Effects
+system.effects.disable("analytics");
+system.effects.enable("analytics");
+system.effects.isEnabled("analytics"); // boolean
+```
+
+See [Constraints](/docs/constraints) and [Effects](/docs/effects) for details.
+
+### Inspection
+
+```typescript
+// Read a derivation programmatically
+const value = system.read("displayName");
+
+// Get detailed system state
+const info = system.inspect();
+// { unmet, inflight, constraints, resolvers, runHistory? }
+
+// Explain why a requirement exists
+const reason = system.explain(requirementId);
+```
+
+### Distributable Snapshots
+
+Export derivation data for caching (Redis, JWT, edge KV):
+
+```typescript
+const snap = system.getDistributableSnapshot({
+  includeDerivations: ['effectivePlan'],
+  ttlSeconds: 3600,
+});
+
+// Watch for changes
+const unsub = system.watchDistributableSnapshot(
+  { includeDerivations: ['effectivePlan'] },
+  (snapshot) => cache.set('plan', snapshot),
+);
+```
+
+See [Snapshots](/docs/advanced/snapshots) for full options.
+
+### Run History
+
+When `debug.runHistory` is enabled, the system tracks per-run changelogs:
+
+```typescript
+const system = createSystem({
+  module: myModule,
+  debug: { runHistory: true },
+});
+
+// Access the run changelog
+system.runHistory; // RunChangelogEntry[] | null
+```
+
+### Time-Travel
+
+When `debug.timeTravel` is enabled, `system.debug` exposes the full time-travel API:
+
+```typescript
+const system = createSystem({
+  module: myModule,
+  debug: { timeTravel: true },
+});
+
+system.debug?.goBack();
+system.debug?.goForward();
+
+// Subscribe to time-travel changes
+const unsub = system.onTimeTravelChange(() => {
+  console.log('Snapshot index:', system.debug?.currentIndex);
+});
+```
+
+See [Time-Travel](/docs/advanced/time-travel) for the full API.
+
 ---
 
 ## Multi-Module Systems

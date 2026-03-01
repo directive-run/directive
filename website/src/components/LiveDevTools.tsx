@@ -95,7 +95,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   // Thin EventSource bridge — all state lives in the system
   const { reconnect } = useDevToolsStream()
 
-  // C3: Periodic poll bump to make snapshot constraint reactive
+  // Periodic poll bump to make snapshot constraint reactive
   // Gated on document.hidden to avoid unnecessary network traffic when tab is backgrounded
   useEffect(() => {
     function bump() {
@@ -226,7 +226,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     a.href = url
     a.download = `devtools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`
     a.click()
-    // M7: Delay revocation so browsers can start the download
+    // Delay revocation so browsers can start the download
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }, [system])
 
@@ -236,7 +236,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     fileInputRef.current?.click()
   }, [])
 
-  // C4: Use replaceEvents for atomic import (no intermediate empty state)
+  // Use replaceEvents for atomic import (no intermediate empty state)
   const MAX_IMPORT_SIZE = 10 * 1024 * 1024 // 10 MB
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -282,7 +282,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     e.target.value = ''
   }, [system])
 
-  // Phase 4: Share replay URL — reads events lazily
+  // Share replay URL — reads events lazily
   const handleShare = useCallback(() => {
     const currentEvents = system.read<DebugEvent[]>('connection.events')
     if (!currentEvents || currentEvents.length === 0) {

@@ -7,14 +7,14 @@ import { useDevToolsSystem } from '../DevToolsSystemContext'
 import { GUARDRAIL_INFO } from '../constants'
 import { EmptyState } from '../EmptyState'
 
-// C3: Guardrail aggregation wrapped in useMemo
+// Guardrail aggregation wrapped in useMemo
 
 export function GuardrailsView() {
   const system = useDevToolsSystem()
   const events = useSelector(system, (s) => s.facts.connection.events)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // C3: Memoize guardrail filtering and aggregation
+  // Memoize guardrail filtering and aggregation
   const { guardrailEvents, guardrails, totalChecks, totalBlocked, passRate } = useMemo(() => {
     const gEvents = events.filter((e) => e.type === 'guardrail_check')
 

@@ -11,7 +11,7 @@ function mockAgent(name = "test-agent") {
 }
 
 // ============================================================================
-// C1: budgetWarningThreshold / onBudgetWarning
+// budgetWarningThreshold / onBudgetWarning
 // ============================================================================
 
 describe("budgetWarningThreshold / onBudgetWarning (C1)", () => {
@@ -145,7 +145,7 @@ describe("budgetWarningThreshold / onBudgetWarning (C1)", () => {
 });
 
 // ============================================================================
-// C2: totalTokens convenience property
+// totalTokens convenience property
 // ============================================================================
 
 describe("totalTokens convenience property (C2)", () => {
@@ -184,7 +184,7 @@ describe("totalTokens convenience property (C2)", () => {
 });
 
 // ============================================================================
-// H1: waitForIdle
+// waitForIdle
 // ============================================================================
 
 describe("waitForIdle (H1)", () => {
@@ -234,7 +234,7 @@ describe("waitForIdle (H1)", () => {
 });
 
 // ============================================================================
-// M1: agentId in onGuardrailCheck hook
+// agentId in onGuardrailCheck hook
 // ============================================================================
 
 describe("agentId in onGuardrailCheck (M1)", () => {

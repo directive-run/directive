@@ -87,7 +87,7 @@ describe("replay visibleEvents slicing", () => {
     expect(visibleEvents).toHaveLength(6); // 0 through 5 inclusive
   });
 
-  it("shows 1 event when cursor is at start (M8 fix)", () => {
+  it("shows 1 event when cursor is at start", () => {
     const events = makeEvents(10);
     const active = true;
     const clampedIndex = 0;
