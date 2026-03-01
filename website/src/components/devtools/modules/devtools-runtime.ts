@@ -439,8 +439,7 @@ export const devtoolsRuntime = createModule('runtime', {
               let conditionMet = true
               if (bpCondition) {
                 try {
-                  const fn = new Function('newValue', 'oldValue', `return (${bpCondition})`)
-                  conditionMet = !!fn(newValue, oldValue)
+                  conditionMet = evaluateBreakpointCondition(bpCondition, { newValue, oldValue })
                 } catch {
                   conditionMet = false
                 }
@@ -505,8 +504,7 @@ function checkEventBreakpoints(facts: Record<string, any>, event: { type: string
     let conditionMet = true
     if (bp.condition) {
       try {
-        const fn = new Function('data', 'type', `return (${bp.condition})`)
-        conditionMet = !!fn(event, event.type)
+        conditionMet = evaluateBreakpointCondition(bp.condition, { data: event, type: event.type })
       } catch {
         conditionMet = false
       }
@@ -538,6 +536,38 @@ function checkEventBreakpoints(facts: Record<string, any>, event: { type: string
         }
       }
     }
+  }
+}
+
+/**
+ * Safe expression evaluator for breakpoint conditions.
+ * Only allows simple comparisons and property access — no function calls,
+ * assignments, or arbitrary code execution.
+ */
+const SAFE_CONDITION_RE = /^[\w\s.!<>=&|?:'"()\-+*/\[\],%]+$/
+function evaluateBreakpointCondition(
+  condition: string,
+  vars: Record<string, unknown>,
+): boolean {
+  // Block anything that could execute arbitrary code
+  if (
+    !SAFE_CONDITION_RE.test(condition) ||
+    /\b(function|=>|import|require|eval|new |class |delete |void |typeof |with |yield )\b/.test(condition)
+  ) {
+    return false
+  }
+  // Cap length to prevent abuse
+  if (condition.length > 200) {
+    return false
+  }
+  try {
+    const keys = Object.keys(vars)
+    const values = keys.map((k) => vars[k])
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(...keys, `"use strict"; return (${condition})`)
+    return !!fn(...values)
+  } catch {
+    return false
   }
 }
 

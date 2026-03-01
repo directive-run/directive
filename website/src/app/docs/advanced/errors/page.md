@@ -147,9 +147,13 @@ When a resolver exceeds its timeout, it is aborted via the `context.signal` (an 
 ```typescript
 resolve: async (req, context) => {
   // Pass the abort signal to fetch so the request cancels on timeout
-  const res = await fetch(`/api/data/${req.id}`, {
+  const res = await fetch(`/api/data/${encodeURIComponent(req.id)}`, {
     signal: context.signal,
   });
+
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
 
   context.facts.data = await res.json();
 },

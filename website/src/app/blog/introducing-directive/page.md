@@ -202,17 +202,23 @@ resolvers: {
     timeout: 10000,
     retry: { attempts: 3, backoff: 'exponential', initialDelay: 500 },
     resolve: async (req, context) => {
-      const user = await fetch(`/api/users/${req.userId}`)
-        .then((r) => r.json());
-      context.facts.user = user;
+      const res = await fetch(`/api/users/${encodeURIComponent(req.userId)}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch user: ${res.status}`);
+      }
+
+      context.facts.user = await res.json();
     },
   },
   fetchPreferences: {
     requirement: 'FETCH_PREFERENCES',
     resolve: async (req, context) => {
-      const prefs = await fetch(`/api/users/${req.userId}/preferences`)
-        .then((r) => r.json());
-      context.facts.preferences = prefs;
+      const res = await fetch(`/api/users/${encodeURIComponent(req.userId)}/preferences`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch preferences: ${res.status}`);
+      }
+
+      context.facts.preferences = await res.json();
     },
   },
 },
@@ -391,17 +397,23 @@ const userProfile = createModule("user-profile", {
       requirement: 'FETCH_USER',
       retry: { attempts: 3, backoff: 'exponential', initialDelay: 500 },
       resolve: async (req, context) => {
-        const user = await fetch(`/api/users/${req.userId}`)
-          .then((r) => r.json());
-        context.facts.user = user;
+        const res = await fetch(`/api/users/${encodeURIComponent(req.userId)}`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch user: ${res.status}`);
+        }
+
+        context.facts.user = await res.json();
       },
     },
     fetchPreferences: {
       requirement: 'FETCH_PREFERENCES',
       resolve: async (req, context) => {
-        const prefs = await fetch(`/api/users/${req.userId}/preferences`)
-          .then((r) => r.json());
-        context.facts.preferences = prefs;
+        const res = await fetch(`/api/users/${encodeURIComponent(req.userId)}/preferences`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch preferences: ${res.status}`);
+        }
+
+        context.facts.preferences = await res.json();
       },
     },
   },

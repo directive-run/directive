@@ -25,15 +25,40 @@ interface CartItem {
   maxStock: number;
 }
 
+// Define authSchema first so cart can reference it via crossModuleDeps
+const authSchema = {
+  facts: {
+    isAuthenticated: t.boolean(),
+    userId: t.string(),
+  },
+  derivations: {
+    isAuthenticated: t.boolean(),
+  },
+};
+
 const cart = createModule('cart', {
   schema: {
-    items: t.object<CartItem[]>(),
-    couponCode: t.string(),
-    couponDiscount: t.number(),
-    couponStatus: t.string<'idle' | 'checking' | 'valid' | 'invalid'>(),
-    checkoutRequested: t.boolean(),
-    checkoutStatus: t.string<'idle' | 'processing' | 'complete' | 'failed'>(),
+    facts: {
+      items: t.object<CartItem[]>(),
+      couponCode: t.string(),
+      couponDiscount: t.number(),
+      couponStatus: t.string<'idle' | 'checking' | 'valid' | 'invalid'>(),
+      checkoutRequested: t.boolean(),
+      checkoutStatus: t.string<'idle' | 'processing' | 'complete' | 'failed'>(),
+    },
+    derivations: {
+      subtotal: t.number(),
+      itemCount: t.number(),
+      isEmpty: t.boolean(),
+      discount: t.number(),
+      tax: t.number(),
+      total: t.number(),
+      hasOverstockedItem: t.boolean(),
+      freeShipping: t.boolean(),
+    },
   },
+
+  crossModuleDeps: { auth: authSchema },
 
   init: (facts) => {
     facts.items = [];
@@ -45,39 +70,38 @@ const cart = createModule('cart', {
   },
 
   derive: {
-    subtotal: (facts) => facts.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    itemCount: (facts) => facts.items.reduce((sum, item) => sum + item.quantity, 0),
-    isEmpty: (facts) => facts.items.length === 0,
-    discount: (facts) => facts.couponDiscount,
+    subtotal: (facts) => facts.self.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    itemCount: (facts) => facts.self.items.reduce((sum, item) => sum + item.quantity, 0),
+    isEmpty: (facts) => facts.self.items.length === 0,
+    discount: (facts) => facts.self.couponDiscount,
     tax: (facts, derive) => Math.round((derive.subtotal - derive.discount) * 0.08 * 100) / 100,
     total: (facts, derive) => Math.max(0, derive.subtotal - derive.discount + derive.tax),
-    hasOverstockedItem: (facts) => facts.items.some((item) => item.quantity > item.maxStock),
+    hasOverstockedItem: (facts) => facts.self.items.some((item) => item.quantity > item.maxStock),
     freeShipping: (facts, derive) => derive.subtotal >= 50,
   },
 
   constraints: {
     quantityLimit: {
       priority: 80,
-      when: (facts) => facts.items.some((item) => item.quantity > item.maxStock),
+      when: (facts) => facts.self.items.some((item) => item.quantity > item.maxStock),
       require: { type: 'ADJUST_QUANTITY' },
     },
     couponValidation: {
       priority: 70,
-      when: (facts) => facts.couponCode !== '' && facts.couponStatus === 'idle',
+      when: (facts) => facts.self.couponCode !== '' && facts.self.couponStatus === 'idle',
       require: (facts) => ({
         type: 'VALIDATE_COUPON',
-        code: facts.couponCode,
+        code: facts.self.couponCode,
       }),
     },
     checkoutReady: {
       priority: 60,
       after: ['quantityLimit', 'couponValidation'],
-      crossModuleDeps: ['auth.isAuthenticated'],
       when: (facts) => {
         return (
-          facts.checkoutRequested &&
-          facts.items.length > 0 &&
-          !facts.items.some((item) => item.quantity > item.maxStock) &&
+          facts.self.checkoutRequested &&
+          facts.self.items.length > 0 &&
+          !facts.self.items.some((item) => item.quantity > item.maxStock) &&
           facts.auth.isAuthenticated
         );
       },
@@ -172,10 +196,7 @@ const cart = createModule('cart', {
 });
 
 const auth = createModule('auth', {
-  schema: {
-    isAuthenticated: t.boolean(),
-    userId: t.string(),
-  },
+  schema: authSchema,
 
   init: (facts) => {
     facts.isAuthenticated = false;
@@ -209,7 +230,7 @@ function CartSummary({ system }) {
       {derived['cart::freeShipping'] && <p>Free shipping!</p>}
       <button
         disabled={derived['cart::isEmpty']}
-        onClick={() => system.events.requestCheckout()}
+        onClick={() => system.events.cart.requestCheckout()}
       >
         Checkout
       </button>
@@ -226,9 +247,9 @@ function CartSummary({ system }) {
 
 3. **`checkoutReady` uses `after`** — it waits for both `quantityLimit` and `couponValidation` to settle before evaluating. This ensures checkout never proceeds with invalid quantities or an unchecked coupon.
 
-4. **Cross-module auth gating** — `crossModuleDeps: ['auth.isAuthenticated']` ensures checkout only fires when the user is authenticated. Guest users see the checkout button but it won't proceed.
+4. **Module-level `crossModuleDeps`** — `crossModuleDeps: { auth: authSchema }` is declared on the cart module, giving all constraints and derivations access to `facts.auth.*`. Own-module facts are accessed via `facts.self.*` (e.g., `facts.self.items`, `facts.self.checkoutRequested`). The `authSchema` is defined above the cart module so it can be referenced. The `auth` module then reuses the same schema object: `schema: authSchema`.
 
-5. **Derivation composition** — `total` depends on `subtotal`, `discount`, and `tax`. Changing any item recalculates all three. The `freeShipping` derivation reads `subtotal` for threshold detection.
+5. **Derivation composition** — `total` depends on `subtotal`, `discount`, and `tax`. Changing any item recalculates all three. The `freeShipping` derivation reads `subtotal` for threshold detection. Note that `derive` callbacks use `facts.self.*` for own-module facts, while the `derive` parameter (e.g., `derive.subtotal`) is always scoped to the current module.
 
 6. **`devtoolsPlugin({ panel: true })`** opens the DevTools panel, showing real-time constraint evaluation, resolver status, and fact changes — invaluable for debugging business rules.
 
@@ -239,8 +260,8 @@ function CartSummary({ system }) {
 ```typescript
 derive: {
   bundleDiscount: (facts) => {
-    const hasShirt = facts.items.some((i) => i.category === 'shirts');
-    const hasPants = facts.items.some((i) => i.category === 'pants');
+    const hasShirt = facts.self.items.some((i) => i.category === 'shirts');
+    const hasPants = facts.self.items.some((i) => i.category === 'pants');
 
     return hasShirt && hasPants ? 10 : 0;
   },
@@ -253,8 +274,8 @@ derive: {
 constraints: {
   checkoutReady: {
     when: (facts) => {
-      return facts.checkoutRequested && facts.items.length > 0 && (
-        facts.auth.isAuthenticated || facts.guestEmail !== ''
+      return facts.self.checkoutRequested && facts.self.items.length > 0 && (
+        facts.auth.isAuthenticated || facts.self.guestEmail !== ''
       );
     },
     require: { type: 'PROCESS_CHECKOUT' },
@@ -267,10 +288,10 @@ constraints: {
 ```typescript
 constraints: {
   checkInventory: {
-    when: (facts) => facts.items.length > 0 && facts.inventoryStale,
+    when: (facts) => facts.self.items.length > 0 && facts.self.inventoryStale,
     require: (facts) => ({
       type: 'CHECK_INVENTORY',
-      itemIds: facts.items.map((i) => i.id),
+      itemIds: facts.self.items.map((i) => i.id),
     }),
   },
 },

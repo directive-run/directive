@@ -17,11 +17,18 @@ The auth guide shows a single-module chain. Real apps need cross-module chains: 
 import { createModule, createSystem, t } from '@directive-run/core';
 import { loggingPlugin, devtoolsPlugin } from '@directive-run/core/plugins';
 
-const auth = createModule('auth', {
-  schema: {
+const authSchema = {
+  facts: {
     token: t.string(),
     status: t.string<'idle' | 'validating' | 'valid' | 'expired'>(),
   },
+  derivations: {
+    isValid: t.boolean(),
+  },
+};
+
+const auth = createModule('auth', {
+  schema: authSchema,
 
   init: (facts) => {
     facts.token = '';
@@ -63,12 +70,22 @@ const auth = createModule('auth', {
   },
 });
 
-const permissions = createModule('permissions', {
-  schema: {
+const permissionsSchema = {
+  facts: {
     role: t.string(),
     permissions: t.object<string[]>(),
     loaded: t.boolean(),
   },
+  derivations: {
+    canEdit: t.boolean(),
+    canPublish: t.boolean(),
+    canManageUsers: t.boolean(),
+  },
+};
+
+const permissions = createModule('permissions', {
+  schema: permissionsSchema,
+  crossModuleDeps: { auth: authSchema },
 
   init: (facts) => {
     facts.role = '';
@@ -77,16 +94,15 @@ const permissions = createModule('permissions', {
   },
 
   derive: {
-    canEdit: (facts) => facts.permissions.includes('edit'),
-    canPublish: (facts) => facts.permissions.includes('publish'),
-    canManageUsers: (facts) => facts.role === 'admin',
+    canEdit: (facts) => facts.self.permissions.includes('edit'),
+    canPublish: (facts) => facts.self.permissions.includes('publish'),
+    canManageUsers: (facts) => facts.self.role === 'admin',
   },
 
   constraints: {
     loadPermissions: {
       after: ['auth::validateSession'],
-      crossModuleDeps: ['auth.isValid'],
-      when: (facts) => facts.auth.isValid && !facts.loaded,
+      when: (facts) => facts.auth.isValid && !facts.self.loaded,
       require: { type: 'LOAD_PERMISSIONS' },
     },
   },
@@ -110,9 +126,12 @@ const permissions = createModule('permissions', {
 
 const dashboard = createModule('dashboard', {
   schema: {
-    widgets: t.object<Array<{ id: string; type: string; data: unknown }>>(),
-    loaded: t.boolean(),
+    facts: {
+      widgets: t.object<Array<{ id: string; type: string; data: unknown }>>(),
+      loaded: t.boolean(),
+    },
   },
+  crossModuleDeps: { permissions: permissionsSchema },
 
   init: (facts) => {
     facts.widgets = [];
@@ -122,8 +141,7 @@ const dashboard = createModule('dashboard', {
   constraints: {
     loadDashboard: {
       after: ['permissions::loadPermissions'],
-      crossModuleDeps: ['permissions.canEdit', 'permissions.role'],
-      when: (facts) => facts.permissions.role !== '' && !facts.loaded,
+      when: (facts) => facts.permissions.role !== '' && !facts.self.loaded,
       require: (facts) => ({
         type: 'LOAD_DASHBOARD',
         role: facts.permissions.role,
@@ -187,9 +205,9 @@ function App({ system }) {
 
 1. **`after` blocks constraint evaluation** — `loadPermissions` won't even evaluate its `when` until `auth::validateSession`'s resolver has settled (fulfilled or rejected). This is a hard dependency on completion, not just on a fact value.
 
-2. **`crossModuleDeps` reads facts from other modules** — permissions reads `auth.isValid`, dashboard reads `permissions.role` and `permissions.canEdit`. These are tracked as dependencies so the constraint re-evaluates when they change.
+2. **`crossModuleDeps` enables cross-module access** — declared at the module level, it gives constraints, derivations, and effects typed access to other modules' facts via `facts.{dep}.*`. Own module facts are accessed via `facts.self.*`. Permissions reads `facts.auth.isValid`, dashboard reads `facts.permissions.role`.
 
-3. **`after` vs `crossModuleDeps`** — `after` is about _ordering_ (wait for that constraint's resolver to finish). `crossModuleDeps` is about _data_ (read facts from other modules). You often use both together: wait for auth to finish (`after`), then check if it succeeded (`crossModuleDeps`).
+3. **`after` vs `crossModuleDeps`** — `after` is about _ordering_ (wait for that constraint's resolver to finish). `crossModuleDeps` is about _data_ (read facts and derivations from other modules). You often use both together: wait for auth to finish (`after`), then check if it succeeded (`facts.auth.isValid`).
 
 4. **Error propagation** — if `validateSession` throws (after retries), it stays in rejected state. `loadPermissions` never evaluates because `auth.isValid` is false. `loadDashboard` is doubly blocked: its `after` dependency (`loadPermissions`) never ran.
 

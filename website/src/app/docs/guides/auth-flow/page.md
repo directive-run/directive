@@ -18,11 +18,18 @@ import { createModule, t } from '@directive-run/core';
 
 const auth = createModule('auth', {
   schema: {
-    token: t.string().optional(),
-    refreshToken: t.string().optional(),
-    expiresAt: t.number(),
-    user: t.object<{ id: string; role: string }>().optional(),
-    status: t.string<'idle' | 'authenticating' | 'authenticated' | 'expired'>(),
+    facts: {
+      token: t.string().optional(),
+      refreshToken: t.string().optional(),
+      expiresAt: t.number(),
+      user: t.object<{ id: string; role: string }>().optional(),
+      status: t.string<'idle' | 'authenticating' | 'authenticated' | 'expired'>(),
+    },
+    derivations: {
+      isAuthenticated: t.boolean(),
+      isExpiringSoon: t.boolean(),
+      canRefresh: t.boolean(),
+    },
   },
 
   init: (facts) => {
@@ -218,11 +225,27 @@ function logout(system) {
 
 ```typescript
 // In another module, gate on auth
+const authSchema = {
+  facts: {
+    token: t.string().optional(),
+    status: t.string<'idle' | 'authenticating' | 'authenticated' | 'expired'>(),
+  },
+  derivations: {
+    isAuthenticated: t.boolean(),
+  },
+};
+
 const cart = createModule('cart', {
+  schema: {
+    facts: {
+      items: t.array<{ id: string; price: number }>(),
+    },
+  },
+  crossModuleDeps: { auth: authSchema },
+
   constraints: {
     checkout: {
-      crossModuleDeps: ['auth.isAuthenticated'],
-      when: (facts, derive, cross) => cross.auth.isAuthenticated && facts.items.length > 0,
+      when: (facts) => facts.auth.isAuthenticated && facts.self.items.length > 0,
       require: { type: 'CHECKOUT' },
     },
   },

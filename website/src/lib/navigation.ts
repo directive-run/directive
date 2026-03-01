@@ -95,7 +95,7 @@ export const docsNavigation: NavigationSection[] = [
   {
     title: 'Examples',
     links: [
-      { title: 'Counter', href: '/docs/examples/counter' },
+      { title: 'Number Match', href: '/docs/examples/counter' },
       { title: 'Auth Flow', href: '/docs/examples/auth-flow' },
       { title: 'Shopping Cart', href: '/docs/examples/shopping-cart' },
       { title: 'Async Chains', href: '/docs/examples/async-chains' },

@@ -17,8 +17,8 @@ The form validation example covers single-page forms. Multi-step wizards need: p
 import { createModule, createSystem, t } from '@directive-run/core';
 import { persistencePlugin } from '@directive-run/core/plugins';
 
-const wizard = createModule('wizard', {
-  schema: {
+const wizardSchema = {
+  facts: {
     currentStep: t.number(),
     totalSteps: t.number(),
     advanceRequested: t.boolean(),
@@ -32,6 +32,19 @@ const wizard = createModule('wizard', {
     plan: t.string<'free' | 'pro' | 'enterprise'>(),
     newsletter: t.boolean(),
   },
+  derivations: {
+    step0Valid: t.boolean(),
+    step1Valid: t.boolean(),
+    step2Valid: t.boolean(),
+    currentStepValid: t.boolean(),
+    canAdvance: t.boolean(),
+    canGoBack: t.boolean(),
+    progress: t.number(),
+  },
+};
+
+const wizard = createModule('wizard', {
+  schema: wizardSchema,
 
   init: (facts) => {
     facts.currentStep = 0;
@@ -96,7 +109,7 @@ const wizard = createModule('wizard', {
       facts.advanceRequested = false;
     },
     setField: (facts, { field, value }: { field: string; value: string | boolean }) => {
-      const allowed = ['email', 'name', 'company', 'plan', 'newsletter'];
+      const allowed = ['email', 'password', 'name', 'company', 'plan', 'newsletter'];
       if (allowed.includes(field)) {
         facts[field] = value;
       }
@@ -106,9 +119,12 @@ const wizard = createModule('wizard', {
 
 const validation = createModule('validation', {
   schema: {
-    emailAvailable: t.boolean(),
-    checkingEmail: t.boolean(),
+    facts: {
+      emailAvailable: t.boolean(),
+      checkingEmail: t.boolean(),
+    },
   },
+  crossModuleDeps: { wizard: wizardSchema },
 
   init: (facts) => {
     facts.emailAvailable = true;
@@ -117,10 +133,9 @@ const validation = createModule('validation', {
 
   constraints: {
     checkEmail: {
-      crossModuleDeps: ['wizard.email'],
       after: ['wizard::advance'],
       when: (facts) => {
-        return facts.wizard.email.includes('@') && !facts.checkingEmail;
+        return facts.wizard.email.includes('@') && !facts.self.checkingEmail;
       },
       require: (facts) => ({
         type: 'CHECK_EMAIL',
@@ -176,13 +191,13 @@ function WizardForm({ system }) {
       <div className="wizard-nav">
         <button
           disabled={!derived['wizard::canGoBack']}
-          onClick={() => system.events.goBack()}
+          onClick={() => system.events.wizard.goBack()}
         >
           Back
         </button>
         <button
           disabled={!derived['wizard::canAdvance']}
-          onClick={() => system.events.requestAdvance()}
+          onClick={() => system.events.wizard.requestAdvance()}
         >
           {step === 2 ? 'Submit' : 'Next'}
         </button>

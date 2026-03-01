@@ -288,7 +288,11 @@ async function login(email: string, password: string) {
 }
 
 async function logout() {
-  await fetch("/api/auth/logout", { method: "POST" });
+  const res = await fetch("/api/auth/logout", { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Logout failed: ${res.status}`);
+  }
+
   system.facts.user = undefined;
   system.facts.token = undefined;
   system.facts.sessionChecked = false;

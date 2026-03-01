@@ -299,13 +299,17 @@ resolvers: {
     requirement: "SEARCH",
     resolve: async (req, context) => {
       // Pass the AbortSignal to fetch for automatic cancellation
-      const results = await fetch(`/api/search?q=${req.query}`, {
+      const results = await fetch(`/api/search?q=${encodeURIComponent(req.query)}`, {
         signal: context.signal,
       });
 
       // Guard against processing stale results
       if (context.signal.aborted) {
         return;
+      }
+
+      if (!results.ok) {
+        throw new Error(`Search failed: ${results.status}`);
       }
 
       context.facts.searchResults = await results.json();
@@ -511,8 +515,8 @@ test("fetches user data", async () => {
     mocks: {
       resolvers: {
         FETCH_USER: {
-          resolve: (req, ctx) => {
-            ctx.facts.user = { id: req.userId, name: "Test User" };
+          resolve: (req, context) => {
+            context.facts.user = { id: req.userId, name: "Test User" };
           },
         },
       },
