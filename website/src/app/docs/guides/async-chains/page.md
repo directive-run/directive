@@ -177,9 +177,9 @@ const system = createSystem({
 
 ```tsx
 function App({ system }) {
-  const authStatus = useFact(system, 'auth::status');
-  const dashLoaded = useFact(system, 'dashboard::loaded');
-  const widgets = useFact(system, 'dashboard::widgets');
+  const authStatus = useSelector(system, (facts) => facts.auth.status);
+  const dashLoaded = useSelector(system, (facts) => facts.dashboard.loaded);
+  const widgets = useSelector(system, (facts) => facts.dashboard.widgets);
 
   if (authStatus === 'validating') {
     return <Spinner label="Validating session..." />;
@@ -224,7 +224,7 @@ function App({ system }) {
 constraints: {
   loadPermissions: {
     after: ['auth::validateSession'],
-    when: (facts) => facts.auth.isValid && !facts.loaded,
+    when: (facts) => facts.auth.isValid && !facts.self.loaded,
     require: { type: 'LOAD_PERMISSIONS' },
   },
 },
@@ -232,7 +232,7 @@ constraints: {
 constraints: {
   loadNotifications: {
     after: ['auth::validateSession'],
-    when: (facts) => facts.auth.isValid && !facts.loaded,
+    when: (facts) => facts.auth.isValid && !facts.self.loaded,
     require: { type: 'LOAD_NOTIFICATIONS' },
   },
 },

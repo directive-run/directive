@@ -24,6 +24,8 @@ const auth = createModule('auth', {
       expiresAt: t.number(),
       user: t.object<{ id: string; role: string }>().optional(),
       status: t.string<'idle' | 'authenticating' | 'authenticated' | 'expired'>(),
+      loginEmail: t.string().optional(),
+      loginPassword: t.string().optional(),
     },
     derivations: {
       isAuthenticated: t.boolean(),
@@ -38,6 +40,8 @@ const auth = createModule('auth', {
     facts.expiresAt = 0;
     facts.user = undefined;
     facts.status = 'idle';
+    facts.loginEmail = undefined;
+    facts.loginPassword = undefined;
   },
 
   derive: {
@@ -52,7 +56,24 @@ const auth = createModule('auth', {
     canRefresh: (facts) => !!facts.refreshToken,
   },
 
+  events: {
+    requestLogin: (facts, { email, password }: { email: string; password: string }) => {
+      facts.loginEmail = email;
+      facts.loginPassword = password;
+      facts.status = 'authenticating';
+    },
+  },
+
   constraints: {
+    // Trigger login resolver when credentials are set
+    loginRequested: {
+      when: (facts) => facts.status === 'authenticating' && !!facts.loginEmail,
+      require: (facts) => ({
+        type: 'LOGIN',
+        email: facts.loginEmail!,
+        password: facts.loginPassword!,
+      }),
+    },
     // Auto-refresh when token is about to expire
     refreshNeeded: {
       when: (facts) => {
@@ -99,6 +120,8 @@ const auth = createModule('auth', {
         context.facts.refreshToken = data.refreshToken;
         context.facts.expiresAt = Date.now() + data.expiresIn * 1000;
         context.facts.status = 'authenticated';
+        context.facts.loginEmail = undefined;
+        context.facts.loginPassword = undefined;
       },
     },
     refreshToken: {
@@ -144,16 +167,14 @@ const auth = createModule('auth', {
 ```tsx
 // Login form
 function LoginForm({ system }) {
-  const { facts } = useDirective(system);
-  const loginStatus = useRequirementStatus(system, 'LOGIN');
+  const status = useSelector(system, (facts) => facts.status);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    system.dispatch({
-      type: 'LOGIN',
-      email: form.get('email'),
-      password: form.get('password'),
+    system.events.auth.requestLogin({
+      email: form.get('email') as string,
+      password: form.get('password') as string,
     });
   };
 
@@ -161,11 +182,11 @@ function LoginForm({ system }) {
     <form onSubmit={handleSubmit}>
       <input name="email" type="email" />
       <input name="password" type="password" />
-      <button disabled={loginStatus.isPending}>
-        {loginStatus.isPending ? 'Signing in...' : 'Sign in'}
+      <button disabled={status === 'authenticating'}>
+        {status === 'authenticating' ? 'Signing in...' : 'Sign in'}
       </button>
-      {loginStatus.isRejected && (
-        <p className="error">{loginStatus.error.message}</p>
+      {status === 'idle' && (
+        <p className="error">Login failed. Please try again.</p>
       )}
     </form>
   );
@@ -190,7 +211,7 @@ function ProtectedRoute({ system, children }) {
 
 3. **Resolver handles failure gracefully** – if refresh fails, the resolver clears tokens and sets status to `expired` rather than throwing, so the UI can redirect to login.
 
-4. **`system.dispatch` triggers login** – the login form dispatches a `LOGIN` requirement directly, and `useRequirementStatus` tracks it through pending → fulfilled/rejected.
+4. **`system.events.auth.requestLogin` triggers login** – the login form calls an event that sets `loginEmail` and `loginPassword` facts, which activates the `loginRequested` constraint. The `useSelector` hook tracks `status` to show loading and error states.
 
 ## Common Variations
 

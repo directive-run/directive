@@ -9,7 +9,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ message, icon, action, docsUrl }: EmptyStateProps) {
   return (
-    <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-center">
+    <div role="status" className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-center">
       {icon && (
         <div className="text-zinc-300 dark:text-zinc-600">{icon}</div>
       )}

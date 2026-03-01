@@ -455,7 +455,7 @@ Explore the patterns used in this tutorial:
 
 - **[Multi-Module Composition](/docs/advanced/multi-module)** &ndash; composing independent modules into a single system
 - **[Multi-Module Example](/docs/examples/multi-module)** &ndash; full e-commerce example with auth, cart, and checkout
-- **[Data Fetching Example](/docs/examples/data-fetching)** &ndash; constraints and resolvers for async data
+- **[Dashboard Loader Example](/docs/examples/dashboard-loader)** &ndash; constraints and resolvers for async data
 - **[Effects](/docs/effects)** &ndash; fire-and-forget side effects
 - **[React Hooks](/docs/api/react)** &ndash; `useSelector`, `useFact`, `useDerived`, and more
 

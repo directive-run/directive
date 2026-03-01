@@ -18,10 +18,12 @@ import { createModule, t } from '@directive-run/core';
 
 const search = createModule('search', {
   schema: {
-    query: t.string(),
-    debouncedQuery: t.string(),
-    results: t.array<{ id: string; title: string }>(),
-    isSearching: t.boolean(),
+    facts: {
+      query: t.string(),
+      debouncedQuery: t.string(),
+      results: t.array<{ id: string; title: string }>(),
+      isSearching: t.boolean(),
+    },
   },
 
   init: (facts) => {

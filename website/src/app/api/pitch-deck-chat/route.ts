@@ -135,6 +135,7 @@ export async function POST(request: Request) {
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
         'X-Accel-Buffering': 'no',
+        'Access-Control-Allow-Origin': '*',
       },
     })
   }

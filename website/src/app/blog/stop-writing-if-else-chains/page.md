@@ -99,19 +99,21 @@ import { createModule, createSystem, t } from "@directive-run/core";
 
 const checkout = createModule("checkout", {
   schema: {
-    userVerified: t.boolean(),
-    userRole: t.string<"guest" | "member" | "enterprise">(),
-    flaggedForReview: t.boolean(),
-    fraudStatus: t.string<"clear" | "blocked" | "pending">(),
-    cartTotal: t.number(),
-    creditLimit: t.number(),
-    paymentMethod: t.string<"credit" | "invoice" | "debit">(),
-    allItemsInStock: t.boolean(),
-    hasOverseasOvernight: t.boolean(),
-    hasInternationalShipping: t.boolean(),
-    internationalEnabled: t.boolean(),
-    hasHazmatAir: t.boolean(),
-    checkoutReady: t.boolean(),
+    facts: {
+      userVerified: t.boolean(),
+      userRole: t.string<"guest" | "member" | "enterprise">(),
+      flaggedForReview: t.boolean(),
+      fraudStatus: t.string<"clear" | "blocked" | "pending">(),
+      cartTotal: t.number(),
+      creditLimit: t.number(),
+      paymentMethod: t.string<"credit" | "invoice" | "debit">(),
+      allItemsInStock: t.boolean(),
+      hasOverseasOvernight: t.boolean(),
+      hasInternationalShipping: t.boolean(),
+      internationalEnabled: t.boolean(),
+      hasHazmatAir: t.boolean(),
+      checkoutReady: t.boolean(),
+    },
   },
 
   init: (facts) => {
