@@ -60,10 +60,6 @@ export default function FraudAnalysisPage() {
           </p>
         </div>
 
-        <div className="mt-4 shrink-0">
-          <ProviderConfig onChange={handleConfigChange} />
-        </div>
-
         <div className="mt-4 min-h-0 flex-1">
           <InlineChat
             apiEndpoint="/api/fraud-review-chat"
@@ -76,6 +72,10 @@ export default function FraudAnalysisPage() {
             pageUrl="/ai/examples/fraud-analysis"
             headers={headers}
           />
+        </div>
+
+        <div className="mt-3 shrink-0">
+          <ProviderConfig onChange={handleConfigChange} />
         </div>
       </div>
     </DevToolsWithProvider>

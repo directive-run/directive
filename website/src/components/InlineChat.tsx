@@ -20,6 +20,9 @@ interface ChatState {
   isLoading: boolean
   error: string | null
   input: string
+  hourlyRemaining: number | null
+  hourlyLimit: number | null
+  rateLimited: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -34,6 +37,9 @@ function createChatStore() {
     isLoading: false,
     error: null,
     input: '',
+    hourlyRemaining: null,
+    hourlyLimit: null,
+    rateLimited: false,
   }
 
   const _listeners = new Set<() => void>()
@@ -93,6 +99,7 @@ function createChatStore() {
       isLoading: true,
       streamingContent: '',
       error: null,
+      rateLimited: false,
     })
 
     let accumulated = ''
@@ -113,8 +120,28 @@ function createChatStore() {
         return
       }
 
+      // Read rate limit headers from response
+      const remaining = response.headers.get('X-Hourly-Remaining')
+      const limit = response.headers.get('X-Hourly-Limit')
+      if (remaining !== null) {
+        setState({
+          hourlyRemaining: parseInt(remaining, 10),
+          hourlyLimit: limit ? parseInt(limit, 10) : 5,
+        })
+      }
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({ error: 'Request failed' }))
+
+        if (response.status === 429) {
+          setState({
+            rateLimited: true,
+            error: errData.error || "You've used your free tries this hour.",
+          })
+
+          return
+        }
+
         throw new Error(errData.error || `Request failed (${response.status})`)
       }
 
@@ -284,7 +311,7 @@ export function InlineChat({
   headers: extraHeaders,
 }: InlineChatProps) {
   const store = getStore(apiEndpoint)
-  const { messages, streamingContent, isLoading, error, input } =
+  const { messages, streamingContent, isLoading, error, input, hourlyRemaining, hourlyLimit, rateLimited } =
     useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -301,6 +328,9 @@ export function InlineChat({
 
   const send = (text?: string) => store.handleSend(apiEndpoint, resolvedPageUrl, text, extraHeaders)
 
+  // Check if user is using BYOK (no rate limit counter needed)
+  const isByok = extraHeaders && 'x-api-key' in extraHeaders
+
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
       {/* Header */}
@@ -308,10 +338,15 @@ export function InlineChat({
         <div className="flex h-7 w-7 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
           <Sparkle weight="duotone" className="h-3.5 w-3.5 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">{title}</h3>
           <p className="text-[10px] text-zinc-500 dark:text-zinc-400">{subtitle}</p>
         </div>
+        {!isByok && hourlyRemaining !== null && hourlyLimit !== null && (
+          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+            {hourlyRemaining} of {hourlyLimit} tries remaining
+          </span>
+        )}
       </div>
 
       {/* Messages */}
@@ -382,7 +417,44 @@ export function InlineChat({
               </div>
             )}
 
-            {error && (
+            {/* Rate limit message — conversion CTA */}
+            {rateLimited && (
+              <div className="mx-auto max-w-[90%] rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20" role="alert">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                  {error}
+                </p>
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                  Want unlimited access? Use your own API key below.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <a
+                    href="https://www.npmjs.com/package/@directive-run/ai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-amber-300 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                  >
+                    npm install
+                  </a>
+                  <a
+                    href="/docs"
+                    className="rounded-full border border-amber-300 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                  >
+                    Read docs
+                  </a>
+                  <a
+                    href="https://github.com/directive-run/directive"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-amber-300 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                  >
+                    GitHub
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Generic errors (non-rate-limit) */}
+            {error && !rateLimited && (
               <div className="mx-auto flex max-w-[90%] items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400" role="alert">
                 <span className="flex-1 text-center">{error}</span>
                 <button
