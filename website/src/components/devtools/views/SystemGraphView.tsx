@@ -1330,7 +1330,7 @@ export function SystemGraphView() {
   )
 
   if (!connected) {
-    return <EmptyState message="No Directive system connected" />
+    return <EmptyState message="No Directive system connected" docsUrl="/docs/plugins/devtools" />
   }
 
   const isEmpty = Object.keys(facts).length === 0 && constraints.length === 0

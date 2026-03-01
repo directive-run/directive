@@ -19,7 +19,7 @@ export function FactsView() {
   }, [factBreakpoints, system])
 
   if (!connected) {
-    return <EmptyState message="No Directive system connected" />
+    return <EmptyState message="No Directive system connected" docsUrl="/docs/plugins/devtools" />
   }
 
   return (

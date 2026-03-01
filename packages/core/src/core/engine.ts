@@ -520,6 +520,12 @@ export function createEngine<S extends Schema>(
 				constraintsManager.disable(req.fromConstraint);
 			}
 
+			if (strategy === "retry") {
+				// Remove from previousRequirements so the diff sees it as "added" again
+				state.previousRequirements.remove(req.id);
+				scheduleReconcile();
+			}
+
 			if (strategy === "retry-later") {
 				const pending = errorBoundary.getRetryLaterManager().getPendingRetries();
 				const entry = pending.find(p => p.sourceId === resolver);
@@ -1329,6 +1335,11 @@ export function createEngine<S extends Schema>(
 
 			// Use while loop instead of recursion to prevent stack overflow
 			while (true) {
+				// Flush any pending batches so they start executing
+				if (resolversManager.hasPendingBatches()) {
+					resolversManager.processBatches();
+				}
+
 				// Wait for any pending microtasks
 				await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -1337,7 +1348,8 @@ export function createEngine<S extends Schema>(
 				const settled =
 					inspection.inflight.length === 0 &&
 					!state.isReconciling &&
-					!state.reconcileScheduled;
+					!state.reconcileScheduled &&
+					!resolversManager.hasPendingBatches();
 
 				if (settled) {
 					return;

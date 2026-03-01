@@ -359,9 +359,8 @@ resolvers: {
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `false` | Enable batching for this resolver |
 | `windowMs` | `number` | `50` | Time window to collect requirements (ms) |
-| `maxSize` | `number` | unlimited | Maximum batch size |
+| `maxSize` | `number` | unlimited | Maximum batch size. Flushes immediately when reached. |
 | `timeoutMs` | `number` | – | Per-batch timeout (overrides resolver `timeout`) |
-| `failureStrategy` | `"all-or-nothing" \| "per-item"` | `"all-or-nothing"` | How to handle failures within a batch |
 
 ### Partial Failure Handling
 

@@ -6,12 +6,17 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
 import { getDagTimeline } from '../../dag-chat/orchestrator-singleton'
 
 let activeStreams = 0
 const MAX_STREAMS = 10
 
 export async function GET(request: Request) {
+  if (!isAllowedOrigin(request)) {
+    return forbiddenResponse(request)
+  }
+
   if (activeStreams >= MAX_STREAMS) {
     return Response.json({ error: 'Too many DevTools connections' }, { status: 429 })
   }
@@ -21,6 +26,25 @@ export async function GET(request: Request) {
   let unsubscribe: (() => void) | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  let cleaned = false
+
+  const cleanup = () => {
+    if (cleaned) {
+      return
+    }
+    cleaned = true
+    activeStreams--
+    unsubscribe?.()
+    unsubscribe = null
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer)
+      heartbeatTimer = null
+    }
+  }
 
   const stream = new ReadableStream({
     start(controller) {
@@ -74,17 +98,7 @@ export async function GET(request: Request) {
       }, 15000)
 
       request.signal.addEventListener('abort', () => {
-        activeStreams--
-        unsubscribe?.()
-        unsubscribe = null
-        if (pollTimer) {
-          clearInterval(pollTimer)
-          pollTimer = null
-        }
-        if (heartbeatTimer) {
-          clearInterval(heartbeatTimer)
-          heartbeatTimer = null
-        }
+        cleanup()
         try {
           controller.close()
         } catch {
@@ -94,17 +108,7 @@ export async function GET(request: Request) {
     },
 
     cancel() {
-      activeStreams--
-      unsubscribe?.()
-      unsubscribe = null
-      if (pollTimer) {
-        clearInterval(pollTimer)
-        pollTimer = null
-      }
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+      cleanup()
     },
   })
 

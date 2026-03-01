@@ -7,6 +7,7 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
 import {
   getDagTimeline,
   getDagOrchestrator,
@@ -15,7 +16,10 @@ import {
   getDagCheckpointStore,
 } from '../../dag-chat/orchestrator-singleton'
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAllowedOrigin(request)) {
+    return forbiddenResponse(request)
+  }
   const timeline = getDagTimeline()
   const instance = getDagOrchestrator()
 

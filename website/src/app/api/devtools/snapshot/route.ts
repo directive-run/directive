@@ -116,7 +116,7 @@ export async function GET(request: Request) {
         input: ['rate-limit', 'prompt-injection', 'pii-detection'],
         output: ['length'],
       },
-      fallbackModel: process.env.OPENAI_API_KEY ? 'gpt-4o-mini' : null,
+      fallbackModel: null,
     },
   })
 }
