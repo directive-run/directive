@@ -28,13 +28,13 @@ import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directiv
 import { createOpenAIRunner, createOpenAIEmbedder } from '@directive-run/ai/openai'
 import { createSystem } from '@directive-run/core'
 import { createCircuitBreaker } from '@directive-run/core/plugins'
-import { docsChatbot, MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP } from './module'
+import { docsChatbot, MAX_REQUESTS_PER_WINDOW } from './module'
 
 // ---------------------------------------------------------------------------
 // Re-exports (used by route.ts)
 // ---------------------------------------------------------------------------
 
-export { MAX_REQUESTS_PER_WINDOW, DAILY_CAP_PER_IP }
+export { MAX_REQUESTS_PER_WINDOW }
 
 // ---------------------------------------------------------------------------
 // Constants

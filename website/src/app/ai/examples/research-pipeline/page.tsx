@@ -60,10 +60,6 @@ export default function AIResearchPipelinePage() {
           </p>
         </div>
 
-        <div className="mt-4 shrink-0">
-          <ProviderConfig onChange={handleConfigChange} />
-        </div>
-
         <div className="mt-4 min-h-0 flex-1">
           <InlineChat
             apiEndpoint="/api/dag-chat"
@@ -76,6 +72,10 @@ export default function AIResearchPipelinePage() {
             pageUrl="/ai/examples/research-pipeline"
             headers={headers}
           />
+        </div>
+
+        <div className="mt-3 shrink-0">
+          <ProviderConfig onChange={handleConfigChange} />
         </div>
       </div>
     </DevToolsWithProvider>
