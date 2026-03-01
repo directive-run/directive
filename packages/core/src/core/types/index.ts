@@ -91,8 +91,6 @@ export type {
 	RecoveryStrategy,
 	ErrorBoundaryConfig,
 	RetryLaterConfig,
-	CircuitBreakerConfig,
-	CircuitBreakerState,
 } from "./errors.js";
 
 // Module types

@@ -692,7 +692,7 @@ describe("createOtelPlugin", () => {
   });
 
   // ==========================================================================
-  // M1: Nested patterns use stack (not single variable)
+  // Nested patterns use stack (not single variable)
   // ==========================================================================
 
   it("nested patterns: inner agents get innermost pattern as parent", () => {
@@ -756,7 +756,7 @@ describe("createOtelPlugin", () => {
   });
 
   // ==========================================================================
-  // M5: Shadow status tracking for external tracers
+  // Shadow status tracking for external tracers
   // ==========================================================================
 
   it("external tracer shadow tracks status via setStatus calls", () => {
@@ -793,7 +793,7 @@ describe("createOtelPlugin", () => {
   });
 
   // ==========================================================================
-  // M4: cleanupStaleSpans fires onSpanEnd
+  // cleanupStaleSpans fires onSpanEnd
   // ==========================================================================
 
   it("detach fires onSpanEnd for orphaned spans", () => {
@@ -821,7 +821,7 @@ describe("createOtelPlugin", () => {
   });
 
   // ==========================================================================
-  // M9: Instance-scoped counters (separate plugin instances don't share IDs)
+  // Instance-scoped counters (separate plugin instances don't share IDs)
   // ==========================================================================
 
   // ==========================================================================
