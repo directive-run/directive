@@ -31,6 +31,10 @@ const search = createModule('search', {
     facts.isSearching = false;
   },
 
+  // Note: This effect intentionally writes to facts. The debounce pattern is
+  // a valid exception to the "effects shouldn't mutate facts" guideline — the
+  // delayed copy is specifically designed to throttle downstream constraint
+  // evaluation without triggering re-entrant loops.
   effects: {
     // Debounce: copy query → debouncedQuery after 300ms of inactivity
     debounceQuery: {

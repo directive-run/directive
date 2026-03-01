@@ -125,7 +125,11 @@ const response = await fetch('/api/chat', {
   signal: controller.signal,
 });
 
-const reader = response.body!.getReader();
+if (!response.body) {
+  throw new Error('No response body');
+}
+
+const reader = response.body.getReader();
 const decoder = new TextDecoder();
 let buffer = '';
 
@@ -138,14 +142,19 @@ while (true) {
 
   buffer += decoder.decode(value, { stream: true });
   const lines = buffer.split('\n');
-  buffer = lines.pop()!;
+  buffer = lines.pop() ?? '';
 
   for (const line of lines) {
     if (!line.startsWith('data: ')) {
       continue;
     }
 
-    const data = JSON.parse(line.slice(6));
+    let data;
+    try {
+      data = JSON.parse(line.slice(6));
+    } catch {
+      continue; // Skip malformed frames
+    }
 
     if (data.type === 'text') {
       appendToUI(data.content);

@@ -99,7 +99,10 @@ const cart = createModule('cart', {
       requirement: 'VALIDATE_COUPON',
       resolve: async (req, context) => {
         context.facts.couponStatus = 'checking';
-        const res = await fetch(`/api/coupons/validate?code=${req.code}`);
+        const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(req.code)}`);
+        if (!res.ok) {
+          throw new Error(`Coupon validation failed: ${res.status}`);
+        }
         const data = await res.json();
 
         if (data.valid) {
