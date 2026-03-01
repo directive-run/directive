@@ -1633,9 +1633,9 @@ export function createEngine<S extends Schema>(
 		},
 
 		get isSettled(): boolean {
-			const inspection = this.inspect();
 			return (
-				inspection.inflight.length === 0 &&
+				resolversManager.getInflight().length === 0 &&
+				!resolversManager.hasPendingBatches() &&
 				!state.isReconciling &&
 				!state.reconcileScheduled
 			);

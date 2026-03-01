@@ -176,13 +176,17 @@ const system = createSystem({
 ```
 
 ```tsx
+import { useSelector } from '@directive-run/react';
+
 function WizardForm({ system }) {
-  const { facts, derived } = useDirective(system);
-  const step = facts['wizard::currentStep'];
+  const step = useSelector(system, (s) => s.facts.wizard.currentStep);
+  const progress = useSelector(system, (s) => s.derive.wizard.progress);
+  const canGoBack = useSelector(system, (s) => s.derive.wizard.canGoBack);
+  const canAdvance = useSelector(system, (s) => s.derive.wizard.canAdvance);
 
   return (
     <div>
-      <progress value={derived['wizard::progress']} max={100} />
+      <progress value={progress} max={100} />
 
       {step === 0 && <AccountStep system={system} />}
       {step === 1 && <ProfileStep system={system} />}
@@ -190,13 +194,13 @@ function WizardForm({ system }) {
 
       <div className="wizard-nav">
         <button
-          disabled={!derived['wizard::canGoBack']}
+          disabled={!canGoBack}
           onClick={() => system.events.wizard.goBack()}
         >
           Back
         </button>
         <button
-          disabled={!derived['wizard::canAdvance']}
+          disabled={!canAdvance}
           onClick={() => system.events.wizard.requestAdvance()}
         >
           {step === 2 ? 'Submit' : 'Next'}

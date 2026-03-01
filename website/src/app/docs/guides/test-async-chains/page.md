@@ -40,15 +40,15 @@ describe('auth flow', () => {
     await system.start();
 
     // Trigger login
-    system.dispatch({ type: 'LOGIN', email: 'test@example.com', password: 'pass' });
+    system.events.auth.requestLogin({ email: 'test@example.com', password: 'pass' });
 
     // Wait for all constraints and resolvers to settle
     await system.settle();
 
     // Assert the full chain completed
-    expect(system.facts['auth::status']).toBe('authenticated');
-    expect(system.facts['auth::token']).toBe('mock-token');
-    expect(system.facts['auth::user']).toEqual({ id: '1', name: 'Test User', role: 'admin' });
+    expect(system.facts.auth.status).toBe('authenticated');
+    expect(system.facts.auth.token).toBe('mock-token');
+    expect(system.facts.auth.user).toEqual({ id: '1', name: 'Test User', role: 'admin' });
   });
 
   it('handles login failure', async () => {
@@ -62,11 +62,11 @@ describe('auth flow', () => {
     });
 
     await system.start();
-    system.dispatch({ type: 'LOGIN', email: 'bad@example.com', password: 'wrong' });
+    system.events.auth.requestLogin({ email: 'bad@example.com', password: 'wrong' });
     await system.settle();
 
-    expect(system.facts['auth::status']).toBe('idle');
-    expect(system.facts['auth::token']).toBeUndefined();
+    expect(system.facts.auth.status).toBe('idle');
+    expect(system.facts.auth.token).toBeUndefined();
   });
 
   it('auto-refreshes when token expires', async () => {
@@ -84,17 +84,17 @@ describe('auth flow', () => {
 
     // Set up authenticated state with a token about to expire
     system.batch(() => {
-      system.facts['auth::token'] = 'old-token';
-      system.facts['auth::refreshToken'] = 'refresh-token';
-      system.facts['auth::expiresAt'] = Date.now() + 30_000; // Expires in 30s (within 60s buffer)
-      system.facts['auth::status'] = 'authenticated';
+      system.facts.auth.token = 'old-token';
+      system.facts.auth.refreshToken = 'refresh-token';
+      system.facts.auth.expiresAt = Date.now() + 30_000; // Expires in 30s (within 60s buffer)
+      system.facts.auth.status = 'authenticated';
     });
 
     await system.settle();
 
     // The refreshNeeded constraint should have fired
     expect(refreshMock).toHaveBeenCalled();
-    expect(system.facts['auth::token']).toBe('new-token');
+    expect(system.facts.auth.token).toBe('new-token');
   });
 });
 ```
@@ -118,15 +118,15 @@ it('follows the correct sequence', async () => {
   const system = createTestSystem({ modules: { auth: authModule } });
   await system.start();
 
-  system.dispatch({ type: 'LOGIN', email: 'test@example.com', password: 'pass' });
+  system.events.auth.requestLogin({ email: 'test@example.com', password: 'pass' });
 
   // Flush only the first microtask cycle
   await flushMicrotasks();
-  expect(system.facts['auth::status']).toBe('authenticating');
+  expect(system.facts.auth.status).toBe('authenticating');
 
   // Let the resolver complete
   await system.settle();
-  expect(system.facts['auth::status']).toBe('authenticated');
+  expect(system.facts.auth.status).toBe('authenticated');
 });
 ```
 
@@ -179,11 +179,11 @@ it('retries on transient failure', async () => {
   });
 
   await system.start();
-  system.facts['dashboard::userId'] = 'user-1';
+  system.facts.dashboard.userId = 'user-1';
   await system.settle();
 
   expect(attempts).toBe(3);
-  expect(system.facts['dashboard::profile'].name).toBe('Test');
+  expect(system.facts.dashboard.profile.name).toBe('Test');
 });
 ```
 

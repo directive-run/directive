@@ -11,6 +11,7 @@
  */
 import { NextRequest } from 'next/server'
 import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
+import { checkHourlyRateLimit, isRateLimited, getClientIp, getRateLimitHeaders, getResetMinutes } from '@/lib/rate-limit'
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -22,13 +23,27 @@ export async function POST(request: NextRequest) {
   }
 
   const clientKey = request.headers.get('x-api-key')
-  const apiKey = process.env.ANTHROPIC_API_KEY || clientKey
+  const apiKey = clientKey || process.env.ANTHROPIC_API_KEY
 
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'No API key configured' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     })
+  }
+
+  // Rate limit only when using the server's API key (not the client's own key)
+  if (!clientKey) {
+    const ip = getClientIp(request)
+    const rl = checkHourlyRateLimit(ip)
+    if (isRateLimited(ip)) {
+      const mins = getResetMinutes(ip)
+
+      return new Response(
+        JSON.stringify({ error: `You've used your 5 free tries this hour. Try again in ${mins} minutes.` }),
+        { status: 429, headers: { 'Content-Type': 'application/json', ...getRateLimitHeaders(rl.remaining, rl.limit) } },
+      )
+    }
   }
 
   const body = await request.text()

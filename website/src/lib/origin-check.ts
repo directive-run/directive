@@ -40,12 +40,10 @@ export function isAllowedOrigin(request: Request): boolean {
   }
 }
 
-/** Return a 403 Response with a descriptive error message. */
-export function forbiddenResponse(request: Request): Response {
-  const origin = request.headers.get('origin') ?? request.headers.get('referer') ?? 'unknown'
-
+/** Return a 403 Response with a generic error message. */
+export function forbiddenResponse(_request: Request): Response {
   return Response.json(
-    { error: 'Forbidden', reason: `Origin "${origin}" is not allowed. Requests must originate from directive.run or localhost.` },
+    { error: 'Forbidden', reason: 'Origin not allowed' },
     { status: 403 },
   )
 }

@@ -422,3 +422,4 @@ This is useful for feature flags, A/B testing, or temporarily suppressing constr
 - [Derivations](/docs/derivations) – Computed values
 - [Effects](/docs/effects) – Side effects
 - [Events](/docs/events) – Typed event dispatching
+- [Choosing Primitives](/docs/choosing-primitives) – When to use what

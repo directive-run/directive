@@ -515,6 +515,7 @@ console.log(system.derive.isAdmin);      // false
 
 ## Next Steps
 
+- [Module & System](/docs/module-system) - How to organize modules and create systems
 - [Facts](/docs/facts) - Deep dive into state management
 - [Constraints](/docs/constraints) - Advanced constraint patterns
 - [Resolvers](/docs/resolvers) - Retry, timeout, batching

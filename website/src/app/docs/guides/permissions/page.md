@@ -201,9 +201,9 @@ const system = createSystem({
 
 ```tsx
 function ContentList({ system }) {
-  const articles = useFact(system, 'content::articles');
-  const canPublish = useDerived(system, 'permissions::canPublish');
-  const canEdit = useDerived(system, 'permissions::canEdit');
+  const articles = useSelector(system, (facts) => facts.content.articles);
+  const canPublish = useSelector(system, (derive) => derive.permissions.canPublish);
+  const canEdit = useSelector(system, (derive) => derive.permissions.canEdit);
 
   return (
     <ul>
@@ -224,7 +224,7 @@ function ContentList({ system }) {
 }
 
 function AdminPanel({ system }) {
-  const canManageUsers = useDerived(system, 'permissions::canManageUsers');
+  const canManageUsers = useSelector(system, (derive) => derive.permissions.canManageUsers);
 
   if (!canManageUsers) {
     return null;
@@ -255,7 +255,7 @@ function AdminPanel({ system }) {
 ```typescript
 constraints: {
   refreshPermissions: {
-    when: (facts) => facts.permissionsStale,
+    when: (facts) => facts.self.permissionsStale,
     require: { type: 'FETCH_PERMISSIONS' },
   },
 },
@@ -288,9 +288,9 @@ derive: {
       viewer: ['analytics.view'],
     };
 
-    const base = rolePermissions[facts.role] || [];
+    const base = rolePermissions[facts.self.role] || [];
 
-    return [...new Set([...base, ...facts.permissions])];
+    return [...new Set([...base, ...facts.self.permissions])];
   },
 },
 ```
