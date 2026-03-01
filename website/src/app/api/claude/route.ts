@@ -10,11 +10,17 @@
  *   2. `ANTHROPIC_API_KEY` env var (local dev fallback)
  */
 import { NextRequest } from 'next/server'
+import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
+const MAX_BODY_BYTES = 64 * 1024 // 64 KB
 
 export async function POST(request: NextRequest) {
+  if (!isAllowedOrigin(request)) {
+    return forbiddenResponse(request)
+  }
+
   const clientKey = request.headers.get('x-api-key')
   const apiKey = process.env.ANTHROPIC_API_KEY || clientKey
 
@@ -26,6 +32,12 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.text()
+  if (body.length > MAX_BODY_BYTES) {
+    return new Response(JSON.stringify({ error: 'Request body too large' }), {
+      status: 413,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
   const upstream = await fetch(ANTHROPIC_URL, {
     method: 'POST',

@@ -18,7 +18,9 @@ import { createModule, t } from '@directive-run/core';
 
 const todos = createModule('todos', {
   schema: {
-    items: t.array<{ id: string; text: string; done: boolean }>(),
+    facts: {
+      items: t.array<{ id: string; text: string; done: boolean }>(),
+    },
   },
 
   init: (facts) => {
@@ -140,6 +142,10 @@ resolve: async (req, context) => {
       method: 'POST',
       body: JSON.stringify({ text: req.text }),
     });
+    if (!res.ok) {
+      throw new Error(`Failed to create todo: ${res.status}`);
+    }
+
     const created = await res.json();
     // Replace optimistic entry with server data (real ID, timestamps, etc.)
     context.facts.items = context.facts.items.map((i) =>
@@ -160,7 +166,10 @@ resolve: async (req, context) => {
   context.facts.items = context.facts.items.filter((i) => i.id !== req.id);
 
   try {
-    await fetch(`/api/todos/${req.id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/todos/${encodeURIComponent(req.id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      throw new Error(`Failed to delete: ${res.status}`);
+    }
   } catch (error) {
     context.facts.items = snapshot.get('items')!;
     context.facts.toastMessage = 'Failed to delete – change reverted';

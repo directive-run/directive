@@ -185,10 +185,13 @@ For SIEM integration, use the `exporter` callback to push entries to Splunk, Dat
 ```typescript
 const audit = createAuditTrail({
   exporter: async (entries) => {
-    await fetch('https://siem.example.com/ingest', {
+    const res = await fetch('https://siem.example.com/ingest', {
       method: 'POST',
       body: JSON.stringify(entries),
     });
+    if (!res.ok) {
+      throw new Error(`SIEM export failed: ${res.status}`);
+    }
   },
   exportInterval: 60_000, // Flush every 60 seconds
 });

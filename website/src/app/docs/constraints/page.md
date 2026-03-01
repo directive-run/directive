@@ -50,6 +50,11 @@ const userModule = createModule("user", {
 | `after` | `string[]` | Constraint IDs that must resolve before this one evaluates |
 | `async` | `boolean` | Mark as async (avoids runtime detection overhead) |
 | `timeout` | `number` | Timeout in ms for async `when()` evaluation (default: 5000) |
+| `deps` | `string[]` | Explicit fact dependencies (required for async constraints) |
+
+{% callout title="Cross-module access" %}
+To read facts from other modules, declare `crossModuleDeps` at the **module level** (not on individual constraints). This gives `derive`, `constraints`, and `effects` access via `facts.self.*` (own module) and `facts.{dep}.*` (cross-module). See [Multi-Module](/docs/advanced/multi-module) for the full pattern.
+{% /callout %}
 
 ---
 

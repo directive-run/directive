@@ -73,6 +73,10 @@ const search = createModule('search', {
         context.facts.isSearching = true;
         try {
           const res = await fetch(`/api/search?q=${encodeURIComponent(req.query)}`);
+          if (!res.ok) {
+            throw new Error(`Search failed: ${res.status}`);
+          }
+
           const data = await res.json();
           // Only apply if this is still the current query
           if (context.facts.debouncedQuery === req.query) {

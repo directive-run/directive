@@ -359,6 +359,10 @@ function remoteConfigPlugin(endpoint: string): Plugin {
     // onInit is the only async hook – the system waits for it before calling onStart
     onInit: async (system) => {
       const res = await fetch(endpoint);
+      if (!res.ok) {
+        throw new Error(`Failed to load config: ${res.status}`);
+      }
+
       config = await res.json();
     },
 

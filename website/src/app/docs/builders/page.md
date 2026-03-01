@@ -174,6 +174,10 @@ const dataModule = createModule('data', {
       requirement: 'LOAD_USERS',
       resolve: async (_req, context) => {
         const res = await fetch('/api/users');
+        if (!res.ok) {
+          throw new Error(`Failed to load users: ${res.status}`);
+        }
+
         context.facts.users = await res.json();
         context.facts.loaded = true;
       },
