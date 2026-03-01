@@ -199,23 +199,15 @@ These are built into Directive and don't use the subscribe patterns above:
 
 ---
 
-## Migration Guides
+## Concept Mapping
 
-Ready to go all-in? These guides walk through a full migration, concept by concept:
+Key concept mapping when adopting Directive alongside existing libraries:
 
 | From | Key Mapping |
 |------|------------|
-| [Redux](/docs/migration/from-redux) | Slices → Modules, actions → events, selectors → derivations, thunks → resolvers |
-| [Zustand](/docs/migration/from-zustand) | Stores → Modules, set → events, get → derivations, middleware → plugins |
-| [XState](/docs/migration/from-xstate) | Machines → Modules, states → facts, transitions → events, services → resolvers |
-
-All three guides follow the same pattern:
-
-1. **Analyze** – Map your existing concepts to Directive equivalents
-2. **Create module** – Define schema, init, events, derive, constraints, resolvers
-3. **Coexist** – Run both systems side-by-side using the interop patterns above
-4. **Migrate UI** – Replace store hooks with Directive hooks
-5. **Remove old store** – Once fully migrated, remove the old state library
+| [Redux](/docs/works-with/redux) | Slices → Modules, actions → events, selectors → derivations, thunks → resolvers |
+| [Zustand](/docs/works-with/zustand) | Stores → Modules, set → events, get → derivations, middleware → plugins |
+| [XState](/docs/works-with/xstate) | Machines → Modules, states → facts, transitions → events, services → resolvers |
 
 ---
 

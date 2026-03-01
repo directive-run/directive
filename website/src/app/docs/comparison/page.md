@@ -447,11 +447,11 @@ const userModule = createModule("user", {
 
 ## Migration Paths
 
-Already using another library? See our migration guides:
+Already using another library? See our integration guides for incremental adoption:
 
-- **[From Redux](/docs/migration/from-redux)** &ndash; Migrate reducers to modules
-- **[From Zustand](/docs/migration/from-zustand)** &ndash; Convert stores to modules
-- **[From XState](/docs/migration/from-xstate)** &ndash; Transform machines to constraints
+- **[Directive + Redux](/docs/works-with/redux)** &ndash; Side-by-side Redux integration
+- **[Directive + Zustand](/docs/works-with/zustand)** &ndash; Side-by-side Zustand integration
+- **[Directive + XState](/docs/works-with/xstate)** &ndash; Side-by-side XState integration
 
 ---
 

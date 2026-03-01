@@ -122,4 +122,3 @@ const result = await runContentPipeline('The future of quantum computing');
 - [Multi-Agent Orchestrator](/ai/multi-agent) — full multi-agent reference
 - [Execution Patterns](/ai/patterns) — DAG, reflect, and other execution patterns
 - [DAG Pipeline guide](/ai/guides/dag-pipeline) — parallel and conditional agent workflows
-- [Self-Improving Agents guide](/ai/guides/self-improving-agents) — iterative refinement with reflect

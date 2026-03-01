@@ -147,5 +147,4 @@ system.batch(() => {
 
 - [Facts](/docs/facts) – store internals and notification model
 - [Constraints](/docs/constraints) – evaluation timing
-- [WebSocket Connections](/docs/guides/websockets) – batching socket events
-- [Optimize Re-Renders](/docs/guides/optimize-rerenders) – reducing React updates
+- [React Adapter](/docs/adapters/react) – hook patterns for reducing re-renders

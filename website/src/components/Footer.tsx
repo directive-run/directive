@@ -49,9 +49,8 @@ export function Footer() {
               <ul className="mt-3 space-y-2">
                 <li><Link href="/philosophy" className={footerLinkClass}>Philosophy</Link></li>
                 <li><Link href="/about" className={footerLinkClass}>About</Link></li>
-                <li><Link href="/docs/glossary" className={footerLinkClass}>Glossary</Link></li>
-                <li><Link href="/docs/faq" className={footerLinkClass}>FAQ</Link></li>
-                <li><Link href="/docs/troubleshooting" className={footerLinkClass}>Troubleshooting</Link></li>
+                <li><Link href="/docs/core-concepts" className={footerLinkClass}>Core Concepts</Link></li>
+                <li><Link href="/docs/quick-start" className={footerLinkClass}>Quick Start</Link></li>
               </ul>
             </div>
           </div>

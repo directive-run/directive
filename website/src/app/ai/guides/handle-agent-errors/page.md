@@ -153,4 +153,3 @@ console.log(`Stats:`, breaker.getStats());
 
 - [Resilience & Routing](/ai/resilience-routing) — full middleware reference
 - [Control AI Costs guide](/ai/guides/control-ai-costs) — budget middleware to prevent runaway spending
-- [Smart Model Routing guide](/ai/guides/smart-model-routing) — route to different models based on input
