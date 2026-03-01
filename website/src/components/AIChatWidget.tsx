@@ -106,8 +106,8 @@ const ChatDialog = memo(function ChatDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [dailyRemaining, setDailyRemaining] = useState<number | null>(null)
-  const [dailyLimit, setDailyLimit] = useState(15)
+  const [hourlyRemaining, setHourlyRemaining] = useState<number | null>(null)
+  const [hourlyLimit, setHourlyLimit] = useState(5)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -127,7 +127,7 @@ const ChatDialog = memo(function ChatDialog({
   const handleSend = useCallback(
     async (messageText?: string) => {
       const text = (messageText ?? input).trim()
-      if (!text || isLoading || dailyRemaining === 0) return
+      if (!text || isLoading || hourlyRemaining === 0) return
 
       const userMessage: Message = {
         id: `user-${Date.now()}`,
@@ -164,14 +164,14 @@ const ChatDialog = memo(function ChatDialog({
           signal: controller.signal,
         })
 
-        // Read daily usage headers (available on both success and 429 responses)
-        const remainingHeader = response.headers.get('X-Daily-Remaining')
-        const limitHeader = response.headers.get('X-Daily-Limit')
+        // Read hourly usage headers (available on both success and 429 responses)
+        const remainingHeader = response.headers.get('X-Hourly-Remaining')
+        const limitHeader = response.headers.get('X-Hourly-Limit')
         if (remainingHeader !== null) {
-          setDailyRemaining(parseInt(remainingHeader, 10))
+          setHourlyRemaining(parseInt(remainingHeader, 10))
         }
         if (limitHeader !== null) {
-          setDailyLimit(parseInt(limitHeader, 10))
+          setHourlyLimit(parseInt(limitHeader, 10))
         }
 
         if (!response.ok) {
@@ -271,7 +271,7 @@ const ChatDialog = memo(function ChatDialog({
         abortControllerRef.current = null
       }
     },
-    [input, isLoading, messages, dailyRemaining],
+    [input, isLoading, messages, hourlyRemaining],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -410,13 +410,13 @@ const ChatDialog = memo(function ChatDialog({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={dailyRemaining === 0 ? 'Daily limit reached' : 'Ask about Directive...'}
-                    disabled={dailyRemaining === 0}
+                    placeholder={hourlyRemaining === 0 ? 'Hourly limit reached' : 'Ask about Directive...'}
+                    disabled={hourlyRemaining === 0}
                     className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-brand-surface-raised dark:text-white dark:placeholder-slate-400"
                   />
                   <button
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isLoading || dailyRemaining === 0}
+                    disabled={!input.trim() || isLoading || hourlyRemaining === 0}
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-brand-primary text-white transition hover:bg-brand-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <PaperPlaneTilt weight="fill" className="h-5 w-5" />
@@ -425,16 +425,16 @@ const ChatDialog = memo(function ChatDialog({
                 <p className="mt-2 text-center text-xs text-slate-400">
                   AI responses are generated and may not always be accurate.
                 </p>
-                {dailyRemaining !== null && (
+                {hourlyRemaining !== null && (
                   <p
                     className={clsx(
                       'mt-1 text-center text-xs',
-                      dailyRemaining <= 5
+                      hourlyRemaining <= 5
                         ? 'font-medium text-amber-500 dark:text-amber-400'
                         : 'text-slate-400',
                     )}
                   >
-                    {dailyRemaining} of {dailyLimit} questions remaining today
+                    {hourlyRemaining} of {hourlyLimit} tries remaining this hour
                   </p>
                 )}
 

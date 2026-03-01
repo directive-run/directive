@@ -10,23 +10,16 @@ import { createModule, t } from '@directive-run/core'
 // Constants
 // ---------------------------------------------------------------------------
 
-const RATE_LIMIT_WINDOW = 60 * 1000
-const MAX_REQUESTS_PER_WINDOW = 10
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour
+const MAX_REQUESTS_PER_WINDOW = 5
 const DAILY_TOKEN_BUDGET = 500_000
 const MAX_RATE_LIMIT_ENTRIES = 10_000
-const DAILY_CAP_PER_IP = 15
-const DAILY_CAP_WINDOW = 24 * 60 * 60 * 1000
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface RateLimitEntry {
-  count: number
-  resetAt: number
-}
-
-interface DailyCapEntry {
   count: number
   resetAt: number
 }
@@ -39,7 +32,6 @@ export const docsChatbot = createModule('docs-chatbot', {
   schema: {
     facts: {
       requestCounts: t.object<Record<string, RateLimitEntry>>(),
-      dailyCounts: t.object<Record<string, DailyCapEntry>>(),
       totalRequests: t.number(),
       totalTokensUsed: t.number(),
       consecutiveErrors: t.number(),
@@ -64,7 +56,6 @@ export const docsChatbot = createModule('docs-chatbot', {
 
   init: (facts) => {
     facts.requestCounts = {}
-    facts.dailyCounts = {}
     facts.totalRequests = 0
     facts.totalTokensUsed = 0
     facts.consecutiveErrors = 0
@@ -97,18 +88,6 @@ export const docsChatbot = createModule('docs-chatbot', {
       facts.requestCounts = counts
       facts.totalRequests += 1
 
-      // Daily cap tracking (same pattern, 24h window)
-      const daily = { ...facts.dailyCounts }
-      const dailyEntry = daily[ip]
-
-      if (!dailyEntry || now > dailyEntry.resetAt) {
-        daily[ip] = { count: 1, resetAt: now + DAILY_CAP_WINDOW }
-      } else {
-        daily[ip] = { ...dailyEntry, count: dailyEntry.count + 1 }
-      }
-
-      facts.dailyCounts = daily
-
       // Trigger eviction when map grows too large
       if (Object.keys(counts).length > MAX_RATE_LIMIT_ENTRIES) {
         const cleaned = { ...counts }
@@ -116,14 +95,6 @@ export const docsChatbot = createModule('docs-chatbot', {
           if (now > val.resetAt) delete cleaned[key]
         }
         facts.requestCounts = cleaned
-      }
-
-      if (Object.keys(daily).length > MAX_RATE_LIMIT_ENTRIES) {
-        const cleaned = { ...daily }
-        for (const [key, val] of Object.entries(cleaned)) {
-          if (now > val.resetAt) delete cleaned[key]
-        }
-        facts.dailyCounts = cleaned
       }
     },
 
@@ -148,16 +119,6 @@ export const docsChatbot = createModule('docs-chatbot', {
         }
       }
       if (changed) facts.requestCounts = counts
-
-      const daily = { ...facts.dailyCounts }
-      let dailyChanged = false
-      for (const [ip, entry] of Object.entries(daily)) {
-        if (now > entry.resetAt) {
-          delete daily[ip]
-          dailyChanged = true
-        }
-      }
-      if (dailyChanged) facts.dailyCounts = daily
     },
   },
 
@@ -200,4 +161,4 @@ export const docsChatbot = createModule('docs-chatbot', {
 // Helpers (used by route.ts)
 // ---------------------------------------------------------------------------
 
-export { MAX_REQUESTS_PER_WINDOW, RATE_LIMIT_WINDOW, DAILY_CAP_PER_IP }
+export { MAX_REQUESTS_PER_WINDOW, RATE_LIMIT_WINDOW }

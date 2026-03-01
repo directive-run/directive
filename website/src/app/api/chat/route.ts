@@ -20,7 +20,6 @@ import {
   getEnricher,
   transport,
   MAX_REQUESTS_PER_WINDOW,
-  DAILY_CAP_PER_IP,
   BASE_INSTRUCTIONS,
 } from './orchestrator-singleton'
 import { createStreamingRunner } from '@directive-run/ai'
@@ -111,8 +110,8 @@ function sanitizePageUrl(url: string | undefined): string | undefined {
 
 function getClientIp(request: NextRequest): string {
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   )
 }
@@ -178,36 +177,28 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request)
   chatbotSystem.events.incomingRequest({ ip })
 
-  // Route-level rate limiting (read from module facts)
+  // -------------------------------------------------------------------------
+  // Dual-path: BYOK (skip rate limit) vs server key (rate limited)
+  // -------------------------------------------------------------------------
+
+  const clientApiKey = request.headers.get('x-api-key')
+  const isByok = Boolean(clientApiKey)
+
+  // Rate limiting only applies to server key usage
   const entry = chatbotSystem.facts.requestCounts[ip]
-  if (entry && entry.count > MAX_REQUESTS_PER_WINDOW) {
+  const hourlyCount = entry ? entry.count : 0
+  const hourlyRemaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - hourlyCount)
+
+  if (!isByok && entry && entry.count > MAX_REQUESTS_PER_WINDOW) {
     return new Response(
-      JSON.stringify({ error: 'Too many requests. Please wait a moment.' }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
-
-  // Daily cap check
-  const capDisabled = process.env.DISABLE_DAILY_CAP === 'true'
-  const dailyEntry = chatbotSystem.facts.dailyCounts[ip]
-  const dailyCount = dailyEntry ? dailyEntry.count : 0
-
-  // dailyRemaining reports full capacity when disabled so widget never shows "0 remaining"
-  const dailyRemaining = capDisabled
-    ? DAILY_CAP_PER_IP
-    : Math.max(0, DAILY_CAP_PER_IP - dailyCount)
-
-  // Skip enforcement when disabled
-  if (!capDisabled && dailyCount > DAILY_CAP_PER_IP) {
-    return new Response(
-      JSON.stringify({ error: 'Daily question limit reached. Come back tomorrow!' }),
+      JSON.stringify({ error: "You've used your 5 free tries this hour. Use your own API key for unlimited access." }),
       {
         status: 429,
         headers: {
           'Content-Type': 'application/json',
-          'X-Daily-Remaining': '0',
-          'X-Daily-Limit': String(DAILY_CAP_PER_IP),
-          'Access-Control-Expose-Headers': 'X-Daily-Remaining, X-Daily-Limit',
+          'X-Hourly-Remaining': '0',
+          'X-Hourly-Limit': String(MAX_REQUESTS_PER_WINDOW),
+          'Access-Control-Expose-Headers': 'X-Hourly-Remaining, X-Hourly-Limit',
         },
       },
     )
@@ -330,19 +321,18 @@ export async function POST(request: NextRequest) {
   }
 
   // -------------------------------------------------------------------------
-  // Dual-path: user-provided API key vs server env var
+  // Dual-path: BYOK (user key) vs server key
   // -------------------------------------------------------------------------
 
-  const clientApiKey = request.headers.get('x-api-key')
   const clientProvider = request.headers.get('x-provider') || 'anthropic'
 
-  if (clientApiKey) {
+  if (isByok) {
     // User-provided key: create a one-shot streaming runner (no budget/rate-limit tracking)
     const callbackRunner =
       clientProvider === 'openai'
-        ? createOpenAIStreamingRunner({ apiKey: clientApiKey, model: 'gpt-4o-mini' })
+        ? createOpenAIStreamingRunner({ apiKey: clientApiKey!, model: 'gpt-4o-mini' })
         : createAnthropicStreamingRunner({
-            apiKey: clientApiKey,
+            apiKey: clientApiKey!,
             model: 'claude-haiku-4-5-20251001',
             maxTokens: 2000,
           })
@@ -405,17 +395,10 @@ export async function POST(request: NextRequest) {
     return new Response(responseStream, { headers: sseHeaders })
   }
 
-  // No user key: require env var (dev fallback, 401 in prod)
+  // Server key path — 503 if not configured
   if (!instance) {
-    if (process.env.NODE_ENV !== 'development') {
-      return new Response(
-        JSON.stringify({ error: 'API key required. Enter your key in the provider config above.' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
-      )
-    }
-
     return new Response(
-      JSON.stringify({ error: 'Chat service is not configured.' }),
+      JSON.stringify({ error: 'Service unavailable' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     )
   }
@@ -426,9 +409,9 @@ export async function POST(request: NextRequest) {
   })
 
   // Add usage + CORS headers
-  sseResponse.headers.set('X-Daily-Remaining', String(dailyRemaining))
-  sseResponse.headers.set('X-Daily-Limit', String(DAILY_CAP_PER_IP))
-  sseResponse.headers.set('Access-Control-Expose-Headers', 'X-Daily-Remaining, X-Daily-Limit')
+  sseResponse.headers.set('X-Hourly-Remaining', String(hourlyRemaining))
+  sseResponse.headers.set('X-Hourly-Limit', String(MAX_REQUESTS_PER_WINDOW))
+  sseResponse.headers.set('Access-Control-Expose-Headers', 'X-Hourly-Remaining, X-Hourly-Limit')
 
   if (origin) {
     sseResponse.headers.set('Access-Control-Allow-Origin', origin)

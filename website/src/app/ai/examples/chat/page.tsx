@@ -45,10 +45,6 @@ export default function AIChatPage() {
           </p>
         </div>
 
-        <div className="mt-4 shrink-0">
-          <ProviderConfig onChange={handleConfigChange} />
-        </div>
-
         <div className="mt-4 min-h-0 flex-1">
           <InlineChat
             apiEndpoint="/api/chat"
@@ -61,6 +57,10 @@ export default function AIChatPage() {
             pageUrl="/ai/examples/chat"
             headers={headers}
           />
+        </div>
+
+        <div className="mt-3 shrink-0">
+          <ProviderConfig onChange={handleConfigChange} />
         </div>
       </div>
     </DevToolsWithProvider>

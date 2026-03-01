@@ -11,6 +11,7 @@ import { getFraudReviewOrchestrator, getFraudReviewInputGuardrails } from './orc
 import { findScenario, buildCaseSummary } from './case-data'
 import { createAnthropicRunner } from '@directive-run/ai/anthropic'
 import { createOpenAIRunner } from '@directive-run/ai/openai'
+import { checkHourlyRateLimit, isRateLimited, getClientIp, getRateLimitHeaders, getResetMinutes } from '@/lib/rate-limit'
 
 interface HistoryMessage {
   role: 'user' | 'assistant'
@@ -50,6 +51,31 @@ export async function POST(request: Request) {
   const history = validateHistory(Array.isArray(body?.history) ? body.history : [])
 
   // -------------------------------------------------------------------------
+  // BYOK vs server key rate limiting
+  // -------------------------------------------------------------------------
+
+  const clientApiKey = (request.headers as Headers).get?.('x-api-key') ?? null
+  const clientProvider = (request.headers as Headers).get?.('x-provider') || 'anthropic'
+  const isByok = Boolean(clientApiKey)
+  const ip = getClientIp(request)
+  let hourlyRemaining = 0
+  let hourlyLimit = 5
+
+  if (!isByok) {
+    const rl = checkHourlyRateLimit(ip)
+    hourlyRemaining = rl.remaining
+    hourlyLimit = rl.limit
+    if (isRateLimited(ip)) {
+      const mins = getResetMinutes(ip)
+
+      return Response.json(
+        { error: `You've used your 5 free tries this hour. Try again in ${mins} minutes.` },
+        { status: 429, headers: getRateLimitHeaders(hourlyRemaining, hourlyLimit) },
+      )
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Match scenario from user message → build case summary
   // -------------------------------------------------------------------------
 
@@ -59,18 +85,15 @@ export async function POST(request: Request) {
     : `The user wants to discuss fraud analysis: "${message}". If they mention a specific fraud pattern, provide analysis. Available scenarios: card skimming, account takeover, bust-out fraud, deposit name mismatch, cash in/cash out, merchant credit abuse, rapid funds movement, and more.`
 
   // -------------------------------------------------------------------------
-  // Dual-path: user-provided API key vs server env var
+  // Dual-path: BYOK (user key) vs server key
   // -------------------------------------------------------------------------
 
-  const clientApiKey = (request.headers as Headers).get?.('x-api-key') ?? null
-  const clientProvider = (request.headers as Headers).get?.('x-provider') || 'anthropic'
-
-  if (clientApiKey) {
+  if (isByok) {
     const runner =
       clientProvider === 'openai'
-        ? createOpenAIRunner({ apiKey: clientApiKey, model: 'gpt-4o-mini' })
+        ? createOpenAIRunner({ apiKey: clientApiKey!, model: 'gpt-4o-mini' })
         : createAnthropicRunner({
-            apiKey: clientApiKey,
+            apiKey: clientApiKey!,
             model: 'claude-haiku-4-5-20251001',
             maxTokens: 2000,
           })
@@ -130,18 +153,11 @@ Format your response as a professional fraud investigation report.`,
     })
   }
 
-  // No user key: require env var (dev fallback, 401 in prod)
+  // Server key path — 503 if not configured
   const instance = getFraudReviewOrchestrator()
   if (!instance) {
-    if (process.env.NODE_ENV !== 'development') {
-      return Response.json(
-        { error: 'API key required. Enter your key in the provider config above.' },
-        { status: 401 },
-      )
-    }
-
     return Response.json(
-      { error: 'ANTHROPIC_API_KEY not configured' },
+      { error: 'Service unavailable' },
       { status: 503 },
     )
   }
@@ -272,12 +288,16 @@ Format your response as a professional fraud investigation report.`,
     },
   })
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
-  })
+  const responseHeaders: Record<string, string> = {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  }
+
+  if (!isByok) {
+    Object.assign(responseHeaders, getRateLimitHeaders(hourlyRemaining, hourlyLimit))
+  }
+
+  return new Response(stream, { headers: responseHeaders })
 }
