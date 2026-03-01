@@ -12,7 +12,7 @@ export function DerivationsView() {
   const derivationCount = useSelector(system, (s) => s.derive.runtime.derivationCount)
 
   if (!connected) {
-    return <EmptyState message="No Directive system connected" />
+    return <EmptyState message="No Directive system connected" docsUrl="/docs/plugins/devtools" />
   }
 
   return (

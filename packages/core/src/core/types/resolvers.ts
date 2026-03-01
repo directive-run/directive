@@ -43,16 +43,10 @@ export interface BatchConfig {
 	enabled: boolean;
 	/** Time window to collect requirements (ms) */
 	windowMs: number;
-	/** Maximum batch size (default: unlimited) */
+	/** Maximum batch size. When reached, the batch flushes immediately instead of waiting for the timer. (default: unlimited) */
 	maxSize?: number;
 	/** Per-batch timeout in ms (overrides resolver timeout for batches) */
 	timeoutMs?: number;
-	/**
-	 * Failure strategy for partial batch failures:
-	 * - "all-or-nothing" (default): If resolveBatch throws, all requirements fail
-	 * - "per-item": Use resolveBatchWithResults to get per-item results
-	 */
-	failureStrategy?: "all-or-nothing" | "per-item";
 }
 
 /**
@@ -77,6 +71,7 @@ export type BatchResolveResults<T = unknown> = Array<BatchItemResult<T>>;
 export interface ResolverContext<S extends Schema = Schema> {
 	readonly facts: Facts<S>;
 	readonly signal: AbortSignal;
+	/** Returns a read-only snapshot of the current facts state, useful for before/after comparisons inside resolvers. */
 	readonly snapshot: () => FactsSnapshot<S>;
 }
 
@@ -98,7 +93,7 @@ export interface ResolverDef<S extends Schema, R extends Requirement = Requireme
 	retry?: RetryPolicy;
 	/** Timeout for resolver execution (ms) */
 	timeout?: number;
-	/** Batch configuration (mutually exclusive with regular resolve) */
+	/** Batch configuration. Works with resolve() (individual fallback), resolveBatch(), or resolveBatchWithResults(). */
 	batch?: BatchConfig;
 	/** Resolve function for single requirement */
 	resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
@@ -165,12 +160,14 @@ type TypedResolverForType<
 	retry?: RetryPolicy;
 	/** Timeout for resolver execution (ms) */
 	timeout?: number;
-	/** Batch configuration (mutually exclusive with regular resolve) */
+	/** Batch configuration */
 	batch?: BatchConfig;
 	/** Resolve function for single requirement */
 	resolve?: (req: InferredReq<R, T>, ctx: ResolverContext<S>) => Promise<void>;
-	/** Resolve function for batched requirements */
+	/** Resolve function for batched requirements (all-or-nothing) */
 	resolveBatch?: (reqs: Array<InferredReq<R, T>>, ctx: ResolverContext<S>) => Promise<void>;
+	/** Resolve function for batched requirements with per-item results */
+	resolveBatchWithResults?: (reqs: Array<InferredReq<R, T>>, ctx: ResolverContext<S>) => Promise<BatchResolveResults>;
 };
 
 /**
@@ -188,10 +185,12 @@ export type ResolversDef<S extends Schema> = Record<
 >;
 
 /**
- * Map of typed resolver definitions.
+ * Map of typed resolver definitions (schema-based variant).
  * Each resolver uses `requirement: "TYPE"` with types inferred from the requirements schema.
+ *
+ * @internal Use `TypedResolversDef` from `types/module.ts` for the public module-based API.
  */
-export type TypedResolversDef<
+export type SchemaTypedResolversDef<
 	S extends Schema,
 	R extends RequirementsSchema,
 > = Record<string, AnyTypedResolver<S, R> | ResolverDef<S, Requirement & InferRequirementsFromSchema<R>>>;

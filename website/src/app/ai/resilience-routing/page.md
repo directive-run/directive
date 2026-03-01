@@ -16,7 +16,7 @@ Every wrapper has the signature `(runner, config) => AgentRunner` — except `wi
 {% callout title="Composition order matters" %}
 Apply wrappers from inside out:
 
-**Model Selection → Fallback → Retry → Budget → Structured Output**
+`Model Selection → Fallback → Retry → Budget → Structured Output`
 
 Model selection runs closest to the provider. Budget checks happen before retries. Structured output validates after everything else.
 
