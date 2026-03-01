@@ -307,7 +307,7 @@ export function createDepGraph(): DepGraph {
 // Record & Replay
 // ============================================================================
 
-// C3: Recording caps to prevent unbounded growth
+// Recording caps to prevent unbounded growth
 export const MAX_RECORDED_EVENTS = 10_000;
 export const MAX_RECORDED_SNAPSHOTS = 100;
 

@@ -14,7 +14,6 @@ const VALID_SERVER_MESSAGE_TYPES = new Set([
   "event",
   "event_batch",
   "snapshot",
-  "health",
   "breakpoints",
   "scratchpad_state",
   "scratchpad_update",
@@ -26,7 +25,7 @@ const VALID_SERVER_MESSAGE_TYPES = new Set([
   "error",
 ]);
 
-/** BLOCKED_KEYS from use-devtools-connection.ts (P1 fix) */
+/** BLOCKED_KEYS from use-devtools-connection.ts */
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /** Simulates the scratchpad_state/derived_state processing from the hook */
@@ -46,7 +45,7 @@ function isAllowedKey(key: string): boolean {
   return typeof key === "string" && !BLOCKED_KEYS.has(key);
 }
 
-/** Simulates the forkFromSnapshot eventId validation (M12 fix) */
+/** Simulates the forkFromSnapshot eventId validation */
 function isValidForkEventId(eventId: number): boolean {
   return Number.isFinite(eventId) && eventId >= 0;
 }
@@ -264,7 +263,7 @@ describe("VALID_EVENT_TYPES", () => {
 });
 
 // ============================================================================
-// P7: VALID_SERVER_MESSAGE_TYPES exported from types.ts
+// VALID_SERVER_MESSAGE_TYPES exported from types.ts
 // ============================================================================
 
 describe("VALID_SERVER_MESSAGE_TYPES (P7: exported from types.ts)", () => {
@@ -278,13 +277,13 @@ describe("VALID_SERVER_MESSAGE_TYPES (P7: exported from types.ts)", () => {
     }
   });
 
-  it("contains all 15 expected server message types", () => {
-    expect(EXPORTED_SERVER_MESSAGE_TYPES.size).toBe(15);
+  it("contains all 14 expected server message types", () => {
+    expect(EXPORTED_SERVER_MESSAGE_TYPES.size).toBe(14);
   });
 });
 
 // ============================================================================
-// P1: BLOCKED_KEYS filtering for scratchpad/derived state
+// BLOCKED_KEYS filtering for scratchpad/derived state
 // ============================================================================
 
 describe("BLOCKED_KEYS filtering (P1)", () => {
@@ -335,7 +334,7 @@ describe("BLOCKED_KEYS filtering (P1)", () => {
 });
 
 // ============================================================================
-// M12: Fork eventId validation
+// Fork eventId validation
 // ============================================================================
 
 describe("forkFromSnapshot eventId validation (M12)", () => {

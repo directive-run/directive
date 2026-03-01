@@ -20,7 +20,7 @@ const DEMO_EVENTS = [
 const AGENTS = ['researcher', 'writer', 'reviewer'] as const
 
 const VIEWS = ['Timeline', 'Cost', 'State'] as const
-const DISABLED_VIEWS = ['Flamechart', 'Graph', 'Goal', 'Health', 'Breakpoints', 'Compare'] as const
+const DISABLED_VIEWS = ['Graph', 'Goal', 'Breakpoints'] as const
 
 const EVENT_COLORS: Record<string, string> = {
   agent_start: 'bg-sky-500',

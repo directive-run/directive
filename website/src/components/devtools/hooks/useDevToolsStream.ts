@@ -54,7 +54,7 @@ export function useDevToolsStream() {
         }
         maxIdRef.current = event.id
 
-        // Phase 5: Check breakpoints before buffering
+        // Check breakpoints before buffering
         const activeBreakpoints = system.facts.connection.breakpoints.filter(
           (b: { enabled: boolean; eventType: string }) => b.enabled && b.eventType === event.type,
         )
@@ -102,7 +102,7 @@ export function useDevToolsStream() {
     return unsub
   }, [system, connect])
 
-  // Phase 5: Watch isPaused — when resumed, reconnect EventSource
+  // Watch isPaused — when resumed, reconnect EventSource
   useEffect(() => {
     let prevPaused = system.facts.connection.isPaused
     const unsub = system.watch('connection.isPaused', (nowPaused: unknown) => {
@@ -141,7 +141,7 @@ export function useDevToolsStream() {
       const imported = (e as CustomEvent).detail as DebugEvent[]
       if (Array.isArray(imported) && imported.length > 0) {
         system.events.connection.importEvents({ imported })
-        // M4: Avoid Math.max(...spread) stack overflow for large imports
+        // Avoid Math.max(...spread) stack overflow for large imports
         maxIdRef.current = imported.reduce((max, ev) => Math.max(max, ev.id), -1)
       }
     }
@@ -198,12 +198,12 @@ export function useDevToolsStream() {
 
     return () => {
       window.removeEventListener(DEVTOOLS_EVENT_NAME, handler)
-      // M3: Reset so remount can re-enable AI for a new system
+      // Reset so remount can re-enable AI for a new system
       aiEnabledRef.current = false
     }
   }, []) // stable — uses refs for all mutable deps
 
-  // M1: Manual reconnect (exposed for "click to retry" after max retries)
+  // Manual reconnect (exposed for "click to retry" after max retries)
   const reconnect = useCallback(() => {
     system.events.connection.resetRetries()
     maxIdRef.current = -1

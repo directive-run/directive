@@ -170,7 +170,7 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 			},
 			importSession(json, name) {
 				try {
-					// C1: Size cap — reject payloads over 10MB
+					// Size cap — reject payloads over 10MB
 					if (json.length > 10 * 1024 * 1024) {
 						return false;
 					}
@@ -181,7 +181,7 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 					if (!Array.isArray(data.events)) {
 						return false;
 					}
-					// C1: Cap imported events at target's maxEvents
+					// Cap imported events at target's maxEvents
 					const target = name ? systems.get(name) : systems.values().next().value;
 					if (!target) {
 						return false;
@@ -203,7 +203,7 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 							(evt as Record<string, unknown>).type !== "constructor" &&
 							(evt as Record<string, unknown>).type !== "prototype"
 						) {
-							// C1: Sanitize — only copy known fields
+							// Sanitize — only copy known fields
 							target.events.push({
 								timestamp: (evt as Record<string, unknown>).timestamp as number,
 								type: (evt as Record<string, unknown>).type as string,
@@ -226,7 +226,7 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
 			},
 		};
 
-		// C2: Non-writable global — prevent casual script overwriting
+		// Non-writable global — prevent casual script overwriting
 		// configurable in dev mode for test cleanup and plugin re-initialization
 		Object.defineProperty(window, "__DIRECTIVE__", {
 			value: api,

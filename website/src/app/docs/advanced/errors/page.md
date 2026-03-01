@@ -7,40 +7,74 @@ Directive provides robust error handling for resolvers, constraints, effects, an
 
 ---
 
-## Resolver Error Handling
+## How Resilience Works
 
-Handle errors directly in resolver logic with try-catch:
+Directive has a two-layer error handling system. Resolver retry handles transient failures fast. The error boundary handles persistent failures after retries are exhausted.
+
+```
+  Resolver executes
+      │ fails
+      ▼
+  Resolver retry policy (attempts: 3, backoff: exponential)
+      │ all attempts exhausted
+      ▼
+  Error boundary receives the error
+      │
+      ├─ "skip"        → swallow, move on
+      ├─ "retry"       → immediate single re-attempt (same cycle)
+      ├─ "retry-later" → schedule deferred retry (exponential backoff)
+      ├─ "disable"     → disable the constraint that produced this requirement
+      └─ "throw"       → re-throw, crash current reconciliation
+```
+
+**Configure fast retries on the resolver. Configure what happens after they fail on the error boundary.**
+
+### When to Use What
+
+| Layer | Purpose | Speed | Scope |
+|-------|---------|-------|-------|
+| `resolver.retry` | Transient failures (network blips, rate limits) | Fast — immediate retries with backoff | Per-resolver |
+| `errorBoundary: "retry"` | One more attempt after all retries fail | Immediate — same reconciliation cycle | System-wide |
+| `errorBoundary: "retry-later"` | Service degradation, longer outages | Slow — deferred with exponential backoff | System-wide |
+| [Circuit Breaker](/docs/plugins/circuit-breaker) | Cascading failure prevention | Instant rejection when open | Per-service |
+
+### Full Example
 
 ```typescript
-resolvers: {
-  fetchUser: {
-    requirement: "FETCH_USER",
-    resolve: async (req, context) => {
-      try {
-        // Signal the UI that a request is in flight
-        context.facts.loading = true;
+const system = createSystem({
+  module: myModule,
 
-        // Fetch and store the user, clearing any previous error
-        context.facts.user = await api.getUser(req.userId);
-        context.facts.error = null;
-      } catch (error) {
-        // Store the error message and clear stale user data
-        context.facts.error = error.message;
-        context.facts.user = null;
-      } finally {
-        // Always reset loading state, even on failure
-        context.facts.loading = false;
+  errorBoundary: {
+    onResolverError: (error, resolver) => {
+      // At this point, the resolver's own retry policy is already exhausted.
+      if (error.message.includes("rate limit")) {
+        return "retry-later"; // Back off and try again later
       }
+      if (error.message.includes("not found")) {
+        return "disable"; // Stop trying — the resource doesn't exist
+      }
+
+      return "skip"; // Swallow and continue
+    },
+
+    retryLater: {
+      delayMs: 2000,
+      maxRetries: 5,
+      backoffMultiplier: 2,
+    },
+
+    onError: (error) => {
+      errorReporter.capture(error);
     },
   },
-}
+});
 ```
 
 ---
 
-## Retry Policies
+## Resolver Retry Policy
 
-Configure automatic retries with backoff:
+Configure automatic retries directly on the resolver for transient failures:
 
 ```typescript
 resolvers: {
@@ -63,13 +97,13 @@ resolvers: {
 }
 ```
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `attempts` | `number` | Maximum retry attempts |
-| `backoff` | `"none" \| "linear" \| "exponential"` | Backoff strategy |
-| `initialDelay` | `number` | Delay before first retry (ms) |
-| `maxDelay` | `number` | Maximum delay between retries (ms) |
-| `shouldRetry` | `(error, attempt) => boolean` | Predicate to control whether to retry |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `attempts` | `number` | `1` | Maximum retry attempts |
+| `backoff` | `"none" \| "linear" \| "exponential"` | `"none"` | Backoff strategy |
+| `initialDelay` | `number` | `100` | Delay before first retry (ms) |
+| `maxDelay` | `number` | `30000` | Maximum delay between retries (ms) |
+| `shouldRetry` | `(error, attempt) => boolean` | – | Predicate to control whether to retry |
 
 Use `shouldRetry` to skip retries for non-transient errors:
 
@@ -125,7 +159,7 @@ resolve: async (req, context) => {
 
 ## Error Boundary
 
-Configure system-level error handling with `errorBoundary`:
+The error boundary catches errors **after** resolver retries are exhausted. Configure system-level error handling with `errorBoundary`:
 
 ```typescript
 const system = createSystem({
@@ -164,23 +198,179 @@ const system = createSystem({
 
 | Strategy | Behavior |
 |----------|----------|
-| `"skip"` | Ignore the error and continue |
-| `"retry"` | Retry the operation immediately |
-| `"retry-later"` | Retry after a delay (configurable) |
-| `"disable"` | Disable the failing constraint/effect/resolver |
-| `"throw"` | Re-throw the error (stops the system) |
+| `"skip"` | Ignore the error and continue. The system proceeds as if nothing happened. |
+| `"retry"` | Retry the operation immediately. For effects, forces a re-run on the next reconcile. For derivations, marks them stale so they recompute on the next read. |
+| `"retry-later"` | Schedule a retry with exponential backoff. Requires `retryLater` configuration. The engine polls for due retries and triggers reconciliation. |
+| `"disable"` | Permanently disable the failing source. Disables the constraint (for constraint/resolver errors) or effect (for effect errors). The source stays disabled until manually re-enabled. |
+| `"throw"` | Re-throw the error. This stops the current reconciliation cycle. |
 
-You can also pass a callback instead of a strategy string:
+---
+
+## Retry-Later Configuration
+
+When using `"retry-later"`, configure the backoff behavior. This is **separate** from resolver retry — it fires after all resolver-level retries are exhausted:
 
 ```typescript
 errorBoundary: {
-  // Use a callback for fine-grained control over error recovery
-  onResolverError: (error, resolver) => {
-    console.error(`Resolver ${resolver} failed:`, error);
-    // Implement custom recovery logic here
+  onResolverError: "retry-later",
+  retryLater: {
+    delayMs: 1000,        // Initial delay before first retry (default: 1000)
+    maxRetries: 3,        // Give up after this many attempts (default: 3)
+    backoffMultiplier: 2, // Multiply delay by this on each retry (default: 2)
+    maxDelayMs: 30000,    // Cap the delay at this value (default: 30000)
   },
 },
 ```
+
+The engine starts a polling timer when `retryLater` is configured. When a due retry fires, it triggers a reconciliation cycle so constraints re-evaluate and resolvers re-execute. Retry attempts are cleared automatically when a resolver succeeds.
+
+### Disable Strategy
+
+Use `"disable"` to permanently turn off failing constraints or effects:
+
+```typescript
+errorBoundary: {
+  onConstraintError: "disable", // Permanently disable failing constraints
+  onEffectError: "disable",     // Permanently disable failing effects
+},
+```
+
+For resolver errors, `"disable"` disables the constraint that produced the requirement. You can re-enable disabled constraints/effects programmatically:
+
+```typescript
+system.constraints.enable("myConstraint");
+system.effects.enable("myEffect");
+```
+
+### Callback with Strategy Return
+
+Pass a callback that returns a strategy string for dynamic error handling:
+
+```typescript
+errorBoundary: {
+  onResolverError: (error, resolver) => {
+    if (error.message.includes("rate limit")) {
+      return "retry-later";
+    }
+    if (error.message.includes("not found")) {
+      return "disable";
+    }
+
+    return "skip";
+  },
+},
+```
+
+If the callback returns `void` (no return value), the strategy defaults to `"skip"`.
+
+### See Also
+
+- [Error Boundaries Example](/docs/examples/error-boundaries) — Interactive demo of all 5 strategies
+
+---
+
+## Circuit Breaker
+
+For operations that call external services, use a [circuit breaker](/docs/plugins/circuit-breaker) to automatically stop sending requests to a failing service and recover gracefully.
+
+The circuit breaker is a **standalone utility** — wrap calls inside your resolver's `resolve()` function. It complements retry policies: retries handle transient failures within a single operation, while the circuit breaker prevents repeated attempts against a service that is consistently failing.
+
+```typescript
+import { createCircuitBreaker } from '@directive-run/core/plugins';
+
+const apiBreaker = createCircuitBreaker({
+  name: 'external-api',
+  failureThreshold: 5,
+  recoveryTimeMs: 30000,
+});
+
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    retry: { attempts: 3, backoff: "exponential" },
+    resolve: async (req, context) => {
+      // Circuit breaker wraps the call inside the resolver
+      const data = await apiBreaker.execute(() => api.getData(req.id));
+      context.facts.data = data;
+    },
+  },
+}
+```
+
+See [Circuit Breaker](/docs/plugins/circuit-breaker) for full configuration and the 3-state pattern.
+
+---
+
+## Batch Error Handling
+
+When using [batched resolvers](/docs/resolvers#batched-resolution), error handling depends on your failure strategy.
+
+### All-or-Nothing (default)
+
+With `resolveBatch`, if the handler throws, **all** requirements in the batch fail. Retry policies apply to the entire batch:
+
+```typescript
+resolvers: {
+  fetchUsers: {
+    requirement: "FETCH_USER",
+    batch: { enabled: true, windowMs: 50 },
+    retry: { attempts: 3, backoff: "exponential" },
+
+    // If this throws, all 3 requirements fail together
+    resolveBatch: async (reqs, context) => {
+      const ids = reqs.map(r => r.userId);
+      const users = await api.getUsersBatch(ids);
+      users.forEach(user => { context.facts[`user_${user.id}`] = user; });
+    },
+  },
+}
+```
+
+### Per-Item Results
+
+With `resolveBatchWithResults`, each item reports success or failure independently:
+
+```typescript
+resolvers: {
+  fetchUsers: {
+    requirement: "FETCH_USER",
+    batch: { enabled: true, windowMs: 50 },
+
+    resolveBatchWithResults: async (reqs, context) => {
+      return Promise.all(reqs.map(async (req) => {
+        try {
+          const user = await api.getUser(req.userId);
+          context.facts[`user_${user.id}`] = user;
+
+          return { success: true };
+        } catch (error) {
+          return { success: false, error };
+        }
+      }));
+    },
+  },
+}
+```
+
+### Batch with resolve() Fallback
+
+You can enable batching with just `resolve()` (no `resolveBatch`). The system falls back to calling `resolve()` individually for each batched requirement. This gives you batching benefits (windowing, dedup) without writing a bulk handler:
+
+```typescript
+resolvers: {
+  fetchUser: {
+    requirement: "FETCH_USER",
+    batch: { enabled: true, windowMs: 50 },
+
+    // Individual resolve — called once per batched requirement
+    resolve: async (req, context) => {
+      context.facts.user = await api.getUser(req.userId);
+    },
+  },
+}
+```
+
+Upgrade to `resolveBatch` when you need true bulk operations (e.g., a single SQL `WHERE id IN (...)` query).
 
 ---
 
@@ -326,6 +516,7 @@ const system = createSystem({
 
 ## Next Steps
 
-- [Resolvers](/docs/resolvers) – Retry configuration
+- [Circuit Breaker](/docs/plugins/circuit-breaker) – Fault isolation and automatic recovery
+- [Resolvers](/docs/resolvers) – Retry configuration and batching
 - [Custom Plugins](/docs/plugins/custom) – Monitoring hooks
 - [Testing](/docs/testing/overview) – Testing error scenarios

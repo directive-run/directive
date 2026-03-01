@@ -31,16 +31,17 @@ const docsAgent = {
   model: 'claude-sonnet-4-5-20250929',
 };
 
-// SSE transport accepts any SSEStreamable – an object with a .stream(agentOrInput, input?) method
+// SSE transport accepts any SSEStreamable – an object with a .stream(agentId, input, opts?) method
 const streamable = {
-  stream: (input: string) => streamRunner(docsAgent, input),
+  stream: (agentId: string, input: string, opts?: { signal?: AbortSignal }) =>
+    streamRunner(docsAgent, input, opts),
 };
 
 // Next.js route handler
 export async function POST(request: Request) {
   const { message } = await request.json();
 
-  return transport.toResponse(streamable, message);
+  return transport.toResponse(streamable, 'docs-qa', message);
 }
 ```
 
@@ -79,25 +80,25 @@ type SSEEvent =
   | { type: 'heartbeat'; timestamp: number };
 ```
 
-### `toResponse(streamable, input, opts?)`
+### `toResponse(streamable, agentId, input, opts?)`
 
-Creates a full `Response` object with SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`). Pass it directly as the return value from a route handler.
+Creates a full `Response` object with SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`). The `agentId` identifies which agent handles this request — it is passed through to the streamable's `.stream()` method for logging, routing, and timeline correlation. Pass the response directly as the return value from a route handler.
 
 ```typescript
 export async function POST(request: Request) {
   const { message } = await request.json();
 
-  return transport.toResponse(streamable, message);
+  return transport.toResponse(streamable, 'docs-qa', message);
 }
 ```
 
-### `toStream(streamable, input, opts?)`
+### `toStream(streamable, agentId, input, opts?)`
 
 Returns just the `ReadableStream<Uint8Array>` for frameworks like Express or Koa where you pipe the stream into `res.write()` manually.
 
 ```typescript
 app.post('/api/chat', async (req, res) => {
-  const stream = transport.toStream(streamable, req.body.message);
+  const stream = transport.toStream(streamable, 'docs-qa', req.body.message);
   const reader = stream.getReader();
   res.setHeader('Content-Type', 'text/event-stream');
 
@@ -145,7 +146,13 @@ if (!res.ok) {
   return;
 }
 
-const reader = res.body!.getReader();
+if (!res.body) {
+  showError('No response body');
+
+  return;
+}
+
+const reader = res.body.getReader();
 const decoder = new TextDecoder();
 let buffer = '';
 
@@ -164,7 +171,12 @@ while (true) {
     const data = line.slice(6).trim();
     if (!data) continue;
 
-    const event = JSON.parse(data);
+    let event: SSEEvent;
+    try {
+      event = JSON.parse(data);
+    } catch {
+      continue; // Skip malformed frames
+    }
 
     switch (event.type) {
       case 'text':
@@ -278,7 +290,7 @@ Pass an `AbortSignal` to cancel the stream from the server side. This is useful 
 export async function POST(request: Request) {
   const { message } = await request.json();
 
-  return transport.toResponse(streamable, message, {
+  return transport.toResponse(streamable, 'docs-qa', message, {
     signal: request.signal,  // Cancels the agent stream if the client disconnects
   });
 }
@@ -311,7 +323,8 @@ const chatAgent = { name: 'chat', instructions: 'You are helpful.', model: 'clau
 
 // Create a streamable wrapper for SSE transport
 const streamable = {
-  stream: (input: string) => streamRunner(chatAgent, input),
+  stream: (agentId: string, input: string, opts?: { signal?: AbortSignal }) =>
+    streamRunner(chatAgent, input, opts),
 };
 ```
 
@@ -368,7 +381,8 @@ const streamRunner = createStreamingRunner(
 
 // SSE transport accepts any SSEStreamable
 const streamable = {
-  stream: (input: string) => streamRunner(docsAgent, input),
+  stream: (agentId: string, input: string, opts?: { signal?: AbortSignal }) =>
+    streamRunner(docsAgent, input, opts),
 };
 
 const transport = createSSETransport({
@@ -387,7 +401,7 @@ export async function POST(request: Request) {
     filter: (chunk) => chunk.metadata.type === 'docs',
   });
 
-  return transport.toResponse(streamable, enrichedInput, {
+  return transport.toResponse(streamable, 'docs-qa', enrichedInput, {
     signal: request.signal,
   });
 }
@@ -436,10 +450,11 @@ export async function POST(request: Request) {
   }
 
   const streamable = {
-    stream: (input: string) => streamRunner(agentDef, input),
+    stream: (id: string, input: string, opts?: { signal?: AbortSignal }) =>
+      streamRunner(agentDef, input, opts),
   };
 
-  return transport.toResponse(streamable, message, { signal: request.signal });
+  return transport.toResponse(streamable, agentId, message, { signal: request.signal });
 }
 ```
 

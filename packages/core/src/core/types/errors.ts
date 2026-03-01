@@ -67,34 +67,14 @@ export interface RetryLaterConfig {
 	maxDelayMs?: number;
 }
 
-/**
- * Circuit breaker configuration for automatic failure protection.
- * After `failureThreshold` consecutive failures, the circuit opens
- * and all requests fail fast for `resetTimeoutMs`.
- */
-export interface CircuitBreakerConfig {
-	/** Number of consecutive failures before opening the circuit (default: 5) */
-	failureThreshold?: number;
-	/** Time in milliseconds before attempting to close the circuit (default: 60000) */
-	resetTimeoutMs?: number;
-	/** Number of successful requests needed to close a half-open circuit (default: 1) */
-	successThreshold?: number;
-}
-
-/** Circuit breaker state */
-export type CircuitBreakerState = "closed" | "open" | "half-open";
-
 /** Error boundary configuration */
 export interface ErrorBoundaryConfig {
-	onConstraintError?: RecoveryStrategy | ((error: Error, constraint: string) => void);
-	onResolverError?: RecoveryStrategy | ((error: Error, resolver: string) => void);
-	onEffectError?: RecoveryStrategy | ((error: Error, effect: string) => void);
-	onDerivationError?: RecoveryStrategy | ((error: Error, derivation: string) => void);
+	onConstraintError?: RecoveryStrategy | ((error: Error, constraint: string) => RecoveryStrategy | void);
+	onResolverError?: RecoveryStrategy | ((error: Error, resolver: string) => RecoveryStrategy | void);
+	onEffectError?: RecoveryStrategy | ((error: Error, effect: string) => RecoveryStrategy | void);
+	onDerivationError?: RecoveryStrategy | ((error: Error, derivation: string) => RecoveryStrategy | void);
 	onError?: (error: DirectiveError) => void;
 
 	/** Configuration for retry-later strategy */
 	retryLater?: RetryLaterConfig;
-
-	/** Circuit breaker configuration (applies to resolvers only) */
-	circuitBreaker?: CircuitBreakerConfig;
 }

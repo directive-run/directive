@@ -5,7 +5,7 @@
 export const MAX_EVENTS = 2000
 export const RECONNECT_DELAY = 3000
 
-// M1: Max reconnect attempts before showing manual retry
+// Max reconnect attempts before showing manual retry
 export const MAX_RECONNECT_RETRIES = 10
 
 // SSE flush interval (ms) — batches incoming events before setState
@@ -75,6 +75,8 @@ export const DEFAULT_MODEL_PRICING: Record<string, { input: number; output: numb
   'claude-sonnet-4-5-20250514': { input: 3.00, output: 15.00, label: 'Sonnet 4.5' },
   'claude-opus-4': { input: 15.00, output: 75.00, label: 'Opus 4' },
   'claude-opus-4-20250514': { input: 15.00, output: 75.00, label: 'Opus 4' },
+  'claude-opus-4-6': { input: 15.00, output: 75.00, label: 'Opus 4.6' },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00, label: 'Sonnet 4.6' },
   'gpt-4o': { input: 2.50, output: 10.00, label: 'GPT-4o' },
   'gpt-4o-mini': { input: 0.15, output: 0.60, label: 'GPT-4o Mini' },
 }

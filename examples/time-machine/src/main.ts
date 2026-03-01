@@ -131,7 +131,7 @@ const system = createSystem({
 });
 system.start();
 
-const tt = system.timeTravel!;
+const tt = system.debug!;
 
 // ============================================================================
 // DOM References
@@ -189,18 +189,17 @@ function escapeHtml(text: string): string {
 function render(): void {
   drawCanvas();
 
-  const history = tt.getHistory();
-  const canUndo = history.currentIndex > 0;
-  const canRedo = history.currentIndex < history.snapshots.length - 1;
+  const canUndo = tt.currentIndex > 0;
+  const canRedo = tt.currentIndex < tt.snapshots.length - 1;
 
   // Buttons
   undoBtn.disabled = !canUndo;
   redoBtn.disabled = !canRedo;
 
   // Snapshot slider
-  snapshotSlider.max = String(Math.max(0, history.snapshots.length - 1));
-  snapshotSlider.value = String(history.currentIndex);
-  snapshotInfo.textContent = `${history.currentIndex} / ${history.snapshots.length - 1}`;
+  snapshotSlider.max = String(Math.max(0, tt.snapshots.length - 1));
+  snapshotSlider.value = String(tt.currentIndex);
+  snapshotInfo.textContent = `${tt.currentIndex} / ${tt.snapshots.length - 1}`;
 
   // Changeset status
   const isActive = system.facts.changesetActive as boolean;
@@ -302,19 +301,19 @@ brushSlider.addEventListener("input", () => {
 
 undoBtn.addEventListener("click", () => {
   tt.goBack();
-  addTimeline("undo", `→ snapshot #${tt.getHistory().currentIndex}`, "undo");
+  addTimeline("undo", `→ snapshot #${tt.currentIndex}`, "undo");
   render();
 });
 
 redoBtn.addEventListener("click", () => {
   tt.goForward();
-  addTimeline("redo", `→ snapshot #${tt.getHistory().currentIndex}`, "redo");
+  addTimeline("redo", `→ snapshot #${tt.currentIndex}`, "redo");
   render();
 });
 
 replayBtn.addEventListener("click", async () => {
-  addTimeline("replay", `replaying ${tt.getHistory().snapshots.length} snapshots`, "replay");
-  await tt.replay(80);
+  addTimeline("replay", `replaying ${tt.snapshots.length} snapshots`, "replay");
+  await tt.replay();
   render();
 });
 
@@ -325,19 +324,17 @@ clearBtn.addEventListener("click", () => {
 
 snapshotSlider.addEventListener("input", () => {
   const idx = Number(snapshotSlider.value);
-  const history = tt.getHistory();
-  if (idx >= 0 && idx < history.snapshots.length) {
-    tt.goTo(history.snapshots[idx]!.id);
+  if (idx >= 0 && idx < tt.snapshots.length) {
+    tt.goTo(tt.snapshots[idx]!.id);
     addTimeline("goto", `→ snapshot #${idx}`, "goto");
     render();
   }
 });
 
 exportBtn.addEventListener("click", () => {
-  const data = tt.exportSnapshots();
+  const data = tt.export();
   exportArea.value = data;
-  const history = tt.getHistory();
-  addTimeline("export", `${history.snapshots.length} snapshots`, "export");
+  addTimeline("export", `${tt.snapshots.length} snapshots`, "export");
   render();
 });
 
@@ -348,7 +345,7 @@ importBtn.addEventListener("click", () => {
   }
 
   try {
-    tt.importSnapshots(data);
+    tt.import(data);
     addTimeline("import", "snapshots restored", "import");
     render();
   } catch (err) {

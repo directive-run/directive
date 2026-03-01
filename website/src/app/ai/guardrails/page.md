@@ -22,6 +22,39 @@ audit trails, and GDPR/CCPA compliance &ndash; see
 
 ---
 
+## Execution Order
+
+Guardrails run in three stages. Each stage runs its guardrails in the order they are listed:
+
+```
+User Input
+  │
+  ▼
+┌──────────────────┐
+│  Input Guards    │  ← Validate/transform before the agent sees the input
+│  (in order)      │
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│  Agent Execution │  ← LLM call + tool calls
+│                  │
+│  ┌─────────────┐ │
+│  │ Tool Guards │ │  ← Validate each tool call before execution
+│  └─────────────┘ │
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│  Output Guards   │  ← Validate the final agent output
+│  (in order)      │
+└────────┬─────────┘
+         ▼
+   Final Output
+```
+
+If any guardrail fails with `critical: true` (the default), a `GuardrailError` is thrown and the run stops. Guardrails with `critical: false` log a warning and continue.
+
+---
+
 ## Built-in Guardrails
 
 Directive ships with guardrails you can drop into any orchestrator. No external dependencies needed.
@@ -376,6 +409,39 @@ const orchestrator = createAgentOrchestrator({
 });
 ```
 
+### Async Error Handling
+
+When a custom guardrail calls an external service, handle failures explicitly. If the `fn` throws, the orchestrator treats it as a guardrail failure and blocks the run. Use try-catch to control the behavior:
+
+```typescript
+const externalCheck: NamedGuardrail<InputGuardrailData> = {
+  name: 'external-safety-check',
+
+  fn: async (data) => {
+    try {
+      const result = await externalSafetyService.check(data.input);
+
+      return { passed: result.safe, reason: result.safe ? undefined : result.reason };
+    } catch (error) {
+      // Option 1: Fail open — allow the input through when the service is down
+      console.warn('Safety service unavailable, allowing input:', error);
+
+      return { passed: true };
+
+      // Option 2: Fail closed — block the input when the service is down
+      // return { passed: false, reason: 'Safety check unavailable' };
+    }
+  },
+
+  // Retry transient failures before hitting the catch block
+  retry: { attempts: 2, backoff: 'exponential', baseDelayMs: 200 },
+};
+```
+
+{% callout type="warning" title="Fail-open vs fail-closed" %}
+**Fail-open** (allow on error) prioritizes availability — use for non-critical checks. **Fail-closed** (block on error) prioritizes safety — use for PII, injection detection, and compliance-critical guardrails.
+{% /callout %}
+
 ---
 
 ## Error Handling
@@ -414,6 +480,7 @@ import {
   createStreamingRunner,
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
+  createToxicityStreamingGuardrail,
   combineStreamingGuardrails,
 } from '@directive-run/ai';
 
@@ -431,8 +498,15 @@ const patternGuard = createPatternStreamingGuardrail({
   ],
 });
 
-// Merge both guardrails into a single checker
-const combined = combineStreamingGuardrails([lengthGuard, patternGuard]);
+// Halt the stream when toxicity exceeds a threshold
+const toxicityGuard = createToxicityStreamingGuardrail({
+  checkFn: async (text) => myToxicityModel.score(text), // Returns 0–1
+  threshold: 0.9,   // Flag above this score (default: 0.8)
+  stopOnFail: true,  // Halt the stream on detection (default: true)
+});
+
+// Merge all guardrails into a single checker
+const combined = combineStreamingGuardrails([lengthGuard, patternGuard, toxicityGuard]);
 
 // Attach to a standalone streaming runner
 const streamRunner = createStreamingRunner(baseRunner, {

@@ -1,42 +1,7 @@
 'use client'
 
 import { CodeTabs } from '@/components/CodeTabs'
-import { Fence } from '@/components/Fence'
 import { ExampleEmbed } from '@/components/ExampleEmbed'
-
-const EMBED_SNIPPET = `<script>
-class DirectiveCheckers extends HTMLElement {
-  connectedCallback() {
-    fetch('/examples/checkers/index.html')
-      .then(r => r.text())
-      .then(html => {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        // Inject scoped styles
-        const style = document.createElement('style');
-        const rawCss = doc.querySelector('style')?.textContent || '';
-        style.textContent = rawCss
-          .replace(/^(\\s*)\\*\\s*\\{/m, '$1directive-checkers, directive-checkers * {')
-          .replace(/^(\\s*)body\\s*\\{/m, '$1directive-checkers {')
-          .replace(/^(\\s*)h1\\s*\\{/m, '$1directive-checkers h1 {')
-          .replace(/^(\\s*)button(\\s*[{:.])/gm, '$1directive-checkers button$2');
-        document.head.appendChild(style);
-        // Inject body content
-        this.innerHTML = doc.body.innerHTML;
-        // Load game JS
-        const src = doc.querySelector('script[src]')?.getAttribute('src');
-        if (src) {
-          const s = document.createElement('script');
-          s.type = 'module';
-          s.src = src;
-          document.head.appendChild(s);
-        }
-      });
-  }
-}
-customElements.define('directive-checkers', DirectiveCheckers);
-</script>
-
-<directive-checkers></directive-checkers>`
 
 export function CheckersDemo({
   build,
@@ -76,18 +41,6 @@ export function CheckersDemo({
           2-player and vs Computer modes work in the embed. The vs Claude mode
           requires an API key and dev server proxy.
         </p>
-      </section>
-
-      {/* Embed snippet */}
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
-          Embed it
-        </h2>
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-          Register the custom element, then use it like any HTML tag. No iframe
-          &ndash; the game renders directly in your page.
-        </p>
-        <Fence language="html">{EMBED_SNIPPET}</Fence>
       </section>
 
       {/* How it works */}

@@ -52,7 +52,7 @@ const memory = createAgentMemory({
 
   // Callbacks
   onMemoryManaged: (result) => {
-    console.log(`Trimmed ${result.before.messageCount - result.after.messageCount} messages`);
+    console.log(`Trimmed ${result.messagesBefore - result.messagesAfter} messages`);
   },
   onManageError: (error) => {
     console.error('Memory management failed:', error);
@@ -199,14 +199,15 @@ const context = memory.getContextMessages();
 
 // Manually trigger memory management
 const result = await memory.manage();
-console.log(result.before.messageCount);
-console.log(result.after.messageCount);
-console.log(result.after.estimatedTokens);
+console.log(result.messagesBefore);         // Messages before management
+console.log(result.messagesAfter);          // Messages after management
+console.log(result.messagesSummarized);     // How many were summarized
+console.log(result.estimatedTokensAfter);   // Token count after management
 
 // Check state
 const state = memory.getState();
 console.log(state.messages);                // Active messages
-console.log(state.summaries);               // Summary strings
+console.log(state.summaries);               // Summary objects ({ content, messagesCount, createdAt })
 console.log(state.totalMessagesProcessed);  // Lifetime count
 console.log(state.estimatedTokens);         // Current token estimate
 
@@ -226,7 +227,11 @@ memory.clear();
 ```typescript
 interface MemoryState {
   messages: MemoryMessage[];
-  summaries: string[];
+  summaries: Array<{
+    content: string;
+    messagesCount: number;
+    createdAt: number;
+  }>;
   totalMessagesProcessed: number;
   estimatedTokens: number;
 }

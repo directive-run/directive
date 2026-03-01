@@ -89,8 +89,6 @@ export async function GET(request: Request) {
       isHealthy: chatbotSystem.derive.isHealthy,
       activeIPs: chatbotSystem.derive.activeIPs,
     },
-    // M4: Only expose message previews when DEVTOOLS_TOKEN is configured
-    // (indicates an authenticated/internal environment)
     memory: {
       totalMessages: memoryState?.messages?.length ?? 0,
       contextMessages: contextMessages.length,
@@ -98,9 +96,7 @@ export async function GET(request: Request) {
       messages: contextMessages.map((m: { role: string; content: string }) => ({
         role: m.role,
         contentLength: typeof m.content === 'string' ? m.content.length : 0,
-        preview: tokenEnv
-          ? (typeof m.content === 'string' ? m.content.slice(0, 2000) + (m.content.length > 2000 ? '…' : '') : '')
-          : '',
+        preview: typeof m.content === 'string' ? m.content.slice(0, 2000) + (m.content.length > 2000 ? '…' : '') : '',
       })),
     },
     config: {

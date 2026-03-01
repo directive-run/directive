@@ -130,7 +130,7 @@ export function TimelineView({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedEvent]);
 
-  // M5: Extracted hooks
+  // Extracted hooks
   const zoom = useTimelineZoom(events);
   const filters = useTimelineFilters(events);
 
@@ -143,7 +143,7 @@ export function TimelineView({
     return new Set(anomalies.map((a) => a.eventId));
   }, [anomalies]);
 
-  // H3: Group events by agent and pre-compute row packing (memoized together)
+  // Group events by agent and pre-compute row packing (memoized together)
   const lanesWithRows = useMemo(() => {
     const laneMap = new Map<string, DebugEvent[]>();
     laneMap.set("__global__", []);

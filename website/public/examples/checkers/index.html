@@ -116,17 +116,13 @@
 
     /* Mode toggle */
     .mode-toggle {
-      display: flex; justify-content: center; margin-bottom: 0.75rem;
+      display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.75rem;
     }
     .mode-btn {
       background: #1e293b; border: 1px solid #334155; color: #94a3b8;
       padding: 0.45rem 1rem; font-size: 0.8rem; cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.15s; border-radius: 6px;
     }
-    .mode-btn:first-child { border-radius: 6px 0 0 6px; }
-    .mode-btn:last-child { border-radius: 0 6px 6px 0; }
-    .mode-btn:not(:first-child):not(:last-child) { border-left: none; border-right: none; }
-    .mode-btn:first-child + .mode-btn { border-left: none; }
     .mode-btn.active {
       background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600;
     }

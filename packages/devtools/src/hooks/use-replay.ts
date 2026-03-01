@@ -39,7 +39,7 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
   const [cursorIndex, setCursorIndex] = useState(0);
   const [speed, setSpeedState] = useState<ReplaySpeed>(1);
 
-  // M7: Single ref object to avoid stale closures in rAF
+  // Single ref object to avoid stale closures in rAF
   const stateRef = useRef({
     playing: false,
     cursorIndex: 0,
@@ -226,7 +226,7 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
     ? events[clampedIndex]!.timestamp
     : null;
 
-  // H1: Memoize to avoid new array reference on every render during replay
+  // Memoize to avoid new array reference on every render during replay
   const visibleEvents = useMemo(
     () => active ? events.slice(0, clampedIndex + 1) : events,
     [active, events, clampedIndex],

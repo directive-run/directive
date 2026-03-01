@@ -453,6 +453,31 @@ await orchestrator.runAgent('nonexistent', 'hello');
 await orchestrator.runPattern('nonexistent', 'hello');
 ```
 
+### Guardrail Errors
+
+When a guardrail blocks a run, a structured `GuardrailError` is thrown. Use `isGuardrailError()` to type-narrow:
+
+```typescript
+import { isGuardrailError } from '@directive-run/ai';
+
+try {
+  await orchestrator.runAgent('writer', userInput);
+} catch (error) {
+  if (isGuardrailError(error)) {
+    // Structured fields for programmatic handling
+    console.log(error.code);           // 'INPUT_GUARDRAIL_FAILED' | 'OUTPUT_GUARDRAIL_FAILED' | 'TOOL_CALL_GUARDRAIL_FAILED'
+    console.log(error.guardrailName);  // e.g. 'pii-detector'
+    console.log(error.guardrailType);  // 'input' | 'output' | 'toolCall'
+    console.log(error.agentName);      // Which agent triggered the error
+
+    // Safe for end-user display
+    showToast(error.userMessage);
+  }
+}
+```
+
+See [Guardrails](/ai/guardrails) for the full guardrail API including named guardrails, retries, and streaming guardrails.
+
 See [Execution Patterns](/ai/patterns) for pattern-specific error handling (parallel `minSuccess`, sequential `continueOnError`, supervisor worker validation).
 
 ---

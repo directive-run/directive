@@ -1442,7 +1442,7 @@ export function createMultiAgentOrchestrator(
       ? convertOrchestratorConstraints(registration.constraints)
       : {};
 
-    // Convert per-agent resolvers (C3 fix)
+    // Convert per-agent resolvers
     // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
     const perAgentResolvers: Record<string, any> = Object.create(null);
     if (registration.resolvers) {
@@ -2036,7 +2036,7 @@ export function createMultiAgentOrchestrator(
         unsubscribe();
       };
 
-      // Use system.subscribe with namespaced key (C1 fix)
+      // Use system.subscribe with namespaced key
       const unsubscribe = system.subscribe([`${agentId}.${APPROVAL_KEY}`], () => {
         const approval = getApprovalState(agentFacts);
         if (approval.approved.includes(requestId)) {
@@ -2069,7 +2069,7 @@ export function createMultiAgentOrchestrator(
         signal.addEventListener("abort", onAbort, { once: true });
       }
 
-      // Timeout with solution guidance (M12 fix)
+      // Timeout with solution guidance
       timeoutId = setTimeout(() => {
         cleanupAll();
         const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
@@ -3153,7 +3153,7 @@ export function createMultiAgentOrchestrator(
       let currentInput = resumeFrom?.currentInput ?? input;
 
       for (let round = startRound; round < maxRounds; round++) {
-        // M9: Validate supervisor output shape
+        // Validate supervisor output shape
         const raw = supervisorResult.output;
         let action: { action: string; worker?: string; workerInput?: string; output?: unknown };
 
@@ -4539,13 +4539,13 @@ export function createMultiAgentOrchestrator(
       }
     }
 
-    // C2: Cycle detection
+    // Cycle detection
     validateGoalAcyclic(pId, nodes);
 
-    // M1: Producer conflict warnings
+    // Producer conflict warnings
     validateProducerConflicts(pId, nodes);
 
-    // M3: Warn if extractOutput is missing (dev guidance)
+    // Warn if extractOutput is missing (dev guidance)
     for (const [nodeId, node] of Object.entries(nodes)) {
       if (!node.extractOutput) {
         console.warn(
@@ -4730,7 +4730,7 @@ export function createMultiAgentOrchestrator(
           }
 
           const strategyResult = selectionStrategy.select(readyNodes, strategyMetrics, goalProgressMetrics);
-          // M5: Guard against empty selection strategy result — fall back to readyNodes
+          // Guard against empty selection strategy result — fall back to readyNodes
           selectedNodes = (strategyResult && strategyResult.length > 0) ? strategyResult : readyNodes;
         }
 
@@ -4761,7 +4761,7 @@ export function createMultiAgentOrchestrator(
                     }
                     break;
                   case "alternative_nodes":
-                    // M2: Use shadow copy — don't mutate original pattern nodes
+                    // Use shadow copy — don't mutate original pattern nodes
                     for (const altNode of strategy.nodes) {
                       const altId = `__relaxation_${tierIdx}_${altNode.agent}`;
                       nodes[altId] = { ...altNode };
@@ -4797,7 +4797,7 @@ export function createMultiAgentOrchestrator(
                       completedNodes: new Set(completedNodes),
                       failedNodes: new Map(failedNodes),
                     };
-                    // C1: safe-wrap custom strategy callback
+                    // safe-wrap custom strategy callback
                     await safeCallAsync(strategy.apply, ctx);
                     break;
                   }
@@ -4983,7 +4983,7 @@ export function createMultiAgentOrchestrator(
           stallSteps = 0;
         }
 
-        // P5: Save checkpoint at configured intervals
+        // Save checkpoint at configured intervals
         if (checkpointConfig && checkpointStoreRef && step > startStep && (step - startStep) % checkpointEveryN === 0) {
           const ckptState: GoalCheckpointState = {
             type: "goal",

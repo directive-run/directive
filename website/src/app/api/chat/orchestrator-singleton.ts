@@ -227,13 +227,13 @@ export function getOrchestrator() {
     runner = withFallback([runner, fallbackRunner])
   }
 
-  // P2: Intelligent retry – retries 429/503, skips 400/401/403
+  // Intelligent retry – retries 429/503, skips 400/401/403
   runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 })
 
   // Claude Haiku 4.5 pricing (per million tokens)
   const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
 
-  // P1: Cost budget – cap hourly spend at $5 using Haiku pricing
+  // Cost budget – cap hourly spend at $5 using Haiku pricing
   runner = withBudget(runner, {
     budgets: [
       { window: 'hour' as const, maxCost: 5.00, pricing: haikuPricing },

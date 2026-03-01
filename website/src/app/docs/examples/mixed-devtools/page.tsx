@@ -13,7 +13,7 @@ export const metadata = buildPageMetadata({
 export default function MixedDevtoolsPage() {
   const counterBuild = parseExampleBuild('counter')
   const guardrailsBuild = parseExampleBuild('ai-guardrails')
-  const heistBuild = parseExampleBuild('goal-heist')
+  const fraudBuild = parseExampleBuild('fraud-analysis')
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -33,7 +33,7 @@ export default function MixedDevtoolsPage() {
       <MixedDemo
         counterBuild={counterBuild}
         guardrailsBuild={guardrailsBuild}
-        heistBuild={heistBuild}
+        fraudBuild={fraudBuild}
       />
     </div>
   )

@@ -85,8 +85,49 @@ Audit trails and compliance tooling are most useful on the server where you cont
 
 ---
 
+## Threat Model
+
+A unified view of the threats Directive's security features address:
+
+| Threat | Attack Vector | Mitigation | Feature |
+|--------|--------------|------------|---------|
+| **Data exfiltration** | Agent leaks PII in output | Output scanning with redaction | [PII Detection](/ai/security/pii) |
+| **PII in prompts** | User submits personal data | Input scanning with redaction | [PII Detection](/ai/security/pii) |
+| **Prompt injection** | Attacker embeds instructions in input | Pattern detection, encoding analysis | [Prompt Injection](/ai/security/prompt-injection) |
+| **Jailbreak** | User overrides system prompt | Strict mode, known-attack patterns | [Prompt Injection](/ai/security/prompt-injection) |
+| **Encoding evasion** | Base64, Unicode smuggling | Multi-encoding detection | [Prompt Injection](/ai/security/prompt-injection) |
+| **Unaudited operations** | No record of what agents did | Tamper-evident logging, HMAC chain | [Audit Trail](/ai/security/audit) |
+| **Data subject requests** | GDPR right to erasure / export | Automated data deletion + export | [GDPR/CCPA](/ai/security/compliance) |
+| **Runaway costs** | Agent enters infinite loop | Token budgets, circuit breakers | [Self-Healing](/ai/self-healing) |
+| **Unsafe tool calls** | Agent invokes dangerous tools | Tool-call guardrails, deny lists | [Guardrails](/ai/guardrails) |
+
+### Layered Defense Strategy
+
+```
+Layer 1: Input Validation
+  └─ Prompt injection detection (block attacks before they reach agents)
+  └─ PII detection with redaction (scrub sensitive data from input)
+
+Layer 2: Execution Controls
+  └─ Tool-call guardrails (restrict which tools agents can invoke)
+  └─ Token budgets + circuit breakers (prevent runaway costs)
+  └─ Approval workflows (human-in-the-loop for high-risk actions)
+
+Layer 3: Output Validation
+  └─ Output guardrails (catch data leaks, enforce format)
+  └─ Streaming guardrails (halt streams mid-generation)
+
+Layer 4: Observability & Compliance
+  └─ Audit trail with HMAC integrity chain
+  └─ GDPR/CCPA data export and deletion
+  └─ OpenTelemetry spans for every operation
+```
+
+---
+
 ## Next Steps
 
-- **Start with safety** – [PII Detection](/ai/security/pii) is the most common first step
-- **Add attack prevention** – [Prompt Injection](/ai/security/prompt-injection) for user-facing apps
-- **Compliance requirements?** – [GDPR/CCPA](/ai/security/compliance) for regulated industries
+- **Start with safety** &ndash; [PII Detection](/ai/security/pii) is the most common first step
+- **Add attack prevention** &ndash; [Prompt Injection](/ai/security/prompt-injection) for user-facing apps
+- **Compliance requirements?** &ndash; [GDPR/CCPA](/ai/security/compliance) for regulated industries
+- **Troubleshooting** &ndash; [Troubleshooting](/ai/troubleshooting) for common issues and solutions

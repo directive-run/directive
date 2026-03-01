@@ -1,4 +1,4 @@
-// M6: Loading skeleton placeholder (replaces "Loading..." text)
+// Loading skeleton placeholder (replaces "Loading..." text)
 
 export function Skeleton({ rows = 4, className = '' }: { rows?: number; className?: string }) {
   return (

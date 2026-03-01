@@ -47,7 +47,7 @@ export function SearchBar({ events, onResults }: SearchBarProps) {
         return;
       }
 
-      // M4: Limit regex length to prevent ReDoS
+      // Limit regex length to prevent ReDoS
       if (term.length > 200) {
         setIsInvalidRegex(true);
         setMatchCount(null);

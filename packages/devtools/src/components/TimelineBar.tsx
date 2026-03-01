@@ -22,7 +22,7 @@ function getEventDuration(event: DebugEvent): number {
   return 0;
 }
 
-// M11: React.memo prevents re-rendering all bars when only selection changes
+// React.memo prevents re-rendering all bars when only selection changes
 // D1: onSelect is a stable callback ref — memo comparison succeeds when only
 //     a different bar's isSelected changes, preventing O(n) re-renders.
 export const TimelineBar = React.memo(function TimelineBar({ event, timeRange, isSelected, onSelect, row = 0, isAnomaly = false }: TimelineBarProps) {

@@ -21,7 +21,11 @@ import {
   transport,
   MAX_REQUESTS_PER_WINDOW,
   DAILY_CAP_PER_IP,
+  BASE_INSTRUCTIONS,
 } from './orchestrator-singleton'
+import { createStreamingRunner } from '@directive-run/ai'
+import { createAnthropicStreamingRunner } from '@directive-run/ai/anthropic'
+import { createOpenAIStreamingRunner } from '@directive-run/ai/openai'
 import { getFeatureFlagSystem } from '@/lib/feature-flags/config'
 
 // ---------------------------------------------------------------------------
@@ -239,12 +243,6 @@ export async function POST(request: NextRequest) {
   }
 
   const instance = getOrchestrator()
-  if (!instance) {
-    return new Response(
-      JSON.stringify({ error: 'Chat service is not configured.' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
 
   // Validate history entries
   const history = validateHistory(Array.isArray(rawHistory) ? rawHistory : [])
@@ -329,6 +327,97 @@ export async function POST(request: NextRequest) {
     } catch {
       // Enrichment failed or timed out — fall back to raw message
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Dual-path: user-provided API key vs server env var
+  // -------------------------------------------------------------------------
+
+  const clientApiKey = request.headers.get('x-api-key')
+  const clientProvider = request.headers.get('x-provider') || 'anthropic'
+
+  if (clientApiKey) {
+    // User-provided key: create a one-shot streaming runner (no budget/rate-limit tracking)
+    const callbackRunner =
+      clientProvider === 'openai'
+        ? createOpenAIStreamingRunner({ apiKey: clientApiKey, model: 'gpt-4o-mini' })
+        : createAnthropicStreamingRunner({
+            apiKey: clientApiKey,
+            model: 'claude-haiku-4-5-20251001',
+            maxTokens: 2000,
+          })
+
+    const streamRunner = createStreamingRunner(callbackRunner)
+    const agent = {
+      name: 'directive-docs-qa',
+      model: clientProvider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001',
+      instructions: BASE_INSTRUCTIONS,
+    }
+
+    const { stream, result } = streamRunner(agent, enrichedInput, { signal: request.signal })
+
+    const encoder = new TextEncoder()
+    const responseStream = new ReadableStream({
+      async start(controller) {
+        const send = (data: Record<string, unknown>) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+          } catch {
+            // Stream closed
+          }
+        }
+
+        try {
+          for await (const chunk of stream) {
+            if (chunk.type === 'token') {
+              send({ type: 'text', text: chunk.data })
+            }
+          }
+
+          await result
+          send({ type: 'done' })
+        } catch (err) {
+          send({
+            type: 'error',
+            message: err instanceof Error ? err.message : 'Stream failed',
+          })
+        } finally {
+          try {
+            controller.close()
+          } catch {
+            // Already closed
+          }
+        }
+      },
+    })
+
+    const sseHeaders: Record<string, string> = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    }
+
+    if (origin) {
+      sseHeaders['Access-Control-Allow-Origin'] = origin
+    }
+
+    return new Response(responseStream, { headers: sseHeaders })
+  }
+
+  // No user key: require env var (dev fallback, 401 in prod)
+  if (!instance) {
+    if (process.env.NODE_ENV !== 'development') {
+      return new Response(
+        JSON.stringify({ error: 'API key required. Enter your key in the provider config above.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    return new Response(
+      JSON.stringify({ error: 'Chat service is not configured.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    )
   }
 
   // Stream via SSE transport (propagate request abort signal)

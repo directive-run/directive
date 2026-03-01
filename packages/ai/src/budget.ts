@@ -248,7 +248,7 @@ export function withBudget(runner: AgentRunner, config: BudgetConfig): BudgetRun
     }
   }
 
-  // Per-window ledgers to avoid double-counting (H3 fix)
+  // Per-window ledgers to avoid double-counting
   const windowLedgers = new Map<string, CostLedger>();
   for (const budget of budgets) {
     windowLedgers.set(budget.window, new CostLedger());

@@ -175,7 +175,7 @@ export const devtoolsShell = createModule('shell', {
   resolvers: {
     cancelStaleClear: {
       requirement: 'CANCEL_STALE_CLEAR',
-      // M2: Dedupe key prevents duplicate resolvers when constraint re-fires
+      // Dedupe key prevents duplicate resolvers when constraint re-fires
       key: () => 'cancel-stale-clear',
       resolve: async (req, context) => {
         await new Promise((r) => setTimeout(r, 5000))

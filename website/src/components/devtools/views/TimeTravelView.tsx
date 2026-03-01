@@ -112,7 +112,11 @@ export function TimeTravelView() {
 
   if (!timeTravelEnabled) {
     return (
-      <EmptyState message="Time-travel not enabled. Add debug: { timeTravel: true } to your system config." />
+      <div className="flex h-48 flex-col items-center justify-center">
+        <div className="rounded border border-dashed border-zinc-200 px-3 py-2 text-center font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
+          Enable <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">timeTravel: true</code> in debug config for time-travel debugging
+        </div>
+      </div>
     )
   }
 

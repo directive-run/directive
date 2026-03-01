@@ -40,7 +40,7 @@ import { detectPII, redactPII } from "../guardrails/pii-enhanced.js";
 // Types
 // ============================================================================
 
-/** Audit event types - 17 total covering all system operations */
+/** Audit event types - 22 total covering all system operations */
 export type AuditEventType =
 	// Agent lifecycle
 	| "agent.run.start"

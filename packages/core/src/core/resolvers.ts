@@ -173,11 +173,17 @@ export function createResolversManager<S extends Schema>(
 						`Add one of these methods to handle requirements.`,
 				);
 			}
-			if (def.batch?.enabled && !def.resolveBatch) {
-				throw new Error(
-					`[Directive] Resolver "${id}" has batch.enabled=true but no resolveBatch() method. ` +
-						`Add resolveBatch() to handle batched requirements.`,
-				);
+			if (def.batch?.enabled && !def.resolveBatch && !def.resolveBatchWithResults) {
+				if (def.resolve) {
+					console.warn(
+						`[Directive] Resolver "${id}" has batch.enabled but no resolveBatch(). ` +
+							`Falling back to individual resolve() calls. Add resolveBatch() for true bulk operations.`,
+					);
+				} else {
+					throw new Error(
+						`[Directive] Resolver "${id}" has batch.enabled=true but no resolve(), resolveBatch(), or resolveBatchWithResults() method.`,
+					);
+				}
 			}
 		}
 	}

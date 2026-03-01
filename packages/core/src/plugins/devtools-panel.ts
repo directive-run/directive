@@ -419,7 +419,7 @@ export function createPanel(
 	if (document.body) {
 		mount();
 	} else {
-		// M8: Store reference for cleanup
+		// Store reference for cleanup
 		document.addEventListener("DOMContentLoaded", mount, { once: true });
 	}
 
@@ -429,7 +429,7 @@ export function createPanel(
 		closeBtn.removeEventListener("click", close);
 		container.removeEventListener("keydown", onKeyDown);
 		document.removeEventListener("keydown", onGlobalKeyDown);
-		// M8: Clean up DOMContentLoaded listener in case body wasn't ready
+		// Clean up DOMContentLoaded listener in case body wasn't ready
 		document.removeEventListener("DOMContentLoaded", mount);
 		for (const id of flashTimers) {
 			clearTimeout(id);

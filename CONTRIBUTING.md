@@ -37,14 +37,14 @@ directive/
 
 ```
 @directive-run/core ─────────────────────────────┐
-   │                                              │
-   ├── @directive-run/react   (peer: core)        │
-   ├── @directive-run/vue     (peer: core)        │
-   ├── @directive-run/svelte  (peer: core)        │
-   ├── @directive-run/solid   (peer: core)        │
-   └── @directive-run/lit     (peer: core)        │
-                                                  │
-@directive-run/ai ────────────────────────────────┘
+   │                                             │
+   ├── @directive-run/react   (peer: core)       │
+   ├── @directive-run/vue     (peer: core)       │
+   ├── @directive-run/svelte  (peer: core)       │
+   ├── @directive-run/solid   (peer: core)       │
+   └── @directive-run/lit     (peer: core)       │
+                                            m    │
+@directive-run/ai ───────────────────────────────┘
    (peer: core)
 ```
 
@@ -209,16 +209,15 @@ Three parallel processes trigger on different events:
 │                     Push / PR to main                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  PR opened/updated          Merge to main     Merge to main│
+│  PR opened/updated          Merge to main     Merge to main │
 │       │                          │                  │       │
 │       ▼                          ▼                  ▼       │
 │   ci.yml                    release.yml         Vercel      │
-│   ┌──────────┐              ┌──────────┐      ┌──────────┐ │
-│   │ build    │              │ build    │      │ API docs │ │
-│   │ test     │              │ typecheck│      │ embeds   │ │
-│   │ lint     │              │ test     │      │ next     │ │
-│   │ typecheck│              │ publish  │      │ build    │ │
-│   └──────────┘              └──────────┘      └──────────┘ │
+│   ┌──────────┐              ┌──────────┐      ┌──────────┐  │
+│   │ test     │              │ typecheck│      │ embeds   │  │
+│   │ lint     │              │ test     │      │ next     │  │
+│   │ typecheck│              │ publish  │      │ build    │  │
+│   └──────────┘              └──────────┘      └──────────┘  │
 │   Quality gate              npm release       Website deploy│
 │                                                             │
 └─────────────────────────────────────────────────────────────┘

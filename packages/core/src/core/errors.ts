@@ -247,13 +247,18 @@ export function createErrorBoundaryManager(
 			}
 		})();
 
-		// If handler is a function, call it and return skip
+		// If handler is a function, call it — use returned strategy if provided, else "skip"
 		if (typeof handler === "function") {
 			try {
-				handler(error, sourceId);
+				const result = handler(error, sourceId);
+
+				if (typeof result === "string") {
+					return result as RecoveryStrategy;
+				}
 			} catch (e) {
 				console.error("[Directive] Error in error handler callback:", e);
 			}
+
 			return "skip";
 		}
 

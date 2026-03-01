@@ -20,7 +20,7 @@ Directive's AI adapter doesn't replace your LLM framework &ndash; it wraps it wi
 | **Execution patterns** | 8 built-in (parallel, sequential, supervisor, DAG, race, reflect, debate, goal) | LangGraph nodes/edges | Sequential/parallel | Round-robin chat | &ndash; |
 | **Constraints** | Declarative `when`/`require` | &ndash; | &ndash; | &ndash; | &ndash; |
 | **Time-travel debug** | Built-in snapshots + fork | LangSmith tracing | &ndash; | &ndash; | &ndash; |
-| **DevTools** | Visual debugger (12 views) | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
+| **DevTools** | Visual debugger (13 views) | LangSmith dashboard | &ndash; | AutoGen Studio | &ndash; |
 | **Streaming** | Token-level with backpressure | LangChain streaming | &ndash; | &ndash; | Core strength |
 | **Memory** | 3 strategies + summarizers | LangChain memory | Crew memory | Chat history | &ndash; |
 | **Evals** | 10 built-in criteria + LLM judge | LangSmith evals | &ndash; | &ndash; | &ndash; |
@@ -122,6 +122,68 @@ Use Vercel AI SDK for the streaming UI layer and Directive for backend orchestra
 
 ---
 
+## Migration Cheat Sheets
+
+Quick code mappings from other frameworks to Directive AI.
+
+### From LangChain
+
+| LangChain | Directive |
+|-----------|-----------|
+| `ChatOpenAI({ model })` | `AgentRunner` function wrapping your SDK |
+| `RunnableSequence.from([a, b, c])` | `sequential(['a', 'b', 'c'])` pattern |
+| `StateGraph` with nodes/edges | `dag({ nodes, edges })` pattern |
+| `PromptTemplate` | Agent `instructions` field |
+| `LangSmith tracing` | `debug: true` + [DevTools](/ai/devtools) |
+| `ConversationBufferMemory` | `createMemory({ strategy: 'sliding-window' })` |
+
+```typescript
+// LangChain
+const chain = RunnableSequence.from([retriever, llm, parser]);
+const result = await chain.invoke("query");
+
+// Directive
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { retriever: { agent: retriever }, writer: { agent: writer } },
+  patterns: { pipeline: sequential(['retriever', 'writer']) },
+});
+const result = await orchestrator.runPattern('pipeline', 'query');
+```
+
+### From Vercel AI SDK
+
+| Vercel AI SDK | Directive |
+|---------------|-----------|
+| `streamText()` | `createStreamingRunner()` + `createSSETransport()` |
+| `useChat()` | `useFact(system, 'agent::__agent')` + SSE client |
+| `tool()` definitions | `toolCall` guardrails for validation |
+| `generateText()` | `orchestrator.run(agentId, input)` |
+
+```typescript
+// Vercel AI SDK
+const result = streamText({ model: openai('gpt-4'), prompt: 'Hello' });
+
+// Directive (with SSE transport for streaming)
+const streamable = {
+  stream: (agentId: string, input: string, opts?: { signal?: AbortSignal }) =>
+    streamRunner(agent, input, opts),
+};
+return transport.toResponse(streamable, 'chat', 'Hello');
+```
+
+### From CrewAI / AutoGen
+
+| CrewAI / AutoGen | Directive |
+|-----------------|-----------|
+| `Agent(role=..., goal=...)` | `AgentLike` with `name` + `instructions` |
+| `Task(agent=..., description=...)` | Agent registration + pattern |
+| `Crew(agents, tasks, process)` | `createMultiAgentOrchestrator({ agents, patterns })` |
+| `crew.kickoff()` | `orchestrator.runPattern('pipeline', input)` |
+| Round-robin chat | `debate({ agents, evaluator })` pattern |
+
+---
+
 ## Directive's Unique Differentiators
 
 Features no other framework provides:
@@ -130,7 +192,7 @@ Features no other framework provides:
 2. **Goal pattern** &ndash; Declare desired end-state with `produces`/`requires` declarations; runtime resolves through dependency-ordered agent runs with satisfaction scoring and progressive relaxation
 3. **Reactive Directive System backbone** &ndash; Every agent is a namespaced module with reactive facts, derivations, and effects
 4. **Cross-agent derivations** &ndash; Compute values across all agent states reactively
-5. **Visual DevTools** &ndash; Timeline, Cost, State (plus 5 more views planned: Flamechart, DAG, Health, Breakpoints, Compare)
+5. **Visual DevTools** &ndash; Timeline, Cost, State, DAG, Breakpoints, Compare
 6. **Self-healing** &ndash; Circuit breakers with automatic agent rerouting and health scoring
 7. **Pattern checkpoints** &ndash; Save/resume mid-execution for all 8 pattern types with progress tracking, forking, and diffing
 8. **Framework-agnostic** &ndash; Wraps any `AgentRunner` function, no LLM SDK lock-in
