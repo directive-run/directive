@@ -373,9 +373,19 @@ const { stream } = streamRunner(agent, input, {
 });
 
 for await (const chunk of stream) {
-  if (chunk.type === 'guardrail_triggered') {
-    console.warn(`${chunk.guardrailName}: ${chunk.reason}`);
-    if (chunk.stopped) break;     // Stream was halted by the guardrail
+  switch (chunk.type) {
+    case 'token':
+      process.stdout.write(chunk.data);
+      break;
+    case 'guardrail_triggered':
+      console.warn(`${chunk.guardrailName}: ${chunk.reason}`);
+      if (chunk.stopped) break;
+      break;
+    case 'error':
+      console.error('Stream error:', chunk.error);
+      break;
+    case 'done':
+      break;
   }
 }
 ```
