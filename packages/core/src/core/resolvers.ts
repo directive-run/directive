@@ -54,6 +54,8 @@ export interface ResolversManager<_S extends Schema> {
 	isResolving(requirementId: string): boolean;
 	/** Process batched requirements (called periodically) */
 	processBatches(): void;
+	/** Check if there are pending batched requirements waiting to be processed */
+	hasPendingBatches(): boolean;
 	/** Register new resolver definitions (for dynamic module registration) */
 	registerDefinitions(newDefs: ResolversDef<Schema>): void;
 }
@@ -167,7 +169,7 @@ export function createResolversManager<S extends Schema>(
 	// Validate resolver definitions
 	if (process.env.NODE_ENV !== "production") {
 		for (const [id, def] of Object.entries(definitions)) {
-			if (!def.resolve && !def.resolveBatch) {
+			if (!def.resolve && !def.resolveBatch && !def.resolveBatchWithResults) {
 				throw new Error(
 					`[Directive] Resolver "${id}" must define either resolve() or resolveBatch(). ` +
 						`Add one of these methods to handle requirements.`,
@@ -630,6 +632,17 @@ export function createResolversManager<S extends Schema>(
 		const batch = batches.get(resolverId)!;
 		batch.requirements.push(req);
 
+		// Flush immediately if maxSize reached
+		if (batchConfig.maxSize && batch.requirements.length >= batchConfig.maxSize) {
+			if (batch.timer) {
+				clearTimeout(batch.timer);
+				batch.timer = null;
+			}
+			processBatch(resolverId);
+
+			return;
+		}
+
 		// Start or reset timer
 		if (batch.timer) {
 			clearTimeout(batch.timer);
@@ -665,7 +678,7 @@ export function createResolversManager<S extends Schema>(
 			// Find resolver
 			const resolverId = findResolver(req.requirement);
 			if (!resolverId) {
-				console.warn(`[Directive] No resolver found for requirement: ${req.id}`);
+				console.warn(`[Directive] No resolver found for requirement type "${req.requirement.type}" (id: ${req.id})`);
 				return;
 			}
 
@@ -713,20 +726,44 @@ export function createResolversManager<S extends Schema>(
 		},
 
 		cancel(requirementId: string): void {
+			// Check inflight resolvers first
 			const state = inflight.get(requirementId);
-			if (!state) return;
+			if (state) {
+				state.controller.abort();
+				inflight.delete(requirementId);
 
-			state.controller.abort();
-			inflight.delete(requirementId);
+				statuses.set(requirementId, {
+					state: "canceled",
+					requirementId,
+					canceledAt: Date.now(),
+				});
+				cleanupStatuses();
 
-			statuses.set(requirementId, {
-				state: "canceled",
-				requirementId,
-				canceledAt: Date.now(),
-			});
-			cleanupStatuses();
+				onCancel?.(state.resolverId, state.originalRequirement);
 
-			onCancel?.(state.resolverId, state.originalRequirement);
+				return;
+			}
+
+			// Check pending batch queues
+			for (const batch of batches.values()) {
+				const idx = batch.requirements.findIndex((r) => r.id === requirementId);
+				if (idx !== -1) {
+					const [removed] = batch.requirements.splice(idx, 1);
+
+					statuses.set(requirementId, {
+						state: "canceled",
+						requirementId,
+						canceledAt: Date.now(),
+					});
+					cleanupStatuses();
+
+					if (removed) {
+						onCancel?.(batch.resolverId, removed);
+					}
+
+					return;
+				}
+			}
 		},
 
 		cancelAll(): void {
@@ -734,13 +771,18 @@ export function createResolversManager<S extends Schema>(
 				this.cancel(id);
 			}
 
-			// Clear batches
+			// Cancel queued batch requirements
 			for (const batch of batches.values()) {
 				if (batch.timer) {
 					clearTimeout(batch.timer);
 				}
+				for (const req of batch.requirements) {
+					statuses.set(req.id, { state: "canceled", requirementId: req.id, canceledAt: Date.now() });
+					onCancel?.(batch.resolverId, req);
+				}
 			}
 			batches.clear();
+			cleanupStatuses();
 		},
 
 		getStatus(requirementId: string): ResolverStatus {
@@ -779,6 +821,16 @@ export function createResolversManager<S extends Schema>(
 			for (const resolverId of batches.keys()) {
 				processBatch(resolverId);
 			}
+		},
+
+		hasPendingBatches(): boolean {
+			for (const batch of batches.values()) {
+				if (batch.requirements.length > 0) {
+					return true;
+				}
+			}
+
+			return false;
 		},
 
 		registerDefinitions(newDefs: ResolversDef<Schema>): void {

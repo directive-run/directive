@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { createErrorBoundaryManager } from "../errors.js";
 import type { RecoveryStrategy } from "../types.js";
@@ -444,8 +444,8 @@ describe("error boundary: retry-later manager", () => {
 		boundary.handleError("resolver", "testResolver", new Error("fail"), {});
 		const pending = boundary.getRetryLaterManager().getPendingRetries();
 		expect(pending.length).toBe(1);
-		expect(pending[0].attempt).toBe(1);
-		expect(pending[0].sourceId).toBe("testResolver");
+		expect(pending[0]!.attempt).toBe(1);
+		expect(pending[0]!.sourceId).toBe("testResolver");
 	});
 
 	it("respects maxRetries limit", () => {
@@ -499,7 +499,7 @@ describe("error boundary: retry-later manager", () => {
 		// With delayMs=0, the entry is immediately due
 		const due = boundary.processDueRetries();
 		expect(due.length).toBe(1);
-		expect(due[0].sourceId).toBe("testResolver");
+		expect(due[0]!.sourceId).toBe("testResolver");
 
 		// No more pending
 		const remaining = boundary.getRetryLaterManager().getPendingRetries();

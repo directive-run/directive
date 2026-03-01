@@ -31,6 +31,25 @@ export async function GET(request: Request) {
   let unsubscribe: (() => void) | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  let cleaned = false
+
+  const cleanup = () => {
+    if (cleaned) {
+      return
+    }
+    cleaned = true
+    activeStreams--
+    unsubscribe?.()
+    unsubscribe = null
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer)
+      heartbeatTimer = null
+    }
+  }
 
   const stream = new ReadableStream({
     start(controller) {
@@ -52,19 +71,16 @@ export async function GET(request: Request) {
           return false
         }
 
-        // Stop polling
         if (pollTimer) {
           clearInterval(pollTimer)
           pollTimer = null
         }
 
-        // Replay existing events
         const existing = timeline.getEvents()
         for (const event of existing) {
           send(event)
         }
 
-        // Subscribe to new events
         unsubscribe = timeline.subscribe((event) => {
           send(event)
         })
@@ -72,9 +88,7 @@ export async function GET(request: Request) {
         return true
       }
 
-      // Try immediately
       if (!attachToTimeline()) {
-        // Poll every second until the orchestrator is initialized
         pollTimer = setInterval(() => {
           attachToTimeline()
         }, 1000)
@@ -88,19 +102,8 @@ export async function GET(request: Request) {
         }
       }, 15000)
 
-      // Clean up on client disconnect
       request.signal.addEventListener('abort', () => {
-        activeStreams--
-        unsubscribe?.()
-        unsubscribe = null
-        if (pollTimer) {
-          clearInterval(pollTimer)
-          pollTimer = null
-        }
-        if (heartbeatTimer) {
-          clearInterval(heartbeatTimer)
-          heartbeatTimer = null
-        }
+        cleanup()
         try {
           controller.close()
         } catch {
@@ -110,17 +113,7 @@ export async function GET(request: Request) {
     },
 
     cancel() {
-      activeStreams--
-      unsubscribe?.()
-      unsubscribe = null
-      if (pollTimer) {
-        clearInterval(pollTimer)
-        pollTimer = null
-      }
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+      cleanup()
     },
   })
 

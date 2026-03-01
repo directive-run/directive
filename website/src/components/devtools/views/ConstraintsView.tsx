@@ -743,7 +743,7 @@ export function PipelineView() {
   }, [filteredConstraints])
 
   if (!connected) {
-    return <EmptyState message="No Directive system connected" />
+    return <EmptyState message="No Directive system connected" docsUrl="/docs/plugins/devtools" />
   }
 
   if (constraints.length === 0 && allRequirements.length === 0 && resolverEntries.length === 0 && requirementTypes.length === 0) {

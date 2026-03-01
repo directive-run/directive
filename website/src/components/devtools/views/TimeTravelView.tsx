@@ -107,7 +107,7 @@ export function TimeTravelView() {
   }
 
   if (!connected) {
-    return <EmptyState message="No Directive system connected" />
+    return <EmptyState message="No Directive system connected" docsUrl="/docs/plugins/devtools" />
   }
 
   if (!timeTravelEnabled) {
