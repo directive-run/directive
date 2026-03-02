@@ -220,7 +220,7 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
       role="dialog"
       aria-label="DevTools panel"
       aria-modal="false"
-      className="fixed flex flex-col border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
+      className="devtools-panel fixed flex flex-col border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
       style={{ ...panelStyle, zIndex: Z_DRAWER }}
     >
       {/* #5: Resize handle — expanded hit area (16px transparent zone, 2px visible line) */}

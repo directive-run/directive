@@ -27,6 +27,8 @@ import type { DebugEvent } from '../types'
 import { EmptyState } from '../EmptyState'
 import { getDefaultPricing, formatCost } from '../constants'
 import { graphDraw, type Stroke } from './graph-draw-module'
+import { usePlayback } from './usePlayback'
+import { PlaybackControls } from './PlaybackControls'
 
 // ---------------------------------------------------------------------------
 // Status colors (matches packages/devtools palette)
@@ -682,6 +684,147 @@ function buildGraphFromEvents(events: DebugEvent[]): {
 }
 
 // ---------------------------------------------------------------------------
+// Playback step clustering
+// ---------------------------------------------------------------------------
+
+interface PlaybackStep {
+  events: DebugEvent[]
+  timestamp: number
+  label: string
+}
+
+function clusterEventsByTimestamp(events: DebugEvent[], thresholdMs = 50): PlaybackStep[] {
+  // Only cluster status-changing events
+  const statusEvents = events.filter(
+    (e) =>
+      e.type === 'agent_start' ||
+      e.type === 'agent_complete' ||
+      e.type === 'agent_error' ||
+      e.type === 'task_start' ||
+      e.type === 'task_complete' ||
+      e.type === 'task_error' ||
+      e.type === 'dag_node_update' ||
+      e.type === 'pattern_start' ||
+      e.type === 'pattern_complete',
+  )
+
+  if (statusEvents.length === 0) {
+    return []
+  }
+
+  const steps: PlaybackStep[] = []
+  let currentCluster: DebugEvent[] = [statusEvents[0]]
+  let clusterStart = statusEvents[0].timestamp
+
+  for (let i = 1; i < statusEvents.length; i++) {
+    const e = statusEvents[i]
+    if (e.timestamp - clusterStart <= thresholdMs) {
+      currentCluster.push(e)
+    } else {
+      steps.push(buildStep(currentCluster))
+      currentCluster = [e]
+      clusterStart = e.timestamp
+    }
+  }
+  steps.push(buildStep(currentCluster))
+
+  return steps
+}
+
+function buildStep(events: DebugEvent[]): PlaybackStep {
+  const parts: string[] = []
+  for (const e of events) {
+    const id = e.agentId ?? (e as Record<string, unknown>).taskId as string ?? (e as Record<string, unknown>).nodeId as string
+    if (!id) {
+      continue
+    }
+    const action =
+      e.type === 'agent_start' || e.type === 'task_start' || e.type === 'pattern_start'
+        ? 'started'
+        : e.type === 'agent_complete' || e.type === 'task_complete' || e.type === 'pattern_complete'
+          ? 'completed'
+          : e.type === 'agent_error' || e.type === 'task_error'
+            ? 'error'
+            : e.type === 'dag_node_update'
+              ? ((e as Record<string, unknown>).status as string ?? 'updated')
+              : 'updated'
+    parts.push(`${id} ${action}`)
+  }
+
+  return {
+    events,
+    timestamp: events[0].timestamp,
+    label: parts.join(', ') || 'step',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Build graph with partial event application (for playback)
+// ---------------------------------------------------------------------------
+
+function buildGraphUpToStep(
+  allEvents: DebugEvent[],
+  steps: PlaybackStep[],
+  currentStep: number,
+): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[]; patternType: PatternType | null } | null {
+  // Build full topology from ALL events (stable layout)
+  const full = buildGraphFromEvents(allEvents)
+  if (!full) {
+    return null
+  }
+
+  // Reset all node statuses to pending and zero telemetry
+  for (const node of full.nodes.values()) {
+    if (!node.isVirtual) {
+      node.status = 'pending'
+    }
+    node.tokens = 0
+    node.inputTokens = 0
+    node.outputTokens = 0
+    node.runs = 0
+    node.durationMs = 0
+    node.lastDurationMs = 0
+    node.modelId = null
+    node.lastError = null
+    node.retries = 0
+    node.lastInput = null
+    node.lastOutput = null
+    node.progress = null
+  }
+
+  // Reset virtual nodes too
+  for (const node of full.nodes.values()) {
+    if (node.isVirtual) {
+      node.status = 'pending'
+    }
+  }
+
+  // Collect events from steps 0..currentStep
+  const partialEvents: DebugEvent[] = []
+  for (let i = 0; i <= currentStep && i < steps.length; i++) {
+    partialEvents.push(...steps[i].events)
+  }
+
+  // Re-enrich with partial events
+  enrichFromAgentEvents(full.nodes, partialEvents)
+  markVirtualStatus(full.nodes, partialEvents)
+
+  // Replay dag_node_update events from partial set (DAG patterns set status directly)
+  for (const e of partialEvents) {
+    if (e.type === 'dag_node_update') {
+      const nodeId = e.nodeId as string
+      const status = (e.status as string) ?? 'pending'
+      const node = full.nodes.get(nodeId)
+      if (node) {
+        node.status = status
+      }
+    }
+  }
+
+  return full
+}
+
+// ---------------------------------------------------------------------------
 // Layout: topological layer assignment + barycenter heuristic
 // ---------------------------------------------------------------------------
 
@@ -1130,13 +1273,23 @@ export function GraphView() {
   const activeRunIndex = selectedRun ?? runs.length - 1
   const activeEvents = runs[activeRunIndex] ?? []
 
+  // ---- Playback ----
+  const playbackSteps = useMemo(() => clusterEventsByTimestamp(activeEvents), [activeEvents])
+  const playback = usePlayback({ totalSteps: playbackSteps.length })
+
+  // Reset playback when switching runs
+  useEffect(() => { playback.stop() }, [activeRunIndex])
+
   const graphData = useMemo(() => {
     if (activeEvents.length === 0) {
       return null
     }
+    if (playback.step !== null && playbackSteps.length > 0) {
+      return buildGraphUpToStep(activeEvents, playbackSteps, playback.step)
+    }
 
     return buildGraphFromEvents(activeEvents)
-  }, [activeEvents])
+  }, [activeEvents, playback.step, playbackSteps])
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [panelExpanded, setPanelExpanded] = useState(false)
@@ -1172,26 +1325,40 @@ export function GraphView() {
   const hasGraph = graphData && graphData.nodes.size > 0
   const selected = hasGraph && selectedNode ? graphData.nodes.get(selectedNode) : null
 
-  // Run pager — rendered outside ReactFlow so it's always visible
-  const runPager = runs.length > 1 && (
-    <div className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
-      <button
-        onClick={() => setSelectedRun(Math.max(0, activeRunIndex - 1))}
-        disabled={activeRunIndex === 0}
-        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        Prev
-      </button>
-      <span className="px-1 text-[10px] font-medium text-zinc-300">
-        Run {activeRunIndex + 1} / {runs.length}
-      </span>
-      <button
-        onClick={() => setSelectedRun(Math.min(runs.length - 1, activeRunIndex + 1))}
-        disabled={activeRunIndex === runs.length - 1}
-        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        Next
-      </button>
+  // Combined run pager + playback controls
+  const showPlayback = hasGraph && playback.totalSteps > 1
+  const controlPanel = (runs.length > 1 || showPlayback) && (
+    <div className="flex w-80 flex-col gap-1 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+      {/* Row 1: Run pager */}
+      {runs.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => { playback.stop(); setSelectedRun(Math.max(0, activeRunIndex - 1)) }}
+            disabled={activeRunIndex === 0}
+            className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            Prev
+          </button>
+          <span className="px-1 text-[10px] font-medium text-zinc-300">
+            Run {activeRunIndex + 1} / {runs.length}
+          </span>
+          <button
+            onClick={() => { playback.stop(); setSelectedRun(Math.min(runs.length - 1, activeRunIndex + 1)) }}
+            disabled={activeRunIndex === runs.length - 1}
+            className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      {/* Row 2+3: Playback controls + step label (only when graph is renderable) */}
+      {showPlayback && (
+        <PlaybackControls
+          playback={playback}
+          stepLabel={playback.step !== null && playbackSteps[playback.step] ? playbackSteps[playback.step].label : null}
+        />
+      )}
     </div>
   )
 
@@ -1202,7 +1369,7 @@ export function GraphView() {
   if (!hasGraph) {
     return (
       <div className="-mx-4 -mt-4 -mb-4 flex flex-col" style={{ height: 'calc(100% + 2rem)' }}>
-        {runPager && <div className="flex justify-end p-2">{runPager}</div>}
+        {controlPanel && <div className="flex justify-end p-2">{controlPanel}</div>}
         <div className="flex flex-1 items-center justify-center">
           <EmptyState message="No execution graph detected. Select a different run or run a query." />
         </div>
@@ -1232,7 +1399,7 @@ export function GraphView() {
           <DrawingOverlay />
 
           {/* Run pager */}
-          {runPager && <Panel position="top-right" className="!m-2">{runPager}</Panel>}
+          {controlPanel && <Panel position="top-right" className="!m-2">{controlPanel}</Panel>}
         </ReactFlow>
       </div>
 
