@@ -637,7 +637,6 @@ export interface DagPattern<T = unknown> {
 
 /** Debug configuration for orchestrators */
 export interface OrchestratorDebugConfig {
-  /** Include truncated input/output in timeline events for prompt/completion viewing */
   verboseTimeline?: boolean;
 }
 
@@ -678,7 +677,8 @@ export type DebugEventType =
   | "task_start"
   | "task_complete"
   | "task_error"
-  | "task_progress";
+  | "task_progress"
+  | "goal_step";
 
 /** Base debug event */
 export interface DebugEventBase {
@@ -694,7 +694,7 @@ export interface AgentStartEvent extends DebugEventBase {
   type: "agent_start";
   agentId: string;
   inputLength: number;
-  /** Truncated input text (only when verboseTimeline is enabled) */
+  /** Truncated input text (max 5000 chars) */
   input?: string;
 }
 
@@ -708,7 +708,7 @@ export interface AgentCompleteEvent extends DebugEventBase {
   outputTokens: number;
   durationMs: number;
   modelId?: string;
-  /** Truncated output text (only when verboseTimeline is enabled) */
+  /** Truncated output text (max 5000 chars) */
   output?: string;
 }
 
@@ -803,6 +803,10 @@ export interface PatternStartEvent extends DebugEventBase {
   type: "pattern_start";
   patternId: string;
   patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
+  /** All handler IDs in this pattern (agents + tasks) */
+  handlers?: string[];
+  /** Which handler IDs are tasks (rest are agents) */
+  taskIds?: string[];
 }
 
 /** Pattern complete event */
@@ -957,6 +961,16 @@ export interface TaskProgressEvent extends DebugEventBase {
   message?: string;
 }
 
+/** Goal step event — emitted for each agent invocation within a goal step */
+export interface GoalStepEvent extends DebugEventBase {
+  type: "goal_step";
+  agentId: string;
+  step: number;
+  nodeId: string;
+  satisfaction: number;
+  satisfactionDelta: number;
+}
+
 /** Union of all debug event types */
 export type DebugEvent =
   | AgentStartEvent
@@ -990,7 +1004,8 @@ export type DebugEvent =
   | TaskStartEvent
   | TaskCompleteEvent
   | TaskErrorEvent
-  | TaskProgressEvent;
+  | TaskProgressEvent
+  | GoalStepEvent;
 
 // ============================================================================
 // Self-Healing Types
@@ -1308,9 +1323,6 @@ export interface CheckpointContext {
   satisfaction?: number;
 }
 
-/**
- * @deprecated Use `PatternCheckpointConfig` instead. Alias kept for backward compatibility.
- */
 export type GoalCheckpointConfig = PatternCheckpointConfig;
 
 // ---- Common checkpoint state fields ----

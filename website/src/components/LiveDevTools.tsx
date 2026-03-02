@@ -130,6 +130,13 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
   const eventCount = useSelector(system, (s) => s.derive.connection.eventCount)
   const showAiTabs = aiEnabled && eventCount > 0
 
+  // Check if any goal pattern events exist — used to conditionally show Goal tab
+  const events = useSelector(system, (s) => s.facts.connection.events) as DebugEvent[]
+  const hasGoalPattern = useMemo(
+    () => events.some((e: DebugEvent) => e.type === 'pattern_start' && (e as Record<string, unknown>).patternType === 'goal'),
+    [events],
+  )
+
   // Visible views based on which groups are connected
   const visibleViews = useMemo(() => {
     const views: Array<typeof VIEWS[number]> = []
@@ -137,7 +144,11 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
       views.push(...SYSTEM_VIEWS)
     }
     if (showAiTabs) {
-      views.push(...AI_VIEWS)
+      if (hasGoalPattern) {
+        views.push(...AI_VIEWS)
+      } else {
+        views.push(...AI_VIEWS.filter(v => v !== 'Goal'))
+      }
     }
     // Fallback: show system tabs if runtime is present, otherwise AI tabs
     if (views.length === 0) {
@@ -145,7 +156,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     }
 
     return views
-  }, [showSystemTabs, showAiTabs, runtimeConnected, aiEnabled])
+  }, [showSystemTabs, showAiTabs, hasGoalPattern, runtimeConnected, aiEnabled])
 
   // Auto-switch active view when it's not in the visible set
   useEffect(() => {

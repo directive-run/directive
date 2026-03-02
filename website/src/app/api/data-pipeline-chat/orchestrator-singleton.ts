@@ -89,17 +89,45 @@ const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [
 // Tasks
 // ---------------------------------------------------------------------------
 
+/** DAG wraps upstream output as `{"depName": "<stringified>"}`. Unwrap to the raw value. */
+function unwrapDagInput(input: string): string {
+  try {
+    const envelope = JSON.parse(input)
+    if (envelope && typeof envelope === 'object' && !Array.isArray(envelope)) {
+      const values = Object.values(envelope)
+      if (values.length === 1 && typeof values[0] === 'string') {
+        return values[0]
+      }
+    }
+  } catch {
+    // Not JSON — return as-is
+  }
+
+  return input
+}
+
+/** Strip markdown code fences (```json ... ```) if present. */
+function stripCodeFences(text: string): string {
+  const fenced = text.match(/^```[\w]*\n([\s\S]*?)\n```$/m)
+
+  return fenced ? fenced[1].trim() : text.trim()
+}
+
+/** Parse JSON from an agent response, handling DAG envelope + code fences. */
+function parseAgentJson(input: string, fallbackKey: string): Record<string, unknown> {
+  const raw = stripCodeFences(unwrapDagInput(input))
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return { [fallbackKey]: raw }
+  }
+}
+
 const transformTask: TaskRegistration = {
   run: async (input, _signal, context) => {
     context.reportProgress(10, 'Parsing classification')
 
-    let data: Record<string, unknown>
-    try {
-      data = JSON.parse(input)
-    } catch {
-      // If the agent didn't return valid JSON, wrap it
-      data = { classification: input, raw: true }
-    }
+    const data = parseAgentJson(input, 'classification')
 
     context.reportProgress(40, 'Normalizing structure')
 
@@ -125,12 +153,7 @@ const validateTask: TaskRegistration = {
   run: async (input, _signal, context) => {
     context.reportProgress(25, 'Parsing analysis')
 
-    let data: Record<string, unknown>
-    try {
-      data = JSON.parse(input)
-    } catch {
-      data = { analysis: input }
-    }
+    const data = parseAgentJson(input, 'analysis')
 
     context.reportProgress(50, 'Validating fields')
 

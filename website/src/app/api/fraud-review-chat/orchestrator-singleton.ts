@@ -194,8 +194,8 @@ Available specialists: transaction-analyst, geo-analyst, identity-analyst
 To delegate to a specialist, respond with ONLY this JSON (no other text):
 { "action": "delegate", "worker": "<agent-id>", "workerInput": "<specific analysis task>" }
 
-When you've gathered enough findings, respond with ONLY this JSON:
-{ "action": "complete" }`,
+When you've gathered enough findings, compile a brief summary of the key findings from all specialists, then respond with ONLY this JSON:
+{ "action": "complete", "report": "<your compiled findings summary>" }`,
         },
         capabilities: ['supervision', 'investigation', 'reporting'],
       },
@@ -227,7 +227,33 @@ When you've gathered enough findings, respond with ONLY this JSON:
     patterns: {
       fraudReview: supervisor<string>('supervisor', ['transaction-analyst', 'geo-analyst', 'identity-analyst'], {
         maxRounds: 5,
-        extract: (supervisorOutput) => String(supervisorOutput),
+        extract: (supervisorOutput, workerResults) => {
+          // Try to extract a report from the supervisor's completion
+          let report = ''
+          if (typeof supervisorOutput === 'string') {
+            try {
+              const parsed = JSON.parse(supervisorOutput)
+              if (parsed.report) {
+                report = parsed.report
+              }
+            } catch {
+              // Not JSON — use as-is if it's not just the action marker
+              if (!supervisorOutput.includes('"action"')) {
+                report = supervisorOutput
+              }
+            }
+          }
+
+          // If supervisor didn't include a report, compile from worker results
+          if (!report && workerResults && workerResults.length > 0) {
+            const sections = workerResults
+              .map((r, i) => `**Finding ${i + 1}:**\n${String(r.output)}`)
+              .join('\n\n')
+            report = `## Fraud Analysis Report\n\n${sections}`
+          }
+
+          return report || 'Analysis complete — no detailed findings available.'
+        },
       }),
     },
 

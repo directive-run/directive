@@ -38,6 +38,11 @@ export const EVENT_COLORS: Record<string, string> = {
   breakpoint_resumed: 'bg-emerald-400',
   derivation_update: 'bg-purple-500',
   scratchpad_update: 'bg-fuchsia-500',
+  task_start: 'bg-sky-400',
+  task_complete: 'bg-emerald-400',
+  task_error: 'bg-red-400',
+  task_progress: 'bg-sky-300',
+  goal_step: 'bg-teal-400',
 }
 
 export const EVENT_LABELS: Record<string, string> = {
@@ -58,6 +63,11 @@ export const EVENT_LABELS: Record<string, string> = {
   breakpoint_resumed: 'Resumed',
   derivation_update: 'Derivation',
   scratchpad_update: 'Scratchpad',
+  task_start: 'Task Start',
+  task_complete: 'Task Done',
+  task_error: 'Task Error',
+  task_progress: 'Task Progress',
+  goal_step: 'Goal Step',
 }
 
 export const SYSTEM_VIEWS = ['Facts', 'Derivations', 'Pipeline', 'System Graph', 'Time Travel', 'Breakpoints'] as const

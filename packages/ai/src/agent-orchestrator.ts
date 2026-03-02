@@ -375,7 +375,6 @@ export function createAgentOrchestrator<
 
   // Normalize debug config
   const debug = typeof rawDebug === "object" ? true : !!rawDebug;
-  const verboseTimeline = typeof rawDebug === "object" ? !!rawDebug.verboseTimeline : false;
   const MAX_VERBOSE_LENGTH = 5000;
 
   // Warn if selfHealing is configured without circuitBreaker (selfHealing only triggers in CB error path)
@@ -775,7 +774,7 @@ export function createAgentOrchestrator<
         inputLength: input.length,
         modelId: agent.model ?? undefined,
         ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
-        ...(verboseTimeline ? { input: input.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+        input: input.slice(0, MAX_VERBOSE_LENGTH),
       });
     }
 
@@ -1059,7 +1058,7 @@ export function createAgentOrchestrator<
         outputTokens: result.tokenUsage?.outputTokens ?? 0,
         durationMs: Date.now() - startTime,
         modelId: agent.model ?? undefined,
-        ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+        output: outputStr.slice(0, MAX_VERBOSE_LENGTH),
       });
     }
 
