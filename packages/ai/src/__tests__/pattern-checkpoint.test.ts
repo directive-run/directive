@@ -63,7 +63,7 @@ describe("Sequential Pattern Checkpoint", () => {
       patterns: {
         seq: {
           type: "sequential",
-          agents: ["a", "b", "c", "d"],
+          handlers: ["a", "b", "c", "d"],
           checkpoint: { everyN: 1, store, labelPrefix: "seq-test" },
         },
       },
@@ -225,7 +225,7 @@ describe("Reflect Pattern Checkpoint", () => {
       patterns: {
         ref: {
           type: "reflect",
-          agent: "writer",
+          handler: "writer",
           evaluator: "reviewer",
           maxIterations: 3,
           checkpoint: { everyN: 1, store, labelPrefix: "ref-test" },
@@ -309,7 +309,7 @@ describe("Debate Pattern Checkpoint", () => {
       patterns: {
         dbt: {
           type: "debate",
-          agents: ["d1", "d2"],
+          handlers: ["d1", "d2"],
           evaluator: "judge",
           maxRounds: 3,
           checkpoint: { everyN: 1, store, labelPrefix: "dbt-test" },
@@ -365,7 +365,7 @@ describe("Debate Pattern Checkpoint", () => {
       tokensConsumed: 35,
     };
 
-    const pattern = debate<string>({ agents: ["d1", "d2"], evaluator: "judge", maxRounds: 3 });
+    const pattern = debate<string>({ handlers: ["d1", "d2"], evaluator: "judge", maxRounds: 3 });
     const result = await orchestrator.resumeDebate(checkpointState, pattern);
 
     expect(result).toBeDefined();
@@ -380,7 +380,7 @@ describe("Debate Pattern Checkpoint", () => {
     await expect(
       orchestrator.resumeDebate(
         { version: 2 } as any,
-        debate({ agents: ["d1", "d2"], evaluator: "judge" }),
+        debate({ handlers: ["d1", "d2"], evaluator: "judge" }),
       ),
     ).rejects.toThrow("Invalid debate checkpoint state");
   });
@@ -408,9 +408,9 @@ describe("DAG Pattern Checkpoint", () => {
         pipeline: {
           type: "dag",
           nodes: {
-            fetch: { agent: "fetcher" },
-            analyze: { agent: "analyzer", deps: ["fetch"] },
-            summarize: { agent: "summarizer", deps: ["analyze"] },
+            fetch: { handler: "fetcher" },
+            analyze: { handler: "analyzer", deps: ["fetch"] },
+            summarize: { handler: "summarizer", deps: ["analyze"] },
           },
           merge: (context) => context.outputs.summarize as string,
           checkpoint: { everyN: 1, store, labelPrefix: "dag-test" },
@@ -459,9 +459,9 @@ describe("DAG Pattern Checkpoint", () => {
 
     const pattern = dag<string>(
       {
-        fetch: { agent: "fetcher" },
-        analyze: { agent: "analyzer", deps: ["fetch"] },
-        summarize: { agent: "summarizer", deps: ["analyze"] },
+        fetch: { handler: "fetcher" },
+        analyze: { handler: "analyzer", deps: ["fetch"] },
+        summarize: { handler: "summarizer", deps: ["analyze"] },
       },
       (context) => context.outputs.summarize as string,
     );
@@ -478,7 +478,7 @@ describe("DAG Pattern Checkpoint", () => {
     await expect(
       orchestrator.resumeDag(
         { version: 2 } as any,
-        dag({ fetch: { agent: "fetcher" } }),
+        dag({ fetch: { handler: "fetcher" } }),
       ),
     ).rejects.toThrow("Invalid DAG checkpoint state");
   });
@@ -713,7 +713,7 @@ describe("Conditional Checkpointing", () => {
       patterns: {
         seq: {
           type: "sequential",
-          agents: ["a", "b", "c", "d", "e"],
+          handlers: ["a", "b", "c", "d", "e"],
           checkpoint: {
             everyN: 1,
             store,

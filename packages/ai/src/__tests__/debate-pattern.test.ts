@@ -27,7 +27,7 @@ describe("debate pattern", () => {
       },
       patterns: {
         myDebate: debate({
-          agents: ["optimist", "pessimist"],
+          handlers: ["optimist", "pessimist"],
           evaluator: "judge",
           maxRounds: 1,
         }),
@@ -216,7 +216,7 @@ describe("debate pattern", () => {
       },
       patterns: {
         theDebate: debate({
-          agents: ["pro", "con"],
+          handlers: ["pro", "con"],
           evaluator: "arbiter",
           maxRounds: 1,
         }),
@@ -248,7 +248,7 @@ describe("debate pattern", () => {
     const result = await runDebate(
       orchestrator,
       {
-        agents: ["x", "y"],
+        handlers: ["x", "y"],
         evaluator: "evaluator",
         maxRounds: 1,
       },
@@ -311,7 +311,7 @@ describe("debate pattern", () => {
 
     // 5ms timeout — agents take 300ms, should abort before first round finishes
     const pattern = debate({
-      agents: ["slow1", "slow2"],
+      handlers: ["slow1", "slow2"],
       evaluator: "judge",
       maxRounds: 2,
       timeout: 5,
@@ -319,7 +319,7 @@ describe("debate pattern", () => {
 
     expect(pattern.timeout).toBe(5);
     expect(pattern.type).toBe("debate");
-    expect(pattern.agents).toEqual(["slow1", "slow2"]);
+    expect(pattern.handlers).toEqual(["slow1", "slow2"]);
   });
 
   it("lifecycle hooks fire with patternType debate", async () => {
@@ -340,7 +340,7 @@ describe("debate pattern", () => {
         },
       },
       patterns: {
-        d: debate({ agents: ["a", "b"], evaluator: "judge", maxRounds: 1 }),
+        d: debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 1 }),
       },
       hooks: {
         onPatternStart: (event) => hookEvents.push({ patternType: event.patternType, phase: "start" }),
@@ -372,7 +372,7 @@ describe("debate pattern", () => {
         },
       },
       patterns: {
-        d: debate({ agents: ["a", "b"], evaluator: "judge", maxRounds: 2 }),
+        d: debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 2 }),
       },
       debug: true,
     });
@@ -429,15 +429,15 @@ describe("debate pattern", () => {
     expect(result.winnerId).toBe("a");
   });
 
-  it("requires at least 2 agents — throws on single agent", () => {
+  it("requires at least 2 handlers — throws on single handler", () => {
     expect(() => {
-      debate({ agents: ["only"], evaluator: "judge" });
-    }).toThrow("debate requires at least 2 agents");
+      debate({ handlers: ["only"], evaluator: "judge" });
+    }).toThrow("debate requires at least 2 handlers");
   });
 
   it("requires maxRounds >= 1 — throws on zero", () => {
     expect(() => {
-      debate({ agents: ["a", "b"], evaluator: "judge", maxRounds: 0 });
+      debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 });
     }).toThrow("maxRounds must be >= 1");
   });
 });

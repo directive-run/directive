@@ -20,7 +20,7 @@
  *   patterns: {
  *     parallelResearch: {
  *       type: 'parallel',
- *       agents: ['researcher', 'researcher', 'researcher'],
+ *       handlers: ['researcher', 'researcher', 'researcher'],
  *       merge: (results) => combineResearch(results),
  *     },
  *   },
@@ -122,7 +122,7 @@ import {
   convertOrchestratorConstraints,
 } from "./orchestrator-bridge.js";
 
-import { withStructuredOutput, type SafeParseable } from "./structured-output.js";
+import { withStructuredOutput, extractJsonFromOutput, type SafeParseable } from "./structured-output.js";
 import { createCheckpointId, validateCheckpoint, type Checkpoint, type CheckpointStore, type MultiAgentCheckpointLocalState } from "./checkpoint.js";
 import type { BreakpointConfig, BreakpointRequest, BreakpointModifications, BreakpointContext, MultiAgentBreakpointType } from "./breakpoints.js";
 import { matchBreakpoint, createBreakpointId, createInitialBreakpointState, MAX_BREAKPOINT_HISTORY } from "./breakpoints.js";
@@ -620,26 +620,26 @@ export interface AgentRegistry {
 // Execution Pattern Types
 // ============================================================================
 
-/** Parallel execution pattern - run agents concurrently and merge results */
+/** Parallel execution pattern - run handlers concurrently and merge results */
 export interface ParallelPattern<T = unknown> {
   type: "parallel";
-  /** Agent IDs to run in parallel (can repeat for multiple instances) */
-  agents: string[];
-  /** Function to merge results from all agents */
+  /** Handler IDs (agents or tasks) to run in parallel (can repeat for multiple instances) */
+  handlers: string[];
+  /** Function to merge results from all handlers */
   merge: (results: RunResult<unknown>[]) => T | Promise<T>;
-  /** Minimum successful results required. @default agents.length */
+  /** Minimum successful results required. @default handlers.length */
   minSuccess?: number;
   /** Overall timeout (ms) */
   timeout?: number;
 }
 
-/** Sequential execution pattern - pipeline of agents */
+/** Sequential execution pattern - pipeline of handlers */
 export interface SequentialPattern<T = unknown> {
   type: "sequential";
-  /** Agent IDs in execution order */
-  agents: string[];
+  /** Handler IDs (agents or tasks) in execution order */
+  handlers: string[];
   /** Transform output to next input. @default JSON.stringify */
-  transform?: (output: unknown, agentId: string, index: number) => string;
+  transform?: (output: unknown, handlerId: string, index: number) => string;
   /** Final result extractor */
   extract?: (output: unknown) => T;
   /** Continue on error. @default false */
@@ -681,8 +681,8 @@ export interface ReflectIterationRecord {
  */
 export interface ReflectPattern<T = unknown> {
   type: "reflect";
-  /** Producer agent ID */
-  agent: string;
+  /** Producer handler ID (agent or task) */
+  handler: string;
   /** Evaluator agent ID (receives output as input) */
   evaluator: string;
   /** Maximum iterations. @default 2 */
@@ -714,8 +714,8 @@ export interface ReflectPattern<T = unknown> {
  */
 export interface RacePattern<T = unknown> {
   type: "race";
-  /** Agent IDs to race */
-  agents: string[];
+  /** Handler IDs (agents or tasks) to race */
+  handlers: string[];
   /** Extract result from winning RunResult (receives full RunResult for access to tokens/metadata). @default output field */
   extract?: (result: RunResult<unknown>) => T;
   /** Overall timeout (ms) */
@@ -757,8 +757,8 @@ export interface RaceResult<T = unknown> {
  */
 export interface DebatePattern<T = unknown> {
   type: "debate";
-  /** Agent IDs that will generate competing proposals */
-  agents: string[];
+  /** Handler IDs (agents or tasks) that will generate competing proposals */
+  handlers: string[];
   /** Evaluator agent ID that judges proposals */
   evaluator: string;
   /** Maximum rounds of debate. @default 2 */
@@ -825,12 +825,51 @@ export interface RunAgentRequirement extends Requirement {
   context?: Record<string, unknown>;
 }
 
+/** Read-only context passed to task functions */
+export interface TaskContext {
+  /** The ID of this task */
+  taskId: string;
+  /** Conversation history from orchestrator memory (read-only deep copy) */
+  memory: ReadonlyArray<{ role: string; content: string }>;
+  /** Current scratchpad state (read-only deep copy) */
+  scratchpad: Readonly<Record<string, unknown>>;
+  /** Read the state of any registered agent or task (status, lastOutput, lastError, totalTokens) */
+  readAgentState: (nodeId: string) => Readonly<{ status: string; lastOutput?: string; lastError?: string; totalTokens: number }> | undefined;
+  /** Report intermediate progress (0-100) for DevTools timeline */
+  reportProgress: (percent: number, message?: string) => void;
+}
+
+/** Configuration for a registered task (imperative code) */
+export interface TaskRegistration {
+  /** The function to execute. Receives input, abort signal, and context. */
+  run: (input: string, signal: AbortSignal, context: TaskContext) => unknown | Promise<unknown>;
+  /** Display label for DevTools graph. Defaults to task ID. */
+  label?: string;
+  /** Description for DevTools tooltip/detail panel. */
+  description?: string;
+  /** Timeout (ms) */
+  timeout?: number;
+  /** Max concurrent executions of this task. @default 1 */
+  maxConcurrent?: number;
+  /** Optional retry configuration for transient failures */
+  retry?: {
+    /** Max number of attempts (including the first try) */
+    attempts: number;
+    /** Backoff strategy between retries. @default 'fixed' */
+    backoff?: "fixed" | "exponential";
+    /** Base delay between retries (ms). @default 1000 */
+    delayMs?: number;
+  };
+}
+
 /** Multi-agent orchestrator options */
 export interface MultiAgentOrchestratorOptions {
   /** Base run function */
   runner: AgentRunner;
   /** Registered agents */
   agents: AgentRegistry;
+  /** Imperative code tasks, referenced by ID in patterns (same namespace as agents) */
+  tasks?: Record<string, TaskRegistration>;
   /** Execution patterns */
   patterns?: Record<string, ExecutionPattern>;
   /** Handoff callbacks */
@@ -908,6 +947,8 @@ export interface MultiAgentRunCallOptions extends RunOptions {
   outputSchema?: SafeParseable<unknown> | null;
   /** Override max schema retries for this call. */
   maxSchemaRetries?: number;
+  /** Pattern ID that initiated this run (for lifecycle hooks). Set internally by pattern executors. */
+  patternId?: string;
 }
 
 /** Multi-agent orchestrator instance */
@@ -965,6 +1006,20 @@ export interface MultiAgentOrchestrator {
   unregisterAgent(agentId: string): void;
   /** Get registered agent IDs */
   getAgentIds(): string[];
+  /** Register a new task dynamically */
+  registerTask(taskId: string, registration: TaskRegistration): void;
+  /** Unregister a task */
+  unregisterTask(taskId: string): void;
+  /** Get registered task IDs */
+  getTaskIds(): string[];
+  /** Get task registry info (labels + descriptions) */
+  getTaskRegistry(): Record<string, { label?: string; description?: string }>;
+  /** Get task state */
+  getTaskState(taskId: string): { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number } | undefined;
+  /** Get all task states */
+  getAllTaskStates(): Record<string, { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number }>;
+  /** Get all handler IDs (agents + tasks combined) */
+  getNodeIds(): string[];
   /** Get agent state */
   getAgentState(agentId: string): MultiAgentState["__agents"][string] | undefined;
   /** Get all agent states */
@@ -1187,6 +1242,7 @@ export function createMultiAgentOrchestrator(
     breakpointTimeoutMs = 300000,
     derive: userDerivations,
     scratchpad: scratchpadConfig,
+    tasks: inputTasks = {},
   } = options;
 
   // Normalize debug config
@@ -1196,6 +1252,18 @@ export function createMultiAgentOrchestrator(
 
   // Shallow copy so registerAgent/unregisterAgent don't mutate the caller's object
   const agents: AgentRegistry = { ...inputAgents };
+
+  // Task registry (shallow copy for same reason as agents)
+  const tasks: Record<string, TaskRegistration> = { ...inputTasks };
+
+  // Task state tracking (parallel to agentStates)
+  const taskStates: Record<string, { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number }> = Object.create(null);
+  for (const taskId of Object.keys(tasks)) {
+    taskStates[taskId] = { status: "idle" };
+  }
+
+  // Task semaphores are created after validation (below)
+  const taskSemaphores = new Map<string, Semaphore>();
 
   // Enforce approval workflow configuration
   if (!autoApproveToolCalls && !onApprovalRequest) {
@@ -1219,9 +1287,46 @@ export function createMultiAgentOrchestrator(
       throw new Error(`[Directive MultiAgent] Agent ID "${agentId}" is reserved and cannot be used`);
     }
   }
+  for (const [taskId, taskReg] of Object.entries(tasks)) {
+    if (!taskId || taskId.trim() !== taskId) {
+      throw new Error(`[Directive MultiAgent] Task ID must be a non-empty trimmed string, got "${taskId}"`);
+    }
+    if (RESERVED_IDS.has(taskId)) {
+      throw new Error(`[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`);
+    }
+    // Validate timeout and maxConcurrent
+    if (taskReg.timeout !== undefined && (!Number.isFinite(taskReg.timeout) || taskReg.timeout <= 0)) {
+      throw new Error(`[Directive MultiAgent] Task "${taskId}" timeout must be a finite number > 0`);
+    }
+    if (taskReg.maxConcurrent !== undefined && (!Number.isFinite(taskReg.maxConcurrent) || taskReg.maxConcurrent < 1 || !Number.isInteger(taskReg.maxConcurrent))) {
+      throw new Error(`[Directive MultiAgent] Task "${taskId}" maxConcurrent must be a finite integer >= 1`);
+    }
+    // Validate retry configuration
+    if (taskReg.retry) {
+      const { attempts, delayMs } = taskReg.retry;
+      if (!Number.isFinite(attempts) || attempts < 1) {
+        throw new Error(`[Directive MultiAgent] Task "${taskId}" retry attempts must be a finite number >= 1`);
+      }
+      if (delayMs !== undefined && (!Number.isFinite(delayMs) || delayMs < 0)) {
+        throw new Error(`[Directive MultiAgent] Task "${taskId}" retry delayMs must be a finite number >= 0`);
+      }
+    }
+  }
 
-  // Validate that all pattern agents exist in the registry
-  const registeredAgentIds = new Set(Object.keys(agents));
+  // Create task semaphores (after validation passes)
+  for (const [taskId, reg] of Object.entries(tasks)) {
+    taskSemaphores.set(taskId, new Semaphore(reg.maxConcurrent ?? 1));
+  }
+
+  // Validate no ID collisions between agents and tasks
+  for (const taskId of Object.keys(tasks)) {
+    if (agents[taskId]) {
+      throw new Error(`[Directive MultiAgent] ID "${taskId}" is registered as both an agent and a task. IDs must be unique across both registries.`);
+    }
+  }
+
+  // Validate that all pattern handlers exist in the combined registry
+  const registeredAgentIds = new Set([...Object.keys(agents), ...Object.keys(tasks)]);
   const missingAgents: Array<{ patternId: string; agentId: string }> = [];
 
   for (const [patternId, pattern] of Object.entries(patterns)) {
@@ -1229,27 +1334,27 @@ export function createMultiAgentOrchestrator(
 
     switch (pattern.type) {
       case "parallel":
-        agentsToCheck.push(...pattern.agents);
+        agentsToCheck.push(...pattern.handlers);
         break;
       case "sequential":
-        agentsToCheck.push(...pattern.agents);
+        agentsToCheck.push(...pattern.handlers);
         break;
       case "supervisor":
         agentsToCheck.push(pattern.supervisor, ...pattern.workers);
         break;
       case "dag":
         for (const node of Object.values(pattern.nodes)) {
-          agentsToCheck.push(node.agent);
+          agentsToCheck.push(node.handler);
         }
         break;
       case "reflect":
-        agentsToCheck.push(pattern.agent, pattern.evaluator);
+        agentsToCheck.push(pattern.handler, pattern.evaluator);
         break;
       case "race":
-        agentsToCheck.push(...pattern.agents);
+        agentsToCheck.push(...pattern.handlers);
         break;
       case "debate":
-        agentsToCheck.push(...(pattern as DebatePattern).agents, (pattern as DebatePattern).evaluator);
+        agentsToCheck.push(...(pattern as DebatePattern).handlers, (pattern as DebatePattern).evaluator);
         break;
     }
 
@@ -2085,6 +2190,259 @@ export function createMultiAgentOrchestrator(
     });
   }
 
+  // ---- Core: Run a task (imperative code) ----
+  async function runTask<T>(
+    taskId: string,
+    taskReg: TaskRegistration,
+    input: string,
+    opts?: MultiAgentRunCallOptions,
+  ): Promise<RunResult<T>> {
+    const label = taskReg.label ?? taskId;
+    const startTime = Date.now();
+    const state = taskStates[taskId] ?? (taskStates[taskId] = { status: "idle" });
+    state.status = "running";
+    state.startTime = startTime;
+    state.lastError = undefined;
+
+    // Check breakpoints — tasks don't have system modules, so only check if
+    // breakpoints are configured and handle the missing agent facts gracefully
+    let effectiveInput = input;
+    if (breakpointConfigs.length > 0) {
+      try {
+        const bpResult = await handleBreakpoint("pre_agent_run", taskId, label, input, opts?.signal);
+        if (bpResult.skip) {
+          state.status = "completed";
+
+          return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        }
+        effectiveInput = bpResult.input;
+      } catch {
+        // Tasks don't have system facts — breakpoint state access may fail.
+        // Fall through with original input.
+      }
+    }
+
+    // Emit timeline event
+    if (timeline) {
+      timeline.record({
+        type: "task_start",
+        timestamp: startTime,
+        agentId: taskId,
+        snapshotId: null,
+        taskId,
+        label,
+        description: taskReg.description,
+        inputLength: effectiveInput.length,
+      });
+    }
+
+    // Fire hook
+    const effectivePatternId = opts?.patternId ?? "";
+    fireHook("onTaskStart", { patternId: effectivePatternId, taskId, label, timestamp: startTime });
+
+    // Semaphore for maxConcurrent
+    const sem = taskSemaphores.get(taskId);
+
+    // Build TaskContext with deep-cloned memory and scratchpad
+    const buildContext = (): TaskContext => ({
+      taskId,
+      memory: sharedMemory
+        ? structuredClone(sharedMemory.getContextMessages?.() ?? []) as ReadonlyArray<{ role: string; content: string }>
+        : [],
+      scratchpad: scratchpadInstance
+        ? Object.freeze(structuredClone(scratchpadInstance.getAll()))
+        : Object.freeze({}),
+      readAgentState: (nodeId: string) => {
+        // Check agent states first, then task states
+        const agentState = agentStates[nodeId];
+        if (agentState) {
+          return Object.freeze({ status: agentState.status, lastOutput: agentState.lastOutput != null ? String(agentState.lastOutput) : undefined, lastError: agentState.lastError, totalTokens: agentState.totalTokens });
+        }
+        const taskState = taskStates[nodeId];
+        if (taskState) {
+          return Object.freeze({ status: taskState.status, lastOutput: taskState.lastOutput != null ? String(taskState.lastOutput) : undefined, lastError: taskState.lastError, totalTokens: 0 });
+        }
+
+        return undefined;
+      },
+      reportProgress: (percent: number, message?: string) => {
+        const clampedPercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+        if (timeline) {
+          timeline.record({
+            type: "task_progress",
+            timestamp: Date.now(),
+            agentId: taskId,
+            snapshotId: null,
+            taskId,
+            label,
+            percent: clampedPercent,
+            message,
+          });
+        }
+        fireHook("onTaskProgress", { patternId: effectivePatternId, taskId, label, percent: clampedPercent, message, timestamp: Date.now() });
+      },
+    });
+
+    const maxAttempts = taskReg.retry?.attempts ?? 1;
+    const backoff = taskReg.retry?.backoff ?? "fixed";
+    const baseDelay = taskReg.retry?.delayMs ?? 1000;
+    let lastError: Error | undefined;
+
+    const executeAttempt = async (signal: AbortSignal): Promise<unknown> => {
+      const context = buildContext();
+
+      return taskReg.run(effectiveInput, signal, context);
+    };
+
+    let releaseFn: (() => void) | null = null;
+
+    try {
+      if (sem) {
+        releaseFn = await sem.acquire();
+      }
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const abortController = new AbortController();
+        let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+        // Chain with external signal — store handler for cleanup
+        const abortHandler = () => abortController.abort();
+        if (opts?.signal) {
+          if (opts.signal.aborted) {
+            throw new Error(`[Directive MultiAgent] Task "${taskId}" aborted before starting`);
+          }
+          opts.signal.addEventListener("abort", abortHandler, { once: true });
+        }
+
+        // Timeout
+        if (taskReg.timeout) {
+          timeoutTimer = setTimeout(() => abortController.abort(), taskReg.timeout);
+        }
+
+        try {
+          const rawOutput = await executeAttempt(abortController.signal);
+          if (timeoutTimer) {
+            clearTimeout(timeoutTimer);
+          }
+
+          // Stringify non-string output
+          const output = typeof rawOutput === "string" ? rawOutput : safeStringify(rawOutput);
+          const durationMs = Date.now() - startTime;
+
+          state.status = "completed";
+          state.lastOutput = output;
+          state.durationMs = durationMs;
+
+          // Emit timeline event
+          if (timeline) {
+            timeline.record({
+              type: "task_complete",
+              timestamp: Date.now(),
+              agentId: taskId,
+              snapshotId: null,
+              taskId,
+              label,
+              durationMs,
+            });
+          }
+
+          // Fire hooks
+          fireHook("onTaskComplete", { patternId: opts?.patternId ?? "", taskId, label, durationMs, timestamp: Date.now() });
+
+          // Update coordinator fact for constraint reactivity
+          try {
+            const coordFacts = system.read("__coord");
+            setBridgeFact(coordFacts as any, "__lastTaskCompletion" as any, { taskId, timestamp: Date.now() });
+          } catch {
+            // non-fatal: system might be disposed
+          }
+
+          return { output: output as T, messages: [], toolCalls: [], totalTokens: 0 };
+        } catch (err) {
+          if (timeoutTimer) {
+            clearTimeout(timeoutTimer);
+          }
+          lastError = err instanceof Error ? err : new Error(String(err));
+
+          // Emit per-attempt error if retrying
+          if (attempt < maxAttempts) {
+            if (timeline) {
+              timeline.record({
+                type: "task_error",
+                timestamp: Date.now(),
+                agentId: taskId,
+                snapshotId: null,
+                taskId,
+                label,
+                error: lastError.message,
+                durationMs: Date.now() - startTime,
+                attempt,
+              });
+            }
+
+            // Backoff with cap and abort-awareness
+            const MAX_BACKOFF_MS = 30_000;
+            const rawDelay = backoff === "exponential"
+              ? baseDelay * 2 ** (attempt - 1)
+              : baseDelay;
+            const delay = Math.min(rawDelay, MAX_BACKOFF_MS);
+            await new Promise<void>((resolve, reject) => {
+              let settled = false;
+              const onAbort = () => {
+                if (!settled) {
+                  settled = true;
+                  clearTimeout(timer);
+                  reject(new Error(`[Directive MultiAgent] Task "${taskId}" aborted during retry backoff`));
+                }
+              };
+              const timer = setTimeout(() => {
+                settled = true;
+                opts?.signal?.removeEventListener("abort", onAbort);
+                resolve();
+              }, delay);
+              if (opts?.signal) {
+                opts.signal.addEventListener("abort", onAbort, { once: true });
+              }
+            });
+          }
+        } finally {
+          // Clean up abort listener to prevent accumulation
+          opts?.signal?.removeEventListener("abort", abortHandler);
+        }
+      }
+
+      // All attempts exhausted
+      const durationMs = Date.now() - startTime;
+      state.status = "error";
+      state.lastError = lastError?.message;
+      state.durationMs = durationMs;
+
+      // Emit final error event
+      if (timeline) {
+        timeline.record({
+          type: "task_error",
+          timestamp: Date.now(),
+          agentId: taskId,
+          snapshotId: null,
+          taskId,
+          label,
+          error: lastError?.message ?? "Unknown error",
+          durationMs,
+        });
+      }
+
+      fireHook("onTaskError", { patternId: effectivePatternId, taskId, label, error: lastError!, durationMs, timestamp: Date.now() });
+
+      // Note: Tasks bypass the circuit breaker's execute() wrapper (tasks are imperative
+      // code, not LLM calls). Task failure recovery is handled by the retry config on
+      // TaskRegistration. The CB's execute() is only used for agent runs.
+
+      throw lastError;
+    } finally {
+      releaseFn?.();
+    }
+  }
+
   // ---- Core: Run a single agent ----
   async function runSingleAgent<T>(
     agentId: string,
@@ -2093,15 +2451,8 @@ export function createMultiAgentOrchestrator(
   ): Promise<RunResult<T>> {
     assertNotDisposed();
 
-    const registration = agents[agentId];
-    if (!registration) {
-      const available = Object.keys(agents).join(", ") || "(none)";
-
-      throw new Error(`[Directive MultiAgent] Unknown agent "${agentId}". Registered agents: ${available}`);
-    }
-
     if (opts?.signal?.aborted) {
-      throw new Error(`[Directive MultiAgent] Agent "${agentId}" run aborted before starting`);
+      throw new Error(`[Directive MultiAgent] Handler "${agentId}" run aborted before starting`);
     }
 
     if (globalStatus === "paused") {
@@ -2112,6 +2463,19 @@ export function createMultiAgentOrchestrator(
     pendingRuns++;
 
     try {
+      // Check if this is a task (imperative code), not an agent (LLM call)
+      const taskReg = tasks[agentId];
+      if (taskReg) {
+        return await runTask<T>(agentId, taskReg, input, opts);
+      }
+
+      const registration = agents[agentId];
+      if (!registration) {
+        const available = [...Object.keys(agents), ...Object.keys(tasks)].join(", ") || "(none)";
+
+        throw new Error(`[Directive MultiAgent] Unknown handler "${agentId}". Registered handlers: ${available}`);
+      }
+
       const effectiveCircuitBreaker = registration.circuitBreaker ?? orchestratorCircuitBreaker;
       if (effectiveCircuitBreaker) {
         return await effectiveCircuitBreaker.execute(() =>
@@ -2122,7 +2486,8 @@ export function createMultiAgentOrchestrator(
       return await runSingleAgentInner<T>(agentId, registration, input, opts);
     } catch (error) {
       // Self-healing: attempt reroute if configured and this is a CB error or health threshold
-      if (selfHealing && !(opts as { __isReroute?: boolean })?.__isReroute) {
+      // Tasks are imperative code — self-healing reroute/degradation only applies to agents
+      if (selfHealing && !tasks[agentId] && !(opts as { __isReroute?: boolean })?.__isReroute) {
         const equivalents = findEquivalentAgents(agentId);
         const alternate = selectBestEquivalent(equivalents);
         if (alternate) {
@@ -2697,11 +3062,103 @@ export function createMultiAgentOrchestrator(
   ): OrchestratorStreamResult<T> {
     assertNotDisposed();
 
+    // Task streaming: run task, emit single chunk + done
+    const taskReg = tasks[agentId];
+    if (taskReg) {
+      const taskChunks: OrchestratorStreamChunk[] = [];
+      const taskWaiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
+      let taskClosed = false;
+
+      const pushTaskChunk = (chunk: OrchestratorStreamChunk) => {
+        if (taskClosed) {
+          return;
+        }
+        const waiter = taskWaiters.shift();
+        if (waiter) {
+          waiter(chunk);
+        } else {
+          taskChunks.push(chunk);
+        }
+      };
+
+      const closeTaskStream = () => {
+        taskClosed = true;
+        for (const w of taskWaiters) {
+          w(null);
+        }
+        taskWaiters.length = 0;
+      };
+
+      const taskAbortController = new AbortController();
+      // Wire external signal into task-local controller
+      let taskExternalAbortHandler: (() => void) | undefined;
+      if (options.signal) {
+        if (options.signal.aborted) {
+          taskAbortController.abort();
+        } else {
+          taskExternalAbortHandler = () => taskAbortController.abort();
+          options.signal.addEventListener("abort", taskExternalAbortHandler, { once: true });
+        }
+      }
+
+      const resultPromise = runSingleAgent<T>(agentId, input, { signal: taskAbortController.signal }).then(
+        (result) => {
+          const output = typeof result.output === "string" ? result.output : safeStringify(result.output);
+          pushTaskChunk({ type: "token", data: output, tokenCount: 0 });
+          pushTaskChunk({ type: "done", totalTokens: 0, duration: 0, droppedTokens: 0 });
+          closeTaskStream();
+
+          return result;
+        },
+        (err) => {
+          pushTaskChunk({ type: "error", error: err });
+          closeTaskStream();
+          throw err;
+        },
+      ).finally(() => {
+        if (taskExternalAbortHandler && options.signal) {
+          options.signal.removeEventListener("abort", taskExternalAbortHandler);
+        }
+      });
+
+      // Prevent unhandled rejection if no one awaits .result
+      resultPromise.catch(() => {});
+
+      return {
+        stream: {
+          async *[Symbol.asyncIterator]() {
+            while (true) {
+              const chunk = taskChunks.shift();
+              if (chunk) {
+                yield chunk;
+                if (chunk.type === "done" || chunk.type === "error") {
+                  return;
+                }
+              } else if (taskClosed) {
+                return;
+              } else {
+                const next = await new Promise<OrchestratorStreamChunk | null>((resolve) => taskWaiters.push(resolve));
+                if (!next) {
+                  return;
+                }
+                yield next;
+                if (next.type === "done" || next.type === "error") {
+                  return;
+                }
+              }
+            }
+          },
+        },
+        result: resultPromise,
+        abort: () => { taskAbortController.abort(); },
+      } as OrchestratorStreamResult<T>;
+    }
+
     const registration = agents[agentId];
     if (!registration) {
-      const available = Object.keys(agents).join(", ") || "(none)";
+      const available = [...Object.keys(agents), ...Object.keys(tasks)].join(", ") || "(none)";
 
-      throw new Error(`[Directive MultiAgent] Unknown agent "${agentId}". Registered agents: ${available}`);
+      throw new Error(`[Directive MultiAgent] Unknown handler "${agentId}". Registered handlers: ${available}`);
     }
 
     const MAX_AGENT_STREAM_BUFFER = 10_000;
@@ -2858,8 +3315,8 @@ export function createMultiAgentOrchestrator(
 
     let patternError: Error | undefined;
     try {
-      const promises = pattern.agents.map((agentId) =>
-        runSingleAgent(agentId, input, { signal: controller.signal }).catch(
+      const promises = pattern.handlers.map((agentId) =>
+        runSingleAgent(agentId, input, { signal: controller.signal, patternId }).catch(
           (error) => {
             if (pattern.minSuccess === undefined) {
               throw error;
@@ -2877,7 +3334,7 @@ export function createMultiAgentOrchestrator(
         const failCount = results.length - successResults.length;
 
         throw new Error(
-          `[Directive MultiAgent] Parallel pattern: Only ${successResults.length}/${pattern.agents.length} agents succeeded ` +
+          `[Directive MultiAgent] Parallel pattern: Only ${successResults.length}/${pattern.handlers.length} agents succeeded ` +
           `(minimum required: ${pattern.minSuccess}, failed: ${failCount})`
         );
       }
@@ -3026,8 +3483,8 @@ export function createMultiAgentOrchestrator(
     }
 
     try {
-      for (let i = startIdx; i < pattern.agents.length; i++) {
-        const agentId = pattern.agents[i]!;
+      for (let i = startIdx; i < pattern.handlers.length; i++) {
+        const agentId = pattern.handlers[i]!;
 
         // ---- Breakpoint: pre_pattern_step ----
         {
@@ -3041,10 +3498,10 @@ export function createMultiAgentOrchestrator(
         }
 
         try {
-          lastResult = await runSingleAgent(agentId, currentInput);
+          lastResult = await runSingleAgent(agentId, currentInput, { patternId });
           collectedResults.push({ agentId, output: lastResult.output, totalTokens: lastResult.totalTokens });
 
-          if (i < pattern.agents.length - 1) {
+          if (i < pattern.handlers.length - 1) {
             if (pattern.transform) {
               currentInput = pattern.transform(lastResult.output, agentId, i);
             } else {
@@ -3057,7 +3514,7 @@ export function createMultiAgentOrchestrator(
 
           // Save checkpoint after each agent
           if (ckptConfig && ckptStore && i > startIdx && (i - startIdx) % ckptEveryN === 0) {
-            const nextInput = i < pattern.agents.length - 1 ? currentInput : initialInput;
+            const nextInput = i < pattern.handlers.length - 1 ? currentInput : initialInput;
             await savePatternCheckpoint({
               type: "sequential",
               version: 1,
@@ -3065,7 +3522,7 @@ export function createMultiAgentOrchestrator(
               createdAt: new Date().toISOString(),
               label: `${ckptPrefix}:step-${i + 1}`,
               patternId: pId,
-              stepsTotal: pattern.agents.length,
+              stepsTotal: pattern.handlers.length,
               step: i + 1,
               currentInput: nextInput,
               results: [...collectedResults],
@@ -3161,10 +3618,22 @@ export function createMultiAgentOrchestrator(
           try {
             action = JSON.parse(raw);
           } catch {
-            throw new Error(
-              `[Directive MultiAgent] Supervisor "${pattern.supervisor}" returned unparseable output (round ${round + 1}). ` +
-              `Expected JSON with { action, worker?, workerInput? } but got: ${raw.slice(0, 200)}`
-            );
+            // LLMs sometimes wrap JSON in conversational text or XML tool-call markup
+            try {
+              // Strip XML tags first (models sometimes emit <function_calls>/<invoke>/<parameter> wrappers)
+              const stripped = raw.replace(/<[^>]+>/g, " ");
+              const extracted = extractJsonFromOutput(stripped);
+              if (extracted && typeof extracted === "object" && "action" in (extracted as Record<string, unknown>)) {
+                action = extracted as typeof action;
+              } else {
+                throw new Error("extracted value missing 'action' property");
+              }
+            } catch {
+              throw new Error(
+                `[Directive MultiAgent] Supervisor "${pattern.supervisor}" returned unparseable output (round ${round + 1}). ` +
+                `Expected JSON with { action, worker?, workerInput? } but got: ${raw.slice(0, 200)}`
+              );
+            }
           }
         } else if (raw && typeof raw === "object" && "action" in raw) {
           action = raw as typeof action;
@@ -3189,7 +3658,8 @@ export function createMultiAgentOrchestrator(
 
         const workerResult = await runSingleAgent(
           action.worker,
-          action.workerInput ?? ""
+          action.workerInput ?? "",
+          { patternId },
         );
         workerResults.push(workerResult);
         serializedWorkerResults.push({ output: workerResult.output, totalTokens: workerResult.totalTokens });
@@ -3198,6 +3668,7 @@ export function createMultiAgentOrchestrator(
         supervisorResult = await runSingleAgent(
           pattern.supervisor,
           currentInput,
+          { patternId },
         );
 
         // Save checkpoint after each round
@@ -3357,7 +3828,8 @@ export function createMultiAgentOrchestrator(
               fireHook("onDagNodeSkipped", {
                 patternId: pId,
                 nodeId,
-                agentId: node.agent,
+                agentId: node.handler,
+                nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
                 reason: "upstream dependency errored",
                 timestamp: Date.now(),
               });
@@ -3384,7 +3856,8 @@ export function createMultiAgentOrchestrator(
                 fireHook("onDagNodeSkipped", {
                   patternId: pId,
                   nodeId,
-                  agentId: node.agent,
+                  agentId: node.handler,
+                  nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
                   reason: "when() returned false",
                   timestamp: Date.now(),
                 });
@@ -3419,7 +3892,8 @@ export function createMultiAgentOrchestrator(
         fireHook("onDagNodeStart", {
           patternId: pId,
           nodeId,
-          agentId: node.agent,
+          agentId: node.handler,
+          nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
           timestamp: nodeStartTime,
         });
 
@@ -3451,8 +3925,9 @@ export function createMultiAgentOrchestrator(
         controller.signal.addEventListener("abort", abortHandler, { once: true });
 
         try {
-          const result = await runSingleAgent(node.agent, nodeInput, {
+          const result = await runSingleAgent(node.handler, nodeInput, {
             signal: nodeController.signal,
+            patternId: pId,
           });
 
           context.outputs[nodeId] = result.output;
@@ -3472,7 +3947,8 @@ export function createMultiAgentOrchestrator(
           fireHook("onDagNodeComplete", {
             patternId: pId,
             nodeId,
-            agentId: node.agent,
+            agentId: node.handler,
+            nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
             durationMs: Date.now() - nodeStartTime,
             timestamp: Date.now(),
           });
@@ -3522,7 +3998,8 @@ export function createMultiAgentOrchestrator(
           fireHook("onDagNodeError", {
             patternId: pId,
             nodeId,
-            agentId: node.agent,
+            agentId: node.handler,
+            nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
             error: error instanceof Error ? error : new Error(String(error)),
             durationMs: Date.now() - nodeStartTime,
             timestamp: Date.now(),
@@ -3710,7 +4187,7 @@ export function createMultiAgentOrchestrator(
         const iterStart = Date.now();
 
         // Run producer (pass signal through)
-        const producerResult = await runSingleAgent(pattern.agent, effectiveInput, { signal: effectiveSignal });
+        const producerResult = await runSingleAgent(pattern.handler, effectiveInput, { signal: effectiveSignal, patternId });
         lastProducerResult = producerResult;
         const producerOutput = typeof producerResult.output === "string"
           ? producerResult.output
@@ -3726,7 +4203,7 @@ export function createMultiAgentOrchestrator(
         }
 
         // Run evaluator (pass signal through)
-        const evaluatorResult = await runSingleAgent(pattern.evaluator, producerOutput, { signal: effectiveSignal });
+        const evaluatorResult = await runSingleAgent(pattern.evaluator, producerOutput, { signal: effectiveSignal, patternId });
         let evaluation: ReflectionEvaluation;
         try {
           evaluation = parseEvaluation(evaluatorResult.output);
@@ -3901,7 +4378,7 @@ export function createMultiAgentOrchestrator(
     input: string,
     patternId?: string
   ): Promise<RaceResult<T>> {
-    if (pattern.agents.length === 0) {
+    if (pattern.handlers.length === 0) {
       throw new Error("[Directive MultiAgent] Race pattern requires at least one agent");
     }
 
@@ -3910,16 +4387,16 @@ export function createMultiAgentOrchestrator(
     if (!Number.isInteger(minSuccess) || minSuccess < 1) {
       throw new Error("[Directive MultiAgent] Race pattern minSuccess must be a positive integer");
     }
-    if (minSuccess > pattern.agents.length) {
+    if (minSuccess > pattern.handlers.length) {
       throw new Error(
-        `[Directive MultiAgent] Race pattern minSuccess (${minSuccess}) exceeds agent count (${pattern.agents.length})`
+        `[Directive MultiAgent] Race pattern minSuccess (${minSuccess}) exceeds agent count (${pattern.handlers.length})`
       );
     }
 
-    // Validate agent IDs
-    for (const agentId of pattern.agents) {
-      if (!agents[agentId]) {
-        throw new Error(`[Directive MultiAgent] Race: unknown agent "${agentId}"`);
+    // Validate handler IDs (agents or tasks)
+    for (const agentId of pattern.handlers) {
+      if (!agents[agentId] && !tasks[agentId]) {
+        throw new Error(`[Directive MultiAgent] Race: unknown handler "${agentId}"`);
       }
     }
 
@@ -3954,7 +4431,7 @@ export function createMultiAgentOrchestrator(
         timestamp: patternStartTime,
         snapshotId: null,
         patternId: pId,
-        agents: pattern.agents,
+        agents: pattern.handlers,
       });
     }
 
@@ -3964,15 +4441,15 @@ export function createMultiAgentOrchestrator(
 
     let patternError: Error | undefined;
     const agentErrors: Record<string, string> = Object.create(null);
-    const startedAgents = [...pattern.agents];
+    const startedAgents = [...pattern.handlers];
 
     try {
       // Start all agents, collecting promises
       type RaceEntry = { agentId: string; promise: Promise<{ agentId: string; result: RunResult<unknown> }> };
-      const entries: RaceEntry[] = pattern.agents.map((agentId) => ({
+      const entries: RaceEntry[] = pattern.handlers.map((agentId) => ({
         agentId,
         // Output guardrails are already checked inside runSingleAgent
-        promise: runSingleAgent(agentId, input, { signal: controller.signal })
+        promise: runSingleAgent(agentId, input, { signal: controller.signal, patternId })
           .then((result) => ({ agentId, result })),
       }));
 
@@ -4122,10 +4599,10 @@ export function createMultiAgentOrchestrator(
     patternId?: string,
     resumeFrom?: DebateCheckpointState,
   ): Promise<DebateResult<T>> {
-    const { agents: debateAgents, evaluator, maxRounds = 2, extract, parseJudgement } = pattern;
+    const { handlers: debateAgents, evaluator, maxRounds = 2, extract, parseJudgement } = pattern;
 
     if (debateAgents.length < 2) {
-      throw new Error("[Directive MultiAgent] debate requires at least 2 agents");
+      throw new Error("[Directive MultiAgent] debate requires at least 2 handlers");
     }
     if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
       throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
@@ -4213,7 +4690,7 @@ export function createMultiAgentOrchestrator(
         }
 
         const proposalPromises = debateAgents.map(async (agentId) => {
-          const result = await runSingleAgent(agentId, currentInput, { signal: effectiveSignal });
+          const result = await runSingleAgent(agentId, currentInput, { signal: effectiveSignal, patternId: pId });
           debateTotalTokens += result.totalTokens;
 
           return { agentId, output: result.output };
@@ -4233,7 +4710,7 @@ export function createMultiAgentOrchestrator(
           })),
         });
 
-        const evalResult = await runSingleAgent(evaluator, evalInput, { signal: effectiveSignal });
+        const evalResult = await runSingleAgent(evaluator, evalInput, { signal: effectiveSignal, patternId: pId });
         debateTotalTokens += evalResult.totalTokens;
         const judgement = parseJudge(evalResult.output);
 
@@ -4532,10 +5009,10 @@ export function createMultiAgentOrchestrator(
 
     const pId = patternId ?? "__goal";
 
-    // Validate all node agents are registered
+    // Validate all node handlers (agents or tasks) are registered
     for (const [nodeId, node] of Object.entries(nodes)) {
-      if (!agents[node.agent]) {
-        throw new Error(`[Directive MultiAgent] goal node "${nodeId}" references unregistered agent "${node.agent}"`);
+      if (!agents[node.handler] && !tasks[node.handler]) {
+        throw new Error(`[Directive MultiAgent] goal node "${nodeId}" references unregistered handler "${node.handler}"`);
       }
     }
 
@@ -4763,7 +5240,7 @@ export function createMultiAgentOrchestrator(
                   case "alternative_nodes":
                     // Use shadow copy — don't mutate original pattern nodes
                     for (const altNode of strategy.nodes) {
-                      const altId = `__relaxation_${tierIdx}_${altNode.agent}`;
+                      const altId = `__relaxation_${tierIdx}_${altNode.handler}`;
                       nodes[altId] = { ...altNode };
                     }
                     break;
@@ -4889,8 +5366,9 @@ export function createMultiAgentOrchestrator(
           }
 
           try {
-            const result = await runSingleAgent(node.agent, nodeInput, {
+            const result = await runSingleAgent(node.handler, nodeInput, {
               signal: effectiveSignal ?? undefined,
+              patternId: pId,
             });
             nodeResults[nodeId] = result;
             executionOrder.push(nodeId);
@@ -4965,10 +5443,10 @@ export function createMultiAgentOrchestrator(
         // Update per-agent metrics
         for (const nodeId of selectedNodes) {
           const node = nodes[nodeId]!;
-          if (!agentMetrics[node.agent]) {
-            agentMetrics[node.agent] = { runs: 0, avgSatisfactionDelta: 0, tokens: 0, totalDelta: 0 };
+          if (!agentMetrics[node.handler]) {
+            agentMetrics[node.handler] = { runs: 0, avgSatisfactionDelta: 0, tokens: 0, totalDelta: 0 };
           }
-          const m = agentMetrics[node.agent]!;
+          const m = agentMetrics[node.handler]!;
           m.runs++;
           m.totalDelta += satisfactionDelta;
           m.tokens += nodeResults[nodeId]?.totalTokens ?? 0;
@@ -5610,6 +6088,9 @@ export function createMultiAgentOrchestrator(
       if (agents[agentId]) {
         throw new Error(`[Directive MultiAgent] Agent "${agentId}" is already registered. Unregister first.`);
       }
+      if (tasks[agentId]) {
+        throw new Error(`[Directive MultiAgent] ID "${agentId}" is already registered as a task`);
+      }
 
       // Build per-agent constraints and resolvers (same as initial setup)
       // biome-ignore lint/suspicious/noExplicitAny: Constraint types complex
@@ -5709,18 +6190,18 @@ export function createMultiAgentOrchestrator(
             referencedAgents = [pattern.supervisor, ...pattern.workers];
             break;
           case "dag":
-            referencedAgents = Object.values(pattern.nodes).map((n) => n.agent);
+            referencedAgents = Object.values(pattern.nodes).map((n) => n.handler);
             break;
           case "reflect":
-            referencedAgents = [pattern.agent, pattern.evaluator];
+            referencedAgents = [pattern.handler, pattern.evaluator];
             break;
           case "parallel":
           case "sequential":
           case "race":
-            referencedAgents = pattern.agents;
+            referencedAgents = pattern.handlers;
             break;
           case "debate":
-            referencedAgents = [...(pattern as DebatePattern).agents, (pattern as DebatePattern).evaluator];
+            referencedAgents = [...(pattern as DebatePattern).handlers, (pattern as DebatePattern).evaluator];
             break;
           default:
             referencedAgents = [];
@@ -5778,6 +6259,100 @@ export function createMultiAgentOrchestrator(
       return Object.keys(agents);
     },
 
+    registerTask(taskId: string, registration: TaskRegistration): void {
+      assertNotDisposed();
+      if (RESERVED_IDS.has(taskId)) {
+        throw new Error(`[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`);
+      }
+      if (!taskId || typeof taskId !== "string" || taskId.trim() !== taskId || taskId.length === 0) {
+        throw new Error(`[Directive MultiAgent] Task ID must be a non-empty trimmed string`);
+      }
+      if (agents[taskId]) {
+        throw new Error(`[Directive MultiAgent] ID "${taskId}" is already registered as an agent`);
+      }
+      if (tasks[taskId]) {
+        throw new Error(`[Directive MultiAgent] Task "${taskId}" is already registered`);
+      }
+      // Validate timeout and maxConcurrent
+      if (registration.timeout !== undefined && (!Number.isFinite(registration.timeout) || registration.timeout <= 0)) {
+        throw new Error(`[Directive MultiAgent] Task "${taskId}" timeout must be a finite number > 0`);
+      }
+      if (registration.maxConcurrent !== undefined && (!Number.isFinite(registration.maxConcurrent) || registration.maxConcurrent < 1 || !Number.isInteger(registration.maxConcurrent))) {
+        throw new Error(`[Directive MultiAgent] Task "${taskId}" maxConcurrent must be a finite integer >= 1`);
+      }
+      // Validate retry configuration
+      if (registration.retry) {
+        const { attempts, delayMs } = registration.retry;
+        if (!Number.isFinite(attempts) || attempts < 1) {
+          throw new Error(`[Directive MultiAgent] Task "${taskId}" retry attempts must be a finite number >= 1`);
+        }
+        if (delayMs !== undefined && (!Number.isFinite(delayMs) || delayMs < 0)) {
+          throw new Error(`[Directive MultiAgent] Task "${taskId}" retry delayMs must be a finite number >= 0`);
+        }
+      }
+      tasks[taskId] = registration;
+      taskStates[taskId] = { status: "idle" };
+      taskSemaphores.set(taskId, new Semaphore(registration.maxConcurrent ?? 1));
+
+      if (debug) {
+        console.debug(`[Directive MultiAgent] Registered task "${taskId}" (${registration.label ?? taskId})`);
+      }
+    },
+
+    unregisterTask(taskId: string): void {
+      assertNotDisposed();
+      if (!tasks[taskId]) {
+        throw new Error(`[Directive MultiAgent] Task "${taskId}" is not registered`);
+      }
+      const state = taskStates[taskId];
+      if (state?.status === "running") {
+        throw new Error(`[Directive MultiAgent] Cannot unregister task "${taskId}" while it is running`);
+      }
+      const sem = taskSemaphores.get(taskId);
+      if (sem) {
+        sem.drain();
+        taskSemaphores.delete(taskId);
+      }
+      delete tasks[taskId];
+      delete taskStates[taskId];
+
+      if (debug) {
+        console.debug(`[Directive MultiAgent] Unregistered task "${taskId}"`);
+      }
+    },
+
+    getTaskIds(): string[] {
+      return Object.keys(tasks);
+    },
+
+    getTaskRegistry(): Record<string, { label?: string; description?: string }> {
+      const result: Record<string, { label?: string; description?: string }> = Object.create(null);
+      for (const [id, reg] of Object.entries(tasks)) {
+        result[id] = { label: reg.label, description: reg.description };
+      }
+
+      return result;
+    },
+
+    getTaskState(taskId: string) {
+      const s = taskStates[taskId];
+
+      return s ? Object.freeze(structuredClone(s)) : undefined;
+    },
+
+    getAllTaskStates() {
+      const result: Record<string, { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number }> = Object.create(null);
+      for (const [id, s] of Object.entries(taskStates)) {
+        result[id] = Object.freeze(structuredClone(s));
+      }
+
+      return result;
+    },
+
+    getNodeIds(): string[] {
+      return [...Object.keys(agents), ...Object.keys(tasks)];
+    },
+
     reset() {
       assertNotDisposed();
       for (const agentId of Object.keys(agents)) {
@@ -5813,6 +6388,16 @@ export function createMultiAgentOrchestrator(
           setBreakpointState(agentFacts, createInitialBreakpointState());
         });
       }
+      // Reset task states
+      for (const taskId of Object.keys(tasks)) {
+        taskStates[taskId] = { status: "idle" };
+        const tsem = taskSemaphores.get(taskId);
+        if (tsem) {
+          tsem.drain();
+        }
+        taskSemaphores.set(taskId, new Semaphore(tasks[taskId]!.maxConcurrent ?? 1));
+      }
+
       breakpointModifications.clear();
       breakpointCancelReasons.clear();
       approvalRequestIndex.clear();
@@ -5856,10 +6441,15 @@ export function createMultiAgentOrchestrator(
     async checkpoint(opts?: { label?: string }): Promise<Checkpoint> {
       assertNotDisposed();
 
-      // Ensure no agents are running
+      // Ensure no agents or tasks are running
       for (const [id, s] of Object.entries(agentStates)) {
         if (s.status === "running") {
           throw new Error(`[Directive MultiAgent] Cannot checkpoint while agent "${id}" is running`);
+        }
+      }
+      for (const [id, s] of Object.entries(taskStates)) {
+        if (s.status === "running") {
+          throw new Error(`[Directive MultiAgent] Cannot checkpoint while task "${id}" is running`);
         }
       }
       if (!(system as any).debug?.export) {
@@ -5888,6 +6478,9 @@ export function createMultiAgentOrchestrator(
           roundRobinCounters: roundRobinCounters
             ? Object.fromEntries(roundRobinCounters)
             : null,
+          taskStates: Object.fromEntries(
+            Object.entries(taskStates).map(([k, v]) => [k, { lastOutput: v.lastOutput != null ? String(v.lastOutput) : undefined, lastError: v.lastError }])
+          ),
         } satisfies MultiAgentCheckpointLocalState,
         memoryExport: sharedMemory ? (sharedMemory as any).export?.() ?? null : null,
         orchestratorType: "multi",
@@ -5960,6 +6553,24 @@ export function createMultiAgentOrchestrator(
           existing.drain();
         }
         semaphores.set(agentId, new Semaphore(reg.maxConcurrent ?? 1));
+      }
+
+      // Restore task states
+      if (local.taskStates) {
+        for (const [id, s] of Object.entries(local.taskStates)) {
+          if (!tasks[id]) {
+            throw new Error(`[Directive MultiAgent] Checkpoint references task "${id}" which is not registered. Task run functions cannot be serialized — re-provide the task registration.`);
+          }
+          taskStates[id] = { status: "idle", lastOutput: s.lastOutput, lastError: s.lastError };
+        }
+        // Rebuild task semaphores
+        for (const [taskId, reg] of Object.entries(tasks)) {
+          const existing = taskSemaphores.get(taskId);
+          if (existing) {
+            existing.drain();
+          }
+          taskSemaphores.set(taskId, new Semaphore(reg.maxConcurrent ?? 1));
+        }
       }
 
       // Recompute derivations from restored state
@@ -6084,7 +6695,7 @@ export function createMultiAgentOrchestrator(
 
       const pattern: RacePattern<T> = {
         type: "race",
-        agents: agentIds,
+        handlers: agentIds,
         extract: raceOpts?.extract,
         timeout: raceOpts?.timeout,
         minSuccess: raceOpts?.minSuccess,
@@ -6116,7 +6727,7 @@ export function createMultiAgentOrchestrator(
 
       const pattern: ReflectPattern<T> = {
         type: "reflect",
-        agent: producerId,
+        handler: producerId,
         evaluator: evaluatorId,
         maxIterations: reflectOpts?.maxIterations,
         parseEvaluation: reflectOpts?.parseEvaluation,
@@ -6159,7 +6770,7 @@ export function createMultiAgentOrchestrator(
       return runDebateInternal<T>(
         {
           type: "debate",
-          agents: agentIds,
+          handlers: agentIds,
           evaluator: evaluatorId,
           maxRounds: debateOpts?.maxRounds,
           extract: debateOpts?.extract,
@@ -6522,9 +7133,8 @@ export function createMultiAgentOrchestrator(
 /**
  * Create a parallel pattern configuration.
  *
- * @param agents - Agent IDs to run concurrently
- * @param merge - Combine all agent results into a single output
- * @param config.merge - Receives all successful RunResults (array may be shorter than agents.length when minSuccess is set). Returns the merged result.
+ * @param handlers - Handler IDs (agents or tasks) to run concurrently
+ * @param merge - Combine all handler results into a single output. Receives all successful RunResults (array may be shorter than handlers.length when minSuccess is set).
  * @param options - Optional `minSuccess` and `timeout` overrides
  *
  * @example
@@ -6536,13 +7146,13 @@ export function createMultiAgentOrchestrator(
  * ```
  */
 export function parallel<T>(
-  agents: string[],
+  handlers: string[],
   merge: (results: RunResult<unknown>[]) => T | Promise<T>,
   options?: { minSuccess?: number; timeout?: number }
 ): ParallelPattern<T> {
   return {
     type: "parallel",
-    agents,
+    handlers,
     merge,
     ...options,
   };
@@ -6551,7 +7161,7 @@ export function parallel<T>(
 /**
  * Create a sequential pattern configuration.
  *
- * @param agents - Agent IDs to run in order (output of each feeds into the next)
+ * @param handlers - Handler IDs (agents or tasks) to run in order (output of each feeds into the next)
  * @param options - Optional `transform`, `extract`, `continueOnError`
  *
  * @example
@@ -6563,16 +7173,16 @@ export function parallel<T>(
  * ```
  */
 export function sequential<T>(
-  agents: string[],
+  handlers: string[],
   options?: {
-    transform?: (output: unknown, agentId: string, index: number) => string;
+    transform?: (output: unknown, handlerId: string, index: number) => string;
     extract?: (output: unknown) => T;
     continueOnError?: boolean;
   }
 ): SequentialPattern<T> {
   return {
     type: "sequential",
-    agents,
+    handlers,
     ...options,
   };
 }
@@ -6612,7 +7222,7 @@ export function supervisor<T>(
 /**
  * Create a DAG execution pattern.
  *
- * @param nodes - Node definitions keyed by ID, each with `agent` and optional `deps`
+ * @param nodes - Node definitions keyed by ID, each with `handler` and optional `deps`
  * @param merge - Combine DAG outputs into a single result (defaults to `context.outputs`)
  * @param options - Optional `timeout`, `maxConcurrent`, `onNodeError`
  *
@@ -6620,9 +7230,9 @@ export function supervisor<T>(
  * ```typescript
  * const researchPipeline = dag(
  *   {
- *     fetch: { agent: 'fetcher' },
- *     analyze: { agent: 'analyzer', deps: ['fetch'] },
- *     summarize: { agent: 'summarizer', deps: ['analyze'] },
+ *     fetch: { handler: 'fetcher' },
+ *     analyze: { handler: 'analyzer', deps: ['fetch'] },
+ *     summarize: { handler: 'summarizer', deps: ['analyze'] },
  *   },
  *   (context) => context.outputs.summarize,
  * );
@@ -6656,8 +7266,8 @@ export function dag<T = Record<string, unknown>>(
 /**
  * Create a reflect pattern configuration.
  *
- * @param agent - Producer agent ID that generates output
- * @param evaluator - Evaluator agent ID that judges quality
+ * @param handler - Producer handler ID (agent or task) that generates output
+ * @param evaluator - Evaluator handler ID that judges quality
  * @param options - Optional iteration, parsing, signal, and threshold config
  *
  * @example
@@ -6666,7 +7276,7 @@ export function dag<T = Record<string, unknown>>(
  * ```
  */
 export function reflect<T>(
-  agent: string,
+  handler: string,
   evaluator: string,
   options?: {
     maxIterations?: number;
@@ -6682,7 +7292,7 @@ export function reflect<T>(
 ): ReflectPattern<T> {
   return {
     type: "reflect",
-    agent,
+    handler,
     evaluator,
     ...options,
   };
@@ -6691,7 +7301,7 @@ export function reflect<T>(
 /**
  * Create a race pattern configuration.
  *
- * @param agents - Agent IDs to race concurrently
+ * @param handlers - Handler IDs (agents or tasks) to race concurrently
  * @param options - Optional `extract`, `timeout`, `minSuccess`, `signal`
  *
  * @example
@@ -6700,7 +7310,7 @@ export function reflect<T>(
  * ```
  */
 export function race<T>(
-  agents: string[],
+  handlers: string[],
   options?: {
     extract?: (result: RunResult<unknown>) => T;
     timeout?: number;
@@ -6710,7 +7320,7 @@ export function race<T>(
 ): RacePattern<T> {
   return {
     type: "race",
-    agents,
+    handlers,
     ...options,
   };
 }
@@ -6731,13 +7341,13 @@ export function race<T>(
  * const pipeline = goal(
  *   {
  *     researcher: {
- *       agent: "researcher",
+ *       handler: "researcher",
  *       produces: ["research.findings"],
  *       requires: ["research.topic"],
  *       extractOutput: (r) => ({ "research.findings": r.output }),
  *     },
  *     writer: {
- *       agent: "writer",
+ *       handler: "writer",
  *       produces: ["article.draft"],
  *       requires: ["research.findings"],
  *       extractOutput: (r) => ({ "article.draft": r.output }),
@@ -7053,9 +7663,9 @@ export function composePatterns(
       switch (pattern.type) {
         case "parallel": {
           const parallelPattern = pattern as ParallelPattern<unknown>;
-          const inputsArr = parallelPattern.agents.map(() => currentInput);
+          const inputsArr = parallelPattern.handlers.map(() => currentInput);
           lastOutput = await orchestrator.runParallel(
-            parallelPattern.agents,
+            parallelPattern.handlers,
             inputsArr,
             parallelPattern.merge,
             {
@@ -7069,7 +7679,7 @@ export function composePatterns(
         case "sequential": {
           const seqPattern = pattern as SequentialPattern<unknown>;
           const results = await orchestrator.runSequential(
-            seqPattern.agents,
+            seqPattern.handlers,
             currentInput,
             { transform: seqPattern.transform }
           );
@@ -7101,7 +7711,17 @@ export function composePatterns(
               try {
                 action = JSON.parse(raw);
               } catch {
-                break;
+                try {
+                  const stripped = raw.replace(/<[^>]+>/g, " ");
+                  const extracted = extractJsonFromOutput(stripped);
+                  if (extracted && typeof extracted === "object" && "action" in (extracted as Record<string, unknown>)) {
+                    action = extracted as typeof action;
+                  } else {
+                    break;
+                  }
+                } catch {
+                  break;
+                }
               }
             } else if (raw && typeof raw === "object" && "action" in raw) {
               action = raw as typeof action;
@@ -7169,7 +7789,7 @@ export function composePatterns(
                 }
                 nodeInput = JSON.stringify(upstreamOutputs);
               }
-              const result = await orchestrator.runAgent(node.agent, nodeInput);
+              const result = await orchestrator.runAgent(node.handler, nodeInput);
               dagContext.outputs[nodeId] = result.output;
               dagContext.results[nodeId] = result;
               dagContext.statuses[nodeId] = "completed";
@@ -7206,7 +7826,7 @@ export function composePatterns(
           let effectiveInput = currentInput;
           let producerOutput: unknown;
           for (let i = 0; i < maxIter; i++) {
-            const producerResult = await orchestrator.runAgent(reflectPattern.agent, effectiveInput);
+            const producerResult = await orchestrator.runAgent(reflectPattern.handler, effectiveInput);
             producerOutput = producerResult.output;
             const producerStr = typeof producerOutput === "string"
               ? producerOutput
@@ -7229,7 +7849,7 @@ export function composePatterns(
         case "race": {
           const racePattern = pattern as RacePattern<unknown>;
           const raceResult = await orchestrator.runRace(
-            racePattern.agents,
+            racePattern.handlers,
             currentInput,
             { extract: racePattern.extract, timeout: racePattern.timeout },
           );
@@ -7240,7 +7860,7 @@ export function composePatterns(
         case "debate": {
           const debatePattern = pattern as DebatePattern<unknown>;
           const debateResult = await orchestrator.runDebate(
-            debatePattern.agents,
+            debatePattern.handlers,
             debatePattern.evaluator,
             currentInput,
             {
@@ -7468,7 +8088,7 @@ export type DebateConfig<T = unknown> = Omit<DebatePattern<T>, "type">;
  * 2. Evaluator receives all proposals and picks a winner
  * 3. Optionally repeat with evaluator feedback for refinement
  *
- * @param config - Debate configuration with `agents`, `evaluator`, and optional settings
+ * @param config - Debate configuration with `handlers`, `evaluator`, and optional settings
  * @see runDebate for the imperative API
  *
  * @example
@@ -7481,7 +8101,7 @@ export type DebateConfig<T = unknown> = Omit<DebatePattern<T>, "type">;
  *   },
  *   patterns: {
  *     debate: debate({
- *       agents: ['optimist', 'pessimist'],
+ *       handlers: ['optimist', 'pessimist'],
  *       evaluator: 'judge',
  *       maxRounds: 2,
  *     }),
@@ -7492,10 +8112,10 @@ export type DebateConfig<T = unknown> = Omit<DebatePattern<T>, "type">;
  * ```
  */
 export function debate<T = unknown>(config: DebateConfig<T>): DebatePattern<T> {
-  const { agents, evaluator, maxRounds, extract, parseJudgement, signal, timeout } = config;
+  const { handlers, evaluator, maxRounds, extract, parseJudgement, signal, timeout } = config;
 
-  if (agents.length < 2) {
-    throw new Error("[Directive MultiAgent] debate requires at least 2 agents");
+  if (handlers.length < 2) {
+    throw new Error("[Directive MultiAgent] debate requires at least 2 handlers");
   }
   if (maxRounds != null && (maxRounds < 1 || !Number.isFinite(maxRounds))) {
     throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
@@ -7503,7 +8123,7 @@ export function debate<T = unknown>(config: DebateConfig<T>): DebatePattern<T> {
 
   return {
     type: "debate",
-    agents,
+    handlers,
     evaluator,
     maxRounds,
     extract,
@@ -7530,7 +8150,7 @@ export async function runDebate<T>(
   input: string,
 ): Promise<DebateResult<T>> {
   return orchestrator.runDebate<T>(
-    config.agents,
+    config.handlers,
     config.evaluator,
     input,
     {
@@ -7683,7 +8303,9 @@ export function spawnPool(
 
 /** Serialized DAG node (functions stripped) */
 export interface SerializedDagNode {
-  agent: string;
+  handler: string;
+  /** @deprecated Use `handler` instead */
+  agent?: string;
   deps?: string[];
   timeout?: number;
   priority?: number;
@@ -7691,18 +8313,20 @@ export interface SerializedDagNode {
 
 /** JSON-safe representation of any execution pattern (all functions stripped) */
 export type SerializedPattern =
-  | { type: "parallel"; agents: string[]; minSuccess?: number; timeout?: number }
-  | { type: "sequential"; agents: string[]; continueOnError?: boolean }
+  | { type: "parallel"; handlers: string[]; minSuccess?: number; timeout?: number }
+  | { type: "sequential"; handlers: string[]; continueOnError?: boolean }
   | { type: "supervisor"; supervisor: string; workers: string[]; maxRounds?: number }
   | { type: "dag"; nodes: Record<string, SerializedDagNode>; timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" }
-  | { type: "reflect"; agent: string; evaluator: string; maxIterations?: number; onExhausted?: "accept-last" | "accept-best" | "throw"; timeout?: number; threshold?: number }
-  | { type: "race"; agents: string[]; timeout?: number; minSuccess?: number }
-  | { type: "debate"; agents: string[]; evaluator: string; maxRounds?: number; timeout?: number }
+  | { type: "reflect"; handler: string; evaluator: string; maxIterations?: number; onExhausted?: "accept-last" | "accept-best" | "throw"; timeout?: number; threshold?: number }
+  | { type: "race"; handlers: string[]; timeout?: number; minSuccess?: number }
+  | { type: "debate"; handlers: string[]; evaluator: string; maxRounds?: number; timeout?: number }
   | { type: "goal"; nodes: Record<string, SerializedGoalNode>; maxSteps?: number; timeout?: number };
 
 /** Serialized goal node (functions stripped) */
 export interface SerializedGoalNode {
-  agent: string;
+  handler: string;
+  /** @deprecated Use `handler` instead */
+  agent?: string;
   produces: string[];
   requires?: string[];
   allowRerun?: boolean;
@@ -7724,24 +8348,24 @@ export interface SerializedGoalNode {
  *
  * @example
  * ```typescript
- * const p = parallel({ agents: ["a", "b"], merge: (r) => r });
+ * const p = parallel({ handlers: ["a", "b"], merge: (r) => r });
  * const json = patternToJSON(p);
- * // { type: "parallel", agents: ["a", "b"] }
+ * // { type: "parallel", handlers: ["a", "b"] }
  * localStorage.setItem("plan", JSON.stringify(json));
  * ```
  */
 export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPattern {
   switch (pattern.type) {
     case "parallel":
-      return { type: "parallel", agents: pattern.agents, minSuccess: pattern.minSuccess, timeout: pattern.timeout };
+      return { type: "parallel", handlers: pattern.handlers, minSuccess: pattern.minSuccess, timeout: pattern.timeout };
     case "sequential":
-      return { type: "sequential", agents: pattern.agents, continueOnError: pattern.continueOnError };
+      return { type: "sequential", handlers: pattern.handlers, continueOnError: pattern.continueOnError };
     case "supervisor":
       return { type: "supervisor", supervisor: pattern.supervisor, workers: pattern.workers, maxRounds: pattern.maxRounds };
     case "dag": {
       const nodes: Record<string, SerializedDagNode> = Object.create(null);
       for (const [id, node] of Object.entries(pattern.nodes)) {
-        nodes[id] = { agent: node.agent, deps: node.deps, timeout: node.timeout, priority: node.priority };
+        nodes[id] = { handler: node.handler, deps: node.deps, timeout: node.timeout, priority: node.priority };
       }
 
       return { type: "dag", nodes, timeout: pattern.timeout, maxConcurrent: pattern.maxConcurrent, onNodeError: pattern.onNodeError };
@@ -7749,7 +8373,7 @@ export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPat
     case "reflect":
       return {
         type: "reflect",
-        agent: pattern.agent,
+        handler: pattern.handler,
         evaluator: pattern.evaluator,
         maxIterations: pattern.maxIterations,
         onExhausted: pattern.onExhausted,
@@ -7757,13 +8381,13 @@ export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPat
         threshold: typeof pattern.threshold === "number" ? pattern.threshold : undefined,
       };
     case "race":
-      return { type: "race", agents: pattern.agents, timeout: pattern.timeout, minSuccess: pattern.minSuccess };
+      return { type: "race", handlers: pattern.handlers, timeout: pattern.timeout, minSuccess: pattern.minSuccess };
     case "debate":
-      return { type: "debate", agents: pattern.agents, evaluator: pattern.evaluator, maxRounds: pattern.maxRounds, timeout: pattern.timeout };
+      return { type: "debate", handlers: pattern.handlers, evaluator: pattern.evaluator, maxRounds: pattern.maxRounds, timeout: pattern.timeout };
     case "goal": {
       const cnodes: Record<string, SerializedGoalNode> = Object.create(null);
       for (const [id, node] of Object.entries(pattern.nodes)) {
-        cnodes[id] = { agent: node.agent, produces: node.produces, requires: node.requires, allowRerun: node.allowRerun, priority: node.priority };
+        cnodes[id] = { handler: node.handler, produces: node.produces, requires: node.requires, allowRerun: node.allowRerun, priority: node.priority };
       }
 
       return { type: "goal", nodes: cnodes, maxSteps: pattern.maxSteps, timeout: pattern.timeout };
@@ -7788,7 +8412,7 @@ const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "
  * });
  * // Use the imperative API — runPattern takes a registered pattern ID, not an object
  * if (pattern.type === "parallel") {
- *   const result = await orchestrator.runParallel(pattern.agents, input, pattern.merge);
+ *   const result = await orchestrator.runParallel(pattern.handlers, input, pattern.merge);
  * }
  * ```
  */
@@ -7807,6 +8431,26 @@ export function patternFromJSON<T = unknown>(
   for (const [k, v] of Object.entries(normalized)) {
     if (k !== "__proto__" && k !== "constructor" && k !== "prototype") {
       safe[k] = v;
+    }
+  }
+
+  // Migration shim: accept legacy `agent`/`agents` fields from persisted patterns
+  const raw = safe as Record<string, unknown>;
+  if (!raw.handler && raw.agent && typeof raw.agent === "string") {
+    raw.handler = raw.agent;
+    delete raw.agent;
+  }
+  if (!raw.handlers && raw.agents && Array.isArray(raw.agents)) {
+    raw.handlers = raw.agents;
+    delete raw.agents;
+  }
+  // Migrate DAG/goal node `agent` → `handler`
+  if (raw.nodes && typeof raw.nodes === "object") {
+    for (const node of Object.values(raw.nodes as Record<string, Record<string, unknown>>)) {
+      if (!node.handler && node.agent && typeof node.agent === "string") {
+        node.handler = node.agent;
+        delete node.agent;
+      }
     }
   }
 

@@ -18,6 +18,8 @@ export type DevToolsSystem = NamespacedSystem<DevToolsModules>
 
 export const DevToolsSystemContext = createContext<DevToolsSystem | null>(null)
 
+export const DevToolsLabelContext = createContext<string | null>(null)
+
 export function useDevToolsSystem(): DevToolsSystem {
   const system = useContext(DevToolsSystemContext)
   if (!system) {
@@ -25,4 +27,8 @@ export function useDevToolsSystem(): DevToolsSystem {
   }
 
   return system
+}
+
+export function useDevToolsLabel(): string | null {
+  return useContext(DevToolsLabelContext)
 }

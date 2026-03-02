@@ -71,9 +71,14 @@ interface GraphNodeState {
   lastError: string | null
   retries: number
   isVirtual: boolean
+  isTask: boolean
   lastInput: string | null
   lastOutput: string | null
   instructions: string | null
+  /** Task progress percent (0-100) */
+  progress: number | null
+  /** Task description for tooltip */
+  description: string | null
 }
 
 interface GraphEdgeState {
@@ -149,7 +154,67 @@ function VirtualNode({ data, selected }: NodeProps) {
   )
 }
 
-const nodeTypes: NodeTypes = { agent: AgentNode, virtual: VirtualNode }
+// ---------------------------------------------------------------------------
+// Task node component (imperative code — violet, dashed border, gear icon)
+// ---------------------------------------------------------------------------
+
+interface TaskNodeData {
+  label: string
+  status: string
+  runs: number
+  progress: number | null
+  description: string | null
+  [key: string]: unknown
+}
+
+function TaskNode({ data, selected }: NodeProps) {
+  const { label, status, runs, progress, description } = data as TaskNodeData
+  const color = status === 'running' ? '#8b5cf6' : STATUS_COLORS[status] ?? '#8b5cf6'
+
+  return (
+    <div
+      className={`cursor-pointer rounded-lg border-2 border-dashed bg-zinc-900 px-4 py-3 shadow-lg transition-all ${
+        selected ? 'ring-2 ring-white/30' : ''
+      } ${status === 'running' ? 'motion-safe:animate-pulse' : ''}`}
+      style={{ borderColor: color }}
+      title={description ?? undefined}
+    >
+      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-zinc-600" />
+
+      <div className="flex items-center gap-2">
+        <span style={{ color }} className="text-lg">&#9881;</span>
+        <div>
+          <div className="text-sm font-medium text-zinc-100">{label}</div>
+          {runs > 0 && (
+            <div className="text-[10px] text-zinc-500">
+              {runs} run{runs !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {progress !== null && progress >= 0 && (
+        <div
+          className="mt-1.5 h-1 w-full rounded-full bg-zinc-700"
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${label} progress`}
+        >
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: progress >= 100 ? '#22c55e' : color }}
+          />
+        </div>
+      )}
+
+      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !bg-zinc-600" />
+    </div>
+  )
+}
+
+const nodeTypes: NodeTypes = { agent: AgentNode, virtual: VirtualNode, task: TaskNode }
 
 // No hardcoded fallback — graph is built entirely from live events
 
@@ -157,7 +222,7 @@ const nodeTypes: NodeTypes = { agent: AgentNode, virtual: VirtualNode }
 // Helper: create an empty GraphNodeState
 // ---------------------------------------------------------------------------
 
-function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; deps?: string[] }): GraphNodeState {
+function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; isTask?: boolean; deps?: string[] }): GraphNodeState {
   return {
     id,
     label: opts?.label ?? id,
@@ -173,9 +238,12 @@ function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; dep
     lastError: null,
     retries: 0,
     isVirtual: opts?.isVirtual ?? false,
+    isTask: opts?.isTask ?? false,
     lastInput: null,
     lastOutput: null,
     instructions: null,
+    progress: null,
+    description: null,
   }
 }
 
@@ -188,7 +256,8 @@ function enrichFromAgentEvents(
   events: DebugEvent[],
 ): void {
   for (const e of events) {
-    const agent = e.agentId
+    // Task events may use taskId instead of agentId
+    const agent = e.agentId ?? (e as Record<string, unknown>).taskId as string | undefined
     if (!agent) {
       continue
     }
@@ -235,6 +304,28 @@ function enrichFromAgentEvents(
       matched.lastError = (e.errorMessage as string) ?? 'Unknown error'
     } else if (e.type === 'agent_retry') {
       matched.retries++
+    } else if (e.type === 'task_start') {
+      matched.status = 'running'
+      matched.isTask = true
+      if (typeof e.description === 'string') {
+        matched.description = e.description
+      }
+      if (typeof e.label === 'string') {
+        matched.label = e.label
+      }
+    } else if (e.type === 'task_complete') {
+      matched.status = 'completed'
+      matched.isTask = true
+      matched.lastDurationMs = (e as Record<string, unknown>).durationMs as number ?? 0
+      matched.durationMs += matched.lastDurationMs
+      matched.runs++
+    } else if (e.type === 'task_error') {
+      matched.status = 'error'
+      matched.isTask = true
+      matched.lastError = (e as Record<string, unknown>).error as string ?? 'Unknown error'
+    } else if (e.type === 'task_progress') {
+      matched.isTask = true
+      matched.progress = (e as Record<string, unknown>).percent as number ?? null
     }
   }
 }
@@ -487,9 +578,10 @@ function extractAgentIds(events: DebugEvent[]): string[] {
   const seen = new Set<string>()
   const ids: string[] = []
   for (const e of events) {
-    if (e.type === 'agent_start' && e.agentId && !seen.has(e.agentId)) {
-      seen.add(e.agentId)
-      ids.push(e.agentId)
+    const id = e.agentId ?? (e.type === 'task_start' ? (e as Record<string, unknown>).taskId as string : null)
+    if ((e.type === 'agent_start' || e.type === 'task_start') && id && !seen.has(id)) {
+      seen.add(id)
+      ids.push(id)
     }
   }
 
@@ -497,13 +589,14 @@ function extractAgentIds(events: DebugEvent[]): string[] {
 }
 
 function extractAgentIdsOrdered(events: DebugEvent[]): string[] {
-  // Ordered by first agent_start timestamp
+  // Ordered by first agent_start/task_start timestamp
   const starts: Array<{ id: string; ts: number }> = []
   const seen = new Set<string>()
   for (const e of events) {
-    if (e.type === 'agent_start' && e.agentId && !seen.has(e.agentId)) {
-      seen.add(e.agentId)
-      starts.push({ id: e.agentId, ts: e.timestamp })
+    const id = e.agentId ?? (e.type === 'task_start' ? (e as Record<string, unknown>).taskId as string : null)
+    if ((e.type === 'agent_start' || e.type === 'task_start') && id && !seen.has(id)) {
+      seen.add(id)
+      starts.push({ id, ts: e.timestamp })
     }
   }
   starts.sort((a, b) => a.ts - b.ts)
@@ -671,13 +764,15 @@ function layoutGraph(
 
     return {
       id: n.id,
-      type: n.isVirtual ? 'virtual' : 'agent',
+      type: n.isTask ? 'task' : n.isVirtual ? 'virtual' : 'agent',
       position: { x: 400 + xOffset, y: 80 + layer * 150 },
       data: {
         label: n.label,
         status: n.status,
         tokens: n.tokens,
         runs: n.runs,
+        progress: n.progress,
+        description: n.description,
       },
     }
   })
@@ -1180,6 +1275,20 @@ export function GraphView() {
             {/* Virtual nodes only show status */}
             {!selected.isVirtual && (
               <>
+                {selected.isTask && (
+                  <DetailRow label="Type" value="Task" />
+                )}
+                {selected.isTask && selected.description && (
+                  <div className="flex justify-between gap-2">
+                    <span className="shrink-0 text-zinc-500">Description</span>
+                    <span className="min-w-0 truncate text-zinc-300" title={selected.description}>
+                      {selected.description}
+                    </span>
+                  </div>
+                )}
+                {selected.isTask && selected.progress !== null && selected.progress >= 0 && (
+                  <DetailRow label="Progress" value={`${Math.round(selected.progress)}%`} />
+                )}
                 {selected.runs > 0 && selected.durationMs > 0 && (
                   <DetailRow
                     label="Avg Duration"
@@ -1189,16 +1298,16 @@ export function GraphView() {
                 {selected.lastDurationMs > 0 && (
                   <DetailRow label="Last Duration" value={`${selected.lastDurationMs}ms`} />
                 )}
-                {selected.tokens > 0 && (
+                {!selected.isTask && selected.tokens > 0 && (
                   <DetailRow label="Total Tokens" value={selected.tokens.toLocaleString()} />
                 )}
-                {(selected.inputTokens > 0 || selected.outputTokens > 0) && (
+                {!selected.isTask && (selected.inputTokens > 0 || selected.outputTokens > 0) && (
                   <DetailRow
                     label="Input / Output"
                     value={`${selected.inputTokens.toLocaleString()} / ${selected.outputTokens.toLocaleString()}`}
                   />
                 )}
-                {selected.tokens > 0 && (
+                {!selected.isTask && selected.tokens > 0 && (
                   <DetailRow
                     label="Est. Cost"
                     value={(() => {
@@ -1210,7 +1319,7 @@ export function GraphView() {
                     })()}
                   />
                 )}
-                {selected.modelId && (
+                {!selected.isTask && selected.modelId && (
                   <DetailRow label="Model" value={selected.modelId} />
                 )}
                 <DetailRow label="Runs" value={selected.runs} />

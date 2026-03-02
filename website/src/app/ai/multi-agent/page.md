@@ -79,6 +79,7 @@ const orchestrator = createMultiAgentOrchestrator({
 |--------|------|---------|-------------|
 | `runner` | `AgentRunner` | *required* | Base LLM execution function |
 | `agents` | `AgentRegistry` | *required* | Map of agent ID to `AgentRegistration` |
+| `tasks` | `Record<string, TaskRegistration>` | `{}` | Imperative code [tasks](/ai/tasks) (same ID namespace as agents) |
 | `patterns` | `Record<string, ExecutionPattern>` | `{}` | Named [execution patterns](/ai/patterns) |
 | `guardrails` | `GuardrailsConfig` | &ndash; | Orchestrator-level guardrails (applied to all agents) |
 | `hooks` | `MultiAgentLifecycleHooks` | &ndash; | Lifecycle hooks for observability |
@@ -219,6 +220,50 @@ orchestrator.unregisterAgent('editor');  // Must be idle
 
 ---
 
+## Task Registration
+
+Register imperative code tasks alongside agents. Tasks and agents share an ID namespace — patterns reference both by ID.
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: { ... },
+  tasks: {
+    validate: {
+      run: async (input, signal, context) => {
+        const data = JSON.parse(input);
+        if (!data.result) throw new Error('Missing result');
+        return input;
+      },
+      label: 'Validate',
+      timeout: 5000,
+    },
+  },
+});
+
+// Dynamic registration
+orchestrator.registerTask('transform', {
+  run: async (input) => JSON.stringify({ transformed: input }),
+  label: 'Transform',
+});
+
+orchestrator.unregisterTask('transform');
+orchestrator.getTaskIds(); // ['validate']
+```
+
+### TaskRegistration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `run` | `(input, signal, context) => unknown` | required | The function to execute |
+| `label` | `string` | task ID | Display label for DevTools |
+| `description` | `string` | — | DevTools tooltip text |
+| `timeout` | `number` | — | Timeout in milliseconds |
+| `maxConcurrent` | `number` | `1` | Max parallel executions |
+| `retry` | `object` | — | Retry config: `attempts`, `backoff`, `delayMs` |
+
+---
+
 ## Guardrails
 
 Guardrails run at two levels: orchestrator-level (all agents) then per-agent (additive):
@@ -314,6 +359,10 @@ const orchestrator = createMultiAgentOrchestrator({
     },
     onGuardrailCheck: ({ agentId, guardrailName, guardrailType, passed, reason }) => { },
     onAgentRetry: ({ agentId, attempt, error, delayMs }) => { },
+    onTaskStart: ({ patternId, taskId, label, timestamp }) => { },
+    onTaskComplete: ({ patternId, taskId, label, durationMs, timestamp }) => { },
+    onTaskError: ({ patternId, taskId, label, error, durationMs, timestamp }) => { },
+    onTaskProgress: ({ patternId, taskId, label, percent, message, timestamp }) => { },
     onPatternStart: ({ patternId, patternType }) => { },
     onPatternComplete: ({ patternId, durationMs, error }) => { },
   },
@@ -514,6 +563,7 @@ Framework adapters for Vue, Svelte, Solid, and Lit follow the same pattern &ndas
 ## Next Steps
 
 - [Execution Patterns](/ai/patterns) &ndash; Parallel, sequential, supervisor, DAG, race, reflect, debate
+- [Tasks](/ai/tasks) &ndash; Imperative code in execution patterns
 - [Communication](/ai/communication) &ndash; Message bus, agent network, handoffs
 - [Cross-Agent State](/ai/cross-agent-state) &ndash; Derivations and scratchpad
 - [Self-Healing](/ai/self-healing) &ndash; Automatic error recovery

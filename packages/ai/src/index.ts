@@ -99,6 +99,11 @@ export type {
   PatternStartEvent,
   PatternCompleteEvent,
   DagNodeUpdateEvent,
+  // Task event types
+  TaskStartEvent,
+  TaskCompleteEvent,
+  TaskErrorEvent,
+  TaskProgressEvent,
   DebugEvent,
   // Self-Healing types
   AgentHealthState,
@@ -287,6 +292,8 @@ export {
   type MultiAgentOrchestrator,
   type MultiAgentOrchestratorOptions,
   type MultiAgentState,
+  type TaskRegistration,
+  type TaskContext,
   type AgentRegistration,
   type AgentRegistry,
   type ExecutionPattern,

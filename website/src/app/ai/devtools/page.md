@@ -110,6 +110,12 @@ Horizontal lanes per agent with bar-per-event rendering and row packing to preve
 - Live token streaming panel &ndash; per-agent token preview (up to 500 chars) with count
 - Pause/resume button with pending event count badge
 
+**Task event types:**
+- `task_start` &ndash; Task execution begins
+- `task_complete` &ndash; Task execution completed
+- `task_error` &ndash; Task execution failed
+- `task_progress` &ndash; Task reports intermediate progress
+
 ### 2. Cost & Budget
 
 Combined cost analysis and budget tracking in a single tabbed view.
@@ -151,6 +157,8 @@ Interactive directed acyclic graph using React Flow showing agent execution flow
 - Execution edges with animated connections
 - Node selection for detail inspection
 - Freehand drawing annotations
+
+Task nodes appear as violet dashed-border nodes with a gear icon, distinct from agent nodes. They show label, run count, and a progress bar during execution. Hover to see the task description.
 
 ### 6. Goal
 
@@ -248,7 +256,7 @@ The DevTools highlights error events in the Timeline view with red rings and dis
 
 ## Supported Event Types
 
-The DevTools UI recognizes 25 event types grouped by category:
+The DevTools UI recognizes 29 event types grouped by category:
 
 | Category | Event Types |
 |----------|-------------|
@@ -258,6 +266,7 @@ The DevTools UI recognizes 25 event types grouped by category:
 | **Patterns** | `pattern_start`, `pattern_complete`, `race_start`, `race_winner`, `race_cancelled`, `debate_round`, `reflection_iteration` |
 | **State** | `derivation_update`, `scratchpad_update` |
 | **Checkpoints** | `checkpoint_save`, `checkpoint_restore` |
+| **Tasks** | `task_start`, `task_complete`, `task_error`, `task_progress` |
 | **Infrastructure** | `handoff_start`, `handoff_complete`, `reroute`, `dag_node_update` |
 
 ---

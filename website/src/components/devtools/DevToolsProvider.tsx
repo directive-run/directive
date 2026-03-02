@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useDirectiveRef } from '@directive-run/react'
-import { DevToolsSystemContext } from './DevToolsSystemContext'
+import { DevToolsSystemContext, DevToolsLabelContext } from './DevToolsSystemContext'
 import { devtoolsShell } from './modules/devtools-shell'
 import { devtoolsConnection } from './modules/devtools-connection'
 import { devtoolsSnapshot } from './modules/devtools-snapshot'
@@ -15,6 +15,7 @@ import type { DebugEvent } from './types'
 
 interface DevToolsBaseProps {
   runtimeSystemName?: string | null
+  label?: string
   children: React.ReactNode
 }
 
@@ -63,7 +64,7 @@ export type DevToolsMode = DevToolsProviderProps['mode']
 // ---------------------------------------------------------------------------
 
 export function DevToolsProvider(props: DevToolsProviderProps) {
-  const { runtimeSystemName, children } = props
+  const { runtimeSystemName, label, children } = props
 
   // Resolve effective mode
   const effectiveMode = props.mode
@@ -85,6 +86,7 @@ export function DevToolsProvider(props: DevToolsProviderProps) {
   // If the currently-attached system is no longer available, detach and
   // re-attach to whatever system is present.
   const [detectedRuntime, setDetectedRuntime] = useState<string | null>(null)
+
   useEffect(() => {
     if (runtimeSystemName !== undefined) {
       return
@@ -98,7 +100,7 @@ export function DevToolsProvider(props: DevToolsProviderProps) {
       const systems = window.__DIRECTIVE__.getSystems()
 
       setDetectedRuntime((prev) => {
-        // Currently attached system vanished → detach
+        // Currently attached system vanished → pick first available
         if (prev !== null && !systems.includes(prev)) {
           return systems.length > 0 ? systems[0] : null
         }
@@ -161,7 +163,9 @@ export function DevToolsProvider(props: DevToolsProviderProps) {
 
   return (
     <DevToolsSystemContext.Provider value={system}>
-      {children}
+      <DevToolsLabelContext.Provider value={label ?? null}>
+        {children}
+      </DevToolsLabelContext.Provider>
     </DevToolsSystemContext.Provider>
   )
 }

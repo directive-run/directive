@@ -151,7 +151,7 @@ describe("reflect pattern (multi-agent)", () => {
       patterns: {
         review: {
           type: "reflect" as const,
-          agent: "producer",
+          handler: "producer",
           evaluator: "evaluator",
           parseEvaluation: (output: unknown) => ({
             passed: output === "APPROVED",
