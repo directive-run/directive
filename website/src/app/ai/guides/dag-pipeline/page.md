@@ -21,13 +21,13 @@ import { dag } from '@directive-run/ai';
 const contentPipeline = dag(
   {
     researcher: {
-      agent: 'researcher',
+      handler: 'researcher',
     },
     factChecker: {
-      agent: 'fact-checker',
+      handler: 'fact-checker',
     },
     writer: {
-      agent: 'writer',
+      handler: 'writer',
       deps: ['researcher', 'factChecker'],
       transform: (context) => {
         const research = context.outputs.researcher;
@@ -37,7 +37,7 @@ const contentPipeline = dag(
       },
     },
     editor: {
-      agent: 'editor',
+      handler: 'editor',
       deps: ['writer'],
     },
   },
@@ -119,15 +119,15 @@ const orchestrator = createMultiAgentOrchestrator({
     contentPipeline: dag(
       {
         researcher: {
-          agent: 'researcher',
+          handler: 'researcher',
           timeout: 30000,
         },
         factChecker: {
-          agent: 'fact-checker',
+          handler: 'fact-checker',
           timeout: 20000,
         },
         writer: {
-          agent: 'writer',
+          handler: 'writer',
           deps: ['researcher', 'factChecker'],
           transform: (context) => {
             const research = context.outputs.researcher;
@@ -137,11 +137,11 @@ const orchestrator = createMultiAgentOrchestrator({
           },
         },
         editor: {
-          agent: 'editor',
+          handler: 'editor',
           deps: ['writer'],
         },
         seo: {
-          agent: 'seo-optimizer',
+          handler: 'seo-optimizer',
           deps: ['editor'],
           // Only run SEO if the input requested it
           when: (context) => context.input.includes('[SEO]'),
@@ -176,6 +176,39 @@ console.log('Statuses:', result.statuses);
 // If fact-checker failed with skip-downstream:
 // { researcher: 'completed', factChecker: 'failed', writer: 'skipped', editor: 'skipped', seo: 'skipped' }
 ```
+
+## Adding Tasks to Your DAG
+
+Tasks (imperative code) work as DAG nodes alongside agents. Register them in the `tasks` config:
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    fetcher: { agent: fetcherAgent },
+    writer: { agent: writerAgent },
+  },
+  tasks: {
+    transform: {
+      run: async (input, signal, context) => {
+        context.reportProgress(50, 'Transforming');
+        const data = JSON.parse(input);
+        return JSON.stringify({ ...data, transformed: true });
+      },
+      label: 'Transform',
+    },
+  },
+  patterns: {
+    pipeline: dag({
+      fetch: { handler: 'fetcher' },
+      process: { handler: 'transform', deps: ['fetch'] },
+      write: { handler: 'writer', deps: ['process'] },
+    }),
+  },
+});
+```
+
+Task nodes appear as hexagons in Mermaid diagrams and violet dashed-border nodes in DevTools, making them visually distinct from agent nodes.
 
 ## Related
 

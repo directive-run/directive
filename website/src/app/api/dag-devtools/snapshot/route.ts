@@ -218,12 +218,12 @@ export async function GET(request: Request) {
     },
     dag: {
       nodes: {
-        news: { agent: 'news', deps: [] },
-        academic: { agent: 'academic', deps: [] },
-        sentiment: { agent: 'sentiment', deps: ['news'] },
-        'fact-checker': { agent: 'fact-checker', deps: ['academic'] },
-        synthesizer: { agent: 'synthesizer', deps: ['sentiment', 'fact-checker'] },
-        reviewer: { agent: 'reviewer', deps: ['synthesizer'] },
+        news: { handler: 'news', deps: [] },
+        academic: { handler: 'academic', deps: [] },
+        sentiment: { handler: 'sentiment', deps: ['news'] },
+        'fact-checker': { handler: 'fact-checker', deps: ['academic'] },
+        synthesizer: { handler: 'synthesizer', deps: ['sentiment', 'fact-checker'] },
+        reviewer: { handler: 'reviewer', deps: ['synthesizer'] },
       },
       pattern: 'research',
     },

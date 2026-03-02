@@ -78,6 +78,7 @@ export function useChatSystem(apiEndpoint: string) {
     return () => {
       unsubscribe()
       system.stop()
+      system.destroy()
     }
   }, [apiEndpoint, system])
 

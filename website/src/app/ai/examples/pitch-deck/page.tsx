@@ -48,6 +48,8 @@ export default function PitchDeckPage() {
       streamUrl="/api/pitch-deck-devtools/stream"
       snapshotUrl="/api/pitch-deck-devtools/snapshot"
       replayData={replayData}
+      runtimeSystemName={null}
+      label="Pitch Deck"
     >
       <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-3xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
         <div className="shrink-0 text-center">

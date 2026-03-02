@@ -64,6 +64,10 @@ The timeline records the following event types covering the full agent lifecycle
 | `debate_round` | Debate round completed |
 | `checkpoint_save` | Pattern checkpoint saved |
 | `checkpoint_restore` | Pattern checkpoint restored |
+| `task_start` | Task execution begins |
+| `task_complete` | Task execution completed |
+| `task_error` | Task execution failed |
+| `task_progress` | Task reports progress |
 
 Every event includes `id`, `type`, `timestamp`, and `snapshotId` (for time-travel correlation). Agent-scoped events also include `agentId`.
 
@@ -123,6 +127,12 @@ Each event type carries specific data fields beyond the common base:
 **Checkpoint events:**
 - `checkpoint_save` &ndash; `checkpointId`, `patternType`, `step`
 - `checkpoint_restore` &ndash; `checkpointId`, `patternType`, `step`
+
+**Task events:**
+- `task_start` &ndash; `taskId`, `label`, `description`, `inputLength`
+- `task_complete` &ndash; `taskId`, `label`, `durationMs`
+- `task_error` &ndash; `taskId`, `label`, `error`, `durationMs`, `attempt`
+- `task_progress` &ndash; `taskId`, `label`, `percent`, `message`
 
 ---
 

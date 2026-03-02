@@ -42,7 +42,7 @@ import { InMemoryCheckpointStore, type Checkpoint, type CheckpointStore } from "
 import type { BreakpointRequest, BreakpointModifications } from "./breakpoints.js";
 import type { MultiplexedStreamChunk } from "./streaming.js";
 import { createAgentOrchestrator, type OrchestratorOptions, type AgentOrchestrator } from "./agent-orchestrator.js";
-import { createMultiAgentOrchestrator, type MultiAgentOrchestratorOptions, type MultiAgentOrchestrator } from "./multi-agent-orchestrator.js";
+import { createMultiAgentOrchestrator, type MultiAgentOrchestratorOptions, type MultiAgentOrchestrator, type TaskRegistration } from "./multi-agent-orchestrator.js";
 
 // ============================================================================
 // Mock Agent Runner
@@ -775,6 +775,8 @@ export interface TestMultiAgentOrchestratorOptions extends Omit<MultiAgentOrches
   mockResponses?: Record<string, MockAgentConfig>;
   /** Default mock response for unmatched agents */
   defaultMockResponse?: MockAgentConfig;
+  /** Mock tasks keyed by task ID — auto-generates TaskRegistration wrappers */
+  mockTasks?: Record<string, { output: unknown; delay?: number; shouldError?: boolean }>;
 }
 
 /** Test multi-agent orchestrator with additional testing utilities */
@@ -818,8 +820,23 @@ export function createTestMultiAgentOrchestrator(
   const {
     mockResponses = {},
     defaultMockResponse,
+    mockTasks: mockTaskConfigs,
     ...orchestratorOptions
   } = options;
+
+  // Convert mockTasks into real TaskRegistration entries
+  if (mockTaskConfigs) {
+    const existingTasks = orchestratorOptions.tasks ?? {};
+    for (const [taskId, config] of Object.entries(mockTaskConfigs)) {
+      if (!existingTasks[taskId]) {
+        existingTasks[taskId] = createMockTask(config.output, {
+          delay: config.delay,
+          shouldError: config.shouldError,
+        });
+      }
+    }
+    orchestratorOptions.tasks = existingTasks;
+  }
 
   // Map mock responses by agent name (from agent registration)
   const responsesByName: Record<string, MockAgentConfig> = {};
@@ -882,11 +899,26 @@ export function assertMultiAgentState(
   orchestrator: MultiAgentOrchestrator,
   expected: {
     agentStatus?: Record<string, "idle" | "running" | "completed" | "error">;
+    taskStatus?: Record<string, string>;
     totalTokens?: { agentId?: string; min?: number; max?: number };
     globalTokens?: { min?: number; max?: number };
     pendingHandoffs?: number;
   }
 ): void {
+  if (expected.taskStatus) {
+    for (const [taskId, expectedStatus] of Object.entries(expected.taskStatus)) {
+      const state = orchestrator.getTaskState(taskId);
+      if (!state) {
+        throw new Error(`Expected task "${taskId}" to exist, but it was not found`);
+      }
+      if (state.status !== expectedStatus) {
+        throw new Error(
+          `Expected task "${taskId}" status to be "${expectedStatus}", got "${state.status}"`
+        );
+      }
+    }
+  }
+
   if (expected.agentStatus) {
     for (const [agentId, expectedStatus] of Object.entries(expected.agentStatus)) {
       const state = orchestrator.getAgentState(agentId);
@@ -952,6 +984,52 @@ export function assertMultiAgentState(
 }
 
 // ============================================================================
+// Mock Task Helpers
+// ============================================================================
+
+/**
+ * Create a mock TaskRegistration for testing.
+ *
+ * @example
+ * ```typescript
+ * const task = createMockTask({ result: "processed" }, { delay: 100 });
+ * const orchestrator = createTestMultiAgentOrchestrator({
+ *   agents: { writer: { agent: { name: "writer" } } },
+ *   tasks: { process: task },
+ * });
+ * ```
+ */
+export function createMockTask(
+  output: unknown,
+  options?: { delay?: number; shouldError?: boolean; label?: string; description?: string },
+): TaskRegistration {
+  return {
+    run: async (_input: string, signal: AbortSignal) => {
+      if (signal.aborted) {
+        throw new Error("Task aborted");
+      }
+      if (options?.delay && options.delay > 0) {
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, options.delay);
+          signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(new Error("Task aborted"));
+          }, { once: true });
+        });
+      }
+
+      if (options?.shouldError) {
+        throw new Error("Mock task error");
+      }
+
+      return output;
+    },
+    label: options?.label ?? "Mock Task",
+    description: options?.description,
+  };
+}
+
+// ============================================================================
 // DAG Testing Helpers
 // ============================================================================
 
@@ -964,14 +1042,14 @@ import { dag } from "./multi-agent-orchestrator.js";
  * @example
  * ```typescript
  * const pattern = createTestDag({
- *   A: { agent: "researcher" },
- *   B: { agent: "writer", deps: ["A"] },
- *   C: { agent: "reviewer", deps: ["B"] },
+ *   A: { handler: "researcher" },
+ *   B: { handler: "writer", deps: ["A"] },
+ *   C: { handler: "reviewer", deps: ["B"] },
  * });
  * ```
  */
 export function createTestDag<T = unknown>(
-  nodes: Record<string, Pick<DagNode, "agent" | "deps" | "when" | "transform" | "timeout" | "priority">>,
+  nodes: Record<string, Pick<DagNode, "handler" | "deps" | "when" | "transform" | "timeout" | "priority">>,
   merge?: (context: DagExecutionContext) => T | Promise<T>,
   options?: { timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" },
 ): DagPattern<T> {

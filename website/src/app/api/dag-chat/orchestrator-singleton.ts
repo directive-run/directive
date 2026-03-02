@@ -251,33 +251,33 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
       research: dag<string>(
         {
           news: {
-            agent: 'news',
+            handler: 'news',
             transform: (context: DagExecutionContext) => context.input,
           },
           academic: {
-            agent: 'academic',
+            handler: 'academic',
             transform: (context: DagExecutionContext) => context.input,
           },
           sentiment: {
-            agent: 'sentiment',
+            handler: 'sentiment',
             deps: ['news'],
             transform: (context: DagExecutionContext) =>
               `News finding: ${context.outputs['news'] ?? ''}`,
           },
           'fact-checker': {
-            agent: 'fact-checker',
+            handler: 'fact-checker',
             deps: ['academic'],
             transform: (context: DagExecutionContext) =>
               `Academic claim: ${context.outputs['academic'] ?? ''}`,
           },
           synthesizer: {
-            agent: 'synthesizer',
+            handler: 'synthesizer',
             deps: ['sentiment', 'fact-checker'],
             transform: (context: DagExecutionContext) =>
               `Sentiment: ${context.outputs['sentiment'] ?? ''}\nFact-check: ${context.outputs['fact-checker'] ?? ''}`,
           },
           reviewer: {
-            agent: 'reviewer',
+            handler: 'reviewer',
             deps: ['synthesizer'],
             transform: (context: DagExecutionContext) =>
               `Synthesized report: ${context.outputs['synthesizer'] ?? ''}`,

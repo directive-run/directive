@@ -26,9 +26,9 @@ describe("DAG: linear chain (A → B → C)", () => {
       },
       patterns: {
         chain: createTestDag({
-          A: { agent: "a" },
-          B: { agent: "b", deps: ["A"] },
-          C: { agent: "c", deps: ["B"] },
+          A: { handler: "a" },
+          B: { handler: "b", deps: ["A"] },
+          C: { handler: "c", deps: ["B"] },
         }),
       },
     });
@@ -70,8 +70,8 @@ describe("DAG: linear chain (A → B → C)", () => {
       },
       patterns: {
         pipe: createTestDag({
-          A: { agent: "a" },
-          B: { agent: "b", deps: ["A"] },
+          A: { handler: "a" },
+          B: { handler: "b", deps: ["A"] },
         }),
       },
     });
@@ -99,9 +99,9 @@ describe("DAG: linear chain (A → B → C)", () => {
       patterns: {
         chain: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b", deps: ["A"] },
-            C: { agent: "c", deps: ["B"] },
+            A: { handler: "a" },
+            B: { handler: "b", deps: ["A"] },
+            C: { handler: "c", deps: ["B"] },
           },
           (context) => ({
             finalOutput: context.outputs.C,
@@ -145,10 +145,10 @@ describe("DAG: diamond (A → B, A → C, B+C → D)", () => {
       patterns: {
         diamond: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b", deps: ["A"] },
-            C: { agent: "c", deps: ["A"] },
-            D: { agent: "d", deps: ["B", "C"] },
+            A: { handler: "a" },
+            B: { handler: "b", deps: ["A"] },
+            C: { handler: "c", deps: ["A"] },
+            D: { handler: "d", deps: ["B", "C"] },
           },
           (context) => context.outputs.D,
         ),
@@ -187,10 +187,10 @@ describe("DAG: diamond (A → B, A → C, B+C → D)", () => {
       },
       patterns: {
         diamond: createTestDag({
-          A: { agent: "a" },
-          B: { agent: "b", deps: ["A"] },
-          C: { agent: "c", deps: ["A"] },
-          D: { agent: "d", deps: ["B", "C"] },
+          A: { handler: "a" },
+          B: { handler: "b", deps: ["A"] },
+          C: { handler: "c", deps: ["A"] },
+          D: { handler: "d", deps: ["B", "C"] },
         }),
       },
     });
@@ -223,13 +223,13 @@ describe("DAG: conditional branch (when)", () => {
       patterns: {
         cond: createTestDag(
           {
-            A: { agent: "a" },
+            A: { handler: "a" },
             B: {
-              agent: "b",
+              handler: "b",
               deps: ["A"],
               when: (context) => context.outputs.A === "special",
             },
-            C: { agent: "c", deps: ["A"] },
+            C: { handler: "c", deps: ["A"] },
           },
           (context) => ({
             statuses: { ...context.statuses },
@@ -262,9 +262,9 @@ describe("DAG: conditional branch (when)", () => {
       patterns: {
         cond: createTestDag(
           {
-            A: { agent: "a" },
+            A: { handler: "a" },
             B: {
-              agent: "b",
+              handler: "b",
               deps: ["A"],
               when: (context) => context.outputs.A === "special",
             },
@@ -320,9 +320,9 @@ describe("DAG: parallel roots", () => {
       },
       patterns: {
         par: createTestDag({
-          A: { agent: "a" },
-          B: { agent: "b" },
-          C: { agent: "c", deps: ["A", "B"] },
+          A: { handler: "a" },
+          B: { handler: "b" },
+          C: { handler: "c", deps: ["A", "B"] },
         }),
       },
     });
@@ -349,9 +349,9 @@ describe("DAG: parallel roots", () => {
       patterns: {
         par: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b" },
-            C: { agent: "c", deps: ["A", "B"] },
+            A: { handler: "a" },
+            B: { handler: "b" },
+            C: { handler: "c", deps: ["A", "B"] },
           },
           (context) => ({ ...context.statuses }),
         ),
@@ -384,8 +384,8 @@ describe("DAG: error — fail mode", () => {
       patterns: {
         fail: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b", deps: ["A"] },
+            A: { handler: "a" },
+            B: { handler: "b", deps: ["A"] },
           },
           (context) => context.outputs,
           { onNodeError: "fail" },
@@ -409,8 +409,8 @@ describe("DAG: error — fail mode", () => {
       patterns: {
         fail: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b", deps: ["A"] },
+            A: { handler: "a" },
+            B: { handler: "b", deps: ["A"] },
           },
           (context) => context.outputs,
           { onNodeError: "fail" },
@@ -449,9 +449,9 @@ describe("DAG: error — skip-downstream mode", () => {
       patterns: {
         skip: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b", deps: ["A"] },
-            C: { agent: "c" },
+            A: { handler: "a" },
+            B: { handler: "b", deps: ["A"] },
+            C: { handler: "c" },
           },
           (context) => ({
             statuses: { ...context.statuses },
@@ -489,9 +489,9 @@ describe("DAG: error — skip-downstream mode", () => {
       patterns: {
         skip: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b", deps: ["A"] },
-            C: { agent: "c", deps: ["B"] },
+            A: { handler: "a" },
+            B: { handler: "b", deps: ["A"] },
+            C: { handler: "c", deps: ["B"] },
           },
           (context) => ({ ...context.statuses }),
           { onNodeError: "skip-downstream" },
@@ -528,9 +528,9 @@ describe("DAG: error — continue mode", () => {
       patterns: {
         cont: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b" },
-            C: { agent: "c", deps: ["B"] },
+            A: { handler: "a" },
+            B: { handler: "b" },
+            C: { handler: "c", deps: ["B"] },
           },
           (context) => ({
             statuses: { ...context.statuses },
@@ -565,8 +565,8 @@ describe("DAG: error — continue mode", () => {
       patterns: {
         cont: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b" },
+            A: { handler: "a" },
+            B: { handler: "b" },
           },
           (context) => ({
             statuses: { ...context.statuses },
@@ -606,8 +606,8 @@ describe("DAG: per-node timeout", () => {
       patterns: {
         timeout: createTestDag(
           {
-            A: { agent: "a", timeout: 50 },
-            B: { agent: "b" },
+            A: { handler: "a", timeout: 50 },
+            B: { handler: "b" },
           },
           (context) => ({
             statuses: { ...context.statuses },
@@ -648,8 +648,8 @@ describe("DAG: graph-level timeout", () => {
       patterns: {
         gto: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b" },
+            A: { handler: "a" },
+            B: { handler: "b" },
           },
           (context) => ({ ...context.statuses }),
           { timeout: 100, onNodeError: "continue" },
@@ -689,10 +689,10 @@ describe("DAG: maxConcurrent limit", () => {
       patterns: {
         limited: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b" },
-            C: { agent: "c" },
-            D: { agent: "d" },
+            A: { handler: "a" },
+            B: { handler: "b" },
+            C: { handler: "c" },
+            D: { handler: "d" },
           },
           (context) => context.outputs,
           { maxConcurrent: 2 },
@@ -747,9 +747,9 @@ describe("DAG: maxConcurrent limit", () => {
       patterns: {
         serial: createTestDag(
           {
-            A: { agent: "a" },
-            B: { agent: "b" },
-            C: { agent: "c" },
+            A: { handler: "a" },
+            B: { handler: "b" },
+            C: { handler: "c" },
           },
           (context) => context.outputs,
           { maxConcurrent: 1 },
@@ -784,14 +784,14 @@ describe("DAG: dynamic routing via when()", () => {
       patterns: {
         route: createTestDag(
           {
-            router: { agent: "a" },
+            router: { handler: "a" },
             branchB: {
-              agent: "b",
+              handler: "b",
               deps: ["router"],
               when: (context) => context.outputs.router === "route-b",
             },
             branchC: {
-              agent: "c",
+              handler: "c",
               deps: ["router"],
               when: (context) => context.outputs.router === "route-c",
             },
@@ -822,9 +822,9 @@ describe("DAG: dynamic routing via when()", () => {
       },
       patterns: {
         ctx: createTestDag({
-          A: { agent: "a" },
+          A: { handler: "a" },
           B: {
-            agent: "b",
+            handler: "b",
             deps: ["A"],
             when: (context) => {
               capturedContexts.push({
@@ -863,9 +863,9 @@ describe("DAG: dynamic routing via when()", () => {
       patterns: {
         throwing: createTestDag(
           {
-            A: { agent: "a" },
+            A: { handler: "a" },
             B: {
-              agent: "b",
+              handler: "b",
               deps: ["A"],
               when: () => {
                 throw new Error("when() blew up");
@@ -899,8 +899,8 @@ describe("DAG: cycle detection at construction", () => {
         patterns: {
           cyclic: dag(
             {
-              A: { agent: "a", deps: ["B"] },
-              B: { agent: "b", deps: ["A"] },
+              A: { handler: "a", deps: ["B"] },
+              B: { handler: "b", deps: ["A"] },
             },
             (context) => context.outputs,
           ),
@@ -918,7 +918,7 @@ describe("DAG: cycle detection at construction", () => {
         patterns: {
           self: dag(
             {
-              A: { agent: "a", deps: ["A"] },
+              A: { handler: "a", deps: ["A"] },
             },
             (context) => context.outputs,
           ),
@@ -938,9 +938,9 @@ describe("DAG: cycle detection at construction", () => {
         patterns: {
           cycle3: dag(
             {
-              A: { agent: "a", deps: ["C"] },
-              B: { agent: "b", deps: ["A"] },
-              C: { agent: "c", deps: ["B"] },
+              A: { handler: "a", deps: ["C"] },
+              B: { handler: "b", deps: ["A"] },
+              C: { handler: "c", deps: ["B"] },
             },
             (context) => context.outputs,
           ),
@@ -958,7 +958,7 @@ describe("DAG: cycle detection at construction", () => {
         patterns: {
           bad: dag(
             {
-              A: { agent: "a", deps: ["nonexistent"] },
+              A: { handler: "a", deps: ["nonexistent"] },
             },
             (context) => context.outputs,
           ),
@@ -977,8 +977,8 @@ describe("DAG: cycle detection at construction", () => {
         patterns: {
           noroot: dag(
             {
-              A: { agent: "a", deps: ["B"] },
-              B: { agent: "b", deps: ["A"] },
+              A: { handler: "a", deps: ["B"] },
+              B: { handler: "b", deps: ["A"] },
             },
             (context) => context.outputs,
           ),
@@ -1003,7 +1003,7 @@ describe("DAG: single-node (degenerate)", () => {
       },
       patterns: {
         single: createTestDag(
-          { only: { agent: "a" } },
+          { only: { handler: "a" } },
           (context) => context.outputs.only,
         ),
       },
@@ -1033,7 +1033,7 @@ describe("DAG: single-node (degenerate)", () => {
         },
       },
       patterns: {
-        single: createTestDag({ only: { agent: "a" } }),
+        single: createTestDag({ only: { handler: "a" } }),
       },
     });
 
@@ -1054,7 +1054,7 @@ describe("DAG: single-node (degenerate)", () => {
       },
       patterns: {
         single: createTestDag(
-          { only: { agent: "a" } },
+          { only: { handler: "a" } },
           (context) => {
             mergeContext = {
               ...context,
@@ -1098,15 +1098,15 @@ describe("DAG: composePatterns integration", () => {
 
     const dagPattern = dag<string>(
       {
-        r1: { agent: "researcher" },
-        r2: { agent: "researcher" },
+        r1: { handler: "researcher" },
+        r2: { handler: "researcher" },
       },
       (context) => `${context.outputs.r1} | ${context.outputs.r2}`,
     );
 
     const seqPattern = {
       type: "sequential" as const,
-      agents: ["writer", "reviewer"],
+      handlers: ["writer", "reviewer"],
     };
 
     const workflow = composePatterns(dagPattern, seqPattern);
@@ -1142,13 +1142,13 @@ describe("DAG: composePatterns integration", () => {
     });
 
     const dagPat = dag<string>(
-      { A: { agent: "a" } },
+      { A: { handler: "a" } },
       (context) => String(context.outputs.A),
     );
 
     const seqPat = {
       type: "sequential" as const,
-      agents: ["writer"],
+      handlers: ["writer"],
     };
 
     const workflow = composePatterns(dagPat, seqPat);
@@ -1181,9 +1181,9 @@ describe("DAG: same agent in multiple nodes", () => {
       patterns: {
         multi: createTestDag(
           {
-            r1: { agent: "researcher" },
-            r2: { agent: "researcher" },
-            r3: { agent: "researcher" },
+            r1: { handler: "researcher" },
+            r2: { handler: "researcher" },
+            r3: { handler: "researcher" },
           },
           (context) => Object.values(context.outputs),
         ),
@@ -1210,9 +1210,9 @@ describe("DAG: same agent in multiple nodes", () => {
       patterns: {
         sem: createTestDag(
           {
-            r1: { agent: "researcher" },
-            r2: { agent: "researcher" },
-            r3: { agent: "researcher" },
+            r1: { handler: "researcher" },
+            r2: { handler: "researcher" },
+            r3: { handler: "researcher" },
           },
           (context) => context.outputs,
         ),
@@ -1246,9 +1246,9 @@ describe("DAG: same agent in multiple nodes", () => {
       patterns: {
         topics: createTestDag(
           {
-            r1: { agent: "researcher", transform: () => "topic A" },
-            r2: { agent: "researcher", transform: () => "topic B" },
-            r3: { agent: "researcher", transform: () => "topic C" },
+            r1: { handler: "researcher", transform: () => "topic A" },
+            r2: { handler: "researcher", transform: () => "topic B" },
+            r3: { handler: "researcher", transform: () => "topic C" },
           },
           (context) => context.outputs,
         ),
@@ -1271,8 +1271,8 @@ describe("DAG: factory and test helpers", () => {
   it("dag() factory creates a valid DagPattern", () => {
     const pattern = dag(
       {
-        A: { agent: "a" },
-        B: { agent: "b", deps: ["A"] },
+        A: { handler: "a" },
+        B: { handler: "b", deps: ["A"] },
       },
       (context) => context.outputs.B,
     );
@@ -1286,7 +1286,7 @@ describe("DAG: factory and test helpers", () => {
 
   it("dag() factory passes through options", () => {
     const pattern = dag(
-      { A: { agent: "a" } },
+      { A: { handler: "a" } },
       (context) => context.outputs,
       { timeout: 5000, maxConcurrent: 2, onNodeError: "skip-downstream" },
     );
@@ -1298,8 +1298,8 @@ describe("DAG: factory and test helpers", () => {
 
   it("createTestDag creates a pattern with default merge", async () => {
     const pattern = createTestDag({
-      A: { agent: "a" },
-      B: { agent: "b", deps: ["A"] },
+      A: { handler: "a" },
+      B: { handler: "b", deps: ["A"] },
     });
 
     expect(pattern.type).toBe("dag");
@@ -1385,9 +1385,9 @@ describe("DAG: factory and test helpers", () => {
       patterns: {
         prio: createTestDag(
           {
-            A: { agent: "a", priority: 5 },
-            B: { agent: "b", priority: 1 },
-            C: { agent: "c", priority: 10 },
+            A: { handler: "a", priority: 5 },
+            B: { handler: "b", priority: 1 },
+            C: { handler: "c", priority: 10 },
           },
           (context) => context.outputs,
           { maxConcurrent: 1 },
@@ -1425,9 +1425,9 @@ describe("DAG: factory and test helpers", () => {
       },
       patterns: {
         xform: createTestDag({
-          A: { agent: "a" },
+          A: { handler: "a" },
           B: {
-            agent: "b",
+            handler: "b",
             deps: ["A"],
             transform: (context) => `Summarize: ${context.outputs.A}`,
           },

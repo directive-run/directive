@@ -239,7 +239,7 @@ describe("runDebate", () => {
     const result = await runDebate(
       orchestrator,
       {
-        agents: ["optimist", "pessimist"],
+        handlers: ["optimist", "pessimist"],
         evaluator: "judge",
         maxRounds: 1,
       },
@@ -290,7 +290,7 @@ describe("runDebate", () => {
     const result = await runDebate(
       orchestrator,
       {
-        agents: ["a", "b"],
+        handlers: ["a", "b"],
         evaluator: "judge",
         maxRounds: 2,
       },
@@ -314,8 +314,8 @@ describe("runDebate", () => {
     });
 
     await expect(
-      runDebate(orchestrator, { agents: ["a"], evaluator: "judge" }, "go"),
-    ).rejects.toThrow("at least 2 agents");
+      runDebate(orchestrator, { handlers: ["a"], evaluator: "judge" }, "go"),
+    ).rejects.toThrow("at least 2 handlers");
   });
 
   it("custom parseJudgement", async () => {
@@ -335,7 +335,7 @@ describe("runDebate", () => {
     const result = await runDebate(
       orchestrator,
       {
-        agents: ["a", "b"],
+        handlers: ["a", "b"],
         evaluator: "judge",
         maxRounds: 1,
         parseJudgement: (output) => {
@@ -701,7 +701,7 @@ describe("runDebate with AbortSignal", () => {
     });
 
     await expect(runDebate(orchestrator, {
-      agents: ["a", "b"],
+      handlers: ["a", "b"],
       evaluator: "judge",
       maxRounds: 3,
       signal: controller.signal,
@@ -729,7 +729,7 @@ describe("composePatterns with debate", () => {
     });
 
     const composed = composePatterns(
-      debate({ agents: ["a", "b"], evaluator: "judge", maxRounds: 1 }),
+      debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 1 }),
     );
 
     const result = await composed(orchestrator, "test input");
@@ -742,7 +742,7 @@ describe("composePatterns with debate", () => {
     });
 
     const composed = composePatterns(
-      { type: "nonexistent" as any, agents: ["a"] },
+      { type: "nonexistent" as any, handlers: ["a"] },
     );
 
     await expect(composed(orchestrator, "test")).rejects.toThrow("unknown pattern type");
@@ -805,15 +805,15 @@ describe("orchestrator.runDebate", () => {
 
 describe("debate factory validation", () => {
   it("debate() with fewer than 2 agents throws", () => {
-    expect(() => debate({ agents: ["a"], evaluator: "judge" })).toThrow("at least 2");
+    expect(() => debate({ handlers: ["a"], evaluator: "judge" })).toThrow("at least 2");
   });
 
   it("debate() with maxRounds 0 throws", () => {
-    expect(() => debate({ agents: ["a", "b"], evaluator: "judge", maxRounds: 0 })).toThrow("maxRounds");
+    expect(() => debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 })).toThrow("maxRounds");
   });
 
   it("debate() with maxRounds -1 throws", () => {
-    expect(() => debate({ agents: ["a", "b"], evaluator: "judge", maxRounds: -1 })).toThrow("maxRounds");
+    expect(() => debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: -1 })).toThrow("maxRounds");
   });
 });
 
@@ -835,7 +835,7 @@ describe("debate with extract", () => {
     const result = await runDebate(
       orchestrator,
       {
-        agents: ["a", "b"],
+        handlers: ["a", "b"],
         evaluator: "judge",
         maxRounds: 1,
         extract: (output) => {
@@ -867,7 +867,7 @@ describe("debate maxRounds validation (imperative)", () => {
     });
 
     await expect(
-      runDebate(orchestrator, { agents: ["a", "b"], evaluator: "judge", maxRounds: 0 }, "go"),
+      runDebate(orchestrator, { handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 }, "go"),
     ).rejects.toThrow("maxRounds");
   });
 

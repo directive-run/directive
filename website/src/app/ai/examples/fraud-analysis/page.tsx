@@ -48,6 +48,8 @@ export default function FraudAnalysisPage() {
       streamUrl="/api/fraud-review-devtools/stream"
       snapshotUrl="/api/fraud-review-devtools/snapshot"
       replayData={replayData}
+      runtimeSystemName={null}
+      label="Fraud Analysis"
     >
       <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-3xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
         <div className="shrink-0 text-center">

@@ -94,10 +94,10 @@ describe("patternToMermaid", () => {
 
   it("renders DAG with topological sort and dependency edges", () => {
     const p = dag({
-      fetch: { agent: "fetcher" },
-      analyze: { agent: "analyzer", deps: ["fetch"] },
-      summarize: { agent: "summarizer", deps: ["fetch"] },
-      report: { agent: "reporter", deps: ["analyze", "summarize"] },
+      fetch: { handler: "fetcher" },
+      analyze: { handler: "analyzer", deps: ["fetch"] },
+      summarize: { handler: "summarizer", deps: ["fetch"] },
+      report: { handler: "reporter", deps: ["analyze", "summarize"] },
     });
     const result = patternToMermaid(p, { direction: "TD" });
 
@@ -116,16 +116,16 @@ describe("patternToMermaid", () => {
 
   it("DAG determinism — same nodes in different insertion order produce identical output", () => {
     const p1 = dag({
-      a: { agent: "alpha" },
-      b: { agent: "beta", deps: ["a"] },
-      c: { agent: "gamma", deps: ["a"] },
-      d: { agent: "delta", deps: ["b", "c"] },
+      a: { handler: "alpha" },
+      b: { handler: "beta", deps: ["a"] },
+      c: { handler: "gamma", deps: ["a"] },
+      d: { handler: "delta", deps: ["b", "c"] },
     });
     const p2 = dag({
-      d: { agent: "delta", deps: ["b", "c"] },
-      c: { agent: "gamma", deps: ["a"] },
-      b: { agent: "beta", deps: ["a"] },
-      a: { agent: "alpha" },
+      d: { handler: "delta", deps: ["b", "c"] },
+      c: { handler: "gamma", deps: ["a"] },
+      b: { handler: "beta", deps: ["a"] },
+      a: { handler: "alpha" },
     });
 
     expect(patternToMermaid(p1)).toBe(patternToMermaid(p2));
@@ -133,8 +133,8 @@ describe("patternToMermaid", () => {
 
   it("DAG isolated nodes still appear", () => {
     const p = dag({
-      lonely: { agent: "orphan" },
-      connected: { agent: "linked", deps: [] },
+      lonely: { handler: "orphan" },
+      connected: { handler: "linked", deps: [] },
     });
     const result = patternToMermaid(p);
 
@@ -142,9 +142,9 @@ describe("patternToMermaid", () => {
     expect(result).toContain("lonely[orphan]");
   });
 
-  it("DAG node ID vs agent name — key used as ID, node.agent as label", () => {
+  it("DAG node ID vs agent name — key used as ID, node.handler as label", () => {
     const p = dag({
-      step_1: { agent: "my-fancy-agent" },
+      step_1: { handler: "my-fancy-agent" },
     });
     const result = patternToMermaid(p);
 
@@ -197,7 +197,7 @@ describe("patternToMermaid", () => {
   // ---------- debate ----------
 
   it("renders debate pattern with judge and rounds", () => {
-    const p = debate({ agents: ["agent-a", "agent-b"], evaluator: "judge" });
+    const p = debate({ handlers: ["agent-a", "agent-b"], evaluator: "judge" });
     const result = patternToMermaid(p);
 
     expect(result).toBe(
@@ -218,7 +218,7 @@ describe("patternToMermaid", () => {
   it("accepts pre-serialized pattern without double-serializing", () => {
     const json: SerializedPattern = {
       type: "sequential",
-      agents: ["a", "b"],
+      handlers: ["a", "b"],
     };
     const result = patternToMermaid(json);
 
@@ -300,9 +300,9 @@ describe("patternToMermaid", () => {
     const json: SerializedPattern = {
       type: "goal",
       nodes: {
-        fetch: { agent: "fetcher", produces: ["data"], requires: [] },
-        analyze: { agent: "analyzer", produces: ["analysis"], requires: ["data"] },
-        report: { agent: "reporter", produces: ["report"], requires: ["analysis"] },
+        fetch: { handler: "fetcher", produces: ["data"], requires: [] },
+        analyze: { handler: "analyzer", produces: ["analysis"], requires: ["data"] },
+        report: { handler: "reporter", produces: ["report"], requires: ["analysis"] },
       },
     };
     const result = patternToMermaid(json, { direction: "TD" });
@@ -323,8 +323,8 @@ describe("patternToMermaid", () => {
     const json: SerializedPattern = {
       type: "goal",
       nodes: {
-        standalone: { agent: "loner", produces: ["x"], requires: [] },
-        another: { agent: "solo", produces: ["y"], requires: [] },
+        standalone: { handler: "loner", produces: ["x"], requires: [] },
+        another: { handler: "solo", produces: ["y"], requires: [] },
       },
     };
     const result = patternToMermaid(json);
@@ -337,8 +337,8 @@ describe("patternToMermaid", () => {
     const json: SerializedPattern = {
       type: "goal",
       nodes: {
-        source: { agent: "source-agent", produces: ["x", "y"], requires: [] },
-        sink: { agent: "sink-agent", produces: ["z"], requires: ["x", "y"] },
+        source: { handler: "source-agent", produces: ["x", "y"], requires: [] },
+        sink: { handler: "sink-agent", produces: ["z"], requires: ["x", "y"] },
       },
     };
     const result = patternToMermaid(json);
@@ -354,10 +354,10 @@ describe("patternToMermaid", () => {
     const json: SerializedPattern = {
       type: "goal",
       nodes: {
-        root: { agent: "root-agent", produces: ["raw"], requires: [] },
-        left: { agent: "left-agent", produces: ["left-out"], requires: ["raw"] },
-        right: { agent: "right-agent", produces: ["right-out"], requires: ["raw"] },
-        merge: { agent: "merge-agent", produces: ["final"], requires: ["left-out", "right-out"] },
+        root: { handler: "root-agent", produces: ["raw"], requires: [] },
+        left: { handler: "left-agent", produces: ["left-out"], requires: ["raw"] },
+        right: { handler: "right-agent", produces: ["right-out"], requires: ["raw"] },
+        merge: { handler: "merge-agent", produces: ["final"], requires: ["left-out", "right-out"] },
       },
     };
     const result = patternToMermaid(json);
@@ -373,7 +373,7 @@ describe("patternToMermaid", () => {
     const json: SerializedPattern = {
       type: "goal",
       nodes: {
-        analyzer: { agent: "analyzer", produces: ["analysis"], requires: ["external-data"] },
+        analyzer: { handler: "analyzer", produces: ["analysis"], requires: ["external-data"] },
       },
     };
     const result = patternToMermaid(json);
@@ -427,9 +427,9 @@ describe("patternToMermaid", () => {
 
   it("100 calls with same input produce identical output", () => {
     const p = dag({
-      a: { agent: "alpha" },
-      b: { agent: "beta", deps: ["a"] },
-      c: { agent: "gamma", deps: ["a"] },
+      a: { handler: "alpha" },
+      b: { handler: "beta", deps: ["a"] },
+      c: { handler: "gamma", deps: ["a"] },
     });
 
     const first = patternToMermaid(p);
