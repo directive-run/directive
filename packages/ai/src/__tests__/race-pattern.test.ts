@@ -263,7 +263,7 @@ describe("race pattern", () => {
     const pattern = race(["a", "b"], { timeout: 50 });
 
     expect(pattern.type).toBe("race");
-    expect(pattern.agents).toEqual(["a", "b"]);
+    expect(pattern.handlers).toEqual(["a", "b"]);
     expect(pattern.timeout).toBe(50);
   });
 
