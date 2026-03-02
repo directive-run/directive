@@ -92,6 +92,7 @@ import type {
 } from "./types.js";
 import {
   GuardrailError,
+  isGuardrailError,
   APPROVAL_KEY,
   BREAKPOINT_KEY,
   SCRATCHPAD_KEY,
@@ -1144,7 +1145,6 @@ export interface MultiAgentOrchestrator {
   ): Promise<T>;
   /**
    * Get reflection iteration history from last runReflectPattern call.
-   * @deprecated Use the `history` field on the return value from `runReflect()` instead.
    */
   getLastReflectionHistory(): ReflectIterationRecord[] | null;
   /** Cross-agent derived values (frozen snapshot). Empty when derive not configured. */
@@ -1247,7 +1247,6 @@ export function createMultiAgentOrchestrator(
 
   // Normalize debug config
   const debug = typeof rawDebug === "object" ? true : !!rawDebug;
-  const verboseTimeline = typeof rawDebug === "object" ? !!rawDebug.verboseTimeline : false;
   const MAX_VERBOSE_LENGTH = 5000;
 
   // Shallow copy so registerAgent/unregisterAgent don't mutate the caller's object
@@ -2233,6 +2232,7 @@ export function createMultiAgentOrchestrator(
         label,
         description: taskReg.description,
         inputLength: effectiveInput.length,
+        input: effectiveInput.slice(0, MAX_VERBOSE_LENGTH),
       });
     }
 
@@ -2343,6 +2343,7 @@ export function createMultiAgentOrchestrator(
               taskId,
               label,
               durationMs,
+              output,
             });
           }
 
@@ -2673,8 +2674,9 @@ export function createMultiAgentOrchestrator(
           agentId,
           snapshotId: null,
           inputLength: processedInput.length,
+          ...(agent.description ? { description: agent.description } : {}),
           ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
-          ...(verboseTimeline ? { input: processedInput.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+          input: processedInput.slice(0, MAX_VERBOSE_LENGTH),
         });
       }
 
@@ -2978,7 +2980,7 @@ export function createMultiAgentOrchestrator(
           outputTokens: result.tokenUsage?.outputTokens ?? 0,
           durationMs: Date.now() - startTime,
           modelId: registration.agent.model ?? undefined,
-          ...(verboseTimeline ? { output: outputStr.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+          output: outputStr.slice(0, MAX_VERBOSE_LENGTH),
         });
       }
 
@@ -3022,14 +3024,20 @@ export function createMultiAgentOrchestrator(
 
       // Record timeline event
       if (timeline) {
-        timeline.record({
+        const base: Record<string, unknown> = {
           type: "agent_error",
           timestamp: Date.now(),
           agentId,
           snapshotId: null,
           errorMessage: error instanceof Error ? error.message : String(error),
           durationMs: Date.now() - startTime,
-        });
+        };
+        if (isGuardrailError(error)) {
+          base.guardrailName = error.guardrailName;
+          base.guardrailType = error.guardrailType;
+          base.errorCode = error.code;
+        }
+        timeline.record(base as any);
       }
 
       // Record health failure
@@ -5051,12 +5059,16 @@ export function createMultiAgentOrchestrator(
     const patternStartTime = Date.now();
 
     if (timeline) {
+      const goalHandlers = Object.values(nodes).map((n) => n.handler);
+
       timeline.record({
         type: "pattern_start",
         timestamp: patternStartTime,
         snapshotId: null,
         patternId: pId,
         patternType: "goal",
+        handlers: goalHandlers,
+        taskIds: goalHandlers.filter((h) => tasks[h] != null),
       });
     }
     fireHook("onPatternStart", {
@@ -5103,6 +5115,7 @@ export function createMultiAgentOrchestrator(
     let appliedRelaxationTiers = resumeFrom?.appliedRelaxationTiers ?? 0;
     let lastSatisfaction = resumeFrom?.lastSatisfaction ?? 0;
     let patternError: Error | undefined;
+    let goalAchieved = false;
     const startStep = resumeFrom?.step ?? 0;
 
     // Checkpoint config
@@ -5119,6 +5132,7 @@ export function createMultiAgentOrchestrator(
       for (let step = startStep; step < maxSteps; step++) {
         // Check goal condition (C1: safe-wrap user callback)
         if (safeCall(goalWhen, facts) === true) {
+          goalAchieved = true;
           const durationMs = Date.now() - patternStartTime;
           const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
 
@@ -5440,6 +5454,23 @@ export function createMultiAgentOrchestrator(
           tokensConsumed: stepTokens,
         });
 
+        // Record timeline events for each node run in this step
+        if (timeline) {
+          for (const nodeId of selectedNodes) {
+            const node = nodes[nodeId]!;
+            timeline.record({
+              type: "goal_step",
+              timestamp: Date.now(),
+              snapshotId: null,
+              agentId: node.handler,
+              step,
+              nodeId,
+              satisfaction: postSatisfaction,
+              satisfactionDelta,
+            });
+          }
+        }
+
         // Update per-agent metrics
         for (const nodeId of selectedNodes) {
           const node = nodes[nodeId]!;
@@ -5524,6 +5555,10 @@ export function createMultiAgentOrchestrator(
         pattern.signal.removeEventListener("abort", externalOnAbort);
       }
       if (timeline) {
+        const totalTokens = Object.values(nodeResults).reduce(
+          (sum, r) => sum + r.totalTokens,
+          0,
+        );
         timeline.record({
           type: "pattern_complete",
           timestamp: Date.now(),
@@ -5531,6 +5566,10 @@ export function createMultiAgentOrchestrator(
           patternId: pId,
           patternType: "goal",
           durationMs: Date.now() - patternStartTime,
+          achieved: goalAchieved,
+          stepMetrics,
+          relaxations,
+          totalTokens,
           ...(patternError ? { error: patternError.message } : {}),
         });
       }
@@ -5632,6 +5671,21 @@ export function createMultiAgentOrchestrator(
     return best;
   }
 
+  // ---- Pattern handler extraction (for debug events) ----
+  function getPatternHandlers(pattern: ExecutionPattern): string[] {
+    switch (pattern.type) {
+      case "parallel": return pattern.handlers;
+      case "sequential": return pattern.handlers;
+      case "supervisor": return [pattern.supervisor, ...pattern.workers];
+      case "dag": return Object.values(pattern.nodes).map((n) => n.handler);
+      case "reflect": return [pattern.handler, pattern.evaluator];
+      case "race": return pattern.handlers;
+      case "debate": return [...pattern.handlers, pattern.evaluator];
+      case "goal": return Object.values(pattern.nodes).map((n) => n.handler);
+      default: return [];
+    }
+  }
+
   // ---- Build Orchestrator Object ----
   const orchestrator: MultiAgentOrchestrator = {
     system: system as unknown as System<any>,
@@ -5680,12 +5734,16 @@ export function createMultiAgentOrchestrator(
 
       const patternStartTime = Date.now();
       if (timeline) {
+        const handlerIds = getPatternHandlers(pattern);
+
         timeline.record({
           type: "pattern_start",
           timestamp: patternStartTime,
           snapshotId: null,
           patternId,
           patternType: pattern.type,
+          handlers: handlerIds,
+          taskIds: handlerIds.filter((h) => tasks[h] != null),
         });
       }
 
@@ -8050,7 +8108,6 @@ export function spawnOnCondition(config: {
   priority?: number;
   /** Additional context passed to the agent */
   context?: Record<string, unknown>;
-  /** @deprecated Use top-level `priority` and `context` instead */
   options?: SpawnOnConditionOptions;
 }): OrchestratorConstraint<Record<string, unknown>> {
   const { when, agent, input, priority, context, options } = config;
@@ -8304,7 +8361,6 @@ export function spawnPool(
 /** Serialized DAG node (functions stripped) */
 export interface SerializedDagNode {
   handler: string;
-  /** @deprecated Use `handler` instead */
   agent?: string;
   deps?: string[];
   timeout?: number;
@@ -8325,7 +8381,6 @@ export type SerializedPattern =
 /** Serialized goal node (functions stripped) */
 export interface SerializedGoalNode {
   handler: string;
-  /** @deprecated Use `handler` instead */
   agent?: string;
   produces: string[];
   requires?: string[];

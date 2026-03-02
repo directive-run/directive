@@ -71,6 +71,8 @@ interface GraphNodeState {
   lastDurationMs: number
   modelId: string | null
   lastError: string | null
+  lastGuardrailName: string | null
+  lastGuardrailType: string | null
   retries: number
   isVirtual: boolean
   isTask: boolean
@@ -113,7 +115,7 @@ function AgentNode({ data, selected }: NodeProps) {
       className={`cursor-pointer rounded-lg border-2 bg-zinc-900 px-4 py-3 shadow-lg transition-all ${
         selected ? 'ring-2 ring-white/30' : ''
       } ${status === 'running' ? 'motion-safe:animate-pulse' : ''}`}
-      style={{ borderColor: color }}
+      style={{ borderColor: color, opacity: status === 'pending' ? 0.25 : 1 }}
     >
       <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-zinc-600" />
 
@@ -178,7 +180,7 @@ function TaskNode({ data, selected }: NodeProps) {
       className={`cursor-pointer rounded-lg border-2 border-dashed bg-zinc-900 px-4 py-3 shadow-lg transition-all ${
         selected ? 'ring-2 ring-white/30' : ''
       } ${status === 'running' ? 'motion-safe:animate-pulse' : ''}`}
-      style={{ borderColor: color }}
+      style={{ borderColor: color, opacity: status === 'pending' ? 0.25 : 1 }}
       title={description ?? undefined}
     >
       <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-zinc-600" />
@@ -238,6 +240,8 @@ function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; isT
     lastDurationMs: 0,
     modelId: null,
     lastError: null,
+    lastGuardrailName: null,
+    lastGuardrailType: null,
     retries: 0,
     isVirtual: opts?.isVirtual ?? false,
     isTask: opts?.isTask ?? false,
@@ -246,6 +250,42 @@ function emptyNode(id: string, opts?: { label?: string; isVirtual?: boolean; isT
     instructions: null,
     progress: null,
     description: null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Enrich a single node from one event (used by per-round builders)
+// ---------------------------------------------------------------------------
+
+function enrichSingleNode(node: GraphNodeState, e: DebugEvent): void {
+  if (e.type === 'agent_complete') {
+    node.status = 'completed'
+    node.tokens += e.totalTokens ?? 0
+    node.inputTokens += e.inputTokens ?? 0
+    node.outputTokens += e.outputTokens ?? 0
+    node.lastDurationMs = e.durationMs ?? 0
+    node.durationMs += e.durationMs ?? 0
+    node.runs++
+    if (e.modelId) {
+      node.modelId = e.modelId as string
+    }
+    if (typeof e.output === 'string') {
+      node.lastOutput = e.output
+    }
+  } else if (e.type === 'agent_error') {
+    node.status = 'error'
+    node.lastError = (e.errorMessage as string) ?? 'Unknown error'
+  } else if (e.type === 'agent_start') {
+    node.status = 'running'
+    if (typeof e.input === 'string') {
+      node.lastInput = e.input
+    }
+    if (typeof e.instructions === 'string') {
+      node.instructions = e.instructions
+    }
+    if (typeof e.description === 'string') {
+      node.description = e.description
+    }
   }
 }
 
@@ -287,6 +327,9 @@ function enrichFromAgentEvents(
       if (typeof e.instructions === 'string') {
         matched.instructions = e.instructions
       }
+      if (typeof e.description === 'string') {
+        matched.description = e.description
+      }
     } else if (e.type === 'agent_complete') {
       matched.status = 'completed'
       matched.tokens += e.totalTokens ?? 0
@@ -304,11 +347,17 @@ function enrichFromAgentEvents(
     } else if (e.type === 'agent_error') {
       matched.status = 'error'
       matched.lastError = (e.errorMessage as string) ?? 'Unknown error'
+      matched.lastGuardrailName = (e.guardrailName as string) ?? null
+      matched.lastGuardrailType = (e.guardrailType as string) ?? null
     } else if (e.type === 'agent_retry') {
       matched.retries++
     } else if (e.type === 'task_start') {
       matched.status = 'running'
       matched.isTask = true
+      const taskInput = (e as Record<string, unknown>).input
+      if (typeof taskInput === 'string') {
+        matched.lastInput = taskInput
+      }
       if (typeof e.description === 'string') {
         matched.description = e.description
       }
@@ -321,10 +370,16 @@ function enrichFromAgentEvents(
       matched.lastDurationMs = (e as Record<string, unknown>).durationMs as number ?? 0
       matched.durationMs += matched.lastDurationMs
       matched.runs++
+      const taskOutput = (e as Record<string, unknown>).output
+      if (typeof taskOutput === 'string') {
+        matched.lastOutput = taskOutput
+      }
     } else if (e.type === 'task_error') {
       matched.status = 'error'
       matched.isTask = true
       matched.lastError = (e as Record<string, unknown>).error as string ?? 'Unknown error'
+      matched.lastGuardrailName = (e as Record<string, unknown>).guardrailName as string ?? null
+      matched.lastGuardrailType = (e as Record<string, unknown>).guardrailType as string ?? null
     } else if (e.type === 'task_progress') {
       matched.isTask = true
       matched.progress = (e as Record<string, unknown>).percent as number ?? null
@@ -394,16 +449,16 @@ function buildDagGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeStat
 
 function buildParallelGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
   const nodes = new Map<string, GraphNodeState>()
-  const agentIds = extractAgentIds(events)
+  const expected = extractExpectedHandlers(events)
+  const agentIds = expected ? expected.handlers : extractAgentIds(events)
 
   nodes.set('__input', emptyNode('__input', { label: 'Input', isVirtual: true }))
   for (const id of agentIds) {
-    nodes.set(id, emptyNode(id, { deps: ['__input'] }))
+    nodes.set(id, emptyNode(id, { deps: ['__input'], isTask: expected?.taskIds.has(id) }))
   }
   nodes.set('__merge', emptyNode('__merge', { label: 'Merge', isVirtual: true, deps: agentIds }))
 
   enrichFromAgentEvents(nodes, events)
-  // Virtual nodes complete when pattern completes
   markVirtualStatus(nodes, events)
 
   const edges: GraphEdgeState[] = []
@@ -417,12 +472,13 @@ function buildParallelGraph(events: DebugEvent[]): { nodes: Map<string, GraphNod
 
 function buildSequentialGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
   const nodes = new Map<string, GraphNodeState>()
-  const agentIds = extractAgentIdsOrdered(events)
+  const expected = extractExpectedHandlers(events)
+  const agentIds = expected ? expected.handlers : extractAgentIdsOrdered(events)
 
   let prevId: string | null = null
   for (const id of agentIds) {
     const deps = prevId ? [prevId] : []
-    nodes.set(id, emptyNode(id, { deps }))
+    nodes.set(id, emptyNode(id, { deps, isTask: expected?.taskIds.has(id) }))
     prevId = id
   }
 
@@ -437,25 +493,177 @@ function buildSequentialGraph(events: DebugEvent[]): { nodes: Map<string, GraphN
   return { nodes, edges }
 }
 
-function buildSupervisorGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
-  const nodes = new Map<string, GraphNodeState>()
-  const agentIds = extractAgentIds(events)
+function truncateLabel(prefix: string, text: string, maxLen = 30): string {
+  // Strip markdown headings, bold, bullets
+  const stripped = text.replace(/^#+\s+/gm, '').replace(/\*\*|__|[#>*`—]/g, '').trim()
+  const firstLine = stripped.split('\n')[0] ?? stripped
+  const available = maxLen - prefix.length - 2 // for ": "
+  if (available <= 0) {
+    return prefix
+  }
+  if (firstLine.length <= available) {
+    return `${prefix}: ${firstLine}`
+  }
+  // Truncate on word boundary
+  const truncated = firstLine.slice(0, available)
+  const lastSpace = truncated.lastIndexOf(' ')
+  const clean = lastSpace > available / 2 ? truncated.slice(0, lastSpace) : truncated
 
-  // First agent is typically the supervisor
-  const supervisorId = agentIds[0] ?? 'supervisor'
-  const workerIds = agentIds.slice(1)
+  return `${prefix}: ${clean}…`
+}
 
-  nodes.set(supervisorId, emptyNode(supervisorId))
-  for (const id of workerIds) {
-    nodes.set(id, emptyNode(id))
+function extractOutputText(output: unknown): string | null {
+  if (typeof output === 'string') {
+    return output
+  }
+  if (output != null && typeof output === 'object') {
+    try {
+      return JSON.stringify(output)
+    } catch {
+      return null
+    }
   }
 
-  enrichFromAgentEvents(nodes, events)
+  return null
+}
 
+function buildSupervisorGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
+  const nodes = new Map<string, GraphNodeState>()
+  const expected = extractExpectedHandlers(events)
+
+  let supervisorId: string
+  let workerIds: string[]
+
+  if (expected) {
+    supervisorId = expected.handlers[0] ?? 'supervisor'
+    workerIds = expected.handlers.slice(1)
+  } else {
+    const agentIds = extractAgentIds(events)
+    supervisorId = agentIds[0] ?? 'supervisor'
+    workerIds = agentIds.slice(1)
+  }
+
+  const workerSet = new Set(workerIds)
+
+  // Collect agent_complete/agent_error events in order
+  const completions = events.filter(
+    (e) => (e.type === 'agent_complete' || e.type === 'agent_error') && e.agentId,
+  )
+
+  // Build per-round nodes: initial supervisor, then (worker, supervisor) pairs
   const edges: GraphEdgeState[] = []
-  for (const id of workerIds) {
-    edges.push({ source: supervisorId, target: id, label: 'delegate' })
-    edges.push({ source: id, target: supervisorId, label: 'result' })
+  let prevNodeId: string | null = null
+  let round = 0
+  let prevCompletionOutput: string | null = null
+
+  // Initial supervisor node
+  nodes.set(supervisorId, emptyNode(supervisorId, { label: supervisorId }))
+  prevNodeId = supervisorId
+
+  // Walk completions: first one is the initial supervisor, then pairs
+  for (let i = 0; i < completions.length; i++) {
+    const e = completions[i]
+    const agentId = e.agentId!
+    const output = extractOutputText(e.output)
+
+    if (i === 0 && agentId === supervisorId) {
+      // Initial supervisor completion — enrich the root node
+      enrichSingleNode(nodes.get(supervisorId)!, e)
+      prevCompletionOutput = output
+      continue
+    }
+
+    if (workerSet.has(agentId)) {
+      // Worker completion — new round
+      round++
+      const nodeId = `${agentId} R${round}`
+      nodes.set(nodeId, emptyNode(nodeId, {
+        label: agentId,
+        deps: prevNodeId ? [prevNodeId] : [],
+        isTask: expected?.taskIds.has(agentId),
+      }))
+      enrichSingleNode(nodes.get(nodeId)!, e)
+      if (prevNodeId) {
+        // Extract delegation reason from previous supervisor's output
+        let delegateLabel = 'delegate'
+        if (prevCompletionOutput) {
+          try {
+            const parsed = JSON.parse(prevCompletionOutput)
+            if (parsed.workerInput) {
+              delegateLabel = truncateLabel('delegate', parsed.workerInput)
+            }
+          } catch { /* not JSON — use default */ }
+        }
+        edges.push({ source: prevNodeId, target: nodeId, label: delegateLabel })
+      }
+      prevNodeId = nodeId
+      prevCompletionOutput = output
+    } else if (agentId === supervisorId) {
+      // Supervisor completion after a worker — add supervisor round node
+      const nodeId = `${supervisorId} R${round}`
+      if (nodes.has(nodeId)) {
+        // Duplicate supervisor completion at same round — just re-enrich
+        enrichSingleNode(nodes.get(nodeId)!, e)
+      } else {
+        nodes.set(nodeId, emptyNode(nodeId, {
+          label: supervisorId,
+          deps: prevNodeId ? [prevNodeId] : [],
+        }))
+        enrichSingleNode(nodes.get(nodeId)!, e)
+        if (prevNodeId) {
+          // Use previous worker's output as result label
+          const resultLabel = prevCompletionOutput
+            ? truncateLabel('result', prevCompletionOutput)
+            : 'result'
+          edges.push({ source: prevNodeId, target: nodeId, label: resultLabel })
+        }
+        prevNodeId = nodeId
+      }
+      prevCompletionOutput = output
+    }
+  }
+
+  // Add output node
+  nodes.set('__output', emptyNode('__output', {
+    label: 'Output',
+    isVirtual: true,
+    deps: prevNodeId ? [prevNodeId] : [],
+  }))
+  if (prevNodeId) {
+    edges.push({ source: prevNodeId, target: '__output' })
+  }
+  markVirtualStatus(nodes, events)
+
+  // Enrich start events by matching Nth start for each agent to round nodes
+  const startCounts = new Map<string, number>()
+  for (const e of events) {
+    if (e.type === 'agent_start' && e.agentId) {
+      const agentId = e.agentId
+      const count = (startCounts.get(agentId) ?? 0)
+      startCounts.set(agentId, count + 1)
+
+      // Find the matching round node
+      let targetNode: GraphNodeState | undefined
+      if (count === 0 && agentId === supervisorId) {
+        targetNode = nodes.get(supervisorId)
+      } else if (workerSet.has(agentId)) {
+        targetNode = nodes.get(`${agentId} R${count}`)
+      } else if (agentId === supervisorId && count > 0) {
+        targetNode = nodes.get(`${supervisorId} R${count}`)
+      }
+
+      if (targetNode) {
+        if (typeof e.input === 'string') {
+          targetNode.lastInput = e.input
+        }
+        if (typeof e.instructions === 'string') {
+          targetNode.instructions = e.instructions
+        }
+        if (typeof e.description === 'string') {
+          targetNode.description = e.description
+        }
+      }
+    }
   }
 
   return { nodes, edges }
@@ -463,11 +671,12 @@ function buildSupervisorGraph(events: DebugEvent[]): { nodes: Map<string, GraphN
 
 function buildRaceGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
   const nodes = new Map<string, GraphNodeState>()
-  const agentIds = extractAgentIds(events)
+  const expected = extractExpectedHandlers(events)
+  const agentIds = expected ? expected.handlers : extractAgentIds(events)
 
   nodes.set('__input', emptyNode('__input', { label: 'Input', isVirtual: true }))
   for (const id of agentIds) {
-    nodes.set(id, emptyNode(id, { deps: ['__input'] }))
+    nodes.set(id, emptyNode(id, { deps: ['__input'], isTask: expected?.taskIds.has(id) }))
   }
   nodes.set('__output', emptyNode('__output', { label: 'Output', isVirtual: true, deps: agentIds }))
 
@@ -485,96 +694,372 @@ function buildRaceGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeSta
 
 function buildReflectGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
   const nodes = new Map<string, GraphNodeState>()
-  const agentIds = extractAgentIds(events)
+  const expected = extractExpectedHandlers(events)
 
-  const producerId = agentIds[0] ?? 'producer'
-  const evaluatorId = agentIds[1] ?? 'evaluator'
+  let producerId: string
+  let evaluatorId: string
 
-  nodes.set(producerId, emptyNode(producerId))
-  nodes.set(evaluatorId, emptyNode(evaluatorId, { deps: [producerId] }))
-  nodes.set('__output', emptyNode('__output', { label: 'Output', isVirtual: true, deps: [evaluatorId] }))
+  if (expected && expected.handlers.length >= 2) {
+    producerId = expected.handlers[0]!
+    evaluatorId = expected.handlers[1]!
+  } else {
+    const agentIds = extractAgentIds(events)
+    producerId = agentIds[0] ?? 'producer'
+    evaluatorId = agentIds[1] ?? 'evaluator'
+  }
 
-  enrichFromAgentEvents(nodes, events)
+  // Collect completions in order — they alternate: producer, evaluator, producer, evaluator...
+  const completions = events.filter(
+    (e) => (e.type === 'agent_complete' || e.type === 'agent_error') && e.agentId,
+  )
+
+  const edges: GraphEdgeState[] = []
+  let prevNodeId: string | null = null
+  let iteration = 0
+  let producerCount = 0
+  let evaluatorCount = 0
+  let prevCompletionOutput: string | null = null
+
+  for (const e of completions) {
+    const agentId = e.agentId!
+    const output = extractOutputText(e.output)
+
+    if (agentId === producerId) {
+      producerCount++
+      iteration = producerCount
+      const nodeId = `${producerId} I${iteration}`
+      nodes.set(nodeId, emptyNode(nodeId, {
+        label: producerId,
+        deps: prevNodeId ? [prevNodeId] : [],
+        isTask: expected?.taskIds.has(producerId),
+      }))
+      enrichSingleNode(nodes.get(nodeId)!, e)
+      if (prevNodeId) {
+        const isFeedback = prevNodeId.includes(evaluatorId)
+        let label: string | undefined
+        if (isFeedback && prevCompletionOutput) {
+          label = truncateLabel('feedback', prevCompletionOutput)
+        } else if (isFeedback) {
+          label = 'feedback'
+        }
+        edges.push({ source: prevNodeId, target: nodeId, label })
+      }
+      prevNodeId = nodeId
+      prevCompletionOutput = output
+    } else if (agentId === evaluatorId) {
+      evaluatorCount++
+      const nodeId = `${evaluatorId} I${evaluatorCount}`
+      nodes.set(nodeId, emptyNode(nodeId, {
+        label: evaluatorId,
+        deps: prevNodeId ? [prevNodeId] : [],
+        isTask: expected?.taskIds.has(evaluatorId),
+      }))
+      enrichSingleNode(nodes.get(nodeId)!, e)
+      if (prevNodeId) {
+        edges.push({ source: prevNodeId, target: nodeId })
+      }
+      prevNodeId = nodeId
+      prevCompletionOutput = output
+    }
+  }
+
+  // Add output node
+  nodes.set('__output', emptyNode('__output', {
+    label: 'Output',
+    isVirtual: true,
+    deps: prevNodeId ? [prevNodeId] : [],
+  }))
+  if (prevNodeId) {
+    edges.push({ source: prevNodeId, target: '__output', label: 'pass' })
+  }
   markVirtualStatus(nodes, events)
 
-  const edges: GraphEdgeState[] = [
-    { source: producerId, target: evaluatorId },
-    { source: evaluatorId, target: producerId, label: 'feedback' },
-    { source: evaluatorId, target: '__output', label: 'pass' },
-  ]
+  // Enrich start events
+  const startCounts = new Map<string, number>()
+  for (const e of events) {
+    if (e.type === 'agent_start' && e.agentId) {
+      const agentId = e.agentId
+      const count = (startCounts.get(agentId) ?? 0) + 1
+      startCounts.set(agentId, count)
+
+      const suffix = agentId === producerId ? `${producerId} I${count}` : `${evaluatorId} I${count}`
+      const targetNode = nodes.get(suffix)
+      if (targetNode) {
+        if (typeof e.input === 'string') {
+          targetNode.lastInput = e.input
+        }
+        if (typeof e.instructions === 'string') {
+          targetNode.instructions = e.instructions
+        }
+        if (typeof e.description === 'string') {
+          targetNode.description = e.description
+        }
+      }
+    }
+  }
 
   return { nodes, edges }
 }
 
 function buildDebateGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
   const nodes = new Map<string, GraphNodeState>()
-  const agentIds = extractAgentIds(events)
+  const expected = extractExpectedHandlers(events)
 
-  // Last agent is typically the judge/evaluator
-  const judgeId = agentIds[agentIds.length - 1] ?? 'judge'
-  const debaterIds = agentIds.slice(0, -1)
+  let debaterIds: string[]
+  let judgeId: string
 
-  for (const id of debaterIds) {
-    nodes.set(id, emptyNode(id))
+  if (expected && expected.handlers.length >= 2) {
+    // Debate pattern emits handlers as [...debaters, evaluator]
+    debaterIds = expected.handlers.slice(0, -1)
+    judgeId = expected.handlers[expected.handlers.length - 1]!
+  } else {
+    const agentIds = extractAgentIds(events)
+    judgeId = agentIds[agentIds.length - 1] ?? 'judge'
+    debaterIds = agentIds.slice(0, -1)
   }
-  nodes.set(judgeId, emptyNode(judgeId, { deps: debaterIds }))
-  nodes.set('__output', emptyNode('__output', { label: 'Output', isVirtual: true, deps: [judgeId] }))
 
-  enrichFromAgentEvents(nodes, events)
-  markVirtualStatus(nodes, events)
+  const debaterSet = new Set(debaterIds)
+
+  // Collect completions in order — per round: N debater completions, then 1 judge
+  const completions = events.filter(
+    (e) => (e.type === 'agent_complete' || e.type === 'agent_error') && e.agentId,
+  )
 
   const edges: GraphEdgeState[] = []
-  for (const id of debaterIds) {
-    edges.push({ source: id, target: judgeId })
-    edges.push({ source: judgeId, target: id, label: 'next round' })
+  let round = 0
+  let roundDebaters: string[] = []
+  let prevJudgeNodeId: string | null = null
+  let prevJudgeOutput: string | null = null
+
+  for (const e of completions) {
+    const agentId = e.agentId!
+
+    if (debaterSet.has(agentId)) {
+      // Start a new round when we see the first debater after a judge (or at the start)
+      if (roundDebaters.length === 0) {
+        round++
+      }
+
+      const nodeId = `${agentId} R${round}`
+      const deps = prevJudgeNodeId ? [prevJudgeNodeId] : []
+      nodes.set(nodeId, emptyNode(nodeId, {
+        label: agentId,
+        deps,
+        isTask: expected?.taskIds.has(agentId),
+      }))
+      enrichSingleNode(nodes.get(nodeId)!, e)
+
+      if (prevJudgeNodeId) {
+        // Use judge's verdict/feedback as edge label
+        const label = prevJudgeOutput
+          ? truncateLabel('verdict', prevJudgeOutput)
+          : undefined
+        edges.push({ source: prevJudgeNodeId, target: nodeId, label })
+      }
+      roundDebaters.push(nodeId)
+    } else if (agentId === judgeId) {
+      // Judge completion — depends on all debaters in this round
+      const nodeId = `${judgeId} R${round}`
+      nodes.set(nodeId, emptyNode(nodeId, {
+        label: judgeId,
+        deps: [...roundDebaters],
+        isTask: expected?.taskIds.has(judgeId),
+      }))
+      enrichSingleNode(nodes.get(nodeId)!, e)
+
+      for (const debaterNodeId of roundDebaters) {
+        edges.push({ source: debaterNodeId, target: nodeId })
+      }
+
+      prevJudgeNodeId = nodeId
+      prevJudgeOutput = extractOutputText(e.output)
+      roundDebaters = []
+    }
   }
-  edges.push({ source: judgeId, target: '__output' })
+
+  // Add output node
+  const lastNodeId = prevJudgeNodeId ?? (roundDebaters.length > 0 ? roundDebaters[roundDebaters.length - 1] : null)
+  nodes.set('__output', emptyNode('__output', {
+    label: 'Output',
+    isVirtual: true,
+    deps: lastNodeId ? [lastNodeId] : [],
+  }))
+  if (lastNodeId) {
+    edges.push({ source: lastNodeId, target: '__output' })
+  }
+  markVirtualStatus(nodes, events)
+
+  // Enrich start events
+  const startCounts = new Map<string, number>()
+  for (const e of events) {
+    if (e.type === 'agent_start' && e.agentId) {
+      const agentId = e.agentId
+      const count = (startCounts.get(agentId) ?? 0) + 1
+      startCounts.set(agentId, count)
+
+      let targetNode: GraphNodeState | undefined
+      if (debaterSet.has(agentId)) {
+        targetNode = nodes.get(`${agentId} R${count}`)
+      } else if (agentId === judgeId) {
+        targetNode = nodes.get(`${judgeId} R${count}`)
+      }
+
+      if (targetNode) {
+        if (typeof e.input === 'string') {
+          targetNode.lastInput = e.input
+        }
+        if (typeof e.instructions === 'string') {
+          targetNode.instructions = e.instructions
+        }
+        if (typeof e.description === 'string') {
+          targetNode.description = e.description
+        }
+      }
+    }
+  }
 
   return { nodes, edges }
 }
 
 function buildGoalGraph(events: DebugEvent[]): { nodes: Map<string, GraphNodeState>; edges: GraphEdgeState[] } {
-  // Goal pattern: derive edges from goal_step events if available, otherwise treat like DAG
   const goalSteps = events.filter((e) => e.type === 'goal_step')
 
-  if (goalSteps.length > 0) {
+  if (goalSteps.length === 0) {
+    // Fallback: show flat agent nodes from agent_start events
+    const agentIds = extractAgentIds(events)
     const nodes = new Map<string, GraphNodeState>()
-    const edgeSet = new Set<string>()
-    const edges: GraphEdgeState[] = []
+    for (const id of agentIds) {
+      nodes.set(id, emptyNode(id))
+    }
+    enrichFromAgentEvents(nodes, events)
 
-    for (const step of goalSteps) {
-      const nodeId = (step.nodeId ?? step.agentId) as string
-      if (!nodeId) {
-        continue
-      }
-      if (!nodes.has(nodeId)) {
-        const deps = (step.deps as string[]) ?? []
-        nodes.set(nodeId, emptyNode(nodeId, { deps }))
+    return { nodes, edges: [] }
+  }
+
+  const nodes = new Map<string, GraphNodeState>()
+  const edges: GraphEdgeState[] = []
+
+  // Group goal_step events by step number
+  const stepMap = new Map<number, DebugEvent[]>()
+  for (const e of goalSteps) {
+    const step = (e as Record<string, unknown>).step as number
+    if (!stepMap.has(step)) {
+      stepMap.set(step, [])
+    }
+    stepMap.get(step)!.push(e)
+  }
+
+  const sortedSteps = [...stepMap.keys()].sort((a, b) => a - b)
+  let prevStepNodeIds: string[] = []
+
+  for (const step of sortedSteps) {
+    const stepEvents = stepMap.get(step)!
+    const currentStepNodeIds: string[] = []
+
+    for (const e of stepEvents) {
+      const handler = e.agentId as string
+      // Use "handler #N" as the unique graph node ID
+      const graphNodeId = `${handler} #${step + 1}`
+      currentStepNodeIds.push(graphNodeId)
+
+      nodes.set(graphNodeId, emptyNode(graphNodeId, {
+        label: handler,
+        deps: prevStepNodeIds.length > 0 ? [...prevStepNodeIds] : [],
+      }))
+    }
+
+    // Connect previous step nodes -> current step nodes
+    for (const prevId of prevStepNodeIds) {
+      for (const currId of currentStepNodeIds) {
+        edges.push({ source: prevId, target: currId })
       }
     }
 
-    enrichFromAgentEvents(nodes, events)
+    prevStepNodeIds = currentStepNodeIds
+  }
 
-    for (const node of nodes.values()) {
-      for (const dep of node.deps) {
-        const key = `${dep}->${node.id}`
-        if (!edgeSet.has(key)) {
-          edges.push({ source: dep, target: node.id })
-          edgeSet.add(key)
+  // Enrich: match Nth agent_start/complete for handler to step N
+  const handlerEventIndex = new Map<string, number>()
+  for (const step of sortedSteps) {
+    const stepEvents = stepMap.get(step)!
+    for (const e of stepEvents) {
+      const handler = e.agentId as string
+      const graphNodeId = `${handler} #${step + 1}`
+      const node = nodes.get(graphNodeId)
+      if (!node) {
+        continue
+      }
+
+      const idx = handlerEventIndex.get(handler) ?? 0
+      handlerEventIndex.set(handler, idx + 1)
+
+      // Find the Nth agent_complete for this handler
+      let count = 0
+      for (const ae of events) {
+        if (ae.type === 'agent_complete' && ae.agentId === handler) {
+          if (count === idx) {
+            node.status = 'completed'
+            node.tokens += ae.totalTokens ?? 0
+            node.inputTokens += ae.inputTokens ?? 0
+            node.outputTokens += ae.outputTokens ?? 0
+            node.durationMs += ae.durationMs ?? 0
+            node.lastDurationMs = ae.durationMs ?? 0
+            node.runs++
+            if (ae.modelId) {
+              node.modelId = ae.modelId as string
+            }
+            if (typeof ae.output === 'string') {
+              node.lastOutput = ae.output
+            }
+            break
+          }
+          count++
+        }
+      }
+
+      // Find the Nth agent_start for this handler
+      count = 0
+      for (const ae of events) {
+        if (ae.type === 'agent_start' && ae.agentId === handler) {
+          if (count === idx) {
+            if (typeof ae.input === 'string') {
+              node.lastInput = ae.input
+            }
+            if (typeof ae.instructions === 'string') {
+              node.instructions = ae.instructions
+            }
+            if (typeof ae.description === 'string') {
+              node.description = ae.description
+            }
+            break
+          }
+          count++
         }
       }
     }
-
-    return { nodes, edges }
   }
 
-  // Fallback to DAG-style building
-  return buildDagGraph(events)
+  return { nodes, edges }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function extractExpectedHandlers(events: DebugEvent[]): { handlers: string[]; taskIds: Set<string> } | null {
+  const patternStart = events.find((e) => e.type === 'pattern_start')
+  if (!patternStart) {
+    return null
+  }
+
+  const handlers = (patternStart as Record<string, unknown>).handlers as string[] | undefined
+  const taskIds = (patternStart as Record<string, unknown>).taskIds as string[] | undefined
+  if (!handlers || handlers.length === 0) {
+    return null
+  }
+
+  return { handlers, taskIds: new Set(taskIds ?? []) }
+}
 
 function extractAgentIds(events: DebugEvent[]): string[] {
   const seen = new Set<string>()
@@ -704,6 +1189,7 @@ function clusterEventsByTimestamp(events: DebugEvent[], thresholdMs = 50): Playb
       e.type === 'task_complete' ||
       e.type === 'task_error' ||
       e.type === 'dag_node_update' ||
+      e.type === 'goal_step' ||
       e.type === 'pattern_start' ||
       e.type === 'pattern_complete',
   )
@@ -747,7 +1233,9 @@ function buildStep(events: DebugEvent[]): PlaybackStep {
             ? 'error'
             : e.type === 'dag_node_update'
               ? ((e as Record<string, unknown>).status as string ?? 'updated')
-              : 'updated'
+              : e.type === 'goal_step'
+                ? `step ${(e as Record<string, unknown>).step}`
+                : 'updated'
     parts.push(`${id} ${action}`)
   }
 
@@ -755,6 +1243,234 @@ function buildStep(events: DebugEvent[]): PlaybackStep {
     events,
     timestamp: events[0].timestamp,
     label: parts.join(', ') || 'step',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Replay per-round enrichment for supervisor/reflect/debate playback
+// ---------------------------------------------------------------------------
+
+function replayPerRoundEnrichment(
+  full: { nodes: Map<string, GraphNodeState>; patternType: PatternType | null },
+  partialEvents: DebugEvent[],
+): void {
+  // Reset ALL non-virtual nodes (enrichFromAgentEvents is skipped for per-round
+  // patterns, so this function handles all enrichment from scratch)
+  for (const node of full.nodes.values()) {
+    if (!node.isVirtual) {
+      node.status = 'pending'
+      node.tokens = 0
+      node.inputTokens = 0
+      node.outputTokens = 0
+      node.runs = 0
+      node.durationMs = 0
+      node.lastDurationMs = 0
+      node.modelId = null
+      node.lastError = null
+      node.lastInput = null
+      node.lastOutput = null
+    }
+  }
+
+  // Helper: enrich a node's input/instructions/description from a start event
+  // without overwriting status (which is set by completion events)
+  function enrichStartData(node: GraphNodeState, e: DebugEvent): void {
+    if (node.status === 'pending') {
+      node.status = 'running'
+    }
+    if (typeof e.input === 'string') {
+      node.lastInput = e.input
+    }
+    if (typeof e.instructions === 'string') {
+      node.instructions = e.instructions
+    }
+    if (typeof e.description === 'string') {
+      node.description = e.description
+    }
+  }
+
+  // Collect agent events from partial
+  const agentEvents = partialEvents.filter(
+    (e) => e.type === 'agent_start' || e.type === 'agent_complete' || e.type === 'agent_error',
+  )
+
+  if (full.patternType === 'supervisor') {
+    const completions = agentEvents.filter((e) => e.type === 'agent_complete' || e.type === 'agent_error')
+    // Identify supervisor: first node without " R" suffix
+    let supervisorId: string | null = null
+    for (const [nodeId] of full.nodes) {
+      if (!nodeId.includes(' R') && !nodeId.startsWith('__')) {
+        supervisorId = nodeId
+        break
+      }
+    }
+    if (!supervisorId) {
+      return
+    }
+
+    // Collect worker IDs from round nodes
+    const workerSet = new Set<string>()
+    for (const [nodeId, node] of full.nodes) {
+      if (/ R\d+$/.test(nodeId) && !nodeId.startsWith(supervisorId)) {
+        workerSet.add(node.label)
+      }
+    }
+
+    // Replay completions
+    let round = 0
+    for (let i = 0; i < completions.length; i++) {
+      const e = completions[i]
+      const agentId = e.agentId!
+      if (i === 0 && agentId === supervisorId) {
+        enrichSingleNode(full.nodes.get(supervisorId)!, e)
+        continue
+      }
+      if (workerSet.has(agentId)) {
+        round++
+        const node = full.nodes.get(`${agentId} R${round}`)
+        if (node) {
+          enrichSingleNode(node, e)
+        }
+      } else if (agentId === supervisorId) {
+        const node = full.nodes.get(`${supervisorId} R${round}`)
+        if (node) {
+          enrichSingleNode(node, e)
+        }
+      }
+    }
+
+    // Replay starts (input/instructions only, don't override completed status)
+    const startCounts = new Map<string, number>()
+    for (const e of agentEvents) {
+      if (e.type === 'agent_start' && e.agentId) {
+        const aid = e.agentId
+        const count = startCounts.get(aid) ?? 0
+        startCounts.set(aid, count + 1)
+        let target: GraphNodeState | undefined
+        if (count === 0 && aid === supervisorId) {
+          target = full.nodes.get(supervisorId)
+        } else if (workerSet.has(aid)) {
+          target = full.nodes.get(`${aid} R${count + 1}`)
+        } else if (aid === supervisorId && count > 0) {
+          target = full.nodes.get(`${supervisorId} R${count}`)
+        }
+        if (target) {
+          enrichStartData(target, e)
+        }
+      }
+    }
+  } else if (full.patternType === 'reflect') {
+    const completions = agentEvents.filter((e) => e.type === 'agent_complete' || e.type === 'agent_error')
+    // Identify producer and evaluator from node labels
+    const roleIds = new Set<string>()
+    for (const [nodeId, node] of full.nodes) {
+      if (/ I\d+$/.test(nodeId)) {
+        roleIds.add(node.label)
+      }
+    }
+    const roleArr = [...roleIds]
+    const producerId = roleArr[0]
+    const evaluatorId = roleArr[1]
+    if (!producerId || !evaluatorId) {
+      return
+    }
+
+    let producerCount = 0
+    let evaluatorCount = 0
+    for (const e of completions) {
+      const agentId = e.agentId!
+      if (agentId === producerId) {
+        producerCount++
+        const node = full.nodes.get(`${producerId} I${producerCount}`)
+        if (node) {
+          enrichSingleNode(node, e)
+        }
+      } else if (agentId === evaluatorId) {
+        evaluatorCount++
+        const node = full.nodes.get(`${evaluatorId} I${evaluatorCount}`)
+        if (node) {
+          enrichSingleNode(node, e)
+        }
+      }
+    }
+
+    // Replay starts (input/instructions only)
+    const startCounts = new Map<string, number>()
+    for (const e of agentEvents) {
+      if (e.type === 'agent_start' && e.agentId) {
+        const aid = e.agentId
+        const count = (startCounts.get(aid) ?? 0) + 1
+        startCounts.set(aid, count)
+        const suffix = aid === producerId ? `${producerId} I${count}` : `${evaluatorId} I${count}`
+        const target = full.nodes.get(suffix)
+        if (target) {
+          enrichStartData(target, e)
+        }
+      }
+    }
+  } else if (full.patternType === 'debate') {
+    const completions = agentEvents.filter((e) => e.type === 'agent_complete' || e.type === 'agent_error')
+    // Identify judge and debaters from round nodes
+    const roleLabels = new Map<string, string>()
+    for (const [nodeId, node] of full.nodes) {
+      if (/ R\d+$/.test(nodeId) && !roleLabels.has(node.label)) {
+        roleLabels.set(node.label, node.label)
+      }
+    }
+
+    // Judge is the one whose round nodes depend on multiple debater nodes
+    let judgeId: string | null = null
+    const debaterSet = new Set<string>()
+    for (const [, node] of full.nodes) {
+      if (/ R\d+$/.test(node.id) && node.deps.length > 1) {
+        judgeId = node.label
+        break
+      }
+    }
+    for (const label of roleLabels.keys()) {
+      if (label !== judgeId) {
+        debaterSet.add(label)
+      }
+    }
+    if (!judgeId) {
+      return
+    }
+
+    let round = 0
+    let roundDebaters: string[] = []
+    for (const e of completions) {
+      const agentId = e.agentId!
+      if (debaterSet.has(agentId)) {
+        if (roundDebaters.length === 0) {
+          round++
+        }
+        const node = full.nodes.get(`${agentId} R${round}`)
+        if (node) {
+          enrichSingleNode(node, e)
+        }
+        roundDebaters.push(agentId)
+      } else if (agentId === judgeId) {
+        const node = full.nodes.get(`${judgeId} R${round}`)
+        if (node) {
+          enrichSingleNode(node, e)
+        }
+        roundDebaters = []
+      }
+    }
+
+    // Replay starts (input/instructions only)
+    const startCounts = new Map<string, number>()
+    for (const e of agentEvents) {
+      if (e.type === 'agent_start' && e.agentId) {
+        const aid = e.agentId
+        const count = (startCounts.get(aid) ?? 0) + 1
+        startCounts.set(aid, count)
+        const target = full.nodes.get(`${aid} R${count}`)
+        if (target) {
+          enrichStartData(target, e)
+        }
+      }
+    }
   }
 }
 
@@ -786,6 +1502,8 @@ function buildGraphUpToStep(
     node.lastDurationMs = 0
     node.modelId = null
     node.lastError = null
+    node.lastGuardrailName = null
+    node.lastGuardrailType = null
     node.retries = 0
     node.lastInput = null
     node.lastOutput = null
@@ -805,8 +1523,12 @@ function buildGraphUpToStep(
     partialEvents.push(...steps[i].events)
   }
 
-  // Re-enrich with partial events
-  enrichFromAgentEvents(full.nodes, partialEvents)
+  // Re-enrich with partial events (skip for per-round patterns — they use compound
+  // node IDs like "agent R1" that enrichFromAgentEvents can't match by prefix)
+  const isPerRoundPattern = full.patternType === 'supervisor' || full.patternType === 'reflect' || full.patternType === 'debate'
+  if (!isPerRoundPattern) {
+    enrichFromAgentEvents(full.nodes, partialEvents)
+  }
   markVirtualStatus(full.nodes, partialEvents)
 
   // Replay dag_node_update events from partial set (DAG patterns set status directly)
@@ -821,6 +1543,30 @@ function buildGraphUpToStep(
     }
   }
 
+  // Replay goal_step events — map to "handler #step+1" node IDs
+  for (const e of partialEvents) {
+    if (e.type === 'goal_step' && typeof e.step === 'number' && e.agentId) {
+      const nodeId = `${e.agentId} #${(e.step as number) + 1}`
+      const node = full.nodes.get(nodeId)
+      if (node) {
+        node.status = 'completed'
+      }
+    }
+  }
+
+  // Replay per-round enrichment for supervisor/reflect/debate patterns
+  if (isPerRoundPattern) {
+    replayPerRoundEnrichment(full, partialEvents)
+
+    // Output node should only show as completed when pattern_complete fires,
+    // not as running on pattern_start (which markVirtualStatus does)
+    const outputNode = full.nodes.get('__output')
+    if (outputNode) {
+      const hasPatternComplete = partialEvents.some((e) => e.type === 'pattern_complete')
+      outputNode.status = hasPatternComplete ? 'completed' : 'pending'
+    }
+  }
+
   return full
 }
 
@@ -831,8 +1577,26 @@ function buildGraphUpToStep(
 function layoutGraph(
   nodes: Map<string, GraphNodeState>,
   edges: GraphEdgeState[],
+  opts?: { showPending?: boolean },
 ): { flowNodes: Node[]; flowEdges: Edge[] } {
-  const nodeArray = Array.from(nodes.values())
+  let nodeArray = Array.from(nodes.values())
+
+  // Filter out non-virtual pending nodes when showPending is off
+  if (!opts?.showPending) {
+    const removedIds = new Set<string>()
+    nodeArray = nodeArray.filter((n) => {
+      if (n.status === 'pending' && !n.isVirtual) {
+        removedIds.add(n.id)
+
+        return false
+      }
+
+      return true
+    })
+    if (removedIds.size > 0) {
+      edges = edges.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target))
+    }
+  }
 
   // Topological layout: assign layers by dependency depth
   const layers = new Map<string, number>()
@@ -920,12 +1684,13 @@ function layoutGraph(
     }
   })
 
-  const flowEdges: Edge[] = edges.map((edge) => {
+  const flowEdges: Edge[] = edges.map((edge, idx) => {
     const targetNode = nodes.get(edge.target)
     const isRunning = targetNode?.status === 'running'
+    const isPending = targetNode?.status === 'pending'
 
     return {
-      id: `${edge.source}->${edge.target}${edge.label ? `-${edge.label}` : ''}`,
+      id: `${edge.source}->${edge.target}${edge.label ? `-${edge.label}` : ''}-${idx}`,
       source: edge.source,
       target: edge.target,
       type: 'smoothstep',
@@ -934,11 +1699,19 @@ function layoutGraph(
       style: {
         stroke: STATUS_COLORS[targetNode?.status ?? 'pending'] ?? STATUS_COLORS.pending,
         strokeWidth: 2,
+        opacity: isPending ? 0.25 : 1,
         ...(edge.dashed ? { strokeDasharray: '5 5' } : {}),
       },
-      labelStyle: edge.label ? { fill: '#a1a1aa', fontSize: 10 } : undefined,
-      labelBgStyle: edge.label ? { fill: '#18181b', fillOpacity: 0.8 } : undefined,
-      labelBgPadding: edge.label ? [4, 2] as [number, number] : undefined,
+      labelStyle: edge.label ? { fill: '#a1a1aa', fontSize: 11, fontFamily: 'inherit' } : undefined,
+      labelBgStyle: edge.label ? {
+        fill: '#18181b',
+        fillOpacity: 0.9,
+        rx: 6,
+        ry: 6,
+        stroke: '#3f3f46',
+        strokeWidth: 1,
+      } : undefined,
+      labelBgPadding: edge.label ? [10, 6] as [number, number] : undefined,
     }
   })
 
@@ -977,6 +1750,38 @@ function DetailRow({ label, value }: { label: string; value: string | number }) 
     <div className="flex justify-between">
       <span className="text-zinc-500">{label}</span>
       <span className="text-zinc-300">{value}</span>
+    </div>
+  )
+}
+
+function CopyableBlock({ label, content, maxHeight = '200px' }: { label: string; content: string; maxHeight?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  return (
+    <div className="mt-3 border-t border-zinc-700 pt-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+          {label}
+        </div>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(content).catch(() => {})
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+          className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-300"
+          aria-label={copied ? `Copied ${label}` : `Copy ${label}`}
+        >
+          {copied ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+          )}
+        </button>
+      </div>
+      <pre className="overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300" style={{ maxHeight }}>
+        {content}
+      </pre>
     </div>
   )
 }
@@ -1033,7 +1838,7 @@ function getStrokeOptions(size: number) {
 // Drawing overlay (rendered inside ReactFlow to access viewport hooks)
 // ---------------------------------------------------------------------------
 
-function DrawingOverlay() {
+function DrawingOverlay({ showPending, onTogglePending, patternType }: { showPending: boolean; onTogglePending: () => void; patternType?: string | null }) {
   const system = useDirectiveRef(graphDraw)
   const drawMode = useSelector(system, (s) => s.drawMode, false)
   const strokes = useSelector(system, (s) => s.strokes, [] as Stroke[])
@@ -1121,6 +1926,31 @@ function DrawingOverlay() {
           >
             Draw
           </button>
+
+          <div className="mx-1 h-4 w-px bg-zinc-700" />
+
+          {/* Pending nodes toggle */}
+          <button
+            onClick={onTogglePending}
+            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+              showPending
+                ? 'bg-zinc-500/20 text-zinc-300'
+                : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+            }`}
+            title={showPending ? 'Hide pending workers' : 'Show pending workers'}
+          >
+            Pending
+          </button>
+
+          {/* Pattern type badge */}
+          {patternType && (
+            <>
+              <div className="mx-1 h-4 w-px bg-zinc-700" />
+              <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-zinc-400">
+                {patternType.charAt(0).toUpperCase() + patternType.slice(1)} Pattern
+              </span>
+            </>
+          )}
 
           {/* Color/size/undo/clear only visible in draw mode */}
           {drawMode && (
@@ -1293,16 +2123,17 @@ export function GraphView() {
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [panelExpanded, setPanelExpanded] = useState(false)
+  const [showPending, setShowPending] = useState(false)
 
   const { initialNodes, initialEdges } = useMemo(() => {
     if (!graphData) {
       return { initialNodes: [] as Node[], initialEdges: [] as Edge[] }
     }
 
-    const { flowNodes, flowEdges } = layoutGraph(graphData.nodes, graphData.edges)
+    const { flowNodes, flowEdges } = layoutGraph(graphData.nodes, graphData.edges, { showPending })
 
     return { initialNodes: flowNodes, initialEdges: flowEdges }
-  }, [graphData])
+  }, [graphData, showPending])
 
   const [nodes, setNodes] = useState(initialNodes)
   const [edges, setEdges] = useState(initialEdges)
@@ -1396,7 +2227,7 @@ export function GraphView() {
           <Background color="#27272a" gap={20} />
           <Controls className="[&>button]:!border-zinc-700 [&>button]:!bg-zinc-800 [&>button]:!text-zinc-300" />
           <AutoFit nodeCount={nodes.length} />
-          <DrawingOverlay />
+          <DrawingOverlay showPending={showPending} onTogglePending={() => setShowPending((v) => !v)} patternType={graphData?.patternType} />
 
           {/* Run pager */}
           {controlPanel && <Panel position="top-right" className="!m-2">{controlPanel}</Panel>}
@@ -1442,10 +2273,8 @@ export function GraphView() {
             {/* Virtual nodes only show status */}
             {!selected.isVirtual && (
               <>
-                {selected.isTask && (
-                  <DetailRow label="Type" value="Task" />
-                )}
-                {selected.isTask && selected.description && (
+                <DetailRow label="Type" value={selected.isTask ? 'Task' : 'Agent'} />
+                {selected.description && (
                   <div className="flex justify-between gap-2">
                     <span className="shrink-0 text-zinc-500">Description</span>
                     <span className="min-w-0 truncate text-zinc-300" title={selected.description}>
@@ -1501,6 +2330,12 @@ export function GraphView() {
                     </span>
                   </div>
                 )}
+                {selected.lastGuardrailName && (
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Guardrail</span>
+                    <span className="text-amber-400">{selected.lastGuardrailName} ({selected.lastGuardrailType})</span>
+                  </div>
+                )}
                 {selected.retries > 0 && (
                   <DetailRow label="Retries" value={selected.retries} />
                 )}
@@ -1509,40 +2344,13 @@ export function GraphView() {
           </div>
 
           {/* Agent instructions */}
-          {selected.instructions && (
-            <div className="mt-3 border-t border-zinc-700 pt-3">
-              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                Instructions
-              </div>
-              <pre className="max-h-[200px] overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300">
-                {selected.instructions}
-              </pre>
-            </div>
-          )}
+          {selected.instructions && <CopyableBlock label="Instructions" content={selected.instructions} />}
 
           {/* Agent input */}
-          {selected.lastInput && (
-            <div className="mt-3 border-t border-zinc-700 pt-3">
-              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                Input
-              </div>
-              <pre className="max-h-[200px] overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300">
-                {selected.lastInput}
-              </pre>
-            </div>
-          )}
+          {selected.lastInput && <CopyableBlock label="Input" content={selected.lastInput} />}
 
           {/* Agent output */}
-          {selected.lastOutput && (
-            <div className="mt-3 border-t border-zinc-700 pt-3">
-              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                Output
-              </div>
-              <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap rounded bg-zinc-800 px-2 py-1.5 text-[11px] leading-relaxed text-zinc-300">
-                {selected.lastOutput}
-              </pre>
-            </div>
-          )}
+          {selected.lastOutput && <CopyableBlock label="Output" content={selected.lastOutput} maxHeight="300px" />}
         </div>
       )}
     </div>
