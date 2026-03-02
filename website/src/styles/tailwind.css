@@ -134,6 +134,11 @@
   [inert] ::-webkit-scrollbar {
     display: none;
   }
+
+  .devtools-panel button,
+  .devtools-panel a {
+    cursor: pointer;
+  }
 }
 
 @keyframes fade-in-up {
