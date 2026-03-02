@@ -143,7 +143,6 @@ export type {
   CheckpointDiff,
   CheckpointSaveEvent,
   CheckpointRestoreEvent,
-  /** @deprecated Use PatternCheckpointConfig instead */
   GoalCheckpointConfig,
   GoalCheckpointState,
 } from "./types.js";

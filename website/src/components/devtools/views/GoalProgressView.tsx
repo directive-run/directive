@@ -94,6 +94,32 @@ function extractGoalExecutions(events: DebugEvent[]): GoalExecution[] {
       current = null
     }
 
+    // Build partial step data from goal_step events (live progress)
+    if (current && e.type === 'goal_step' && typeof e.step === 'number') {
+      const stepNum = e.step as number
+      const existing = current.steps.find((s) => s.step === stepNum)
+
+      if (existing) {
+        if (typeof e.nodeId === 'string') {
+          existing.nodesRun.push(e.nodeId as string)
+        }
+      } else {
+        current.steps.push({
+          step: stepNum,
+          nodesRun: typeof e.nodeId === 'string' ? [e.nodeId as string] : [],
+          satisfaction: typeof e.satisfaction === 'number' ? (e.satisfaction as number) : 0,
+          satisfactionDelta: typeof e.satisfactionDelta === 'number' ? (e.satisfactionDelta as number) : 0,
+          tokensConsumed: 0,
+          durationMs: 0,
+          factsProduced: [],
+        })
+      }
+
+      if (current.steps.length > 0) {
+        current.finalSatisfaction = current.steps[current.steps.length - 1].satisfaction
+      }
+    }
+
     // Accumulate tokens from agent completions during an active goal
     if (current && e.type === 'agent_complete' && e.totalTokens) {
       current.totalTokens += e.totalTokens

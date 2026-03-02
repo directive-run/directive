@@ -60,7 +60,7 @@ const enrichmentDatabase: Record<string, EnrichmentSignal[]> = {
     { source: 'merchant-rep', risk: 60, detail: 'Merchant flagged for card-present fraud' },
   ],
   'acct-2002': [
-    { source: 'account-history', risk: 70, detail: 'Recent password change, new device' },
+    { source: 'account-history', risk: 70, detail: 'Recent credential reset, new device' },
     { source: 'geo-risk', risk: 85, detail: 'Transactions from 4 countries in 24h' },
     { source: 'merchant-rep', risk: 40, detail: 'Mixed merchant reputation' },
   ],

@@ -162,11 +162,11 @@ export function TimelineView() {
     const runtimeSpans: { startTs: number; endTs: number; durationMs: number; error: boolean }[] = []
     const starts: number[] = []
     for (const e of laneEvents) {
-      if (e.type === 'agent_start') {
+      if (e.type === 'agent_start' || e.type === 'task_start') {
         starts.push(e.timestamp)
-      } else if ((e.type === 'agent_complete' || e.type === 'agent_error') && starts.length > 0) {
+      } else if ((e.type === 'agent_complete' || e.type === 'agent_error' || e.type === 'task_complete' || e.type === 'task_error') && starts.length > 0) {
         const startTs = starts.shift()!
-        runtimeSpans.push({ startTs, endTs: e.timestamp, durationMs: e.timestamp - startTs, error: e.type === 'agent_error' })
+        runtimeSpans.push({ startTs, endTs: e.timestamp, durationMs: e.timestamp - startTs, error: e.type === 'agent_error' || e.type === 'task_error' })
       }
     }
 
@@ -185,7 +185,7 @@ export function TimelineView() {
             <div
               key={`span-${i}`}
               className={`pointer-events-none absolute top-1 h-5 rounded-sm ${span.error ? 'bg-red-500/15 dark:bg-red-400/10' : 'bg-emerald-500/15 dark:bg-emerald-400/10'}`}
-              style={{ left: `${left}%`, width: `${Math.max(width, 0.3)}%`, minWidth: '4px' }}
+              style={{ left: `${left}%`, width: `${width}%`, minWidth: '4px' }}
             />
           )
         })}
@@ -378,7 +378,10 @@ export function TimelineView() {
                 </span>
               </div>
               {e.agentId && (
-                <div><span className="text-zinc-500">agent:</span> {e.agentId}</div>
+                <div><span className="text-zinc-500">{e.type.startsWith('task_') ? 'task' : 'agent'}:</span> {e.agentId}</div>
+              )}
+              {e.description && (
+                <div><span className="text-zinc-500">description:</span> {String(e.description)}</div>
               )}
               {e.modelId && (
                 <div><span className="text-zinc-500">model:</span> {String(e.modelId)}</div>
@@ -402,6 +405,12 @@ export function TimelineView() {
               )}
               {e.reason && (
                 <div><span className="text-zinc-500">reason:</span> <span className="text-red-400">{e.reason}</span></div>
+              )}
+              {(e.errorMessage || e.error) && (
+                <div><span className="text-zinc-500">error:</span> <span className="text-red-400">{String(e.errorMessage ?? e.error)}</span></div>
+              )}
+              {e.errorCode && (
+                <div><span className="text-zinc-500">code:</span> <span className="text-amber-400">{String(e.errorCode)}</span></div>
               )}
               {e.totalTokens !== undefined && (
                 <div><span className="text-zinc-500">tokens:</span> {e.totalTokens}{e.inputTokens ? ` (in: ${e.inputTokens}, out: ${e.outputTokens})` : ''}</div>
