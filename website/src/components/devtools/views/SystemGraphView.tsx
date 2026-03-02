@@ -31,6 +31,8 @@ import type {
   RuntimeResolverStats,
 } from '../modules/devtools-runtime'
 import type { RunChangelogEntry } from '@directive-run/core'
+import { usePlayback } from './usePlayback'
+import { PlaybackControls } from './PlaybackControls'
 
 // ---------------------------------------------------------------------------
 // Status colors & icons (matches GraphView palette)
@@ -1130,9 +1132,8 @@ export function SystemGraphView() {
   const [importedRuns, setImportedRuns] = useState<RunChangelogEntry[] | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Animation state (Part 9)
-  const [animationStep, setAnimationStep] = useState<number | null>(null)
-  const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Playback (shared hook)
+  const playback = usePlayback({ totalSteps: STAGE_ORDER.length })
 
   const activeRunHistory = importedRuns ?? runHistory
 
@@ -1152,10 +1153,15 @@ export function SystemGraphView() {
     }
   }, [selectedRunId, activeRunHistory])
 
-  // Keyboard navigation (M1)
+  // Keyboard navigation (M1) — defers to playback when active
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      // When playback is active, arrow/escape keys are handled by usePlayback
+      if (playback.step !== null) {
         return
       }
 
@@ -1181,48 +1187,7 @@ export function SystemGraphView() {
     window.addEventListener('keydown', handler)
 
     return () => window.removeEventListener('keydown', handler)
-  }, [isLive, selectedRunIndex, activeRunHistory])
-
-  // Animation logic (Part 9)
-  const startAnimation = useCallback(() => {
-    setAnimationStep(0)
-  }, [])
-
-  const stopAnimation = useCallback(() => {
-    if (animationTimerRef.current) {
-      clearTimeout(animationTimerRef.current)
-      animationTimerRef.current = null
-    }
-    setAnimationStep(null)
-  }, [])
-
-  useEffect(() => {
-    if (animationStep === null) {
-      return
-    }
-
-    if (animationStep >= STAGE_ORDER.length) {
-      animationTimerRef.current = setTimeout(() => {
-        setAnimationStep(null)
-      }, 500)
-
-      return () => {
-        if (animationTimerRef.current) {
-          clearTimeout(animationTimerRef.current)
-        }
-      }
-    }
-
-    animationTimerRef.current = setTimeout(() => {
-      setAnimationStep(prev => (prev !== null ? prev + 1 : null))
-    }, 500)
-
-    return () => {
-      if (animationTimerRef.current) {
-        clearTimeout(animationTimerRef.current)
-      }
-    }
-  }, [animationStep])
+  }, [isLive, selectedRunIndex, activeRunHistory, playback.step])
 
   // Export handler (Part 7)
   const handleExport = useCallback(() => {
@@ -1281,12 +1246,12 @@ export function SystemGraphView() {
 
     const { flowNodes, flowEdges } = layoutPipeline(graphData.nodes, graphData.edges)
 
-    // Apply animation styling (Part 9) — opacity only to avoid position shifts
-    if (animationStep !== null) {
+    // Apply playback styling — opacity only to avoid position shifts
+    if (playback.step !== null) {
       for (const node of flowNodes) {
         const nodeType = (node.data as PipelineNodeData).nodeType
         const stageIdx = STAGE_ORDER.indexOf(nodeType)
-        const isActive = stageIdx <= animationStep
+        const isActive = stageIdx <= playback.step
         node.style = {
           opacity: isActive ? 1 : 0.1,
           transition: 'opacity 0.4s ease',
@@ -1297,7 +1262,7 @@ export function SystemGraphView() {
         const targetNode = graphData.nodes.get(edge.target)
         if (targetNode) {
           const stageIdx = STAGE_ORDER.indexOf(targetNode.nodeType)
-          const isActive = stageIdx <= animationStep
+          const isActive = stageIdx <= playback.step
           edge.style = {
             ...edge.style,
             opacity: isActive ? 1 : 0.05,
@@ -1308,7 +1273,7 @@ export function SystemGraphView() {
     }
 
     return { initialNodes: flowNodes, initialEdges: flowEdges }
-  }, [graphData, animationStep])
+  }, [graphData, playback.step])
 
   const [nodes, setNodes] = useState(initialNodes)
   const [graphEdges, setEdges] = useState(initialEdges)
@@ -1464,26 +1429,6 @@ export function SystemGraphView() {
                       Live
                     </button>
                   )}
-                  {/* Animation play button (Part 9) */}
-                  {currentRunEntry && (
-                    animationStep !== null ? (
-                      <button
-                        aria-label="Stop animation"
-                        onClick={stopAnimation}
-                        className="rounded px-1.5 py-0.5 text-[10px] text-amber-400 transition-colors hover:bg-zinc-800"
-                      >
-                        Stop
-                      </button>
-                    ) : (
-                      <button
-                        aria-label="Play causal animation"
-                        onClick={startAnimation}
-                        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                      >
-                        Play
-                      </button>
-                    )
-                  )}
                   {/* Export/Import buttons (Part 7) */}
                   <span className="mx-0.5 h-3 w-px bg-zinc-700" />
                   <button
@@ -1524,6 +1469,18 @@ export function SystemGraphView() {
                   />
                 </div>
               </nav>
+            </Panel>
+          )}
+
+          {/* Playback controls */}
+          {currentRunEntry && (
+            <Panel position="top-center" className="!m-2">
+              <div className="flex flex-col gap-1 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+                <PlaybackControls
+                  playback={playback}
+                  stepLabel={playback.step !== null ? STAGE_ORDER[playback.step] ?? null : null}
+                />
+              </div>
             </Panel>
           )}
 
