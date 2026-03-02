@@ -58,7 +58,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         researcher: {
-          agent: "researcher",
+          handler: "researcher",
           produces: ["research.findings"],
           requires: ["research.topic"],
           extractOutput: (r) => {
@@ -68,13 +68,13 @@ describe("goal pattern", () => {
           },
         },
         writer: {
-          agent: "writer",
+          handler: "writer",
           produces: ["article.draft"],
           requires: ["research.findings"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         reviewer: {
-          agent: "reviewer",
+          handler: "reviewer",
           produces: ["article.approved"],
           requires: ["article.draft"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -140,17 +140,17 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         a: {
-          agent: "a",
+          handler: "a",
           produces: ["data.a"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         b: {
-          agent: "b",
+          handler: "b",
           produces: ["data.b"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         merger: {
-          agent: "merger",
+          handler: "merger",
           produces: ["merged"],
           requires: ["data.a", "data.b"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -206,13 +206,13 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         writer: {
-          agent: "writer",
+          handler: "writer",
           produces: ["draft"],
           allowRerun: true,
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         reviewer: {
-          agent: "reviewer",
+          handler: "reviewer",
           produces: ["approved"],
           requires: ["draft"],
           allowRerun: true,
@@ -255,12 +255,12 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         flaky: {
-          agent: "flaky",
+          handler: "flaky",
           produces: ["flaky.result"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         fallback: {
-          agent: "fallback",
+          handler: "fallback",
           produces: ["done"],
           requires: ["flaky.result"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -298,12 +298,12 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         a: {
-          agent: "a",
+          handler: "a",
           produces: ["partial"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         b: {
-          agent: "a",
+          handler: "a",
           produces: ["complete"],
           requires: ["missing_dep"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -339,7 +339,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["processed"],
           requires: ["data"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -384,12 +384,12 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["partial"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         blocked: {
-          agent: "worker",
+          handler: "worker",
           produces: ["full"],
           requires: ["missing"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -433,17 +433,17 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         a: {
-          agent: "a",
+          handler: "a",
           produces: ["a.done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         b: {
-          agent: "b",
+          handler: "b",
           produces: ["b.done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         c: {
-          agent: "c",
+          handler: "c",
           produces: ["c.done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -487,12 +487,12 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         a: {
-          agent: "a",
+          handler: "a",
           produces: ["step.a"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         b: {
-          agent: "b",
+          handler: "b",
           produces: ["step.b"],
           requires: ["step.a"],
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -541,7 +541,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         slow: {
-          agent: "slow",
+          handler: "slow",
           produces: ["partial"],
           allowRerun: true,
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -583,7 +583,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["partial"],
           allowRerun: true,
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -621,12 +621,12 @@ describe("goal pattern", () => {
         myPipeline: goal(
           {
             fetcher: {
-              agent: "fetcher",
+              handler: "fetcher",
               produces: ["data"],
               extractOutput: (r) => JSON.parse(r.output as string),
             },
             analyzer: {
-              agent: "analyzer",
+              handler: "analyzer",
               produces: ["analysis"],
               requires: ["data"],
               extractOutput: (r) => JSON.parse(r.output as string),
@@ -669,7 +669,7 @@ describe("goal pattern", () => {
       goal(
         {
           worker: {
-            agent: "worker",
+            handler: "worker",
             produces: ["result"],
             extractOutput: (r) => JSON.parse(r.output as string),
           },
@@ -678,7 +678,7 @@ describe("goal pattern", () => {
         { maxSteps: 3, extract: (facts) => String(facts.result) },
       ),
       debate({
-        agents: ["critic1", "critic2"],
+        handlers: ["critic1", "critic2"],
         evaluator: "judge",
         maxRounds: 1,
       }),
@@ -692,7 +692,7 @@ describe("goal pattern", () => {
   it("goal factory creates valid GoalPattern", () => {
     const pattern = goal(
       {
-        a: { agent: "a", produces: ["x"] },
+        a: { handler: "a", produces: ["x"] },
       },
       (facts) => facts.x != null,
       { maxSteps: 5 },
@@ -750,8 +750,8 @@ describe("goal pattern", () => {
   it("patternToJSON/patternFromJSON round-trip for goal", () => {
     const pattern = goal(
       {
-        a: { agent: "a", produces: ["x"], requires: ["y"], priority: 10 },
-        b: { agent: "b", produces: ["z"], allowRerun: true },
+        a: { handler: "a", produces: ["x"], requires: ["y"], priority: 10 },
+        b: { handler: "b", produces: ["z"], allowRerun: true },
       },
       (facts) => facts.x != null,
       { maxSteps: 25, timeout: 60000 },
@@ -762,7 +762,7 @@ describe("goal pattern", () => {
     if (json.type === "goal") {
       const nodeA = json.nodes["a"]!;
       const nodeB = json.nodes["b"]!;
-      expect(nodeA.agent).toBe("a");
+      expect(nodeA.handler).toBe("a");
       expect(nodeA.produces).toEqual(["x"]);
       expect(nodeA.requires).toEqual(["y"]);
       expect(nodeA.priority).toBe(10);
@@ -795,7 +795,7 @@ describe("goal pattern", () => {
     await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -838,7 +838,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["counter"],
           requires: ["counter"],
           allowRerun: true,
@@ -888,13 +888,13 @@ describe("goal pattern", () => {
     await orchestrator.runGoal(
       {
         low: {
-          agent: "low",
+          handler: "low",
           produces: ["low.done"],
           priority: 1,
           extractOutput: (r) => JSON.parse(r.output as string),
         },
         high: {
-          agent: "high",
+          handler: "high",
           produces: ["high.done"],
           priority: 100,
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -933,7 +933,7 @@ describe("goal pattern", () => {
     await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["done"],
           buildInput: (facts) => `Custom input: ${facts.input}`,
           extractOutput: (r) => JSON.parse(r.output as string),
@@ -961,14 +961,14 @@ describe("goal pattern", () => {
       orchestrator.runGoal(
         {
           ghost: {
-            agent: "nonexistent",
+            handler: "nonexistent",
             produces: ["x"],
           },
         },
         {},
         () => true,
       ),
-    ).rejects.toThrow("unregistered agent");
+    ).rejects.toThrow("unregistered handler");
   });
 
   it("relaxation — allow_rerun unblocks completed nodes", async () => {
@@ -998,7 +998,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         writer: {
-          agent: "writer",
+          handler: "writer",
           produces: ["draft", "approved"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -1042,7 +1042,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -1087,7 +1087,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["partial"],
           extractOutput: () => {
             extractCalls++;
@@ -1095,7 +1095,7 @@ describe("goal pattern", () => {
           },
         },
         backup: {
-          agent: "backup",
+          handler: "backup",
           produces: ["done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -1125,7 +1125,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -1161,12 +1161,12 @@ describe("goal pattern", () => {
       orchestrator.runGoal(
         {
           a: {
-            agent: "a",
+            handler: "a",
             produces: ["x"],
             requires: ["y"],
           },
           b: {
-            agent: "b",
+            handler: "b",
             produces: ["y"],
             requires: ["x"],
           },
@@ -1196,7 +1196,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -1246,7 +1246,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["done"],
           extractOutput: (r) => JSON.parse(r.output as string),
         },
@@ -1285,9 +1285,9 @@ describe("goal pattern", () => {
 
     await orchestrator.runGoal(
       {
-        a: { agent: "a", produces: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
-        b: { agent: "b", produces: ["b.done"], requires: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
-        c: { agent: "c", produces: ["c.done"], requires: ["b.done"], extractOutput: (r) => JSON.parse(r.output as string) },
+        a: { handler: "a", produces: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
+        b: { handler: "b", produces: ["b.done"], requires: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
+        c: { handler: "c", produces: ["c.done"], requires: ["b.done"], extractOutput: (r) => JSON.parse(r.output as string) },
       },
       {},
       (facts) => facts["a.done"] === true && facts["b.done"] === true && facts["c.done"] === true,
@@ -1352,7 +1352,7 @@ describe("goal pattern", () => {
     const result = await orchestrator.runGoal(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["counter"],
           requires: ["counter"],
           allowRerun: true,
@@ -1437,7 +1437,7 @@ describe("goal pattern", () => {
     const pattern = goal<number>(
       {
         worker: {
-          agent: "worker",
+          handler: "worker",
           produces: ["counter"],
           requires: ["counter"],
           allowRerun: true,
@@ -1466,7 +1466,7 @@ describe("goal pattern", () => {
     await expect(
       orchestrator.resumeGoal(
         { version: 2 } as any,
-        goal({ a: { agent: "a", produces: ["x"] } }, () => true),
+        goal({ a: { handler: "a", produces: ["x"] } }, () => true),
       ),
     ).rejects.toThrow("Invalid goal checkpoint state");
   });
@@ -1479,21 +1479,21 @@ describe("goal pattern", () => {
     const legacy = {
       type: "converge" as any,
       nodes: {
-        fetch: { agent: "fetcher", produces: ["data"], requires: [] },
+        fetch: { handler: "fetcher", produces: ["data"], requires: [] },
       },
     };
 
     const pattern = patternFromJSON(legacy);
 
     expect(pattern.type).toBe("goal");
-    expect((pattern as any).nodes.fetch.agent).toBe("fetcher");
+    expect((pattern as any).nodes.fetch.handler).toBe("fetcher");
   });
 
   it("M2: patternFromJSON does not mutate the original input", () => {
     const legacy = {
       type: "converge" as any,
       nodes: {
-        a: { agent: "alpha", produces: ["x"], requires: [] },
+        a: { handler: "alpha", produces: ["x"], requires: [] },
       },
     };
 
@@ -1505,7 +1505,7 @@ describe("goal pattern", () => {
 
   it("M2: patternFromJSON still works with native goal type", () => {
     const nativeGoal = patternToJSON(
-      goal({ a: { agent: "alpha", produces: ["x"] } }, () => true),
+      goal({ a: { handler: "alpha", produces: ["x"] } }, () => true),
     );
 
     expect(nativeGoal.type).toBe("goal");
@@ -1547,7 +1547,7 @@ describe("goal pattern", () => {
     };
 
     const pattern = goal(
-      { worker: { agent: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
+      { worker: { handler: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
       (facts) => facts.done === true,
     );
 
@@ -1588,7 +1588,7 @@ describe("goal pattern", () => {
     };
 
     const pattern = goal(
-      { worker: { agent: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
+      { worker: { handler: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
       (facts) => facts.done === true,
     );
 

@@ -296,10 +296,10 @@ const orchestrator = createMultiAgentOrchestrator({
   patterns: {
     pipeline: dag(
       {
-        researcher: { agent: 'researcher' },
-        analyst: { agent: 'analyst', deps: ['researcher'] },
-        writer: { agent: 'writer', deps: ['researcher'] },
-        editor: { agent: 'editor', deps: ['analyst', 'writer'], priority: 10 },
+        researcher: { handler: 'researcher' },
+        analyst: { handler: 'analyst', deps: ['researcher'] },
+        writer: { handler: 'writer', deps: ['researcher'] },
+        editor: { handler: 'editor', deps: ['analyst', 'writer'], priority: 10 },
       },
       (context) => concatResults(Object.values(context.results).map((r) => String(r.output))),
       { timeout: 60000, maxConcurrent: 3, onNodeError: 'skip-downstream' }
@@ -331,7 +331,7 @@ const result = await orchestrator.runPattern('pipeline', 'Research, analyze, and
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `agent` | `string` | *required* | Agent ID |
+| `handler` | `string` | *required* | Agent or task ID |
 | `deps` | `string[]` | `[]` | Upstream node IDs that must complete first |
 | `when` | `(context: DagExecutionContext) => boolean` | &ndash; | Conditional edge &ndash; evaluated when deps are met |
 | `transform` | `(context: DagExecutionContext) => string` | &ndash; | Build input from dependency results |
@@ -349,14 +349,6 @@ interface DagExecutionContext {
   results: Record<string, RunResult<unknown>>;  // Full RunResult keyed by node ID
 }
 ```
-
-### Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `timeout` | `number` | &ndash; | Overall DAG timeout (ms) |
-| `maxConcurrent` | `number` | &ndash; | Max parallel nodes |
-| `onNodeError` | `"fail" \| "skip-downstream" \| "continue"` | `"fail"` | Error handling strategy |
 
 ---
 
@@ -563,7 +555,7 @@ const orchestrator = createMultiAgentOrchestrator({
 
   patterns: {
     adversarial: debate<string>({
-      agents: ['optimist', 'pessimist', 'realist'],
+      handlers: ['optimist', 'pessimist', 'realist'],
       evaluator: 'judge',
       maxRounds: 3,
       extract: (output) => String(output),
@@ -589,7 +581,7 @@ for (const round of result.rounds) {
 ```typescript
 const result = await orchestrator.runDebate<string>(
   {
-    agents: ['optimist', 'pessimist', 'realist'],
+    handlers: ['optimist', 'pessimist', 'realist'],
     evaluator: 'judge',
     maxRounds: 2,
   },
@@ -617,7 +609,7 @@ interface DebateResult<T> {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `agents` | `string[]` | *required* | Competing agent IDs |
+| `handlers` | `string[]` | *required* | Competing agent or task IDs |
 | `evaluator` | `string` | *required* | Judge agent ID |
 | `maxRounds` | `number` | `2` | Number of debate rounds |
 | `extract` | `(output) => T` | identity | Extract final result |
@@ -647,12 +639,12 @@ Need goal planning without an orchestrator? Use `planGoal()`, `validateGoal()`, 
 const result = await orchestrator.runGoal(
   {
     fetcher: {
-      agent: 'fetcher',
+      handler: 'fetcher',
       produces: ['data'],
       extractOutput: (r) => ({ data: r.output }),
     },
     analyzer: {
-      agent: 'analyzer',
+      handler: 'analyzer',
       produces: ['analysis'],
       requires: ['data'],
       extractOutput: (r) => ({ analysis: r.output }),
@@ -684,20 +676,20 @@ const orchestrator = createMultiAgentOrchestrator({
     articlePipeline: goal(
       {
         researcher: {
-          agent: 'researcher',
+          handler: 'researcher',
           produces: ['research.findings'],
           requires: ['research.topic'],
           extractOutput: (r) => ({ 'research.findings': r.output }),
         },
         writer: {
-          agent: 'writer',
+          handler: 'writer',
           produces: ['article.draft'],
           requires: ['research.findings'],
           buildInput: (facts) => `Write about: ${facts['research.findings']}`,
           extractOutput: (r) => ({ 'article.draft': r.output }),
         },
         reviewer: {
-          agent: 'reviewer',
+          handler: 'reviewer',
           produces: ['article.approved'],
           requires: ['article.draft'],
           allowRerun: true,
@@ -1007,9 +999,9 @@ Convert any pattern to a [Mermaid](https://mermaid.js.org/) diagram:
 import { patternToMermaid, dag } from '@directive-run/ai';
 
 const pipeline = dag({
-  fetch: { agent: 'fetcher' },
-  analyze: { agent: 'analyzer', deps: ['fetch'] },
-  report: { agent: 'reporter', deps: ['analyze'] },
+  fetch: { handler: 'fetcher' },
+  analyze: { handler: 'analyzer', deps: ['fetch'] },
+  report: { handler: 'reporter', deps: ['analyze'] },
 });
 
 console.log(patternToMermaid(pipeline, { direction: 'TD' }));
@@ -1028,6 +1020,47 @@ const diagram = patternToMermaid(json);
 | `theme` | `"default" \| "dark" \| "forest" \| "neutral"` | — | Mermaid theme hint |
 | `shapes.agent` | `"square" \| "round" \| "stadium" \| "hexagon"` | `"square"` | Agent node shape |
 | `shapes.virtual` | `"circle" \| "square" \| "round" \| "stadium"` | `"circle"` | Virtual node shape |
+
+---
+
+## Tasks in Patterns
+
+Patterns work with both **agents** (LLM calls) and **tasks** (imperative code). Register tasks alongside agents — they share the same ID namespace and can appear in any position within any pattern.
+
+### TaskRegistration
+
+```typescript
+const orchestrator = createMultiAgentOrchestrator({
+  runner,
+  agents: {
+    researcher: { agent: researchAgent },
+    writer: { agent: writerAgent },
+  },
+  tasks: {
+    transform: {
+      run: async (input, signal, context) => {
+        context.reportProgress(50, 'Processing');
+        const data = JSON.parse(input);
+        return JSON.stringify({ ...data, processed: true });
+      },
+      label: 'Transform',
+      description: 'Transforms research data',
+      retry: { attempts: 3, backoff: 'exponential', delayMs: 500 },
+    },
+  },
+  patterns: {
+    pipeline: dag({
+      research: { handler: 'researcher' },
+      process: { handler: 'transform', deps: ['research'] },
+      write: { handler: 'writer', deps: ['process'] },
+    }),
+  },
+});
+```
+
+Tasks receive a `TaskContext` with read-only access to memory, scratchpad, and agent state. They can report progress via `context.reportProgress(percent, message)`.
+
+> **Decision tree:** Need imperative code between agents? Register it as a task. Tasks appear as distinct nodes in the DevTools Agent Graph and emit their own timeline events.
 
 ---
 

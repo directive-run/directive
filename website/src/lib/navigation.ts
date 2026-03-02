@@ -169,6 +169,7 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Execution Patterns', href: '/ai/patterns' },
       { title: 'Communication', href: '/ai/communication' },
       { title: 'Cross-Agent State', href: '/ai/cross-agent-state' },
+      { title: 'Tasks', href: '/ai/tasks' },
       { title: 'Self-Healing', href: '/ai/self-healing' },
     ],
   },
@@ -212,6 +213,8 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Checkpoint', href: '/docs/examples/checkpoint' },
       { title: 'Fraud Analysis', href: '/ai/examples/fraud-analysis' },
       { title: 'Pitch Deck', href: '/ai/examples/pitch-deck' },
+      { title: 'Data Pipeline', href: '/ai/examples/data-pipeline' },
+      { title: 'Code Review', href: '/ai/examples/code-review' },
     ],
   },
   {

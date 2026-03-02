@@ -72,19 +72,19 @@ const result = await orchestrator.runGoal(
   // Node declarations: what each agent produces and requires
   {
     researcher: {
-      agent: 'researcher',
+      handler: 'researcher',
       produces: ['findings'],
       extractOutput: (r) => ({ findings: r.output }),
     },
     analyst: {
-      agent: 'analyst',
+      handler: 'analyst',
       produces: ['analysis'],
       requires: ['findings'],
       buildInput: (facts) => `Analyze these findings: ${facts.findings}`,
       extractOutput: (r) => ({ analysis: r.output }),
     },
     writer: {
-      agent: 'writer',
+      handler: 'writer',
       produces: ['report'],
       requires: ['analysis'],
       buildInput: (facts) => `Write a report from this analysis: ${facts.analysis}`,
@@ -171,9 +171,9 @@ const orchestrator = createMultiAgentOrchestrator({
   patterns: {
     report: goal(
       {
-        researcher: { agent: 'researcher', produces: ['findings'], extractOutput: (r) => ({ findings: r.output }) },
-        analyst: { agent: 'analyst', produces: ['analysis'], requires: ['findings'], extractOutput: (r) => ({ analysis: r.output }) },
-        writer: { agent: 'writer', produces: ['report'], requires: ['analysis'], extractOutput: (r) => ({ report: r.output }) },
+        researcher: { handler: 'researcher', produces: ['findings'], extractOutput: (r) => ({ findings: r.output }) },
+        analyst: { handler: 'analyst', produces: ['analysis'], requires: ['findings'], extractOutput: (r) => ({ analysis: r.output }) },
+        writer: { handler: 'writer', produces: ['report'], requires: ['analysis'], extractOutput: (r) => ({ report: r.output }) },
       },
       (facts) => facts.report != null,
       { maxSteps: 10, extract: (facts) => facts.report },
@@ -190,7 +190,7 @@ const result = await orchestrator.runPattern('report', 'AI safety trends');
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `agent` | `string` | Agent ID from the registry |
+| `handler` | `string` | Agent ID from the registry |
 | `produces` | `string[]` | Fact keys this node writes |
 | `requires` | `string[]` | Fact keys this node needs (must be produced by other nodes) |
 | `extractOutput` | `(result) => Record<string, unknown>` | Map agent output to fact keys |

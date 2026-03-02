@@ -48,6 +48,8 @@ export default function AIResearchPipelinePage() {
       streamUrl="/api/dag-devtools/stream"
       snapshotUrl="/api/dag-devtools/snapshot"
       replayData={replayData}
+      runtimeSystemName={null}
+      label="Research Pipeline"
     >
       <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-3xl flex-col overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
         <div className="shrink-0 text-center">

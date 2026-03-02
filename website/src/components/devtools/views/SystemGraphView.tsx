@@ -1398,6 +1398,18 @@ export function SystemGraphView() {
               <nav aria-label="Run history navigation">
                 <div className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
                   <button
+                    aria-label="First run"
+                    onClick={() => {
+                      if (activeRunHistory.length > 0) {
+                        setSelectedRunId(activeRunHistory[0].id)
+                      }
+                    }}
+                    disabled={!isLive && selectedRunIndex === 0}
+                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    First
+                  </button>
+                  <button
                     aria-label="Previous run"
                     onClick={() => {
                       if (isLive && activeRunHistory.length > 0) {

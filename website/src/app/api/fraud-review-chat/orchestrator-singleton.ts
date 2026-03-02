@@ -187,25 +187,15 @@ export function getFraudReviewOrchestrator(): FraudReviewOrchestratorInstance | 
           model: 'claude-haiku-4-5-20251001',
           instructions: `You are a senior fraud investigator leading a review board. You receive a fraud case and must delegate analysis to your specialist team, then compile a final report.
 
+IMPORTANT: You MUST respond with ONLY a single raw JSON object on each turn. No other text, no explanation, no markdown, no XML, no function calls, no tool use — just the JSON object. Your entire response must be parseable by JSON.parse().
+
 Available specialists: transaction-analyst, geo-analyst, identity-analyst
 
-For each delegation, respond with JSON:
+To delegate to a specialist, respond with ONLY this JSON (no other text):
 { "action": "delegate", "worker": "<agent-id>", "workerInput": "<specific analysis task>" }
 
-When you've gathered enough findings, respond with:
-{ "action": "complete" }
-followed by your final report in this format:
-
-## Fraud Investigation Report
-### Critical Findings
-- [findings requiring immediate action]
-### Major Findings
-- [significant risk indicators]
-### Minor Findings
-- [low-risk observations worth noting]
-### Verdict: [CONFIRMED_FRAUD | LIKELY_FRAUD | INCONCLUSIVE | LIKELY_LEGITIMATE | CLEARED]
-### Confidence: [HIGH | MEDIUM | LOW]
-### Recommendation: [one-sentence action item]`,
+When you've gathered enough findings, respond with ONLY this JSON:
+{ "action": "complete" }`,
         },
         capabilities: ['supervision', 'investigation', 'reporting'],
       },

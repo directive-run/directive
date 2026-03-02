@@ -686,7 +686,7 @@ describe("pattern events (multi-agent)", () => {
       patterns: {
         par: {
           type: "parallel",
-          agents: ["a", "b"],
+          handlers: ["a", "b"],
           merge: (results: any[]) => results.map((r: any) => r.output).join(", "),
         },
       },
@@ -719,7 +719,7 @@ describe("pattern events (multi-agent)", () => {
       patterns: {
         seq: {
           type: "sequential",
-          agents: ["first", "second"],
+          handlers: ["first", "second"],
           transform: (_output: unknown, _agentId: string) => String(_output),
         },
       },

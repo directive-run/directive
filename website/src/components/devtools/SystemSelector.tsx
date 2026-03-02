@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSelector } from '@directive-run/react'
-import { useDevToolsSystem } from './DevToolsSystemContext'
+import { useDevToolsSystem, useDevToolsLabel } from './DevToolsSystemContext'
 
 /**
  * SystemSelector — dropdown to switch between Directive systems registered on
@@ -11,6 +11,7 @@ import { useDevToolsSystem } from './DevToolsSystemContext'
  */
 export function SystemSelector() {
   const system = useDevToolsSystem()
+  const label = useDevToolsLabel()
   const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
   const currentSystemName = useSelector(system, (s) => s.facts.runtime.systemName)
   const drawerOpen = useSelector(system, (s) => s.facts.shell.drawerOpen)
@@ -23,6 +24,13 @@ export function SystemSelector() {
   // Poll for available systems — only while visible (drawer open or standalone mode)
   // Uses document.hidden to pause when tab is backgrounded
   useEffect(() => {
+    // AI-only pages provide a label — no runtime to poll for
+    if (label) {
+      setAvailableSystems([])
+
+      return
+    }
+
     if (!drawerOpen && typeof document !== 'undefined' && document.hidden) {
       return
     }
@@ -41,7 +49,7 @@ export function SystemSelector() {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [drawerOpen])
+  }, [drawerOpen, label])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -143,8 +151,16 @@ export function SystemSelector() {
     }
   }, [open, availableSystems, handleSelect])
 
-  // Don't render if no systems available
+  // No runtime systems — show label fallback if provided
   if (availableSystems.length === 0) {
+    if (label) {
+      return (
+        <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+          {label}
+        </span>
+      )
+    }
+
     return null
   }
 

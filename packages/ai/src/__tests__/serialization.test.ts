@@ -33,12 +33,12 @@ describe("patternToJSON / patternFromJSON", () => {
     const p = parallel(["a", "b", "c"], (results) => results, { minSuccess: 2, timeout: 5000 });
     const json = patternToJSON(p);
 
-    expect(json).toEqual({ type: "parallel", agents: ["a", "b", "c"], minSuccess: 2, timeout: 5000 });
+    expect(json).toEqual({ type: "parallel", handlers: ["a", "b", "c"], minSuccess: 2, timeout: 5000 });
 
     const restored = patternFromJSON<unknown>(json) as ParallelPattern<unknown>;
 
     expect(restored.type).toBe("parallel");
-    expect(restored.agents).toEqual(["a", "b", "c"]);
+    expect(restored.handlers).toEqual(["a", "b", "c"]);
     expect(restored.minSuccess).toBe(2);
     expect(restored.timeout).toBe(5000);
     // merge function stripped during serialization
@@ -52,7 +52,7 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(json, { merge } as Partial<ParallelPattern<number>>) as ParallelPattern<number>;
 
     expect(restored.merge).toBe(merge);
-    expect(restored.agents).toEqual(["x", "y"]);
+    expect(restored.handlers).toEqual(["x", "y"]);
   });
 
   // ---------- sequential ----------
@@ -61,12 +61,12 @@ describe("patternToJSON / patternFromJSON", () => {
     const p = sequential(["step1", "step2", "step3"], { continueOnError: true });
     const json = patternToJSON(p);
 
-    expect(json).toEqual({ type: "sequential", agents: ["step1", "step2", "step3"], continueOnError: true });
+    expect(json).toEqual({ type: "sequential", handlers: ["step1", "step2", "step3"], continueOnError: true });
 
     const restored = patternFromJSON<unknown>(json) as SequentialPattern<unknown>;
 
     expect(restored.type).toBe("sequential");
-    expect(restored.agents).toEqual(["step1", "step2", "step3"]);
+    expect(restored.handlers).toEqual(["step1", "step2", "step3"]);
     expect(restored.continueOnError).toBe(true);
     // transform and extract functions stripped
     expect(restored.transform).toBeUndefined();
@@ -104,15 +104,15 @@ describe("patternToJSON / patternFromJSON", () => {
   it("round-trip dag — nodes preserved, when/transform functions stripped", () => {
     const p = dag<string>(
       {
-        fetch: { agent: "fetcher" },
+        fetch: { handler: "fetcher" },
         analyze: {
-          agent: "analyzer",
+          handler: "analyzer",
           deps: ["fetch"],
           timeout: 3000,
           when: () => true,          // should be stripped
           transform: () => "ignored", // should be stripped
         },
-        summarize: { agent: "summarizer", deps: ["analyze"], priority: 5 },
+        summarize: { handler: "summarizer", deps: ["analyze"], priority: 5 },
       },
       (context: DagExecutionContext) => String(context.outputs.summarize),
       { timeout: 10000, maxConcurrent: 3, onNodeError: "skip-downstream" },
@@ -132,7 +132,7 @@ describe("patternToJSON / patternFromJSON", () => {
 
     expect(restored.type).toBe("dag");
     expect(Object.keys(restored.nodes)).toEqual(["fetch", "analyze", "summarize"]);
-    expect(restored.nodes["fetch"]!.agent).toBe("fetcher");
+    expect(restored.nodes["fetch"]!.handler).toBe("fetcher");
     expect(restored.nodes["analyze"]!.deps).toEqual(["fetch"]);
     expect(restored.nodes["analyze"]!.timeout).toBe(3000);
     expect(restored.nodes["summarize"]!.priority).toBe(5);
@@ -159,7 +159,7 @@ describe("patternToJSON / patternFromJSON", () => {
     const reflectJson = json as Extract<SerializedPattern, { type: "reflect" }>;
 
     expect(reflectJson.type).toBe("reflect");
-    expect(reflectJson.agent).toBe("producer");
+    expect(reflectJson.handler).toBe("producer");
     expect(reflectJson.evaluator).toBe("evaluator");
     expect(reflectJson.maxIterations).toBe(3);
     expect(reflectJson.onExhausted).toBe("accept-best");
@@ -191,12 +191,12 @@ describe("patternToJSON / patternFromJSON", () => {
     const p = race(["fast", "smart"], { timeout: 4000, minSuccess: 2 });
     const json = patternToJSON(p);
 
-    expect(json).toEqual({ type: "race", agents: ["fast", "smart"], timeout: 4000, minSuccess: 2 });
+    expect(json).toEqual({ type: "race", handlers: ["fast", "smart"], timeout: 4000, minSuccess: 2 });
 
     const restored = patternFromJSON<unknown>(json) as RacePattern<unknown>;
 
     expect(restored.type).toBe("race");
-    expect(restored.agents).toEqual(["fast", "smart"]);
+    expect(restored.handlers).toEqual(["fast", "smart"]);
     expect(restored.timeout).toBe(4000);
     expect(restored.minSuccess).toBe(2);
     // extract function stripped
@@ -207,7 +207,7 @@ describe("patternToJSON / patternFromJSON", () => {
 
   it("round-trip debate — evaluator, agents, and maxRounds preserved", () => {
     const p = debate({
-      agents: ["optimist", "pessimist"],
+      handlers: ["optimist", "pessimist"],
       evaluator: "judge",
       maxRounds: 3,
       timeout: 6000,
@@ -218,7 +218,7 @@ describe("patternToJSON / patternFromJSON", () => {
 
     expect(json).toEqual({
       type: "debate",
-      agents: ["optimist", "pessimist"],
+      handlers: ["optimist", "pessimist"],
       evaluator: "judge",
       maxRounds: 3,
       timeout: 6000,
@@ -227,7 +227,7 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON<unknown>(json) as DebatePattern<unknown>;
 
     expect(restored.type).toBe("debate");
-    expect(restored.agents).toEqual(["optimist", "pessimist"]);
+    expect(restored.handlers).toEqual(["optimist", "pessimist"]);
     expect(restored.evaluator).toBe("judge");
     expect(restored.maxRounds).toBe(3);
     expect(restored.timeout).toBe(6000);
@@ -261,7 +261,7 @@ describe("patternToJSON / patternFromJSON", () => {
 
   it("patternFromJSON strips __proto__ from input — no prototype pollution", () => {
     const malicious = JSON.parse(
-      '{"type":"parallel","agents":["a","b"],"__proto__":{"polluted":true}}',
+      '{"type":"parallel","handlers":["a","b"],"__proto__":{"polluted":true}}',
     ) as SerializedPattern;
 
     const restored = patternFromJSON(malicious);
@@ -272,7 +272,7 @@ describe("patternToJSON / patternFromJSON", () => {
     expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
 
     expect(restored.type).toBe("parallel");
-    expect((restored as ParallelPattern<unknown>).agents).toEqual(["a", "b"]);
+    expect((restored as ParallelPattern<unknown>).handlers).toEqual(["a", "b"]);
   });
 
   it("patternFromJSON strips __proto__ and is safe from prototype pollution", () => {
@@ -280,7 +280,7 @@ describe("patternToJSON / patternFromJSON", () => {
     // pollute Object.prototype. The implementation strips __proto__, constructor,
     // and prototype from the intermediate null-prototype object before spreading.
     const poisoned = JSON.parse(
-      '{"type":"sequential","agents":["a"],"__proto__":{"evil":true}}',
+      '{"type":"sequential","handlers":["a"],"__proto__":{"evil":true}}',
     ) as SerializedPattern;
 
     patternFromJSON(poisoned);
@@ -297,20 +297,20 @@ describe("patternToJSON / patternFromJSON", () => {
   // ---------- overrides ----------
 
   it("patternFromJSON with overrides — override is applied on top of JSON", () => {
-    const json: SerializedPattern = { type: "parallel", agents: ["a", "b"], minSuccess: 1 };
+    const json: SerializedPattern = { type: "parallel", handlers: ["a", "b"], minSuccess: 1 };
     const merge = (results: unknown[]) => results;
     const restored = patternFromJSON(json, { merge } as Partial<ParallelPattern<unknown[]>>) as ParallelPattern<unknown[]>;
 
     expect(restored.merge).toBe(merge);
-    expect(restored.agents).toEqual(["a", "b"]);
+    expect(restored.handlers).toEqual(["a", "b"]);
     expect(restored.minSuccess).toBe(1);
   });
 
   it("patternFromJSON overrides — can override agents list", () => {
-    const json: SerializedPattern = { type: "race", agents: ["slow", "slower"], timeout: 1000 };
-    const restored = patternFromJSON(json, { agents: ["fast", "faster"] } as Partial<RacePattern<unknown>>) as RacePattern<unknown>;
+    const json: SerializedPattern = { type: "race", handlers: ["slow", "slower"], timeout: 1000 };
+    const restored = patternFromJSON(json, { handlers: ["fast", "faster"] } as Partial<RacePattern<unknown>>) as RacePattern<unknown>;
 
-    expect(restored.agents).toEqual(["fast", "faster"]);
+    expect(restored.handlers).toEqual(["fast", "faster"]);
     expect(restored.timeout).toBe(1000);
   });
 
@@ -324,13 +324,13 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(deserialized) as ParallelPattern<unknown>;
 
     expect(restored.type).toBe("parallel");
-    expect(restored.agents).toEqual(["r", "w"]);
+    expect(restored.handlers).toEqual(["r", "w"]);
     expect(restored.minSuccess).toBe(2);
   });
 
   it("JSON.stringify / JSON.parse full cycle — debate", () => {
     const p = debate({
-      agents: ["pro", "con"],
+      handlers: ["pro", "con"],
       evaluator: "judge",
       maxRounds: 2,
       timeout: 5000,
@@ -342,7 +342,7 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(deserialized) as DebatePattern<unknown>;
 
     expect(restored.type).toBe("debate");
-    expect(restored.agents).toEqual(["pro", "con"]);
+    expect(restored.handlers).toEqual(["pro", "con"]);
     expect(restored.evaluator).toBe("judge");
     expect(restored.maxRounds).toBe(2);
     expect(restored.timeout).toBe(5000);
@@ -351,8 +351,8 @@ describe("patternToJSON / patternFromJSON", () => {
   it("JSON.stringify / JSON.parse full cycle — dag with deps", () => {
     const p = dag(
       {
-        A: { agent: "fetcher" },
-        B: { agent: "analyzer", deps: ["A"] },
+        A: { handler: "fetcher" },
+        B: { handler: "analyzer", deps: ["A"] },
       },
       (ctx: DagExecutionContext) => ctx.outputs,
     );
@@ -363,8 +363,8 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(deserialized) as DagPattern<unknown>;
 
     expect(restored.type).toBe("dag");
-    expect(restored.nodes["A"]!.agent).toBe("fetcher");
-    expect(restored.nodes["B"]!.agent).toBe("analyzer");
+    expect(restored.nodes["A"]!.handler).toBe("fetcher");
+    expect(restored.nodes["B"]!.handler).toBe("analyzer");
     expect(restored.nodes["B"]!.deps).toEqual(["A"]);
   });
 
@@ -376,7 +376,7 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(deserialized) as ReflectPattern<unknown>;
 
     expect(restored.type).toBe("reflect");
-    expect(restored.agent).toBe("writer");
+    expect(restored.handler).toBe("writer");
     expect(restored.evaluator).toBe("critic");
     expect(restored.maxIterations).toBe(5);
     expect(restored.threshold).toBe(0.8);

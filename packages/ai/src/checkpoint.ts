@@ -33,6 +33,8 @@ export interface MultiAgentCheckpointLocalState {
   pendingHandoffs: unknown[];
   handoffResults: unknown[];
   roundRobinCounters: Record<string, number> | null;
+  /** Serialized task states (task run functions are closures, not serializable) */
+  taskStates?: Record<string, { lastOutput?: string; lastError?: string }>;
 }
 
 /** Union of local state types */

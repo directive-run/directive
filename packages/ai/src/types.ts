@@ -405,12 +405,14 @@ export interface MultiAgentLifecycleHooks {
     patternId: string;
     nodeId: string;
     agentId: string;
+    nodeType: "agent" | "task";
     timestamp: number;
   }) => void;
   onDagNodeComplete?: (event: {
     patternId: string;
     nodeId: string;
     agentId: string;
+    nodeType: "agent" | "task";
     durationMs: number;
     timestamp: number;
   }) => void;
@@ -418,6 +420,7 @@ export interface MultiAgentLifecycleHooks {
     patternId: string;
     nodeId: string;
     agentId: string;
+    nodeType: "agent" | "task";
     error: Error;
     durationMs: number;
     timestamp: number;
@@ -426,6 +429,7 @@ export interface MultiAgentLifecycleHooks {
     patternId: string;
     nodeId: string;
     agentId: string;
+    nodeType: "agent" | "task";
     reason: string;
     timestamp: number;
   }) => void;
@@ -444,6 +448,14 @@ export interface MultiAgentLifecycleHooks {
   onDerivationError?: (event: { derivationId: string; error: Error; timestamp: number }) => void;
   /** Called when scratchpad values are updated */
   onScratchpadUpdate?: (event: { keys: string[]; timestamp: number }) => void;
+  /** Called when a task starts executing */
+  onTaskStart?: (event: { patternId: string; taskId: string; label: string; timestamp: number }) => void;
+  /** Called when a task completes successfully */
+  onTaskComplete?: (event: { patternId: string; taskId: string; label: string; durationMs: number; timestamp: number }) => void;
+  /** Called when a task fails */
+  onTaskError?: (event: { patternId: string; taskId: string; label: string; error: Error; durationMs: number; timestamp: number }) => void;
+  /** Called when a task reports progress */
+  onTaskProgress?: (event: { patternId: string; taskId: string; label: string; percent: number; message?: string; timestamp: number }) => void;
   /** Called when a pattern checkpoint is saved */
   onCheckpointSave?: (event: {
     checkpointId: string;
@@ -588,8 +600,8 @@ export interface DagExecutionContext {
 
 /** A node in a DAG execution pattern */
 export interface DagNode {
-  /** Registered agent ID to run for this node */
-  agent: string;
+  /** Registered handler ID (agent or task) to run for this node */
+  handler: string;
   /** Upstream node IDs this node depends on */
   deps?: string[];
   /** Conditional edge — evaluated when deps are met. @default unconditional */
@@ -662,7 +674,11 @@ export type DebugEventType =
   | "debate_round"
   | "reroute"
   | "checkpoint_save"
-  | "checkpoint_restore";
+  | "checkpoint_restore"
+  | "task_start"
+  | "task_complete"
+  | "task_error"
+  | "task_progress";
 
 /** Base debug event */
 export interface DebugEventBase {
@@ -905,6 +921,42 @@ export interface CheckpointRestoreEvent extends DebugEventBase {
   step: number;
 }
 
+/** Task start event */
+export interface TaskStartEvent extends DebugEventBase {
+  type: "task_start";
+  taskId: string;
+  label: string;
+  description?: string;
+  inputLength: number;
+}
+
+/** Task complete event */
+export interface TaskCompleteEvent extends DebugEventBase {
+  type: "task_complete";
+  taskId: string;
+  label: string;
+  durationMs: number;
+}
+
+/** Task error event */
+export interface TaskErrorEvent extends DebugEventBase {
+  type: "task_error";
+  taskId: string;
+  label: string;
+  error: string;
+  durationMs: number;
+  attempt?: number;
+}
+
+/** Task progress event */
+export interface TaskProgressEvent extends DebugEventBase {
+  type: "task_progress";
+  taskId: string;
+  label: string;
+  percent: number;
+  message?: string;
+}
+
 /** Union of all debug event types */
 export type DebugEvent =
   | AgentStartEvent
@@ -934,7 +986,11 @@ export type DebugEvent =
   | DebateRoundEvent
   | RerouteDebugEvent
   | CheckpointSaveEvent
-  | CheckpointRestoreEvent;
+  | CheckpointRestoreEvent
+  | TaskStartEvent
+  | TaskCompleteEvent
+  | TaskErrorEvent
+  | TaskProgressEvent;
 
 // ============================================================================
 // Self-Healing Types
@@ -1083,8 +1139,8 @@ export interface Scratchpad<T extends Record<string, unknown> = Record<string, u
 
 /** A node in a goal execution pattern */
 export interface GoalNode {
-  /** Agent ID (registered on the orchestrator) */
-  agent: string;
+  /** Handler ID — agent or task registered on the orchestrator */
+  handler: string;
   /** Fact keys this node can produce */
   produces: string[];
   /** Fact keys this node needs (must be satisfied before running) */

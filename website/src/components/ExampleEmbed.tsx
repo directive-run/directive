@@ -29,6 +29,11 @@ export function ExampleEmbed({
       return
     }
 
+    // Snapshot existing systems before this example mounts
+    const systemsBefore = typeof window !== 'undefined' && window.__DIRECTIVE__
+      ? [...window.__DIRECTIVE__.getSystems()]
+      : []
+
     if (!customElements.get(tag)) {
       const capturedCss = css
       const capturedHtml = html
@@ -79,6 +84,16 @@ export function ExampleEmbed({
         const el = host.querySelector(tag)
         if (el) {
           host.removeChild(el)
+        }
+      }
+
+      // Destroy any Directive systems this example registered
+      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
+        const systemsNow = window.__DIRECTIVE__.getSystems()
+        for (const sysName of systemsNow) {
+          if (!systemsBefore.includes(sysName)) {
+            window.__DIRECTIVE__.getSystem(sysName)?.destroy?.()
+          }
         }
       }
     }

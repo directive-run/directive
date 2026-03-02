@@ -219,24 +219,24 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
       pitchDeck: goal<string>(
         {
           'market-analyst': {
-            agent: 'market-analyst',
+            handler: 'market-analyst',
             produces: ['market_analysis'],
             buildInput: (facts) => String(facts.input ?? ''),
           },
           'financial-modeler': {
-            agent: 'financial-modeler',
+            handler: 'financial-modeler',
             produces: ['financials'],
             buildInput: (facts) => String(facts.input ?? ''),
           },
           storyteller: {
-            agent: 'storyteller',
+            handler: 'storyteller',
             produces: ['narrative'],
             requires: ['market_analysis', 'financials'],
             buildInput: (facts) =>
               `Market: ${facts.market_analysis}\nFinancials: ${facts.financials}`,
           },
           scorer: {
-            agent: 'scorer',
+            handler: 'scorer',
             produces: ['pitch_score'],
             requires: ['narrative'],
             buildInput: (facts) => `Pitch narrative: ${facts.narrative}`,
