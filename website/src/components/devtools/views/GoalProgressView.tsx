@@ -138,169 +138,6 @@ function extractGoalExecutions(events: DebugEvent[]): GoalExecution[] {
 }
 
 // ---------------------------------------------------------------------------
-// Sparkline SVG
-// ---------------------------------------------------------------------------
-
-const SPARKLINE_W = 600
-const SPARKLINE_H = 120
-const SPARKLINE_PAD = { top: 12, right: 16, bottom: 20, left: 40 }
-/** Max x-axis labels before decimation kicks in */
-const MAX_STEP_LABELS = 15
-
-/** Clamp satisfaction to [0, 1] for rendering */
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v))
-}
-
-function SatisfactionSparkline({ steps, relaxations }: {
-  steps: GoalStep[]
-  relaxations: GoalExecution['relaxations']
-}) {
-  const w = SPARKLINE_W - SPARKLINE_PAD.left - SPARKLINE_PAD.right
-  const h = SPARKLINE_H - SPARKLINE_PAD.top - SPARKLINE_PAD.bottom
-
-  if (steps.length === 0) {
-    return null
-  }
-
-  // Build points: step 0 starts at the pre-first-step satisfaction
-  const startSatisfaction = clamp01(steps[0].satisfaction - steps[0].satisfactionDelta)
-  const points = [{ x: 0, y: startSatisfaction }]
-  for (const step of steps) {
-    points.push({ x: step.step, y: clamp01(step.satisfaction) })
-  }
-
-  const maxStep = steps[steps.length - 1].step
-  const xScale = maxStep > 0 ? w / maxStep : w
-  const yScale = h
-
-  const toSvgX = (step: number) => SPARKLINE_PAD.left + step * xScale
-  const toSvgY = (sat: number) => SPARKLINE_PAD.top + h - sat * yScale
-
-  // Build path
-  const pathD = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${toSvgX(p.x).toFixed(1)} ${toSvgY(p.y).toFixed(1)}`)
-    .join(' ')
-
-  // Fill area under curve
-  const areaD = pathD
-    + ` L ${toSvgX(points[points.length - 1].x).toFixed(1)} ${toSvgY(0).toFixed(1)}`
-    + ` L ${toSvgX(0).toFixed(1)} ${toSvgY(0).toFixed(1)} Z`
-
-  // Relaxation step numbers
-  const relaxationSteps = useMemo(() => new Set(relaxations.map((r) => r.step)), [relaxations])
-
-  // Step label decimation: show every Nth label when count exceeds threshold
-  const labelInterval = steps.length > MAX_STEP_LABELS
-    ? Math.ceil(steps.length / MAX_STEP_LABELS)
-    : 1
-
-  return (
-    <svg
-      viewBox={`0 0 ${SPARKLINE_W} ${SPARKLINE_H}`}
-      className="w-full"
-      role="img"
-      aria-label={`Satisfaction curve: ${startSatisfaction.toFixed(2)} → ${steps[steps.length - 1].satisfaction.toFixed(2)} over ${maxStep} steps`}
-    >
-      {/* Grid lines */}
-      {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
-        <g key={tick}>
-          <line
-            x1={SPARKLINE_PAD.left}
-            y1={toSvgY(tick)}
-            x2={SPARKLINE_W - SPARKLINE_PAD.right}
-            y2={toSvgY(tick)}
-            stroke="currentColor"
-            className="text-zinc-200 dark:text-zinc-700"
-            strokeWidth={0.5}
-            strokeDasharray={tick === 1 ? '3,2' : undefined}
-          />
-          <text
-            x={SPARKLINE_PAD.left - 6}
-            y={toSvgY(tick) + 3}
-            textAnchor="end"
-            className="fill-zinc-400 dark:fill-zinc-500"
-            fontSize={9}
-            fontFamily="monospace"
-          >
-            {tick.toFixed(tick === 0 || tick === 1 ? 0 : 2)}
-          </text>
-        </g>
-      ))}
-
-      {/* Step labels on x-axis (decimated when > MAX_STEP_LABELS) */}
-      {steps.filter((_, i) => i % labelInterval === 0 || i === steps.length - 1).map((step) => (
-        <text
-          key={step.step}
-          x={toSvgX(step.step)}
-          y={SPARKLINE_H - 2}
-          textAnchor="middle"
-          className="fill-zinc-400 dark:fill-zinc-500"
-          fontSize={9}
-          fontFamily="monospace"
-        >
-          {step.step}
-        </text>
-      ))}
-
-      {/* Area fill */}
-      <path
-        d={areaD}
-        className="fill-emerald-500/10 dark:fill-emerald-400/10"
-      />
-
-      {/* Line */}
-      <path
-        d={pathD}
-        fill="none"
-        className="stroke-emerald-500 dark:stroke-emerald-400"
-        strokeWidth={2}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-
-      {/* Data points */}
-      {points.slice(1).map((p, i) => {
-        const isRelaxation = relaxationSteps.has(steps[i].step)
-
-        return (
-          <circle
-            key={i}
-            cx={toSvgX(p.x)}
-            cy={toSvgY(p.y)}
-            r={isRelaxation ? 5 : 3.5}
-            className={isRelaxation
-              ? 'fill-amber-500 stroke-amber-300 dark:fill-amber-400 dark:stroke-amber-200'
-              : 'fill-emerald-500 stroke-white dark:fill-emerald-400 dark:stroke-zinc-900'
-            }
-            strokeWidth={isRelaxation ? 1.5 : 1}
-          >
-            <title>
-              Step {steps[i].step}: {p.y.toFixed(3)}
-              {isRelaxation ? ' (relaxation applied)' : ''}
-            </title>
-          </circle>
-        )
-      })}
-
-      {/* Relaxation markers — vertical dashed lines */}
-      {relaxations.map((r, i) => (
-        <line
-          key={`relax-${i}`}
-          x1={toSvgX(r.step)}
-          y1={SPARKLINE_PAD.top}
-          x2={toSvgX(r.step)}
-          y2={SPARKLINE_PAD.top + h}
-          className="stroke-amber-500/50 dark:stroke-amber-400/50"
-          strokeWidth={1}
-          strokeDasharray="4,3"
-        />
-      ))}
-    </svg>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -387,27 +224,12 @@ export function GoalView() {
         </div>
       )}
 
-      {/* Sparkline */}
-      {latest.steps.length > 0 && (
-        <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Satisfaction curve
-            </div>
-            <div className="flex items-center gap-4 text-[10px] text-zinc-400 dark:text-zinc-500">
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" /> step
-              </span>
-              {latest.relaxations.length > 0 && (
-                <span className="flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-full bg-amber-500" /> relaxation
-                </span>
-              )}
-            </div>
-          </div>
-          <SatisfactionSparkline steps={latest.steps} relaxations={latest.relaxations} />
-        </div>
-      )}
+      {/* Explanatory snippet */}
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        Each step dispatches agents toward the goal, collects their output as facts,
+        and re-evaluates satisfaction (0&rarr;1) &mdash; how close the goal is to being met.
+        Satisfaction can plateau or dip along the way.
+      </p>
 
       {/* Per-step table (E8: overflow-x-auto for mobile) */}
       {latest.steps.length > 0 && (
@@ -417,35 +239,76 @@ export function GoalView() {
               <tr className="border-b border-zinc-200 text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                 <th className="py-1 text-left font-medium">Step</th>
                 <th className="py-1 text-left font-medium">Agents</th>
-                <th className="py-1 text-right font-medium">Satisfaction</th>
-                <th className="py-1 text-right font-medium">Delta</th>
+                <th className="py-1 text-left font-medium" title={"0\u20131 score measuring goal completion"}>Satisfaction</th>
+                <th className="py-1 text-right font-medium" title="Change in satisfaction from previous step">Delta</th>
                 <th className="py-1 text-right font-medium">Tokens</th>
                 <th className="py-1 text-right font-medium">Duration</th>
-                <th className="py-1 text-left font-medium">Facts produced</th>
+                <th className="py-1 text-right font-medium" title="Data produced by agents this step">Facts</th>
               </tr>
             </thead>
             <tbody className="text-zinc-700 dark:text-zinc-300">
-              {latest.steps.map((step) => (
-                <tr key={step.step} className="border-b border-zinc-100 dark:border-zinc-800">
-                  <td className="py-1.5 font-mono">{step.step}</td>
-                  <td className="py-1.5 font-mono">{step.nodesRun.join(', ')}</td>
-                  <td className="py-1.5 text-right font-mono">{step.satisfaction.toFixed(3)}</td>
-                  <td className={`py-1.5 text-right font-mono ${
-                    step.satisfactionDelta > 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : step.satisfactionDelta < 0
-                        ? 'text-red-600 dark:text-red-400'
-                        : ''
-                  }`}>
-                    {step.satisfactionDelta >= 0 ? '+' : ''}{step.satisfactionDelta.toFixed(3)}
-                  </td>
-                  <td className="py-1.5 text-right">{step.tokensConsumed.toLocaleString()}</td>
-                  <td className="py-1.5 text-right">{step.durationMs}ms</td>
-                  <td className="max-w-[200px] truncate py-1.5 font-mono text-zinc-500 dark:text-zinc-400" title={step.factsProduced.join(', ')}>
-                    {step.factsProduced.length > 0 ? step.factsProduced.join(', ') : '-'}
-                  </td>
-                </tr>
-              ))}
+              {latest.steps.map((step) => {
+                const hasRelaxation = latest.relaxations.some((r) => r.step === step.step)
+
+                return (
+                  <tr key={step.step} className="border-b border-zinc-100 dark:border-zinc-800">
+                    <td className="py-1.5 font-mono">
+                      <span className="flex items-center gap-1.5">
+                        {step.step}
+                        {hasRelaxation && (
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400"
+                            title="Relaxation applied"
+                          />
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-1.5">
+                      <div className="flex flex-wrap gap-1">
+                        {step.nodesRun.map((agent) => (
+                          <span key={agent} className="rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-mono dark:bg-zinc-700">
+                            {agent}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-1.5 font-mono">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-16 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                          <div
+                            className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
+                            style={{ width: `${(step.satisfaction * 100).toFixed(1)}%` }}
+                          />
+                        </div>
+                        <span>{step.satisfaction.toFixed(3)}</span>
+                      </div>
+                    </td>
+                    <td className={`py-1.5 text-right font-mono ${
+                      step.satisfactionDelta > 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : step.satisfactionDelta < 0
+                          ? 'text-red-600 dark:text-red-400'
+                          : ''
+                    }`}>
+                      {step.satisfactionDelta >= 0 ? '+' : ''}{step.satisfactionDelta.toFixed(3)}
+                    </td>
+                    <td className="py-1.5 text-right font-mono">{step.tokensConsumed.toLocaleString()}</td>
+                    <td className="py-1.5 text-right font-mono">{step.durationMs}ms</td>
+                    <td className="py-1.5 text-right">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {step.factsProduced.length > 0
+                          ? step.factsProduced.map((fact) => (
+                              <span key={fact} className="rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-mono dark:bg-zinc-700">
+                                {fact}
+                              </span>
+                            ))
+                          : <span className="text-zinc-400 dark:text-zinc-500">-</span>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
