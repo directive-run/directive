@@ -134,9 +134,9 @@ export function isDevMode(): boolean {
     // process not available
   }
   try {
-    // @ts-expect-error — import.meta.env is Vite-specific
     if (
       typeof import.meta !== "undefined" &&
+      // @ts-expect-error — import.meta.env is Vite-specific
       import.meta.env?.MODE === "production"
     ) {
       return false;

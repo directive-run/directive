@@ -21,10 +21,13 @@ export interface TrackingContext {
 // ============================================================================
 
 /** Derivation definition function signature. */
-export type DerivationDef<S extends Schema, T, D extends DerivationsDef<S>> = (
-  facts: Facts<S>,
-  derive: DerivedValues<S, D>,
-) => T;
+export interface DerivationDef<
+  S extends Schema,
+  T,
+  D extends DerivationsDef<S>,
+> {
+  (facts: Facts<S>, derive: DerivedValues<S, D>): T;
+}
 
 /** Map of derivation definitions. */
 export type DerivationsDef<S extends Schema> = Record<
