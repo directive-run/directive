@@ -15,20 +15,38 @@ import type { DebugEvent, DebugEventType } from "./types.js";
 
 /** A12: Known event types for import validation */
 const KNOWN_EVENT_TYPES: Set<string> = new Set([
-  "agent_start", "agent_complete", "agent_error", "agent_retry",
-  "guardrail_check", "constraint_evaluate",
-  "resolver_start", "resolver_complete", "resolver_error",
-  "approval_request", "approval_response",
-  "handoff_start", "handoff_complete",
-  "pattern_start", "pattern_complete",
+  "agent_start",
+  "agent_complete",
+  "agent_error",
+  "agent_retry",
+  "guardrail_check",
+  "constraint_evaluate",
+  "resolver_start",
+  "resolver_complete",
+  "resolver_error",
+  "approval_request",
+  "approval_response",
+  "handoff_start",
+  "handoff_complete",
+  "pattern_start",
+  "pattern_complete",
   "dag_node_update",
-  "breakpoint_hit", "breakpoint_resumed",
-  "derivation_update", "scratchpad_update",
+  "breakpoint_hit",
+  "breakpoint_resumed",
+  "derivation_update",
+  "scratchpad_update",
   "reflection_iteration",
-  "race_start", "race_winner", "race_cancelled",
-  "debate_round", "reroute",
-  "checkpoint_save", "checkpoint_restore",
-  "task_start", "task_complete", "task_error", "task_progress",
+  "race_start",
+  "race_winner",
+  "race_cancelled",
+  "debate_round",
+  "reroute",
+  "checkpoint_save",
+  "checkpoint_restore",
+  "task_start",
+  "task_complete",
+  "task_error",
+  "task_progress",
   "goal_step",
 ]);
 
@@ -48,7 +66,9 @@ export interface DebugTimeline {
   /** Get events for a specific agent */
   getEventsForAgent(agentId: string): DebugEvent[];
   /** Get events by type with type narrowing */
-  getEventsByType<T extends DebugEventType>(type: T): Extract<DebugEvent, { type: T }>[];
+  getEventsByType<T extends DebugEventType>(
+    type: T,
+  ): Extract<DebugEvent, { type: T }>[];
   /** Get events at a specific snapshot */
   getEventsAtSnapshot(snapshotId: number): DebugEvent[];
   /** Get events in a time range */
@@ -108,7 +128,9 @@ const BLOCKED_IMPORT_KEYS = new Set([
  * const agentEvents = timeline.getEventsForAgent("researcher");
  * ```
  */
-export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTimeline {
+export function createDebugTimeline(
+  options: DebugTimelineOptions = {},
+): DebugTimeline {
   const maxEvents = options.maxEvents ?? 2000;
   const goToSnapshot = options.goToSnapshot;
 
@@ -138,8 +160,14 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
           listener(fullEvent);
         } catch (err) {
           // A6: Log listener errors in dev mode instead of swallowing silently
-          if (typeof process !== "undefined" && process.env?.["NODE_ENV"] !== "production") {
-            console.error("[Directive DebugTimeline] Listener threw:", err instanceof Error ? err.message : err);
+          if (
+            typeof process !== "undefined" &&
+            process.env?.["NODE_ENV"] !== "production"
+          ) {
+            console.error(
+              "[Directive DebugTimeline] Listener threw:",
+              err instanceof Error ? err.message : err,
+            );
           }
         }
       }
@@ -155,8 +183,13 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
       return events.filter((e) => e.agentId === agentId);
     },
 
-    getEventsByType<T extends DebugEventType>(type: T): Extract<DebugEvent, { type: T }>[] {
-      return events.filter((e) => e.type === type) as Extract<DebugEvent, { type: T }>[];
+    getEventsByType<T extends DebugEventType>(
+      type: T,
+    ): Extract<DebugEvent, { type: T }>[] {
+      return events.filter((e) => e.type === type) as Extract<
+        DebugEvent,
+        { type: T }
+      >[];
     },
 
     getEventsAtSnapshot(snapshotId: number): DebugEvent[] {
@@ -164,14 +197,19 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
     },
 
     getEventsInRange(startMs: number, endMs: number): DebugEvent[] {
-      return events.filter((e) => e.timestamp >= startMs && e.timestamp <= endMs);
+      return events.filter(
+        (e) => e.timestamp >= startMs && e.timestamp <= endMs,
+      );
     },
 
     forkFrom(snapshotId: number): void {
       // A8: Single reverse scan instead of two .filter() passes
       let cutoffId = -1;
       for (let i = events.length - 1; i >= 0; i--) {
-        if (events[i]!.snapshotId !== null && events[i]!.snapshotId! <= snapshotId) {
+        if (
+          events[i]!.snapshotId !== null &&
+          events[i]!.snapshotId! <= snapshotId
+        ) {
           cutoffId = events[i]!.id;
           break;
         }
@@ -217,11 +255,17 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
       // Prototype pollution defense
       for (const key of Object.keys(parsed)) {
         if (BLOCKED_IMPORT_KEYS.has(key)) {
-          throw new Error(`[Directive DebugTimeline] Blocked key in import: ${key}`);
+          throw new Error(
+            `[Directive DebugTimeline] Blocked key in import: ${key}`,
+          );
         }
       }
 
-      const data = parsed as { version?: number; events?: unknown[]; nextId?: number };
+      const data = parsed as {
+        version?: number;
+        events?: unknown[];
+        nextId?: number;
+      };
 
       if (!Array.isArray(data.events)) {
         throw new Error("[Directive DebugTimeline] Missing events array");
@@ -237,19 +281,27 @@ export function createDebugTimeline(options: DebugTimelineOptions = {}): DebugTi
         // Prototype pollution defense on event objects
         for (const key of Object.keys(evt)) {
           if (BLOCKED_IMPORT_KEYS.has(key)) {
-            throw new Error(`[Directive DebugTimeline] Blocked key in event: ${key}`);
+            throw new Error(
+              `[Directive DebugTimeline] Blocked key in event: ${key}`,
+            );
           }
         }
 
         const e = evt as Record<string, unknown>;
         // A12: Also validate that event type is a known DebugEventType
-        if (typeof e.id === "number" && typeof e.type === "string" && KNOWN_EVENT_TYPES.has(e.type) && typeof e.timestamp === "number") {
+        if (
+          typeof e.id === "number" &&
+          typeof e.type === "string" &&
+          KNOWN_EVENT_TYPES.has(e.type) &&
+          typeof e.timestamp === "number"
+        ) {
           validated.push(evt as DebugEvent);
         }
       }
 
       // Enforce maxEvents cap on imported data
-      events = validated.length > maxEvents ? validated.slice(-maxEvents) : validated;
+      events =
+        validated.length > maxEvents ? validated.slice(-maxEvents) : validated;
       nextId = typeof data.nextId === "number" ? data.nextId : validated.length;
     },
 
@@ -333,7 +385,8 @@ export function createDebugTimelinePlugin(
     onResolverError(resolver: string, _req, error) {
       const startTime = resolverStartTimes.get(resolver);
       resolverStartTimes.delete(resolver);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       timeline.record({
         type: "resolver_error",
         timestamp: Date.now(),

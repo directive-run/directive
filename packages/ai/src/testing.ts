@@ -23,26 +23,42 @@
  * ```
  */
 
+import {
+  type AgentOrchestrator,
+  type OrchestratorOptions,
+  createAgentOrchestrator,
+} from "./agent-orchestrator.js";
+import type {
+  BreakpointModifications,
+  BreakpointRequest,
+} from "./breakpoints.js";
+import {
+  type Checkpoint,
+  type CheckpointStore,
+  InMemoryCheckpointStore,
+} from "./checkpoint.js";
+import {
+  type MultiAgentOrchestrator,
+  type MultiAgentOrchestratorOptions,
+  type TaskRegistration,
+  createMultiAgentOrchestrator,
+} from "./multi-agent-orchestrator.js";
+import type { MultiplexedStreamChunk } from "./streaming.js";
 import type {
   AgentLike,
-  RunResult,
-  Message,
-  ToolCall,
-  RunOptions,
   AgentRunner,
-  GuardrailFn,
-  InputGuardrailData,
-  OutputGuardrailData,
-  ToolCallGuardrailData,
-  GuardrailContext,
-  GuardrailResult,
   ApprovalRequest,
+  GuardrailContext,
+  GuardrailFn,
+  GuardrailResult,
+  InputGuardrailData,
+  Message,
+  OutputGuardrailData,
+  RunOptions,
+  RunResult,
+  ToolCall,
+  ToolCallGuardrailData,
 } from "./types.js";
-import { InMemoryCheckpointStore, type Checkpoint, type CheckpointStore } from "./checkpoint.js";
-import type { BreakpointRequest, BreakpointModifications } from "./breakpoints.js";
-import type { MultiplexedStreamChunk } from "./streaming.js";
-import { createAgentOrchestrator, type OrchestratorOptions, type AgentOrchestrator } from "./agent-orchestrator.js";
-import { createMultiAgentOrchestrator, type MultiAgentOrchestratorOptions, type MultiAgentOrchestrator, type TaskRegistration } from "./multi-agent-orchestrator.js";
 
 // ============================================================================
 // Mock Agent Runner
@@ -124,7 +140,7 @@ export interface MockAgentRunner {
  * ```
  */
 export function createMockAgentRunner(
-  options: MockAgentRunnerOptions = {}
+  options: MockAgentRunnerOptions = {},
 ): MockAgentRunner {
   const {
     defaultResponse = { output: "mock response", totalTokens: 10 },
@@ -134,13 +150,15 @@ export function createMockAgentRunner(
   } = options;
 
   const calls: RecordedCall[] = [];
-  const responseMap = new Map<string, MockAgentConfig>(Object.entries(responses));
+  const responseMap = new Map<string, MockAgentConfig>(
+    Object.entries(responses),
+  );
   let currentDefault = defaultResponse;
 
   const run: AgentRunner = async <T>(
     agent: AgentLike,
     input: string,
-    runOptions?: RunOptions
+    runOptions?: RunOptions,
   ): Promise<RunResult<T>> => {
     onRun?.(agent, input);
 
@@ -196,9 +214,9 @@ export function createMockAgentRunner(
     run,
     getCalls: () => [...calls],
     getCallsFor: (name) => calls.filter((c) => c.agent.name === name),
-    clearCalls: () => calls.length = 0,
+    clearCalls: () => (calls.length = 0),
     setResponse: (name, config) => responseMap.set(name, config),
-    setDefaultResponse: (config) => currentDefault = config,
+    setDefaultResponse: (config) => (currentDefault = config),
   };
 }
 
@@ -207,11 +225,18 @@ export function createMockAgentRunner(
 // ============================================================================
 
 /** Test input for guardrail testing */
-export type GuardrailTestInput<T> =
-  T extends InputGuardrailData ? { input: string; agentName?: string } :
-  T extends OutputGuardrailData ? { output: unknown; agentName?: string; input?: string; messages?: Message[] } :
-  T extends ToolCallGuardrailData ? { toolCall: ToolCall; agentName?: string; input?: string } :
-  Partial<T>;
+export type GuardrailTestInput<T> = T extends InputGuardrailData
+  ? { input: string; agentName?: string }
+  : T extends OutputGuardrailData
+    ? {
+        output: unknown;
+        agentName?: string;
+        input?: string;
+        messages?: Message[];
+      }
+    : T extends ToolCallGuardrailData
+      ? { toolCall: ToolCall; agentName?: string; input?: string }
+      : Partial<T>;
 
 /** Extended guardrail result with test assertions */
 export interface GuardrailTestResult extends GuardrailResult {
@@ -249,7 +274,7 @@ export interface GuardrailTestResult extends GuardrailResult {
 export async function testGuardrail<T>(
   guardrail: GuardrailFn<T>,
   testInput: GuardrailTestInput<T>,
-  context?: Partial<GuardrailContext>
+  context?: Partial<GuardrailContext>,
 ): Promise<GuardrailTestResult> {
   // Build full data object
   const data = {
@@ -276,7 +301,9 @@ export async function testGuardrail<T>(
     testedData: data,
     assertPassed() {
       if (!result.passed) {
-        throw new Error(`Expected guardrail to pass, but it failed: ${result.reason}`);
+        throw new Error(
+          `Expected guardrail to pass, but it failed: ${result.reason}`,
+        );
       }
     },
     assertFailed(expectedReason) {
@@ -284,25 +311,33 @@ export async function testGuardrail<T>(
         throw new Error("Expected guardrail to fail, but it passed");
       }
       if (expectedReason !== undefined) {
-        if (typeof expectedReason === "string" && !result.reason?.includes(expectedReason)) {
+        if (
+          typeof expectedReason === "string" &&
+          !result.reason?.includes(expectedReason)
+        ) {
           throw new Error(
-            `Expected failure reason to include "${expectedReason}", got: ${result.reason}`
+            `Expected failure reason to include "${expectedReason}", got: ${result.reason}`,
           );
         }
-        if (expectedReason instanceof RegExp && !expectedReason.test(result.reason ?? "")) {
+        if (
+          expectedReason instanceof RegExp &&
+          !expectedReason.test(result.reason ?? "")
+        ) {
           throw new Error(
-            `Expected failure reason to match ${expectedReason}, got: ${result.reason}`
+            `Expected failure reason to match ${expectedReason}, got: ${result.reason}`,
           );
         }
       }
     },
     assertTransformed(expected) {
       if (result.transformed === undefined) {
-        throw new Error("Expected guardrail to transform input, but no transformation occurred");
+        throw new Error(
+          "Expected guardrail to transform input, but no transformation occurred",
+        );
       }
       if (expected !== undefined && result.transformed !== expected) {
         throw new Error(
-          `Expected transformation to be ${JSON.stringify(expected)}, got: ${JSON.stringify(result.transformed)}`
+          `Expected transformation to be ${JSON.stringify(expected)}, got: ${JSON.stringify(result.transformed)}`,
         );
       }
     },
@@ -329,21 +364,37 @@ export async function testGuardrailBatch<T>(
     input: GuardrailTestInput<T>;
     expect: "pass" | "fail" | "transform";
     context?: Partial<GuardrailContext>;
-  }>
+  }>,
 ): Promise<{
   results: GuardrailTestResult[];
   allPassed(): boolean;
-  failures(): Array<{ index: number; expected: string; actual: GuardrailTestResult }>;
+  failures(): Array<{
+    index: number;
+    expected: string;
+    actual: GuardrailTestResult;
+  }>;
 }> {
   const results: GuardrailTestResult[] = [];
-  const failures: Array<{ index: number; expected: string; actual: GuardrailTestResult }> = [];
+  const failures: Array<{
+    index: number;
+    expected: string;
+    actual: GuardrailTestResult;
+  }> = [];
 
   for (let i = 0; i < testCases.length; i++) {
     const testCase = testCases[i]!;
-    const result = await testGuardrail(guardrail, testCase.input, testCase.context);
+    const result = await testGuardrail(
+      guardrail,
+      testCase.input,
+      testCase.context,
+    );
     results.push(result);
 
-    const actualOutcome = !result.passed ? "fail" : result.transformed !== undefined ? "transform" : "pass";
+    const actualOutcome = !result.passed
+      ? "fail"
+      : result.transformed !== undefined
+        ? "transform"
+        : "pass";
 
     if (actualOutcome !== testCase.expect) {
       failures.push({ index: i, expected: testCase.expect, actual: result });
@@ -386,7 +437,10 @@ export interface ApprovalSimulator {
   /** Manually reject a request */
   reject(requestId: string, reason?: string): void;
   /** Wait for a specific request */
-  waitForRequest(predicate: (req: ApprovalRequest) => boolean, timeoutMs?: number): Promise<ApprovalRequest>;
+  waitForRequest(
+    predicate: (req: ApprovalRequest) => boolean,
+    timeoutMs?: number,
+  ): Promise<ApprovalRequest>;
 }
 
 /**
@@ -404,18 +458,22 @@ export interface ApprovalSimulator {
  * ```
  */
 export function createApprovalSimulator(
-  options: ApprovalSimulatorOptions = {}
+  options: ApprovalSimulatorOptions = {},
 ): ApprovalSimulator {
-  const {
-    autoApprove,
-    autoReject,
-    delay = 0,
-    recordRequests = true,
-  } = options;
+  const { autoApprove, autoReject, delay = 0, recordRequests = true } = options;
 
   const requests: ApprovalRequest[] = [];
-  const pendingRequests = new Map<string, { request: ApprovalRequest; resolve: (decision: "approved" | "rejected") => void }>();
-  const requestWaiters: Array<{ predicate: (req: ApprovalRequest) => boolean; resolve: (req: ApprovalRequest) => void }> = [];
+  const pendingRequests = new Map<
+    string,
+    {
+      request: ApprovalRequest;
+      resolve: (decision: "approved" | "rejected") => void;
+    }
+  >();
+  const requestWaiters: Array<{
+    predicate: (req: ApprovalRequest) => boolean;
+    resolve: (req: ApprovalRequest) => void;
+  }> = [];
 
   return {
     async handle(request: ApprovalRequest): Promise<"approved" | "rejected"> {
@@ -446,7 +504,7 @@ export function createApprovalSimulator(
       }
 
       // Check auto-approve
-      if (autoApprove && autoApprove(request)) {
+      if (autoApprove?.(request)) {
         return "approved";
       }
 
@@ -457,7 +515,7 @@ export function createApprovalSimulator(
     },
 
     getRequests: () => [...requests],
-    clearRequests: () => requests.length = 0,
+    clearRequests: () => (requests.length = 0),
 
     approve(requestId: string) {
       const pending = pendingRequests.get(requestId);
@@ -475,7 +533,9 @@ export function createApprovalSimulator(
         // Store reason on the request for test assertions
         const request = requests.find((r) => r.id === requestId);
         if (request) {
-          (request as ApprovalRequest & { rejectionReason?: string }).rejectionReason = reason;
+          (
+            request as ApprovalRequest & { rejectionReason?: string }
+          ).rejectionReason = reason;
         }
       }
     },
@@ -516,7 +576,8 @@ export function createApprovalSimulator(
 // ============================================================================
 
 /** Options for test orchestrator */
-export interface TestOrchestratorOptions<F extends Record<string, unknown>> extends Omit<OrchestratorOptions<F>, "runner"> {
+export interface TestOrchestratorOptions<F extends Record<string, unknown>>
+  extends Omit<OrchestratorOptions<F>, "runner"> {
   /** Mock responses for agents */
   mockResponses?: Record<string, MockAgentConfig>;
   /** Default mock response */
@@ -524,7 +585,8 @@ export interface TestOrchestratorOptions<F extends Record<string, unknown>> exte
 }
 
 /** Test orchestrator with additional testing utilities */
-export interface TestOrchestrator<F extends Record<string, unknown>> extends AgentOrchestrator<F> {
+export interface TestOrchestrator<F extends Record<string, unknown>>
+  extends AgentOrchestrator<F> {
   /** The mock runner */
   mockRunner: MockAgentRunner;
   /** Approval simulator */
@@ -558,14 +620,11 @@ export interface TestOrchestrator<F extends Record<string, unknown>> extends Age
  * expect(test.getCalls()).toHaveLength(1);
  * ```
  */
-export function createTestOrchestrator<F extends Record<string, unknown> = Record<string, never>>(
-  options: TestOrchestratorOptions<F> = {}
-): TestOrchestrator<F> {
-  const {
-    mockResponses,
-    defaultMockResponse,
-    ...orchestratorOptions
-  } = options;
+export function createTestOrchestrator<
+  F extends Record<string, unknown> = Record<string, never>,
+>(options: TestOrchestratorOptions<F> = {}): TestOrchestrator<F> {
+  const { mockResponses, defaultMockResponse, ...orchestratorOptions } =
+    options;
 
   const mockRunner = createMockAgentRunner({
     responses: mockResponses,
@@ -629,7 +688,11 @@ export interface ConstraintSnapshot {
 export function createConstraintRecorder(): {
   plugin: {
     name: string;
-    onRequirementCreated: (data: { constraintId: string; requirement: unknown; facts: unknown }) => void;
+    onRequirementCreated: (data: {
+      constraintId: string;
+      requirement: unknown;
+      facts: unknown;
+    }) => void;
   };
   getSnapshots(): ConstraintSnapshot[];
   clearSnapshots(): void;
@@ -650,7 +713,7 @@ export function createConstraintRecorder(): {
       },
     },
     getSnapshots: () => [...snapshots],
-    clearSnapshots: () => snapshots.length = 0,
+    clearSnapshots: () => (snapshots.length = 0),
   };
 }
 
@@ -677,13 +740,16 @@ export function assertOrchestratorState<F extends Record<string, unknown>>(
     tokenUsage?: { min?: number; max?: number; exact?: number };
     pendingApprovals?: number;
     conversationLength?: { min?: number; max?: number; exact?: number };
-  }
+  },
 ): void {
   const state = orchestrator.facts;
 
-  if (expected.agentStatus !== undefined && state.agent.status !== expected.agentStatus) {
+  if (
+    expected.agentStatus !== undefined &&
+    state.agent.status !== expected.agentStatus
+  ) {
     throw new Error(
-      `Expected agent status to be "${expected.agentStatus}", got "${state.agent.status}"`
+      `Expected agent status to be "${expected.agentStatus}", got "${state.agent.status}"`,
     );
   }
 
@@ -691,24 +757,27 @@ export function assertOrchestratorState<F extends Record<string, unknown>>(
     const { min, max, exact } = expected.tokenUsage;
     if (exact !== undefined && state.agent.tokenUsage !== exact) {
       throw new Error(
-        `Expected token usage to be exactly ${exact}, got ${state.agent.tokenUsage}`
+        `Expected token usage to be exactly ${exact}, got ${state.agent.tokenUsage}`,
       );
     }
     if (min !== undefined && state.agent.tokenUsage < min) {
       throw new Error(
-        `Expected token usage to be at least ${min}, got ${state.agent.tokenUsage}`
+        `Expected token usage to be at least ${min}, got ${state.agent.tokenUsage}`,
       );
     }
     if (max !== undefined && state.agent.tokenUsage > max) {
       throw new Error(
-        `Expected token usage to be at most ${max}, got ${state.agent.tokenUsage}`
+        `Expected token usage to be at most ${max}, got ${state.agent.tokenUsage}`,
       );
     }
   }
 
-  if (expected.pendingApprovals !== undefined && state.approval.pending.length !== expected.pendingApprovals) {
+  if (
+    expected.pendingApprovals !== undefined &&
+    state.approval.pending.length !== expected.pendingApprovals
+  ) {
     throw new Error(
-      `Expected ${expected.pendingApprovals} pending approvals, got ${state.approval.pending.length}`
+      `Expected ${expected.pendingApprovals} pending approvals, got ${state.approval.pending.length}`,
     );
   }
 
@@ -716,13 +785,19 @@ export function assertOrchestratorState<F extends Record<string, unknown>>(
     const { min, max, exact } = expected.conversationLength;
     const len = state.conversation.length;
     if (exact !== undefined && len !== exact) {
-      throw new Error(`Expected conversation length to be exactly ${exact}, got ${len}`);
+      throw new Error(
+        `Expected conversation length to be exactly ${exact}, got ${len}`,
+      );
     }
     if (min !== undefined && len < min) {
-      throw new Error(`Expected conversation length to be at least ${min}, got ${len}`);
+      throw new Error(
+        `Expected conversation length to be at least ${min}, got ${len}`,
+      );
     }
     if (max !== undefined && len > max) {
-      throw new Error(`Expected conversation length to be at most ${max}, got ${len}`);
+      throw new Error(
+        `Expected conversation length to be at most ${max}, got ${len}`,
+      );
     }
   }
 }
@@ -759,9 +834,15 @@ export function createTimeController(startTime = Date.now()): {
 
   return {
     now: () => currentTime,
-    advance: (ms) => { currentTime += ms; },
-    set: (time) => { currentTime = time; },
-    reset: () => { currentTime = initial; },
+    advance: (ms) => {
+      currentTime += ms;
+    },
+    set: (time) => {
+      currentTime = time;
+    },
+    reset: () => {
+      currentTime = initial;
+    },
   };
 }
 
@@ -770,13 +851,17 @@ export function createTimeController(startTime = Date.now()): {
 // ============================================================================
 
 /** Options for test multi-agent orchestrator */
-export interface TestMultiAgentOrchestratorOptions extends Omit<MultiAgentOrchestratorOptions, "runner"> {
+export interface TestMultiAgentOrchestratorOptions
+  extends Omit<MultiAgentOrchestratorOptions, "runner"> {
   /** Mock responses keyed by agent ID — internally mapped to agent names for the mock runner */
   mockResponses?: Record<string, MockAgentConfig>;
   /** Default mock response for unmatched agents */
   defaultMockResponse?: MockAgentConfig;
   /** Mock tasks keyed by task ID — auto-generates TaskRegistration wrappers */
-  mockTasks?: Record<string, { output: unknown; delay?: number; shouldError?: boolean }>;
+  mockTasks?: Record<
+    string,
+    { output: unknown; delay?: number; shouldError?: boolean }
+  >;
 }
 
 /** Test multi-agent orchestrator with additional testing utilities */
@@ -815,7 +900,7 @@ export interface TestMultiAgentOrchestrator extends MultiAgentOrchestrator {
  * ```
  */
 export function createTestMultiAgentOrchestrator(
-  options: TestMultiAgentOrchestratorOptions
+  options: TestMultiAgentOrchestratorOptions,
 ): TestMultiAgentOrchestrator {
   const {
     mockResponses = {},
@@ -865,7 +950,9 @@ export function createTestMultiAgentOrchestrator(
 
   // Use Object.create to preserve getters (derived, scratchpad, timeline, etc.)
   // instead of { ...orchestrator } which evaluates getters at spread time
-  const testOrchestrator = Object.create(orchestrator) as TestMultiAgentOrchestrator;
+  const testOrchestrator = Object.create(
+    orchestrator,
+  ) as TestMultiAgentOrchestrator;
   testOrchestrator.mockRunner = mockRunner;
   testOrchestrator.approvalSimulator = approvalSimulator;
   testOrchestrator.getCalls = () => mockRunner.getCalls();
@@ -903,31 +990,39 @@ export function assertMultiAgentState(
     totalTokens?: { agentId?: string; min?: number; max?: number };
     globalTokens?: { min?: number; max?: number };
     pendingHandoffs?: number;
-  }
+  },
 ): void {
   if (expected.taskStatus) {
-    for (const [taskId, expectedStatus] of Object.entries(expected.taskStatus)) {
+    for (const [taskId, expectedStatus] of Object.entries(
+      expected.taskStatus,
+    )) {
       const state = orchestrator.getTaskState(taskId);
       if (!state) {
-        throw new Error(`Expected task "${taskId}" to exist, but it was not found`);
+        throw new Error(
+          `Expected task "${taskId}" to exist, but it was not found`,
+        );
       }
       if (state.status !== expectedStatus) {
         throw new Error(
-          `Expected task "${taskId}" status to be "${expectedStatus}", got "${state.status}"`
+          `Expected task "${taskId}" status to be "${expectedStatus}", got "${state.status}"`,
         );
       }
     }
   }
 
   if (expected.agentStatus) {
-    for (const [agentId, expectedStatus] of Object.entries(expected.agentStatus)) {
+    for (const [agentId, expectedStatus] of Object.entries(
+      expected.agentStatus,
+    )) {
       const state = orchestrator.getAgentState(agentId);
       if (!state) {
-        throw new Error(`Expected agent "${agentId}" to exist, but it was not found`);
+        throw new Error(
+          `Expected agent "${agentId}" to exist, but it was not found`,
+        );
       }
       if (state.status !== expectedStatus) {
         throw new Error(
-          `Expected agent "${agentId}" status to be "${expectedStatus}", got "${state.status}"`
+          `Expected agent "${agentId}" status to be "${expectedStatus}", got "${state.status}"`,
         );
       }
     }
@@ -938,26 +1033,35 @@ export function assertMultiAgentState(
     if (agentId) {
       const state = orchestrator.getAgentState(agentId);
       if (!state) {
-        throw new Error(`Expected agent "${agentId}" to exist, but it was not found`);
+        throw new Error(
+          `Expected agent "${agentId}" to exist, but it was not found`,
+        );
       }
       if (min !== undefined && state.totalTokens < min) {
         throw new Error(
-          `Expected agent "${agentId}" tokens to be at least ${min}, got ${state.totalTokens}`
+          `Expected agent "${agentId}" tokens to be at least ${min}, got ${state.totalTokens}`,
         );
       }
       if (max !== undefined && state.totalTokens > max) {
         throw new Error(
-          `Expected agent "${agentId}" tokens to be at most ${max}, got ${state.totalTokens}`
+          `Expected agent "${agentId}" tokens to be at most ${max}, got ${state.totalTokens}`,
         );
       }
     } else {
       const allStates = orchestrator.getAllAgentStates();
-      const total = Object.values(allStates).reduce((sum, s) => sum + s.totalTokens, 0);
+      const total = Object.values(allStates).reduce(
+        (sum, s) => sum + s.totalTokens,
+        0,
+      );
       if (min !== undefined && total < min) {
-        throw new Error(`Expected total tokens to be at least ${min}, got ${total}`);
+        throw new Error(
+          `Expected total tokens to be at least ${min}, got ${total}`,
+        );
       }
       if (max !== undefined && total > max) {
-        throw new Error(`Expected total tokens to be at most ${max}, got ${total}`);
+        throw new Error(
+          `Expected total tokens to be at most ${max}, got ${total}`,
+        );
       }
     }
   }
@@ -966,10 +1070,14 @@ export function assertMultiAgentState(
     const { min, max } = expected.globalTokens;
     const total = orchestrator.totalTokens;
     if (min !== undefined && total < min) {
-      throw new Error(`Expected global tokens to be at least ${min}, got ${total}`);
+      throw new Error(
+        `Expected global tokens to be at least ${min}, got ${total}`,
+      );
     }
     if (max !== undefined && total > max) {
-      throw new Error(`Expected global tokens to be at most ${max}, got ${total}`);
+      throw new Error(
+        `Expected global tokens to be at most ${max}, got ${total}`,
+      );
     }
   }
 
@@ -977,7 +1085,7 @@ export function assertMultiAgentState(
     const pendingCount = orchestrator.getPendingHandoffs().length;
     if (pendingCount !== expected.pendingHandoffs) {
       throw new Error(
-        `Expected ${expected.pendingHandoffs} pending handoffs, got ${pendingCount}`
+        `Expected ${expected.pendingHandoffs} pending handoffs, got ${pendingCount}`,
       );
     }
   }
@@ -1001,7 +1109,12 @@ export function assertMultiAgentState(
  */
 export function createMockTask(
   output: unknown,
-  options?: { delay?: number; shouldError?: boolean; label?: string; description?: string },
+  options?: {
+    delay?: number;
+    shouldError?: boolean;
+    label?: string;
+    description?: string;
+  },
 ): TaskRegistration {
   return {
     run: async (_input: string, signal: AbortSignal) => {
@@ -1011,10 +1124,14 @@ export function createMockTask(
       if (options?.delay && options.delay > 0) {
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(resolve, options.delay);
-          signal.addEventListener("abort", () => {
-            clearTimeout(timer);
-            reject(new Error("Task aborted"));
-          }, { once: true });
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              reject(new Error("Task aborted"));
+            },
+            { once: true },
+          );
         });
       }
 
@@ -1033,8 +1150,13 @@ export function createMockTask(
 // DAG Testing Helpers
 // ============================================================================
 
-import type { DagNode, DagExecutionContext, DagNodeStatus, DagPattern } from "./types.js";
 import { dag } from "./multi-agent-orchestrator.js";
+import type {
+  DagExecutionContext,
+  DagNode,
+  DagNodeStatus,
+  DagPattern,
+} from "./types.js";
 
 /**
  * Create a test DAG pattern from a simplified node spec.
@@ -1049,11 +1171,22 @@ import { dag } from "./multi-agent-orchestrator.js";
  * ```
  */
 export function createTestDag<T = unknown>(
-  nodes: Record<string, Pick<DagNode, "handler" | "deps" | "when" | "transform" | "timeout" | "priority">>,
+  nodes: Record<
+    string,
+    Pick<
+      DagNode,
+      "handler" | "deps" | "when" | "transform" | "timeout" | "priority"
+    >
+  >,
   merge?: (context: DagExecutionContext) => T | Promise<T>,
-  options?: { timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" },
+  options?: {
+    timeout?: number;
+    maxConcurrent?: number;
+    onNodeError?: "fail" | "skip-downstream" | "continue";
+  },
 ): DagPattern<T> {
-  const defaultMerge = (context: DagExecutionContext) => context.outputs as unknown as T;
+  const defaultMerge = (context: DagExecutionContext) =>
+    context.outputs as unknown as T;
 
   return dag<T>(nodes, merge ?? defaultMerge, options);
 }
@@ -1081,11 +1214,13 @@ export function assertDagExecution(
   },
 ): void {
   if (expected.nodeStatuses) {
-    for (const [nodeId, expectedStatus] of Object.entries(expected.nodeStatuses)) {
+    for (const [nodeId, expectedStatus] of Object.entries(
+      expected.nodeStatuses,
+    )) {
       const actual = context.statuses[nodeId];
       if (actual !== expectedStatus) {
         throw new Error(
-          `Expected node "${nodeId}" status to be "${expectedStatus}", got "${actual}"`
+          `Expected node "${nodeId}" status to be "${expectedStatus}", got "${actual}"`,
         );
       }
     }
@@ -1095,7 +1230,7 @@ export function assertDagExecution(
     for (const nodeId of expected.completedNodes) {
       if (context.statuses[nodeId] !== "completed") {
         throw new Error(
-          `Expected node "${nodeId}" to be completed, got "${context.statuses[nodeId]}"`
+          `Expected node "${nodeId}" to be completed, got "${context.statuses[nodeId]}"`,
         );
       }
     }
@@ -1105,7 +1240,7 @@ export function assertDagExecution(
     for (const nodeId of expected.skippedNodes) {
       if (context.statuses[nodeId] !== "skipped") {
         throw new Error(
-          `Expected node "${nodeId}" to be skipped, got "${context.statuses[nodeId]}"`
+          `Expected node "${nodeId}" to be skipped, got "${context.statuses[nodeId]}"`,
         );
       }
     }
@@ -1115,18 +1250,20 @@ export function assertDagExecution(
     for (const nodeId of expected.errorNodes) {
       if (context.statuses[nodeId] !== "error") {
         throw new Error(
-          `Expected node "${nodeId}" to be error, got "${context.statuses[nodeId]}"`
+          `Expected node "${nodeId}" to be error, got "${context.statuses[nodeId]}"`,
         );
       }
     }
   }
 
   if (expected.outputContains) {
-    for (const [nodeId, expectedOutput] of Object.entries(expected.outputContains)) {
+    for (const [nodeId, expectedOutput] of Object.entries(
+      expected.outputContains,
+    )) {
       const actual = context.outputs[nodeId];
       if (actual !== expectedOutput) {
         throw new Error(
-          `Expected node "${nodeId}" output to be ${JSON.stringify(expectedOutput)}, got ${JSON.stringify(actual)}`
+          `Expected node "${nodeId}" output to be ${JSON.stringify(expectedOutput)}, got ${JSON.stringify(actual)}`,
         );
       }
     }
@@ -1137,8 +1274,8 @@ export function assertDagExecution(
 // Debug Timeline Testing Helpers
 // ============================================================================
 
+import { type DebugTimeline, createDebugTimeline } from "./debug-timeline.js";
 import type { DebugEvent, DebugEventType } from "./types.js";
-import { createDebugTimeline, type DebugTimeline } from "./debug-timeline.js";
 
 /**
  * Create a test debug timeline pre-populated with events.
@@ -1157,7 +1294,9 @@ export function createTestTimeline(
   events?: Array<Partial<DebugEvent> & { type: DebugEventType }>,
   options?: { maxEvents?: number },
 ): DebugTimeline {
-  const timeline = createDebugTimeline({ maxEvents: options?.maxEvents ?? 500 });
+  const timeline = createDebugTimeline({
+    maxEvents: options?.maxEvents ?? 500,
+  });
 
   if (events) {
     for (const event of events) {
@@ -1200,21 +1339,24 @@ export function assertTimelineEvents(
 ): void {
   const events = timeline.getEvents();
 
-  if (expected.totalEvents !== undefined && events.length !== expected.totalEvents) {
+  if (
+    expected.totalEvents !== undefined &&
+    events.length !== expected.totalEvents
+  ) {
     throw new Error(
-      `Expected ${expected.totalEvents} timeline events, got ${events.length}`
+      `Expected ${expected.totalEvents} timeline events, got ${events.length}`,
     );
   }
 
   if (expected.minEvents !== undefined && events.length < expected.minEvents) {
     throw new Error(
-      `Expected at least ${expected.minEvents} timeline events, got ${events.length}`
+      `Expected at least ${expected.minEvents} timeline events, got ${events.length}`,
     );
   }
 
   if (expected.maxEvents !== undefined && events.length > expected.maxEvents) {
     throw new Error(
-      `Expected at most ${expected.maxEvents} timeline events, got ${events.length}`
+      `Expected at most ${expected.maxEvents} timeline events, got ${events.length}`,
     );
   }
 
@@ -1223,18 +1365,20 @@ export function assertTimelineEvents(
       const found = events.some((e) => e.type === type);
       if (!found) {
         throw new Error(
-          `Expected timeline to contain event of type "${type}", but none found`
+          `Expected timeline to contain event of type "${type}", but none found`,
         );
       }
     }
   }
 
   if (expected.agentEvents) {
-    for (const [agentId, expectedCount] of Object.entries(expected.agentEvents)) {
+    for (const [agentId, expectedCount] of Object.entries(
+      expected.agentEvents,
+    )) {
       const actual = timeline.getEventsForAgent(agentId).length;
       if (actual !== expectedCount) {
         throw new Error(
-          `Expected ${expectedCount} events for agent "${agentId}", got ${actual}`
+          `Expected ${expectedCount} events for agent "${agentId}", got ${actual}`,
         );
       }
     }
@@ -1244,7 +1388,7 @@ export function assertTimelineEvents(
     const found = events.some((e) => e.type === expected.hasType);
     if (!found) {
       throw new Error(
-        `Expected timeline to contain event of type "${expected.hasType}"`
+        `Expected timeline to contain event of type "${expected.hasType}"`,
       );
     }
   }
@@ -1253,7 +1397,7 @@ export function assertTimelineEvents(
     const found = events.some((e) => e.type === expected.doesNotHaveType);
     if (found) {
       throw new Error(
-        `Expected timeline NOT to contain event of type "${expected.doesNotHaveType}"`
+        `Expected timeline NOT to contain event of type "${expected.doesNotHaveType}"`,
       );
     }
   }
@@ -1263,9 +1407,9 @@ export function assertTimelineEvents(
 // Self-Healing Testing Helpers
 // ============================================================================
 
-import type { RerouteEvent, Scratchpad } from "./types.js";
 import type { HealthMonitor } from "./health-monitor.js";
 import type { ReflectionEvaluator } from "./reflection.js";
+import type { RerouteEvent, Scratchpad } from "./types.js";
 
 /**
  * Create a runner that always fails, useful for testing self-healing.
@@ -1343,9 +1487,12 @@ export function assertRerouted(
     throw new Error("Expected at least one reroute event, but none occurred");
   }
 
-  if (expected.minReroutes !== undefined && events.length < expected.minReroutes) {
+  if (
+    expected.minReroutes !== undefined &&
+    events.length < expected.minReroutes
+  ) {
     throw new Error(
-      `Expected at least ${expected.minReroutes} reroute events, got ${events.length}`
+      `Expected at least ${expected.minReroutes} reroute events, got ${events.length}`,
     );
   }
 
@@ -1353,7 +1500,7 @@ export function assertRerouted(
     const found = events.some((e) => e.originalAgent === expected.fromAgent);
     if (!found) {
       throw new Error(
-        `Expected reroute from agent "${expected.fromAgent}", but no matching event found`
+        `Expected reroute from agent "${expected.fromAgent}", but no matching event found`,
       );
     }
   }
@@ -1362,7 +1509,7 @@ export function assertRerouted(
     const found = events.some((e) => e.reroutedTo === expected.toAgent);
     if (!found) {
       throw new Error(
-        `Expected reroute to agent "${expected.toAgent}", but no matching event found`
+        `Expected reroute to agent "${expected.toAgent}", but no matching event found`,
       );
     }
   }
@@ -1377,7 +1524,7 @@ export function assertRerouted(
     });
     if (!found) {
       throw new Error(
-        `Expected reroute reason matching ${expected.reason}, but no matching event found`
+        `Expected reroute reason matching ${expected.reason}, but no matching event found`,
       );
     }
   }
@@ -1406,27 +1553,39 @@ export function assertAgentHealth(
 ): void {
   const metrics = monitor.getMetrics(agentId);
 
-  if (expected.minScore !== undefined && metrics.healthScore < expected.minScore) {
+  if (
+    expected.minScore !== undefined &&
+    metrics.healthScore < expected.minScore
+  ) {
     throw new Error(
-      `Expected agent "${agentId}" health score to be at least ${expected.minScore}, got ${metrics.healthScore}`
+      `Expected agent "${agentId}" health score to be at least ${expected.minScore}, got ${metrics.healthScore}`,
     );
   }
 
-  if (expected.maxScore !== undefined && metrics.healthScore > expected.maxScore) {
+  if (
+    expected.maxScore !== undefined &&
+    metrics.healthScore > expected.maxScore
+  ) {
     throw new Error(
-      `Expected agent "${agentId}" health score to be at most ${expected.maxScore}, got ${metrics.healthScore}`
+      `Expected agent "${agentId}" health score to be at most ${expected.maxScore}, got ${metrics.healthScore}`,
     );
   }
 
-  if (expected.circuitState !== undefined && metrics.circuitState !== expected.circuitState) {
+  if (
+    expected.circuitState !== undefined &&
+    metrics.circuitState !== expected.circuitState
+  ) {
     throw new Error(
-      `Expected agent "${agentId}" circuit state to be "${expected.circuitState}", got "${metrics.circuitState}"`
+      `Expected agent "${agentId}" circuit state to be "${expected.circuitState}", got "${metrics.circuitState}"`,
     );
   }
 
-  if (expected.minSuccessRate !== undefined && metrics.successRate < expected.minSuccessRate) {
+  if (
+    expected.minSuccessRate !== undefined &&
+    metrics.successRate < expected.minSuccessRate
+  ) {
     throw new Error(
-      `Expected agent "${agentId}" success rate to be at least ${expected.minSuccessRate}, got ${metrics.successRate}`
+      `Expected agent "${agentId}" success rate to be at least ${expected.minSuccessRate}, got ${metrics.successRate}`,
     );
   }
 }
@@ -1446,7 +1605,9 @@ export function assertAgentHealth(
  * expect(store.saved).toHaveLength(1);
  * ```
  */
-export function createTestCheckpointStore(maxCheckpoints = 100): CheckpointStore & {
+export function createTestCheckpointStore(
+  maxCheckpoints = 100,
+): CheckpointStore & {
   saved: Checkpoint[];
   inner: InMemoryCheckpointStore;
   /** Get the most recently saved checkpoint */
@@ -1485,34 +1646,52 @@ export function assertCheckpoint(
     label?: string;
   },
 ): void {
-  if (expected.orchestratorType !== undefined && checkpoint.orchestratorType !== expected.orchestratorType) {
+  if (
+    expected.orchestratorType !== undefined &&
+    checkpoint.orchestratorType !== expected.orchestratorType
+  ) {
     throw new Error(
-      `Expected checkpoint orchestratorType "${expected.orchestratorType}", got "${checkpoint.orchestratorType}"`
+      `Expected checkpoint orchestratorType "${expected.orchestratorType}", got "${checkpoint.orchestratorType}"`,
     );
   }
 
-  if (expected.hasSystemExport === true && (!checkpoint.systemExport || checkpoint.systemExport === "")) {
-    throw new Error("Expected checkpoint to have non-empty systemExport, but it was empty");
+  if (
+    expected.hasSystemExport === true &&
+    (!checkpoint.systemExport || checkpoint.systemExport === "")
+  ) {
+    throw new Error(
+      "Expected checkpoint to have non-empty systemExport, but it was empty",
+    );
   }
 
   if (expected.hasTimeline === true && checkpoint.timelineExport === null) {
-    throw new Error("Expected checkpoint to have timeline export, but it was null");
+    throw new Error(
+      "Expected checkpoint to have timeline export, but it was null",
+    );
   }
 
   if (expected.hasTimeline === false && checkpoint.timelineExport !== null) {
-    throw new Error("Expected checkpoint to have no timeline export, but it was present");
+    throw new Error(
+      "Expected checkpoint to have no timeline export, but it was present",
+    );
   }
 
   if (expected.hasMemory === true && checkpoint.memoryExport === null) {
-    throw new Error("Expected checkpoint to have memory export, but it was null");
+    throw new Error(
+      "Expected checkpoint to have memory export, but it was null",
+    );
   }
 
   if (expected.hasMemory === false && checkpoint.memoryExport !== null) {
-    throw new Error("Expected checkpoint to have no memory export, but it was present");
+    throw new Error(
+      "Expected checkpoint to have no memory export, but it was present",
+    );
   }
 
   if (expected.label !== undefined && checkpoint.label !== expected.label) {
-    throw new Error(`Expected checkpoint label "${expected.label}", got "${checkpoint.label}"`);
+    throw new Error(
+      `Expected checkpoint label "${expected.label}", got "${checkpoint.label}"`,
+    );
   }
 }
 
@@ -1571,7 +1750,7 @@ export function createBreakpointSimulator(
     if (!attached) {
       throw new Error(
         "[Directive] BreakpointSimulator: handler called but attachTo() was never called. " +
-        "Breakpoints will not be resolved. Call simulator.attachTo(orchestrator) after creation."
+          "Breakpoints will not be resolved. Call simulator.attachTo(orchestrator) after creation.",
       );
     }
 
@@ -1619,7 +1798,7 @@ export function assertBreakpointHit(
 ): void {
   if (expected.count !== undefined && hits.length !== expected.count) {
     throw new Error(
-      `Expected ${expected.count} breakpoint hits, got ${hits.length}`
+      `Expected ${expected.count} breakpoint hits, got ${hits.length}`,
     );
   }
 
@@ -1629,7 +1808,7 @@ export function assertBreakpointHit(
       const types = hits.map((h) => h.type).join(", ");
 
       throw new Error(
-        `Expected breakpoint of type "${expected.type}", found types: [${types}]`
+        `Expected breakpoint of type "${expected.type}", found types: [${types}]`,
       );
     }
   }
@@ -1640,7 +1819,7 @@ export function assertBreakpointHit(
       const agents = hits.map((h) => h.agentId).join(", ");
 
       throw new Error(
-        `Expected breakpoint for agent "${expected.agentId}", found agents: [${agents}]`
+        `Expected breakpoint for agent "${expected.agentId}", found agents: [${agents}]`,
       );
     }
   }
@@ -1665,7 +1844,14 @@ export function assertBreakpointHit(
 export function createMockSchema<T>(
   validate: (data: unknown) => boolean,
   description?: string,
-): { safeParse: (data: unknown) => { success: boolean; data?: T; error?: { message: string } }; description?: string } {
+): {
+  safeParse: (data: unknown) => {
+    success: boolean;
+    data?: T;
+    error?: { message: string };
+  };
+  description?: string;
+} {
   return {
     safeParse: (data: unknown) => {
       if (validate(data)) {
@@ -1717,7 +1903,7 @@ export function assertMultiplexedStream(
 ): void {
   if (expected.minChunks !== undefined && chunks.length < expected.minChunks) {
     throw new Error(
-      `Expected at least ${expected.minChunks} chunks, got ${chunks.length}`
+      `Expected at least ${expected.minChunks} chunks, got ${chunks.length}`,
     );
   }
 
@@ -1726,7 +1912,7 @@ export function assertMultiplexedStream(
     for (const agentId of expected.agentIds) {
       if (!seenAgents.has(agentId)) {
         throw new Error(
-          `Expected chunks from agent "${agentId}", found agents: [${[...seenAgents].join(", ")}]`
+          `Expected chunks from agent "${agentId}", found agents: [${[...seenAgents].join(", ")}]`,
         );
       }
     }
@@ -1816,7 +2002,7 @@ export function assertScratchpadState(
     const actual = all[key];
     if (actual !== expectedValue) {
       throw new Error(
-        `Expected scratchpad key "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
+        `Expected scratchpad key "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`,
       );
     }
   }
@@ -1846,15 +2032,16 @@ export function assertDerivedValues(
     const actual = derived[key];
     if (typeof expectedValue === "object" && expectedValue !== null) {
       // Sort keys for order-independent comparison
-      const sortedStringify = (v: unknown): string => JSON.stringify(v, Object.keys(v as Record<string, unknown>).sort());
+      const sortedStringify = (v: unknown): string =>
+        JSON.stringify(v, Object.keys(v as Record<string, unknown>).sort());
       if (sortedStringify(actual) !== sortedStringify(expectedValue)) {
         throw new Error(
-          `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
+          `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`,
         );
       }
     } else if (actual !== expectedValue) {
       throw new Error(
-        `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`
+        `Expected derived value "${key}" to be ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actual)}`,
       );
     }
   }

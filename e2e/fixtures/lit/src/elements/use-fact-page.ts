@@ -1,8 +1,8 @@
+import { FactController } from "@directive-run/lit";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController } from "@directive-run/lit";
-import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 @customElement("use-fact-page")
 export class UseFactPage extends LitElement {

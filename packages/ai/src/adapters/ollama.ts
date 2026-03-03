@@ -23,13 +23,13 @@ import type { AdapterHooks, AgentRunner } from "../types.js";
 
 /** Options for createOllamaRunner */
 export interface OllamaRunnerOptions {
-	model?: string;
-	baseURL?: string;
-	fetch?: typeof globalThis.fetch;
-	/** @default undefined */
-	timeoutMs?: number;
-	/** Lifecycle hooks for tracing, logging, and metrics */
-	hooks?: AdapterHooks;
+  model?: string;
+  baseURL?: string;
+  fetch?: typeof globalThis.fetch;
+  /** @default undefined */
+  timeoutMs?: number;
+  /** Lifecycle hooks for tracing, logging, and metrics */
+  hooks?: AdapterHooks;
 }
 
 /**
@@ -49,58 +49,61 @@ export interface OllamaRunnerOptions {
  * ```
  */
 export function createOllamaRunner(
-	options: OllamaRunnerOptions = {},
+  options: OllamaRunnerOptions = {},
 ): AgentRunner {
-	const {
-		model = "llama3",
-		baseURL = "http://localhost:11434",
-		fetch: fetchFn = globalThis.fetch,
-		timeoutMs,
-		hooks,
-	} = options;
+  const {
+    model = "llama3",
+    baseURL = "http://localhost:11434",
+    fetch: fetchFn = globalThis.fetch,
+    timeoutMs,
+    hooks,
+  } = options;
 
-	validateBaseURL(baseURL);
+  validateBaseURL(baseURL);
 
-	return createRunner({
-		fetch: fetchFn,
-		hooks,
-		buildRequest: (agent, _input, messages) => ({
-			url: `${baseURL}/api/chat`,
-			init: {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					model: agent.model ?? model,
-					messages: [
-						...(agent.instructions
-							? [{ role: "system", content: agent.instructions }]
-							: []),
-						...messages.map((m) => ({ role: m.role, content: m.content })),
-					],
-					stream: false,
-				}),
-				...(timeoutMs != null ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
-			},
-		}),
-		parseResponse: async (res) => {
-			let data: Record<string, unknown>;
-			try {
-				data = await res.json();
-			} catch {
-				throw new Error(
-					`[Directive] Ollama returned non-JSON response. Is Ollama running at ${baseURL}? Start it with: ollama serve`,
-				);
-			}
-			const text = (data.message as Record<string, unknown>)?.content as string ?? "";
-			const inputTokens = (data.prompt_eval_count as number) ?? 0;
-			const outputTokens = (data.eval_count as number) ?? 0;
+  return createRunner({
+    fetch: fetchFn,
+    hooks,
+    buildRequest: (agent, _input, messages) => ({
+      url: `${baseURL}/api/chat`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: agent.model ?? model,
+          messages: [
+            ...(agent.instructions
+              ? [{ role: "system", content: agent.instructions }]
+              : []),
+            ...messages.map((m) => ({ role: m.role, content: m.content })),
+          ],
+          stream: false,
+        }),
+        ...(timeoutMs != null
+          ? { signal: AbortSignal.timeout(timeoutMs) }
+          : {}),
+      },
+    }),
+    parseResponse: async (res) => {
+      let data: Record<string, unknown>;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(
+          `[Directive] Ollama returned non-JSON response. Is Ollama running at ${baseURL}? Start it with: ollama serve`,
+        );
+      }
+      const text =
+        ((data.message as Record<string, unknown>)?.content as string) ?? "";
+      const inputTokens = (data.prompt_eval_count as number) ?? 0;
+      const outputTokens = (data.eval_count as number) ?? 0;
 
-			return {
-				text,
-				totalTokens: inputTokens + outputTokens,
-				inputTokens,
-				outputTokens,
-			};
-		},
-	});
+      return {
+        text,
+        totalTokens: inputTokens + outputTokens,
+        inputTokens,
+        outputTokens,
+      };
+    },
+  });
 }

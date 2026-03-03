@@ -6,7 +6,12 @@
  * difficulty levels.
  */
 
-import { type Grid, type Difficulty, GIVENS_COUNT, getCandidates } from "./rules.js";
+import {
+  type Difficulty,
+  GIVENS_COUNT,
+  type Grid,
+  getCandidates,
+} from "./rules.js";
 
 // ============================================================================
 // Fisher-Yates Shuffle
@@ -114,7 +119,10 @@ function fillBox(grid: Grid, boxRow: number, boxCol: number): void {
  */
 const MAX_GENERATION_RETRIES = 10;
 
-export function generatePuzzle(difficulty: Difficulty, attempt = 0): { puzzle: Grid; solution: Grid } {
+export function generatePuzzle(
+  difficulty: Difficulty,
+  attempt = 0,
+): { puzzle: Grid; solution: Grid } {
   // Start with empty grid
   const grid: Grid = new Array(81).fill(0);
 
@@ -127,7 +135,9 @@ export function generatePuzzle(difficulty: Difficulty, attempt = 0): { puzzle: G
   const solution = solve(grid);
   if (!solution) {
     if (attempt >= MAX_GENERATION_RETRIES) {
-      throw new Error("Failed to generate a valid Sudoku puzzle after max retries.");
+      throw new Error(
+        "Failed to generate a valid Sudoku puzzle after max retries.",
+      );
     }
 
     return generatePuzzle(difficulty, attempt + 1);

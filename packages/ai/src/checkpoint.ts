@@ -21,14 +21,17 @@ export interface MultiAgentCheckpointLocalState {
   type: "multi";
   globalTokenCount: number;
   globalStatus: "idle" | "paused";
-  agentStates: Record<string, {
-    status: "idle" | "running" | "completed" | "error";
-    lastInput?: string;
-    lastOutput?: unknown;
-    lastError?: string;
-    runCount: number;
-    totalTokens: number;
-  }>;
+  agentStates: Record<
+    string,
+    {
+      status: "idle" | "running" | "completed" | "error";
+      lastInput?: string;
+      lastOutput?: unknown;
+      lastError?: string;
+      runCount: number;
+      totalTokens: number;
+    }
+  >;
   handoffCounter: number;
   pendingHandoffs: unknown[];
   handoffResults: unknown[];
@@ -187,12 +190,12 @@ export class InMemoryCheckpointStore implements CheckpointStore {
 
   constructor(options?: InMemoryCheckpointStoreOptions) {
     this.maxCheckpoints = options?.maxCheckpoints ?? 100;
-    this.retentionMs = options?.retentionMs ?? Infinity;
+    this.retentionMs = options?.retentionMs ?? Number.POSITIVE_INFINITY;
     this.preserveLabeled = options?.preserveLabeled ?? false;
 
     if (!Number.isFinite(this.maxCheckpoints) || this.maxCheckpoints < 1) {
       throw new Error(
-        `[Directive Checkpoint] maxCheckpoints must be >= 1, got ${this.maxCheckpoints}`
+        `[Directive Checkpoint] maxCheckpoints must be >= 1, got ${this.maxCheckpoints}`,
       );
     }
   }
@@ -226,7 +229,9 @@ export class InMemoryCheckpointStore implements CheckpointStore {
     return this.store.get(checkpointId) ?? null;
   }
 
-  async list(): Promise<Array<{ id: string; label?: string; createdAt: string }>> {
+  async list(): Promise<
+    Array<{ id: string; label?: string; createdAt: string }>
+  > {
     return this.order.map((id) => {
       const cp = this.store.get(id)!;
 

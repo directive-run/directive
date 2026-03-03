@@ -5,14 +5,19 @@
  * PII detection, and compliance checks. All run locally using built-in patterns.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { devtoolsPlugin, emitDevToolsEvent } from "@directive-run/core/plugins";
 import {
-  detectPromptInjection,
-  detectPII,
   type InjectionDetectionResult,
   type PIIDetectionResult,
+  detectPII,
+  detectPromptInjection,
 } from "@directive-run/ai";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import { devtoolsPlugin, emitDevToolsEvent } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -42,7 +47,11 @@ type ComplianceMode = "standard" | "gdpr" | "hipaa";
 
 const timeline: TimelineEntry[] = [];
 
-function addTimeline(event: string, detail: string, type: TimelineEntry["type"]) {
+function addTimeline(
+  event: string,
+  detail: string,
+  type: TimelineEntry["type"],
+) {
   timeline.unshift({ time: Date.now(), event, detail, type });
   if (timeline.length > 50) {
     timeline.length = 50;
@@ -100,7 +109,9 @@ const guardrailModule = createModule("guardrails", {
         return "0%";
       }
 
-      const blocked = (facts.messages as ChatMessage[]).filter((m) => m.blocked).length;
+      const blocked = (facts.messages as ChatMessage[]).filter(
+        (m) => m.blocked,
+      ).length;
 
       return `${Math.round((blocked / facts.messages.length) * 100)}%`;
     },
@@ -114,7 +125,11 @@ const guardrailModule = createModule("guardrails", {
         }
       }
 
-      return Object.entries(counts).map(([k, v]) => `${k}:${v}`).join(", ") || "none";
+      return (
+        Object.entries(counts)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(", ") || "none"
+      );
     },
   },
 
@@ -140,7 +155,10 @@ const guardrailModule = createModule("guardrails", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: guardrailModule, plugins: [devtoolsPlugin({ name: "ai-guardrails" })] });
+const system = createSystem({
+  module: guardrailModule,
+  plugins: [devtoolsPlugin({ name: "ai-guardrails" })],
+});
 system.start();
 
 // ============================================================================
@@ -155,7 +173,8 @@ function analyzeMessage(text: string): ChatMessage {
   const injectionResult = detectPromptInjection(text);
   if (injectionResult.detected) {
     blocked = true;
-    system.facts.injectionAttempts = (system.facts.injectionAttempts as number) + 1;
+    system.facts.injectionAttempts =
+      (system.facts.injectionAttempts as number) + 1;
     for (const p of injectionResult.patterns) {
       addTimeline("injection", `${p.name} (${p.severity})`, "injection");
     }
@@ -170,7 +189,10 @@ function analyzeMessage(text: string): ChatMessage {
   });
 
   // 2. PII detection
-  const piiResult = detectPII(text, { redact: system.facts.redactionEnabled as boolean, redactionStyle: "typed" });
+  const piiResult = detectPII(text, {
+    redact: system.facts.redactionEnabled as boolean,
+    redactionStyle: "typed",
+  });
   if (piiResult.detected) {
     system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
     for (const item of piiResult.items) {
@@ -189,22 +211,27 @@ function analyzeMessage(text: string): ChatMessage {
   // 3. Compliance check
   const mode = system.facts.complianceMode as ComplianceMode;
   if (mode !== "standard" && piiResult.detected) {
-    const hasPHI = piiResult.items.some((i) =>
-      i.type === "medical_id" || i.type === "ssn" || i.type === "date_of_birth"
+    const hasPHI = piiResult.items.some(
+      (i) =>
+        i.type === "medical_id" ||
+        i.type === "ssn" ||
+        i.type === "date_of_birth",
     );
-    const hasContactInfo = piiResult.items.some((i) =>
-      i.type === "email" || i.type === "phone" || i.type === "name"
+    const hasContactInfo = piiResult.items.some(
+      (i) => i.type === "email" || i.type === "phone" || i.type === "name",
     );
 
     if (mode === "hipaa" && hasPHI) {
       blocked = true;
-      system.facts.complianceBlocks = (system.facts.complianceBlocks as number) + 1;
+      system.facts.complianceBlocks =
+        (system.facts.complianceBlocks as number) + 1;
       addTimeline("compliance", "HIPAA: PHI detected", "compliance");
     }
 
     if (mode === "gdpr" && hasContactInfo) {
       blocked = true;
-      system.facts.complianceBlocks = (system.facts.complianceBlocks as number) + 1;
+      system.facts.complianceBlocks =
+        (system.facts.complianceBlocks as number) + 1;
       addTimeline("compliance", "GDPR: personal data detected", "compliance");
     }
   }
@@ -244,8 +271,12 @@ function analyzeMessage(text: string): ChatMessage {
 const chatInput = document.getElementById("gs-input") as HTMLInputElement;
 const sendBtn = document.getElementById("gs-send") as HTMLButtonElement;
 const chatLog = document.getElementById("gs-chat-log")!;
-const complianceSelect = document.getElementById("gs-compliance") as HTMLSelectElement;
-const redactionToggle = document.getElementById("gs-redaction") as HTMLInputElement;
+const complianceSelect = document.getElementById(
+  "gs-compliance",
+) as HTMLSelectElement;
+const redactionToggle = document.getElementById(
+  "gs-redaction",
+) as HTMLInputElement;
 
 // Timeline
 const timelineEl = document.getElementById("gs-timeline")!;
@@ -272,7 +303,8 @@ function render(): void {
 
   // Chat log
   if (messages.length === 0) {
-    chatLog.innerHTML = '<div class="gs-empty">Send a message to test guardrails</div>';
+    chatLog.innerHTML =
+      '<div class="gs-empty">Send a message to test guardrails</div>';
   } else {
     chatLog.innerHTML = "";
     for (const msg of messages) {
@@ -280,7 +312,9 @@ function render(): void {
       el.className = `gs-message ${msg.blocked ? "blocked" : "passed"}`;
       el.setAttribute("data-testid", `gs-msg-${msg.id}`);
 
-      const displayText = (system.facts.redactionEnabled as boolean) ? msg.redactedText : msg.text;
+      const displayText = (system.facts.redactionEnabled as boolean)
+        ? msg.redactedText
+        : msg.text;
 
       let flags = "";
       if (msg.injectionResult) {
@@ -305,7 +339,8 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="gs-timeline-empty">Events appear after sending messages</div>';
+    timelineEl.innerHTML =
+      '<div class="gs-timeline-empty">Events appear after sending messages</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {
@@ -334,7 +369,10 @@ function render(): void {
 // Subscribe
 // ============================================================================
 
-const allKeys = [...Object.keys(schema.facts), ...Object.keys(schema.derivations)];
+const allKeys = [
+  ...Object.keys(schema.facts),
+  ...Object.keys(schema.derivations),
+];
 system.subscribe(allKeys, render);
 
 // ============================================================================

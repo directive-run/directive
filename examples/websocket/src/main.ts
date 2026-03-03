@@ -8,14 +8,14 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import type { WsMessage } from "./mock-ws.js";
 import {
-  websocketModule,
-  websocketSchema,
-  getActiveSocket,
   type EventLogEntry,
   type WsStatus,
+  getActiveSocket,
+  websocketModule,
+  websocketSchema,
 } from "./websocket.js";
-import type { WsMessage } from "./mock-ws.js";
 
 // ============================================================================
 // System
@@ -44,10 +44,18 @@ const reconnectCountdownEl = document.getElementById("ws-reconnect-countdown")!;
 
 // Connection & Send
 const urlInput = document.getElementById("ws-url-input") as HTMLInputElement;
-const connectBtn = document.getElementById("ws-connect-btn") as HTMLButtonElement;
-const disconnectBtn = document.getElementById("ws-disconnect-btn") as HTMLButtonElement;
-const forceErrorBtn = document.getElementById("ws-force-error-btn") as HTMLButtonElement;
-const messageInput = document.getElementById("ws-message-input") as HTMLInputElement;
+const connectBtn = document.getElementById(
+  "ws-connect-btn",
+) as HTMLButtonElement;
+const disconnectBtn = document.getElementById(
+  "ws-disconnect-btn",
+) as HTMLButtonElement;
+const forceErrorBtn = document.getElementById(
+  "ws-force-error-btn",
+) as HTMLButtonElement;
+const messageInput = document.getElementById(
+  "ws-message-input",
+) as HTMLInputElement;
 const sendBtn = document.getElementById("ws-send-btn") as HTMLButtonElement;
 const clearBtn = document.getElementById("ws-clear-btn") as HTMLButtonElement;
 const connectError = document.getElementById("ws-connect-error")!;
@@ -57,13 +65,21 @@ const messageFeed = document.getElementById("ws-message-feed")!;
 const messageFooter = document.getElementById("ws-message-footer")!;
 
 // Config sliders
-const messageRateSlider = document.getElementById("ws-message-rate") as HTMLInputElement;
+const messageRateSlider = document.getElementById(
+  "ws-message-rate",
+) as HTMLInputElement;
 const rateVal = document.getElementById("ws-rate-val")!;
-const connectFailSlider = document.getElementById("ws-connect-failrate") as HTMLInputElement;
+const connectFailSlider = document.getElementById(
+  "ws-connect-failrate",
+) as HTMLInputElement;
 const connectFailVal = document.getElementById("ws-connect-fail-val")!;
-const reconnectFailSlider = document.getElementById("ws-reconnect-failrate") as HTMLInputElement;
+const reconnectFailSlider = document.getElementById(
+  "ws-reconnect-failrate",
+) as HTMLInputElement;
 const reconnectFailVal = document.getElementById("ws-reconnect-fail-val")!;
-const maxRetriesSlider = document.getElementById("ws-max-retries") as HTMLInputElement;
+const maxRetriesSlider = document.getElementById(
+  "ws-max-retries",
+) as HTMLInputElement;
 const maxRetriesVal = document.getElementById("ws-max-retries-val")!;
 
 // Timeline
@@ -102,7 +118,10 @@ function render(): void {
   }
 
   // --- Connection form state ---
-  connectBtn.disabled = status === "connected" || status === "connecting" || status === "reconnecting";
+  connectBtn.disabled =
+    status === "connected" ||
+    status === "connecting" ||
+    status === "reconnecting";
   disconnectBtn.disabled = status === "disconnected";
   forceErrorBtn.disabled = status !== "connected";
   sendBtn.disabled = !canSend;
@@ -121,7 +140,8 @@ function render(): void {
 
   // --- Message feed ---
   if (messages.length === 0) {
-    messageFeed.innerHTML = '<div class="ws-message-empty">Messages will appear here after connecting</div>';
+    messageFeed.innerHTML =
+      '<div class="ws-message-empty">Messages will appear here after connecting</div>';
   } else {
     messageFeed.innerHTML = "";
     for (const msg of messages) {
@@ -166,7 +186,8 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML = '<div class="ws-timeline-empty">Events will appear here after connecting</div>';
+    timelineEl.innerHTML =
+      '<div class="ws-timeline-empty">Events will appear here after connecting</div>';
   } else {
     timelineEl.innerHTML = "";
     for (let i = eventLog.length - 1; i >= 0; i--) {
@@ -274,7 +295,9 @@ connectFailSlider.addEventListener("input", () => {
 });
 
 reconnectFailSlider.addEventListener("input", () => {
-  system.events.setReconnectFailRate({ value: Number(reconnectFailSlider.value) });
+  system.events.setReconnectFailRate({
+    value: Number(reconnectFailSlider.value),
+  });
 });
 
 maxRetriesSlider.addEventListener("input", () => {

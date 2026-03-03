@@ -1,5 +1,5 @@
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
 import type { AgentRunner } from "@directive-run/ai";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import {
   AGENTS,
   AGENT_ORDER,
@@ -7,9 +7,9 @@ import {
   computeSatisfaction,
   createHeistRunner,
   getApiKey,
-  setApiKey as storeApiKey,
-  setFailHacker,
   setFailForger,
+  setFailHacker,
+  setApiKey as storeApiKey,
 } from "./agents.js";
 
 // ---------------------------------------------------------------------------
@@ -78,10 +78,8 @@ function selectAgents(
   if (strategyId === "highestImpact") {
     const scored = ready.map((id) => {
       const agent = AGENTS[id];
-      const weight = agent?.produces.reduce(
-        (sum, key) => sum + (WEIGHTS[key] ?? 0),
-        0,
-      ) ?? 0;
+      const weight =
+        agent?.produces.reduce((sum, key) => sum + (WEIGHTS[key] ?? 0), 0) ?? 0;
 
       return { id, weight };
     });
@@ -227,8 +225,7 @@ export const heistModule = createModule("heist", {
   derive: {
     progressPercent: (facts) => Math.round(facts.satisfaction * 100),
 
-    readyNodes: (facts) =>
-      getReadyNodes(facts.nodeStatuses, facts.goalFacts),
+    readyNodes: (facts) => getReadyNodes(facts.nodeStatuses, facts.goalFacts),
 
     summaryText: (facts) => {
       if (facts.status === "idle") {
@@ -258,7 +255,9 @@ export const heistModule = createModule("heist", {
       const ready = getReadyNodes(facts.nodeStatuses, facts.goalFacts);
 
       return (
-        facts.status === "running" && facts.stallCount >= 2 && ready.length === 0
+        facts.status === "running" &&
+        facts.stallCount >= 2 &&
+        ready.length === 0
       );
     },
 
@@ -524,10 +523,7 @@ export const heistModule = createModule("heist", {
           } else {
             nodesRun.push(id);
             newStatuses[id] = "failed";
-            console.warn(
-              `[Heist] ${AGENTS[id]?.name} failed:`,
-              outcome.reason,
-            );
+            console.warn(`[Heist] ${AGENTS[id]?.name} failed:`, outcome.reason);
           }
         }
 
@@ -573,8 +569,13 @@ export const heistModule = createModule("heist", {
     applyRelaxation: {
       requirement: "APPLY_RELAXATION",
       resolve: async (req, context) => {
-        const { relaxations, currentStep, nodeStatuses, failHacker, failForger } =
-          context.facts;
+        const {
+          relaxations,
+          currentStep,
+          nodeStatuses,
+          failHacker,
+          failForger,
+        } = context.facts;
         const applied = relaxations.length;
 
         // Heightened Security: Hacker fails -> inject cameras_disabled

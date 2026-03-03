@@ -19,7 +19,12 @@
  * ```
  */
 
-import type { GuardrailFn, InputGuardrailData, OutputGuardrailData, GuardrailResult } from "../types.js";
+import type {
+  GuardrailFn,
+  GuardrailResult,
+  InputGuardrailData,
+  OutputGuardrailData,
+} from "../types.js";
 
 // ============================================================================
 // PII Types
@@ -83,7 +88,11 @@ const PII_PATTERNS: PIIPattern[] = [
       // Remove separators and validate format
       const digits = match.replace(/[-\s]/g, "");
       // SSN cannot start with 000, 666, or 9xx
-      if (digits.startsWith("000") || digits.startsWith("666") || digits.startsWith("9")) {
+      if (
+        digits.startsWith("000") ||
+        digits.startsWith("666") ||
+        digits.startsWith("9")
+      ) {
         return false;
       }
       // Middle 2 digits cannot be 00
@@ -149,7 +158,8 @@ const PII_PATTERNS: PIIPattern[] = [
   {
     type: "date_of_birth",
     // Various formats: MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY
-    pattern: /\b(born|dob|birth.?date|date.?of.?birth)[:.\s]+(\d{1,4}[-/]\d{1,2}[-/]\d{1,4})\b/gi,
+    pattern:
+      /\b(born|dob|birth.?date|date.?of.?birth)[:.\s]+(\d{1,4}[-/]\d{1,2}[-/]\d{1,4})\b/gi,
     confidence: 0.85,
   },
 
@@ -209,10 +219,11 @@ function detectAddresses(text: string): DetectedPII[] {
   // Simplified US address pattern to avoid ReDoS
   // Matches: "123 Main Street, City, CA 12345" or similar
   // Uses possessive-like matching and limits word count to prevent catastrophic backtracking
-  const streetTypes = "street|st|avenue|ave|road|rd|drive|dr|lane|ln|court|ct|way|boulevard|blvd|circle|cir|place|pl";
+  const streetTypes =
+    "street|st|avenue|ave|road|rd|drive|dr|lane|ln|court|ct|way|boulevard|blvd|circle|cir|place|pl";
   const addressPattern = new RegExp(
     `\\b(\\d{1,5}\\s+(?:\\w+\\s+){1,4}(?:${streetTypes})\\b[^\\n]{0,50}\\b[A-Z]{2}\\s+\\d{5}(?:-\\d{4})?)\\b`,
-    "gi"
+    "gi",
   );
 
   let match: RegExpExecArray | null;
@@ -234,9 +245,24 @@ function detectAddresses(text: string): DetectedPII[] {
 
 /** Common prefixes that indicate names */
 const NAME_PREFIXES = [
-  "mr", "mrs", "ms", "miss", "dr", "prof", "sir", "madam",
-  "name is", "called", "known as", "signed by", "from",
-  "dear", "hi", "hello", "contact", "recipient",
+  "mr",
+  "mrs",
+  "ms",
+  "miss",
+  "dr",
+  "prof",
+  "sir",
+  "madam",
+  "name is",
+  "called",
+  "known as",
+  "signed by",
+  "from",
+  "dear",
+  "hi",
+  "hello",
+  "contact",
+  "recipient",
 ];
 
 /** Detect personal names (requires context) */
@@ -249,7 +275,7 @@ function detectNames(text: string): DetectedPII[] {
   const prefixPattern = NAME_PREFIXES.join("|");
   const nameRegex = new RegExp(
     `\\b(${prefixPattern})[.,:]?\\s+([A-Z][a-z]{1,20}(?:\\s[A-Z][a-z]{1,20}){0,2})\\b`,
-    "gi"
+    "gi",
   );
 
   let match: RegExpExecArray | null;
@@ -260,7 +286,10 @@ function detectNames(text: string): DetectedPII[] {
     // Skip if name is undefined
     if (!name) continue;
     // Ignore single-word names that might be common words
-    if (name.split(/\s+/).length >= 2 || (prefix && NAME_PREFIXES.some(p => prefix.toLowerCase().includes(p)))) {
+    if (
+      name.split(/\s+/).length >= 2 ||
+      (prefix && NAME_PREFIXES.some((p) => prefix.toLowerCase().includes(p)))
+    ) {
       results.push({
         type: "name",
         value: name,
@@ -295,7 +324,7 @@ export const regexDetector: PIIDetector = {
     if (text.length > MAX_PII_INPUT_LENGTH) {
       throw new Error(
         `[Directive] Input exceeds maximum length of ${MAX_PII_INPUT_LENGTH} characters for PII detection. ` +
-        `Truncate input or process in chunks.`
+          `Truncate input or process in chunks.`,
       );
     }
 
@@ -311,7 +340,10 @@ export const regexDetector: PIIDetector = {
 
       while ((match = regex.exec(text)) !== null) {
         const value = match[1] || match[0];
-        const context = text.slice(Math.max(0, match.index - 20), match.index + value.length + 20);
+        const context = text.slice(
+          Math.max(0, match.index - 20),
+          match.index + value.length + 20,
+        );
 
         // Apply validation if present
         if (pattern.validate && !pattern.validate(value, context)) {
@@ -361,7 +393,7 @@ export type RedactionStyle =
 export function redactPII(
   text: string,
   items: DetectedPII[],
-  style: RedactionStyle = "typed"
+  style: RedactionStyle = "typed",
 ): string {
   // Sort by position descending to avoid offset issues
   const sorted = [...items].sort((a, b) => b.position.start - a.position.start);
@@ -387,7 +419,10 @@ export function redactPII(
         break;
     }
 
-    result = result.slice(0, item.position.start) + replacement + result.slice(item.position.end);
+    result =
+      result.slice(0, item.position.start) +
+      replacement +
+      result.slice(item.position.end);
   }
 
   return result;
@@ -477,7 +512,7 @@ const DEFAULT_PII_TYPES: PIIType[] = [
  * ```
  */
 export function createEnhancedPIIGuardrail(
-  options: EnhancedPIIGuardrailOptions = {}
+  options: EnhancedPIIGuardrailOptions = {},
 ): GuardrailFn<InputGuardrailData> {
   const {
     types = DEFAULT_PII_TYPES,
@@ -496,7 +531,10 @@ export function createEnhancedPIIGuardrail(
   const allowSet = new Set(allowlist.map((v) => v.toLowerCase().trim()));
 
   // Wrap detector with timeout to prevent DoS via slow external services
-  async function detectWithTimeout(text: string, piiTypes: PIIType[]): Promise<DetectedPII[]> {
+  async function detectWithTimeout(
+    text: string,
+    piiTypes: PIIType[],
+  ): Promise<DetectedPII[]> {
     // Built-in regex detector doesn't need timeout (it's synchronous)
     if (detectorInstance === regexDetector) {
       return detectorInstance.detect(text, piiTypes);
@@ -509,8 +547,13 @@ export function createEnhancedPIIGuardrail(
         detectorInstance.detect(text, piiTypes),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
-            () => reject(new Error(`[Directive] PII detector '${detectorInstance.name}' timed out after ${detectorTimeout}ms`)),
-            detectorTimeout
+            () =>
+              reject(
+                new Error(
+                  `[Directive] PII detector '${detectorInstance.name}' timed out after ${detectorTimeout}ms`,
+                ),
+              ),
+            detectorTimeout,
           );
         }),
       ]);
@@ -574,17 +617,17 @@ export function createEnhancedPIIGuardrail(
  * ```
  */
 export function createOutputPIIGuardrail(
-  options: EnhancedPIIGuardrailOptions = {}
+  options: EnhancedPIIGuardrailOptions = {},
 ): GuardrailFn<OutputGuardrailData> {
   const inputGuardrail = createEnhancedPIIGuardrail(options);
 
   return async (data, context): Promise<GuardrailResult> => {
-    const text = typeof data.output === "string" ? data.output : JSON.stringify(data.output);
+    const text =
+      typeof data.output === "string"
+        ? data.output
+        : JSON.stringify(data.output);
 
-    return inputGuardrail(
-      { input: text, agentName: data.agentName },
-      context
-    );
+    return inputGuardrail({ input: text, agentName: data.agentName }, context);
   };
 }
 
@@ -616,7 +659,7 @@ export async function detectPII(
     minConfidence?: number;
     /** Timeout for custom detectors in milliseconds (default: 5000) */
     timeout?: number;
-  } = {}
+  } = {},
 ): Promise<PIIDetectionResult> {
   const {
     types = DEFAULT_PII_TYPES,
@@ -640,8 +683,13 @@ export async function detectPII(
         detectorInstance.detect(text, types),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
-            () => reject(new Error(`[Directive] PII detector '${detectorInstance.name}' timed out after ${timeout}ms`)),
-            timeout
+            () =>
+              reject(
+                new Error(
+                  `[Directive] PII detector '${detectorInstance.name}' timed out after ${timeout}ms`,
+                ),
+              ),
+            timeout,
           );
         }),
       ]);

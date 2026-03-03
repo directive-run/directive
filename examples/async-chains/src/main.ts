@@ -9,14 +9,14 @@
  */
 
 import { createSystem } from "@directive-run/core";
-import { loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
+import { devtoolsPlugin, loggingPlugin } from "@directive-run/core/plugins";
 import {
   authModule,
   authSchema,
-  permissionsModule,
-  permissionsSchema,
   dashboardModule,
   dashboardSchema,
+  permissionsModule,
+  permissionsSchema,
 } from "./async-chains.js";
 import type { DashboardWidget } from "./mock-api.js";
 
@@ -104,11 +104,17 @@ const arrow2 = document.getElementById("ac-arrow-2")!;
 // Controls
 const startBtn = document.getElementById("ac-start-btn") as HTMLButtonElement;
 const resetBtn = document.getElementById("ac-reset-btn") as HTMLButtonElement;
-const authFailSlider = document.getElementById("ac-auth-fail-rate") as HTMLInputElement;
+const authFailSlider = document.getElementById(
+  "ac-auth-fail-rate",
+) as HTMLInputElement;
 const authFailVal = document.getElementById("ac-auth-fail-val")!;
-const permsFailSlider = document.getElementById("ac-perms-fail-rate") as HTMLInputElement;
+const permsFailSlider = document.getElementById(
+  "ac-perms-fail-rate",
+) as HTMLInputElement;
 const permsFailVal = document.getElementById("ac-perms-fail-val")!;
-const dashFailSlider = document.getElementById("ac-dash-fail-rate") as HTMLInputElement;
+const dashFailSlider = document.getElementById(
+  "ac-dash-fail-rate",
+) as HTMLInputElement;
 const dashFailVal = document.getElementById("ac-dash-fail-val")!;
 
 // Timeline
@@ -193,7 +199,11 @@ function renderChainBox(
   detailEl.textContent = detail;
 }
 
-function renderArrow(arrowEl: HTMLElement, active: boolean, done: boolean): void {
+function renderArrow(
+  arrowEl: HTMLElement,
+  active: boolean,
+  done: boolean,
+): void {
   arrowEl.className = "ac-arrow";
   if (done) {
     arrowEl.classList.add("done");
@@ -236,7 +246,13 @@ function render(): void {
   } else {
     permsDetail = "Failed to load";
   }
-  renderChainBox(permsBox, permsStatusEl, permsDetailEl, permsStatus, permsDetail);
+  renderChainBox(
+    permsBox,
+    permsStatusEl,
+    permsDetailEl,
+    permsStatus,
+    permsDetail,
+  );
 
   // Dashboard box
   let dashDetail = "";
@@ -255,8 +271,16 @@ function render(): void {
   // Arrows
   const authDone = authStatus === "success";
   const permsDone = permsStatus === "success";
-  renderArrow(arrow1, authStatus === "running" || permsStatus === "running", authDone);
-  renderArrow(arrow2, permsStatus === "running" || dashStatus === "running", permsDone);
+  renderArrow(
+    arrow1,
+    authStatus === "running" || permsStatus === "running",
+    authDone,
+  );
+  renderArrow(
+    arrow2,
+    permsStatus === "running" || dashStatus === "running",
+    permsDone,
+  );
 
   // Timeline entries for state transitions
   const currentAuthStatus = authFacts.status as string;
@@ -297,15 +321,13 @@ function render(): void {
   const token = authFacts.token as string;
   startBtn.disabled = token !== "" && currentAuthStatus !== "idle";
   resetBtn.disabled =
-    currentAuthStatus === "idle" &&
-    !currentPermsLoaded &&
-    !currentDashLoaded;
-
+    currentAuthStatus === "idle" && !currentPermsLoaded && !currentDashLoaded;
 }
 
 function renderTimeline(): void {
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="ac-timeline-empty">Events will appear here after starting the chain</div>';
+    timelineEl.innerHTML =
+      '<div class="ac-timeline-empty">Events will appear here after starting the chain</div>';
 
     return;
   }
@@ -373,7 +395,9 @@ authFailSlider.addEventListener("input", () => {
 });
 
 permsFailSlider.addEventListener("input", () => {
-  system.events.permissions.setFailRate({ value: Number(permsFailSlider.value) });
+  system.events.permissions.setFailRate({
+    value: Number(permsFailSlider.value),
+  });
 });
 
 dashFailSlider.addEventListener("input", () => {

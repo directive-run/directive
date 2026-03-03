@@ -5,20 +5,32 @@
  * at every stage. Save/restore/delete checkpoints. Retry with backoff on failures.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
+  type Checkpoint,
   InMemoryCheckpointStore,
   createCheckpointId,
   validateCheckpoint,
-  type Checkpoint,
 } from "@directive-run/ai";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type PipelineStage = "idle" | "extract" | "summarize" | "classify" | "archive" | "done" | "error";
+type PipelineStage =
+  | "idle"
+  | "extract"
+  | "summarize"
+  | "classify"
+  | "archive"
+  | "done"
+  | "error";
 
 interface StageResult {
   stage: string;
@@ -48,10 +60,28 @@ interface TimelineEntry {
 const STAGES: PipelineStage[] = ["extract", "summarize", "classify", "archive"];
 
 const STAGE_CONFIG = {
-  extract: { tokens: 150, baseLatency: 300, output: "Extracted 3 sections, 2 tables, 5 figures from document." },
-  summarize: { tokens: 200, baseLatency: 400, output: "Summary: Key findings include efficiency gains of 23% and cost reduction of $1.2M annually." },
-  classify: { tokens: 80, baseLatency: 200, output: "Classification: category=research, confidence=0.94, tags=[efficiency, cost, annual-review]" },
-  archive: { tokens: 50, baseLatency: 150, output: "Archived to /documents/2026/research/efficiency-report.json" },
+  extract: {
+    tokens: 150,
+    baseLatency: 300,
+    output: "Extracted 3 sections, 2 tables, 5 figures from document.",
+  },
+  summarize: {
+    tokens: 200,
+    baseLatency: 400,
+    output:
+      "Summary: Key findings include efficiency gains of 23% and cost reduction of $1.2M annually.",
+  },
+  classify: {
+    tokens: 80,
+    baseLatency: 200,
+    output:
+      "Classification: category=research, confidence=0.94, tags=[efficiency, cost, annual-review]",
+  },
+  archive: {
+    tokens: 50,
+    baseLatency: 150,
+    output: "Archived to /documents/2026/research/efficiency-report.json",
+  },
 };
 
 // ============================================================================
@@ -60,7 +90,11 @@ const STAGE_CONFIG = {
 
 const timeline: TimelineEntry[] = [];
 
-function addTimeline(event: string, detail: string, type: TimelineEntry["type"]) {
+function addTimeline(
+  event: string,
+  detail: string,
+  type: TimelineEntry["type"],
+) {
   timeline.unshift({ time: Date.now(), event, detail, type });
   if (timeline.length > 50) {
     timeline.length = 50;
@@ -154,7 +188,11 @@ const pipelineModule = createModule("pipeline", {
       return STAGES.indexOf(facts.currentStage as PipelineStage);
     },
     canAdvance: (facts) => {
-      return !facts.isRunning && facts.currentStage !== "done" && facts.currentStage !== "error";
+      return (
+        !facts.isRunning &&
+        facts.currentStage !== "done" &&
+        facts.currentStage !== "error"
+      );
     },
     isPipelineDone: (facts) => facts.currentStage === "done",
     stageCount: () => STAGES.length,
@@ -187,7 +225,10 @@ const pipelineModule = createModule("pipeline", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: pipelineModule, plugins: [devtoolsPlugin({ name: "ai-checkpoint" })] });
+const system = createSystem({
+  module: pipelineModule,
+  plugins: [devtoolsPlugin({ name: "ai-checkpoint" })],
+});
 system.start();
 
 // ============================================================================
@@ -227,7 +268,11 @@ async function runStageWithRetry(stage: PipelineStage): Promise<StageResult> {
         const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000);
         const jitter = Math.random() * delay * 0.1;
         system.facts.retryCount = (system.facts.retryCount as number) + 1;
-        addTimeline("retry", `${stage}: attempt ${attempt + 1}/${maxRetries + 1} (delay ${Math.round(delay)}ms)`, "retry");
+        addTimeline(
+          "retry",
+          `${stage}: attempt ${attempt + 1}/${maxRetries + 1} (delay ${Math.round(delay)}ms)`,
+          "retry",
+        );
         render();
         await new Promise((resolve) => setTimeout(resolve, delay + jitter));
       }
@@ -273,8 +318,13 @@ async function advancePipeline() {
     const result = await runStageWithRetry(nextStage);
     const results = [...(system.facts.stageResults as StageResult[]), result];
     system.facts.stageResults = results;
-    system.facts.totalTokens = (system.facts.totalTokens as number) + result.tokens;
-    addTimeline("success", `${nextStage}: complete (${result.tokens} tokens)`, "success");
+    system.facts.totalTokens =
+      (system.facts.totalTokens as number) + result.tokens;
+    addTimeline(
+      "success",
+      `${nextStage}: complete (${result.tokens} tokens)`,
+      "success",
+    );
 
     const idx = STAGES.indexOf(nextStage);
     if (idx >= STAGES.length - 1) {
@@ -314,13 +364,22 @@ async function autoRun() {
       const result = await runStageWithRetry(stage);
       const results = [...(system.facts.stageResults as StageResult[]), result];
       system.facts.stageResults = results;
-      system.facts.totalTokens = (system.facts.totalTokens as number) + result.tokens;
-      addTimeline("success", `${stage}: complete (${result.tokens} tokens)`, "success");
+      system.facts.totalTokens =
+        (system.facts.totalTokens as number) + result.tokens;
+      addTimeline(
+        "success",
+        `${stage}: complete (${result.tokens} tokens)`,
+        "success",
+      );
     } catch (err) {
       system.facts.currentStage = "error";
       system.facts.lastError = err instanceof Error ? err.message : String(err);
       system.facts.isRunning = false;
-      addTimeline("error", `pipeline halted at ${stage}: ${system.facts.lastError}`, "error");
+      addTimeline(
+        "error",
+        `pipeline halted at ${stage}: ${system.facts.lastError}`,
+        "error",
+      );
 
       return;
     }
@@ -361,8 +420,16 @@ async function saveCheckpoint() {
 
   await checkpointStore.save(checkpoint);
 
-  const entry: CheckpointEntry = { id, label, createdAt: checkpoint.createdAt, stage };
-  system.facts.checkpoints = [...(system.facts.checkpoints as CheckpointEntry[]), entry];
+  const entry: CheckpointEntry = {
+    id,
+    label,
+    createdAt: checkpoint.createdAt,
+    stage,
+  };
+  system.facts.checkpoints = [
+    ...(system.facts.checkpoints as CheckpointEntry[]),
+    entry,
+  ];
 
   addTimeline("checkpoint", `saved: ${label}`, "checkpoint");
 }
@@ -403,7 +470,9 @@ async function restoreCheckpoint(checkpointId: string) {
 async function deleteCheckpoint(checkpointId: string) {
   const deleted = await checkpointStore.delete(checkpointId);
   if (deleted) {
-    const checkpoints = (system.facts.checkpoints as CheckpointEntry[]).filter((c) => c.id !== checkpointId);
+    const checkpoints = (system.facts.checkpoints as CheckpointEntry[]).filter(
+      (c) => c.id !== checkpointId,
+    );
     system.facts.checkpoints = checkpoints;
     addTimeline("checkpoint", "deleted checkpoint", "checkpoint");
   }
@@ -438,7 +507,12 @@ function render(): void {
 
   // Progress bar
   progressBar.style.width = `${completion}%`;
-  progressLabel.textContent = stage === "done" ? "Complete" : stage === "idle" ? "Ready" : `${stage}... ${completion}%`;
+  progressLabel.textContent =
+    stage === "done"
+      ? "Complete"
+      : stage === "idle"
+        ? "Ready"
+        : `${stage}... ${completion}%`;
 
   // Stage dots
   stageIndicators.forEach((dot) => {
@@ -460,13 +534,19 @@ function render(): void {
   // Checkpoints
   const checkpoints = system.facts.checkpoints as CheckpointEntry[];
   if (checkpoints.length === 0) {
-    checkpointList.innerHTML = '<div style="color:var(--brand-text-faint);font-size:0.65rem;font-style:italic">No checkpoints saved</div>';
+    checkpointList.innerHTML =
+      '<div style="color:var(--brand-text-faint);font-size:0.65rem;font-style:italic">No checkpoints saved</div>';
   } else {
-    checkpointList.innerHTML = checkpoints.map((cp) => {
-      const time = new Date(cp.createdAt);
-      const timeStr = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    checkpointList.innerHTML = checkpoints
+      .map((cp) => {
+        const time = new Date(cp.createdAt);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      return `<div class="cp-checkpoint-entry" data-testid="cp-ckpt-${cp.id}">
+        return `<div class="cp-checkpoint-entry" data-testid="cp-ckpt-${cp.id}">
         <div class="cp-checkpoint-info">
           <span class="cp-checkpoint-label">${escapeHtml(cp.label)}</span>
           <span class="cp-checkpoint-time">${timeStr}</span>
@@ -476,20 +556,25 @@ function render(): void {
           <button class="cp-btn-sm danger" data-delete="${cp.id}">Del</button>
         </div>
       </div>`;
-    }).join("");
-
+      })
+      .join("");
   }
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="cp-timeline-empty">Events appear after running the pipeline</div>';
+    timelineEl.innerHTML =
+      '<div class="cp-timeline-empty">Events appear after running the pipeline</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {
       const el = document.createElement("div");
       el.className = `cp-timeline-entry ${entry.type}`;
       const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const timeStr = time.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
       el.innerHTML = `
         <span class="cp-timeline-time">${timeStr}</span>
         <span class="cp-timeline-event">${escapeHtml(entry.event)}</span>
@@ -504,17 +589,26 @@ function render(): void {
 // Subscribe
 // ============================================================================
 
-const allKeys = [...Object.keys(schema.facts), ...Object.keys(schema.derivations)];
+const allKeys = [
+  ...Object.keys(schema.facts),
+  ...Object.keys(schema.derivations),
+];
 system.subscribe(allKeys, render);
 
 // ============================================================================
 // Controls
 // ============================================================================
 
-document.getElementById("cp-advance")!.addEventListener("click", () => advancePipeline());
-document.getElementById("cp-auto-run")!.addEventListener("click", () => autoRun());
+document
+  .getElementById("cp-advance")!
+  .addEventListener("click", () => advancePipeline());
+document
+  .getElementById("cp-auto-run")!
+  .addEventListener("click", () => autoRun());
 
-document.getElementById("cp-save-ckpt")!.addEventListener("click", () => saveCheckpoint());
+document
+  .getElementById("cp-save-ckpt")!
+  .addEventListener("click", () => saveCheckpoint());
 
 document.getElementById("cp-reset")!.addEventListener("click", () => {
   system.events.reset();
@@ -522,7 +616,9 @@ document.getElementById("cp-reset")!.addEventListener("click", () => {
   system.facts.checkpoints = [];
 });
 
-const failSelect = document.getElementById("cp-fail-stage") as HTMLSelectElement;
+const failSelect = document.getElementById(
+  "cp-fail-stage",
+) as HTMLSelectElement;
 failSelect.addEventListener("change", () => {
   system.events.setFailStage({ value: failSelect.value });
 });
@@ -542,7 +638,9 @@ checkpointList.addEventListener("click", (e) => {
   }
 });
 
-const retrySlider = document.getElementById("cp-max-retries") as HTMLInputElement;
+const retrySlider = document.getElementById(
+  "cp-max-retries",
+) as HTMLInputElement;
 retrySlider.addEventListener("input", () => {
   document.getElementById("cp-retry-val")!.textContent = retrySlider.value;
   system.events.setMaxRetries({ value: Number(retrySlider.value) });

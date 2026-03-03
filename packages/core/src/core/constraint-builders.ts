@@ -23,51 +23,53 @@
  * ```
  */
 
-import type { ModuleSchema, InferRequirements } from "./types/schema.js";
 import type { Facts } from "./types/facts.js";
-import type { TypedConstraintDef, RequirementOutput } from "./types/module.js";
+import type { RequirementOutput, TypedConstraintDef } from "./types/module.js";
+import type { InferRequirements, ModuleSchema } from "./types/schema.js";
 
 // ============================================================================
 // Builder Types
 // ============================================================================
 
-type WhenFn<M extends ModuleSchema> = (facts: Facts<M["facts"]>) => boolean | Promise<boolean>;
+type WhenFn<M extends ModuleSchema> = (
+  facts: Facts<M["facts"]>,
+) => boolean | Promise<boolean>;
 type RequireValue<M extends ModuleSchema> =
-	| RequirementOutput<InferRequirements<M>>
-	| ((facts: Facts<M["facts"]>) => RequirementOutput<InferRequirements<M>>);
+  | RequirementOutput<InferRequirements<M>>
+  | ((facts: Facts<M["facts"]>) => RequirementOutput<InferRequirements<M>>);
 
 /** Builder after constraint() — must call .when() first */
 export interface ConstraintBuilderStart<M extends ModuleSchema> {
-	when(condition: WhenFn<M>): ConstraintBuilderWithWhen<M>;
+  when(condition: WhenFn<M>): ConstraintBuilderWithWhen<M>;
 }
 
 /** Builder after .when() — must call .require() next */
 export interface ConstraintBuilderWithWhen<M extends ModuleSchema> {
-	require(req: RequireValue<M>): ConstraintBuilderComplete<M>;
+  require(req: RequireValue<M>): ConstraintBuilderComplete<M>;
 }
 
 /** Builder after .require() — optional chaining + .build() */
 export interface ConstraintBuilderComplete<M extends ModuleSchema> {
-	priority(n: number): ConstraintBuilderComplete<M>;
-	after(...ids: string[]): ConstraintBuilderComplete<M>;
-	deps(...keys: string[]): ConstraintBuilderComplete<M>;
-	timeout(ms: number): ConstraintBuilderComplete<M>;
-	async(value: boolean): ConstraintBuilderComplete<M>;
-	build(): TypedConstraintDef<M>;
+  priority(n: number): ConstraintBuilderComplete<M>;
+  after(...ids: string[]): ConstraintBuilderComplete<M>;
+  deps(...keys: string[]): ConstraintBuilderComplete<M>;
+  timeout(ms: number): ConstraintBuilderComplete<M>;
+  async(value: boolean): ConstraintBuilderComplete<M>;
+  build(): TypedConstraintDef<M>;
 }
 
 /** Result from when().require() — a valid constraint with optional immutable chaining */
 export type WhenConstraint<M extends ModuleSchema> = TypedConstraintDef<M> & {
-	withPriority(n: number): WhenConstraint<M>;
-	withAfter(...ids: string[]): WhenConstraint<M>;
-	withDeps(...keys: string[]): WhenConstraint<M>;
-	withTimeout(ms: number): WhenConstraint<M>;
-	withAsync(value: boolean): WhenConstraint<M>;
+  withPriority(n: number): WhenConstraint<M>;
+  withAfter(...ids: string[]): WhenConstraint<M>;
+  withDeps(...keys: string[]): WhenConstraint<M>;
+  withTimeout(ms: number): WhenConstraint<M>;
+  withAsync(value: boolean): WhenConstraint<M>;
 };
 
 /** Result from when() — must call .require() */
 export interface WhenBuilder<M extends ModuleSchema> {
-	require(req: RequireValue<M>): WhenConstraint<M>;
+  require(req: RequireValue<M>): WhenConstraint<M>;
 }
 
 // ============================================================================
@@ -88,57 +90,59 @@ export interface WhenBuilder<M extends ModuleSchema> {
  *   .build();
  * ```
  */
-export function constraint<M extends ModuleSchema>(): ConstraintBuilderStart<M> {
-	return {
-		when(condition: WhenFn<M>): ConstraintBuilderWithWhen<M> {
-			return {
-				require(req: RequireValue<M>): ConstraintBuilderComplete<M> {
-					let _priority: number | undefined;
-					let _after: string[] | undefined;
-					let _deps: string[] | undefined;
-					let _timeout: number | undefined;
-					let _async: boolean | undefined;
+export function constraint<
+  M extends ModuleSchema,
+>(): ConstraintBuilderStart<M> {
+  return {
+    when(condition: WhenFn<M>): ConstraintBuilderWithWhen<M> {
+      return {
+        require(req: RequireValue<M>): ConstraintBuilderComplete<M> {
+          let _priority: number | undefined;
+          let _after: string[] | undefined;
+          let _deps: string[] | undefined;
+          let _timeout: number | undefined;
+          let _async: boolean | undefined;
 
-					const complete: ConstraintBuilderComplete<M> = {
-						priority(n) {
-							_priority = n;
-							return complete;
-						},
-						after(...ids) {
-							_after = _after ? [..._after, ...ids] : [...ids];
-							return complete;
-						},
-						deps(...keys) {
-							_deps = _deps ? [..._deps, ...keys] : [...keys];
-							return complete;
-						},
-						timeout(ms) {
-							_timeout = ms;
-							return complete;
-						},
-						async(value) {
-							_async = value;
-							return complete;
-						},
-						build(): TypedConstraintDef<M> {
-							const def: TypedConstraintDef<M> = {
-								when: condition,
-								require: req,
-							};
-							if (_priority !== undefined) def.priority = _priority;
-							if (_after !== undefined) def.after = _after;
-							if (_deps !== undefined) def.deps = _deps;
-							if (_timeout !== undefined) def.timeout = _timeout;
-							if (_async !== undefined) def.async = _async;
-							return def;
-						},
-					};
+          const complete: ConstraintBuilderComplete<M> = {
+            priority(n) {
+              _priority = n;
+              return complete;
+            },
+            after(...ids) {
+              _after = _after ? [..._after, ...ids] : [...ids];
+              return complete;
+            },
+            deps(...keys) {
+              _deps = _deps ? [..._deps, ...keys] : [...keys];
+              return complete;
+            },
+            timeout(ms) {
+              _timeout = ms;
+              return complete;
+            },
+            async(value) {
+              _async = value;
+              return complete;
+            },
+            build(): TypedConstraintDef<M> {
+              const def: TypedConstraintDef<M> = {
+                when: condition,
+                require: req,
+              };
+              if (_priority !== undefined) def.priority = _priority;
+              if (_after !== undefined) def.after = _after;
+              if (_deps !== undefined) def.deps = _deps;
+              if (_timeout !== undefined) def.timeout = _timeout;
+              if (_async !== undefined) def.async = _async;
+              return def;
+            },
+          };
 
-					return complete;
-				},
-			};
-		},
-	};
+          return complete;
+        },
+      };
+    },
+  };
 }
 
 // ============================================================================
@@ -150,32 +154,32 @@ export function constraint<M extends ModuleSchema>(): ConstraintBuilderStart<M> 
  * a plain TypedConstraintDef<M> when spread or assigned.
  */
 function createWhenConstraint<M extends ModuleSchema>(
-	base: TypedConstraintDef<M>,
+  base: TypedConstraintDef<M>,
 ): WhenConstraint<M> {
-	const obj = { ...base } as WhenConstraint<M>;
+  const obj = { ...base } as WhenConstraint<M>;
 
-	obj.withPriority = (n: number) =>
-		createWhenConstraint<M>({ ...base, priority: n });
+  obj.withPriority = (n: number) =>
+    createWhenConstraint<M>({ ...base, priority: n });
 
-	obj.withAfter = (...ids: string[]) =>
-		createWhenConstraint<M>({
-			...base,
-			after: base.after ? [...base.after, ...ids] : [...ids],
-		});
+  obj.withAfter = (...ids: string[]) =>
+    createWhenConstraint<M>({
+      ...base,
+      after: base.after ? [...base.after, ...ids] : [...ids],
+    });
 
-	obj.withDeps = (...keys: string[]) =>
-		createWhenConstraint<M>({
-			...base,
-			deps: base.deps ? [...base.deps, ...keys] : [...keys],
-		});
+  obj.withDeps = (...keys: string[]) =>
+    createWhenConstraint<M>({
+      ...base,
+      deps: base.deps ? [...base.deps, ...keys] : [...keys],
+    });
 
-	obj.withTimeout = (ms: number) =>
-		createWhenConstraint<M>({ ...base, timeout: ms });
+  obj.withTimeout = (ms: number) =>
+    createWhenConstraint<M>({ ...base, timeout: ms });
 
-	obj.withAsync = (value: boolean) =>
-		createWhenConstraint<M>({ ...base, async: value });
+  obj.withAsync = (value: boolean) =>
+    createWhenConstraint<M>({ ...base, async: value });
 
-	return obj;
+  return obj;
 }
 
 /**
@@ -195,11 +199,11 @@ function createWhenConstraint<M extends ModuleSchema>(
  * ```
  */
 export function when<M extends ModuleSchema>(
-	condition: WhenFn<M>,
+  condition: WhenFn<M>,
 ): WhenBuilder<M> {
-	return {
-		require(req: RequireValue<M>): WhenConstraint<M> {
-			return createWhenConstraint<M>({ when: condition, require: req });
-		},
-	};
+  return {
+    require(req: RequireValue<M>): WhenConstraint<M> {
+      return createWhenConstraint<M>({ when: condition, require: req });
+    },
+  };
 }

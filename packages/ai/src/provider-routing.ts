@@ -34,7 +34,13 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions, TokenUsage } from "./types.js";
+import type {
+  AgentLike,
+  AgentRunner,
+  RunOptions,
+  RunResult,
+  TokenUsage,
+} from "./types.js";
 
 // ============================================================================
 // Types
@@ -98,7 +104,10 @@ export interface ConstraintRouterConfig {
   /** User-supplied routing constraints. */
   constraints?: RoutingConstraint[];
   /** Called when a provider is selected. */
-  onProviderSelected?: (providerName: string, reason: "constraint" | "cheapest" | "default") => void;
+  onProviderSelected?: (
+    providerName: string,
+    reason: "constraint" | "cheapest" | "default",
+  ) => void;
   /** Error cooldown — skip a provider for this many ms after an error. @default 30000 */
   errorCooldownMs?: number;
   /**
@@ -124,7 +133,10 @@ function createEmptyStats(): ProviderStats {
   };
 }
 
-function calculateCost(usage: TokenUsage | undefined, pricing?: { inputPerMillion: number; outputPerMillion: number }): number {
+function calculateCost(
+  usage: TokenUsage | undefined,
+  pricing?: { inputPerMillion: number; outputPerMillion: number },
+): number {
   if (!usage || !pricing) {
     return 0;
   }
@@ -158,7 +170,9 @@ function calculateCost(usage: TokenUsage | undefined, pricing?: { inputPerMillio
  * });
  * ```
  */
-export function createConstraintRouter(config: ConstraintRouterConfig): ConstraintRouterRunner {
+export function createConstraintRouter(
+  config: ConstraintRouterConfig,
+): ConstraintRouterRunner {
   const {
     providers,
     defaultProvider,
@@ -170,7 +184,9 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
 
   // Validate config
   if (!Number.isFinite(errorCooldownMs) || errorCooldownMs < 0) {
-    throw new Error("[Directive] createConstraintRouter: errorCooldownMs must be a non-negative finite number.");
+    throw new Error(
+      "[Directive] createConstraintRouter: errorCooldownMs must be a non-negative finite number.",
+    );
   }
 
   // Validate
@@ -180,7 +196,9 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
   }
 
   if (!providerMap.has(defaultProvider)) {
-    throw new Error(`[Directive] Default provider "${defaultProvider}" not found in providers list.`);
+    throw new Error(
+      `[Directive] Default provider "${defaultProvider}" not found in providers list.`,
+    );
   }
 
   // Initialize facts
@@ -206,7 +224,10 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
   );
 
   /** Select provider based on constraints and heuristics. */
-  function selectProvider(): { provider: RoutingProvider; reason: "constraint" | "cheapest" | "default" } {
+  function selectProvider(): {
+    provider: RoutingProvider;
+    reason: "constraint" | "cheapest" | "default";
+  } {
     const now = Date.now();
 
     for (const constraint of sortedConstraints) {
@@ -238,8 +259,12 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
     // 3. Cheapest-provider heuristic (opt-in via preferCheapest)
     if (preferCheapest && availableProviders.length > 0) {
       const sorted = [...availableProviders].sort((a, b) => {
-        const aCost = a.pricing ? a.pricing.inputPerMillion + a.pricing.outputPerMillion : Infinity;
-        const bCost = b.pricing ? b.pricing.inputPerMillion + b.pricing.outputPerMillion : Infinity;
+        const aCost = a.pricing
+          ? a.pricing.inputPerMillion + a.pricing.outputPerMillion
+          : Number.POSITIVE_INFINITY;
+        const bCost = b.pricing
+          ? b.pricing.inputPerMillion + b.pricing.outputPerMillion
+          : Number.POSITIVE_INFINITY;
         if (aCost !== bCost) {
           return aCost - bCost;
         }
@@ -260,7 +285,10 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
     }
 
     // 4. If default is in cooldown, pick the first available
-    if (availableProviders.length > 0 && !availableProviders.some((p) => p.name === defaultProvider)) {
+    if (
+      availableProviders.length > 0 &&
+      !availableProviders.some((p) => p.name === defaultProvider)
+    ) {
       return { provider: availableProviders[0]!, reason: "default" };
     }
 
@@ -269,7 +297,13 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
   }
 
   /** Update facts after a call. */
-  function recordCall(providerName: string, latencyMs: number, usage: TokenUsage | undefined, pricing?: { inputPerMillion: number; outputPerMillion: number }, error?: Error): void {
+  function recordCall(
+    providerName: string,
+    latencyMs: number,
+    usage: TokenUsage | undefined,
+    pricing?: { inputPerMillion: number; outputPerMillion: number },
+    error?: Error,
+  ): void {
     const stats = facts.providers[providerName] ?? createEmptyStats();
 
     stats.callCount++;
@@ -289,9 +323,11 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
     totalLatencyMs += latencyMs;
     facts.avgLatencyMs = totalLatencyMs / facts.callCount;
 
-    const statsTotal = stats.callCount > 0
-      ? ((stats.avgLatencyMs * (stats.callCount - 1)) + latencyMs) / stats.callCount
-      : latencyMs;
+    const statsTotal =
+      stats.callCount > 0
+        ? (stats.avgLatencyMs * (stats.callCount - 1) + latencyMs) /
+          stats.callCount
+        : latencyMs;
     stats.avgLatencyMs = statsTotal;
 
     facts.providers[providerName] = stats;
@@ -304,7 +340,11 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
     options?: RunOptions,
   ): Promise<RunResult<T>> => {
     const { provider, reason } = selectProvider();
-    try { onProviderSelected?.(provider.name, reason); } catch { /* callback error must not disrupt routing flow */ }
+    try {
+      onProviderSelected?.(provider.name, reason);
+    } catch {
+      /* callback error must not disrupt routing flow */
+    }
 
     const startTime = Date.now();
 
@@ -328,7 +368,9 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
   /** Expose facts for external inspection (deep-cloned to prevent mutation). */
   Object.defineProperty(routerRunner, "facts", {
     get: () => {
-      const clonedProviders: Record<string, ProviderStats> = Object.create(null) as Record<string, ProviderStats>;
+      const clonedProviders: Record<string, ProviderStats> = Object.create(
+        null,
+      ) as Record<string, ProviderStats>;
       for (const key of Object.keys(facts.providers)) {
         clonedProviders[key] = { ...facts.providers[key]! };
       }
@@ -342,4 +384,6 @@ export function createConstraintRouter(config: ConstraintRouterConfig): Constrai
 }
 
 /** Helper type for accessing router facts. */
-export type ConstraintRouterRunner = AgentRunner & { readonly facts: RoutingFacts };
+export type ConstraintRouterRunner = AgentRunner & {
+  readonly facts: RoutingFacts;
+};

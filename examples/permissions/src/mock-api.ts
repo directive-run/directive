@@ -52,15 +52,42 @@ export async function fetchArticles(): Promise<Article[]> {
   await wait(400);
 
   return [
-    { id: "a1", title: "Getting Started with Directive", status: "published", author: "Alice" },
-    { id: "a2", title: "Constraint-Driven Architecture", status: "draft", author: "Bob" },
-    { id: "a3", title: "Reactive State Management", status: "published", author: "Alice" },
-    { id: "a4", title: "Cross-Module Dependencies", status: "draft", author: "Carol" },
-    { id: "a5", title: "Advanced Resolver Patterns", status: "archived", author: "Bob" },
+    {
+      id: "a1",
+      title: "Getting Started with Directive",
+      status: "published",
+      author: "Alice",
+    },
+    {
+      id: "a2",
+      title: "Constraint-Driven Architecture",
+      status: "draft",
+      author: "Bob",
+    },
+    {
+      id: "a3",
+      title: "Reactive State Management",
+      status: "published",
+      author: "Alice",
+    },
+    {
+      id: "a4",
+      title: "Cross-Module Dependencies",
+      status: "draft",
+      author: "Carol",
+    },
+    {
+      id: "a5",
+      title: "Advanced Resolver Patterns",
+      status: "archived",
+      author: "Bob",
+    },
   ];
 }
 
-export async function publishArticle(id: string): Promise<{ success: boolean }> {
+export async function publishArticle(
+  id: string,
+): Promise<{ success: boolean }> {
   await wait(300);
 
   return { success: true };

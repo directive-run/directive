@@ -1,9 +1,7 @@
-import { describe, it, expect } from "vitest";
-import {
-  createTestMultiAgentOrchestrator,
-} from "../testing.js";
+import { describe, expect, it } from "vitest";
 import { debate, runDebate } from "../multi-agent-orchestrator.js";
 import type { DebateResult } from "../multi-agent-orchestrator.js";
+import { createTestMultiAgentOrchestrator } from "../testing.js";
 
 // ============================================================================
 // Tests
@@ -21,7 +19,10 @@ describe("debate pattern", () => {
         optimist: { output: "it will work great", totalTokens: 20 },
         pessimist: { output: "it will fail", totalTokens: 20 },
         judge: {
-          output: JSON.stringify({ winnerId: "optimist", feedback: "More positive outlook" }),
+          output: JSON.stringify({
+            winnerId: "optimist",
+            feedback: "More positive outlook",
+          }),
           totalTokens: 10,
         },
       },
@@ -34,7 +35,10 @@ describe("debate pattern", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<DebateResult<unknown>>("myDebate", "Should we proceed?");
+    const result = await orchestrator.runPattern<DebateResult<unknown>>(
+      "myDebate",
+      "Should we proceed?",
+    );
 
     // runPattern for debate extracts result so returns the winning output
     expect(result).toBe("it will work great");
@@ -68,8 +72,12 @@ describe("debate pattern", () => {
     expect(result.result).toBe("proposal A");
     expect(result.rounds).toHaveLength(1);
     expect(result.rounds[0]!.proposals).toHaveLength(2);
-    expect(result.rounds[0]!.proposals.find((p) => p.agentId === "a")?.output).toBe("proposal A");
-    expect(result.rounds[0]!.proposals.find((p) => p.agentId === "b")?.output).toBe("proposal B");
+    expect(
+      result.rounds[0]!.proposals.find((p) => p.agentId === "a")?.output,
+    ).toBe("proposal A");
+    expect(
+      result.rounds[0]!.proposals.find((p) => p.agentId === "b")?.output,
+    ).toBe("proposal B");
     expect(result.rounds[0]!.judgement.winnerId).toBe("a");
     expect(result.rounds[0]!.judgement.score).toBe(0.8);
   });
@@ -187,12 +195,9 @@ describe("debate pattern", () => {
       },
     });
 
-    const result = await orchestrator.runDebate(
-      ["a", "b"],
-      "judge",
-      "topic",
-      { maxRounds: 1 },
-    );
+    const result = await orchestrator.runDebate(["a", "b"], "judge", "topic", {
+      maxRounds: 1,
+    });
 
     // Falls back to first agent in the list
     expect(result.winnerId).toBe("a");
@@ -223,7 +228,10 @@ describe("debate pattern", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<string>("theDebate", "Should we do this?");
+    const result = await orchestrator.runPattern<string>(
+      "theDebate",
+      "Should we do this?",
+    );
 
     expect(result).toBe("pro argument");
   });
@@ -283,12 +291,10 @@ describe("debate pattern", () => {
     controller.abort();
 
     await expect(
-      orchestrator.runDebate(
-        ["slow1", "slow2"],
-        "judge",
-        "debate topic",
-        { maxRounds: 3, signal: controller.signal },
-      ),
+      orchestrator.runDebate(["slow1", "slow2"], "judge", "debate topic", {
+        maxRounds: 3,
+        signal: controller.signal,
+      }),
     ).rejects.toThrow("Debate aborted before any round completed");
   });
 
@@ -323,7 +329,10 @@ describe("debate pattern", () => {
   });
 
   it("lifecycle hooks fire with patternType debate", async () => {
-    const hookEvents: Array<{ patternType: string; phase: "start" | "complete" }> = [];
+    const hookEvents: Array<{
+      patternType: string;
+      phase: "start" | "complete";
+    }> = [];
 
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
@@ -343,8 +352,13 @@ describe("debate pattern", () => {
         d: debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 1 }),
       },
       hooks: {
-        onPatternStart: (event) => hookEvents.push({ patternType: event.patternType, phase: "start" }),
-        onPatternComplete: (event) => hookEvents.push({ patternType: event.patternType, phase: "complete" }),
+        onPatternStart: (event) =>
+          hookEvents.push({ patternType: event.patternType, phase: "start" }),
+        onPatternComplete: (event) =>
+          hookEvents.push({
+            patternType: event.patternType,
+            phase: "complete",
+          }),
       },
     });
 

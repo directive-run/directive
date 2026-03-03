@@ -8,10 +8,10 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
+  type EventLogEntry,
+  type ResourceState,
   dashboardLoaderModule,
   dashboardLoaderSchema,
-  type ResourceState,
-  type EventLogEntry,
 } from "./dashboard-loader.js";
 
 // ============================================================================
@@ -59,19 +59,31 @@ const permsAttempts = document.getElementById("dl-perms-attempts")!;
 const timelineEl = document.getElementById("dl-timeline")!;
 
 // Slider elements
-const profileDelaySlider = document.getElementById("dl-profile-delay") as HTMLInputElement;
+const profileDelaySlider = document.getElementById(
+  "dl-profile-delay",
+) as HTMLInputElement;
 const profileDelayVal = document.getElementById("dl-profile-delay-val")!;
-const profileFailrateSlider = document.getElementById("dl-profile-failrate") as HTMLInputElement;
+const profileFailrateSlider = document.getElementById(
+  "dl-profile-failrate",
+) as HTMLInputElement;
 const profileFailrateVal = document.getElementById("dl-profile-failrate-val")!;
 
-const prefsDelaySlider = document.getElementById("dl-prefs-delay") as HTMLInputElement;
+const prefsDelaySlider = document.getElementById(
+  "dl-prefs-delay",
+) as HTMLInputElement;
 const prefsDelayVal = document.getElementById("dl-prefs-delay-val")!;
-const prefsFailrateSlider = document.getElementById("dl-prefs-failrate") as HTMLInputElement;
+const prefsFailrateSlider = document.getElementById(
+  "dl-prefs-failrate",
+) as HTMLInputElement;
 const prefsFailrateVal = document.getElementById("dl-prefs-failrate-val")!;
 
-const permsDelaySlider = document.getElementById("dl-perms-delay") as HTMLInputElement;
+const permsDelaySlider = document.getElementById(
+  "dl-perms-delay",
+) as HTMLInputElement;
 const permsDelayVal = document.getElementById("dl-perms-delay-val")!;
-const permsFailrateSlider = document.getElementById("dl-perms-failrate") as HTMLInputElement;
+const permsFailrateSlider = document.getElementById(
+  "dl-perms-failrate",
+) as HTMLInputElement;
 const permsFailrateVal = document.getElementById("dl-perms-failrate-val")!;
 
 // ============================================================================
@@ -114,9 +126,11 @@ function renderCard(
 
   // Body
   if (res.status === "idle") {
-    bodyEl.innerHTML = '<span class="dl-loading-msg" style="color: var(--brand-text-faint); font-style: italic;">Waiting to start</span>';
+    bodyEl.innerHTML =
+      '<span class="dl-loading-msg" style="color: var(--brand-text-faint); font-style: italic;">Waiting to start</span>';
   } else if (res.status === "loading") {
-    bodyEl.innerHTML = '<span class="dl-loading-msg"><span class="dl-spinner"></span> Fetching data...</span>';
+    bodyEl.innerHTML =
+      '<span class="dl-loading-msg"><span class="dl-spinner"></span> Fetching data...</span>';
   } else if (res.status === "success" && res.data) {
     const data = res.data as Record<string, unknown>;
     let preview = "";
@@ -163,12 +177,38 @@ function render(): void {
 
   // Buttons
   startBtn.disabled = !canStart;
-  reloadBtn.disabled = [profile, prefs, perms].every((r: any) => r.status === "idle");
+  reloadBtn.disabled = [profile, prefs, perms].every(
+    (r: any) => r.status === "idle",
+  );
 
   // Cards
-  renderCard(profile, profileBody, profileStatus, profileTiming, profileAttempts, "dashboard-loader-profile-retry", "profile");
-  renderCard(prefs, prefsBody, prefsStatus, prefsTiming, prefsAttempts, "dashboard-loader-prefs-retry", "preferences");
-  renderCard(perms, permsBody, permsStatus, permsTiming, permsAttempts, "dashboard-loader-perms-retry", "permissions");
+  renderCard(
+    profile,
+    profileBody,
+    profileStatus,
+    profileTiming,
+    profileAttempts,
+    "dashboard-loader-profile-retry",
+    "profile",
+  );
+  renderCard(
+    prefs,
+    prefsBody,
+    prefsStatus,
+    prefsTiming,
+    prefsAttempts,
+    "dashboard-loader-prefs-retry",
+    "preferences",
+  );
+  renderCard(
+    perms,
+    permsBody,
+    permsStatus,
+    permsTiming,
+    permsAttempts,
+    "dashboard-loader-perms-retry",
+    "permissions",
+  );
 
   // Slider value labels
   profileDelayVal.textContent = `${facts.profileDelay}ms`;
@@ -180,7 +220,8 @@ function render(): void {
 
   // Timeline
   if (eventLog.length === 0) {
-    timelineEl.innerHTML = '<div class="dl-timeline-empty">Events will appear here when loading starts</div>';
+    timelineEl.innerHTML =
+      '<div class="dl-timeline-empty">Events will appear here when loading starts</div>';
   } else {
     timelineEl.innerHTML = "";
     // Show newest first
@@ -256,29 +297,47 @@ document.addEventListener("click", (e) => {
 
 // Sliders — Profile
 profileDelaySlider.addEventListener("input", () => {
-  system.events.setDelay({ resource: "profile", value: Number(profileDelaySlider.value) });
+  system.events.setDelay({
+    resource: "profile",
+    value: Number(profileDelaySlider.value),
+  });
 });
 
 profileFailrateSlider.addEventListener("input", () => {
-  system.events.setFailRate({ resource: "profile", value: Number(profileFailrateSlider.value) });
+  system.events.setFailRate({
+    resource: "profile",
+    value: Number(profileFailrateSlider.value),
+  });
 });
 
 // Sliders — Preferences
 prefsDelaySlider.addEventListener("input", () => {
-  system.events.setDelay({ resource: "preferences", value: Number(prefsDelaySlider.value) });
+  system.events.setDelay({
+    resource: "preferences",
+    value: Number(prefsDelaySlider.value),
+  });
 });
 
 prefsFailrateSlider.addEventListener("input", () => {
-  system.events.setFailRate({ resource: "preferences", value: Number(prefsFailrateSlider.value) });
+  system.events.setFailRate({
+    resource: "preferences",
+    value: Number(prefsFailrateSlider.value),
+  });
 });
 
 // Sliders — Permissions
 permsDelaySlider.addEventListener("input", () => {
-  system.events.setDelay({ resource: "permissions", value: Number(permsDelaySlider.value) });
+  system.events.setDelay({
+    resource: "permissions",
+    value: Number(permsDelaySlider.value),
+  });
 });
 
 permsFailrateSlider.addEventListener("input", () => {
-  system.events.setFailRate({ resource: "permissions", value: Number(permsFailrateSlider.value) });
+  system.events.setFailRate({
+    resource: "permissions",
+    value: Number(permsFailrateSlider.value),
+  });
 });
 
 // ============================================================================

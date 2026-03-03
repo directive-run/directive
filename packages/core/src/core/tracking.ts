@@ -12,28 +12,28 @@ const trackingStack: TrackingContext[] = [];
 
 /** Create a new tracking context */
 function createTrackingContext(): TrackingContext {
-	const dependencies = new Set<string>();
+  const dependencies = new Set<string>();
 
-	return {
-		get isTracking() {
-			return true;
-		},
-		track(key: string) {
-			dependencies.add(key);
-		},
-		getDependencies() {
-			return dependencies;
-		},
-	};
+  return {
+    get isTracking() {
+      return true;
+    },
+    track(key: string) {
+      dependencies.add(key);
+    },
+    getDependencies() {
+      return dependencies;
+    },
+  };
 }
 
 /** Null tracking context when not tracking */
 const nullContext: TrackingContext = {
-	isTracking: false,
-	track() {},
-	getDependencies() {
-		return new Set();
-	},
+  isTracking: false,
+  track() {},
+  getDependencies() {
+    return new Set();
+  },
 };
 
 /**
@@ -41,14 +41,14 @@ const nullContext: TrackingContext = {
  * Returns null context if no tracking is active.
  */
 export function getCurrentTracker(): TrackingContext {
-	return trackingStack[trackingStack.length - 1] ?? nullContext;
+  return trackingStack[trackingStack.length - 1] ?? nullContext;
 }
 
 /**
  * Check if we're currently tracking dependencies.
  */
 export function isTracking(): boolean {
-	return trackingStack.length > 0;
+  return trackingStack.length > 0;
 }
 
 /**
@@ -56,15 +56,15 @@ export function isTracking(): boolean {
  * Returns the computed value and the set of dependencies accessed.
  */
 export function withTracking<T>(fn: () => T): { value: T; deps: Set<string> } {
-	const context = createTrackingContext();
-	trackingStack.push(context);
+  const context = createTrackingContext();
+  trackingStack.push(context);
 
-	try {
-		const value = fn();
-		return { value, deps: context.getDependencies() };
-	} finally {
-		trackingStack.pop();
-	}
+  try {
+    const value = fn();
+    return { value, deps: context.getDependencies() };
+  } finally {
+    trackingStack.pop();
+  }
 }
 
 /**
@@ -72,15 +72,15 @@ export function withTracking<T>(fn: () => T): { value: T; deps: Set<string> } {
  * Useful for reading facts without creating dependencies.
  */
 export function withoutTracking<T>(fn: () => T): T {
-	// Temporarily clear the stack
-	const saved = trackingStack.splice(0, trackingStack.length);
+  // Temporarily clear the stack
+  const saved = trackingStack.splice(0, trackingStack.length);
 
-	try {
-		return fn();
-	} finally {
-		// Restore the stack
-		trackingStack.push(...saved);
-	}
+  try {
+    return fn();
+  } finally {
+    // Restore the stack
+    trackingStack.push(...saved);
+  }
 }
 
 /**
@@ -88,5 +88,5 @@ export function withoutTracking<T>(fn: () => T): T {
  * No-op if not currently tracking.
  */
 export function trackAccess(key: string): void {
-	getCurrentTracker().track(key);
+  getCurrentTracker().track(key);
 }

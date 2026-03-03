@@ -8,11 +8,17 @@ forEachFramework("useRequirementStatus", async (_fw, { page }) => {
 
   // Trigger load → isLoading becomes true
   await tid(page, TestIds.btnTriggerLoad).click();
-  await expect(tid(page, TestIds.reqStatusLoading)).toHaveText("true", { timeout: 2000 });
+  await expect(tid(page, TestIds.reqStatusLoading)).toHaveText("true", {
+    timeout: 2000,
+  });
 
   // After resolution → isLoading false
-  await expect(tid(page, TestIds.reqStatusLoading)).toHaveText("false", { timeout: 5000 });
-  await expect(tid(page, TestIds.factSingle)).toHaveText("done", { timeout: 5000 });
+  await expect(tid(page, TestIds.reqStatusLoading)).toHaveText("false", {
+    timeout: 5000,
+  });
+  await expect(tid(page, TestIds.factSingle)).toHaveText("done", {
+    timeout: 5000,
+  });
 
   // Reset
   await tid(page, TestIds.btnReset).click();

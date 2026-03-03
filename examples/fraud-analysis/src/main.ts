@@ -5,27 +5,26 @@
  */
 
 import {
-  system,
-  fraudSchema,
-  timeline,
+  type Checkpoint,
+  createCheckpointId,
+  validateCheckpoint,
+} from "./checkpoint.js";
+import {
   addTimeline,
   checkpointStore,
   delay,
+  fraudSchema,
+  system,
+  timeline,
 } from "./fraud-analysis.js";
 import {
-  createCheckpointId,
-  validateCheckpoint,
-  type Checkpoint,
-} from "./checkpoint.js";
-import {
-  scenarios,
-  type FraudCase,
-  type FlagEvent,
-  type EnrichmentSignal,
   type CheckpointEntry,
-  type PipelineStage,
   type Disposition,
-  type Scenario,
+  type EnrichmentSignal,
+  type FlagEvent,
+  type FraudCase,
+  type PipelineStage,
+  scenarios,
 } from "./mock-data.js";
 
 // ============================================================================
@@ -41,7 +40,9 @@ system.start();
 const stageBadge = document.getElementById("fraud-stage-badge")!;
 const progressFill = document.getElementById("fraud-progress-fill")!;
 const progressLabel = document.getElementById("fraud-progress-label")!;
-const stageDots = document.querySelectorAll<HTMLElement>(".fraud-stage-dot-circle");
+const stageDots = document.querySelectorAll<HTMLElement>(
+  ".fraud-stage-dot-circle",
+);
 const casesEl = document.getElementById("fraud-cases")!;
 
 const metricStage = document.getElementById("fraud-metric-stage")!;
@@ -51,24 +52,34 @@ const metricBudget = document.getElementById("fraud-metric-budget")!;
 const metricCases = document.getElementById("fraud-metric-cases")!;
 const metricCritical = document.getElementById("fraud-metric-critical")!;
 const metricRisk = document.getElementById("fraud-metric-risk")!;
-const dispositionBreakdown = document.getElementById("fraud-disposition-breakdown")!;
+const dispositionBreakdown = document.getElementById(
+  "fraud-disposition-breakdown",
+)!;
 const stageStatsEl = document.getElementById("fraud-stage-stats")!;
 
 const timelineEl = document.getElementById("fraud-timeline")!;
 const checkpointsEl = document.getElementById("fraud-checkpoints")!;
 
-const scenarioSelect = document.getElementById("fraud-scenario-select") as HTMLSelectElement;
+const scenarioSelect = document.getElementById(
+  "fraud-scenario-select",
+) as HTMLSelectElement;
 const scenarioDesc = document.getElementById("fraud-scenario-desc")!;
 const rulesEl = document.getElementById("fraud-rules")!;
-const thresholdSlider = document.getElementById("fraud-threshold-slider") as HTMLInputElement;
+const thresholdSlider = document.getElementById(
+  "fraud-threshold-slider",
+) as HTMLInputElement;
 const thresholdValue = document.getElementById("fraud-threshold-value")!;
-const budgetSlider = document.getElementById("fraud-budget-slider") as HTMLInputElement;
+const budgetSlider = document.getElementById(
+  "fraud-budget-slider",
+) as HTMLInputElement;
 const budgetValue = document.getElementById("fraud-budget-value")!;
 
 const runBtn = document.getElementById("fraud-run-btn") as HTMLButtonElement;
 const autoBtn = document.getElementById("fraud-auto-btn") as HTMLButtonElement;
 const saveBtn = document.getElementById("fraud-save-btn") as HTMLButtonElement;
-const resetBtn = document.getElementById("fraud-reset-btn") as HTMLButtonElement;
+const resetBtn = document.getElementById(
+  "fraud-reset-btn",
+) as HTMLButtonElement;
 
 // ============================================================================
 // Helpers
@@ -82,12 +93,21 @@ function escapeHtml(text: string): string {
 }
 
 const STAGE_ORDER: PipelineStage[] = [
-  "idle", "ingesting", "normalizing", "grouping",
-  "enriching", "analyzing", "complete",
+  "idle",
+  "ingesting",
+  "normalizing",
+  "grouping",
+  "enriching",
+  "analyzing",
+  "complete",
 ];
 
 const DISPOSITION_ORDER: Disposition[] = [
-  "pending", "cleared", "flagged", "human_review", "escalated",
+  "pending",
+  "cleared",
+  "flagged",
+  "human_review",
+  "escalated",
 ];
 
 function signalColor(risk: number): string {
@@ -106,25 +126,32 @@ function formatTimestamp(ts: string): string {
   try {
     const d = new Date(ts);
 
-    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return ts;
   }
 }
 
 function renderTransactionTable(events: FlagEvent[]): string {
-  const rows = events.map((e) => {
-    const merchant = escapeHtml(e.redactedMerchant ?? e.merchant);
-    const piiDot = e.piiFound ? '<span class="fraud-pii-dot" title="PII detected"></span>' : "";
+  const rows = events
+    .map((e) => {
+      const merchant = escapeHtml(e.redactedMerchant ?? e.merchant);
+      const piiDot = e.piiFound
+        ? '<span class="fraud-pii-dot" title="PII detected"></span>'
+        : "";
 
-    return `<tr>
+      return `<tr>
       <td>${escapeHtml(formatTimestamp(e.timestamp))}</td>
       <td>${merchant}${piiDot}</td>
       <td>$${e.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
       <td class="fraud-txn-col-location">${escapeHtml(e.location)}</td>
       <td>${escapeHtml(e.cardLast4)}</td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
 
   return `<table class="fraud-txn-table">
     <thead><tr>
@@ -140,7 +167,9 @@ function renderSignals(signals: EnrichmentSignal[]): string {
     return "";
   }
 
-  const items = signals.map((s) => `
+  const items = signals
+    .map(
+      (s) => `
     <div class="fraud-signal-item">
       <span class="fraud-signal-name">${escapeHtml(s.source)}</span>
       <div class="fraud-signal-bar-track">
@@ -149,7 +178,9 @@ function renderSignals(signals: EnrichmentSignal[]): string {
       <span class="fraud-signal-score">${s.risk}</span>
     </div>
     <div class="fraud-signal-detail">${escapeHtml(s.detail)}</div>
-  `).join("");
+  `,
+    )
+    .join("");
 
   return `<div class="fraud-detail-label">Signals</div>
     <div class="fraud-signal-list">${items}</div>`;
@@ -176,7 +207,8 @@ function renderCaseCard(c: FraudCase, testId: string): string {
   const totalAmount = c.events.reduce((sum, e) => sum + e.amount, 0);
 
   const hasDetails = c.events.length > 0;
-  const detailsBlock = hasDetails ? `
+  const detailsBlock = hasDetails
+    ? `
     <details class="fraud-case-details" data-testid="${testId}-details">
       <summary>Details</summary>
       <div class="fraud-case-details-body">
@@ -187,7 +219,8 @@ function renderCaseCard(c: FraudCase, testId: string): string {
         ${renderDispositionReason(c.dispositionReason)}
       </div>
     </details>
-  ` : "";
+  `
+    : "";
 
   return `
     <div class="fraud-case-card" data-disposition="${escapeHtml(c.disposition)}" data-testid="${testId}">
@@ -226,7 +259,10 @@ function render(): void {
   const criticalCount = derive.criticalCaseCount;
   const completionPct = derive.completionPercentage;
   const avgRisk = derive.averageRiskScore;
-  const dispositionSummary = derive.dispositionSummary as Record<string, number>;
+  const dispositionSummary = derive.dispositionSummary as Record<
+    string,
+    number
+  >;
   const ungroupedCount = derive.ungroupedCount;
   const pendingAnalysisCount = derive.pendingAnalysisCount;
 
@@ -262,18 +298,23 @@ function render(): void {
   // ---- Disposition Breakdown ----
   const hasDispositions = Object.keys(dispositionSummary).length > 0;
   if (hasDispositions) {
-    const rows = DISPOSITION_ORDER
-      .filter((d) => (dispositionSummary[d] ?? 0) > 0)
-      .map((d) => `
+    const rows = DISPOSITION_ORDER.filter(
+      (d) => (dispositionSummary[d] ?? 0) > 0,
+    )
+      .map(
+        (d) => `
         <div class="fraud-disposition-row">
           <span class="fraud-disposition-dot disp-${escapeHtml(d)}"></span>
           <span class="fraud-disposition-label">${escapeHtml(d.replace("_", " "))}</span>
           <span class="fraud-disposition-count">${dispositionSummary[d]}</span>
         </div>
-      `).join("");
+      `,
+      )
+      .join("");
     dispositionBreakdown.innerHTML = `<div class="fraud-metric-label">Dispositions</div>${rows}`;
   } else {
-    dispositionBreakdown.innerHTML = '<div class="fraud-metric-label">Dispositions</div><div style="font-size: 0.6rem; color: var(--fraud-text-dim);">No cases</div>';
+    dispositionBreakdown.innerHTML =
+      '<div class="fraud-metric-label">Dispositions</div><div style="font-size: 0.6rem; color: var(--fraud-text-dim);">No cases</div>';
   }
 
   // ---- Stage Progress Stats ----
@@ -307,26 +348,33 @@ function render(): void {
 
   // ---- Case Cards (with open-state preservation) ----
   if (cases.length === 0) {
-    casesEl.innerHTML = '<div class="fraud-empty">No cases yet. Select a scenario and run the pipeline.</div>';
+    casesEl.innerHTML =
+      '<div class="fraud-empty">No cases yet. Select a scenario and run the pipeline.</div>';
   } else {
     // Capture which details are currently open
     const openDetails = new Set<string>();
-    casesEl.querySelectorAll<HTMLDetailsElement>("details[open]").forEach((d) => {
-      const testid = d.getAttribute("data-testid");
-      if (testid) {
-        openDetails.add(testid);
-      }
-    });
+    casesEl
+      .querySelectorAll<HTMLDetailsElement>("details[open]")
+      .forEach((d) => {
+        const testid = d.getAttribute("data-testid");
+        if (testid) {
+          openDetails.add(testid);
+        }
+      });
 
-    casesEl.innerHTML = cases.map((c) => {
-      const testId = `fraud-case-${escapeHtml(c.id)}`;
+    casesEl.innerHTML = cases
+      .map((c) => {
+        const testId = `fraud-case-${escapeHtml(c.id)}`;
 
-      return renderCaseCard(c, testId);
-    }).join("");
+        return renderCaseCard(c, testId);
+      })
+      .join("");
 
     // Restore open state
     for (const tid of openDetails) {
-      const el = casesEl.querySelector<HTMLDetailsElement>(`[data-testid="${tid}"]`);
+      const el = casesEl.querySelector<HTMLDetailsElement>(
+        `[data-testid="${tid}"]`,
+      );
       if (el) {
         el.open = true;
       }
@@ -335,22 +383,31 @@ function render(): void {
 
   // ---- Timeline ----
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="fraud-empty" style="padding: 0.5rem 0; font-size: 0.6rem;">No activity yet</div>';
+    timelineEl.innerHTML =
+      '<div class="fraud-empty" style="padding: 0.5rem 0; font-size: 0.6rem;">No activity yet</div>';
   } else {
-    timelineEl.innerHTML = timeline.slice(-30).map((entry) => `
+    timelineEl.innerHTML = timeline
+      .slice(-30)
+      .map(
+        (entry) => `
       <div class="fraud-timeline-entry" data-type="${escapeHtml(entry.type)}">
         <span class="fraud-timeline-time">${escapeHtml(entry.time)}</span>
         <span class="fraud-timeline-msg">${escapeHtml(entry.message)}</span>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
     timelineEl.scrollTop = timelineEl.scrollHeight;
   }
 
   // ---- Checkpoints ----
   if (checkpoints.length === 0) {
-    checkpointsEl.innerHTML = '<div style="font-size: 0.6rem; color: var(--fraud-text-dim);">No checkpoints saved</div>';
+    checkpointsEl.innerHTML =
+      '<div style="font-size: 0.6rem; color: var(--fraud-text-dim);">No checkpoints saved</div>';
   } else {
-    checkpointsEl.innerHTML = checkpoints.map((cp) => `
+    checkpointsEl.innerHTML = checkpoints
+      .map(
+        (cp) => `
       <div class="fraud-checkpoint-item" data-testid="fraud-checkpoint-${escapeHtml(cp.id)}">
         <span class="fraud-checkpoint-label" title="${escapeHtml(cp.label)}">${escapeHtml(cp.label)}</span>
         <div class="fraud-checkpoint-actions">
@@ -358,7 +415,9 @@ function render(): void {
           <button class="fraud-checkpoint-btn delete" data-action="delete-checkpoint" data-checkpoint-id="${escapeHtml(cp.id)}" title="Delete">&times;</button>
         </div>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
   }
 
   // ---- Button States ----
@@ -408,8 +467,11 @@ async function runPipeline(): Promise<void> {
   // Check if more stages need to run
   const stage = system.facts.stage;
   const cases = system.facts.cases;
-  const allAnalyzed = cases.length > 0 && cases.every((c) => c.analyzed || c.disposition === "escalated");
-  const allDispositioned = cases.length > 0 && cases.every((c) => c.disposition !== "pending");
+  const allAnalyzed =
+    cases.length > 0 &&
+    cases.every((c) => c.analyzed || c.disposition === "escalated");
+  const allDispositioned =
+    cases.length > 0 && cases.every((c) => c.disposition !== "pending");
 
   if (allDispositioned || (allAnalyzed && !autoRunning)) {
     system.facts.stage = "complete";
@@ -447,9 +509,13 @@ async function autoRun(): Promise<void> {
     await delay(200);
 
     const cases = system.facts.cases;
-    const allDone = cases.length > 0 && cases.every(
-      (c) => c.disposition !== "pending" || (c.enriched && !c.analyzed && system.facts.analysisBudget <= 0),
-    );
+    const allDone =
+      cases.length > 0 &&
+      cases.every(
+        (c) =>
+          c.disposition !== "pending" ||
+          (c.enriched && !c.analyzed && system.facts.analysisBudget <= 0),
+      );
 
     if (allDone) {
       break;
@@ -529,7 +595,12 @@ async function saveCheckpoint(): Promise<void> {
 
   await checkpointStore.save(checkpoint);
 
-  const entry: CheckpointEntry = { id, label, createdAt: checkpoint.createdAt, stage: system.facts.stage };
+  const entry: CheckpointEntry = {
+    id,
+    label,
+    createdAt: checkpoint.createdAt,
+    stage: system.facts.stage,
+  };
   system.facts.checkpoints = [...system.facts.checkpoints, entry];
 
   addTimeline("checkpoint", `saved: ${label}`);
@@ -569,7 +640,8 @@ async function restoreCheckpoint(checkpointId: string): Promise<void> {
   system.facts.maxAnalysisBudget = saved.maxAnalysisBudget as number;
   system.facts.riskThreshold = saved.riskThreshold as number;
   system.facts.lastError = (saved.lastError as string) ?? "";
-  system.facts.selectedScenario = (saved.selectedScenario as string) ?? "card-skimming";
+  system.facts.selectedScenario =
+    (saved.selectedScenario as string) ?? "card-skimming";
 
   // Restore timeline
   if (checkpoint.timelineExport) {
@@ -619,9 +691,12 @@ function updateScenarioDesc(): void {
   const scenario = scenarios[scenarioSelect.value];
   if (scenario) {
     scenarioDesc.textContent = scenario.description;
-    rulesEl.innerHTML = scenario.rules.map((r) =>
-      `<div class="fraud-rule"><div class="fraud-rule-header"><span class="fraud-rule-severity fraud-rule-${r.severity}">${r.severity}</span> <strong>${escapeHtml(r.name)}</strong></div><div class="fraud-rule-desc">${escapeHtml(r.description)}</div></div>`,
-    ).join("");
+    rulesEl.innerHTML = scenario.rules
+      .map(
+        (r) =>
+          `<div class="fraud-rule"><div class="fraud-rule-header"><span class="fraud-rule-severity fraud-rule-${r.severity}">${r.severity}</span> <strong>${escapeHtml(r.name)}</strong></div><div class="fraud-rule-desc">${escapeHtml(r.description)}</div></div>`,
+      )
+      .join("");
   }
 }
 

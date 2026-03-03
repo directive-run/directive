@@ -1,16 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  type EvalCase,
   createEvalSuite,
+  evalAssert,
   evalCost,
+  evalFaithfulness,
+  evalJudge,
   evalLatency,
+  evalMatch,
   evalOutputLength,
   evalSafety,
   evalStructure,
-  evalMatch,
-  evalJudge,
-  evalFaithfulness,
-  evalAssert,
-  type EvalCase,
 } from "../evals.js";
 import type { AgentLike, AgentRunner, RunResult } from "../types.js";
 
@@ -22,7 +22,9 @@ function mockAgent(name: string): AgentLike {
   return { name };
 }
 
-function mockRunner(outputs: Record<string, string | Record<string, unknown>>): AgentRunner {
+function mockRunner(
+  outputs: Record<string, string | Record<string, unknown>>,
+): AgentRunner {
   return (async (agent) => {
     const output = outputs[agent.name] ?? "";
 
@@ -148,7 +150,12 @@ describe("evalOutputLength", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "hello world", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "hello world",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -173,7 +180,12 @@ describe("evalOutputLength", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "this is way too long", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "this is way too long",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -191,7 +203,12 @@ describe("evalSafety", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "AI is fascinating", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "AI is fascinating",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -203,7 +220,12 @@ describe("evalSafety", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "My SSN is 123-45-6789", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "My SSN is 123-45-6789",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -215,7 +237,12 @@ describe("evalSafety", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "The SECRET code is 42", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "The SECRET code is 42",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -229,11 +256,19 @@ describe("evalSafety", () => {
 
 describe("evalStructure", () => {
   it("passes valid JSON with required keys", () => {
-    const criterion = evalStructure({ type: "json", requiredKeys: ["name", "age"] });
+    const criterion = evalStructure({
+      type: "json",
+      requiredKeys: ["name", "age"],
+    });
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: '{"name":"Alice","age":30}', messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: '{"name":"Alice","age":30}',
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -241,11 +276,19 @@ describe("evalStructure", () => {
   });
 
   it("fails on missing keys", () => {
-    const criterion = evalStructure({ type: "json", requiredKeys: ["name", "age", "email"] });
+    const criterion = evalStructure({
+      type: "json",
+      requiredKeys: ["name", "age", "email"],
+    });
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: '{"name":"Alice"}', messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: '{"name":"Alice"}',
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -259,7 +302,12 @@ describe("evalStructure", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "not json", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "not json",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -271,7 +319,12 @@ describe("evalStructure", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "some output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "some output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -289,7 +342,12 @@ describe("evalMatch", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", expected: "hello" },
-      result: { output: "say hello world", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "say hello world",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -301,7 +359,12 @@ describe("evalMatch", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", expected: "goodbye" },
-      result: { output: "hello world", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "hello world",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -313,7 +376,12 @@ describe("evalMatch", () => {
     const partialResult = criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", expected: "hello" },
-      result: { output: "hello world", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "hello world",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -334,7 +402,12 @@ describe("evalMatch", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", expected: "\\d{3}" },
-      result: { output: "code 123 here", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "code 123 here",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -346,7 +419,12 @@ describe("evalMatch", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test" },
-      result: { output: "anything", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "anything",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -375,7 +453,12 @@ describe("evalJudge", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "What is AI?", expected: "artificial intelligence" },
-      result: { output: "AI is a field of computer science", messages: [], toolCalls: [], totalTokens: 100 },
+      result: {
+        output: "AI is a field of computer science",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 100,
+      },
       runDurationMs: 200,
     });
 
@@ -397,7 +480,12 @@ describe("evalJudge", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -422,7 +510,12 @@ describe("evalJudge", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -712,7 +805,12 @@ describe("evalMatch ReDoS prevention (A1)", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", expected: "\\d{3}-\\d{4}" },
-      result: { output: "call 123-4567 now", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "call 123-4567 now",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -765,7 +863,12 @@ describe("evalStructure non-object output (A4)", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: "[1, 2, 3]", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "[1, 2, 3]",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -790,7 +893,12 @@ describe("evalStructure non-object output (A4)", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: '"just a string"', messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: '"just a string"',
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -814,7 +922,12 @@ describe("evalStructure non-object output (A4)", () => {
     const result = criterion.fn({
       agent: mockAgent("a"),
       testCase: dataset[0]!,
-      result: { output: '{"name":"Alice"}', messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: '{"name":"Alice"}',
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -831,7 +944,7 @@ describe("NaN score propagation guard (A10)", () => {
     const suite = createEvalSuite({
       criteria: {
         nanProducer: () => ({
-          score: NaN,
+          score: Number.NaN,
           passed: false,
           reason: "Produced NaN",
           durationMs: 0,
@@ -854,7 +967,7 @@ describe("NaN score propagation guard (A10)", () => {
     const suite = createEvalSuite({
       criteria: {
         infProducer: () => ({
-          score: Infinity,
+          score: Number.POSITIVE_INFINITY,
           passed: false,
           reason: "Produced Infinity",
           durationMs: 0,
@@ -940,10 +1053,12 @@ describe("evalAssert", () => {
 
     const results = await suite.run();
 
-    expect(() => evalAssert(results, {
-      minScore: 0.0,
-      minPassRate: 0.0,
-    })).not.toThrow();
+    expect(() =>
+      evalAssert(results, {
+        minScore: 0.0,
+        minPassRate: 0.0,
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -959,11 +1074,15 @@ describe("evalOutputLength minLength > maxLength validation (L2)", () => {
   });
 
   it("allows minLength === maxLength", () => {
-    expect(() => evalOutputLength({ minLength: 50, maxLength: 50 })).not.toThrow();
+    expect(() =>
+      evalOutputLength({ minLength: 50, maxLength: 50 }),
+    ).not.toThrow();
   });
 
   it("allows minLength < maxLength", () => {
-    expect(() => evalOutputLength({ minLength: 10, maxLength: 100 })).not.toThrow();
+    expect(() =>
+      evalOutputLength({ minLength: 10, maxLength: 100 }),
+    ).not.toThrow();
   });
 
   it("allows only minLength", () => {
@@ -996,7 +1115,12 @@ describe("evalJudge non-string output type guard (L5)", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", expected: "answer" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -1021,7 +1145,12 @@ describe("evalJudge non-string output type guard (L5)", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -1036,7 +1165,11 @@ describe("evalJudge non-string output type guard (L5)", () => {
 
 describe("evalJudge timeoutMs option (L6)", () => {
   it("times out after timeoutMs", async () => {
-    const judgeRunner = (async (_agent: AgentLike, _input: string, opts?: { signal?: AbortSignal }) => {
+    const judgeRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      opts?: { signal?: AbortSignal },
+    ) => {
       // Wait longer than the timeout
       await new Promise((resolve, reject) => {
         const timer = setTimeout(resolve, 5000);
@@ -1063,7 +1196,12 @@ describe("evalJudge timeoutMs option (L6)", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -1089,7 +1227,12 @@ describe("evalJudge timeoutMs option (L6)", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 
@@ -1098,7 +1241,11 @@ describe("evalJudge timeoutMs option (L6)", () => {
   });
 
   it("semantic judge functions also support timeoutMs", async () => {
-    const slowRunner = (async (_agent: AgentLike, _input: string, opts?: { signal?: AbortSignal }) => {
+    const slowRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      opts?: { signal?: AbortSignal },
+    ) => {
       await new Promise((resolve, reject) => {
         const timer = setTimeout(resolve, 5000);
         opts?.signal?.addEventListener("abort", () => {
@@ -1107,7 +1254,12 @@ describe("evalJudge timeoutMs option (L6)", () => {
         });
       });
 
-      return { output: '{"score": 1.0}', messages: [], toolCalls: [], totalTokens: 50 };
+      return {
+        output: '{"score": 1.0}',
+        messages: [],
+        toolCalls: [],
+        totalTokens: 50,
+      };
     }) as AgentRunner;
 
     const criterion = evalFaithfulness({
@@ -1119,7 +1271,12 @@ describe("evalJudge timeoutMs option (L6)", () => {
     const result = await criterion.fn({
       agent: mockAgent("a"),
       testCase: { input: "test", context: "some context" },
-      result: { output: "output", messages: [], toolCalls: [], totalTokens: 10 },
+      result: {
+        output: "output",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 10,
+      },
       runDurationMs: 100,
     });
 

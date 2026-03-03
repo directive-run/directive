@@ -12,9 +12,14 @@
  * - observeScroll: IntersectionObserver on sentinel element
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import {loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
-import { fetchPage, type ListItem } from "./mock-api.js";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import { devtoolsPlugin, loggingPlugin } from "@directive-run/core/plugins";
+import { type ListItem, fetchPage } from "./mock-api.js";
 
 // ============================================================================
 // Filters Module

@@ -1,19 +1,17 @@
-import { describe, it, expect } from "vitest";
-import {
-  createTestMultiAgentOrchestrator,
-} from "../testing.js";
-import {
-  goal,
-  allReadyStrategy,
-  highestImpactStrategy,
-  costEfficientStrategy,
-  composePatterns,
-  debate,
-  patternToJSON,
-  patternFromJSON,
-} from "../multi-agent-orchestrator.js";
-import type { GoalMetrics, GoalCheckpointState } from "../types.js";
+import { describe, expect, it } from "vitest";
 import { InMemoryCheckpointStore } from "../checkpoint.js";
+import {
+  allReadyStrategy,
+  composePatterns,
+  costEfficientStrategy,
+  debate,
+  goal,
+  highestImpactStrategy,
+  patternFromJSON,
+  patternToJSON,
+} from "../multi-agent-orchestrator.js";
+import { createTestMultiAgentOrchestrator } from "../testing.js";
+import type { GoalCheckpointState, GoalMetrics } from "../types.js";
 
 // ============================================================================
 // Tests
@@ -32,7 +30,9 @@ describe("goal pattern", () => {
           output: "dynamic",
           totalTokens: 50,
           generate: () => ({
-            output: JSON.stringify({ "research.findings": "AI Safety is important" }),
+            output: JSON.stringify({
+              "research.findings": "AI Safety is important",
+            }),
             totalTokens: 50,
           }),
         },
@@ -40,7 +40,9 @@ describe("goal pattern", () => {
           output: "dynamic",
           totalTokens: 40,
           generate: () => ({
-            output: JSON.stringify({ "article.draft": "A great article about AI Safety" }),
+            output: JSON.stringify({
+              "article.draft": "A great article about AI Safety",
+            }),
             totalTokens: 40,
           }),
         },
@@ -113,7 +115,10 @@ describe("goal pattern", () => {
           generate: () => {
             callOrder.push("a");
 
-            return { output: JSON.stringify({ "data.a": "result-a" }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ "data.a": "result-a" }),
+              totalTokens: 10,
+            };
           },
         },
         b: {
@@ -122,7 +127,10 @@ describe("goal pattern", () => {
           generate: () => {
             callOrder.push("b");
 
-            return { output: JSON.stringify({ "data.b": "result-b" }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ "data.b": "result-b" }),
+              totalTokens: 10,
+            };
           },
         },
         merger: {
@@ -131,7 +139,10 @@ describe("goal pattern", () => {
           generate: () => {
             callOrder.push("merger");
 
-            return { output: JSON.stringify({ merged: true }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ merged: true }),
+              totalTokens: 10,
+            };
           },
         },
       },
@@ -183,7 +194,7 @@ describe("goal pattern", () => {
           output: "dynamic",
           totalTokens: 20,
           generate: () => ({
-            output: JSON.stringify({ "draft": `version-${reviewerCalls + 1}` }),
+            output: JSON.stringify({ draft: `version-${reviewerCalls + 1}` }),
             totalTokens: 20,
           }),
         },
@@ -195,7 +206,12 @@ describe("goal pattern", () => {
             const approved = reviewerCalls >= 2;
 
             return {
-              output: JSON.stringify({ approved, "draft": approved ? `version-${reviewerCalls}` : `version-${reviewerCalls + 1}` }),
+              output: JSON.stringify({
+                approved,
+                draft: approved
+                  ? `version-${reviewerCalls}`
+                  : `version-${reviewerCalls + 1}`,
+              }),
               totalTokens: 15,
             };
           },
@@ -274,7 +290,10 @@ describe("goal pattern", () => {
           {
             label: "skip-flaky",
             afterStallSteps: 1,
-            strategy: { type: "inject_facts", facts: { "flaky.result": "fallback-data" } },
+            strategy: {
+              type: "inject_facts",
+              facts: { "flaky.result": "fallback-data" },
+            },
           },
         ],
       },
@@ -291,7 +310,7 @@ describe("goal pattern", () => {
         a: { agent: { name: "a" } },
       },
       mockResponses: {
-        a: { output: JSON.stringify({ "partial": true }), totalTokens: 10 },
+        a: { output: JSON.stringify({ partial: true }), totalTokens: 10 },
       },
     });
 
@@ -353,7 +372,10 @@ describe("goal pattern", () => {
           {
             label: "inject-data",
             afterStallSteps: 1,
-            strategy: { type: "inject_facts", facts: { data: "injected-data" } },
+            strategy: {
+              type: "inject_facts",
+              facts: { data: "injected-data" },
+            },
           },
         ],
         onStall: () => {
@@ -449,7 +471,10 @@ describe("goal pattern", () => {
         },
       },
       {},
-      (facts) => facts["a.done"] === true && facts["b.done"] === true && facts["c.done"] === true,
+      (facts) =>
+        facts["a.done"] === true &&
+        facts["b.done"] === true &&
+        facts["c.done"] === true,
       {
         maxSteps: 10,
         selectionStrategy: highestImpactStrategy({ topN: 2 }),
@@ -574,7 +599,10 @@ describe("goal pattern", () => {
             // Abort after first call
             controller.abort();
 
-            return { output: JSON.stringify({ partial: true }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ partial: true }),
+              totalTokens: 10,
+            };
           },
         },
       },
@@ -709,7 +737,12 @@ describe("goal pattern", () => {
     const selected = strategy.select(
       ["a", "b", "c"],
       {},
-      { satisfaction: 0, progressRate: 0, estimatedStepsRemaining: null, decelerating: false },
+      {
+        satisfaction: 0,
+        progressRate: 0,
+        estimatedStepsRemaining: null,
+        decelerating: false,
+      },
     );
 
     expect(selected).toEqual(["a", "b", "c"]);
@@ -724,7 +757,12 @@ describe("goal pattern", () => {
         b: { runs: 3, avgSatisfactionDelta: 0.3, tokens: 100 },
         c: { runs: 3, avgSatisfactionDelta: 0.2, tokens: 100 },
       },
-      { satisfaction: 0.5, progressRate: 0, estimatedStepsRemaining: null, decelerating: false },
+      {
+        satisfaction: 0.5,
+        progressRate: 0,
+        estimatedStepsRemaining: null,
+        decelerating: false,
+      },
     );
 
     expect(selected).toHaveLength(2);
@@ -740,7 +778,12 @@ describe("goal pattern", () => {
         expensive: { runs: 5, avgSatisfactionDelta: 0.1, tokens: 1000 },
         cheap: { runs: 5, avgSatisfactionDelta: 0.1, tokens: 100 },
       },
-      { satisfaction: 0.5, progressRate: 0, estimatedStepsRemaining: null, decelerating: false },
+      {
+        satisfaction: 0.5,
+        progressRate: 0,
+        estimatedStepsRemaining: null,
+        decelerating: false,
+      },
     );
 
     // Cheap should come first
@@ -829,7 +872,10 @@ describe("goal pattern", () => {
           generate: () => {
             callCount++;
 
-            return { output: JSON.stringify({ counter: callCount }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ counter: callCount }),
+              totalTokens: 10,
+            };
           },
         },
       },
@@ -870,7 +916,10 @@ describe("goal pattern", () => {
           generate: () => {
             callOrder.push("low");
 
-            return { output: JSON.stringify({ "low.done": true }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ "low.done": true }),
+              totalTokens: 10,
+            };
           },
         },
         high: {
@@ -879,7 +928,10 @@ describe("goal pattern", () => {
           generate: () => {
             callOrder.push("high");
 
-            return { output: JSON.stringify({ "high.done": true }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ "high.done": true }),
+              totalTokens: 10,
+            };
           },
         },
       },
@@ -1208,10 +1260,10 @@ describe("goal pattern", () => {
         satisfaction: () => {
           callIdx++;
           if (callIdx === 1) {
-            return NaN;
+            return Number.NaN;
           }
           if (callIdx === 2) {
-            return Infinity;
+            return Number.POSITIVE_INFINITY;
           }
 
           return 0.5;
@@ -1285,12 +1337,29 @@ describe("goal pattern", () => {
 
     await orchestrator.runGoal(
       {
-        a: { handler: "a", produces: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
-        b: { handler: "b", produces: ["b.done"], requires: ["a.done"], extractOutput: (r) => JSON.parse(r.output as string) },
-        c: { handler: "c", produces: ["c.done"], requires: ["b.done"], extractOutput: (r) => JSON.parse(r.output as string) },
+        a: {
+          handler: "a",
+          produces: ["a.done"],
+          extractOutput: (r) => JSON.parse(r.output as string),
+        },
+        b: {
+          handler: "b",
+          produces: ["b.done"],
+          requires: ["a.done"],
+          extractOutput: (r) => JSON.parse(r.output as string),
+        },
+        c: {
+          handler: "c",
+          produces: ["c.done"],
+          requires: ["b.done"],
+          extractOutput: (r) => JSON.parse(r.output as string),
+        },
       },
       {},
-      (facts) => facts["a.done"] === true && facts["b.done"] === true && facts["c.done"] === true,
+      (facts) =>
+        facts["a.done"] === true &&
+        facts["b.done"] === true &&
+        facts["c.done"] === true,
       {
         maxSteps: 10,
         satisfaction: (facts) => {
@@ -1343,7 +1412,10 @@ describe("goal pattern", () => {
           generate: () => {
             callCount++;
 
-            return { output: JSON.stringify({ counter: callCount }), totalTokens: 10 };
+            return {
+              output: JSON.stringify({ counter: callCount }),
+              totalTokens: 10,
+            };
           },
         },
       },
@@ -1398,7 +1470,10 @@ describe("goal pattern", () => {
             generate: () => {
               callCount++;
 
-              return { output: JSON.stringify({ counter: callCount }), totalTokens: 10 };
+              return {
+                output: JSON.stringify({ counter: callCount }),
+                totalTokens: 10,
+              };
             },
           },
         },
@@ -1421,9 +1496,33 @@ describe("goal pattern", () => {
       nodeOutputs: { worker: { output: { counter: 3 }, totalTokens: 30 } },
       executionOrder: ["worker", "worker", "worker"],
       stepMetrics: [
-        { step: 0, durationMs: 1, nodesRun: ["worker"], factsProduced: ["counter"], satisfaction: 0.1, satisfactionDelta: 0.1, tokensConsumed: 10 },
-        { step: 1, durationMs: 1, nodesRun: ["worker"], factsProduced: ["counter"], satisfaction: 0.2, satisfactionDelta: 0.1, tokensConsumed: 10 },
-        { step: 2, durationMs: 1, nodesRun: ["worker"], factsProduced: ["counter"], satisfaction: 0.3, satisfactionDelta: 0.1, tokensConsumed: 10 },
+        {
+          step: 0,
+          durationMs: 1,
+          nodesRun: ["worker"],
+          factsProduced: ["counter"],
+          satisfaction: 0.1,
+          satisfactionDelta: 0.1,
+          tokensConsumed: 10,
+        },
+        {
+          step: 1,
+          durationMs: 1,
+          nodesRun: ["worker"],
+          factsProduced: ["counter"],
+          satisfaction: 0.2,
+          satisfactionDelta: 0.1,
+          tokensConsumed: 10,
+        },
+        {
+          step: 2,
+          durationMs: 1,
+          nodesRun: ["worker"],
+          factsProduced: ["counter"],
+          satisfaction: 0.3,
+          satisfactionDelta: 0.1,
+          tokensConsumed: 10,
+        },
       ],
       relaxations: [],
       appliedRelaxationTiers: 0,
@@ -1547,11 +1646,20 @@ describe("goal pattern", () => {
     };
 
     const pattern = goal(
-      { worker: { handler: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
+      {
+        worker: {
+          handler: "worker",
+          produces: ["done"],
+          extractOutput: (r) => JSON.parse(r.output as string),
+        },
+      },
       (facts) => facts.done === true,
     );
 
-    const result = await orchestrator.resumeGoal(legacyCheckpoint as any, pattern);
+    const result = await orchestrator.resumeGoal(
+      legacyCheckpoint as any,
+      pattern,
+    );
 
     expect(result.achieved).toBe(true);
   });
@@ -1588,7 +1696,13 @@ describe("goal pattern", () => {
     };
 
     const pattern = goal(
-      { worker: { handler: "worker", produces: ["done"], extractOutput: (r) => JSON.parse(r.output as string) } },
+      {
+        worker: {
+          handler: "worker",
+          produces: ["done"],
+          extractOutput: (r) => JSON.parse(r.output as string),
+        },
+      },
       (facts) => facts.done === true,
     );
 

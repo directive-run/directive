@@ -9,17 +9,19 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
+  type EventLogEntry,
   dashboardModule,
   moduleRegistry,
-  type EventLogEntry,
 } from "./modules.js";
 
 // ============================================================================
 // System
 // ============================================================================
 
-let system = createSystem({ modules: { dashboard: dashboardModule },
-  plugins: [devtoolsPlugin({ name: "dynamic-modules" })], });
+let system = createSystem({
+  modules: { dashboard: dashboardModule },
+  plugins: [devtoolsPlugin({ name: "dynamic-modules" })],
+});
 system.start();
 
 // ============================================================================
@@ -51,9 +53,15 @@ const statusText = document.getElementById("dm-status-text")!;
 const widgetsArea = document.getElementById("dm-widgets-area")!;
 const timelineEl = document.getElementById("dm-timeline")!;
 
-const loadCounterBtn = document.getElementById("dm-load-counter") as HTMLButtonElement;
-const loadWeatherBtn = document.getElementById("dm-load-weather") as HTMLButtonElement;
-const loadDiceBtn = document.getElementById("dm-load-dice") as HTMLButtonElement;
+const loadCounterBtn = document.getElementById(
+  "dm-load-counter",
+) as HTMLButtonElement;
+const loadWeatherBtn = document.getElementById(
+  "dm-load-weather",
+) as HTMLButtonElement;
+const loadDiceBtn = document.getElementById(
+  "dm-load-dice",
+) as HTMLButtonElement;
 const resetBtn = document.getElementById("dm-reset-btn") as HTMLButtonElement;
 
 // ============================================================================
@@ -82,7 +90,8 @@ function render(): void {
 
   // --- Widgets area ---
   if (loaded.length === 0) {
-    widgetsArea.innerHTML = '<div class="dm-widgets-empty">Load a module to get started</div>';
+    widgetsArea.innerHTML =
+      '<div class="dm-widgets-empty">Load a module to get started</div>';
   } else {
     widgetsArea.innerHTML = "";
     for (const ns of loaded) {
@@ -131,16 +140,22 @@ function renderCounterWidget(): void {
   widgetsArea.appendChild(card);
 
   // Wire up controls after appending
-  card.querySelector('[data-testid="dm-counter-increment"]')!.addEventListener("click", () => {
-    system.events.counter.increment();
-  });
-  card.querySelector('[data-testid="dm-counter-decrement"]')!.addEventListener("click", () => {
-    system.events.counter.decrement();
-  });
-  card.querySelector('[data-testid="dm-counter-step"]')!.addEventListener("input", (e) => {
-    const value = Number((e.target as HTMLInputElement).value);
-    system.events.counter.setStep({ value });
-  });
+  card
+    .querySelector('[data-testid="dm-counter-increment"]')!
+    .addEventListener("click", () => {
+      system.events.counter.increment();
+    });
+  card
+    .querySelector('[data-testid="dm-counter-decrement"]')!
+    .addEventListener("click", () => {
+      system.events.counter.decrement();
+    });
+  card
+    .querySelector('[data-testid="dm-counter-step"]')!
+    .addEventListener("input", (e) => {
+      const value = Number((e.target as HTMLInputElement).value);
+      system.events.counter.setStep({ value });
+    });
 }
 
 function renderWeatherWidget(): void {
@@ -171,7 +186,9 @@ function renderWeatherWidget(): void {
   }
 
   // Preserve city input value during re-render
-  const existingInput = document.querySelector('[data-testid="dm-weather-city"]') as HTMLInputElement | null;
+  const existingInput = document.querySelector(
+    '[data-testid="dm-weather-city"]',
+  ) as HTMLInputElement | null;
   const currentCityValue = existingInput ? existingInput.value : city;
 
   card.innerHTML = `
@@ -195,13 +212,17 @@ function renderWeatherWidget(): void {
   widgetsArea.appendChild(card);
 
   // Wire up controls
-  const cityInput = card.querySelector('[data-testid="dm-weather-city"]') as HTMLInputElement;
+  const cityInput = card.querySelector(
+    '[data-testid="dm-weather-city"]',
+  ) as HTMLInputElement;
   cityInput.addEventListener("input", () => {
     system.events.weather.setCity({ value: cityInput.value });
   });
-  card.querySelector('[data-testid="dm-weather-refresh"]')!.addEventListener("click", () => {
-    system.events.weather.refresh();
-  });
+  card
+    .querySelector('[data-testid="dm-weather-refresh"]')!
+    .addEventListener("click", () => {
+      system.events.weather.refresh();
+    });
 
   // Focus management: re-focus if user was typing
   if (existingInput && document.activeElement === existingInput) {
@@ -242,14 +263,17 @@ function renderDiceWidget(): void {
 
   widgetsArea.appendChild(card);
 
-  card.querySelector('[data-testid="dm-dice-roll"]')!.addEventListener("click", () => {
-    system.events.dice.roll();
-  });
+  card
+    .querySelector('[data-testid="dm-dice-roll"]')!
+    .addEventListener("click", () => {
+      system.events.dice.roll();
+    });
 }
 
 function renderTimeline(eventLog: EventLogEntry[]): void {
   if (eventLog.length === 0) {
-    timelineEl.innerHTML = '<div class="dm-timeline-empty">Events will appear here</div>';
+    timelineEl.innerHTML =
+      '<div class="dm-timeline-empty">Events will appear here</div>';
 
     return;
   }
@@ -263,9 +287,15 @@ function renderTimeline(eventLog: EventLogEntry[]): void {
     let entryClass = "loaded";
     if (entry.event === "loaded") {
       entryClass = "loaded";
-    } else if (entry.detail.includes("counter") || entry.event.includes("counter")) {
+    } else if (
+      entry.detail.includes("counter") ||
+      entry.event.includes("counter")
+    ) {
       entryClass = "counter";
-    } else if (entry.detail.includes("weather") || entry.event.includes("weather")) {
+    } else if (
+      entry.detail.includes("weather") ||
+      entry.event.includes("weather")
+    ) {
       entryClass = "weather";
     } else if (entry.detail.includes("dice") || entry.event.includes("dice")) {
       entryClass = "dice";
@@ -336,8 +366,10 @@ function resetDemo(): void {
   }
   unsubs.length = 0;
 
-  system = createSystem({ modules: { dashboard: dashboardModule },
-  plugins: [devtoolsPlugin({ name: "dynamic-modules" })], });
+  system = createSystem({
+    modules: { dashboard: dashboardModule },
+    plugins: [devtoolsPlugin({ name: "dynamic-modules" })],
+  });
   system.start();
 
   setupSubscriptions();

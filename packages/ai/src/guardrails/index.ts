@@ -113,8 +113,15 @@ export {
 // Output Sanitization
 // ============================================================================
 
-import type { GuardrailFn, OutputGuardrailData, GuardrailResult } from "../types.js";
-import { detectPromptInjection, STRICT_INJECTION_PATTERNS } from "./prompt-injection.js";
+import type {
+  GuardrailFn,
+  GuardrailResult,
+  OutputGuardrailData,
+} from "../types.js";
+import {
+  STRICT_INJECTION_PATTERNS,
+  detectPromptInjection,
+} from "./prompt-injection.js";
 
 /** Options for output sanitizer */
 export interface OutputSanitizerOptions {
@@ -129,7 +136,11 @@ export interface OutputSanitizerOptions {
   /** Custom sanitization function */
   customSanitizer?: (text: string) => string;
   /** Callback when sanitization occurs */
-  onSanitized?: (original: string, sanitized: string, reasons: string[]) => void;
+  onSanitized?: (
+    original: string,
+    sanitized: string,
+    reasons: string[],
+  ) => void;
 }
 
 /**
@@ -149,7 +160,7 @@ export interface OutputSanitizerOptions {
  * ```
  */
 export function createOutputSanitizer(
-  options: OutputSanitizerOptions = {}
+  options: OutputSanitizerOptions = {},
 ): GuardrailFn<OutputGuardrailData> {
   const {
     stripInjectionPatterns = true,
@@ -161,7 +172,10 @@ export function createOutputSanitizer(
   } = options;
 
   return (data): GuardrailResult => {
-    let text = typeof data.output === "string" ? data.output : JSON.stringify(data.output);
+    let text =
+      typeof data.output === "string"
+        ? data.output
+        : JSON.stringify(data.output);
     const original = text;
     const reasons: string[] = [];
 
@@ -170,7 +184,13 @@ export function createOutputSanitizer(
       const detection = detectPromptInjection(text, STRICT_INJECTION_PATTERNS);
       if (detection.detected) {
         for (const pattern of detection.patterns) {
-          text = text.replace(new RegExp(pattern.match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '[SANITIZED]');
+          text = text.replace(
+            new RegExp(
+              pattern.match.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "gi",
+            ),
+            "[SANITIZED]",
+          );
         }
         reasons.push(`injection-patterns:${detection.patterns.length}`);
       }
@@ -180,8 +200,8 @@ export function createOutputSanitizer(
     if (stripCodeBlocks) {
       const codeBlockRegex = /```[\s\S]*?```/g;
       if (codeBlockRegex.test(text)) {
-        text = text.replace(codeBlockRegex, '[CODE REMOVED]');
-        reasons.push('code-blocks');
+        text = text.replace(codeBlockRegex, "[CODE REMOVED]");
+        reasons.push("code-blocks");
       }
     }
 
@@ -189,14 +209,14 @@ export function createOutputSanitizer(
     if (stripUrls) {
       const urlRegex = /https?:\/\/[^\s)>\]]+/gi;
       if (urlRegex.test(text)) {
-        text = text.replace(urlRegex, '[URL REMOVED]');
-        reasons.push('urls');
+        text = text.replace(urlRegex, "[URL REMOVED]");
+        reasons.push("urls");
       }
     }
 
     // Apply max length
     if (maxLength && text.length > maxLength) {
-      text = text.slice(0, maxLength) + '... [TRUNCATED]';
+      text = text.slice(0, maxLength) + "... [TRUNCATED]";
       reasons.push(`length:${original.length}>${maxLength}`);
     }
 
@@ -205,7 +225,7 @@ export function createOutputSanitizer(
       const customResult = customSanitizer(text);
       if (customResult !== text) {
         text = customResult;
-        reasons.push('custom');
+        reasons.push("custom");
       }
     }
 
@@ -247,9 +267,9 @@ export function composeGuardrails<T>(
     name?: string;
     /** Continue checking even after a failure (collect all failures) */
     collectAllFailures?: boolean;
-  } = {}
+  } = {},
 ): GuardrailFn<T> {
-  const { name = 'composed', collectAllFailures = false } = options;
+  const { name = "composed", collectAllFailures = false } = options;
 
   return async (data, context): Promise<GuardrailResult> => {
     const failures: string[] = [];
@@ -262,7 +282,7 @@ export function composeGuardrails<T>(
         if (!collectAllFailures) {
           return result;
         }
-        failures.push(result.reason || 'Unknown failure');
+        failures.push(result.reason || "Unknown failure");
       } else if (result.transformed !== undefined) {
         // Apply transformation and continue
         currentData = { ...currentData, input: result.transformed } as T;
@@ -272,12 +292,17 @@ export function composeGuardrails<T>(
     if (failures.length > 0) {
       return {
         passed: false,
-        reason: `[${name}] Multiple failures: ${failures.join('; ')}`,
+        reason: `[${name}] Multiple failures: ${failures.join("; ")}`,
       };
     }
 
     // Return any accumulated transformations
-    if (currentData !== data && typeof data === 'object' && data !== null && 'input' in data) {
+    if (
+      currentData !== data &&
+      typeof data === "object" &&
+      data !== null &&
+      "input" in data
+    ) {
       return {
         passed: true,
         transformed: (currentData as Record<string, unknown>).input,
@@ -301,7 +326,7 @@ export function composeGuardrails<T>(
  */
 export function conditionalGuardrail<T>(
   guardrail: GuardrailFn<T>,
-  condition: (data: T) => boolean | Promise<boolean>
+  condition: (data: T) => boolean | Promise<boolean>,
 ): GuardrailFn<T> {
   return async (data, context): Promise<GuardrailResult> => {
     const shouldRun = await condition(data);
@@ -330,7 +355,7 @@ export function retryableGuardrail<T>(
     delayMs?: number;
     /** Only retry on errors, not on guardrail failures */
     retryOnErrorOnly?: boolean;
-  } = {}
+  } = {},
 ): GuardrailFn<T> {
   const { maxRetries = 3, delayMs = 100, retryOnErrorOnly = true } = options;
 
@@ -351,7 +376,9 @@ export function retryableGuardrail<T>(
         lastError = error instanceof Error ? error : new Error(String(error));
 
         if (attempt < maxRetries - 1) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+          await new Promise((resolve) =>
+            setTimeout(resolve, delayMs * (attempt + 1)),
+          );
         }
       }
     }

@@ -31,19 +31,19 @@
 import type { Plugin } from "@directive-run/core";
 import type {
   MCPAdapterConfig,
+  MCPApprovalRequest,
+  MCPCallToolRequirement,
   MCPClient,
-  MCPServerConfig,
-  MCPTool,
+  MCPGetPromptRequirement,
+  MCPReadResourceRequirement,
   MCPResource,
+  MCPResourceMapping,
+  MCPResourceResult,
+  MCPServerConfig,
+  MCPSyncResourcesRequirement,
+  MCPTool,
   MCPToolConstraint,
   MCPToolResult,
-  MCPResourceResult,
-  MCPResourceMapping,
-  MCPCallToolRequirement,
-  MCPReadResourceRequirement,
-  MCPGetPromptRequirement,
-  MCPSyncResourcesRequirement,
-  MCPApprovalRequest,
 } from "./mcp-types.js";
 
 // ============================================================================
@@ -107,13 +107,17 @@ export interface MCPAdapter {
     server: string,
     tool: string,
     args: Record<string, unknown>,
-    facts: Record<string, unknown>
+    facts: Record<string, unknown>,
   ): Promise<MCPToolResult>;
   /**
    * Call a tool directly, bypassing all constraints (rate limits, approvals, etc.).
    * Use only for trusted internal calls where constraint checking is not needed.
    */
-  callToolDirect(server: string, tool: string, args: Record<string, unknown>): Promise<MCPToolResult>;
+  callToolDirect(
+    server: string,
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<MCPToolResult>;
   /** Read a resource directly */
   readResource(server: string, uri: string): Promise<MCPResourceResult>;
   /** Sync resources to facts */
@@ -161,7 +165,8 @@ function createStubClient(config: MCPServerConfig, debug = false): MCPClient {
   const resources: MCPResource[] = [];
 
   const log = debug
-    ? (msg: string, ...args: unknown[]) => console.debug(`[MCP Stub] ${msg}`, ...args)
+    ? (msg: string, ...args: unknown[]) =>
+        console.debug(`[MCP Stub] ${msg}`, ...args)
     : () => {};
 
   return {
@@ -201,7 +206,12 @@ function createStubClient(config: MCPServerConfig, debug = false): MCPClient {
     },
     async getPrompt(name: string) {
       return {
-        messages: [{ role: "user" as const, content: { type: "text" as const, text: `Stub prompt ${name}` } }],
+        messages: [
+          {
+            role: "user" as const,
+            content: { type: "text" as const, text: `Stub prompt ${name}` },
+          },
+        ],
       };
     },
   };
@@ -214,7 +224,7 @@ function createStubClient(config: MCPServerConfig, debug = false): MCPClient {
 function checkRateLimit(
   rateLimiters: Map<string, { count: number; resetTime: number }>,
   key: string,
-  limit: number
+  limit: number,
 ): boolean {
   const now = Date.now();
   const limiter = rateLimiters.get(key);
@@ -286,27 +296,30 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
   // Warn if using stub client in production
   const usingStubClient = !config.clientFactory;
   if (usingStubClient) {
-    const isProduction = typeof process !== "undefined" && process.env?.NODE_ENV === "production";
+    const isProduction =
+      typeof process !== "undefined" && process.env?.NODE_ENV === "production";
     if (isProduction) {
       console.warn(
         "[Directive MCP] WARNING: Using stub MCP client in production!\n" +
-        "The stub client returns mock data and does not connect to real MCP servers.\n" +
-        "Provide a real 'clientFactory' option to connect to actual MCP servers:\n\n" +
-        "  import { Client } from '@modelcontextprotocol/sdk/client/index.js';\n\n" +
-        "  const adapter = createMCPAdapter({\n" +
-        "    servers: [...],\n" +
-        "    clientFactory: (config) => new Client(config),\n" +
-        "  });"
+          "The stub client returns mock data and does not connect to real MCP servers.\n" +
+          "Provide a real 'clientFactory' option to connect to actual MCP servers:\n\n" +
+          "  import { Client } from '@modelcontextprotocol/sdk/client/index.js';\n\n" +
+          "  const adapter = createMCPAdapter({\n" +
+          "    servers: [...],\n" +
+          "    clientFactory: (config) => new Client(config),\n" +
+          "  });",
       );
     } else if (debug) {
       console.debug(
         "[Directive MCP] Using stub client for development. " +
-        "Provide 'clientFactory' for production use."
+          "Provide 'clientFactory' for production use.",
       );
     }
   }
 
-  const clientFactory = config.clientFactory ?? ((serverConfig: MCPServerConfig) => createStubClient(serverConfig, debug));
+  const clientFactory =
+    config.clientFactory ??
+    ((serverConfig: MCPServerConfig) => createStubClient(serverConfig, debug));
   const approvalTimeoutMs = config.approvalTimeoutMs ?? 300000;
 
   // Initialize state
@@ -324,11 +337,14 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
   let approvalCounter = 0;
 
   // Promise-based approval waiting (no polling)
-  const approvalWaiters = new Map<string, {
-    resolve: () => void;
-    reject: (error: Error) => void;
-    timeoutId: ReturnType<typeof setTimeout>;
-  }>();
+  const approvalWaiters = new Map<
+    string,
+    {
+      resolve: () => void;
+      reject: (error: Error) => void;
+      timeoutId: ReturnType<typeof setTimeout>;
+    }
+  >();
 
   // Rejection reasons storage
   const rejectionReasons = new Map<string, string>();
@@ -350,9 +366,11 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         const reason = rejectionReasons.get(requestId);
         rejectionReasons.delete(requestId);
         events.onApprovalResolved?.(requestId, false);
-        reject(new Error(
-          `[Directive MCP] Tool call request ${requestId} was rejected${reason ? `: ${reason}` : ""}`
-        ));
+        reject(
+          new Error(
+            `[Directive MCP] Tool call request ${requestId} was rejected${reason ? `: ${reason}` : ""}`,
+          ),
+        );
         return;
       }
 
@@ -360,10 +378,12 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       const timeoutId = setTimeout(() => {
         approvalWaiters.delete(requestId);
         state.pendingApprovals.delete(requestId);
-        reject(new Error(
-          `[Directive MCP] Approval timeout: Request ${requestId} was not approved or rejected within ${approvalTimeoutMs}ms. ` +
-          `Call adapter.approve("${requestId}") or adapter.reject("${requestId}") to resolve.`
-        ));
+        reject(
+          new Error(
+            `[Directive MCP] Approval timeout: Request ${requestId} was not approved or rejected within ${approvalTimeoutMs}ms. ` +
+              `Call adapter.approve("${requestId}") or adapter.reject("${requestId}") to resolve.`,
+          ),
+        );
       }, approvalTimeoutMs);
 
       // Store waiter for later resolution
@@ -372,7 +392,11 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
   }
 
   // Resolve an approval (called by approve/reject)
-  function resolveApproval(requestId: string, approved: boolean, reason?: string): void {
+  function resolveApproval(
+    requestId: string,
+    approved: boolean,
+    reason?: string,
+  ): void {
     const waiter = approvalWaiters.get(requestId);
     if (waiter) {
       clearTimeout(waiter.timeoutId);
@@ -383,9 +407,11 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (approved) {
         waiter.resolve();
       } else {
-        waiter.reject(new Error(
-          `[Directive MCP] Tool call request ${requestId} was rejected${reason ? `: ${reason}` : ""}`
-        ));
+        waiter.reject(
+          new Error(
+            `[Directive MCP] Tool call request ${requestId} was rejected${reason ? `: ${reason}` : ""}`,
+          ),
+        );
       }
     } else {
       // Waiter not yet created, store for immediate resolution with TTL cleanup
@@ -408,12 +434,15 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
   }
 
   // Track reconnect state per server
-  const reconnectState = new Map<string, {
-    timer: ReturnType<typeof setTimeout> | null;
-    attempts: number;
-    maxAttempts: number;
-    baseDelay: number;
-  }>();
+  const reconnectState = new Map<
+    string,
+    {
+      timer: ReturnType<typeof setTimeout> | null;
+      attempts: number;
+      maxAttempts: number;
+      baseDelay: number;
+    }
+  >();
 
   // Initialize server states
   for (const serverConfig of servers) {
@@ -474,7 +503,8 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       events.onConnect?.(name);
     } catch (error) {
       serverState.status = "error";
-      serverState.error = error instanceof Error ? error : new Error(String(error));
+      serverState.error =
+        error instanceof Error ? error : new Error(String(error));
       events.onError?.(name, serverState.error);
 
       if (autoReconnect) {
@@ -483,8 +513,9 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
           rState.attempts++;
           // Exponential backoff with jitter, capped at 60s
           const delay = Math.min(
-            rState.baseDelay * Math.pow(2, rState.attempts - 1) + Math.random() * 1000,
-            60000
+            rState.baseDelay * Math.pow(2, rState.attempts - 1) +
+              Math.random() * 1000,
+            60000,
           );
           rState.timer = setTimeout(() => {
             rState.timer = null;
@@ -493,7 +524,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         } else if (rState) {
           console.error(
             `[Directive MCP] Max reconnect attempts (${rState.maxAttempts}) reached for server '${name}'. ` +
-            `Call adapter.connectServer("${name}") to retry manually.`
+              `Call adapter.connectServer("${name}") to retry manually.`,
           );
         }
       }
@@ -531,19 +562,19 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
     server: string,
     tool: string,
     args: Record<string, unknown>,
-    facts: Record<string, unknown>
+    facts: Record<string, unknown>,
   ): Promise<MCPToolResult> {
     const serverState = state.servers.get(server);
     if (!serverState) {
       throw new Error(
         `[Directive MCP] Unknown server '${server}'. ` +
-        `Available servers: ${Array.from(state.servers.keys()).join(", ") || "(none)"}`
+          `Available servers: ${Array.from(state.servers.keys()).join(", ") || "(none)"}`,
       );
     }
     if (!serverState.client) {
       throw new Error(
         `[Directive MCP] Server '${server}' is not connected. ` +
-        `Call 'adapter.connect()' or 'adapter.connectServer("${server}")' first.`
+          `Call 'adapter.connect()' or 'adapter.connectServer("${server}")' first.`,
       );
     }
 
@@ -555,12 +586,20 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       // Check rate limit
       if (constraint.rateLimit) {
         const limiter = state.rateLimiters.get(constraintKey);
-        if (!checkRateLimit(state.rateLimiters, constraintKey, constraint.rateLimit)) {
-          const resetAt = limiter?.resetTime ? new Date(limiter.resetTime).toISOString() : "unknown";
+        if (
+          !checkRateLimit(
+            state.rateLimiters,
+            constraintKey,
+            constraint.rateLimit,
+          )
+        ) {
+          const resetAt = limiter?.resetTime
+            ? new Date(limiter.resetTime).toISOString()
+            : "unknown";
           throw new Error(
             `[Directive MCP] Rate limit exceeded for '${constraintKey}': ` +
-            `${limiter?.count ?? 0}/${constraint.rateLimit} requests per minute. ` +
-            `Resets at ${resetAt}.`
+              `${limiter?.count ?? 0}/${constraint.rateLimit} requests per minute. ` +
+              `Resets at ${resetAt}.`,
           );
         }
       }
@@ -569,7 +608,9 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (constraint.maxArgSize) {
         const argSize = JSON.stringify(args).length;
         if (argSize > constraint.maxArgSize) {
-          throw new Error(`Arguments exceed max size (${argSize} > ${constraint.maxArgSize})`);
+          throw new Error(
+            `Arguments exceed max size (${argSize} > ${constraint.maxArgSize})`,
+          );
         }
       }
 
@@ -608,8 +649,8 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       new Promise<never>((_, reject) =>
         setTimeout(
           () => reject(new Error(`Tool call timeout: ${constraintKey}`)),
-          constraint?.timeout ?? 30000
-        )
+          constraint?.timeout ?? 30000,
+        ),
       ),
     ]);
 
@@ -626,8 +667,10 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (autoConnect) {
         await Promise.all(
           Array.from(state.servers.keys()).map((name) =>
-            connectServer(name).catch((e) => console.error(`Failed to connect to ${name}:`, e))
-          )
+            connectServer(name).catch((e) =>
+              console.error(`Failed to connect to ${name}:`, e),
+            ),
+          ),
         );
       }
     },
@@ -644,14 +687,20 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       // Reject all pending approval waiters
       for (const [, waiter] of approvalWaiters) {
         clearTimeout(waiter.timeoutId);
-        waiter.reject(new Error("[Directive MCP] Adapter destroyed while awaiting approval"));
+        waiter.reject(
+          new Error(
+            "[Directive MCP] Adapter destroyed while awaiting approval",
+          ),
+        );
       }
       approvalWaiters.clear();
 
       await Promise.all(
         Array.from(state.servers.keys()).map((name) =>
-          disconnectServer(name).catch((e) => console.error(`Failed to disconnect from ${name}:`, e))
-        )
+          disconnectServer(name).catch((e) =>
+            console.error(`Failed to disconnect from ${name}:`, e),
+          ),
+        ),
       );
     },
   };
@@ -671,9 +720,13 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
 
           if (matches) {
             try {
-              const result = await serverState.client.readResource(resource.uri);
+              const result = await serverState.client.readResource(
+                resource.uri,
+              );
               const content = result.contents[0]?.text ?? "";
-              const value = mapping.transform ? mapping.transform(content) : content;
+              const value = mapping.transform
+                ? mapping.transform(content)
+                : content;
 
               facts[mapping.factKey] = value;
               events.onResourceUpdate?.(serverName, resource.uri, result);
@@ -726,13 +779,13 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (!serverState) {
         throw new Error(
           `[Directive MCP] Unknown server '${server}'. ` +
-          `Available servers: ${Array.from(state.servers.keys()).join(", ") || "(none)"}`
+            `Available servers: ${Array.from(state.servers.keys()).join(", ") || "(none)"}`,
         );
       }
       if (!serverState.client) {
         throw new Error(
           `[Directive MCP] Server '${server}' is not connected. ` +
-          `Call 'adapter.connect()' or 'adapter.connectServer("${server}")' first.`
+            `Call 'adapter.connect()' or 'adapter.connectServer("${server}")' first.`,
         );
       }
       events.onToolCall?.(server, tool, args);
@@ -746,13 +799,13 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (!serverState) {
         throw new Error(
           `[Directive MCP] Unknown server '${server}'. ` +
-          `Available servers: ${Array.from(state.servers.keys()).join(", ") || "(none)"}`
+            `Available servers: ${Array.from(state.servers.keys()).join(", ") || "(none)"}`,
         );
       }
       if (!serverState.client) {
         throw new Error(
           `[Directive MCP] Server '${server}' is not connected. ` +
-          `Call 'adapter.connect()' or 'adapter.connectServer("${server}")' first.`
+            `Call 'adapter.connect()' or 'adapter.connectServer("${server}")' first.`,
         );
       }
       const result = await serverState.client.readResource(uri);
@@ -775,7 +828,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (!request && !approvalWaiters.has(requestId)) {
         throw new Error(
           `[Directive MCP] No pending approval request with ID '${requestId}'. ` +
-          `Pending requests: ${Array.from(state.pendingApprovals.keys()).join(", ") || "(none)"}`
+            `Pending requests: ${Array.from(state.pendingApprovals.keys()).join(", ") || "(none)"}`,
         );
       }
       resolveApproval(requestId, true);
@@ -786,7 +839,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       if (!request && !approvalWaiters.has(requestId)) {
         throw new Error(
           `[Directive MCP] No pending approval request with ID '${requestId}'. ` +
-          `Pending requests: ${Array.from(state.pendingApprovals.keys()).join(", ") || "(none)"}`
+            `Pending requests: ${Array.from(state.pendingApprovals.keys()).join(", ") || "(none)"}`,
         );
       }
       resolveApproval(requestId, false, reason);
@@ -848,9 +901,7 @@ function matchGlob(str: string, pattern: string): boolean {
  * // Use with OpenAI/Anthropic/etc.
  * ```
  */
-export function convertToolsForLLM(
-  tools: Map<string, MCPTool[]>
-): Array<{
+export function convertToolsForLLM(tools: Map<string, MCPTool[]>): Array<{
   type: "function";
   function: {
     name: string;
@@ -895,7 +946,7 @@ export function convertToolsForLLM(
 export function mcpCallTool(
   server: string,
   tool: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): MCPCallToolRequirement {
   return { type: "MCP_CALL_TOOL", server, tool, args };
 }
@@ -903,7 +954,10 @@ export function mcpCallTool(
 /**
  * Create a requirement to read an MCP resource.
  */
-export function mcpReadResource(server: string, uri: string): MCPReadResourceRequirement {
+export function mcpReadResource(
+  server: string,
+  uri: string,
+): MCPReadResourceRequirement {
   return { type: "MCP_READ_RESOURCE", server, uri };
 }
 
@@ -913,7 +967,7 @@ export function mcpReadResource(server: string, uri: string): MCPReadResourceReq
 export function mcpGetPrompt(
   server: string,
   prompt: string,
-  args?: Record<string, string>
+  args?: Record<string, string>,
 ): MCPGetPromptRequirement {
   return { type: "MCP_GET_PROMPT", server, prompt, args };
 }
@@ -923,7 +977,7 @@ export function mcpGetPrompt(
  */
 export function mcpSyncResources(
   server?: string,
-  pattern?: string | RegExp
+  pattern?: string | RegExp,
 ): MCPSyncResourcesRequirement {
   return { type: "MCP_SYNC_RESOURCES", server, pattern };
 }

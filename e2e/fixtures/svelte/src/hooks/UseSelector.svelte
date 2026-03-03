@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { useSelector } from "@directive-run/svelte";
-  import { system } from "../system";
-  import { TestIds } from "../../../../shared/test-ids";
+import { useSelector } from "@directive-run/svelte";
+import { system } from "../system";
 
-  const tripled = useSelector(system, (state) => state.count * 3);
+const tripled = useSelector(system, (state) => state.count * 3);
 </script>
 
 <div>

@@ -6,8 +6,8 @@
  * and scroll sentinel.
  */
 
-import { system, filtersSchema, listSchema } from "./pagination.js";
 import type { ListItem } from "./mock-api.js";
+import { filtersSchema, listSchema, system } from "./pagination.js";
 
 // ============================================================================
 // System
@@ -27,8 +27,11 @@ const allKeys = [
 
 // Filters
 const searchInput = document.getElementById("pg-search") as HTMLInputElement;
-const categoryBtns = document.querySelectorAll<HTMLButtonElement>("[data-category]");
-const sortSelect = document.getElementById("pg-sort-select") as HTMLSelectElement;
+const categoryBtns =
+  document.querySelectorAll<HTMLButtonElement>("[data-category]");
+const sortSelect = document.getElementById(
+  "pg-sort-select",
+) as HTMLSelectElement;
 
 // List
 const itemListEl = document.getElementById("pg-item-list")!;

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { withReflection, ReflectionExhaustedError } from "../reflection.js";
+import { describe, expect, it } from "vitest";
+import { ReflectionExhaustedError, withReflection } from "../reflection.js";
 import { createMockAgentRunner } from "../testing.js";
 import type { AgentLike } from "../types.js";
 
@@ -20,7 +20,8 @@ function makeRunner(responses: string[]) {
         output: "dynamic",
         totalTokens: 10,
         generate: () => {
-          const output = responses[callIndex] ?? responses[responses.length - 1];
+          const output =
+            responses[callIndex] ?? responses[responses.length - 1];
           callIndex++;
 
           return { output, totalTokens: 10 };
@@ -92,7 +93,11 @@ describe("withReflection", () => {
     const mock = makeRunner(["bad1", "bad2"]);
 
     const reflective = withReflection(mock.run, {
-      evaluate: () => ({ passed: false, feedback: "Not good enough", score: 0.1 }),
+      evaluate: () => ({
+        passed: false,
+        feedback: "Not good enough",
+        score: 0.1,
+      }),
       maxIterations: 2,
       onExhausted: "throw",
     });
@@ -122,7 +127,10 @@ describe("withReflection", () => {
           generate: (input) => {
             inputs.push(input);
 
-            return { output: inputs.length >= 2 ? "good" : "bad", totalTokens: 5 };
+            return {
+              output: inputs.length >= 2 ? "good" : "bad",
+              totalTokens: 5,
+            };
           },
         },
       },
@@ -152,7 +160,11 @@ describe("withReflection", () => {
 
   it("fires onIteration callback correctly", async () => {
     const mock = makeRunner(["try1", "try2"]);
-    const iterations: Array<{ iteration: number; passed: boolean; feedback?: string }> = [];
+    const iterations: Array<{
+      iteration: number;
+      passed: boolean;
+      feedback?: string;
+    }> = [];
     let evalCount = 0;
 
     const reflective = withReflection(mock.run, {
@@ -176,15 +188,19 @@ describe("withReflection", () => {
     await reflective(agent, "input");
 
     expect(iterations).toHaveLength(2);
-    expect(iterations[0]).toEqual(expect.objectContaining({
-      iteration: 0,
-      passed: false,
-      feedback: "Improve",
-    }));
-    expect(iterations[1]).toEqual(expect.objectContaining({
-      iteration: 1,
-      passed: true,
-    }));
+    expect(iterations[0]).toEqual(
+      expect.objectContaining({
+        iteration: 0,
+        passed: false,
+        feedback: "Improve",
+      }),
+    );
+    expect(iterations[1]).toEqual(
+      expect.objectContaining({
+        iteration: 1,
+        passed: true,
+      }),
+    );
   });
 
   it("propagates score and feedback in evaluation", async () => {

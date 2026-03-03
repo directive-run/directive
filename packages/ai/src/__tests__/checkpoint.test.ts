@@ -1,11 +1,18 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { createCheckpointId, validateCheckpoint, InMemoryCheckpointStore } from "../checkpoint.js";
-import type { Checkpoint, MultiAgentCheckpointLocalState } from "../checkpoint.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  InMemoryCheckpointStore,
+  createCheckpointId,
+  validateCheckpoint,
+} from "../checkpoint.js";
+import type {
+  Checkpoint,
+  MultiAgentCheckpointLocalState,
+} from "../checkpoint.js";
 import {
   createMockAgentRunner,
-  createTestOrchestrator,
-  createTestMultiAgentOrchestrator,
   createTestCheckpointStore,
+  createTestMultiAgentOrchestrator,
+  createTestOrchestrator,
 } from "../testing.js";
 
 // ============================================================================
@@ -259,7 +266,9 @@ describe("InMemoryCheckpointStore", () => {
   it("rejects invalid checkpoint data on save", async () => {
     const invalid = { version: 999 } as unknown as Checkpoint;
 
-    await expect(store.save(invalid)).rejects.toThrow("Invalid checkpoint data");
+    await expect(store.save(invalid)).rejects.toThrow(
+      "Invalid checkpoint data",
+    );
   });
 
   it("rejects maxCheckpoints < 1", () => {
@@ -292,7 +301,7 @@ describe("InMemoryCheckpointStore", () => {
 
   it("handles concurrent saves without data loss", async () => {
     const checkpoints = Array.from({ length: 10 }, (_, i) =>
-      createValidCheckpoint({ label: `concurrent-${i}` })
+      createValidCheckpoint({ label: `concurrent-${i}` }),
     );
 
     // Save all concurrently
@@ -422,7 +431,9 @@ describe("Single-agent checkpoint round-trip", () => {
       return originalRun(agent, input, opts);
     };
 
-    const { createAgentOrchestrator } = await import("../agent-orchestrator.js");
+    const { createAgentOrchestrator } = await import(
+      "../agent-orchestrator.js"
+    );
     const orch = createAgentOrchestrator({
       runner: mockRunner.run,
       checkpointStore: store,
@@ -439,7 +450,9 @@ describe("Single-agent checkpoint round-trip", () => {
     await new Promise((r) => setTimeout(r, 20));
 
     // Attempt checkpoint while agent is running
-    await expect(orch.checkpoint()).rejects.toThrow("Cannot checkpoint while agent is running");
+    await expect(orch.checkpoint()).rejects.toThrow(
+      "Cannot checkpoint while agent is running",
+    );
 
     // Release the runner so the test completes cleanly
     releaseRunner();
@@ -551,7 +564,9 @@ describe("Multi-agent checkpoint round-trip", () => {
     // The restored state should match the original
     expect(local2.globalTokenCount).toBe(local1.globalTokenCount);
     expect(local2.globalStatus).toBe(local1.globalStatus);
-    expect(Object.keys(local2.agentStates)).toEqual(Object.keys(local1.agentStates));
+    expect(Object.keys(local2.agentStates)).toEqual(
+      Object.keys(local1.agentStates),
+    );
     expect(local2.handoffCounter).toBe(local1.handoffCounter);
   });
 });

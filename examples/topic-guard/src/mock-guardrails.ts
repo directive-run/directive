@@ -14,8 +14,14 @@ export interface GuardrailResult {
 // Keyword guardrail — regex patterns for obvious off-topic input
 const OFF_TOPIC_PATTERNS: Array<{ pattern: RegExp; category: string }> = [
   { pattern: /recipe|cooking|food|bake|ingredient/i, category: "cooking" },
-  { pattern: /politic|election|vote|democrat|republican/i, category: "politics" },
-  { pattern: /sport|game score|nfl|nba|mlb|soccer|football score/i, category: "sports" },
+  {
+    pattern: /politic|election|vote|democrat|republican/i,
+    category: "politics",
+  },
+  {
+    pattern: /sport|game score|nfl|nba|mlb|soccer|football score/i,
+    category: "sports",
+  },
 ];
 
 export function checkKeywordGuardrail(text: string): GuardrailResult {
@@ -51,7 +57,7 @@ export function checkTopicClassifier(
   // If any allowed topic matches, it's on-topic
   for (const topic of allowedTopics) {
     const signal = TOPIC_SIGNALS[topic];
-    if (signal && signal.test(text)) {
+    if (signal?.test(text)) {
       return {
         blocked: false,
         guardrailName: "classifier",
@@ -79,14 +85,46 @@ export function checkTopicClassifier(
 
 // Mock agent response — pre-canned product support answers
 const MOCK_RESPONSES: Array<{ pattern: RegExp; response: string }> = [
-  { pattern: /password|reset/i, response: "To reset your password, go to Settings > Security > Reset Password. You'll receive a confirmation email." },
-  { pattern: /bill|invoice|charge|payment/i, response: "You can view your billing history at Settings > Billing. For refund requests, please include your invoice number." },
-  { pattern: /pricing|plan|upgrade/i, response: "We offer Free, Pro ($29/mo), and Enterprise plans. Visit our pricing page for a full comparison." },
-  { pattern: /api|sdk|webhook|endpoint/i, response: "Our API docs are at docs.example.com/api. Rate limits are 1000 req/min on Pro, 10000 on Enterprise." },
-  { pattern: /bug|error|broken|issue/i, response: "I'm sorry to hear that! Could you share the error message? In the meantime, try clearing your cache and refreshing." },
-  { pattern: /feature|request/i, response: "Thanks for the suggestion! I've logged this as a feature request. Our product team reviews these weekly." },
-  { pattern: /refund/i, response: "Refund requests are processed within 5-7 business days. Please provide your invoice number and I'll start the process." },
-  { pattern: /cancel|subscription/i, response: "To cancel your subscription, go to Settings > Billing > Cancel Plan. Your access continues until the end of the billing period." },
+  {
+    pattern: /password|reset/i,
+    response:
+      "To reset your password, go to Settings > Security > Reset Password. You'll receive a confirmation email.",
+  },
+  {
+    pattern: /bill|invoice|charge|payment/i,
+    response:
+      "You can view your billing history at Settings > Billing. For refund requests, please include your invoice number.",
+  },
+  {
+    pattern: /pricing|plan|upgrade/i,
+    response:
+      "We offer Free, Pro ($29/mo), and Enterprise plans. Visit our pricing page for a full comparison.",
+  },
+  {
+    pattern: /api|sdk|webhook|endpoint/i,
+    response:
+      "Our API docs are at docs.example.com/api. Rate limits are 1000 req/min on Pro, 10000 on Enterprise.",
+  },
+  {
+    pattern: /bug|error|broken|issue/i,
+    response:
+      "I'm sorry to hear that! Could you share the error message? In the meantime, try clearing your cache and refreshing.",
+  },
+  {
+    pattern: /feature|request/i,
+    response:
+      "Thanks for the suggestion! I've logged this as a feature request. Our product team reviews these weekly.",
+  },
+  {
+    pattern: /refund/i,
+    response:
+      "Refund requests are processed within 5-7 business days. Please provide your invoice number and I'll start the process.",
+  },
+  {
+    pattern: /cancel|subscription/i,
+    response:
+      "To cancel your subscription, go to Settings > Billing > Cancel Plan. Your access continues until the end of the billing period.",
+  },
 ];
 
 export function getMockAgentResponse(input: string): string {

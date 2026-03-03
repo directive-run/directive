@@ -97,7 +97,8 @@ function generateItems(count: number, startId: number): ListItem[] {
     const category = CATEGORIES[id % CATEGORIES.length];
     const subjects = TITLE_SUBJECTS[category];
     const prefix = TITLE_PREFIXES[id % TITLE_PREFIXES.length];
-    const subject = subjects[Math.floor(id / CATEGORIES.length) % subjects.length];
+    const subject =
+      subjects[Math.floor(id / CATEGORIES.length) % subjects.length];
 
     items.push({
       id: `item-${id}`,
@@ -150,7 +151,7 @@ export async function fetchPage(
   // "newest" is the default order
 
   // Paginate from cursor
-  const startIndex = cursor === "" ? 0 : parseInt(cursor, 10);
+  const startIndex = cursor === "" ? 0 : Number.parseInt(cursor, 10);
   const page = filtered.slice(startIndex, startIndex + limit);
   const nextIndex = startIndex + limit;
   const hasMore = nextIndex < filtered.length;

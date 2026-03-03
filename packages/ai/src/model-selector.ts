@@ -36,7 +36,7 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions } from "./types.js";
+import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
 // Types
@@ -55,7 +55,10 @@ export interface ModelSelectionConfig {
   /** Rules evaluated in order. First match wins. */
   rules: ModelRule[];
   /** Called when a model is selected (even if it matches the original). */
-  onModelSelected?: (originalModel: string | undefined, selectedModel: string | undefined) => void;
+  onModelSelected?: (
+    originalModel: string | undefined,
+    selectedModel: string | undefined,
+  ) => void;
 }
 
 // ============================================================================
@@ -171,12 +174,17 @@ export function withModelSelection(
       }
     }
 
-    try { onModelSelected?.(agent.model, selectedModel); } catch { /* callback error must not disrupt model selection flow */ }
+    try {
+      onModelSelected?.(agent.model, selectedModel);
+    } catch {
+      /* callback error must not disrupt model selection flow */
+    }
 
     // Override model if a rule matched and model is different
-    const effectiveAgent = selectedModel !== agent.model
-      ? { ...agent, model: selectedModel }
-      : agent;
+    const effectiveAgent =
+      selectedModel !== agent.model
+        ? { ...agent, model: selectedModel }
+        : agent;
 
     return runner<T>(effectiveAgent, input, options);
   };

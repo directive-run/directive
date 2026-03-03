@@ -9,9 +9,14 @@
  * constraints, and resolver-driven data fetching with mock delay.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import { filterProducts, allProducts, type Product } from "./mock-products.js";
+import { type Product, allProducts, filterProducts } from "./mock-products.js";
 
 // ============================================================================
 // URL Module — Schema
@@ -58,7 +63,7 @@ function readUrlParams(): {
     search: params.get("q") ?? "",
     category: params.get("cat") ?? "",
     sortBy: params.get("sort") ?? "newest",
-    page: Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1),
+    page: Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1),
   };
 }
 
@@ -164,7 +169,9 @@ export const urlModule = createModule("url", {
         }
 
         const search = params.toString();
-        const newUrl = search ? `${window.location.pathname}?${search}` : window.location.pathname;
+        const newUrl = search
+          ? `${window.location.pathname}?${search}`
+          : window.location.pathname;
 
         if (newUrl !== `${window.location.pathname}${window.location.search}`) {
           history.replaceState(null, "", newUrl);
@@ -283,7 +290,8 @@ export const productsModule = createModule("products", {
   resolvers: {
     fetchProducts: {
       requirement: "FETCH_PRODUCTS",
-      key: (req) => `fetch-${req.search}-${req.category}-${req.sortBy}-${req.page}-${req.itemsPerPage}`,
+      key: (req) =>
+        `fetch-${req.search}-${req.category}-${req.sortBy}-${req.page}-${req.itemsPerPage}`,
       timeout: 10000,
       resolve: async (req, context) => {
         context.facts.isLoading = true;

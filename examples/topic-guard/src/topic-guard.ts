@@ -6,7 +6,7 @@
  * are rejected with an explanation; allowed messages get a mock response.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import {
   type GuardrailResult,
   checkKeywordGuardrail,
@@ -89,7 +89,8 @@ export const topicGuardModule = createModule("topic-guard", {
 
   derive: {
     messageCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter((m) => m.role === "user").length;
+      return (facts.messages as ChatMessage[]).filter((m) => m.role === "user")
+        .length;
     },
 
     blockedCount: (facts) => {
@@ -116,7 +117,10 @@ export const topicGuardModule = createModule("topic-guard", {
     },
 
     canSend: (facts) => {
-      return (facts.input as string).trim().length > 0 && !(facts.isProcessing as boolean);
+      return (
+        (facts.input as string).trim().length > 0 &&
+        !(facts.isProcessing as boolean)
+      );
     },
 
     lastMessageBlocked: (facts) => {

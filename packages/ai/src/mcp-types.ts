@@ -108,10 +108,7 @@ export interface MCPToolResult {
 }
 
 /** MCP Content types */
-export type MCPContent =
-  | MCPTextContent
-  | MCPImageContent
-  | MCPResourceContent;
+export type MCPContent = MCPTextContent | MCPImageContent | MCPResourceContent;
 
 /** Text content */
 export interface MCPTextContent {
@@ -192,13 +189,19 @@ export interface MCPClient {
   /** Read a resource */
   readResource(uri: string): Promise<MCPResourceResult>;
   /** Subscribe to resource changes */
-  subscribeResource?(uri: string, callback: (resource: MCPResource) => void): () => void;
+  subscribeResource?(
+    uri: string,
+    callback: (resource: MCPResource) => void,
+  ): () => void;
 
   // Prompts
   /** List available prompts */
   listPrompts(): Promise<MCPPrompt[]>;
   /** Get a prompt with arguments */
-  getPrompt(name: string, args?: Record<string, string>): Promise<MCPPromptResult>;
+  getPrompt(
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<MCPPromptResult>;
 }
 
 // ============================================================================
@@ -212,7 +215,10 @@ export interface MCPToolConstraint {
   /** Maximum argument size (bytes) */
   maxArgSize?: number;
   /** Constraint that must be true to allow the tool */
-  when?: (facts: Record<string, unknown>, args: Record<string, unknown>) => boolean | Promise<boolean>;
+  when?: (
+    facts: Record<string, unknown>,
+    args: Record<string, unknown>,
+  ) => boolean | Promise<boolean>;
   /** Requirement to emit when constraint is violated */
   require?: { type: string; [key: string]: unknown };
   /** Rate limit (calls per minute) */
@@ -251,11 +257,19 @@ export interface MCPAdapterEvents {
   /** Server disconnected */
   onDisconnect?: (server: string, reason?: string) => void;
   /** Tool called */
-  onToolCall?: (server: string, tool: string, args: Record<string, unknown>) => void;
+  onToolCall?: (
+    server: string,
+    tool: string,
+    args: Record<string, unknown>,
+  ) => void;
   /** Tool result received */
   onToolResult?: (server: string, tool: string, result: MCPToolResult) => void;
   /** Resource updated */
-  onResourceUpdate?: (server: string, uri: string, content: MCPResourceResult) => void;
+  onResourceUpdate?: (
+    server: string,
+    uri: string,
+    content: MCPResourceResult,
+  ) => void;
   /** Error occurred */
   onError?: (server: string, error: Error) => void;
   /** Approval required for tool call */
@@ -341,21 +355,29 @@ export function isMCPRequirement(req: { type: string }): req is MCPRequirement {
 }
 
 /** Check if a requirement is to call an MCP tool */
-export function isMCPCallToolRequirement(req: { type: string }): req is MCPCallToolRequirement {
+export function isMCPCallToolRequirement(req: {
+  type: string;
+}): req is MCPCallToolRequirement {
   return req.type === "MCP_CALL_TOOL";
 }
 
 /** Check if a requirement is to read an MCP resource */
-export function isMCPReadResourceRequirement(req: { type: string }): req is MCPReadResourceRequirement {
+export function isMCPReadResourceRequirement(req: {
+  type: string;
+}): req is MCPReadResourceRequirement {
   return req.type === "MCP_READ_RESOURCE";
 }
 
 /** Check if a requirement is to get an MCP prompt */
-export function isMCPGetPromptRequirement(req: { type: string }): req is MCPGetPromptRequirement {
+export function isMCPGetPromptRequirement(req: {
+  type: string;
+}): req is MCPGetPromptRequirement {
   return req.type === "MCP_GET_PROMPT";
 }
 
 /** Check if a requirement is to sync MCP resources */
-export function isMCPSyncResourcesRequirement(req: { type: string }): req is MCPSyncResourcesRequirement {
+export function isMCPSyncResourcesRequirement(req: {
+  type: string;
+}): req is MCPSyncResourcesRequirement {
   return req.type === "MCP_SYNC_RESOURCES";
 }

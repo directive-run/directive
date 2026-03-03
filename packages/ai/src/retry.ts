@@ -29,7 +29,7 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions } from "./types.js";
+import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
 // Types
@@ -70,7 +70,9 @@ export class RetryExhaustedError extends Error {
   readonly lastError: Error;
 
   constructor(retryCount: number, lastError: Error) {
-    super(`[Directive] All ${retryCount} retries exhausted: ${lastError.message}`);
+    super(
+      `[Directive] All ${retryCount} retries exhausted: ${lastError.message}`,
+    );
     this.name = "RetryExhaustedError";
     this.retryCount = retryCount;
     this.lastError = lastError;
@@ -94,17 +96,26 @@ const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404, 422]);
 export function parseHttpStatus(error: Error): number | null {
   // Check error properties first (many HTTP libraries set these)
   const errObj = error as unknown as Record<string, unknown>;
-  if (typeof errObj.status === "number" && errObj.status >= 100 && errObj.status <= 599) {
+  if (
+    typeof errObj.status === "number" &&
+    errObj.status >= 100 &&
+    errObj.status <= 599
+  ) {
     return errObj.status;
   }
-  if (typeof errObj.statusCode === "number" && errObj.statusCode >= 100 && errObj.statusCode <= 599) {
+  if (
+    typeof errObj.statusCode === "number" &&
+    errObj.statusCode >= 100 &&
+    errObj.statusCode <= 599
+  ) {
     return errObj.statusCode;
   }
 
   // Match common error message patterns:
   // "request failed: 429", "HTTP 503", "status 401", "Error 400"
   // Guard against scanning very large error messages (ReDoS protection)
-  const msg = error.message.length > 1000 ? error.message.slice(0, 1000) : error.message;
+  const msg =
+    error.message.length > 1000 ? error.message.slice(0, 1000) : error.message;
   const match = msg.match(/(?:failed|error|status|http)[:\s]+(\d{3})\b/i);
   if (!match) {
     return null;
@@ -132,7 +143,8 @@ export function parseRetryAfter(error: Error): number | null {
   }
 
   // Guard against scanning very large error messages (ReDoS protection)
-  const msg = error.message.length > 1000 ? error.message.slice(0, 1000) : error.message;
+  const msg =
+    error.message.length > 1000 ? error.message.slice(0, 1000) : error.message;
   const match = msg.match(/retry[- ]?after[:\s]+(\d+)/i);
   if (!match) {
     return null;
@@ -209,7 +221,10 @@ function isStatusRetryable(error: Error): boolean {
  * });
  * ```
  */
-export function withRetry(runner: AgentRunner, config: RetryConfig = {}): AgentRunner {
+export function withRetry(
+  runner: AgentRunner,
+  config: RetryConfig = {},
+): AgentRunner {
   const {
     maxRetries = 3,
     baseDelayMs = 1000,
@@ -220,13 +235,19 @@ export function withRetry(runner: AgentRunner, config: RetryConfig = {}): AgentR
 
   // Validate config
   if (!Number.isFinite(maxRetries) || maxRetries < 0) {
-    throw new Error("[Directive] withRetry: maxRetries must be a non-negative finite number.");
+    throw new Error(
+      "[Directive] withRetry: maxRetries must be a non-negative finite number.",
+    );
   }
   if (!Number.isFinite(baseDelayMs) || baseDelayMs < 0) {
-    throw new Error("[Directive] withRetry: baseDelayMs must be a non-negative finite number.");
+    throw new Error(
+      "[Directive] withRetry: baseDelayMs must be a non-negative finite number.",
+    );
   }
   if (!Number.isFinite(maxDelayMs) || maxDelayMs < 0) {
-    throw new Error("[Directive] withRetry: maxDelayMs must be a non-negative finite number.");
+    throw new Error(
+      "[Directive] withRetry: maxDelayMs must be a non-negative finite number.",
+    );
   }
 
   return async <T = unknown>(
@@ -265,8 +286,17 @@ export function withRetry(runner: AgentRunner, config: RetryConfig = {}): AgentR
         }
 
         // Calculate delay
-        const delayMs = getRetryDelay(lastError, attempt + 1, baseDelayMs, maxDelayMs);
-        try { onRetry?.(attempt + 1, lastError, delayMs); } catch { /* callback error must not disrupt retry flow */ }
+        const delayMs = getRetryDelay(
+          lastError,
+          attempt + 1,
+          baseDelayMs,
+          maxDelayMs,
+        );
+        try {
+          onRetry?.(attempt + 1, lastError, delayMs);
+        } catch {
+          /* callback error must not disrupt retry flow */
+        }
 
         // Wait before retrying (abortable via signal)
         const signal = options?.signal;

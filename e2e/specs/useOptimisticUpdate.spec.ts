@@ -10,11 +10,15 @@ forEachFramework("useOptimisticUpdate", async (_fw, { page }) => {
 
   // Mutate → isPending true, value updated optimistically
   await tid(page, TestIds.btnMutate).click();
-  await expect(tid(page, TestIds.optimisticPending)).toHaveText("true", { timeout: 2000 });
+  await expect(tid(page, TestIds.optimisticPending)).toHaveText("true", {
+    timeout: 2000,
+  });
   await expect(tid(page, TestIds.optimisticValue)).toHaveText("10");
 
   // After resolution → isPending false
-  await expect(tid(page, TestIds.optimisticPending)).toHaveText("false", { timeout: 5000 });
+  await expect(tid(page, TestIds.optimisticPending)).toHaveText("false", {
+    timeout: 5000,
+  });
 
   // Reset
   await tid(page, TestIds.btnReset).click();

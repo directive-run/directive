@@ -11,7 +11,7 @@
  * - No asCombined() helper needed
  */
 
-import { system, getFacts, getDerive } from "./system";
+import { getFacts, system } from "./system";
 
 // DOM Elements
 const authStatusEl = document.getElementById("auth-status")!;
@@ -86,7 +86,7 @@ function updateUI() {
         <div class="status ${n.type === "success" ? "authenticated" : n.type === "error" ? "unauthenticated" : "loading"}" style="margin-bottom: 0.5rem; display: block">
           ${n.message}
         </div>
-      `
+      `,
       )
       .join("");
   } else {
@@ -117,9 +117,18 @@ function updateUI() {
 
 // Subscribe to derivation changes using namespaced keys
 // Note: The internal keys are still prefixed (auth_status), so we use those for subscribe
-system.subscribe(["auth_status", "auth_displayName", "data_status", "data_userCount", "ui_hasNotifications"], () => {
-  updateUI();
-});
+system.subscribe(
+  [
+    "auth_status",
+    "auth_displayName",
+    "data_status",
+    "data_userCount",
+    "ui_hasNotifications",
+  ],
+  () => {
+    updateUI();
+  },
+);
 
 // Also update on fact changes via polling (simple approach for this demo)
 setInterval(updateUI, 100);
@@ -152,5 +161,7 @@ updateUI();
 console.log("Multi-Module Example Started (Namespaced Mode)");
 console.log("Try clicking Login to see the cross-module constraint in action:");
 console.log("1. Auth module validates token via facts.auth.*");
-console.log("2. Data module automatically fetches users when facts.auth.isAuthenticated");
+console.log(
+  "2. Data module automatically fetches users when facts.auth.isAuthenticated",
+);
 console.log("3. UI module effects react to facts.data.* changes");

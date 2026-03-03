@@ -7,10 +7,10 @@
  */
 
 import {
+  type ModuleSchema,
   createModule,
   createSystem,
   t,
-  type ModuleSchema,
 } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 
@@ -65,7 +65,11 @@ const MOCK_USERS: Record<number, UserProfile> = {
 
 const timeline: TimelineEntry[] = [];
 
-function addTimeline(event: string, detail: string, type: TimelineEntry["type"]) {
+function addTimeline(
+  event: string,
+  detail: string,
+  type: TimelineEntry["type"],
+) {
   timeline.unshift({ time: Date.now(), event, detail, type });
   if (timeline.length > 50) {
     timeline.length = 50;
@@ -138,7 +142,10 @@ const batchModule = createModule("batch-loader", {
 
   events: {
     loadUser: (facts, { id }) => {
-      if (!facts.loadingIds.includes(id) && !facts.users.find((u: UserProfile) => u.id === id)) {
+      if (
+        !facts.loadingIds.includes(id) &&
+        !facts.users.find((u: UserProfile) => u.id === id)
+      ) {
         facts.loadingIds = [...facts.loadingIds, id];
         facts.totalRequests = facts.totalRequests + 1;
       }
@@ -146,7 +153,10 @@ const batchModule = createModule("batch-loader", {
     loadRange: (facts, { start, count }) => {
       const newIds: number[] = [];
       for (let i = start; i < start + count; i++) {
-        if (!facts.loadingIds.includes(i) && !facts.users.find((u: UserProfile) => u.id === i)) {
+        if (
+          !facts.loadingIds.includes(i) &&
+          !facts.users.find((u: UserProfile) => u.id === i)
+        ) {
           newIds.push(i);
         }
       }
@@ -164,8 +174,15 @@ const batchModule = createModule("batch-loader", {
     injectSchemaError: (facts) => {
       // Intentionally write a bad type to trigger validation
       (facts as Record<string, unknown>).users = "not-an-array";
-      facts.validationErrors = [...facts.validationErrors, "schema: expected array for 'users', got string"];
-      addTimeline("validation", "schema error: expected array for 'users'", "validation");
+      facts.validationErrors = [
+        ...facts.validationErrors,
+        "schema: expected array for 'users', got string",
+      ];
+      addTimeline(
+        "validation",
+        "schema error: expected array for 'users'",
+        "validation",
+      );
       // Fix it immediately so the system keeps working
       facts.users = [];
     },
@@ -205,25 +222,37 @@ const batchModule = createModule("batch-loader", {
       },
       resolveBatchWithResults: async (requirements, context) => {
         const ids = requirements.map((r) => r.userId);
-        addTimeline("batch", `batch formed: ${ids.length} items [${ids.join(", ")}]`, "batch");
+        addTimeline(
+          "batch",
+          `batch formed: ${ids.length} items [${ids.join(", ")}]`,
+          "batch",
+        );
         context.facts.batchCount = context.facts.batchCount + 1;
 
         // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 150 + Math.random() * 100));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 150 + Math.random() * 100),
+        );
 
         const failId = context.facts.failItemId;
         const results = ids.map((id) => {
           if (id === failId) {
             addTimeline("error", `user ${id}: simulated failure`, "error");
 
-            return { success: false as const, error: new Error(`Failed to load user ${id}`) };
+            return {
+              success: false as const,
+              error: new Error(`Failed to load user ${id}`),
+            };
           }
 
           const user = MOCK_USERS[id];
           if (!user) {
             addTimeline("error", `user ${id}: not found`, "error");
 
-            return { success: false as const, error: new Error(`User ${id} not found`) };
+            return {
+              success: false as const,
+              error: new Error(`User ${id} not found`),
+            };
           }
 
           return { success: true as const };
@@ -241,10 +270,16 @@ const batchModule = createModule("batch-loader", {
 
         // Remove all processed IDs from loading
         const loadingIds = context.facts.loadingIds as number[];
-        context.facts.loadingIds = loadingIds.filter((lid: number) => !ids.includes(lid));
+        context.facts.loadingIds = loadingIds.filter(
+          (lid: number) => !ids.includes(lid),
+        );
 
         const successCount = results.filter((r) => r.success).length;
-        addTimeline("success", `batch resolved: ${successCount}/${ids.length} success`, "success");
+        addTimeline(
+          "success",
+          `batch resolved: ${successCount}/${ids.length} success`,
+          "success",
+        );
 
         return results;
       },
@@ -256,7 +291,10 @@ const batchModule = createModule("batch-loader", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: batchModule, plugins: [devtoolsPlugin({ name: "batch-resolver" })] });
+const system = createSystem({
+  module: batchModule,
+  plugins: [devtoolsPlugin({ name: "batch-resolver" })],
+});
 system.start();
 
 // ============================================================================
@@ -266,7 +304,9 @@ system.start();
 const userListEl = document.getElementById("bl-user-list")!;
 const inspUserCount = document.getElementById("bl-insp-user-count")!;
 const batchWindowVal = document.getElementById("bl-batch-window-val")!;
-const failItemSelect = document.getElementById("bl-fail-item") as HTMLSelectElement;
+const failItemSelect = document.getElementById(
+  "bl-fail-item",
+) as HTMLSelectElement;
 const timelineEl = document.getElementById("bl-timeline")!;
 
 // ============================================================================
@@ -287,7 +327,8 @@ function render(): void {
 
   // User list
   if (users.length === 0 && loadingIds.length === 0) {
-    userListEl.innerHTML = '<div class="bl-empty">No users loaded. Click a button to start.</div>';
+    userListEl.innerHTML =
+      '<div class="bl-empty">No users loaded. Click a button to start.</div>';
   } else {
     userListEl.innerHTML = "";
 
@@ -321,7 +362,8 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="bl-timeline-empty">Events appear after interactions</div>';
+    timelineEl.innerHTML =
+      '<div class="bl-timeline-empty">Events appear after interactions</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {

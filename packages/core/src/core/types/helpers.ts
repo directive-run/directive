@@ -5,10 +5,10 @@
  * outside of module definitions, while maintaining proper type inference.
  */
 
-import type { Schema } from "./schema.js";
 import type { Facts } from "./facts.js";
 import type { Requirement, RequirementOutput } from "./requirements.js";
-import type { ResolverContext, RetryPolicy, BatchConfig } from "./resolvers.js";
+import type { BatchConfig, ResolverContext, RetryPolicy } from "./resolvers.js";
+import type { Schema } from "./schema.js";
 
 // ============================================================================
 // Typed Constraint Definition
@@ -42,28 +42,28 @@ import type { ResolverContext, RetryPolicy, BatchConfig } from "./resolvers.js";
  * ```
  */
 export interface TypedConstraint<
-	S extends Schema,
-	R extends Requirement = Requirement,
+  S extends Schema,
+  R extends Requirement = Requirement,
 > {
-	/** Priority for ordering (higher runs first) */
-	priority?: number;
-	/** Mark this constraint as async (avoids runtime detection) */
-	async?: boolean;
-	/** Condition function (sync or async) */
-	when: (facts: Facts<S>) => boolean | Promise<boolean>;
-	/**
-	 * Requirement(s) to produce when condition is met.
-	 */
-	require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
-	/** Timeout for async constraints (ms) */
-	timeout?: number;
-	/**
-	 * Constraint IDs whose resolvers must complete before this constraint is evaluated.
-	 * - If dependency's `when()` returns false, this constraint proceeds (nothing to wait for)
-	 * - If dependency's resolver fails, this constraint remains blocked until it succeeds
-	 * - Cross-module: use the constraint ID as it appears in the merged system
-	 */
-	after?: string[];
+  /** Priority for ordering (higher runs first) */
+  priority?: number;
+  /** Mark this constraint as async (avoids runtime detection) */
+  async?: boolean;
+  /** Condition function (sync or async) */
+  when: (facts: Facts<S>) => boolean | Promise<boolean>;
+  /**
+   * Requirement(s) to produce when condition is met.
+   */
+  require: RequirementOutput<R> | ((facts: Facts<S>) => RequirementOutput<R>);
+  /** Timeout for async constraints (ms) */
+  timeout?: number;
+  /**
+   * Constraint IDs whose resolvers must complete before this constraint is evaluated.
+   * - If dependency's `when()` returns false, this constraint proceeds (nothing to wait for)
+   * - If dependency's resolver fails, this constraint remains blocked until it succeeds
+   * - Cross-module: use the constraint ID as it appears in the merged system
+   */
+  after?: string[];
 }
 
 // ============================================================================
@@ -99,27 +99,27 @@ export interface TypedConstraint<
  * ```
  */
 export interface TypedResolver<
-	S extends Schema,
-	R extends Requirement = Requirement,
+  S extends Schema,
+  R extends Requirement = Requirement,
 > {
-	/**
-	 * Requirement type to handle.
-	 * - String: matches `req.type` directly (e.g., `requirement: "FETCH_USER"`)
-	 * - Function: type guard predicate (e.g., `requirement: (req) => req.type === "FETCH_USER"`)
-	 */
-	requirement: R["type"] | ((req: Requirement) => req is R);
-	/** Custom key function for deduplication */
-	key?: (req: R) => string;
-	/** Retry policy */
-	retry?: RetryPolicy;
-	/** Timeout for resolver execution (ms) */
-	timeout?: number;
-	/** Batch configuration */
-	batch?: BatchConfig;
-	/** Resolve function for single requirement */
-	resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
-	/** Resolve function for batched requirements */
-	resolveBatch?: (reqs: R[], ctx: ResolverContext<S>) => Promise<void>;
+  /**
+   * Requirement type to handle.
+   * - String: matches `req.type` directly (e.g., `requirement: "FETCH_USER"`)
+   * - Function: type guard predicate (e.g., `requirement: (req) => req.type === "FETCH_USER"`)
+   */
+  requirement: R["type"] | ((req: Requirement) => req is R);
+  /** Custom key function for deduplication */
+  key?: (req: R) => string;
+  /** Retry policy */
+  retry?: RetryPolicy;
+  /** Timeout for resolver execution (ms) */
+  timeout?: number;
+  /** Batch configuration */
+  batch?: BatchConfig;
+  /** Resolve function for single requirement */
+  resolve?: (req: R, ctx: ResolverContext<S>) => Promise<void>;
+  /** Resolve function for batched requirements */
+  resolveBatch?: (reqs: R[], ctx: ResolverContext<S>) => Promise<void>;
 }
 
 // ============================================================================
@@ -142,16 +142,16 @@ export interface TypedResolver<
  * ```
  */
 export function constraintFactory<S extends Schema>() {
-	return {
-		/**
-		 * Create a typed constraint
-		 */
-		create<R extends Requirement = Requirement>(
-			constraint: TypedConstraint<S, R>,
-		): TypedConstraint<S, R> {
-			return constraint;
-		},
-	};
+  return {
+    /**
+     * Create a typed constraint
+     */
+    create<R extends Requirement = Requirement>(
+      constraint: TypedConstraint<S, R>,
+    ): TypedConstraint<S, R> {
+      return constraint;
+    },
+  };
 }
 
 /**
@@ -172,16 +172,16 @@ export function constraintFactory<S extends Schema>() {
  * ```
  */
 export function resolverFactory<S extends Schema>() {
-	return {
-		/**
-		 * Create a typed resolver
-		 */
-		create<R extends Requirement = Requirement>(
-			resolver: TypedResolver<S, R>,
-		): TypedResolver<S, R> {
-			return resolver;
-		},
-	};
+  return {
+    /**
+     * Create a typed resolver
+     */
+    create<R extends Requirement = Requirement>(
+      resolver: TypedResolver<S, R>,
+    ): TypedResolver<S, R> {
+      return resolver;
+    },
+  };
 }
 
 // ============================================================================
@@ -201,10 +201,10 @@ export function resolverFactory<S extends Schema>() {
  * ```
  */
 export function typedConstraint<
-	S extends Schema,
-	R extends Requirement = Requirement,
+  S extends Schema,
+  R extends Requirement = Requirement,
 >(constraint: TypedConstraint<S, R>): TypedConstraint<S, R> {
-	return constraint;
+  return constraint;
 }
 
 /**
@@ -222,8 +222,8 @@ export function typedConstraint<
  * ```
  */
 export function typedResolver<
-	S extends Schema,
-	R extends Requirement = Requirement,
+  S extends Schema,
+  R extends Requirement = Requirement,
 >(resolver: TypedResolver<S, R>): TypedResolver<S, R> {
-	return resolver;
+  return resolver;
 }

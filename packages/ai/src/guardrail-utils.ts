@@ -8,16 +8,16 @@
  */
 
 import type {
-  GuardrailFn,
+  AgentLike,
+  AgentRetryConfig,
+  AgentRunner,
   GuardrailContext,
+  GuardrailFn,
   GuardrailResult,
   GuardrailRetryConfig,
-  AgentRetryConfig,
   NamedGuardrail,
-  AgentLike,
-  AgentRunner,
-  RunResult,
   RunOptions,
+  RunResult,
 } from "./types.js";
 
 // ============================================================================
@@ -28,7 +28,7 @@ import type {
 export function normalizeGuardrail<T>(
   guardrail: GuardrailFn<T> | NamedGuardrail<T>,
   index: number,
-  type: string
+  type: string,
 ): NamedGuardrail<T> {
   if (typeof guardrail === "function") {
     return {
@@ -44,9 +44,13 @@ export function normalizeGuardrail<T>(
 /** Calculate delay for retry with backoff */
 export function calculateRetryDelay(
   attempt: number,
-  config: GuardrailRetryConfig
+  config: GuardrailRetryConfig,
 ): number {
-  const { backoff = "exponential", baseDelayMs = 100, maxDelayMs = 5000 } = config;
+  const {
+    backoff = "exponential",
+    baseDelayMs = 100,
+    maxDelayMs = 5000,
+  } = config;
   let delay: number;
   switch (backoff) {
     case "exponential":
@@ -55,7 +59,6 @@ export function calculateRetryDelay(
     case "linear":
       delay = baseDelayMs * attempt;
       break;
-    case "fixed":
     default:
       delay = baseDelayMs;
   }
@@ -93,7 +96,7 @@ export async function executeGuardrailWithRetry<T>(
   guardrail: NamedGuardrail<T>,
   data: T,
   context: GuardrailContext,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<GuardrailResult> {
   const { retry } = guardrail;
   const maxAttempts = Math.max(retry?.attempts ?? 1, 1);
@@ -127,9 +130,13 @@ export async function executeGuardrailWithRetry<T>(
 /** Calculate delay for agent retry with backoff */
 export function calculateAgentRetryDelay(
   attempt: number,
-  config: AgentRetryConfig
+  config: AgentRetryConfig,
 ): number {
-  const { backoff = "exponential", baseDelayMs = 1000, maxDelayMs = 30000 } = config;
+  const {
+    backoff = "exponential",
+    baseDelayMs = 1000,
+    maxDelayMs = 30000,
+  } = config;
   let delay: number;
   switch (backoff) {
     case "exponential":
@@ -138,7 +145,6 @@ export function calculateAgentRetryDelay(
     case "linear":
       delay = baseDelayMs * attempt;
       break;
-    case "fixed":
     default:
       delay = baseDelayMs;
   }
@@ -152,7 +158,7 @@ export async function executeAgentWithRetry<T>(
   agent: AgentLike,
   input: string,
   options: RunOptions | undefined,
-  retryConfig: AgentRetryConfig | undefined
+  retryConfig: AgentRetryConfig | undefined,
 ): Promise<RunResult<T>> {
   const maxAttempts = Math.max(retryConfig?.attempts ?? 1, 1);
   const isRetryable = retryConfig?.isRetryable ?? (() => true);

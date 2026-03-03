@@ -13,7 +13,7 @@
  */
 
 import { createSystem } from "@directive-run/core";
-import {loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
+import { devtoolsPlugin, loggingPlugin } from "@directive-run/core/plugins";
 import { authModule } from "./modules/auth";
 import { dataModule } from "./modules/data";
 import { uiModule } from "./modules/ui";

@@ -84,12 +84,23 @@ type Direction = [number, number];
 /** Diagonal directions a piece can move based on player/king status */
 export function getMoveDirections(piece: Piece): Direction[] {
   if (piece.king) {
-    return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+    return [
+      [-1, -1],
+      [-1, 1],
+      [1, -1],
+      [1, 1],
+    ];
   }
   // Red moves up (negative row), Black moves down (positive row)
   return piece.player === "red"
-    ? [[-1, -1], [-1, 1]]
-    : [[1, -1], [1, 1]];
+    ? [
+        [-1, -1],
+        [-1, 1],
+      ]
+    : [
+        [1, -1],
+        [1, 1],
+      ];
 }
 
 /** Non-capture diagonal moves for a piece at the given index */
@@ -130,7 +141,11 @@ export function getJumpMoves(board: Board, index: number): Move[] {
     const landIdx = toIndex(landR, landC);
     const midPiece = board[midIdx];
 
-    if (midPiece && midPiece.player !== piece.player && board[landIdx] === null) {
+    if (
+      midPiece &&
+      midPiece.player !== piece.player &&
+      board[landIdx] === null
+    ) {
       moves.push({ from: index, to: landIdx, captured: midIdx });
     }
   }
@@ -189,8 +204,10 @@ export function shouldKing(board: Board, index: number): boolean {
   const piece = board[index];
   if (!piece || piece.king) return false;
   const [row] = toRowCol(index);
-  return (piece.player === "red" && row === 0) ||
-         (piece.player === "black" && row === 7);
+  return (
+    (piece.player === "red" && row === 0) ||
+    (piece.player === "black" && row === 7)
+  );
 }
 
 /** Return new board with piece at index promoted to king */
@@ -314,14 +331,22 @@ function minimax(
   const moves = getAllValidMoves(board, current);
 
   if (maximizing) {
-    let best = -Infinity;
+    let best = Number.NEGATIVE_INFINITY;
     for (const move of moves) {
       // Expand multi-jump chains
       if (move.captured !== null) {
         const sequences = getAllJumpSequences(board, move.from);
         for (const seq of sequences) {
           const newBoard = applyMoveSequence(board, seq);
-          const score = minimax(newBoard, player, depth - 1, alpha, beta, false, aiPlayer);
+          const score = minimax(
+            newBoard,
+            player,
+            depth - 1,
+            alpha,
+            beta,
+            false,
+            aiPlayer,
+          );
           best = Math.max(best, score);
           alpha = Math.max(alpha, score);
           if (beta <= alpha) break;
@@ -329,8 +354,17 @@ function minimax(
         if (beta <= alpha) break;
       } else {
         let newBoard = applyMove(board, move);
-        if (shouldKing(newBoard, move.to)) newBoard = promotePiece(newBoard, move.to);
-        const score = minimax(newBoard, player, depth - 1, alpha, beta, false, aiPlayer);
+        if (shouldKing(newBoard, move.to))
+          newBoard = promotePiece(newBoard, move.to);
+        const score = minimax(
+          newBoard,
+          player,
+          depth - 1,
+          alpha,
+          beta,
+          false,
+          aiPlayer,
+        );
         best = Math.max(best, score);
         alpha = Math.max(alpha, score);
         if (beta <= alpha) break;
@@ -338,13 +372,21 @@ function minimax(
     }
     return best;
   } else {
-    let best = Infinity;
+    let best = Number.POSITIVE_INFINITY;
     for (const move of moves) {
       if (move.captured !== null) {
         const sequences = getAllJumpSequences(board, move.from);
         for (const seq of sequences) {
           const newBoard = applyMoveSequence(board, seq);
-          const score = minimax(newBoard, player, depth - 1, alpha, beta, true, aiPlayer);
+          const score = minimax(
+            newBoard,
+            player,
+            depth - 1,
+            alpha,
+            beta,
+            true,
+            aiPlayer,
+          );
           best = Math.min(best, score);
           beta = Math.min(beta, score);
           if (beta <= alpha) break;
@@ -352,8 +394,17 @@ function minimax(
         if (beta <= alpha) break;
       } else {
         let newBoard = applyMove(board, move);
-        if (shouldKing(newBoard, move.to)) newBoard = promotePiece(newBoard, move.to);
-        const score = minimax(newBoard, player, depth - 1, alpha, beta, true, aiPlayer);
+        if (shouldKing(newBoard, move.to))
+          newBoard = promotePiece(newBoard, move.to);
+        const score = minimax(
+          newBoard,
+          player,
+          depth - 1,
+          alpha,
+          beta,
+          true,
+          aiPlayer,
+        );
         best = Math.min(best, score);
         beta = Math.min(beta, score);
         if (beta <= alpha) break;
@@ -368,7 +419,7 @@ export function pickAiMove(board: Board, player: Player): Move | null {
   const moves = getAllValidMoves(board, player);
   if (moves.length === 0) return null;
 
-  let bestScore = -Infinity;
+  let bestScore = Number.NEGATIVE_INFINITY;
   let bestMove: Move = moves[0];
 
   // Dedupe by "from" index for jump moves to avoid evaluating same chain starts multiple times
@@ -383,7 +434,15 @@ export function pickAiMove(board: Board, player: Player): Move | null {
       const sequences = getAllJumpSequences(board, move.from);
       for (const seq of sequences) {
         const newBoard = applyMoveSequence(board, seq);
-        const score = minimax(newBoard, player, 3, -Infinity, Infinity, false, player);
+        const score = minimax(
+          newBoard,
+          player,
+          3,
+          Number.NEGATIVE_INFINITY,
+          Number.POSITIVE_INFINITY,
+          false,
+          player,
+        );
         if (score > bestScore) {
           bestScore = score;
           bestMove = seq[0]; // Return first move of best sequence
@@ -391,8 +450,17 @@ export function pickAiMove(board: Board, player: Player): Move | null {
       }
     } else {
       let newBoard = applyMove(board, move);
-      if (shouldKing(newBoard, move.to)) newBoard = promotePiece(newBoard, move.to);
-      const score = minimax(newBoard, player, 3, -Infinity, Infinity, false, player);
+      if (shouldKing(newBoard, move.to))
+        newBoard = promotePiece(newBoard, move.to);
+      const score = minimax(
+        newBoard,
+        player,
+        3,
+        Number.NEGATIVE_INFINITY,
+        Number.POSITIVE_INFINITY,
+        false,
+        player,
+      );
       if (score > bestScore) {
         bestScore = score;
         bestMove = move;
@@ -404,12 +472,16 @@ export function pickAiMove(board: Board, player: Player): Move | null {
 }
 
 /** Pick best jump continuation from a specific square (for multi-jump chains) */
-export function pickAiJumpFrom(board: Board, index: number, player: Player): Move | null {
+export function pickAiJumpFrom(
+  board: Board,
+  index: number,
+  player: Player,
+): Move | null {
   const jumps = getJumpMoves(board, index);
   if (jumps.length === 0) return null;
   if (jumps.length === 1) return jumps[0];
 
-  let bestScore = -Infinity;
+  let bestScore = Number.NEGATIVE_INFINITY;
   let bestMove: Move = jumps[0];
 
   for (const jump of jumps) {

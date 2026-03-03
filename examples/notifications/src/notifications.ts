@@ -6,7 +6,7 @@
  * - app: action log that triggers cross-module notifications via effects
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 
 // ============================================================================
 // Types
@@ -67,7 +67,10 @@ export const notificationsModule = createModule("notifications", {
 
   derive: {
     visibleNotifications: (facts) => {
-      return (facts.queue as Notification[]).slice(0, facts.maxVisible as number);
+      return (facts.queue as Notification[]).slice(
+        0,
+        facts.maxVisible as number,
+      );
     },
 
     hasNotifications: (facts) => {
@@ -137,7 +140,10 @@ export const notificationsModule = createModule("notifications", {
   // ============================================================================
 
   events: {
-    addNotification: (facts, payload: { message: string; level: string; ttl?: number }) => {
+    addNotification: (
+      facts,
+      payload: { message: string; level: string; ttl?: number },
+    ) => {
       const ttlMap: Record<string, number> = {
         info: 4000,
         success: 3000,

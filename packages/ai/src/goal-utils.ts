@@ -39,7 +39,6 @@ function safeSatisfaction(val: number): number {
   return val;
 }
 
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -177,7 +176,7 @@ function buildGraph(
 
     throw new Error(
       `[Directive Goal] Circular dependency detected among agents: ${inCycle.join(", ")}. ` +
-      `Review their produces/requires declarations.`,
+        `Review their produces/requires declarations.`,
     );
   }
 
@@ -186,7 +185,9 @@ function buildGraph(
     const decl = agents[id]!;
     const requires = decl.requires ?? [];
 
-    return requires.every((key) => !producerMap.has(key) || producerMap.get(key) === id);
+    return requires.every(
+      (key) => !producerMap.has(key) || producerMap.get(key) === id,
+    );
   });
 
   const consumedBy = new Set<string>();
@@ -283,7 +284,9 @@ export function validateGoal(
   for (const [id, decl] of Object.entries(agents)) {
     for (const key of decl.requires ?? []) {
       if (!allProduced.has(key)) {
-        warnings.push(`Agent "${id}" requires "${key}" which no agent produces — must be in initial facts`);
+        warnings.push(
+          `Agent "${id}" requires "${key}" which no agent produces — must be in initial facts`,
+        );
       }
     }
   }
@@ -462,13 +465,13 @@ export function explainGoal<T = unknown>(
       const sat = safeSatisfaction(metric.satisfaction);
       const satDelta = safeSatisfaction(metric.satisfactionDelta);
       const agentList = metric.nodesRun.join(", ");
-      const factList = metric.factsProduced.length > 0
-        ? metric.factsProduced.join(", ")
-        : "none";
+      const factList =
+        metric.factsProduced.length > 0
+          ? metric.factsProduced.join(", ")
+          : "none";
       const prevSatisfaction = +safeSatisfaction(sat - satDelta).toFixed(3);
-      const delta = satDelta >= 0
-        ? `+${satDelta.toFixed(3)}`
-        : satDelta.toFixed(3);
+      const delta =
+        satDelta >= 0 ? `+${satDelta.toFixed(3)}` : satDelta.toFixed(3);
 
       const description =
         `Step ${metric.step}: Ran ${agentList}. ` +
@@ -519,17 +522,25 @@ export function explainGoal<T = unknown>(
     };
   });
 
-  const firstSatisfaction = result.stepMetrics.length > 0
-    ? safeSatisfaction(result.stepMetrics[0]!.satisfaction - result.stepMetrics[0]!.satisfactionDelta).toFixed(3)
-    : "0";
-  const lastSatisfaction = result.stepMetrics.length > 0
-    ? safeSatisfaction(result.stepMetrics[result.stepMetrics.length - 1]!.satisfaction).toFixed(3)
-    : "0";
+  const firstSatisfaction =
+    result.stepMetrics.length > 0
+      ? safeSatisfaction(
+          result.stepMetrics[0]!.satisfaction -
+            result.stepMetrics[0]!.satisfactionDelta,
+        ).toFixed(3)
+      : "0";
+  const lastSatisfaction =
+    result.stepMetrics.length > 0
+      ? safeSatisfaction(
+          result.stepMetrics[result.stepMetrics.length - 1]!.satisfaction,
+        ).toFixed(3)
+      : "0";
 
   const status = result.achieved ? "Goal achieved" : "Goal not achieved";
-  const relaxationNote = result.relaxations.length > 0
-    ? ` ${result.relaxations.length} relaxation(s) applied.`
-    : "";
+  const relaxationNote =
+    result.relaxations.length > 0
+      ? ` ${result.relaxations.length} relaxation(s) applied.`
+      : "";
   const errorNote = result.error ? ` Error: ${result.error}` : "";
 
   const summary =

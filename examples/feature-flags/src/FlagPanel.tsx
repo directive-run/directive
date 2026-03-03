@@ -1,6 +1,6 @@
-import { useCallback } from "react";
-import { useFact, useEvents } from "@directive-run/react";
 import type { SingleModuleSystem } from "@directive-run/core";
+import { useEvents, useFact } from "@directive-run/react";
+import { useCallback } from "react";
 import type { featureFlagsModule } from "./module";
 
 type System = SingleModuleSystem<typeof featureFlagsModule.schema>;
@@ -13,7 +13,13 @@ interface FlagRowProps {
   testId?: string;
 }
 
-function FlagRow({ label, description, checked, onChange, testId }: FlagRowProps) {
+function FlagRow({
+  label,
+  description,
+  checked,
+  onChange,
+  testId,
+}: FlagRowProps) {
   return (
     <div className="ff-flag-row" data-testid={testId}>
       <div>
@@ -59,8 +65,10 @@ export function FlagPanel({
   const playgroundEnabled = useFact(system, "playgroundEnabled") ?? true;
   const brandSwitcherEnabled = useFact(system, "brandSwitcherEnabled") ?? true;
   const themeSelectorEnabled = useFact(system, "themeSelectorEnabled") ?? true;
-  const onboardingToastEnabled = useFact(system, "onboardingToastEnabled") ?? true;
-  const versionSelectorEnabled = useFact(system, "versionSelectorEnabled") ?? true;
+  const onboardingToastEnabled =
+    useFact(system, "onboardingToastEnabled") ?? true;
+  const versionSelectorEnabled =
+    useFact(system, "versionSelectorEnabled") ?? true;
   const voteApiEnabled = useFact(system, "voteApiEnabled") ?? true;
   const maintenanceMode = useFact(system, "maintenanceMode") ?? false;
   const events = useEvents(system);
@@ -79,7 +87,9 @@ export function FlagPanel({
   }, [events, onTimelineEvent]);
 
   const logChangesDisabled = effectsDisabled.has("logChanges");
-  const constraintDisabled = constraintsDisabled.has("onboardingRequiresBrandSwitcher");
+  const constraintDisabled = constraintsDisabled.has(
+    "onboardingRequiresBrandSwitcher",
+  );
 
   return (
     <div className="ff-panel">
@@ -91,7 +101,9 @@ export function FlagPanel({
       </div>
       <div className="ff-panel-body">
         <div className="ff-flag-group">
-          <div className="ff-flag-group-title">Interactive (maintenance-gated)</div>
+          <div className="ff-flag-group-title">
+            Interactive (maintenance-gated)
+          </div>
           <FlagRow
             label="Chat"
             description="AI chat assistant"
@@ -148,7 +160,9 @@ export function FlagPanel({
         </div>
 
         <div className="ff-flag-group">
-          <div className="ff-flag-group-title">Dependent (constraint: requires Brand Switcher)</div>
+          <div className="ff-flag-group-title">
+            Dependent (constraint: requires Brand Switcher)
+          </div>
           <FlagRow
             label="Onboarding Toast"
             description="Welcome toast (requires Brand Switcher)"
@@ -166,12 +180,18 @@ export function FlagPanel({
             checked={maintenanceMode}
             onChange={(v) => {
               events.setMaintenanceMode({ enabled: v });
-              onTimelineEvent("maintenance", v ? "enabled" : "disabled", "maintenance");
+              onTimelineEvent(
+                "maintenance",
+                v ? "enabled" : "disabled",
+                "maintenance",
+              );
             }}
             testId="ff-maintenance"
           />
           <div className="ff-system-row">
-            <span className="ff-system-label">onboardingRequiresBrandSwitcher</span>
+            <span className="ff-system-label">
+              onboardingRequiresBrandSwitcher
+            </span>
             <button
               className="ff-btn"
               onClick={() =>

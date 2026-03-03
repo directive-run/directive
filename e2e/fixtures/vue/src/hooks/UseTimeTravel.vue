@@ -2,7 +2,6 @@
 import { useFact } from "@directive-run/vue";
 import { useTimeTravel } from "@directive-run/vue";
 import { system } from "../system";
-import { TestIds } from "../../../../shared/test-ids";
 
 const count = useFact(system, "count");
 const tt = useTimeTravel(system);

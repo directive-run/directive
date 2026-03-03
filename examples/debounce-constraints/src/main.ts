@@ -10,10 +10,10 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
+  type EventLogEntry,
+  type SearchResult,
   debounceSearchModule,
   debounceSearchSchema,
-  type SearchResult,
-  type EventLogEntry,
 } from "./debounce-search.js";
 
 // ============================================================================
@@ -40,7 +40,9 @@ const statusIndicator = document.getElementById("dc-status-indicator")!;
 const statusText = document.getElementById("dc-status-text")!;
 
 // Search form
-const searchInput = document.getElementById("dc-search-input") as HTMLInputElement;
+const searchInput = document.getElementById(
+  "dc-search-input",
+) as HTMLInputElement;
 const clearBtn = document.getElementById("dc-clear-btn") as HTMLButtonElement;
 
 // Progress bar
@@ -61,11 +63,17 @@ const statApiCalls = document.getElementById("dc-stat-api-calls")!;
 const statSaved = document.getElementById("dc-stat-saved")!;
 
 // Config sliders
-const debounceDelaySlider = document.getElementById("dc-debounce-delay") as HTMLInputElement;
+const debounceDelaySlider = document.getElementById(
+  "dc-debounce-delay",
+) as HTMLInputElement;
 const debounceVal = document.getElementById("dc-debounce-val")!;
-const apiDelaySlider = document.getElementById("dc-api-delay") as HTMLInputElement;
+const apiDelaySlider = document.getElementById(
+  "dc-api-delay",
+) as HTMLInputElement;
 const apiDelayVal = document.getElementById("dc-api-delay-val")!;
-const minCharsSlider = document.getElementById("dc-min-chars") as HTMLInputElement;
+const minCharsSlider = document.getElementById(
+  "dc-min-chars",
+) as HTMLInputElement;
 const minCharsVal = document.getElementById("dc-min-chars-val")!;
 
 // Timeline
@@ -118,8 +126,14 @@ function render(): void {
 
   // --- Results list ---
   if (query === "" && results.length === 0) {
-    resultsList.innerHTML = '<div class="dc-results-empty">Type to search 30 tech items...</div>';
-  } else if (results.length === 0 && debouncedQuery.length > 0 && !isSearching && !isDebouncing) {
+    resultsList.innerHTML =
+      '<div class="dc-results-empty">Type to search 30 tech items...</div>';
+  } else if (
+    results.length === 0 &&
+    debouncedQuery.length > 0 &&
+    !isSearching &&
+    !isDebouncing
+  ) {
     resultsList.innerHTML = `<div class="dc-results-empty">No results for "${escapeHtml(debouncedQuery)}"</div>`;
   } else if (results.length === 0 && (isSearching || isDebouncing)) {
     resultsList.innerHTML = '<div class="dc-results-empty">Searching...</div>';
@@ -141,7 +155,8 @@ function render(): void {
   }
 
   // --- Footer ---
-  const savedPct = keystrokeCount > 0 ? Math.round((savedCalls / keystrokeCount) * 100) : 0;
+  const savedPct =
+    keystrokeCount > 0 ? Math.round((savedCalls / keystrokeCount) * 100) : 0;
   resultsFooter.textContent = `${resultCount} result${resultCount !== 1 ? "s" : ""} \u00b7 ${keystrokeCount} keystroke${keystrokeCount !== 1 ? "s" : ""} \u00b7 ${apiCallCount} API call${apiCallCount !== 1 ? "s" : ""} (${savedCalls} saved)`;
 
   // --- Stats ---
@@ -156,7 +171,8 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML = '<div class="dc-timeline-empty">Events will appear here after typing</div>';
+    timelineEl.innerHTML =
+      '<div class="dc-timeline-empty">Events will appear here after typing</div>';
   } else {
     timelineEl.innerHTML = "";
     for (let i = eventLog.length - 1; i >= 0; i--) {

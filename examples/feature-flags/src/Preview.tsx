@@ -1,5 +1,5 @@
-import { useFact, useDerived } from "@directive-run/react";
 import type { createSystem } from "@directive-run/core";
+import { useDerived, useFact } from "@directive-run/react";
 import type { featureFlagsModule } from "./module";
 
 type System = ReturnType<typeof createSystem<typeof featureFlagsModule.schema>>;
@@ -44,7 +44,8 @@ export function Preview({ system }: PreviewProps) {
   const searchEnabled = useFact(system, "searchEnabled") ?? true;
   const playgroundEnabled = useFact(system, "playgroundEnabled") ?? true;
   const voteApiEnabled = useFact(system, "voteApiEnabled") ?? true;
-  const onboardingToastEnabled = useFact(system, "onboardingToastEnabled") ?? true;
+  const onboardingToastEnabled =
+    useFact(system, "onboardingToastEnabled") ?? true;
   const brandSwitcherEnabled = useFact(system, "brandSwitcherEnabled") ?? true;
 
   function maintenanceDetail(flagEnabled: boolean, label: string) {
@@ -108,7 +109,9 @@ export function Preview({ system }: PreviewProps) {
           <PreviewCard
             title="Version Selector"
             enabled={canUseVersionSelector}
-            detail={canUseVersionSelector ? "Version picker active" : "Disabled"}
+            detail={
+              canUseVersionSelector ? "Version picker active" : "Disabled"
+            }
           />
           <PreviewCard
             title="Onboarding Toast"

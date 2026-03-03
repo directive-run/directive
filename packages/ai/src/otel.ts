@@ -24,17 +24,17 @@
 
 import type { DebugTimeline } from "./debug-timeline.js";
 import type {
-  DebugEvent,
-  AgentStartEvent,
   AgentCompleteEvent,
   AgentErrorEvent,
-  GuardrailCheckEvent,
+  AgentStartEvent,
   ConstraintEvaluateEvent,
-  ResolverStartEvent,
+  DebugEvent,
+  GuardrailCheckEvent,
+  PatternCompleteEvent,
+  PatternStartEvent,
   ResolverCompleteEvent,
   ResolverErrorEvent,
-  PatternStartEvent,
-  PatternCompleteEvent,
+  ResolverStartEvent,
 } from "./types.js";
 
 // ============================================================================
@@ -59,7 +59,10 @@ export interface OtelSpan {
   /** Set an attribute on the span */
   setAttribute(key: string, value: string | number | boolean): void;
   /** Add an event to the span */
-  addEvent(name: string, attributes?: Record<string, string | number | boolean>): void;
+  addEvent(
+    name: string,
+    attributes?: Record<string, string | number | boolean>,
+  ): void;
   /** Set the span status */
   setStatus(status: { code: number; message?: string }): void;
   /** End the span */
@@ -73,12 +76,16 @@ export const OtelStatusCode = {
   ERROR: 2,
 } as const;
 
-export type OtelStatusCode = (typeof OtelStatusCode)[keyof typeof OtelStatusCode];
+export type OtelStatusCode =
+  (typeof OtelStatusCode)[keyof typeof OtelStatusCode];
 
 /** Tracer interface compatible with OpenTelemetry API */
 export interface OtelTracer {
   /** Start a new span */
-  startSpan(name: string, options?: { attributes?: Record<string, string | number | boolean> }): OtelSpan;
+  startSpan(
+    name: string,
+    options?: { attributes?: Record<string, string | number | boolean> },
+  ): OtelSpan;
 }
 
 /** Configuration for the OTEL plugin */
@@ -104,7 +111,11 @@ export interface SpanData {
   spanId: string;
   parentSpanId?: string;
   attributes: Record<string, string | number | boolean>;
-  events: Array<{ name: string; attributes?: Record<string, string | number | boolean>; timestamp: number }>;
+  events: Array<{
+    name: string;
+    attributes?: Record<string, string | number | boolean>;
+    timestamp: number;
+  }>;
   status: { code: OtelStatusCode; message?: string };
   startTime: number;
   endTime: number;
@@ -130,9 +141,16 @@ export interface OtelPlugin {
 // ============================================================================
 
 class CollectedSpan implements OtelSpan {
-  readonly attributes: Record<string, string | number | boolean> = Object.create(null);
-  readonly spanEvents: Array<{ name: string; attributes?: Record<string, string | number | boolean>; timestamp: number }> = [];
-  status: { code: OtelStatusCode; message?: string } = { code: OtelStatusCode.UNSET };
+  readonly attributes: Record<string, string | number | boolean> =
+    Object.create(null);
+  readonly spanEvents: Array<{
+    name: string;
+    attributes?: Record<string, string | number | boolean>;
+    timestamp: number;
+  }> = [];
+  status: { code: OtelStatusCode; message?: string } = {
+    code: OtelStatusCode.UNSET,
+  };
   readonly startTime: number;
   endTime = 0;
 
@@ -156,7 +174,10 @@ class CollectedSpan implements OtelSpan {
     this.attributes[key] = value;
   }
 
-  addEvent(name: string, attributes?: Record<string, string | number | boolean>): void {
+  addEvent(
+    name: string,
+    attributes?: Record<string, string | number | boolean>,
+  ): void {
     this.spanEvents.push({ name, attributes, timestamp: Date.now() });
   }
 
@@ -233,7 +254,11 @@ interface ExternalSpanShadow {
   traceId: string;
   parentSpanId?: string;
   attributes: Record<string, string | number | boolean>;
-  events: Array<{ name: string; attributes?: Record<string, string | number | boolean>; timestamp: number }>;
+  events: Array<{
+    name: string;
+    attributes?: Record<string, string | number | boolean>;
+    timestamp: number;
+  }>;
   status: { code: OtelStatusCode; message?: string };
   startTime: number;
 }
@@ -343,7 +368,10 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
     return `${type}:${id}:${keyCounter++}`;
   }
 
-  function findActiveSpan(type: string, id: string): { key: string; entry: ActiveSpanEntry } | null {
+  function findActiveSpan(
+    type: string,
+    id: string,
+  ): { key: string; entry: ActiveSpanEntry } | null {
     const indexKey = `${type}:${id}`;
     const keys = spanKeyIndex.get(indexKey);
     if (keys) {
@@ -362,7 +390,12 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
     return null;
   }
 
-  function registerSpan(type: string, id: string, key: string, entry: ActiveSpanEntry): void {
+  function registerSpan(
+    type: string,
+    id: string,
+    key: string,
+    entry: ActiveSpanEntry,
+  ): void {
     // A13: Store indexKey explicitly to avoid parsing from key later
     const indexKey = `${type}:${id}`;
     entry.indexKey = indexKey;
@@ -528,21 +561,32 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
     };
   }
 
-  function setAttributeTracked(entry: ActiveSpanEntry, key: string, value: string | number | boolean): void {
+  function setAttributeTracked(
+    entry: ActiveSpanEntry,
+    key: string,
+    value: string | number | boolean,
+  ): void {
     entry.span.setAttribute(key, value);
     if (entry.shadow) {
       entry.shadow.attributes[key] = value;
     }
   }
 
-  function addEventTracked(entry: ActiveSpanEntry, name: string, attributes?: Record<string, string | number | boolean>): void {
+  function addEventTracked(
+    entry: ActiveSpanEntry,
+    name: string,
+    attributes?: Record<string, string | number | boolean>,
+  ): void {
     entry.span.addEvent(name, attributes);
     if (entry.shadow) {
       entry.shadow.events.push({ name, attributes, timestamp: Date.now() });
     }
   }
 
-  function setStatusTracked(entry: ActiveSpanEntry, status: { code: OtelStatusCode; message?: string }): void {
+  function setStatusTracked(
+    entry: ActiveSpanEntry,
+    status: { code: OtelStatusCode; message?: string },
+  ): void {
     entry.span.setStatus(status);
     if (entry.shadow) {
       entry.shadow.status = { ...status };
@@ -603,18 +647,21 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
 
   function handleAgentStart(event: AgentStartEvent): void {
     // Agent span is a child of the active pattern span (top of stack)
-    const parentEntry = patternStack.length > 0
-      ? patternStack[patternStack.length - 1]!
-      : null;
+    const parentEntry =
+      patternStack.length > 0 ? patternStack[patternStack.length - 1]! : null;
 
-    const { entry } = startSpan(`${prefix}.agent.run`, {
-      "directive.service": config.serviceName,
-      "directive.agent.name": event.agentId,
-      "directive.agent.input_length": event.inputLength,
-      // GenAI semantic conventions
-      "gen_ai.operation.name": "agent.run",
-      "gen_ai.agent.name": event.agentId,
-    }, parentEntry);
+    const { entry } = startSpan(
+      `${prefix}.agent.run`,
+      {
+        "directive.service": config.serviceName,
+        "directive.agent.name": event.agentId,
+        "directive.agent.input_length": event.inputLength,
+        // GenAI semantic conventions
+        "gen_ai.operation.name": "agent.run",
+        "gen_ai.agent.name": event.agentId,
+      },
+      parentEntry,
+    );
 
     const key = makeSpanKey("agent", event.agentId);
     registerSpan("agent", event.agentId, key, entry);
@@ -623,11 +670,27 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handleAgentComplete(event: AgentCompleteEvent): void {
     const found = findActiveSpan("agent", event.agentId);
     if (found) {
-      setAttributeTracked(found.entry, "directive.agent.output_length", event.outputLength);
-      setAttributeTracked(found.entry, "directive.agent.total_tokens", event.totalTokens);
-      setAttributeTracked(found.entry, "directive.agent.duration_ms", event.durationMs);
+      setAttributeTracked(
+        found.entry,
+        "directive.agent.output_length",
+        event.outputLength,
+      );
+      setAttributeTracked(
+        found.entry,
+        "directive.agent.total_tokens",
+        event.totalTokens,
+      );
+      setAttributeTracked(
+        found.entry,
+        "directive.agent.duration_ms",
+        event.durationMs,
+      );
       // GenAI semantic conventions
-      setAttributeTracked(found.entry, "gen_ai.usage.total_tokens", event.totalTokens);
+      setAttributeTracked(
+        found.entry,
+        "gen_ai.usage.total_tokens",
+        event.totalTokens,
+      );
 
       setStatusTracked(found.entry, { code: OtelStatusCode.OK });
       endSpan(found.entry);
@@ -638,12 +701,27 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handleAgentError(event: AgentErrorEvent): void {
     const found = findActiveSpan("agent", event.agentId);
     if (found) {
-      setAttributeTracked(found.entry, "directive.agent.duration_ms", event.durationMs);
-      setAttributeTracked(found.entry, "directive.agent.error", event.errorMessage);
+      setAttributeTracked(
+        found.entry,
+        "directive.agent.duration_ms",
+        event.durationMs,
+      );
+      setAttributeTracked(
+        found.entry,
+        "directive.agent.error",
+        event.errorMessage,
+      );
       // GenAI semantic conventions
-      setAttributeTracked(found.entry, "gen_ai.error.message", event.errorMessage);
+      setAttributeTracked(
+        found.entry,
+        "gen_ai.error.message",
+        event.errorMessage,
+      );
 
-      setStatusTracked(found.entry, { code: OtelStatusCode.ERROR, message: event.errorMessage });
+      setStatusTracked(found.entry, {
+        code: OtelStatusCode.ERROR,
+        message: event.errorMessage,
+      });
       endSpan(found.entry);
       removeSpan(found.key);
     }
@@ -652,20 +730,24 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handleGuardrailCheck(event: GuardrailCheckEvent): void {
     // Guardrail span is a child of the active agent span for this event's agent
     const parentEntry = event.agentId
-      ? findActiveSpan("agent", event.agentId)?.entry ?? null
+      ? (findActiveSpan("agent", event.agentId)?.entry ?? null)
       : null;
 
-    const { entry } = startSpan(`${prefix}.guardrail.check`, {
-      "directive.service": config.serviceName,
-      "directive.guardrail.name": event.guardrailName,
-      "directive.guardrail.type": event.guardrailType,
-      "directive.guardrail.passed": event.passed,
-      "directive.guardrail.duration_ms": event.durationMs,
-      // GenAI semantic conventions
-      "gen_ai.guardrail.name": event.guardrailName,
-      "gen_ai.guardrail.type": event.guardrailType,
-      "gen_ai.guardrail.passed": event.passed,
-    }, parentEntry);
+    const { entry } = startSpan(
+      `${prefix}.guardrail.check`,
+      {
+        "directive.service": config.serviceName,
+        "directive.guardrail.name": event.guardrailName,
+        "directive.guardrail.type": event.guardrailType,
+        "directive.guardrail.passed": event.passed,
+        "directive.guardrail.duration_ms": event.durationMs,
+        // GenAI semantic conventions
+        "gen_ai.guardrail.name": event.guardrailName,
+        "gen_ai.guardrail.type": event.guardrailType,
+        "gen_ai.guardrail.passed": event.passed,
+      },
+      parentEntry,
+    );
 
     if (event.reason) {
       setAttributeTracked(entry, "directive.guardrail.reason", event.reason);
@@ -693,11 +775,15 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
     }
 
     // No parent span — create a standalone span
-    const { entry } = startSpan(`${prefix}.constraint.evaluate`, {
-      "directive.service": config.serviceName,
-      "directive.constraint.id": event.constraintId,
-      "directive.constraint.fired": event.fired,
-    }, null);
+    const { entry } = startSpan(
+      `${prefix}.constraint.evaluate`,
+      {
+        "directive.service": config.serviceName,
+        "directive.constraint.id": event.constraintId,
+        "directive.constraint.fired": event.fired,
+      },
+      null,
+    );
     setStatusTracked(entry, { code: OtelStatusCode.OK });
     endSpan(entry);
   }
@@ -705,18 +791,22 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handleResolverStart(event: ResolverStartEvent): void {
     // Resolver spans can be children of the active agent span
     const agentParent = event.agentId
-      ? findActiveSpan("agent", event.agentId)?.entry ?? null
+      ? (findActiveSpan("agent", event.agentId)?.entry ?? null)
       : null;
     // Or fall back to pattern span (top of stack)
-    const parentEntry = agentParent ?? (patternStack.length > 0
-      ? patternStack[patternStack.length - 1]!
-      : null);
+    const parentEntry =
+      agentParent ??
+      (patternStack.length > 0 ? patternStack[patternStack.length - 1]! : null);
 
-    const { entry } = startSpan(`${prefix}.resolver.execute`, {
-      "directive.service": config.serviceName,
-      "directive.resolver.id": event.resolverId,
-      "directive.resolver.requirement_type": event.requirementType,
-    }, parentEntry);
+    const { entry } = startSpan(
+      `${prefix}.resolver.execute`,
+      {
+        "directive.service": config.serviceName,
+        "directive.resolver.id": event.resolverId,
+        "directive.resolver.requirement_type": event.requirementType,
+      },
+      parentEntry,
+    );
 
     const key = makeSpanKey("resolver", event.resolverId);
     registerSpan("resolver", event.resolverId, key, entry);
@@ -725,7 +815,11 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handleResolverComplete(event: ResolverCompleteEvent): void {
     const found = findActiveSpan("resolver", event.resolverId);
     if (found) {
-      setAttributeTracked(found.entry, "directive.resolver.duration_ms", event.durationMs);
+      setAttributeTracked(
+        found.entry,
+        "directive.resolver.duration_ms",
+        event.durationMs,
+      );
       setStatusTracked(found.entry, { code: OtelStatusCode.OK });
       endSpan(found.entry);
       removeSpan(found.key);
@@ -735,21 +829,37 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handleResolverError(event: ResolverErrorEvent): void {
     const found = findActiveSpan("resolver", event.resolverId);
     if (found) {
-      setAttributeTracked(found.entry, "directive.resolver.duration_ms", event.durationMs);
-      setAttributeTracked(found.entry, "directive.resolver.error", event.errorMessage);
-      setStatusTracked(found.entry, { code: OtelStatusCode.ERROR, message: event.errorMessage });
+      setAttributeTracked(
+        found.entry,
+        "directive.resolver.duration_ms",
+        event.durationMs,
+      );
+      setAttributeTracked(
+        found.entry,
+        "directive.resolver.error",
+        event.errorMessage,
+      );
+      setStatusTracked(found.entry, {
+        code: OtelStatusCode.ERROR,
+        message: event.errorMessage,
+      });
       endSpan(found.entry);
       removeSpan(found.key);
     }
   }
 
   function handlePatternStart(event: PatternStartEvent): void {
-    const parentEntry = patternStack.length > 0 ? patternStack[patternStack.length - 1]! : null;
-    const { entry } = startSpan(`${prefix}.pattern.${event.patternType}`, {
-      "directive.service": config.serviceName,
-      "directive.pattern.id": event.patternId,
-      "directive.pattern.type": event.patternType,
-    }, parentEntry);
+    const parentEntry =
+      patternStack.length > 0 ? patternStack[patternStack.length - 1]! : null;
+    const { entry } = startSpan(
+      `${prefix}.pattern.${event.patternType}`,
+      {
+        "directive.service": config.serviceName,
+        "directive.pattern.id": event.patternId,
+        "directive.pattern.type": event.patternType,
+      },
+      parentEntry,
+    );
 
     const key = makeSpanKey("pattern", event.patternId);
     registerSpan("pattern", event.patternId, key, entry);
@@ -762,10 +872,21 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
   function handlePatternComplete(event: PatternCompleteEvent): void {
     const found = findActiveSpan("pattern", event.patternId);
     if (found) {
-      setAttributeTracked(found.entry, "directive.pattern.duration_ms", event.durationMs);
+      setAttributeTracked(
+        found.entry,
+        "directive.pattern.duration_ms",
+        event.durationMs,
+      );
       if (event.error) {
-        setAttributeTracked(found.entry, "directive.pattern.error", event.error);
-        setStatusTracked(found.entry, { code: OtelStatusCode.ERROR, message: event.error });
+        setAttributeTracked(
+          found.entry,
+          "directive.pattern.error",
+          event.error,
+        );
+        setStatusTracked(found.entry, {
+          code: OtelStatusCode.ERROR,
+          message: event.error,
+        });
       } else {
         setStatusTracked(found.entry, { code: OtelStatusCode.OK });
       }
@@ -784,12 +905,17 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
     attach(timeline: DebugTimeline): () => void {
       // A7: Prevent attaching to multiple timelines simultaneously
       if (attachedTimeline && attachedTimeline !== timeline) {
-        throw new Error("[Directive OTEL] Plugin already attached to a different timeline. Create a new plugin instance.");
+        throw new Error(
+          "[Directive OTEL] Plugin already attached to a different timeline. Create a new plugin instance.",
+        );
       }
 
       attachedTimeline = timeline;
       const unsub = timeline.subscribe(handleEvent);
-      const cleanupInterval = setInterval(cleanupStaleSpans, Math.min(spanTtlMs, 60_000));
+      const cleanupInterval = setInterval(
+        cleanupStaleSpans,
+        Math.min(spanTtlMs, 60_000),
+      );
 
       return () => {
         unsub();
@@ -818,10 +944,13 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
 
       if (!warnedExternalGetSpans) {
         warnedExternalGetSpans = true;
-        if (typeof process !== "undefined" && process.env?.["NODE_ENV"] !== "production") {
+        if (
+          typeof process !== "undefined" &&
+          process.env?.["NODE_ENV"] !== "production"
+        ) {
           console.warn(
             "[Directive OTEL] getSpans() returns [] when using an external tracer. " +
-            "Use the onSpanEnd callback to collect span data instead.",
+              "Use the onSpanEnd callback to collect span data instead.",
           );
         }
       }

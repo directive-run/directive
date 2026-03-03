@@ -5,7 +5,12 @@
  * and renders the cart items, order summary, coupon, and checkout.
  */
 
-import { system, cartSchema, authSchema, type CartItem } from "./shopping-cart.js";
+import {
+  type CartItem,
+  authSchema,
+  cartSchema,
+  system,
+} from "./shopping-cart.js";
 
 // ============================================================================
 // System Startup
@@ -26,15 +31,25 @@ const totalEl = document.getElementById("sc-total")!;
 const freeShippingEl = document.getElementById("sc-free-shipping")!;
 const itemCountEl = document.getElementById("sc-item-count")!;
 
-const couponInputEl = document.getElementById("sc-coupon-input") as HTMLInputElement;
-const couponApplyBtn = document.getElementById("sc-coupon-apply") as HTMLButtonElement;
+const couponInputEl = document.getElementById(
+  "sc-coupon-input",
+) as HTMLInputElement;
+const couponApplyBtn = document.getElementById(
+  "sc-coupon-apply",
+) as HTMLButtonElement;
 const couponStatusEl = document.getElementById("sc-coupon-status")!;
-const couponClearBtn = document.getElementById("sc-coupon-clear") as HTMLButtonElement;
+const couponClearBtn = document.getElementById(
+  "sc-coupon-clear",
+) as HTMLButtonElement;
 
-const checkoutBtn = document.getElementById("sc-checkout-btn") as HTMLButtonElement;
+const checkoutBtn = document.getElementById(
+  "sc-checkout-btn",
+) as HTMLButtonElement;
 const checkoutStatusEl = document.getElementById("sc-checkout-status")!;
 
-const authToggleBtn = document.getElementById("sc-auth-toggle") as HTMLButtonElement;
+const authToggleBtn = document.getElementById(
+  "sc-auth-toggle",
+) as HTMLButtonElement;
 const authStatusEl = document.getElementById("sc-auth-status")!;
 
 // ============================================================================
@@ -206,9 +221,9 @@ function render(): void {
     authStatusEl.innerHTML = `<span class="sc-auth-badge sc-auth-in">Signed in as ${escapeHtml(userName)}</span>`;
   } else {
     authToggleBtn.textContent = "Sign In";
-    authStatusEl.innerHTML = '<span class="sc-auth-badge sc-auth-out">Not signed in</span>';
+    authStatusEl.innerHTML =
+      '<span class="sc-auth-badge sc-auth-out">Not signed in</span>';
   }
-
 }
 
 // ============================================================================
@@ -242,12 +257,16 @@ document.addEventListener("click", (e) => {
   }
 
   if (action === "increase") {
-    const item = (system.facts.cart.items as CartItem[]).find((i) => i.id === id);
+    const item = (system.facts.cart.items as CartItem[]).find(
+      (i) => i.id === id,
+    );
     if (item) {
       system.events.cart.updateQuantity({ id, quantity: item.quantity + 1 });
     }
   } else if (action === "decrease") {
-    const item = (system.facts.cart.items as CartItem[]).find((i) => i.id === id);
+    const item = (system.facts.cart.items as CartItem[]).find(
+      (i) => i.id === id,
+    );
     if (item) {
       system.events.cart.updateQuantity({ id, quantity: item.quantity - 1 });
     }

@@ -6,80 +6,101 @@
  */
 
 import type {
-  Requirement,
   ModuleSchema,
   Plugin,
+  Requirement,
   SingleModuleSystem,
   System,
 } from "@directive-run/core";
-import type { AgentMemory } from "./memory.js";
-import type { CircuitBreaker } from "@directive-run/core/plugins";
-import type { StreamChunk as StreamChunkBase } from "./streaming.js";
-import {
-  createCallbackPlugin,
-  requirementGuard,
-  setBridgeFact,
-  getBridgeFact,
-} from "@directive-run/core/adapter-utils";
 import { createModule, t } from "@directive-run/core";
 import { createSystem } from "@directive-run/core";
+import {
+  createCallbackPlugin,
+  getBridgeFact,
+  requirementGuard,
+  setBridgeFact,
+} from "@directive-run/core/adapter-utils";
+import type { CircuitBreaker } from "@directive-run/core/plugins";
+import type { AgentMemory } from "./memory.js";
+import type { StreamChunk as StreamChunkBase } from "./streaming.js";
 
 import type {
   AgentLike,
-  RunResult,
-  AgentRunner,
-  RunOptions,
-  GuardrailFn,
-  InputGuardrailData,
-  OutputGuardrailData,
   AgentRetryConfig,
-  NamedGuardrail,
-  GuardrailsConfig,
-  RejectedRequest,
+  AgentRunner,
   ApprovalRequest,
+  GuardrailFn,
+  GuardrailsConfig,
+  InputGuardrailData,
+  NamedGuardrail,
   OrchestratorConstraint,
+  OrchestratorLifecycleHooks,
   OrchestratorResolver,
   OrchestratorState,
-  OrchestratorLifecycleHooks,
-  SelfHealingConfig,
+  OutputGuardrailData,
+  RejectedRequest,
   RerouteEvent,
+  RunOptions,
+  RunResult,
+  SelfHealingConfig,
 } from "./types.js";
 
 import {
-  GuardrailError,
   APPROVAL_KEY,
   BREAKPOINT_KEY,
+  GuardrailError,
   orchestratorBridgeSchema,
 } from "./types.js";
 
-import { createDebugTimeline, createDebugTimelinePlugin, type DebugTimeline } from "./debug-timeline.js";
+import {
+  type DebugTimeline,
+  createDebugTimeline,
+  createDebugTimelinePlugin,
+} from "./debug-timeline.js";
 
 import {
-  normalizeGuardrail,
-  executeGuardrailWithRetry,
   executeAgentWithRetry,
+  executeGuardrailWithRetry,
+  normalizeGuardrail,
 } from "./guardrail-utils.js";
 
 import {
-  getAgentState,
-  setAgentState,
-  getApprovalState,
-  setApprovalState,
-  getConversation,
-  setConversation,
-  getToolCalls,
-  setToolCalls,
-  getBreakpointState,
-  setBreakpointState,
-  getOrchestratorState,
   convertOrchestratorConstraints,
   convertOrchestratorResolvers,
+  getAgentState,
+  getApprovalState,
+  getBreakpointState,
+  getConversation,
+  getOrchestratorState,
+  getToolCalls,
+  setAgentState,
+  setApprovalState,
+  setBreakpointState,
+  setConversation,
+  setToolCalls,
 } from "./orchestrator-bridge.js";
 
-import { withStructuredOutput, type SafeParseable } from "./structured-output.js";
-import { createCheckpointId, validateCheckpoint, type Checkpoint, type CheckpointStore } from "./checkpoint.js";
-import type { BreakpointConfig, BreakpointRequest, BreakpointModifications, BreakpointContext } from "./breakpoints.js";
-import { matchBreakpoint, createBreakpointId, MAX_BREAKPOINT_HISTORY } from "./breakpoints.js";
+import type {
+  BreakpointConfig,
+  BreakpointContext,
+  BreakpointModifications,
+  BreakpointRequest,
+} from "./breakpoints.js";
+import {
+  MAX_BREAKPOINT_HISTORY,
+  createBreakpointId,
+  matchBreakpoint,
+} from "./breakpoints.js";
+import {
+  type Checkpoint,
+  type CheckpointStore,
+  createCheckpointId,
+  validateCheckpoint,
+} from "./checkpoint.js";
+import {
+  type SafeParseable,
+  withStructuredOutput,
+} from "./structured-output.js";
 
 // Bridge accessors and constraint/resolver converters imported from orchestrator-bridge.ts
 
@@ -153,7 +174,11 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Fires when token usage reaches this percentage of maxTokenBudget (0-1). @default 0.8 */
   budgetWarningThreshold?: number;
   /** Callback when budget warning threshold is reached */
-  onBudgetWarning?: (event: { currentTokens: number; maxBudget: number; percentage: number }) => void;
+  onBudgetWarning?: (event: {
+    currentTokens: number;
+    maxBudget: number;
+    percentage: number;
+  }) => void;
   /** Plugins */
   plugins?: Plugin[];
   /**
@@ -228,9 +253,13 @@ export type OrchestratorStreamChunk =
 /** Per-call options for run() */
 export interface RunCallOptions {
   /** Override output guardrails for this call only. Set to [] to skip. */
-  outputGuardrails?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
+  outputGuardrails?: Array<
+    GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>
+  >;
   /** Override input guardrails for this call only. Set to [] to skip. */
-  inputGuardrails?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
+  inputGuardrails?: Array<
+    GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>
+  >;
   /** Signal for abort */
   signal?: AbortSignal;
   /** Override structured output schema for this call. Set to `null` to opt out. */
@@ -245,7 +274,11 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   system: System<any>;
   facts: F & OrchestratorState;
   /** Run an agent with guardrails. Pass options to override guardrails per-call. */
-  run<T>(agent: AgentLike, input: string, options?: RunCallOptions): Promise<RunResult<T>>;
+  run<T>(
+    agent: AgentLike,
+    input: string,
+    options?: RunCallOptions,
+  ): Promise<RunResult<T>>;
   /**
    * Run an agent with streaming support.
    * Returns an async iterator for chunks and a promise for the final result.
@@ -263,7 +296,11 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
    * const finalResult = await result;
    * ```
    */
-  runStream<T>(agent: AgentLike, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
+  runStream<T>(
+    agent: AgentLike,
+    input: string,
+    options?: { signal?: AbortSignal },
+  ): OrchestratorStreamResult<T>;
   /** Approve a pending request */
   approve(requestId: string): void;
   /** Reject a pending request */
@@ -283,7 +320,10 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   /** Create a checkpoint of the current orchestrator state. Only valid when agent is not running. */
   checkpoint(options?: { label?: string }): Promise<Checkpoint>;
   /** Restore orchestrator state from a checkpoint. */
-  restore(checkpoint: Checkpoint, options?: { restoreTimeline?: boolean }): void;
+  restore(
+    checkpoint: Checkpoint,
+    options?: { restoreTimeline?: boolean },
+  ): void;
   /** Resume a pending breakpoint, optionally with input modifications. */
   resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;
   /** Cancel a pending breakpoint with optional reason. */
@@ -343,7 +383,7 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
  * @throws {Error} If autoApproveToolCalls is false but no onApprovalRequest callback is provided
  */
 export function createAgentOrchestrator<
-  F extends Record<string, unknown> = Record<string, never>
+  F extends Record<string, unknown> = Record<string, never>,
 >(options: OrchestratorOptions<F>): AgentOrchestrator<F> {
   const {
     runner,
@@ -381,29 +421,31 @@ export function createAgentOrchestrator<
   if (debug && selfHealing && !circuitBreaker) {
     console.warn(
       "[Directive] selfHealing config has no effect without a circuitBreaker — " +
-      "fallback behavior requires the circuit breaker to detect failures."
+        "fallback behavior requires the circuit breaker to detect failures.",
     );
   }
 
   // Validate budget warning threshold
   if (budgetWarningThreshold < 0 || budgetWarningThreshold > 1) {
-    throw new Error(`[Directive Orchestrator] budgetWarningThreshold must be between 0 and 1, got ${budgetWarningThreshold}`);
+    throw new Error(
+      `[Directive Orchestrator] budgetWarningThreshold must be between 0 and 1, got ${budgetWarningThreshold}`,
+    );
   }
 
   // Enforce approval workflow configuration - require either auto-approve or callback
   if (!autoApproveToolCalls && !onApprovalRequest) {
     throw new Error(
       "[Directive] Invalid approval configuration: autoApproveToolCalls is false but no onApprovalRequest callback provided. " +
-      "Tool calls would wait for approval indefinitely. Either:\n" +
-      "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
-      "  - Provide an onApprovalRequest callback to handle approvals programmatically"
+        "Tool calls would wait for approval indefinitely. Either:\n" +
+        "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
+        "  - Provide an onApprovalRequest callback to handle approvals programmatically",
     );
   }
 
   /** Safe hook caller — user-provided hooks must never crash the orchestrator */
   function fireHook<K extends keyof OrchestratorLifecycleHooks>(
     name: K,
-    event: Parameters<NonNullable<OrchestratorLifecycleHooks[K]>>[0]
+    event: Parameters<NonNullable<OrchestratorLifecycleHooks[K]>>[0],
   ): void {
     try {
       (hooks[name] as ((e: typeof event) => void) | undefined)?.(event);
@@ -415,13 +457,18 @@ export function createAgentOrchestrator<
   }
 
   // Dev-mode: validate that user-provided facts keys don't collide with bridge state keys
-  const RESERVED_ORCHESTRATOR_KEYS = ["agent", "approval", "conversation", "toolCalls"];
+  const RESERVED_ORCHESTRATOR_KEYS = [
+    "agent",
+    "approval",
+    "conversation",
+    "toolCalls",
+  ];
   for (const key of Object.keys(factsSchema)) {
     if (RESERVED_ORCHESTRATOR_KEYS.includes(key)) {
       throw new Error(
         `[Directive] Facts schema key "${key}" conflicts with orchestrator state. ` +
-        `Reserved keys: ${RESERVED_ORCHESTRATOR_KEYS.join(", ")}. ` +
-        `Rename your fact to avoid the collision.`
+          `Reserved keys: ${RESERVED_ORCHESTRATOR_KEYS.join(", ")}. ` +
+          `Rename your fact to avoid the collision.`,
       );
     }
   }
@@ -444,7 +491,7 @@ export function createAgentOrchestrator<
     input: string,
     currentFacts: F & OrchestratorState,
     opts?: RunOptions,
-    callOptions?: RunCallOptions
+    callOptions?: RunCallOptions,
   ) => Promise<RunResult<T>>;
 
   // Forward declaration for system (used in resolver converter)
@@ -471,13 +518,16 @@ export function createAgentOrchestrator<
   const directiveResolvers: Record<string, any> =
     convertOrchestratorResolvers<F>(
       resolvers,
-      (agent, input, currentFacts, opts) => runAgentWithGuardrailsFn(agent, input, currentFacts, opts),
+      (agent, input, currentFacts, opts) =>
+        runAgentWithGuardrailsFn(agent, input, currentFacts, opts),
       () => system.facts,
     );
 
   // Add built-in pause resolver
   directiveResolvers["__pause"] = {
-    requirement: requirementGuard<PauseBudgetExceededReq>("__PAUSE_BUDGET_EXCEEDED"),
+    requirement: requirementGuard<PauseBudgetExceededReq>(
+      "__PAUSE_BUDGET_EXCEEDED",
+    ),
     // biome-ignore lint/suspicious/noExplicitAny: Context type varies
     resolve: async (_req: Requirement, context: any) => {
       const currentAgent = getAgentState(context.facts);
@@ -542,7 +592,8 @@ export function createAgentOrchestrator<
       setBridgeFact(facts, "__budgetWarningFired", false);
       if (init) {
         const state = getOrchestratorState(facts);
-        const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
+        const combinedFacts = { ...facts, ...state } as unknown as F &
+          OrchestratorState;
         init(combinedFacts);
       }
     },
@@ -553,16 +604,15 @@ export function createAgentOrchestrator<
   // Build plugins array with optional timeline plugin
   const allPlugins = [...plugins, callbackPlugin];
   if (debug && timeline) {
-    allPlugins.push(createDebugTimelinePlugin(
-      timeline,
-      () => {
+    allPlugins.push(
+      createDebugTimelinePlugin(timeline, () => {
         try {
           return (system as any).debug?.currentIndex ?? null;
         } catch {
           return null;
         }
-      },
-    ));
+      }),
+    );
   }
 
   // Create system
@@ -580,13 +630,19 @@ export function createAgentOrchestrator<
     input: string,
     _currentFacts: F & OrchestratorState,
     opts?: RunOptions,
-    callOptions?: RunCallOptions
+    callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
     // Wrap in circuit breaker if configured
     if (circuitBreaker) {
       try {
         return await circuitBreaker.execute(() =>
-          runAgentWithGuardrailsInner<T>(agent, input, _currentFacts, opts, callOptions)
+          runAgentWithGuardrailsInner<T>(
+            agent,
+            input,
+            _currentFacts,
+            opts,
+            callOptions,
+          ),
         );
       } catch (error) {
         // Self-healing fallback
@@ -598,10 +654,15 @@ export function createAgentOrchestrator<
                 const rerouteEvent: RerouteEvent = {
                   originalAgent: agent.name,
                   reroutedTo: "fallback-runner",
-                  reason: error instanceof Error ? error.message : String(error),
+                  reason:
+                    error instanceof Error ? error.message : String(error),
                   timestamp: Date.now(),
                 };
-                try { selfHealing.onReroute?.(rerouteEvent); } catch { /* non-fatal */ }
+                try {
+                  selfHealing.onReroute?.(rerouteEvent);
+                } catch {
+                  /* non-fatal */
+                }
                 if (timeline) {
                   timeline.record({
                     type: "reroute",
@@ -610,7 +671,8 @@ export function createAgentOrchestrator<
                     snapshotId: null,
                     from: agent.name,
                     to: "fallback-runner",
-                    reason: error instanceof Error ? error.message : String(error),
+                    reason:
+                      error instanceof Error ? error.message : String(error),
                   });
                 }
 
@@ -630,7 +692,11 @@ export function createAgentOrchestrator<
                 reason: error instanceof Error ? error.message : String(error),
                 timestamp: Date.now(),
               };
-              try { selfHealing.onReroute?.(rerouteEvent); } catch { /* non-fatal */ }
+              try {
+                selfHealing.onReroute?.(rerouteEvent);
+              } catch {
+                /* non-fatal */
+              }
               if (timeline) {
                 timeline.record({
                   type: "reroute",
@@ -639,7 +705,8 @@ export function createAgentOrchestrator<
                   snapshotId: null,
                   from: agent.name,
                   to: selfHealing.fallbackAgent.name,
-                  reason: error instanceof Error ? error.message : String(error),
+                  reason:
+                    error instanceof Error ? error.message : String(error),
                 });
               }
 
@@ -650,7 +717,10 @@ export function createAgentOrchestrator<
           }
 
           // Apply degradation policy
-          if (selfHealing.degradation === "fallback-response" && selfHealing.fallbackResponse !== undefined) {
+          if (
+            selfHealing.degradation === "fallback-response" &&
+            selfHealing.fallbackResponse !== undefined
+          ) {
             return {
               output: selfHealing.fallbackResponse as T,
               messages: [],
@@ -663,7 +733,13 @@ export function createAgentOrchestrator<
       }
     }
 
-    return runAgentWithGuardrailsInner<T>(agent, input, _currentFacts, opts, callOptions);
+    return runAgentWithGuardrailsInner<T>(
+      agent,
+      input,
+      _currentFacts,
+      opts,
+      callOptions,
+    );
   }
 
   async function runAgentWithGuardrailsInner<T>(
@@ -671,7 +747,7 @@ export function createAgentOrchestrator<
     input: string,
     _currentFacts: F & OrchestratorState,
     opts?: RunOptions,
-    callOptions?: RunCallOptions
+    callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
     const startTime = Date.now();
 
@@ -684,7 +760,10 @@ export function createAgentOrchestrator<
           .join("\n");
         agent = {
           ...agent,
-          instructions: (agent.instructions ?? "") + "\n\nConversation context:\n" + contextStr,
+          instructions:
+            (agent.instructions ?? "") +
+            "\n\nConversation context:\n" +
+            contextStr,
         };
       }
     }
@@ -698,9 +777,18 @@ export function createAgentOrchestrator<
         state: system.facts.$store.toObject(),
         breakpointType: "pre_input_guardrails",
       };
-      const mods = await handleBreakpoint("pre_input_guardrails", bpContext, callOptions?.signal ?? opts?.signal);
+      const mods = await handleBreakpoint(
+        "pre_input_guardrails",
+        bpContext,
+        callOptions?.signal ?? opts?.signal,
+      );
       if (mods?.skip) {
-        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        return {
+          output: undefined as T,
+          messages: [],
+          toolCalls: [],
+          totalTokens: 0,
+        };
       }
       if (mods?.input) {
         input = mods.input;
@@ -708,16 +796,18 @@ export function createAgentOrchestrator<
     }
 
     // Resolve which guardrails to use: per-call override > orchestrator defaults
-    const effectiveInputGuardrails = callOptions?.inputGuardrails !== undefined
-      ? callOptions.inputGuardrails
-      : (guardrails.input ?? []);
-    const effectiveOutputGuardrails = callOptions?.outputGuardrails !== undefined
-      ? callOptions.outputGuardrails
-      : (guardrails.output ?? []);
+    const effectiveInputGuardrails =
+      callOptions?.inputGuardrails !== undefined
+        ? callOptions.inputGuardrails
+        : (guardrails.input ?? []);
+    const effectiveOutputGuardrails =
+      callOptions?.outputGuardrails !== undefined
+        ? callOptions.outputGuardrails
+        : (guardrails.output ?? []);
 
     // Run input guardrails BEFORE agent_start so timeline shows correct order
     const inputGuardrailsList = effectiveInputGuardrails.map((g, i) =>
-      normalizeGuardrail(g, i, "input")
+      normalizeGuardrail(g, i, "input"),
     );
     for (const guardrail of inputGuardrailsList) {
       const { name } = guardrail;
@@ -730,10 +820,10 @@ export function createAgentOrchestrator<
       const result = await executeGuardrailWithRetry(
         guardrail,
         { input, agentName: agent.name },
-        context
+        context,
       );
       // Call onGuardrailCheck hook
-      fireHook("onGuardrailCheck",{
+      fireHook("onGuardrailCheck", {
         agentId: agent.name,
         guardrailName: name,
         guardrailType: "input",
@@ -773,7 +863,9 @@ export function createAgentOrchestrator<
         snapshotId: null,
         inputLength: input.length,
         modelId: agent.model ?? undefined,
-        ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+        ...(agent.instructions
+          ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) }
+          : {}),
         input: input.slice(0, MAX_VERBOSE_LENGTH),
       });
     }
@@ -799,9 +891,18 @@ export function createAgentOrchestrator<
         state: system.facts.$store.toObject(),
         breakpointType: "pre_agent_run",
       };
-      const mods = await handleBreakpoint("pre_agent_run", bpContext, callOptions?.signal ?? opts?.signal);
+      const mods = await handleBreakpoint(
+        "pre_agent_run",
+        bpContext,
+        callOptions?.signal ?? opts?.signal,
+      );
       if (mods?.skip) {
-        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        return {
+          output: undefined as T,
+          messages: [],
+          toolCalls: [],
+          totalTokens: 0,
+        };
       }
       if (mods?.input) {
         input = mods.input;
@@ -809,9 +910,10 @@ export function createAgentOrchestrator<
     }
 
     // Structured output wrapping
-    const effectiveSchema = callOptions?.outputSchema !== undefined
-      ? callOptions.outputSchema
-      : outputSchema;
+    const effectiveSchema =
+      callOptions?.outputSchema !== undefined
+        ? callOptions.outputSchema
+        : outputSchema;
 
     let effectiveRunner = runner;
     if (effectiveSchema) {
@@ -822,105 +924,122 @@ export function createAgentOrchestrator<
     }
 
     // Run the agent with retry support
-    const result = await executeAgentWithRetry<T>(effectiveRunner, agent, input, {
-      ...opts,
-      signal: opts?.signal,
-      onMessage: (message) => {
-        const currentConversation = getConversation(system.facts);
-        const updated = [...currentConversation, message];
-        setConversation(system.facts, updated.length > MAX_CONVERSATION_MESSAGES
-          ? updated.slice(-MAX_CONVERSATION_MESSAGES)
-          : updated);
-        opts?.onMessage?.(message);
-      },
-      onToolCall: async (toolCall) => {
-        // Run tool call guardrails with retry support
-        const toolCallGuardrails = (guardrails.toolCall ?? []).map((g, i) =>
-          normalizeGuardrail(g, i, "toolCall")
-        );
-        for (const guardrail of toolCallGuardrails) {
-          const { name } = guardrail;
-          const context = {
-            agentName: agent.name,
-            input,
-            facts: system.facts.$store.toObject(),
-          };
-          const guardStartTime = Date.now();
-          const guardResult = await executeGuardrailWithRetry(
-            guardrail,
-            { toolCall, agentName: agent.name, input },
-            context
+    const result = await executeAgentWithRetry<T>(
+      effectiveRunner,
+      agent,
+      input,
+      {
+        ...opts,
+        signal: opts?.signal,
+        onMessage: (message) => {
+          const currentConversation = getConversation(system.facts);
+          const updated = [...currentConversation, message];
+          setConversation(
+            system.facts,
+            updated.length > MAX_CONVERSATION_MESSAGES
+              ? updated.slice(-MAX_CONVERSATION_MESSAGES)
+              : updated,
           );
-          fireHook("onGuardrailCheck",{
-            agentId: agent.name,
-            guardrailName: name,
-            guardrailType: "toolCall",
-            passed: guardResult.passed,
-            reason: guardResult.reason,
-            durationMs: Date.now() - guardStartTime,
-            timestamp: Date.now(),
-          });
-          if (!guardResult.passed) {
-            throw new GuardrailError({
-              code: "TOOL_CALL_GUARDRAIL_FAILED",
-              message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
-              guardrailName: name,
-              guardrailType: "toolCall",
-              userMessage: guardResult.reason ?? "Tool call blocked",
-              data: { toolCall },
+          opts?.onMessage?.(message);
+        },
+        onToolCall: async (toolCall) => {
+          // Run tool call guardrails with retry support
+          const toolCallGuardrails = (guardrails.toolCall ?? []).map((g, i) =>
+            normalizeGuardrail(g, i, "toolCall"),
+          );
+          for (const guardrail of toolCallGuardrails) {
+            const { name } = guardrail;
+            const context = {
               agentName: agent.name,
               input,
+              facts: system.facts.$store.toObject(),
+            };
+            const guardStartTime = Date.now();
+            const guardResult = await executeGuardrailWithRetry(
+              guardrail,
+              { toolCall, agentName: agent.name, input },
+              context,
+            );
+            fireHook("onGuardrailCheck", {
+              agentId: agent.name,
+              guardrailName: name,
+              guardrailType: "toolCall",
+              passed: guardResult.passed,
+              reason: guardResult.reason,
+              durationMs: Date.now() - guardStartTime,
+              timestamp: Date.now(),
             });
+            if (!guardResult.passed) {
+              throw new GuardrailError({
+                code: "TOOL_CALL_GUARDRAIL_FAILED",
+                message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
+                guardrailName: name,
+                guardrailType: "toolCall",
+                userMessage: guardResult.reason ?? "Tool call blocked",
+                data: { toolCall },
+                agentName: agent.name,
+                input,
+              });
+            }
           }
-        }
 
-        // Check if approval is needed
-        if (!autoApproveToolCalls) {
-          const approvalId = `tool-${toolCall.id}`;
-          const approvalRequest: ApprovalRequest = {
-            id: approvalId,
-            type: "tool_call",
-            agentName: agent.name,
-            description: `Tool call: ${toolCall.name}`,
-            data: toolCall,
-            requestedAt: Date.now(),
-          };
+          // Check if approval is needed
+          if (!autoApproveToolCalls) {
+            const approvalId = `tool-${toolCall.id}`;
+            const approvalRequest: ApprovalRequest = {
+              id: approvalId,
+              type: "tool_call",
+              agentName: agent.name,
+              description: `Tool call: ${toolCall.name}`,
+              data: toolCall,
+              requestedAt: Date.now(),
+            };
 
-          system.batch(() => {
-            const currentApproval = getApprovalState(system.facts);
-            setApprovalState(system.facts, {
-              ...currentApproval,
-              pending: [...currentApproval.pending, approvalRequest],
+            system.batch(() => {
+              const currentApproval = getApprovalState(system.facts);
+              setApprovalState(system.facts, {
+                ...currentApproval,
+                pending: [...currentApproval.pending, approvalRequest],
+              });
             });
-          });
 
-          onApprovalRequest?.(approvalRequest);
+            onApprovalRequest?.(approvalRequest);
 
-          // Wait for approval (pass signal so abort cancels the wait)
-          await waitForApproval(approvalId, callOptions?.signal ?? opts?.signal);
-        }
+            // Wait for approval (pass signal so abort cancels the wait)
+            await waitForApproval(
+              approvalId,
+              callOptions?.signal ?? opts?.signal,
+            );
+          }
 
-        const currentToolCalls = getToolCalls(system.facts);
-        const updatedToolCalls = [...currentToolCalls, toolCall];
-        setToolCalls(system.facts, updatedToolCalls.length > MAX_TOOL_CALLS
-          ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
-          : updatedToolCalls);
-        opts?.onToolCall?.(toolCall);
+          const currentToolCalls = getToolCalls(system.facts);
+          const updatedToolCalls = [...currentToolCalls, toolCall];
+          setToolCalls(
+            system.facts,
+            updatedToolCalls.length > MAX_TOOL_CALLS
+              ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
+              : updatedToolCalls,
+          );
+          opts?.onToolCall?.(toolCall);
+        },
       },
-    }, agentRetry ? {
-      ...agentRetry,
-      onRetry: (attempt, error, delayMs) => {
-        agentRetry.onRetry?.(attempt, error, delayMs);
-        fireHook("onAgentRetry",{
-          agentName: agent.name,
-          input,
-          attempt,
-          error,
-          delayMs,
-          timestamp: Date.now(),
-        });
-      },
-    } : undefined);
+      agentRetry
+        ? {
+            ...agentRetry,
+            onRetry: (attempt, error, delayMs) => {
+              agentRetry.onRetry?.(attempt, error, delayMs);
+              fireHook("onAgentRetry", {
+                agentName: agent.name,
+                input,
+                attempt,
+                error,
+                delayMs,
+                timestamp: Date.now(),
+              });
+            },
+          }
+        : undefined,
+    );
 
     // Breakpoint: pre_output_guardrails
     if (breakpoints && breakpoints.length > 0) {
@@ -931,9 +1050,18 @@ export function createAgentOrchestrator<
         state: system.facts.$store.toObject(),
         breakpointType: "pre_output_guardrails",
       };
-      const mods = await handleBreakpoint("pre_output_guardrails", bpContext, callOptions?.signal ?? opts?.signal);
+      const mods = await handleBreakpoint(
+        "pre_output_guardrails",
+        bpContext,
+        callOptions?.signal ?? opts?.signal,
+      );
       if (mods?.skip) {
-        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        return {
+          output: undefined as T,
+          messages: [],
+          toolCalls: [],
+          totalTokens: 0,
+        };
       }
       if (mods?.input) {
         input = mods.input;
@@ -942,7 +1070,7 @@ export function createAgentOrchestrator<
 
     // Run output guardrails with retry support
     const outputGuardrailsList = effectiveOutputGuardrails.map((g, i) =>
-      normalizeGuardrail(g, i, "output")
+      normalizeGuardrail(g, i, "output"),
     );
     for (const guardrail of outputGuardrailsList) {
       const { name } = guardrail;
@@ -960,9 +1088,9 @@ export function createAgentOrchestrator<
           input,
           messages: result.messages,
         },
-        context
+        context,
       );
-      fireHook("onGuardrailCheck",{
+      fireHook("onGuardrailCheck", {
         agentId: agent.name,
         guardrailName: name,
         guardrailType: "output",
@@ -1005,7 +1133,10 @@ export function createAgentOrchestrator<
       // Check budget warning threshold
       if (maxTokenBudget && onBudgetWarning) {
         budgetPercentage = newTokenUsage / maxTokenBudget;
-        const warningFired = getBridgeFact<boolean>(system.facts, "__budgetWarningFired");
+        const warningFired = getBridgeFact<boolean>(
+          system.facts,
+          "__budgetWarningFired",
+        );
         if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
           setBridgeFact(system.facts, "__budgetWarningFired", true);
           shouldFireBudgetWarning = true;
@@ -1016,10 +1147,17 @@ export function createAgentOrchestrator<
     // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
     if (shouldFireBudgetWarning) {
       try {
-        onBudgetWarning!({ currentTokens: getAgentState(system.facts).tokenUsage, maxBudget: maxTokenBudget!, percentage: budgetPercentage });
+        onBudgetWarning!({
+          currentTokens: getAgentState(system.facts).tokenUsage,
+          maxBudget: maxTokenBudget!,
+          percentage: budgetPercentage,
+        });
       } catch (callbackError) {
         if (debug) {
-          console.debug("[Directive Orchestrator] onBudgetWarning threw:", callbackError);
+          console.debug(
+            "[Directive Orchestrator] onBudgetWarning threw:",
+            callbackError,
+          );
         }
       }
     }
@@ -1036,7 +1174,7 @@ export function createAgentOrchestrator<
     }
 
     // Call onAgentComplete hook
-    fireHook("onAgentComplete",{
+    fireHook("onAgentComplete", {
       agentName: agent.name,
       input,
       output: result.output,
@@ -1046,7 +1184,10 @@ export function createAgentOrchestrator<
     });
 
     if (timeline) {
-      const outputStr = typeof result.output === "string" ? result.output : JSON.stringify(result.output);
+      const outputStr =
+        typeof result.output === "string"
+          ? result.output
+          : JSON.stringify(result.output);
       timeline.record({
         type: "agent_complete",
         timestamp: Date.now(),
@@ -1071,9 +1212,18 @@ export function createAgentOrchestrator<
         state: system.facts.$store.toObject(),
         breakpointType: "post_run",
       };
-      const mods = await handleBreakpoint("post_run", bpContext, callOptions?.signal ?? opts?.signal);
+      const mods = await handleBreakpoint(
+        "post_run",
+        bpContext,
+        callOptions?.signal ?? opts?.signal,
+      );
       if (mods?.skip) {
-        return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+        return {
+          output: undefined as T,
+          messages: [],
+          toolCalls: [],
+          totalTokens: 0,
+        };
       }
       if (mods?.input) {
         input = mods.input;
@@ -1090,9 +1240,14 @@ export function createAgentOrchestrator<
   const breakpointModifications = new Map<string, BreakpointModifications>();
   const breakpointCancelReasons = new Map<string, string>();
 
-  function waitForBreakpointResolution(bpId: string, signal?: AbortSignal): Promise<BreakpointModifications | null> {
+  function waitForBreakpointResolution(
+    bpId: string,
+    signal?: AbortSignal,
+  ): Promise<BreakpointModifications | null> {
     if (signal?.aborted) {
-      return Promise.reject(signal.reason ?? new Error("Aborted while waiting for breakpoint"));
+      return Promise.reject(
+        signal.reason ?? new Error("Aborted while waiting for breakpoint"),
+      );
     }
 
     return new Promise((resolve, reject) => {
@@ -1117,32 +1272,43 @@ export function createAgentOrchestrator<
 
       const onAbort = () => {
         cleanupAll();
-        reject(signal!.reason ?? new Error(`Breakpoint wait for ${bpId} aborted`));
+        reject(
+          signal!.reason ?? new Error(`Breakpoint wait for ${bpId} aborted`),
+        );
       };
 
       if (signal) {
         signal.addEventListener("abort", onAbort, { once: true });
       }
 
-      const unsubscribe = system.facts.$store.subscribe([BREAKPOINT_KEY], () => {
-        if (settled) {
-          return;
-        }
+      const unsubscribe = system.facts.$store.subscribe(
+        [BREAKPOINT_KEY],
+        () => {
+          if (settled) {
+            return;
+          }
 
-        const bpState = getBreakpointState(system.facts);
-        if (bpState.resolved.includes(bpId)) {
-          cleanupAll();
-          const mods = breakpointModifications.get(bpId) ?? null;
-          breakpointModifications.delete(bpId);
-          resolve(mods);
-        } else if (bpState.cancelled.includes(bpId)) {
-          cleanupAll();
-          breakpointModifications.delete(bpId);
-          const cancelReason = breakpointCancelReasons.get(bpId);
-          breakpointCancelReasons.delete(bpId);
-          reject(new Error(cancelReason ? `Breakpoint ${bpId} was cancelled: ${cancelReason}` : `Breakpoint ${bpId} was cancelled`));
-        }
-      });
+          const bpState = getBreakpointState(system.facts);
+          if (bpState.resolved.includes(bpId)) {
+            cleanupAll();
+            const mods = breakpointModifications.get(bpId) ?? null;
+            breakpointModifications.delete(bpId);
+            resolve(mods);
+          } else if (bpState.cancelled.includes(bpId)) {
+            cleanupAll();
+            breakpointModifications.delete(bpId);
+            const cancelReason = breakpointCancelReasons.get(bpId);
+            breakpointCancelReasons.delete(bpId);
+            reject(
+              new Error(
+                cancelReason
+                  ? `Breakpoint ${bpId} was cancelled: ${cancelReason}`
+                  : `Breakpoint ${bpId} was cancelled`,
+              ),
+            );
+          }
+        },
+      );
 
       const bpTimeout = breakpointTimeoutMs ?? 300000;
       timeoutId = setTimeout(() => {
@@ -1153,7 +1319,11 @@ export function createAgentOrchestrator<
         cleanupAll();
         breakpointModifications.delete(bpId);
         breakpointCancelReasons.delete(bpId);
-        reject(new Error(`[Directive] Breakpoint timeout: ${bpId} not resolved within ${Math.round(bpTimeout / 1000)}s`));
+        reject(
+          new Error(
+            `[Directive] Breakpoint timeout: ${bpId} not resolved within ${Math.round(bpTimeout / 1000)}s`,
+          ),
+        );
       }, bpTimeout);
     });
   }
@@ -1167,7 +1337,11 @@ export function createAgentOrchestrator<
       return null;
     }
 
-    const match = matchBreakpoint(breakpoints as BreakpointConfig<string>[], type, context);
+    const match = matchBreakpoint(
+      breakpoints as BreakpointConfig<string>[],
+      type,
+      context,
+    );
     if (!match) {
       return null;
     }
@@ -1190,8 +1364,16 @@ export function createAgentOrchestrator<
       });
     });
 
-    try { onBreakpoint?.(request); } catch { /* non-fatal */ }
-    try { hooks.onBreakpoint?.(request); } catch { /* non-fatal */ }
+    try {
+      onBreakpoint?.(request);
+    } catch {
+      /* non-fatal */
+    }
+    try {
+      hooks.onBreakpoint?.(request);
+    } catch {
+      /* non-fatal */
+    }
 
     if (timeline) {
       timeline.record({
@@ -1223,9 +1405,14 @@ export function createAgentOrchestrator<
   }
 
   // Wait for approval with configurable timeout and abort signal support
-  function waitForApproval(requestId: string, signal?: AbortSignal): Promise<void> {
+  function waitForApproval(
+    requestId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
     if (signal?.aborted) {
-      return Promise.reject(signal.reason ?? new Error("Aborted while waiting for approval"));
+      return Promise.reject(
+        signal.reason ?? new Error("Aborted while waiting for approval"),
+      );
     }
 
     return new Promise((resolve, reject) => {
@@ -1250,7 +1437,9 @@ export function createAgentOrchestrator<
 
       const onAbort = () => {
         cleanupAll();
-        reject(signal!.reason ?? new Error(`Approval wait for ${requestId} aborted`));
+        reject(
+          signal!.reason ?? new Error(`Approval wait for ${requestId} aborted`),
+        );
       };
 
       if (signal) {
@@ -1267,7 +1456,9 @@ export function createAgentOrchestrator<
           cleanupAll();
           resolve();
         } else {
-          const rejectedRequest = approval.rejected.find((r) => r.id === requestId);
+          const rejectedRequest = approval.rejected.find(
+            (r) => r.id === requestId,
+          );
           if (rejectedRequest) {
             cleanupAll();
             const errorMsg = rejectedRequest.reason
@@ -1286,14 +1477,16 @@ export function createAgentOrchestrator<
 
         cleanupAll();
         const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
-        reject(new Error(
-          `[Directive] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
-          `Solutions:\n` +
-          `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
-          `  2. Set autoApproveToolCalls: true to auto-approve\n` +
-          `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
-          `See: https://directive.run/docs/ai/running-agents`
-        ));
+        reject(
+          new Error(
+            `[Directive] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
+              `Solutions:\n` +
+              `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
+              `  2. Set autoApproveToolCalls: true to auto-approve\n` +
+              `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
+              `See: https://directive.run/docs/ai/running-agents`,
+          ),
+        );
       }, approvalTimeoutMs);
     });
   }
@@ -1317,19 +1510,30 @@ export function createAgentOrchestrator<
       return timeline;
     },
 
-    async run<T>(agent: AgentLike, input: string, options?: RunCallOptions): Promise<RunResult<T>> {
-      return runAgentWithGuardrails<T>(agent, input, getCombinedFacts(), undefined, options);
+    async run<T>(
+      agent: AgentLike,
+      input: string,
+      options?: RunCallOptions,
+    ): Promise<RunResult<T>> {
+      return runAgentWithGuardrails<T>(
+        agent,
+        input,
+        getCombinedFacts(),
+        undefined,
+        options,
+      );
     },
 
     runStream<T>(
       agent: AgentLike,
       input: string,
-      options: { signal?: AbortSignal } = {}
+      options: { signal?: AbortSignal } = {},
     ): OrchestratorStreamResult<T> {
       const abortController = new AbortController();
       const MAX_STREAM_BUFFER = 10_000;
       const chunks: OrchestratorStreamChunk[] = [];
-      const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
+      const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> =
+        [];
       let closed = false;
       const startTime = Date.now();
       let tokenCount = 0;
@@ -1376,13 +1580,17 @@ export function createAgentOrchestrator<
 
       // Run the agent with streaming callbacks
       const resultPromise = (async (): Promise<RunResult<T>> => {
-        pushChunk({ type: "progress", phase: "starting", message: "Running input guardrails" });
+        pushChunk({
+          type: "progress",
+          phase: "starting",
+          message: "Running input guardrails",
+        });
 
         try {
           // Run input guardrails first with retry support
           let processedInput = input;
           const inputGuardrails = (guardrails.input ?? []).map((g, i) =>
-            normalizeGuardrail(g, i, "input")
+            normalizeGuardrail(g, i, "input"),
           );
           for (const guardrail of inputGuardrails) {
             const { name } = guardrail;
@@ -1394,7 +1602,7 @@ export function createAgentOrchestrator<
             const result = await executeGuardrailWithRetry(
               guardrail,
               { input: processedInput, agentName: agent.name },
-              context
+              context,
             );
             if (!result.passed) {
               pushChunk({
@@ -1419,7 +1627,11 @@ export function createAgentOrchestrator<
             }
           }
 
-          pushChunk({ type: "progress", phase: "generating", message: "Starting agent" });
+          pushChunk({
+            type: "progress",
+            phase: "generating",
+            message: "Starting agent",
+          });
 
           // Update state
           system.batch(() => {
@@ -1434,105 +1646,142 @@ export function createAgentOrchestrator<
           });
 
           // Run agent with streaming callbacks and retry support
-          const result = await executeAgentWithRetry<T>(runner, agent, processedInput, {
-            signal: abortController.signal,
-            onMessage: (message) => {
-              const currentConversation = getConversation(system.facts);
-              setConversation(system.facts, [...currentConversation, message]);
-              pushChunk({ type: "message", message });
+          const result = await executeAgentWithRetry<T>(
+            runner,
+            agent,
+            processedInput,
+            {
+              signal: abortController.signal,
+              onMessage: (message) => {
+                const currentConversation = getConversation(system.facts);
+                setConversation(system.facts, [
+                  ...currentConversation,
+                  message,
+                ]);
+                pushChunk({ type: "message", message });
 
-              // Approximate token counting from content
-              if (message.role === "assistant" && message.content) {
-                const newTokens = Math.ceil(message.content.length / 4);
-                tokenCount += newTokens;
-                accumulatedOutput += message.content;
-                if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-                  accumulatedOutput = accumulatedOutput.slice(-MAX_ACCUMULATED_OUTPUT);
-                }
-                pushChunk({ type: "token", data: message.content, tokenCount });
-              }
-            },
-            onToolCall: async (toolCall) => {
-              pushChunk({ type: "tool_start", tool: toolCall.name, toolCallId: toolCall.id, arguments: toolCall.arguments });
-
-              // Run tool call guardrails with retry support
-              const toolCallGuardrails = (guardrails.toolCall ?? []).map((g, i) =>
-                normalizeGuardrail(g, i, "toolCall")
-              );
-              for (const guardrail of toolCallGuardrails) {
-                const { name } = guardrail;
-                const context = {
-                  agentName: agent.name,
-                  input: processedInput,
-                  facts: system.facts.$store.toObject(),
-                };
-                const guardResult = await executeGuardrailWithRetry(
-                  guardrail,
-                  { toolCall, agentName: agent.name, input: processedInput },
-                  context
-                );
-                if (!guardResult.passed) {
+                // Approximate token counting from content
+                if (message.role === "assistant" && message.content) {
+                  const newTokens = Math.ceil(message.content.length / 4);
+                  tokenCount += newTokens;
+                  accumulatedOutput += message.content;
+                  if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
+                    accumulatedOutput = accumulatedOutput.slice(
+                      -MAX_ACCUMULATED_OUTPUT,
+                    );
+                  }
                   pushChunk({
-                    type: "guardrail_triggered",
-                    guardrailName: name,
-                    reason: guardResult.reason ?? "Tool call blocked",
-                    partialOutput: accumulatedOutput,
-                    stopped: true,
-                  });
-                  throw new GuardrailError({
-                    code: "TOOL_CALL_GUARDRAIL_FAILED",
-                    message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
-                    guardrailName: name,
-                    guardrailType: "toolCall",
-                    userMessage: guardResult.reason ?? "Tool call blocked",
-                    data: { toolCall },
-                    agentName: agent.name,
-                    input: processedInput,
+                    type: "token",
+                    data: message.content,
+                    tokenCount,
                   });
                 }
-              }
-
-              // Check if approval is needed
-              if (!autoApproveToolCalls) {
-                const approvalId = `tool-${toolCall.id}`;
-                pushChunk({ type: "approval_required", requestId: approvalId, toolName: toolCall.name });
-
-                const approvalRequest: ApprovalRequest = {
-                  id: approvalId,
-                  type: "tool_call",
-                  agentName: agent.name,
-                  description: `Tool call: ${toolCall.name}`,
-                  data: toolCall,
-                  requestedAt: Date.now(),
-                };
-
-                system.batch(() => {
-                  const currentApproval = getApprovalState(system.facts);
-                  setApprovalState(system.facts, {
-                    ...currentApproval,
-                    pending: [...currentApproval.pending, approvalRequest],
-                  });
+              },
+              onToolCall: async (toolCall) => {
+                pushChunk({
+                  type: "tool_start",
+                  tool: toolCall.name,
+                  toolCallId: toolCall.id,
+                  arguments: toolCall.arguments,
                 });
 
-                onApprovalRequest?.(approvalRequest);
-                await waitForApproval(approvalId, abortController.signal);
-                pushChunk({ type: "approval_resolved", requestId: approvalId, approved: true });
-              }
+                // Run tool call guardrails with retry support
+                const toolCallGuardrails = (guardrails.toolCall ?? []).map(
+                  (g, i) => normalizeGuardrail(g, i, "toolCall"),
+                );
+                for (const guardrail of toolCallGuardrails) {
+                  const { name } = guardrail;
+                  const context = {
+                    agentName: agent.name,
+                    input: processedInput,
+                    facts: system.facts.$store.toObject(),
+                  };
+                  const guardResult = await executeGuardrailWithRetry(
+                    guardrail,
+                    { toolCall, agentName: agent.name, input: processedInput },
+                    context,
+                  );
+                  if (!guardResult.passed) {
+                    pushChunk({
+                      type: "guardrail_triggered",
+                      guardrailName: name,
+                      reason: guardResult.reason ?? "Tool call blocked",
+                      partialOutput: accumulatedOutput,
+                      stopped: true,
+                    });
+                    throw new GuardrailError({
+                      code: "TOOL_CALL_GUARDRAIL_FAILED",
+                      message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
+                      guardrailName: name,
+                      guardrailType: "toolCall",
+                      userMessage: guardResult.reason ?? "Tool call blocked",
+                      data: { toolCall },
+                      agentName: agent.name,
+                      input: processedInput,
+                    });
+                  }
+                }
 
-              const currentToolCalls = getToolCalls(system.facts);
-              setToolCalls(system.facts, [...currentToolCalls, toolCall]);
+                // Check if approval is needed
+                if (!autoApproveToolCalls) {
+                  const approvalId = `tool-${toolCall.id}`;
+                  pushChunk({
+                    type: "approval_required",
+                    requestId: approvalId,
+                    toolName: toolCall.name,
+                  });
 
-              if (toolCall.result) {
-                pushChunk({ type: "tool_end", tool: toolCall.name, toolCallId: toolCall.id, result: toolCall.result });
-              }
+                  const approvalRequest: ApprovalRequest = {
+                    id: approvalId,
+                    type: "tool_call",
+                    agentName: agent.name,
+                    description: `Tool call: ${toolCall.name}`,
+                    data: toolCall,
+                    requestedAt: Date.now(),
+                  };
+
+                  system.batch(() => {
+                    const currentApproval = getApprovalState(system.facts);
+                    setApprovalState(system.facts, {
+                      ...currentApproval,
+                      pending: [...currentApproval.pending, approvalRequest],
+                    });
+                  });
+
+                  onApprovalRequest?.(approvalRequest);
+                  await waitForApproval(approvalId, abortController.signal);
+                  pushChunk({
+                    type: "approval_resolved",
+                    requestId: approvalId,
+                    approved: true,
+                  });
+                }
+
+                const currentToolCalls = getToolCalls(system.facts);
+                setToolCalls(system.facts, [...currentToolCalls, toolCall]);
+
+                if (toolCall.result) {
+                  pushChunk({
+                    type: "tool_end",
+                    tool: toolCall.name,
+                    toolCallId: toolCall.id,
+                    result: toolCall.result,
+                  });
+                }
+              },
             },
-          }, agentRetry);
+            agentRetry,
+          );
 
           // Run output guardrails
-          pushChunk({ type: "progress", phase: "finishing", message: "Running output guardrails" });
+          pushChunk({
+            type: "progress",
+            phase: "finishing",
+            message: "Running output guardrails",
+          });
 
           const outputGuardrails = (guardrails.output ?? []).map((g, i) =>
-            normalizeGuardrail(g, i, "output")
+            normalizeGuardrail(g, i, "output"),
           );
           for (const guardrail of outputGuardrails) {
             const { name } = guardrail;
@@ -1549,14 +1798,15 @@ export function createAgentOrchestrator<
                 input: processedInput,
                 messages: result.messages,
               },
-              context
+              context,
             );
             if (!guardResult.passed) {
               pushChunk({
                 type: "guardrail_triggered",
                 guardrailName: name,
                 reason: guardResult.reason ?? "Output validation failed",
-                partialOutput: typeof result.output === "string" ? result.output : "",
+                partialOutput:
+                  typeof result.output === "string" ? result.output : "",
                 stopped: true,
               });
               throw new GuardrailError({
@@ -1588,12 +1838,20 @@ export function createAgentOrchestrator<
           });
 
           const duration = Date.now() - startTime;
-          pushChunk({ type: "done", totalTokens: result.totalTokens, duration, droppedTokens: 0 });
+          pushChunk({
+            type: "done",
+            totalTokens: result.totalTokens,
+            duration,
+            droppedTokens: 0,
+          });
           closeStream();
 
           return result;
         } catch (error) {
-          pushChunk({ type: "error", error: error instanceof Error ? error : new Error(String(error)) });
+          pushChunk({
+            type: "error",
+            error: error instanceof Error ? error : new Error(String(error)),
+          });
           closeStream();
           throw error;
         }
@@ -1614,15 +1872,17 @@ export function createAgentOrchestrator<
                 return { done: true, value: undefined };
               }
 
-              return new Promise<IteratorResult<OrchestratorStreamChunk>>((resolve) => {
-                waiters.push((chunk) => {
-                  if (chunk === null) {
-                    resolve({ done: true, value: undefined });
-                  } else {
-                    resolve({ done: false, value: chunk });
-                  }
-                });
-              });
+              return new Promise<IteratorResult<OrchestratorStreamChunk>>(
+                (resolve) => {
+                  waiters.push((chunk) => {
+                    if (chunk === null) {
+                      resolve({ done: true, value: undefined });
+                    } else {
+                      resolve({ done: false, value: chunk });
+                    }
+                  });
+                },
+              );
             },
           };
         },
@@ -1657,7 +1917,10 @@ export function createAgentOrchestrator<
       system.batch(() => {
         const approval = getApprovalState(system.facts);
         if (!approval.pending.some((r) => r.id === requestId)) {
-          if (debug) console.debug(`[Directive] approve() ignored: no pending request "${requestId}"`);
+          if (debug)
+            console.debug(
+              `[Directive] approve() ignored: no pending request "${requestId}"`,
+            );
 
           return;
         }
@@ -1666,7 +1929,10 @@ export function createAgentOrchestrator<
         setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
-          approved: approved.length > MAX_APPROVAL_HISTORY ? approved.slice(-MAX_APPROVAL_HISTORY) : approved,
+          approved:
+            approved.length > MAX_APPROVAL_HISTORY
+              ? approved.slice(-MAX_APPROVAL_HISTORY)
+              : approved,
         });
       });
     },
@@ -1675,7 +1941,10 @@ export function createAgentOrchestrator<
       system.batch(() => {
         const approval = getApprovalState(system.facts);
         if (!approval.pending.some((r) => r.id === requestId)) {
-          if (debug) console.debug(`[Directive] reject() ignored: no pending request "${requestId}"`);
+          if (debug)
+            console.debug(
+              `[Directive] reject() ignored: no pending request "${requestId}"`,
+            );
 
           return;
         }
@@ -1692,7 +1961,10 @@ export function createAgentOrchestrator<
         setApprovalState(system.facts, {
           ...approval,
           pending: approval.pending.filter((r) => r.id !== requestId),
-          rejected: rejected.length > MAX_REJECTION_HISTORY ? rejected.slice(-MAX_REJECTION_HISTORY) : rejected,
+          rejected:
+            rejected.length > MAX_REJECTION_HISTORY
+              ? rejected.slice(-MAX_REJECTION_HISTORY)
+              : rejected,
         });
       });
     },
@@ -1735,7 +2007,11 @@ export function createAgentOrchestrator<
         });
         setConversation(system.facts, []);
         setToolCalls(system.facts, []);
-        setBreakpointState(system.facts, { pending: [], resolved: [], cancelled: [] });
+        setBreakpointState(system.facts, {
+          pending: [],
+          resolved: [],
+          cancelled: [],
+        });
         setBridgeFact(system.facts, "__budgetWarningFired", false);
       });
       breakpointModifications.clear();
@@ -1749,7 +2025,7 @@ export function createAgentOrchestrator<
       }
       if (!system.debug?.export) {
         throw new Error(
-          "[Directive] Checkpointing requires debug mode. Set `debug: true` in orchestrator options."
+          "[Directive] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.",
         );
       }
 
@@ -1761,7 +2037,7 @@ export function createAgentOrchestrator<
         systemExport: system.debug.export(),
         timelineExport: timeline?.export() ?? null,
         localState: { type: "single" },
-        memoryExport: memory ? (memory as any).export?.() ?? null : null,
+        memoryExport: memory ? ((memory as any).export?.() ?? null) : null,
         orchestratorType: "single",
       };
 
@@ -1777,17 +2053,23 @@ export function createAgentOrchestrator<
         throw new Error("[Directive] Invalid checkpoint data");
       }
       if (cp.orchestratorType !== "single") {
-        throw new Error("[Directive] Cannot restore multi-agent checkpoint in single-agent orchestrator");
+        throw new Error(
+          "[Directive] Cannot restore multi-agent checkpoint in single-agent orchestrator",
+        );
       }
       if (!system.debug?.import) {
         throw new Error(
-          "[Directive] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options."
+          "[Directive] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.",
         );
       }
 
       system.debug.import(cp.systemExport);
 
-      if (restoreOpts?.restoreTimeline !== false && cp.timelineExport && timeline) {
+      if (
+        restoreOpts?.restoreTimeline !== false &&
+        cp.timelineExport &&
+        timeline
+      ) {
         timeline.import(cp.timelineExport);
       }
 
@@ -1796,7 +2078,10 @@ export function createAgentOrchestrator<
       }
     },
 
-    resumeBreakpoint(id: string, modifications?: BreakpointModifications): void {
+    resumeBreakpoint(
+      id: string,
+      modifications?: BreakpointModifications,
+    ): void {
       if (modifications) {
         breakpointModifications.set(id, modifications);
       }
@@ -1806,7 +2091,10 @@ export function createAgentOrchestrator<
         setBreakpointState(system.facts, {
           ...bpState,
           pending: bpState.pending.filter((r) => r.id !== id),
-          resolved: resolved.length > MAX_BREAKPOINT_HISTORY ? resolved.slice(-MAX_BREAKPOINT_HISTORY) : resolved,
+          resolved:
+            resolved.length > MAX_BREAKPOINT_HISTORY
+              ? resolved.slice(-MAX_BREAKPOINT_HISTORY)
+              : resolved,
         });
       });
     },
@@ -1821,7 +2109,10 @@ export function createAgentOrchestrator<
         setBreakpointState(system.facts, {
           ...bpState,
           pending: bpState.pending.filter((r) => r.id !== id),
-          cancelled: cancelled.length > MAX_BREAKPOINT_HISTORY ? cancelled.slice(-MAX_BREAKPOINT_HISTORY) : cancelled,
+          cancelled:
+            cancelled.length > MAX_BREAKPOINT_HISTORY
+              ? cancelled.slice(-MAX_BREAKPOINT_HISTORY)
+              : cancelled,
         });
       });
     },

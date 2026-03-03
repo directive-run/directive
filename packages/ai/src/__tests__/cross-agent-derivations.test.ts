@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  createTestMultiAgentOrchestrator,
   assertDerivedValues,
+  createTestMultiAgentOrchestrator,
 } from "../testing.js";
 import type { CrossAgentSnapshot } from "../types.js";
 
@@ -183,9 +183,7 @@ describe("cross-agent derivations", () => {
 
     await orchestrator.runAgent("a", "input");
 
-    expect(changes).toEqual([
-      { id: "completedCount", value: 1 },
-    ]);
+    expect(changes).toEqual([{ id: "completedCount", value: 1 }]);
 
     // Running again should still fire since runCount changes (derivation recomputes)
     // But completedCount stays at 1, so no change should fire
@@ -367,8 +365,6 @@ describe("cross-agent derivations", () => {
     assertDerivedValues(orchestrator, { value: 42, label: "hello" });
 
     // Should throw on mismatch
-    expect(() =>
-      assertDerivedValues(orchestrator, { value: 99 }),
-    ).toThrow();
+    expect(() => assertDerivedValues(orchestrator, { value: 99 })).toThrow();
   });
 });

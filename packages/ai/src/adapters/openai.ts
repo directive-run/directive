@@ -14,9 +14,14 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type { AdapterHooks, AgentRunner, Message, TokenUsage } from "../types.js";
-import type { StreamingCallbackRunner } from "../types.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
+import type {
+  AdapterHooks,
+  AgentRunner,
+  Message,
+  TokenUsage,
+} from "../types.js";
+import type { StreamingCallbackRunner } from "../types.js";
 
 // ============================================================================
 // Pricing Constants
@@ -38,12 +43,13 @@ import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://openai.com/pricing
  */
-export const OPENAI_PRICING: Record<string, { input: number; output: number }> = {
-	"gpt-4o": { input: 2.5, output: 10 },
-	"gpt-4o-mini": { input: 0.15, output: 0.6 },
-	"gpt-4-turbo": { input: 10, output: 30 },
-	"o3-mini": { input: 1.1, output: 4.4 },
-};
+export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
+  {
+    "gpt-4o": { input: 2.5, output: 10 },
+    "gpt-4o-mini": { input: 0.15, output: 0.6 },
+    "gpt-4-turbo": { input: 10, output: 30 },
+    "o3-mini": { input: 1.1, output: 4.4 },
+  };
 
 // ============================================================================
 // OpenAI Runner
@@ -51,15 +57,15 @@ export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
 
 /** Options for createOpenAIRunner */
 export interface OpenAIRunnerOptions {
-	apiKey: string;
-	model?: string;
-	maxTokens?: number;
-	baseURL?: string;
-	fetch?: typeof globalThis.fetch;
-	/** @default undefined */
-	timeoutMs?: number;
-	/** Lifecycle hooks for tracing, logging, and metrics */
-	hooks?: AdapterHooks;
+  apiKey: string;
+  model?: string;
+  maxTokens?: number;
+  baseURL?: string;
+  fetch?: typeof globalThis.fetch;
+  /** @default undefined */
+  timeoutMs?: number;
+  /** Lifecycle hooks for tracing, logging, and metrics */
+  hooks?: AdapterHooks;
 }
 
 /**
@@ -86,60 +92,68 @@ export interface OpenAIRunnerOptions {
  * ```
  */
 export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
-	const {
-		apiKey,
-		model = "gpt-4o",
-		maxTokens,
-		baseURL = "https://api.openai.com/v1",
-		fetch: fetchFn = globalThis.fetch,
-		timeoutMs,
-		hooks,
-	} = options;
+  const {
+    apiKey,
+    model = "gpt-4o",
+    maxTokens,
+    baseURL = "https://api.openai.com/v1",
+    fetch: fetchFn = globalThis.fetch,
+    timeoutMs,
+    hooks,
+  } = options;
 
-	validateBaseURL(baseURL);
+  validateBaseURL(baseURL);
 
-	if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production" && !apiKey) {
-		console.warn("[Directive] createOpenAIRunner: apiKey is empty. API calls will fail.");
-	}
+  if (
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV !== "production" &&
+    !apiKey
+  ) {
+    console.warn(
+      "[Directive] createOpenAIRunner: apiKey is empty. API calls will fail.",
+    );
+  }
 
-	return createRunner({
-		fetch: fetchFn,
-		hooks,
-		buildRequest: (agent, _input, messages) => ({
-			url: `${baseURL}/chat/completions`,
-			init: {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${apiKey}`,
-				},
-				body: JSON.stringify({
-					model: agent.model ?? model,
-					...(maxTokens != null ? { max_tokens: maxTokens } : {}),
-					messages: [
-						...(agent.instructions
-							? [{ role: "system", content: agent.instructions }]
-							: []),
-						...messages.map((m) => ({ role: m.role, content: m.content })),
-					],
-				}),
-				...(timeoutMs != null ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
-			},
-		}),
-		parseResponse: async (res) => {
-			const data = await res.json();
-			const text = data.choices?.[0]?.message?.content ?? "";
-			const inputTokens = data.usage?.prompt_tokens ?? 0;
-			const outputTokens = data.usage?.completion_tokens ?? 0;
+  return createRunner({
+    fetch: fetchFn,
+    hooks,
+    buildRequest: (agent, _input, messages) => ({
+      url: `${baseURL}/chat/completions`,
+      init: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: agent.model ?? model,
+          ...(maxTokens != null ? { max_tokens: maxTokens } : {}),
+          messages: [
+            ...(agent.instructions
+              ? [{ role: "system", content: agent.instructions }]
+              : []),
+            ...messages.map((m) => ({ role: m.role, content: m.content })),
+          ],
+        }),
+        ...(timeoutMs != null
+          ? { signal: AbortSignal.timeout(timeoutMs) }
+          : {}),
+      },
+    }),
+    parseResponse: async (res) => {
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content ?? "";
+      const inputTokens = data.usage?.prompt_tokens ?? 0;
+      const outputTokens = data.usage?.completion_tokens ?? 0;
 
-			return {
-				text,
-				totalTokens: inputTokens + outputTokens,
-				inputTokens,
-				outputTokens,
-			};
-		},
-	});
+      return {
+        text,
+        totalTokens: inputTokens + outputTokens,
+        inputTokens,
+        outputTokens,
+      };
+    },
+  });
 }
 
 // ============================================================================
@@ -148,13 +162,13 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
 
 /** Options for createOpenAIEmbedder */
 export interface OpenAIEmbedderOptions {
-	apiKey: string;
-	model?: string;
-	dimensions?: number;
-	baseURL?: string;
-	fetch?: typeof globalThis.fetch;
-	/** @default 30000 */
-	timeoutMs?: number;
+  apiKey: string;
+  model?: string;
+  dimensions?: number;
+  baseURL?: string;
+  fetch?: typeof globalThis.fetch;
+  /** @default 30000 */
+  timeoutMs?: number;
 }
 
 /**
@@ -167,55 +181,61 @@ export interface OpenAIEmbedderOptions {
  * ```
  */
 export function createOpenAIEmbedder(
-	options: OpenAIEmbedderOptions,
+  options: OpenAIEmbedderOptions,
 ): EmbedderFn {
-	const {
-		apiKey,
-		model = "text-embedding-3-small",
-		dimensions = 1536,
-		baseURL = "https://api.openai.com/v1",
-		fetch: fetchFn = globalThis.fetch,
-		timeoutMs,
-	} = options;
+  const {
+    apiKey,
+    model = "text-embedding-3-small",
+    dimensions = 1536,
+    baseURL = "https://api.openai.com/v1",
+    fetch: fetchFn = globalThis.fetch,
+    timeoutMs,
+  } = options;
 
-	validateBaseURL(baseURL);
+  validateBaseURL(baseURL);
 
-	if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production" && !apiKey) {
-		console.warn("[Directive] createOpenAIEmbedder: apiKey is empty. API calls will fail.");
-	}
+  if (
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV !== "production" &&
+    !apiKey
+  ) {
+    console.warn(
+      "[Directive] createOpenAIEmbedder: apiKey is empty. API calls will fail.",
+    );
+  }
 
-	return async (text: string): Promise<Embedding> => {
-		const response = await fetchFn(`${baseURL}/embeddings`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${apiKey}`,
-			},
-			body: JSON.stringify({ model, input: text, dimensions }),
-			signal: AbortSignal.timeout(timeoutMs ?? 30_000),
-		});
+  return async (text: string): Promise<Embedding> => {
+    const response = await fetchFn(`${baseURL}/embeddings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, input: text, dimensions }),
+      signal: AbortSignal.timeout(timeoutMs ?? 30_000),
+    });
 
-		if (!response.ok) {
-			const errBody = await response.text().catch(() => "");
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
 
-			throw new Error(
-				`[Directive] OpenAI embedding failed: ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
-			);
-		}
+      throw new Error(
+        `[Directive] OpenAI embedding failed: ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
+      );
+    }
 
-		const data = (await response.json()) as {
-			data: Array<{ embedding: number[] }>;
-		};
+    const data = (await response.json()) as {
+      data: Array<{ embedding: number[] }>;
+    };
 
-		const entry = data.data[0];
-		if (!entry) {
-			throw new Error(
-				"[Directive] OpenAI embedding response contained no data entries",
-			);
-		}
+    const entry = data.data[0];
+    if (!entry) {
+      throw new Error(
+        "[Directive] OpenAI embedding response contained no data entries",
+      );
+    }
 
-		return entry.embedding;
-	};
+    return entry.embedding;
+  };
 }
 
 // ============================================================================
@@ -224,13 +244,13 @@ export function createOpenAIEmbedder(
 
 /** Options for createOpenAIStreamingRunner */
 export interface OpenAIStreamingRunnerOptions {
-	apiKey: string;
-	model?: string;
-	maxTokens?: number;
-	baseURL?: string;
-	fetch?: typeof globalThis.fetch;
-	/** Lifecycle hooks for tracing, logging, and metrics */
-	hooks?: AdapterHooks;
+  apiKey: string;
+  model?: string;
+  maxTokens?: number;
+  baseURL?: string;
+  fetch?: typeof globalThis.fetch;
+  /** Lifecycle hooks for tracing, logging, and metrics */
+  hooks?: AdapterHooks;
 }
 
 /**
@@ -249,162 +269,168 @@ export interface OpenAIStreamingRunnerOptions {
  * ```
  */
 export function createOpenAIStreamingRunner(
-	options: OpenAIStreamingRunnerOptions,
+  options: OpenAIStreamingRunnerOptions,
 ): StreamingCallbackRunner {
-	const {
-		apiKey,
-		model = "gpt-4o",
-		maxTokens,
-		baseURL = "https://api.openai.com/v1",
-		fetch: fetchFn = globalThis.fetch,
-		hooks,
-	} = options;
+  const {
+    apiKey,
+    model = "gpt-4o",
+    maxTokens,
+    baseURL = "https://api.openai.com/v1",
+    fetch: fetchFn = globalThis.fetch,
+    hooks,
+  } = options;
 
-	validateBaseURL(baseURL);
+  validateBaseURL(baseURL);
 
-	if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production" && !apiKey) {
-		console.warn("[Directive] createOpenAIStreamingRunner: apiKey is empty. API calls will fail.");
-	}
+  if (
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV !== "production" &&
+    !apiKey
+  ) {
+    console.warn(
+      "[Directive] createOpenAIStreamingRunner: apiKey is empty. API calls will fail.",
+    );
+  }
 
-	return async (agent, input, callbacks) => {
-		const startTime = Date.now();
-		hooks?.onBeforeCall?.({ agent, input, timestamp: startTime });
+  return async (agent, input, callbacks) => {
+    const startTime = Date.now();
+    hooks?.onBeforeCall?.({ agent, input, timestamp: startTime });
 
-		try {
-			const response = await fetchFn(`${baseURL}/chat/completions`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${apiKey}`,
-				},
-				body: JSON.stringify({
-					model: agent.model ?? model,
-					...(maxTokens != null ? { max_tokens: maxTokens } : {}),
-					messages: [
-						...(agent.instructions
-							? [{ role: "system", content: agent.instructions }]
-							: []),
-						{ role: "user", content: input },
-					],
-					stream: true,
-					stream_options: { include_usage: true },
-				}),
-				signal: callbacks.signal,
-			});
+    try {
+      const response = await fetchFn(`${baseURL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: agent.model ?? model,
+          ...(maxTokens != null ? { max_tokens: maxTokens } : {}),
+          messages: [
+            ...(agent.instructions
+              ? [{ role: "system", content: agent.instructions }]
+              : []),
+            { role: "user", content: input },
+          ],
+          stream: true,
+          stream_options: { include_usage: true },
+        }),
+        signal: callbacks.signal,
+      });
 
-			if (!response.ok) {
-				const errBody = await response.text().catch(() => "");
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
 
-				throw new Error(
-					`[Directive] OpenAI streaming error ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
-				);
-			}
+        throw new Error(
+          `[Directive] OpenAI streaming error ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
+        );
+      }
 
-			const reader = response.body?.getReader();
-			if (!reader) {
-				throw new Error("[Directive] No response body");
-			}
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("[Directive] No response body");
+      }
 
-			const decoder = new TextDecoder();
-			let buf = "";
-			let fullText = "";
-			let promptTokens = 0;
-			let completionTokens = 0;
+      const decoder = new TextDecoder();
+      let buf = "";
+      let fullText = "";
+      let promptTokens = 0;
+      let completionTokens = 0;
 
-			try {
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) {
-						break;
-					}
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
 
-					buf += decoder.decode(value, { stream: true });
-					const lines = buf.split("\n");
-					buf = lines.pop() ?? "";
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
 
-					for (const line of lines) {
-						if (!line.startsWith("data: ")) {
-							continue;
-						}
-						const data = line.slice(6).trim();
-						if (data === "[DONE]") {
-							continue;
-						}
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) {
+              continue;
+            }
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") {
+              continue;
+            }
 
-						try {
-							const event = JSON.parse(data);
+            try {
+              const event = JSON.parse(data);
 
-							// Extract token content from delta
-							const delta = event.choices?.[0]?.delta;
-							if (delta?.content) {
-								fullText += delta.content;
-								callbacks.onToken?.(delta.content);
-							}
+              // Extract token content from delta
+              const delta = event.choices?.[0]?.delta;
+              if (delta?.content) {
+                fullText += delta.content;
+                callbacks.onToken?.(delta.content);
+              }
 
-							// Extract usage from the final chunk (stream_options: include_usage)
-							if (event.usage) {
-								promptTokens = event.usage.prompt_tokens ?? 0;
-								completionTokens = event.usage.completion_tokens ?? 0;
-							}
-						} catch (parseErr) {
-							if (parseErr instanceof SyntaxError) {
-								if (
-									typeof process !== "undefined" &&
-									process.env?.NODE_ENV === "development"
-								) {
-									console.warn(
-										"[Directive] Malformed SSE event from OpenAI:",
-										data,
-									);
-								}
-							} else {
-								throw parseErr;
-							}
-						}
-					}
-				}
-			} finally {
-				reader.cancel().catch(() => {});
-			}
+              // Extract usage from the final chunk (stream_options: include_usage)
+              if (event.usage) {
+                promptTokens = event.usage.prompt_tokens ?? 0;
+                completionTokens = event.usage.completion_tokens ?? 0;
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof SyntaxError) {
+                if (
+                  typeof process !== "undefined" &&
+                  process.env?.NODE_ENV === "development"
+                ) {
+                  console.warn(
+                    "[Directive] Malformed SSE event from OpenAI:",
+                    data,
+                  );
+                }
+              } else {
+                throw parseErr;
+              }
+            }
+          }
+        }
+      } finally {
+        reader.cancel().catch(() => {});
+      }
 
-			const assistantMsg: Message = { role: "assistant", content: fullText };
-			callbacks.onMessage?.(assistantMsg);
+      const assistantMsg: Message = { role: "assistant", content: fullText };
+      callbacks.onMessage?.(assistantMsg);
 
-			const tokenUsage: TokenUsage = {
-				inputTokens: promptTokens,
-				outputTokens: completionTokens,
-			};
-			const totalTokens = promptTokens + completionTokens;
+      const tokenUsage: TokenUsage = {
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
+      };
+      const totalTokens = promptTokens + completionTokens;
 
-			hooks?.onAfterCall?.({
-				agent,
-				input,
-				output: fullText,
-				totalTokens,
-				tokenUsage,
-				durationMs: Date.now() - startTime,
-				timestamp: Date.now(),
-			});
+      hooks?.onAfterCall?.({
+        agent,
+        input,
+        output: fullText,
+        totalTokens,
+        tokenUsage,
+        durationMs: Date.now() - startTime,
+        timestamp: Date.now(),
+      });
 
-			return {
-				output: fullText,
-				messages: [{ role: "user" as const, content: input }, assistantMsg],
-				toolCalls: [],
-				totalTokens,
-				tokenUsage,
-			};
-		} catch (err) {
-			if (err instanceof Error) {
-				hooks?.onError?.({
-					agent,
-					input,
-					error: err,
-					durationMs: Date.now() - startTime,
-					timestamp: Date.now(),
-				});
-			}
+      return {
+        output: fullText,
+        messages: [{ role: "user" as const, content: input }, assistantMsg],
+        toolCalls: [],
+        totalTokens,
+        tokenUsage,
+      };
+    } catch (err) {
+      if (err instanceof Error) {
+        hooks?.onError?.({
+          agent,
+          input,
+          error: err,
+          durationMs: Date.now() - startTime,
+          timestamp: Date.now(),
+        });
+      }
 
-			throw err;
-		}
-	};
+      throw err;
+    }
+  };
 }
