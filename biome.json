@@ -15,6 +15,7 @@
       },
       "style": {
         "noNonNullAssertion": "off",
+        "useShorthandFunctionType": "off",
         "useNodejsImportProtocol": "error",
         "useImportType": "error",
         "useConsistentArrayType": "warn",
