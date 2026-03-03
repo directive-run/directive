@@ -95,6 +95,7 @@ export type DevToolsServerMessage =
 
 /** Messages sent FROM clients TO the server */
 export type DevToolsClientMessage =
+  | { type: "authenticate"; token: string }
   | { type: "request_snapshot" }
   | { type: "request_health" }
   | { type: "request_events"; since?: number }
@@ -159,6 +160,8 @@ export interface DevToolsServerConfig {
   healthPushIntervalMs?: number;
   /** Maximum connected clients. Default: 50 */
   maxClients?: number;
+  /** Token authentication callback. When set, new connections must send an `authenticate` message before receiving data. */
+  authenticate?: (token: string) => boolean | Promise<boolean>;
 }
 
 // ============================================================================
@@ -220,11 +223,13 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     batchSize = 1,
     batchIntervalMs = 50,
     healthPushIntervalMs = 0,
+    authenticate,
   } = config;
   const maxClients = config.maxClients ?? 50;
 
   const sessionId = `devtools_${crypto.randomUUID()}`;
   const clients = new Set<DevToolsClient>();
+  const pendingAuthClients = new Set<DevToolsClient>();
   let batchBuffer: DebugEvent[] = [];
   let batchTimer: ReturnType<typeof setInterval> | null = null;
   let healthTimer: ReturnType<typeof setInterval> | null = null;
@@ -331,6 +336,68 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
       return;
     }
     clientLastMessage.set(client, now);
+
+    // Handle authenticate message
+    if (msg.type === "authenticate") {
+      if (!authenticate) {
+        // No auth configured — treat as unknown command
+        sendToClient(client, { type: "error", code: "UNKNOWN_COMMAND", message: "Authentication not configured on this server" });
+
+        return;
+      }
+
+      if (!pendingAuthClients.has(client)) {
+        // Already authenticated
+        sendToClient(client, { type: "error", code: "ALREADY_AUTHENTICATED", message: "Already authenticated" });
+
+        return;
+      }
+
+      if (typeof msg.token !== "string") {
+        sendToClient(client, { type: "error", code: "AUTH_FAILED", message: "Missing token" });
+        client.close();
+        pendingAuthClients.delete(client);
+
+        return;
+      }
+
+      const result = authenticate(msg.token);
+      const handleResult = (valid: boolean) => {
+        if (valid) {
+          pendingAuthClients.delete(client);
+          clients.add(client);
+          sendToClient(client, {
+            type: "welcome",
+            version: PROTOCOL_VERSION,
+            sessionId,
+            timestamp: Date.now(),
+          });
+        } else {
+          sendToClient(client, { type: "error", code: "AUTH_FAILED", message: "Invalid token" });
+          pendingAuthClients.delete(client);
+          client.close();
+        }
+      };
+
+      if (result instanceof Promise) {
+        result.then(handleResult).catch(() => {
+          sendToClient(client, { type: "error", code: "AUTH_FAILED", message: "Authentication error" });
+          pendingAuthClients.delete(client);
+          client.close();
+        });
+      } else {
+        handleResult(result);
+      }
+
+      return;
+    }
+
+    // Reject commands from clients pending authentication
+    if (pendingAuthClients.has(client)) {
+      sendToClient(client, { type: "error", code: "AUTH_REQUIRED", message: "Authentication required" });
+
+      return;
+    }
 
     switch (msg.type) {
       case "ping":
@@ -460,7 +527,7 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
   // ------------------------------------------------------------------
 
   transport.onConnection((client, onMessage, onClose) => {
-    if (clients.size >= maxClients) {
+    if (clients.size + pendingAuthClients.size >= maxClients) {
       try {
         const msg: DevToolsServerMessage = { type: "error", code: "MAX_CLIENTS", message: "Connection limit reached" };
         client.send(JSON.stringify(msg));
@@ -469,19 +536,25 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
       return;
     }
-    clients.add(client);
 
-    // Send welcome message with current state
-    sendToClient(client, {
-      type: "welcome",
-      version: PROTOCOL_VERSION,
-      sessionId,
-      timestamp: Date.now(),
-    });
+    if (authenticate) {
+      // Hold in pending state until client sends authenticate message
+      pendingAuthClients.add(client);
+    } else {
+      // No auth — add directly and send welcome
+      clients.add(client);
+      sendToClient(client, {
+        type: "welcome",
+        version: PROTOCOL_VERSION,
+        sessionId,
+        timestamp: Date.now(),
+      });
+    }
 
     onMessage((data) => handleClientMessage(client, data));
     onClose(() => {
       clients.delete(client);
+      pendingAuthClients.delete(client);
       clientLastMessage.delete(client);
     });
   });
@@ -557,7 +630,15 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
           // Ignore close errors
         }
       }
+      for (const client of pendingAuthClients) {
+        try {
+          client.close();
+        } catch {
+          // Ignore close errors
+        }
+      }
       clients.clear();
+      pendingAuthClients.clear();
       clientLastMessage.clear();
 
       transport.close();
@@ -579,6 +660,8 @@ export interface ConnectDevToolsOptions {
   healthPushIntervalMs?: number;
   /** Event batching size. Default: 1 (no batching) */
   batchSize?: number;
+  /** Token authentication callback. When set, clients must authenticate before receiving data. */
+  authenticate?: (token: string) => boolean | Promise<boolean>;
 }
 
 /** Minimal orchestrator interface for DevTools connection */
@@ -634,6 +717,7 @@ export async function connectDevTools(
     healthMonitor: orchestrator.healthMonitor as HealthMonitor | undefined,
     healthPushIntervalMs: options.healthPushIntervalMs ?? 5000,
     batchSize: options.batchSize,
+    authenticate: options.authenticate,
     getSnapshot: orchestrator.getAllAgentStates
       ? () => {
         const agents = orchestrator.getAllAgentStates!();

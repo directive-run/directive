@@ -78,6 +78,13 @@ class ViewErrorBoundary extends React.Component<
 export function App() {
   const [view, setView] = useState<View>("timeline");
   const [wsUrl, setWsUrl] = useState("ws://localhost:4040");
+  const [authToken, setAuthToken] = useState(() => {
+    try {
+      return localStorage.getItem("directive-devtools-auth-token") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const conn = useDevToolsConnection();
   const replay = useReplay(conn.events);
   // E7: Time format state — D13: persist to localStorage
@@ -116,7 +123,7 @@ export function App() {
 
   // Auto-connect on mount
   useEffect(() => {
-    conn.connect(wsUrl);
+    conn.connect(wsUrl, authToken || undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,9 +139,19 @@ export function App() {
   }, [conn.status, conn.requestEvents, conn.requestBreakpoints, conn.requestSnapshot, conn.requestScratchpad, conn.requestDerived]);
 
   const handleConnect = useCallback(() => {
+    // Persist token to localStorage
+    try {
+      if (authToken) {
+        localStorage.setItem("directive-devtools-auth-token", authToken);
+      } else {
+        localStorage.removeItem("directive-devtools-auth-token");
+      }
+    } catch {
+      // Ignore storage errors
+    }
     conn.disconnect();
-    conn.connect(wsUrl);
-  }, [conn.disconnect, conn.connect, wsUrl]);
+    conn.connect(wsUrl, authToken || undefined);
+  }, [conn.disconnect, conn.connect, wsUrl, authToken]);
 
   // E9: Replay from event handler
   const handleReplayFromEvent = useCallback((eventId: number) => {
@@ -198,6 +215,29 @@ export function App() {
             >
               {conn.status === "connected" ? "↻" : "⚡"}
             </button>
+          </div>
+          <label htmlFor="auth-token-input" className="mb-1 mt-2 block text-xs text-zinc-500">Auth Token (optional)</label>
+          <div className="flex gap-1">
+            <input
+              id="auth-token-input"
+              type="password"
+              value={authToken}
+              onChange={(e) => setAuthToken(e.target.value)}
+              className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/50"
+              placeholder="Token for remote servers"
+            />
+            {authToken && (
+              <button
+                onClick={() => {
+                  setAuthToken("");
+                  try { localStorage.removeItem("directive-devtools-auth-token"); } catch { /* ignore */ }
+                }}
+                aria-label="Clear auth token"
+                className="rounded bg-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 

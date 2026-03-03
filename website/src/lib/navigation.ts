@@ -209,8 +209,8 @@ export const aiNavigation: NavigationSection[] = [
     links: [
       { title: 'Chat', href: '/ai/examples/chat' },
       { title: 'Research Pipeline', href: '/ai/examples/research-pipeline' },
-      { title: 'Safety Shield', href: '/docs/examples/guardrails' },
-      { title: 'Checkpoint', href: '/docs/examples/checkpoint' },
+      { title: 'Safety Shield', href: '/ai/examples/safety-shield' },
+      { title: 'Checkpoint', href: '/ai/examples/checkpoint' },
       { title: 'Fraud Analysis', href: '/ai/examples/fraud-analysis' },
       { title: 'Pitch Deck', href: '/ai/examples/pitch-deck' },
       { title: 'Data Pipeline', href: '/ai/examples/data-pipeline' },
