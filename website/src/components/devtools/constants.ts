@@ -13,9 +13,9 @@ export const FLUSH_INTERVAL_MS = 100
 
 // Timeline zoom bounds
 export const ZOOM_MIN = 1
-export const ZOOM_MAX = 20
-// Per-wheel-tick zoom factor (applied as deltaY * ZOOM_STEP * 0.01)
-export const ZOOM_STEP = 0.15
+export const ZOOM_MAX = 500
+// Gap (ms) between events that defines a new "cluster" (for Fit button)
+export const CLUSTER_GAP_MS = 10_000
 
 // Snapshot polling interval (ms) — shared by all polling views
 export const SNAPSHOT_POLL_INTERVAL = 3000

@@ -23,6 +23,7 @@ import {
   type RunResult,
   type NamedGuardrail,
   type InputGuardrailData,
+  type OutputGuardrailData,
 } from '@directive-run/ai'
 import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic'
 import { createOpenAIRunner, createOpenAIEmbedder } from '@directive-run/ai/openai'
@@ -282,6 +283,10 @@ export function getOrchestrator() {
     { name: 'pii-detection', fn: createEnhancedPIIGuardrail({ redact: true }) },
   ]
 
+  const outputGuardrails: NamedGuardrail<OutputGuardrailData>[] = [
+    { name: 'length', fn: createLengthGuardrail({ maxCharacters: MAX_RESPONSE_CHARS }) },
+  ]
+
   const orchestrator = createAgentOrchestrator({
     runner,
     maxTokenBudget: 2000,
@@ -290,9 +295,7 @@ export function getOrchestrator() {
     debug: true,
     guardrails: {
       input: inputGuardrails,
-      output: [
-        createLengthGuardrail({ maxCharacters: MAX_RESPONSE_CHARS }),
-      ],
+      output: outputGuardrails,
     },
     hooks: {
       onAgentComplete: ({ tokenUsage }) => {
@@ -322,29 +325,75 @@ export function getOrchestrator() {
       const tl = orchestrator.timeline
       const startTime = Date.now()
 
-      // Run input guardrails BEFORE agent_start so timeline shows correct order
+      // Run input guardrails BEFORE agent_start so timeline shows correct order.
+      // Sync guardrails enforce (block on fail, apply transforms).
+      // Async guardrails record timeline events when resolved.
+      let processedInput = input
+      let blocked: { guardrailName: string; reason?: string } | null = null
+
       for (const guardrail of inputGuardrails) {
         const gStart = Date.now()
         try {
           const res = guardrail.fn(
-            { input, agentName: docsAgent.name },
-            { agentName: docsAgent.name, input, facts: {} },
+            { input: processedInput, agentName: docsAgent.name },
+            { agentName: docsAgent.name, input: processedInput, facts: {} },
           )
-          if (res && typeof res === 'object' && 'passed' in res && tl) {
-            tl.record({
-              type: 'guardrail_check',
-              timestamp: gStart,
-              snapshotId: null,
-              guardrailName: guardrail.name,
-              guardrailType: 'input',
-              passed: res.passed,
-              reason: res.reason,
-              durationMs: Date.now() - gStart,
+
+          const recordCheck = (result: { passed: boolean; reason?: string; transformed?: unknown }) => {
+            if (tl) {
+              tl.record({
+                type: 'guardrail_check',
+                timestamp: gStart,
+                snapshotId: null,
+                guardrailName: guardrail.name,
+                guardrailType: 'input',
+                passed: result.passed,
+                reason: result.reason,
+                durationMs: Date.now() - gStart,
+              })
+            }
+          }
+
+          if (res instanceof Promise) {
+            res.then((result) => {
+              if (result && typeof result === 'object' && 'passed' in result) {
+                recordCheck(result)
+              }
+            }).catch(() => {
+              // Don't block streaming on async guardrail errors
             })
+          } else if (res && typeof res === 'object' && 'passed' in res) {
+            recordCheck(res)
+            if (!res.passed) {
+              blocked = { guardrailName: guardrail.name, reason: res.reason }
+              break
+            }
+            if ((res as { transformed?: unknown }).transformed !== undefined) {
+              processedInput = (res as { transformed: string }).transformed
+            }
           }
         } catch {
           // Don't block streaming on guardrail errors
         }
+      }
+
+      // If a sync guardrail blocked, return an error stream instead of calling the LLM
+      if (blocked) {
+        const errorMessage = 'Your message was flagged by our safety filter. Please rephrase your question.'
+        async function* errorStream() {
+          yield errorMessage
+        }
+        const errorResult = Promise.resolve({
+          output: errorMessage,
+          messages: [],
+          totalTokens: 0,
+          tokenUsage: { inputTokens: 0, outputTokens: 0 },
+        })
+
+        return Object.assign(errorStream(), {
+          result: errorResult,
+          abort() {},
+        })
       }
 
       // Record agent_start (after guardrails pass)
@@ -355,17 +404,17 @@ export function getOrchestrator() {
           snapshotId: null,
           agentId: docsAgent.name,
           modelId: 'claude-haiku-4-5',
-          inputLength: input.length,
+          inputLength: processedInput.length,
         })
       }
 
-      const { stream, result: rawResult, abort } = streamRunner(docsAgent, input, {
+      const { stream, result: rawResult, abort } = streamRunner(docsAgent, processedInput, {
         signal: opts?.signal,
       })
 
       // Wrap result to record agent_complete when stream finishes
       const result = rawResult.then(
-        (res) => {
+        async (res) => {
           const tokens = res.totalTokens ?? 0
           if (tl) {
             tl.record({
@@ -380,6 +429,43 @@ export function getOrchestrator() {
               durationMs: Date.now() - startTime,
               outputLength: typeof res.output === 'string' ? res.output.length : 0,
             })
+          }
+
+          // Run output guardrails after stream completes
+          for (const guardrail of outputGuardrails) {
+            const gStart = Date.now()
+            try {
+              const guardRes = guardrail.fn(
+                { output: res.output, agentName: docsAgent.name, input: processedInput, messages: res.messages ?? [] },
+                { agentName: docsAgent.name, input: processedInput, facts: {} },
+              )
+
+              const recordOutputCheck = (result: { passed: boolean; reason?: string }) => {
+                if (tl) {
+                  tl.record({
+                    type: 'guardrail_check',
+                    timestamp: gStart,
+                    snapshotId: null,
+                    guardrailName: guardrail.name,
+                    guardrailType: 'output',
+                    passed: result.passed,
+                    reason: result.reason,
+                    durationMs: Date.now() - gStart,
+                  })
+                }
+              }
+
+              if (guardRes instanceof Promise) {
+                const result = await guardRes
+                if (result && typeof result === 'object' && 'passed' in result) {
+                  recordOutputCheck(result)
+                }
+              } else if (guardRes && typeof guardRes === 'object' && 'passed' in guardRes) {
+                recordOutputCheck(guardRes)
+              }
+            } catch {
+              // Don't break streaming result on output guardrail errors
+            }
           }
 
           // Update chatbot system (streamable bypasses orchestrator.run())
