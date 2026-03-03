@@ -1,4 +1,3 @@
-import { STORAGE_KEYS } from "@/lib/storage-keys";
 // @ts-nocheck
 /**
  * Notification Banner Directive Module
@@ -7,6 +6,7 @@ import { STORAGE_KEYS } from "@/lib/storage-keys";
  * Notification definitions live in config.ts – only dismissal tracking
  * is reactive state.
  */
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 import { createModule, t } from "@directive-run/core";
 import { NOTIFICATION_DEFS, type NotificationDef } from "./config";
 

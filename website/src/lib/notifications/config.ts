@@ -1,4 +1,3 @@
-import { STORAGE_KEYS, safeGetItem } from "@/lib/storage-keys";
 // @ts-nocheck
 /**
  * Notification Definitions & System Singleton
@@ -6,6 +5,7 @@ import { STORAGE_KEYS, safeGetItem } from "@/lib/storage-keys";
  * Add or remove notifications by editing NOTIFICATION_DEFS.
  * Each entry is a static definition – only dismissal state is reactive.
  */
+import { STORAGE_KEYS, safeGetItem } from "@/lib/storage-keys";
 import { createSystem } from "@directive-run/core";
 import { notifications } from "./module";
 
