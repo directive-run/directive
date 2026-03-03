@@ -238,13 +238,9 @@ Provide a structured report with scores out of 100 for each category and a final
   }
 
   // -------------------------------------------------------------------------
-  // Add user message to memory
-  // -------------------------------------------------------------------------
-
-  memory.addMessage({ role: 'user', content: message })
-
-  // -------------------------------------------------------------------------
   // Run pipeline → stream result as SSE
+  // (User + assistant messages are added to memory by the orchestrator
+  //  via effectiveMemory.addMessages(result.messages) in runSingleAgent)
   // -------------------------------------------------------------------------
 
   const encoder = new TextEncoder()
@@ -262,8 +258,6 @@ Provide a structured report with scores out of 100 for each category and a final
         const result = await orchestrator.runPattern<string>('codeReview', message)
         send({ type: 'text', text: result })
         send({ type: 'done' })
-
-        memory.addMessage({ role: 'assistant', content: result })
       } catch (err) {
         send({
           type: 'error',

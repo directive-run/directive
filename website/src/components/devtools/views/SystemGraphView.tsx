@@ -1357,130 +1357,128 @@ export function SystemGraphView() {
             </Panel>
           )}
 
-          {/* Run pager (M1: a11y) */}
+          {/* Run pager + playback controls (stacked in single panel) */}
           {runHistoryEnabled && (hasRunHistory || !isLive) && (
             <Panel position="top-right" className="!m-2">
               <nav aria-label="Run history navigation">
-                <div className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
-                  <button
-                    aria-label="First run"
-                    onClick={() => {
-                      if (activeRunHistory.length > 0) {
-                        setSelectedRunId(activeRunHistory[0].id)
-                      }
-                    }}
-                    disabled={!isLive && selectedRunIndex === 0}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    First
-                  </button>
-                  <button
-                    aria-label="Previous run"
-                    onClick={() => {
-                      if (isLive && activeRunHistory.length > 0) {
-                        setSelectedRunId(activeRunHistory[activeRunHistory.length - 1].id)
-                      } else if (selectedRunIndex > 0) {
-                        setSelectedRunId(activeRunHistory[selectedRunIndex - 1].id)
-                      }
-                    }}
-                    disabled={!isLive && selectedRunIndex === 0}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    Prev
-                  </button>
-                  <span className="px-1 text-[10px] font-medium text-zinc-300">
-                    {isLive ? (
-                      <>
-                        Live
-                        <span className="ml-1 text-emerald-400">●</span>
-                      </>
-                    ) : (
-                      <>
-                        Run {selectedRunIndex + 1} / {activeRunHistory.length}
-                        {currentRunEntry?.status === 'pending' && (
-                          <span className="ml-1 text-amber-400">◉</span>
-                        )}
-                        {currentRunEntry?.anomalies && currentRunEntry.anomalies.length > 0 && (
-                          <span className="ml-1 text-red-400" title={currentRunEntry.anomalies.join(', ')}>!</span>
-                        )}
-                      </>
-                    )}
-                  </span>
-                  <button
-                    aria-label="Next run"
-                    onClick={() => {
-                      if (!isLive && selectedRunIndex < activeRunHistory.length - 1) {
-                        setSelectedRunId(activeRunHistory[selectedRunIndex + 1].id)
-                      } else {
-                        setSelectedRunId(null)
-                      }
-                    }}
-                    disabled={isLive}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    Next
-                  </button>
-                  {!isLive && (
+                <div className="flex flex-col gap-1 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+                  {/* Row 1: Run pager */}
+                  <div className="flex items-center gap-1.5">
                     <button
-                      aria-label="Return to live view"
-                      onClick={() => setSelectedRunId(null)}
-                      className="rounded px-1.5 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-zinc-800"
-                    >
-                      Live
-                    </button>
-                  )}
-                  {/* Export/Import buttons (Part 7) */}
-                  <span className="mx-0.5 h-3 w-px bg-zinc-700" />
-                  <button
-                    aria-label="Export run history"
-                    onClick={handleExport}
-                    disabled={activeRunHistory.length === 0}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                    title="Export run history as JSON"
-                  >
-                    Export
-                  </button>
-                  <button
-                    aria-label="Import run history"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                    title="Import run history from JSON"
-                  >
-                    Import
-                  </button>
-                  {importedRuns && (
-                    <button
-                      aria-label="Clear imported data"
+                      aria-label="First run"
                       onClick={() => {
-                        setImportedRuns(null)
-                        setSelectedRunId(null)
+                        if (activeRunHistory.length > 0) {
+                          setSelectedRunId(activeRunHistory[0].id)
+                        }
                       }}
-                      className="rounded px-1.5 py-0.5 text-[10px] text-red-400 transition-colors hover:bg-zinc-800"
+                      disabled={!isLive && selectedRunIndex === 0}
+                      className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
                     >
-                      Clear
+                      First
                     </button>
+                    <button
+                      aria-label="Previous run"
+                      onClick={() => {
+                        if (isLive && activeRunHistory.length > 0) {
+                          setSelectedRunId(activeRunHistory[activeRunHistory.length - 1].id)
+                        } else if (selectedRunIndex > 0) {
+                          setSelectedRunId(activeRunHistory[selectedRunIndex - 1].id)
+                        }
+                      }}
+                      disabled={!isLive && selectedRunIndex === 0}
+                      className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      Prev
+                    </button>
+                    <span className="px-1 text-[10px] font-medium text-zinc-300">
+                      {isLive ? (
+                        <>
+                          Live
+                          <span className="ml-1 text-emerald-400">●</span>
+                        </>
+                      ) : (
+                        <>
+                          Run {selectedRunIndex + 1} / {activeRunHistory.length}
+                          {currentRunEntry?.status === 'pending' && (
+                            <span className="ml-1 text-amber-400">◉</span>
+                          )}
+                          {currentRunEntry?.anomalies && currentRunEntry.anomalies.length > 0 && (
+                            <span className="ml-1 text-red-400" title={currentRunEntry.anomalies.join(', ')}>!</span>
+                          )}
+                        </>
+                      )}
+                    </span>
+                    <button
+                      aria-label="Next run"
+                      onClick={() => {
+                        if (!isLive && selectedRunIndex < activeRunHistory.length - 1) {
+                          setSelectedRunId(activeRunHistory[selectedRunIndex + 1].id)
+                        } else {
+                          setSelectedRunId(null)
+                        }
+                      }}
+                      disabled={isLive}
+                      className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      Next
+                    </button>
+                    {!isLive && (
+                      <button
+                        aria-label="Return to live view"
+                        onClick={() => setSelectedRunId(null)}
+                        className="rounded px-1.5 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-zinc-800"
+                      >
+                        Live
+                      </button>
+                    )}
+                    {/* Export/Import buttons (Part 7) */}
+                    <span className="mx-0.5 h-3 w-px bg-zinc-700" />
+                    <button
+                      aria-label="Export run history"
+                      onClick={handleExport}
+                      disabled={activeRunHistory.length === 0}
+                      className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                      title="Export run history as JSON"
+                    >
+                      Export
+                    </button>
+                    <button
+                      aria-label="Import run history"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                      title="Import run history from JSON"
+                    >
+                      Import
+                    </button>
+                    {importedRuns && (
+                      <button
+                        aria-label="Clear imported data"
+                        onClick={() => {
+                          setImportedRuns(null)
+                          setSelectedRunId(null)
+                        }}
+                        className="rounded px-1.5 py-0.5 text-[10px] text-red-400 transition-colors hover:bg-zinc-800"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleImport}
+                    />
+                  </div>
+                  {/* Row 2+3: Playback controls (when run selected) */}
+                  {currentRunEntry && (
+                    <PlaybackControls
+                      playback={playback}
+                      stepLabel={playback.step !== null ? STAGE_ORDER[playback.step] ?? null : null}
+                    />
                   )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={handleImport}
-                  />
                 </div>
               </nav>
-            </Panel>
-          )}
-
-          {/* Playback controls */}
-          {currentRunEntry && (
-            <Panel position="top-center" className="!m-2">
-              <div className="flex flex-col gap-1 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
-                <PlaybackControls
-                  playback={playback}
-                  stepLabel={playback.step !== null ? STAGE_ORDER[playback.step] ?? null : null}
-                />
-              </div>
             </Panel>
           )}
 
