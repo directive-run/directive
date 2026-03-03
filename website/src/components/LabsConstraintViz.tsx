@@ -1,136 +1,137 @@
-'use client'
+"use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import clsx from 'clsx'
 import {
-  PencilSimple,
   ArrowsClockwise,
-  Funnel,
-  PaperPlaneTilt,
-  Lightning,
   CheckCircle,
   Clock,
-} from '@phosphor-icons/react'
+  Funnel,
+  Lightning,
+  PaperPlaneTilt,
+  PencilSimple,
+} from "@phosphor-icons/react";
+import clsx from "clsx";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
-import type { ExperimentChangeEvent } from '@/components/LabsExperimentPanel'
+import type { ExperimentChangeEvent } from "@/components/LabsExperimentPanel";
 
 interface Step {
-  id: string
-  label: string
-  idleDetail: string
-  activeDetail?: (event: ExperimentChangeEvent) => string
-  icon: React.ElementType
-  iconBg: string
-  iconBgDone: string
+  id: string;
+  label: string;
+  idleDetail: string;
+  activeDetail?: (event: ExperimentChangeEvent) => string;
+  icon: React.ElementType;
+  iconBg: string;
+  iconBgDone: string;
 }
 
 const STEPS: Step[] = [
   {
-    id: 'fact',
-    label: 'Fact mutated',
-    idleDetail: 'A value in the store changes',
+    id: "fact",
+    label: "Fact mutated",
+    idleDetail: "A value in the store changes",
     activeDetail: (e) => `assignments["${e.experimentId}"] = "${e.toVariant}"`,
     icon: PencilSimple,
-    iconBg: 'bg-brand-primary',
-    iconBgDone: 'bg-brand-primary',
+    iconBg: "bg-brand-primary",
+    iconBgDone: "bg-brand-primary",
   },
   {
-    id: 'derivation',
-    label: 'Derivation invalidated',
-    idleDetail: 'Computed values that depend on it recompute',
+    id: "derivation",
+    label: "Derivation invalidated",
+    idleDetail: "Computed values that depend on it recompute",
     icon: ArrowsClockwise,
-    iconBg: 'bg-sky-500',
-    iconBgDone: 'bg-sky-500',
+    iconBg: "bg-sky-500",
+    iconBgDone: "bg-sky-500",
   },
   {
-    id: 'constraint',
-    label: 'Constraint evaluates',
-    idleDetail: 'Rules check if any action is needed',
+    id: "constraint",
+    label: "Constraint evaluates",
+    idleDetail: "Rules check if any action is needed",
     activeDetail: (e) => `needsExposure("${e.experimentId}") → true`,
     icon: Funnel,
-    iconBg: 'bg-amber-500',
-    iconBgDone: 'bg-amber-500',
+    iconBg: "bg-amber-500",
+    iconBgDone: "bg-amber-500",
   },
   {
-    id: 'requirement',
-    label: 'Requirement emitted',
-    idleDetail: 'A needed action is identified and queued',
-    activeDetail: (e) => `TRACK_EXPOSURE { "${e.experimentId}", "${e.toVariant}" }`,
+    id: "requirement",
+    label: "Requirement emitted",
+    idleDetail: "A needed action is identified and queued",
+    activeDetail: (e) =>
+      `TRACK_EXPOSURE { "${e.experimentId}", "${e.toVariant}" }`,
     icon: PaperPlaneTilt,
-    iconBg: 'bg-violet-500',
-    iconBgDone: 'bg-violet-500',
+    iconBg: "bg-violet-500",
+    iconBgDone: "bg-violet-500",
   },
   {
-    id: 'resolver',
-    label: 'Resolver executes',
-    idleDetail: 'The matching handler fulfills the requirement',
+    id: "resolver",
+    label: "Resolver executes",
+    idleDetail: "The matching handler fulfills the requirement",
     activeDetail: (e) => `trackExposure("${e.experimentId}", "${e.toVariant}")`,
     icon: Lightning,
-    iconBg: 'bg-emerald-500',
-    iconBgDone: 'bg-emerald-500',
+    iconBg: "bg-emerald-500",
+    iconBgDone: "bg-emerald-500",
   },
   {
-    id: 'settled',
-    label: 'Facts updated',
-    idleDetail: 'Results written back to the store',
+    id: "settled",
+    label: "Facts updated",
+    idleDetail: "Results written back to the store",
     activeDetail: (e) => `exposures["${e.experimentId}"] = ${e.timestamp}`,
     icon: CheckCircle,
-    iconBg: 'bg-brand-primary',
-    iconBgDone: 'bg-brand-primary',
+    iconBg: "bg-brand-primary",
+    iconBgDone: "bg-brand-primary",
   },
-]
+];
 
 /** Delay between steps in ms (slowed for visualization). */
-const STEP_DELAY = 600
+const STEP_DELAY = 600;
 
 interface LabsConstraintVizProps {
-  lastEvent: ExperimentChangeEvent | null
+  lastEvent: ExperimentChangeEvent | null;
 }
 
 export const LabsConstraintViz = memo(function LabsConstraintViz({
   lastEvent,
 }: LabsConstraintVizProps) {
-  const [activeStep, setActiveStep] = useState(-1)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevEventRef = useRef<ExperimentChangeEvent | null>(null)
+  const [activeStep, setActiveStep] = useState(-1);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevEventRef = useRef<ExperimentChangeEvent | null>(null);
 
   const animate = useCallback(() => {
-    setIsAnimating(true)
-    let step = 0
+    setIsAnimating(true);
+    let step = 0;
 
     function next() {
-      setActiveStep(step)
-      step++
+      setActiveStep(step);
+      step++;
       if (step <= STEPS.length) {
-        timeoutRef.current = setTimeout(next, STEP_DELAY)
+        timeoutRef.current = setTimeout(next, STEP_DELAY);
       } else {
         timeoutRef.current = setTimeout(() => {
-          setIsAnimating(false)
-        }, 800)
+          setIsAnimating(false);
+        }, 800);
       }
     }
 
-    next()
-  }, [])
+    next();
+  }, []);
 
   useEffect(() => {
     if (lastEvent && lastEvent !== prevEventRef.current) {
-      prevEventRef.current = lastEvent
+      prevEventRef.current = lastEvent;
       if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
+        clearTimeout(timeoutRef.current);
       }
-      animate()
+      animate();
     }
-  }, [lastEvent, animate])
+  }, [lastEvent, animate]);
 
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
+        clearTimeout(timeoutRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -147,7 +148,8 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
       <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">
         <Clock weight="bold" className="h-3.5 w-3.5 shrink-0 text-slate-400" />
         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-          Slowed to {STEP_DELAY}ms per step for visualization. In production this cycle completes synchronously in &lt;1ms.
+          Slowed to {STEP_DELAY}ms per step for visualization. In production
+          this cycle completes synchronously in &lt;1ms.
         </p>
       </div>
 
@@ -155,10 +157,10 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
       <div className="flow-root">
         <ul role="list" className="-mb-8">
           {STEPS.map((step, i) => {
-            const isActive = activeStep === i
-            const isDone = activeStep > i
-            const isReached = activeStep >= i
-            const Icon = step.icon
+            const isActive = activeStep === i;
+            const isDone = activeStep > i;
+            const isReached = activeStep >= i;
+            const Icon = step.icon;
 
             return (
               <li key={step.id}>
@@ -168,10 +170,10 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
                     <span
                       aria-hidden="true"
                       className={clsx(
-                        'absolute top-4 left-4 -ml-px h-full w-0.5 transition-colors duration-300',
+                        "absolute top-4 left-4 -ml-px h-full w-0.5 transition-colors duration-300",
                         isDone
-                          ? 'bg-slate-300 dark:bg-slate-600'
-                          : 'bg-slate-200 dark:bg-slate-700/50',
+                          ? "bg-slate-300 dark:bg-slate-600"
+                          : "bg-slate-200 dark:bg-slate-700/50",
                       )}
                     />
                   )}
@@ -181,21 +183,21 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
                     <div>
                       <span
                         className={clsx(
-                          'flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white transition-all duration-300 dark:ring-slate-800',
+                          "flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white transition-all duration-300 dark:ring-slate-800",
                           isReached
                             ? step.iconBg
-                            : 'bg-slate-200 dark:bg-slate-700',
-                          isActive && 'scale-110 shadow-lg',
+                            : "bg-slate-200 dark:bg-slate-700",
+                          isActive && "scale-110 shadow-lg",
                         )}
                       >
                         <Icon
                           weight="bold"
                           aria-hidden="true"
                           className={clsx(
-                            'h-4 w-4 transition-colors duration-300',
+                            "h-4 w-4 transition-colors duration-300",
                             isReached
-                              ? 'text-white'
-                              : 'text-slate-400 dark:text-slate-500',
+                              ? "text-white"
+                              : "text-slate-400 dark:text-slate-500",
                           )}
                         />
                       </span>
@@ -206,10 +208,10 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
                       <div className="min-w-0">
                         <p
                           className={clsx(
-                            'flex items-center text-sm font-medium transition-colors duration-300',
+                            "flex items-center text-sm font-medium transition-colors duration-300",
                             isReached
-                              ? 'text-slate-900 dark:text-white'
-                              : 'text-slate-400 dark:text-slate-500',
+                              ? "text-slate-900 dark:text-white"
+                              : "text-slate-400 dark:text-slate-500",
                           )}
                         >
                           {step.label}
@@ -219,10 +221,10 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
                         </p>
                         <p
                           className={clsx(
-                            'mt-0.5 truncate font-mono text-xs transition-colors duration-300',
+                            "mt-0.5 truncate font-mono text-xs transition-colors duration-300",
                             isReached
-                              ? 'text-slate-500 dark:text-slate-400'
-                              : 'text-slate-300 dark:text-slate-600',
+                              ? "text-slate-500 dark:text-slate-400"
+                              : "text-slate-300 dark:text-slate-600",
                           )}
                         >
                           {lastEvent && isReached && step.activeDetail
@@ -234,7 +236,7 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
                   </div>
                 </div>
               </li>
-            )
+            );
           })}
         </ul>
       </div>
@@ -253,7 +255,10 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
           </div>
         ) : activeStep >= STEPS.length - 1 ? (
           <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/30">
-            <CheckCircle weight="fill" className="h-5 w-5 shrink-0 text-emerald-500" />
+            <CheckCircle
+              weight="fill"
+              className="h-5 w-5 shrink-0 text-emerald-500"
+            />
             <span className="min-w-0 truncate text-sm font-semibold text-emerald-700 dark:text-emerald-300">
               Settled
             </span>
@@ -270,5 +275,5 @@ export const LabsConstraintViz = memo(function LabsConstraintViz({
         )}
       </div>
     </div>
-  )
-})
+  );
+});

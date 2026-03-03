@@ -155,11 +155,7 @@ export function SearchBar({ events, onResults }: SearchBarProps) {
             {matchCount} match{matchCount !== 1 ? "es" : ""}
           </span>
         )}
-        {isInvalidRegex && (
-          <span className="text-red-400">
-            invalid regex
-          </span>
-        )}
+        {isInvalidRegex && <span className="text-red-400">invalid regex</span>}
       </span>
     </div>
   );

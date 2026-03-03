@@ -20,8 +20,15 @@
  * ```
  */
 
-import type { AgentLike, Message, RunResult, GuardrailFn, OutputGuardrailData, StreamingCallbackRunner } from "./types.js";
 import type { OrchestratorStreamChunk } from "./agent-orchestrator.js";
+import type {
+  AgentLike,
+  GuardrailFn,
+  Message,
+  OutputGuardrailData,
+  RunResult,
+  StreamingCallbackRunner,
+} from "./types.js";
 
 // ============================================================================
 // Constants
@@ -35,7 +42,6 @@ export const DEFAULT_GUARDRAIL_CHECK_INTERVAL = 50;
 
 /** Default toxicity threshold for toxicity streaming guardrail */
 export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
-
 
 // ============================================================================
 // Stream Event Types
@@ -153,7 +159,7 @@ export interface StreamRunOptions {
 export type StreamRunner = <T = unknown>(
   agent: AgentLike,
   input: string,
-  options?: StreamRunOptions
+  options?: StreamRunOptions,
 ) => StreamingRunResult<T>;
 
 /** Result from a streaming run */
@@ -175,7 +181,10 @@ export interface StreamingGuardrail {
   /** Unique name for this guardrail */
   name: string;
   /** Check partial output (called every guardrailCheckInterval tokens) */
-  check: (partialOutput: string, tokenCount: number) => StreamingGuardrailResult | Promise<StreamingGuardrailResult>;
+  check: (
+    partialOutput: string,
+    tokenCount: number,
+  ) => StreamingGuardrailResult | Promise<StreamingGuardrailResult>;
   /** Whether to stop the stream on failure. @default true */
   stopOnFail?: boolean;
 }
@@ -204,7 +213,10 @@ class StreamBuffer<T> {
   private closed = false;
   private droppedCount = 0;
 
-  constructor(strategy: BackpressureStrategy = "buffer", maxSize = DEFAULT_BUFFER_SIZE) {
+  constructor(
+    strategy: BackpressureStrategy = "buffer",
+    maxSize = DEFAULT_BUFFER_SIZE,
+  ) {
     this.strategy = strategy;
     this.maxSize = maxSize;
   }
@@ -301,14 +313,14 @@ export function createStreamingRunner(
   baseRunner: StreamingCallbackRunner,
   options: {
     streamingGuardrails?: StreamingGuardrail[];
-  } = {}
+  } = {},
 ): StreamRunner {
   const { streamingGuardrails = [] } = options;
 
   return <T>(
     agent: AgentLike,
     input: string,
-    runOptions: StreamRunOptions = {}
+    runOptions: StreamRunOptions = {},
   ): StreamingRunResult<T> => {
     const {
       signal,
@@ -319,9 +331,12 @@ export function createStreamingRunner(
     } = runOptions;
 
     // Validate configuration
-    if (guardrailCheckInterval <= 0 || !Number.isFinite(guardrailCheckInterval)) {
+    if (
+      guardrailCheckInterval <= 0 ||
+      !Number.isFinite(guardrailCheckInterval)
+    ) {
       throw new Error(
-        `[Directive Streaming] guardrailCheckInterval must be a positive number, got ${guardrailCheckInterval}`
+        `[Directive Streaming] guardrailCheckInterval must be a positive number, got ${guardrailCheckInterval}`,
       );
     }
 
@@ -364,9 +379,10 @@ export function createStreamingRunner(
             await buffer.push(chunk);
 
             if (shouldStop) {
-              const stopFn = typeof stopOnGuardrail === "function"
-                ? stopOnGuardrail
-                : () => stopOnGuardrail;
+              const stopFn =
+                typeof stopOnGuardrail === "function"
+                  ? stopOnGuardrail
+                  : () => stopOnGuardrail;
               if (stopFn(chunk)) {
                 stopped = true;
                 abortController.abort();
@@ -385,7 +401,11 @@ export function createStreamingRunner(
 
     // Run the agent and pipe to buffer
     const resultPromise = (async (): Promise<RunResult<T>> => {
-      await buffer.push({ type: "progress", phase: "starting", message: "Starting agent" });
+      await buffer.push({
+        type: "progress",
+        phase: "starting",
+        message: "Starting agent",
+      });
 
       try {
         const result = await baseRunner(agent, input, {
@@ -408,12 +428,30 @@ export function createStreamingRunner(
             }
           },
           onToolStart: async (tool, id, args) => {
-            await buffer.push({ type: "progress", phase: "tool_calling", message: `Calling ${tool}` });
-            await buffer.push({ type: "tool_start", tool, toolCallId: id, arguments: args });
+            await buffer.push({
+              type: "progress",
+              phase: "tool_calling",
+              message: `Calling ${tool}`,
+            });
+            await buffer.push({
+              type: "tool_start",
+              tool,
+              toolCallId: id,
+              arguments: args,
+            });
           },
           onToolEnd: async (tool, id, result) => {
-            await buffer.push({ type: "tool_end", tool, toolCallId: id, result });
-            await buffer.push({ type: "progress", phase: "generating", message: "Continuing generation" });
+            await buffer.push({
+              type: "tool_end",
+              tool,
+              toolCallId: id,
+              result,
+            });
+            await buffer.push({
+              type: "progress",
+              phase: "generating",
+              message: "Continuing generation",
+            });
           },
           onMessage: async (message) => {
             await buffer.push({ type: "message", message });
@@ -495,7 +533,11 @@ export function createToxicityStreamingGuardrail(options: {
   /** Stop the stream on detection. @default true */
   stopOnFail?: boolean;
 }): StreamingGuardrail {
-  const { checkFn, threshold = DEFAULT_TOXICITY_THRESHOLD, stopOnFail = true } = options;
+  const {
+    checkFn,
+    threshold = DEFAULT_TOXICITY_THRESHOLD,
+    stopOnFail = true,
+  } = options;
 
   return {
     name: "toxicity-streaming",
@@ -618,7 +660,7 @@ export function createPatternStreamingGuardrail(options: {
  */
 export function combineStreamingGuardrails(
   guardrails: StreamingGuardrail[],
-  options: { name?: string; stopOnFirstFail?: boolean } = {}
+  options: { name?: string; stopOnFirstFail?: boolean } = {},
 ): StreamingGuardrail {
   const { name = "combined-streaming", stopOnFirstFail = true } = options;
 
@@ -631,7 +673,10 @@ export function combineStreamingGuardrails(
         const result = await guardrail.check(partialOutput, tokenCount);
         if (!result.passed) {
           if (stopOnFirstFail) {
-            return { ...result, reason: `[${guardrail.name}] ${result.reason}` };
+            return {
+              ...result,
+              reason: `[${guardrail.name}] ${result.reason}`,
+            };
           }
           failures.push(`[${guardrail.name}] ${result.reason ?? "failed"}`);
         }
@@ -668,7 +713,7 @@ export function adaptOutputGuardrail(
     /** Only run after this many tokens (optimization) */
     minTokens?: number;
     stopOnFail?: boolean;
-  } = {}
+  } = {},
 ): StreamingGuardrail {
   const { minTokens = 0, stopOnFail = true } = options;
 
@@ -691,7 +736,7 @@ export function adaptOutputGuardrail(
           agentName: "streaming",
           input: "",
           facts: {},
-        }
+        },
       );
 
       return {
@@ -716,7 +761,9 @@ export function adaptOutputGuardrail(
  * const fullOutput = await collectTokens(stream);
  * ```
  */
-export async function collectTokens(stream: AsyncIterable<StreamChunk>): Promise<string> {
+export async function collectTokens(
+  stream: AsyncIterable<StreamChunk>,
+): Promise<string> {
   let output = "";
   for await (const chunk of stream) {
     if (chunk.type === "token") {
@@ -739,7 +786,7 @@ export async function collectTokens(stream: AsyncIterable<StreamChunk>): Promise
  */
 export async function* tapStream(
   stream: AsyncIterable<StreamChunk>,
-  fn: (chunk: StreamChunk) => void | Promise<void>
+  fn: (chunk: StreamChunk) => void | Promise<void>,
 ): AsyncIterable<StreamChunk> {
   for await (const chunk of stream) {
     await fn(chunk);
@@ -757,7 +804,7 @@ export async function* tapStream(
  */
 export async function* filterStream<T extends StreamChunk["type"]>(
   stream: AsyncIterable<StreamChunk>,
-  types: T[]
+  types: T[],
 ): AsyncIterable<Extract<StreamChunk, { type: T }>> {
   const typeSet = new Set(types);
   for await (const chunk of stream) {
@@ -780,7 +827,7 @@ export async function* filterStream<T extends StreamChunk["type"]>(
  */
 export async function* mapStream<R>(
   stream: AsyncIterable<StreamChunk>,
-  fn: (chunk: StreamChunk) => R | Promise<R>
+  fn: (chunk: StreamChunk) => R | Promise<R>,
 ): AsyncIterable<R> {
   for await (const chunk of stream) {
     yield await fn(chunk);
@@ -850,11 +897,18 @@ export function mergeTaggedStreams(
   if (sources.length === 0) {
     const emptyStream: AsyncIterable<MultiplexedStreamChunk> = {
       [Symbol.asyncIterator]() {
-        const done = { done: true as const, value: undefined as unknown as MultiplexedStreamChunk };
+        const done = {
+          done: true as const,
+          value: undefined as unknown as MultiplexedStreamChunk,
+        };
 
         return {
-          async next() { return done; },
-          async return() { return done; },
+          async next() {
+            return done;
+          },
+          async return() {
+            return done;
+          },
         };
       },
     };
@@ -932,15 +986,17 @@ export function mergeTaggedStreams(
             return { done: true, value: undefined };
           }
 
-          return new Promise<IteratorResult<MultiplexedStreamChunk>>((resolve) => {
-            waiters.push((item) => {
-              if (item === null) {
-                resolve({ done: true, value: undefined });
-              } else {
-                resolve({ done: false, value: item });
-              }
-            });
-          });
+          return new Promise<IteratorResult<MultiplexedStreamChunk>>(
+            (resolve) => {
+              waiters.push((item) => {
+                if (item === null) {
+                  resolve({ done: true, value: undefined });
+                } else {
+                  resolve({ done: false, value: item });
+                }
+              });
+            },
+          );
         },
 
         return(): Promise<IteratorResult<MultiplexedStreamChunk>> {

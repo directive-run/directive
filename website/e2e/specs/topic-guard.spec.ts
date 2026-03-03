@@ -1,24 +1,34 @@
-import { test, expect } from "@playwright/test";
-import { gotoExample, tid } from "../helpers/example-test.js";
+import { expect, test } from "@playwright/test";
+import { tid } from "../helpers/example-test.js";
 
 /**
  * Helper: type text into the input and wait for the send button to enable.
  * Uses page.evaluate to directly set value and fire input event in page context.
  */
-async function typeMessage(page: import("@playwright/test").Page, text: string) {
+async function typeMessage(
+  page: import("@playwright/test").Page,
+  text: string,
+) {
   await page.evaluate((t) => {
-    const input = document.querySelector('[data-testid="topic-guard-input"]') as HTMLInputElement;
+    const input = document.querySelector(
+      '[data-testid="topic-guard-input"]',
+    ) as HTMLInputElement;
     input.value = t;
     input.dispatchEvent(new Event("input", { bubbles: true }));
   }, text);
-  await expect(tid(page, "topic-guard-send-btn")).toBeEnabled({ timeout: 5000 });
+  await expect(tid(page, "topic-guard-send-btn")).toBeEnabled({
+    timeout: 5000,
+  });
 }
 
 test.describe("Topic Guard example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/topic-guard");
     // Dev server may need extra time when parallel workers compile simultaneously
-    await page.waitForSelector("directive-topic-guard", { state: "attached", timeout: 30_000 });
+    await page.waitForSelector("directive-topic-guard", {
+      state: "attached",
+      timeout: 30_000,
+    });
     // Wait for the module script to fully initialize
     await page.waitForSelector("[data-topic-guard-ready]", { timeout: 15_000 });
   });
@@ -82,7 +92,9 @@ test.describe("Topic Guard example", () => {
     await tid(page, "topic-guard-send-btn").click();
 
     // Wait for message to appear
-    await expect(page.locator("[data-testid^='topic-guard-message-']").first()).toBeVisible();
+    await expect(
+      page.locator("[data-testid^='topic-guard-message-']").first(),
+    ).toBeVisible();
 
     await tid(page, "topic-guard-clear-btn").click();
 
@@ -91,7 +103,9 @@ test.describe("Topic Guard example", () => {
   });
 
   test("example chips fill input", async ({ page }) => {
-    const chip = page.locator("[data-testid^='topic-guard-example-chip-']").first();
+    const chip = page
+      .locator("[data-testid^='topic-guard-example-chip-']")
+      .first();
     await chip.click();
     const inputVal = await tid(page, "topic-guard-input").inputValue();
     expect(inputVal.length).toBeGreaterThan(0);

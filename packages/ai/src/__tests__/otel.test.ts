@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  createOtelPlugin,
-  OtelStatusCode,
-  type OtelPlugin,
-  type SpanData,
-} from "../otel.js";
+import { describe, expect, it, vi } from "vitest";
 import { createDebugTimeline } from "../debug-timeline.js";
 import type { DebugTimeline } from "../debug-timeline.js";
+import {
+  type OtelPlugin,
+  OtelStatusCode,
+  type SpanData,
+  createOtelPlugin,
+} from "../otel.js";
 
 // ============================================================================
 // Test helpers
@@ -92,7 +92,9 @@ describe("createOtelPlugin", () => {
     expect(spans).toHaveLength(1);
     expect(spans[0]!.status.code).toBe(OtelStatusCode.ERROR);
     expect(spans[0]!.status.message).toBe("Network timeout");
-    expect(spans[0]!.attributes["directive.agent.error"]).toBe("Network timeout");
+    expect(spans[0]!.attributes["directive.agent.error"]).toBe(
+      "Network timeout",
+    );
   });
 
   it("records guardrail spans", () => {
@@ -133,7 +135,9 @@ describe("createOtelPlugin", () => {
     const spans = otel.getSpans();
 
     expect(spans[0]!.status.code).toBe(OtelStatusCode.ERROR);
-    expect(spans[0]!.attributes["directive.guardrail.reason"]).toBe("PII detected");
+    expect(spans[0]!.attributes["directive.guardrail.reason"]).toBe(
+      "PII detected",
+    );
   });
 
   it("records resolver spans", () => {
@@ -186,7 +190,9 @@ describe("createOtelPlugin", () => {
 
     expect(spans).toHaveLength(1);
     expect(spans[0]!.status.code).toBe(OtelStatusCode.ERROR);
-    expect(spans[0]!.attributes["directive.resolver.error"]).toBe("Resolution failed");
+    expect(spans[0]!.attributes["directive.resolver.error"]).toBe(
+      "Resolution failed",
+    );
   });
 
   it("records pattern spans", () => {
@@ -292,9 +298,11 @@ describe("createOtelPlugin", () => {
     recordAgentRun(timeline, "agent");
 
     expect(onSpanEnd).toHaveBeenCalledTimes(1);
-    expect(onSpanEnd).toHaveBeenCalledWith(expect.objectContaining({
-      name: "directive.ai.agent.run",
-    }));
+    expect(onSpanEnd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "directive.ai.agent.run",
+      }),
+    );
   });
 
   it("filters events via instrumentEvents", () => {
@@ -354,9 +362,14 @@ describe("createOtelPlugin", () => {
 
     recordAgentRun(timeline, "agent");
 
-    expect(mockTracer.startSpan).toHaveBeenCalledWith("directive.ai.agent.run", expect.any(Object));
+    expect(mockTracer.startSpan).toHaveBeenCalledWith(
+      "directive.ai.agent.run",
+      expect.any(Object),
+    );
     expect(mockSpan.setAttribute).toHaveBeenCalled();
-    expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: OtelStatusCode.OK });
+    expect(mockSpan.setStatus).toHaveBeenCalledWith({
+      code: OtelStatusCode.OK,
+    });
     expect(mockSpan.end).toHaveBeenCalled();
 
     // External tracer — getSpans returns empty (no built-in collector)
@@ -676,7 +689,11 @@ describe("createOtelPlugin", () => {
     };
 
     const timeline = createDebugTimeline({ maxEvents: 500 });
-    const otel = createOtelPlugin({ serviceName: "test", tracer: mockTracer, onSpanEnd });
+    const otel = createOtelPlugin({
+      serviceName: "test",
+      tracer: mockTracer,
+      onSpanEnd,
+    });
     otel.attach(timeline);
 
     recordAgentRun(timeline, "agent");
@@ -744,8 +761,12 @@ describe("createOtelPlugin", () => {
     expect(spans).toHaveLength(3);
 
     const agentSpan = spans.find((s) => s.name.includes("agent"))!;
-    const innerSpan = spans.find((s) => s.attributes["directive.pattern.id"] === "inner")!;
-    const outerSpan = spans.find((s) => s.attributes["directive.pattern.id"] === "outer")!;
+    const innerSpan = spans.find(
+      (s) => s.attributes["directive.pattern.id"] === "inner",
+    )!;
+    const outerSpan = spans.find(
+      (s) => s.attributes["directive.pattern.id"] === "outer",
+    )!;
 
     // Agent's parent should be the inner (most recent) pattern
     expect(agentSpan.parentSpanId).toBe(innerSpan.spanId);
@@ -772,7 +793,11 @@ describe("createOtelPlugin", () => {
     };
 
     const timeline = createDebugTimeline({ maxEvents: 500 });
-    const otel = createOtelPlugin({ serviceName: "test", tracer: mockTracer, onSpanEnd });
+    const otel = createOtelPlugin({
+      serviceName: "test",
+      tracer: mockTracer,
+      onSpanEnd,
+    });
     otel.attach(timeline);
 
     recordAgentRun(timeline, "agent", { error: "something broke" });

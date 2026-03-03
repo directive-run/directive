@@ -1,26 +1,26 @@
-'use client'
+"use client";
 
-import { Component } from 'react'
-import type { ErrorInfo, ReactNode } from 'react'
+import { Component } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 
 interface Props {
-  children: ReactNode
+  children: ReactNode;
 }
 
 interface State {
-  hasError: boolean
-  error: Error | null
+  hasError: boolean;
+  error: Error | null;
 }
 
 export class DevToolsErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null }
+  state: State = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[DevTools] Render error:', error, info.componentStack)
+    console.error("[DevTools] Render error:", error, info.componentStack);
   }
 
   render() {
@@ -32,7 +32,7 @@ export class DevToolsErrorBoundary extends Component<Props, State> {
             DevTools encountered an error
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            {this.state.error?.message ?? 'Unknown error'}
+            {this.state.error?.message ?? "Unknown error"}
           </p>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
@@ -41,9 +41,9 @@ export class DevToolsErrorBoundary extends Component<Props, State> {
             Reload DevTools
           </button>
         </div>
-      )
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }

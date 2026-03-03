@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * DevTools Console API E2E Tests
@@ -12,17 +12,28 @@ test.describe("DevTools Console API", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/shopping-cart");
     try {
-      await page.waitForSelector("directive-shopping-cart", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-shopping-cart", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-shopping-cart", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-shopping-cart", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-shopping-cart-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-shopping-cart-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("window.__DIRECTIVE__ is defined", async ({ page }) => {
     const exists = await page.evaluate(() => {
-      return typeof window.__DIRECTIVE__ === "object" && window.__DIRECTIVE__ !== null;
+      return (
+        typeof window.__DIRECTIVE__ === "object" &&
+        window.__DIRECTIVE__ !== null
+      );
     });
     expect(exists).toBe(true);
   });
@@ -45,7 +56,9 @@ test.describe("DevTools Console API", () => {
 
   test("inspect() returns facts and constraint data", async ({ page }) => {
     const inspection = await page.evaluate(() => {
-      const result = window.__DIRECTIVE__?.inspect() as Record<string, unknown> | undefined;
+      const result = window.__DIRECTIVE__?.inspect() as
+        | Record<string, unknown>
+        | undefined;
       if (!result) return null;
       return {
         hasUnmet: Array.isArray(result.unmet),
@@ -94,11 +107,17 @@ test.describe("DevTools Console API", () => {
     expect(result).toBe(0);
   });
 
-  test("explain() returns null for non-existent requirement", async ({ page }) => {
+  test("explain() returns null for non-existent requirement", async ({
+    page,
+  }) => {
     const result = await page.evaluate(() => {
       const val = window.__DIRECTIVE__?.explain("non-existent-id");
 
-      return val === null ? "NULL" : val === undefined ? "UNDEFINED" : String(val);
+      return val === null
+        ? "NULL"
+        : val === undefined
+          ? "UNDEFINED"
+          : String(val);
     });
     expect(result).toBe("NULL");
   });

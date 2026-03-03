@@ -81,7 +81,12 @@ export async function mockFetchUser(token: string): Promise<User> {
   const hash = token.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const names = ["Alice Johnson", "Bob Smith", "Carol White", "Dan Brown"];
   const roles = ["admin", "viewer", "editor", "moderator"];
-  const emails = ["alice@test.com", "bob@test.com", "carol@test.com", "dan@test.com"];
+  const emails = [
+    "alice@test.com",
+    "bob@test.com",
+    "carol@test.com",
+    "dan@test.com",
+  ];
 
   return {
     id: `user_${hash % 1000}`,

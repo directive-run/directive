@@ -1,17 +1,17 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import clsx from 'clsx'
+import clsx from "clsx";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { type Section, type Subsection } from '@/lib/sections'
+import type { Section, Subsection } from "@/lib/sections";
 
 function DesktopTableOfContents({
   tableOfContents,
   isActive,
 }: {
-  tableOfContents: Array<Section>
-  isActive: (section: Section | Subsection) => boolean
+  tableOfContents: Array<Section>;
+  isActive: (section: Section | Subsection) => boolean;
 }) {
   return (
     <div className="hidden xl:sticky xl:top-19 xl:-mr-6 xl:block xl:h-[calc(100vh-4.75rem)] xl:flex-none xl:overflow-y-auto xl:py-16 xl:pr-6">
@@ -32,8 +32,8 @@ function DesktopTableOfContents({
                       href={`#${section.id}`}
                       className={clsx(
                         isActive(section)
-                          ? 'text-brand-primary'
-                          : 'font-normal text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300',
+                          ? "text-brand-primary"
+                          : "font-normal text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300",
                       )}
                     >
                       {section.title}
@@ -50,8 +50,8 @@ function DesktopTableOfContents({
                             href={`#${subSection.id}`}
                             className={
                               isActive(subSection)
-                                ? 'text-brand-primary'
-                                : 'hover:text-slate-600 dark:hover:text-slate-300'
+                                ? "text-brand-primary"
+                                : "hover:text-slate-600 dark:hover:text-slate-300"
                             }
                           >
                             {subSection.title}
@@ -67,101 +67,111 @@ function DesktopTableOfContents({
         )}
       </nav>
     </div>
-  )
+  );
 }
 
 export function TableOfContents({
   tableOfContents,
 }: {
-  tableOfContents: Array<Section>
+  tableOfContents: Array<Section>;
 }) {
-  const [currentSection, setCurrentSection] = useState(tableOfContents[0]?.id)
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const headingElementsRef = useRef<Map<string, IntersectionObserverEntry>>(new Map())
+  const [currentSection, setCurrentSection] = useState(tableOfContents[0]?.id);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const headingElementsRef = useRef<Map<string, IntersectionObserverEntry>>(
+    new Map(),
+  );
 
   // Memoize heading IDs to avoid recalculating on every render
   const headingIds = useMemo(() => {
-    return tableOfContents.flatMap((node) => [node.id, ...node.children.map((child) => child.id)])
-  }, [tableOfContents])
+    return tableOfContents.flatMap((node) => [
+      node.id,
+      ...node.children.map((child) => child.id),
+    ]);
+  }, [tableOfContents]);
 
   useEffect(() => {
-    if (tableOfContents.length === 0) return
+    if (tableOfContents.length === 0) return;
 
     // Clean up previous observer and entries
-    headingElementsRef.current.clear()
+    headingElementsRef.current.clear();
     if (observerRef.current) {
-      observerRef.current.disconnect()
-      observerRef.current = null
+      observerRef.current.disconnect();
+      observerRef.current = null;
     }
 
     const callback: IntersectionObserverCallback = (entries) => {
       entries.forEach((entry) => {
-        headingElementsRef.current.set(entry.target.id, entry)
-      })
+        headingElementsRef.current.set(entry.target.id, entry);
+      });
 
       // Find the first visible heading or the last one that was scrolled past
-      const visibleHeadings: IntersectionObserverEntry[] = []
+      const visibleHeadings: IntersectionObserverEntry[] = [];
       headingElementsRef.current.forEach((entry) => {
         if (entry.isIntersecting) {
-          visibleHeadings.push(entry)
+          visibleHeadings.push(entry);
         }
-      })
+      });
 
       if (visibleHeadings.length > 0) {
         // Sort by position and use the topmost visible heading
         const sortedHeadings = visibleHeadings.sort(
-          (a, b) => a.boundingClientRect.top - b.boundingClientRect.top
-        )
-        setCurrentSection(sortedHeadings[0].target.id)
+          (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+        );
+        setCurrentSection(sortedHeadings[0].target.id);
       } else {
         // No headings visible, find the one closest above viewport
-        const allEntries = Array.from(headingElementsRef.current.values())
+        const allEntries = Array.from(headingElementsRef.current.values());
         const aboveViewport = allEntries.filter(
-          (entry) => entry.boundingClientRect.top < 0
-        )
+          (entry) => entry.boundingClientRect.top < 0,
+        );
         if (aboveViewport.length > 0) {
           const closest = aboveViewport.reduce((prev, curr) =>
-            prev.boundingClientRect.top > curr.boundingClientRect.top ? prev : curr
-          )
-          setCurrentSection(closest.target.id)
+            prev.boundingClientRect.top > curr.boundingClientRect.top
+              ? prev
+              : curr,
+          );
+          setCurrentSection(closest.target.id);
         }
       }
-    }
+    };
 
     const observer = new IntersectionObserver(callback, {
-      rootMargin: '-80px 0px -40% 0px',
+      rootMargin: "-80px 0px -40% 0px",
       threshold: [0, 1],
-    })
-    observerRef.current = observer
+    });
+    observerRef.current = observer;
 
     // Observe all heading elements
     headingIds.forEach((id) => {
-      const element = document.getElementById(id)
+      const element = document.getElementById(id);
       if (element) {
-        observer.observe(element)
+        observer.observe(element);
       }
-    })
+    });
 
     return () => {
-      observer.disconnect()
-      headingElementsRef.current.clear()
-    }
-  }, [headingIds, tableOfContents.length])
+      observer.disconnect();
+      headingElementsRef.current.clear();
+    };
+  }, [headingIds, tableOfContents.length]);
 
-  const isActive = useCallback((section: Section | Subsection) => {
-    if (section.id === currentSection) {
-      return true
-    }
-    if (!section.children) {
-      return false
-    }
-    return section.children.some((child) => child.id === currentSection)
-  }, [currentSection])
+  const isActive = useCallback(
+    (section: Section | Subsection) => {
+      if (section.id === currentSection) {
+        return true;
+      }
+      if (!section.children) {
+        return false;
+      }
+      return section.children.some((child) => child.id === currentSection);
+    },
+    [currentSection],
+  );
 
   return (
     <DesktopTableOfContents
       tableOfContents={tableOfContents}
       isActive={isActive}
     />
-  )
+  );
 }

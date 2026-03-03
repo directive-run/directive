@@ -6,9 +6,9 @@
  * streaming status — so DevTools can display System tabs (Facts, Derivations,
  * Pipeline) alongside AI tabs on the AI Chat page.
  */
-import { createModule, t } from '@directive-run/core'
+import { createModule, t } from "@directive-run/core";
 
-export const chatSession = createModule('chat-session', {
+export const chatSession = createModule("chat-session", {
   schema: {
     facts: {
       messageCount: t.number(),
@@ -45,53 +45,65 @@ export const chatSession = createModule('chat-session', {
   },
 
   init: (facts) => {
-    facts.messageCount = 0
-    facts.userMessages = 0
-    facts.assistantMessages = 0
-    facts.isStreaming = false
-    facts.totalCharsSent = 0
-    facts.totalCharsReceived = 0
-    facts.error = ''
-    facts.startedAt = Date.now()
-    facts.summary = ''
-    facts.warning = ''
+    facts.messageCount = 0;
+    facts.userMessages = 0;
+    facts.assistantMessages = 0;
+    facts.isStreaming = false;
+    facts.totalCharsSent = 0;
+    facts.totalCharsReceived = 0;
+    facts.error = "";
+    facts.startedAt = Date.now();
+    facts.summary = "";
+    facts.warning = "";
   },
 
   derive: {
     avgResponseLength: (facts) => {
       if (facts.assistantMessages === 0) {
-        return 0
+        return 0;
       }
 
-      return Math.round(facts.totalCharsReceived / facts.assistantMessages)
+      return Math.round(facts.totalCharsReceived / facts.assistantMessages);
     },
 
     isActive: (facts) => facts.messageCount > 0 || facts.isStreaming,
 
     responseRatio: (facts) => {
       if (facts.totalCharsSent === 0) {
-        return 0
+        return 0;
       }
 
-      return Math.round((facts.totalCharsReceived / facts.totalCharsSent) * 100) / 100
+      return (
+        Math.round((facts.totalCharsReceived / facts.totalCharsSent) * 100) /
+        100
+      );
     },
   },
 
   events: {
-    updateMessages: (facts, { messageCount, userMessages, assistantMessages, totalCharsSent, totalCharsReceived }) => {
-      facts.messageCount = messageCount
-      facts.userMessages = userMessages
-      facts.assistantMessages = assistantMessages
-      facts.totalCharsSent = totalCharsSent
-      facts.totalCharsReceived = totalCharsReceived
+    updateMessages: (
+      facts,
+      {
+        messageCount,
+        userMessages,
+        assistantMessages,
+        totalCharsSent,
+        totalCharsReceived,
+      },
+    ) => {
+      facts.messageCount = messageCount;
+      facts.userMessages = userMessages;
+      facts.assistantMessages = assistantMessages;
+      facts.totalCharsSent = totalCharsSent;
+      facts.totalCharsReceived = totalCharsReceived;
     },
 
     setStreaming: (facts, { isStreaming }) => {
-      facts.isStreaming = isStreaming
+      facts.isStreaming = isStreaming;
     },
 
     setError: (facts, { error }) => {
-      facts.error = error
+      facts.error = error;
     },
   },
 
@@ -99,44 +111,46 @@ export const chatSession = createModule('chat-session', {
     longConversation: {
       priority: 30,
       when: (facts) => facts.messageCount > 8 && !facts.summary,
-      require: { type: 'SUMMARIZE_CONVERSATION' },
+      require: { type: "SUMMARIZE_CONVERSATION" },
     },
 
     highTokenUsage: {
       priority: 20,
       when: (facts) => facts.totalCharsReceived > 5000 && !facts.warning,
-      require: { type: 'USAGE_WARNING' },
+      require: { type: "USAGE_WARNING" },
     },
   },
 
   resolvers: {
     summarize: {
-      requirement: 'SUMMARIZE_CONVERSATION',
+      requirement: "SUMMARIZE_CONVERSATION",
       resolve: async (req, context) => {
-        context.facts.summary = `Conversation has ${context.facts.messageCount} messages — consider summarizing.`
+        context.facts.summary = `Conversation has ${context.facts.messageCount} messages — consider summarizing.`;
       },
     },
 
     usageWarning: {
-      requirement: 'USAGE_WARNING',
+      requirement: "USAGE_WARNING",
       resolve: async (req, context) => {
-        const kb = (context.facts.totalCharsReceived / 1024).toFixed(1)
-        context.facts.warning = `High token usage: ${kb} KB received. Monitor costs.`
+        const kb = (context.facts.totalCharsReceived / 1024).toFixed(1);
+        context.facts.warning = `High token usage: ${kb} KB received. Monitor costs.`;
       },
     },
   },
 
   effects: {
     logActivity: {
-      deps: ['messageCount'],
+      deps: ["messageCount"],
       run: (facts, prev) => {
         if (!prev || facts.messageCount === prev.messageCount) {
-          return
+          return;
         }
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[chat-session] ${facts.messageCount} messages (${facts.userMessages} user, ${facts.assistantMessages} assistant)`)
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            `[chat-session] ${facts.messageCount} messages (${facts.userMessages} user, ${facts.assistantMessages} assistant)`,
+          );
         }
       },
     },
   },
-})
+});

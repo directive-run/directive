@@ -31,7 +31,13 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions, TokenUsage } from "./types.js";
+import type {
+  AgentLike,
+  AgentRunner,
+  RunOptions,
+  RunResult,
+  TokenUsage,
+} from "./types.js";
 
 // ============================================================================
 // Types
@@ -115,7 +121,7 @@ export class BudgetExceededError extends Error {
   constructor(details: BudgetExceededDetails) {
     super(
       `[Directive] Budget exceeded (${details.window}): estimated $${details.estimated.toFixed(4)}, ` +
-      `remaining $${details.remaining.toFixed(4)}`,
+        `remaining $${details.remaining.toFixed(4)}`,
     );
     this.name = "BudgetExceededError";
     this.estimated = details.estimated;
@@ -158,7 +164,10 @@ class CostLedger {
   /** Remove entries older than the cutoff. */
   private prune(cutoff: number): void {
     let pruneIndex = 0;
-    while (pruneIndex < this.entries.length && this.entries[pruneIndex]!.timestamp < cutoff) {
+    while (
+      pruneIndex < this.entries.length &&
+      this.entries[pruneIndex]!.timestamp < cutoff
+    ) {
       pruneIndex++;
     }
     if (pruneIndex > 0) {
@@ -191,7 +200,11 @@ function calculateCost(usage: TokenUsage, pricing: TokenPricing): number {
   );
 }
 
-function estimateCallCost(inputTokens: number, pricing: TokenPricing, outputMultiplier = 1.0): number {
+function estimateCallCost(
+  inputTokens: number,
+  pricing: TokenPricing,
+  outputMultiplier = 1.0,
+): number {
   const estimatedOutputTokens = Math.ceil(inputTokens * outputMultiplier);
 
   return (
@@ -219,7 +232,10 @@ function estimateCallCost(inputTokens: number, pricing: TokenPricing, outputMult
  * });
  * ```
  */
-export function withBudget(runner: AgentRunner, config: BudgetConfig): BudgetRunner {
+export function withBudget(
+  runner: AgentRunner,
+  config: BudgetConfig,
+): BudgetRunner {
   const {
     maxCostPerCall,
     budgets = [],
@@ -231,20 +247,36 @@ export function withBudget(runner: AgentRunner, config: BudgetConfig): BudgetRun
 
   // Validate config
   if (!Number.isFinite(charsPerToken) || charsPerToken <= 0) {
-    throw new Error("[Directive] withBudget: charsPerToken must be a positive finite number.");
+    throw new Error(
+      "[Directive] withBudget: charsPerToken must be a positive finite number.",
+    );
   }
-  if (maxCostPerCall != null && (!Number.isFinite(maxCostPerCall) || maxCostPerCall < 0)) {
-    throw new Error("[Directive] withBudget: maxCostPerCall must be a non-negative finite number.");
+  if (
+    maxCostPerCall != null &&
+    (!Number.isFinite(maxCostPerCall) || maxCostPerCall < 0)
+  ) {
+    throw new Error(
+      "[Directive] withBudget: maxCostPerCall must be a non-negative finite number.",
+    );
   }
-  if (!Number.isFinite(estimatedOutputMultiplier) || estimatedOutputMultiplier < 0) {
-    throw new Error("[Directive] withBudget: estimatedOutputMultiplier must be a non-negative finite number.");
+  if (
+    !Number.isFinite(estimatedOutputMultiplier) ||
+    estimatedOutputMultiplier < 0
+  ) {
+    throw new Error(
+      "[Directive] withBudget: estimatedOutputMultiplier must be a non-negative finite number.",
+    );
   }
   if (maxCostPerCall != null && !pricing) {
-    console.warn("[Directive] withBudget: maxCostPerCall has no effect without pricing. Provide a pricing config to enable per-call cost estimation.");
+    console.warn(
+      "[Directive] withBudget: maxCostPerCall has no effect without pricing. Provide a pricing config to enable per-call cost estimation.",
+    );
   }
   for (const budget of budgets) {
     if (!Number.isFinite(budget.maxCost) || budget.maxCost < 0) {
-      throw new Error(`[Directive] withBudget: budgets[${budget.window}].maxCost must be a non-negative finite number.`);
+      throw new Error(
+        `[Directive] withBudget: budgets[${budget.window}].maxCost must be a non-negative finite number.`,
+      );
     }
   }
 
@@ -265,14 +297,22 @@ export function withBudget(runner: AgentRunner, config: BudgetConfig): BudgetRun
 
     // Pre-call: Check per-call budget
     if (maxCostPerCall != null && pricing) {
-      const estimated = estimateCallCost(inputTokens, pricing, estimatedOutputMultiplier);
+      const estimated = estimateCallCost(
+        inputTokens,
+        pricing,
+        estimatedOutputMultiplier,
+      );
       if (estimated > maxCostPerCall) {
         const details: BudgetExceededDetails = {
           estimated,
           remaining: maxCostPerCall,
           window: "per-call",
         };
-        try { onBudgetExceeded?.(details); } catch { /* callback error must not disrupt budget flow */ }
+        try {
+          onBudgetExceeded?.(details);
+        } catch {
+          /* callback error must not disrupt budget flow */
+        }
         throw new BudgetExceededError(details);
       }
     }
@@ -283,7 +323,11 @@ export function withBudget(runner: AgentRunner, config: BudgetConfig): BudgetRun
       const ledger = windowLedgers.get(budget.window)!;
       const spent = ledger.getCostInWindow(windowMs);
       const remaining = budget.maxCost - spent;
-      const estimated = estimateCallCost(inputTokens, budget.pricing, estimatedOutputMultiplier);
+      const estimated = estimateCallCost(
+        inputTokens,
+        budget.pricing,
+        estimatedOutputMultiplier,
+      );
 
       if (estimated > remaining) {
         const details: BudgetExceededDetails = {
@@ -291,7 +335,11 @@ export function withBudget(runner: AgentRunner, config: BudgetConfig): BudgetRun
           remaining: Math.max(0, remaining),
           window: budget.window,
         };
-        try { onBudgetExceeded?.(details); } catch { /* callback error must not disrupt budget flow */ }
+        try {
+          onBudgetExceeded?.(details);
+        } catch {
+          /* callback error must not disrupt budget flow */
+        }
         throw new BudgetExceededError(details);
       }
     }

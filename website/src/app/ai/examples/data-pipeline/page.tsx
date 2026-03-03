@@ -1,47 +1,55 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
-import { InlineChat } from '@/components/InlineChat'
-import { ProviderConfig, type ProviderConfigState } from '@/components/ProviderConfig'
-import { decodeReplay } from '@/components/devtools/utils/replay-codec'
-import type { DebugEvent } from '@/components/devtools/types'
+import { DevToolsWithProvider } from "@/components/DevToolsWithProvider";
+import { InlineChat } from "@/components/InlineChat";
+import {
+  ProviderConfig,
+  type ProviderConfigState,
+} from "@/components/ProviderConfig";
+import type { DebugEvent } from "@/components/devtools/types";
+import { decodeReplay } from "@/components/devtools/utils/replay-codec";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const EXAMPLE_PROMPTS = [
-  'Analyze global electric vehicle adoption trends',
-  'Process recent developments in quantum computing',
-  'Evaluate the impact of remote work on urban planning',
-]
+  "Analyze global electric vehicle adoption trends",
+  "Process recent developments in quantum computing",
+  "Evaluate the impact of remote work on urban planning",
+];
 
 export default function AIDataPipelinePage() {
-  const [replayData, setReplayData] = useState<DebugEvent[] | undefined>(undefined)
-  const [config, setConfig] = useState<ProviderConfigState>({ provider: 'anthropic', apiKey: '' })
+  const [replayData, setReplayData] = useState<DebugEvent[] | undefined>(
+    undefined,
+  );
+  const [config, setConfig] = useState<ProviderConfigState>({
+    provider: "anthropic",
+    apiKey: "",
+  });
 
   useEffect(() => {
-    const hash = window.location.hash
-    const prefix = '#replay='
+    const hash = window.location.hash;
+    const prefix = "#replay=";
     if (!hash.startsWith(prefix)) {
-      return
+      return;
     }
 
     try {
-      setReplayData(decodeReplay(hash.slice(prefix.length)))
+      setReplayData(decodeReplay(hash.slice(prefix.length)));
     } catch {
-      console.warn('[DevTools] Failed to decode replay URL')
+      console.warn("[DevTools] Failed to decode replay URL");
     }
-  }, [])
+  }, []);
 
   const handleConfigChange = useCallback((next: ProviderConfigState) => {
-    setConfig(next)
-  }, [])
+    setConfig(next);
+  }, []);
 
   const headers = useMemo(() => {
     if (!config.apiKey) {
-      return undefined
+      return undefined;
     }
 
-    return { 'x-api-key': config.apiKey, 'x-provider': config.provider }
-  }, [config.apiKey, config.provider])
+    return { "x-api-key": config.apiKey, "x-provider": config.provider };
+  }, [config.apiKey, config.provider]);
 
   return (
     <DevToolsWithProvider
@@ -57,8 +65,9 @@ export default function AIDataPipelinePage() {
             Data Pipeline
           </h1>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            3 agents + 2 tasks in a mixed DAG — classify, transform, analyze, validate, report.
-            Open DevTools with the button in the bottom-left corner.
+            3 agents + 2 tasks in a mixed DAG — classify, transform, analyze,
+            validate, report. Open DevTools with the button in the bottom-left
+            corner.
           </p>
         </div>
 
@@ -81,5 +90,5 @@ export default function AIDataPipelinePage() {
         </div>
       </div>
     </DevToolsWithProvider>
-  )
+  );
 }

@@ -1,14 +1,14 @@
-'use client'
+"use client";
 
-import { Fragment, useState } from 'react'
-import Image from 'next/image'
-import clsx from 'clsx'
-import { Highlight } from 'prism-react-renderer'
+import clsx from "clsx";
+import Image from "next/image";
+import { Highlight } from "prism-react-renderer";
+import { Fragment, useState } from "react";
 
-import { Button } from '@/components/Button'
-import { HeroBackground } from '@/components/HeroBackground'
-import blurCyanImage from '@/images/blur-cyan.png'
-import blurIndigoImage from '@/images/blur-indigo.png'
+import { Button } from "@/components/Button";
+import { HeroBackground } from "@/components/HeroBackground";
+import blurCyanImage from "@/images/blur-cyan.png";
+import blurIndigoImage from "@/images/blur-indigo.png";
 
 const moduleCode = `import { createModule } from '@directive-run/core';
 
@@ -33,7 +33,7 @@ export default createModule("publish", {
     upload:   { requirement: "UPLOAD",   resolve: uploadImages },
     save:     { requirement: "SAVE",     resolve: createPost },
   },
-});`
+});`;
 
 const reactCode = `import { useFact } from '@directive-run/react';
 
@@ -47,29 +47,29 @@ function PublishButton() {
   );
 }
 
-// One assignment. Directive validates, uploads, and saves.`
+// One assignment. Directive validates, uploads, and saves.`;
 
 const tabs = [
-  { name: 'publish.module.ts', language: 'typescript' },
-  { name: 'Editor.tsx', language: 'tsx' },
-]
+  { name: "publish.module.ts", language: "typescript" },
+  { name: "Editor.tsx", language: "tsx" },
+];
 
-const codeBlocks = [moduleCode, reactCode]
+const codeBlocks = [moduleCode, reactCode];
 
-function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
+function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<"svg">) {
   return (
     <svg aria-hidden="true" viewBox="0 0 42 10" fill="none" {...props}>
       <circle cx="5" cy="5" r="4.5" />
       <circle cx="21" cy="5" r="4.5" />
       <circle cx="37" cy="5" r="4.5" />
     </svg>
-  )
+  );
 }
 
 export function Hero() {
-  const [activeTab, setActiveTab] = useState(0)
-  const activeCode = codeBlocks[activeTab]
-  const activeLanguage = tabs[activeTab].language
+  const [activeTab, setActiveTab] = useState(0);
+  const activeCode = codeBlocks[activeTab];
+  const activeLanguage = tabs[activeTab].language;
 
   return (
     <div className="overflow-hidden bg-slate-900 dark:bg-brand-surface dark:-mt-19 dark:-mb-32 dark:pt-19 dark:pb-32">
@@ -86,7 +86,13 @@ export function Hero() {
               priority
             />
             <div className="relative">
-              <p className="inline bg-clip-text font-display text-5xl tracking-tight text-transparent" style={{ backgroundImage: 'linear-gradient(to right, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))' }}>
+              <p
+                className="inline bg-clip-text font-display text-5xl tracking-tight text-transparent"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(to right, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))",
+                }}
+              >
                 State that resolves itself.
               </p>
               <p className="mt-3 text-2xl tracking-tight text-slate-400">
@@ -132,9 +138,10 @@ export function Hero() {
               <div
                 className="relative rounded-2xl"
                 style={{
-                  backgroundColor: 'var(--hero-editor-bg)',
-                  boxShadow: '0 0 0 1px var(--hero-editor-ring), var(--hero-editor-shadow)',
-                  backdropFilter: 'var(--hero-editor-backdrop)',
+                  backgroundColor: "var(--hero-editor-bg)",
+                  boxShadow:
+                    "0 0 0 1px var(--hero-editor-ring), var(--hero-editor-shadow)",
+                  backdropFilter: "var(--hero-editor-backdrop)",
                 }}
               >
                 <div className="absolute -top-px right-11 left-20 h-px bg-linear-to-r from-brand-primary-300/0 via-brand-primary-300/70 to-brand-primary-300/0" />
@@ -142,26 +149,36 @@ export function Hero() {
                 <div className="pt-4 pl-4">
                   <TrafficLightsIcon
                     className="h-2.5 w-auto"
-                    style={{ stroke: 'var(--hero-traffic-stroke)' }}
+                    style={{ stroke: "var(--hero-traffic-stroke)" }}
                   />
                   <div className="mt-4 flex space-x-2 text-xs">
                     {tabs.map((tab, index) => (
                       <div
                         key={tab.name}
                         className={clsx(
-                          'flex h-6 cursor-pointer rounded-full',
+                          "flex h-6 cursor-pointer rounded-full",
                           index === activeTab
-                            ? 'bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium'
-                            : 'hero-pill-inactive',
+                            ? "bg-linear-to-r from-brand-primary-400/30 via-brand-primary-400 to-brand-primary-400/30 p-px font-medium"
+                            : "hero-pill-inactive",
                         )}
-                        style={index === activeTab ? { color: 'var(--hero-pill-active-text)' } : undefined}
+                        style={
+                          index === activeTab
+                            ? { color: "var(--hero-pill-active-text)" }
+                            : undefined
+                        }
                         onClick={() => setActiveTab(index)}
                       >
                         <div
                           className={clsx(
-                            'flex items-center rounded-full px-2.5',
+                            "flex items-center rounded-full px-2.5",
                           )}
-                          style={index === activeTab ? { backgroundColor: 'var(--hero-pill-active-bg)' } : undefined}
+                          style={
+                            index === activeTab
+                              ? {
+                                  backgroundColor: "var(--hero-pill-active-bg)",
+                                }
+                              : undefined
+                          }
                         >
                           {tab.name}
                         </div>
@@ -173,15 +190,15 @@ export function Hero() {
                       aria-hidden="true"
                       className="border-r pr-4 font-mono select-none"
                       style={{
-                        borderColor: 'var(--hero-line-border)',
-                        color: 'var(--hero-line-text)',
+                        borderColor: "var(--hero-line-border)",
+                        color: "var(--hero-line-text)",
                       }}
                     >
                       {Array.from({
-                        length: activeCode.split('\n').length,
+                        length: activeCode.split("\n").length,
                       }).map((_, index) => (
                         <Fragment key={index}>
-                          {(index + 1).toString().padStart(2, '0')}
+                          {(index + 1).toString().padStart(2, "0")}
                           <br />
                         </Fragment>
                       ))}
@@ -201,7 +218,7 @@ export function Hero() {
                         <pre
                           className={clsx(
                             className,
-                            'flex overflow-x-auto pb-6 !bg-transparent',
+                            "flex overflow-x-auto pb-6 !bg-transparent",
                           )}
                           style={style}
                         >
@@ -228,5 +245,5 @@ export function Hero() {
         </div>
       </div>
     </div>
-  )
+  );
 }

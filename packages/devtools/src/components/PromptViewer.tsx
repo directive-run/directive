@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 
 interface PromptViewerProps {
   input?: string;
@@ -10,10 +10,18 @@ interface PromptViewerProps {
 
 type Tab = "input" | "output";
 
-export function PromptViewer({ input, output, inputTokens, outputTokens, totalTokens }: PromptViewerProps) {
+export function PromptViewer({
+  input,
+  output,
+  inputTokens,
+  outputTokens,
+  totalTokens,
+}: PromptViewerProps) {
   const hasInput = typeof input === "string" && input.length > 0;
   const hasOutput = typeof output === "string" && output.length > 0;
-  const [activeTab, setActiveTab] = useState<Tab>(hasInput ? "input" : "output");
+  const [activeTab, setActiveTab] = useState<Tab>(
+    hasInput ? "input" : "output",
+  );
 
   const handleCopy = useCallback(() => {
     const text = activeTab === "input" ? input : output;
@@ -31,7 +39,9 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium text-zinc-400">Prompt / Completion</h3>
+        <h3 className="text-xs font-medium text-zinc-400">
+          Prompt / Completion
+        </h3>
         <button
           onClick={handleCopy}
           className="rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
@@ -43,7 +53,11 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
       </div>
 
       {/* Tabs */}
-      <div className="mt-2 flex gap-1 border-b border-zinc-800" role="tablist" aria-label="Prompt and completion">
+      <div
+        className="mt-2 flex gap-1 border-b border-zinc-800"
+        role="tablist"
+        aria-label="Prompt and completion"
+      >
         {hasInput && (
           <button
             role="tab"
@@ -59,7 +73,9 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
           >
             Input
             {inputTokens != null && (
-              <span className="ml-1 text-zinc-600">({inputTokens.toLocaleString()} tok)</span>
+              <span className="ml-1 text-zinc-600">
+                ({inputTokens.toLocaleString()} tok)
+              </span>
             )}
           </button>
         )}
@@ -78,7 +94,9 @@ export function PromptViewer({ input, output, inputTokens, outputTokens, totalTo
           >
             Output
             {outputTokens != null && (
-              <span className="ml-1 text-zinc-600">({outputTokens.toLocaleString()} tok)</span>
+              <span className="ml-1 text-zinc-600">
+                ({outputTokens.toLocaleString()} tok)
+              </span>
             )}
           </button>
         )}

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useFact } from "@directive-run/vue";
 import { system } from "../system";
-import { TestIds } from "../../../../shared/test-ids";
 
 const count = useFact(system, "count");
 const multi = useFact(system, ["count", "name"]);

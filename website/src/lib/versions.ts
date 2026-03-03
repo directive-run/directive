@@ -1,19 +1,19 @@
 export interface DocsVersion {
   /** URL slug used in path prefix, e.g. "v0", "v1" */
-  slug: string
+  slug: string;
   /** Human-readable label, e.g. "v0.x" */
-  label: string
+  label: string;
   /** Status determines banner and SEO behavior */
-  status: 'latest' | 'current' | 'deprecated'
+  status: "latest" | "current" | "deprecated";
   /** Path prefix: "" for latest (canonical URLs), "/v0" for frozen */
-  pathPrefix: string
+  pathPrefix: string;
   /**
    * Scope allows multiple independent version pickers.
    * Currently only "docs" exists. If AI packages diverge in a future
    * major version, add entries with scope "ai-docs" and render a
    * second picker in the AI section – no rewrite needed.
    */
-  scope: string
+  scope: string;
 }
 
 /**
@@ -26,38 +26,39 @@ export interface DocsVersion {
  */
 export const DOCS_VERSIONS: DocsVersion[] = [
   {
-    slug: 'v0',
-    label: 'v0.x',
-    status: 'latest',
-    pathPrefix: '',
-    scope: 'docs',
+    slug: "v0",
+    label: "v0.x",
+    status: "latest",
+    pathPrefix: "",
+    scope: "docs",
   },
-]
+];
 
 /** The version whose pathPrefix is "" (i.e. the canonical, unversioned URLs). */
-export const LATEST_VERSION: DocsVersion =
-  DOCS_VERSIONS.find((v) => v.status === 'latest')!
+export const LATEST_VERSION: DocsVersion = DOCS_VERSIONS.find(
+  (v) => v.status === "latest",
+)!;
 
 // Match "/docs/v0/", "/docs/v1/", etc. at the start of a docs path
-const VERSION_PREFIX_RE = /^\/docs\/(v\d+)(\/|$)/
+const VERSION_PREFIX_RE = /^\/docs\/(v\d+)(\/|$)/;
 
 /**
  * Determine which DocsVersion a pathname belongs to.
  * Falls back to LATEST_VERSION for unversioned paths like `/docs/quick-start`.
  */
 export function getVersionFromPath(pathname: string): DocsVersion {
-  const match = pathname.match(VERSION_PREFIX_RE)
+  const match = pathname.match(VERSION_PREFIX_RE);
 
   if (match) {
-    const slug = match[1]
-    const found = DOCS_VERSIONS.find((v) => v.slug === slug)
+    const slug = match[1];
+    const found = DOCS_VERSIONS.find((v) => v.slug === slug);
 
     if (found) {
-      return found
+      return found;
     }
   }
 
-  return LATEST_VERSION
+  return LATEST_VERSION;
 }
 
 /**
@@ -65,7 +66,7 @@ export function getVersionFromPath(pathname: string): DocsVersion {
  * Currently only "docs" exists but this supports future AI-specific scopes.
  */
 export function getVersionsForScope(scope: string): DocsVersion[] {
-  return DOCS_VERSIONS.filter((v) => v.scope === scope)
+  return DOCS_VERSIONS.filter((v) => v.scope === scope);
 }
 
 /**
@@ -84,18 +85,18 @@ export function switchVersionPath(
   to: DocsVersion,
 ): string {
   // Strip the source version prefix to get the bare docs-relative path
-  let barePath: string
+  let barePath: string;
 
   if (from.pathPrefix) {
-    barePath = currentPath.replace(`/docs${from.pathPrefix}`, '/docs')
+    barePath = currentPath.replace(`/docs${from.pathPrefix}`, "/docs");
   } else {
-    barePath = currentPath
+    barePath = currentPath;
   }
 
   // Apply the target version prefix
   if (to.pathPrefix) {
-    return barePath.replace('/docs', `/docs${to.pathPrefix}`)
+    return barePath.replace("/docs", `/docs${to.pathPrefix}`);
   }
 
-  return barePath
+  return barePath;
 }

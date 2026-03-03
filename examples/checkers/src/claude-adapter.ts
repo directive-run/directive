@@ -6,13 +6,9 @@
  * Includes a streaming-capable runner for token-by-token delivery.
  */
 
-import type {
-  RunResult,
-  AgentLike,
-  Message,
-} from "@directive-run/ai";
+import type { AgentLike, Message, RunResult } from "@directive-run/ai";
 import { createRunner } from "@directive-run/ai";
-import type { Board, Piece, Move } from "./rules.js";
+import type { Board, Move, Piece } from "./rules.js";
 import { toRowCol } from "./rules.js";
 
 // ============================================================================
@@ -65,9 +61,7 @@ export function formatLegalMoves(moves: Move[]): string {
       const from = describeMoveIndex(m.from);
       const to = describeMoveIndex(m.to);
       const capture =
-        m.captured !== null
-          ? ` capturing piece at index ${m.captured}`
-          : "";
+        m.captured !== null ? ` capturing piece at index ${m.captured}` : "";
       return `  from ${m.from} ${from} → to ${m.to} ${to}${capture}`;
     })
     .join("\n");
@@ -158,7 +152,8 @@ export const runClaude = createRunner({
     const data = await res.json();
     return {
       text: data.content?.[0]?.text ?? "",
-      totalTokens: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
+      totalTokens:
+        (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
     };
   },
   parseOutput: <T>(text: string): T => {
@@ -187,7 +182,7 @@ export async function runClaudeWithCallbacks(
     onToken?: (token: string) => void;
     onMessage?: (message: Message) => void;
     signal?: AbortSignal;
-  }
+  },
 ): Promise<RunResult<unknown>> {
   const apiKey = getApiKey();
 
@@ -251,7 +246,9 @@ export async function runClaudeWithCallbacks(
           }
 
           if (event.type === "message_delta" && event.usage) {
-            totalTokens = (event.usage.input_tokens ?? 0) + (event.usage.output_tokens ?? 0);
+            totalTokens =
+              (event.usage.input_tokens ?? 0) +
+              (event.usage.output_tokens ?? 0);
           }
 
           if (event.type === "message_start" && event.message?.usage) {
@@ -266,7 +263,8 @@ export async function runClaudeWithCallbacks(
     // Non-streaming response — simulate token emission
     const data = await response.json();
     fullText = data.content?.[0]?.text ?? "";
-    totalTokens = (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
+    totalTokens =
+      (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
 
     // Emit tokens in small chunks for UI effect
     const words = fullText.split(/(\s+)/);

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Batch Resolver example", () => {
@@ -7,12 +7,20 @@ test.describe("Batch Resolver example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/batch-resolver");
     try {
-      await page.waitForSelector("directive-batch-resolver", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-batch-resolver", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-batch-resolver", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-batch-resolver", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-batch-resolver-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-batch-resolver-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and UI renders", async ({ page }) => {
@@ -25,7 +33,9 @@ test.describe("Batch Resolver example", () => {
     await tid(page, "bl-load-1").click();
     await page.waitForTimeout(1500);
 
-    await expect(tid(page, "bl-batch-count")).not.toHaveText("0", { timeout: 5_000 });
+    await expect(tid(page, "bl-batch-count")).not.toHaveText("0", {
+      timeout: 5_000,
+    });
   });
 
   test("load all 5 creates single batch", async ({ page }) => {
@@ -67,14 +77,18 @@ test.describe("Batch Resolver example", () => {
 
     // Timeline should mention failure
     const timeline = tid(page, "bl-timeline");
-    await expect(timeline.locator(".bl-timeline-entry.error")).toBeVisible({ timeout: 5_000 });
+    await expect(timeline.locator(".bl-timeline-entry.error")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("schema error injection shows validation error", async ({ page }) => {
     await tid(page, "bl-schema-error").click();
     await page.waitForTimeout(1000);
 
-    await expect(tid(page, "bl-validation-errors")).not.toHaveText("0", { timeout: 5_000 });
+    await expect(tid(page, "bl-validation-errors")).not.toHaveText("0", {
+      timeout: 5_000,
+    });
   });
 
   test("reset clears all state", async ({ page }) => {

@@ -1,116 +1,120 @@
 /**
  * JSON snapshot of the data pipeline orchestrator's current state.
  */
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
+import { forbiddenResponse, isAllowedOrigin } from "@/lib/origin-check";
 import {
-  getDataPipelineTimeline,
   getDataPipelineOrchestrator,
-  getDataPipelineAudit,
-} from '../../data-pipeline-chat/orchestrator-singleton'
+  getDataPipelineTimeline,
+} from "../../data-pipeline-chat/orchestrator-singleton";
 
 export async function GET(request: Request) {
   if (!isAllowedOrigin(request)) {
-    return forbiddenResponse(request)
+    return forbiddenResponse(request);
   }
-  const timeline = getDataPipelineTimeline()
-  const instance = getDataPipelineOrchestrator()
+  const timeline = getDataPipelineTimeline();
+  const instance = getDataPipelineOrchestrator();
 
   if (!timeline || !instance) {
     return Response.json(
-      { error: 'No active data pipeline orchestrator. Send a query first.' },
+      { error: "No active data pipeline orchestrator. Send a query first." },
       { status: 503 },
-    )
+    );
   }
 
-  const { orchestrator, memory, audit } = instance
-  const events = timeline.getEvents()
+  const { orchestrator, memory, audit } = instance;
+  const events = timeline.getEvents();
 
   // -------------------------------------------------------------------------
   // Aggregate timeline events
   // -------------------------------------------------------------------------
 
-  let totalTokens = 0
-  let agentRuns = 0
-  let taskRuns = 0
-  let totalDurationMs = 0
-  let guardrailChecks = 0
-  let guardrailBlocked = 0
-  const runCounts = new Map<string, number>()
+  let totalTokens = 0;
+  let agentRuns = 0;
+  let taskRuns = 0;
+  let totalDurationMs = 0;
+  let guardrailChecks = 0;
+  let guardrailBlocked = 0;
+  const runCounts = new Map<string, number>();
 
   for (const e of events) {
-    if (e.type === 'agent_complete') {
-      const t = (e as { totalTokens?: number }).totalTokens ?? 0
-      const d = (e as { durationMs?: number }).durationMs ?? 0
-      const a = (e as { agentId?: string }).agentId ?? 'unknown'
-      totalTokens += t
-      totalDurationMs += d
-      agentRuns++
-      runCounts.set(a, (runCounts.get(a) ?? 0) + 1)
+    if (e.type === "agent_complete") {
+      const t = (e as { totalTokens?: number }).totalTokens ?? 0;
+      const d = (e as { durationMs?: number }).durationMs ?? 0;
+      const a = (e as { agentId?: string }).agentId ?? "unknown";
+      totalTokens += t;
+      totalDurationMs += d;
+      agentRuns++;
+      runCounts.set(a, (runCounts.get(a) ?? 0) + 1);
     }
-    if (e.type === 'task_complete') {
-      const d = (e as { durationMs?: number }).durationMs ?? 0
-      const taskId = (e as { taskId?: string }).taskId ?? 'unknown'
-      totalDurationMs += d
-      taskRuns++
-      runCounts.set(taskId, (runCounts.get(taskId) ?? 0) + 1)
+    if (e.type === "task_complete") {
+      const d = (e as { durationMs?: number }).durationMs ?? 0;
+      const taskId = (e as { taskId?: string }).taskId ?? "unknown";
+      totalDurationMs += d;
+      taskRuns++;
+      runCounts.set(taskId, (runCounts.get(taskId) ?? 0) + 1);
     }
-    if (e.type === 'guardrail_check') {
-      guardrailChecks++
+    if (e.type === "guardrail_check") {
+      guardrailChecks++;
       if (!(e as { passed?: boolean }).passed) {
-        guardrailBlocked++
+        guardrailBlocked++;
       }
     }
   }
 
-  const totalRuns = agentRuns + taskRuns
-  const guardrailPassRate = guardrailChecks > 0
-    ? `${Math.round(((guardrailChecks - guardrailBlocked) / guardrailChecks) * 100)}%`
-    : 'N/A'
+  const totalRuns = agentRuns + taskRuns;
+  const guardrailPassRate =
+    guardrailChecks > 0
+      ? `${Math.round(((guardrailChecks - guardrailBlocked) / guardrailChecks) * 100)}%`
+      : "N/A";
 
   // -------------------------------------------------------------------------
   // Orchestrator state
   // -------------------------------------------------------------------------
 
-  let agentStates: Record<string, unknown> = {}
+  let agentStates: Record<string, unknown> = {};
   try {
-    agentStates = orchestrator.getAllAgentStates()
+    agentStates = orchestrator.getAllAgentStates();
   } catch {
     // Not yet initialized
   }
 
-  let taskStates: Record<string, unknown> = {}
+  let taskStates: Record<string, unknown> = {};
   try {
-    taskStates = orchestrator.getAllTaskStates()
+    taskStates = orchestrator.getAllTaskStates();
   } catch {
     // Not yet initialized
   }
 
-  const derived = orchestrator.derived ?? {}
-  const scratchpad = orchestrator.scratchpad?.getAll() ?? {}
+  const derived = orchestrator.derived ?? {};
+  const scratchpad = orchestrator.scratchpad?.getAll() ?? {};
 
   // -------------------------------------------------------------------------
   // Memory
   // -------------------------------------------------------------------------
 
-  let memoryMessages: Array<{ role: string; contentLength: number; preview: string }> = []
-  let totalMemoryMessages = 0
-  let contextMessageCount = 0
+  let memoryMessages: Array<{
+    role: string;
+    contentLength: number;
+    preview: string;
+  }> = [];
+  let totalMemoryMessages = 0;
+  let contextMessageCount = 0;
 
   try {
-    const memState = memory.export()
-    totalMemoryMessages = memState.messages?.length ?? 0
+    const memState = memory.export();
+    totalMemoryMessages = memState.messages?.length ?? 0;
 
-    const contextMsgs = memory.getContextMessages()
-    contextMessageCount = contextMsgs.length
+    const contextMsgs = memory.getContextMessages();
+    contextMessageCount = contextMsgs.length;
 
     memoryMessages = contextMsgs.map((m) => ({
       role: m.role,
       contentLength: m.content.length,
-      preview: m.content.slice(0, 2000) + (m.content.length > 2000 ? '…' : ''),
-    }))
+      preview: m.content.slice(0, 2000) + (m.content.length > 2000 ? "…" : ""),
+    }));
   } catch {
     // Memory not yet populated
   }
@@ -119,12 +123,12 @@ export async function GET(request: Request) {
   // Health
   // -------------------------------------------------------------------------
 
-  const healthData: Record<string, unknown> = {}
-  const healthMonitor = orchestrator.healthMonitor
+  const healthData: Record<string, unknown> = {};
+  const healthMonitor = orchestrator.healthMonitor;
   if (healthMonitor) {
     for (const agentId of orchestrator.getAgentIds()) {
       try {
-        healthData[agentId] = healthMonitor.getMetrics(agentId)
+        healthData[agentId] = healthMonitor.getMetrics(agentId);
       } catch {
         // No metrics yet
       }
@@ -135,9 +139,9 @@ export async function GET(request: Request) {
   // Audit
   // -------------------------------------------------------------------------
 
-  let auditStats: unknown = {}
+  let auditStats: unknown = {};
   try {
-    auditStats = audit.getStats()
+    auditStats = audit.getStats();
   } catch {
     // Not yet populated
   }
@@ -151,11 +155,12 @@ export async function GET(request: Request) {
     eventCount: events.length,
     totalTokens,
     orchestrator: {
-      status: 'active',
+      status: "active",
       currentAgent: null,
       totalRuns,
       totalTurns: 0,
-      avgDurationMs: totalRuns > 0 ? Math.round(totalDurationMs / totalRuns) : 0,
+      avgDurationMs:
+        totalRuns > 0 ? Math.round(totalDurationMs / totalRuns) : 0,
       runCounts: Object.fromEntries(runCounts),
       agentStates,
       taskStates,
@@ -186,32 +191,32 @@ export async function GET(request: Request) {
     },
     dag: {
       nodes: {
-        classify: { handler: 'classify', deps: [] },
-        transform: { handler: 'transform', deps: ['classify'], isTask: true },
-        analyze: { handler: 'analyze', deps: ['transform'] },
-        validate: { handler: 'validate', deps: ['analyze'], isTask: true },
-        report: { handler: 'report', deps: ['validate'] },
+        classify: { handler: "classify", deps: [] },
+        transform: { handler: "transform", deps: ["classify"], isTask: true },
+        analyze: { handler: "analyze", deps: ["transform"] },
+        validate: { handler: "validate", deps: ["analyze"], isTask: true },
+        report: { handler: "report", deps: ["validate"] },
       },
-      pattern: 'process',
+      pattern: "process",
     },
     config: {
-      model: 'claude-haiku-4-5-20251001',
+      model: "claude-haiku-4-5-20251001",
       maxTokenBudget: 50000,
       maxResponseChars: 300,
       maxHistoryMessages: 20,
       preserveRecentCount: 4,
-      memoryStrategy: 'sliding-window',
+      memoryStrategy: "sliding-window",
       retry: { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 },
       circuitBreaker: { failureThreshold: 5, recoveryTimeMs: 30000 },
-      budgets: [{ window: 'hour', maxCost: 5.0 }],
+      budgets: [{ window: "hour", maxCost: 5.0 }],
       budgetWarningThreshold: 0.8,
       guardrails: {
-        input: ['prompt-injection', 'content-filter'],
-        output: ['output-length'],
+        input: ["prompt-injection", "content-filter"],
+        output: ["output-length"],
       },
-      derivations: ['pipelineComplete', 'totalCost'],
-      scratchpadKeys: ['topic', 'confidence', 'lastError'],
-      tasks: ['transform', 'validate'],
+      derivations: ["pipelineComplete", "totalCost"],
+      scratchpadKeys: ["topic", "confidence", "lastError"],
+      tasks: ["transform", "validate"],
     },
-  })
+  });
 }

@@ -23,7 +23,9 @@ export interface TimelineFilters {
 export function useTimelineFilters(events: DebugEvent[]): TimelineFilters {
   const [typeFilter, setTypeFilter] = useState<Set<DebugEventType>>(new Set());
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
-  const [searchMatchIds, setSearchMatchIds] = useState<Set<number> | null>(null);
+  const [searchMatchIds, setSearchMatchIds] = useState<Set<number> | null>(
+    null,
+  );
   const [filterMode, setFilterMode] = useState<FilterMode>("and");
 
   // Compute unique agents

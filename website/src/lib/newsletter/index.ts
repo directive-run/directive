@@ -1,1 +1,1 @@
-export { newsletter } from './module'
+export { newsletter } from "./module";

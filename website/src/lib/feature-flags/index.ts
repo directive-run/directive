@@ -1,5 +1,5 @@
-export { featureFlags } from './module'
-export { getFeatureFlagSystem } from './config'
+export { featureFlags } from "./module";
+export { getFeatureFlagSystem } from "./config";
 export {
   useCanUseChat,
   useCanUseSearch,
@@ -9,4 +9,4 @@ export {
   useCanShowOnboardingToast,
   useCanUseVersionSelector,
   useCanUseShareButton,
-} from './hooks'
+} from "./hooks";

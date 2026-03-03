@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import type { DebugEvent } from "../lib/types";
 import { generateStandaloneHTML } from "../lib/html-export";
+import type { DebugEvent } from "../lib/types";
 
 const MAX_IMPORT_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
@@ -16,7 +16,11 @@ export function SessionPanel({ events, onImport, onClear }: SessionPanelProps) {
   const [importing, setImporting] = useState(false);
 
   const handleExportToFile = useCallback(() => {
-    const data = JSON.stringify({ version: 1, events, exportedAt: new Date().toISOString() }, null, 2);
+    const data = JSON.stringify(
+      { version: 1, events, exportedAt: new Date().toISOString() },
+      null,
+      2,
+    );
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -27,7 +31,9 @@ export function SessionPanel({ events, onImport, onClear }: SessionPanelProps) {
   }, [events]);
 
   const handleExportToHtml = useCallback(() => {
-    const html = generateStandaloneHTML(events, { title: "Directive DevTools Trace" });
+    const html = generateStandaloneHTML(events, {
+      title: "Directive DevTools Trace",
+    });
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -43,40 +49,43 @@ export function SessionPanel({ events, onImport, onClear }: SessionPanelProps) {
     }
   }, [importing]);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    if (file.size > MAX_IMPORT_SIZE_BYTES) {
-      e.target.value = "";
-
-      return;
-    }
-
-    // D8: Validate file extension and MIME type
-    if (!file.name.endsWith(".json") && file.type !== "application/json") {
-      e.target.value = "";
-
-      return;
-    }
-
-    setImporting(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        onImport(reader.result);
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) {
+        return;
       }
-      setImporting(false);
-    };
-    reader.onerror = () => {
-      setImporting(false);
-    };
-    reader.readAsText(file);
-    // Reset input so same file can be re-imported
-    e.target.value = "";
-  }, [onImport]);
+
+      if (file.size > MAX_IMPORT_SIZE_BYTES) {
+        e.target.value = "";
+
+        return;
+      }
+
+      // D8: Validate file extension and MIME type
+      if (!file.name.endsWith(".json") && file.type !== "application/json") {
+        e.target.value = "";
+
+        return;
+      }
+
+      setImporting(true);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          onImport(reader.result);
+        }
+        setImporting(false);
+      };
+      reader.onerror = () => {
+        setImporting(false);
+      };
+      reader.readAsText(file);
+      // Reset input so same file can be re-imported
+      e.target.value = "";
+    },
+    [onImport],
+  );
 
   return (
     <div className="border-t border-zinc-800 px-4 py-3">
@@ -106,11 +115,16 @@ export function SessionPanel({ events, onImport, onClear }: SessionPanelProps) {
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
           disabled={importing}
         >
-          <span aria-hidden="true">📤</span> {importing ? "Importing..." : "Import from file"}
+          <span aria-hidden="true">📤</span>{" "}
+          {importing ? "Importing..." : "Import from file"}
         </button>
 
         <button
-          onClick={() => { if (window.confirm("Clear all recorded events?")) { onClear(); } }}
+          onClick={() => {
+            if (window.confirm("Clear all recorded events?")) {
+              onClear();
+            }
+          }}
           className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-red-400 disabled:opacity-50"
           disabled={events.length === 0}
         >

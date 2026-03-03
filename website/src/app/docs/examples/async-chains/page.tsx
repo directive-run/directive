@@ -1,22 +1,22 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { AsyncChainsDemo } from './AsyncChainsDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { AsyncChainsDemo } from "./AsyncChainsDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Async Chains',
+  title: "Async Chains",
   description:
-    'Interactive async chain demo built with Directive. Three-module after chain with error propagation, retry, and parallel branches.',
-  path: '/docs/examples/async-chains',
-  section: 'Docs',
-})
+    "Interactive async chain demo built with Directive. Three-module after chain with error propagation, retry, and parallel branches.",
+  path: "/docs/examples/async-chains",
+  section: "Docs",
+});
 
 export default function AsyncChainsPage() {
-  const build = parseExampleBuild('async-chains')
-  const sources = readExampleSources('async-chains', [
-    'async-chains.ts',
-    'mock-api.ts',
-    'main.ts',
-  ])
+  const build = parseExampleBuild("async-chains");
+  const sources = readExampleSources("async-chains", [
+    "async-chains.ts",
+    "mock-api.ts",
+    "main.ts",
+  ]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -35,5 +35,5 @@ export default function AsyncChainsPage() {
 
       <AsyncChainsDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

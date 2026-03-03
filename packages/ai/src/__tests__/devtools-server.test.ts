@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDebugTimeline } from "../debug-timeline.js";
-import { createHealthMonitor } from "../health-monitor.js";
 import {
-  createDevToolsServer,
-  type DevToolsTransport,
   type DevToolsClient,
-  type DevToolsServerMessage,
   type DevToolsClientMessage,
+  type DevToolsServerMessage,
   type DevToolsSnapshot,
+  type DevToolsTransport,
+  createDevToolsServer,
 } from "../devtools-server.js";
+import { createHealthMonitor } from "../health-monitor.js";
 import type { BreakpointState } from "../types.js";
 
 // ============================================================================
@@ -28,21 +28,25 @@ function createMockTransport(): {
   connect: () => MockClient;
   closed: boolean;
 } {
-  let connectionHandler: ((
-    client: DevToolsClient,
-    onMessage: (handler: (data: string) => void) => void,
-    onClose: (handler: () => void) => void,
-  ) => void) | null = null;
+  let connectionHandler:
+    | ((
+        client: DevToolsClient,
+        onMessage: (handler: (data: string) => void) => void,
+        onClose: (handler: () => void) => void,
+      ) => void)
+    | null = null;
 
   let closed = false;
 
   const result = {
     transport: {
-      onConnection(handler: (
-        client: DevToolsClient,
-        onMessage: (handler: (data: string) => void) => void,
-        onClose: (handler: () => void) => void,
-      ) => void) {
+      onConnection(
+        handler: (
+          client: DevToolsClient,
+          onMessage: (handler: (data: string) => void) => void,
+          onClose: (handler: () => void) => void,
+        ) => void,
+      ) {
         connectionHandler = handler;
       },
       close() {
@@ -54,7 +58,7 @@ function createMockTransport(): {
       const messages: DevToolsServerMessage[] = [];
       let messageHandler: ((data: string) => void) | null = null;
       let closeHandler: (() => void) | null = null;
-      let isClosed = false;
+      const isClosed = false;
 
       const mock: MockClient = {
         messages,
@@ -77,8 +81,12 @@ function createMockTransport(): {
 
       connectionHandler?.(
         mock.client,
-        (handler) => { messageHandler = handler; },
-        (handler) => { closeHandler = handler; },
+        (handler) => {
+          messageHandler = handler;
+        },
+        (handler) => {
+          closeHandler = handler;
+        },
       );
 
       return mock;
@@ -120,7 +128,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("welcome");
 
-      const welcome = client.messages[0] as Extract<DevToolsServerMessage, { type: "welcome" }>;
+      const welcome = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "welcome" }
+      >;
       expect(welcome.version).toBe(1);
       expect(welcome.sessionId).toMatch(/^devtools_/);
       expect(welcome.timestamp).toBeGreaterThan(0);
@@ -187,7 +198,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("event");
 
-      const msg = client.messages[0] as Extract<DevToolsServerMessage, { type: "event" }>;
+      const msg = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "event" }
+      >;
       expect(msg.event.type).toBe("agent_start");
       expect(msg.event.agentId).toBe("test-agent");
 
@@ -283,16 +297,37 @@ describe("DevTools Server", () => {
       client.messages.length = 0;
 
       // Record 2 events — not enough to flush
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
-      timeline.record({ type: "agent_start", timestamp: 2, agentId: "b", snapshotId: null, inputLength: 2 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 2,
+        agentId: "b",
+        snapshotId: null,
+        inputLength: 2,
+      });
       expect(client.messages).toHaveLength(0);
 
       // 3rd event triggers flush
-      timeline.record({ type: "agent_start", timestamp: 3, agentId: "c", snapshotId: null, inputLength: 3 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 3,
+        agentId: "c",
+        snapshotId: null,
+        inputLength: 3,
+      });
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("event_batch");
 
-      const batch = client.messages[0] as Extract<DevToolsServerMessage, { type: "event_batch" }>;
+      const batch = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "event_batch" }
+      >;
       expect(batch.events).toHaveLength(3);
 
       server.close();
@@ -312,7 +347,13 @@ describe("DevTools Server", () => {
       const client = mockTransport.connect();
       client.messages.length = 0;
 
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
       expect(client.messages).toHaveLength(0);
 
       vi.advanceTimersByTime(50);
@@ -349,8 +390,22 @@ describe("DevTools Server", () => {
       });
 
       // Record some events before connecting
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
-      timeline.record({ type: "agent_complete", timestamp: 2, agentId: "a", snapshotId: null, outputLength: 10, totalTokens: 100, durationMs: 500 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
+      timeline.record({
+        type: "agent_complete",
+        timestamp: 2,
+        agentId: "a",
+        snapshotId: null,
+        outputLength: 10,
+        totalTokens: 100,
+        durationMs: 500,
+      });
 
       const client = mockTransport.connect();
       client.messages.length = 0;
@@ -359,7 +414,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("event_batch");
 
-      const batch = client.messages[0] as Extract<DevToolsServerMessage, { type: "event_batch" }>;
+      const batch = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "event_batch" }
+      >;
       expect(batch.events).toHaveLength(2);
 
       server.close();
@@ -371,15 +429,32 @@ describe("DevTools Server", () => {
         timeline,
       });
 
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
-      timeline.record({ type: "agent_complete", timestamp: 2, agentId: "a", snapshotId: null, outputLength: 10, totalTokens: 100, durationMs: 500 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
+      timeline.record({
+        type: "agent_complete",
+        timestamp: 2,
+        agentId: "a",
+        snapshotId: null,
+        outputLength: 10,
+        totalTokens: 100,
+        durationMs: 500,
+      });
 
       const client = mockTransport.connect();
       client.messages.length = 0;
 
       // Request only events after id 0
       sendCommand(client, { type: "request_events", since: 0 });
-      const batch = client.messages[0] as Extract<DevToolsServerMessage, { type: "event_batch" }>;
+      const batch = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "event_batch" }
+      >;
       expect(batch.events).toHaveLength(1);
       expect(batch.events[0]!.id).toBe(1);
 
@@ -408,7 +483,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("snapshot");
 
-      const msg = client.messages[0] as Extract<DevToolsServerMessage, { type: "snapshot" }>;
+      const msg = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "snapshot" }
+      >;
       expect(msg.data.agents.researcher!.status).toBe("completed");
 
       server.close();
@@ -426,7 +504,10 @@ describe("DevTools Server", () => {
       sendCommand(client, { type: "request_snapshot" });
       expect(client.messages[0]!.type).toBe("error");
 
-      const err = client.messages[0] as Extract<DevToolsServerMessage, { type: "error" }>;
+      const err = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "error" }
+      >;
       expect(err.code).toBe("NO_SNAPSHOT");
 
       server.close();
@@ -449,7 +530,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("health");
 
-      const msg = client.messages[0] as Extract<DevToolsServerMessage, { type: "health" }>;
+      const msg = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "health" }
+      >;
       expect(msg.metrics["agent-a"]).toBeDefined();
       expect(msg.metrics["agent-a"]!.healthScore).toBeGreaterThan(0);
 
@@ -458,7 +542,15 @@ describe("DevTools Server", () => {
 
     it("handles request_breakpoints", () => {
       const bpState: BreakpointState = {
-        pending: [{ id: "bp_1", type: "pre_agent_run", agentId: "a", input: "test", requestedAt: Date.now() }],
+        pending: [
+          {
+            id: "bp_1",
+            type: "pre_agent_run",
+            agentId: "a",
+            input: "test",
+            requestedAt: Date.now(),
+          },
+        ],
         resolved: [],
         cancelled: [],
       };
@@ -476,7 +568,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("breakpoints");
 
-      const msg = client.messages[0] as Extract<DevToolsServerMessage, { type: "breakpoints" }>;
+      const msg = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "breakpoints" }
+      >;
       expect(msg.state.pending).toHaveLength(1);
       expect(msg.state.pending[0]!.id).toBe("bp_1");
 
@@ -493,7 +588,11 @@ describe("DevTools Server", () => {
       });
 
       const client = mockTransport.connect();
-      sendCommand(client, { type: "resume_breakpoint", breakpointId: "bp_1", modifications: { input: "modified" } });
+      sendCommand(client, {
+        type: "resume_breakpoint",
+        breakpointId: "bp_1",
+        modifications: { input: "modified" },
+      });
 
       expect(onResume).toHaveBeenCalledWith("bp_1", { input: "modified" });
 
@@ -510,7 +609,11 @@ describe("DevTools Server", () => {
       });
 
       const client = mockTransport.connect();
-      sendCommand(client, { type: "cancel_breakpoint", breakpointId: "bp_1", reason: "not needed" });
+      sendCommand(client, {
+        type: "cancel_breakpoint",
+        breakpointId: "bp_1",
+        reason: "not needed",
+      });
 
       expect(onCancel).toHaveBeenCalledWith("bp_1", "not needed");
 
@@ -523,7 +626,13 @@ describe("DevTools Server", () => {
         timeline,
       });
 
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
 
       const client = mockTransport.connect();
       client.messages.length = 0;
@@ -544,7 +653,14 @@ describe("DevTools Server", () => {
       const exportData = JSON.stringify({
         version: 1,
         events: [
-          { id: 0, type: "agent_start", timestamp: 100, agentId: "imported", snapshotId: null, inputLength: 5 },
+          {
+            id: 0,
+            type: "agent_start",
+            timestamp: 100,
+            agentId: "imported",
+            snapshotId: null,
+            inputLength: 5,
+          },
         ],
         nextId: 1,
       });
@@ -556,7 +672,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("event_batch");
 
-      const batch = client.messages[0] as Extract<DevToolsServerMessage, { type: "event_batch" }>;
+      const batch = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "event_batch" }
+      >;
       expect(batch.events).toHaveLength(1);
       expect(batch.events[0]!.agentId).toBe("imported");
 
@@ -576,7 +695,10 @@ describe("DevTools Server", () => {
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("error");
 
-      const err = client.messages[0] as Extract<DevToolsServerMessage, { type: "error" }>;
+      const err = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "error" }
+      >;
       expect(err.code).toBe("INVALID_JSON");
 
       server.close();
@@ -591,11 +713,16 @@ describe("DevTools Server", () => {
       const client = mockTransport.connect();
       client.messages.length = 0;
 
-      sendCommand(client, { type: "unknown_thing" } as unknown as DevToolsClientMessage);
+      sendCommand(client, {
+        type: "unknown_thing",
+      } as unknown as DevToolsClientMessage);
       expect(client.messages).toHaveLength(1);
       expect(client.messages[0]!.type).toBe("error");
 
-      const err = client.messages[0] as Extract<DevToolsServerMessage, { type: "error" }>;
+      const err = client.messages[0] as Extract<
+        DevToolsServerMessage,
+        { type: "error" }
+      >;
       expect(err.code).toBe("UNKNOWN_COMMAND");
 
       server.close();
@@ -716,23 +843,43 @@ describe("DevTools Server", () => {
       const cb = vi.fn();
       const unsub = timeline.subscribe(cb);
 
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
       expect(cb).toHaveBeenCalledTimes(1);
 
       unsub();
 
-      timeline.record({ type: "agent_start", timestamp: 2, agentId: "b", snapshotId: null, inputLength: 2 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 2,
+        agentId: "b",
+        snapshotId: null,
+        inputLength: 2,
+      });
       expect(cb).toHaveBeenCalledTimes(1);
     });
 
     it("throwing listener does not break other listeners", () => {
       const good = vi.fn();
-      const bad = vi.fn(() => { throw new Error("boom"); });
+      const bad = vi.fn(() => {
+        throw new Error("boom");
+      });
 
       timeline.subscribe(bad);
       timeline.subscribe(good);
 
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
 
       expect(bad).toHaveBeenCalledTimes(1);
       expect(good).toHaveBeenCalledTimes(1);
@@ -750,10 +897,18 @@ describe("DevTools Server", () => {
 
       // Override send to throw
       const originalSend = client.client.send;
-      client.client.send = () => { throw new Error("connection closed"); };
+      client.client.send = () => {
+        throw new Error("connection closed");
+      };
 
       // Should not throw
-      timeline.record({ type: "agent_start", timestamp: 1, agentId: "a", snapshotId: null, inputLength: 1 });
+      timeline.record({
+        type: "agent_start",
+        timestamp: 1,
+        agentId: "a",
+        snapshotId: null,
+        inputLength: 1,
+      });
 
       // Client should be removed
       expect(server.clientCount).toBe(0);

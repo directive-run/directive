@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useDerived } from "@directive-run/vue";
 import { system } from "../system";
-import { TestIds } from "../../../../shared/test-ids";
 
 const doubled = useDerived(system, "doubled");
 const isPositive = useDerived(system, "isPositive");

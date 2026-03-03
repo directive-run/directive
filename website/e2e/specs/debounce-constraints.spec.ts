@@ -1,24 +1,42 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 /**
  * Helper: set a value on an input element via page.evaluate to bypass
  * Playwright's typing delay.
  */
-async function setInput(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setInput(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
-async function setSlider(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setSlider(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
 test.describe("Debounce Constraints example", () => {
@@ -28,13 +46,21 @@ test.describe("Debounce Constraints example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/debounce-constraints");
     try {
-      await page.waitForSelector("directive-debounce-constraints", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-debounce-constraints", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       // Dev server sometimes needs a second attempt under parallel load
       await page.reload();
-      await page.waitForSelector("directive-debounce-constraints", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-debounce-constraints", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-debounce-constraints-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-debounce-constraints-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and renders search input", async ({ page }) => {
@@ -49,7 +75,9 @@ test.describe("Debounce Constraints example", () => {
   test("typing updates raw query display", async ({ page }) => {
     await setInput(page, "dc-search-input", "react");
 
-    await expect(tid(page, "dc-raw-query")).toContainText("react", { timeout: 1_000 });
+    await expect(tid(page, "dc-raw-query")).toContainText("react", {
+      timeout: 1_000,
+    });
   });
 
   test("debounced query updates after delay", async ({ page }) => {
@@ -59,7 +87,9 @@ test.describe("Debounce Constraints example", () => {
     await setInput(page, "dc-search-input", "java");
 
     // Debounced query should eventually show "java"
-    await expect(tid(page, "dc-debounced-query")).toContainText("java", { timeout: 3_000 });
+    await expect(tid(page, "dc-debounced-query")).toContainText("java", {
+      timeout: 3_000,
+    });
   });
 
   test("debounce resets on new keystroke", async ({ page }) => {
@@ -78,7 +108,9 @@ test.describe("Debounce Constraints example", () => {
     await page.waitForTimeout(500);
 
     // Debounced query should still be empty (timer reset on second keystroke)
-    await expect(tid(page, "dc-debounced-query")).toContainText('""', { timeout: 500 });
+    await expect(tid(page, "dc-debounced-query")).toContainText('""', {
+      timeout: 500,
+    });
   });
 
   test("search results appear after debounce", async ({ page }) => {
@@ -89,7 +121,9 @@ test.describe("Debounce Constraints example", () => {
     await setInput(page, "dc-search-input", "react");
 
     // Results should appear after debounce + API delay
-    await expect(tid(page, "dc-results-list")).toContainText("React", { timeout: 5_000 });
+    await expect(tid(page, "dc-results-list")).toContainText("React", {
+      timeout: 5_000,
+    });
   });
 
   test("min chars threshold prevents search", async ({ page }) => {
@@ -104,13 +138,17 @@ test.describe("Debounce Constraints example", () => {
     await page.waitForTimeout(1_000);
 
     // No results should appear (below min chars)
-    await expect(tid(page, "dc-results-list")).not.toContainText("React", { timeout: 1_000 });
+    await expect(tid(page, "dc-results-list")).not.toContainText("React", {
+      timeout: 1_000,
+    });
 
     // Type 3 chars — meets threshold
     await setInput(page, "dc-search-input", "rea");
 
     // Results should now appear
-    await expect(tid(page, "dc-results-list")).toContainText("React", { timeout: 5_000 });
+    await expect(tid(page, "dc-results-list")).toContainText("React", {
+      timeout: 5_000,
+    });
   });
 
   test("keystroke counter tracks input", async ({ page }) => {
@@ -120,7 +158,9 @@ test.describe("Debounce Constraints example", () => {
     await setInput(page, "dc-search-input", "hell");
     await setInput(page, "dc-search-input", "hello");
 
-    await expect(tid(page, "dc-stat-keystrokes")).toContainText("5", { timeout: 1_000 });
+    await expect(tid(page, "dc-stat-keystrokes")).toContainText("5", {
+      timeout: 1_000,
+    });
   });
 
   test("API calls saved counter", async ({ page }) => {
@@ -135,10 +175,14 @@ test.describe("Debounce Constraints example", () => {
     await setInput(page, "dc-search-input", "java");
 
     // Wait for debounce + search to complete
-    await expect(tid(page, "dc-results-list")).toContainText("Java", { timeout: 5_000 });
+    await expect(tid(page, "dc-results-list")).toContainText("Java", {
+      timeout: 5_000,
+    });
 
     // Saved calls should be > 0 (4 keystrokes but only 1 API call)
-    await expect(tid(page, "dc-stat-saved")).not.toContainText("0 (0%)", { timeout: 2_000 });
+    await expect(tid(page, "dc-stat-saved")).not.toContainText("0 (0%)", {
+      timeout: 2_000,
+    });
   });
 
   test("progress bar visible during debounce", async ({ page }) => {
@@ -148,7 +192,9 @@ test.describe("Debounce Constraints example", () => {
     await setInput(page, "dc-search-input", "a");
 
     // Progress bar should become visible
-    await expect(tid(page, "dc-progress-bar")).not.toHaveClass(/hidden/, { timeout: 1_000 });
+    await expect(tid(page, "dc-progress-bar")).not.toHaveClass(/hidden/, {
+      timeout: 1_000,
+    });
   });
 
   test("derivations update correctly", async ({ page }) => {
@@ -164,7 +210,9 @@ test.describe("Debounce Constraints example", () => {
     await setInput(page, "dc-search-input", "react");
 
     // Wait for results
-    await expect(tid(page, "dc-deriv-result-count")).not.toContainText("0", { timeout: 5_000 });
+    await expect(tid(page, "dc-deriv-result-count")).not.toContainText("0", {
+      timeout: 5_000,
+    });
   });
 
   test("clear resets search state", async ({ page }) => {
@@ -173,16 +221,22 @@ test.describe("Debounce Constraints example", () => {
 
     // Type and wait for results
     await setInput(page, "dc-search-input", "react");
-    await expect(tid(page, "dc-results-list")).toContainText("React", { timeout: 5_000 });
+    await expect(tid(page, "dc-results-list")).toContainText("React", {
+      timeout: 5_000,
+    });
 
     // Click clear
     await tid(page, "dc-clear-btn").click();
 
     // Results should be gone
-    await expect(tid(page, "dc-results-list")).toContainText("Type to search", { timeout: 1_000 });
+    await expect(tid(page, "dc-results-list")).toContainText("Type to search", {
+      timeout: 1_000,
+    });
 
     // Input should be empty
-    await expect(tid(page, "dc-search-input")).toHaveValue("", { timeout: 1_000 });
+    await expect(tid(page, "dc-search-input")).toHaveValue("", {
+      timeout: 1_000,
+    });
   });
 
   test("code tabs visible below example", async ({ page }) => {

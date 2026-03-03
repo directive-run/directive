@@ -1,9 +1,9 @@
-import dynamic from 'next/dynamic'
+import dynamic from "next/dynamic";
 
-import { buildPageMetadata } from '@/lib/metadata'
-import { BlogCard } from '@/components/BlogCard'
-import { BlogListItem } from '@/components/BlogListItem'
-import { getFeaturedPosts, getPublishedPosts } from '@/lib/blog'
+import { BlogCard } from "@/components/BlogCard";
+import { BlogListItem } from "@/components/BlogListItem";
+import { getFeaturedPosts, getPublishedPosts } from "@/lib/blog";
+import { buildPageMetadata } from "@/lib/metadata";
 
 function BlogPostListFallback() {
   return (
@@ -19,26 +19,26 @@ function BlogPostListFallback() {
         ))}
       </div>
     </section>
-  )
+  );
 }
 
 const BlogPostList = dynamic(
-  () => import('@/components/BlogPostList').then((m) => m.BlogPostList),
+  () => import("@/components/BlogPostList").then((m) => m.BlogPostList),
   {
     loading: () => <BlogPostListFallback />,
   },
-)
+);
 
 export const metadata = buildPageMetadata({
-  title: 'Blog — Directive',
+  title: "Blog — Directive",
   description:
-    'Deep dives into constraint-driven architecture, state management patterns, and building AI agents with Directive.',
-  path: '/blog',
-  section: 'Blog',
-})
+    "Deep dives into constraint-driven architecture, state management patterns, and building AI agents with Directive.",
+  path: "/blog",
+  section: "Blog",
+});
 
 export default function BlogPage() {
-  const featured = getFeaturedPosts().slice(0, 3)
+  const featured = getFeaturedPosts().slice(0, 3);
 
   return (
     <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">
@@ -67,5 +67,5 @@ export default function BlogPage() {
 
       <BlogPostList />
     </div>
-  )
+  );
 }

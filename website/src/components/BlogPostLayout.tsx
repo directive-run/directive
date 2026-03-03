@@ -1,21 +1,21 @@
-import Link from 'next/link'
-import { type Node } from '@markdoc/markdoc'
+import type { Node } from "@markdoc/markdoc";
+import Link from "next/link";
 
-import { Prose } from '@/components/Prose'
-import { ArticleJsonLd } from '@/components/JsonLd'
-import { RelatedPosts } from '@/components/RelatedPosts'
-import { calculateReadingTime, formatReadingTime } from '@/lib/readingTime'
-import { resolveAuthor } from '@/lib/blog'
+import { ArticleJsonLd } from "@/components/JsonLd";
+import { Prose } from "@/components/Prose";
+import { RelatedPosts } from "@/components/RelatedPosts";
+import { resolveAuthor } from "@/lib/blog";
+import { calculateReadingTime, formatReadingTime } from "@/lib/readingTime";
 
 interface BlogFrontmatter {
-  title?: string
-  description?: string
-  date?: string | Date
-  dateModified?: string | Date
-  slug?: string
-  author?: string
-  categories?: string[]
-  layout?: string
+  title?: string;
+  description?: string;
+  date?: string | Date;
+  dateModified?: string | Date;
+  slug?: string;
+  author?: string;
+  categories?: string[];
+  layout?: string;
 }
 
 function formatDate(dateStr: string | Date): string {
@@ -23,16 +23,16 @@ function formatDate(dateStr: string | Date): string {
     dateStr instanceof Date
       ? dateStr
       : new Date(
-          typeof dateStr === 'string' && !dateStr.includes('T')
-            ? dateStr + 'T00:00:00'
+          typeof dateStr === "string" && !dateStr.includes("T")
+            ? dateStr + "T00:00:00"
             : dateStr,
-        )
+        );
 
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function BlogPostLayout({
@@ -40,9 +40,9 @@ export function BlogPostLayout({
   frontmatter,
   nodes,
 }: {
-  children: React.ReactNode
-  frontmatter: BlogFrontmatter
-  nodes: Array<Node>
+  children: React.ReactNode;
+  frontmatter: BlogFrontmatter;
+  nodes: Array<Node>;
 }) {
   const {
     title,
@@ -52,13 +52,13 @@ export function BlogPostLayout({
     slug,
     author: authorId,
     categories = [],
-  } = frontmatter
-  const author = authorId ? resolveAuthor(authorId) : null
-  const readingTime = formatReadingTime(calculateReadingTime(nodes))
-  const canonicalUrl = slug ? `https://directive.run/blog/${slug}` : undefined
+  } = frontmatter;
+  const author = authorId ? resolveAuthor(authorId) : null;
+  const readingTime = formatReadingTime(calculateReadingTime(nodes));
+  const canonicalUrl = slug ? `https://directive.run/blog/${slug}` : undefined;
   const ogImageUrl = title
     ? `https://directive.run/api/og?title=${encodeURIComponent(title)}&section=Blog`
-    : undefined
+    : undefined;
 
   return (
     <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">
@@ -86,11 +86,17 @@ export function BlogPostLayout({
       {dateModified && (
         <meta
           property="article:modified_time"
-          content={dateModified instanceof Date ? dateModified.toISOString() : String(dateModified)}
+          content={
+            dateModified instanceof Date
+              ? dateModified.toISOString()
+              : String(dateModified)
+          }
         />
       )}
       {author && <meta property="article:author" content={author.name} />}
-      {categories.length > 0 && <meta property="article:section" content={categories[0]} />}
+      {categories.length > 0 && (
+        <meta property="article:section" content={categories[0]} />
+      )}
 
       {title && description && slug && (
         <ArticleJsonLd
@@ -129,7 +135,13 @@ export function BlogPostLayout({
 
       {date && (
         <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-          <time dateTime={date instanceof Date ? date.toISOString().slice(0, 10) : date}>{formatDate(date)}</time>
+          <time
+            dateTime={
+              date instanceof Date ? date.toISOString().slice(0, 10) : date
+            }
+          >
+            {formatDate(date)}
+          </time>
           <span className="text-slate-300 dark:text-slate-600">&middot;</span>
           <span>{readingTime}</span>
         </div>
@@ -215,7 +227,7 @@ export function BlogPostLayout({
       </div>
 
       <p className="mt-12 text-sm text-slate-400">
-        Directive is free and open source. If this was useful, consider{' '}
+        Directive is free and open source. If this was useful, consider{" "}
         <Link
           href="/support"
           className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
@@ -247,5 +259,5 @@ export function BlogPostLayout({
         </Link>
       </div>
     </div>
-  )
+  );
 }

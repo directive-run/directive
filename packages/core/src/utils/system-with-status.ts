@@ -6,44 +6,44 @@
 
 import { createSystem } from "../core/system.js";
 import type {
-	ModuleDef,
-	Plugin,
-	DebugConfig,
-	ErrorBoundaryConfig,
-	ModuleSchema,
-	SingleModuleSystem,
+  DebugConfig,
+  ErrorBoundaryConfig,
+  ModuleDef,
+  ModuleSchema,
+  Plugin,
+  SingleModuleSystem,
 } from "../core/types.js";
 import { createRequirementStatusPlugin } from "./requirement-status.js";
 
 /** Options for createSystemWithStatus */
 export interface CreateSystemWithStatusOptions<M extends ModuleSchema> {
-	/** The module to use for the system */
-	module: ModuleDef<M>;
-	/** Additional plugins to include alongside the status plugin */
-	// biome-ignore lint/suspicious/noExplicitAny: Plugin generic contravariance issues
-	plugins?: Plugin<any>[];
-	/** Debug configuration */
-	debug?: DebugConfig;
-	/** Error boundary configuration */
-	errorBoundary?: ErrorBoundaryConfig;
-	/** Tick interval in milliseconds */
-	tickMs?: number;
-	/** Enable zero-config mode */
-	zeroConfig?: boolean;
-	/** Initial facts to set on the system */
-	// biome-ignore lint/suspicious/noExplicitAny: Facts type varies by module
-	initialFacts?: Record<string, any>;
+  /** The module to use for the system */
+  module: ModuleDef<M>;
+  /** Additional plugins to include alongside the status plugin */
+  // biome-ignore lint/suspicious/noExplicitAny: Plugin generic contravariance issues
+  plugins?: Plugin<any>[];
+  /** Debug configuration */
+  debug?: DebugConfig;
+  /** Error boundary configuration */
+  errorBoundary?: ErrorBoundaryConfig;
+  /** Tick interval in milliseconds */
+  tickMs?: number;
+  /** Enable zero-config mode */
+  zeroConfig?: boolean;
+  /** Initial facts to set on the system */
+  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies by module
+  initialFacts?: Record<string, any>;
 }
 
 /** Return type for createSystemWithStatus */
 export interface SystemWithStatus<M extends ModuleSchema> {
-	/**
-	 * The Directive system instance.
-	 * This is a SingleModuleSystem - use system.facts, system.dispatch(), etc.
-	 */
-	system: SingleModuleSystem<M>;
-	/** The status plugin for use with useRequirementStatus hooks */
-	statusPlugin: ReturnType<typeof createRequirementStatusPlugin>;
+  /**
+   * The Directive system instance.
+   * This is a SingleModuleSystem - use system.facts, system.dispatch(), etc.
+   */
+  system: SingleModuleSystem<M>;
+  /** The status plugin for use with useRequirementStatus hooks */
+  statusPlugin: ReturnType<typeof createRequirementStatusPlugin>;
 }
 
 /**
@@ -81,33 +81,33 @@ export interface SystemWithStatus<M extends ModuleSchema> {
  * ```
  */
 export function createSystemWithStatus<M extends ModuleSchema>(
-	options: CreateSystemWithStatusOptions<M>,
+  options: CreateSystemWithStatusOptions<M>,
 ): SystemWithStatus<M> {
-	// Create the status plugin
-	const statusPlugin = createRequirementStatusPlugin();
+  // Create the status plugin
+  const statusPlugin = createRequirementStatusPlugin();
 
-	// Add the plugin to the options
-	const existingPlugins = options.plugins ?? [];
+  // Add the plugin to the options
+  const existingPlugins = options.plugins ?? [];
 
-	// Create the system with the status plugin included
-	// Use type assertion to bypass overload resolution issues
-	// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-	const allPlugins = [...existingPlugins, statusPlugin.plugin] as Plugin<any>[];
-	// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-	const system = createSystem({
-		module: options.module,
-		plugins: allPlugins,
-		debug: options.debug,
-		errorBoundary: options.errorBoundary,
-		tickMs: options.tickMs,
-		zeroConfig: options.zeroConfig,
-		initialFacts: options.initialFacts,
-	// biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-	} as any);
+  // Create the system with the status plugin included
+  // Use type assertion to bypass overload resolution issues
+  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+  const allPlugins = [...existingPlugins, statusPlugin.plugin] as Plugin<any>[];
+  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+  const system = createSystem({
+    module: options.module,
+    plugins: allPlugins,
+    debug: options.debug,
+    errorBoundary: options.errorBoundary,
+    tickMs: options.tickMs,
+    zeroConfig: options.zeroConfig,
+    initialFacts: options.initialFacts,
+    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+  } as any);
 
-	return {
-		// The system returned by createSystem with a single module is a SingleModuleSystem
-		system: system as SingleModuleSystem<M>,
-		statusPlugin,
-	};
+  return {
+    // The system returned by createSystem with a single module is a SingleModuleSystem
+    system: system as SingleModuleSystem<M>,
+    statusPlugin,
+  };
 }

@@ -11,8 +11,13 @@
  *   crossModuleDeps on the wizard schema.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import {persistencePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import { devtoolsPlugin, persistencePlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -66,7 +71,10 @@ export const wizardSchema = {
 /** Inline step validity check for use in constraints (which only receive facts). */
 function isStepValid(facts: Record<string, unknown>, step: number): boolean {
   if (step === 0) {
-    return (facts.email as string).includes("@") && (facts.password as string).length >= 8;
+    return (
+      (facts.email as string).includes("@") &&
+      (facts.password as string).length >= 8
+    );
   }
   if (step === 1) {
     return (facts.name as string).trim().length > 0;
@@ -130,7 +138,9 @@ export const wizardModule = createModule("wizard", {
     },
 
     canAdvance: (facts, derive) => {
-      return derive.currentStepValid && facts.currentStep < facts.totalSteps - 1;
+      return (
+        derive.currentStepValid && facts.currentStep < facts.totalSteps - 1
+      );
     },
 
     canGoBack: (facts) => {

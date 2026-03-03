@@ -1,5 +1,4 @@
-import { Fragment } from 'react'
-import type { Icon } from '@phosphor-icons/react'
+import type { Icon } from "@phosphor-icons/react";
 import {
   CheckCircle,
   CircleHalf,
@@ -9,299 +8,300 @@ import {
   PlugsConnected,
   ShieldCheck,
   Wrench,
-} from '@phosphor-icons/react/dist/ssr'
-import clsx from 'clsx'
+} from "@phosphor-icons/react/dist/ssr";
+import clsx from "clsx";
+import { Fragment } from "react";
 
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
 
 const libraries = [
-  'Directive',
-  'Redux',
-  'Zustand',
-  'XState',
-  'React Query',
-] as const
+  "Directive",
+  "Redux",
+  "Zustand",
+  "XState",
+  "React Query",
+] as const;
 
-type Library = (typeof libraries)[number]
+type Library = (typeof libraries)[number];
 
-type CellValue = boolean | string
+type CellValue = boolean | string;
 
 interface Feature {
-  name: string
-  values: Record<Library, CellValue>
+  name: string;
+  values: Record<Library, CellValue>;
 }
 
 interface Section {
-  name: string
-  icon: Icon
-  features: Feature[]
+  name: string;
+  icon: Icon;
+  features: Feature[];
 }
 
 const sections: Section[] = [
   {
-    name: 'Core',
+    name: "Core",
     icon: Cube,
     features: [
       {
-        name: 'Declarative constraints',
+        name: "Declarative constraints",
         values: {
           Redux: false,
           Zustand: false,
 
-          XState: 'Partial',
-          'React Query': false,
+          XState: "Partial",
+          "React Query": false,
           Directive: true,
         },
       },
       {
-        name: 'Auto-tracking derivations',
-        values: {
-          Redux: false,
-          Zustand: false,
-
-          XState: false,
-          'React Query': false,
-          Directive: true,
-        },
-      },
-      {
-        name: 'Effects system',
-        values: {
-          Redux: 'Middleware',
-          Zustand: 'Middleware',
-
-          XState: 'Actions',
-          'React Query': false,
-          Directive: true,
-        },
-      },
-      {
-        name: 'Multi-module composition',
-        values: {
-          Redux: 'Slices',
-          Zustand: 'Slices',
-
-          XState: 'Actors',
-          'React Query': false,
-          Directive: true,
-        },
-      },
-      {
-        name: 'Schema validation',
+        name: "Auto-tracking derivations",
         values: {
           Redux: false,
           Zustand: false,
 
           XState: false,
-          'React Query': false,
+          "React Query": false,
           Directive: true,
         },
       },
       {
-        name: 'Optimistic updates',
+        name: "Effects system",
         values: {
-          Redux: 'RTK Query',
+          Redux: "Middleware",
+          Zustand: "Middleware",
+
+          XState: "Actions",
+          "React Query": false,
+          Directive: true,
+        },
+      },
+      {
+        name: "Multi-module composition",
+        values: {
+          Redux: "Slices",
+          Zustand: "Slices",
+
+          XState: "Actors",
+          "React Query": false,
+          Directive: true,
+        },
+      },
+      {
+        name: "Schema validation",
+        values: {
+          Redux: false,
           Zustand: false,
 
           XState: false,
-          'React Query': true,
+          "React Query": false,
+          Directive: true,
+        },
+      },
+      {
+        name: "Optimistic updates",
+        values: {
+          Redux: "RTK Query",
+          Zustand: false,
+
+          XState: false,
+          "React Query": true,
           Directive: true,
         },
       },
     ],
   },
   {
-    name: 'Resilience',
+    name: "Resilience",
     icon: ShieldCheck,
     features: [
       {
-        name: 'Built-in retry/timeout',
+        name: "Built-in retry/timeout",
         values: {
-          Redux: 'RTK Query',
+          Redux: "RTK Query",
           Zustand: false,
 
-          XState: 'Partial',
-          'React Query': true,
+          XState: "Partial",
+          "React Query": true,
           Directive: true,
         },
       },
       {
-        name: 'Error boundaries',
+        name: "Error boundaries",
         values: {
           Redux: false,
           Zustand: false,
 
           XState: false,
-          'React Query': true,
+          "React Query": true,
           Directive: true,
         },
       },
       {
-        name: 'Batched resolution',
+        name: "Batched resolution",
         values: {
           Redux: false,
           Zustand: false,
 
           XState: false,
-          'React Query': true,
+          "React Query": true,
           Directive: true,
         },
       },
       {
-        name: 'Settlement detection',
+        name: "Settlement detection",
         values: {
           Redux: false,
           Zustand: false,
 
           XState: false,
-          'React Query': false,
+          "React Query": false,
           Directive: true,
         },
       },
     ],
   },
   {
-    name: 'Developer Experience',
+    name: "Developer Experience",
     icon: Wrench,
     features: [
       {
-        name: 'Snapshots',
+        name: "Snapshots",
         values: {
           Redux: true,
           Zustand: false,
 
           XState: true,
-          'React Query': false,
+          "React Query": false,
           Directive: true,
         },
       },
       {
-        name: 'Time-travel debugging',
+        name: "Time-travel debugging",
         values: {
           Redux: true,
           Zustand: true,
 
           XState: true,
-          'React Query': false,
+          "React Query": false,
           Directive: true,
         },
       },
       {
-        name: 'Plugin architecture',
+        name: "Plugin architecture",
         values: {
-          Redux: 'Middleware',
-          Zustand: 'Middleware',
+          Redux: "Middleware",
+          Zustand: "Middleware",
 
           XState: false,
-          'React Query': false,
+          "React Query": false,
           Directive: true,
         },
       },
       {
-        name: 'Testing utilities',
+        name: "Testing utilities",
         values: {
           Redux: false,
           Zustand: false,
 
           XState: true,
-          'React Query': true,
+          "React Query": true,
           Directive: true,
         },
       },
       {
-        name: 'TypeScript inference',
+        name: "TypeScript inference",
         values: {
-          Redux: 'Good',
-          Zustand: 'Good',
+          Redux: "Good",
+          Zustand: "Good",
 
-          XState: 'Good',
-          'React Query': 'Good',
-          Directive: 'Good',
+          XState: "Good",
+          "React Query": "Good",
+          Directive: "Good",
         },
       },
       {
-        name: 'Bundle size (gzip)',
+        name: "Bundle size (gzip)",
         values: {
-          Redux: '~11KB',
-          Zustand: '~1KB',
+          Redux: "~11KB",
+          Zustand: "~1KB",
 
-          XState: '~14KB',
-          'React Query': '~13KB',
-          Directive: '~3KB',
+          XState: "~14KB",
+          "React Query": "~13KB",
+          Directive: "~3KB",
         },
       },
       {
-        name: 'Learning curve',
+        name: "Learning curve",
         values: {
-          Redux: 'Medium',
-          Zustand: 'Low',
+          Redux: "Medium",
+          Zustand: "Low",
 
-          XState: 'High',
-          'React Query': 'Low',
-          Directive: 'Medium',
+          XState: "High",
+          "React Query": "Low",
+          Directive: "Medium",
         },
       },
     ],
   },
   {
-    name: 'Integration',
+    name: "Integration",
     icon: PlugsConnected,
     features: [
       {
-        name: 'AI agent orchestration',
+        name: "AI agent orchestration",
         values: {
           Redux: false,
           Zustand: false,
 
           XState: false,
-          'React Query': false,
+          "React Query": false,
           Directive: true,
         },
       },
       {
-        name: 'Framework agnostic',
+        name: "Framework agnostic",
         values: {
           Redux: true,
           Zustand: true,
 
           XState: true,
-          'React Query': true,
+          "React Query": true,
           Directive: true,
         },
       },
       {
-        name: 'SSR support',
+        name: "SSR support",
         values: {
           Redux: true,
           Zustand: true,
 
           XState: true,
-          'React Query': true,
+          "React Query": true,
           Directive: true,
         },
       },
     ],
   },
-]
+];
 
 // ---------------------------------------------------------------------------
 // Cell renderers
 // ---------------------------------------------------------------------------
 
 const learningCurveStyles: Record<string, { color: string; label: string }> = {
-  Low: { color: 'text-emerald-500', label: 'Low difficulty' },
-  Medium: { color: 'text-amber-500', label: 'Medium difficulty' },
-  High: { color: 'text-red-500', label: 'High difficulty' },
-}
+  Low: { color: "text-emerald-500", label: "Low difficulty" },
+  Medium: { color: "text-amber-500", label: "Medium difficulty" },
+  High: { color: "text-red-500", label: "High difficulty" },
+};
 
 function CellContent({
   value,
   featureName,
 }: {
-  value: CellValue
-  featureName: string
+  value: CellValue;
+  featureName: string;
 }) {
   if (value === true) {
     return (
@@ -310,7 +310,7 @@ function CellContent({
         className="h-5 w-5 text-emerald-500"
         aria-label="Supported"
       />
-    )
+    );
   }
 
   if (value === false) {
@@ -319,11 +319,11 @@ function CellContent({
         className="h-5 w-5 text-slate-400 dark:text-slate-600"
         aria-label="Not supported"
       />
-    )
+    );
   }
 
   // Partial support
-  if (value === 'Partial') {
+  if (value === "Partial") {
     return (
       <span className="inline-flex items-center gap-1">
         <CircleHalf
@@ -335,38 +335,38 @@ function CellContent({
           Partial
         </span>
       </span>
-    )
+    );
   }
 
   // Learning curve with gauge icon
-  if (featureName === 'Learning curve' && learningCurveStyles[value]) {
-    const style = learningCurveStyles[value]
+  if (featureName === "Learning curve" && learningCurveStyles[value]) {
+    const style = learningCurveStyles[value];
 
     return (
       <span className="inline-flex items-center gap-1">
         <Gauge
           weight="fill"
-          className={clsx('h-4 w-4', style.color)}
+          className={clsx("h-4 w-4", style.color)}
           aria-label={style.label}
         />
         <span className="text-sm text-slate-700 dark:text-slate-200">
           {value}
         </span>
       </span>
-    )
+    );
   }
 
   // Default text
   return (
     <span className="text-sm text-slate-700 dark:text-slate-200">{value}</span>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Table component
 // ---------------------------------------------------------------------------
 
-const DIRECTIVE_INDEX = libraries.indexOf('Directive')
+const DIRECTIVE_INDEX = libraries.indexOf("Directive");
 
 export function ComparisonTable() {
   return (
@@ -386,10 +386,10 @@ export function ComparisonTable() {
                 <th
                   key={lib}
                   className={clsx(
-                    'px-3 py-3 text-center text-sm font-semibold',
+                    "px-3 py-3 text-center text-sm font-semibold",
                     i === DIRECTIVE_INDEX
-                      ? 'border-t-2 border-brand-primary bg-brand-primary-50 text-brand-primary-700 dark:bg-brand-primary-950/30 dark:text-brand-primary-300'
-                      : 'bg-brand-surface text-slate-900 dark:text-white',
+                      ? "border-t-2 border-brand-primary bg-brand-primary-50 text-brand-primary-700 dark:bg-brand-primary-950/30 dark:text-brand-primary-300"
+                      : "bg-brand-surface text-slate-900 dark:text-white",
                   )}
                 >
                   {lib}
@@ -400,7 +400,7 @@ export function ComparisonTable() {
 
           <tbody>
             {sections.map((section) => {
-              const SectionIcon = section.icon
+              const SectionIcon = section.icon;
 
               return (
                 <Fragment key={section.name}>
@@ -430,9 +430,9 @@ export function ComparisonTable() {
                         <td
                           key={lib}
                           className={clsx(
-                            'px-3 py-3 text-center',
+                            "px-3 py-3 text-center",
                             i === DIRECTIVE_INDEX &&
-                              'bg-brand-primary-50/50 dark:bg-brand-primary-950/20',
+                              "bg-brand-primary-50/50 dark:bg-brand-primary-950/20",
                           )}
                         >
                           <span className="inline-flex items-center justify-center">
@@ -446,11 +446,11 @@ export function ComparisonTable() {
                     </tr>
                   ))}
                 </Fragment>
-              )
+              );
             })}
           </tbody>
         </table>
       </div>
     </div>
-  )
+  );
 }

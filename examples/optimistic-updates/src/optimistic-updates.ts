@@ -6,7 +6,7 @@
  * resolver key deduplication, toast notifications, and context.snapshot().
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import { mockServerSync } from "./mock-server.js";
 
 // ============================================================================
@@ -84,11 +84,7 @@ export const optimisticUpdatesSchema = {
 // Helpers
 // ============================================================================
 
-function addLogEntry(
-  facts: any,
-  event: string,
-  detail: string,
-): void {
+function addLogEntry(facts: any, event: string, detail: string): void {
   const log = [...(facts.eventLog as EventLogEntry[])];
   log.push({ timestamp: Date.now(), event, detail });
   if (log.length > 100) {
@@ -129,7 +125,8 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
   derive: {
     totalCount: (facts) => (facts.items as TodoItem[]).length,
 
-    doneCount: (facts) => (facts.items as TodoItem[]).filter((i) => i.done).length,
+    doneCount: (facts) =>
+      (facts.items as TodoItem[]).filter((i) => i.done).length,
 
     pendingCount: (facts) => (facts.syncQueue as SyncQueueEntry[]).length,
 
@@ -265,7 +262,11 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
         try {
           await mockServerSync(entry.op, entry.itemId, serverDelay, failRate);
 
-          addLogEntry(context.facts, "success", `${entry.op} item ${entry.itemId} synced`);
+          addLogEntry(
+            context.facts,
+            "success",
+            `${entry.op} item ${entry.itemId} synced`,
+          );
           context.facts.toastMessage = `${entry.op} synced successfully`;
           context.facts.toastType = "success";
         } catch {
@@ -281,7 +282,9 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
 
         // Remove entry from queue
         const currentQueue = context.facts.syncQueue as SyncQueueEntry[];
-        context.facts.syncQueue = currentQueue.filter((e) => e.opId !== req.opId);
+        context.facts.syncQueue = currentQueue.filter(
+          (e) => e.opId !== req.opId,
+        );
         context.facts.syncingOpId = "";
       },
     },

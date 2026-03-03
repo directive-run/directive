@@ -5,7 +5,12 @@
  * renders experiment cards and event timeline.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
@@ -46,7 +51,11 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
-function pickVariant(userId: string, experimentId: string, variants: Variant[]): string {
+function pickVariant(
+  userId: string,
+  experimentId: string,
+  variants: Variant[],
+): string {
   const hash = hashCode(`${userId}:${experimentId}`);
   const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
   let roll = hash % totalWeight;
@@ -91,7 +100,11 @@ function log(type: "event" | "constraint" | "resolver", msg: string) {
     event = "manual";
     detail = msg.replace("Manual assignment: ", "");
     tlType = "assign";
-  } else if (msg.includes("Paused") || msg.includes("Resumed") || msg.includes("Reset")) {
+  } else if (
+    msg.includes("Paused") ||
+    msg.includes("Resumed") ||
+    msg.includes("Reset")
+  ) {
     event = msg.toLowerCase().split(" ")[0];
     detail = msg;
     tlType = "control";
@@ -156,7 +169,9 @@ const abTesting = createModule("ab-testing", {
 
   derive: {
     activeExperiments: (facts) =>
-      (facts.experiments as Experiment[]).filter((e) => e.active && !facts.paused),
+      (facts.experiments as Experiment[]).filter(
+        (e) => e.active && !facts.paused,
+      ),
     assignedCount: (facts) => Object.keys(facts.assignments).length,
     exposedCount: (facts) => Object.keys(facts.exposures).length,
   },
@@ -165,7 +180,10 @@ const abTesting = createModule("ab-testing", {
     registerExperiment: (facts, { id, name, variants }) => {
       const experiments = facts.experiments as Experiment[];
       if (!experiments.find((e: Experiment) => e.id === id)) {
-        facts.experiments = [...experiments, { id, name, variants, active: true }];
+        facts.experiments = [
+          ...experiments,
+          { id, name, variants, active: true },
+        ];
       }
     },
     assignVariant: (facts, { experimentId, variantId }) => {
@@ -286,7 +304,10 @@ const abTesting = createModule("ab-testing", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: abTesting, plugins: [devtoolsPlugin({ name: "ab-testing" })] });
+const system = createSystem({
+  module: abTesting,
+  plugins: [devtoolsPlugin({ name: "ab-testing" })],
+});
 system.start();
 
 // ============================================================================
@@ -371,7 +392,8 @@ function render() {
 
   // --- Timeline ---
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="ab-timeline-empty">Events appear after interactions</div>';
+    timelineEl.innerHTML =
+      '<div class="ab-timeline-empty">Events appear after interactions</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {

@@ -1,45 +1,45 @@
-'use client'
+"use client";
 
-import { useCallback } from 'react'
-import Image from 'next/image'
-import { CircleNotch, CheckCircle } from '@phosphor-icons/react'
-import { useDirectiveRef, useSelector, useEvents } from '@directive-run/react'
+import { useDirectiveRef, useEvents, useSelector } from "@directive-run/react";
+import { CheckCircle, CircleNotch } from "@phosphor-icons/react";
+import Image from "next/image";
+import { useCallback } from "react";
 
-import { Button } from '@/components/Button'
-import { DirectiveCallout } from '@/components/DirectiveCallout'
-import { newsletter } from '@/lib/newsletter'
-import blurCyanImage from '@/images/blur-cyan.png'
-import blurIndigoImage from '@/images/blur-indigo.png'
+import { Button } from "@/components/Button";
+import { DirectiveCallout } from "@/components/DirectiveCallout";
+import blurCyanImage from "@/images/blur-cyan.png";
+import blurIndigoImage from "@/images/blur-indigo.png";
+import { newsletter } from "@/lib/newsletter";
 
 export function Newsletter() {
-  const system = useDirectiveRef(newsletter)
+  const system = useDirectiveRef(newsletter);
 
-  const email = useSelector(system, (state) => state.email, '')
-  const status = useSelector(system, (state) => state.status, 'idle')
-  const errorMessage = useSelector(system, (state) => state.errorMessage, '')
-  const emailError = useSelector(system, (state) => state.emailError, '')
-  const canSubmit = useSelector(system, (state) => state.canSubmit, false)
+  const email = useSelector(system, (state) => state.email, "");
+  const status = useSelector(system, (state) => state.status, "idle");
+  const errorMessage = useSelector(system, (state) => state.errorMessage, "");
+  const emailError = useSelector(system, (state) => state.emailError, "");
+  const canSubmit = useSelector(system, (state) => state.canSubmit, false);
 
-  const events = useEvents(system)
+  const events = useEvents(system);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      events.updateEmail({ value: e.target.value })
+      events.updateEmail({ value: e.target.value });
     },
     [events],
-  )
+  );
 
   const handleBlur = useCallback(() => {
-    events.touchEmail()
-  }, [events])
+    events.touchEmail();
+  }, [events]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
-      e.preventDefault()
-      events.submit()
+      e.preventDefault();
+      events.submit();
     },
     [events],
-  )
+  );
 
   return (
     <div className="relative isolate overflow-hidden border-t border-slate-200 bg-brand-surface pt-16 pb-16 sm:pt-24 sm:pb-24 dark:border-slate-800 dark:pt-24">
@@ -50,10 +50,13 @@ export function Newsletter() {
           </span>
         </h2>
 
-        {status === 'success' ? (
+        {status === "success" ? (
           <div className="w-full max-w-md rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-400/20 dark:bg-emerald-950/20">
             <div className="flex items-center gap-2">
-              <CheckCircle weight="duotone" className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle
+                weight="duotone"
+                className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+              />
               <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 You&apos;re in! Watch for updates.
               </span>
@@ -82,21 +85,22 @@ export function Newsletter() {
                 disabled={!canSubmit}
                 className="disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {status === 'submitting' ? (
-                  <CircleNotch
-                    weight="bold"
-                    className="h-4 w-4 animate-spin"
-                  />
+                {status === "submitting" ? (
+                  <CircleNotch weight="bold" className="h-4 w-4 animate-spin" />
                 ) : (
-                  'Subscribe'
+                  "Subscribe"
                 )}
               </Button>
             </div>
 
             {emailError ? (
-              <p className="mt-4 text-sm/6 text-red-600 dark:text-red-400">{emailError}</p>
-            ) : status === 'error' && errorMessage ? (
-              <p className="mt-4 text-sm/6 text-red-600 dark:text-red-400">{errorMessage}</p>
+              <p className="mt-4 text-sm/6 text-red-600 dark:text-red-400">
+                {emailError}
+              </p>
+            ) : status === "error" && errorMessage ? (
+              <p className="mt-4 text-sm/6 text-red-600 dark:text-red-400">
+                {errorMessage}
+              </p>
             ) : (
               <p className="mt-4 text-sm/6 text-slate-500 dark:text-slate-300">
                 We care about your data. We&apos;ll never share your email.
@@ -131,5 +135,5 @@ export function Newsletter() {
         unoptimized
       />
     </div>
-  )
+  );
 }

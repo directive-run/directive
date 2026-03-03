@@ -1,23 +1,23 @@
-'use client'
+"use client";
 
-import { usePathname } from 'next/navigation'
+import { usePathname } from "next/navigation";
 
-import { navigation } from '@/lib/navigation'
+import { navigation } from "@/lib/navigation";
 
 export function DocsHeader({
   title,
   readingTime,
 }: {
-  title?: string
-  readingTime?: string
+  title?: string;
+  readingTime?: string;
 }) {
-  let pathname = usePathname()
-  let section = navigation.find((section) =>
+  const pathname = usePathname();
+  const section = navigation.find((section) =>
     section.links.find((link) => link.href === pathname),
-  )
+  );
 
   if (!title && !section) {
-    return null
+    return null;
   }
 
   return (
@@ -45,5 +45,5 @@ export function DocsHeader({
         </h1>
       )}
     </header>
-  )
+  );
 }

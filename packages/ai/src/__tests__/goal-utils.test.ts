@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  validateGoal,
-  planGoal,
-  getDependencyGraph,
   explainGoal,
+  getDependencyGraph,
+  planGoal,
+  validateGoal,
 } from "../goal-utils.js";
 import type { GoalResult, RelaxationRecord } from "../types.js";
 
@@ -68,7 +68,9 @@ describe("validateGoal", () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes("Circular dependency"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Circular dependency"))).toBe(
+      true,
+    );
   });
 
   it("duplicate producer → error", () => {
@@ -78,7 +80,9 @@ describe("validateGoal", () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes("produced by both"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("produced by both"))).toBe(
+      true,
+    );
   });
 
   it("agent with no produces → warning", () => {
@@ -97,7 +101,9 @@ describe("validateGoal", () => {
     });
 
     expect(result.valid).toBe(true);
-    expect(result.warnings.some((w) => w.includes("no agent produces"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("no agent produces"))).toBe(
+      true,
+    );
   });
 
   it("diamond pattern is valid (no false cycle)", () => {
@@ -231,8 +237,16 @@ describe("getDependencyGraph", () => {
     expect(graph.roots).toEqual(["fetcher"]);
     expect(graph.leaves).toEqual(["reporter"]);
     expect(graph.edges).toHaveLength(2);
-    expect(graph.edges[0]).toEqual({ from: "fetcher", to: "analyzer", factKey: "data" });
-    expect(graph.edges[1]).toEqual({ from: "analyzer", to: "reporter", factKey: "analysis" });
+    expect(graph.edges[0]).toEqual({
+      from: "fetcher",
+      to: "analyzer",
+      factKey: "data",
+    });
+    expect(graph.edges[1]).toEqual({
+      from: "analyzer",
+      to: "reporter",
+      factKey: "analysis",
+    });
   });
 
   it("producers map is correct", () => {
@@ -359,8 +373,8 @@ describe("explainGoal", () => {
           {
             step: 1,
             nodesRun: ["a"],
-            satisfaction: NaN,
-            satisfactionDelta: NaN,
+            satisfaction: Number.NaN,
+            satisfactionDelta: Number.NaN,
             tokensConsumed: 0,
             durationMs: 0,
             factsProduced: [],
@@ -380,8 +394,8 @@ describe("explainGoal", () => {
           {
             step: 1,
             nodesRun: ["a"],
-            satisfaction: Infinity,
-            satisfactionDelta: -Infinity,
+            satisfaction: Number.POSITIVE_INFINITY,
+            satisfactionDelta: Number.NEGATIVE_INFINITY,
             tokensConsumed: 0,
             durationMs: 0,
             factsProduced: [],
@@ -410,16 +424,24 @@ describe("explainGoal", () => {
       strategy,
     }));
 
-    const explanation = explainGoal(
-      makeGoalResult({ relaxations }),
-    );
+    const explanation = explainGoal(makeGoalResult({ relaxations }));
 
     expect(explanation.relaxations).toHaveLength(5);
-    expect(explanation.relaxations[0]!.description).toContain("re-enabled completed nodes");
-    expect(explanation.relaxations[1]!.description).toContain("injected fact values");
-    expect(explanation.relaxations[2]!.description).toContain("accepted current facts");
-    expect(explanation.relaxations[3]!.description).toContain("alternative nodes");
-    expect(explanation.relaxations[4]!.description).toContain("custom recovery logic");
+    expect(explanation.relaxations[0]!.description).toContain(
+      "re-enabled completed nodes",
+    );
+    expect(explanation.relaxations[1]!.description).toContain(
+      "injected fact values",
+    );
+    expect(explanation.relaxations[2]!.description).toContain(
+      "accepted current facts",
+    );
+    expect(explanation.relaxations[3]!.description).toContain(
+      "alternative nodes",
+    );
+    expect(explanation.relaxations[4]!.description).toContain(
+      "custom recovery logic",
+    );
     expect(explanation.summary).toContain("5 relaxation(s) applied");
   });
 
@@ -466,9 +488,33 @@ describe("explainGoal", () => {
         totalTokens: 300,
         durationMs: 1500,
         stepMetrics: [
-          { step: 1, nodesRun: ["a"], satisfaction: 0.3, satisfactionDelta: 0.3, tokensConsumed: 100, durationMs: 500, factsProduced: ["x"] },
-          { step: 2, nodesRun: ["b"], satisfaction: 0.7, satisfactionDelta: 0.4, tokensConsumed: 100, durationMs: 500, factsProduced: ["y"] },
-          { step: 3, nodesRun: ["c"], satisfaction: 1.0, satisfactionDelta: 0.3, tokensConsumed: 100, durationMs: 500, factsProduced: ["z"] },
+          {
+            step: 1,
+            nodesRun: ["a"],
+            satisfaction: 0.3,
+            satisfactionDelta: 0.3,
+            tokensConsumed: 100,
+            durationMs: 500,
+            factsProduced: ["x"],
+          },
+          {
+            step: 2,
+            nodesRun: ["b"],
+            satisfaction: 0.7,
+            satisfactionDelta: 0.4,
+            tokensConsumed: 100,
+            durationMs: 500,
+            factsProduced: ["y"],
+          },
+          {
+            step: 3,
+            nodesRun: ["c"],
+            satisfaction: 1.0,
+            satisfactionDelta: 0.3,
+            tokensConsumed: 100,
+            durationMs: 500,
+            factsProduced: ["z"],
+          },
         ],
       }),
     );

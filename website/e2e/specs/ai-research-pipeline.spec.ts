@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * AI Research Pipeline Example E2E Tests
@@ -15,18 +15,28 @@ test.describe("AI Research Pipeline Example", () => {
   });
 
   test("page loads with header and description", async ({ page }) => {
-    await expect(page.locator("h1", { hasText: "Research Pipeline" })).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator("h1", { hasText: "Research Pipeline" }),
+    ).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("text=6 agents")).toBeVisible();
   });
 
   test("chat panel renders with input", async ({ page }) => {
-    await expect(page.locator("text=Research Pipeline")).toBeVisible({ timeout: 10_000 });
-    const input = page.locator("input[placeholder='Enter a research topic...']");
+    await expect(page.locator("text=Research Pipeline")).toBeVisible({
+      timeout: 10_000,
+    });
+    const input = page.locator(
+      "input[placeholder='Enter a research topic...']",
+    );
     await expect(input).toBeVisible();
   });
 
   test("example prompt buttons are present", async ({ page }) => {
-    await expect(page.locator("button", { hasText: "Research the impact of AI on healthcare" })).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator("button", {
+        hasText: "Research the impact of AI on healthcare",
+      }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test("DAG devtools snapshot endpoint returns JSON", async ({ page }) => {

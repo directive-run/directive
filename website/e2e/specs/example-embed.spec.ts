@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { gotoExample } from "../helpers/example-test.js";
 
 const EXAMPLES = ["sudoku", "checkers"] as const;
@@ -33,8 +33,8 @@ for (const name of EXAMPLES) {
       await expect(heading).toBeVisible();
 
       // Host page body should not have the example's dark background
-      const bodyBg = await page.evaluate(() =>
-        getComputedStyle(document.body).backgroundColor,
+      const bodyBg = await page.evaluate(
+        () => getComputedStyle(document.body).backgroundColor,
       );
       // Site uses white/light background in light mode, not #0f172a (rgb(15, 23, 42))
       expect(bodyBg).not.toBe("rgb(15, 23, 42)");

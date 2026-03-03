@@ -1,21 +1,23 @@
-'use client'
+"use client";
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState } from "react";
 
-import { LabsThemePanel } from '@/components/LabsThemePanel'
+import { DirectiveCallout } from "@/components/DirectiveCallout";
+import { LabsConstraintViz } from "@/components/LabsConstraintViz";
 import {
-  LabsExperimentPanel,
   type ExperimentChangeEvent,
-} from '@/components/LabsExperimentPanel'
-import { LabsConstraintViz } from '@/components/LabsConstraintViz'
-import { DirectiveCallout } from '@/components/DirectiveCallout'
+  LabsExperimentPanel,
+} from "@/components/LabsExperimentPanel";
+import { LabsThemePanel } from "@/components/LabsThemePanel";
 
 export default function LabsPage() {
-  const [lastEvent, setLastEvent] = useState<ExperimentChangeEvent | null>(null)
+  const [lastEvent, setLastEvent] = useState<ExperimentChangeEvent | null>(
+    null,
+  );
 
   const handleExperimentChange = useCallback((event: ExperimentChangeEvent) => {
-    setLastEvent(event)
-  }, [])
+    setLastEvent(event);
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-8xl px-4 py-16 sm:px-6 lg:px-8 xl:px-12">
@@ -30,17 +32,26 @@ export default function LabsPage() {
 
       <div className="space-y-12">
         {/* Section 1: Theme Customization */}
-        <section aria-label="Theme customization" className="rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50">
+        <section
+          aria-label="Theme customization"
+          className="rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 dark:border-slate-700 dark:bg-slate-800/50"
+        >
           <LabsThemePanel />
         </section>
 
         {/* Section 2 + 3: Experiments and Constraint Viz */}
         <div className="grid min-w-0 gap-12 lg:grid-cols-5">
-          <section aria-label="A/B experiments" className="overflow-hidden rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 lg:col-span-3 dark:border-slate-700 dark:bg-slate-800/50">
+          <section
+            aria-label="A/B experiments"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 lg:col-span-3 dark:border-slate-700 dark:bg-slate-800/50"
+          >
             <LabsExperimentPanel onExperimentChange={handleExperimentChange} />
           </section>
 
-          <section aria-label="Constraint flow visualization" className="overflow-hidden rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <section
+            aria-label="Constraint flow visualization"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-brand-surface-card p-6 sm:p-8 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800/50"
+          >
             <LabsConstraintViz lastEvent={lastEvent} />
           </section>
         </div>
@@ -52,5 +63,5 @@ export default function LabsPage() {
         />
       </div>
     </div>
-  )
+  );
 }

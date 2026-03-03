@@ -15,9 +15,9 @@
   --gradient-b: var(--brand-accent, #6366f1);
   --gradient-c: var(--brand-primary, #0ea5e9);
   --accent: var(--brand-primary-400, #38bdf8);
-  --node-box-shadow:
-    10px 0 15px color-mix(in srgb, var(--brand-primary, #0ea5e9) 30%, transparent),
-    -10px 0 15px color-mix(in srgb, var(--brand-accent, #6366f1) 30%, transparent);
+  --node-box-shadow: 10px 0 15px
+    color-mix(in srgb, var(--brand-primary, #0ea5e9) 30%, transparent), -10px 0
+    15px color-mix(in srgb, var(--brand-accent, #6366f1) 30%, transparent);
 }
 
 /* === Step Node (main node type) === */
@@ -44,7 +44,7 @@
 
 /* === Static Gradient (default state) === */
 .turbo-step .gradient::before {
-  content: '';
+  content: "";
   position: absolute;
   padding-bottom: calc(100% * 1.41421356237);
   width: calc(100% * 1.41421356237);
@@ -159,7 +159,7 @@
 }
 
 .turbo-status .gradient::before {
-  content: '';
+  content: "";
   position: absolute;
   padding-bottom: calc(100% * 1.41421356237);
   width: calc(100% * 1.41421356237);
@@ -218,7 +218,7 @@
 }
 
 .turbo-circle .gradient::before {
-  content: '';
+  content: "";
   position: absolute;
   padding-bottom: calc(100% * 1.41421356237);
   width: calc(100% * 1.41421356237);
@@ -276,7 +276,7 @@
 }
 
 .turbo-badge .gradient::before {
-  content: '';
+  content: "";
   position: absolute;
   padding-bottom: calc(100% * 1.41421356237);
   width: calc(100% * 1.41421356237);

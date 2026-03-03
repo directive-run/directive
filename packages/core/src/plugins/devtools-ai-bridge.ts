@@ -38,44 +38,44 @@ const SESSION_NONCE = Math.random().toString(36).slice(2, 8);
  * Returns a unique numeric ID by combining a session nonce hash with a counter.
  */
 function getNextId(): number {
-	if (typeof window !== "undefined") {
-		const key = `__DIRECTIVE_BRIDGE_ID_${SESSION_NONCE}__`;
-		const w = window as unknown as Record<string, unknown>;
-		const current = (w[key] as number | undefined) ?? 0;
-		w[key] = current + 1;
+  if (typeof window !== "undefined") {
+    const key = `__DIRECTIVE_BRIDGE_ID_${SESSION_NONCE}__`;
+    const w = window as unknown as Record<string, unknown>;
+    const current = (w[key] as number | undefined) ?? 0;
+    w[key] = current + 1;
 
-		return current + 1;
-	}
+    return current + 1;
+  }
 
-	return 1;
+  return 1;
 }
 
 /**
  * Strip prototype-pollution keys from an event object.
  */
 function sanitizeEvent(
-	event: Record<string, unknown>,
+  event: Record<string, unknown>,
 ): Record<string, unknown> {
-	let needsSanitize = false;
-	for (const key of BLOCKED_KEYS) {
-		if (key in event) {
-			needsSanitize = true;
-			break;
-		}
-	}
+  let needsSanitize = false;
+  for (const key of BLOCKED_KEYS) {
+    if (key in event) {
+      needsSanitize = true;
+      break;
+    }
+  }
 
-	if (!needsSanitize) {
-		return event;
-	}
+  if (!needsSanitize) {
+    return event;
+  }
 
-	const clean: Record<string, unknown> = Object.create(null);
-	for (const [key, value] of Object.entries(event)) {
-		if (!BLOCKED_KEYS.has(key)) {
-			clean[key] = value;
-		}
-	}
+  const clean: Record<string, unknown> = Object.create(null);
+  for (const [key, value] of Object.entries(event)) {
+    if (!BLOCKED_KEYS.has(key)) {
+      clean[key] = value;
+    }
+  }
 
-	return clean;
+  return clean;
 }
 
 /**
@@ -88,25 +88,25 @@ function sanitizeEvent(
  * Fields `id`, `timestamp`, and `snapshotId` are auto-assigned if not provided.
  */
 export function emitDevToolsEvent(
-	event: Record<string, unknown> & { type: string },
+  event: Record<string, unknown> & { type: string },
 ): void {
-	if (typeof window === "undefined") {
-		return;
-	}
+  if (typeof window === "undefined") {
+    return;
+  }
 
-	try {
-		const safe = sanitizeEvent(event);
-		const full = {
-			id: getNextId(),
-			timestamp: Date.now(),
-			snapshotId: null,
-			...safe,
-		};
+  try {
+    const safe = sanitizeEvent(event);
+    const full = {
+      id: getNextId(),
+      timestamp: Date.now(),
+      snapshotId: null,
+      ...safe,
+    };
 
-		window.dispatchEvent(
-			new CustomEvent(DEVTOOLS_EVENT_NAME, { detail: full }),
-		);
-	} catch {
-		// DevTools bridge must never crash the host application
-	}
+    window.dispatchEvent(
+      new CustomEvent(DEVTOOLS_EVENT_NAME, { detail: full }),
+    );
+  } catch {
+    // DevTools bridge must never crash the host application
+  }
 }

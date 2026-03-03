@@ -1,7 +1,7 @@
-import { createSignal } from "solid-js";
 import { useWatch } from "@directive-run/solid";
-import { system } from "../system";
+import { createSignal } from "solid-js";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 export function UseWatchPage() {
   const [prev, setPrev] = createSignal("none");
@@ -19,7 +19,10 @@ export function UseWatchPage() {
       <span data-testid={TestIds.watchPrev}>{prev()}</span>
       <span data-testid={TestIds.watchNew}>{next()}</span>
       <span data-testid={TestIds.watchCount}>{watchCount()}</span>
-      <button data-testid={TestIds.btnIncrement} onClick={() => system.events.increment()}>
+      <button
+        data-testid={TestIds.btnIncrement}
+        onClick={() => system.events.increment()}
+      >
         inc
       </button>
     </div>

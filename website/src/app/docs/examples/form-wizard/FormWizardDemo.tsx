@@ -1,17 +1,17 @@
-'use client'
+"use client";
 
-import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CodeTabs } from '@/components/CodeTabs'
+import { CodeTabs } from "@/components/CodeTabs";
+import { ExampleEmbed } from "@/components/ExampleEmbed";
 
 export function FormWizardDemo({
   build,
   sources,
 }: {
-  build: import('@/lib/examples').ExampleBuild | null
-  sources: import('@/lib/examples').ExampleSource[]
+  build: import("@/lib/examples").ExampleBuild | null;
+  sources: import("@/lib/examples").ExampleSource[];
 }) {
-  const moduleSource = sources.find((s) => s.filename === 'form-wizard.ts')
-  const mainSource = sources.find((s) => s.filename === 'main.ts')
+  const moduleSource = sources.find((s) => s.filename === "form-wizard.ts");
+  const mainSource = sources.find((s) => s.filename === "main.ts");
 
   return (
     <div className="space-y-8">
@@ -30,10 +30,10 @@ export function FormWizardDemo({
           />
         ) : (
           <div className="rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)] p-8 text-center text-sm text-slate-400">
-            Example not built yet. Run{' '}
+            Example not built yet. Run{" "}
             <code className="text-slate-300">
               pnpm build:example form-wizard
-            </code>{' '}
+            </code>{" "}
             to generate the embed.
           </div>
         )}
@@ -58,26 +58,34 @@ export function FormWizardDemo({
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Facts</strong>{' '}
-              &ndash; <code>currentStep</code>, per-step field facts
-              (<code>email</code>, <code>password</code>, <code>name</code>,{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                Facts
+              </strong>{" "}
+              &ndash; <code>currentStep</code>, per-step field facts (
+              <code>email</code>, <code>password</code>, <code>name</code>,{" "}
               <code>plan</code>), and <code>advanceRequested</code>
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Derivations</strong>{' '}
-              &ndash; per-step validators (<code>step0Valid</code>,{' '}
-              <code>step1Valid</code>, <code>step2Valid</code>),{' '}
-              <code>currentStepValid</code>, <code>canAdvance</code>, and{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                Derivations
+              </strong>{" "}
+              &ndash; per-step validators (<code>step0Valid</code>,{" "}
+              <code>step1Valid</code>, <code>step2Valid</code>),{" "}
+              <code>currentStepValid</code>, <code>canAdvance</code>, and{" "}
               <code>progress</code> percentage
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Constraints</strong>{' '}
-              &ndash; <code>advance</code> (priority 50) only fires when
-              both <code>advanceRequested</code> and{' '}
-              <code>currentStepValid</code> are true
+              <strong className="text-slate-900 dark:text-slate-200">
+                Constraints
+              </strong>{" "}
+              &ndash; <code>advance</code> (priority 50) only fires when both{" "}
+              <code>advanceRequested</code> and <code>currentStepValid</code>{" "}
+              are true
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Persistence</strong>{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                Persistence
+              </strong>{" "}
               &ndash; <code>persistencePlugin</code> saves field values and
               current step, enabling save-and-resume across page reloads
             </li>
@@ -92,19 +100,23 @@ export function FormWizardDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">
+              What:
+            </strong>{" "}
             A three-step form wizard with per-step validation, async email
             availability checks, and persistent draft state.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
-            Derivations compute step validity. The <code>advance</code>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{" "}
+            Derivations compute step validity. The <code>advance</code>{" "}
             constraint gates on <code>currentStepValid</code>, preventing
             advancement until all fields pass. The persistence plugin saves
             progress automatically.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">Why it works:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">
+              Why it works:
+            </strong>{" "}
             Constraint-gated advancement replaces imperative validation chains.
             Back navigation preserves all data because facts persist until
             explicitly cleared. The persistence plugin enables resume without
@@ -121,20 +133,20 @@ export function FormWizardDemo({
         <CodeTabs
           tabs={[
             moduleSource && {
-              filename: 'form-wizard.ts',
-              label: 'form-wizard.ts - Directive modules',
+              filename: "form-wizard.ts",
+              label: "form-wizard.ts - Directive modules",
               code: moduleSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             mainSource && {
-              filename: 'main.ts',
-              label: 'main.ts - DOM wiring',
+              filename: "main.ts",
+              label: "main.ts - DOM wiring",
               code: mainSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
           ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
         />
       </section>
     </div>
-  )
+  );
 }

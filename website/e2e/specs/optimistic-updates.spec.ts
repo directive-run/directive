@@ -1,24 +1,42 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 /**
  * Helper: set a value on an input element via page.evaluate to bypass
  * Playwright's typing delay.
  */
-async function setInput(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setInput(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
-async function setSlider(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setSlider(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
 test.describe("Optimistic Updates example", () => {
@@ -28,13 +46,21 @@ test.describe("Optimistic Updates example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/optimistic-updates");
     try {
-      await page.waitForSelector("directive-optimistic-updates", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-optimistic-updates", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       // Dev server sometimes needs a second attempt under parallel load
       await page.reload();
-      await page.waitForSelector("directive-optimistic-updates", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-optimistic-updates", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-optimistic-updates-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-optimistic-updates-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and renders todo items", async ({ page }) => {
@@ -59,7 +85,11 @@ test.describe("Optimistic Updates example", () => {
     await tid(page, "ou-toggle-1").click();
 
     // Should show pending class within 500ms
-    await expect(tid(page, "ou-item-1")).toHaveAttribute("data-pending", "true", { timeout: 500 });
+    await expect(tid(page, "ou-item-1")).toHaveAttribute(
+      "data-pending",
+      "true",
+      { timeout: 500 },
+    );
   });
 
   test("successful toggle persists", async ({ page }) => {
@@ -74,10 +104,16 @@ test.describe("Optimistic Updates example", () => {
     await checkbox.click();
 
     // Wait for sync to complete — pending should clear
-    await expect(tid(page, "ou-item-1")).not.toHaveAttribute("data-pending", "true", { timeout: 5_000 });
+    await expect(tid(page, "ou-item-1")).not.toHaveAttribute(
+      "data-pending",
+      "true",
+      { timeout: 5_000 },
+    );
 
     // Item should have done class (was toggled from false to true)
-    await expect(tid(page, "ou-item-1")).toHaveClass(/done/, { timeout: 5_000 });
+    await expect(tid(page, "ou-item-1")).toHaveClass(/done/, {
+      timeout: 5_000,
+    });
   });
 
   test("failed toggle rolls back with toast", async ({ page }) => {
@@ -89,10 +125,14 @@ test.describe("Optimistic Updates example", () => {
     await tid(page, "ou-toggle-1").click();
 
     // After failure, item should revert — not done
-    await expect(tid(page, "ou-item-1")).not.toHaveClass(/done/, { timeout: 5_000 });
+    await expect(tid(page, "ou-item-1")).not.toHaveClass(/done/, {
+      timeout: 5_000,
+    });
 
     // Toast should appear
-    await expect(tid(page, "ou-toast")).toContainText("rolled back", { timeout: 5_000 });
+    await expect(tid(page, "ou-toast")).toContainText("rolled back", {
+      timeout: 5_000,
+    });
   });
 
   test("delete removes item immediately", async ({ page }) => {
@@ -126,7 +166,9 @@ test.describe("Optimistic Updates example", () => {
     await expect(tid(page, "ou-item-3")).toBeVisible({ timeout: 5_000 });
 
     // Toast should show error
-    await expect(tid(page, "ou-toast")).toContainText("rolled back", { timeout: 5_000 });
+    await expect(tid(page, "ou-toast")).toContainText("rolled back", {
+      timeout: 5_000,
+    });
   });
 
   test("add item appears instantly", async ({ page }) => {
@@ -142,7 +184,9 @@ test.describe("Optimistic Updates example", () => {
     await expect(items).toHaveCount(6, { timeout: 500 });
 
     // The new item text should be visible
-    await expect(tid(page, "ou-todo-list")).toContainText("New test todo", { timeout: 500 });
+    await expect(tid(page, "ou-todo-list")).toContainText("New test todo", {
+      timeout: 500,
+    });
   });
 
   test("failed add rolls back", async ({ page }) => {
@@ -167,10 +211,14 @@ test.describe("Optimistic Updates example", () => {
 
     // Toggle item — pending count should become 1
     await tid(page, "ou-toggle-1").click();
-    await expect(tid(page, "ou-pending-count")).toContainText("1 syncing", { timeout: 1_000 });
+    await expect(tid(page, "ou-pending-count")).toContainText("1 syncing", {
+      timeout: 1_000,
+    });
 
     // Wait for sync to complete — pending count should become 0
-    await expect(tid(page, "ou-pending-count")).not.toHaveClass(/visible/, { timeout: 10_000 });
+    await expect(tid(page, "ou-pending-count")).not.toHaveClass(/visible/, {
+      timeout: 10_000,
+    });
   });
 
   test("derivations update correctly", async ({ page }) => {
@@ -184,7 +232,9 @@ test.describe("Optimistic Updates example", () => {
     await tid(page, "ou-toggle-1").click();
 
     // doneCount should now be 3
-    await expect(tid(page, "ou-deriv-done")).toContainText("3", { timeout: 1_000 });
+    await expect(tid(page, "ou-deriv-done")).toContainText("3", {
+      timeout: 1_000,
+    });
   });
 
   test("code tabs visible below example", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Theme & Locale example", () => {
@@ -7,15 +7,25 @@ test.describe("Theme & Locale example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/theme-locale");
     // Clear persisted prefs before each test
-    await page.evaluate(() => localStorage.removeItem("directive-theme-locale-example"));
+    await page.evaluate(() =>
+      localStorage.removeItem("directive-theme-locale-example"),
+    );
     await page.reload();
     try {
-      await page.waitForSelector("directive-theme-locale", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-theme-locale", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-theme-locale", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-theme-locale", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-theme-locale-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-theme-locale-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads with default settings", async ({ page }) => {
@@ -80,7 +90,9 @@ test.describe("Theme & Locale example", () => {
     await tid(page, "tl-sidebar-toggle").click();
     await page.waitForTimeout(200);
     await expect(tid(page, "tl-sidebar-toggle")).toContainText("Show Sidebar");
-    await expect(tid(page, "tl-sidebar-toggle")).not.toHaveClass(/tl-btn-active/);
+    await expect(tid(page, "tl-sidebar-toggle")).not.toHaveClass(
+      /tl-btn-active/,
+    );
 
     // Toggle back on
     await tid(page, "tl-sidebar-toggle").click();

@@ -11,50 +11,61 @@
 
 import { trackAccess, withTracking } from "./tracking.js";
 import type {
-	DerivationsDef,
-	DerivationState,
-	DerivedValues,
-	Facts,
-	FactsStore,
-	Schema,
+  DerivationState,
+  DerivationsDef,
+  DerivedValues,
+  Facts,
+  FactsStore,
+  Schema,
 } from "./types.js";
 
 // ============================================================================
 // Derivations Manager
 // ============================================================================
 
-export interface DerivationsManager<S extends Schema, D extends DerivationsDef<S>> {
-	/** Get a derived value (computes if stale) */
-	get<K extends keyof D>(id: K): ReturnType<D[K]>;
-	/** Check if a derivation is stale */
-	isStale(id: keyof D): boolean;
-	/** Invalidate derivations that depend on a fact key */
-	invalidate(factKey: string): void;
-	/** Invalidate derivations for multiple fact keys, notifying listeners once at the end */
-	invalidateMany(factKeys: Iterable<string>): void;
-	/** Invalidate all derivations */
-	invalidateAll(): void;
-	/** Subscribe to derivation changes */
-	subscribe(ids: Array<keyof D>, listener: () => void): () => void;
-	/** Get the proxy for composition */
-	getProxy(): DerivedValues<S, D>;
-	/** Get dependencies for a derivation */
-	getDependencies(id: keyof D): Set<string>;
-	/** Register new derivation definitions (for dynamic module registration) */
-	registerDefinitions(newDefs: DerivationsDef<S>): void;
+export interface DerivationsManager<
+  S extends Schema,
+  D extends DerivationsDef<S>,
+> {
+  /** Get a derived value (computes if stale) */
+  get<K extends keyof D>(id: K): ReturnType<D[K]>;
+  /** Check if a derivation is stale */
+  isStale(id: keyof D): boolean;
+  /** Invalidate derivations that depend on a fact key */
+  invalidate(factKey: string): void;
+  /** Invalidate derivations for multiple fact keys, notifying listeners once at the end */
+  invalidateMany(factKeys: Iterable<string>): void;
+  /** Invalidate all derivations */
+  invalidateAll(): void;
+  /** Subscribe to derivation changes */
+  subscribe(ids: Array<keyof D>, listener: () => void): () => void;
+  /** Get the proxy for composition */
+  getProxy(): DerivedValues<S, D>;
+  /** Get dependencies for a derivation */
+  getDependencies(id: keyof D): Set<string>;
+  /** Register new derivation definitions (for dynamic module registration) */
+  registerDefinitions(newDefs: DerivationsDef<S>): void;
 }
 
 /** Options for creating a derivations manager */
-export interface CreateDerivationsOptions<S extends Schema, D extends DerivationsDef<S>> {
-	definitions: D;
-	facts: Facts<S>;
-	store: FactsStore<S>;
-	/** Callback when a derivation is computed */
-	onCompute?: (id: string, value: unknown, oldValue: unknown, deps: string[]) => void;
-	/** Callback when a derivation is invalidated */
-	onInvalidate?: (id: string) => void;
-	/** Callback when a derivation errors */
-	onError?: (id: string, error: unknown) => void;
+export interface CreateDerivationsOptions<
+  S extends Schema,
+  D extends DerivationsDef<S>,
+> {
+  definitions: D;
+  facts: Facts<S>;
+  store: FactsStore<S>;
+  /** Callback when a derivation is computed */
+  onCompute?: (
+    id: string,
+    value: unknown,
+    oldValue: unknown,
+    deps: string[],
+  ) => void;
+  /** Callback when a derivation is invalidated */
+  onInvalidate?: (id: string) => void;
+  /** Callback when a derivation errors */
+  onError?: (id: string, error: unknown) => void;
 }
 
 /**
@@ -71,327 +82,337 @@ export interface CreateDerivationsOptions<S extends Schema, D extends Derivation
  * @param options - Derivation definitions, facts proxy, store, and optional lifecycle callbacks
  * @returns A `DerivationsManager` with get/invalidate/subscribe/getProxy methods
  */
-export function createDerivationsManager<S extends Schema, D extends DerivationsDef<S>>(
-	options: CreateDerivationsOptions<S, D>,
-): DerivationsManager<S, D> {
-	const { definitions, facts, store: _store, onCompute, onInvalidate, onError } = options;
-	// Note: _store is kept for API compatibility but invalidation is handled by the engine calling invalidate()
+export function createDerivationsManager<
+  S extends Schema,
+  D extends DerivationsDef<S>,
+>(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D> {
+  const {
+    definitions,
+    facts,
+    store: _store,
+    onCompute,
+    onInvalidate,
+    onError,
+  } = options;
+  // Note: _store is kept for API compatibility but invalidation is handled by the engine calling invalidate()
 
-	// Internal state for each derivation
-	const states = new Map<string, DerivationState<unknown>>();
-	const listeners = new Map<string, Set<() => void>>();
+  // Internal state for each derivation
+  const states = new Map<string, DerivationState<unknown>>();
+  const listeners = new Map<string, Set<() => void>>();
 
-	// Track which derivations depend on which fact keys
-	const factToDerivedDeps = new Map<string, Set<string>>();
-	// Track which derivations depend on which other derivations
-	const derivedToDerivedDeps = new Map<string, Set<string>>();
+  // Track which derivations depend on which fact keys
+  const factToDerivedDeps = new Map<string, Set<string>>();
+  // Track which derivations depend on which other derivations
+  const derivedToDerivedDeps = new Map<string, Set<string>>();
 
-	// Prototype pollution guard (same pattern as engine.ts, facts.ts, system.ts)
-	const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+  // Prototype pollution guard (same pattern as engine.ts, facts.ts, system.ts)
+  const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
 
-	// Deferred notification: during invalidation, collect IDs to notify.
-	// Listeners fire AFTER all invalidations complete so they see consistent state.
-	let invalidationDepth = 0;
-	const pendingNotifications = new Set<string>();
-	let isFlushing = false;
-	const MAX_FLUSH_ITERATIONS = 100;
+  // Deferred notification: during invalidation, collect IDs to notify.
+  // Listeners fire AFTER all invalidations complete so they see consistent state.
+  let invalidationDepth = 0;
+  const pendingNotifications = new Set<string>();
+  let isFlushing = false;
+  const MAX_FLUSH_ITERATIONS = 100;
 
-	// The proxy for composition (derivations accessing other derivations)
-	let derivedProxy: DerivedValues<S, D>;
+  // The proxy for composition (derivations accessing other derivations)
+  let derivedProxy: DerivedValues<S, D>;
 
-	/** Initialize state for a derivation */
-	function initState(id: string): DerivationState<unknown> {
-		const def = definitions[id as keyof D];
-		if (!def) {
-			throw new Error(`[Directive] Unknown derivation: ${id}`);
-		}
+  /** Initialize state for a derivation */
+  function initState(id: string): DerivationState<unknown> {
+    const def = definitions[id as keyof D];
+    if (!def) {
+      throw new Error(`[Directive] Unknown derivation: ${id}`);
+    }
 
-		const state: DerivationState<unknown> = {
-			id,
-			compute: () => computeDerivation(id),
-			cachedValue: undefined,
-			dependencies: new Set(),
-			isStale: true,
-			isComputing: false,
-		};
+    const state: DerivationState<unknown> = {
+      id,
+      compute: () => computeDerivation(id),
+      cachedValue: undefined,
+      dependencies: new Set(),
+      isStale: true,
+      isComputing: false,
+    };
 
-		states.set(id, state);
-		return state;
-	}
+    states.set(id, state);
+    return state;
+  }
 
-	/** Get or create state for a derivation */
-	function getState(id: string): DerivationState<unknown> {
-		return states.get(id) ?? initState(id);
-	}
+  /** Get or create state for a derivation */
+  function getState(id: string): DerivationState<unknown> {
+    return states.get(id) ?? initState(id);
+  }
 
-	/** Compute a derivation and track its dependencies */
-	function computeDerivation(id: string): unknown {
-		const state = getState(id);
-		const def = definitions[id as keyof D];
+  /** Compute a derivation and track its dependencies */
+  function computeDerivation(id: string): unknown {
+    const state = getState(id);
+    const def = definitions[id as keyof D];
 
-		if (!def) {
-			throw new Error(`[Directive] Unknown derivation: ${id}`);
-		}
+    if (!def) {
+      throw new Error(`[Directive] Unknown derivation: ${id}`);
+    }
 
-		// Circular dependency detection
-		if (state.isComputing) {
-			throw new Error(`[Directive] Circular dependency detected in derivation: ${id}`);
-		}
+    // Circular dependency detection
+    if (state.isComputing) {
+      throw new Error(
+        `[Directive] Circular dependency detected in derivation: ${id}`,
+      );
+    }
 
-		state.isComputing = true;
+    state.isComputing = true;
 
-		try {
-			// Capture old value before recomputation
-			const oldValue = state.cachedValue;
+    try {
+      // Capture old value before recomputation
+      const oldValue = state.cachedValue;
 
-			// Compute with tracking
-			const { value, deps } = withTracking(() => def(facts, derivedProxy));
+      // Compute with tracking
+      const { value, deps } = withTracking(() => def(facts, derivedProxy));
 
-			// Update state
-			state.cachedValue = value;
-			state.isStale = false;
+      // Update state
+      state.cachedValue = value;
+      state.isStale = false;
 
-			// Update dependency tracking
-			updateDependencies(id, deps);
+      // Update dependency tracking
+      updateDependencies(id, deps);
 
-			// Notify callback
-			onCompute?.(id, value, oldValue, [...deps]);
+      // Notify callback
+      onCompute?.(id, value, oldValue, [...deps]);
 
-			return value;
-		} catch (error) {
-			onError?.(id, error);
-			throw error;
-		} finally {
-			state.isComputing = false;
-		}
-	}
+      return value;
+    } catch (error) {
+      onError?.(id, error);
+      throw error;
+    } finally {
+      state.isComputing = false;
+    }
+  }
 
-	/** Update dependency tracking for a derivation */
-	function updateDependencies(id: string, newDeps: Set<string>): void {
-		const state = getState(id);
-		const oldDeps = state.dependencies;
+  /** Update dependency tracking for a derivation */
+  function updateDependencies(id: string, newDeps: Set<string>): void {
+    const state = getState(id);
+    const oldDeps = state.dependencies;
 
-		// Remove old fact dependencies
-		for (const dep of oldDeps) {
-			// Check if it's a fact key or a derived key
-			if (states.has(dep)) {
-				const depSet = derivedToDerivedDeps.get(dep);
-				depSet?.delete(id);
-				// Clean up empty Sets to prevent memory leaks
-				if (depSet && depSet.size === 0) {
-					derivedToDerivedDeps.delete(dep);
-				}
-			} else {
-				const depSet = factToDerivedDeps.get(dep);
-				depSet?.delete(id);
-				// Clean up empty Sets to prevent memory leaks
-				if (depSet && depSet.size === 0) {
-					factToDerivedDeps.delete(dep);
-				}
-			}
-		}
+    // Remove old fact dependencies
+    for (const dep of oldDeps) {
+      // Check if it's a fact key or a derived key
+      if (states.has(dep)) {
+        const depSet = derivedToDerivedDeps.get(dep);
+        depSet?.delete(id);
+        // Clean up empty Sets to prevent memory leaks
+        if (depSet && depSet.size === 0) {
+          derivedToDerivedDeps.delete(dep);
+        }
+      } else {
+        const depSet = factToDerivedDeps.get(dep);
+        depSet?.delete(id);
+        // Clean up empty Sets to prevent memory leaks
+        if (depSet && depSet.size === 0) {
+          factToDerivedDeps.delete(dep);
+        }
+      }
+    }
 
-		// Add new dependencies
-		for (const dep of newDeps) {
-			// Check if it's a derivation or a fact
-			if (definitions[dep as keyof D]) {
-				// It's a derivation-to-derivation dependency
-				if (!derivedToDerivedDeps.has(dep)) {
-					derivedToDerivedDeps.set(dep, new Set());
-				}
-				derivedToDerivedDeps.get(dep)!.add(id);
-			} else {
-				// It's a fact dependency
-				if (!factToDerivedDeps.has(dep)) {
-					factToDerivedDeps.set(dep, new Set());
-				}
-				factToDerivedDeps.get(dep)!.add(id);
-			}
-		}
+    // Add new dependencies
+    for (const dep of newDeps) {
+      // Check if it's a derivation or a fact
+      if (definitions[dep as keyof D]) {
+        // It's a derivation-to-derivation dependency
+        if (!derivedToDerivedDeps.has(dep)) {
+          derivedToDerivedDeps.set(dep, new Set());
+        }
+        derivedToDerivedDeps.get(dep)!.add(id);
+      } else {
+        // It's a fact dependency
+        if (!factToDerivedDeps.has(dep)) {
+          factToDerivedDeps.set(dep, new Set());
+        }
+        factToDerivedDeps.get(dep)!.add(id);
+      }
+    }
 
-		state.dependencies = newDeps;
-	}
+    state.dependencies = newDeps;
+  }
 
-	/** Flush deferred notifications after all invalidations complete */
-	function flushNotifications(): void {
-		if (invalidationDepth > 0 || isFlushing) return;
+  /** Flush deferred notifications after all invalidations complete */
+  function flushNotifications(): void {
+    if (invalidationDepth > 0 || isFlushing) return;
 
-		isFlushing = true;
-		try {
-			// Loop until no more pending — listeners may trigger new invalidations
-			// that add to pendingNotifications via re-entrant invalidate() calls.
-			let iterations = 0;
-			while (pendingNotifications.size > 0) {
-				if (++iterations > MAX_FLUSH_ITERATIONS) {
-					const remaining = [...pendingNotifications];
-					pendingNotifications.clear();
-					throw new Error(
-						`[Directive] Infinite derivation notification loop detected after ${MAX_FLUSH_ITERATIONS} iterations. ` +
-							`Remaining: ${remaining.join(", ")}. ` +
-							`This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
-					);
-				}
+    isFlushing = true;
+    try {
+      // Loop until no more pending — listeners may trigger new invalidations
+      // that add to pendingNotifications via re-entrant invalidate() calls.
+      let iterations = 0;
+      while (pendingNotifications.size > 0) {
+        if (++iterations > MAX_FLUSH_ITERATIONS) {
+          const remaining = [...pendingNotifications];
+          pendingNotifications.clear();
+          throw new Error(
+            `[Directive] Infinite derivation notification loop detected after ${MAX_FLUSH_ITERATIONS} iterations. ` +
+              `Remaining: ${remaining.join(", ")}. ` +
+              `This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+          );
+        }
 
-				const ids = [...pendingNotifications];
-				pendingNotifications.clear();
+        const ids = [...pendingNotifications];
+        pendingNotifications.clear();
 
-				for (const id of ids) {
-					listeners.get(id)?.forEach((listener) => listener());
-				}
-			}
-		} finally {
-			isFlushing = false;
-		}
-	}
+        for (const id of ids) {
+          listeners.get(id)?.forEach((listener) => listener());
+        }
+      }
+    } finally {
+      isFlushing = false;
+    }
+  }
 
-	/** Invalidate a derivation and its dependents */
-	function invalidateDerivation(id: string, visited = new Set<string>()): void {
-		if (visited.has(id)) return;
-		visited.add(id);
+  /** Invalidate a derivation and its dependents */
+  function invalidateDerivation(id: string, visited = new Set<string>()): void {
+    if (visited.has(id)) return;
+    visited.add(id);
 
-		const state = states.get(id);
-		if (!state || state.isStale) return;
+    const state = states.get(id);
+    if (!state || state.isStale) return;
 
-		state.isStale = true;
-		onInvalidate?.(id);
+    state.isStale = true;
+    onInvalidate?.(id);
 
-		// Defer listener notification until all invalidations complete.
-		// This prevents listeners from observing partially-stale state and
-		// avoids infinite loops from Set mutation during iteration (listeners
-		// recompute derivations → updateDependencies → modify dep Sets).
-		pendingNotifications.add(id);
+    // Defer listener notification until all invalidations complete.
+    // This prevents listeners from observing partially-stale state and
+    // avoids infinite loops from Set mutation during iteration (listeners
+    // recompute derivations → updateDependencies → modify dep Sets).
+    pendingNotifications.add(id);
 
-		// Invalidate derivations that depend on this one
-		const dependents = derivedToDerivedDeps.get(id);
-		if (dependents) {
-			for (const dependent of dependents) {
-				invalidateDerivation(dependent, visited);
-			}
-		}
-	}
+    // Invalidate derivations that depend on this one
+    const dependents = derivedToDerivedDeps.get(id);
+    if (dependents) {
+      for (const dependent of dependents) {
+        invalidateDerivation(dependent, visited);
+      }
+    }
+  }
 
-	// Create the proxy for composition
-	derivedProxy = new Proxy({} as DerivedValues<S, D>, {
-		get(_, prop: string | symbol) {
-			if (typeof prop === "symbol") return undefined;
-			if (BLOCKED_PROPS.has(prop)) return undefined;
+  // Create the proxy for composition
+  derivedProxy = new Proxy({} as DerivedValues<S, D>, {
+    get(_, prop: string | symbol) {
+      if (typeof prop === "symbol") return undefined;
+      if (BLOCKED_PROPS.has(prop)) return undefined;
 
-			// Track this derivation access so the consuming derivation
-			// records a dependency on it (enables composition invalidation)
-			trackAccess(prop);
+      // Track this derivation access so the consuming derivation
+      // records a dependency on it (enables composition invalidation)
+      trackAccess(prop);
 
-			const state = getState(prop);
+      const state = getState(prop);
 
-			// Recompute if stale
-			if (state.isStale) {
-				computeDerivation(prop);
-			}
+      // Recompute if stale
+      if (state.isStale) {
+        computeDerivation(prop);
+      }
 
-			return state.cachedValue;
-		},
-	});
+      return state.cachedValue;
+    },
+  });
 
-	// Note: Fact change invalidation is handled by the engine calling invalidate()
+  // Note: Fact change invalidation is handled by the engine calling invalidate()
 
-	const manager: DerivationsManager<S, D> = {
-		get<K extends keyof D>(id: K): ReturnType<D[K]> {
-			const state = getState(id as string);
+  const manager: DerivationsManager<S, D> = {
+    get<K extends keyof D>(id: K): ReturnType<D[K]> {
+      const state = getState(id as string);
 
-			if (state.isStale) {
-				computeDerivation(id as string);
-			}
+      if (state.isStale) {
+        computeDerivation(id as string);
+      }
 
-			return state.cachedValue as ReturnType<D[K]>;
-		},
+      return state.cachedValue as ReturnType<D[K]>;
+    },
 
-		isStale(id: keyof D): boolean {
-			const state = states.get(id as string);
-			return state?.isStale ?? true;
-		},
+    isStale(id: keyof D): boolean {
+      const state = states.get(id as string);
+      return state?.isStale ?? true;
+    },
 
-		invalidate(factKey: string): void {
-			const dependents = factToDerivedDeps.get(factKey);
-			if (!dependents) return;
+    invalidate(factKey: string): void {
+      const dependents = factToDerivedDeps.get(factKey);
+      if (!dependents) return;
 
-			invalidationDepth++;
-			try {
-				for (const id of dependents) {
-					invalidateDerivation(id);
-				}
-			} finally {
-				invalidationDepth--;
-				flushNotifications();
-			}
-		},
+      invalidationDepth++;
+      try {
+        for (const id of dependents) {
+          invalidateDerivation(id);
+        }
+      } finally {
+        invalidationDepth--;
+        flushNotifications();
+      }
+    },
 
-		invalidateMany(factKeys: Iterable<string>): void {
-			invalidationDepth++;
-			try {
-				for (const factKey of factKeys) {
-					const dependents = factToDerivedDeps.get(factKey);
-					if (!dependents) continue;
-					for (const id of dependents) {
-						invalidateDerivation(id);
-					}
-				}
-			} finally {
-				invalidationDepth--;
-				flushNotifications();
-			}
-		},
+    invalidateMany(factKeys: Iterable<string>): void {
+      invalidationDepth++;
+      try {
+        for (const factKey of factKeys) {
+          const dependents = factToDerivedDeps.get(factKey);
+          if (!dependents) continue;
+          for (const id of dependents) {
+            invalidateDerivation(id);
+          }
+        }
+      } finally {
+        invalidationDepth--;
+        flushNotifications();
+      }
+    },
 
-		invalidateAll(): void {
-			invalidationDepth++;
-			try {
-				for (const state of states.values()) {
-					if (!state.isStale) {
-						state.isStale = true;
-						pendingNotifications.add(state.id);
-					}
-				}
-			} finally {
-				invalidationDepth--;
-				flushNotifications();
-			}
-		},
+    invalidateAll(): void {
+      invalidationDepth++;
+      try {
+        for (const state of states.values()) {
+          if (!state.isStale) {
+            state.isStale = true;
+            pendingNotifications.add(state.id);
+          }
+        }
+      } finally {
+        invalidationDepth--;
+        flushNotifications();
+      }
+    },
 
-		subscribe(ids: Array<keyof D>, listener: () => void): () => void {
-			for (const id of ids) {
-				const idStr = id as string;
-				if (!listeners.has(idStr)) {
-					listeners.set(idStr, new Set());
-				}
-				listeners.get(idStr)!.add(listener);
-			}
+    subscribe(ids: Array<keyof D>, listener: () => void): () => void {
+      for (const id of ids) {
+        const idStr = id as string;
+        if (!listeners.has(idStr)) {
+          listeners.set(idStr, new Set());
+        }
+        listeners.get(idStr)!.add(listener);
+      }
 
-			return () => {
-				for (const id of ids) {
-					const idStr = id as string;
-					const listenerSet = listeners.get(idStr);
-					listenerSet?.delete(listener);
-					// Clean up empty Sets to prevent memory leaks
-					if (listenerSet && listenerSet.size === 0) {
-						listeners.delete(idStr);
-					}
-				}
-			};
-		},
+      return () => {
+        for (const id of ids) {
+          const idStr = id as string;
+          const listenerSet = listeners.get(idStr);
+          listenerSet?.delete(listener);
+          // Clean up empty Sets to prevent memory leaks
+          if (listenerSet && listenerSet.size === 0) {
+            listeners.delete(idStr);
+          }
+        }
+      };
+    },
 
-		getProxy(): DerivedValues<S, D> {
-			return derivedProxy;
-		},
+    getProxy(): DerivedValues<S, D> {
+      return derivedProxy;
+    },
 
-		getDependencies(id: keyof D): Set<string> {
-			return getState(id as string).dependencies;
-		},
+    getDependencies(id: keyof D): Set<string> {
+      return getState(id as string).dependencies;
+    },
 
-		registerDefinitions(newDefs: DerivationsDef<S>): void {
-			for (const [key, fn] of Object.entries(newDefs)) {
-				(definitions as Record<string, unknown>)[key] = fn;
-				initState(key);
-			}
-		},
-	};
+    registerDefinitions(newDefs: DerivationsDef<S>): void {
+      for (const [key, fn] of Object.entries(newDefs)) {
+        (definitions as Record<string, unknown>)[key] = fn;
+        initState(key);
+      }
+    },
+  };
 
-	return manager;
+  return manager;
 }

@@ -1,42 +1,45 @@
-'use client'
+"use client";
 
-import { Fragment, memo, useCallback, useState } from 'react'
-import { Highlight } from 'prism-react-renderer'
-import { Check, Copy } from '@phosphor-icons/react'
+import { Check, Copy } from "@phosphor-icons/react";
+import { Highlight } from "prism-react-renderer";
+import { Fragment, memo, useCallback, useState } from "react";
 
 export interface CodeTab {
-  filename: string
-  label?: string
-  code: string
-  language: string
+  filename: string;
+  label?: string;
+  code: string;
+  language: string;
 }
 
 interface CodeTabsProps {
-  tabs: CodeTab[]
+  tabs: CodeTab[];
 }
 
 export const CopyButton = memo(function CopyButton({
   code,
 }: {
-  code: string
+  code: string;
 }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err instanceof Error ? err.message : 'Unknown error')
+      console.error(
+        "Failed to copy:",
+        err instanceof Error ? err.message : "Unknown error",
+      );
     }
-  }, [code])
+  }, [code]);
 
   return (
     <button
       onClick={handleCopy}
       className="code-copy-btn cursor-pointer absolute right-2 top-2 z-10 rounded-md px-2 py-1 text-xs opacity-50 transition hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
-      aria-label={copied ? 'Copied!' : 'Copy code'}
+      aria-label={copied ? "Copied!" : "Copy code"}
     >
       {copied ? (
         <span className="flex items-center gap-1">
@@ -50,24 +53,24 @@ export const CopyButton = memo(function CopyButton({
         </span>
       )}
     </button>
-  )
-})
+  );
+});
 
 export const CodeBlock = memo(function CodeBlock({
   code,
   language,
 }: {
-  code: string
-  language: string
+  code: string;
+  language: string;
 }) {
-  const trimmed = code.trimEnd()
+  const trimmed = code.trimEnd();
 
   return (
     <>
       <CopyButton code={trimmed} />
       <Highlight
         code={trimmed}
-        language={language || 'text'}
+        language={language || "text"}
         theme={{ plain: {}, styles: [] }}
       >
         {({ className, style, tokens, getTokenProps }) => (
@@ -83,7 +86,7 @@ export const CodeBlock = memo(function CodeBlock({
                     .map((token, tokenIndex) => (
                       <span key={tokenIndex} {...getTokenProps({ token })} />
                     ))}
-                  {'\n'}
+                  {"\n"}
                 </Fragment>
               ))}
             </code>
@@ -91,44 +94,47 @@ export const CodeBlock = memo(function CodeBlock({
         )}
       </Highlight>
     </>
-  )
-})
+  );
+});
 
 export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(0);
 
   if (tabs.length === 0) {
-    return null
+    return null;
   }
 
-  const activeTab = tabs[activeIndex] ?? tabs[0]
-  const isSingle = tabs.length === 1
+  const activeTab = tabs[activeIndex] ?? tabs[0];
+  const isSingle = tabs.length === 1;
 
   return (
     <div
       className="group relative overflow-hidden rounded-xl"
       style={{
-        backgroundColor: 'var(--code-bg)',
-        boxShadow: '0 0 0 1px var(--code-ring), var(--code-shadow)',
+        backgroundColor: "var(--code-bg)",
+        boxShadow: "0 0 0 1px var(--code-ring), var(--code-shadow)",
       }}
     >
       {/* Header: single title or tab bar */}
       {isSingle ? (
         <div
           className="border-b px-5 pt-3 pb-2 font-mono text-xs"
-          style={{ borderColor: 'var(--code-title-border)', color: 'var(--code-title-text)' }}
+          style={{
+            borderColor: "var(--code-title-border)",
+            color: "var(--code-title-text)",
+          }}
         >
           {activeTab.filename}
         </div>
       ) : (
         <div
           className="flex border-b"
-          style={{ borderColor: 'var(--code-title-border)' }}
+          style={{ borderColor: "var(--code-title-border)" }}
           data-testid="code-tabs-bar"
         >
           {tabs.map((tab, i) => {
-            const isActive = i === activeIndex
-            const lines = tab.code.trimEnd().split('\n').length
+            const isActive = i === activeIndex;
+            const lines = tab.code.trimEnd().split("\n").length;
 
             return (
               <button
@@ -136,17 +142,24 @@ export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
                 onClick={() => setActiveIndex(i)}
                 className={
                   isActive
-                    ? 'cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors border-b-2 border-brand-primary'
-                    : 'code-tab-inactive cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors'
+                    ? "cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors border-b-2 border-brand-primary"
+                    : "code-tab-inactive cursor-pointer px-4 pt-3 pb-2 font-mono text-xs transition-colors"
                 }
-                style={isActive ? { color: 'var(--code-tab-active-text)' } : undefined}
+                style={
+                  isActive
+                    ? { color: "var(--code-tab-active-text)" }
+                    : undefined
+                }
               >
                 {tab.filename}
-                <span className="ml-1.5" style={{ color: 'var(--code-line-count)' }}>
+                <span
+                  className="ml-1.5"
+                  style={{ color: "var(--code-line-count)" }}
+                >
                   ({lines})
                 </span>
               </button>
-            )
+            );
           })}
         </div>
       )}
@@ -154,5 +167,5 @@ export const CodeTabs = memo(function CodeTabs({ tabs }: CodeTabsProps) {
       {/* Code block */}
       <CodeBlock code={activeTab.code} language={activeTab.language} />
     </div>
-  )
-})
+  );
+});

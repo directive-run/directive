@@ -1,22 +1,37 @@
-import type { UsePlaybackReturn } from './usePlayback'
+import type { UsePlaybackReturn } from "./usePlayback";
 
 const SPEED_OPTIONS = [
-  { label: '0.5x', value: 1000 },
-  { label: '1x', value: 500 },
-  { label: '2x', value: 250 },
-]
+  { label: "0.5x", value: 1000 },
+  { label: "1x", value: 500 },
+  { label: "2x", value: 250 },
+];
 
 interface PlaybackControlsProps {
-  playback: UsePlaybackReturn
+  playback: UsePlaybackReturn;
   /** Optional label for the current step (e.g. event description or stage name) */
-  stepLabel?: string | null
+  stepLabel?: string | null;
 }
 
-export function PlaybackControls({ playback, stepLabel }: PlaybackControlsProps) {
-  const { step, isPlaying, speed, totalSteps, start, pause, resume, stop, stepForward, stepBackward, setSpeed } = playback
+export function PlaybackControls({
+  playback,
+  stepLabel,
+}: PlaybackControlsProps) {
+  const {
+    step,
+    isPlaying,
+    speed,
+    totalSteps,
+    start,
+    pause,
+    resume,
+    stop,
+    stepForward,
+    stepBackward,
+    setSpeed,
+  } = playback;
 
   if (totalSteps <= 1) {
-    return null
+    return null;
   }
 
   return (
@@ -89,8 +104,8 @@ export function PlaybackControls({ playback, stepLabel }: PlaybackControlsProps)
                 onClick={() => setSpeed(opt.value)}
                 className={`rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${
                   speed === opt.value
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+                    ? "bg-zinc-700 text-zinc-100"
+                    : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
                 }`}
               >
                 {opt.label}
@@ -102,10 +117,13 @@ export function PlaybackControls({ playback, stepLabel }: PlaybackControlsProps)
 
       {/* Step label row */}
       {step !== null && stepLabel && (
-        <div className="truncate text-center text-[10px] text-zinc-500" title={stepLabel}>
+        <div
+          className="truncate text-center text-[10px] text-zinc-500"
+          title={stepLabel}
+        >
           {stepLabel}
         </div>
       )}
     </>
-  )
+  );
 }

@@ -1,38 +1,38 @@
-'use client'
+"use client";
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { Dialog, DialogPanel } from '@headlessui/react'
+import { Dialog, DialogPanel } from "@headlessui/react";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
-import { List, X } from '@phosphor-icons/react'
+import { List, X } from "@phosphor-icons/react";
 
-import { Logomark } from '@/components/Logo'
-import { Navigation } from '@/components/Navigation'
-import { aiNavigation, docsNavigation } from '@/lib/navigation'
+import { Logomark } from "@/components/Logo";
+import { Navigation } from "@/components/Navigation";
+import { aiNavigation, docsNavigation } from "@/lib/navigation";
 
 function CloseOnNavigation({ close }: { close: () => void }) {
-  let pathname = usePathname()
-  let searchParams = useSearchParams()
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    close()
-  }, [pathname, searchParams, close])
+    close();
+  }, [pathname, searchParams, close]);
 
-  return null
+  return null;
 }
 
 export function MobileNavigation() {
-  let [isOpen, setIsOpen] = useState(false)
-  let close = useCallback(() => setIsOpen(false), [setIsOpen])
+  const [isOpen, setIsOpen] = useState(false);
+  const close = useCallback(() => setIsOpen(false), [setIsOpen]);
 
   function onLinkClick(event: React.MouseEvent<HTMLAnchorElement>) {
-    let link = event.currentTarget
+    const link = event.currentTarget;
     if (
       link.pathname + link.search + link.hash ===
       window.location.pathname + window.location.search + window.location.hash
     ) {
-      close()
+      close();
     }
   }
 
@@ -102,13 +102,21 @@ export function MobileNavigation() {
           <h3 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Documentation
           </h3>
-          <Navigation className="px-1" onLinkClick={onLinkClick} navigationOverride={docsNavigation} />
+          <Navigation
+            className="px-1"
+            onLinkClick={onLinkClick}
+            navigationOverride={docsNavigation}
+          />
           <h3 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             AI
           </h3>
-          <Navigation className="px-1" onLinkClick={onLinkClick} navigationOverride={aiNavigation} />
+          <Navigation
+            className="px-1"
+            onLinkClick={onLinkClick}
+            navigationOverride={aiNavigation}
+          />
         </DialogPanel>
       </Dialog>
     </>
-  )
+  );
 }

@@ -70,7 +70,7 @@ export interface MemoryStrategyResult {
 /** Memory management strategy function */
 export type MemoryStrategy = (
   messages: Message[],
-  config: MemoryStrategyConfig
+  config: MemoryStrategyConfig,
 ) => MemoryStrategyResult;
 
 /** Summarizer function to compress older messages */
@@ -175,7 +175,7 @@ const APPROX_CHARS_PER_TOKEN = 4;
  */
 export function estimateTokens(
   message: Message,
-  tokenizer?: (text: string) => number
+  tokenizer?: (text: string) => number,
 ): number {
   const content =
     typeof message.content === "string"
@@ -194,7 +194,7 @@ export function estimateTokens(
  */
 export function estimateTotalTokens(
   messages: Message[],
-  tokenizer?: (text: string) => number
+  tokenizer?: (text: string) => number,
 ): number {
   return messages.reduce((sum, msg) => sum + estimateTokens(msg, tokenizer), 0);
 }
@@ -217,7 +217,7 @@ export function estimateTotalTokens(
  * ```
  */
 export function createSlidingWindowStrategy(
-  defaultConfig: MemoryStrategyConfig = {}
+  defaultConfig: MemoryStrategyConfig = {},
 ): MemoryStrategy {
   return (messages: Message[], configOverride: MemoryStrategyConfig = {}) => {
     const config = { ...defaultConfig, ...configOverride };
@@ -265,7 +265,7 @@ export function createSlidingWindowStrategy(
  * ```
  */
 export function createTokenBasedStrategy(
-  defaultConfig: MemoryStrategyConfig = {}
+  defaultConfig: MemoryStrategyConfig = {},
 ): MemoryStrategy {
   return (messages: Message[], configOverride: MemoryStrategyConfig = {}) => {
     const config = { ...defaultConfig, ...configOverride };
@@ -277,7 +277,7 @@ export function createTokenBasedStrategy(
     const recentMessages = messages.slice(-preserveRecentCount);
     const olderMessages = messages.slice(0, -preserveRecentCount);
 
-    let recentTokens = recentMessages.reduce((sum, msg) => {
+    const recentTokens = recentMessages.reduce((sum, msg) => {
       if (!countSystemMessages && msg.role === "system") return sum;
       return sum + estimateTokens(msg);
     }, 0);
@@ -323,7 +323,7 @@ export function createTokenBasedStrategy(
  * ```
  */
 export function createHybridStrategy(
-  defaultConfig: MemoryStrategyConfig = {}
+  defaultConfig: MemoryStrategyConfig = {},
 ): MemoryStrategy {
   const slidingWindow = createSlidingWindowStrategy(defaultConfig);
   const tokenBased = createTokenBasedStrategy(defaultConfig);
@@ -469,7 +469,11 @@ export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
 
   return {
     getState() {
-      return { ...state, messages: [...state.messages], summaries: state.summaries.map(s => ({ ...s })) };
+      return {
+        ...state,
+        messages: [...state.messages],
+        summaries: state.summaries.map((s) => ({ ...s })),
+      };
     },
 
     addMessage(message: Message) {
@@ -518,7 +522,7 @@ export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
         if (totalTokens > maxContextTokens) {
           console.warn(
             `[Directive Memory] Context messages (${totalTokens} tokens) exceed maxContextTokens (${maxContextTokens}). ` +
-            `Consider calling manage() or reducing message count.`
+              `Consider calling manage() or reducing message count.`,
           );
         }
       }
@@ -574,9 +578,7 @@ export function createTruncationSummarizer(maxLength = 500): MessageSummarizer {
       .filter((m) => m.role !== "system")
       .map((m) => {
         const text =
-          typeof m.content === "string"
-            ? m.content
-            : JSON.stringify(m.content);
+          typeof m.content === "string" ? m.content : JSON.stringify(m.content);
         return `${m.role}: ${text.slice(0, 100)}${text.length > 100 ? "..." : ""}`;
       })
       .join("\n");
@@ -638,7 +640,7 @@ export function createLLMSummarizer(
   options: {
     maxSummaryLength?: number;
     preserveKeyFacts?: boolean;
-  } = {}
+  } = {},
 ): MessageSummarizer {
   const { maxSummaryLength = 500, preserveKeyFacts = true } = options;
 
@@ -647,9 +649,7 @@ export function createLLMSummarizer(
       .filter((m) => m.role !== "system")
       .map((m) => {
         const content =
-          typeof m.content === "string"
-            ? m.content
-            : JSON.stringify(m.content);
+          typeof m.content === "string" ? m.content : JSON.stringify(m.content);
         return `${m.role.toUpperCase()}: ${content}`;
       })
       .join("\n\n");

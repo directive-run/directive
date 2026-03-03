@@ -18,43 +18,43 @@
  */
 
 import {
-  createAgentOrchestrator,
-  createMultiAgentOrchestrator,
-  createStreamingRunner,
+  type AgentLike,
+  CircuitBreakerOpenError,
+  type InputGuardrailData,
+  type NamedGuardrail,
+  type RunResult,
   createAgentMemory,
-  createSlidingWindowStrategy,
-  createSemanticCache,
-  createTestEmbedder,
-  createMessageBus,
-  createOutputSchemaGuardrail,
+  createAgentOrchestrator,
   createLengthStreamingGuardrail,
+  createMessageBus,
+  createMultiAgentOrchestrator,
+  createOutputSchemaGuardrail,
+  createSemanticCache,
+  createSlidingWindowStrategy,
+  createStreamingRunner,
+  createTestEmbedder,
   estimateCost,
   parallel,
-  CircuitBreakerOpenError,
-  type RunResult,
-  type AgentLike,
-  type NamedGuardrail,
-  type InputGuardrailData,
 } from "@directive-run/ai";
-import {
-  createObservability,
-  createAgentMetrics,
-  createOTLPExporter,
-  createCircuitBreaker,
-  type CircuitState,
-} from "@directive-run/core/plugins";
 import type { CacheStats } from "@directive-run/ai";
-import type { Board, Player, Move } from "./rules.js";
-import { pickAiMove } from "./rules.js";
 import {
+  type CircuitState,
+  createAgentMetrics,
+  createCircuitBreaker,
+  createOTLPExporter,
+  createObservability,
+} from "@directive-run/core/plugins";
+import {
+  analysisAgent,
+  chatAgent,
+  formatLegalMoves,
+  moveAgent,
+  renderBoardForClaude,
   runClaude,
   runClaudeWithCallbacks,
-  moveAgent,
-  chatAgent,
-  analysisAgent,
-  renderBoardForClaude,
-  formatLegalMoves,
 } from "./claude-adapter.js";
+import type { Board, Move, Player } from "./rules.js";
+import { pickAiMove } from "./rules.js";
 
 // ============================================================================
 // Types
@@ -80,11 +80,11 @@ export interface CheckersAI {
     board: Board,
     player: Player,
     legalMoves: Move[],
-    humanMoveDesc?: string
+    humanMoveDesc?: string,
   ): Promise<MoveResult>;
   sendChat(
     message: string,
-    onToken?: (token: string) => void
+    onToken?: (token: string) => void,
   ): Promise<string | null>;
   reset(): void;
   getState(): {
@@ -105,7 +105,10 @@ export interface CheckersAI {
 // Move Schema Validation
 // ============================================================================
 
-function validateMoveOutput(value: unknown): { valid: boolean; errors?: string[] } {
+function validateMoveOutput(value: unknown): {
+  valid: boolean;
+  errors?: string[];
+} {
   if (typeof value !== "object" || value === null) {
     return { valid: false, errors: ["Expected an object"] };
   }
@@ -113,7 +116,8 @@ function validateMoveOutput(value: unknown): { valid: boolean; errors?: string[]
   const errors: string[] = [];
   if (typeof obj.from !== "number") errors.push("'from' must be a number");
   if (typeof obj.to !== "number") errors.push("'to' must be a number");
-  if (typeof obj.reasoning !== "string") errors.push("'reasoning' must be a string");
+  if (typeof obj.reasoning !== "string")
+    errors.push("'reasoning' must be a string");
   if (typeof obj.chat !== "string") errors.push("'chat' must be a string");
 
   return errors.length > 0 ? { valid: false, errors } : { valid: true };
@@ -124,11 +128,18 @@ function validateMoveOutput(value: unknown): { valid: boolean; errors?: string[]
 // ============================================================================
 
 function mergeResults(results: RunResult<unknown>[]): MoveWithAnalysis {
-  const moveResult = results[0]?.output as { from: number; to: number; reasoning: string; chat: string } | undefined;
+  const moveResult = results[0]?.output as
+    | { from: number; to: number; reasoning: string; chat: string }
+    | undefined;
   const analysisResult = results[1]?.output as string | undefined;
 
   return {
-    move: moveResult ?? { from: -1, to: -1, reasoning: "No result", chat: "Something went wrong" },
+    move: moveResult ?? {
+      from: -1,
+      to: -1,
+      reasoning: "No result",
+      chat: "Something went wrong",
+    },
     analysis: analysisResult ?? null,
   };
 }
@@ -169,7 +180,12 @@ export function createCheckersAI(): CheckersAI {
     tracing: { enabled: true, sampleRate: 1.0 },
     alerts: [
       { metric: "agent.errors", threshold: 5, operator: ">", action: "warn" },
-      { metric: "agent.latency", threshold: 10000, operator: ">", action: "warn" },
+      {
+        metric: "agent.latency",
+        threshold: 10000,
+        operator: ">",
+        action: "warn",
+      },
     ],
   });
 
@@ -179,7 +195,10 @@ export function createCheckersAI(): CheckersAI {
     endpoint: "http://localhost:4318",
     serviceName: "checkers-ai",
     onError: (err) => {
-      console.debug(`[OTLP] export failed (collector not running?):`, err.message);
+      console.debug(
+        `[OTLP] export failed (collector not running?):`,
+        err.message,
+      );
     },
   });
 
@@ -205,16 +224,25 @@ export function createCheckersAI(): CheckersAI {
     fn: () => {
       const now = Date.now();
       const windowStart = now - 60_000;
-      while (rateLimitStartIdx < rateLimitTimestamps.length && rateLimitTimestamps[rateLimitStartIdx]! < windowStart) {
+      while (
+        rateLimitStartIdx < rateLimitTimestamps.length &&
+        rateLimitTimestamps[rateLimitStartIdx]! < windowStart
+      ) {
         rateLimitStartIdx++;
       }
-      if (rateLimitStartIdx > rateLimitTimestamps.length / 2 && rateLimitStartIdx > 100) {
+      if (
+        rateLimitStartIdx > rateLimitTimestamps.length / 2 &&
+        rateLimitStartIdx > 100
+      ) {
         rateLimitTimestamps.splice(0, rateLimitStartIdx);
         rateLimitStartIdx = 0;
       }
       const active = rateLimitTimestamps.length - rateLimitStartIdx;
       if (active >= MAX_PER_MINUTE) {
-        return { passed: false, reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)` };
+        return {
+          passed: false,
+          reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)`,
+        };
       }
       rateLimitTimestamps.push(now);
 
@@ -241,9 +269,21 @@ export function createCheckersAI(): CheckersAI {
 
   // --- Multi-agent ---
   const agentRegistry = {
-    move:     { agent: moveAgent,     description: "Selects the best move", capabilities: ["move"] as string[] },
-    chat:     { agent: chatAgent,     description: "Free-form chat",        capabilities: ["chat"] as string[] },
-    analysis: { agent: analysisAgent, description: "Strategic analysis",    capabilities: ["analysis"] as string[] },
+    move: {
+      agent: moveAgent,
+      description: "Selects the best move",
+      capabilities: ["move"] as string[],
+    },
+    chat: {
+      agent: chatAgent,
+      description: "Free-form chat",
+      capabilities: ["chat"] as string[],
+    },
+    analysis: {
+      agent: analysisAgent,
+      description: "Strategic analysis",
+      capabilities: ["analysis"] as string[],
+    },
   };
 
   const multi = createMultiAgentOrchestrator({
@@ -278,7 +318,7 @@ export function createCheckersAI(): CheckersAI {
     board: Board,
     player: Player,
     legalMoves: Move[],
-    humanMoveDesc?: string
+    humanMoveDesc?: string,
   ): string {
     const boardStr = renderBoardForClaude(board);
     const movesStr = formatLegalMoves(legalMoves);
@@ -295,7 +335,7 @@ export function createCheckersAI(): CheckersAI {
     board: Board,
     player: Player,
     legalMoves: Move[],
-    reason: string
+    reason: string,
   ): MoveResult {
     const move = pickAiMove(board, player) ?? legalMoves[0];
 
@@ -316,10 +356,18 @@ export function createCheckersAI(): CheckersAI {
     board: Board,
     player: Player,
     legalMoves: Move[],
-    humanMoveDesc?: string
+    humanMoveDesc?: string,
   ): Promise<MoveResult> {
     if (legalMoves.length === 0) {
-      return { from: -1, to: -1, reasoning: "No moves", chat: "No moves!", analysis: null, isLocalFallback: true, isCached: false };
+      return {
+        from: -1,
+        to: -1,
+        reasoning: "No moves",
+        chat: "No moves!",
+        analysis: null,
+        isLocalFallback: true,
+        isCached: false,
+      };
     }
 
     isThinking = true;
@@ -356,7 +404,10 @@ export function createCheckersAI(): CheckersAI {
     const startTime = Date.now();
 
     try {
-      const result = await multi.runPattern<MoveWithAnalysis>("moveWithAnalysis", input);
+      const result = await multi.runPattern<MoveWithAnalysis>(
+        "moveWithAnalysis",
+        input,
+      );
       const latencyMs = Date.now() - startTime;
       const parsed = result.move;
 
@@ -381,12 +432,22 @@ export function createCheckersAI(): CheckersAI {
       } as Parameters<typeof bus.publish>[0]);
 
       // Validate the move is legal
-      const isLegal = legalMoves.some((m) => m.from === parsed.from && m.to === parsed.to);
+      const isLegal = legalMoves.some(
+        (m) => m.from === parsed.from && m.to === parsed.to,
+      );
       if (!isLegal) {
-        console.warn("[CheckersAI] Illegal move returned, falling back", parsed);
+        console.warn(
+          "[CheckersAI] Illegal move returned, falling back",
+          parsed,
+        );
         isThinking = false;
 
-        return localFallback(board, player, legalMoves, "Hmm, I tried an illegal move. Let me pick again!");
+        return localFallback(
+          board,
+          player,
+          legalMoves,
+          "Hmm, I tried an illegal move. Let me pick again!",
+        );
       }
 
       isThinking = false;
@@ -407,19 +468,29 @@ export function createCheckersAI(): CheckersAI {
       metrics.trackRun("moveWithAnalysis", { success: false, latencyMs });
 
       if (err instanceof CircuitBreakerOpenError) {
-        return localFallback(board, player, legalMoves, "Circuit breaker open — using local AI while I recover.");
+        return localFallback(
+          board,
+          player,
+          legalMoves,
+          "Circuit breaker open — using local AI while I recover.",
+        );
       }
 
       console.error("[CheckersAI] Move error:", err);
       const msg = err instanceof Error ? err.message : "Unknown error";
 
-      return localFallback(board, player, legalMoves, `Error: ${msg}. Using local AI.`);
+      return localFallback(
+        board,
+        player,
+        legalMoves,
+        `Error: ${msg}. Using local AI.`,
+      );
     }
   }
 
   async function sendChat(
     message: string,
-    onToken?: (token: string) => void
+    onToken?: (token: string) => void,
   ): Promise<string | null> {
     try {
       const agent = resolveAgent("chat");
@@ -433,9 +504,10 @@ export function createCheckersAI(): CheckersAI {
         }
         const finalResult = await result;
         totalTokens += finalResult.totalTokens;
-        reply = typeof finalResult.output === "string"
-          ? finalResult.output
-          : String(finalResult.output);
+        reply =
+          typeof finalResult.output === "string"
+            ? finalResult.output
+            : String(finalResult.output);
       } else {
         // Non-streaming: skip output guardrails for chat
         const result = await orchestrator.run<string>(agent, message, {
@@ -474,7 +546,10 @@ export function createCheckersAI(): CheckersAI {
     return {
       isThinking,
       totalTokens,
-      estimatedCost: costRatePerMillion > 0 ? estimateCost(totalTokens, costRatePerMillion) : 0,
+      estimatedCost:
+        costRatePerMillion > 0
+          ? estimateCost(totalTokens, costRatePerMillion)
+          : 0,
       circuitState: circuitBreaker.getState(),
       memoryMessageCount: memory.getState()?.messages?.length ?? 0,
       cacheStats: cache.getStats(),
@@ -503,6 +578,8 @@ export function createCheckersAI(): CheckersAI {
     reset,
     getState,
     dispose,
-    get observability() { return obs; },
+    get observability() {
+      return obs;
+    },
   };
 }

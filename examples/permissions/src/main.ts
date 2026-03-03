@@ -6,8 +6,8 @@
  * and admin panel.
  */
 
-import { system } from "./permissions.js";
 import type { Article } from "./mock-api.js";
+import { system } from "./permissions.js";
 
 // ============================================================================
 // Start System
@@ -19,9 +19,15 @@ system.start();
 // DOM References
 // ============================================================================
 
-const userAdminBtn = document.getElementById("pm-user-admin") as HTMLButtonElement;
-const userEditorBtn = document.getElementById("pm-user-editor") as HTMLButtonElement;
-const userViewerBtn = document.getElementById("pm-user-viewer") as HTMLButtonElement;
+const userAdminBtn = document.getElementById(
+  "pm-user-admin",
+) as HTMLButtonElement;
+const userEditorBtn = document.getElementById(
+  "pm-user-editor",
+) as HTMLButtonElement;
+const userViewerBtn = document.getElementById(
+  "pm-user-viewer",
+) as HTMLButtonElement;
 const logoutBtn = document.getElementById("pm-logout") as HTMLButtonElement;
 
 const permEditEl = document.getElementById("pm-perm-edit")!;
@@ -44,7 +50,10 @@ const toastEl = document.getElementById("pm-toast")!;
 
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
-function showToast(message: string, type: "denied" | "success" = "denied"): void {
+function showToast(
+  message: string,
+  type: "denied" | "success" = "denied",
+): void {
   toastEl.textContent = message;
   toastEl.className = `pm-toast visible ${type}`;
 
@@ -102,7 +111,8 @@ function render(): void {
 
   // --- Article list ---
   if (!isAuthenticated) {
-    articleListEl.innerHTML = '<div class="pm-empty">Sign in to view articles</div>';
+    articleListEl.innerHTML =
+      '<div class="pm-empty">Sign in to view articles</div>';
   } else if (!contentLoaded) {
     articleListEl.innerHTML = '<div class="pm-empty">Loading articles...</div>';
   } else if (articles.length === 0) {
@@ -177,7 +187,6 @@ function render(): void {
     adminPanelEl.classList.remove("visible");
     adminPanelEl.innerHTML = "";
   }
-
 }
 
 // ============================================================================

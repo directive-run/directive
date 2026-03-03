@@ -1,18 +1,18 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { CounterDemo } from './CounterDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { CounterDemo } from "./CounterDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Number Match',
+  title: "Number Match",
   description:
-    'Interactive Number Match game built with Directive. Constraint-driven pair matching, automatic refill, and game-over detection.',
-  path: '/docs/examples/counter',
-  section: 'Docs',
-})
+    "Interactive Number Match game built with Directive. Constraint-driven pair matching, automatic refill, and game-over detection.",
+  path: "/docs/examples/counter",
+  section: "Docs",
+});
 
 export default function CounterPage() {
-  const build = parseExampleBuild('counter')
-  const sources = readExampleSources('counter', ['main.ts'])
+  const build = parseExampleBuild("counter");
+  const sources = readExampleSources("counter", ["main.ts"]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -31,5 +31,5 @@ export default function CounterPage() {
 
       <CounterDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

@@ -28,7 +28,7 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions } from "./types.js";
+import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
 // Types
@@ -91,7 +91,9 @@ const MAX_EXTRACT_LENGTH = 1_048_576;
 /** Default JSON extractor — finds the first `{...}` or `[...]` in output. */
 export function extractJsonFromOutput(output: string): unknown {
   if (output.length > MAX_EXTRACT_LENGTH) {
-    throw new Error(`[Directive] Output too large for JSON extraction (${output.length} chars, max ${MAX_EXTRACT_LENGTH}).`);
+    throw new Error(
+      `[Directive] Output too large for JSON extraction (${output.length} chars, max ${MAX_EXTRACT_LENGTH}).`,
+    );
   }
 
   const trimmed = output.trim();
@@ -167,13 +169,11 @@ export function extractJsonFromOutput(output: string): unknown {
           return JSON.parse(jsonStr);
         } catch {
           // LLMs emit literal newlines inside JSON string values — escape them
-          const sanitized = jsonStr.replace(
-            /"(?:[^"\\]|\\.)*"/g,
-            (match) =>
-              match
-                .replace(/\n/g, "\\n")
-                .replace(/\r/g, "\\r")
-                .replace(/\t/g, "\\t"),
+          const sanitized = jsonStr.replace(/"(?:[^"\\]|\\.)*"/g, (match) =>
+            match
+              .replace(/\n/g, "\\n")
+              .replace(/\r/g, "\\r")
+              .replace(/\t/g, "\\t"),
           );
 
           return JSON.parse(sanitized);
@@ -186,7 +186,9 @@ export function extractJsonFromOutput(output: string): unknown {
 }
 
 /** Format validation errors for feedback. */
-function formatValidationError(error: SafeParseResult<unknown>["error"]): string {
+function formatValidationError(
+  error: SafeParseResult<unknown>["error"],
+): string {
   if (!error) {
     return "Validation failed";
   }
@@ -236,10 +238,13 @@ export function withStructuredOutput<T = unknown>(
 
   // Validate config
   if (!Number.isFinite(maxRetries) || maxRetries < 0) {
-    throw new Error("[Directive] withStructuredOutput: maxRetries must be a non-negative finite number.");
+    throw new Error(
+      "[Directive] withStructuredOutput: maxRetries must be a non-negative finite number.",
+    );
   }
 
-  const schemaPrompt = schemaDescription ?? schema.description ?? "the specified JSON schema";
+  const schemaPrompt =
+    schemaDescription ?? schema.description ?? "the specified JSON schema";
 
   // The returned runner produces `T` from the schema. We cast at the
   // boundary to satisfy the `AgentRunner` generic while keeping output type-safe.
@@ -251,8 +256,11 @@ export function withStructuredOutput<T = unknown>(
     // Append JSON instruction to agent's system prompt
     const structuredAgent: AgentLike = {
       ...agent,
-      instructions: (agent.instructions ?? "") +
-        "\n\nIMPORTANT: Respond with valid JSON matching " + schemaPrompt + ". " +
+      instructions:
+        (agent.instructions ?? "") +
+        "\n\nIMPORTANT: Respond with valid JSON matching " +
+        schemaPrompt +
+        ". " +
         "Output ONLY the JSON object, no additional text or markdown formatting.",
     };
 
@@ -261,17 +269,19 @@ export function withStructuredOutput<T = unknown>(
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       // On retries, append error feedback as additional input
-      const effectiveInput = attempt === 0
-        ? input
-        : `${input}\n\nYour previous response was not valid JSON. Error: ${lastError}\nPlease try again with valid JSON only.`;
+      const effectiveInput =
+        attempt === 0
+          ? input
+          : `${input}\n\nYour previous response was not valid JSON. Error: ${lastError}\nPlease try again with valid JSON only.`;
 
       const result = await runner(structuredAgent, effectiveInput, options);
       lastResult = result;
 
       // Try to extract and validate JSON
-      const outputStr = typeof result.output === "string"
-        ? result.output
-        : JSON.stringify(result.output);
+      const outputStr =
+        typeof result.output === "string"
+          ? result.output
+          : JSON.stringify(result.output);
 
       try {
         const extracted = extractJson(outputStr);

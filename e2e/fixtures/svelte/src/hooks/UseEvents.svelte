@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { useFact, useEvents } from "@directive-run/svelte";
-  import { system } from "../system";
-  import { TestIds } from "../../../../shared/test-ids";
+import { useEvents, useFact } from "@directive-run/svelte";
+import { system } from "../system";
 
-  const count = useFact(system, "count");
-  const events = useEvents(system);
+const count = useFact(system, "count");
+const events = useEvents(system);
 </script>
 
 <div>

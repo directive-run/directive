@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { OrchestratorStreamChunk } from "../agent-orchestrator.js";
 import { mergeTaggedStreams } from "../streaming.js";
 import type { MultiplexedStreamChunk } from "../streaming.js";
-import type { OrchestratorStreamChunk } from "../agent-orchestrator.js";
 import {
-  createTestMultiAgentOrchestrator,
-  collectMultiplexedStream,
   assertMultiplexedStream,
+  collectMultiplexedStream,
+  createTestMultiAgentOrchestrator,
 } from "../testing.js";
 
 // ============================================================================
@@ -28,7 +28,10 @@ function tokenChunk(data: string, tokenCount: number): OrchestratorStreamChunk {
   return { type: "token", data, tokenCount };
 }
 
-function doneChunk(totalTokens: number, duration = 100): OrchestratorStreamChunk {
+function doneChunk(
+  totalTokens: number,
+  duration = 100,
+): OrchestratorStreamChunk {
   return { type: "done", totalTokens, duration, droppedTokens: 0 };
 }
 

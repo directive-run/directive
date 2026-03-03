@@ -1,4 +1,4 @@
-import { test as base, type Page } from "@playwright/test";
+import { type Page, test as base } from "@playwright/test";
 
 /** Framework config for parametrized tests */
 export interface FrameworkConfig {

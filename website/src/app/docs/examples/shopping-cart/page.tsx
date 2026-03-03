@@ -1,22 +1,22 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { ShoppingCartDemo } from './ShoppingCartDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { ShoppingCartDemo } from "./ShoppingCartDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Shopping Cart',
+  title: "Shopping Cart",
   description:
-    'Interactive shopping cart demo built with Directive. Constraint-driven business rules for quantity limits, coupon validation, and checkout gating.',
-  path: '/docs/examples/shopping-cart',
-  section: 'Docs',
-})
+    "Interactive shopping cart demo built with Directive. Constraint-driven business rules for quantity limits, coupon validation, and checkout gating.",
+  path: "/docs/examples/shopping-cart",
+  section: "Docs",
+});
 
 export default function ShoppingCartPage() {
-  const build = parseExampleBuild('shopping-cart')
-  const sources = readExampleSources('shopping-cart', [
-    'shopping-cart.ts',
-    'mock-api.ts',
-    'main.ts',
-  ])
+  const build = parseExampleBuild("shopping-cart");
+  const sources = readExampleSources("shopping-cart", [
+    "shopping-cart.ts",
+    "mock-api.ts",
+    "main.ts",
+  ]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -35,5 +35,5 @@ export default function ShoppingCartPage() {
 
       <ShoppingCartDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

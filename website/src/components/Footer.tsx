@@ -1,14 +1,14 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { Heart, PaperPlaneTilt } from '@phosphor-icons/react'
+import { Heart, PaperPlaneTilt } from "@phosphor-icons/react";
+import Link from "next/link";
 
-import { Logomark } from '@/components/Logo'
-import { GitHubIcon } from '@/components/icons/GitHubIcon'
-import { ThemeToggle } from '@/components/ThemeSelector'
+import { Logomark } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeSelector";
+import { GitHubIcon } from "@/components/icons/GitHubIcon";
 
 const footerLinkClass =
-  'text-[15px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+  "text-[15px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300";
 
 export function Footer() {
   return (
@@ -24,7 +24,10 @@ export function Footer() {
               </span>
             </div>
             <p className="mt-3 text-[15px] text-slate-500 dark:text-slate-400">
-              Declare requirements. Let the runtime resolve them. A constraint-driven state management library for TypeScript that handles async resolution, dependency tracking, and side effects automatically.
+              Declare requirements. Let the runtime resolve them. A
+              constraint-driven state management library for TypeScript that
+              handles async resolution, dependency tracking, and side effects
+              automatically.
             </p>
           </div>
 
@@ -35,11 +38,31 @@ export function Footer() {
                 Resources
               </h3>
               <ul className="mt-3 space-y-2">
-                <li><Link href="/docs/quick-start" className={footerLinkClass}>Docs</Link></li>
-                <li><Link href="/ai/overview" className={footerLinkClass}>AI Docs</Link></li>
-                <li><Link href="/blog" className={footerLinkClass}>Blog</Link></li>
-                <li><Link href="/labs" className={footerLinkClass}>Labs</Link></li>
-                <li><Link href="/branding" className={footerLinkClass}>Brand Guide</Link></li>
+                <li>
+                  <Link href="/docs/quick-start" className={footerLinkClass}>
+                    Docs
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/ai/overview" className={footerLinkClass}>
+                    AI Docs
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/blog" className={footerLinkClass}>
+                    Blog
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/labs" className={footerLinkClass}>
+                    Labs
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/branding" className={footerLinkClass}>
+                    Brand Guide
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
@@ -47,10 +70,26 @@ export function Footer() {
                 Help
               </h3>
               <ul className="mt-3 space-y-2">
-                <li><Link href="/philosophy" className={footerLinkClass}>Philosophy</Link></li>
-                <li><Link href="/about" className={footerLinkClass}>About</Link></li>
-                <li><Link href="/docs/core-concepts" className={footerLinkClass}>Core Concepts</Link></li>
-                <li><Link href="/docs/quick-start" className={footerLinkClass}>Quick Start</Link></li>
+                <li>
+                  <Link href="/philosophy" className={footerLinkClass}>
+                    Philosophy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/about" className={footerLinkClass}>
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/core-concepts" className={footerLinkClass}>
+                    Core Concepts
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/quick-start" className={footerLinkClass}>
+                    Quick Start
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
@@ -61,7 +100,8 @@ export function Footer() {
               Community
             </h3>
             <p className="mt-3 text-[15px] text-slate-500 dark:text-slate-400">
-              Directive is free and open source, sustained by the community. Help shape the project by contributing or sponsoring.
+              Directive is free and open source, sustained by the community.
+              Help shape the project by contributing or sponsoring.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <Link
@@ -96,9 +136,12 @@ export function Footer() {
               <GitHubIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />
             </Link>
           </div>
-          <span>MIT License &copy; {new Date().getFullYear()} Directive &middot; Made possible by sponsors and contributors</span>
+          <span>
+            MIT License &copy; {new Date().getFullYear()} Directive &middot;
+            Made possible by sponsors and contributors
+          </span>
         </div>
       </div>
     </footer>
-  )
+  );
 }

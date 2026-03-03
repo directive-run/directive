@@ -10,7 +10,7 @@
  * - No @ts-expect-error needed - types flow automatically!
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import type { UserData } from "../types";
 import { authSchema } from "./auth";
 

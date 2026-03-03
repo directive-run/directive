@@ -9,11 +9,11 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  notificationsModule,
-  notificationsSchema,
+  type Notification,
   appModule,
   appSchema,
-  type Notification,
+  notificationsModule,
+  notificationsSchema,
 } from "./notifications.js";
 
 // ============================================================================
@@ -29,7 +29,9 @@ system.start();
 
 const allKeys = [
   ...Object.keys(notificationsSchema.facts).map((k) => `notifications::${k}`),
-  ...Object.keys(notificationsSchema.derivations).map((k) => `notifications::${k}`),
+  ...Object.keys(notificationsSchema.derivations).map(
+    (k) => `notifications::${k}`,
+  ),
   ...Object.keys(appSchema.facts).map((k) => `app::${k}`),
 ];
 
@@ -38,14 +40,22 @@ const allKeys = [
 // ============================================================================
 
 const toastStack = document.getElementById("nt-toast-stack")!;
-const maxVisibleSlider = document.getElementById("nt-max-visible") as HTMLInputElement;
+const maxVisibleSlider = document.getElementById(
+  "nt-max-visible",
+) as HTMLInputElement;
 const maxVisibleVal = document.getElementById("nt-max-visible-val")!;
 const actionLogEl = document.getElementById("nt-action-log")!;
 
 const addInfoBtn = document.getElementById("nt-add-info") as HTMLButtonElement;
-const addSuccessBtn = document.getElementById("nt-add-success") as HTMLButtonElement;
-const addWarningBtn = document.getElementById("nt-add-warning") as HTMLButtonElement;
-const addErrorBtn = document.getElementById("nt-add-error") as HTMLButtonElement;
+const addSuccessBtn = document.getElementById(
+  "nt-add-success",
+) as HTMLButtonElement;
+const addWarningBtn = document.getElementById(
+  "nt-add-warning",
+) as HTMLButtonElement;
+const addErrorBtn = document.getElementById(
+  "nt-add-error",
+) as HTMLButtonElement;
 const burstBtn = document.getElementById("nt-burst") as HTMLButtonElement;
 
 // ============================================================================
@@ -124,7 +134,9 @@ function render(): void {
 
   // Add or update toasts
   for (const notification of visible) {
-    let el = toastStack.querySelector<HTMLElement>(`[data-id="${notification.id}"]`);
+    let el = toastStack.querySelector<HTMLElement>(
+      `[data-id="${notification.id}"]`,
+    );
 
     if (!el) {
       el = document.createElement("div");
@@ -225,7 +237,13 @@ addErrorBtn.addEventListener("click", () => {
 });
 
 burstBtn.addEventListener("click", () => {
-  const levels: Notification["level"][] = ["info", "success", "warning", "error", "info"];
+  const levels: Notification["level"][] = [
+    "info",
+    "success",
+    "warning",
+    "error",
+    "info",
+  ];
   for (const level of levels) {
     addNotification(level);
   }
@@ -242,7 +260,9 @@ toastStack.addEventListener("click", (e) => {
 
 // Max visible slider
 maxVisibleSlider.addEventListener("input", () => {
-  system.events.notifications.setMaxVisible({ value: Number(maxVisibleSlider.value) });
+  system.events.notifications.setMaxVisible({
+    value: Number(maxVisibleSlider.value),
+  });
 });
 
 // ============================================================================

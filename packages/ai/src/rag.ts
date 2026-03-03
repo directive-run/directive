@@ -24,7 +24,7 @@
  */
 
 import { cosineSimilarity } from "./guardrails/semantic-cache.js";
-import type { Embedding, EmbedderFn } from "./guardrails/semantic-cache.js";
+import type { EmbedderFn, Embedding } from "./guardrails/semantic-cache.js";
 
 // ============================================================================
 // Types
@@ -249,9 +249,7 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
       const data = await fs.promises.readFile(filePath, "utf-8");
       const raw = JSON.parse(data) as Record<string, unknown>[];
 
-      cached = mapEntry
-        ? raw.map(mapEntry)
-        : (raw as unknown as RAGChunk[]);
+      cached = mapEntry ? raw.map(mapEntry) : (raw as unknown as RAGChunk[]);
 
       cachedAt = Date.now();
       return cached;
@@ -290,4 +288,3 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
     },
   };
 }
-

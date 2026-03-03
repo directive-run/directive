@@ -37,7 +37,10 @@ export class InMemoryCheckpointStore {
 }
 
 export function createCheckpointId(): string {
-  return crypto.randomUUID?.() ?? `cp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return (
+    crypto.randomUUID?.() ??
+    `cp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
 }
 
 export function validateCheckpoint(cp: unknown): cp is Checkpoint {

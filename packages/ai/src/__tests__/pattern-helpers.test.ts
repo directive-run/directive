@@ -1,16 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  createTestMultiAgentOrchestrator,
-} from "../testing.js";
-import {
-  reflect,
-  debate,
-  runDebate,
   composePatterns,
-  spawnOnCondition,
+  debate,
   derivedConstraint,
+  reflect,
+  runDebate,
+  spawnOnCondition,
   spawnPool,
 } from "../multi-agent-orchestrator.js";
+import { createTestMultiAgentOrchestrator } from "../testing.js";
 import type { CrossAgentSnapshot } from "../types.js";
 
 // ============================================================================
@@ -43,9 +41,9 @@ describe("edge cases", () => {
     });
 
     // Pre-aborted signal should throw immediately since no producer output exists
-    await expect(
-      orchestrator.runPattern("review", "Go"),
-    ).rejects.toThrow("aborted");
+    await expect(orchestrator.runPattern("review", "Go")).rejects.toThrow(
+      "aborted",
+    );
   });
 
   it("minSuccess with float throws validation error", async () => {
@@ -78,7 +76,7 @@ describe("edge cases", () => {
     });
 
     await expect(
-      orchestrator.runRace(["a", "b"], "go", { minSuccess: NaN }),
+      orchestrator.runRace(["a", "b"], "go", { minSuccess: Number.NaN }),
     ).rejects.toThrow("minSuccess");
   });
 
@@ -201,7 +199,9 @@ describe("spawnOnCondition", () => {
       options: { priority: 10, context: { urgent: true } },
     });
 
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({ task: "do stuff" } as any);
 
     expect(req).toMatchObject({
@@ -230,7 +230,11 @@ describe("runDebate", () => {
         optimist: { output: "Things are great!", totalTokens: 10 },
         pessimist: { output: "Things are terrible!", totalTokens: 10 },
         judge: {
-          output: JSON.stringify({ winnerId: "optimist", feedback: "More convincing", score: 0.8 }),
+          output: JSON.stringify({
+            winnerId: "optimist",
+            feedback: "More convincing",
+            score: 0.8,
+          }),
           totalTokens: 15,
         },
       },
@@ -369,8 +373,12 @@ describe("derivedConstraint", () => {
     );
 
     // Simulates the orchestrator passing __derived in facts
-    expect(constraint.when({ __derived: { totalCost: 3.0 } } as any)).toBe(false);
-    expect(constraint.when({ __derived: { totalCost: 10.0 } } as any)).toBe(true);
+    expect(constraint.when({ __derived: { totalCost: 3.0 } } as any)).toBe(
+      false,
+    );
+    expect(constraint.when({ __derived: { totalCost: 10.0 } } as any)).toBe(
+      true,
+    );
   });
 
   it("require() returns RUN_AGENT with derived value", () => {
@@ -388,7 +396,9 @@ describe("derivedConstraint", () => {
     // Trigger when() to capture value
     constraint.when({ __derived: { risk: 0.95 } } as any);
 
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({} as any);
     expect(req).toMatchObject({
       type: "RUN_AGENT",
@@ -422,9 +432,14 @@ describe("runReflect (imperative)", () => {
             evalCount++;
 
             return {
-              output: evalCount >= 2
-                ? JSON.stringify({ passed: true, score: 0.9 })
-                : JSON.stringify({ passed: false, feedback: "Improve", score: 0.4 }),
+              output:
+                evalCount >= 2
+                  ? JSON.stringify({ passed: true, score: 0.9 })
+                  : JSON.stringify({
+                      passed: false,
+                      feedback: "Improve",
+                      score: 0.4,
+                    }),
               totalTokens: 8,
             };
           },
@@ -432,9 +447,14 @@ describe("runReflect (imperative)", () => {
       },
     });
 
-    const result = await orchestrator.runReflect<string>("producer", "evaluator", "Write essay", {
-      maxIterations: 3,
-    });
+    const result = await orchestrator.runReflect<string>(
+      "producer",
+      "evaluator",
+      "Write essay",
+      {
+        maxIterations: 3,
+      },
+    );
 
     expect(result.result).toBe("essay");
     expect(result.iterations).toBe(2);
@@ -453,15 +473,24 @@ describe("runReflect (imperative)", () => {
       mockResponses: {
         producer: { output: "draft", totalTokens: 10 },
         evaluator: {
-          output: JSON.stringify({ passed: false, feedback: "Not good enough", score: 0.3 }),
+          output: JSON.stringify({
+            passed: false,
+            feedback: "Not good enough",
+            score: 0.3,
+          }),
           totalTokens: 5,
         },
       },
     });
 
-    const result = await orchestrator.runReflect<string>("producer", "evaluator", "Write essay", {
-      maxIterations: 2,
-    });
+    const result = await orchestrator.runReflect<string>(
+      "producer",
+      "evaluator",
+      "Write essay",
+      {
+        maxIterations: 2,
+      },
+    );
 
     expect(result.exhausted).toBe(true);
     expect(result.iterations).toBe(2);
@@ -498,7 +527,11 @@ describe("runReflect (imperative)", () => {
             const score = scores[(evalCount - 1) % scores.length]!;
 
             return {
-              output: JSON.stringify({ passed: false, feedback: "Try harder", score }),
+              output: JSON.stringify({
+                passed: false,
+                feedback: "Try harder",
+                score,
+              }),
               totalTokens: 5,
             };
           },
@@ -506,10 +539,15 @@ describe("runReflect (imperative)", () => {
       },
     });
 
-    const result = await orchestrator.runReflect<string>("producer", "evaluator", "Write essay", {
-      maxIterations: 3,
-      onExhausted: "accept-best",
-    });
+    const result = await orchestrator.runReflect<string>(
+      "producer",
+      "evaluator",
+      "Write essay",
+      {
+        maxIterations: 3,
+        onExhausted: "accept-best",
+      },
+    );
 
     expect(result.exhausted).toBe(true);
     expect(result.result).toBe("draft-v2"); // Highest score was 0.9 at iteration 2
@@ -530,10 +568,15 @@ describe("runReflect (imperative)", () => {
       },
     });
 
-    const result = await orchestrator.runReflect<string>("producer", "evaluator", "Write essay", {
-      maxIterations: 3,
-      threshold: 0.7,
-    });
+    const result = await orchestrator.runReflect<string>(
+      "producer",
+      "evaluator",
+      "Write essay",
+      {
+        maxIterations: 3,
+        threshold: 0.7,
+      },
+    );
 
     // Score 0.75 >= threshold 0.7, so it should pass on first iteration
     expect(result.iterations).toBe(1);
@@ -548,46 +591,39 @@ describe("runReflect (imperative)", () => {
 
 describe("spawnPool", () => {
   it("creates a valid constraint with static count", () => {
-    const constraint = spawnPool(
-      (facts) => (facts.pending as number) > 0,
-      {
-        agent: "worker",
-        count: 3,
-        input: (_facts, i) => `Task ${i}`,
-      },
-    );
+    const constraint = spawnPool((facts) => (facts.pending as number) > 0, {
+      agent: "worker",
+      count: 3,
+      input: (_facts, i) => `Task ${i}`,
+    });
 
     expect(constraint.when).toBeTypeOf("function");
     expect(constraint.require).toBeTypeOf("function");
   });
 
   it("when() evaluates condition", () => {
-    const constraint = spawnPool(
-      (facts) => (facts.load as number) > 10,
-      {
-        agent: "worker",
-        count: 2,
-        input: () => "do work",
-      },
-    );
+    const constraint = spawnPool((facts) => (facts.load as number) > 10, {
+      agent: "worker",
+      count: 2,
+      input: () => "do work",
+    });
 
     expect(constraint.when({ load: 5 } as any)).toBe(false);
     expect(constraint.when({ load: 15 } as any)).toBe(true);
   });
 
   it("require() returns RUN_AGENT requirement", () => {
-    const constraint = spawnPool(
-      () => true,
-      {
-        agent: "worker",
-        count: 3,
-        input: (_facts, i) => `Task ${i}`,
-        priority: 50,
-        context: { pool: true },
-      },
-    );
+    const constraint = spawnPool(() => true, {
+      agent: "worker",
+      count: 3,
+      input: (_facts, i) => `Task ${i}`,
+      priority: 50,
+      context: { pool: true },
+    });
 
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({} as any);
 
     expect(req).toMatchObject({
@@ -600,17 +636,16 @@ describe("spawnPool", () => {
   });
 
   it("dynamic count uses function", () => {
-    const constraint = spawnPool(
-      () => true,
-      {
-        agent: "worker",
-        count: (facts) => (facts.pending as number),
-        input: (_facts, i) => `Job ${i}`,
-      },
-    );
+    const constraint = spawnPool(() => true, {
+      agent: "worker",
+      count: (facts) => facts.pending as number,
+      input: (_facts, i) => `Job ${i}`,
+    });
 
     // The constraint returns a single RUN_AGENT requirement per evaluation cycle
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({ pending: 5 } as any);
 
     expect(req).toMatchObject({
@@ -636,7 +671,9 @@ describe("spawnOnCondition flattened options", () => {
     });
 
     expect(constraint.priority).toBe(42);
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({} as any);
     expect(req).toMatchObject({
       context: { urgent: true },
@@ -652,7 +689,9 @@ describe("spawnOnCondition flattened options", () => {
     });
 
     expect(constraint.priority).toBe(10);
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({} as Record<string, unknown>);
     expect(req).toMatchObject({
       context: { legacy: true },
@@ -670,7 +709,9 @@ describe("spawnOnCondition flattened options", () => {
     });
 
     expect(constraint.priority).toBe(99);
-    const requireFn = constraint.require as (facts: Record<string, unknown>) => unknown;
+    const requireFn = constraint.require as (
+      facts: Record<string, unknown>,
+    ) => unknown;
     const req = requireFn({} as Record<string, unknown>);
     expect(req).toMatchObject({
       context: { modern: true },
@@ -700,12 +741,18 @@ describe("runDebate with AbortSignal", () => {
       },
     });
 
-    await expect(runDebate(orchestrator, {
-      handlers: ["a", "b"],
-      evaluator: "judge",
-      maxRounds: 3,
-      signal: controller.signal,
-    }, "test")).rejects.toThrow("Debate aborted before any round completed");
+    await expect(
+      runDebate(
+        orchestrator,
+        {
+          handlers: ["a", "b"],
+          evaluator: "judge",
+          maxRounds: 3,
+          signal: controller.signal,
+        },
+        "test",
+      ),
+    ).rejects.toThrow("Debate aborted before any round completed");
   });
 });
 
@@ -741,11 +788,14 @@ describe("composePatterns with debate", () => {
       agents: { a: { agent: { name: "a" } } },
     });
 
-    const composed = composePatterns(
-      { type: "nonexistent" as any, handlers: ["a"] },
-    );
+    const composed = composePatterns({
+      type: "nonexistent" as any,
+      handlers: ["a"],
+    });
 
-    await expect(composed(orchestrator, "test")).rejects.toThrow("unknown pattern type");
+    await expect(composed(orchestrator, "test")).rejects.toThrow(
+      "unknown pattern type",
+    );
   });
 });
 
@@ -805,15 +855,21 @@ describe("orchestrator.runDebate", () => {
 
 describe("debate factory validation", () => {
   it("debate() with fewer than 2 agents throws", () => {
-    expect(() => debate({ handlers: ["a"], evaluator: "judge" })).toThrow("at least 2");
+    expect(() => debate({ handlers: ["a"], evaluator: "judge" })).toThrow(
+      "at least 2",
+    );
   });
 
   it("debate() with maxRounds 0 throws", () => {
-    expect(() => debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 })).toThrow("maxRounds");
+    expect(() =>
+      debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 }),
+    ).toThrow("maxRounds");
   });
 
   it("debate() with maxRounds -1 throws", () => {
-    expect(() => debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: -1 })).toThrow("maxRounds");
+    expect(() =>
+      debate({ handlers: ["a", "b"], evaluator: "judge", maxRounds: -1 }),
+    ).toThrow("maxRounds");
   });
 });
 
@@ -867,7 +923,11 @@ describe("debate maxRounds validation (imperative)", () => {
     });
 
     await expect(
-      runDebate(orchestrator, { handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 }, "go"),
+      runDebate(
+        orchestrator,
+        { handlers: ["a", "b"], evaluator: "judge", maxRounds: 0 },
+        "go",
+      ),
     ).rejects.toThrow("maxRounds");
   });
 

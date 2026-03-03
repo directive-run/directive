@@ -1,6 +1,6 @@
 import { useFact, useOptimisticUpdate } from "@directive-run/react";
-import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { statusPlugin, system } from "../system";
 
 export function UseOptimisticUpdatePage() {
   const count = useFact(system, "count");
@@ -14,7 +14,9 @@ export function UseOptimisticUpdatePage() {
     <div>
       <span data-testid={TestIds.optimisticValue}>{count}</span>
       <span data-testid={TestIds.optimisticPending}>{String(isPending)}</span>
-      <span data-testid={TestIds.optimisticError}>{error?.message ?? "null"}</span>
+      <span data-testid={TestIds.optimisticError}>
+        {error?.message ?? "null"}
+      </span>
       <button
         data-testid={TestIds.btnMutate}
         onClick={() =>
@@ -29,7 +31,10 @@ export function UseOptimisticUpdatePage() {
       <button data-testid={TestIds.btnRollback} onClick={rollback}>
         rollback
       </button>
-      <button data-testid={TestIds.btnReset} onClick={() => system.events.reset()}>
+      <button
+        data-testid={TestIds.btnReset}
+        onClick={() => system.events.reset()}
+      >
         reset
       </button>
     </div>

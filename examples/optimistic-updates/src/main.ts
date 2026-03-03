@@ -9,11 +9,11 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
+  type EventLogEntry,
+  type SyncQueueEntry,
+  type TodoItem,
   optimisticUpdatesModule,
   optimisticUpdatesSchema,
-  type TodoItem,
-  type SyncQueueEntry,
-  type EventLogEntry,
 } from "./optimistic-updates.js";
 
 // ============================================================================
@@ -53,9 +53,13 @@ const toastText = document.getElementById("ou-toast-text")!;
 const toastDismiss = document.getElementById("ou-toast-dismiss")!;
 
 // Config sliders
-const serverDelaySlider = document.getElementById("ou-server-delay") as HTMLInputElement;
+const serverDelaySlider = document.getElementById(
+  "ou-server-delay",
+) as HTMLInputElement;
 const delayVal = document.getElementById("ou-delay-val")!;
-const failRateSlider = document.getElementById("ou-fail-rate") as HTMLInputElement;
+const failRateSlider = document.getElementById(
+  "ou-fail-rate",
+) as HTMLInputElement;
 const failVal = document.getElementById("ou-fail-val")!;
 
 // Timeline
@@ -212,7 +216,8 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML = '<div class="ou-timeline-empty">Events will appear here after actions</div>';
+    timelineEl.innerHTML =
+      '<div class="ou-timeline-empty">Events will appear here after actions</div>';
   } else {
     timelineEl.innerHTML = "";
     for (let i = eventLog.length - 1; i >= 0; i--) {

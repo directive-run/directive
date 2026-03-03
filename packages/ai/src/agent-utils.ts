@@ -6,12 +6,12 @@ import type {
   AdapterHooks,
   AgentLike,
   AgentRunner,
-  RunResult,
-  RunOptions,
-  Message,
-  TokenUsage,
   AgentState,
   ApprovalState,
+  Message,
+  RunOptions,
+  RunResult,
+  TokenUsage,
 } from "./types.js";
 
 // ============================================================================
@@ -41,7 +41,7 @@ export function hasPendingApprovals(state: ApprovalState): boolean {
  */
 export function estimateCost(
   tokenUsage: number,
-  ratePerMillionTokens: number
+  ratePerMillionTokens: number,
 ): number {
   return (tokenUsage / 1_000_000) * ratePerMillionTokens;
 }
@@ -95,11 +95,11 @@ export interface CreateRunnerOptions {
   buildRequest: (
     agent: AgentLike,
     input: string,
-    messages: Message[]
+    messages: Message[],
   ) => { url: string; init: RequestInit };
   parseResponse: (
     response: Response,
-    messages: Message[]
+    messages: Message[],
   ) => Promise<ParsedResponse>;
   parseOutput?: <T>(text: string) => T;
   /** Lifecycle hooks for tracing, logging, and metrics */
@@ -171,7 +171,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
   return async <T = unknown>(
     agent: AgentLike,
     input: string,
-    runOptions?: RunOptions
+    runOptions?: RunOptions,
   ): Promise<RunResult<T>> => {
     const startTime = Date.now();
     hooks?.onBeforeCall?.({ agent, input, timestamp: startTime });
@@ -201,7 +201,10 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
         outputTokens: parsed.outputTokens ?? 0,
       };
 
-      const assistantMessage: Message = { role: "assistant", content: parsed.text };
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: parsed.text,
+      };
       const allMessages: Message[] = [...messages, assistantMessage];
 
       runOptions?.onMessage?.(assistantMessage);

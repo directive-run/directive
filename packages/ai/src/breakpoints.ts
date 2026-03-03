@@ -9,7 +9,10 @@
  * @module
  */
 
-import { getBridgeFact, setBridgeFact } from "@directive-run/core/adapter-utils";
+import {
+  getBridgeFact,
+  setBridgeFact,
+} from "@directive-run/core/adapter-utils";
 
 // ============================================================================
 // Types

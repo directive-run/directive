@@ -1,12 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
-async function setSlider(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setSlider(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
 test.describe("Error Boundaries example", () => {
@@ -15,12 +24,20 @@ test.describe("Error Boundaries example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/error-boundaries");
     try {
-      await page.waitForSelector("directive-error-boundaries", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-error-boundaries", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-error-boundaries", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-error-boundaries", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-error-boundaries-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-error-boundaries-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and UI renders", async ({ page }) => {
@@ -34,7 +51,9 @@ test.describe("Error Boundaries example", () => {
     await tid(page, "eb-fetch-all").click();
 
     // Wait for total requests to increment
-    await expect(tid(page, "eb-total-requests")).not.toHaveText("0", { timeout: 10_000 });
+    await expect(tid(page, "eb-total-requests")).not.toHaveText("0", {
+      timeout: 10_000,
+    });
   });
 
   test("inject error on service shows error in timeline", async ({ page }) => {
@@ -59,7 +78,9 @@ test.describe("Error Boundaries example", () => {
     }
 
     // Circuit state should show OPEN
-    await expect(tid(page, "eb-circuit-users")).toContainText("OPEN", { timeout: 10_000 });
+    await expect(tid(page, "eb-circuit-users")).toContainText("OPEN", {
+      timeout: 10_000,
+    });
   });
 
   test("retry-later strategy shows retry events", async ({ page }) => {
@@ -116,7 +137,9 @@ test.describe("Error Boundaries example", () => {
       await page.waitForTimeout(800);
     }
 
-    await expect(tid(page, "eb-circuit-users")).toContainText("OPEN", { timeout: 10_000 });
+    await expect(tid(page, "eb-circuit-users")).toContainText("OPEN", {
+      timeout: 10_000,
+    });
 
     // Remove errors and wait for recovery
     await setSlider(page, "eb-fail-users", "0");

@@ -1,6 +1,10 @@
 export type TimeFormat = "ms" | "elapsed" | "clock";
 
-export function formatTimestamp(ts: number, format: TimeFormat, baseTimestamp?: number): string {
+export function formatTimestamp(
+  ts: number,
+  format: TimeFormat,
+  baseTimestamp?: number,
+): string {
   switch (format) {
     case "ms":
       return `${Math.round(ts)}ms`;

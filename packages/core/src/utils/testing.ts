@@ -11,12 +11,12 @@
 
 import { createSystem } from "../core/system.js";
 import type {
-	CreateSystemOptionsNamed,
-	ModulesMap,
-	NamespacedSystem,
-	Requirement,
-	RequirementWithId,
-	SystemInspection,
+  CreateSystemOptionsNamed,
+  ModulesMap,
+  NamespacedSystem,
+  Requirement,
+  RequirementWithId,
+  SystemInspection,
 } from "../core/types.js";
 
 // ============================================================================
@@ -38,10 +38,10 @@ import type {
  * ```
  */
 export async function flushMicrotasks(): Promise<void> {
-	// Multiple rounds to catch nested microtasks
-	for (let i = 0; i < 10; i++) {
-		await Promise.resolve();
-	}
+  // Multiple rounds to catch nested microtasks
+  for (let i = 0; i < 10; i++) {
+    await Promise.resolve();
+  }
 }
 
 /**
@@ -68,50 +68,50 @@ export async function flushMicrotasks(): Promise<void> {
  * ```
  */
 export async function settleWithFakeTimers(
-	system: { inspect(): SystemInspection },
-	advanceTime: (ms: number) => void,
-	options: {
-		/** Total time to advance (default: 5000ms) */
-		totalTime?: number;
-		/** Time to advance each step (default: 10ms) */
-		stepSize?: number;
-		/** Maximum iterations before giving up (default: 1000) */
-		maxIterations?: number;
-	} = {},
+  system: { inspect(): SystemInspection },
+  advanceTime: (ms: number) => void,
+  options: {
+    /** Total time to advance (default: 5000ms) */
+    totalTime?: number;
+    /** Time to advance each step (default: 10ms) */
+    stepSize?: number;
+    /** Maximum iterations before giving up (default: 1000) */
+    maxIterations?: number;
+  } = {},
 ): Promise<void> {
-	const { totalTime = 5000, stepSize = 10, maxIterations = 1000 } = options;
+  const { totalTime = 5000, stepSize = 10, maxIterations = 1000 } = options;
 
-	let elapsed = 0;
-	let iterations = 0;
+  let elapsed = 0;
+  let iterations = 0;
 
-	while (elapsed < totalTime && iterations < maxIterations) {
-		// Flush microtasks first (handles queueMicrotask, Promise.resolve)
-		await flushMicrotasks();
+  while (elapsed < totalTime && iterations < maxIterations) {
+    // Flush microtasks first (handles queueMicrotask, Promise.resolve)
+    await flushMicrotasks();
 
-		// Check if settled
-		const inspection = system.inspect();
-		if (inspection.inflight.length === 0) {
-			// One more flush to be safe
-			await flushMicrotasks();
-			return;
-		}
+    // Check if settled
+    const inspection = system.inspect();
+    if (inspection.inflight.length === 0) {
+      // One more flush to be safe
+      await flushMicrotasks();
+      return;
+    }
 
-		// Advance fake timers
-		advanceTime(stepSize);
-		elapsed += stepSize;
-		iterations++;
-	}
+    // Advance fake timers
+    advanceTime(stepSize);
+    elapsed += stepSize;
+    iterations++;
+  }
 
-	// Final check
-	const finalInspection = system.inspect();
-	if (finalInspection.inflight.length > 0) {
-		const resolverIds = finalInspection.inflight
-			.map((r) => r.resolverId)
-			.join(", ");
-		throw new Error(
-			`[Directive] settleWithFakeTimers did not settle after ${totalTime}ms. ${finalInspection.inflight.length} resolvers still inflight: ${resolverIds}`,
-		);
-	}
+  // Final check
+  const finalInspection = system.inspect();
+  if (finalInspection.inflight.length > 0) {
+    const resolverIds = finalInspection.inflight
+      .map((r) => r.resolverId)
+      .join(", ");
+    throw new Error(
+      `[Directive] settleWithFakeTimers did not settle after ${totalTime}ms. ${finalInspection.inflight.length} resolvers still inflight: ${resolverIds}`,
+    );
+  }
 }
 
 // ============================================================================
@@ -119,16 +119,16 @@ export async function settleWithFakeTimers(
 // ============================================================================
 
 export interface FakeTimers {
-	/** Advance time by a number of milliseconds */
-	advance(ms: number): Promise<void>;
-	/** Advance to the next scheduled timer */
-	next(): Promise<void>;
-	/** Run all pending timers */
-	runAll(): Promise<void>;
-	/** Get current fake time */
-	now(): number;
-	/** Reset to time 0 */
-	reset(): void;
+  /** Advance time by a number of milliseconds */
+  advance(ms: number): Promise<void>;
+  /** Advance to the next scheduled timer */
+  next(): Promise<void>;
+  /** Run all pending timers */
+  runAll(): Promise<void>;
+  /** Get current fake time */
+  now(): number;
+  /** Reset to time 0 */
+  reset(): void;
 }
 
 /**
@@ -137,48 +137,48 @@ export interface FakeTimers {
  * settleWithFakeTimers() for better integration.
  */
 export function createFakeTimers(): FakeTimers {
-	let currentTime = 0;
-	const timers: Array<{ time: number; callback: () => void }> = [];
+  let currentTime = 0;
+  const timers: Array<{ time: number; callback: () => void }> = [];
 
-	return {
-		async advance(ms: number): Promise<void> {
-			const targetTime = currentTime + ms;
+  return {
+    async advance(ms: number): Promise<void> {
+      const targetTime = currentTime + ms;
 
-			// Run all timers that would fire during this advance
-			while (timers.length > 0 && timers[0]!.time <= targetTime) {
-				const timer = timers.shift()!;
-				currentTime = timer.time;
-				timer.callback();
-				await Promise.resolve(); // Allow microtasks
-			}
+      // Run all timers that would fire during this advance
+      while (timers.length > 0 && timers[0]!.time <= targetTime) {
+        const timer = timers.shift()!;
+        currentTime = timer.time;
+        timer.callback();
+        await Promise.resolve(); // Allow microtasks
+      }
 
-			currentTime = targetTime;
-		},
+      currentTime = targetTime;
+    },
 
-		async next(): Promise<void> {
-			if (timers.length === 0) return;
+    async next(): Promise<void> {
+      if (timers.length === 0) return;
 
-			const timer = timers.shift()!;
-			currentTime = timer.time;
-			timer.callback();
-			await Promise.resolve();
-		},
+      const timer = timers.shift()!;
+      currentTime = timer.time;
+      timer.callback();
+      await Promise.resolve();
+    },
 
-		async runAll(): Promise<void> {
-			while (timers.length > 0) {
-				await this.next();
-			}
-		},
+    async runAll(): Promise<void> {
+      while (timers.length > 0) {
+        await this.next();
+      }
+    },
 
-		now(): number {
-			return currentTime;
-		},
+    now(): number {
+      return currentTime;
+    },
 
-		reset(): void {
-			currentTime = 0;
-			timers.length = 0;
-		},
-	};
+    reset(): void {
+      currentTime = 0;
+      timers.length = 0;
+    },
+  };
 }
 
 // ============================================================================
@@ -187,70 +187,70 @@ export function createFakeTimers(): FakeTimers {
 
 /** Context passed to mock resolver resolve functions */
 export interface MockResolverContext {
-	/** Facts object (use type assertion for specific facts) */
-	// biome-ignore lint/suspicious/noExplicitAny: Facts type varies by system
-	facts: any;
-	/** Abort signal for cancellation */
-	signal: AbortSignal;
+  /** Facts object (use type assertion for specific facts) */
+  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies by system
+  facts: any;
+  /** Abort signal for cancellation */
+  signal: AbortSignal;
 }
 
 export interface MockResolverOptions<R extends Requirement = Requirement> {
-	/** Predicate to check if this resolver handles a requirement */
-	requirement?: (req: Requirement) => req is R;
-	/** Mock implementation */
-	resolve?: (req: R, ctx: MockResolverContext) => void | Promise<void>;
-	/** Delay before resolving (ms) */
-	delay?: number;
-	/** Simulate an error */
-	error?: Error | string;
-	/** Track calls */
-	calls?: R[];
+  /** Predicate to check if this resolver handles a requirement */
+  requirement?: (req: Requirement) => req is R;
+  /** Mock implementation */
+  resolve?: (req: R, ctx: MockResolverContext) => void | Promise<void>;
+  /** Delay before resolving (ms) */
+  delay?: number;
+  /** Simulate an error */
+  error?: Error | string;
+  /** Track calls */
+  calls?: R[];
 }
 
 /** Internal resolver definition type for mock resolvers */
 interface MockResolverDef {
-	requirement: (req: Requirement) => boolean;
-	resolve: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
+  requirement: (req: Requirement) => boolean;
+  resolve: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
 }
 
 /**
  * Create a mock resolver for testing.
  */
 export function createMockResolver<R extends Requirement = Requirement>(
-	typeOrOptions: string | MockResolverOptions<R>,
+  typeOrOptions: string | MockResolverOptions<R>,
 ): MockResolverDef {
-	const options: MockResolverOptions<R> =
-		typeof typeOrOptions === "string"
-			? {
-					requirement: ((req: Requirement) => req.type === typeOrOptions) as (
-						req: Requirement,
-					) => req is R,
-				}
-			: typeOrOptions;
+  const options: MockResolverOptions<R> =
+    typeof typeOrOptions === "string"
+      ? {
+          requirement: ((req: Requirement) => req.type === typeOrOptions) as (
+            req: Requirement,
+          ) => req is R,
+        }
+      : typeOrOptions;
 
-	const calls: R[] = options.calls ?? [];
+  const calls: R[] = options.calls ?? [];
 
-	return {
-		requirement:
-			options.requirement ?? ((_req: Requirement): _req is R => true),
-		async resolve(req: Requirement, ctx: MockResolverContext): Promise<void> {
-			calls.push(req as R);
+  return {
+    requirement:
+      options.requirement ?? ((_req: Requirement): _req is R => true),
+    async resolve(req: Requirement, ctx: MockResolverContext): Promise<void> {
+      calls.push(req as R);
 
-			if (options.delay) {
-				await new Promise((resolve) => setTimeout(resolve, options.delay));
-			}
+      if (options.delay) {
+        await new Promise((resolve) => setTimeout(resolve, options.delay));
+      }
 
-			if (options.error) {
-				throw typeof options.error === "string"
-					? new Error(options.error)
-					: options.error;
-			}
+      if (options.error) {
+        throw typeof options.error === "string"
+          ? new Error(options.error)
+          : options.error;
+      }
 
-			if (options.resolve) {
-				await options.resolve(req as R, ctx);
-			}
-		},
-	};
+      if (options.resolve) {
+        await options.resolve(req as R, ctx);
+      }
+    },
+  };
 }
 
 // ============================================================================
@@ -262,24 +262,24 @@ export function createMockResolver<R extends Requirement = Requirement>(
  * Use this when you need fine-grained control over when and how requirements resolve.
  */
 export interface MockResolver<R extends Requirement = Requirement> {
-	/** All requirements received by this resolver */
-	readonly calls: R[];
-	/** Pending requirements waiting to be resolved/rejected */
-	readonly pending: Array<{
-		requirement: R;
-		resolve: (result?: unknown) => void;
-		reject: (error: Error) => void;
-	}>;
-	/** Resolve the next pending requirement */
-	resolve(result?: unknown): void;
-	/** Reject the next pending requirement */
-	reject(error: Error): void;
-	/** Resolve all pending requirements */
-	resolveAll(result?: unknown): void;
-	/** Reject all pending requirements */
-	rejectAll(error: Error): void;
-	/** Clear call history and pending queue */
-	reset(): void;
+  /** All requirements received by this resolver */
+  readonly calls: R[];
+  /** Pending requirements waiting to be resolved/rejected */
+  readonly pending: Array<{
+    requirement: R;
+    resolve: (result?: unknown) => void;
+    reject: (error: Error) => void;
+  }>;
+  /** Resolve the next pending requirement */
+  resolve(result?: unknown): void;
+  /** Reject the next pending requirement */
+  reject(error: Error): void;
+  /** Resolve all pending requirements */
+  resolveAll(result?: unknown): void;
+  /** Reject all pending requirements */
+  rejectAll(error: Error): void;
+  /** Clear call history and pending queue */
+  reset(): void;
 }
 
 /**
@@ -314,68 +314,71 @@ export interface MockResolver<R extends Requirement = Requirement> {
  * ```
  */
 export function mockResolver<R extends Requirement = Requirement>(
-	_requirementType: string,
+  _requirementType: string,
 ): MockResolver<R> & {
-	/** Handler that can be passed to createTestSystem mocks */
-	handler: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
+  /** Handler that can be passed to createTestSystem mocks */
+  handler: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
 } {
-	const calls: R[] = [];
-	const pending: Array<{
-		requirement: R;
-		resolve: (result?: unknown) => void;
-		reject: (error: Error) => void;
-	}> = [];
+  const calls: R[] = [];
+  const pending: Array<{
+    requirement: R;
+    resolve: (result?: unknown) => void;
+    reject: (error: Error) => void;
+  }> = [];
 
-	const mock: MockResolver<R> = {
-		get calls() {
-			return calls;
-		},
-		get pending() {
-			return pending;
-		},
-		resolve(result?: unknown) {
-			const item = pending.shift();
-			if (item) {
-				item.resolve(result);
-			}
-		},
-		reject(error: Error) {
-			const item = pending.shift();
-			if (item) {
-				item.reject(error);
-			}
-		},
-		resolveAll(result?: unknown) {
-			while (pending.length > 0) {
-				this.resolve(result);
-			}
-		},
-		rejectAll(error: Error) {
-			while (pending.length > 0) {
-				this.reject(error);
-			}
-		},
-		reset() {
-			calls.length = 0;
-			pending.length = 0;
-		},
-	};
+  const mock: MockResolver<R> = {
+    get calls() {
+      return calls;
+    },
+    get pending() {
+      return pending;
+    },
+    resolve(result?: unknown) {
+      const item = pending.shift();
+      if (item) {
+        item.resolve(result);
+      }
+    },
+    reject(error: Error) {
+      const item = pending.shift();
+      if (item) {
+        item.reject(error);
+      }
+    },
+    resolveAll(result?: unknown) {
+      while (pending.length > 0) {
+        this.resolve(result);
+      }
+    },
+    rejectAll(error: Error) {
+      while (pending.length > 0) {
+        this.reject(error);
+      }
+    },
+    reset() {
+      calls.length = 0;
+      pending.length = 0;
+    },
+  };
 
-	const handler = (req: Requirement, _ctx: MockResolverContext): Promise<void> => {
-		calls.push(req as R);
-		return new Promise<void>((resolve, reject) => {
-			pending.push({
-				requirement: req as R,
-				resolve: () => resolve(),
-				reject,
-			});
-		});
-	};
+  const handler = (
+    req: Requirement,
+    _ctx: MockResolverContext,
+  ): Promise<void> => {
+    calls.push(req as R);
+    return new Promise<void>((resolve, reject) => {
+      pending.push({
+        requirement: req as R,
+        resolve: () => resolve(),
+        reject,
+      });
+    });
+  };
 
-	return {
-		...mock,
-		handler,
-	};
+  return {
+    ...mock,
+    handler,
+  };
 }
 
 // ============================================================================
@@ -384,257 +387,258 @@ export function mockResolver<R extends Requirement = Requirement>(
 
 /** Record of a single fact change */
 export interface FactChangeRecord {
-	/** The fact key that changed (without namespace prefix for namespaced systems) */
-	key: string;
-	/** The full key including namespace prefix (e.g., "test::value") */
-	fullKey: string;
-	/** The namespace (e.g., "test") - undefined for single-module systems */
-	namespace?: string;
-	/** The previous value */
-	previousValue: unknown;
-	/** The new value */
-	newValue: unknown;
-	/** Timestamp of the change */
-	timestamp: number;
+  /** The fact key that changed (without namespace prefix for namespaced systems) */
+  key: string;
+  /** The full key including namespace prefix (e.g., "test::value") */
+  fullKey: string;
+  /** The namespace (e.g., "test") - undefined for single-module systems */
+  namespace?: string;
+  /** The previous value */
+  previousValue: unknown;
+  /** The new value */
+  newValue: unknown;
+  /** Timestamp of the change */
+  timestamp: number;
 }
 
 // ============================================================================
 // Test System
 // ============================================================================
 
-export interface TestSystem<Modules extends ModulesMap> extends NamespacedSystem<Modules> {
-	/**
-	 * Wait for all pending operations to complete.
-	 * @param maxWait - Maximum time to wait in ms (default: 5000)
-	 * @throws Error if timeout is exceeded with resolvers still inflight
-	 */
-	waitForIdle(maxWait?: number): Promise<void>;
-	/** Get the history of dispatched events */
-	eventHistory: Array<{ type: string; [key: string]: unknown }>;
-	/** Get resolver call history */
-	resolverCalls: Map<string, Requirement[]>;
-	/**
-	 * Get all requirements that have been generated (both resolved and pending).
-	 * Unlike `inspect().unmet`, this includes requirements that have already been handled.
-	 */
-	readonly allRequirements: RequirementWithId[];
-	/**
-	 * Get all fact changes since system start or last reset.
-	 */
-	getFactsHistory(): FactChangeRecord[];
-	/**
-	 * Reset the facts history tracking.
-	 */
-	resetFactsHistory(): void;
-	/** Assert that a requirement was created */
-	assertRequirement(type: string): void;
-	/** Assert that a resolver was called */
-	assertResolverCalled(type: string, times?: number): void;
-	/**
-	 * Assert that a fact was set to a specific value.
-	 */
-	assertFactSet(key: string, value?: unknown): void;
-	/**
-	 * Assert the number of times a fact was changed.
-	 */
-	assertFactChanges(key: string, times: number): void;
+export interface TestSystem<Modules extends ModulesMap>
+  extends NamespacedSystem<Modules> {
+  /**
+   * Wait for all pending operations to complete.
+   * @param maxWait - Maximum time to wait in ms (default: 5000)
+   * @throws Error if timeout is exceeded with resolvers still inflight
+   */
+  waitForIdle(maxWait?: number): Promise<void>;
+  /** Get the history of dispatched events */
+  eventHistory: Array<{ type: string; [key: string]: unknown }>;
+  /** Get resolver call history */
+  resolverCalls: Map<string, Requirement[]>;
+  /**
+   * Get all requirements that have been generated (both resolved and pending).
+   * Unlike `inspect().unmet`, this includes requirements that have already been handled.
+   */
+  readonly allRequirements: RequirementWithId[];
+  /**
+   * Get all fact changes since system start or last reset.
+   */
+  getFactsHistory(): FactChangeRecord[];
+  /**
+   * Reset the facts history tracking.
+   */
+  resetFactsHistory(): void;
+  /** Assert that a requirement was created */
+  assertRequirement(type: string): void;
+  /** Assert that a resolver was called */
+  assertResolverCalled(type: string, times?: number): void;
+  /**
+   * Assert that a fact was set to a specific value.
+   */
+  assertFactSet(key: string, value?: unknown): void;
+  /**
+   * Assert the number of times a fact was changed.
+   */
+  assertFactChanges(key: string, times: number): void;
 }
 
 export interface CreateTestSystemOptions<Modules extends ModulesMap>
-	extends Omit<CreateSystemOptionsNamed<Modules>, "plugins"> {
-	/** Mock resolvers by type */
-	mocks?: {
-		resolvers?: Record<string, MockResolverOptions>;
-	};
-	/** Additional plugins (tracking plugin is added automatically) */
-	// biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
-	plugins?: Array<any>;
+  extends Omit<CreateSystemOptionsNamed<Modules>, "plugins"> {
+  /** Mock resolvers by type */
+  mocks?: {
+    resolvers?: Record<string, MockResolverOptions>;
+  };
+  /** Additional plugins (tracking plugin is added automatically) */
+  // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
+  plugins?: Array<any>;
 }
 
 /**
  * Create a test system with additional testing utilities.
  */
 export function createTestSystem<Modules extends ModulesMap>(
-	options: CreateTestSystemOptions<Modules>,
+  options: CreateTestSystemOptions<Modules>,
 ): TestSystem<Modules> {
-	const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
-	const resolverCalls = new Map<string, Requirement[]>();
-	const allRequirements: RequirementWithId[] = [];
-	const factsHistory: FactChangeRecord[] = [];
+  const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
+  const resolverCalls = new Map<string, Requirement[]>();
+  const allRequirements: RequirementWithId[] = [];
+  const factsHistory: FactChangeRecord[] = [];
 
-	// Create mock resolvers
-	const mockResolvers: Record<string, MockResolverDef> = {};
-	if (options.mocks?.resolvers) {
-		for (const [type, mockOptions] of Object.entries(options.mocks.resolvers)) {
-			const calls: Requirement[] = [];
-			resolverCalls.set(type, calls);
-			mockResolvers[type] = createMockResolver({ ...mockOptions, calls });
-		}
-	}
+  // Create mock resolvers
+  const mockResolvers: Record<string, MockResolverDef> = {};
+  if (options.mocks?.resolvers) {
+    for (const [type, mockOptions] of Object.entries(options.mocks.resolvers)) {
+      const calls: Requirement[] = [];
+      resolverCalls.set(type, calls);
+      mockResolvers[type] = createMockResolver({ ...mockOptions, calls });
+    }
+  }
 
-	// Create modules with mock resolvers
-	const modulesWithMocks: Modules = {} as Modules;
-	for (const [name, module] of Object.entries(options.modules)) {
-		// biome-ignore lint/suspicious/noExplicitAny: Module types are complex
-		(modulesWithMocks as any)[name] = {
-			...module,
-			resolvers: {
-				...module.resolvers,
-				...mockResolvers,
-			},
-		};
-	}
+  // Create modules with mock resolvers
+  const modulesWithMocks: Modules = {} as Modules;
+  for (const [name, module] of Object.entries(options.modules)) {
+    // biome-ignore lint/suspicious/noExplicitAny: Module types are complex
+    (modulesWithMocks as any)[name] = {
+      ...module,
+      resolvers: {
+        ...module.resolvers,
+        ...mockResolvers,
+      },
+    };
+  }
 
-	// Get module namespaces for key parsing
-	const moduleNamespaces = new Set(Object.keys(options.modules));
+  // Get module namespaces for key parsing
+  const moduleNamespaces = new Set(Object.keys(options.modules));
 
-	// Create tracking plugin
-	const trackingPlugin = {
-		name: "__test-tracking__",
-		onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
-			// Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
-			const SEPARATOR = "::";
-			const sepIndex = fullKey.indexOf(SEPARATOR);
-			let namespace: string | undefined;
-			let key: string;
+  // Create tracking plugin
+  const trackingPlugin = {
+    name: "__test-tracking__",
+    onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
+      // Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
+      const SEPARATOR = "::";
+      const sepIndex = fullKey.indexOf(SEPARATOR);
+      let namespace: string | undefined;
+      let key: string;
 
-			if (sepIndex > 0) {
-				const possibleNamespace = fullKey.substring(0, sepIndex);
-				if (moduleNamespaces.has(possibleNamespace)) {
-					namespace = possibleNamespace;
-					key = fullKey.substring(sepIndex + SEPARATOR.length);
-				} else {
-					key = fullKey;
-				}
-			} else {
-				key = fullKey;
-			}
+      if (sepIndex > 0) {
+        const possibleNamespace = fullKey.substring(0, sepIndex);
+        if (moduleNamespaces.has(possibleNamespace)) {
+          namespace = possibleNamespace;
+          key = fullKey.substring(sepIndex + SEPARATOR.length);
+        } else {
+          key = fullKey;
+        }
+      } else {
+        key = fullKey;
+      }
 
-			factsHistory.push({
-				key,
-				fullKey,
-				namespace,
-				previousValue,
-				newValue: value,
-				timestamp: Date.now(),
-			});
-		},
-		onRequirementCreated: (requirement: RequirementWithId) => {
-			allRequirements.push(requirement);
-		},
-	};
+      factsHistory.push({
+        key,
+        fullKey,
+        namespace,
+        previousValue,
+        newValue: value,
+        timestamp: Date.now(),
+      });
+    },
+    onRequirementCreated: (requirement: RequirementWithId) => {
+      allRequirements.push(requirement);
+    },
+  };
 
-	// Create the underlying system
-	const system = createSystem({
-		...options,
-		modules: modulesWithMocks,
-		plugins: [trackingPlugin, ...(options.plugins ?? [])],
-	}) as NamespacedSystem<Modules>;
+  // Create the underlying system
+  const system = createSystem({
+    ...options,
+    modules: modulesWithMocks,
+    plugins: [trackingPlugin, ...(options.plugins ?? [])],
+  }) as NamespacedSystem<Modules>;
 
-	// Wrap dispatch to track events
-	const originalDispatch = system.dispatch.bind(system);
-	// biome-ignore lint/suspicious/noExplicitAny: Event type varies
-	(system as any).dispatch = (event: any) => {
-		eventHistory.push(event);
-		originalDispatch(event);
-	};
+  // Wrap dispatch to track events
+  const originalDispatch = system.dispatch.bind(system);
+  // biome-ignore lint/suspicious/noExplicitAny: Event type varies
+  (system as any).dispatch = (event: any) => {
+    eventHistory.push(event);
+    originalDispatch(event);
+  };
 
-	const testSystem: TestSystem<Modules> = {
-		...system,
-		eventHistory,
-		resolverCalls,
+  const testSystem: TestSystem<Modules> = {
+    ...system,
+    eventHistory,
+    resolverCalls,
 
-		get allRequirements() {
-			return allRequirements;
-		},
+    get allRequirements() {
+      return allRequirements;
+    },
 
-		getFactsHistory(): FactChangeRecord[] {
-			return [...factsHistory];
-		},
+    getFactsHistory(): FactChangeRecord[] {
+      return [...factsHistory];
+    },
 
-		resetFactsHistory(): void {
-			factsHistory.length = 0;
-		},
+    resetFactsHistory(): void {
+      factsHistory.length = 0;
+    },
 
-		async waitForIdle(maxWait = 5000): Promise<void> {
-			const startTime = Date.now();
+    async waitForIdle(maxWait = 5000): Promise<void> {
+      const startTime = Date.now();
 
-			const checkIdle = async (): Promise<void> => {
-				// Wait for microtasks
-				await new Promise((resolve) => setTimeout(resolve, 0));
+      const checkIdle = async (): Promise<void> => {
+        // Wait for microtasks
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
-				// Check if there are inflight resolvers
-				const inspection = system.inspect();
-				if (inspection.inflight.length > 0) {
-					// Check timeout
-					if (Date.now() - startTime > maxWait) {
-						const resolverIds = inspection.inflight.map((r) => r.id).join(", ");
-						throw new Error(
-							`[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
-						);
-					}
-					// Wait a bit more and check again
-					await new Promise((resolve) => setTimeout(resolve, 10));
-					return checkIdle();
-				}
-			};
+        // Check if there are inflight resolvers
+        const inspection = system.inspect();
+        if (inspection.inflight.length > 0) {
+          // Check timeout
+          if (Date.now() - startTime > maxWait) {
+            const resolverIds = inspection.inflight.map((r) => r.id).join(", ");
+            throw new Error(
+              `[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
+            );
+          }
+          // Wait a bit more and check again
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return checkIdle();
+        }
+      };
 
-			return checkIdle();
-		},
+      return checkIdle();
+    },
 
-		assertRequirement(type: string): void {
-			const hasRequirement = allRequirements.some(
-				(r) => r.requirement.type === type,
-			);
-			if (!hasRequirement) {
-				throw new Error(
-					`Expected requirement of type "${type}" but none found`,
-				);
-			}
-		},
+    assertRequirement(type: string): void {
+      const hasRequirement = allRequirements.some(
+        (r) => r.requirement.type === type,
+      );
+      if (!hasRequirement) {
+        throw new Error(
+          `Expected requirement of type "${type}" but none found`,
+        );
+      }
+    },
 
-		assertResolverCalled(type: string, times?: number): void {
-			const calls = resolverCalls.get(type) ?? [];
-			if (times !== undefined) {
-				if (calls.length !== times) {
-					throw new Error(
-						`Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
-					);
-				}
-			} else if (calls.length === 0) {
-				throw new Error(
-					`Expected resolver "${type}" to be called but it was not`,
-				);
-			}
-		},
+    assertResolverCalled(type: string, times?: number): void {
+      const calls = resolverCalls.get(type) ?? [];
+      if (times !== undefined) {
+        if (calls.length !== times) {
+          throw new Error(
+            `Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
+          );
+        }
+      } else if (calls.length === 0) {
+        throw new Error(
+          `Expected resolver "${type}" to be called but it was not`,
+        );
+      }
+    },
 
-		assertFactSet(key: string, value?: unknown): void {
-			const changes = factsHistory.filter((c) => c.key === key);
-			if (changes.length === 0) {
-				throw new Error(`Expected fact "${key}" to be set but it was not`);
-			}
-			if (value !== undefined) {
-				const hasValue = changes.some((c) => c.newValue === value);
-				if (!hasValue) {
-					const actualValues = changes
-						.map((c) => JSON.stringify(c.newValue))
-						.join(", ");
-					throw new Error(
-						`Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
-					);
-				}
-			}
-		},
+    assertFactSet(key: string, value?: unknown): void {
+      const changes = factsHistory.filter((c) => c.key === key);
+      if (changes.length === 0) {
+        throw new Error(`Expected fact "${key}" to be set but it was not`);
+      }
+      if (value !== undefined) {
+        const hasValue = changes.some((c) => c.newValue === value);
+        if (!hasValue) {
+          const actualValues = changes
+            .map((c) => JSON.stringify(c.newValue))
+            .join(", ");
+          throw new Error(
+            `Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
+          );
+        }
+      }
+    },
 
-		assertFactChanges(key: string, times: number): void {
-			const changes = factsHistory.filter((c) => c.key === key);
-			if (changes.length !== times) {
-				throw new Error(
-					`Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
-				);
-			}
-		},
-	};
+    assertFactChanges(key: string, times: number): void {
+      const changes = factsHistory.filter((c) => c.key === key);
+      if (changes.length !== times) {
+        throw new Error(
+          `Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
+        );
+      }
+    },
+  };
 
-	return testSystem;
+  return testSystem;
 }

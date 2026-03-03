@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Counter (Number Match) example", () => {
@@ -7,10 +7,16 @@ test.describe("Counter (Number Match) example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/counter");
     try {
-      await page.waitForSelector("directive-counter", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-counter", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-counter", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-counter", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
     await page.waitForSelector("[data-counter-ready]", { timeout: 15_000 });
   });
@@ -56,8 +62,12 @@ test.describe("Counter (Number Match) example", () => {
       await tileElements[pair[1]].click();
 
       // Wait for resolver to process — moves should increment
-      await expect(tid(page, "nm-moves")).not.toHaveText("0", { timeout: 5_000 });
-      await expect(tid(page, "nm-removed")).not.toHaveText("0", { timeout: 5_000 });
+      await expect(tid(page, "nm-moves")).not.toHaveText("0", {
+        timeout: 5_000,
+      });
+      await expect(tid(page, "nm-removed")).not.toHaveText("0", {
+        timeout: 5_000,
+      });
     }
   });
 

@@ -1,70 +1,83 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useSelector } from '@directive-run/react'
-import { useDevToolsSystem } from '../DevToolsSystemContext'
-import { EmptyState } from '../EmptyState'
-import { Skeleton } from '../Skeleton'
+import { useSelector } from "@directive-run/react";
+import { useState } from "react";
+import { useDevToolsSystem } from "../DevToolsSystemContext";
+import { EmptyState } from "../EmptyState";
+import { Skeleton } from "../Skeleton";
 
 // preview field still displayed — server-side sanitization handles redaction
 
 export function MemoryView() {
-  const system = useDevToolsSystem()
-  const data = useSelector(system, (s) => s.facts.snapshot.data)
-  const error = useSelector(system, (s) => s.facts.snapshot.error)
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const system = useDevToolsSystem();
+  const data = useSelector(system, (s) => s.facts.snapshot.data);
+  const error = useSelector(system, (s) => s.facts.snapshot.error);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   if (error) {
-    return <EmptyState message={error} />
+    return <EmptyState message={error} />;
   }
 
   if (!data) {
-    return <Skeleton rows={5} />
+    return <Skeleton rows={5} />;
   }
 
-  const { memory, config } = data
-  const totalMessages = memory.totalMessages
-  const contextMessages = memory.contextMessages
-  const summaries = memory.summaries
-  const messages = memory.messages
-  const maxHistory = config.maxHistoryMessages
-  const preserveRecent = config.preserveRecentCount
+  const { memory, config } = data;
+  const totalMessages = memory.totalMessages;
+  const contextMessages = memory.contextMessages;
+  const summaries = memory.summaries;
+  const messages = memory.messages;
+  const maxHistory = config.maxHistoryMessages;
+  const preserveRecent = config.preserveRecentCount;
 
-  const prunedCount = Math.max(0, totalMessages - contextMessages)
-  const usagePct = maxHistory > 0 ? Math.min(100, (totalMessages / maxHistory) * 100) : 0
+  const prunedCount = Math.max(0, totalMessages - contextMessages);
+  const usagePct =
+    maxHistory > 0 ? Math.min(100, (totalMessages / maxHistory) * 100) : 0;
 
   const toggleExpand = (index: number) => {
     setExpanded((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev);
       if (next.has(index)) {
-        next.delete(index)
+        next.delete(index);
       } else {
-        next.add(index)
+        next.add(index);
       }
 
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   return (
     <div className="flex h-full flex-col gap-4">
       {/* Summary stats */}
       <div className="flex flex-wrap gap-6 text-xs">
         <div>
-          <span className="text-zinc-500 dark:text-zinc-400">Total messages</span>
-          <div className="text-lg font-semibold text-zinc-900 dark:text-white">{totalMessages}</div>
+          <span className="text-zinc-500 dark:text-zinc-400">
+            Total messages
+          </span>
+          <div className="text-lg font-semibold text-zinc-900 dark:text-white">
+            {totalMessages}
+          </div>
         </div>
         <div>
           <span className="text-zinc-500 dark:text-zinc-400">In context</span>
-          <div className="text-lg font-semibold text-sky-600 dark:text-sky-400">{contextMessages}</div>
+          <div className="text-lg font-semibold text-sky-600 dark:text-sky-400">
+            {contextMessages}
+          </div>
         </div>
         <div>
           <span className="text-zinc-500 dark:text-zinc-400">Pruned</span>
-          <div className={`text-lg font-semibold ${prunedCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-white'}`}>{prunedCount}</div>
+          <div
+            className={`text-lg font-semibold ${prunedCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-zinc-900 dark:text-white"}`}
+          >
+            {prunedCount}
+          </div>
         </div>
         <div>
           <span className="text-zinc-500 dark:text-zinc-400">Summaries</span>
-          <div className="text-lg font-semibold text-zinc-900 dark:text-white">{summaries}</div>
+          <div className="text-lg font-semibold text-zinc-900 dark:text-white">
+            {summaries}
+          </div>
         </div>
       </div>
 
@@ -72,11 +85,13 @@ export function MemoryView() {
       <div>
         <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
           <span>Context window usage</span>
-          <span>{totalMessages}/{maxHistory} messages ({usagePct.toFixed(0)}%)</span>
+          <span>
+            {totalMessages}/{maxHistory} messages ({usagePct.toFixed(0)}%)
+          </span>
         </div>
         <div className="flex h-3 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-700">
           <div
-            className={`transition-all ${usagePct > 80 ? 'bg-amber-500' : 'bg-sky-500'}`}
+            className={`transition-all ${usagePct > 80 ? "bg-amber-500" : "bg-sky-500"}`}
             style={{ width: `${usagePct}%` }}
           />
         </div>
@@ -93,7 +108,7 @@ export function MemoryView() {
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
             {messages.map((m, i) => {
-              const isExpanded = expanded.has(i)
+              const isExpanded = expanded.has(i);
 
               return (
                 <button
@@ -103,29 +118,39 @@ export function MemoryView() {
                   className="w-full cursor-pointer rounded border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-left dark:border-zinc-700 dark:bg-zinc-800/50"
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                      m.role === 'user'
-                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
-                        : m.role === 'assistant'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                          : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400'
-                    }`}>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        m.role === "user"
+                          ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                          : m.role === "assistant"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
+                      }`}
+                    >
                       {m.role}
                     </span>
-                    <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{m.contentLength} chars</span>
-                    <span className={`ml-auto text-[10px] text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                    <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+                      {m.contentLength} chars
+                    </span>
+                    <span
+                      className={`ml-auto text-[10px] text-zinc-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    >
+                      ▾
+                    </span>
                   </div>
                   {m.preview && (
-                    <div className={`mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 ${isExpanded ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                    <div
+                      className={`mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 ${isExpanded ? "whitespace-pre-wrap" : "truncate"}`}
+                    >
                       {m.preview}
                     </div>
                   )}
                 </button>
-              )
+              );
             })}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

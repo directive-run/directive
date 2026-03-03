@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { DebugEvent } from "../lib/types";
 
 // Re-implement the core detection logic for testing since the hook wraps useMemo
@@ -51,14 +51,18 @@ function computeMeansByAgent(
   return means;
 }
 
-function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = DEFAULT_THRESHOLDS): Anomaly[] {
+function detectAnomalies(
+  events: DebugEvent[],
+  thresholds: AnomalyThresholds = DEFAULT_THRESHOLDS,
+): Anomaly[] {
   const anomalies: Anomaly[] = [];
   const durationMeans = computeMeansByAgent(events, "durationMs");
   const tokenMeans = computeMeansByAgent(events, "totalTokens");
 
   for (const e of events) {
     if (e.type === "agent_error") {
-      const errorMsg = typeof e.errorMessage === "string" ? e.errorMessage : "Unknown error";
+      const errorMsg =
+        typeof e.errorMessage === "string" ? e.errorMessage : "Unknown error";
       anomalies.push({
         eventId: e.id,
         type: "agent_error",
@@ -105,7 +109,10 @@ function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = D
       const durationMs = e.durationMs;
       if (typeof durationMs === "number") {
         const mean = durationMeans.get(e.agentId);
-        if (mean !== undefined && durationMs > thresholds.durationMultiplier * mean) {
+        if (
+          mean !== undefined &&
+          durationMs > thresholds.durationMultiplier * mean
+        ) {
           anomalies.push({
             eventId: e.id,
             type: "duration_outlier",
@@ -119,7 +126,10 @@ function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = D
       const totalTokens = e.totalTokens;
       if (typeof totalTokens === "number") {
         const mean = tokenMeans.get(e.agentId);
-        if (mean !== undefined && totalTokens > thresholds.tokenMultiplier * mean) {
+        if (
+          mean !== undefined &&
+          totalTokens > thresholds.tokenMultiplier * mean
+        ) {
           anomalies.push({
             eventId: e.id,
             type: "token_spike",
@@ -157,7 +167,13 @@ function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = D
   return anomalies;
 }
 
-function makeEvent(overrides: Partial<DebugEvent> & { id: number; type: DebugEvent["type"]; timestamp: number }): DebugEvent {
+function makeEvent(
+  overrides: Partial<DebugEvent> & {
+    id: number;
+    type: DebugEvent["type"];
+    timestamp: number;
+  },
+): DebugEvent {
   return { snapshotId: null, ...overrides } as DebugEvent;
 }
 
@@ -173,14 +189,27 @@ describe("detectAnomalies", () => {
   it("returns empty array for events with no anomalies", () => {
     const events = [
       makeEvent({ id: 1, type: "agent_start", timestamp: 1000, agentId: "a" }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 1000, totalTokens: 100 }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 1000,
+        totalTokens: 100,
+      }),
     ];
     expect(detectAnomalies(events)).toEqual([]);
   });
 
   it("detects agent_error as critical", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_error", timestamp: 1000, agentId: "a", errorMessage: "boom" }),
+      makeEvent({
+        id: 1,
+        type: "agent_error",
+        timestamp: 1000,
+        agentId: "a",
+        errorMessage: "boom",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
@@ -191,7 +220,12 @@ describe("detectAnomalies", () => {
 
   it("detects resolver_error as critical", () => {
     const events = [
-      makeEvent({ id: 1, type: "resolver_error", timestamp: 1000, agentId: "a" }),
+      makeEvent({
+        id: 1,
+        type: "resolver_error",
+        timestamp: 1000,
+        agentId: "a",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
@@ -200,7 +234,13 @@ describe("detectAnomalies", () => {
 
   it("detects guardrail rejection as critical", () => {
     const events = [
-      makeEvent({ id: 1, type: "guardrail_check", timestamp: 1000, agentId: "a", status: "REJECTED" }),
+      makeEvent({
+        id: 1,
+        type: "guardrail_check",
+        timestamp: 1000,
+        agentId: "a",
+        status: "REJECTED",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
@@ -210,7 +250,13 @@ describe("detectAnomalies", () => {
 
   it("does not flag passed guardrail checks", () => {
     const events = [
-      makeEvent({ id: 1, type: "guardrail_check", timestamp: 1000, agentId: "a", status: "PASSED" }),
+      makeEvent({
+        id: 1,
+        type: "guardrail_check",
+        timestamp: 1000,
+        agentId: "a",
+        status: "PASSED",
+      }),
     ];
     expect(detectAnomalies(events)).toHaveLength(0);
   });
@@ -226,22 +272,66 @@ describe("detectAnomalies", () => {
 
   it("detects duration outliers (>2x mean)", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 3, type: "agent_complete", timestamp: 3000, agentId: "a", durationMs: 500, totalTokens: 50 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 3,
+        type: "agent_complete",
+        timestamp: 3000,
+        agentId: "a",
+        durationMs: 500,
+        totalTokens: 50,
+      }),
     ];
     const anomalies = detectAnomalies(events);
     // Mean is (100+100+500)/3 = 233.3, and 500 > 2 * 233.3 = 466.6? Yes, 500 > 466.6
-    const durationAnomalies = anomalies.filter((a) => a.type === "duration_outlier");
+    const durationAnomalies = anomalies.filter(
+      (a) => a.type === "duration_outlier",
+    );
     expect(durationAnomalies).toHaveLength(1);
     expect(durationAnomalies[0]!.eventId).toBe(3);
   });
 
   it("detects token spikes (>2x mean)", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "b", durationMs: 100, totalTokens: 100 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "b", durationMs: 100, totalTokens: 100 }),
-      makeEvent({ id: 3, type: "agent_complete", timestamp: 3000, agentId: "b", durationMs: 100, totalTokens: 1000 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "b",
+        durationMs: 100,
+        totalTokens: 100,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "b",
+        durationMs: 100,
+        totalTokens: 100,
+      }),
+      makeEvent({
+        id: 3,
+        type: "agent_complete",
+        timestamp: 3000,
+        agentId: "b",
+        durationMs: 100,
+        totalTokens: 1000,
+      }),
     ];
     const anomalies = detectAnomalies(events);
     const tokenAnomalies = anomalies.filter((a) => a.type === "token_spike");
@@ -251,7 +341,13 @@ describe("detectAnomalies", () => {
 
   it("detects reroute as info", () => {
     const events = [
-      makeEvent({ id: 1, type: "reroute", timestamp: 1000, from: "a", to: "b" }),
+      makeEvent({
+        id: 1,
+        type: "reroute",
+        timestamp: 1000,
+        from: "a",
+        to: "b",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
@@ -261,7 +357,12 @@ describe("detectAnomalies", () => {
 
   it("detects breakpoint_hit as info", () => {
     const events = [
-      makeEvent({ id: 1, type: "breakpoint_hit", timestamp: 1000, agentId: "a" }),
+      makeEvent({
+        id: 1,
+        type: "breakpoint_hit",
+        timestamp: 1000,
+        agentId: "a",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
@@ -270,22 +371,39 @@ describe("detectAnomalies", () => {
 
   it("respects custom thresholds (M6)", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100, totalTokens: 100 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 200, totalTokens: 200 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 100,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 200,
+        totalTokens: 200,
+      }),
     ];
 
     // With default thresholds (2x), no outlier: mean=150, 200 < 2*150=300
-    expect(detectAnomalies(events).filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+    expect(
+      detectAnomalies(events).filter((a) => a.type === "duration_outlier"),
+    ).toHaveLength(0);
 
     // With 1.2x threshold, 200 > 1.2*150=180, so it IS an outlier
-    const strict = detectAnomalies(events, { durationMultiplier: 1.2, tokenMultiplier: 1.2 });
+    const strict = detectAnomalies(events, {
+      durationMultiplier: 1.2,
+      tokenMultiplier: 1.2,
+    });
     expect(strict.filter((a) => a.type === "duration_outlier")).toHaveLength(1);
   });
 
   it("handles events without agentId gracefully", () => {
-    const events = [
-      makeEvent({ id: 1, type: "agent_error", timestamp: 1000 }),
-    ];
+    const events = [makeEvent({ id: 1, type: "agent_error", timestamp: 1000 })];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
     expect(anomalies[0]!.message).toContain("unknown");
@@ -303,27 +421,65 @@ describe("detectAnomalies", () => {
     // 3 events: 100, 100, 200. Mean = (100+100+200)/3 = 133.3
     // 2x mean = 266.6. 200 < 266.6 → not flagged
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 3, type: "agent_complete", timestamp: 3000, agentId: "a", durationMs: 200, totalTokens: 50 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 3,
+        type: "agent_complete",
+        timestamp: 3000,
+        agentId: "a",
+        durationMs: 200,
+        totalTokens: 50,
+      }),
     ];
     const anomalies = detectAnomalies(events);
-    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(
+      0,
+    );
   });
 
   it("does NOT flag when only a single event per agent (value == mean)", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 500, totalTokens: 100 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 500,
+        totalTokens: 100,
+      }),
     ];
     const anomalies = detectAnomalies(events);
     // Mean = 500, 500 is NOT > 2*500=1000 → not flagged
-    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(
+      0,
+    );
     expect(anomalies.filter((a) => a.type === "token_spike")).toHaveLength(0);
   });
 
   it("detects guardrail rejection via 'result' field (not just 'status')", () => {
     const events = [
-      makeEvent({ id: 1, type: "guardrail_check", timestamp: 1000, agentId: "a", result: "REJECTED" }),
+      makeEvent({
+        id: 1,
+        type: "guardrail_check",
+        timestamp: 1000,
+        agentId: "a",
+        result: "REJECTED",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
@@ -331,9 +487,7 @@ describe("detectAnomalies", () => {
   });
 
   it("handles reroute with missing from/to gracefully", () => {
-    const events = [
-      makeEvent({ id: 1, type: "reroute", timestamp: 1000 }),
-    ];
+    const events = [makeEvent({ id: 1, type: "reroute", timestamp: 1000 })];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(1);
     expect(anomalies[0]!.message).toContain("unknown");
@@ -341,9 +495,20 @@ describe("detectAnomalies", () => {
 
   it("detects multiple anomaly types on the same agent", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_error", timestamp: 1000, agentId: "a", errorMessage: "fail" }),
+      makeEvent({
+        id: 1,
+        type: "agent_error",
+        timestamp: 1000,
+        agentId: "a",
+        errorMessage: "fail",
+      }),
       makeEvent({ id: 2, type: "agent_retry", timestamp: 2000, agentId: "a" }),
-      makeEvent({ id: 3, type: "resolver_error", timestamp: 3000, agentId: "a" }),
+      makeEvent({
+        id: 3,
+        type: "resolver_error",
+        timestamp: 3000,
+        agentId: "a",
+      }),
     ];
     const anomalies = detectAnomalies(events);
     expect(anomalies).toHaveLength(3);
@@ -356,13 +521,43 @@ describe("detectAnomalies", () => {
     // Agent "b": durations 100, 500. Mean = 300. 500 > 2*300=600? No.
     // No outliers expected
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 3, type: "agent_complete", timestamp: 3000, agentId: "b", durationMs: 100, totalTokens: 50 }),
-      makeEvent({ id: 4, type: "agent_complete", timestamp: 4000, agentId: "b", durationMs: 500, totalTokens: 50 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 3,
+        type: "agent_complete",
+        timestamp: 3000,
+        agentId: "b",
+        durationMs: 100,
+        totalTokens: 50,
+      }),
+      makeEvent({
+        id: 4,
+        type: "agent_complete",
+        timestamp: 4000,
+        agentId: "b",
+        durationMs: 500,
+        totalTokens: 50,
+      }),
     ];
     const anomalies = detectAnomalies(events);
-    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(0);
+    expect(anomalies.filter((a) => a.type === "duration_outlier")).toHaveLength(
+      0,
+    );
   });
 });
 
@@ -377,8 +572,20 @@ describe("computeMeansByAgent", () => {
 
   it("computes correct mean for single agent", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 300 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 100,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 300,
+      }),
     ];
     const means = computeMeansByAgent(events, "durationMs");
     expect(means.get("a")).toBe(200);
@@ -386,8 +593,20 @@ describe("computeMeansByAgent", () => {
 
   it("computes separate means for different agents", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, agentId: "a", durationMs: 100 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "b", durationMs: 500 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 100,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "b",
+        durationMs: 500,
+      }),
     ];
     const means = computeMeansByAgent(events, "durationMs");
     expect(means.get("a")).toBe(100);
@@ -396,8 +615,20 @@ describe("computeMeansByAgent", () => {
 
   it("ignores non-agent_complete events", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_start", timestamp: 1000, agentId: "a", durationMs: 999 }),
-      makeEvent({ id: 2, type: "agent_complete", timestamp: 2000, agentId: "a", durationMs: 100 }),
+      makeEvent({
+        id: 1,
+        type: "agent_start",
+        timestamp: 1000,
+        agentId: "a",
+        durationMs: 999,
+      }),
+      makeEvent({
+        id: 2,
+        type: "agent_complete",
+        timestamp: 2000,
+        agentId: "a",
+        durationMs: 100,
+      }),
     ];
     const means = computeMeansByAgent(events, "durationMs");
     expect(means.get("a")).toBe(100);
@@ -405,7 +636,12 @@ describe("computeMeansByAgent", () => {
 
   it("ignores events without agentId", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, durationMs: 100 }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        durationMs: 100,
+      }),
     ];
     expect(computeMeansByAgent(events, "durationMs").size).toBe(0);
   });

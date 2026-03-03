@@ -1,21 +1,20 @@
 <script lang="ts">
-  import { useFact, useOptimisticUpdate } from "@directive-run/svelte";
-  import { system, statusPlugin } from "../system";
-  import { TestIds } from "../../../../shared/test-ids";
+import { useFact, useOptimisticUpdate } from "@directive-run/svelte";
+import { statusPlugin, system } from "../system";
 
-  const count = useFact(system, "count");
-  const { mutate, isPending, error, rollback } = useOptimisticUpdate(
-    system,
-    statusPlugin,
-    "LOAD_DATA",
-  );
+const count = useFact(system, "count");
+const { mutate, isPending, error, rollback } = useOptimisticUpdate(
+  system,
+  statusPlugin,
+  "LOAD_DATA",
+);
 
-  function handleMutate() {
-    mutate(() => {
-      system.facts.count = system.facts.count + 10;
-      system.facts.status = "loading";
-    });
-  }
+function handleMutate() {
+  mutate(() => {
+    system.facts.count = system.facts.count + 10;
+    system.facts.status = "loading";
+  });
+}
 </script>
 
 <div>

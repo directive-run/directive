@@ -18,7 +18,11 @@
  * ```
  */
 
-import type { GuardrailFn, InputGuardrailData, GuardrailResult } from "../types.js";
+import type {
+  GuardrailFn,
+  GuardrailResult,
+  InputGuardrailData,
+} from "../types.js";
 
 // ============================================================================
 // Pattern Categories
@@ -50,19 +54,22 @@ export type InjectionCategory =
 export const DEFAULT_INJECTION_PATTERNS: InjectionPattern[] = [
   // Instruction override patterns
   {
-    pattern: /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|guidelines?)/i,
+    pattern:
+      /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|guidelines?)/i,
     name: "ignore-previous",
     severity: "critical",
     category: "instruction_override",
   },
   {
-    pattern: /disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?)/i,
+    pattern:
+      /disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?)/i,
     name: "disregard-previous",
     severity: "critical",
     category: "instruction_override",
   },
   {
-    pattern: /forget\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?)/i,
+    pattern:
+      /forget\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?)/i,
     name: "forget-previous",
     severity: "critical",
     category: "instruction_override",
@@ -94,13 +101,15 @@ export const DEFAULT_INJECTION_PATTERNS: InjectionPattern[] = [
     category: "jailbreak",
   },
   {
-    pattern: /pretend\s+(you\s+)?(are|can|have)\s+(no\s+)?(restrictions?|limits?|boundaries?|ethics)/i,
+    pattern:
+      /pretend\s+(you\s+)?(are|can|have)\s+(no\s+)?(restrictions?|limits?|boundaries?|ethics)/i,
     name: "pretend-no-restrictions",
     severity: "high",
     category: "jailbreak",
   },
   {
-    pattern: /you\s+(now\s+)?have\s+no\s+(ethical\s+)?(restrictions?|guidelines?|boundaries?)/i,
+    pattern:
+      /you\s+(now\s+)?have\s+no\s+(ethical\s+)?(restrictions?|guidelines?|boundaries?)/i,
     name: "no-restrictions",
     severity: "high",
     category: "jailbreak",
@@ -233,13 +242,13 @@ const MAX_INJECTION_INPUT_LENGTH = 100_000;
  */
 export function detectPromptInjection(
   text: string,
-  patterns: InjectionPattern[] = DEFAULT_INJECTION_PATTERNS
+  patterns: InjectionPattern[] = DEFAULT_INJECTION_PATTERNS,
 ): InjectionDetectionResult {
   // Security: Prevent DoS via extremely large inputs
   if (text.length > MAX_INJECTION_INPUT_LENGTH) {
     throw new Error(
       `[Directive] Input exceeds maximum length of ${MAX_INJECTION_INPUT_LENGTH} characters for injection detection. ` +
-      `Truncate input or process in chunks.`
+        `Truncate input or process in chunks.`,
     );
   }
 
@@ -269,7 +278,10 @@ export function detectPromptInjection(
     critical: 100,
   };
 
-  const totalScore = matches.reduce((sum, m) => sum + severityScores[m.severity], 0);
+  const totalScore = matches.reduce(
+    (sum, m) => sum + severityScores[m.severity],
+    0,
+  );
   const riskScore = Math.min(100, totalScore);
 
   return {
@@ -288,10 +300,10 @@ export function detectPromptInjection(
  */
 export function sanitizeInjection(
   text: string,
-  patterns: InjectionPattern[] = DEFAULT_INJECTION_PATTERNS
+  patterns: InjectionPattern[] = DEFAULT_INJECTION_PATTERNS,
 ): string {
   // Remove zero-width characters first (always safe)
-  let sanitized = text.replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, "");
+  let sanitized = text.replace(/\u200b|\u200c|\u200d|\u2060|\ufeff/g, "");
 
   // Build a combined regex for single-pass replacement to prevent
   // infinite loops where "[REDACTED]" could match another pattern
@@ -355,7 +367,7 @@ export interface PromptInjectionGuardrailOptions {
  * ```
  */
 export function createPromptInjectionGuardrail(
-  options: PromptInjectionGuardrailOptions = {}
+  options: PromptInjectionGuardrailOptions = {},
 ): GuardrailFn<InputGuardrailData> {
   const {
     additionalPatterns = [],
@@ -372,7 +384,9 @@ export function createPromptInjectionGuardrail(
   if (replacePatterns) {
     patterns = replacePatterns;
   } else {
-    patterns = strictMode ? [...STRICT_INJECTION_PATTERNS] : [...DEFAULT_INJECTION_PATTERNS];
+    patterns = strictMode
+      ? [...STRICT_INJECTION_PATTERNS]
+      : [...DEFAULT_INJECTION_PATTERNS];
   }
   patterns = [...patterns, ...additionalPatterns];
 
@@ -453,11 +467,15 @@ export function createUntrustedContentGuardrail(options: {
   additionalPatterns?: InjectionPattern[];
 }): GuardrailFn<InputGuardrailData> {
   const {
-    baseGuardrail = createPromptInjectionGuardrail({ strictMode: true, blockThreshold: 25 }),
+    baseGuardrail = createPromptInjectionGuardrail({
+      strictMode: true,
+      blockThreshold: 25,
+    }),
     additionalPatterns = [],
   } = options;
 
-  const untrustedMarkerRegex = /\[UNTRUSTED_CONTENT source="([^"]+)"\]([\s\S]*?)\[\/UNTRUSTED_CONTENT\]/g;
+  const untrustedMarkerRegex =
+    /\[UNTRUSTED_CONTENT source="([^"]+)"\]([\s\S]*?)\[\/UNTRUSTED_CONTENT\]/g;
 
   return async (data, context): Promise<GuardrailResult> => {
     // First, check the entire input

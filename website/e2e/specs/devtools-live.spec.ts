@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * AI Chat Example E2E Tests
@@ -15,18 +15,24 @@ test.describe("AI Chat Example", () => {
   });
 
   test("page loads with header and description", async ({ page }) => {
-    await expect(page.locator("h1", { hasText: "AI Chat" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("h1", { hasText: "AI Chat" })).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.locator("text=Send a message below")).toBeVisible();
   });
 
   test("chat panel renders with input", async ({ page }) => {
-    await expect(page.locator("text=Directive AI")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=Directive AI")).toBeVisible({
+      timeout: 10_000,
+    });
     const input = page.locator("input[placeholder='Ask about Directive...']");
     await expect(input).toBeVisible();
   });
 
   test("example prompt buttons are present", async ({ page }) => {
-    await expect(page.locator("button", { hasText: "Tell me about Directive" })).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator("button", { hasText: "Tell me about Directive" }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test("snapshot endpoint returns JSON", async ({ page }) => {

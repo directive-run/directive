@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Pitch Deck example", () => {
   test.describe.configure({ timeout: 60_000 });
@@ -12,14 +12,22 @@ test.describe("Pitch Deck example", () => {
   });
 
   test("InlineChat renders with correct placeholder", async ({ page }) => {
-    const input = page.locator('textarea[placeholder="Describe your startup idea..."]');
+    const input = page.locator(
+      'textarea[placeholder="Describe your startup idea..."]',
+    );
     await expect(input).toBeVisible({ timeout: 15_000 });
   });
 
   test("example prompt buttons are present", async ({ page }) => {
-    await expect(page.getByText("An AI-powered personal stylist app")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("A marketplace for local farm-to-table produce")).toBeVisible();
-    await expect(page.getByText("A SaaS tool that automates legal contract review")).toBeVisible();
+    await expect(
+      page.getByText("An AI-powered personal stylist app"),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByText("A marketplace for local farm-to-table produce"),
+    ).toBeVisible();
+    await expect(
+      page.getByText("A SaaS tool that automates legal contract review"),
+    ).toBeVisible();
   });
 
   test("DevTools snapshot endpoint returns JSON", async ({ request }) => {

@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
 import { apiProxy } from "@directive-run/vite-plugin-api-proxy";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "/examples/goal-heist/",

@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
-import {
-  createTestMultiAgentOrchestrator,
-} from "../testing.js";
+import { describe, expect, it } from "vitest";
 import { reflect } from "../multi-agent-orchestrator.js";
-import type { ReflectPattern, ReflectIterationRecord } from "../multi-agent-orchestrator.js";
+import type {
+  ReflectIterationRecord,
+  ReflectPattern,
+} from "../multi-agent-orchestrator.js";
+import { createTestMultiAgentOrchestrator } from "../testing.js";
 
 // ============================================================================
 // Tests
@@ -28,7 +29,10 @@ describe("reflect pattern (multi-agent)", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<string>("review", "Write an essay");
+    const result = await orchestrator.runPattern<string>(
+      "review",
+      "Write an essay",
+    );
 
     expect(result).toBe("great essay");
   });
@@ -64,9 +68,14 @@ describe("reflect pattern (multi-agent)", () => {
             evaluatorCallCount++;
 
             return {
-              output: evaluatorCallCount >= 2
-                ? JSON.stringify({ passed: true, score: 0.9 })
-                : JSON.stringify({ passed: false, feedback: "Needs more detail", score: 0.4 }),
+              output:
+                evaluatorCallCount >= 2
+                  ? JSON.stringify({ passed: true, score: 0.9 })
+                  : JSON.stringify({
+                      passed: false,
+                      feedback: "Needs more detail",
+                      score: 0.4,
+                    }),
               totalTokens: 5,
             };
           },
@@ -77,7 +86,10 @@ describe("reflect pattern (multi-agent)", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<string>("review", "Write an essay");
+    const result = await orchestrator.runPattern<string>(
+      "review",
+      "Write an essay",
+    );
 
     expect(result).toBe("improved essay");
     expect(producerCallCount).toBe(2);
@@ -95,7 +107,10 @@ describe("reflect pattern (multi-agent)", () => {
       mockResponses: {
         producer: { output: "best effort", totalTokens: 15 },
         evaluator: {
-          output: JSON.stringify({ passed: false, feedback: "Not good enough" }),
+          output: JSON.stringify({
+            passed: false,
+            feedback: "Not good enough",
+          }),
           totalTokens: 5,
         },
       },
@@ -107,7 +122,10 @@ describe("reflect pattern (multi-agent)", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<string>("review", "Write an essay");
+    const result = await orchestrator.runPattern<string>(
+      "review",
+      "Write an essay",
+    );
 
     expect(result).toBe("best effort");
   });
@@ -185,8 +203,10 @@ describe("reflect pattern (multi-agent)", () => {
         review: reflect("producer", "evaluator"),
       },
       hooks: {
-        onPatternStart: (event) => hookEvents.push({ patternType: event.patternType }),
-        onPatternComplete: (event) => hookEvents.push({ patternType: event.patternType }),
+        onPatternStart: (event) =>
+          hookEvents.push({ patternType: event.patternType }),
+        onPatternComplete: (event) =>
+          hookEvents.push({ patternType: event.patternType }),
       },
     });
 
@@ -215,9 +235,14 @@ describe("reflect pattern (multi-agent)", () => {
             evaluatorCallCount++;
 
             return {
-              output: evaluatorCallCount >= 2
-                ? JSON.stringify({ passed: true, score: 0.9 })
-                : JSON.stringify({ passed: false, feedback: "Improve", score: 0.3 }),
+              output:
+                evaluatorCallCount >= 2
+                  ? JSON.stringify({ passed: true, score: 0.9 })
+                  : JSON.stringify({
+                      passed: false,
+                      feedback: "Improve",
+                      score: 0.3,
+                    }),
               totalTokens: 5,
             };
           },
@@ -232,7 +257,9 @@ describe("reflect pattern (multi-agent)", () => {
     await orchestrator.runPattern("review", "input");
 
     const events = orchestrator.timeline!.getEvents();
-    const reflectionEvents = events.filter((e) => e.type === "reflection_iteration");
+    const reflectionEvents = events.filter(
+      (e) => e.type === "reflection_iteration",
+    );
 
     expect(reflectionEvents.length).toBeGreaterThanOrEqual(2);
     expect(reflectionEvents[0]).toMatchObject({
@@ -309,9 +336,14 @@ describe("reflect pattern (multi-agent)", () => {
             evaluatorCallCount++;
 
             return {
-              output: evaluatorCallCount >= 2
-                ? JSON.stringify({ passed: true, score: 0.95 })
-                : JSON.stringify({ passed: false, feedback: "Add examples", score: 0.4 }),
+              output:
+                evaluatorCallCount >= 2
+                  ? JSON.stringify({ passed: true, score: 0.95 })
+                  : JSON.stringify({
+                      passed: false,
+                      feedback: "Add examples",
+                      score: 0.4,
+                    }),
               totalTokens: 8,
             };
           },
@@ -363,9 +395,14 @@ describe("reflect pattern (multi-agent)", () => {
             evaluatorCallCount++;
 
             return {
-              output: evaluatorCallCount >= 2
-                ? JSON.stringify({ passed: true, score: 0.8 })
-                : JSON.stringify({ passed: false, feedback: "Try harder", score: 0.3 }),
+              output:
+                evaluatorCallCount >= 2
+                  ? JSON.stringify({ passed: true, score: 0.8 })
+                  : JSON.stringify({
+                      passed: false,
+                      feedback: "Try harder",
+                      score: 0.3,
+                    }),
               totalTokens: 5,
             };
           },
@@ -406,7 +443,10 @@ describe("reflect pattern (multi-agent)", () => {
             run++;
 
             return {
-              output: JSON.stringify({ passed: true, score: run === 1 ? 0.5 : 0.9 }),
+              output: JSON.stringify({
+                passed: true,
+                score: run === 1 ? 0.5 : 0.9,
+              }),
               totalTokens: 5,
             };
           },

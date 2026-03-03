@@ -1,19 +1,19 @@
-import { type Metadata } from 'next'
+import type { Metadata } from "next";
 
 export function buildPageMetadata(opts: {
-  title: string
-  description: string
-  path: string
-  section?: string
+  title: string;
+  description: string;
+  path: string;
+  section?: string;
 }): Metadata {
-  const { title, description, path, section } = opts
-  const url = `https://directive.run${path}`
+  const { title, description, path, section } = opts;
+  const url = `https://directive.run${path}`;
 
-  const ogImageParams = new URLSearchParams({ title })
+  const ogImageParams = new URLSearchParams({ title });
   if (section) {
-    ogImageParams.set('section', section)
+    ogImageParams.set("section", section);
   }
-  const ogImageUrl = `https://directive.run/api/og?${ogImageParams.toString()}`
+  const ogImageUrl = `https://directive.run/api/og?${ogImageParams.toString()}`;
 
   return {
     title,
@@ -22,8 +22,8 @@ export function buildPageMetadata(opts: {
       title,
       description,
       url,
-      siteName: 'Directive',
-      type: 'website',
+      siteName: "Directive",
+      type: "website",
       images: [
         {
           url: ogImageUrl,
@@ -34,10 +34,10 @@ export function buildPageMetadata(opts: {
       ],
     },
     twitter: {
-      card: 'summary_large_image',
+      card: "summary_large_image",
       title,
       description,
       images: [ogImageUrl],
     },
-  }
+  };
 }

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { gotoExample, tid } from "../helpers/example-test.js";
 
 test.describe("Sudoku example", () => {

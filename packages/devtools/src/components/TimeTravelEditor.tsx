@@ -7,7 +7,11 @@ interface TimeTravelEditorProps {
   onClose: () => void;
 }
 
-export function TimeTravelEditor({ snapshot, onFork, onClose }: TimeTravelEditorProps) {
+export function TimeTravelEditor({
+  snapshot,
+  onFork,
+  onClose,
+}: TimeTravelEditorProps) {
   const [jsonText, setJsonText] = useState(() =>
     snapshot ? JSON.stringify(snapshot, null, 2) : "{}",
   );
@@ -16,15 +20,25 @@ export function TimeTravelEditor({ snapshot, onFork, onClose }: TimeTravelEditor
   const handleFork = useCallback(() => {
     try {
       const parsed = JSON.parse(jsonText);
-      if (typeof parsed !== "object" || parsed === null || typeof parsed.timestamp !== "number") {
-        setError("Invalid snapshot: must be an object with a numeric 'timestamp' field");
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        typeof parsed.timestamp !== "number"
+      ) {
+        setError(
+          "Invalid snapshot: must be an object with a numeric 'timestamp' field",
+        );
 
         return;
       }
       setError(null);
       onFork(parsed as DevToolsSnapshot);
     } catch (e) {
-      setError(e instanceof SyntaxError ? `Invalid JSON: ${e.message}` : "Failed to parse JSON");
+      setError(
+        e instanceof SyntaxError
+          ? `Invalid JSON: ${e.message}`
+          : "Failed to parse JSON",
+      );
     }
   }, [jsonText, onFork]);
 
@@ -40,7 +54,9 @@ export function TimeTravelEditor({ snapshot, onFork, onClose }: TimeTravelEditor
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <h3 className="text-sm font-semibold text-zinc-200">Edit State & Fork</h3>
+        <h3 className="text-sm font-semibold text-zinc-200">
+          Edit State & Fork
+        </h3>
         <button
           onClick={onClose}
           className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
@@ -52,7 +68,10 @@ export function TimeTravelEditor({ snapshot, onFork, onClose }: TimeTravelEditor
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden p-4">
-        <label htmlFor="snapshot-editor" className="mb-2 block text-xs text-zinc-500">
+        <label
+          htmlFor="snapshot-editor"
+          className="mb-2 block text-xs text-zinc-500"
+        >
           Snapshot state (JSON)
         </label>
         <textarea

@@ -13,31 +13,34 @@
  */
 
 import type { Requirement } from "@directive-run/core";
-import { setBridgeFact, getBridgeFact } from "@directive-run/core/adapter-utils";
+import {
+  getBridgeFact,
+  setBridgeFact,
+} from "@directive-run/core/adapter-utils";
 
 import type {
+  AgentHealthState,
   AgentLike,
-  RunResult,
-  Message,
-  ToolCall,
-  RunOptions,
   AgentState,
   ApprovalState,
-  AgentHealthState,
   BreakpointState,
+  Message,
   OrchestratorConstraint,
-  OrchestratorResolverContext,
   OrchestratorResolver,
+  OrchestratorResolverContext,
   OrchestratorState,
+  RunOptions,
+  RunResult,
+  ToolCall,
 } from "./types.js";
 
 import {
   AGENT_KEY,
   APPROVAL_KEY,
-  CONVERSATION_KEY,
-  TOOL_CALLS_KEY,
-  HEALTH_KEY,
   BREAKPOINT_KEY,
+  CONVERSATION_KEY,
+  HEALTH_KEY,
+  TOOL_CALLS_KEY,
 } from "./types.js";
 
 // ============================================================================
@@ -90,7 +93,10 @@ export function getHealthState(facts: any): Record<string, AgentHealthState> {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
-export function setHealthState(facts: any, state: Record<string, AgentHealthState>): void {
+export function setHealthState(
+  facts: any,
+  state: Record<string, AgentHealthState>,
+): void {
   setBridgeFact(facts, HEALTH_KEY, state);
 }
 
@@ -121,9 +127,9 @@ export function getOrchestratorState(facts: any): OrchestratorState {
 
 /** Convert user-facing OrchestratorConstraint objects into Directive core constraint format */
 // biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
-export function convertOrchestratorConstraints<F extends Record<string, unknown>>(
-  constraints: Record<string, OrchestratorConstraint<F>>,
-): Record<string, any> {
+export function convertOrchestratorConstraints<
+  F extends Record<string, unknown>,
+>(constraints: Record<string, OrchestratorConstraint<F>>): Record<string, any> {
   // biome-ignore lint/suspicious/noExplicitAny: Result type is complex
   const result: Record<string, any> = Object.create(null);
 
@@ -133,14 +139,16 @@ export function convertOrchestratorConstraints<F extends Record<string, unknown>
       // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       when: (facts: any) => {
         const state = getOrchestratorState(facts);
-        const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
+        const combinedFacts = { ...facts, ...state } as unknown as F &
+          OrchestratorState;
 
         return constraint.when(combinedFacts);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       require: (facts: any) => {
         const state = getOrchestratorState(facts);
-        const combinedFacts = { ...facts, ...state } as unknown as F & OrchestratorState;
+        const combinedFacts = { ...facts, ...state } as unknown as F &
+          OrchestratorState;
 
         return typeof constraint.require === "function"
           ? constraint.require(combinedFacts)
@@ -160,7 +168,7 @@ export function convertOrchestratorResolvers<F extends Record<string, unknown>>(
     agent: AgentLike,
     input: string,
     currentFacts: F & OrchestratorState,
-    opts?: RunOptions
+    opts?: RunOptions,
   ) => Promise<RunResult<T>>,
   // biome-ignore lint/suspicious/noExplicitAny: Facts getter type varies
   getSystemFacts: () => any,
@@ -175,16 +183,22 @@ export function convertOrchestratorResolvers<F extends Record<string, unknown>>(
       // biome-ignore lint/suspicious/noExplicitAny: Context type varies
       resolve: async (req: Requirement, context: any) => {
         const state = getOrchestratorState(context.facts);
-        const combinedFacts = { ...context.facts, ...state } as unknown as F & OrchestratorState;
+        const combinedFacts = { ...context.facts, ...state } as unknown as F &
+          OrchestratorState;
 
         const orchestratorContext: OrchestratorResolverContext<F> = {
           facts: combinedFacts,
-          runAgent: async <T>(agent: AgentLike, input: string, opts?: RunOptions) => {
+          runAgent: async <T>(
+            agent: AgentLike,
+            input: string,
+            opts?: RunOptions,
+          ) => {
             return runAgentWithGuardrails<T>(
               agent,
               input,
-              getOrchestratorState(getSystemFacts()) as unknown as F & OrchestratorState,
-              opts
+              getOrchestratorState(getSystemFacts()) as unknown as F &
+                OrchestratorState,
+              opts,
             );
           },
           signal: context.signal,

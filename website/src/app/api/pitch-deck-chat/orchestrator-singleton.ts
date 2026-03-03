@@ -17,134 +17,157 @@
  * - Checkpoint store (in-memory, max 50)       → State tab, Events tab
  */
 import {
-  createMultiAgentOrchestrator,
-  goal,
-  withRetry,
-  withBudget,
-  createAgentMemory,
-  createSlidingWindowStrategy,
-  createPromptInjectionGuardrail,
-  createEnhancedPIIGuardrail,
-  createOutputPIIGuardrail,
-  createLengthGuardrail,
-  createAuditTrail,
-  createAgentAuditHandlers,
+  type CheckpointStore,
+  type CrossAgentSnapshot,
   InMemoryCheckpointStore,
+  type InputGuardrailData,
   type MultiAgentOrchestrator,
   type NamedGuardrail,
-  type InputGuardrailData,
   type OutputGuardrailData,
-  type CrossAgentSnapshot,
-  type CheckpointStore,
-} from '@directive-run/ai'
-import { createAnthropicRunner } from '@directive-run/ai/anthropic'
-import { createCircuitBreaker } from '@directive-run/core/plugins'
+  createAgentAuditHandlers,
+  createAgentMemory,
+  createAuditTrail,
+  createEnhancedPIIGuardrail,
+  createLengthGuardrail,
+  createMultiAgentOrchestrator,
+  createOutputPIIGuardrail,
+  createPromptInjectionGuardrail,
+  createSlidingWindowStrategy,
+  goal,
+  withBudget,
+  withRetry,
+} from "@directive-run/ai";
+import { createAnthropicRunner } from "@directive-run/ai/anthropic";
+import { createCircuitBreaker } from "@directive-run/core/plugins";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface PitchDeckOrchestratorInstance {
-  orchestrator: MultiAgentOrchestrator
-  memory: ReturnType<typeof createAgentMemory>
-  audit: ReturnType<typeof createAuditTrail>
-  inputGuardrails: NamedGuardrail<InputGuardrailData>[]
-  checkpointStore: CheckpointStore
+  orchestrator: MultiAgentOrchestrator;
+  memory: ReturnType<typeof createAgentMemory>;
+  audit: ReturnType<typeof createAuditTrail>;
+  inputGuardrails: NamedGuardrail<InputGuardrailData>[];
+  checkpointStore: CheckpointStore;
 }
 
 // ---------------------------------------------------------------------------
 // Singleton on globalThis (survives HMR)
 // ---------------------------------------------------------------------------
 
-const GLOBAL_KEY = '__directive_pitch_deck_orchestrator' as const
-const g = globalThis as typeof globalThis & { [GLOBAL_KEY]?: PitchDeckOrchestratorInstance }
+const GLOBAL_KEY = "__directive_pitch_deck_orchestrator" as const;
+const g = globalThis as typeof globalThis & {
+  [GLOBAL_KEY]?: PitchDeckOrchestratorInstance;
+};
 
 export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null {
   if (g[GLOBAL_KEY]) {
-    return g[GLOBAL_KEY]
+    return g[GLOBAL_KEY];
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
-    return null
+    return null;
   }
 
   let runner = createAnthropicRunner({
     apiKey: anthropicKey,
-    model: 'claude-haiku-4-5-20251001',
+    model: "claude-haiku-4-5-20251001",
     maxTokens: 300,
-  })
+  });
 
-  runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 })
+  runner = withRetry(runner, {
+    maxRetries: 2,
+    baseDelayMs: 1_000,
+    maxDelayMs: 10_000,
+  });
 
-  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 };
   runner = withBudget(runner, {
-    budgets: [
-      { window: 'hour' as const, maxCost: 5.00, pricing: haikuPricing },
-    ],
-  })
+    budgets: [{ window: "hour" as const, maxCost: 5.0, pricing: haikuPricing }],
+  });
 
   // ---------------------------------------------------------------------------
   // Input Guardrails (4) → Guardrails tab
   // ---------------------------------------------------------------------------
 
-  const rateLimitTimestamps: number[] = []
-  let rateLimitStartIdx = 0
-  const MAX_PER_MINUTE = 20
+  const rateLimitTimestamps: number[] = [];
+  let rateLimitStartIdx = 0;
+  const MAX_PER_MINUTE = 20;
 
   const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [
     {
-      name: 'rate-limit',
+      name: "rate-limit",
       fn: () => {
-        const now = Date.now()
-        const windowStart = now - 60_000
-        while (rateLimitStartIdx < rateLimitTimestamps.length && rateLimitTimestamps[rateLimitStartIdx]! < windowStart) {
-          rateLimitStartIdx++
+        const now = Date.now();
+        const windowStart = now - 60_000;
+        while (
+          rateLimitStartIdx < rateLimitTimestamps.length &&
+          rateLimitTimestamps[rateLimitStartIdx]! < windowStart
+        ) {
+          rateLimitStartIdx++;
         }
-        if (rateLimitStartIdx > rateLimitTimestamps.length / 2 && rateLimitStartIdx > 100) {
-          rateLimitTimestamps.splice(0, rateLimitStartIdx)
-          rateLimitStartIdx = 0
+        if (
+          rateLimitStartIdx > rateLimitTimestamps.length / 2 &&
+          rateLimitStartIdx > 100
+        ) {
+          rateLimitTimestamps.splice(0, rateLimitStartIdx);
+          rateLimitStartIdx = 0;
         }
-        const active = rateLimitTimestamps.length - rateLimitStartIdx
+        const active = rateLimitTimestamps.length - rateLimitStartIdx;
         if (active >= MAX_PER_MINUTE) {
-          return { passed: false, reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)` }
+          return {
+            passed: false,
+            reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)`,
+          };
         }
-        rateLimitTimestamps.push(now)
+        rateLimitTimestamps.push(now);
 
-        return { passed: true }
+        return { passed: true };
       },
     },
     {
-      name: 'prompt-injection',
+      name: "prompt-injection",
       fn: createPromptInjectionGuardrail({ strictMode: true }),
     },
     {
-      name: 'pii-detection',
+      name: "pii-detection",
       fn: createEnhancedPIIGuardrail({ redact: true }),
     },
     {
-      name: 'content-filter',
+      name: "content-filter",
       fn: ({ input }) => {
-        const patterns = [/\bpassword\b/i, /\bsecret\s*key\b/i, /\bapi[_\s]*key\b/i]
+        const patterns = [
+          /\bpassword\b/i,
+          /\bsecret\s*key\b/i,
+          /\bapi[_\s]*key\b/i,
+        ];
         for (const p of patterns) {
           if (p.test(input)) {
-            return { passed: false, reason: `Content filter: blocked sensitive keyword` }
+            return {
+              passed: false,
+              reason: `Content filter: blocked sensitive keyword`,
+            };
           }
         }
 
-        return { passed: true }
+        return { passed: true };
       },
     },
-  ]
+  ];
 
   // ---------------------------------------------------------------------------
   // Output Guardrails (2) → Guardrails tab
   // ---------------------------------------------------------------------------
 
   const outputGuardrails: NamedGuardrail<OutputGuardrailData>[] = [
-    { name: 'output-length', fn: createLengthGuardrail({ maxCharacters: 3000 }) },
-    { name: 'output-pii', fn: createOutputPIIGuardrail({ redact: true }) },
-  ]
+    {
+      name: "output-length",
+      fn: createLengthGuardrail({ maxCharacters: 3000 }),
+    },
+    { name: "output-pii", fn: createOutputPIIGuardrail({ redact: true }) },
+  ];
 
   // ---------------------------------------------------------------------------
   // Memory → Memory tab
@@ -154,26 +177,32 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
     strategy: createSlidingWindowStrategy(),
     strategyConfig: { maxMessages: 30, preserveRecentCount: 6 },
     autoManage: true,
-  })
+  });
 
   // ---------------------------------------------------------------------------
   // Circuit Breaker → Health tab, Config tab
   // ---------------------------------------------------------------------------
 
-  const cb = createCircuitBreaker({ failureThreshold: 5, recoveryTimeMs: 30_000 })
+  const cb = createCircuitBreaker({
+    failureThreshold: 5,
+    recoveryTimeMs: 30_000,
+  });
 
   // ---------------------------------------------------------------------------
   // Audit Trail → Events tab
   // ---------------------------------------------------------------------------
 
-  const audit = createAuditTrail({ maxEntries: 5000, sessionId: 'pitch-deck-demo' })
-  const auditHandlers = createAgentAuditHandlers(audit)
+  const audit = createAuditTrail({
+    maxEntries: 5000,
+    sessionId: "pitch-deck-demo",
+  });
+  const auditHandlers = createAgentAuditHandlers(audit);
 
   // ---------------------------------------------------------------------------
   // Checkpoint Store → State tab, Events tab (replay/resume)
   // ---------------------------------------------------------------------------
 
-  const checkpointStore = new InMemoryCheckpointStore({ maxCheckpoints: 50 })
+  const checkpointStore = new InMemoryCheckpointStore({ maxCheckpoints: 50 });
 
   // ---------------------------------------------------------------------------
   // Orchestrator
@@ -182,102 +211,109 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
   const orchestrator = createMultiAgentOrchestrator({
     runner,
     agents: {
-      'market-analyst': {
+      "market-analyst": {
         agent: {
-          name: 'market-analyst',
-          model: 'claude-haiku-4-5-20251001',
-          instructions: 'You are a market research analyst. Evaluate the TAM/SAM/SOM, competitive landscape, and market trends for the given startup idea. Respond in 2-3 sentences with concrete numbers or comparisons when possible.',
+          name: "market-analyst",
+          model: "claude-haiku-4-5-20251001",
+          instructions:
+            "You are a market research analyst. Evaluate the TAM/SAM/SOM, competitive landscape, and market trends for the given startup idea. Respond in 2-3 sentences with concrete numbers or comparisons when possible.",
         },
-        capabilities: ['research', 'market-analysis'],
+        capabilities: ["research", "market-analysis"],
       },
-      'financial-modeler': {
+      "financial-modeler": {
         agent: {
-          name: 'financial-modeler',
-          model: 'claude-haiku-4-5-20251001',
-          instructions: 'You are a financial modeling expert. Estimate revenue potential, unit economics, and burn rate for the given startup idea. Respond in 2-3 sentences with specific financial projections.',
+          name: "financial-modeler",
+          model: "claude-haiku-4-5-20251001",
+          instructions:
+            "You are a financial modeling expert. Estimate revenue potential, unit economics, and burn rate for the given startup idea. Respond in 2-3 sentences with specific financial projections.",
         },
-        capabilities: ['analysis', 'finance'],
+        capabilities: ["analysis", "finance"],
       },
       storyteller: {
         agent: {
-          name: 'storyteller',
-          model: 'claude-haiku-4-5-20251001',
-          instructions: 'You are an expert pitch deck storyteller. Craft a compelling investor narrative covering the problem, solution, and why now — based on the market analysis and financial projections provided. Respond in 3-4 sentences.',
+          name: "storyteller",
+          model: "claude-haiku-4-5-20251001",
+          instructions:
+            "You are an expert pitch deck storyteller. Craft a compelling investor narrative covering the problem, solution, and why now — based on the market analysis and financial projections provided. Respond in 3-4 sentences.",
         },
-        capabilities: ['synthesis', 'narrative'],
+        capabilities: ["synthesis", "narrative"],
       },
       scorer: {
         agent: {
-          name: 'scorer',
-          model: 'claude-haiku-4-5-20251001',
-          instructions: 'You are an experienced VC investor. Score the pitch narrative from 1-10 based on market opportunity, financial viability, and narrative clarity. Respond in exactly 2 sentences: the score and a brief justification.',
+          name: "scorer",
+          model: "claude-haiku-4-5-20251001",
+          instructions:
+            "You are an experienced VC investor. Score the pitch narrative from 1-10 based on market opportunity, financial viability, and narrative clarity. Respond in exactly 2 sentences: the score and a brief justification.",
         },
-        capabilities: ['evaluation', 'scoring'],
+        capabilities: ["evaluation", "scoring"],
       },
     },
     patterns: {
       pitchDeck: goal<string>(
         {
-          'market-analyst': {
-            handler: 'market-analyst',
-            produces: ['market_analysis'],
-            buildInput: (facts) => String(facts.input ?? ''),
+          "market-analyst": {
+            handler: "market-analyst",
+            produces: ["market_analysis"],
+            buildInput: (facts) => String(facts.input ?? ""),
           },
-          'financial-modeler': {
-            handler: 'financial-modeler',
-            produces: ['financials'],
-            buildInput: (facts) => String(facts.input ?? ''),
+          "financial-modeler": {
+            handler: "financial-modeler",
+            produces: ["financials"],
+            buildInput: (facts) => String(facts.input ?? ""),
           },
           storyteller: {
-            handler: 'storyteller',
-            produces: ['narrative'],
-            requires: ['market_analysis', 'financials'],
+            handler: "storyteller",
+            produces: ["narrative"],
+            requires: ["market_analysis", "financials"],
             buildInput: (facts) =>
               `Market: ${facts.market_analysis}\nFinancials: ${facts.financials}`,
           },
           scorer: {
-            handler: 'scorer',
-            produces: ['pitch_score'],
-            requires: ['narrative'],
+            handler: "scorer",
+            produces: ["pitch_score"],
+            requires: ["narrative"],
             buildInput: (facts) => `Pitch narrative: ${facts.narrative}`,
           },
         },
         (facts) => !!facts.pitch_score,
         {
           satisfaction: (facts) => {
-            let s = 0
+            let s = 0;
             if (facts.market_analysis) {
-              s += 0.2
+              s += 0.2;
             }
             if (facts.financials) {
-              s += 0.2
+              s += 0.2;
             }
             if (facts.narrative) {
-              s += 0.35
+              s += 0.35;
             }
             if (facts.pitch_score) {
-              s += 0.25
+              s += 0.25;
             }
 
-            return s
+            return s;
           },
           maxSteps: 10,
           relaxation: [
             {
-              label: 'Rerun storyteller',
+              label: "Rerun storyteller",
               afterStallSteps: 3,
-              strategy: { type: 'allow_rerun', nodes: ['storyteller'] },
+              strategy: { type: "allow_rerun", nodes: ["storyteller"] },
             },
             {
-              label: 'Inject simplified narrative',
+              label: "Inject simplified narrative",
               afterStallSteps: 5,
               strategy: {
-                type: 'inject_facts',
-                facts: { narrative: 'A promising startup with strong market potential and viable financials.' },
+                type: "inject_facts",
+                facts: {
+                  narrative:
+                    "A promising startup with strong market potential and viable financials.",
+                },
               },
             },
           ],
-          extract: (facts) => String(facts.pitch_score ?? ''),
+          extract: (facts) => String(facts.pitch_score ?? ""),
         },
       ),
     },
@@ -296,56 +332,57 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
 
     // Self-healing → Health tab
     selfHealing: {
-      equivalencyGroups: { analysis: ['market-analyst', 'financial-modeler'] },
+      equivalencyGroups: { analysis: ["market-analyst", "financial-modeler"] },
       healthThreshold: 30,
       circuitBreakerDefaults: {
         failureThreshold: 3,
         resetTimeoutMs: 30_000,
         halfOpenSuccesses: 2,
       },
-      selectionStrategy: 'healthiest',
-      degradation: 'fallback-response',
-      fallbackResponse: 'Service temporarily degraded. Please try again shortly.',
+      selectionStrategy: "healthiest",
+      degradation: "fallback-response",
+      fallbackResponse:
+        "Service temporarily degraded. Please try again shortly.",
     },
 
     // Cross-agent derivations (4) → State tab
     derive: {
       allComplete: (snap: CrossAgentSnapshot) => {
-        const agents = Object.values(snap.agents)
+        const agents = Object.values(snap.agents);
         if (agents.length === 0) {
-          return false
+          return false;
         }
 
-        return agents.every((a) => a.status === 'completed')
+        return agents.every((a) => a.status === "completed");
       },
       totalCost: (snap: CrossAgentSnapshot) => {
-        const tokens = snap.coordinator.globalTokens
-        const inputTokens = tokens * 0.6
-        const outputTokens = tokens * 0.4
+        const tokens = snap.coordinator.globalTokens;
+        const inputTokens = tokens * 0.6;
+        const outputTokens = tokens * 0.4;
 
-        return (inputTokens * 0.8 + outputTokens * 4) / 1_000_000
+        return (inputTokens * 0.8 + outputTokens * 4) / 1_000_000;
       },
       pitchProgress: (snap: CrossAgentSnapshot) => {
-        const agents = Object.values(snap.agents)
-        const completed = agents.filter((a) => a.status === 'completed').length
+        const agents = Object.values(snap.agents);
+        const completed = agents.filter((a) => a.status === "completed").length;
 
-        return `${completed}/${agents.length}`
+        return `${completed}/${agents.length}`;
       },
       pitchQuality: (snap: CrossAgentSnapshot) => {
-        const agents = Object.values(snap.agents)
+        const agents = Object.values(snap.agents);
         if (agents.length === 0) {
-          return 0
+          return 0;
         }
-        const completed = agents.filter((a) => a.status === 'completed').length
+        const completed = agents.filter((a) => a.status === "completed").length;
 
-        return Math.round((completed / agents.length) * 100)
+        return Math.round((completed / agents.length) * 100);
       },
     },
 
     // Scratchpad (5 keys) → State tab
     scratchpad: {
       init: {
-        idea: '',
+        idea: "",
         confidence: 0,
         sources: [] as string[],
         lastError: null as string | null,
@@ -359,38 +396,43 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
     // Lifecycle hooks → Timeline tab, Events tab
     hooks: {
       onAgentStart: ({ agentId }) => {
-        auditHandlers.onAgentStart(agentId, '')
+        auditHandlers.onAgentStart(agentId, "");
       },
       onAgentComplete: ({ agentId, tokenUsage }) => {
-        auditHandlers.onAgentComplete(agentId, '', tokenUsage ?? 0, 0)
+        auditHandlers.onAgentComplete(agentId, "", tokenUsage ?? 0, 0);
       },
       onAgentError: ({ agentId, error }) => {
-        auditHandlers.onAgentError(agentId, error instanceof Error ? error : new Error(String(error)))
+        auditHandlers.onAgentError(
+          agentId,
+          error instanceof Error ? error : new Error(String(error)),
+        );
       },
       onDagNodeComplete: ({ agentId }) => {
-        const orch = g[GLOBAL_KEY]?.orchestrator
+        const orch = g[GLOBAL_KEY]?.orchestrator;
         if (orch?.scratchpad) {
-          const current = orch.scratchpad.get('sources') as string[] | undefined
+          const current = orch.scratchpad.get("sources") as
+            | string[]
+            | undefined;
 
-          orch.scratchpad.set('sources', [...(current ?? []), agentId])
+          orch.scratchpad.set("sources", [...(current ?? []), agentId]);
         }
       },
       onPatternStart: () => {
-        const orch = g[GLOBAL_KEY]?.orchestrator
+        const orch = g[GLOBAL_KEY]?.orchestrator;
         if (orch?.scratchpad) {
-          const count = (orch.scratchpad.get('requestCount') as number) ?? 0
+          const count = (orch.scratchpad.get("requestCount") as number) ?? 0;
 
-          orch.scratchpad.set('requestCount', count + 1)
+          orch.scratchpad.set("requestCount", count + 1);
         }
       },
       onCheckpointSave: ({ checkpointId, patternType, step }) => {
-        audit.addEntry('checkpoint.save', { checkpointId, patternType, step })
+        audit.addEntry("checkpoint.save", { checkpointId, patternType, step });
       },
       onCheckpointError: ({ error }) => {
-        audit.addEntry('error.occurred', {
-          source: 'checkpoint',
+        audit.addEntry("error.occurred", {
+          source: "checkpoint",
           error: error instanceof Error ? error.message : String(error),
-        })
+        });
       },
     },
 
@@ -400,44 +442,56 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
     onBudgetWarning: ({ currentTokens, maxBudget, percentage }) => {
       console.warn(
         `[pitch-deck-orchestrator] Budget warning: ${currentTokens}/${maxBudget} tokens (${Math.round(percentage * 100)}%)`,
-      )
+      );
     },
 
     // Constraints + resolvers (demo) → State tab, Events tab
     constraints: {
       tokenOverload: {
-        when: (facts) => (facts as Record<string, unknown> & { __globalTokens?: number }).__globalTokens! > 40_000,
-        require: { type: 'PAUSE_FOR_REVIEW' },
+        when: (facts) =>
+          (facts as Record<string, unknown> & { __globalTokens?: number })
+            .__globalTokens! > 40_000,
+        require: { type: "PAUSE_FOR_REVIEW" },
         priority: 80,
       },
       allAgentsErrored: {
         when: (facts) => {
-          const agents = (facts as Record<string, unknown> & { __agents?: Record<string, { status: string }> }).__agents
+          const agents = (
+            facts as Record<string, unknown> & {
+              __agents?: Record<string, { status: string }>;
+            }
+          ).__agents;
           if (!agents) {
-            return false
+            return false;
           }
-          const statuses = Object.values(agents)
+          const statuses = Object.values(agents);
           if (statuses.length === 0) {
-            return false
+            return false;
           }
 
-          return statuses.every((a) => a.status === 'error')
+          return statuses.every((a) => a.status === "error");
         },
-        require: { type: 'RESET_PIPELINE' },
+        require: { type: "RESET_PIPELINE" },
         priority: 100,
       },
     },
     resolvers: {
       pauseForReview: {
-        requirement: (req): req is { type: 'PAUSE_FOR_REVIEW' } => req.type === 'PAUSE_FOR_REVIEW',
+        requirement: (req): req is { type: "PAUSE_FOR_REVIEW" } =>
+          req.type === "PAUSE_FOR_REVIEW",
         resolve: () => {
-          console.log('[pitch-deck-orchestrator] Token overload — pausing for review (demo no-op)')
+          console.log(
+            "[pitch-deck-orchestrator] Token overload — pausing for review (demo no-op)",
+          );
         },
       },
       resetPipeline: {
-        requirement: (req): req is { type: 'RESET_PIPELINE' } => req.type === 'RESET_PIPELINE',
+        requirement: (req): req is { type: "RESET_PIPELINE" } =>
+          req.type === "RESET_PIPELINE",
         resolve: () => {
-          console.log('[pitch-deck-orchestrator] All agents errored — resetting pipeline (demo no-op)')
+          console.log(
+            "[pitch-deck-orchestrator] All agents errored — resetting pipeline (demo no-op)",
+          );
         },
       },
     },
@@ -447,11 +501,17 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
 
     // Debug — verbose timeline includes prompt/completion text in events
     debug: { verboseTimeline: true },
-  })
+  });
 
-  g[GLOBAL_KEY] = { orchestrator, memory, audit, inputGuardrails, checkpointStore }
+  g[GLOBAL_KEY] = {
+    orchestrator,
+    memory,
+    audit,
+    inputGuardrails,
+    checkpointStore,
+  };
 
-  return g[GLOBAL_KEY]
+  return g[GLOBAL_KEY];
 }
 
 // ---------------------------------------------------------------------------
@@ -459,21 +519,21 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
 // ---------------------------------------------------------------------------
 
 export function getPitchDeckTimeline() {
-  return g[GLOBAL_KEY]?.orchestrator.timeline ?? null
+  return g[GLOBAL_KEY]?.orchestrator.timeline ?? null;
 }
 
 export function getPitchDeckMemory() {
-  return g[GLOBAL_KEY]?.memory ?? null
+  return g[GLOBAL_KEY]?.memory ?? null;
 }
 
 export function getPitchDeckAudit() {
-  return g[GLOBAL_KEY]?.audit ?? null
+  return g[GLOBAL_KEY]?.audit ?? null;
 }
 
 export function getPitchDeckInputGuardrails() {
-  return g[GLOBAL_KEY]?.inputGuardrails ?? []
+  return g[GLOBAL_KEY]?.inputGuardrails ?? [];
 }
 
 export function getPitchDeckCheckpointStore() {
-  return g[GLOBAL_KEY]?.checkpointStore ?? null
+  return g[GLOBAL_KEY]?.checkpointStore ?? null;
 }

@@ -59,62 +59,70 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
   }, [playing, cursorIndex, speed, events.length]);
 
   // Animation loop for playback — M7: reads from stateRef for up-to-date values
-  const animate = useCallback((now: number) => {
-    const { playing: isPlaying, cursorIndex: idx, speed: spd, eventsLength } = stateRef.current;
+  const animate = useCallback(
+    (now: number) => {
+      const {
+        playing: isPlaying,
+        cursorIndex: idx,
+        speed: spd,
+        eventsLength,
+      } = stateRef.current;
 
-    if (!isPlaying) {
-      return;
-    }
-
-    // Clamp cursor to bounds
-    if (idx >= eventsLength - 1) {
-      setPlaying(false);
-
-      return;
-    }
-
-    const elapsed = now - lastFrameTimeRef.current;
-    const currentEvent = events[idx];
-    const nextEvent = events[idx + 1];
-
-    // Safety: if events array changed and our index is invalid, stop
-    if (!currentEvent || !nextEvent) {
-      setPlaying(false);
-
-      return;
-    }
-
-    const gap = nextEvent.timestamp - currentEvent.timestamp;
-    // Scale gap by speed — wait real-time gap / speed
-    const scaledGap = gap / spd;
-
-    if (elapsed >= scaledGap) {
-      // Frame-skip: advance by multiple events if we're behind
-      let next = idx + 1;
-      let accumulatedGap = gap;
-
-      while (next < eventsLength - 1) {
-        const peekNext = events[next + 1];
-        if (!peekNext) {
-          break;
-        }
-
-        const nextGap = peekNext.timestamp - events[next]!.timestamp;
-        if (accumulatedGap + nextGap > elapsed * spd) {
-          break;
-        }
-
-        accumulatedGap += nextGap;
-        next++;
+      if (!isPlaying) {
+        return;
       }
 
-      stateRef.current.cursorIndex = next;
-      setCursorIndex(next);
-      lastFrameTimeRef.current = now;
-    }
+      // Clamp cursor to bounds
+      if (idx >= eventsLength - 1) {
+        setPlaying(false);
 
-    rafRef.current = requestAnimationFrame(animate);
-  }, [events]);
+        return;
+      }
+
+      const elapsed = now - lastFrameTimeRef.current;
+      const currentEvent = events[idx];
+      const nextEvent = events[idx + 1];
+
+      // Safety: if events array changed and our index is invalid, stop
+      if (!currentEvent || !nextEvent) {
+        setPlaying(false);
+
+        return;
+      }
+
+      const gap = nextEvent.timestamp - currentEvent.timestamp;
+      // Scale gap by speed — wait real-time gap / speed
+      const scaledGap = gap / spd;
+
+      if (elapsed >= scaledGap) {
+        // Frame-skip: advance by multiple events if we're behind
+        let next = idx + 1;
+        let accumulatedGap = gap;
+
+        while (next < eventsLength - 1) {
+          const peekNext = events[next + 1];
+          if (!peekNext) {
+            break;
+          }
+
+          const nextGap = peekNext.timestamp - events[next]!.timestamp;
+          if (accumulatedGap + nextGap > elapsed * spd) {
+            break;
+          }
+
+          accumulatedGap += nextGap;
+          next++;
+        }
+
+        stateRef.current.cursorIndex = next;
+        setCursorIndex(next);
+        lastFrameTimeRef.current = now;
+      }
+
+      rafRef.current = requestAnimationFrame(animate);
+    },
+    [events],
+  );
 
   // Start/stop animation
   useEffect(() => {
@@ -202,33 +210,42 @@ export function useReplay(events: DebugEvent[]): ReplayControls {
     setSpeedState(s);
   }, []);
 
-  const seekTo = useCallback((index: number) => {
-    const clamped = Math.max(0, Math.min(index, events.length - 1));
-    setCursorIndex(clamped);
-    stateRef.current.cursorIndex = clamped;
-  }, [events.length]);
+  const seekTo = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(index, events.length - 1));
+      setCursorIndex(clamped);
+      stateRef.current.cursorIndex = clamped;
+    },
+    [events.length],
+  );
 
   // E9: Start replay from a specific event index
-  const replayFromIndex = useCallback((index: number) => {
-    const clamped = Math.max(0, Math.min(index, events.length - 1));
-    setCursorIndex(clamped);
-    stateRef.current.cursorIndex = clamped;
-    if (!active) {
-      setActive(true);
-    }
-    setPlaying(true);
-  }, [events.length, active]);
+  const replayFromIndex = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(index, events.length - 1));
+      setCursorIndex(clamped);
+      stateRef.current.cursorIndex = clamped;
+      if (!active) {
+        setActive(true);
+      }
+      setPlaying(true);
+    },
+    [events.length, active],
+  );
 
   // Clamp cursor when events array shrinks
-  const clampedIndex = active ? Math.min(cursorIndex, Math.max(events.length - 1, 0)) : cursorIndex;
+  const clampedIndex = active
+    ? Math.min(cursorIndex, Math.max(events.length - 1, 0))
+    : cursorIndex;
 
-  const cursorTimestamp = active && events.length > 0 && clampedIndex < events.length
-    ? events[clampedIndex]!.timestamp
-    : null;
+  const cursorTimestamp =
+    active && events.length > 0 && clampedIndex < events.length
+      ? events[clampedIndex]!.timestamp
+      : null;
 
   // Memoize to avoid new array reference on every render during replay
   const visibleEvents = useMemo(
-    () => active ? events.slice(0, clampedIndex + 1) : events,
+    () => (active ? events.slice(0, clampedIndex + 1) : events),
     [active, events, clampedIndex],
   );
 

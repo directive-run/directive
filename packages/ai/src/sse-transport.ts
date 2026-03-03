@@ -161,7 +161,9 @@ export function createSSETransport(
           if (heartbeatIntervalMs > 0) {
             heartbeatTimer = setInterval(() => {
               try {
-                controller.enqueue(frame({ type: "heartbeat", timestamp: Date.now() }));
+                controller.enqueue(
+                  frame({ type: "heartbeat", timestamp: Date.now() }),
+                );
               } catch {
                 // Controller may be closed
               }

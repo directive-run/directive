@@ -29,105 +29,136 @@
  */
 
 import type {
-  Requirement,
   ModuleSchema,
   Plugin,
+  Requirement,
   System,
 } from "@directive-run/core";
-import {
-  setBridgeFact,
-  getBridgeFact,
-  createCallbackPlugin,
-  requirementGuard,
-} from "@directive-run/core/adapter-utils";
 import { createModule, createSystem, t } from "@directive-run/core";
-import type { AgentMemory } from "./memory.js";
+import {
+  createCallbackPlugin,
+  getBridgeFact,
+  requirementGuard,
+  setBridgeFact,
+} from "@directive-run/core/adapter-utils";
 import type { CircuitBreaker } from "@directive-run/core/plugins";
 import type {
-  AgentLike,
-  RunResult,
-  RunOptions,
-  AgentRunner,
-  GuardrailFn,
-  InputGuardrailData,
-  OutputGuardrailData,
-  ToolCallGuardrailData,
-  AgentRetryConfig,
-  NamedGuardrail,
-  GuardrailsConfig,
-  RejectedRequest,
-  ApprovalRequest,
-  OrchestratorConstraint,
-  OrchestratorResolverContext,
-  OrchestratorResolver,
-  OrchestratorState,
-  MultiAgentLifecycleHooks,
-  DagNode,
-  DagPattern,
-  DagExecutionContext,
-  MultiAgentSelfHealingConfig,
-  RerouteEvent,
-  CrossAgentSnapshot,
-  CrossAgentDerivationFn,
-  Scratchpad,
-  GoalPattern,
-  GoalNode,
-  GoalResult,
-  GoalStepMetrics,
-  GoalMetrics,
-  AgentSelectionStrategy,
-  RelaxationTier,
-  RelaxationRecord,
-  RelaxationContext,
-  GoalCheckpointState,
-  PatternCheckpointConfig,
-  PatternCheckpointState,
-  SequentialCheckpointState,
-  SupervisorCheckpointState,
-  ReflectCheckpointState,
-  DebateCheckpointState,
-  DagCheckpointState,
-  CheckpointProgress,
-  CheckpointDiff,
-} from "./types.js";
+  OrchestratorStreamChunk,
+  OrchestratorStreamResult,
+} from "./agent-orchestrator.js";
 import {
-  GuardrailError,
-  isGuardrailError,
-  APPROVAL_KEY,
-  BREAKPOINT_KEY,
-  SCRATCHPAD_KEY,
-  orchestratorBridgeSchema,
-} from "./types.js";
+  type DebugTimeline,
+  createDebugTimeline,
+  createDebugTimelinePlugin,
+} from "./debug-timeline.js";
+import {
+  executeAgentWithRetry,
+  executeGuardrailWithRetry,
+  normalizeGuardrail,
+} from "./guardrail-utils.js";
+import { type HealthMonitor, createHealthMonitor } from "./health-monitor.js";
+import type { AgentMemory } from "./memory.js";
+import {
+  convertOrchestratorConstraints,
+  getAgentState,
+  getApprovalState,
+  getBreakpointState,
+  getConversation,
+  getOrchestratorState,
+  getToolCalls,
+  setAgentState,
+  setApprovalState,
+  setBreakpointState,
+  setConversation,
+  setToolCalls,
+} from "./orchestrator-bridge.js";
 import { ReflectionExhaustedError } from "./reflection.js";
 import type { ReflectionEvaluation } from "./reflection.js";
-import { createDebugTimeline, createDebugTimelinePlugin, type DebugTimeline } from "./debug-timeline.js";
-import { createHealthMonitor, type HealthMonitor } from "./health-monitor.js";
+import type {
+  AgentLike,
+  AgentRetryConfig,
+  AgentRunner,
+  AgentSelectionStrategy,
+  ApprovalRequest,
+  CheckpointDiff,
+  CheckpointProgress,
+  CrossAgentDerivationFn,
+  CrossAgentSnapshot,
+  DagCheckpointState,
+  DagExecutionContext,
+  DagNode,
+  DagPattern,
+  DebateCheckpointState,
+  GoalCheckpointState,
+  GoalMetrics,
+  GoalNode,
+  GoalPattern,
+  GoalResult,
+  GoalStepMetrics,
+  GuardrailFn,
+  GuardrailsConfig,
+  InputGuardrailData,
+  MultiAgentLifecycleHooks,
+  MultiAgentSelfHealingConfig,
+  NamedGuardrail,
+  OrchestratorConstraint,
+  OrchestratorResolver,
+  OrchestratorResolverContext,
+  OrchestratorState,
+  OutputGuardrailData,
+  PatternCheckpointConfig,
+  PatternCheckpointState,
+  ReflectCheckpointState,
+  RejectedRequest,
+  RelaxationContext,
+  RelaxationRecord,
+  RelaxationTier,
+  RerouteEvent,
+  RunOptions,
+  RunResult,
+  Scratchpad,
+  SequentialCheckpointState,
+  SupervisorCheckpointState,
+  ToolCallGuardrailData,
+} from "./types.js";
 import {
-  normalizeGuardrail,
-  executeGuardrailWithRetry,
-  executeAgentWithRetry,
-} from "./guardrail-utils.js";
-import type { OrchestratorStreamResult, OrchestratorStreamChunk } from "./agent-orchestrator.js";
-import {
-  getAgentState,
-  setAgentState,
-  getApprovalState,
-  setApprovalState,
-  getConversation,
-  setConversation,
-  getToolCalls,
-  setToolCalls,
-  getBreakpointState,
-  setBreakpointState,
-  getOrchestratorState,
-  convertOrchestratorConstraints,
-} from "./orchestrator-bridge.js";
+  APPROVAL_KEY,
+  BREAKPOINT_KEY,
+  GuardrailError,
+  SCRATCHPAD_KEY,
+  isGuardrailError,
+  orchestratorBridgeSchema,
+} from "./types.js";
 
-import { withStructuredOutput, extractJsonFromOutput, type SafeParseable } from "./structured-output.js";
-import { createCheckpointId, validateCheckpoint, type Checkpoint, type CheckpointStore, type MultiAgentCheckpointLocalState } from "./checkpoint.js";
-import type { BreakpointConfig, BreakpointRequest, BreakpointModifications, BreakpointContext, MultiAgentBreakpointType } from "./breakpoints.js";
-import { matchBreakpoint, createBreakpointId, createInitialBreakpointState, MAX_BREAKPOINT_HISTORY } from "./breakpoints.js";
-import { mergeTaggedStreams, type MultiplexedStreamResult } from "./streaming.js";
+import type {
+  BreakpointConfig,
+  BreakpointContext,
+  BreakpointModifications,
+  BreakpointRequest,
+  MultiAgentBreakpointType,
+} from "./breakpoints.js";
+import {
+  MAX_BREAKPOINT_HISTORY,
+  createBreakpointId,
+  createInitialBreakpointState,
+  matchBreakpoint,
+} from "./breakpoints.js";
+import {
+  type Checkpoint,
+  type CheckpointStore,
+  type MultiAgentCheckpointLocalState,
+  createCheckpointId,
+  validateCheckpoint,
+} from "./checkpoint.js";
+import {
+  type MultiplexedStreamResult,
+  mergeTaggedStreams,
+} from "./streaming.js";
+import {
+  type SafeParseable,
+  extractJsonFromOutput,
+  withStructuredOutput,
+} from "./structured-output.js";
 
 // ============================================================================
 /** Safe JSON.stringify that handles circular refs or throwing toJSON */
@@ -196,42 +227,66 @@ function shallowEqual(a: unknown, b: unknown): boolean {
 /** Get the current step/round/iteration count from a pattern checkpoint state */
 export function getPatternStep(state: PatternCheckpointState): number {
   switch (state.type) {
-    case "sequential": return state.step;
-    case "supervisor": return state.round;
-    case "reflect": return state.iteration;
-    case "debate": return state.round;
-    case "dag": return state.completedCount;
-    case "goal": return state.step;
+    case "sequential":
+      return state.step;
+    case "supervisor":
+      return state.round;
+    case "reflect":
+      return state.iteration;
+    case "debate":
+      return state.round;
+    case "dag":
+      return state.completedCount;
+    case "goal":
+      return state.step;
   }
 }
 
 /** Compute progress from a pattern checkpoint state */
-export function getCheckpointProgress(state: PatternCheckpointState): CheckpointProgress {
+export function getCheckpointProgress(
+  state: PatternCheckpointState,
+): CheckpointProgress {
   const stepsCompleted = getPatternStep(state);
   const stepsTotal = state.stepsTotal ?? null;
 
   switch (state.type) {
     case "sequential": {
-      const tokensConsumed = state.results.reduce((sum, r) => sum + r.totalTokens, 0);
-      const avgTokens = state.results.length > 0 ? tokensConsumed / state.results.length : 0;
+      const tokensConsumed = state.results.reduce(
+        (sum, r) => sum + r.totalTokens,
+        0,
+      );
+      const avgTokens =
+        state.results.length > 0 ? tokensConsumed / state.results.length : 0;
       const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
 
       return {
-        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        percentage:
+          stepsTotal != null && stepsTotal > 0
+            ? Math.round((stepsCompleted / stepsTotal) * 100)
+            : 0,
         stepsCompleted,
         stepsTotal,
         tokensConsumed,
-        estimatedTokensRemaining: avgTokens > 0 && remaining != null ? Math.round(avgTokens * remaining) : null,
+        estimatedTokensRemaining:
+          avgTokens > 0 && remaining != null
+            ? Math.round(avgTokens * remaining)
+            : null,
         estimatedStepsRemaining: remaining,
       };
     }
 
     case "supervisor": {
-      const tokensConsumed = state.workerResults.reduce((sum, r) => sum + r.totalTokens, 0);
+      const tokensConsumed = state.workerResults.reduce(
+        (sum, r) => sum + r.totalTokens,
+        0,
+      );
       const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
 
       return {
-        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        percentage:
+          stepsTotal != null && stepsTotal > 0
+            ? Math.round((stepsCompleted / stepsTotal) * 100)
+            : 0,
         stepsCompleted,
         stepsTotal,
         tokensConsumed,
@@ -242,12 +297,16 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
 
     case "reflect": {
       const tokensConsumed = state.history.reduce(
-        (sum, h) => sum + h.producerTokens + h.evaluatorTokens, 0
+        (sum, h) => sum + h.producerTokens + h.evaluatorTokens,
+        0,
       );
       const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
 
       return {
-        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        percentage:
+          stepsTotal != null && stepsTotal > 0
+            ? Math.round((stepsCompleted / stepsTotal) * 100)
+            : 0,
         stepsCompleted,
         stepsTotal,
         tokensConsumed,
@@ -261,7 +320,10 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
       const remaining = stepsTotal != null ? stepsTotal - stepsCompleted : null;
 
       return {
-        percentage: stepsTotal != null && stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0,
+        percentage:
+          stepsTotal != null && stepsTotal > 0
+            ? Math.round((stepsCompleted / stepsTotal) * 100)
+            : 0,
         stepsCompleted,
         stepsTotal,
         tokensConsumed,
@@ -274,7 +336,8 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
       const total = stepsTotal ?? Object.keys(state.statuses).length;
       const completed = state.completedCount;
       const tokensConsumed = Object.values(state.nodeResults).reduce(
-        (sum, r) => sum + r.totalTokens, 0
+        (sum, r) => sum + r.totalTokens,
+        0,
       );
       const avgTokens = completed > 0 ? tokensConsumed / completed : 0;
       const remaining = total - completed;
@@ -284,14 +347,16 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
         stepsCompleted: completed,
         stepsTotal: total,
         tokensConsumed,
-        estimatedTokensRemaining: remaining > 0 ? Math.round(avgTokens * remaining) : 0,
+        estimatedTokensRemaining:
+          remaining > 0 ? Math.round(avgTokens * remaining) : 0,
         estimatedStepsRemaining: remaining,
       };
     }
 
     case "goal": {
       const tokensConsumed = Object.values(state.nodeOutputs).reduce(
-        (sum, r) => sum + r.totalTokens, 0
+        (sum, r) => sum + r.totalTokens,
+        0,
       );
       const satisfaction = state.lastSatisfaction;
 
@@ -301,9 +366,8 @@ export function getCheckpointProgress(state: PatternCheckpointState): Checkpoint
         stepsTotal: stepsTotal ?? null,
         tokensConsumed,
         estimatedTokensRemaining: null,
-        estimatedStepsRemaining: state.stepMetrics.length > 0
-          ? estimateGoalSteps(state)
-          : null,
+        estimatedStepsRemaining:
+          state.stepMetrics.length > 0 ? estimateGoalSteps(state) : null,
       };
     }
   }
@@ -321,7 +385,10 @@ function estimateGoalSteps(state: GoalCheckpointState): number | null {
   }
 
   // Average satisfaction delta
-  const totalDelta = metrics.reduce((sum, m) => sum + Math.max(0, m.satisfactionDelta), 0);
+  const totalDelta = metrics.reduce(
+    (sum, m) => sum + Math.max(0, m.satisfactionDelta),
+    0,
+  );
   const avgDelta = totalDelta / metrics.length;
   if (avgDelta <= 0) {
     return null;
@@ -336,17 +403,34 @@ export function diffCheckpoints(
   b: PatternCheckpointState,
 ): CheckpointDiff {
   if (a.type !== b.type) {
-    throw new Error(`[Directive Checkpoint] Cannot diff different pattern types: ${a.type} vs ${b.type}`);
+    throw new Error(
+      `[Directive Checkpoint] Cannot diff different pattern types: ${a.type} vs ${b.type}`,
+    );
   }
 
   const getTokens = (s: PatternCheckpointState): number => {
     switch (s.type) {
-      case "sequential": return s.results.reduce((sum, r) => sum + r.totalTokens, 0);
-      case "supervisor": return s.workerResults.reduce((sum, r) => sum + r.totalTokens, 0);
-      case "reflect": return s.history.reduce((sum, h) => sum + h.producerTokens + h.evaluatorTokens, 0);
-      case "debate": return s.tokensConsumed;
-      case "dag": return Object.values(s.nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
-      case "goal": return Object.values(s.nodeOutputs).reduce((sum, r) => sum + r.totalTokens, 0);
+      case "sequential":
+        return s.results.reduce((sum, r) => sum + r.totalTokens, 0);
+      case "supervisor":
+        return s.workerResults.reduce((sum, r) => sum + r.totalTokens, 0);
+      case "reflect":
+        return s.history.reduce(
+          (sum, h) => sum + h.producerTokens + h.evaluatorTokens,
+          0,
+        );
+      case "debate":
+        return s.tokensConsumed;
+      case "dag":
+        return Object.values(s.nodeResults).reduce(
+          (sum, r) => sum + r.totalTokens,
+          0,
+        );
+      case "goal":
+        return Object.values(s.nodeOutputs).reduce(
+          (sum, r) => sum + r.totalTokens,
+          0,
+        );
     }
   };
 
@@ -367,7 +451,9 @@ export function diffCheckpoints(
     for (const key of bKeys) {
       if (!aKeys.has(key)) {
         added.push(key);
-      } else if (JSON.stringify(a.facts[key]) !== JSON.stringify(b.facts[key])) {
+      } else if (
+        JSON.stringify(a.facts[key]) !== JSON.stringify(b.facts[key])
+      ) {
         changed.push({ key, before: a.facts[key], after: b.facts[key] });
       }
     }
@@ -385,7 +471,7 @@ export function diffCheckpoints(
     const aCompleted = new Set(
       Object.entries(a.statuses)
         .filter(([, s]) => s === "completed")
-        .map(([id]) => id)
+        .map(([id]) => id),
     );
     diff.nodesCompleted = Object.entries(b.statuses)
       .filter(([id, s]) => s === "completed" && !aCompleted.has(id))
@@ -422,7 +508,9 @@ export async function forkFromCheckpoint(
 ): Promise<MultiAgentOrchestrator> {
   const checkpoint = await checkpointStore.load(checkpointId);
   if (!checkpoint) {
-    throw new Error(`[Directive MultiAgent] Checkpoint not found: ${checkpointId}`);
+    throw new Error(
+      `[Directive MultiAgent] Checkpoint not found: ${checkpointId}`,
+    );
   }
 
   // Deep-clone the checkpoint so the forked orchestrator is fully independent
@@ -461,11 +549,16 @@ export async function forkFromCheckpoint(
 export class Semaphore {
   private count: number;
   private readonly maxPermits: number;
-  private readonly queue: Array<{ resolve: (release: () => void) => void; reject: (error: Error) => void }> = [];
+  private readonly queue: Array<{
+    resolve: (release: () => void) => void;
+    reject: (error: Error) => void;
+  }> = [];
 
   constructor(max: number) {
     if (max < 1 || !Number.isFinite(max)) {
-      throw new Error(`[Directive Semaphore] Invalid max permits: ${max}. Must be a finite number >= 1.`);
+      throw new Error(
+        `[Directive Semaphore] Invalid max permits: ${max}. Must be a finite number >= 1.`,
+      );
     }
     this.maxPermits = max;
     this.count = max;
@@ -514,7 +607,11 @@ export class Semaphore {
           const idx = this.queue.indexOf(entry);
           if (idx >= 0) {
             this.queue.splice(idx, 1);
-            reject(new Error("[Directive Semaphore] Aborted while waiting for permit"));
+            reject(
+              new Error(
+                "[Directive Semaphore] Aborted while waiting for permit",
+              ),
+            );
           }
         };
         signal.addEventListener("abort", onAbort, { once: true });
@@ -559,7 +656,9 @@ export class Semaphore {
 
   /** Reject all pending waiters with an error and reset permits */
   drain(): void {
-    const err = new Error("[Directive Semaphore] Semaphore drained - all pending acquisitions rejected");
+    const err = new Error(
+      "[Directive Semaphore] Semaphore drained - all pending acquisitions rejected",
+    );
     const pending = this.queue.splice(0, this.queue.length);
     for (const waiter of pending) {
       waiter.reject(err);
@@ -588,16 +687,25 @@ export interface AgentRegistration {
   capabilities?: string[];
   /** Per-agent guardrails (applied in addition to orchestrator-level guardrails) */
   guardrails?: {
-    input?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
-    output?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
-    toolCall?: Array<GuardrailFn<ToolCallGuardrailData> | NamedGuardrail<ToolCallGuardrailData>>;
+    input?: Array<
+      GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>
+    >;
+    output?: Array<
+      GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>
+    >;
+    toolCall?: Array<
+      GuardrailFn<ToolCallGuardrailData> | NamedGuardrail<ToolCallGuardrailData>
+    >;
   };
   /** Per-agent retry config (overrides orchestrator-level agentRetry) */
   retry?: AgentRetryConfig;
   /** Per-agent constraints */
   constraints?: Record<string, OrchestratorConstraint<Record<string, unknown>>>;
   /** Per-agent resolvers */
-  resolvers?: Record<string, OrchestratorResolver<Record<string, unknown>, Requirement>>;
+  resolvers?: Record<
+    string,
+    OrchestratorResolver<Record<string, unknown>, Requirement>
+  >;
   /** Per-agent memory (overrides orchestrator-level memory) */
   memory?: AgentMemory;
   /** Per-agent circuit breaker (overrides orchestrator-level circuitBreaker) */
@@ -659,7 +767,10 @@ export interface SupervisorPattern<T = unknown> {
   /** Maximum delegation rounds. @default 5 */
   maxRounds?: number;
   /** Extract final result */
-  extract?: (supervisorOutput: unknown, workerResults: RunResult<unknown>[]) => T;
+  extract?: (
+    supervisorOutput: unknown,
+    workerResults: RunResult<unknown>[],
+  ) => T;
   /** Checkpoint configuration for mid-execution fault tolerance */
   checkpoint?: PatternCheckpointConfig;
 }
@@ -691,7 +802,11 @@ export interface ReflectPattern<T = unknown> {
   /** Parse evaluator output into ReflectionEvaluation. @default JSON.parse */
   parseEvaluation?: (output: unknown) => ReflectionEvaluation;
   /** Build retry input from original input + feedback */
-  buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+  buildRetryInput?: (
+    input: string,
+    feedback: string,
+    iteration: number,
+  ) => string;
   /** Extract result from raw producer output. Unlike race's extract (which receives RunResult), this receives the output directly since the producer is already selected. */
   extract?: (output: unknown) => T;
   /** Behavior when maxIterations exhausted. @default "accept-last" */
@@ -767,7 +882,11 @@ export interface DebatePattern<T = unknown> {
   /** Extract final result from the winning proposal */
   extract?: (output: unknown) => T;
   /** Parse evaluator output. @default JSON.parse expecting `{ winnerId, feedback }` */
-  parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+  parseJudgement?: (output: unknown) => {
+    winnerId: string;
+    feedback?: string;
+    score?: number;
+  };
   /** AbortSignal for external cancellation */
   signal?: AbortSignal;
   /** Overall timeout (ms). Creates an internal AbortSignal. */
@@ -780,7 +899,18 @@ export interface DebatePattern<T = unknown> {
 export type { DagPattern, DagExecutionContext } from "./types.js";
 
 /** Re-export goal types consumed by tests / external consumers */
-export type { GoalPattern, GoalNode, GoalResult, GoalStepMetrics, GoalMetrics, AgentSelectionStrategy, RelaxationTier, RelaxationStrategy, RelaxationRecord, RelaxationContext } from "./types.js";
+export type {
+  GoalPattern,
+  GoalNode,
+  GoalResult,
+  GoalStepMetrics,
+  GoalMetrics,
+  AgentSelectionStrategy,
+  RelaxationTier,
+  RelaxationStrategy,
+  RelaxationRecord,
+  RelaxationContext,
+} from "./types.js";
 
 /** Union of all patterns */
 export type ExecutionPattern<T = unknown> =
@@ -835,7 +965,14 @@ export interface TaskContext {
   /** Current scratchpad state (read-only deep copy) */
   scratchpad: Readonly<Record<string, unknown>>;
   /** Read the state of any registered agent or task (status, lastOutput, lastError, totalTokens) */
-  readAgentState: (nodeId: string) => Readonly<{ status: string; lastOutput?: string; lastError?: string; totalTokens: number }> | undefined;
+  readAgentState: (nodeId: string) =>
+    | Readonly<{
+        status: string;
+        lastOutput?: string;
+        lastError?: string;
+        totalTokens: number;
+      }>
+    | undefined;
   /** Report intermediate progress (0-100) for DevTools timeline */
   reportProgress: (percent: number, message?: string) => void;
 }
@@ -843,7 +980,11 @@ export interface TaskContext {
 /** Configuration for a registered task (imperative code) */
 export interface TaskRegistration {
   /** The function to execute. Receives input, abort signal, and context. */
-  run: (input: string, signal: AbortSignal, context: TaskContext) => unknown | Promise<unknown>;
+  run: (
+    input: string,
+    signal: AbortSignal,
+    context: TaskContext,
+  ) => unknown | Promise<unknown>;
   /** Display label for DevTools graph. Defaults to task ID. */
   label?: string;
   /** Description for DevTools tooltip/detail panel. */
@@ -894,7 +1035,11 @@ export interface MultiAgentOrchestratorOptions {
   /** Fires when token usage reaches this percentage of maxTokenBudget (0-1). @default 0.8 */
   budgetWarningThreshold?: number;
   /** Callback when budget warning threshold is reached */
-  onBudgetWarning?: (event: { currentTokens: number; maxBudget: number; percentage: number }) => void;
+  onBudgetWarning?: (event: {
+    currentTokens: number;
+    maxBudget: number;
+    percentage: number;
+  }) => void;
   /** Plugins to attach to the underlying Directive System */
   plugins?: Plugin[];
   /** Callback for approval requests */
@@ -906,7 +1051,10 @@ export interface MultiAgentOrchestratorOptions {
   /** Orchestrator-level constraints */
   constraints?: Record<string, OrchestratorConstraint<Record<string, unknown>>>;
   /** Orchestrator-level resolvers */
-  resolvers?: Record<string, OrchestratorResolver<Record<string, unknown>, Requirement>>;
+  resolvers?: Record<
+    string,
+    OrchestratorResolver<Record<string, unknown>, Requirement>
+  >;
   /** Orchestrator-level circuit breaker */
   circuitBreaker?: CircuitBreaker;
   /** Self-healing configuration for automatic agent rerouting */
@@ -928,14 +1076,17 @@ export interface MultiAgentOrchestratorOptions {
 /** Multi-agent state in facts */
 export interface MultiAgentState {
   /** Namespace for each agent's state */
-  __agents: Record<string, {
-    status: "idle" | "running" | "completed" | "error";
-    lastInput?: string;
-    lastOutput?: unknown;
-    lastError?: string;
-    runCount: number;
-    totalTokens: number;
-  }>;
+  __agents: Record<
+    string,
+    {
+      status: "idle" | "running" | "completed" | "error";
+      lastInput?: string;
+      lastOutput?: unknown;
+      lastError?: string;
+      runCount: number;
+      totalTokens: number;
+    }
+  >;
   /** Pending handoffs */
   __handoffs: HandoffRequest[];
   /** Completed handoffs */
@@ -960,9 +1111,17 @@ export interface MultiAgentOrchestrator {
   /** Combined facts from all agent modules + coordinator */
   facts: Record<string, unknown>;
   /** Run a single agent */
-  runAgent<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>>;
+  runAgent<T>(
+    agentId: string,
+    input: string,
+    options?: MultiAgentRunCallOptions,
+  ): Promise<RunResult<T>>;
   /** Run an agent with streaming support */
-  runAgentStream<T>(agentId: string, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
+  runAgentStream<T>(
+    agentId: string,
+    input: string,
+    options?: { signal?: AbortSignal },
+  ): OrchestratorStreamResult<T>;
   /**
    * Run an execution pattern by its registered pattern ID.
    *
@@ -975,16 +1134,23 @@ export interface MultiAgentOrchestrator {
     agentIds: string[],
     inputs: string | string[],
     merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-    options?: { minSuccess?: number; timeout?: number }
+    options?: { minSuccess?: number; timeout?: number },
   ): Promise<T>;
   /** Run agents sequentially */
   runSequential<T>(
     agentIds: string[],
     initialInput: string,
-    options?: { transform?: (output: unknown, agentId: string, index: number) => string }
+    options?: {
+      transform?: (output: unknown, agentId: string, index: number) => string;
+    },
   ): Promise<RunResult<T>[]>;
   /** Request a handoff between agents */
-  handoff(fromAgent: string, toAgent: string, input: string, context?: Record<string, unknown>): Promise<RunResult<unknown>>;
+  handoff(
+    fromAgent: string,
+    toAgent: string,
+    input: string,
+    context?: Record<string, unknown>,
+  ): Promise<RunResult<unknown>>;
   /** Approve a pending request */
   approve(requestId: string): void;
   /** Reject a pending request */
@@ -998,9 +1164,17 @@ export interface MultiAgentOrchestrator {
   /** Wait until all agents are idle */
   waitForIdle(timeoutMs?: number): Promise<void>;
   /** Alias for runAgent */
-  run<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>>;
+  run<T>(
+    agentId: string,
+    input: string,
+    options?: MultiAgentRunCallOptions,
+  ): Promise<RunResult<T>>;
   /** Alias for runAgentStream */
-  runStream<T>(agentId: string, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T>;
+  runStream<T>(
+    agentId: string,
+    input: string,
+    options?: { signal?: AbortSignal },
+  ): OrchestratorStreamResult<T>;
   /** Register a new agent dynamically */
   registerAgent(agentId: string, registration: AgentRegistration): void;
   /** Unregister an agent (must be idle) */
@@ -1016,13 +1190,32 @@ export interface MultiAgentOrchestrator {
   /** Get task registry info (labels + descriptions) */
   getTaskRegistry(): Record<string, { label?: string; description?: string }>;
   /** Get task state */
-  getTaskState(taskId: string): { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number } | undefined;
+  getTaskState(taskId: string):
+    | {
+        status: string;
+        lastOutput?: unknown;
+        lastError?: string;
+        startTime?: number;
+        durationMs?: number;
+      }
+    | undefined;
   /** Get all task states */
-  getAllTaskStates(): Record<string, { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number }>;
+  getAllTaskStates(): Record<
+    string,
+    {
+      status: string;
+      lastOutput?: unknown;
+      lastError?: string;
+      startTime?: number;
+      durationMs?: number;
+    }
+  >;
   /** Get all handler IDs (agents + tasks combined) */
   getNodeIds(): string[];
   /** Get agent state */
-  getAgentState(agentId: string): MultiAgentState["__agents"][string] | undefined;
+  getAgentState(
+    agentId: string,
+  ): MultiAgentState["__agents"][string] | undefined;
   /** Get all agent states */
   getAllAgentStates(): Record<string, MultiAgentState["__agents"][string]>;
   /** Get pending handoffs */
@@ -1036,13 +1229,16 @@ export interface MultiAgentOrchestrator {
   /** Create a checkpoint of the current state */
   checkpoint(options?: { label?: string }): Promise<Checkpoint>;
   /** Restore from a checkpoint */
-  restore(checkpoint: Checkpoint, options?: { restoreTimeline?: boolean }): void;
+  restore(
+    checkpoint: Checkpoint,
+    options?: { restoreTimeline?: boolean },
+  ): void;
   /** Run multiple agents with multiplexed streaming */
   runParallelStream<T>(
     agentIds: string[],
     inputs: string | string[],
     merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-    options?: { minSuccess?: number; timeout?: number; signal?: AbortSignal }
+    options?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
   ): MultiplexedStreamResult<T>;
   /** Resume a paused breakpoint */
   resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;
@@ -1054,7 +1250,12 @@ export interface MultiAgentOrchestrator {
   runRace<T>(
     agentIds: string[],
     input: string,
-    options?: { extract?: (result: RunResult<unknown>) => T; timeout?: number; minSuccess?: number; signal?: AbortSignal }
+    options?: {
+      extract?: (result: RunResult<unknown>) => T;
+      timeout?: number;
+      minSuccess?: number;
+      signal?: AbortSignal;
+    },
   ): Promise<RaceResult<T>>;
   /** Run a reflect pattern imperatively (no pre-registration needed) */
   runReflect<T>(
@@ -1064,15 +1265,24 @@ export interface MultiAgentOrchestrator {
     options?: {
       maxIterations?: number;
       parseEvaluation?: (output: unknown) => ReflectionEvaluation;
-      buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+      buildRetryInput?: (
+        input: string,
+        feedback: string,
+        iteration: number,
+      ) => string;
       extract?: (output: unknown) => T;
       onExhausted?: "accept-last" | "accept-best" | "throw";
       onIteration?: (record: ReflectIterationRecord) => void;
       signal?: AbortSignal;
       timeout?: number;
       threshold?: number | ((iteration: number) => number);
-    }
-  ): Promise<{ result: T; iterations: number; history: ReflectIterationRecord[]; exhausted: boolean }>;
+    },
+  ): Promise<{
+    result: T;
+    iterations: number;
+    history: ReflectIterationRecord[];
+    exhausted: boolean;
+  }>;
   /** Run a debate imperatively (no pre-registration needed) */
   runDebate<T>(
     agentIds: string[],
@@ -1081,10 +1291,14 @@ export interface MultiAgentOrchestrator {
     options?: {
       maxRounds?: number;
       extract?: (output: unknown) => T;
-      parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+      parseJudgement?: (output: unknown) => {
+        winnerId: string;
+        feedback?: string;
+        score?: number;
+      };
       signal?: AbortSignal;
       timeout?: number;
-    }
+    },
   ): Promise<DebateResult<T>>;
   /** Run a goal pattern imperatively — declare desired state, let the runtime resolve */
   runGoal<T>(
@@ -1157,7 +1371,6 @@ export interface MultiAgentOrchestrator {
   dispose(): void;
 }
 
-
 /** Built-in pause requirement type */
 interface PauseBudgetExceededReq extends Requirement {
   type: "__PAUSE_BUDGET_EXCEEDED";
@@ -1211,7 +1424,7 @@ const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
  * @throws {Error} If autoApproveToolCalls is false but no onApprovalRequest callback is provided
  */
 export function createMultiAgentOrchestrator(
-  options: MultiAgentOrchestratorOptions
+  options: MultiAgentOrchestratorOptions,
 ): MultiAgentOrchestrator {
   const {
     runner,
@@ -1256,7 +1469,16 @@ export function createMultiAgentOrchestrator(
   const tasks: Record<string, TaskRegistration> = { ...inputTasks };
 
   // Task state tracking (parallel to agentStates)
-  const taskStates: Record<string, { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number }> = Object.create(null);
+  const taskStates: Record<
+    string,
+    {
+      status: string;
+      lastOutput?: unknown;
+      lastError?: string;
+      startTime?: number;
+      durationMs?: number;
+    }
+  > = Object.create(null);
   for (const taskId of Object.keys(tasks)) {
     taskStates[taskId] = { status: "idle" };
   }
@@ -1268,46 +1490,78 @@ export function createMultiAgentOrchestrator(
   if (!autoApproveToolCalls && !onApprovalRequest) {
     throw new Error(
       "[Directive MultiAgent] Invalid approval configuration: autoApproveToolCalls is false but no onApprovalRequest callback provided. " +
-      "Tool calls would wait for approval indefinitely. Either:\n" +
-      "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
-      "  - Provide an onApprovalRequest callback to handle approvals programmatically"
+        "Tool calls would wait for approval indefinitely. Either:\n" +
+        "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
+        "  - Provide an onApprovalRequest callback to handle approvals programmatically",
     );
   }
 
   // Validate budget warning threshold
   if (budgetWarningThreshold < 0 || budgetWarningThreshold > 1) {
-    throw new Error(`[Directive MultiAgent] budgetWarningThreshold must be between 0 and 1, got ${budgetWarningThreshold}`);
+    throw new Error(
+      `[Directive MultiAgent] budgetWarningThreshold must be between 0 and 1, got ${budgetWarningThreshold}`,
+    );
   }
 
   // Validate reserved agent IDs
-  const RESERVED_IDS = new Set(["__coord", "__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty"]);
+  const RESERVED_IDS = new Set([
+    "__coord",
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
   for (const agentId of Object.keys(agents)) {
     if (RESERVED_IDS.has(agentId)) {
-      throw new Error(`[Directive MultiAgent] Agent ID "${agentId}" is reserved and cannot be used`);
+      throw new Error(
+        `[Directive MultiAgent] Agent ID "${agentId}" is reserved and cannot be used`,
+      );
     }
   }
   for (const [taskId, taskReg] of Object.entries(tasks)) {
     if (!taskId || taskId.trim() !== taskId) {
-      throw new Error(`[Directive MultiAgent] Task ID must be a non-empty trimmed string, got "${taskId}"`);
+      throw new Error(
+        `[Directive MultiAgent] Task ID must be a non-empty trimmed string, got "${taskId}"`,
+      );
     }
     if (RESERVED_IDS.has(taskId)) {
-      throw new Error(`[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`);
+      throw new Error(
+        `[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`,
+      );
     }
     // Validate timeout and maxConcurrent
-    if (taskReg.timeout !== undefined && (!Number.isFinite(taskReg.timeout) || taskReg.timeout <= 0)) {
-      throw new Error(`[Directive MultiAgent] Task "${taskId}" timeout must be a finite number > 0`);
+    if (
+      taskReg.timeout !== undefined &&
+      (!Number.isFinite(taskReg.timeout) || taskReg.timeout <= 0)
+    ) {
+      throw new Error(
+        `[Directive MultiAgent] Task "${taskId}" timeout must be a finite number > 0`,
+      );
     }
-    if (taskReg.maxConcurrent !== undefined && (!Number.isFinite(taskReg.maxConcurrent) || taskReg.maxConcurrent < 1 || !Number.isInteger(taskReg.maxConcurrent))) {
-      throw new Error(`[Directive MultiAgent] Task "${taskId}" maxConcurrent must be a finite integer >= 1`);
+    if (
+      taskReg.maxConcurrent !== undefined &&
+      (!Number.isFinite(taskReg.maxConcurrent) ||
+        taskReg.maxConcurrent < 1 ||
+        !Number.isInteger(taskReg.maxConcurrent))
+    ) {
+      throw new Error(
+        `[Directive MultiAgent] Task "${taskId}" maxConcurrent must be a finite integer >= 1`,
+      );
     }
     // Validate retry configuration
     if (taskReg.retry) {
       const { attempts, delayMs } = taskReg.retry;
       if (!Number.isFinite(attempts) || attempts < 1) {
-        throw new Error(`[Directive MultiAgent] Task "${taskId}" retry attempts must be a finite number >= 1`);
+        throw new Error(
+          `[Directive MultiAgent] Task "${taskId}" retry attempts must be a finite number >= 1`,
+        );
       }
       if (delayMs !== undefined && (!Number.isFinite(delayMs) || delayMs < 0)) {
-        throw new Error(`[Directive MultiAgent] Task "${taskId}" retry delayMs must be a finite number >= 0`);
+        throw new Error(
+          `[Directive MultiAgent] Task "${taskId}" retry delayMs must be a finite number >= 0`,
+        );
       }
     }
   }
@@ -1320,12 +1574,17 @@ export function createMultiAgentOrchestrator(
   // Validate no ID collisions between agents and tasks
   for (const taskId of Object.keys(tasks)) {
     if (agents[taskId]) {
-      throw new Error(`[Directive MultiAgent] ID "${taskId}" is registered as both an agent and a task. IDs must be unique across both registries.`);
+      throw new Error(
+        `[Directive MultiAgent] ID "${taskId}" is registered as both an agent and a task. IDs must be unique across both registries.`,
+      );
     }
   }
 
   // Validate that all pattern handlers exist in the combined registry
-  const registeredAgentIds = new Set([...Object.keys(agents), ...Object.keys(tasks)]);
+  const registeredAgentIds = new Set([
+    ...Object.keys(agents),
+    ...Object.keys(tasks),
+  ]);
   const missingAgents: Array<{ patternId: string; agentId: string }> = [];
 
   for (const [patternId, pattern] of Object.entries(patterns)) {
@@ -1353,7 +1612,10 @@ export function createMultiAgentOrchestrator(
         agentsToCheck.push(...pattern.handlers);
         break;
       case "debate":
-        agentsToCheck.push(...(pattern as DebatePattern).handlers, (pattern as DebatePattern).evaluator);
+        agentsToCheck.push(
+          ...(pattern as DebatePattern).handlers,
+          (pattern as DebatePattern).evaluator,
+        );
         break;
     }
 
@@ -1366,10 +1628,13 @@ export function createMultiAgentOrchestrator(
 
   if (missingAgents.length > 0) {
     const details = missingAgents
-      .map(({ patternId, agentId }) => `  - Pattern "${patternId}" references unknown agent "${agentId}"`)
+      .map(
+        ({ patternId, agentId }) =>
+          `  - Pattern "${patternId}" references unknown agent "${agentId}"`,
+      )
       .join("\n");
     throw new Error(
-      `[Directive MultiAgent] Pattern validation failed. The following agents are not registered:\n${details}\n\nRegistered agents: ${[...registeredAgentIds].join(", ") || "(none)"}`
+      `[Directive MultiAgent] Pattern validation failed. The following agents are not registered:\n${details}\n\nRegistered agents: ${[...registeredAgentIds].join(", ") || "(none)"}`,
     );
   }
 
@@ -1382,7 +1647,8 @@ export function createMultiAgentOrchestrator(
 
   // ---- Debug Timeline setup ----
   let timeline: DebugTimeline | null = null;
-  let timelinePlugin: ReturnType<typeof createDebugTimelinePlugin> | null = null;
+  let timelinePlugin: ReturnType<typeof createDebugTimelinePlugin> | null =
+    null;
   if (debug) {
     timeline = createDebugTimeline({
       getSnapshotId: () => {
@@ -1415,7 +1681,7 @@ export function createMultiAgentOrchestrator(
   /** Safe hook caller — user-provided hooks must never crash the orchestrator */
   function fireHook<K extends keyof MultiAgentLifecycleHooks>(
     name: K,
-    event: Parameters<NonNullable<MultiAgentLifecycleHooks[K]>>[0]
+    event: Parameters<NonNullable<MultiAgentLifecycleHooks[K]>>[0],
   ): void {
     try {
       (hooks[name] as ((e: typeof event) => void) | undefined)?.(event);
@@ -1455,7 +1721,8 @@ export function createMultiAgentOrchestrator(
 
   // Convert orchestrator-level constraints
   // biome-ignore lint/suspicious/noExplicitAny: Constraint types complex
-  const coordConstraints: Record<string, any> = convertOrchestratorConstraints(userConstraints);
+  const coordConstraints: Record<string, any> =
+    convertOrchestratorConstraints(userConstraints);
 
   // Add built-in budget constraint — reads coordinator fact reactively
   if (maxTokenBudget) {
@@ -1482,11 +1749,20 @@ export function createMultiAgentOrchestrator(
       // biome-ignore lint/suspicious/noExplicitAny: Context type varies
       resolve: async (req: Requirement, context: any) => {
         const state = getOrchestratorState(context.facts);
-        const combinedFacts = { ...context.facts, ...state } as unknown as Record<string, unknown> & OrchestratorState;
+        const combinedFacts = {
+          ...context.facts,
+          ...state,
+        } as unknown as Record<string, unknown> & OrchestratorState;
 
-        const resolverCtx: OrchestratorResolverContext<Record<string, unknown>> = {
+        const resolverCtx: OrchestratorResolverContext<
+          Record<string, unknown>
+        > = {
           facts: combinedFacts,
-          runAgent: async <T>(agent: AgentLike, input: string, opts?: RunOptions) => {
+          runAgent: async <T>(
+            agent: AgentLike,
+            input: string,
+            opts?: RunOptions,
+          ) => {
             return runner<T>(agent, input, opts);
           },
           signal: context.signal,
@@ -1499,12 +1775,16 @@ export function createMultiAgentOrchestrator(
 
   // Built-in pause resolver
   coordResolvers["__pause"] = {
-    requirement: requirementGuard<PauseBudgetExceededReq>("__PAUSE_BUDGET_EXCEEDED"),
+    requirement: requirementGuard<PauseBudgetExceededReq>(
+      "__PAUSE_BUDGET_EXCEEDED",
+    ),
     // biome-ignore lint/suspicious/noExplicitAny: Context type varies
     resolve: async () => {
       globalStatus = "paused";
       if (debug) {
-        console.debug("[Directive MultiAgent] Budget exceeded — all agents paused");
+        console.debug(
+          "[Directive MultiAgent] Budget exceeded — all agents paused",
+        );
       }
     },
   };
@@ -1557,11 +1837,20 @@ export function createMultiAgentOrchestrator(
           // biome-ignore lint/suspicious/noExplicitAny: Context type varies
           resolve: async (req: Requirement, context: any) => {
             const state = getOrchestratorState(context.facts);
-            const combinedFacts = { ...context.facts, ...state } as unknown as Record<string, unknown> & OrchestratorState;
+            const combinedFacts = {
+              ...context.facts,
+              ...state,
+            } as unknown as Record<string, unknown> & OrchestratorState;
 
-            const resolverContext: OrchestratorResolverContext<Record<string, unknown>> = {
+            const resolverContext: OrchestratorResolverContext<
+              Record<string, unknown>
+            > = {
               facts: combinedFacts,
-              runAgent: async <T>(agent: AgentLike, input: string, opts?: RunOptions) => {
+              runAgent: async <T>(
+                agent: AgentLike,
+                input: string,
+                opts?: RunOptions,
+              ) => {
                 return runner<T>(agent, input, opts);
               },
               signal: context.signal,
@@ -1593,27 +1882,30 @@ export function createMultiAgentOrchestrator(
         setBreakpointState(facts, createInitialBreakpointState());
       },
       constraints: perAgentConstraints,
-      resolvers: Object.keys(perAgentResolvers).length > 0 ? (perAgentResolvers as any) : undefined,
+      resolvers:
+        Object.keys(perAgentResolvers).length > 0
+          ? (perAgentResolvers as any)
+          : undefined,
     });
   }
 
   // ---- Create System ----
-  const callbackPlugin = createCallbackPlugin("directive-multi-agent-callbacks", {});
+  const callbackPlugin = createCallbackPlugin(
+    "directive-multi-agent-callbacks",
+    {},
+  );
 
   // Build plugins array with optional timeline plugin
   const allPlugins = [...plugins, callbackPlugin];
   if (debug && timeline) {
     // Create timeline plugin after system is available (uses lazy getSnapshotId)
-    timelinePlugin = createDebugTimelinePlugin(
-      timeline,
-      () => {
-        try {
-          return (system as any).debug?.currentIndex ?? null;
-        } catch {
-          return null;
-        }
-      },
-    );
+    timelinePlugin = createDebugTimelinePlugin(timeline, () => {
+      try {
+        return (system as any).debug?.currentIndex ?? null;
+      } catch {
+        return null;
+      }
+    });
     allPlugins.push(timelinePlugin);
   }
 
@@ -1654,7 +1946,8 @@ export function createMultiAgentOrchestrator(
   // Agent states: lightweight local tracking for orchestrator API methods (getAgentState, etc.)
   // System facts (per-agent bridge schema) provide the rich state for constraints/resolvers/plugins.
   // Both are updated together — local state is the quick-access view, System facts drive reactivity.
-  const agentStates: Record<string, MultiAgentState["__agents"][string]> = Object.create(null);
+  const agentStates: Record<string, MultiAgentState["__agents"][string]> =
+    Object.create(null);
   for (const agentId of Object.keys(agents)) {
     agentStates[agentId] = {
       status: "idle",
@@ -1689,7 +1982,9 @@ export function createMultiAgentOrchestrator(
 
   // ---- Cross-Agent Derivations ----
   const derivedValues: Record<string, unknown> = Object.create(null);
-  const derivedChangeCallbacks = new Set<(id: string, value: unknown) => void>();
+  const derivedChangeCallbacks = new Set<
+    (id: string, value: unknown) => void
+  >();
 
   /** Build a CrossAgentSnapshot from current state */
   function buildCrossAgentSnapshot(): CrossAgentSnapshot {
@@ -1716,7 +2011,9 @@ export function createMultiAgentOrchestrator(
 
     // Include scratchpad in snapshot if configured
     if (scratchpadConfig && coordFacts) {
-      snapshot.scratchpad = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
+      snapshot.scratchpad =
+        getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ??
+        {};
     }
 
     return snapshot;
@@ -1791,148 +2088,215 @@ export function createMultiAgentOrchestrator(
 
     for (const { derivId, derivError } of errors) {
       if (debug) {
-        console.warn(`[Directive MultiAgent] Derivation "${derivId}" threw:`, derivError);
+        console.warn(
+          `[Directive MultiAgent] Derivation "${derivId}" threw:`,
+          derivError,
+        );
       }
       fireHook("onDerivationError", {
         derivationId: derivId,
-        error: derivError instanceof Error ? derivError : new Error(String(derivError)),
+        error:
+          derivError instanceof Error
+            ? derivError
+            : new Error(String(derivError)),
         timestamp: Date.now(),
       });
     }
   }
 
   // ---- Shared Scratchpad ----
-  const scratchpadChangeCallbacks = new Set<(key: string, value: unknown) => void>();
-  const scratchpadKeyCallbacks = new Map<string, Set<(key: string, value: unknown) => void>>();
+  const scratchpadChangeCallbacks = new Set<
+    (key: string, value: unknown) => void
+  >();
+  const scratchpadKeyCallbacks = new Map<
+    string,
+    Set<(key: string, value: unknown) => void>
+  >();
 
-  const scratchpadInstance: Scratchpad | null = scratchpadConfig ? {
-    get(key: string): unknown {
-      const coordFacts = getAgentFacts("__coord");
-      const data = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY);
-      if (data == null || !Object.hasOwn(data, key)) {
-        return undefined;
+  const scratchpadInstance: Scratchpad | null = scratchpadConfig
+    ? {
+        get(key: string): unknown {
+          const coordFacts = getAgentFacts("__coord");
+          const data = getBridgeFact<Record<string, unknown>>(
+            coordFacts,
+            SCRATCHPAD_KEY,
+          );
+          if (data == null || !Object.hasOwn(data, key)) {
+            return undefined;
+          }
+
+          return data[key];
+        },
+
+        set(key: string, value: unknown): void {
+          if (
+            key === "__proto__" ||
+            key === "constructor" ||
+            key === "prototype"
+          ) {
+            return;
+          }
+
+          const coordFacts = getAgentFacts("__coord");
+          const changedKeys = [key];
+          system.batch(() => {
+            const current =
+              getBridgeFact<Record<string, unknown>>(
+                coordFacts,
+                SCRATCHPAD_KEY,
+              ) ?? {};
+            setBridgeFact(coordFacts, SCRATCHPAD_KEY, {
+              ...current,
+              [key]: value,
+            });
+          });
+
+          notifyScratchpadChange(changedKeys, key, value);
+          recomputeDerivations();
+        },
+
+        has(key: string): boolean {
+          const coordFacts = getAgentFacts("__coord");
+          const data = getBridgeFact<Record<string, unknown>>(
+            coordFacts,
+            SCRATCHPAD_KEY,
+          );
+
+          return data != null && Object.hasOwn(data, key);
+        },
+
+        delete(key: string): void {
+          if (
+            key === "__proto__" ||
+            key === "constructor" ||
+            key === "prototype"
+          ) {
+            return;
+          }
+          const coordFacts = getAgentFacts("__coord");
+          system.batch(() => {
+            const current =
+              getBridgeFact<Record<string, unknown>>(
+                coordFacts,
+                SCRATCHPAD_KEY,
+              ) ?? {};
+            const { [key]: _, ...rest } = current;
+            setBridgeFact(coordFacts, SCRATCHPAD_KEY, rest);
+          });
+
+          notifyScratchpadChange([key], key, undefined);
+          recomputeDerivations();
+        },
+
+        update(values: Record<string, unknown>): void {
+          // Filter out prototype pollution keys
+          const safeValues: Record<string, unknown> = Object.create(null);
+          for (const k of Object.keys(values)) {
+            if (k === "__proto__" || k === "constructor" || k === "prototype") {
+              continue;
+            }
+            safeValues[k] = values[k];
+          }
+
+          const coordFacts = getAgentFacts("__coord");
+          const keys = Object.keys(safeValues);
+          if (keys.length === 0) {
+            return;
+          }
+
+          system.batch(() => {
+            const current =
+              getBridgeFact<Record<string, unknown>>(
+                coordFacts,
+                SCRATCHPAD_KEY,
+              ) ?? {};
+            setBridgeFact(coordFacts, SCRATCHPAD_KEY, {
+              ...current,
+              ...safeValues,
+            });
+          });
+
+          for (const [k, v] of Object.entries(safeValues)) {
+            notifyScratchpadChange(keys, k, v);
+          }
+          recomputeDerivations();
+        },
+
+        getAll(): Record<string, unknown> {
+          const coordFacts = getAgentFacts("__coord");
+
+          return {
+            ...(getBridgeFact<Record<string, unknown>>(
+              coordFacts,
+              SCRATCHPAD_KEY,
+            ) ?? {}),
+          };
+        },
+
+        subscribe(
+          keys: string[],
+          callback: (key: string, value: unknown) => void,
+        ): () => void {
+          for (const key of keys) {
+            if (!scratchpadKeyCallbacks.has(key)) {
+              scratchpadKeyCallbacks.set(key, new Set());
+            }
+            scratchpadKeyCallbacks.get(key)!.add(callback);
+          }
+
+          return () => {
+            for (const key of keys) {
+              scratchpadKeyCallbacks.get(key)?.delete(callback);
+            }
+          };
+        },
+
+        onChange(callback: (key: string, value: unknown) => void): () => void {
+          scratchpadChangeCallbacks.add(callback);
+
+          return () => {
+            scratchpadChangeCallbacks.delete(callback);
+          };
+        },
+
+        reset(): void {
+          if (!scratchpadConfig) {
+            return;
+          }
+          const coordFacts = getAgentFacts("__coord");
+          system.batch(() => {
+            setBridgeFact(coordFacts, SCRATCHPAD_KEY, {
+              ...scratchpadConfig.init,
+            });
+          });
+        },
       }
+    : null;
 
-      return data[key];
-    },
-
-    set(key: string, value: unknown): void {
-      if (key === "__proto__" || key === "constructor" || key === "prototype") {
-        return;
-      }
-
-      const coordFacts = getAgentFacts("__coord");
-      const changedKeys = [key];
-      system.batch(() => {
-        const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
-        setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...current, [key]: value });
-      });
-
-      notifyScratchpadChange(changedKeys, key, value);
-      recomputeDerivations();
-    },
-
-    has(key: string): boolean {
-      const coordFacts = getAgentFacts("__coord");
-      const data = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY);
-
-      return data != null && Object.hasOwn(data, key);
-    },
-
-    delete(key: string): void {
-      if (key === "__proto__" || key === "constructor" || key === "prototype") {
-        return;
-      }
-      const coordFacts = getAgentFacts("__coord");
-      system.batch(() => {
-        const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
-        const { [key]: _, ...rest } = current;
-        setBridgeFact(coordFacts, SCRATCHPAD_KEY, rest);
-      });
-
-      notifyScratchpadChange([key], key, undefined);
-      recomputeDerivations();
-    },
-
-    update(values: Record<string, unknown>): void {
-      // Filter out prototype pollution keys
-      const safeValues: Record<string, unknown> = Object.create(null);
-      for (const k of Object.keys(values)) {
-        if (k === "__proto__" || k === "constructor" || k === "prototype") {
-          continue;
-        }
-        safeValues[k] = values[k];
-      }
-
-      const coordFacts = getAgentFacts("__coord");
-      const keys = Object.keys(safeValues);
-      if (keys.length === 0) {
-        return;
-      }
-
-      system.batch(() => {
-        const current = getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {};
-        setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...current, ...safeValues });
-      });
-
-      for (const [k, v] of Object.entries(safeValues)) {
-        notifyScratchpadChange(keys, k, v);
-      }
-      recomputeDerivations();
-    },
-
-    getAll(): Record<string, unknown> {
-      const coordFacts = getAgentFacts("__coord");
-
-      return { ...(getBridgeFact<Record<string, unknown>>(coordFacts, SCRATCHPAD_KEY) ?? {}) };
-    },
-
-    subscribe(keys: string[], callback: (key: string, value: unknown) => void): () => void {
-      for (const key of keys) {
-        if (!scratchpadKeyCallbacks.has(key)) {
-          scratchpadKeyCallbacks.set(key, new Set());
-        }
-        scratchpadKeyCallbacks.get(key)!.add(callback);
-      }
-
-      return () => {
-        for (const key of keys) {
-          scratchpadKeyCallbacks.get(key)?.delete(callback);
-        }
-      };
-    },
-
-    onChange(callback: (key: string, value: unknown) => void): () => void {
-      scratchpadChangeCallbacks.add(callback);
-
-      return () => {
-        scratchpadChangeCallbacks.delete(callback);
-      };
-    },
-
-    reset(): void {
-      if (!scratchpadConfig) {
-        return;
-      }
-      const coordFacts = getAgentFacts("__coord");
-      system.batch(() => {
-        setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...scratchpadConfig.init });
-      });
-    },
-  } : null;
-
-  function notifyScratchpadChange(allKeys: string[], key: string, value: unknown): void {
+  function notifyScratchpadChange(
+    allKeys: string[],
+    key: string,
+    value: unknown,
+  ): void {
     // Fire key-specific callbacks
     const keyCbs = scratchpadKeyCallbacks.get(key);
     if (keyCbs) {
       for (const cb of keyCbs) {
-        try { cb(key, value); } catch { /* non-fatal */ }
+        try {
+          cb(key, value);
+        } catch {
+          /* non-fatal */
+        }
       }
     }
 
     // Fire global change callbacks
     for (const cb of scratchpadChangeCallbacks) {
-      try { cb(key, value); } catch { /* non-fatal */ }
+      try {
+        cb(key, value);
+      } catch {
+        /* non-fatal */
+      }
     }
 
     // Record timeline event (once per batch of keys, not per key)
@@ -1959,7 +2323,11 @@ export function createMultiAgentOrchestrator(
   const breakpointCancelReasons = new Map<string, string>();
 
   /** Wait for a breakpoint to be resolved or cancelled */
-  function waitForBreakpointResolution(agentId: string, breakpointId: string, signal?: AbortSignal): Promise<BreakpointModifications | null> {
+  function waitForBreakpointResolution(
+    agentId: string,
+    breakpointId: string,
+    signal?: AbortSignal,
+  ): Promise<BreakpointModifications | null> {
     return new Promise((resolve, reject) => {
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       let settled = false;
@@ -1981,34 +2349,48 @@ export function createMultiAgentOrchestrator(
         unsubscribe();
       };
 
-      const unsubscribe = system.subscribe([`${agentId}.${BREAKPOINT_KEY}`], () => {
-        const bpState = getBreakpointState(agentFacts);
-        if (bpState.resolved.includes(breakpointId)) {
-          cleanupAll();
-          const mods = breakpointModifications.get(breakpointId) ?? null;
-          breakpointModifications.delete(breakpointId);
+      const unsubscribe = system.subscribe(
+        [`${agentId}.${BREAKPOINT_KEY}`],
+        () => {
+          const bpState = getBreakpointState(agentFacts);
+          if (bpState.resolved.includes(breakpointId)) {
+            cleanupAll();
+            const mods = breakpointModifications.get(breakpointId) ?? null;
+            breakpointModifications.delete(breakpointId);
 
-          resolve(mods);
-        } else if (bpState.cancelled.includes(breakpointId)) {
-          cleanupAll();
-          breakpointModifications.delete(breakpointId);
-          const cancelReason = breakpointCancelReasons.get(breakpointId);
-          breakpointCancelReasons.delete(breakpointId);
-          reject(new Error(cancelReason
-            ? `[Directive MultiAgent] Breakpoint ${breakpointId} cancelled: ${cancelReason}`
-            : `[Directive MultiAgent] Breakpoint ${breakpointId} cancelled`
-          ));
-        }
-      });
+            resolve(mods);
+          } else if (bpState.cancelled.includes(breakpointId)) {
+            cleanupAll();
+            breakpointModifications.delete(breakpointId);
+            const cancelReason = breakpointCancelReasons.get(breakpointId);
+            breakpointCancelReasons.delete(breakpointId);
+            reject(
+              new Error(
+                cancelReason
+                  ? `[Directive MultiAgent] Breakpoint ${breakpointId} cancelled: ${cancelReason}`
+                  : `[Directive MultiAgent] Breakpoint ${breakpointId} cancelled`,
+              ),
+            );
+          }
+        },
+      );
 
       if (signal) {
         onAbort = () => {
           cleanupAll();
-          reject(new Error(`[Directive MultiAgent] Breakpoint wait aborted for ${breakpointId}`));
+          reject(
+            new Error(
+              `[Directive MultiAgent] Breakpoint wait aborted for ${breakpointId}`,
+            ),
+          );
         };
         if (signal.aborted) {
           cleanupAll();
-          reject(new Error(`[Directive MultiAgent] Breakpoint wait aborted for ${breakpointId}`));
+          reject(
+            new Error(
+              `[Directive MultiAgent] Breakpoint wait aborted for ${breakpointId}`,
+            ),
+          );
 
           return;
         }
@@ -2019,9 +2401,11 @@ export function createMultiAgentOrchestrator(
         cleanupAll();
         breakpointModifications.delete(breakpointId);
         breakpointCancelReasons.delete(breakpointId);
-        reject(new Error(
-          `[Directive MultiAgent] Breakpoint timeout: ${breakpointId} not resolved within ${Math.round(breakpointTimeoutMs / 1000)}s`
-        ));
+        reject(
+          new Error(
+            `[Directive MultiAgent] Breakpoint timeout: ${breakpointId} not resolved within ${Math.round(breakpointTimeoutMs / 1000)}s`,
+          ),
+        );
       }, breakpointTimeoutMs);
     });
   }
@@ -2033,7 +2417,10 @@ export function createMultiAgentOrchestrator(
     agentName: string,
     input: string,
     signal?: AbortSignal,
-    extra?: { patternId?: string; handoff?: { fromAgent: string; toAgent: string } }
+    extra?: {
+      patternId?: string;
+      handoff?: { fromAgent: string; toAgent: string };
+    },
   ): Promise<{ input: string; skip: boolean }> {
     if (breakpointConfigs.length === 0) {
       return { input, skip: false };
@@ -2044,7 +2431,10 @@ export function createMultiAgentOrchestrator(
       agentId,
       agentName,
       input,
-      state: getOrchestratorState(agentFacts) as unknown as Record<string, unknown>,
+      state: getOrchestratorState(agentFacts) as unknown as Record<
+        string,
+        unknown
+      >,
       breakpointType: type,
       patternId: extra?.patternId,
       handoff: extra?.handoff,
@@ -2075,8 +2465,16 @@ export function createMultiAgentOrchestrator(
     });
 
     // Fire callbacks
-    try { onBreakpoint?.(request); } catch { /* callback error non-fatal */ }
-    try { (hooks as any).onBreakpoint?.(request); } catch { /* hook error non-fatal */ }
+    try {
+      onBreakpoint?.(request);
+    } catch {
+      /* callback error non-fatal */
+    }
+    try {
+      (hooks as any).onBreakpoint?.(request);
+    } catch {
+      /* hook error non-fatal */
+    }
 
     // Record timeline event
     if (timeline) {
@@ -2092,7 +2490,11 @@ export function createMultiAgentOrchestrator(
     }
 
     // Wait for resolution
-    const modifications = await waitForBreakpointResolution(agentId, bpId, signal);
+    const modifications = await waitForBreakpointResolution(
+      agentId,
+      bpId,
+      signal,
+    );
 
     // Record resume event
     if (timeline) {
@@ -2120,7 +2522,11 @@ export function createMultiAgentOrchestrator(
   }
 
   // ---- Helper: Wait for approval ----
-  function waitForApproval(agentId: string, requestId: string, signal?: AbortSignal): Promise<void> {
+  function waitForApproval(
+    agentId: string,
+    requestId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       let settled = false;
@@ -2141,32 +2547,45 @@ export function createMultiAgentOrchestrator(
       };
 
       // Use system.subscribe with namespaced key
-      const unsubscribe = system.subscribe([`${agentId}.${APPROVAL_KEY}`], () => {
-        const approval = getApprovalState(agentFacts);
-        if (approval.approved.includes(requestId)) {
-          cleanupAll();
-          resolve();
-        } else {
-          const rejectedRequest = approval.rejected.find((r: RejectedRequest) => r.id === requestId);
-          if (rejectedRequest) {
+      const unsubscribe = system.subscribe(
+        [`${agentId}.${APPROVAL_KEY}`],
+        () => {
+          const approval = getApprovalState(agentFacts);
+          if (approval.approved.includes(requestId)) {
             cleanupAll();
-            const errorMsg = rejectedRequest.reason
-              ? `Request ${requestId} rejected: ${rejectedRequest.reason}`
-              : `Request ${requestId} rejected`;
-            reject(new Error(errorMsg));
+            resolve();
+          } else {
+            const rejectedRequest = approval.rejected.find(
+              (r: RejectedRequest) => r.id === requestId,
+            );
+            if (rejectedRequest) {
+              cleanupAll();
+              const errorMsg = rejectedRequest.reason
+                ? `Request ${requestId} rejected: ${rejectedRequest.reason}`
+                : `Request ${requestId} rejected`;
+              reject(new Error(errorMsg));
+            }
           }
-        }
-      });
+        },
+      );
 
       // Abort signal cleanup
       if (signal) {
         onAbort = () => {
           cleanupAll();
-          reject(new Error(`[Directive MultiAgent] Approval wait aborted for request ${requestId}`));
+          reject(
+            new Error(
+              `[Directive MultiAgent] Approval wait aborted for request ${requestId}`,
+            ),
+          );
         };
         if (signal.aborted) {
           cleanupAll();
-          reject(new Error(`[Directive MultiAgent] Approval wait aborted for request ${requestId}`));
+          reject(
+            new Error(
+              `[Directive MultiAgent] Approval wait aborted for request ${requestId}`,
+            ),
+          );
 
           return;
         }
@@ -2177,14 +2596,16 @@ export function createMultiAgentOrchestrator(
       timeoutId = setTimeout(() => {
         cleanupAll();
         const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
-        reject(new Error(
-          `[Directive MultiAgent] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
-          `Solutions:\n` +
-          `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
-          `  2. Set autoApproveToolCalls: true to auto-approve\n` +
-          `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
-          `See: https://directive.run/docs/ai/multi-agent`
-        ));
+        reject(
+          new Error(
+            `[Directive MultiAgent] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
+              `Solutions:\n` +
+              `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
+              `  2. Set autoApproveToolCalls: true to auto-approve\n` +
+              `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
+              `See: https://directive.run/docs/ai/multi-agent`,
+          ),
+        );
       }, approvalTimeoutMs);
     });
   }
@@ -2198,7 +2619,8 @@ export function createMultiAgentOrchestrator(
   ): Promise<RunResult<T>> {
     const label = taskReg.label ?? taskId;
     const startTime = Date.now();
-    const state = taskStates[taskId] ?? (taskStates[taskId] = { status: "idle" });
+    const state =
+      taskStates[taskId] ?? (taskStates[taskId] = { status: "idle" });
     state.status = "running";
     state.startTime = startTime;
     state.lastError = undefined;
@@ -2208,11 +2630,22 @@ export function createMultiAgentOrchestrator(
     let effectiveInput = input;
     if (breakpointConfigs.length > 0) {
       try {
-        const bpResult = await handleBreakpoint("pre_agent_run", taskId, label, input, opts?.signal);
+        const bpResult = await handleBreakpoint(
+          "pre_agent_run",
+          taskId,
+          label,
+          input,
+          opts?.signal,
+        );
         if (bpResult.skip) {
           state.status = "completed";
 
-          return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+          return {
+            output: undefined as T,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
         }
         effectiveInput = bpResult.input;
       } catch {
@@ -2238,7 +2671,12 @@ export function createMultiAgentOrchestrator(
 
     // Fire hook
     const effectivePatternId = opts?.patternId ?? "";
-    fireHook("onTaskStart", { patternId: effectivePatternId, taskId, label, timestamp: startTime });
+    fireHook("onTaskStart", {
+      patternId: effectivePatternId,
+      taskId,
+      label,
+      timestamp: startTime,
+    });
 
     // Semaphore for maxConcurrent
     const sem = taskSemaphores.get(taskId);
@@ -2247,7 +2685,9 @@ export function createMultiAgentOrchestrator(
     const buildContext = (): TaskContext => ({
       taskId,
       memory: sharedMemory
-        ? structuredClone(sharedMemory.getContextMessages?.() ?? []) as ReadonlyArray<{ role: string; content: string }>
+        ? (structuredClone(
+            sharedMemory.getContextMessages?.() ?? [],
+          ) as ReadonlyArray<{ role: string; content: string }>)
         : [],
       scratchpad: scratchpadInstance
         ? Object.freeze(structuredClone(scratchpadInstance.getAll()))
@@ -2256,17 +2696,35 @@ export function createMultiAgentOrchestrator(
         // Check agent states first, then task states
         const agentState = agentStates[nodeId];
         if (agentState) {
-          return Object.freeze({ status: agentState.status, lastOutput: agentState.lastOutput != null ? String(agentState.lastOutput) : undefined, lastError: agentState.lastError, totalTokens: agentState.totalTokens });
+          return Object.freeze({
+            status: agentState.status,
+            lastOutput:
+              agentState.lastOutput != null
+                ? String(agentState.lastOutput)
+                : undefined,
+            lastError: agentState.lastError,
+            totalTokens: agentState.totalTokens,
+          });
         }
         const taskState = taskStates[nodeId];
         if (taskState) {
-          return Object.freeze({ status: taskState.status, lastOutput: taskState.lastOutput != null ? String(taskState.lastOutput) : undefined, lastError: taskState.lastError, totalTokens: 0 });
+          return Object.freeze({
+            status: taskState.status,
+            lastOutput:
+              taskState.lastOutput != null
+                ? String(taskState.lastOutput)
+                : undefined,
+            lastError: taskState.lastError,
+            totalTokens: 0,
+          });
         }
 
         return undefined;
       },
       reportProgress: (percent: number, message?: string) => {
-        const clampedPercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+        const clampedPercent = Number.isFinite(percent)
+          ? Math.max(0, Math.min(100, percent))
+          : 0;
         if (timeline) {
           timeline.record({
             type: "task_progress",
@@ -2279,7 +2737,14 @@ export function createMultiAgentOrchestrator(
             message,
           });
         }
-        fireHook("onTaskProgress", { patternId: effectivePatternId, taskId, label, percent: clampedPercent, message, timestamp: Date.now() });
+        fireHook("onTaskProgress", {
+          patternId: effectivePatternId,
+          taskId,
+          label,
+          percent: clampedPercent,
+          message,
+          timestamp: Date.now(),
+        });
       },
     });
 
@@ -2309,14 +2774,19 @@ export function createMultiAgentOrchestrator(
         const abortHandler = () => abortController.abort();
         if (opts?.signal) {
           if (opts.signal.aborted) {
-            throw new Error(`[Directive MultiAgent] Task "${taskId}" aborted before starting`);
+            throw new Error(
+              `[Directive MultiAgent] Task "${taskId}" aborted before starting`,
+            );
           }
           opts.signal.addEventListener("abort", abortHandler, { once: true });
         }
 
         // Timeout
         if (taskReg.timeout) {
-          timeoutTimer = setTimeout(() => abortController.abort(), taskReg.timeout);
+          timeoutTimer = setTimeout(
+            () => abortController.abort(),
+            taskReg.timeout,
+          );
         }
 
         try {
@@ -2326,7 +2796,10 @@ export function createMultiAgentOrchestrator(
           }
 
           // Stringify non-string output
-          const output = typeof rawOutput === "string" ? rawOutput : safeStringify(rawOutput);
+          const output =
+            typeof rawOutput === "string"
+              ? rawOutput
+              : safeStringify(rawOutput);
           const durationMs = Date.now() - startTime;
 
           state.status = "completed";
@@ -2348,17 +2821,31 @@ export function createMultiAgentOrchestrator(
           }
 
           // Fire hooks
-          fireHook("onTaskComplete", { patternId: opts?.patternId ?? "", taskId, label, durationMs, timestamp: Date.now() });
+          fireHook("onTaskComplete", {
+            patternId: opts?.patternId ?? "",
+            taskId,
+            label,
+            durationMs,
+            timestamp: Date.now(),
+          });
 
           // Update coordinator fact for constraint reactivity
           try {
             const coordFacts = system.read("__coord");
-            setBridgeFact(coordFacts as any, "__lastTaskCompletion" as any, { taskId, timestamp: Date.now() });
+            setBridgeFact(coordFacts as any, "__lastTaskCompletion" as any, {
+              taskId,
+              timestamp: Date.now(),
+            });
           } catch {
             // non-fatal: system might be disposed
           }
 
-          return { output: output as T, messages: [], toolCalls: [], totalTokens: 0 };
+          return {
+            output: output as T,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
         } catch (err) {
           if (timeoutTimer) {
             clearTimeout(timeoutTimer);
@@ -2383,9 +2870,10 @@ export function createMultiAgentOrchestrator(
 
             // Backoff with cap and abort-awareness
             const MAX_BACKOFF_MS = 30_000;
-            const rawDelay = backoff === "exponential"
-              ? baseDelay * 2 ** (attempt - 1)
-              : baseDelay;
+            const rawDelay =
+              backoff === "exponential"
+                ? baseDelay * 2 ** (attempt - 1)
+                : baseDelay;
             const delay = Math.min(rawDelay, MAX_BACKOFF_MS);
             await new Promise<void>((resolve, reject) => {
               let settled = false;
@@ -2393,7 +2881,11 @@ export function createMultiAgentOrchestrator(
                 if (!settled) {
                   settled = true;
                   clearTimeout(timer);
-                  reject(new Error(`[Directive MultiAgent] Task "${taskId}" aborted during retry backoff`));
+                  reject(
+                    new Error(
+                      `[Directive MultiAgent] Task "${taskId}" aborted during retry backoff`,
+                    ),
+                  );
                 }
               };
               const timer = setTimeout(() => {
@@ -2432,7 +2924,14 @@ export function createMultiAgentOrchestrator(
         });
       }
 
-      fireHook("onTaskError", { patternId: effectivePatternId, taskId, label, error: lastError!, durationMs, timestamp: Date.now() });
+      fireHook("onTaskError", {
+        patternId: effectivePatternId,
+        taskId,
+        label,
+        error: lastError!,
+        durationMs,
+        timestamp: Date.now(),
+      });
 
       // Note: Tasks bypass the circuit breaker's execute() wrapper (tasks are imperative
       // code, not LLM calls). Task failure recovery is handled by the retry config on
@@ -2448,16 +2947,20 @@ export function createMultiAgentOrchestrator(
   async function runSingleAgent<T>(
     agentId: string,
     input: string,
-    opts?: MultiAgentRunCallOptions
+    opts?: MultiAgentRunCallOptions,
   ): Promise<RunResult<T>> {
     assertNotDisposed();
 
     if (opts?.signal?.aborted) {
-      throw new Error(`[Directive MultiAgent] Handler "${agentId}" run aborted before starting`);
+      throw new Error(
+        `[Directive MultiAgent] Handler "${agentId}" run aborted before starting`,
+      );
     }
 
     if (globalStatus === "paused") {
-      throw new Error(`[Directive MultiAgent] Orchestrator is paused (budget exceeded or manual pause)`);
+      throw new Error(
+        `[Directive MultiAgent] Orchestrator is paused (budget exceeded or manual pause)`,
+      );
     }
 
     // Increment synchronously before any await so waitForIdle knows a run is pending
@@ -2472,15 +2975,20 @@ export function createMultiAgentOrchestrator(
 
       const registration = agents[agentId];
       if (!registration) {
-        const available = [...Object.keys(agents), ...Object.keys(tasks)].join(", ") || "(none)";
+        const available =
+          [...Object.keys(agents), ...Object.keys(tasks)].join(", ") ||
+          "(none)";
 
-        throw new Error(`[Directive MultiAgent] Unknown handler "${agentId}". Registered handlers: ${available}`);
+        throw new Error(
+          `[Directive MultiAgent] Unknown handler "${agentId}". Registered handlers: ${available}`,
+        );
       }
 
-      const effectiveCircuitBreaker = registration.circuitBreaker ?? orchestratorCircuitBreaker;
+      const effectiveCircuitBreaker =
+        registration.circuitBreaker ?? orchestratorCircuitBreaker;
       if (effectiveCircuitBreaker) {
         return await effectiveCircuitBreaker.execute(() =>
-          runSingleAgentInner<T>(agentId, registration, input, opts)
+          runSingleAgentInner<T>(agentId, registration, input, opts),
         );
       }
 
@@ -2488,7 +2996,11 @@ export function createMultiAgentOrchestrator(
     } catch (error) {
       // Self-healing: attempt reroute if configured and this is a CB error or health threshold
       // Tasks are imperative code — self-healing reroute/degradation only applies to agents
-      if (selfHealing && !tasks[agentId] && !(opts as { __isReroute?: boolean })?.__isReroute) {
+      if (
+        selfHealing &&
+        !tasks[agentId] &&
+        !(opts as { __isReroute?: boolean })?.__isReroute
+      ) {
         const equivalents = findEquivalentAgents(agentId);
         const alternate = selectBestEquivalent(equivalents);
         if (alternate) {
@@ -2526,7 +3038,10 @@ export function createMultiAgentOrchestrator(
         }
 
         // No equivalents — apply degradation policy
-        if (selfHealing.degradation === "fallback-response" && selfHealing.fallbackResponse !== undefined) {
+        if (
+          selfHealing.degradation === "fallback-response" &&
+          selfHealing.fallbackResponse !== undefined
+        ) {
           return {
             output: selfHealing.fallbackResponse as T,
             messages: [],
@@ -2540,7 +3055,8 @@ export function createMultiAgentOrchestrator(
       const state = agentStates[agentId];
       if (state && state.status !== "error") {
         state.status = "error";
-        state.lastError = error instanceof Error ? error.message : String(error);
+        state.lastError =
+          error instanceof Error ? error.message : String(error);
       }
 
       throw error;
@@ -2554,7 +3070,7 @@ export function createMultiAgentOrchestrator(
     agentId: string,
     registration: AgentRegistration,
     originalInput: string,
-    opts?: MultiAgentRunCallOptions
+    opts?: MultiAgentRunCallOptions,
   ): Promise<RunResult<T>> {
     const startTime = Date.now();
     const agentFacts = getAgentFacts(agentId);
@@ -2567,7 +3083,9 @@ export function createMultiAgentOrchestrator(
     if (!semaphore) {
       const available = Object.keys(agents).join(", ") || "(none)";
 
-      throw new Error(`[Directive MultiAgent] Unknown agent "${agentId}". Registered agents: ${available}`);
+      throw new Error(
+        `[Directive MultiAgent] Unknown agent "${agentId}". Registered agents: ${available}`,
+      );
     }
     const release = await semaphore.acquire(opts?.signal);
 
@@ -2595,19 +3113,33 @@ export function createMultiAgentOrchestrator(
             .join("\n");
           agent = {
             ...agent,
-            instructions: (agent.instructions ?? "") + "\n\nConversation context:\n" + contextStr,
+            instructions:
+              (agent.instructions ?? "") +
+              "\n\nConversation context:\n" +
+              contextStr,
           };
         }
       }
 
       // ---- Breakpoint: pre_input_guardrails ----
       {
-        const bpResult = await handleBreakpoint("pre_input_guardrails", agentId, agent.name, processedInput, opts?.signal);
+        const bpResult = await handleBreakpoint(
+          "pre_input_guardrails",
+          agentId,
+          agent.name,
+          processedInput,
+          opts?.signal,
+        );
         if (bpResult.skip) {
           state.status = "completed";
           notifyIdleWaiters();
 
-          return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+          return {
+            output: undefined as T,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
         }
         processedInput = bpResult.input;
       }
@@ -2618,22 +3150,25 @@ export function createMultiAgentOrchestrator(
         ...(registration.guardrails?.input ?? []),
       ];
       const inputGuardrailsList = allInputGuardrails.map((g, i) =>
-        normalizeGuardrail(g, i, "input")
+        normalizeGuardrail(g, i, "input"),
       );
       for (const guardrail of inputGuardrailsList) {
         const { name } = guardrail;
         const context = {
           agentName: agent.name,
           input: processedInput,
-          facts: getOrchestratorState(agentFacts) as unknown as Record<string, unknown>,
+          facts: getOrchestratorState(agentFacts) as unknown as Record<
+            string,
+            unknown
+          >,
         };
         const guardStartTime = Date.now();
         const result = await executeGuardrailWithRetry(
           guardrail,
           { input: processedInput, agentName: agent.name },
-          context
+          context,
         );
-        fireHook("onGuardrailCheck",{
+        fireHook("onGuardrailCheck", {
           agentId,
           guardrailName: name,
           guardrailType: "input",
@@ -2659,7 +3194,7 @@ export function createMultiAgentOrchestrator(
       }
 
       // Fire onAgentStart hook (after guardrails pass)
-      fireHook("onAgentStart",{
+      fireHook("onAgentStart", {
         agentId,
         agentName: agent.name,
         input: processedInput,
@@ -2674,8 +3209,12 @@ export function createMultiAgentOrchestrator(
           agentId,
           snapshotId: null,
           inputLength: processedInput.length,
-          ...("description" in agent && agent.description ? { description: String(agent.description) } : {}),
-          ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
+          ...("description" in agent && agent.description
+            ? { description: String(agent.description) }
+            : {}),
+          ...(agent.instructions
+            ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) }
+            : {}),
           input: processedInput.slice(0, MAX_VERBOSE_LENGTH),
         });
       }
@@ -2695,25 +3234,38 @@ export function createMultiAgentOrchestrator(
 
       // ---- Breakpoint: pre_agent_run ----
       {
-        const bpResult = await handleBreakpoint("pre_agent_run", agentId, agent.name, processedInput, opts?.signal);
+        const bpResult = await handleBreakpoint(
+          "pre_agent_run",
+          agentId,
+          agent.name,
+          processedInput,
+          opts?.signal,
+        );
         if (bpResult.skip) {
           state.status = "completed";
           notifyIdleWaiters();
 
-          return { output: undefined as T, messages: [], toolCalls: [], totalTokens: 0 };
+          return {
+            output: undefined as T,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
         }
         processedInput = bpResult.input;
       }
 
       // ---- Per-agent structured output wrapping (per-call overrides per-agent) ----
       let effectiveRunner: AgentRunner = runner;
-      const effectiveSchema = opts?.outputSchema !== undefined
-        ? opts.outputSchema              // null = opt-out, SafeParseable = override
-        : registration.outputSchema;     // per-agent default
+      const effectiveSchema =
+        opts?.outputSchema !== undefined
+          ? opts.outputSchema // null = opt-out, SafeParseable = override
+          : registration.outputSchema; // per-agent default
       if (effectiveSchema) {
         effectiveRunner = withStructuredOutput(runner, {
           schema: effectiveSchema,
-          maxRetries: opts?.maxSchemaRetries ?? registration.maxSchemaRetries ?? 2,
+          maxRetries:
+            opts?.maxSchemaRetries ?? registration.maxSchemaRetries ?? 2,
           extractJson: registration.extractJson,
           schemaDescription: registration.schemaDescription,
         });
@@ -2723,114 +3275,137 @@ export function createMultiAgentOrchestrator(
       const effectiveRetry = registration.retry ?? defaultAgentRetry;
 
       // Run agent with retry support
-      const result = await executeAgentWithRetry<T>(effectiveRunner, agent, processedInput, {
-        ...registration.runOptions,
-        ...opts,
-        signal: controller.signal,
-        onMessage: (message) => {
-          const currentConversation = getConversation(agentFacts);
-          const updated = [...currentConversation, message];
-          setConversation(agentFacts, updated.length > MAX_CONVERSATION_MESSAGES
-            ? updated.slice(-MAX_CONVERSATION_MESSAGES)
-            : updated);
-          opts?.onMessage?.(message);
-        },
-        onToolCall: async (toolCall) => {
-          // ---- Tool call guardrails: orchestrator-level, then per-agent ----
-          const allToolCallGuardrails = [
-            ...(guardrails.toolCall ?? []),
-            ...(registration.guardrails?.toolCall ?? []),
-          ];
-          const toolCallGuardrailsList = allToolCallGuardrails.map((g, i) =>
-            normalizeGuardrail(g, i, "toolCall")
-          );
-          for (const guardrail of toolCallGuardrailsList) {
-            const { name } = guardrail;
-            const context = {
-              agentName: agent.name,
-              input: processedInput,
-              facts: getOrchestratorState(agentFacts) as unknown as Record<string, unknown>,
-            };
-            const guardStartTime = Date.now();
-            const guardResult = await executeGuardrailWithRetry(
-              guardrail,
-              { toolCall, agentName: agent.name, input: processedInput },
-              context
+      const result = await executeAgentWithRetry<T>(
+        effectiveRunner,
+        agent,
+        processedInput,
+        {
+          ...registration.runOptions,
+          ...opts,
+          signal: controller.signal,
+          onMessage: (message) => {
+            const currentConversation = getConversation(agentFacts);
+            const updated = [...currentConversation, message];
+            setConversation(
+              agentFacts,
+              updated.length > MAX_CONVERSATION_MESSAGES
+                ? updated.slice(-MAX_CONVERSATION_MESSAGES)
+                : updated,
             );
-            fireHook("onGuardrailCheck",{
-              agentId,
-              guardrailName: name,
-              guardrailType: "toolCall",
-              passed: guardResult.passed,
-              reason: guardResult.reason,
-              durationMs: Date.now() - guardStartTime,
-              timestamp: Date.now(),
-            });
-            if (!guardResult.passed) {
-              throw new GuardrailError({
-                code: "TOOL_CALL_GUARDRAIL_FAILED",
-                message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
-                guardrailName: name,
-                guardrailType: "toolCall",
-                userMessage: guardResult.reason ?? "Tool call blocked",
-                data: { toolCall },
+            opts?.onMessage?.(message);
+          },
+          onToolCall: async (toolCall) => {
+            // ---- Tool call guardrails: orchestrator-level, then per-agent ----
+            const allToolCallGuardrails = [
+              ...(guardrails.toolCall ?? []),
+              ...(registration.guardrails?.toolCall ?? []),
+            ];
+            const toolCallGuardrailsList = allToolCallGuardrails.map((g, i) =>
+              normalizeGuardrail(g, i, "toolCall"),
+            );
+            for (const guardrail of toolCallGuardrailsList) {
+              const { name } = guardrail;
+              const context = {
                 agentName: agent.name,
                 input: processedInput,
+                facts: getOrchestratorState(agentFacts) as unknown as Record<
+                  string,
+                  unknown
+                >,
+              };
+              const guardStartTime = Date.now();
+              const guardResult = await executeGuardrailWithRetry(
+                guardrail,
+                { toolCall, agentName: agent.name, input: processedInput },
+                context,
+              );
+              fireHook("onGuardrailCheck", {
+                agentId,
+                guardrailName: name,
+                guardrailType: "toolCall",
+                passed: guardResult.passed,
+                reason: guardResult.reason,
+                durationMs: Date.now() - guardStartTime,
+                timestamp: Date.now(),
               });
+              if (!guardResult.passed) {
+                throw new GuardrailError({
+                  code: "TOOL_CALL_GUARDRAIL_FAILED",
+                  message: `Tool call guardrail "${name}" failed: ${guardResult.reason}`,
+                  guardrailName: name,
+                  guardrailType: "toolCall",
+                  userMessage: guardResult.reason ?? "Tool call blocked",
+                  data: { toolCall },
+                  agentName: agent.name,
+                  input: processedInput,
+                });
+              }
             }
-          }
 
-          // Approval workflow
-          if (!autoApproveToolCalls) {
-            const approvalId = `tool-${agentId}-${toolCall.id}`;
-            const approvalRequest: ApprovalRequest = {
-              id: approvalId,
-              type: "tool_call",
-              agentName: agent.name,
-              description: `Tool call: ${toolCall.name}`,
-              data: toolCall,
-              requestedAt: Date.now(),
-            };
+            // Approval workflow
+            if (!autoApproveToolCalls) {
+              const approvalId = `tool-${agentId}-${toolCall.id}`;
+              const approvalRequest: ApprovalRequest = {
+                id: approvalId,
+                type: "tool_call",
+                agentName: agent.name,
+                description: `Tool call: ${toolCall.name}`,
+                data: toolCall,
+                requestedAt: Date.now(),
+              };
 
-            approvalRequestIndex.set(approvalId, agentId);
-            system.batch(() => {
-              const currentApproval = getApprovalState(agentFacts);
-              setApprovalState(agentFacts, {
-                ...currentApproval,
-                pending: [...currentApproval.pending, approvalRequest],
+              approvalRequestIndex.set(approvalId, agentId);
+              system.batch(() => {
+                const currentApproval = getApprovalState(agentFacts);
+                setApprovalState(agentFacts, {
+                  ...currentApproval,
+                  pending: [...currentApproval.pending, approvalRequest],
+                });
               });
-            });
 
-            onApprovalRequest?.(approvalRequest);
-            await waitForApproval(agentId, approvalId, opts?.signal);
-          }
+              onApprovalRequest?.(approvalRequest);
+              await waitForApproval(agentId, approvalId, opts?.signal);
+            }
 
-          const currentToolCalls = getToolCalls(agentFacts);
-          const updatedToolCalls = [...currentToolCalls, toolCall];
-          setToolCalls(agentFacts, updatedToolCalls.length > MAX_TOOL_CALLS
-            ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
-            : updatedToolCalls);
-          opts?.onToolCall?.(toolCall);
+            const currentToolCalls = getToolCalls(agentFacts);
+            const updatedToolCalls = [...currentToolCalls, toolCall];
+            setToolCalls(
+              agentFacts,
+              updatedToolCalls.length > MAX_TOOL_CALLS
+                ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
+                : updatedToolCalls,
+            );
+            opts?.onToolCall?.(toolCall);
+          },
         },
-      }, effectiveRetry ? {
-        ...effectiveRetry,
-        onRetry: (attempt, error, delayMs) => {
-          effectiveRetry.onRetry?.(attempt, error, delayMs);
-          fireHook("onAgentRetry",{
-            agentId,
-            agentName: agent.name,
-            input: processedInput,
-            attempt,
-            error,
-            delayMs,
-            timestamp: Date.now(),
-          });
-        },
-      } : undefined);
+        effectiveRetry
+          ? {
+              ...effectiveRetry,
+              onRetry: (attempt, error, delayMs) => {
+                effectiveRetry.onRetry?.(attempt, error, delayMs);
+                fireHook("onAgentRetry", {
+                  agentId,
+                  agentName: agent.name,
+                  input: processedInput,
+                  attempt,
+                  error,
+                  delayMs,
+                  timestamp: Date.now(),
+                });
+              },
+            }
+          : undefined,
+      );
 
       // ---- Breakpoint: pre_output_guardrails ----
       {
-        const bpResult = await handleBreakpoint("pre_output_guardrails", agentId, agent.name, processedInput, opts?.signal);
+        const bpResult = await handleBreakpoint(
+          "pre_output_guardrails",
+          agentId,
+          agent.name,
+          processedInput,
+          opts?.signal,
+        );
         if (bpResult.skip) {
           // Skip output guardrails, return result directly
           state.status = "completed";
@@ -2846,14 +3421,17 @@ export function createMultiAgentOrchestrator(
         ...(registration.guardrails?.output ?? []),
       ];
       const outputGuardrailsList = allOutputGuardrails.map((g, i) =>
-        normalizeGuardrail(g, i, "output")
+        normalizeGuardrail(g, i, "output"),
       );
       for (const guardrail of outputGuardrailsList) {
         const { name } = guardrail;
         const context = {
           agentName: agent.name,
           input: processedInput,
-          facts: getOrchestratorState(agentFacts) as unknown as Record<string, unknown>,
+          facts: getOrchestratorState(agentFacts) as unknown as Record<
+            string,
+            unknown
+          >,
         };
         const guardStartTime = Date.now();
         const guardResult = await executeGuardrailWithRetry(
@@ -2864,9 +3442,9 @@ export function createMultiAgentOrchestrator(
             input: processedInput,
             messages: result.messages,
           },
-          context
+          context,
         );
-        fireHook("onGuardrailCheck",{
+        fireHook("onGuardrailCheck", {
           agentId,
           guardrailName: name,
           guardrailType: "output",
@@ -2917,7 +3495,10 @@ export function createMultiAgentOrchestrator(
       let shouldFireBudgetWarning = false;
       let budgetPercentage = 0;
       system.batch(() => {
-        const currentTokens = getBridgeFact<number>(coordFacts, "__globalTokens");
+        const currentTokens = getBridgeFact<number>(
+          coordFacts,
+          "__globalTokens",
+        );
         const newTotal = currentTokens + result.totalTokens;
         globalTokenCount = newTotal;
         setBridgeFact(coordFacts, "__globalTokens", newTotal);
@@ -2925,7 +3506,10 @@ export function createMultiAgentOrchestrator(
         // Check budget warning threshold
         if (maxTokenBudget && onBudgetWarning) {
           budgetPercentage = newTotal / maxTokenBudget;
-          const warningFired = getBridgeFact<boolean>(coordFacts, "__budgetWarningFired");
+          const warningFired = getBridgeFact<boolean>(
+            coordFacts,
+            "__budgetWarningFired",
+          );
           if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
             setBridgeFact(coordFacts, "__budgetWarningFired", true);
             shouldFireBudgetWarning = true;
@@ -2936,10 +3520,17 @@ export function createMultiAgentOrchestrator(
       // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
       if (shouldFireBudgetWarning) {
         try {
-          onBudgetWarning!({ currentTokens: globalTokenCount, maxBudget: maxTokenBudget!, percentage: budgetPercentage });
+          onBudgetWarning!({
+            currentTokens: globalTokenCount,
+            maxBudget: maxTokenBudget!,
+            percentage: budgetPercentage,
+          });
         } catch (callbackError) {
           if (debug) {
-            console.debug("[Directive MultiAgent] onBudgetWarning threw:", callbackError);
+            console.debug(
+              "[Directive MultiAgent] onBudgetWarning threw:",
+              callbackError,
+            );
           }
         }
       }
@@ -2951,21 +3542,26 @@ export function createMultiAgentOrchestrator(
         try {
           const existingMessages = effectiveMemory.getContextMessages();
           const hasUserMessage = existingMessages.some(
-            (m) => m.role === "user" && m.content === processedInput
+            (m) => m.role === "user" && m.content === processedInput,
           );
           const messagesToStore = hasUserMessage
-            ? result.messages.filter((m) => !(m.role === "user" && m.content === processedInput))
+            ? result.messages.filter(
+                (m) => !(m.role === "user" && m.content === processedInput),
+              )
             : result.messages;
           effectiveMemory.addMessages(messagesToStore);
         } catch (memoryError) {
           if (debug) {
-            console.debug("[Directive MultiAgent] Memory addMessages failed:", memoryError);
+            console.debug(
+              "[Directive MultiAgent] Memory addMessages failed:",
+              memoryError,
+            );
           }
         }
       }
 
       // Fire onAgentComplete hook
-      fireHook("onAgentComplete",{
+      fireHook("onAgentComplete", {
         agentId,
         agentName: agent.name,
         input: processedInput,
@@ -2977,7 +3573,10 @@ export function createMultiAgentOrchestrator(
 
       // Record timeline event
       if (timeline) {
-        const outputStr = typeof result.output === "string" ? result.output : safeStringify(result.output);
+        const outputStr =
+          typeof result.output === "string"
+            ? result.output
+            : safeStringify(result.output);
         timeline.record({
           type: "agent_complete",
           timestamp: Date.now(),
@@ -3002,7 +3601,13 @@ export function createMultiAgentOrchestrator(
       recomputeDerivations();
 
       // ---- Breakpoint: post_run ----
-      await handleBreakpoint("post_run", agentId, agent.name, processedInput, opts?.signal);
+      await handleBreakpoint(
+        "post_run",
+        agentId,
+        agent.name,
+        processedInput,
+        opts?.signal,
+      );
 
       return result;
     } catch (error) {
@@ -3022,7 +3627,7 @@ export function createMultiAgentOrchestrator(
       });
 
       // Fire onAgentError hook
-      fireHook("onAgentError",{
+      fireHook("onAgentError", {
         agentId,
         agentName: agent.name,
         input: processedInput,
@@ -3075,7 +3680,7 @@ export function createMultiAgentOrchestrator(
   function runAgentStreamImpl<T>(
     agentId: string,
     input: string,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): OrchestratorStreamResult<T> {
     assertNotDisposed();
 
@@ -3083,7 +3688,9 @@ export function createMultiAgentOrchestrator(
     const taskReg = tasks[agentId];
     if (taskReg) {
       const taskChunks: OrchestratorStreamChunk[] = [];
-      const taskWaiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
+      const taskWaiters: Array<
+        (chunk: OrchestratorStreamChunk | null) => void
+      > = [];
       let taskClosed = false;
 
       const pushTaskChunk = (chunk: OrchestratorStreamChunk) => {
@@ -3114,29 +3721,46 @@ export function createMultiAgentOrchestrator(
           taskAbortController.abort();
         } else {
           taskExternalAbortHandler = () => taskAbortController.abort();
-          options.signal.addEventListener("abort", taskExternalAbortHandler, { once: true });
+          options.signal.addEventListener("abort", taskExternalAbortHandler, {
+            once: true,
+          });
         }
       }
 
-      const resultPromise = runSingleAgent<T>(agentId, input, { signal: taskAbortController.signal }).then(
-        (result) => {
-          const output = typeof result.output === "string" ? result.output : safeStringify(result.output);
-          pushTaskChunk({ type: "token", data: output, tokenCount: 0 });
-          pushTaskChunk({ type: "done", totalTokens: 0, duration: 0, droppedTokens: 0 });
-          closeTaskStream();
+      const resultPromise = runSingleAgent<T>(agentId, input, {
+        signal: taskAbortController.signal,
+      })
+        .then(
+          (result) => {
+            const output =
+              typeof result.output === "string"
+                ? result.output
+                : safeStringify(result.output);
+            pushTaskChunk({ type: "token", data: output, tokenCount: 0 });
+            pushTaskChunk({
+              type: "done",
+              totalTokens: 0,
+              duration: 0,
+              droppedTokens: 0,
+            });
+            closeTaskStream();
 
-          return result;
-        },
-        (err) => {
-          pushTaskChunk({ type: "error", error: err });
-          closeTaskStream();
-          throw err;
-        },
-      ).finally(() => {
-        if (taskExternalAbortHandler && options.signal) {
-          options.signal.removeEventListener("abort", taskExternalAbortHandler);
-        }
-      });
+            return result;
+          },
+          (err) => {
+            pushTaskChunk({ type: "error", error: err });
+            closeTaskStream();
+            throw err;
+          },
+        )
+        .finally(() => {
+          if (taskExternalAbortHandler && options.signal) {
+            options.signal.removeEventListener(
+              "abort",
+              taskExternalAbortHandler,
+            );
+          }
+        });
 
       // Prevent unhandled rejection if no one awaits .result
       resultPromise.catch(() => {});
@@ -3154,7 +3778,9 @@ export function createMultiAgentOrchestrator(
               } else if (taskClosed) {
                 return;
               } else {
-                const next = await new Promise<OrchestratorStreamChunk | null>((resolve) => taskWaiters.push(resolve));
+                const next = await new Promise<OrchestratorStreamChunk | null>(
+                  (resolve) => taskWaiters.push(resolve),
+                );
                 if (!next) {
                   return;
                 }
@@ -3167,15 +3793,20 @@ export function createMultiAgentOrchestrator(
           },
         },
         result: resultPromise,
-        abort: () => { taskAbortController.abort(); },
+        abort: () => {
+          taskAbortController.abort();
+        },
       } as OrchestratorStreamResult<T>;
     }
 
     const registration = agents[agentId];
     if (!registration) {
-      const available = [...Object.keys(agents), ...Object.keys(tasks)].join(", ") || "(none)";
+      const available =
+        [...Object.keys(agents), ...Object.keys(tasks)].join(", ") || "(none)";
 
-      throw new Error(`[Directive MultiAgent] Unknown handler "${agentId}". Registered handlers: ${available}`);
+      throw new Error(
+        `[Directive MultiAgent] Unknown handler "${agentId}". Registered handlers: ${available}`,
+      );
     }
 
     const MAX_AGENT_STREAM_BUFFER = 10_000;
@@ -3223,7 +3854,11 @@ export function createMultiAgentOrchestrator(
     };
 
     const resultPromise = (async (): Promise<RunResult<T>> => {
-      pushChunk({ type: "progress", phase: "starting", message: "Running input guardrails" });
+      pushChunk({
+        type: "progress",
+        phase: "starting",
+        message: "Running input guardrails",
+      });
 
       try {
         const result = await runSingleAgent<T>(agentId, input, {
@@ -3235,21 +3870,38 @@ export function createMultiAgentOrchestrator(
               tokenCount += newTokens;
               accumulatedOutput += message.content;
               if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-                accumulatedOutput = accumulatedOutput.slice(-MAX_ACCUMULATED_OUTPUT);
+                accumulatedOutput = accumulatedOutput.slice(
+                  -MAX_ACCUMULATED_OUTPUT,
+                );
               }
               pushChunk({ type: "token", data: message.content, tokenCount });
             }
           },
           onToolCall: async (toolCall) => {
-            pushChunk({ type: "tool_start", tool: toolCall.name, toolCallId: toolCall.id, arguments: toolCall.arguments });
+            pushChunk({
+              type: "tool_start",
+              tool: toolCall.name,
+              toolCallId: toolCall.id,
+              arguments: toolCall.arguments,
+            });
             if (toolCall.result) {
-              pushChunk({ type: "tool_end", tool: toolCall.name, toolCallId: toolCall.id, result: toolCall.result });
+              pushChunk({
+                type: "tool_end",
+                tool: toolCall.name,
+                toolCallId: toolCall.id,
+                result: toolCall.result,
+              });
             }
           },
         });
 
         const duration = Date.now() - startTime;
-        pushChunk({ type: "done", totalTokens: result.totalTokens, duration, droppedTokens: 0 });
+        pushChunk({
+          type: "done",
+          totalTokens: result.totalTokens,
+          duration,
+          droppedTokens: 0,
+        });
         closeStream();
 
         return result;
@@ -3263,7 +3915,10 @@ export function createMultiAgentOrchestrator(
             stopped: true,
           });
         }
-        pushChunk({ type: "error", error: error instanceof Error ? error : new Error(String(error)) });
+        pushChunk({
+          type: "error",
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         closeStream();
         throw error;
       }
@@ -3280,15 +3935,17 @@ export function createMultiAgentOrchestrator(
               return { done: true, value: undefined };
             }
 
-            return new Promise<IteratorResult<OrchestratorStreamChunk>>((resolve) => {
-              waiters.push((chunk) => {
-                if (chunk === null) {
-                  resolve({ done: true, value: undefined });
-                } else {
-                  resolve({ done: false, value: chunk });
-                }
-              });
-            });
+            return new Promise<IteratorResult<OrchestratorStreamChunk>>(
+              (resolve) => {
+                waiters.push((chunk) => {
+                  if (chunk === null) {
+                    resolve({ done: true, value: undefined });
+                  } else {
+                    resolve({ done: false, value: chunk });
+                  }
+                });
+              },
+            );
           },
         };
       },
@@ -3311,11 +3968,11 @@ export function createMultiAgentOrchestrator(
   async function runParallelPattern<T>(
     pattern: ParallelPattern<T>,
     input: string,
-    patternId?: string
+    patternId?: string,
   ): Promise<T> {
     const patternStartTime = Date.now();
     if (patternId) {
-      fireHook("onPatternStart",{
+      fireHook("onPatternStart", {
         patternId,
         patternType: "parallel",
         input,
@@ -3333,26 +3990,32 @@ export function createMultiAgentOrchestrator(
     let patternError: Error | undefined;
     try {
       const promises = pattern.handlers.map((agentId) =>
-        runSingleAgent(agentId, input, { signal: controller.signal, patternId }).catch(
-          (error) => {
-            if (pattern.minSuccess === undefined) {
-              throw error;
-            }
-
-            return null;
+        runSingleAgent(agentId, input, {
+          signal: controller.signal,
+          patternId,
+        }).catch((error) => {
+          if (pattern.minSuccess === undefined) {
+            throw error;
           }
-        )
+
+          return null;
+        }),
       );
 
       const results = await Promise.all(promises);
-      const successResults = results.filter((r): r is RunResult<unknown> => r !== null);
+      const successResults = results.filter(
+        (r): r is RunResult<unknown> => r !== null,
+      );
 
-      if (pattern.minSuccess !== undefined && successResults.length < pattern.minSuccess) {
+      if (
+        pattern.minSuccess !== undefined &&
+        successResults.length < pattern.minSuccess
+      ) {
         const failCount = results.length - successResults.length;
 
         throw new Error(
           `[Directive MultiAgent] Parallel pattern: Only ${successResults.length}/${pattern.handlers.length} agents succeeded ` +
-          `(minimum required: ${pattern.minSuccess}, failed: ${failCount})`
+            `(minimum required: ${pattern.minSuccess}, failed: ${failCount})`,
         );
       }
 
@@ -3363,7 +4026,7 @@ export function createMultiAgentOrchestrator(
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
       if (patternId) {
-        fireHook("onPatternComplete",{
+        fireHook("onPatternComplete", {
           patternId,
           patternType: "parallel",
           durationMs: Date.now() - patternStartTime,
@@ -3390,8 +4053,14 @@ export function createMultiAgentOrchestrator(
         const shouldSave = config.when({
           step,
           patternType: state.type,
-          facts: state.type === "goal" ? (state as GoalCheckpointState).facts : undefined,
-          satisfaction: state.type === "goal" ? (state as GoalCheckpointState).lastSatisfaction : undefined,
+          facts:
+            state.type === "goal"
+              ? (state as GoalCheckpointState).facts
+              : undefined,
+          satisfaction:
+            state.type === "goal"
+              ? (state as GoalCheckpointState).lastSatisfaction
+              : undefined,
         });
         if (!shouldSave) {
           return null;
@@ -3448,7 +4117,10 @@ export function createMultiAgentOrchestrator(
       return state.id;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      console.error(`[Directive MultiAgent] ${state.type}: checkpoint save failed:`, error);
+      console.error(
+        `[Directive MultiAgent] ${state.type}: checkpoint save failed:`,
+        error,
+      );
 
       fireHook("onCheckpointError", {
         patternType: state.type,
@@ -3472,7 +4144,7 @@ export function createMultiAgentOrchestrator(
     const patternStartTime = Date.now();
     const pId = patternId ?? "__inline_sequential";
     if (patternId) {
-      fireHook("onPatternStart",{
+      fireHook("onPatternStart", {
         patternId,
         patternType: "sequential",
         input: initialInput,
@@ -3489,14 +4161,23 @@ export function createMultiAgentOrchestrator(
     // Resume state
     let currentInput = resumeFrom?.currentInput ?? initialInput;
     let lastResult: RunResult<unknown> | undefined;
-    const collectedResults: Array<{ agentId: string; output: unknown; totalTokens: number }> = resumeFrom?.results ? [...resumeFrom.results] : [];
+    const collectedResults: Array<{
+      agentId: string;
+      output: unknown;
+      totalTokens: number;
+    }> = resumeFrom?.results ? [...resumeFrom.results] : [];
     const startIdx = resumeFrom?.step ?? 0;
     let patternError: Error | undefined;
 
     // Restore lastResult from checkpoint
     if (resumeFrom && collectedResults.length > 0) {
       const last = collectedResults[collectedResults.length - 1]!;
-      lastResult = { output: last.output, totalTokens: last.totalTokens, messages: [], toolCalls: [] };
+      lastResult = {
+        output: last.output,
+        totalTokens: last.totalTokens,
+        messages: [],
+        toolCalls: [],
+      };
     }
 
     try {
@@ -3505,9 +4186,16 @@ export function createMultiAgentOrchestrator(
 
         // ---- Breakpoint: pre_pattern_step ----
         {
-          const bpResult = await handleBreakpoint("pre_pattern_step", agentId, agents[agentId]?.agent.name ?? agentId, currentInput, undefined, {
-            patternId,
-          });
+          const bpResult = await handleBreakpoint(
+            "pre_pattern_step",
+            agentId,
+            agents[agentId]?.agent.name ?? agentId,
+            currentInput,
+            undefined,
+            {
+              patternId,
+            },
+          );
           if (bpResult.skip) {
             continue;
           }
@@ -3515,8 +4203,14 @@ export function createMultiAgentOrchestrator(
         }
 
         try {
-          lastResult = await runSingleAgent(agentId, currentInput, { patternId });
-          collectedResults.push({ agentId, output: lastResult.output, totalTokens: lastResult.totalTokens });
+          lastResult = await runSingleAgent(agentId, currentInput, {
+            patternId,
+          });
+          collectedResults.push({
+            agentId,
+            output: lastResult.output,
+            totalTokens: lastResult.totalTokens,
+          });
 
           if (i < pattern.handlers.length - 1) {
             if (pattern.transform) {
@@ -3530,20 +4224,30 @@ export function createMultiAgentOrchestrator(
           }
 
           // Save checkpoint after each agent
-          if (ckptConfig && ckptStore && i > startIdx && (i - startIdx) % ckptEveryN === 0) {
-            const nextInput = i < pattern.handlers.length - 1 ? currentInput : initialInput;
-            await savePatternCheckpoint({
-              type: "sequential",
-              version: 1,
-              id: createCheckpointId(),
-              createdAt: new Date().toISOString(),
-              label: `${ckptPrefix}:step-${i + 1}`,
-              patternId: pId,
-              stepsTotal: pattern.handlers.length,
-              step: i + 1,
-              currentInput: nextInput,
-              results: [...collectedResults],
-            }, ckptStore, ckptConfig);
+          if (
+            ckptConfig &&
+            ckptStore &&
+            i > startIdx &&
+            (i - startIdx) % ckptEveryN === 0
+          ) {
+            const nextInput =
+              i < pattern.handlers.length - 1 ? currentInput : initialInput;
+            await savePatternCheckpoint(
+              {
+                type: "sequential",
+                version: 1,
+                id: createCheckpointId(),
+                createdAt: new Date().toISOString(),
+                label: `${ckptPrefix}:step-${i + 1}`,
+                patternId: pId,
+                stepsTotal: pattern.handlers.length,
+                step: i + 1,
+                currentInput: nextInput,
+                results: [...collectedResults],
+              },
+              ckptStore,
+              ckptConfig,
+            );
           }
         } catch (error) {
           if (!pattern.continueOnError) {
@@ -3553,7 +4257,9 @@ export function createMultiAgentOrchestrator(
       }
 
       if (!lastResult) {
-        throw new Error("[Directive MultiAgent] No successful results in sequential pattern");
+        throw new Error(
+          "[Directive MultiAgent] No successful results in sequential pattern",
+        );
       }
 
       return pattern.extract
@@ -3564,7 +4270,7 @@ export function createMultiAgentOrchestrator(
       throw error;
     } finally {
       if (patternId) {
-        fireHook("onPatternComplete",{
+        fireHook("onPatternComplete", {
           patternId,
           patternType: "sequential",
           durationMs: Date.now() - patternStartTime,
@@ -3584,7 +4290,7 @@ export function createMultiAgentOrchestrator(
     const patternStartTime = Date.now();
     const pId = patternId ?? "__inline_supervisor";
     if (patternId) {
-      fireHook("onPatternStart",{
+      fireHook("onPatternStart", {
         patternId,
         patternType: "supervisor",
         input,
@@ -3599,18 +4305,27 @@ export function createMultiAgentOrchestrator(
     const ckptPrefix = ckptConfig?.labelPrefix ?? "supervisor";
 
     const workerResults: RunResult<unknown>[] = [];
-    const serializedWorkerResults: Array<{ output: unknown; totalTokens: number }> =
-      resumeFrom?.workerResults ? [...resumeFrom.workerResults] : [];
+    const serializedWorkerResults: Array<{
+      output: unknown;
+      totalTokens: number;
+    }> = resumeFrom?.workerResults ? [...resumeFrom.workerResults] : [];
     const maxRounds = pattern.maxRounds ?? 5;
     if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
-      throw new Error("[Directive MultiAgent] supervisor maxRounds must be >= 1");
+      throw new Error(
+        "[Directive MultiAgent] supervisor maxRounds must be >= 1",
+      );
     }
     let patternError: Error | undefined;
 
     // Restore worker results from checkpoint
     if (resumeFrom) {
       for (const wr of resumeFrom.workerResults) {
-        workerResults.push({ output: wr.output, totalTokens: wr.totalTokens, messages: [], toolCalls: [] });
+        workerResults.push({
+          output: wr.output,
+          totalTokens: wr.totalTokens,
+          messages: [],
+          toolCalls: [],
+        });
       }
     }
 
@@ -3619,9 +4334,17 @@ export function createMultiAgentOrchestrator(
     try {
       let supervisorResult: RunResult<unknown>;
       if (resumeFrom) {
-        supervisorResult = { output: resumeFrom.supervisorOutput, totalTokens: 0, messages: [], toolCalls: [] };
+        supervisorResult = {
+          output: resumeFrom.supervisorOutput,
+          totalTokens: 0,
+          messages: [],
+          toolCalls: [],
+        };
       } else {
-        supervisorResult = await runSingleAgent<unknown>(pattern.supervisor, input);
+        supervisorResult = await runSingleAgent<unknown>(
+          pattern.supervisor,
+          input,
+        );
       }
 
       let currentInput = resumeFrom?.currentInput ?? input;
@@ -3629,7 +4352,12 @@ export function createMultiAgentOrchestrator(
       for (let round = startRound; round < maxRounds; round++) {
         // Validate supervisor output shape
         const raw = supervisorResult.output;
-        let action: { action: string; worker?: string; workerInput?: string; output?: unknown };
+        let action: {
+          action: string;
+          worker?: string;
+          workerInput?: string;
+          output?: unknown;
+        };
 
         if (typeof raw === "string") {
           try {
@@ -3640,9 +4368,15 @@ export function createMultiAgentOrchestrator(
             // LLMs sometimes wrap JSON in conversational text or XML tool-call markup
             try {
               // Strip markdown fences + XML tags (models sometimes emit <function_calls>/<invoke>/<parameter> wrappers)
-              const stripped = raw.replace(/```(?:json|JSON)?\s*\n?/g, "").replace(/<[^>]+>/g, " ");
+              const stripped = raw
+                .replace(/```(?:json|JSON)?\s*\n?/g, "")
+                .replace(/<[^>]+>/g, " ");
               const extracted = extractJsonFromOutput(stripped);
-              if (extracted && typeof extracted === "object" && "action" in (extracted as Record<string, unknown>)) {
+              if (
+                extracted &&
+                typeof extracted === "object" &&
+                "action" in (extracted as Record<string, unknown>)
+              ) {
                 action = extracted as typeof action;
               } else {
                 throw new Error("extracted value missing 'action' property");
@@ -3650,7 +4384,7 @@ export function createMultiAgentOrchestrator(
             } catch {
               throw new Error(
                 `[Directive MultiAgent] Supervisor "${pattern.supervisor}" returned unparseable output (round ${round + 1}). ` +
-                `Expected JSON with { action, worker?, workerInput? } but got: ${raw.slice(0, 200)}`
+                  `Expected JSON with { action, worker?, workerInput? } but got: ${raw.slice(0, 200)}`,
               );
             }
           }
@@ -3659,7 +4393,7 @@ export function createMultiAgentOrchestrator(
         } else {
           throw new Error(
             `[Directive MultiAgent] Supervisor "${pattern.supervisor}" returned invalid output (round ${round + 1}). ` +
-            `Expected { action: "delegate"|"complete", worker?, workerInput? }`
+              `Expected { action: "delegate"|"complete", worker?, workerInput? }`,
           );
         }
 
@@ -3671,7 +4405,7 @@ export function createMultiAgentOrchestrator(
           const available = pattern.workers.join(", ");
 
           throw new Error(
-            `[Directive MultiAgent] Supervisor delegated to unknown worker "${action.worker}". Available workers: ${available}`
+            `[Directive MultiAgent] Supervisor delegated to unknown worker "${action.worker}". Available workers: ${available}`,
           );
         }
 
@@ -3681,7 +4415,10 @@ export function createMultiAgentOrchestrator(
           { patternId },
         );
         workerResults.push(workerResult);
-        serializedWorkerResults.push({ output: workerResult.output, totalTokens: workerResult.totalTokens });
+        serializedWorkerResults.push({
+          output: workerResult.output,
+          totalTokens: workerResult.totalTokens,
+        });
 
         currentInput = `Worker ${action.worker} completed with result: ${safeStringify(workerResult.output)}`;
         supervisorResult = await runSingleAgent(
@@ -3691,20 +4428,29 @@ export function createMultiAgentOrchestrator(
         );
 
         // Save checkpoint after each round
-        if (ckptConfig && ckptStore && round > startRound && (round - startRound) % ckptEveryN === 0) {
-          await savePatternCheckpoint({
-            type: "supervisor",
-            version: 1,
-            id: createCheckpointId(),
-            createdAt: new Date().toISOString(),
-            label: `${ckptPrefix}:round-${round + 1}`,
-            patternId: pId,
-            stepsTotal: pattern.maxRounds ?? 10,
-            round: round + 1,
-            supervisorOutput: supervisorResult.output,
-            workerResults: [...serializedWorkerResults],
-            currentInput,
-          }, ckptStore, ckptConfig);
+        if (
+          ckptConfig &&
+          ckptStore &&
+          round > startRound &&
+          (round - startRound) % ckptEveryN === 0
+        ) {
+          await savePatternCheckpoint(
+            {
+              type: "supervisor",
+              version: 1,
+              id: createCheckpointId(),
+              createdAt: new Date().toISOString(),
+              label: `${ckptPrefix}:round-${round + 1}`,
+              patternId: pId,
+              stepsTotal: pattern.maxRounds ?? 10,
+              round: round + 1,
+              supervisorOutput: supervisorResult.output,
+              workerResults: [...serializedWorkerResults],
+              currentInput,
+            },
+            ckptStore,
+            ckptConfig,
+          );
         }
       }
 
@@ -3716,7 +4462,7 @@ export function createMultiAgentOrchestrator(
       throw error;
     } finally {
       if (patternId) {
-        fireHook("onPatternComplete",{
+        fireHook("onPatternComplete", {
           patternId,
           patternType: "supervisor",
           durationMs: Date.now() - patternStartTime,
@@ -3782,12 +4528,17 @@ export function createMultiAgentOrchestrator(
         context.errors[nodeId] = error;
       }
       for (const [nodeId, nr] of Object.entries(resumeFrom.nodeResults)) {
-        context.results[nodeId] = { output: nr.output, totalTokens: nr.totalTokens, messages: [], toolCalls: [] };
+        context.results[nodeId] = {
+          output: nr.output,
+          totalTokens: nr.totalTokens,
+          messages: [],
+          toolCalls: [],
+        };
       }
     }
 
     const onNodeError = pattern.onNodeError ?? "fail";
-    const maxConcurrent = pattern.maxConcurrent ?? Infinity;
+    const maxConcurrent = pattern.maxConcurrent ?? Number.POSITIVE_INFINITY;
     const controller = new AbortController();
     let graphTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let patternError: Error | undefined;
@@ -3816,9 +4567,10 @@ export function createMultiAgentOrchestrator(
           }
 
           // Check if all deps are terminal (completed, skipped, or error for non-fail modes)
-          const terminalStatuses = onNodeError === "fail"
-            ? new Set(["completed", "skipped"])
-            : new Set(["completed", "skipped", "error"]);
+          const terminalStatuses =
+            onNodeError === "fail"
+              ? new Set(["completed", "skipped"])
+              : new Set(["completed", "skipped", "error"]);
           const depsResolved = (node.deps ?? []).every((depId) => {
             return terminalStatuses.has(context.statuses[depId]!);
           });
@@ -3830,7 +4582,9 @@ export function createMultiAgentOrchestrator(
           // Check if any dep errored or was skipped (for skip-downstream propagation)
           if (onNodeError === "skip-downstream") {
             const anyDepFailed = (node.deps ?? []).some(
-              (depId) => context.statuses[depId] === "error" || context.statuses[depId] === "skipped",
+              (depId) =>
+                context.statuses[depId] === "error" ||
+                context.statuses[depId] === "skipped",
             );
             if (anyDepFailed) {
               context.statuses[nodeId] = "skipped";
@@ -3848,7 +4602,9 @@ export function createMultiAgentOrchestrator(
                 patternId: pId,
                 nodeId,
                 agentId: node.handler,
-                nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
+                nodeType: tasks[node.handler]
+                  ? ("task" as const)
+                  : ("agent" as const),
                 reason: "upstream dependency errored",
                 timestamp: Date.now(),
               });
@@ -3876,7 +4632,9 @@ export function createMultiAgentOrchestrator(
                   patternId: pId,
                   nodeId,
                   agentId: node.handler,
-                  nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
+                  nodeType: tasks[node.handler]
+                    ? ("task" as const)
+                    : ("agent" as const),
                   reason: "when() returned false",
                   timestamp: Date.now(),
                 });
@@ -3912,7 +4670,9 @@ export function createMultiAgentOrchestrator(
           patternId: pId,
           nodeId,
           agentId: node.handler,
-          nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
+          nodeType: tasks[node.handler]
+            ? ("task" as const)
+            : ("agent" as const),
           timestamp: nodeStartTime,
         });
 
@@ -3936,12 +4696,17 @@ export function createMultiAgentOrchestrator(
         const nodeController = new AbortController();
         let nodeTimeoutId: ReturnType<typeof setTimeout> | undefined;
         if (node.timeout) {
-          nodeTimeoutId = setTimeout(() => nodeController.abort(), node.timeout);
+          nodeTimeoutId = setTimeout(
+            () => nodeController.abort(),
+            node.timeout,
+          );
         }
 
         // Forward graph-level abort
         const abortHandler = () => nodeController.abort();
-        controller.signal.addEventListener("abort", abortHandler, { once: true });
+        controller.signal.addEventListener("abort", abortHandler, {
+          once: true,
+        });
 
         try {
           const result = await runSingleAgent(node.handler, nodeInput, {
@@ -3967,18 +4732,31 @@ export function createMultiAgentOrchestrator(
             patternId: pId,
             nodeId,
             agentId: node.handler,
-            nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
+            nodeType: tasks[node.handler]
+              ? ("task" as const)
+              : ("agent" as const),
             durationMs: Date.now() - nodeStartTime,
             timestamp: Date.now(),
           });
 
           // Save checkpoint after node completion (serialized to prevent concurrent race)
           dagCompletedCount++;
-          if (dagCkptConfig && dagCkptStore && dagCompletedCount > dagLastCheckpointCount && (dagCompletedCount - dagLastCheckpointCount) >= dagCkptEveryN) {
+          if (
+            dagCkptConfig &&
+            dagCkptStore &&
+            dagCompletedCount > dagLastCheckpointCount &&
+            dagCompletedCount - dagLastCheckpointCount >= dagCkptEveryN
+          ) {
             dagLastCheckpointCount = dagCompletedCount;
-            const nodeResults: Record<string, { output: unknown; totalTokens: number }> = Object.create(null);
+            const nodeResults: Record<
+              string,
+              { output: unknown; totalTokens: number }
+            > = Object.create(null);
             for (const [nid, r] of Object.entries(context.results)) {
-              nodeResults[nid] = { output: r.output, totalTokens: r.totalTokens };
+              nodeResults[nid] = {
+                output: r.output,
+                totalTokens: r.totalTokens,
+              };
             }
             const ckptState = {
               type: "dag" as const,
@@ -3996,13 +4774,14 @@ export function createMultiAgentOrchestrator(
               input: context.input,
             };
             dagCheckpointChain = dagCheckpointChain.then(() =>
-              savePatternCheckpoint(ckptState, dagCkptStore!, dagCkptConfig)
+              savePatternCheckpoint(ckptState, dagCkptStore!, dagCkptConfig),
             );
             await dagCheckpointChain;
           }
         } catch (error) {
           context.statuses[nodeId] = "error";
-          context.errors[nodeId] = error instanceof Error ? error.message : String(error);
+          context.errors[nodeId] =
+            error instanceof Error ? error.message : String(error);
 
           if (timeline) {
             timeline.record({
@@ -4018,7 +4797,9 @@ export function createMultiAgentOrchestrator(
             patternId: pId,
             nodeId,
             agentId: node.handler,
-            nodeType: tasks[node.handler] ? "task" as const : "agent" as const,
+            nodeType: tasks[node.handler]
+              ? ("task" as const)
+              : ("agent" as const),
             error: error instanceof Error ? error : new Error(String(error)),
             durationMs: Date.now() - nodeStartTime,
             timestamp: Date.now(),
@@ -4065,7 +4846,7 @@ export function createMultiAgentOrchestrator(
 
         // Check if we're done
         const hasPendingOrRunning = Object.values(context.statuses).some(
-          (s) => s === "pending" || s === "running" || s === "ready"
+          (s) => s === "pending" || s === "running" || s === "ready",
         );
         if (!hasPendingOrRunning) {
           break;
@@ -4117,10 +4898,14 @@ export function createMultiAgentOrchestrator(
     const maxIterations = pattern.maxIterations ?? 2;
 
     if (maxIterations < 1) {
-      throw new Error("[Directive MultiAgent] Reflect pattern maxIterations must be >= 1");
+      throw new Error(
+        "[Directive MultiAgent] Reflect pattern maxIterations must be >= 1",
+      );
     }
     if (debug && maxIterations > 3) {
-      console.warn("[Directive MultiAgent] Reflection loops > 3 iterations rarely improve quality. Consider reducing maxIterations.");
+      console.warn(
+        "[Directive MultiAgent] Reflection loops > 3 iterations rarely improve quality. Consider reducing maxIterations.",
+      );
     }
 
     // Merge timeout into signal if provided
@@ -4136,28 +4921,35 @@ export function createMultiAgentOrchestrator(
       const controller = new AbortController();
       reflectTimeoutId = setTimeout(() => controller.abort(), pattern.timeout);
       reflectExternalOnAbort = () => controller.abort();
-      effectiveSignal.addEventListener("abort", reflectExternalOnAbort, { once: true });
+      effectiveSignal.addEventListener("abort", reflectExternalOnAbort, {
+        once: true,
+      });
       effectiveSignal = controller.signal;
     }
 
-    const parseEvaluation = pattern.parseEvaluation ?? ((output: unknown): ReflectionEvaluation => {
-      if (typeof output === "string") {
-        try {
-          return JSON.parse(output);
-        } catch {
-          return { passed: false, feedback: `Evaluator returned unparseable output: ${output.slice(0, 200)}` };
+    const parseEvaluation =
+      pattern.parseEvaluation ??
+      ((output: unknown): ReflectionEvaluation => {
+        if (typeof output === "string") {
+          try {
+            return JSON.parse(output);
+          } catch {
+            return {
+              passed: false,
+              feedback: `Evaluator returned unparseable output: ${output.slice(0, 200)}`,
+            };
+          }
         }
-      }
-      if (output && typeof output === "object" && "passed" in output) {
-        return output as ReflectionEvaluation;
-      }
+        if (output && typeof output === "object" && "passed" in output) {
+          return output as ReflectionEvaluation;
+        }
 
-      return { passed: false, feedback: "Evaluator returned invalid format" };
-    });
-    const buildRetryInput = pattern.buildRetryInput ?? (
-      (inp: string, feedback: string, _iteration: number) =>
-        `${inp}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`
-    );
+        return { passed: false, feedback: "Evaluator returned invalid format" };
+      });
+    const buildRetryInput =
+      pattern.buildRetryInput ??
+      ((inp: string, feedback: string, _iteration: number) =>
+        `${inp}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`);
 
     if (patternId) {
       fireHook("onPatternStart", {
@@ -4176,20 +4968,32 @@ export function createMultiAgentOrchestrator(
 
     let patternError: Error | undefined;
     let lastProducerResult: RunResult<unknown> | undefined;
-    const history: ReflectIterationRecord[] = resumeFrom?.history ? [...resumeFrom.history] : [];
+    const history: ReflectIterationRecord[] = resumeFrom?.history
+      ? [...resumeFrom.history]
+      : [];
     // Track per-iteration producer outputs for accept-best
-    const producerOutputs: Array<{ output: unknown; score?: number }> = resumeFrom?.producerOutputs ? [...resumeFrom.producerOutputs] : [];
+    const producerOutputs: Array<{ output: unknown; score?: number }> =
+      resumeFrom?.producerOutputs ? [...resumeFrom.producerOutputs] : [];
     const startIteration = resumeFrom?.iteration ?? 0;
 
     // Restore last producer result from checkpoint
     if (resumeFrom?.lastProducerOutput != null) {
-      lastProducerResult = { output: resumeFrom.lastProducerOutput, totalTokens: 0, messages: [], toolCalls: [] };
+      lastProducerResult = {
+        output: resumeFrom.lastProducerOutput,
+        totalTokens: 0,
+        messages: [],
+        toolCalls: [],
+      };
     }
 
     try {
       let effectiveInput = resumeFrom?.effectiveInput ?? input;
 
-      for (let iteration = startIteration; iteration < maxIterations; iteration++) {
+      for (
+        let iteration = startIteration;
+        iteration < maxIterations;
+        iteration++
+      ) {
         // Check abort signal at top of each iteration
         if (effectiveSignal?.aborted) {
           if (lastProducerResult) {
@@ -4206,11 +5010,16 @@ export function createMultiAgentOrchestrator(
         const iterStart = Date.now();
 
         // Run producer (pass signal through)
-        const producerResult = await runSingleAgent(pattern.handler, effectiveInput, { signal: effectiveSignal, patternId });
+        const producerResult = await runSingleAgent(
+          pattern.handler,
+          effectiveInput,
+          { signal: effectiveSignal, patternId },
+        );
         lastProducerResult = producerResult;
-        const producerOutput = typeof producerResult.output === "string"
-          ? producerResult.output
-          : safeStringify(producerResult.output);
+        const producerOutput =
+          typeof producerResult.output === "string"
+            ? producerResult.output
+            : safeStringify(producerResult.output);
 
         // Check abort after producer, before evaluator
         if (effectiveSignal?.aborted) {
@@ -4222,7 +5031,11 @@ export function createMultiAgentOrchestrator(
         }
 
         // Run evaluator (pass signal through)
-        const evaluatorResult = await runSingleAgent(pattern.evaluator, producerOutput, { signal: effectiveSignal, patternId });
+        const evaluatorResult = await runSingleAgent(
+          pattern.evaluator,
+          producerOutput,
+          { signal: effectiveSignal, patternId },
+        );
         let evaluation: ReflectionEvaluation;
         try {
           evaluation = parseEvaluation(evaluatorResult.output);
@@ -4234,10 +5047,15 @@ export function createMultiAgentOrchestrator(
         }
 
         // Apply threshold-based pass override
-        if (!evaluation.passed && pattern.threshold != null && evaluation.score != null) {
-          const thresholdValue = typeof pattern.threshold === "function"
-            ? pattern.threshold(iteration)
-            : pattern.threshold;
+        if (
+          !evaluation.passed &&
+          pattern.threshold != null &&
+          evaluation.score != null
+        ) {
+          const thresholdValue =
+            typeof pattern.threshold === "function"
+              ? pattern.threshold(iteration)
+              : pattern.threshold;
           if (evaluation.score >= thresholdValue) {
             evaluation = { ...evaluation, passed: true };
           }
@@ -4246,7 +5064,10 @@ export function createMultiAgentOrchestrator(
         const iterDurationMs = Date.now() - iterStart;
 
         // Store producer output for accept-best
-        producerOutputs.push({ output: producerResult.output, score: evaluation.score });
+        producerOutputs.push({
+          output: producerResult.output,
+          score: evaluation.score,
+        });
 
         // Build iteration record
         const record: ReflectIterationRecord = {
@@ -4266,7 +5087,10 @@ export function createMultiAgentOrchestrator(
             pattern.onIteration(record);
           } catch (cbError) {
             if (debug) {
-              console.warn("[Directive MultiAgent] onIteration callback threw:", cbError);
+              console.warn(
+                "[Directive MultiAgent] onIteration callback threw:",
+                cbError,
+              );
             }
           }
         }
@@ -4297,31 +5121,47 @@ export function createMultiAgentOrchestrator(
         // Build retry input for next iteration
         if (iteration < maxIterations - 1 && evaluation.feedback) {
           try {
-            effectiveInput = buildRetryInput(input, evaluation.feedback, iteration);
+            effectiveInput = buildRetryInput(
+              input,
+              evaluation.feedback,
+              iteration,
+            );
           } catch (retryError) {
             if (debug) {
-              console.warn("[Directive MultiAgent] buildRetryInput threw, using default format:", retryError);
+              console.warn(
+                "[Directive MultiAgent] buildRetryInput threw, using default format:",
+                retryError,
+              );
             }
             effectiveInput = `${input}\n\nFeedback on your previous response:\n${evaluation.feedback}\n\nPlease improve your response.`;
           }
         }
 
         // Save checkpoint after each iteration
-        if (reflectCkptConfig && reflectCkptStore && iteration >= startIteration && (iteration - startIteration + 1) % reflectCkptEveryN === 0) {
-          await savePatternCheckpoint({
-            type: "reflect",
-            version: 1,
-            id: createCheckpointId(),
-            createdAt: new Date().toISOString(),
-            label: `${reflectCkptPrefix}:iter-${iteration + 1}`,
-            patternId: pId,
-            stepsTotal: maxIterations,
-            iteration: iteration + 1,
-            effectiveInput,
-            history: [...history],
-            producerOutputs: [...producerOutputs],
-            lastProducerOutput: producerResult.output,
-          }, reflectCkptStore, reflectCkptConfig);
+        if (
+          reflectCkptConfig &&
+          reflectCkptStore &&
+          iteration >= startIteration &&
+          (iteration - startIteration + 1) % reflectCkptEveryN === 0
+        ) {
+          await savePatternCheckpoint(
+            {
+              type: "reflect",
+              version: 1,
+              id: createCheckpointId(),
+              createdAt: new Date().toISOString(),
+              label: `${reflectCkptPrefix}:iter-${iteration + 1}`,
+              patternId: pId,
+              stepsTotal: maxIterations,
+              iteration: iteration + 1,
+              effectiveInput,
+              history: [...history],
+              producerOutputs: [...producerOutputs],
+              lastProducerOutput: producerResult.output,
+            },
+            reflectCkptStore,
+            reflectCkptConfig,
+          );
         }
       }
 
@@ -4345,10 +5185,12 @@ export function createMultiAgentOrchestrator(
       if (pattern.onExhausted === "accept-best" && producerOutputs.length > 0) {
         const hasAnyScore = producerOutputs.some((p) => p.score != null);
         if (!hasAnyScore && debug) {
-          console.warn("[Directive MultiAgent] accept-best exhaustion strategy used but no iterations returned scores. Falling back to last output.");
+          console.warn(
+            "[Directive MultiAgent] accept-best exhaustion strategy used but no iterations returned scores. Falling back to last output.",
+          );
         }
         let bestIdx = producerOutputs.length - 1;
-        let bestScore = -Infinity;
+        let bestScore = Number.NEGATIVE_INFINITY;
         for (let i = 0; i < producerOutputs.length; i++) {
           const s = producerOutputs[i]!.score;
           if (s != null && s > bestScore) {
@@ -4395,27 +5237,33 @@ export function createMultiAgentOrchestrator(
   async function runRacePattern<T>(
     pattern: RacePattern<T>,
     input: string,
-    patternId?: string
+    patternId?: string,
   ): Promise<RaceResult<T>> {
     if (pattern.handlers.length === 0) {
-      throw new Error("[Directive MultiAgent] Race pattern requires at least one agent");
+      throw new Error(
+        "[Directive MultiAgent] Race pattern requires at least one agent",
+      );
     }
 
     const minSuccess = pattern.minSuccess ?? 1;
 
     if (!Number.isInteger(minSuccess) || minSuccess < 1) {
-      throw new Error("[Directive MultiAgent] Race pattern minSuccess must be a positive integer");
+      throw new Error(
+        "[Directive MultiAgent] Race pattern minSuccess must be a positive integer",
+      );
     }
     if (minSuccess > pattern.handlers.length) {
       throw new Error(
-        `[Directive MultiAgent] Race pattern minSuccess (${minSuccess}) exceeds agent count (${pattern.handlers.length})`
+        `[Directive MultiAgent] Race pattern minSuccess (${minSuccess}) exceeds agent count (${pattern.handlers.length})`,
       );
     }
 
     // Validate handler IDs (agents or tasks)
     for (const agentId of pattern.handlers) {
       if (!agents[agentId] && !tasks[agentId]) {
-        throw new Error(`[Directive MultiAgent] Race: unknown handler "${agentId}"`);
+        throw new Error(
+          `[Directive MultiAgent] Race: unknown handler "${agentId}"`,
+        );
       }
     }
 
@@ -4431,7 +5279,9 @@ export function createMultiAgentOrchestrator(
         controller.abort();
       } else {
         raceExternalOnAbort = () => controller.abort();
-        pattern.signal.addEventListener("abort", raceExternalOnAbort, { once: true });
+        pattern.signal.addEventListener("abort", raceExternalOnAbort, {
+          once: true,
+        });
       }
     }
 
@@ -4464,20 +5314,30 @@ export function createMultiAgentOrchestrator(
 
     try {
       // Start all agents, collecting promises
-      type RaceEntry = { agentId: string; promise: Promise<{ agentId: string; result: RunResult<unknown> }> };
+      type RaceEntry = {
+        agentId: string;
+        promise: Promise<{ agentId: string; result: RunResult<unknown> }>;
+      };
       const entries: RaceEntry[] = pattern.handlers.map((agentId) => ({
         agentId,
         // Output guardrails are already checked inside runSingleAgent
-        promise: runSingleAgent(agentId, input, { signal: controller.signal, patternId })
-          .then((result) => ({ agentId, result })),
+        promise: runSingleAgent(agentId, input, {
+          signal: controller.signal,
+          patternId,
+        }).then((result) => ({ agentId, result })),
       }));
 
       // Custom race: track settled count, await all promises for cleanup
       const allPromises = entries.map((e) => e.promise.catch(() => undefined));
 
-      const collectedResults: Array<{ agentId: string; result: RunResult<unknown> }> = [];
+      const collectedResults: Array<{
+        agentId: string;
+        result: RunResult<unknown>;
+      }> = [];
 
-      const result = await new Promise<Array<{ agentId: string; result: RunResult<unknown> }>>((resolve, reject) => {
+      const result = await new Promise<
+        Array<{ agentId: string; result: RunResult<unknown> }>
+      >((resolve, reject) => {
         let settledCount = 0;
         let resolved = false;
 
@@ -4496,7 +5356,8 @@ export function createMultiAgentOrchestrator(
               }
             })
             .catch((error) => {
-              agentErrors[entry.agentId] = error instanceof Error ? error.message : String(error);
+              agentErrors[entry.agentId] =
+                error instanceof Error ? error.message : String(error);
               settledCount++;
 
               if (resolved) {
@@ -4504,27 +5365,35 @@ export function createMultiAgentOrchestrator(
               }
 
               const failedCount = Object.keys(agentErrors).length;
-              const maxPossibleSuccesses = collectedResults.length + (entries.length - settledCount);
+              const maxPossibleSuccesses =
+                collectedResults.length + (entries.length - settledCount);
 
               // All agents failed
-              if (settledCount === entries.length && failedCount === entries.length) {
+              if (
+                settledCount === entries.length &&
+                failedCount === entries.length
+              ) {
                 resolved = true;
-                reject(new Error(
-                  `[Directive MultiAgent] Race: all ${entries.length} agents failed.\n` +
-                  Object.entries(agentErrors)
-                    .map(([id, msg]) => `  - ${id}: ${msg}`)
-                    .join("\n")
-                ));
+                reject(
+                  new Error(
+                    `[Directive MultiAgent] Race: all ${entries.length} agents failed.\n` +
+                      Object.entries(agentErrors)
+                        .map(([id, msg]) => `  - ${id}: ${msg}`)
+                        .join("\n"),
+                  ),
+                );
               } else if (maxPossibleSuccesses < minSuccess) {
                 // Impossible to reach minSuccess — some succeeded but not enough can
                 resolved = true;
-                reject(new Error(
-                  `[Directive MultiAgent] Race: cannot reach minSuccess (${minSuccess}). ` +
-                  `${failedCount} agent(s) failed.\n` +
-                  Object.entries(agentErrors)
-                    .map(([id, msg]) => `  - ${id}: ${msg}`)
-                    .join("\n")
-                ));
+                reject(
+                  new Error(
+                    `[Directive MultiAgent] Race: cannot reach minSuccess (${minSuccess}). ` +
+                      `${failedCount} agent(s) failed.\n` +
+                      Object.entries(agentErrors)
+                        .map(([id, msg]) => `  - ${id}: ${msg}`)
+                        .join("\n"),
+                  ),
+                );
               }
             });
         }
@@ -4538,7 +5407,9 @@ export function createMultiAgentOrchestrator(
       const first = result[0]!;
       const winnerId = first.agentId;
       const successIds = new Set(result.map((r) => r.agentId));
-      const cancelledIds = startedAgents.filter((id) => !successIds.has(id) && !(id in agentErrors));
+      const cancelledIds = startedAgents.filter(
+        (id) => !successIds.has(id) && !(id in agentErrors),
+      );
 
       if (timeline) {
         timeline.record({
@@ -4566,14 +5437,15 @@ export function createMultiAgentOrchestrator(
         : (first.result.output as T);
 
       // Build allResults when minSuccess > 1
-      const allResults = minSuccess > 1
-        ? result.map((r) => ({
-            agentId: r.agentId,
-            result: pattern.extract
-              ? pattern.extract(r.result)
-              : (r.result.output as T),
-          }))
-        : undefined;
+      const allResults =
+        minSuccess > 1
+          ? result.map((r) => ({
+              agentId: r.agentId,
+              result: pattern.extract
+                ? pattern.extract(r.result)
+                : (r.result.output as T),
+            }))
+          : undefined;
 
       return { winnerId, result: extracted, allResults };
     } catch (error) {
@@ -4618,10 +5490,18 @@ export function createMultiAgentOrchestrator(
     patternId?: string,
     resumeFrom?: DebateCheckpointState,
   ): Promise<DebateResult<T>> {
-    const { handlers: debateAgents, evaluator, maxRounds = 2, extract, parseJudgement } = pattern;
+    const {
+      handlers: debateAgents,
+      evaluator,
+      maxRounds = 2,
+      extract,
+      parseJudgement,
+    } = pattern;
 
     if (debateAgents.length < 2) {
-      throw new Error("[Directive MultiAgent] debate requires at least 2 handlers");
+      throw new Error(
+        "[Directive MultiAgent] debate requires at least 2 handlers",
+      );
     }
     if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
       throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
@@ -4639,44 +5519,69 @@ export function createMultiAgentOrchestrator(
       const ctrl = new AbortController();
       debateTimeoutId = setTimeout(() => ctrl.abort(), pattern.timeout);
       externalOnAbort = () => ctrl.abort();
-      effectiveSignal.addEventListener("abort", externalOnAbort, { once: true });
+      effectiveSignal.addEventListener("abort", externalOnAbort, {
+        once: true,
+      });
       effectiveSignal = ctrl.signal;
     }
 
-    const defaultParseJudgement = (output: unknown): { winnerId: string; feedback?: string; score?: number } => {
+    const defaultParseJudgement = (
+      output: unknown,
+    ): { winnerId: string; feedback?: string; score?: number } => {
       if (typeof output === "string") {
         try {
           const parsed = JSON.parse(output);
-          if (parsed && typeof parsed === "object" && typeof parsed.winnerId === "string") {
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            typeof parsed.winnerId === "string"
+          ) {
             return parsed;
           }
 
           if (debug) {
-            console.warn("[Directive MultiAgent] defaultParseJudgement: parsed JSON missing winnerId, falling back to first agent");
+            console.warn(
+              "[Directive MultiAgent] defaultParseJudgement: parsed JSON missing winnerId, falling back to first agent",
+            );
           }
 
           return { winnerId: debateAgents[0]! };
         } catch {
           if (debug) {
-            console.warn("[Directive MultiAgent] defaultParseJudgement: output is not valid JSON, falling back to first agent");
+            console.warn(
+              "[Directive MultiAgent] defaultParseJudgement: output is not valid JSON, falling back to first agent",
+            );
           }
 
           return { winnerId: debateAgents[0]! };
         }
       }
-      if (output && typeof output === "object" && "winnerId" in output && typeof (output as Record<string, unknown>).winnerId === "string") {
-        return output as { winnerId: string; feedback?: string; score?: number };
+      if (
+        output &&
+        typeof output === "object" &&
+        "winnerId" in output &&
+        typeof (output as Record<string, unknown>).winnerId === "string"
+      ) {
+        return output as {
+          winnerId: string;
+          feedback?: string;
+          score?: number;
+        };
       }
 
       if (debug) {
-        console.warn("[Directive MultiAgent] defaultParseJudgement: unrecognized output format, falling back to first agent");
+        console.warn(
+          "[Directive MultiAgent] defaultParseJudgement: unrecognized output format, falling back to first agent",
+        );
       }
 
       return { winnerId: debateAgents[0]! };
     };
 
     const parseJudge = parseJudgement ?? defaultParseJudgement;
-    const rounds: DebateResult<T>["rounds"] = resumeFrom?.rounds ? [...resumeFrom.rounds] : [];
+    const rounds: DebateResult<T>["rounds"] = resumeFrom?.rounds
+      ? [...resumeFrom.rounds]
+      : [];
     let currentInput = resumeFrom?.currentInput ?? input;
     let lastWinnerId = resumeFrom?.lastWinnerId ?? debateAgents[0]!;
     let lastWinnerOutput: unknown = resumeFrom?.lastWinnerOutput ?? undefined;
@@ -4709,7 +5614,10 @@ export function createMultiAgentOrchestrator(
         }
 
         const proposalPromises = debateAgents.map(async (agentId) => {
-          const result = await runSingleAgent(agentId, currentInput, { signal: effectiveSignal, patternId: pId });
+          const result = await runSingleAgent(agentId, currentInput, {
+            signal: effectiveSignal,
+            patternId: pId,
+          });
           debateTotalTokens += result.totalTokens;
 
           return { agentId, output: result.output };
@@ -4729,7 +5637,10 @@ export function createMultiAgentOrchestrator(
           })),
         });
 
-        const evalResult = await runSingleAgent(evaluator, evalInput, { signal: effectiveSignal, patternId: pId });
+        const evalResult = await runSingleAgent(evaluator, evalInput, {
+          signal: effectiveSignal,
+          patternId: pId,
+        });
         debateTotalTokens += evalResult.totalTokens;
         const judgement = parseJudge(evalResult.output);
 
@@ -4756,11 +5667,18 @@ export function createMultiAgentOrchestrator(
         }
 
         lastWinnerId = judgement.winnerId;
-        const winnerProposal = proposals.find((p) => p.agentId === judgement.winnerId);
+        const winnerProposal = proposals.find(
+          (p) => p.agentId === judgement.winnerId,
+        );
         lastWinnerOutput = winnerProposal?.output ?? proposals[0]!.output;
 
         // Save checkpoint at configured intervals
-        if (debateCkptConfig && debateCkptStore && round > startRound && (round - startRound) % debateCkptEveryN === 0) {
+        if (
+          debateCkptConfig &&
+          debateCkptStore &&
+          round > startRound &&
+          (round - startRound) % debateCkptEveryN === 0
+        ) {
           const ckptState: DebateCheckpointState = {
             type: "debate",
             version: 1,
@@ -4776,7 +5694,11 @@ export function createMultiAgentOrchestrator(
             lastWinnerOutput,
             tokensConsumed: debateTotalTokens,
           };
-          await savePatternCheckpoint(ckptState, debateCkptStore, debateCkptConfig);
+          await savePatternCheckpoint(
+            ckptState,
+            debateCkptStore,
+            debateCkptConfig,
+          );
         }
 
         if (round < maxRounds - 1 && judgement.feedback) {
@@ -4785,10 +5707,14 @@ export function createMultiAgentOrchestrator(
       }
 
       if (rounds.length === 0) {
-        throw new Error("[Directive MultiAgent] Debate aborted before any round completed");
+        throw new Error(
+          "[Directive MultiAgent] Debate aborted before any round completed",
+        );
       }
 
-      const result = extract ? extract(lastWinnerOutput) : lastWinnerOutput as T;
+      const result = extract
+        ? extract(lastWinnerOutput)
+        : (lastWinnerOutput as T);
 
       return { winnerId: lastWinnerId, result, rounds };
     } catch (error) {
@@ -4825,7 +5751,10 @@ export function createMultiAgentOrchestrator(
     "hasOwnProperty",
   ]);
 
-  function goalSafeMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  function goalSafeMerge(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>,
+  ): void {
     for (const key of Object.keys(source)) {
       if (!GOAL_BLOCKED_KEYS.has(key)) {
         target[key] = source[key];
@@ -4837,7 +5766,10 @@ export function createMultiAgentOrchestrator(
    * Detect cycles in goal node dependency graph.
    * Builds an implicit DAG from produces/requires and applies Kahn's algorithm.
    */
-  function validateGoalAcyclic(pId: string, nodes: Record<string, GoalNode>): void {
+  function validateGoalAcyclic(
+    pId: string,
+    nodes: Record<string, GoalNode>,
+  ): void {
     // Build producer map: factKey → nodeId(s) that produce it
     const producerMap: Record<string, string[]> = Object.create(null);
     for (const [nodeId, node] of Object.entries(nodes)) {
@@ -4894,7 +5826,7 @@ export function createMultiAgentOrchestrator(
 
     if (visited !== nodeIds.length) {
       throw new Error(
-        `[Directive MultiAgent] goal pattern "${pId}": cycle detected in produces/requires graph. Visited ${visited}/${nodeIds.length} nodes.`
+        `[Directive MultiAgent] goal pattern "${pId}": cycle detected in produces/requires graph. Visited ${visited}/${nodeIds.length} nodes.`,
       );
     }
   }
@@ -4903,7 +5835,10 @@ export function createMultiAgentOrchestrator(
    * Validate that no two nodes produce the same fact key (M1: producer conflict detection).
    * Logs a dev-mode warning rather than throwing, since some use cases intentionally overlap.
    */
-  function validateProducerConflicts(pId: string, nodes: Record<string, GoalNode>): void {
+  function validateProducerConflicts(
+    pId: string,
+    nodes: Record<string, GoalNode>,
+  ): void {
     const producerMap: Record<string, string[]> = Object.create(null);
     for (const [nodeId, node] of Object.entries(nodes)) {
       for (const key of node.produces) {
@@ -4917,14 +5852,17 @@ export function createMultiAgentOrchestrator(
     for (const [key, producers] of Object.entries(producerMap)) {
       if (producers.length > 1) {
         console.warn(
-          `[Directive MultiAgent] goal pattern "${pId}": fact key "${key}" is produced by multiple nodes: ${producers.join(", ")}. Last writer wins.`
+          `[Directive MultiAgent] goal pattern "${pId}": fact key "${key}" is produced by multiple nodes: ${producers.join(", ")}. Last writer wins.`,
         );
       }
     }
   }
 
   /** Safe wrapper for user-provided callbacks (C1). */
-  function safeCall<A extends unknown[], R>(fn: ((...args: A) => R) | undefined, ...args: A): R | undefined {
+  function safeCall<A extends unknown[], R>(
+    fn: ((...args: A) => R) | undefined,
+    ...args: A
+  ): R | undefined {
     if (!fn) {
       return undefined;
     }
@@ -4939,7 +5877,10 @@ export function createMultiAgentOrchestrator(
   }
 
   /** Safe wrapper for async user-provided callbacks (C1). */
-  async function safeCallAsync<A extends unknown[], R>(fn: ((...args: A) => R | Promise<R>) | undefined, ...args: A): Promise<R | undefined> {
+  async function safeCallAsync<A extends unknown[], R>(
+    fn: ((...args: A) => R | Promise<R>) | undefined,
+    ...args: A
+  ): Promise<R | undefined> {
     if (!fn) {
       return undefined;
     }
@@ -4961,13 +5902,17 @@ export function createMultiAgentOrchestrator(
   ): GoalMetrics {
     // Calculate recent progress rate (average delta over last 3 steps)
     const recentSteps = stepMetrics.slice(-3);
-    const avgDelta = recentSteps.length > 0
-      ? recentSteps.reduce((sum, s) => sum + s.satisfactionDelta, 0) / recentSteps.length
-      : 0;
+    const avgDelta =
+      recentSteps.length > 0
+        ? recentSteps.reduce((sum, s) => sum + s.satisfactionDelta, 0) /
+          recentSteps.length
+        : 0;
 
     let estimatedStepsRemaining: number | null = null;
     if (avgDelta > 0 && currentSatisfaction < 1.0) {
-      estimatedStepsRemaining = Math.ceil((1.0 - currentSatisfaction) / avgDelta);
+      estimatedStepsRemaining = Math.ceil(
+        (1.0 - currentSatisfaction) / avgDelta,
+      );
     }
 
     // Decelerating: compare last 3 deltas to prior 3 deltas
@@ -4975,7 +5920,8 @@ export function createMultiAgentOrchestrator(
     if (stepMetrics.length >= 6) {
       const recent3 = stepMetrics.slice(-3);
       const prior3 = stepMetrics.slice(-6, -3);
-      const recentAvg = recent3.reduce((s, m) => s + m.satisfactionDelta, 0) / 3;
+      const recentAvg =
+        recent3.reduce((s, m) => s + m.satisfactionDelta, 0) / 3;
       const priorAvg = prior3.reduce((s, m) => s + m.satisfactionDelta, 0) / 3;
       decelerating = recentAvg < priorAvg * 0.5;
     }
@@ -5031,7 +5977,9 @@ export function createMultiAgentOrchestrator(
     // Validate all node handlers (agents or tasks) are registered
     for (const [nodeId, node] of Object.entries(nodes)) {
       if (!agents[node.handler] && !tasks[node.handler]) {
-        throw new Error(`[Directive MultiAgent] goal node "${nodeId}" references unregistered handler "${node.handler}"`);
+        throw new Error(
+          `[Directive MultiAgent] goal node "${nodeId}" references unregistered handler "${node.handler}"`,
+        );
       }
     }
 
@@ -5045,7 +5993,7 @@ export function createMultiAgentOrchestrator(
     for (const [nodeId, node] of Object.entries(nodes)) {
       if (!node.extractOutput) {
         console.warn(
-          `[Directive MultiAgent] goal node "${nodeId}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`
+          `[Directive MultiAgent] goal node "${nodeId}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`,
         );
       }
     }
@@ -5063,7 +6011,9 @@ export function createMultiAgentOrchestrator(
       const ctrl = new AbortController();
       goalTimeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
       externalOnAbort = () => ctrl.abort();
-      effectiveSignal.addEventListener("abort", externalOnAbort, { once: true });
+      effectiveSignal.addEventListener("abort", externalOnAbort, {
+        once: true,
+      });
       effectiveSignal = ctrl.signal;
     }
 
@@ -5085,7 +6035,10 @@ export function createMultiAgentOrchestrator(
     fireHook("onPatternStart", {
       patternId: pId,
       patternType: "goal",
-      input: typeof initialInput === "string" ? initialInput : JSON.stringify(initialInput),
+      input:
+        typeof initialInput === "string"
+          ? initialInput
+          : JSON.stringify(initialInput),
       timestamp: patternStartTime,
     });
 
@@ -5100,26 +6053,50 @@ export function createMultiAgentOrchestrator(
     }
 
     // Tracking state — restore from checkpoint or start fresh
-    const executionOrder: string[] = resumeFrom ? [...resumeFrom.executionOrder] : [];
+    const executionOrder: string[] = resumeFrom
+      ? [...resumeFrom.executionOrder]
+      : [];
     const nodeResults: Record<string, RunResult<unknown>> = Object.create(null);
     if (resumeFrom) {
       for (const [id, out] of Object.entries(resumeFrom.nodeOutputs)) {
-        nodeResults[id] = { output: out.output, totalTokens: out.totalTokens } as RunResult<unknown>;
+        nodeResults[id] = {
+          output: out.output,
+          totalTokens: out.totalTokens,
+        } as RunResult<unknown>;
       }
     }
-    const stepMetrics: GoalStepMetrics[] = resumeFrom ? [...resumeFrom.stepMetrics] : [];
-    const relaxations: RelaxationRecord[] = resumeFrom ? [...resumeFrom.relaxations] : [];
+    const stepMetrics: GoalStepMetrics[] = resumeFrom
+      ? [...resumeFrom.stepMetrics]
+      : [];
+    const relaxations: RelaxationRecord[] = resumeFrom
+      ? [...resumeFrom.relaxations]
+      : [];
     const completedNodes = new Set<string>(resumeFrom?.completedNodes ?? []);
     const failedNodes = new Map<string, number>(
-      resumeFrom ? Object.entries(resumeFrom.failedNodes).map(([k, v]) => [k, v]) : []
+      resumeFrom
+        ? Object.entries(resumeFrom.failedNodes).map(([k, v]) => [k, v])
+        : [],
     );
     const nodeInputHashes = new Map<string, string>(
-      resumeFrom ? Object.entries(resumeFrom.nodeInputHashes) : []
+      resumeFrom ? Object.entries(resumeFrom.nodeInputHashes) : [],
     );
-    const agentMetrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number; totalDelta: number }> = Object.create(null);
+    const agentMetrics: Record<
+      string,
+      {
+        runs: number;
+        avgSatisfactionDelta: number;
+        tokens: number;
+        totalDelta: number;
+      }
+    > = Object.create(null);
     if (resumeFrom) {
       for (const [id, m] of Object.entries(resumeFrom.agentMetrics)) {
-        agentMetrics[id] = { runs: m.runs, avgSatisfactionDelta: m.runs > 0 ? m.totalDelta / m.runs : 0, tokens: m.tokens, totalDelta: m.totalDelta };
+        agentMetrics[id] = {
+          runs: m.runs,
+          avgSatisfactionDelta: m.runs > 0 ? m.totalDelta / m.runs : 0,
+          tokens: m.tokens,
+          totalDelta: m.totalDelta,
+        };
       }
     }
     let stallSteps = resumeFrom?.stallSteps ?? 0;
@@ -5145,11 +6122,14 @@ export function createMultiAgentOrchestrator(
         if (safeCall(goalWhen, facts) === true) {
           goalAchieved = true;
           const durationMs = Date.now() - patternStartTime;
-          const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+          const totalTokens = Object.values(nodeResults).reduce(
+            (sum, r) => sum + r.totalTokens,
+            0,
+          );
 
           return {
             achieved: true,
-            result: safeCall(extract, facts) ?? facts as unknown as T,
+            result: safeCall(extract, facts) ?? (facts as unknown as T),
             facts: { ...facts },
             executionOrder,
             nodeResults,
@@ -5164,11 +6144,14 @@ export function createMultiAgentOrchestrator(
         // Check abort
         if (effectiveSignal?.aborted) {
           const durationMs = Date.now() - patternStartTime;
-          const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+          const totalTokens = Object.values(nodeResults).reduce(
+            (sum, r) => sum + r.totalTokens,
+            0,
+          );
 
           return {
             achieved: false,
-            result: safeCall(extract, facts) ?? facts as unknown as T,
+            result: safeCall(extract, facts) ?? (facts as unknown as T),
             facts: { ...facts },
             executionOrder,
             nodeResults,
@@ -5216,13 +6199,22 @@ export function createMultiAgentOrchestrator(
         let selectedNodes = readyNodes;
         if (selectionStrategy && readyNodes.length > 0) {
           const rawSatisfaction = satisfactionFn
-            ? safeCall(satisfactionFn, facts) ?? 0
-            : (safeCall(goalWhen, facts) === true ? 1.0 : 0.0);
+            ? (safeCall(satisfactionFn, facts) ?? 0)
+            : safeCall(goalWhen, facts) === true
+              ? 1.0
+              : 0.0;
           const currentSatisfaction = clampSatisfaction(rawSatisfaction);
-          const goalProgressMetrics = computeGoalMetrics(currentSatisfaction, stepMetrics, step);
+          const goalProgressMetrics = computeGoalMetrics(
+            currentSatisfaction,
+            stepMetrics,
+            step,
+          );
 
           // Build per-agent metrics for the strategy
-          const strategyMetrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number }> = Object.create(null);
+          const strategyMetrics: Record<
+            string,
+            { runs: number; avgSatisfactionDelta: number; tokens: number }
+          > = Object.create(null);
           for (const [id, m] of Object.entries(agentMetrics)) {
             strategyMetrics[id] = {
               runs: m.runs,
@@ -5231,13 +6223,22 @@ export function createMultiAgentOrchestrator(
             };
           }
 
-          const strategyResult = selectionStrategy.select(readyNodes, strategyMetrics, goalProgressMetrics);
+          const strategyResult = selectionStrategy.select(
+            readyNodes,
+            strategyMetrics,
+            goalProgressMetrics,
+          );
           // Guard against empty selection strategy result — fall back to readyNodes
-          selectedNodes = (strategyResult && strategyResult.length > 0) ? strategyResult : readyNodes;
+          selectedNodes =
+            strategyResult && strategyResult.length > 0
+              ? strategyResult
+              : readyNodes;
         }
 
         // Sort by priority (higher first)
-        selectedNodes.sort((a, b) => (nodes[b]!.priority ?? 0) - (nodes[a]!.priority ?? 0));
+        selectedNodes.sort(
+          (a, b) => (nodes[b]!.priority ?? 0) - (nodes[a]!.priority ?? 0),
+        );
 
         // Fire onStep hook (C1: safe-wrap)
         safeCall(onStep, step, { ...facts }, selectedNodes);
@@ -5249,7 +6250,11 @@ export function createMultiAgentOrchestrator(
           let relaxationApplied = false;
 
           if (relaxation) {
-            for (let tierIdx = appliedRelaxationTiers; tierIdx < relaxation.length; tierIdx++) {
+            for (
+              let tierIdx = appliedRelaxationTiers;
+              tierIdx < relaxation.length;
+              tierIdx++
+            ) {
               const tier = relaxation[tierIdx]!;
               const threshold = tier.afterStallSteps ?? 3;
               if (stallSteps >= threshold) {
@@ -5274,11 +6279,15 @@ export function createMultiAgentOrchestrator(
                     break;
                   case "accept_partial": {
                     const durationMs = Date.now() - patternStartTime;
-                    const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+                    const totalTokens = Object.values(nodeResults).reduce(
+                      (sum, r) => sum + r.totalTokens,
+                      0,
+                    );
 
                     return {
                       achieved: false,
-                      result: safeCall(extract, facts) ?? facts as unknown as T,
+                      result:
+                        safeCall(extract, facts) ?? (facts as unknown as T),
                       facts: { ...facts },
                       executionOrder,
                       nodeResults,
@@ -5295,7 +6304,11 @@ export function createMultiAgentOrchestrator(
                     const ctx: RelaxationContext = {
                       step,
                       facts: { ...facts },
-                      metrics: computeGoalMetrics(clampSatisfaction(rawSat), stepMetrics, step),
+                      metrics: computeGoalMetrics(
+                        clampSatisfaction(rawSat),
+                        stepMetrics,
+                        step,
+                      ),
                       completedNodes: new Set(completedNodes),
                       failedNodes: new Map(failedNodes),
                     };
@@ -5322,17 +6335,24 @@ export function createMultiAgentOrchestrator(
           if (!relaxationApplied) {
             // Fire onStall hook (C1: safe-wrap, M7: computed metrics)
             const rawSat = safeCall(satisfactionFn, facts) ?? 0;
-            const stallMetrics = computeGoalMetrics(clampSatisfaction(rawSat), stepMetrics, step);
+            const stallMetrics = computeGoalMetrics(
+              clampSatisfaction(rawSat),
+              stepMetrics,
+              step,
+            );
             safeCall(onStall, step, stallMetrics);
 
             // If we've exhausted all relaxation tiers and still stalled, fail
             if (!relaxation || appliedRelaxationTiers >= relaxation.length) {
               const durationMs = Date.now() - patternStartTime;
-              const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+              const totalTokens = Object.values(nodeResults).reduce(
+                (sum, r) => sum + r.totalTokens,
+                0,
+              );
 
               return {
                 achieved: false,
-                result: safeCall(extract, facts) ?? facts as unknown as T,
+                result: safeCall(extract, facts) ?? (facts as unknown as T),
                 facts: { ...facts },
                 executionOrder,
                 nodeResults,
@@ -5341,7 +6361,8 @@ export function createMultiAgentOrchestrator(
                 durationMs,
                 stepMetrics,
                 relaxations,
-                error: "Goal stalled: no ready nodes and no remaining relaxation tiers",
+                error:
+                  "Goal stalled: no ready nodes and no remaining relaxation tiers",
               };
             }
           }
@@ -5355,8 +6376,10 @@ export function createMultiAgentOrchestrator(
         // Run selected nodes in parallel
         const stepStart = Date.now();
         const rawPreSat = satisfactionFn
-          ? safeCall(satisfactionFn, facts) ?? 0
-          : (safeCall(goalWhen, facts) === true ? 1.0 : 0.0);
+          ? (safeCall(satisfactionFn, facts) ?? 0)
+          : safeCall(goalWhen, facts) === true
+            ? 1.0
+            : 0.0;
         const preSatisfaction = clampSatisfaction(rawPreSat);
         let stepTokens = 0;
         const factsProduced: string[] = [];
@@ -5412,11 +6435,17 @@ export function createMultiAgentOrchestrator(
               const rawOutput = result.output;
               if (rawOutput && typeof rawOutput === "object") {
                 goalSafeMerge(facts, rawOutput as Record<string, unknown>);
-                factsProduced.push(...Object.keys(rawOutput as Record<string, unknown>));
+                factsProduced.push(
+                  ...Object.keys(rawOutput as Record<string, unknown>),
+                );
               } else if (typeof rawOutput === "string") {
                 try {
                   const parsed = JSON.parse(rawOutput);
-                  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                  if (
+                    parsed &&
+                    typeof parsed === "object" &&
+                    !Array.isArray(parsed)
+                  ) {
                     goalSafeMerge(facts, parsed);
                     factsProduced.push(...Object.keys(parsed));
                   } else {
@@ -5450,8 +6479,10 @@ export function createMultiAgentOrchestrator(
 
         // Compute step metrics (M4: clamp satisfaction)
         const rawPostSat = satisfactionFn
-          ? safeCall(satisfactionFn, facts) ?? 0
-          : (safeCall(goalWhen, facts) === true ? 1.0 : 0.0);
+          ? (safeCall(satisfactionFn, facts) ?? 0)
+          : safeCall(goalWhen, facts) === true
+            ? 1.0
+            : 0.0;
         const postSatisfaction = clampSatisfaction(rawPostSat);
         const satisfactionDelta = postSatisfaction - preSatisfaction;
 
@@ -5486,7 +6517,12 @@ export function createMultiAgentOrchestrator(
         for (const nodeId of selectedNodes) {
           const node = nodes[nodeId]!;
           if (!agentMetrics[node.handler]) {
-            agentMetrics[node.handler] = { runs: 0, avgSatisfactionDelta: 0, tokens: 0, totalDelta: 0 };
+            agentMetrics[node.handler] = {
+              runs: 0,
+              avgSatisfactionDelta: 0,
+              tokens: 0,
+              totalDelta: 0,
+            };
           }
           const m = agentMetrics[node.handler]!;
           m.runs++;
@@ -5504,7 +6540,12 @@ export function createMultiAgentOrchestrator(
         }
 
         // Save checkpoint at configured intervals
-        if (checkpointConfig && checkpointStoreRef && step > startStep && (step - startStep) % checkpointEveryN === 0) {
+        if (
+          checkpointConfig &&
+          checkpointStoreRef &&
+          step > startStep &&
+          (step - startStep) % checkpointEveryN === 0
+        ) {
           const ckptState: GoalCheckpointState = {
             type: "goal",
             version: 1,
@@ -5519,7 +6560,10 @@ export function createMultiAgentOrchestrator(
             failedNodes: Object.fromEntries(failedNodes),
             nodeInputHashes: Object.fromEntries(nodeInputHashes),
             nodeOutputs: Object.fromEntries(
-              Object.entries(nodeResults).map(([id, r]) => [id, { output: r.output, totalTokens: r.totalTokens }])
+              Object.entries(nodeResults).map(([id, r]) => [
+                id,
+                { output: r.output, totalTokens: r.totalTokens },
+              ]),
             ),
             executionOrder: [...executionOrder],
             stepMetrics: [...stepMetrics],
@@ -5528,10 +6572,17 @@ export function createMultiAgentOrchestrator(
             stallSteps,
             lastSatisfaction,
             agentMetrics: Object.fromEntries(
-              Object.entries(agentMetrics).map(([id, m]) => [id, { runs: m.runs, totalDelta: m.totalDelta, tokens: m.tokens }])
+              Object.entries(agentMetrics).map(([id, m]) => [
+                id,
+                { runs: m.runs, totalDelta: m.totalDelta, tokens: m.tokens },
+              ]),
             ),
           };
-          const savedId = await savePatternCheckpoint(ckptState, checkpointStoreRef, checkpointConfig);
+          const savedId = await savePatternCheckpoint(
+            ckptState,
+            checkpointStoreRef,
+            checkpointConfig,
+          );
           if (savedId) {
             lastCheckpointId = savedId;
           }
@@ -5540,11 +6591,14 @@ export function createMultiAgentOrchestrator(
 
       // Max steps exhausted
       const durationMs = Date.now() - patternStartTime;
-      const totalTokens = Object.values(nodeResults).reduce((sum, r) => sum + r.totalTokens, 0);
+      const totalTokens = Object.values(nodeResults).reduce(
+        (sum, r) => sum + r.totalTokens,
+        0,
+      );
 
       return {
         achieved: false,
-        result: safeCall(extract, facts) ?? facts as unknown as T,
+        result: safeCall(extract, facts) ?? (facts as unknown as T),
         facts: { ...facts },
         executionOrder,
         nodeResults,
@@ -5685,15 +6739,24 @@ export function createMultiAgentOrchestrator(
   // ---- Pattern handler extraction (for debug events) ----
   function getPatternHandlers(pattern: ExecutionPattern): string[] {
     switch (pattern.type) {
-      case "parallel": return pattern.handlers;
-      case "sequential": return pattern.handlers;
-      case "supervisor": return [pattern.supervisor, ...pattern.workers];
-      case "dag": return Object.values(pattern.nodes).map((n) => n.handler);
-      case "reflect": return [pattern.handler, pattern.evaluator];
-      case "race": return pattern.handlers;
-      case "debate": return [...pattern.handlers, pattern.evaluator];
-      case "goal": return Object.values(pattern.nodes).map((n) => n.handler);
-      default: return [];
+      case "parallel":
+        return pattern.handlers;
+      case "sequential":
+        return pattern.handlers;
+      case "supervisor":
+        return [pattern.supervisor, ...pattern.workers];
+      case "dag":
+        return Object.values(pattern.nodes).map((n) => n.handler);
+      case "reflect":
+        return [pattern.handler, pattern.evaluator];
+      case "race":
+        return pattern.handlers;
+      case "debate":
+        return [...pattern.handlers, pattern.evaluator];
+      case "goal":
+        return Object.values(pattern.nodes).map((n) => n.handler);
+      default:
+        return [];
     }
   }
 
@@ -5718,7 +6781,9 @@ export function createMultiAgentOrchestrator(
       return Object.freeze({ ...derivedValues });
     },
 
-    onDerivedChange(callback: (id: string, value: unknown) => void): () => void {
+    onDerivedChange(
+      callback: (id: string, value: unknown) => void,
+    ): () => void {
       derivedChangeCallbacks.add(callback);
 
       return () => {
@@ -5740,7 +6805,9 @@ export function createMultiAgentOrchestrator(
       if (!pattern) {
         const available = Object.keys(patterns).join(", ") || "(none)";
 
-        throw new Error(`[Directive MultiAgent] Unknown pattern "${patternId}". Available patterns: ${available}`);
+        throw new Error(
+          `[Directive MultiAgent] Unknown pattern "${patternId}". Available patterns: ${available}`,
+        );
       }
 
       const patternStartTime = Date.now();
@@ -5762,37 +6829,72 @@ export function createMultiAgentOrchestrator(
       try {
         switch (pattern.type) {
           case "parallel":
-            return await runParallelPattern(pattern as ParallelPattern<T>, input, patternId);
+            return await runParallelPattern(
+              pattern as ParallelPattern<T>,
+              input,
+              patternId,
+            );
           case "sequential":
-            return await runSequentialPattern(pattern as SequentialPattern<T>, input, patternId);
+            return await runSequentialPattern(
+              pattern as SequentialPattern<T>,
+              input,
+              patternId,
+            );
           case "supervisor":
-            return await runSupervisorPattern(pattern as SupervisorPattern<T>, input, patternId);
+            return await runSupervisorPattern(
+              pattern as SupervisorPattern<T>,
+              input,
+              patternId,
+            );
           case "dag":
-            return await runDagPattern(pattern as DagPattern<T>, input, patternId);
+            return await runDagPattern(
+              pattern as DagPattern<T>,
+              input,
+              patternId,
+            );
           case "reflect":
-            return await runReflectPattern(pattern as ReflectPattern<T>, input, patternId);
+            return await runReflectPattern(
+              pattern as ReflectPattern<T>,
+              input,
+              patternId,
+            );
           case "race": {
-            const raceResult = await runRacePattern(pattern as RacePattern<T>, input, patternId);
+            const raceResult = await runRacePattern(
+              pattern as RacePattern<T>,
+              input,
+              patternId,
+            );
 
             return raceResult.result;
           }
           case "debate": {
             const debatePattern = pattern as DebatePattern<T>;
-            const debateResult = await runDebateInternal<T>(debatePattern, input, patternId);
+            const debateResult = await runDebateInternal<T>(
+              debatePattern,
+              input,
+              patternId,
+            );
 
             return debateResult.result;
           }
           case "goal": {
             const goalPattern = pattern as GoalPattern<T>;
-            const goalResult = await runGoalInternal<T>(goalPattern, input, patternId);
+            const goalResult = await runGoalInternal<T>(
+              goalPattern,
+              input,
+              patternId,
+            );
 
             return goalResult.result;
           }
           default:
-            throw new Error(`[Directive MultiAgent] Unknown pattern type: ${(pattern as { type: string }).type}`);
+            throw new Error(
+              `[Directive MultiAgent] Unknown pattern type: ${(pattern as { type: string }).type}`,
+            );
         }
       } catch (error) {
-        patternError = error instanceof Error ? error : new Error(String(error));
+        patternError =
+          error instanceof Error ? error : new Error(String(error));
         throw error;
       } finally {
         if (timeline) {
@@ -5813,7 +6915,7 @@ export function createMultiAgentOrchestrator(
       agentIds: string[],
       inputs: string | string[],
       merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-      options?: { minSuccess?: number; timeout?: number }
+      options?: { minSuccess?: number; timeout?: number },
     ): Promise<T> {
       assertNotDisposed();
       const inputArray = Array.isArray(inputs)
@@ -5822,7 +6924,7 @@ export function createMultiAgentOrchestrator(
 
       if (inputArray.length !== agentIds.length) {
         throw new Error(
-          `[Directive MultiAgent] Input count (${inputArray.length}) must match agent count (${agentIds.length})`
+          `[Directive MultiAgent] Input count (${inputArray.length}) must match agent count (${agentIds.length})`,
         );
       }
 
@@ -5835,24 +6937,31 @@ export function createMultiAgentOrchestrator(
 
       try {
         const promises = agentIds.map((agentId, i) =>
-          runSingleAgent(agentId, inputArray[i]!, { signal: controller.signal }).catch((error) => {
+          runSingleAgent(agentId, inputArray[i]!, {
+            signal: controller.signal,
+          }).catch((error) => {
             if (options?.minSuccess !== undefined) {
               return null;
             }
 
             throw error;
-          })
+          }),
         );
 
         const results = await Promise.all(promises);
-        const successResults = results.filter((r): r is RunResult<unknown> => r !== null);
+        const successResults = results.filter(
+          (r): r is RunResult<unknown> => r !== null,
+        );
 
-        if (options?.minSuccess !== undefined && successResults.length < options.minSuccess) {
+        if (
+          options?.minSuccess !== undefined &&
+          successResults.length < options.minSuccess
+        ) {
           const failCount = results.length - successResults.length;
 
           throw new Error(
             `[Directive MultiAgent] runParallel: Only ${successResults.length}/${agentIds.length} agents succeeded ` +
-            `(minimum required: ${options.minSuccess}, failed: ${failCount})`
+              `(minimum required: ${options.minSuccess}, failed: ${failCount})`,
           );
         }
 
@@ -5867,7 +6976,9 @@ export function createMultiAgentOrchestrator(
     async runSequential<T>(
       agentIds: string[],
       initialInput: string,
-      opts?: { transform?: (output: unknown, agentId: string, index: number) => string }
+      opts?: {
+        transform?: (output: unknown, agentId: string, index: number) => string;
+      },
     ): Promise<RunResult<T>[]> {
       assertNotDisposed();
       const results: RunResult<unknown>[] = [];
@@ -5897,28 +7008,44 @@ export function createMultiAgentOrchestrator(
       fromAgent: string,
       toAgent: string,
       input: string,
-      context?: Record<string, unknown>
+      context?: Record<string, unknown>,
     ): Promise<RunResult<unknown>> {
       assertNotDisposed();
 
       if (!agents[fromAgent]) {
         const available = Object.keys(agents).join(", ") || "(none)";
 
-        throw new Error(`[Directive MultiAgent] Handoff source agent "${fromAgent}" not found. Registered: ${available}`);
+        throw new Error(
+          `[Directive MultiAgent] Handoff source agent "${fromAgent}" not found. Registered: ${available}`,
+        );
       }
       if (!agents[toAgent]) {
         const available = Object.keys(agents).join(", ") || "(none)";
 
-        throw new Error(`[Directive MultiAgent] Handoff target agent "${toAgent}" not found. Registered: ${available}`);
+        throw new Error(
+          `[Directive MultiAgent] Handoff target agent "${toAgent}" not found. Registered: ${available}`,
+        );
       }
 
       // ---- Breakpoint: pre_handoff ----
       {
-        const bpResult = await handleBreakpoint("pre_handoff", fromAgent, agents[fromAgent]!.agent.name, input, undefined, {
-          handoff: { fromAgent, toAgent },
-        });
+        const bpResult = await handleBreakpoint(
+          "pre_handoff",
+          fromAgent,
+          agents[fromAgent]!.agent.name,
+          input,
+          undefined,
+          {
+            handoff: { fromAgent, toAgent },
+          },
+        );
         if (bpResult.skip) {
-          return { output: undefined as unknown, messages: [], toolCalls: [], totalTokens: 0 };
+          return {
+            output: undefined as unknown,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
         }
         input = bpResult.input;
       }
@@ -5933,8 +7060,12 @@ export function createMultiAgentOrchestrator(
       };
 
       pendingHandoffs.push(request);
-      try { onHandoff?.(request); } catch (e) {
-        if (debug) { console.debug("[Directive MultiAgent] onHandoff threw:", e); }
+      try {
+        onHandoff?.(request);
+      } catch (e) {
+        if (debug) {
+          console.debug("[Directive MultiAgent] onHandoff threw:", e);
+        }
       }
       fireHook("onHandoff", request);
 
@@ -5955,12 +7086,19 @@ export function createMultiAgentOrchestrator(
           const contextSummary = Object.entries(context)
             .map(([k, v]) => `${k}: ${safeStringify(v)}`)
             .join(", ");
-          targetMemory.addMessages([{
-            role: "system",
-            content: `[Handoff from ${fromAgent}] Context: ${contextSummary}`,
-          }]);
+          targetMemory.addMessages([
+            {
+              role: "system",
+              content: `[Handoff from ${fromAgent}] Context: ${contextSummary}`,
+            },
+          ]);
         } catch (memoryError) {
-          if (debug) { console.debug("[Directive MultiAgent] Handoff addMessages failed:", memoryError); }
+          if (debug) {
+            console.debug(
+              "[Directive MultiAgent] Handoff addMessages failed:",
+              memoryError,
+            );
+          }
         }
       }
 
@@ -5974,8 +7112,12 @@ export function createMultiAgentOrchestrator(
         };
 
         addHandoffResult(handoffResult);
-        try { onHandoffComplete?.(handoffResult); } catch (e) {
-          if (debug) { console.debug("[Directive MultiAgent] onHandoffComplete threw:", e); }
+        try {
+          onHandoffComplete?.(handoffResult);
+        } catch (e) {
+          if (debug) {
+            console.debug("[Directive MultiAgent] onHandoffComplete threw:", e);
+          }
         }
         fireHook("onHandoffComplete", handoffResult);
 
@@ -6015,8 +7157,13 @@ export function createMultiAgentOrchestrator(
           const approved = [...currentApproval.approved, requestId];
           setApprovalState(agentFacts, {
             ...currentApproval,
-            pending: currentApproval.pending.filter((r: ApprovalRequest) => r.id !== requestId),
-            approved: approved.length > MAX_APPROVAL_HISTORY ? approved.slice(-MAX_APPROVAL_HISTORY) : approved,
+            pending: currentApproval.pending.filter(
+              (r: ApprovalRequest) => r.id !== requestId,
+            ),
+            approved:
+              approved.length > MAX_APPROVAL_HISTORY
+                ? approved.slice(-MAX_APPROVAL_HISTORY)
+                : approved,
           });
         });
 
@@ -6024,7 +7171,9 @@ export function createMultiAgentOrchestrator(
       }
 
       if (debug) {
-        console.debug(`[Directive MultiAgent] approve() ignored: no pending request "${requestId}"`);
+        console.debug(
+          `[Directive MultiAgent] approve() ignored: no pending request "${requestId}"`,
+        );
       }
     },
 
@@ -6039,7 +7188,9 @@ export function createMultiAgentOrchestrator(
         system.batch(() => {
           const currentApproval = getApprovalState(agentFacts);
           if (reason && debug) {
-            console.debug(`[Directive MultiAgent] Request ${requestId} rejected: ${reason}`);
+            console.debug(
+              `[Directive MultiAgent] Request ${requestId} rejected: ${reason}`,
+            );
           }
           const rejectedRequest: RejectedRequest = {
             id: requestId,
@@ -6050,8 +7201,13 @@ export function createMultiAgentOrchestrator(
           const rejected = [...currentApproval.rejected, rejectedRequest];
           setApprovalState(agentFacts, {
             ...currentApproval,
-            pending: currentApproval.pending.filter((r: ApprovalRequest) => r.id !== requestId),
-            rejected: rejected.length > MAX_REJECTION_HISTORY ? rejected.slice(-MAX_REJECTION_HISTORY) : rejected,
+            pending: currentApproval.pending.filter(
+              (r: ApprovalRequest) => r.id !== requestId,
+            ),
+            rejected:
+              rejected.length > MAX_REJECTION_HISTORY
+                ? rejected.slice(-MAX_REJECTION_HISTORY)
+                : rejected,
           });
         });
 
@@ -6059,7 +7215,9 @@ export function createMultiAgentOrchestrator(
       }
 
       if (debug) {
-        console.debug(`[Directive MultiAgent] reject() ignored: no pending request "${requestId}"`);
+        console.debug(
+          `[Directive MultiAgent] reject() ignored: no pending request "${requestId}"`,
+        );
       }
     },
 
@@ -6089,7 +7247,7 @@ export function createMultiAgentOrchestrator(
 
     getAllAgentStates() {
       return Object.fromEntries(
-        Object.entries(agentStates).map(([k, v]) => [k, { ...v }])
+        Object.entries(agentStates).map(([k, v]) => [k, { ...v }]),
       );
     },
 
@@ -6104,9 +7262,14 @@ export function createMultiAgentOrchestrator(
 
     /** Wait until all agents are idle (no running agents) */
     waitForIdle(timeoutMs?: number): Promise<void> {
-      const allIdle = () => pendingRuns === 0 && Object.values(agentStates).every(
-        (s) => s.status === "idle" || s.status === "completed" || s.status === "error"
-      );
+      const allIdle = () =>
+        pendingRuns === 0 &&
+        Object.values(agentStates).every(
+          (s) =>
+            s.status === "idle" ||
+            s.status === "completed" ||
+            s.status === "error",
+        );
       if (allIdle()) {
         return Promise.resolve();
       }
@@ -6133,32 +7296,50 @@ export function createMultiAgentOrchestrator(
         if (timeoutMs !== undefined) {
           timeoutId = setTimeout(() => {
             cleanup();
-            reject(new Error(`[Directive MultiAgent] waitForIdle timed out after ${timeoutMs}ms`));
+            reject(
+              new Error(
+                `[Directive MultiAgent] waitForIdle timed out after ${timeoutMs}ms`,
+              ),
+            );
           }, timeoutMs);
         }
       });
     },
 
     /** Alias for runAgent */
-    run<T>(agentId: string, input: string, options?: MultiAgentRunCallOptions): Promise<RunResult<T>> {
+    run<T>(
+      agentId: string,
+      input: string,
+      options?: MultiAgentRunCallOptions,
+    ): Promise<RunResult<T>> {
       return runSingleAgent<T>(agentId, input, options);
     },
 
     /** Alias for runAgentStream */
-    runStream<T>(agentId: string, input: string, options?: { signal?: AbortSignal }): OrchestratorStreamResult<T> {
+    runStream<T>(
+      agentId: string,
+      input: string,
+      options?: { signal?: AbortSignal },
+    ): OrchestratorStreamResult<T> {
       return runAgentStreamImpl<T>(agentId, input, options);
     },
 
     registerAgent(agentId: string, registration: AgentRegistration): void {
       assertNotDisposed();
       if (RESERVED_IDS.has(agentId)) {
-        throw new Error(`[Directive MultiAgent] Agent ID "${agentId}" is reserved and cannot be used`);
+        throw new Error(
+          `[Directive MultiAgent] Agent ID "${agentId}" is reserved and cannot be used`,
+        );
       }
       if (agents[agentId]) {
-        throw new Error(`[Directive MultiAgent] Agent "${agentId}" is already registered. Unregister first.`);
+        throw new Error(
+          `[Directive MultiAgent] Agent "${agentId}" is already registered. Unregister first.`,
+        );
       }
       if (tasks[agentId]) {
-        throw new Error(`[Directive MultiAgent] ID "${agentId}" is already registered as a task`);
+        throw new Error(
+          `[Directive MultiAgent] ID "${agentId}" is already registered as a task`,
+        );
       }
 
       // Build per-agent constraints and resolvers (same as initial setup)
@@ -6177,11 +7358,20 @@ export function createMultiAgentOrchestrator(
             // biome-ignore lint/suspicious/noExplicitAny: Context type varies
             resolve: async (req: Requirement, context: any) => {
               const state = getOrchestratorState(context.facts);
-              const combinedFacts = { ...context.facts, ...state } as unknown as Record<string, unknown> & OrchestratorState;
+              const combinedFacts = {
+                ...context.facts,
+                ...state,
+              } as unknown as Record<string, unknown> & OrchestratorState;
 
-              const resolverContext: OrchestratorResolverContext<Record<string, unknown>> = {
+              const resolverContext: OrchestratorResolverContext<
+                Record<string, unknown>
+              > = {
                 facts: combinedFacts,
-                runAgent: async <T>(agent: AgentLike, input: string, opts?: RunOptions) => {
+                runAgent: async <T>(
+                  agent: AgentLike,
+                  input: string,
+                  opts?: RunOptions,
+                ) => {
                   return runner<T>(agent, input, opts);
                 },
                 signal: context.signal,
@@ -6214,7 +7404,10 @@ export function createMultiAgentOrchestrator(
           setBreakpointState(facts, createInitialBreakpointState());
         },
         constraints: perAgentConstraints,
-        resolvers: Object.keys(perAgentResolvers).length > 0 ? (perAgentResolvers as any) : undefined,
+        resolvers:
+          Object.keys(perAgentResolvers).length > 0
+            ? (perAgentResolvers as any)
+            : undefined,
       });
 
       // biome-ignore lint/suspicious/noExplicitAny: System type narrowing loses namespaced overload
@@ -6234,7 +7427,9 @@ export function createMultiAgentOrchestrator(
       };
 
       if (debug) {
-        console.debug(`[Directive MultiAgent] Registered agent "${agentId}" (${registration.agent.name})`);
+        console.debug(
+          `[Directive MultiAgent] Registered agent "${agentId}" (${registration.agent.name})`,
+        );
       }
 
       recomputeDerivations();
@@ -6243,12 +7438,16 @@ export function createMultiAgentOrchestrator(
     unregisterAgent(agentId: string): void {
       assertNotDisposed();
       if (!agents[agentId]) {
-        throw new Error(`[Directive MultiAgent] Agent "${agentId}" is not registered`);
+        throw new Error(
+          `[Directive MultiAgent] Agent "${agentId}" is not registered`,
+        );
       }
 
       const state = agentStates[agentId];
       if (state?.status === "running") {
-        throw new Error(`[Directive MultiAgent] Cannot unregister agent "${agentId}" while it is running`);
+        throw new Error(
+          `[Directive MultiAgent] Cannot unregister agent "${agentId}" while it is running`,
+        );
       }
 
       // Warn about orphaned patterns referencing this agent
@@ -6259,7 +7458,9 @@ export function createMultiAgentOrchestrator(
             referencedAgents = [pattern.supervisor, ...pattern.workers];
             break;
           case "dag":
-            referencedAgents = Object.values(pattern.nodes).map((n) => n.handler);
+            referencedAgents = Object.values(pattern.nodes).map(
+              (n) => n.handler,
+            );
             break;
           case "reflect":
             referencedAgents = [pattern.handler, pattern.evaluator];
@@ -6270,14 +7471,17 @@ export function createMultiAgentOrchestrator(
             referencedAgents = pattern.handlers;
             break;
           case "debate":
-            referencedAgents = [...(pattern as DebatePattern).handlers, (pattern as DebatePattern).evaluator];
+            referencedAgents = [
+              ...(pattern as DebatePattern).handlers,
+              (pattern as DebatePattern).evaluator,
+            ];
             break;
           default:
             referencedAgents = [];
         }
         if (referencedAgents.includes(agentId)) {
           console.warn(
-            `[Directive MultiAgent] Warning: Pattern "${patternId}" references unregistered agent "${agentId}"`
+            `[Directive MultiAgent] Warning: Pattern "${patternId}" references unregistered agent "${agentId}"`,
           );
         }
       }
@@ -6304,7 +7508,11 @@ export function createMultiAgentOrchestrator(
             startedAt: null,
             completedAt: null,
           });
-          setApprovalState(agentFacts, { pending: [], approved: [], rejected: [] });
+          setApprovalState(agentFacts, {
+            pending: [],
+            approved: [],
+            rejected: [],
+          });
           setConversation(agentFacts, []);
           setToolCalls(agentFacts, []);
           setBreakpointState(agentFacts, createInitialBreakpointState());
@@ -6331,51 +7539,92 @@ export function createMultiAgentOrchestrator(
     registerTask(taskId: string, registration: TaskRegistration): void {
       assertNotDisposed();
       if (RESERVED_IDS.has(taskId)) {
-        throw new Error(`[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`);
+        throw new Error(
+          `[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`,
+        );
       }
-      if (!taskId || typeof taskId !== "string" || taskId.trim() !== taskId || taskId.length === 0) {
-        throw new Error(`[Directive MultiAgent] Task ID must be a non-empty trimmed string`);
+      if (
+        !taskId ||
+        typeof taskId !== "string" ||
+        taskId.trim() !== taskId ||
+        taskId.length === 0
+      ) {
+        throw new Error(
+          `[Directive MultiAgent] Task ID must be a non-empty trimmed string`,
+        );
       }
       if (agents[taskId]) {
-        throw new Error(`[Directive MultiAgent] ID "${taskId}" is already registered as an agent`);
+        throw new Error(
+          `[Directive MultiAgent] ID "${taskId}" is already registered as an agent`,
+        );
       }
       if (tasks[taskId]) {
-        throw new Error(`[Directive MultiAgent] Task "${taskId}" is already registered`);
+        throw new Error(
+          `[Directive MultiAgent] Task "${taskId}" is already registered`,
+        );
       }
       // Validate timeout and maxConcurrent
-      if (registration.timeout !== undefined && (!Number.isFinite(registration.timeout) || registration.timeout <= 0)) {
-        throw new Error(`[Directive MultiAgent] Task "${taskId}" timeout must be a finite number > 0`);
+      if (
+        registration.timeout !== undefined &&
+        (!Number.isFinite(registration.timeout) || registration.timeout <= 0)
+      ) {
+        throw new Error(
+          `[Directive MultiAgent] Task "${taskId}" timeout must be a finite number > 0`,
+        );
       }
-      if (registration.maxConcurrent !== undefined && (!Number.isFinite(registration.maxConcurrent) || registration.maxConcurrent < 1 || !Number.isInteger(registration.maxConcurrent))) {
-        throw new Error(`[Directive MultiAgent] Task "${taskId}" maxConcurrent must be a finite integer >= 1`);
+      if (
+        registration.maxConcurrent !== undefined &&
+        (!Number.isFinite(registration.maxConcurrent) ||
+          registration.maxConcurrent < 1 ||
+          !Number.isInteger(registration.maxConcurrent))
+      ) {
+        throw new Error(
+          `[Directive MultiAgent] Task "${taskId}" maxConcurrent must be a finite integer >= 1`,
+        );
       }
       // Validate retry configuration
       if (registration.retry) {
         const { attempts, delayMs } = registration.retry;
         if (!Number.isFinite(attempts) || attempts < 1) {
-          throw new Error(`[Directive MultiAgent] Task "${taskId}" retry attempts must be a finite number >= 1`);
+          throw new Error(
+            `[Directive MultiAgent] Task "${taskId}" retry attempts must be a finite number >= 1`,
+          );
         }
-        if (delayMs !== undefined && (!Number.isFinite(delayMs) || delayMs < 0)) {
-          throw new Error(`[Directive MultiAgent] Task "${taskId}" retry delayMs must be a finite number >= 0`);
+        if (
+          delayMs !== undefined &&
+          (!Number.isFinite(delayMs) || delayMs < 0)
+        ) {
+          throw new Error(
+            `[Directive MultiAgent] Task "${taskId}" retry delayMs must be a finite number >= 0`,
+          );
         }
       }
       tasks[taskId] = registration;
       taskStates[taskId] = { status: "idle" };
-      taskSemaphores.set(taskId, new Semaphore(registration.maxConcurrent ?? 1));
+      taskSemaphores.set(
+        taskId,
+        new Semaphore(registration.maxConcurrent ?? 1),
+      );
 
       if (debug) {
-        console.debug(`[Directive MultiAgent] Registered task "${taskId}" (${registration.label ?? taskId})`);
+        console.debug(
+          `[Directive MultiAgent] Registered task "${taskId}" (${registration.label ?? taskId})`,
+        );
       }
     },
 
     unregisterTask(taskId: string): void {
       assertNotDisposed();
       if (!tasks[taskId]) {
-        throw new Error(`[Directive MultiAgent] Task "${taskId}" is not registered`);
+        throw new Error(
+          `[Directive MultiAgent] Task "${taskId}" is not registered`,
+        );
       }
       const state = taskStates[taskId];
       if (state?.status === "running") {
-        throw new Error(`[Directive MultiAgent] Cannot unregister task "${taskId}" while it is running`);
+        throw new Error(
+          `[Directive MultiAgent] Cannot unregister task "${taskId}" while it is running`,
+        );
       }
       const sem = taskSemaphores.get(taskId);
       if (sem) {
@@ -6394,8 +7643,12 @@ export function createMultiAgentOrchestrator(
       return Object.keys(tasks);
     },
 
-    getTaskRegistry(): Record<string, { label?: string; description?: string }> {
-      const result: Record<string, { label?: string; description?: string }> = Object.create(null);
+    getTaskRegistry(): Record<
+      string,
+      { label?: string; description?: string }
+    > {
+      const result: Record<string, { label?: string; description?: string }> =
+        Object.create(null);
       for (const [id, reg] of Object.entries(tasks)) {
         result[id] = { label: reg.label, description: reg.description };
       }
@@ -6410,7 +7663,16 @@ export function createMultiAgentOrchestrator(
     },
 
     getAllTaskStates() {
-      const result: Record<string, { status: string; lastOutput?: unknown; lastError?: string; startTime?: number; durationMs?: number }> = Object.create(null);
+      const result: Record<
+        string,
+        {
+          status: string;
+          lastOutput?: unknown;
+          lastError?: string;
+          startTime?: number;
+          durationMs?: number;
+        }
+      > = Object.create(null);
       for (const [id, s] of Object.entries(taskStates)) {
         result[id] = Object.freeze(structuredClone(s));
       }
@@ -6451,7 +7713,11 @@ export function createMultiAgentOrchestrator(
             startedAt: null,
             completedAt: null,
           });
-          setApprovalState(agentFacts, { pending: [], approved: [], rejected: [] });
+          setApprovalState(agentFacts, {
+            pending: [],
+            approved: [],
+            rejected: [],
+          });
           setConversation(agentFacts, []);
           setToolCalls(agentFacts, []);
           setBreakpointState(agentFacts, createInitialBreakpointState());
@@ -6464,7 +7730,10 @@ export function createMultiAgentOrchestrator(
         if (tsem) {
           tsem.drain();
         }
-        taskSemaphores.set(taskId, new Semaphore(tasks[taskId]!.maxConcurrent ?? 1));
+        taskSemaphores.set(
+          taskId,
+          new Semaphore(tasks[taskId]!.maxConcurrent ?? 1),
+        );
       }
 
       breakpointModifications.clear();
@@ -6487,7 +7756,9 @@ export function createMultiAgentOrchestrator(
         setBridgeFact(coordFacts, "__handoffResults", []);
         setBridgeFact(coordFacts, "__budgetWarningFired", false);
         if (scratchpadConfig) {
-          setBridgeFact(coordFacts, SCRATCHPAD_KEY, { ...scratchpadConfig.init });
+          setBridgeFact(coordFacts, SCRATCHPAD_KEY, {
+            ...scratchpadConfig.init,
+          });
         }
       });
 
@@ -6513,17 +7784,21 @@ export function createMultiAgentOrchestrator(
       // Ensure no agents or tasks are running
       for (const [id, s] of Object.entries(agentStates)) {
         if (s.status === "running") {
-          throw new Error(`[Directive MultiAgent] Cannot checkpoint while agent "${id}" is running`);
+          throw new Error(
+            `[Directive MultiAgent] Cannot checkpoint while agent "${id}" is running`,
+          );
         }
       }
       for (const [id, s] of Object.entries(taskStates)) {
         if (s.status === "running") {
-          throw new Error(`[Directive MultiAgent] Cannot checkpoint while task "${id}" is running`);
+          throw new Error(
+            `[Directive MultiAgent] Cannot checkpoint while task "${id}" is running`,
+          );
         }
       }
       if (!(system as any).debug?.export) {
         throw new Error(
-          "[Directive MultiAgent] Checkpointing requires debug mode. Set `debug: true` in orchestrator options."
+          "[Directive MultiAgent] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.",
         );
       }
 
@@ -6539,7 +7814,10 @@ export function createMultiAgentOrchestrator(
           globalTokenCount,
           globalStatus,
           agentStates: Object.fromEntries(
-            Object.entries(agentStates).map(([k, v]) => [k, structuredClone(v)])
+            Object.entries(agentStates).map(([k, v]) => [
+              k,
+              structuredClone(v),
+            ]),
           ),
           handoffCounter,
           pendingHandoffs: [...pendingHandoffs],
@@ -6548,10 +7826,19 @@ export function createMultiAgentOrchestrator(
             ? Object.fromEntries(roundRobinCounters)
             : null,
           taskStates: Object.fromEntries(
-            Object.entries(taskStates).map(([k, v]) => [k, { lastOutput: v.lastOutput != null ? String(v.lastOutput) : undefined, lastError: v.lastError }])
+            Object.entries(taskStates).map(([k, v]) => [
+              k,
+              {
+                lastOutput:
+                  v.lastOutput != null ? String(v.lastOutput) : undefined,
+                lastError: v.lastError,
+              },
+            ]),
           ),
         } satisfies MultiAgentCheckpointLocalState,
-        memoryExport: sharedMemory ? (sharedMemory as any).export?.() ?? null : null,
+        memoryExport: sharedMemory
+          ? ((sharedMemory as any).export?.() ?? null)
+          : null,
         orchestratorType: "multi",
       };
 
@@ -6569,13 +7856,15 @@ export function createMultiAgentOrchestrator(
         throw new Error("[Directive MultiAgent] Invalid checkpoint data");
       }
       if (cp.orchestratorType !== "multi") {
-        throw new Error(`[Directive MultiAgent] Expected multi-agent checkpoint, got "${cp.orchestratorType}"`);
+        throw new Error(
+          `[Directive MultiAgent] Expected multi-agent checkpoint, got "${cp.orchestratorType}"`,
+        );
       }
 
       // Restore system state
       if (!(system as any).debug?.import) {
         throw new Error(
-          "[Directive MultiAgent] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options."
+          "[Directive MultiAgent] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.",
         );
       }
       (system as any).debug.import(cp.systemExport);
@@ -6628,9 +7917,15 @@ export function createMultiAgentOrchestrator(
       if (local.taskStates) {
         for (const [id, s] of Object.entries(local.taskStates)) {
           if (!tasks[id]) {
-            throw new Error(`[Directive MultiAgent] Checkpoint references task "${id}" which is not registered. Task run functions cannot be serialized — re-provide the task registration.`);
+            throw new Error(
+              `[Directive MultiAgent] Checkpoint references task "${id}" which is not registered. Task run functions cannot be serialized — re-provide the task registration.`,
+            );
           }
-          taskStates[id] = { status: "idle", lastOutput: s.lastOutput, lastError: s.lastError };
+          taskStates[id] = {
+            status: "idle",
+            lastOutput: s.lastOutput,
+            lastError: s.lastError,
+          };
         }
         // Rebuild task semaphores
         for (const [taskId, reg] of Object.entries(tasks)) {
@@ -6652,7 +7947,7 @@ export function createMultiAgentOrchestrator(
       agentIds: string[],
       inputs: string | string[],
       merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-      opts?: { minSuccess?: number; timeout?: number; signal?: AbortSignal }
+      opts?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
     ): MultiplexedStreamResult<T> {
       assertNotDisposed();
 
@@ -6662,7 +7957,7 @@ export function createMultiAgentOrchestrator(
 
       if (inputArray.length !== agentIds.length) {
         throw new Error(
-          `[Directive MultiAgent] Input count (${inputArray.length}) must match agent count (${agentIds.length})`
+          `[Directive MultiAgent] Input count (${inputArray.length}) must match agent count (${agentIds.length})`,
         );
       }
 
@@ -6687,12 +7982,15 @@ export function createMultiAgentOrchestrator(
       });
 
       // Merge tagged streams
-      const taggedSources = perAgentStreams.map(({ agentId, streamResult }) => ({
-        agentId,
-        stream: streamResult.stream,
-      }));
+      const taggedSources = perAgentStreams.map(
+        ({ agentId, streamResult }) => ({
+          agentId,
+          stream: streamResult.stream,
+        }),
+      );
 
-      const { stream: mergedStream, getDroppedCount } = mergeTaggedStreams(taggedSources);
+      const { stream: mergedStream, getDroppedCount } =
+        mergeTaggedStreams(taggedSources);
 
       // Clean up external abort listener when done
       let externalOnAbort: (() => void) | undefined;
@@ -6703,7 +8001,7 @@ export function createMultiAgentOrchestrator(
 
       // Collect all results
       const resultsPromise = Promise.allSettled(
-        perAgentStreams.map(({ streamResult }) => streamResult.result)
+        perAgentStreams.map(({ streamResult }) => streamResult.result),
       ).then((settled) => {
         if (timeoutId) {
           clearTimeout(timeoutId);
@@ -6720,10 +8018,13 @@ export function createMultiAgentOrchestrator(
           }
         }
 
-        if (opts?.minSuccess !== undefined && successes.length < opts.minSuccess) {
+        if (
+          opts?.minSuccess !== undefined &&
+          successes.length < opts.minSuccess
+        ) {
           throw new Error(
             `[Directive MultiAgent] runParallelStream: Only ${successes.length}/${agentIds.length} agents succeeded ` +
-            `(minimum required: ${opts.minSuccess})`
+              `(minimum required: ${opts.minSuccess})`,
           );
         }
 
@@ -6758,7 +8059,12 @@ export function createMultiAgentOrchestrator(
     async runRace<T>(
       agentIds: string[],
       input: string,
-      raceOpts?: { extract?: (result: RunResult<unknown>) => T; timeout?: number; minSuccess?: number; signal?: AbortSignal }
+      raceOpts?: {
+        extract?: (result: RunResult<unknown>) => T;
+        timeout?: number;
+        minSuccess?: number;
+        signal?: AbortSignal;
+      },
     ): Promise<RaceResult<T>> {
       assertNotDisposed();
 
@@ -6783,15 +8089,24 @@ export function createMultiAgentOrchestrator(
       reflectOpts?: {
         maxIterations?: number;
         parseEvaluation?: (output: unknown) => ReflectionEvaluation;
-        buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+        buildRetryInput?: (
+          input: string,
+          feedback: string,
+          iteration: number,
+        ) => string;
         extract?: (output: unknown) => T;
         onExhausted?: "accept-last" | "accept-best" | "throw";
         onIteration?: (record: ReflectIterationRecord) => void;
         signal?: AbortSignal;
         timeout?: number;
         threshold?: number | ((iteration: number) => number);
-      }
-    ): Promise<{ result: T; iterations: number; history: ReflectIterationRecord[]; exhausted: boolean }> {
+      },
+    ): Promise<{
+      result: T;
+      iterations: number;
+      history: ReflectIterationRecord[];
+      exhausted: boolean;
+    }> {
       assertNotDisposed();
 
       const pattern: ReflectPattern<T> = {
@@ -6809,7 +8124,11 @@ export function createMultiAgentOrchestrator(
         threshold: reflectOpts?.threshold,
       };
 
-      const result = await runReflectPattern<T>(pattern, input, "__imperative_reflect");
+      const result = await runReflectPattern<T>(
+        pattern,
+        input,
+        "__imperative_reflect",
+      );
       const history = lastReflectionHistory ? [...lastReflectionHistory] : [];
       const maxIterations = reflectOpts?.maxIterations ?? 2;
       const exhausted =
@@ -6829,10 +8148,14 @@ export function createMultiAgentOrchestrator(
       debateOpts?: {
         maxRounds?: number;
         extract?: (output: unknown) => T;
-        parseJudgement?: (output: unknown) => { winnerId: string; feedback?: string; score?: number };
+        parseJudgement?: (output: unknown) => {
+          winnerId: string;
+          feedback?: string;
+          score?: number;
+        };
         signal?: AbortSignal;
         timeout?: number;
-      }
+      },
     ): Promise<DebateResult<T>> {
       assertNotDisposed();
 
@@ -6900,13 +8223,21 @@ export function createMultiAgentOrchestrator(
     ): Promise<GoalResult<T>> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || (checkpointState.type !== "goal" && (checkpointState as unknown as Record<string, unknown>).type !== "converge")) {
+      if (
+        !checkpointState ||
+        checkpointState.version !== 1 ||
+        (checkpointState.type !== "goal" &&
+          (checkpointState as unknown as Record<string, unknown>).type !==
+            "converge")
+      ) {
         throw new Error("[Directive MultiAgent] Invalid goal checkpoint state");
       }
       // Migration shim: accept legacy "converge" checkpoint states (shallow copy to avoid mutating input)
-      const normalizedState = (checkpointState as unknown as Record<string, unknown>).type === "converge"
-        ? { ...checkpointState, type: "goal" as const }
-        : checkpointState;
+      const normalizedState =
+        (checkpointState as unknown as Record<string, unknown>).type ===
+        "converge"
+          ? { ...checkpointState, type: "goal" as const }
+          : checkpointState;
 
       return runGoalInternal<T>(
         pattern,
@@ -6922,8 +8253,14 @@ export function createMultiAgentOrchestrator(
     ): Promise<T> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "sequential") {
-        throw new Error("[Directive MultiAgent] Invalid sequential checkpoint state");
+      if (
+        !checkpointState ||
+        checkpointState.version !== 1 ||
+        checkpointState.type !== "sequential"
+      ) {
+        throw new Error(
+          "[Directive MultiAgent] Invalid sequential checkpoint state",
+        );
       }
 
       return runSequentialPattern<T>(
@@ -6941,8 +8278,14 @@ export function createMultiAgentOrchestrator(
     ): Promise<T> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "supervisor") {
-        throw new Error("[Directive MultiAgent] Invalid supervisor checkpoint state");
+      if (
+        !checkpointState ||
+        checkpointState.version !== 1 ||
+        checkpointState.type !== "supervisor"
+      ) {
+        throw new Error(
+          "[Directive MultiAgent] Invalid supervisor checkpoint state",
+        );
       }
 
       const input = options?.input ?? checkpointState.currentInput;
@@ -6962,8 +8305,14 @@ export function createMultiAgentOrchestrator(
     ): Promise<T> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "reflect") {
-        throw new Error("[Directive MultiAgent] Invalid reflect checkpoint state");
+      if (
+        !checkpointState ||
+        checkpointState.version !== 1 ||
+        checkpointState.type !== "reflect"
+      ) {
+        throw new Error(
+          "[Directive MultiAgent] Invalid reflect checkpoint state",
+        );
       }
 
       const input = options?.input ?? checkpointState.effectiveInput;
@@ -6982,8 +8331,14 @@ export function createMultiAgentOrchestrator(
     ): Promise<DebateResult<T>> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "debate") {
-        throw new Error("[Directive MultiAgent] Invalid debate checkpoint state");
+      if (
+        !checkpointState ||
+        checkpointState.version !== 1 ||
+        checkpointState.type !== "debate"
+      ) {
+        throw new Error(
+          "[Directive MultiAgent] Invalid debate checkpoint state",
+        );
       }
 
       return runDebateInternal<T>(
@@ -7001,7 +8356,11 @@ export function createMultiAgentOrchestrator(
     ): Promise<T> {
       assertNotDisposed();
 
-      if (!checkpointState || checkpointState.version !== 1 || checkpointState.type !== "dag") {
+      if (
+        !checkpointState ||
+        checkpointState.version !== 1 ||
+        checkpointState.type !== "dag"
+      ) {
         throw new Error("[Directive MultiAgent] Invalid DAG checkpoint state");
       }
 
@@ -7023,12 +8382,16 @@ export function createMultiAgentOrchestrator(
       assertNotDisposed();
 
       if (!checkpointStore) {
-        throw new Error("[Directive MultiAgent] No checkpoint store configured");
+        throw new Error(
+          "[Directive MultiAgent] No checkpoint store configured",
+        );
       }
 
       const checkpoint = await checkpointStore.load(checkpointId);
       if (!checkpoint) {
-        throw new Error(`[Directive MultiAgent] Checkpoint not found: ${checkpointId}`);
+        throw new Error(
+          `[Directive MultiAgent] Checkpoint not found: ${checkpointId}`,
+        );
       }
 
       // Validate parsed state — prototype pollution defense + structure check
@@ -7046,7 +8409,15 @@ export function createMultiAgentOrchestrator(
           }
         }
 
-        const validTypes = new Set(["sequential", "supervisor", "reflect", "debate", "dag", "goal", "converge"]);
+        const validTypes = new Set([
+          "sequential",
+          "supervisor",
+          "reflect",
+          "debate",
+          "dag",
+          "goal",
+          "converge",
+        ]);
         if (!validTypes.has(parsed.type)) {
           throw new Error(`Unknown checkpoint pattern type: ${parsed.type}`);
         }
@@ -7056,11 +8427,17 @@ export function createMultiAgentOrchestrator(
 
         state = parsed as PatternCheckpointState;
       } catch (err) {
-        throw new Error(`[Directive MultiAgent] Invalid checkpoint state: ${err instanceof Error ? err.message : String(err)}`);
+        throw new Error(
+          `[Directive MultiAgent] Invalid checkpoint state: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
 
       const step = getPatternStep(state);
-      const replayInput = options?.input ?? (("currentInput" in state) ? (state as { currentInput: string }).currentInput : "");
+      const replayInput =
+        options?.input ??
+        ("currentInput" in state
+          ? (state as { currentInput: string }).currentInput
+          : "");
 
       // Record timeline event
       if (timeline) {
@@ -7076,15 +8453,40 @@ export function createMultiAgentOrchestrator(
 
       switch (state.type) {
         case "sequential":
-          return runSequentialPattern<T>(pattern as SequentialPattern<T>, replayInput, state.patternId, state);
+          return runSequentialPattern<T>(
+            pattern as SequentialPattern<T>,
+            replayInput,
+            state.patternId,
+            state,
+          );
         case "supervisor":
-          return runSupervisorPattern<T>(pattern as SupervisorPattern<T>, replayInput, state.patternId, state);
+          return runSupervisorPattern<T>(
+            pattern as SupervisorPattern<T>,
+            replayInput,
+            state.patternId,
+            state,
+          );
         case "reflect":
-          return runReflectPattern<T>(pattern as ReflectPattern<T>, replayInput, state.patternId, state);
+          return runReflectPattern<T>(
+            pattern as ReflectPattern<T>,
+            replayInput,
+            state.patternId,
+            state,
+          );
         case "debate":
-          return runDebateInternal(pattern as DebatePattern<T>, replayInput, state.patternId, state) as Promise<T>;
+          return runDebateInternal(
+            pattern as DebatePattern<T>,
+            replayInput,
+            state.patternId,
+            state,
+          ) as Promise<T>;
         case "dag":
-          return runDagPattern<T>(pattern as DagPattern<T>, replayInput, state.patternId, state);
+          return runDagPattern<T>(
+            pattern as DagPattern<T>,
+            replayInput,
+            state.patternId,
+            state,
+          );
         case "goal":
           return runGoalInternal(
             pattern as GoalPattern<T>,
@@ -7097,7 +8499,10 @@ export function createMultiAgentOrchestrator(
 
     // ---- Breakpoint Methods ----
 
-    resumeBreakpoint(id: string, modifications?: BreakpointModifications): void {
+    resumeBreakpoint(
+      id: string,
+      modifications?: BreakpointModifications,
+    ): void {
       assertNotDisposed();
 
       if (modifications) {
@@ -7114,8 +8519,13 @@ export function createMultiAgentOrchestrator(
             const resolved = [...currentBp.resolved, id];
             setBreakpointState(agentFacts, {
               ...currentBp,
-              pending: currentBp.pending.filter((r: BreakpointRequest) => r.id !== id),
-              resolved: resolved.length > MAX_BREAKPOINT_HISTORY ? resolved.slice(-MAX_BREAKPOINT_HISTORY) : resolved,
+              pending: currentBp.pending.filter(
+                (r: BreakpointRequest) => r.id !== id,
+              ),
+              resolved:
+                resolved.length > MAX_BREAKPOINT_HISTORY
+                  ? resolved.slice(-MAX_BREAKPOINT_HISTORY)
+                  : resolved,
             });
           });
 
@@ -7124,7 +8534,9 @@ export function createMultiAgentOrchestrator(
       }
 
       if (debug) {
-        console.debug(`[Directive MultiAgent] resumeBreakpoint() ignored: no pending breakpoint "${id}"`);
+        console.debug(
+          `[Directive MultiAgent] resumeBreakpoint() ignored: no pending breakpoint "${id}"`,
+        );
       }
     },
 
@@ -7144,8 +8556,13 @@ export function createMultiAgentOrchestrator(
             const cancelled = [...currentBp.cancelled, id];
             setBreakpointState(agentFacts, {
               ...currentBp,
-              pending: currentBp.pending.filter((r: BreakpointRequest) => r.id !== id),
-              cancelled: cancelled.length > MAX_BREAKPOINT_HISTORY ? cancelled.slice(-MAX_BREAKPOINT_HISTORY) : cancelled,
+              pending: currentBp.pending.filter(
+                (r: BreakpointRequest) => r.id !== id,
+              ),
+              cancelled:
+                cancelled.length > MAX_BREAKPOINT_HISTORY
+                  ? cancelled.slice(-MAX_BREAKPOINT_HISTORY)
+                  : cancelled,
             });
           });
 
@@ -7154,7 +8571,9 @@ export function createMultiAgentOrchestrator(
       }
 
       if (debug) {
-        console.debug(`[Directive MultiAgent] cancelBreakpoint() ignored: no pending breakpoint "${id}"`);
+        console.debug(
+          `[Directive MultiAgent] cancelBreakpoint() ignored: no pending breakpoint "${id}"`,
+        );
       }
     },
 
@@ -7217,7 +8636,7 @@ export function createMultiAgentOrchestrator(
 export function parallel<T>(
   handlers: string[],
   merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-  options?: { minSuccess?: number; timeout?: number }
+  options?: { minSuccess?: number; timeout?: number },
 ): ParallelPattern<T> {
   return {
     type: "parallel",
@@ -7247,7 +8666,7 @@ export function sequential<T>(
     transform?: (output: unknown, handlerId: string, index: number) => string;
     extract?: (output: unknown) => T;
     continueOnError?: boolean;
-  }
+  },
 ): SequentialPattern<T> {
   return {
     type: "sequential",
@@ -7277,8 +8696,11 @@ export function supervisor<T>(
   workers: string[],
   options?: {
     maxRounds?: number;
-    extract?: (supervisorOutput: unknown, workerResults: RunResult<unknown>[]) => T;
-  }
+    extract?: (
+      supervisorOutput: unknown,
+      workerResults: RunResult<unknown>[],
+    ) => T;
+  },
 ): SupervisorPattern<T> {
   return {
     type: "supervisor",
@@ -7322,7 +8744,7 @@ export function dag<T = Record<string, unknown>>(
      * - `"continue"` — ignore errors, other branches continue
      */
     onNodeError?: "fail" | "skip-downstream" | "continue";
-  }
+  },
 ): DagPattern<T> {
   return {
     type: "dag",
@@ -7350,14 +8772,18 @@ export function reflect<T>(
   options?: {
     maxIterations?: number;
     parseEvaluation?: (output: unknown) => ReflectionEvaluation;
-    buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+    buildRetryInput?: (
+      input: string,
+      feedback: string,
+      iteration: number,
+    ) => string;
     extract?: (output: unknown) => T;
     onExhausted?: "accept-last" | "accept-best" | "throw";
     onIteration?: (record: ReflectIterationRecord) => void;
     signal?: AbortSignal;
     timeout?: number;
     threshold?: number | ((iteration: number) => number);
-  }
+  },
 ): ReflectPattern<T> {
   return {
     type: "reflect",
@@ -7385,7 +8811,7 @@ export function race<T>(
     timeout?: number;
     minSuccess?: number;
     signal?: AbortSignal;
-  }
+  },
 ): RacePattern<T> {
   return {
     type: "race",
@@ -7438,7 +8864,11 @@ export function goal<T = Record<string, unknown>>(
     signal?: AbortSignal;
     selectionStrategy?: AgentSelectionStrategy;
     relaxation?: RelaxationTier[];
-    onStep?: (step: number, facts: Record<string, unknown>, readyNodes: string[]) => void;
+    onStep?: (
+      step: number,
+      facts: Record<string, unknown>,
+      readyNodes: string[],
+    ) => void;
     onStall?: (step: number, metrics: GoalMetrics) => void;
     checkpoint?: PatternCheckpointConfig;
   },
@@ -7465,7 +8895,9 @@ export function allReadyStrategy(): AgentSelectionStrategy {
  *
  * Sorts by average satisfaction delta (descending) and picks the top N.
  */
-export function highestImpactStrategy(opts?: { topN?: number }): AgentSelectionStrategy {
+export function highestImpactStrategy(opts?: {
+  topN?: number;
+}): AgentSelectionStrategy {
   const topN = opts?.topN ?? 3;
 
   return {
@@ -7501,8 +8933,14 @@ export function costEfficientStrategy(): AgentSelectionStrategy {
         }
 
         // Cost per delta: lower is better
-        const aCost = aM.avgSatisfactionDelta > 0 ? aM.tokens / aM.runs / aM.avgSatisfactionDelta : Infinity;
-        const bCost = bM.avgSatisfactionDelta > 0 ? bM.tokens / bM.runs / bM.avgSatisfactionDelta : Infinity;
+        const aCost =
+          aM.avgSatisfactionDelta > 0
+            ? aM.tokens / aM.runs / aM.avgSatisfactionDelta
+            : Number.POSITIVE_INFINITY;
+        const bCost =
+          bM.avgSatisfactionDelta > 0
+            ? bM.tokens / bM.runs / bM.avgSatisfactionDelta
+            : Number.POSITIVE_INFINITY;
 
         return aCost - bCost;
       });
@@ -7516,7 +8954,10 @@ export function costEfficientStrategy(): AgentSelectionStrategy {
  * Validate that a DAG has no cycles using Kahn's algorithm.
  * Throws if a cycle is detected.
  */
-function validateDagAcyclic(patternId: string, nodes: Record<string, DagNode>): void {
+function validateDagAcyclic(
+  patternId: string,
+  nodes: Record<string, DagNode>,
+): void {
   const nodeIds = Object.keys(nodes);
 
   // Validate deps reference valid node IDs
@@ -7524,7 +8965,7 @@ function validateDagAcyclic(patternId: string, nodes: Record<string, DagNode>): 
     for (const depId of node.deps ?? []) {
       if (!nodes[depId]) {
         throw new Error(
-          `[Directive MultiAgent] DAG pattern "${patternId}": node "${nodeId}" depends on unknown node "${depId}"`
+          `[Directive MultiAgent] DAG pattern "${patternId}": node "${nodeId}" depends on unknown node "${depId}"`,
         );
       }
     }
@@ -7538,7 +8979,7 @@ function validateDagAcyclic(patternId: string, nodes: Record<string, DagNode>): 
   });
   if (!hasRoot) {
     throw new Error(
-      `[Directive MultiAgent] DAG pattern "${patternId}": no root nodes (every node has dependencies)`
+      `[Directive MultiAgent] DAG pattern "${patternId}": no root nodes (every node has dependencies)`,
     );
   }
 
@@ -7576,7 +9017,7 @@ function validateDagAcyclic(patternId: string, nodes: Record<string, DagNode>): 
 
   if (visited !== nodeIds.length) {
     throw new Error(
-      `[Directive MultiAgent] DAG pattern "${patternId}": cycle detected. Visited ${visited}/${nodeIds.length} nodes.`
+      `[Directive MultiAgent] DAG pattern "${patternId}": cycle detected. Visited ${visited}/${nodeIds.length} nodes.`,
     );
   }
 }
@@ -7603,15 +9044,21 @@ export function selectAgent(
   when: (facts: Record<string, unknown>) => boolean | Promise<boolean>,
   agent: string | ((facts: Record<string, unknown>) => string),
   input: string | ((facts: Record<string, unknown>) => string),
-  priority?: number
+  priority?: number,
 ): OrchestratorConstraint<Record<string, unknown>> {
   return {
-    when: when as (facts: Record<string, unknown> & OrchestratorState) => boolean | Promise<boolean>,
+    when: when as (
+      facts: Record<string, unknown> & OrchestratorState,
+    ) => boolean | Promise<boolean>,
     require: (facts: Record<string, unknown> & OrchestratorState) => {
       const selectedAgent = typeof agent === "function" ? agent(facts) : agent;
       const selectedInput = typeof input === "function" ? input(facts) : input;
 
-      return { type: "RUN_AGENT", agent: selectedAgent, input: selectedInput } as RunAgentRequirement;
+      return {
+        type: "RUN_AGENT",
+        agent: selectedAgent,
+        input: selectedInput,
+      } as RunAgentRequirement;
     },
     priority,
   };
@@ -7633,7 +9080,7 @@ export function selectAgent(
 export function runAgentRequirement(
   agent: string,
   input: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): RunAgentRequirement {
   return {
     type: "RUN_AGENT",
@@ -7652,13 +9099,11 @@ export function runAgentRequirement(
  */
 export function concatResults(
   results: RunResult<unknown>[],
-  separator = "\n\n"
+  separator = "\n\n",
 ): string {
   return results
     .map((r) =>
-      typeof r.output === "string"
-        ? r.output
-        : safeStringify(r.output)
+      typeof r.output === "string" ? r.output : safeStringify(r.output),
     )
     .join(separator);
 }
@@ -7668,14 +9113,14 @@ export function concatResults(
  */
 export function pickBestResult<T>(
   results: RunResult<T>[],
-  score: (result: RunResult<T>) => number
+  score: (result: RunResult<T>) => number,
 ): RunResult<T> {
   if (results.length === 0) {
     throw new Error("[Directive MultiAgent] No results to pick from");
   }
 
   return results.reduce((best, current) =>
-    score(current) > score(best) ? current : best
+    score(current) > score(best) ? current : best,
   );
 }
 
@@ -7721,10 +9166,15 @@ export function composePatterns(
   ...patterns: ExecutionPattern[]
 ): (orchestrator: MultiAgentOrchestrator, input: string) => Promise<unknown> {
   if (patterns.length === 0) {
-    throw new Error("[Directive MultiAgent] composePatterns requires at least one pattern");
+    throw new Error(
+      "[Directive MultiAgent] composePatterns requires at least one pattern",
+    );
   }
 
-  return async (orchestrator: MultiAgentOrchestrator, input: string): Promise<unknown> => {
+  return async (
+    orchestrator: MultiAgentOrchestrator,
+    input: string,
+  ): Promise<unknown> => {
     let currentInput = input;
     let lastOutput: unknown = undefined;
 
@@ -7750,7 +9200,7 @@ export function composePatterns(
           const results = await orchestrator.runSequential(
             seqPattern.handlers,
             currentInput,
-            { transform: seqPattern.transform }
+            { transform: seqPattern.transform },
           );
 
           const lastResult = results[results.length - 1];
@@ -7764,26 +9214,38 @@ export function composePatterns(
           const supPattern = pattern as SupervisorPattern<unknown>;
           const maxRounds = supPattern.maxRounds ?? 5;
           if (maxRounds < 1 || !Number.isFinite(maxRounds)) {
-            throw new Error("[Directive MultiAgent] supervisor maxRounds must be >= 1");
+            throw new Error(
+              "[Directive MultiAgent] supervisor maxRounds must be >= 1",
+            );
           }
           const workerResults: RunResult<unknown>[] = [];
           let supervisorResult = await orchestrator.runAgent<unknown>(
             supPattern.supervisor,
-            currentInput
+            currentInput,
           );
 
           for (let round = 0; round < maxRounds; round++) {
             const raw = supervisorResult.output;
-            let action: { action: string; worker?: string; workerInput?: string };
+            let action: {
+              action: string;
+              worker?: string;
+              workerInput?: string;
+            };
 
             if (typeof raw === "string") {
               try {
                 action = JSON.parse(raw);
               } catch {
                 try {
-                  const stripped = raw.replace(/```(?:json|JSON)?\s*\n?/g, "").replace(/<[^>]+>/g, " ");
+                  const stripped = raw
+                    .replace(/```(?:json|JSON)?\s*\n?/g, "")
+                    .replace(/<[^>]+>/g, " ");
                   const extracted = extractJsonFromOutput(stripped);
-                  if (extracted && typeof extracted === "object" && "action" in (extracted as Record<string, unknown>)) {
+                  if (
+                    extracted &&
+                    typeof extracted === "object" &&
+                    "action" in (extracted as Record<string, unknown>)
+                  ) {
                     action = extracted as typeof action;
                   } else {
                     break;
@@ -7808,13 +9270,13 @@ export function composePatterns(
 
             const workerResult = await orchestrator.runAgent(
               action.worker,
-              action.workerInput ?? ""
+              action.workerInput ?? "",
             );
             workerResults.push(workerResult);
 
             supervisorResult = await orchestrator.runAgent(
               supPattern.supervisor,
-              `Worker ${action.worker} completed with result: ${safeStringify(workerResult.output)}`
+              `Worker ${action.worker} completed with result: ${safeStringify(workerResult.output)}`,
             );
           }
 
@@ -7838,8 +9300,13 @@ export function composePatterns(
 
           // Simple sequential execution of DAG for composePatterns
           // (Full parallel DAG execution happens via runPattern/runDagPattern)
-          if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
-            console.debug("[Directive MultiAgent] composePatterns: DAG nodes executed sequentially — use runPattern() for full parallel DAG execution");
+          if (
+            typeof process !== "undefined" &&
+            process.env?.NODE_ENV !== "production"
+          ) {
+            console.debug(
+              "[Directive MultiAgent] composePatterns: DAG nodes executed sequentially — use runPattern() for full parallel DAG execution",
+            );
           }
           const nodeIds = Object.keys(dagPattern.nodes);
           for (const nodeId of nodeIds) {
@@ -7850,7 +9317,8 @@ export function composePatterns(
               if (node.transform) {
                 nodeInput = node.transform(dagContext);
               } else if (node.deps && node.deps.length > 0) {
-                const upstreamOutputs: Record<string, unknown> = Object.create(null);
+                const upstreamOutputs: Record<string, unknown> =
+                  Object.create(null);
                 for (const depId of node.deps) {
                   if (dagContext.outputs[depId] !== undefined) {
                     upstreamOutputs[depId] = dagContext.outputs[depId];
@@ -7858,13 +9326,17 @@ export function composePatterns(
                 }
                 nodeInput = JSON.stringify(upstreamOutputs);
               }
-              const result = await orchestrator.runAgent(node.handler, nodeInput);
+              const result = await orchestrator.runAgent(
+                node.handler,
+                nodeInput,
+              );
               dagContext.outputs[nodeId] = result.output;
               dagContext.results[nodeId] = result;
               dagContext.statuses[nodeId] = "completed";
             } catch (error) {
               dagContext.statuses[nodeId] = "error";
-              dagContext.errors[nodeId] = error instanceof Error ? error.message : String(error);
+              dagContext.errors[nodeId] =
+                error instanceof Error ? error.message : String(error);
               if (dagPattern.onNodeError === "fail") {
                 throw error;
               }
@@ -7878,29 +9350,43 @@ export function composePatterns(
           const reflectPattern = pattern as ReflectPattern<unknown>;
           // Run producer→evaluator loop using runAgent
           const maxIter = reflectPattern.maxIterations ?? 2;
-          const parseEval = reflectPattern.parseEvaluation ?? ((output: unknown): ReflectionEvaluation => {
-            if (typeof output === "string") {
-              try { return JSON.parse(output); } catch { return { passed: false, feedback: output }; }
-            }
-            if (output && typeof output === "object" && "passed" in output) {
-              return output as ReflectionEvaluation;
-            }
+          const parseEval =
+            reflectPattern.parseEvaluation ??
+            ((output: unknown): ReflectionEvaluation => {
+              if (typeof output === "string") {
+                try {
+                  return JSON.parse(output);
+                } catch {
+                  return { passed: false, feedback: output };
+                }
+              }
+              if (output && typeof output === "object" && "passed" in output) {
+                return output as ReflectionEvaluation;
+              }
 
-            return { passed: false, feedback: "Invalid evaluator output" };
-          });
-          const buildInput = reflectPattern.buildRetryInput ?? (
-            (inp: string, feedback: string) => `${inp}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`
-          );
+              return { passed: false, feedback: "Invalid evaluator output" };
+            });
+          const buildInput =
+            reflectPattern.buildRetryInput ??
+            ((inp: string, feedback: string) =>
+              `${inp}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`);
 
           let effectiveInput = currentInput;
           let producerOutput: unknown;
           for (let i = 0; i < maxIter; i++) {
-            const producerResult = await orchestrator.runAgent(reflectPattern.handler, effectiveInput);
+            const producerResult = await orchestrator.runAgent(
+              reflectPattern.handler,
+              effectiveInput,
+            );
             producerOutput = producerResult.output;
-            const producerStr = typeof producerOutput === "string"
-              ? producerOutput
-              : JSON.stringify(producerOutput);
-            const evalResult = await orchestrator.runAgent(reflectPattern.evaluator, producerStr);
+            const producerStr =
+              typeof producerOutput === "string"
+                ? producerOutput
+                : JSON.stringify(producerOutput);
+            const evalResult = await orchestrator.runAgent(
+              reflectPattern.evaluator,
+              producerStr,
+            );
             const evaluation = parseEval(evalResult.output);
             if (evaluation.passed) {
               break;
@@ -7946,9 +9432,16 @@ export function composePatterns(
 
         case "goal": {
           const cp = pattern as GoalPattern<unknown>;
-          const initialFacts = typeof currentInput === "string"
-            ? { input: currentInput }
-            : (() => { try { return JSON.parse(currentInput); } catch { return { input: currentInput }; } })();
+          const initialFacts =
+            typeof currentInput === "string"
+              ? { input: currentInput }
+              : (() => {
+                  try {
+                    return JSON.parse(currentInput);
+                  } catch {
+                    return { input: currentInput };
+                  }
+                })();
           const goalResult = await orchestrator.runGoal(
             cp.nodes,
             initialFacts,
@@ -7970,14 +9463,17 @@ export function composePatterns(
         }
 
         default:
-          throw new Error(`[Directive MultiAgent] composePatterns: unknown pattern type "${(pattern as ExecutionPattern).type}"`);
+          throw new Error(
+            `[Directive MultiAgent] composePatterns: unknown pattern type "${(pattern as ExecutionPattern).type}"`,
+          );
       }
 
       // Convert output to string for next pattern's input
       if (lastOutput !== undefined) {
-        currentInput = typeof lastOutput === "string"
-          ? lastOutput
-          : safeStringify(lastOutput);
+        currentInput =
+          typeof lastOutput === "string"
+            ? lastOutput
+            : safeStringify(lastOutput);
       }
     }
 
@@ -8008,7 +9504,7 @@ export function composePatterns(
  */
 export function findAgentsByCapability(
   registry: AgentRegistry,
-  requiredCapabilities: string[]
+  requiredCapabilities: string[],
 ): string[] {
   return Object.entries(registry)
     .filter(([, reg]) => {
@@ -8035,7 +9531,10 @@ export function capabilityRoute(
   registry: AgentRegistry,
   getCapabilities: (facts: Record<string, unknown>) => string[],
   getInput: (facts: Record<string, unknown>) => string,
-  options?: { priority?: number; select?: (matches: string[], registry: AgentRegistry) => string }
+  options?: {
+    priority?: number;
+    select?: (matches: string[], registry: AgentRegistry) => string;
+  },
 ): OrchestratorConstraint<Record<string, unknown>> {
   const { priority, select } = options ?? {};
 
@@ -8055,12 +9554,15 @@ export function capabilityRoute(
     },
     require: (facts) => {
       // Use cached matches only if from the current when() call
-      const matches = cacheGeneration !== requireGeneration && cachedMatches.length > 0
-        ? (requireGeneration = cacheGeneration, cachedMatches)
-        : findAgentsByCapability(registry, getCapabilities(facts));
+      const matches =
+        cacheGeneration !== requireGeneration && cachedMatches.length > 0
+          ? ((requireGeneration = cacheGeneration), cachedMatches)
+          : findAgentsByCapability(registry, getCapabilities(facts));
 
       if (matches.length === 0) {
-        throw new Error(`[Directive MultiAgent] No agent matches capabilities: ${getCapabilities(facts).join(", ")}`);
+        throw new Error(
+          `[Directive MultiAgent] No agent matches capabilities: ${getCapabilities(facts).join(", ")}`,
+        );
       }
 
       const chosen = select ? select(matches, registry) : matches[0]!;
@@ -8124,19 +9626,22 @@ export function spawnOnCondition(config: {
   const { when, agent, input, priority, context, options } = config;
   if (options && !spawnOnConditionOptionsWarned) {
     spawnOnConditionOptionsWarned = true;
-    console.warn("[Directive MultiAgent] spawnOnCondition `options` is deprecated. Use top-level `priority` and `context` instead.");
+    console.warn(
+      "[Directive MultiAgent] spawnOnCondition `options` is deprecated. Use top-level `priority` and `context` instead.",
+    );
   }
   const effectivePriority = priority ?? options?.priority;
   const effectiveContext = context ?? options?.context;
 
   return {
     when,
-    require: (facts) => ({
-      type: "RUN_AGENT",
-      agent,
-      input: input(facts),
-      context: effectiveContext,
-    } as RunAgentRequirement),
+    require: (facts) =>
+      ({
+        type: "RUN_AGENT",
+        agent,
+        input: input(facts),
+        context: effectiveContext,
+      }) as RunAgentRequirement,
     priority: effectivePriority,
   };
 }
@@ -8180,10 +9685,20 @@ export type DebateConfig<T = unknown> = Omit<DebatePattern<T>, "type">;
  * ```
  */
 export function debate<T = unknown>(config: DebateConfig<T>): DebatePattern<T> {
-  const { handlers, evaluator, maxRounds, extract, parseJudgement, signal, timeout } = config;
+  const {
+    handlers,
+    evaluator,
+    maxRounds,
+    extract,
+    parseJudgement,
+    signal,
+    timeout,
+  } = config;
 
   if (handlers.length < 2) {
-    throw new Error("[Directive MultiAgent] debate requires at least 2 handlers");
+    throw new Error(
+      "[Directive MultiAgent] debate requires at least 2 handlers",
+    );
   }
   if (maxRounds != null && (maxRounds < 1 || !Number.isFinite(maxRounds))) {
     throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
@@ -8217,18 +9732,13 @@ export async function runDebate<T>(
   config: DebateConfig<T>,
   input: string,
 ): Promise<DebateResult<T>> {
-  return orchestrator.runDebate<T>(
-    config.handlers,
-    config.evaluator,
-    input,
-    {
-      maxRounds: config.maxRounds,
-      extract: config.extract,
-      parseJudgement: config.parseJudgement,
-      signal: config.signal,
-      timeout: config.timeout,
-    },
-  );
+  return orchestrator.runDebate<T>(config.handlers, config.evaluator, input, {
+    maxRounds: config.maxRounds,
+    extract: config.extract,
+    parseJudgement: config.parseJudgement,
+    signal: config.signal,
+    timeout: config.timeout,
+  });
 }
 
 // ============================================================================
@@ -8284,9 +9794,12 @@ export function derivedConstraint(
     },
     require: (facts) => {
       // Re-read from facts if generation is stale (concurrent evaluation)
-      const value = whenGeneration !== requireGeneration
-        ? (requireGeneration = whenGeneration, lastValue)
-        : ((facts.__derived as Record<string, unknown> | undefined)?.[derivationId]);
+      const value =
+        whenGeneration !== requireGeneration
+          ? ((requireGeneration = whenGeneration), lastValue)
+          : (facts.__derived as Record<string, unknown> | undefined)?.[
+              derivationId
+            ];
 
       return {
         type: "RUN_AGENT",
@@ -8380,14 +9893,49 @@ export interface SerializedDagNode {
 
 /** JSON-safe representation of any execution pattern (all functions stripped) */
 export type SerializedPattern =
-  | { type: "parallel"; handlers: string[]; minSuccess?: number; timeout?: number }
+  | {
+      type: "parallel";
+      handlers: string[];
+      minSuccess?: number;
+      timeout?: number;
+    }
   | { type: "sequential"; handlers: string[]; continueOnError?: boolean }
-  | { type: "supervisor"; supervisor: string; workers: string[]; maxRounds?: number }
-  | { type: "dag"; nodes: Record<string, SerializedDagNode>; timeout?: number; maxConcurrent?: number; onNodeError?: "fail" | "skip-downstream" | "continue" }
-  | { type: "reflect"; handler: string; evaluator: string; maxIterations?: number; onExhausted?: "accept-last" | "accept-best" | "throw"; timeout?: number; threshold?: number }
+  | {
+      type: "supervisor";
+      supervisor: string;
+      workers: string[];
+      maxRounds?: number;
+    }
+  | {
+      type: "dag";
+      nodes: Record<string, SerializedDagNode>;
+      timeout?: number;
+      maxConcurrent?: number;
+      onNodeError?: "fail" | "skip-downstream" | "continue";
+    }
+  | {
+      type: "reflect";
+      handler: string;
+      evaluator: string;
+      maxIterations?: number;
+      onExhausted?: "accept-last" | "accept-best" | "throw";
+      timeout?: number;
+      threshold?: number;
+    }
   | { type: "race"; handlers: string[]; timeout?: number; minSuccess?: number }
-  | { type: "debate"; handlers: string[]; evaluator: string; maxRounds?: number; timeout?: number }
-  | { type: "goal"; nodes: Record<string, SerializedGoalNode>; maxSteps?: number; timeout?: number };
+  | {
+      type: "debate";
+      handlers: string[];
+      evaluator: string;
+      maxRounds?: number;
+      timeout?: number;
+    }
+  | {
+      type: "goal";
+      nodes: Record<string, SerializedGoalNode>;
+      maxSteps?: number;
+      timeout?: number;
+    };
 
 /** Serialized goal node (functions stripped) */
 export interface SerializedGoalNode {
@@ -8420,21 +9968,48 @@ export interface SerializedGoalNode {
  * localStorage.setItem("plan", JSON.stringify(json));
  * ```
  */
-export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPattern {
+export function patternToJSON(
+  pattern: ExecutionPattern<unknown>,
+): SerializedPattern {
   switch (pattern.type) {
     case "parallel":
-      return { type: "parallel", handlers: pattern.handlers, minSuccess: pattern.minSuccess, timeout: pattern.timeout };
+      return {
+        type: "parallel",
+        handlers: pattern.handlers,
+        minSuccess: pattern.minSuccess,
+        timeout: pattern.timeout,
+      };
     case "sequential":
-      return { type: "sequential", handlers: pattern.handlers, continueOnError: pattern.continueOnError };
+      return {
+        type: "sequential",
+        handlers: pattern.handlers,
+        continueOnError: pattern.continueOnError,
+      };
     case "supervisor":
-      return { type: "supervisor", supervisor: pattern.supervisor, workers: pattern.workers, maxRounds: pattern.maxRounds };
+      return {
+        type: "supervisor",
+        supervisor: pattern.supervisor,
+        workers: pattern.workers,
+        maxRounds: pattern.maxRounds,
+      };
     case "dag": {
       const nodes: Record<string, SerializedDagNode> = Object.create(null);
       for (const [id, node] of Object.entries(pattern.nodes)) {
-        nodes[id] = { handler: node.handler, deps: node.deps, timeout: node.timeout, priority: node.priority };
+        nodes[id] = {
+          handler: node.handler,
+          deps: node.deps,
+          timeout: node.timeout,
+          priority: node.priority,
+        };
       }
 
-      return { type: "dag", nodes, timeout: pattern.timeout, maxConcurrent: pattern.maxConcurrent, onNodeError: pattern.onNodeError };
+      return {
+        type: "dag",
+        nodes,
+        timeout: pattern.timeout,
+        maxConcurrent: pattern.maxConcurrent,
+        onNodeError: pattern.onNodeError,
+      };
     }
     case "reflect":
       return {
@@ -8444,24 +10019,56 @@ export function patternToJSON(pattern: ExecutionPattern<unknown>): SerializedPat
         maxIterations: pattern.maxIterations,
         onExhausted: pattern.onExhausted,
         timeout: pattern.timeout,
-        threshold: typeof pattern.threshold === "number" ? pattern.threshold : undefined,
+        threshold:
+          typeof pattern.threshold === "number" ? pattern.threshold : undefined,
       };
     case "race":
-      return { type: "race", handlers: pattern.handlers, timeout: pattern.timeout, minSuccess: pattern.minSuccess };
+      return {
+        type: "race",
+        handlers: pattern.handlers,
+        timeout: pattern.timeout,
+        minSuccess: pattern.minSuccess,
+      };
     case "debate":
-      return { type: "debate", handlers: pattern.handlers, evaluator: pattern.evaluator, maxRounds: pattern.maxRounds, timeout: pattern.timeout };
+      return {
+        type: "debate",
+        handlers: pattern.handlers,
+        evaluator: pattern.evaluator,
+        maxRounds: pattern.maxRounds,
+        timeout: pattern.timeout,
+      };
     case "goal": {
       const cnodes: Record<string, SerializedGoalNode> = Object.create(null);
       for (const [id, node] of Object.entries(pattern.nodes)) {
-        cnodes[id] = { handler: node.handler, produces: node.produces, requires: node.requires, allowRerun: node.allowRerun, priority: node.priority };
+        cnodes[id] = {
+          handler: node.handler,
+          produces: node.produces,
+          requires: node.requires,
+          allowRerun: node.allowRerun,
+          priority: node.priority,
+        };
       }
 
-      return { type: "goal", nodes: cnodes, maxSteps: pattern.maxSteps, timeout: pattern.timeout };
+      return {
+        type: "goal",
+        nodes: cnodes,
+        maxSteps: pattern.maxSteps,
+        timeout: pattern.timeout,
+      };
     }
   }
 }
 
-const ALLOWED_PATTERN_TYPES = new Set(["parallel", "sequential", "supervisor", "dag", "reflect", "race", "debate", "goal"]);
+const ALLOWED_PATTERN_TYPES = new Set([
+  "parallel",
+  "sequential",
+  "supervisor",
+  "dag",
+  "reflect",
+  "race",
+  "debate",
+  "goal",
+]);
 
 /**
  * Restore an execution pattern from its serialized form.
@@ -8487,11 +10094,20 @@ export function patternFromJSON<T = unknown>(
   overrides?: Partial<ExecutionPattern<T>>,
 ): ExecutionPattern<T> {
   // Migration shim: accept legacy "converge" serialized patterns (shallow copy to avoid mutating input)
-  const normalized = (json && typeof json === "object" && (json as Record<string, unknown>).type === "converge")
-    ? { ...json, type: "goal" as const } as SerializedPattern
-    : json;
-  if (!normalized || typeof normalized !== "object" || !ALLOWED_PATTERN_TYPES.has((normalized as SerializedPattern).type)) {
-    throw new Error(`[Directive] patternFromJSON: invalid or unknown pattern type "${(json as Record<string, unknown>)?.type}"`);
+  const normalized =
+    json &&
+    typeof json === "object" &&
+    (json as Record<string, unknown>).type === "converge"
+      ? ({ ...json, type: "goal" as const } as SerializedPattern)
+      : json;
+  if (
+    !normalized ||
+    typeof normalized !== "object" ||
+    !ALLOWED_PATTERN_TYPES.has((normalized as SerializedPattern).type)
+  ) {
+    throw new Error(
+      `[Directive] patternFromJSON: invalid or unknown pattern type "${(json as Record<string, unknown>)?.type}"`,
+    );
   }
   const safe: Record<string, unknown> = Object.create(null);
   for (const [k, v] of Object.entries(normalized)) {
@@ -8512,7 +10128,9 @@ export function patternFromJSON<T = unknown>(
   }
   // Migrate DAG/goal node `agent` → `handler`
   if (raw.nodes && typeof raw.nodes === "object") {
-    for (const node of Object.values(raw.nodes as Record<string, Record<string, unknown>>)) {
+    for (const node of Object.values(
+      raw.nodes as Record<string, Record<string, unknown>>,
+    )) {
       if (!node.handler && node.agent && typeof node.agent === "string") {
         node.handler = node.agent;
         delete node.agent;

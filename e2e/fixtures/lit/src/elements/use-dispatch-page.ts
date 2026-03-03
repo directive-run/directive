@@ -1,8 +1,8 @@
+import { FactController, useDispatch } from "@directive-run/lit";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController, useDispatch } from "@directive-run/lit";
-import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 const dispatch = useDispatch(system);
 

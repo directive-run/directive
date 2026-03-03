@@ -1,5 +1,9 @@
 import { patternToJSON } from "./multi-agent-orchestrator.js";
-import type { ExecutionPattern, SerializedPattern, SerializedDagNode } from "./multi-agent-orchestrator.js";
+import type {
+  ExecutionPattern,
+  SerializedDagNode,
+  SerializedPattern,
+} from "./multi-agent-orchestrator.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -188,7 +192,12 @@ function isSerializedPattern(
   if (obj.type === "debate" && typeof obj.extract === "function") {
     return false;
   }
-  if (obj.type === "goal" && (typeof obj.when === "function" || typeof obj.satisfaction === "function" || typeof obj.extract === "function")) {
+  if (
+    obj.type === "goal" &&
+    (typeof obj.when === "function" ||
+      typeof obj.satisfaction === "function" ||
+      typeof obj.extract === "function")
+  ) {
     return false;
   }
 
@@ -206,7 +215,10 @@ function isSerializedPattern(
   if (obj.type === "goal" && obj.nodes) {
     for (const node of Object.values(obj.nodes as Record<string, unknown>)) {
       const n = node as Record<string, unknown>;
-      if (typeof n.buildInput === "function" || typeof n.extractOutput === "function") {
+      if (
+        typeof n.buildInput === "function" ||
+        typeof n.extractOutput === "function"
+      ) {
         return false;
       }
     }
@@ -252,7 +264,9 @@ function renderParallel(
   const lines: string[] = [];
 
   for (const handler of handlers) {
-    const nodeType = taskIds?.has(handler.label) ? "task" as const : "agent" as const;
+    const nodeType = taskIds?.has(handler.label)
+      ? ("task" as const)
+      : ("agent" as const);
     const handlerNode = wrapNode(handler.id, handler.label, nodeType, shapes);
     lines.push(`  ${inputNode} --> ${handlerNode}`);
     lines.push(`  ${handlerNode} --> ${mergeNode}`);
@@ -275,7 +289,9 @@ function renderSequential(
     label: a,
   }));
 
-  const nodes = handlers.map((a) => wrapNode(a.id, a.label, taskIds?.has(a.label) ? "task" : "agent", shapes));
+  const nodes = handlers.map((a) =>
+    wrapNode(a.id, a.label, taskIds?.has(a.label) ? "task" : "agent", shapes),
+  );
 
   return [`  ${nodes.join(" --> ")}`];
 }
@@ -311,7 +327,9 @@ function renderDag(
     const node = p.nodes[key]!;
     const nodeId = sanitizeId(key);
     const nodeLabel = node.handler;
-    const nodeType = taskIds?.has(node.handler) ? "task" as const : "agent" as const;
+    const nodeType = taskIds?.has(node.handler)
+      ? ("task" as const)
+      : ("agent" as const);
 
     if (!node.deps || node.deps.length === 0) {
       if (!rendered.has(nodeId)) {
@@ -325,7 +343,9 @@ function renderDag(
       const depId = sanitizeId(dep);
       const depNode = p.nodes[dep]!;
       const depLabel = depNode.handler;
-      const depType = taskIds?.has(depNode.handler) ? "task" as const : "agent" as const;
+      const depType = taskIds?.has(depNode.handler)
+        ? ("task" as const)
+        : ("agent" as const);
       const from = wrapNode(depId, depLabel, depType, shapes);
       const to = wrapNode(nodeId, nodeLabel, nodeType, shapes);
       lines.push(`  ${from} --> ${to}`);
@@ -348,7 +368,9 @@ function renderRace(
   const lines: string[] = [];
 
   for (const handler of handlers) {
-    const nodeType = taskIds?.has(handler.label) ? "task" as const : "agent" as const;
+    const nodeType = taskIds?.has(handler.label)
+      ? ("task" as const)
+      : ("agent" as const);
     const handlerNode = wrapNode(handler.id, handler.label, nodeType, shapes);
     lines.push(`  ${inputNode} --> ${handlerNode}`);
     lines.push(`  ${handlerNode} -.-> ${outputNode}`);
@@ -364,7 +386,9 @@ function renderReflect(
 ): string[] {
   const producerId = sanitizeId(p.handler);
   const evalId = sanitizeId(p.evaluator);
-  const producerType = taskIds?.has(p.handler) ? "task" as const : "agent" as const;
+  const producerType = taskIds?.has(p.handler)
+    ? ("task" as const)
+    : ("agent" as const);
   const producerNode = wrapNode(producerId, p.handler, producerType, shapes);
   const evalNode = wrapNode(evalId, p.evaluator, "agent", shapes);
   const outputNode = wrapNode("__output", "Output", "virtual", shapes);
@@ -405,7 +429,9 @@ function renderGoal(
 
     if (requires.length === 0) {
       if (!rendered.has(id)) {
-        const nodeType = taskIds?.has(node.handler) ? "task" as const : "agent" as const;
+        const nodeType = taskIds?.has(node.handler)
+          ? ("task" as const)
+          : ("agent" as const);
         lines.push(`  ${wrapNode(id, node.handler, nodeType, shapes)}`);
         rendered.add(id);
       }
@@ -421,8 +447,12 @@ function renderGoal(
         const edgeKey = `${producer}->${nodeId}`;
         if (!edgeSet.has(edgeKey)) {
           const fromId = sanitizeId(producer);
-          const fromType = taskIds?.has(fromNode.handler) ? "task" as const : "agent" as const;
-          const toType = taskIds?.has(node.handler) ? "task" as const : "agent" as const;
+          const fromType = taskIds?.has(fromNode.handler)
+            ? ("task" as const)
+            : ("agent" as const);
+          const toType = taskIds?.has(node.handler)
+            ? ("task" as const)
+            : ("agent" as const);
           const from = wrapNode(fromId, fromNode.handler, fromType, shapes);
           const to = wrapNode(id, node.handler, toType, shapes);
           lines.push(`  ${from} -->|${sanitizeLabel(key)}| ${to}`);
@@ -438,7 +468,9 @@ function renderGoal(
   for (const [nodeId, node] of sortedEntries) {
     const id = sanitizeId(nodeId);
     if (!rendered.has(id)) {
-      const nodeType = taskIds?.has(node.handler) ? "task" as const : "agent" as const;
+      const nodeType = taskIds?.has(node.handler)
+        ? ("task" as const)
+        : ("agent" as const);
       lines.push(`  ${wrapNode(id, node.handler, nodeType, shapes)}`);
       rendered.add(id);
     }
@@ -459,7 +491,9 @@ function renderDebate(
   const lines: string[] = [];
 
   for (const handler of handlers) {
-    const nodeType = taskIds?.has(handler.label) ? "task" as const : "agent" as const;
+    const nodeType = taskIds?.has(handler.label)
+      ? ("task" as const)
+      : ("agent" as const);
     const handlerNode = wrapNode(handler.id, handler.label, nodeType, shapes);
     lines.push(`  ${handlerNode} --> ${judgeNode}`);
     lines.push(`  ${judgeNode} -->|next round| ${handlerNode}`);

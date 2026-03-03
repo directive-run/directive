@@ -1,12 +1,12 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { BrandGuide } from '@/components/BrandGuide'
+import { BrandGuide } from "@/components/BrandGuide";
+import { buildPageMetadata } from "@/lib/metadata";
 
 export const metadata = buildPageMetadata({
-  title: 'Brand Guide',
-  description: 'Brand identity options and color system for Directive',
-  path: '/branding',
-  section: 'Brand',
-})
+  title: "Brand Guide",
+  description: "Brand identity options and color system for Directive",
+  path: "/branding",
+  section: "Brand",
+});
 
 export default function BrandGuidePage() {
   return (
@@ -23,5 +23,5 @@ export default function BrandGuidePage() {
       </header>
       <BrandGuide />
     </div>
-  )
+  );
 }

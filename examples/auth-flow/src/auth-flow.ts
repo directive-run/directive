@@ -6,12 +6,12 @@
  * and time-based reactivity (token expiry countdown).
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import {
+  type User,
+  mockFetchUser,
   mockLogin,
   mockRefresh,
-  mockFetchUser,
-  type User,
 } from "./mock-auth.js";
 
 // ============================================================================
@@ -82,11 +82,7 @@ export const authFlowSchema = {
 // Helpers
 // ============================================================================
 
-function addLogEntry(
-  facts: any,
-  event: string,
-  detail: string,
-): void {
+function addLogEntry(facts: any, event: string, detail: string): void {
   const log = [...(facts.eventLog as EventLogEntry[])];
   log.push({ timestamp: Date.now(), event, detail });
   facts.eventLog = log;
@@ -283,7 +279,11 @@ export const authFlowModule = createModule("auth-flow", {
           context.facts.expiresAt = Date.now() + tokens.expiresIn * 1000;
           context.facts.status = "authenticated";
           context.facts.user = null; // trigger needsUser constraint
-          addLogEntry(context.facts, "login-success", `Token: ${tokens.token.slice(0, 12)}...`);
+          addLogEntry(
+            context.facts,
+            "login-success",
+            `Token: ${tokens.token.slice(0, 12)}...`,
+          );
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.status = "idle";
@@ -312,7 +312,11 @@ export const authFlowModule = createModule("auth-flow", {
           context.facts.refreshToken = tokens.refreshToken;
           context.facts.expiresAt = Date.now() + tokens.expiresIn * 1000;
           context.facts.status = "authenticated";
-          addLogEntry(context.facts, "refresh-success", `New token: ${tokens.token.slice(0, 12)}...`);
+          addLogEntry(
+            context.facts,
+            "refresh-success",
+            `New token: ${tokens.token.slice(0, 12)}...`,
+          );
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.token = "";
@@ -333,7 +337,11 @@ export const authFlowModule = createModule("auth-flow", {
         try {
           const user = await mockFetchUser(req.token);
           context.facts.user = user;
-          addLogEntry(context.facts, "fetch-user-success", `${user.name} (${user.role})`);
+          addLogEntry(
+            context.facts,
+            "fetch-user-success",
+            `${user.name} (${user.role})`,
+          );
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           addLogEntry(context.facts, "fetch-user-error", msg);

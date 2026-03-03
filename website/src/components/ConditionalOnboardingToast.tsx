@@ -1,14 +1,14 @@
-'use client'
+"use client";
 
-import { useCanShowOnboardingToast } from '@/lib/feature-flags'
-import { ThemeOnboardingToast } from '@/components/ThemeOnboardingToast'
+import { ThemeOnboardingToast } from "@/components/ThemeOnboardingToast";
+import { useCanShowOnboardingToast } from "@/lib/feature-flags";
 
 export function ConditionalOnboardingToast() {
-  const canShow = useCanShowOnboardingToast()
+  const canShow = useCanShowOnboardingToast();
 
   if (!canShow) {
-    return null
+    return null;
   }
 
-  return <ThemeOnboardingToast />
+  return <ThemeOnboardingToast />;
 }

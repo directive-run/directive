@@ -1,20 +1,25 @@
-import { useMemo, useCallback, useState, useEffect } from "react";
 import {
-  ReactFlow,
   Background,
   Controls,
-  type Node,
   type Edge,
+  type Node,
   type NodeTypes,
-  type OnNodesChange,
   type OnEdgesChange,
-  applyNodeChanges,
+  type OnNodesChange,
+  ReactFlow,
   applyEdgeChanges,
+  applyNodeChanges,
 } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "@xyflow/react/dist/style.css";
-import { isDagNodeUpdate, type DebugEvent, type DevToolsSnapshot, type DagNodeStatus } from "../lib/types";
-import { DAG_NODE_COLORS } from "../lib/colors";
 import { DagNode } from "../components/DagNode";
+import { DAG_NODE_COLORS } from "../lib/colors";
+import {
+  type DagNodeStatus,
+  type DebugEvent,
+  type DevToolsSnapshot,
+  isDagNodeUpdate,
+} from "../lib/types";
 
 interface DagViewProps {
   events: DebugEvent[];
@@ -32,9 +37,14 @@ interface DagNodeState {
 }
 
 /** Extract DAG structure from events */
-function buildDagFromEvents(events: DebugEvent[]): Map<string, DagNodeState> | null {
+function buildDagFromEvents(
+  events: DebugEvent[],
+): Map<string, DagNodeState> | null {
   const dagEvents = events.filter(
-    (e) => e.type === "dag_node_update" || e.type === "pattern_start" || e.type === "pattern_complete",
+    (e) =>
+      e.type === "dag_node_update" ||
+      e.type === "pattern_start" ||
+      e.type === "pattern_complete",
   );
 
   if (dagEvents.length === 0) {
@@ -52,7 +62,11 @@ function buildDagFromEvents(events: DebugEvent[]): Map<string, DagNodeState> | n
           existing.deps = event.deps;
         }
       } else {
-        nodes.set(event.nodeId, { agentId: event.nodeId, status: event.status, deps: event.deps ?? [] });
+        nodes.set(event.nodeId, {
+          agentId: event.nodeId,
+          status: event.status,
+          deps: event.deps ?? [],
+        });
       }
     }
   }
@@ -61,7 +75,9 @@ function buildDagFromEvents(events: DebugEvent[]): Map<string, DagNodeState> | n
 }
 
 /** Build DAG from snapshot agent data when no DAG events exist */
-function buildDagFromSnapshot(snapshot: DevToolsSnapshot): Map<string, DagNodeState> {
+function buildDagFromSnapshot(
+  snapshot: DevToolsSnapshot,
+): Map<string, DagNodeState> {
   const nodes = new Map<string, DagNodeState>();
 
   for (const [agentId, state] of Object.entries(snapshot.agents)) {
@@ -75,7 +91,9 @@ function buildDagFromSnapshot(snapshot: DevToolsSnapshot): Map<string, DagNodeSt
     }
 
     const rawDeps = (state as Record<string, unknown>).deps;
-    const deps = Array.isArray(rawDeps) ? rawDeps.filter((d): d is string => typeof d === "string") : [];
+    const deps = Array.isArray(rawDeps)
+      ? rawDeps.filter((d): d is string => typeof d === "string")
+      : [];
     nodes.set(agentId, { agentId, status, deps });
   }
 
@@ -205,7 +223,9 @@ export function DagView({ events, snapshot }: DagViewProps) {
         <div className="text-center">
           <div className="mb-2 text-4xl">⬡</div>
           <p>No DAG execution detected</p>
-          <p className="mt-1 text-xs">Run a DAG pattern to see the visualization</p>
+          <p className="mt-1 text-xs">
+            Run a DAG pattern to see the visualization
+          </p>
         </div>
       </div>
     );
@@ -219,9 +239,9 @@ export function DagView({ events, snapshot }: DagViewProps) {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={(_e, node) => setSelectedNode(
-            selectedNode === node.id ? null : node.id,
-          )}
+          onNodeClick={(_e, node) =>
+            setSelectedNode(selectedNode === node.id ? null : node.id)
+          }
           nodeTypes={nodeTypes}
           fitView
           proOptions={{ hideAttribution: true }}
@@ -249,15 +269,21 @@ export function DagView({ events, snapshot }: DagViewProps) {
           <div className="mt-3 space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-zinc-500">Status</span>
-              <span className="text-zinc-300">{snapshot.agents[selectedNode]!.status}</span>
+              <span className="text-zinc-300">
+                {snapshot.agents[selectedNode]!.status}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-500">Tokens</span>
-              <span className="text-zinc-300">{snapshot.agents[selectedNode]!.totalTokens.toLocaleString()}</span>
+              <span className="text-zinc-300">
+                {snapshot.agents[selectedNode]!.totalTokens.toLocaleString()}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-500">Runs</span>
-              <span className="text-zinc-300">{snapshot.agents[selectedNode]!.runCount}</span>
+              <span className="text-zinc-300">
+                {snapshot.agents[selectedNode]!.runCount}
+              </span>
             </div>
           </div>
         </div>

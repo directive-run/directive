@@ -1,6 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
-import { createDebugTimeline, createDebugTimelinePlugin } from "../debug-timeline.js";
-import { createTestTimeline, assertTimelineEvents, createTestOrchestrator, createTestMultiAgentOrchestrator } from "../testing.js";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createDebugTimeline,
+  createDebugTimelinePlugin,
+} from "../debug-timeline.js";
+import {
+  assertTimelineEvents,
+  createTestMultiAgentOrchestrator,
+  createTestOrchestrator,
+  createTestTimeline,
+} from "../testing.js";
 import type { DebugEvent, DebugEventType } from "../types.js";
 
 // ============================================================================
@@ -28,10 +36,18 @@ describe("ring buffer overflow/eviction", () => {
   it("evicts oldest events when maxEvents is exceeded", () => {
     const timeline = createDebugTimeline({ maxEvents: 3 });
 
-    timeline.record(makeEvent("agent_start", { agentId: "a1", inputLength: 1 } as any));
-    timeline.record(makeEvent("agent_start", { agentId: "a2", inputLength: 2 } as any));
-    timeline.record(makeEvent("agent_start", { agentId: "a3", inputLength: 3 } as any));
-    timeline.record(makeEvent("agent_start", { agentId: "a4", inputLength: 4 } as any));
+    timeline.record(
+      makeEvent("agent_start", { agentId: "a1", inputLength: 1 } as any),
+    );
+    timeline.record(
+      makeEvent("agent_start", { agentId: "a2", inputLength: 2 } as any),
+    );
+    timeline.record(
+      makeEvent("agent_start", { agentId: "a3", inputLength: 3 } as any),
+    );
+    timeline.record(
+      makeEvent("agent_start", { agentId: "a4", inputLength: 4 } as any),
+    );
 
     expect(timeline.length).toBe(3);
     const events = timeline.getEvents();
@@ -44,7 +60,9 @@ describe("ring buffer overflow/eviction", () => {
     const timeline = createDebugTimeline();
 
     for (let i = 0; i < 2010; i++) {
-      timeline.record(makeEvent("agent_start", { agentId: `a${i}`, inputLength: i } as any));
+      timeline.record(
+        makeEvent("agent_start", { agentId: `a${i}`, inputLength: i } as any),
+      );
     }
 
     expect(timeline.length).toBe(2000);
@@ -69,9 +87,15 @@ describe("record() assigns sequential IDs", () => {
   it("assigns IDs starting from 0", () => {
     const timeline = createDebugTimeline();
 
-    const e0 = timeline.record(makeEvent("agent_start", { agentId: "a" } as any));
-    const e1 = timeline.record(makeEvent("agent_complete", { agentId: "a" } as any));
-    const e2 = timeline.record(makeEvent("agent_error", { agentId: "a" } as any));
+    const e0 = timeline.record(
+      makeEvent("agent_start", { agentId: "a" } as any),
+    );
+    const e1 = timeline.record(
+      makeEvent("agent_complete", { agentId: "a" } as any),
+    );
+    const e2 = timeline.record(
+      makeEvent("agent_error", { agentId: "a" } as any),
+    );
 
     expect(e0.id).toBe(0);
     expect(e1.id).toBe(1);
@@ -81,9 +105,15 @@ describe("record() assigns sequential IDs", () => {
   it("continues sequencing after eviction", () => {
     const timeline = createDebugTimeline({ maxEvents: 2 });
 
-    const e0 = timeline.record(makeEvent("agent_start", { agentId: "a" } as any));
-    const e1 = timeline.record(makeEvent("agent_start", { agentId: "b" } as any));
-    const e2 = timeline.record(makeEvent("agent_start", { agentId: "c" } as any));
+    const e0 = timeline.record(
+      makeEvent("agent_start", { agentId: "a" } as any),
+    );
+    const e1 = timeline.record(
+      makeEvent("agent_start", { agentId: "b" } as any),
+    );
+    const e2 = timeline.record(
+      makeEvent("agent_start", { agentId: "c" } as any),
+    );
 
     expect(e0.id).toBe(0);
     expect(e1.id).toBe(1);
@@ -95,13 +125,15 @@ describe("record() assigns sequential IDs", () => {
   it("returns the recorded event with ID attached", () => {
     const timeline = createDebugTimeline();
 
-    const result = timeline.record(makeEvent("guardrail_check", {
-      agentId: "test",
-      guardrailName: "pii",
-      guardrailType: "input",
-      passed: true,
-      durationMs: 5,
-    } as any));
+    const result = timeline.record(
+      makeEvent("guardrail_check", {
+        agentId: "test",
+        guardrailName: "pii",
+        guardrailType: "input",
+        passed: true,
+        durationMs: 5,
+      } as any),
+    );
 
     expect(result.id).toBe(0);
     expect(result.type).toBe("guardrail_check");
@@ -117,12 +149,20 @@ describe("getEventsForAgent() filtering", () => {
     const timeline = createTestTimeline([
       { type: "agent_start", agentId: "researcher", inputLength: 10 } as any,
       { type: "agent_start", agentId: "writer", inputLength: 20 } as any,
-      { type: "agent_complete", agentId: "researcher", outputLength: 50, durationMs: 100, totalTokens: 200 } as any,
+      {
+        type: "agent_complete",
+        agentId: "researcher",
+        outputLength: 50,
+        durationMs: 100,
+        totalTokens: 200,
+      } as any,
     ]);
 
     const researcherEvents = timeline.getEventsForAgent("researcher");
     expect(researcherEvents).toHaveLength(2);
-    expect(researcherEvents.every((e) => e.agentId === "researcher")).toBe(true);
+    expect(researcherEvents.every((e) => e.agentId === "researcher")).toBe(
+      true,
+    );
   });
 
   it("returns empty array for unknown agentId", () => {
@@ -153,8 +193,21 @@ describe("getEventsByType() type narrowing", () => {
   it("filters events by type", () => {
     const timeline = createTestTimeline([
       { type: "agent_start", agentId: "a", inputLength: 10 } as any,
-      { type: "guardrail_check", agentId: "a", guardrailName: "pii", guardrailType: "input", passed: true, durationMs: 5 } as any,
-      { type: "agent_complete", agentId: "a", outputLength: 50, durationMs: 100, totalTokens: 200 } as any,
+      {
+        type: "guardrail_check",
+        agentId: "a",
+        guardrailName: "pii",
+        guardrailType: "input",
+        passed: true,
+        durationMs: 5,
+      } as any,
+      {
+        type: "agent_complete",
+        agentId: "a",
+        outputLength: 50,
+        durationMs: 100,
+        totalTokens: 200,
+      } as any,
     ]);
 
     const startEvents = timeline.getEventsByType("agent_start");
@@ -165,11 +218,22 @@ describe("getEventsByType() type narrowing", () => {
 
   it("returns all 16 types when mixed", () => {
     const allTypes: DebugEventType[] = [
-      "agent_start", "agent_complete", "agent_error", "agent_retry",
-      "guardrail_check", "constraint_evaluate", "resolver_start",
-      "resolver_complete", "resolver_error", "approval_request",
-      "approval_response", "handoff_start", "handoff_complete",
-      "pattern_start", "pattern_complete", "dag_node_update",
+      "agent_start",
+      "agent_complete",
+      "agent_error",
+      "agent_retry",
+      "guardrail_check",
+      "constraint_evaluate",
+      "resolver_start",
+      "resolver_complete",
+      "resolver_error",
+      "approval_request",
+      "approval_response",
+      "handoff_start",
+      "handoff_complete",
+      "pattern_start",
+      "pattern_complete",
+      "dag_node_update",
     ];
 
     const timeline = createDebugTimeline();
@@ -193,9 +257,13 @@ describe("getEventsAtSnapshot() correlation", () => {
   it("returns events at a specific snapshot ID", () => {
     const timeline = createDebugTimeline();
 
-    timeline.record(makeEvent("agent_start", { agentId: "a", snapshotId: 1 } as any));
+    timeline.record(
+      makeEvent("agent_start", { agentId: "a", snapshotId: 1 } as any),
+    );
     timeline.record(makeEvent("constraint_evaluate", { snapshotId: 2 } as any));
-    timeline.record(makeEvent("agent_complete", { agentId: "a", snapshotId: 1 } as any));
+    timeline.record(
+      makeEvent("agent_complete", { agentId: "a", snapshotId: 1 } as any),
+    );
     timeline.record(makeEvent("resolver_start", { snapshotId: 3 } as any));
 
     const snapshot1 = timeline.getEventsAtSnapshot(1);
@@ -227,9 +295,23 @@ describe("getEventsAtSnapshot() correlation", () => {
 
     // Record without explicit snapshotId — the timeline itself doesn't auto-inject,
     // but the plugin does. Verify the option is accepted.
-    timeline.record({ type: "agent_start", timestamp: Date.now(), snapshotId: currentSnapshot, agentId: "a", inputLength: 1 } as Omit<DebugEvent, "id">);
+    timeline.record({
+      type: "agent_start",
+      timestamp: Date.now(),
+      snapshotId: currentSnapshot,
+      agentId: "a",
+      inputLength: 1,
+    } as Omit<DebugEvent, "id">);
     currentSnapshot = 10;
-    timeline.record({ type: "agent_complete", timestamp: Date.now(), snapshotId: currentSnapshot, agentId: "a", outputLength: 1, totalTokens: 10, durationMs: 5 } as Omit<DebugEvent, "id">);
+    timeline.record({
+      type: "agent_complete",
+      timestamp: Date.now(),
+      snapshotId: currentSnapshot,
+      agentId: "a",
+      outputLength: 1,
+      totalTokens: 10,
+      durationMs: 5,
+    } as Omit<DebugEvent, "id">);
 
     expect(timeline.getEventsAtSnapshot(5)).toHaveLength(1);
     expect(timeline.getEventsAtSnapshot(10)).toHaveLength(1);
@@ -278,10 +360,18 @@ describe("forkFrom() truncation + goToSnapshot callback", () => {
   it("truncates events after the fork snapshot", () => {
     const timeline = createDebugTimeline();
 
-    timeline.record(makeEvent("agent_start", { timestamp: 100, snapshotId: 1 } as any));
-    timeline.record(makeEvent("agent_complete", { timestamp: 200, snapshotId: 2 } as any));
-    timeline.record(makeEvent("agent_start", { timestamp: 300, snapshotId: 3 } as any));
-    timeline.record(makeEvent("agent_complete", { timestamp: 400, snapshotId: 4 } as any));
+    timeline.record(
+      makeEvent("agent_start", { timestamp: 100, snapshotId: 1 } as any),
+    );
+    timeline.record(
+      makeEvent("agent_complete", { timestamp: 200, snapshotId: 2 } as any),
+    );
+    timeline.record(
+      makeEvent("agent_start", { timestamp: 300, snapshotId: 3 } as any),
+    );
+    timeline.record(
+      makeEvent("agent_complete", { timestamp: 400, snapshotId: 4 } as any),
+    );
 
     timeline.forkFrom(2);
 
@@ -295,7 +385,9 @@ describe("forkFrom() truncation + goToSnapshot callback", () => {
     const goTo = vi.fn();
     const timeline = createDebugTimeline({ goToSnapshot: goTo });
 
-    timeline.record(makeEvent("agent_start", { timestamp: 100, snapshotId: 1 } as any));
+    timeline.record(
+      makeEvent("agent_start", { timestamp: 100, snapshotId: 1 } as any),
+    );
     timeline.forkFrom(1);
 
     expect(goTo).toHaveBeenCalledWith(1);
@@ -303,7 +395,9 @@ describe("forkFrom() truncation + goToSnapshot callback", () => {
 
   it("clears all events when no matching snapshot found", () => {
     const timeline = createDebugTimeline();
-    timeline.record(makeEvent("agent_start", { timestamp: 100, snapshotId: 5 } as any));
+    timeline.record(
+      makeEvent("agent_start", { timestamp: 100, snapshotId: 5 } as any),
+    );
 
     timeline.forkFrom(1);
 
@@ -312,7 +406,9 @@ describe("forkFrom() truncation + goToSnapshot callback", () => {
 
   it("does not call goToSnapshot when callback is not provided", () => {
     const timeline = createDebugTimeline();
-    timeline.record(makeEvent("agent_start", { timestamp: 100, snapshotId: 1 } as any));
+    timeline.record(
+      makeEvent("agent_start", { timestamp: 100, snapshotId: 1 } as any),
+    );
 
     // Should not throw
     expect(() => timeline.forkFrom(1)).not.toThrow();
@@ -326,8 +422,22 @@ describe("forkFrom() truncation + goToSnapshot callback", () => {
 describe("export()/import() roundtrip", () => {
   it("roundtrips events through export and import", () => {
     const timeline = createDebugTimeline();
-    timeline.record(makeEvent("agent_start", { agentId: "a", timestamp: 1000, inputLength: 42 } as any));
-    timeline.record(makeEvent("agent_complete", { agentId: "a", timestamp: 2000, outputLength: 100, durationMs: 1000, totalTokens: 200 } as any));
+    timeline.record(
+      makeEvent("agent_start", {
+        agentId: "a",
+        timestamp: 1000,
+        inputLength: 42,
+      } as any),
+    );
+    timeline.record(
+      makeEvent("agent_complete", {
+        agentId: "a",
+        timestamp: 2000,
+        outputLength: 100,
+        durationMs: 1000,
+        totalTokens: 200,
+      } as any),
+    );
 
     const exported = timeline.export();
     const imported = createDebugTimeline();
@@ -360,26 +470,34 @@ describe("export()/import() roundtrip", () => {
     const imported = createDebugTimeline();
     imported.import(exported);
 
-    const newEvent = imported.record(makeEvent("agent_error", { agentId: "a" } as any));
+    const newEvent = imported.record(
+      makeEvent("agent_error", { agentId: "a" } as any),
+    );
     expect(newEvent.id).toBe(2);
   });
 
   it("throws on invalid JSON", () => {
     const timeline = createDebugTimeline();
 
-    expect(() => timeline.import("not-json")).toThrow("[Directive DebugTimeline] Invalid JSON");
+    expect(() => timeline.import("not-json")).toThrow(
+      "[Directive DebugTimeline] Invalid JSON",
+    );
   });
 
   it("throws on non-object payload", () => {
     const timeline = createDebugTimeline();
 
-    expect(() => timeline.import('"hello"')).toThrow("[Directive DebugTimeline] Invalid timeline data");
+    expect(() => timeline.import('"hello"')).toThrow(
+      "[Directive DebugTimeline] Invalid timeline data",
+    );
   });
 
   it("throws on missing events array", () => {
     const timeline = createDebugTimeline();
 
-    expect(() => timeline.import('{"version":1}')).toThrow("[Directive DebugTimeline] Missing events array");
+    expect(() => timeline.import('{"version":1}')).toThrow(
+      "[Directive DebugTimeline] Missing events array",
+    );
   });
 
   it("rejects __proto__ key in top-level object (prototype pollution defense)", () => {
@@ -387,23 +505,31 @@ describe("export()/import() roundtrip", () => {
     // JSON.stringify strips __proto__, so construct the malicious JSON by hand
     const malicious = '{"__proto__":{"polluted":true},"events":[],"nextId":0}';
 
-    expect(() => timeline.import(malicious)).toThrow("Blocked key in import: __proto__");
+    expect(() => timeline.import(malicious)).toThrow(
+      "Blocked key in import: __proto__",
+    );
   });
 
   it("rejects constructor key in top-level object", () => {
     const timeline = createDebugTimeline();
     // constructor is a normal key, so JSON.stringify preserves it
-    const malicious = '{"constructor":{"polluted":true},"events":[],"nextId":0}';
+    const malicious =
+      '{"constructor":{"polluted":true},"events":[],"nextId":0}';
 
-    expect(() => timeline.import(malicious)).toThrow("Blocked key in import: constructor");
+    expect(() => timeline.import(malicious)).toThrow(
+      "Blocked key in import: constructor",
+    );
   });
 
   it("rejects __proto__ key in event objects", () => {
     const timeline = createDebugTimeline();
     // Hand-craft JSON to include __proto__ inside an event object
-    const malicious = '{"version":1,"events":[{"id":0,"type":"agent_start","timestamp":1000,"__proto__":{"bad":true}}],"nextId":1}';
+    const malicious =
+      '{"version":1,"events":[{"id":0,"type":"agent_start","timestamp":1000,"__proto__":{"bad":true}}],"nextId":1}';
 
-    expect(() => timeline.import(malicious)).toThrow("Blocked key in event: __proto__");
+    expect(() => timeline.import(malicious)).toThrow(
+      "Blocked key in event: __proto__",
+    );
   });
 
   it("skips events without required fields", () => {
@@ -469,7 +595,8 @@ describe("integration: single-agent events during run()", () => {
 
     await orchestrator.run({ name: "test-agent" }, "input");
 
-    const completeEvents = orchestrator.timeline!.getEventsByType("agent_complete");
+    const completeEvents =
+      orchestrator.timeline!.getEventsByType("agent_complete");
     expect(completeEvents).toHaveLength(1);
     expect(completeEvents[0]!.totalTokens).toBe(75);
     expect(completeEvents[0]!.durationMs).toBeGreaterThanOrEqual(0);
@@ -570,7 +697,8 @@ describe("zero-cost when debug: false", () => {
 
 describe("guardrail pass/fail events", () => {
   it("records guardrail_check via lifecycle hooks (single-agent)", async () => {
-    const guardrailEvents: Array<{ guardrailName: string; passed: boolean }> = [];
+    const guardrailEvents: Array<{ guardrailName: string; passed: boolean }> =
+      [];
 
     const orchestrator = createTestOrchestrator({
       debug: true,
@@ -585,7 +713,10 @@ describe("guardrail pass/fail events", () => {
       },
       hooks: {
         onGuardrailCheck: (event) => {
-          guardrailEvents.push({ guardrailName: event.guardrailName, passed: event.passed });
+          guardrailEvents.push({
+            guardrailName: event.guardrailName,
+            passed: event.passed,
+          });
         },
       },
     });
@@ -646,7 +777,9 @@ describe("approval events", () => {
         worker: {
           output: "done",
           totalTokens: 10,
-          toolCalls: [{ id: "tc1", name: "delete", arguments: "{}", result: "ok" }],
+          toolCalls: [
+            { id: "tc1", name: "delete", arguments: "{}", result: "ok" },
+          ],
         },
       },
       autoApproveToolCalls: true,
@@ -687,7 +820,8 @@ describe("pattern events (multi-agent)", () => {
         par: {
           type: "parallel",
           handlers: ["a", "b"],
-          merge: (results: any[]) => results.map((r: any) => r.output).join(", "),
+          merge: (results: any[]) =>
+            results.map((r: any) => r.output).join(", "),
         },
       },
     });
@@ -743,7 +877,7 @@ describe("pattern events (multi-agent)", () => {
 describe("createDebugTimelinePlugin bridges core events", () => {
   it("records constraint_evaluate events", () => {
     const timeline = createDebugTimeline();
-    let snapshotId = 7;
+    const snapshotId = 7;
     const plugin = createDebugTimelinePlugin(timeline, () => snapshotId);
 
     plugin.onConstraintEvaluate!("budget-check", true);
@@ -759,7 +893,11 @@ describe("createDebugTimelinePlugin bridges core events", () => {
     const timeline = createDebugTimeline();
     const plugin = createDebugTimelinePlugin(timeline, () => null);
 
-    plugin.onResolverStart!("fetch-data", { requirement: { type: "FETCH" }, id: "req-1", fromConstraint: "c1" });
+    plugin.onResolverStart!("fetch-data", {
+      requirement: { type: "FETCH" },
+      id: "req-1",
+      fromConstraint: "c1",
+    });
 
     const events = timeline.getEventsByType("resolver_start");
     expect(events).toHaveLength(1);
@@ -771,8 +909,16 @@ describe("createDebugTimelinePlugin bridges core events", () => {
     const timeline = createDebugTimeline();
     const plugin = createDebugTimelinePlugin(timeline, () => null);
 
-    plugin.onResolverStart!("fetch-data", { requirement: { type: "FETCH" }, id: "req-1", fromConstraint: "c1" });
-    plugin.onResolverComplete!("fetch-data", { requirement: { type: "FETCH" }, id: "req-1", fromConstraint: "c1" }, 0);
+    plugin.onResolverStart!("fetch-data", {
+      requirement: { type: "FETCH" },
+      id: "req-1",
+      fromConstraint: "c1",
+    });
+    plugin.onResolverComplete!(
+      "fetch-data",
+      { requirement: { type: "FETCH" }, id: "req-1", fromConstraint: "c1" },
+      0,
+    );
 
     const completeEvents = timeline.getEventsByType("resolver_complete");
     expect(completeEvents).toHaveLength(1);
@@ -784,8 +930,16 @@ describe("createDebugTimelinePlugin bridges core events", () => {
     const timeline = createDebugTimeline();
     const plugin = createDebugTimelinePlugin(timeline, () => 42);
 
-    plugin.onResolverStart!("broken", { requirement: { type: "PROCESS" }, id: "req-2", fromConstraint: "c2" });
-    plugin.onResolverError!("broken", { requirement: { type: "PROCESS" }, id: "req-2", fromConstraint: "c2" }, new Error("timeout"));
+    plugin.onResolverStart!("broken", {
+      requirement: { type: "PROCESS" },
+      id: "req-2",
+      fromConstraint: "c2",
+    });
+    plugin.onResolverError!(
+      "broken",
+      { requirement: { type: "PROCESS" }, id: "req-2", fromConstraint: "c2" },
+      new Error("timeout"),
+    );
 
     const errorEvents = timeline.getEventsByType("resolver_error");
     expect(errorEvents).toHaveLength(1);
@@ -798,7 +952,15 @@ describe("createDebugTimelinePlugin bridges core events", () => {
     const timeline = createDebugTimeline();
     const plugin = createDebugTimelinePlugin(timeline, () => null);
 
-    plugin.onResolverComplete!("orphan", { requirement: { type: "UNKNOWN" }, id: "req-orphan", fromConstraint: "c0" }, 0);
+    plugin.onResolverComplete!(
+      "orphan",
+      {
+        requirement: { type: "UNKNOWN" },
+        id: "req-orphan",
+        fromConstraint: "c0",
+      },
+      0,
+    );
 
     const events = timeline.getEventsByType("resolver_complete");
     expect(events).toHaveLength(1);
@@ -813,8 +975,8 @@ describe("createDebugTimelinePlugin bridges core events", () => {
   });
 
   it("uses getSnapshotId from plugin factory (not from timeline options)", () => {
-    let timelineSnapshot = 1;
-    let pluginSnapshot = 99;
+    const timelineSnapshot = 1;
+    const pluginSnapshot = 99;
 
     const timeline = createDebugTimeline({
       getSnapshotId: () => timelineSnapshot,
@@ -895,9 +1057,27 @@ describe("import event type validation (A12)", () => {
     const json = JSON.stringify({
       version: 1,
       events: [
-        { id: 0, type: "agent_start", timestamp: 1000, agentId: "a", snapshotId: null },
-        { id: 1, type: "unknown_type", timestamp: 2000, agentId: "a", snapshotId: null },
-        { id: 2, type: "agent_complete", timestamp: 3000, agentId: "a", snapshotId: null },
+        {
+          id: 0,
+          type: "agent_start",
+          timestamp: 1000,
+          agentId: "a",
+          snapshotId: null,
+        },
+        {
+          id: 1,
+          type: "unknown_type",
+          timestamp: 2000,
+          agentId: "a",
+          snapshotId: null,
+        },
+        {
+          id: 2,
+          type: "agent_complete",
+          timestamp: 3000,
+          agentId: "a",
+          snapshotId: null,
+        },
       ],
       nextId: 3,
     });
@@ -916,8 +1096,20 @@ describe("import event type validation (A12)", () => {
     const json = JSON.stringify({
       version: 1,
       events: [
-        { id: 0, type: "made_up_event", timestamp: 1000, agentId: "a", snapshotId: null },
-        { id: 1, type: "another_fake", timestamp: 2000, agentId: "a", snapshotId: null },
+        {
+          id: 0,
+          type: "made_up_event",
+          timestamp: 1000,
+          agentId: "a",
+          snapshotId: null,
+        },
+        {
+          id: 1,
+          type: "another_fake",
+          timestamp: 2000,
+          agentId: "a",
+          snapshotId: null,
+        },
       ],
       nextId: 2,
     });
@@ -929,18 +1121,32 @@ describe("import event type validation (A12)", () => {
 
   it("accepts all known event types during import", () => {
     const knownTypes: DebugEventType[] = [
-      "agent_start", "agent_complete", "agent_error", "agent_retry",
-      "guardrail_check", "constraint_evaluate",
-      "resolver_start", "resolver_complete", "resolver_error",
-      "approval_request", "approval_response",
-      "handoff_start", "handoff_complete",
-      "pattern_start", "pattern_complete",
+      "agent_start",
+      "agent_complete",
+      "agent_error",
+      "agent_retry",
+      "guardrail_check",
+      "constraint_evaluate",
+      "resolver_start",
+      "resolver_complete",
+      "resolver_error",
+      "approval_request",
+      "approval_response",
+      "handoff_start",
+      "handoff_complete",
+      "pattern_start",
+      "pattern_complete",
       "dag_node_update",
-      "breakpoint_hit", "breakpoint_resumed",
-      "derivation_update", "scratchpad_update",
+      "breakpoint_hit",
+      "breakpoint_resumed",
+      "derivation_update",
+      "scratchpad_update",
       "reflection_iteration",
-      "race_start", "race_winner", "race_cancelled",
-      "reroute", "debate_round",
+      "race_start",
+      "race_winner",
+      "race_cancelled",
+      "reroute",
+      "debate_round",
     ];
 
     const events = knownTypes.map((type, i) => ({
@@ -981,7 +1187,9 @@ describe("clear() and length", () => {
     expect(timeline.getEvents()).toHaveLength(0);
 
     // IDs reset after clear
-    const newEvent = timeline.record(makeEvent("agent_start", { agentId: "b" } as any));
+    const newEvent = timeline.record(
+      makeEvent("agent_start", { agentId: "b" } as any),
+    );
     expect(newEvent.id).toBe(0);
   });
 });
@@ -1010,13 +1218,11 @@ describe("assertTimelineEvents helper", () => {
   });
 
   it("throws when totalEvents mismatch", () => {
-    const timeline = createTestTimeline([
-      { type: "agent_start" } as any,
-    ]);
+    const timeline = createTestTimeline([{ type: "agent_start" } as any]);
 
-    expect(() =>
-      assertTimelineEvents(timeline, { totalEvents: 5 }),
-    ).toThrow("Expected 5 timeline events, got 1");
+    expect(() => assertTimelineEvents(timeline, { totalEvents: 5 })).toThrow(
+      "Expected 5 timeline events, got 1",
+    );
   });
 
   it("supports minEvents and maxEvents", () => {
@@ -1029,8 +1235,8 @@ describe("assertTimelineEvents helper", () => {
       assertTimelineEvents(timeline, { minEvents: 1, maxEvents: 5 }),
     ).not.toThrow();
 
-    expect(() =>
-      assertTimelineEvents(timeline, { minEvents: 10 }),
-    ).toThrow("Expected at least 10 timeline events, got 2");
+    expect(() => assertTimelineEvents(timeline, { minEvents: 10 })).toThrow(
+      "Expected at least 10 timeline events, got 2",
+    );
   });
 });

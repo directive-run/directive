@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  createTestOrchestrator,
-  createTestMultiAgentOrchestrator,
-  createMockSchema,
-} from "../testing.js";
+import { describe, expect, it, vi } from "vitest";
 import { StructuredOutputError } from "../structured-output.js";
+import {
+  createMockSchema,
+  createTestMultiAgentOrchestrator,
+  createTestOrchestrator,
+} from "../testing.js";
 
 // ============================================================================
 // Single-agent structured output
@@ -35,10 +35,7 @@ describe("Single-agent structured output", () => {
 
   it("per-call outputSchema overrides orchestrator schema", async () => {
     const orchestratorSchema = createMockSchema<{ name: string }>(
-      (data) =>
-        typeof data === "object" &&
-        data !== null &&
-        "name" in data,
+      (data) => typeof data === "object" && data !== null && "name" in data,
     );
 
     const callSchema = createMockSchema<{ name: string; score: number }>(
@@ -156,10 +153,7 @@ describe("Multi-agent per-agent structured output", () => {
 
   it("agent with schema gets validated output", async () => {
     const schema = createMockSchema<{ name: string }>(
-      (data) =>
-        typeof data === "object" &&
-        data !== null &&
-        "name" in data,
+      (data) => typeof data === "object" && data !== null && "name" in data,
     );
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -201,10 +195,7 @@ describe("Multi-agent per-agent structured output", () => {
 
   it("invalid output throws StructuredOutputError after retries", async () => {
     const schema = createMockSchema<{ name: string }>(
-      (data) =>
-        typeof data === "object" &&
-        data !== null &&
-        "name" in data,
+      (data) => typeof data === "object" && data !== null && "name" in data,
     );
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -218,18 +209,15 @@ describe("Multi-agent per-agent structured output", () => {
       defaultMockResponse: { output: "not json at all", totalTokens: 10 },
     });
 
-    await expect(
-      orchestrator.runAgent("bad", "do something"),
-    ).rejects.toThrow(StructuredOutputError);
+    await expect(orchestrator.runAgent("bad", "do something")).rejects.toThrow(
+      StructuredOutputError,
+    );
   });
 
   it("maxSchemaRetries controls retry count", async () => {
     let callCount = 0;
     const schema = createMockSchema<{ name: string }>(
-      (data) =>
-        typeof data === "object" &&
-        data !== null &&
-        "name" in data,
+      (data) => typeof data === "object" && data !== null && "name" in data,
     );
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -262,10 +250,7 @@ describe("Multi-agent per-agent structured output", () => {
 
   it("output guardrails see parsed object for structured agents", async () => {
     const schema = createMockSchema<{ name: string }>(
-      (data) =>
-        typeof data === "object" &&
-        data !== null &&
-        "name" in data,
+      (data) => typeof data === "object" && data !== null && "name" in data,
     );
 
     const guardrailOutput = vi.fn();

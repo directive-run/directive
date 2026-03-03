@@ -1,15 +1,16 @@
-'use client'
+"use client";
 
-import { ReactFlow, Background, type ReactFlowProps } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import './turbo-theme.css'
-import clsx from 'clsx'
-import { useDiagramTheme } from './hooks/useDiagramTheme'
-interface DiagramWrapperProps extends Omit<ReactFlowProps, 'children' | 'height'> {
-  height?: number | string
-  className?: string
-  interactive?: boolean
-  children?: React.ReactNode
+import { Background, ReactFlow, type ReactFlowProps } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import "./turbo-theme.css";
+import clsx from "clsx";
+import { useDiagramTheme } from "./hooks/useDiagramTheme";
+interface DiagramWrapperProps
+  extends Omit<ReactFlowProps, "children" | "height"> {
+  height?: number | string;
+  className?: string;
+  interactive?: boolean;
+  children?: React.ReactNode;
 }
 
 export function DiagramWrapper({
@@ -19,16 +20,16 @@ export function DiagramWrapper({
   children,
   ...flowProps
 }: DiagramWrapperProps) {
-  const { bgColor, gridColor } = useDiagramTheme()
+  const { bgColor, gridColor } = useDiagramTheme();
 
   return (
     <div
       className={clsx(
-        'directive-diagram not-prose my-8 w-full overflow-hidden rounded-lg border border-slate-700/50 shadow-lg shadow-slate-900/20',
+        "directive-diagram not-prose my-8 w-full overflow-hidden rounded-lg border border-slate-700/50 shadow-lg shadow-slate-900/20",
         className,
       )}
       style={{
-        height: typeof height === 'number' ? `${height}px` : height,
+        height: typeof height === "number" ? `${height}px` : height,
         background: bgColor,
       }}
     >
@@ -51,5 +52,5 @@ export function DiagramWrapper({
         {children}
       </ReactFlow>
     </div>
-  )
+  );
 }

@@ -1,9 +1,12 @@
 import { useState } from "react";
-import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS, getEventCategory } from "../lib/colors";
-import { PromptViewer } from "./PromptViewer";
 import type { TimeFormat } from "../lib/time-format";
-import { formatTimestamp as formatTs, formatDuration } from "../lib/time-format";
+import {
+  formatDuration,
+  formatTimestamp as formatTs,
+} from "../lib/time-format";
+import type { DebugEvent } from "../lib/types";
+import { PromptViewer } from "./PromptViewer";
 
 interface EventDetailProps {
   event: DebugEvent;
@@ -18,7 +21,18 @@ interface EventDetailProps {
 
 /** Extract all meaningful properties from an event */
 /** D5: Keys to skip including prototype pollution vectors */
-const SKIP_PROPS = new Set(["id", "type", "timestamp", "snapshotId", "agentId", "input", "output", "__proto__", "constructor", "prototype"]);
+const SKIP_PROPS = new Set([
+  "id",
+  "type",
+  "timestamp",
+  "snapshotId",
+  "agentId",
+  "input",
+  "output",
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
 
 function getEventProperties(event: DebugEvent): [string, unknown][] {
   const entries: [string, unknown][] = [];
@@ -62,7 +76,10 @@ function StringValue({ value }: { value: string }) {
 
 const MAX_RENDER_DEPTH = 5;
 
-function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+function PropertyValue({
+  value,
+  depth = 0,
+}: { value: unknown; depth?: number }) {
   if (typeof value === "boolean") {
     return (
       <span className={value ? "text-emerald-400" : "text-red-400"}>
@@ -86,12 +103,14 @@ function PropertyValue({ value, depth = 0 }: { value: unknown; depth?: number })
 
     return (
       <span className="text-zinc-400">
-        [{value.map((v, i) => (
+        [
+        {value.map((v, i) => (
           <span key={i}>
             {i > 0 && ", "}
             <PropertyValue value={v} depth={depth + 1} />
           </span>
-        ))}]
+        ))}
+        ]
       </span>
     );
   }
@@ -129,12 +148,15 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }).catch(() => {
-      // Clipboard unavailable (non-HTTPS or permission denied)
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {
+        // Clipboard unavailable (non-HTTPS or permission denied)
+      });
   };
 
   return (
@@ -148,14 +170,22 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-export function EventDetail({ event, onClose, onForkFromSnapshot, onReplayFromHere, timeFormat = "clock", baseTimestamp }: EventDetailProps) {
+export function EventDetail({
+  event,
+  onClose,
+  onForkFromSnapshot,
+  onReplayFromHere,
+  timeFormat = "clock",
+  baseTimestamp,
+}: EventDetailProps) {
   const properties = getEventProperties(event);
   const color = EVENT_COLORS[event.type];
   const category = getEventCategory(event.type);
   const [showForkConfirm, setShowForkConfirm] = useState(false);
 
   // Check for prompt/completion data (from verbose timeline mode)
-  const hasPromptData = typeof event.input === "string" || typeof event.output === "string";
+  const hasPromptData =
+    typeof event.input === "string" || typeof event.output === "string";
   const canFork = onForkFromSnapshot && event.snapshotId != null;
 
   return (
@@ -190,13 +220,17 @@ export function EventDetail({ event, onClose, onForkFromSnapshot, onReplayFromHe
       <div className="mt-4 space-y-2 text-xs">
         <div className="flex justify-between">
           <span className="text-zinc-500">Time</span>
-          <span className="text-zinc-300 font-mono">{formatTs(event.timestamp, timeFormat, baseTimestamp)}</span>
+          <span className="text-zinc-300 font-mono">
+            {formatTs(event.timestamp, timeFormat, baseTimestamp)}
+          </span>
         </div>
 
         {typeof event.durationMs === "number" && (
           <div className="flex justify-between">
             <span className="text-zinc-500">Duration</span>
-            <span className="text-zinc-300 font-mono">{formatDuration(event.durationMs)}</span>
+            <span className="text-zinc-300 font-mono">
+              {formatDuration(event.durationMs)}
+            </span>
           </div>
         )}
 
@@ -238,14 +272,22 @@ export function EventDetail({ event, onClose, onForkFromSnapshot, onReplayFromHe
         <PromptViewer
           input={event.input as string | undefined}
           output={event.output as string | undefined}
-          totalTokens={typeof event.totalTokens === "number" ? event.totalTokens : undefined}
+          totalTokens={
+            typeof event.totalTokens === "number"
+              ? event.totalTokens
+              : undefined
+          }
         />
       )}
 
       {/* M14: Copy event as JSON */}
       <div className="mt-4">
         <button
-          onClick={() => navigator.clipboard.writeText(JSON.stringify(event, null, 2)).catch(() => {})}
+          onClick={() =>
+            navigator.clipboard
+              .writeText(JSON.stringify(event, null, 2))
+              .catch(() => {})
+          }
           className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700"
         >
           Copy event as JSON
@@ -270,7 +312,8 @@ export function EventDetail({ event, onClose, onForkFromSnapshot, onReplayFromHe
           {showForkConfirm ? (
             <div className="rounded border border-amber-500/30 bg-amber-950/20 p-3">
               <p className="text-xs text-amber-300">
-                Fork timeline from snapshot #{event.snapshotId}? This will truncate the timeline to this point.
+                Fork timeline from snapshot #{event.snapshotId}? This will
+                truncate the timeline to this point.
               </p>
               <div className="mt-2 flex gap-2">
                 <button

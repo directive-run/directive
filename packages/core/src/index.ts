@@ -18,127 +18,127 @@
 // ============================================================================
 
 export type {
-	// Schema
-	Schema,
-	SchemaType,
-	InferSchema,
-	InferSchemaType,
-	// Consolidated Module Schema
-	ModuleSchema,
-	DerivationsSchema,
-	EventsSchema,
-	EventPayloadSchema,
-	InferFacts,
-	InferDerivations,
-	InferSelectorState,
-	InferEventPayloadFromSchema,
-	InferEvents,
-	InferRequirementPayloadFromSchema,
-	InferRequirements,
-	InferRequirementTypes,
-	// Facts
-	Facts,
-	FactsSnapshot,
-	FactsStore,
-	FactChange,
-	// Derivations
-	DerivationsDef,
-	DerivationState,
-	DerivedValues,
-	TypedDerivationsDef,
-	// Effects
-	EffectsDef,
-	EffectCleanup,
-	// Requirements
-	Requirement,
-	RequirementWithId,
-	RequirementKeyFn,
-	RequirementPayloadSchema,
-	RequirementsSchema,
-	RequirementOutput,
-	// Constraints
-	ConstraintsDef,
-	ConstraintState,
-	TypedConstraintDef,
-	TypedConstraintsDef,
-	// Resolvers
-	ResolversDef,
-	ResolverContext,
-	ResolverStatus,
-	RetryPolicy,
-	BatchConfig,
-	BatchItemResult,
-	BatchResolveResults,
-	TypedResolverContext,
-	TypedResolverDef,
-	TypedResolversDef,
-	// Plugins
-	Plugin,
-	ReconcileResult,
-	Snapshot,
-	RecoveryStrategy,
-	// Errors
-	ErrorSource,
-	ErrorBoundaryConfig,
-	RetryLaterConfig,
-	// Module
-	ModuleDef,
-	ModuleHooks,
-	TypedEventsDef,
-	// Events
-	EventsDef,
-	SystemEvent,
-	EventsAccessorFromSchema,
-	DispatchEventsFromSchema,
-	FlexibleEventHandler,
-	// System
-	System,
-	SystemConfig,
-	SystemInspection,
-	SystemSnapshot,
-	RunChangelogEntry,
-	DistributableSnapshotOptions,
-	DistributableSnapshot,
-	DebugConfig,
-	TimeTravelAPI,
-	TimeTravelState,
-	SnapshotMeta,
-	RequirementExplanation,
-	// Accessors
-	DeriveAccessor,
-	EventsAccessor,
-	FactKeys,
-	FactReturnType,
-	DerivationKeys,
-	DerivationReturnType,
-	ObservableKeys,
-	// Typed Helper Utilities
-	TypedConstraint,
-	TypedResolver,
-	// Composition (Namespaced Multi-Module)
-	ModulesMap,
-	NamespacedFacts,
-	MutableNamespacedFacts,
-	NamespacedDerivations,
-	UnionEvents,
-	NamespacedSystem,
-	NamespacedEventsAccessor,
-	CreateSystemOptionsNamed,
-	// Single Module (no namespace)
-	CreateSystemOptionsSingle,
-	SingleModuleSystem,
-	// Type Guards
-	SystemMode,
-	AnySystem,
-	// Cross-Module Dependencies (for modules)
-	CrossModuleDeps,
-	CrossModuleFactsWithSelf,
-	CrossModuleDerivationFn,
-	CrossModuleDerivationsDef,
-	CrossModuleConstraintDef,
-	CrossModuleConstraintsDef,
-	CrossModuleEffectDef,
-	CrossModuleEffectsDef,
+  // Schema
+  Schema,
+  SchemaType,
+  InferSchema,
+  InferSchemaType,
+  // Consolidated Module Schema
+  ModuleSchema,
+  DerivationsSchema,
+  EventsSchema,
+  EventPayloadSchema,
+  InferFacts,
+  InferDerivations,
+  InferSelectorState,
+  InferEventPayloadFromSchema,
+  InferEvents,
+  InferRequirementPayloadFromSchema,
+  InferRequirements,
+  InferRequirementTypes,
+  // Facts
+  Facts,
+  FactsSnapshot,
+  FactsStore,
+  FactChange,
+  // Derivations
+  DerivationsDef,
+  DerivationState,
+  DerivedValues,
+  TypedDerivationsDef,
+  // Effects
+  EffectsDef,
+  EffectCleanup,
+  // Requirements
+  Requirement,
+  RequirementWithId,
+  RequirementKeyFn,
+  RequirementPayloadSchema,
+  RequirementsSchema,
+  RequirementOutput,
+  // Constraints
+  ConstraintsDef,
+  ConstraintState,
+  TypedConstraintDef,
+  TypedConstraintsDef,
+  // Resolvers
+  ResolversDef,
+  ResolverContext,
+  ResolverStatus,
+  RetryPolicy,
+  BatchConfig,
+  BatchItemResult,
+  BatchResolveResults,
+  TypedResolverContext,
+  TypedResolverDef,
+  TypedResolversDef,
+  // Plugins
+  Plugin,
+  ReconcileResult,
+  Snapshot,
+  RecoveryStrategy,
+  // Errors
+  ErrorSource,
+  ErrorBoundaryConfig,
+  RetryLaterConfig,
+  // Module
+  ModuleDef,
+  ModuleHooks,
+  TypedEventsDef,
+  // Events
+  EventsDef,
+  SystemEvent,
+  EventsAccessorFromSchema,
+  DispatchEventsFromSchema,
+  FlexibleEventHandler,
+  // System
+  System,
+  SystemConfig,
+  SystemInspection,
+  SystemSnapshot,
+  RunChangelogEntry,
+  DistributableSnapshotOptions,
+  DistributableSnapshot,
+  DebugConfig,
+  TimeTravelAPI,
+  TimeTravelState,
+  SnapshotMeta,
+  RequirementExplanation,
+  // Accessors
+  DeriveAccessor,
+  EventsAccessor,
+  FactKeys,
+  FactReturnType,
+  DerivationKeys,
+  DerivationReturnType,
+  ObservableKeys,
+  // Typed Helper Utilities
+  TypedConstraint,
+  TypedResolver,
+  // Composition (Namespaced Multi-Module)
+  ModulesMap,
+  NamespacedFacts,
+  MutableNamespacedFacts,
+  NamespacedDerivations,
+  UnionEvents,
+  NamespacedSystem,
+  NamespacedEventsAccessor,
+  CreateSystemOptionsNamed,
+  // Single Module (no namespace)
+  CreateSystemOptionsSingle,
+  SingleModuleSystem,
+  // Type Guards
+  SystemMode,
+  AnySystem,
+  // Cross-Module Dependencies (for modules)
+  CrossModuleDeps,
+  CrossModuleFactsWithSelf,
+  CrossModuleDerivationFn,
+  CrossModuleDerivationsDef,
+  CrossModuleConstraintDef,
+  CrossModuleConstraintsDef,
+  CrossModuleEffectDef,
+  CrossModuleEffectsDef,
 } from "./core/types.js";
 
 // ============================================================================
@@ -218,37 +218,42 @@ export { DirectiveError } from "./core/types.js";
  * };
  * ```
  */
-export { t, type Branded, type ExtendedSchemaType, type ChainableSchemaType } from "./core/facts.js";
+export {
+  t,
+  type Branded,
+  type ExtendedSchemaType,
+  type ChainableSchemaType,
+} from "./core/facts.js";
 
 // ============================================================================
 // Module & System
 // ============================================================================
 
 export {
-	createModule,
-	createModuleFactory,
-	type ModuleConfig,
-	type ModuleConfigWithDeps,
+  createModule,
+  createModuleFactory,
+  type ModuleConfig,
+  type ModuleConfigWithDeps,
 } from "./core/module.js";
 export { createSystem } from "./core/system.js";
 export {
-	module,
-	type ModuleBuilder,
+  module,
+  type ModuleBuilder,
 } from "./core/builder.js";
 export {
-	constraint,
-	when,
-	type ConstraintBuilderStart,
-	type ConstraintBuilderWithWhen,
-	type ConstraintBuilderComplete,
-	type WhenConstraint,
-	type WhenBuilder,
+  constraint,
+  when,
+  type ConstraintBuilderStart,
+  type ConstraintBuilderWithWhen,
+  type ConstraintBuilderComplete,
+  type WhenConstraint,
+  type WhenBuilder,
 } from "./core/constraint-builders.js";
 export {
-	system,
-	type SystemBuilderStart,
-	type SingleModuleSystemBuilder,
-	type NamespacedSystemBuilder,
+  system,
+  type SystemBuilderStart,
+  type SingleModuleSystemBuilder,
+  type NamespacedSystemBuilder,
 } from "./core/system-builder.js";
 
 // Convenience helper for status plugin setup
@@ -256,10 +261,10 @@ export { createSystemWithStatus } from "./utils/system-with-status.js";
 
 // Helper factory functions for external constraint/resolver definitions
 export {
-	constraintFactory,
-	resolverFactory,
-	typedConstraint,
-	typedResolver,
+  constraintFactory,
+  resolverFactory,
+  typedConstraint,
+  typedResolver,
 } from "./core/types.js";
 
 // ============================================================================
@@ -267,11 +272,11 @@ export {
 // ============================================================================
 
 export {
-	req,
-	forType,
-	isRequirementType,
-	generateRequirementId,
-	RequirementSet,
+  req,
+  forType,
+  isRequirementType,
+  generateRequirementId,
+  RequirementSet,
 } from "./core/requirements.js";
 
 // ============================================================================
@@ -279,8 +284,8 @@ export {
 // ============================================================================
 
 export {
-	isSingleModuleSystem,
-	isNamespacedSystem,
+  isSingleModuleSystem,
+  isNamespacedSystem,
 } from "./core/types/composition.js";
 
 // ============================================================================
@@ -307,30 +312,37 @@ export {
  * ```
  */
 export const Backoff = {
-	/** No delay between retries */
-	None: "none",
-	/** Linear delay increase (initialDelay * attempt) */
-	Linear: "linear",
-	/** Exponential delay increase (initialDelay * 2^attempt) */
-	Exponential: "exponential",
+  /** No delay between retries */
+  None: "none",
+  /** Linear delay increase (initialDelay * attempt) */
+  Linear: "linear",
+  /** Exponential delay increase (initialDelay * 2^attempt) */
+  Exponential: "exponential",
 } as const;
 
 // ============================================================================
 // Lower-level APIs (for advanced use)
 // ============================================================================
 
-export { createFacts, createFactsStore, createFactsProxy } from "./core/facts.js";
+export {
+  createFacts,
+  createFactsStore,
+  createFactsProxy,
+} from "./core/facts.js";
 export { createDerivationsManager } from "./core/derivations.js";
 export { createEffectsManager } from "./core/effects.js";
 export { createConstraintsManager } from "./core/constraints.js";
 export { createResolversManager, type InflightInfo } from "./core/resolvers.js";
 export { createPluginManager } from "./core/plugins.js";
 export {
-	createErrorBoundaryManager,
-	createRetryLaterManager,
-	type PendingRetry,
+  createErrorBoundaryManager,
+  createRetryLaterManager,
+  type PendingRetry,
 } from "./core/errors.js";
-export { createTimeTravelManager, createDisabledTimeTravel } from "./utils/time-travel.js";
+export {
+  createTimeTravelManager,
+  createDisabledTimeTravel,
+} from "./utils/time-travel.js";
 export { createEngine } from "./core/engine.js";
 
 // ============================================================================
@@ -338,11 +350,11 @@ export { createEngine } from "./core/engine.js";
 // ============================================================================
 
 export {
-	getCurrentTracker,
-	isTracking,
-	withTracking,
-	withoutTracking,
-	trackAccess,
+  getCurrentTracker,
+  isTracking,
+  withTracking,
+  withoutTracking,
+  trackAccess,
 } from "./core/tracking.js";
 
 // ============================================================================
@@ -350,9 +362,9 @@ export {
 // ============================================================================
 
 export {
-	createRequirementStatusPlugin,
-	createStatusHook,
-	type RequirementTypeStatus,
+  createRequirementStatusPlugin,
+  createStatusHook,
+  type RequirementTypeStatus,
 } from "./utils/requirement-status.js";
 
 // ============================================================================
@@ -360,17 +372,17 @@ export {
 // ============================================================================
 
 export {
-	shallowEqual,
-	isSnapshotExpired,
-	validateSnapshot,
-	diffSnapshots,
-	signSnapshot,
-	verifySnapshotSignature,
-	isSignedSnapshot,
-	type DistributableSnapshotLike,
-	type SnapshotDiff,
-	type SnapshotDiffEntry,
-	type SignedSnapshot,
+  shallowEqual,
+  isSnapshotExpired,
+  validateSnapshot,
+  diffSnapshots,
+  signSnapshot,
+  verifySnapshotSignature,
+  isSignedSnapshot,
+  type DistributableSnapshotLike,
+  type SnapshotDiff,
+  type SnapshotDiffEntry,
+  type SignedSnapshot,
 } from "./utils/utils.js";
 
 // ============================================================================
@@ -378,13 +390,13 @@ export {
 // ============================================================================
 
 export {
-	analyzeReduxSlice,
-	analyzeZustandStore,
-	analyzeXStateMachine,
-	generateModuleCode,
-	generateMigrationChecklist,
-	type ReduxSliceConfig,
-	type ZustandStoreConfig,
-	type XStateMachineConfig,
-	type DirectiveModuleStructure,
+  analyzeReduxSlice,
+  analyzeZustandStore,
+  analyzeXStateMachine,
+  generateModuleCode,
+  generateMigrationChecklist,
+  type ReduxSliceConfig,
+  type ZustandStoreConfig,
+  type XStateMachineConfig,
+  type DirectiveModuleStructure,
 } from "./utils/migration.js";

@@ -1,11 +1,17 @@
-'use client'
+"use client";
 
-import { useCallback, useState } from 'react'
-import { useSelector } from '@directive-run/react'
-import { useDevToolsSystem } from '../DevToolsSystemContext'
-import { EVENT_LABELS } from '../constants'
-import { EmptyState } from '../EmptyState'
-import type { BreakpointDef, FactBreakpointDef, FactBreakpointHit, EventBreakpointDef, EventBreakpointHit } from '../types'
+import { useSelector } from "@directive-run/react";
+import { useCallback, useState } from "react";
+import { useDevToolsSystem } from "../DevToolsSystemContext";
+import { EmptyState } from "../EmptyState";
+import { EVENT_LABELS } from "../constants";
+import type {
+  BreakpointDef,
+  EventBreakpointDef,
+  EventBreakpointHit,
+  FactBreakpointDef,
+  FactBreakpointHit,
+} from "../types";
 
 // ---------------------------------------------------------------------------
 // Shared icons
@@ -13,35 +19,55 @@ import type { BreakpointDef, FactBreakpointDef, FactBreakpointHit, EventBreakpoi
 
 function RemoveIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className="h-3.5 w-3.5"
+    >
       <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
     </svg>
-  )
+  );
 }
 
 function CheckIcon() {
   return (
     <svg viewBox="0 0 12 12" fill="none" className="h-full w-full">
-      <path d="M3 6l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M3 6l2 2 4-4"
+        stroke="white"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
-  )
+  );
 }
 
-function ToggleCheckbox({ enabled, onToggle, label }: { enabled: boolean; onToggle: () => void; label: string }) {
+function ToggleCheckbox({
+  enabled,
+  onToggle,
+  label,
+}: { enabled: boolean; onToggle: () => void; label: string }) {
   return (
     <button
       onClick={onToggle}
       className={`h-4 w-4 rounded border cursor-pointer transition ${
-        enabled ? 'border-rose-500 bg-rose-500' : 'border-zinc-300 dark:border-zinc-600'
+        enabled
+          ? "border-rose-500 bg-rose-500"
+          : "border-zinc-300 dark:border-zinc-600"
       }`}
       aria-label={label}
     >
       {enabled && <CheckIcon />}
     </button>
-  )
+  );
 }
 
-function RemoveButton({ onClick, label }: { onClick: () => void; label: string }) {
+function RemoveButton({
+  onClick,
+  label,
+}: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
@@ -50,7 +76,7 @@ function RemoveButton({ onClick, label }: { onClick: () => void; label: string }
     >
       <RemoveIcon />
     </button>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -58,37 +84,70 @@ function RemoveButton({ onClick, label }: { onClick: () => void; label: string }
 // ---------------------------------------------------------------------------
 
 export function BreakpointsView() {
-  const system = useDevToolsSystem()
+  const system = useDevToolsSystem();
 
   // Runtime (fact + event) breakpoints
-  const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
-  const factBreakpoints = useSelector(system, (s) => s.facts.runtime.factBreakpoints) as FactBreakpointDef[]
-  const factBreakpointHits = useSelector(system, (s) => s.facts.runtime.factBreakpointHits) as FactBreakpointHit[]
-  const eventBreakpoints = useSelector(system, (s) => s.facts.runtime.eventBreakpoints) as EventBreakpointDef[]
-  const eventBreakpointHits = useSelector(system, (s) => s.facts.runtime.eventBreakpointHits) as EventBreakpointHit[]
-  const breakpointPaused = useSelector(system, (s) => s.facts.runtime.breakpointPaused) as boolean
-  const pausedOnHit = useSelector(system, (s) => s.facts.runtime.pausedOnHit) as string | null
+  const runtimeConnected = useSelector(
+    system,
+    (s) => s.facts.runtime.connected,
+  );
+  const factBreakpoints = useSelector(
+    system,
+    (s) => s.facts.runtime.factBreakpoints,
+  ) as FactBreakpointDef[];
+  const factBreakpointHits = useSelector(
+    system,
+    (s) => s.facts.runtime.factBreakpointHits,
+  ) as FactBreakpointHit[];
+  const eventBreakpoints = useSelector(
+    system,
+    (s) => s.facts.runtime.eventBreakpoints,
+  ) as EventBreakpointDef[];
+  const eventBreakpointHits = useSelector(
+    system,
+    (s) => s.facts.runtime.eventBreakpointHits,
+  ) as EventBreakpointHit[];
+  const breakpointPaused = useSelector(
+    system,
+    (s) => s.facts.runtime.breakpointPaused,
+  ) as boolean;
+  const pausedOnHit = useSelector(system, (s) => s.facts.runtime.pausedOnHit) as
+    | string
+    | null;
 
   // AI (SSE) breakpoints — from connection module
-  const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled) as boolean
-  const aiBreakpoints = useSelector(system, (s) => s.facts.connection.breakpoints) as BreakpointDef[]
-  const aiIsPaused = useSelector(system, (s) => s.facts.connection.isPaused) as boolean
-  const aiPausedOnEvent = useSelector(system, (s) => s.facts.connection.pausedOnEvent) as any
+  const aiEnabled = useSelector(
+    system,
+    (s) => s.facts.connection.aiEnabled,
+  ) as boolean;
+  const aiBreakpoints = useSelector(
+    system,
+    (s) => s.facts.connection.breakpoints,
+  ) as BreakpointDef[];
+  const aiIsPaused = useSelector(
+    system,
+    (s) => s.facts.connection.isPaused,
+  ) as boolean;
+  const aiPausedOnEvent = useSelector(
+    system,
+    (s) => s.facts.connection.pausedOnEvent,
+  ) as any;
 
   const handleResumeRuntime = useCallback(() => {
-    system.events.runtime.resumeFromBreakpoint()
-  }, [system])
+    system.events.runtime.resumeFromBreakpoint();
+  }, [system]);
 
   const handleResumeAi = useCallback(() => {
-    system.events.connection.resumeStream()
-  }, [system])
+    system.events.connection.resumeStream();
+  }, [system]);
 
-  const hasAnything = runtimeConnected || (aiEnabled && aiBreakpoints.length > 0)
+  const hasAnything =
+    runtimeConnected || (aiEnabled && aiBreakpoints.length > 0);
 
   if (!hasAnything) {
     return (
       <EmptyState message="Connect a Directive system to use breakpoints. Click the eye icon next to any fact in the Facts tab." />
-    )
+    );
   }
 
   return (
@@ -105,7 +164,10 @@ export function BreakpointsView() {
                 </span>
               </div>
               <div className="mt-1 font-mono text-xs text-amber-600 dark:text-amber-400">
-                Triggered by: {pausedOnHit === 'fact' ? 'fact mutation breakpoint' : 'event breakpoint'}
+                Triggered by:{" "}
+                {pausedOnHit === "fact"
+                  ? "fact mutation breakpoint"
+                  : "event breakpoint"}
               </div>
             </div>
             <button
@@ -130,7 +192,8 @@ export function BreakpointsView() {
                 </span>
               </div>
               <div className="mt-1 font-mono text-xs text-amber-600 dark:text-amber-400">
-                Event: {EVENT_LABELS[aiPausedOnEvent.type] || aiPausedOnEvent.type}
+                Event:{" "}
+                {EVENT_LABELS[aiPausedOnEvent.type] || aiPausedOnEvent.type}
                 {aiPausedOnEvent.agentId && ` (${aiPausedOnEvent.agentId})`}
               </div>
             </div>
@@ -164,13 +227,10 @@ export function BreakpointsView() {
 
       {/* Section 3: AI Event Breakpoints */}
       {aiEnabled && (
-        <AiBreakpointsSection
-          breakpoints={aiBreakpoints}
-          system={system}
-        />
+        <AiBreakpointsSection breakpoints={aiBreakpoints} system={system} />
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -182,23 +242,26 @@ function FactBreakpointsSection({
   hits,
   system,
 }: {
-  breakpoints: FactBreakpointDef[]
-  hits: FactBreakpointHit[]
-  system: any
+  breakpoints: FactBreakpointDef[];
+  hits: FactBreakpointHit[];
+  system: any;
 }) {
-  const [editingCondition, setEditingCondition] = useState<string | null>(null)
-  const [conditionInput, setConditionInput] = useState('')
+  const [editingCondition, setEditingCondition] = useState<string | null>(null);
+  const [conditionInput, setConditionInput] = useState("");
 
-  const handleSaveCondition = useCallback((bpId: string) => {
-    const bp = breakpoints.find((b) => b.id === bpId)
-    if (bp) {
-      system.events.runtime.addFactBreakpoint({
-        breakpoint: { ...bp, condition: conditionInput },
-      })
-    }
-    setEditingCondition(null)
-    setConditionInput('')
-  }, [breakpoints, conditionInput, system])
+  const handleSaveCondition = useCallback(
+    (bpId: string) => {
+      const bp = breakpoints.find((b) => b.id === bpId);
+      if (bp) {
+        system.events.runtime.addFactBreakpoint({
+          breakpoint: { ...bp, condition: conditionInput },
+        });
+      }
+      setEditingCondition(null);
+      setConditionInput("");
+    },
+    [breakpoints, conditionInput, system],
+  );
 
   return (
     <div>
@@ -223,7 +286,8 @@ function FactBreakpointsSection({
 
       {breakpoints.length === 0 ? (
         <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
-          Click the eye icon next to any fact in the Facts tab to add a breakpoint.
+          Click the eye icon next to any fact in the Facts tab to add a
+          breakpoint.
         </p>
       ) : (
         <div className="mt-2 space-y-1.5">
@@ -236,10 +300,18 @@ function FactBreakpointsSection({
                 <div className="flex items-center gap-3">
                   <ToggleCheckbox
                     enabled={bp.enabled}
-                    onToggle={() => system.events.runtime.toggleFactBreakpoint({ id: bp.id })}
-                    label={bp.enabled ? `Disable breakpoint on ${bp.factKey}` : `Enable breakpoint on ${bp.factKey}`}
+                    onToggle={() =>
+                      system.events.runtime.toggleFactBreakpoint({ id: bp.id })
+                    }
+                    label={
+                      bp.enabled
+                        ? `Disable breakpoint on ${bp.factKey}`
+                        : `Enable breakpoint on ${bp.factKey}`
+                    }
                   />
-                  <span className="font-mono text-sm text-sky-600 dark:text-sky-400">{bp.factKey}</span>
+                  <span className="font-mono text-sm text-sky-600 dark:text-sky-400">
+                    {bp.factKey}
+                  </span>
                   {bp.condition && (
                     <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
                       when: {bp.condition}
@@ -249,19 +321,26 @@ function FactBreakpointsSection({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => {
-                      setEditingCondition(bp.id)
-                      setConditionInput(bp.condition)
+                      setEditingCondition(bp.id);
+                      setConditionInput(bp.condition);
                     }}
                     className="cursor-pointer rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                     aria-label={`Edit condition for ${bp.factKey}`}
                     title="Edit condition"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      className="h-3 w-3"
+                    >
                       <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708l-9.5 9.5a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l9.5-9.5zM11.207 2.5 3.5 10.207 2.293 14.207l4-1.5L13.5 5.5 11.207 2.5z" />
                     </svg>
                   </button>
                   <RemoveButton
-                    onClick={() => system.events.runtime.removeFactBreakpoint({ id: bp.id })}
+                    onClick={() =>
+                      system.events.runtime.removeFactBreakpoint({ id: bp.id })
+                    }
                     label={`Remove breakpoint on ${bp.factKey}`}
                   />
                 </div>
@@ -275,11 +354,11 @@ function FactBreakpointsSection({
                     value={conditionInput}
                     onChange={(e) => setConditionInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveCondition(bp.id)
+                      if (e.key === "Enter") {
+                        handleSaveCondition(bp.id);
                       }
-                      if (e.key === 'Escape') {
-                        setEditingCondition(null)
+                      if (e.key === "Escape") {
+                        setEditingCondition(null);
                       }
                     }}
                     placeholder="newValue > 10"
@@ -313,37 +392,46 @@ function FactBreakpointsSection({
             <span className="ml-1.5 font-mono font-normal">{hits.length}</span>
           </h5>
           <div className="max-h-48 space-y-1 overflow-y-auto">
-            {[...hits].reverse().slice(0, 50).map((hit) => (
-              <div
-                key={hit.id}
-                className={`rounded border px-2 py-1.5 font-mono text-[11px] ${
-                  hit.conditionMet
-                    ? 'border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/10'
-                    : 'border-zinc-200 dark:border-zinc-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sky-600 dark:text-sky-400">{hit.factKey}</span>
-                  <span className="text-zinc-400">:</span>
-                  <span className="text-red-500">{JSON.stringify(hit.oldValue)}</span>
-                  <span className="text-zinc-400">{'->'}</span>
-                  <span className="text-emerald-500">{JSON.stringify(hit.newValue)}</span>
-                  {hit.conditionMet && (
-                    <span className="rounded bg-amber-100 px-1 py-px text-[9px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      PAUSED
+            {[...hits]
+              .reverse()
+              .slice(0, 50)
+              .map((hit) => (
+                <div
+                  key={hit.id}
+                  className={`rounded border px-2 py-1.5 font-mono text-[11px] ${
+                    hit.conditionMet
+                      ? "border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/10"
+                      : "border-zinc-200 dark:border-zinc-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sky-600 dark:text-sky-400">
+                      {hit.factKey}
                     </span>
-                  )}
+                    <span className="text-zinc-400">:</span>
+                    <span className="text-red-500">
+                      {JSON.stringify(hit.oldValue)}
+                    </span>
+                    <span className="text-zinc-400">{"->"}</span>
+                    <span className="text-emerald-500">
+                      {JSON.stringify(hit.newValue)}
+                    </span>
+                    {hit.conditionMet && (
+                      <span className="rounded bg-amber-100 px-1 py-px text-[9px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        PAUSED
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[9px] text-zinc-400">
+                    {new Date(hit.timestamp).toLocaleTimeString()}
+                  </div>
                 </div>
-                <div className="mt-0.5 text-[9px] text-zinc-400">
-                  {new Date(hit.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -355,16 +443,16 @@ function EventBreakpointsSection({
   hits,
   system,
 }: {
-  breakpoints: EventBreakpointDef[]
-  hits: EventBreakpointHit[]
-  system: any
+  breakpoints: EventBreakpointDef[];
+  hits: EventBreakpointHit[];
+  system: any;
 }) {
-  const [newEventType, setNewEventType] = useState('')
-  const [newCondition, setNewCondition] = useState('')
+  const [newEventType, setNewEventType] = useState("");
+  const [newCondition, setNewCondition] = useState("");
 
   const handleAdd = useCallback(() => {
     if (!newEventType) {
-      return
+      return;
     }
 
     const bp: EventBreakpointDef = {
@@ -373,11 +461,11 @@ function EventBreakpointsSection({
       condition: newCondition,
       enabled: true,
       createdAt: Date.now(),
-    }
-    system.events.runtime.addEventBreakpoint({ breakpoint: bp })
-    setNewEventType('')
-    setNewCondition('')
-  }, [newEventType, newCondition, system])
+    };
+    system.events.runtime.addEventBreakpoint({ breakpoint: bp });
+    setNewEventType("");
+    setNewCondition("");
+  }, [newEventType, newCondition, system]);
 
   return (
     <div>
@@ -411,10 +499,18 @@ function EventBreakpointsSection({
               <div className="flex items-center gap-3">
                 <ToggleCheckbox
                   enabled={bp.enabled}
-                  onToggle={() => system.events.runtime.toggleEventBreakpoint({ id: bp.id })}
-                  label={bp.enabled ? `Disable event breakpoint ${bp.eventType}` : `Enable event breakpoint ${bp.eventType}`}
+                  onToggle={() =>
+                    system.events.runtime.toggleEventBreakpoint({ id: bp.id })
+                  }
+                  label={
+                    bp.enabled
+                      ? `Disable event breakpoint ${bp.eventType}`
+                      : `Enable event breakpoint ${bp.eventType}`
+                  }
                 />
-                <span className="font-mono text-sm text-violet-600 dark:text-violet-400">{bp.eventType}</span>
+                <span className="font-mono text-sm text-violet-600 dark:text-violet-400">
+                  {bp.eventType}
+                </span>
                 {bp.condition && (
                   <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
                     when: {bp.condition}
@@ -422,7 +518,9 @@ function EventBreakpointsSection({
                 )}
               </div>
               <RemoveButton
-                onClick={() => system.events.runtime.removeEventBreakpoint({ id: bp.id })}
+                onClick={() =>
+                  system.events.runtime.removeEventBreakpoint({ id: bp.id })
+                }
                 label={`Remove event breakpoint ${bp.eventType}`}
               />
             </div>
@@ -467,7 +565,8 @@ function EventBreakpointsSection({
 
       {breakpoints.length === 0 && (
         <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
-          Add a trace event type to break on (e.g. fact.set, resolver.start, constraint.evaluate).
+          Add a trace event type to break on (e.g. fact.set, resolver.start,
+          constraint.evaluate).
         </p>
       )}
 
@@ -479,33 +578,38 @@ function EventBreakpointsSection({
             <span className="ml-1.5 font-mono font-normal">{hits.length}</span>
           </h5>
           <div className="max-h-48 space-y-1 overflow-y-auto">
-            {[...hits].reverse().slice(0, 50).map((hit) => (
-              <div
-                key={hit.id}
-                className={`rounded border px-2 py-1.5 font-mono text-[11px] ${
-                  hit.conditionMet
-                    ? 'border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/10'
-                    : 'border-zinc-200 dark:border-zinc-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-violet-600 dark:text-violet-400">{hit.eventType}</span>
-                  {hit.conditionMet && (
-                    <span className="rounded bg-amber-100 px-1 py-px text-[9px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      PAUSED
+            {[...hits]
+              .reverse()
+              .slice(0, 50)
+              .map((hit) => (
+                <div
+                  key={hit.id}
+                  className={`rounded border px-2 py-1.5 font-mono text-[11px] ${
+                    hit.conditionMet
+                      ? "border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/10"
+                      : "border-zinc-200 dark:border-zinc-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-violet-600 dark:text-violet-400">
+                      {hit.eventType}
                     </span>
-                  )}
+                    {hit.conditionMet && (
+                      <span className="rounded bg-amber-100 px-1 py-px text-[9px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        PAUSED
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[9px] text-zinc-400">
+                    {new Date(hit.timestamp).toLocaleTimeString()}
+                  </div>
                 </div>
-                <div className="mt-0.5 text-[9px] text-zinc-400">
-                  {new Date(hit.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -516,17 +620,17 @@ function AiBreakpointsSection({
   breakpoints,
   system,
 }: {
-  breakpoints: BreakpointDef[]
-  system: any
+  breakpoints: BreakpointDef[];
+  system: any;
 }) {
-  const [newEventType, setNewEventType] = useState('')
-  const [newLabel, setNewLabel] = useState('')
+  const [newEventType, setNewEventType] = useState("");
+  const [newLabel, setNewLabel] = useState("");
 
-  const eventTypes = Object.keys(EVENT_LABELS)
+  const eventTypes = Object.keys(EVENT_LABELS);
 
   const handleAdd = useCallback(() => {
     if (!newEventType) {
-      return
+      return;
     }
 
     const bp: BreakpointDef = {
@@ -534,11 +638,11 @@ function AiBreakpointsSection({
       label: newLabel || EVENT_LABELS[newEventType] || newEventType,
       eventType: newEventType,
       enabled: true,
-    }
-    system.events.connection.addBreakpoint({ breakpoint: bp })
-    setNewEventType('')
-    setNewLabel('')
-  }, [newEventType, newLabel, system])
+    };
+    system.events.connection.addBreakpoint({ breakpoint: bp });
+    setNewEventType("");
+    setNewLabel("");
+  }, [newEventType, newLabel, system]);
 
   return (
     <div>
@@ -561,18 +665,28 @@ function AiBreakpointsSection({
               <div className="flex items-center gap-3">
                 <ToggleCheckbox
                   enabled={bp.enabled}
-                  onToggle={() => system.events.connection.toggleBreakpoint({ id: bp.id })}
-                  label={bp.enabled ? `Disable breakpoint ${bp.label}` : `Enable breakpoint ${bp.label}`}
+                  onToggle={() =>
+                    system.events.connection.toggleBreakpoint({ id: bp.id })
+                  }
+                  label={
+                    bp.enabled
+                      ? `Disable breakpoint ${bp.label}`
+                      : `Enable breakpoint ${bp.label}`
+                  }
                 />
                 <div>
-                  <span className="text-sm text-zinc-700 dark:text-zinc-300">{bp.label}</span>
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                    {bp.label}
+                  </span>
                   <span className="ml-2 font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
                     {bp.eventType}
                   </span>
                 </div>
               </div>
               <RemoveButton
-                onClick={() => system.events.connection.removeBreakpoint({ id: bp.id })}
+                onClick={() =>
+                  system.events.connection.removeBreakpoint({ id: bp.id })
+                }
                 label={`Remove breakpoint ${bp.label}`}
               />
             </div>
@@ -620,5 +734,5 @@ function AiBreakpointsSection({
         </button>
       </div>
     </div>
-  )
+  );
 }

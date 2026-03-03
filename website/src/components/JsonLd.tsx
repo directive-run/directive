@@ -1,62 +1,62 @@
 export function WebsiteJsonLd() {
   const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: 'Directive',
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Directive",
     description:
-      'Constraint-driven state management for TypeScript. Declare what must be true, define how to make it true, let Directive orchestrate the rest.',
-    url: 'https://directive.run',
+      "Constraint-driven state management for TypeScript. Declare what must be true, define how to make it true, let Directive orchestrate the rest.",
+    url: "https://directive.run",
     potentialAction: {
-      '@type': 'SearchAction',
+      "@type": "SearchAction",
       target: {
-        '@type': 'EntryPoint',
-        urlTemplate: 'https://directive.run/docs?q={search_term_string}',
+        "@type": "EntryPoint",
+        urlTemplate: "https://directive.run/docs?q={search_term_string}",
       },
-      'query-input': 'required name=search_term_string',
+      "query-input": "required name=search_term_string",
     },
-  }
+  };
 
   return (
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
-  )
+  );
 }
 
 export function SoftwareJsonLd() {
   const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareSourceCode',
-    name: 'Directive',
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    name: "Directive",
     description:
-      'Constraint-driven state management for TypeScript. Declare what must be true, define how to make it true, let Directive orchestrate the rest.',
-    codeRepository: 'https://github.com/directive-run/directive',
+      "Constraint-driven state management for TypeScript. Declare what must be true, define how to make it true, let Directive orchestrate the rest.",
+    codeRepository: "https://github.com/directive-run/directive",
     programmingLanguage: {
-      '@type': 'ComputerLanguage',
-      name: 'TypeScript',
+      "@type": "ComputerLanguage",
+      name: "TypeScript",
     },
-    runtimePlatform: 'Node.js',
-    applicationCategory: 'DeveloperApplication',
-    operatingSystem: 'Cross-platform',
+    runtimePlatform: "Node.js",
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Cross-platform",
     offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
     },
     author: {
-      '@type': 'Organization',
-      name: 'Sizls',
-      url: 'https://sizls.com',
+      "@type": "Organization",
+      name: "Sizls",
+      url: "https://sizls.com",
     },
-  }
+  };
 
   return (
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
-  )
+  );
 }
 
 export function ArticleJsonLd({
@@ -70,24 +70,26 @@ export function ArticleJsonLd({
   keywords,
   articleSection,
 }: {
-  title: string
-  description: string
-  url: string
-  datePublished?: string | Date
-  dateModified?: string | Date
-  author?: { name: string; url?: string }
-  image?: string
-  keywords?: string[]
-  articleSection?: string
+  title: string;
+  description: string;
+  url: string;
+  datePublished?: string | Date;
+  dateModified?: string | Date;
+  author?: { name: string; url?: string };
+  image?: string;
+  keywords?: string[];
+  articleSection?: string;
 }) {
-  const published = datePublished instanceof Date ? datePublished.toISOString() : datePublished
-  const modified = dateModified instanceof Date ? dateModified.toISOString() : dateModified
+  const published =
+    datePublished instanceof Date ? datePublished.toISOString() : datePublished;
+  const modified =
+    dateModified instanceof Date ? dateModified.toISOString() : dateModified;
 
-  const isPersonAuthor = author && author.name !== 'Directive Labs'
+  const isPersonAuthor = author && author.name !== "Directive Labs";
 
   const jsonLd: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
+    "@context": "https://schema.org",
+    "@type": "Article",
     headline: title,
     description: description,
     url: url,
@@ -95,31 +97,33 @@ export function ArticleJsonLd({
     dateModified: modified || new Date().toISOString(),
     author: author
       ? {
-          '@type': isPersonAuthor ? 'Person' : 'Organization',
+          "@type": isPersonAuthor ? "Person" : "Organization",
           name: author.name,
           ...(author.url ? { url: author.url } : {}),
         }
       : {
-          '@type': 'Organization',
-          name: 'Sizls',
-          url: 'https://sizls.com',
+          "@type": "Organization",
+          name: "Sizls",
+          url: "https://sizls.com",
         },
     publisher: {
-      '@type': 'Organization',
-      name: 'Directive',
-      url: 'https://directive.run',
+      "@type": "Organization",
+      name: "Directive",
+      url: "https://directive.run",
     },
     ...(image ? { image } : {}),
-    ...(keywords && keywords.length > 0 ? { keywords: keywords.join(', ') } : {}),
+    ...(keywords && keywords.length > 0
+      ? { keywords: keywords.join(", ") }
+      : {}),
     ...(articleSection ? { articleSection } : {}),
-  }
+  };
 
   return (
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
-  )
+  );
 }
 
 export function DocumentationJsonLd({
@@ -127,60 +131,60 @@ export function DocumentationJsonLd({
   description,
   url,
 }: {
-  title: string
-  description: string
-  url: string
+  title: string;
+  description: string;
+  url: string;
 }) {
   const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'TechArticle',
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
     headline: title,
     description: description,
     url: url,
     author: {
-      '@type': 'Organization',
-      name: 'Sizls',
+      "@type": "Organization",
+      name: "Sizls",
     },
     publisher: {
-      '@type': 'Organization',
-      name: 'Directive',
-      url: 'https://directive.run',
+      "@type": "Organization",
+      name: "Directive",
+      url: "https://directive.run",
     },
     about: {
-      '@type': 'SoftwareApplication',
-      name: 'Directive',
-      applicationCategory: 'DeveloperApplication',
+      "@type": "SoftwareApplication",
+      name: "Directive",
+      applicationCategory: "DeveloperApplication",
     },
-  }
+  };
 
   return (
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
-  )
+  );
 }
 
 export function BreadcrumbJsonLd({
   items,
 }: {
-  items: { name: string; url: string }[]
+  items: { name: string; url: string }[];
 }) {
   const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
     itemListElement: items.map((item, index) => ({
-      '@type': 'ListItem',
+      "@type": "ListItem",
       position: index + 1,
       name: item.name,
       item: item.url,
     })),
-  }
+  };
 
   return (
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
-  )
+  );
 }

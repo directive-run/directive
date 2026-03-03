@@ -30,7 +30,7 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions } from "./types.js";
+import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
 // Types
@@ -48,9 +48,7 @@ export class AllProvidersFailedError extends Error {
   readonly errors: Error[];
 
   constructor(errors: Error[]) {
-    const summary = errors
-      .map((e, i) => `  [${i}] ${e.message}`)
-      .join("\n");
+    const summary = errors.map((e, i) => `  [${i}] ${e.message}`).join("\n");
     super(`[Directive] All ${errors.length} providers failed:\n${summary}`);
     this.name = "AllProvidersFailedError";
     this.errors = Object.freeze([...errors]) as Error[];
@@ -117,7 +115,11 @@ export function withFallback(
               break;
             }
           }
-          try { onFallback?.(i, i + 1, error); } catch { /* callback error must not disrupt fallback flow */ }
+          try {
+            onFallback?.(i, i + 1, error);
+          } catch {
+            /* callback error must not disrupt fallback flow */
+          }
         }
       }
     }

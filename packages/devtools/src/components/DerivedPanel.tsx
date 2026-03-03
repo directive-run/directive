@@ -22,9 +22,13 @@ export function DerivedPanel({ data }: DerivedPanelProps) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-2xl" aria-hidden="true">🔗</div>
+          <div className="mb-2 text-2xl" aria-hidden="true">
+            🔗
+          </div>
           <p className="text-sm">No derived values</p>
-          <p className="mt-1 text-xs">Derived values appear when cross-agent derivations are configured</p>
+          <p className="mt-1 text-xs">
+            Derived values appear when cross-agent derivations are configured
+          </p>
         </div>
       </div>
     );
@@ -52,13 +56,13 @@ export function DerivedPanel({ data }: DerivedPanelProps) {
             <div className="mb-1 font-mono text-xs font-medium text-purple-400">
               {id}
             </div>
-            <div className="text-[10px] text-zinc-500">
-              {typeof value}
-            </div>
+            <div className="text-[10px] text-zinc-500">{typeof value}</div>
             <div className="mt-1 max-h-20 overflow-auto break-all font-mono text-xs text-zinc-300">
               {typeof value === "string"
-                ? value.length > 200 ? `${value.slice(0, 200)}...` : value
-                : JSON.stringify(value, null, 2)?.slice(0, 300) ?? "null"}
+                ? value.length > 200
+                  ? `${value.slice(0, 200)}...`
+                  : value
+                : (JSON.stringify(value, null, 2)?.slice(0, 300) ?? "null")}
             </div>
           </div>
         ))}

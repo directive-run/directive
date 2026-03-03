@@ -7,14 +7,17 @@
  */
 
 import {
+  type ModuleSchema,
+  type RecoveryStrategy,
   createModule,
   createSystem,
   t,
-  type ModuleSchema,
-  type RecoveryStrategy,
 } from "@directive-run/core";
-import {performancePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
-import { createCircuitBreaker, type CircuitState } from "@directive-run/core/plugins";
+import { devtoolsPlugin, performancePlugin } from "@directive-run/core/plugins";
+import {
+  type CircuitState,
+  createCircuitBreaker,
+} from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -42,7 +45,11 @@ interface TimelineEntry {
 
 const timeline: TimelineEntry[] = [];
 
-function addTimeline(event: string, detail: string, type: TimelineEntry["type"]) {
+function addTimeline(
+  event: string,
+  detail: string,
+  type: TimelineEntry["type"],
+) {
   timeline.unshift({ time: Date.now(), event, detail, type });
   if (timeline.length > 50) {
     timeline.length = 50;
@@ -262,13 +269,19 @@ const dashboardModule = createModule("dashboard", {
       retry: { attempts: 2, backoff: "exponential", initialDelay: 200 },
       resolve: async (req, context) => {
         const { service, failRate } = req;
-        const breaker = circuitBreakers[service as keyof typeof circuitBreakers];
-        const serviceKey = `${service}Service` as "usersService" | "ordersService" | "analyticsService";
+        const breaker =
+          circuitBreakers[service as keyof typeof circuitBreakers];
+        const serviceKey = `${service}Service` as
+          | "usersService"
+          | "ordersService"
+          | "analyticsService";
 
         try {
           await breaker.execute(async () => {
             // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 200 + Math.random() * 300));
+            await new Promise((resolve) =>
+              setTimeout(resolve, 200 + Math.random() * 300),
+            );
 
             if (Math.random() * 100 < failRate) {
               throw new Error(`${service} API: simulated failure`);
@@ -325,7 +338,11 @@ const system = createSystem({
   plugins: [perf, devtoolsPlugin({ name: "error-boundaries" })],
   errorBoundary: {
     onResolverError: (_error, resolver) => {
-      addTimeline("recovery", `${resolver}: strategy=${currentStrategy}`, "recovery");
+      addTimeline(
+        "recovery",
+        `${resolver}: strategy=${currentStrategy}`,
+        "recovery",
+      );
 
       return currentStrategy;
     },
@@ -368,15 +385,23 @@ const analyticsResultEl = document.getElementById("eb-analytics-result")!;
 const analyticsErrorEl = document.getElementById("eb-analytics-error")!;
 
 // Sliders
-const usersFailSlider = document.getElementById("eb-users-failrate") as HTMLInputElement;
+const usersFailSlider = document.getElementById(
+  "eb-users-failrate",
+) as HTMLInputElement;
 const usersFailVal = document.getElementById("eb-users-fail-val")!;
-const ordersFailSlider = document.getElementById("eb-orders-failrate") as HTMLInputElement;
+const ordersFailSlider = document.getElementById(
+  "eb-orders-failrate",
+) as HTMLInputElement;
 const ordersFailVal = document.getElementById("eb-orders-fail-val")!;
-const analyticsFailSlider = document.getElementById("eb-analytics-failrate") as HTMLInputElement;
+const analyticsFailSlider = document.getElementById(
+  "eb-analytics-failrate",
+) as HTMLInputElement;
 const analyticsFailVal = document.getElementById("eb-analytics-fail-val")!;
 
 // Strategy dropdown
-const strategySelect = document.getElementById("eb-strategy") as HTMLSelectElement;
+const strategySelect = document.getElementById(
+  "eb-strategy",
+) as HTMLSelectElement;
 
 // Timeline
 const timelineEl = document.getElementById("eb-timeline")!;
@@ -413,9 +438,24 @@ function render(): void {
   const facts = system.facts;
 
   // Service cards
-  renderServiceCard(usersStatusEl, usersResultEl, usersErrorEl, facts.usersService as ServiceState);
-  renderServiceCard(ordersStatusEl, ordersResultEl, ordersErrorEl, facts.ordersService as ServiceState);
-  renderServiceCard(analyticsStatusEl, analyticsResultEl, analyticsErrorEl, facts.analyticsService as ServiceState);
+  renderServiceCard(
+    usersStatusEl,
+    usersResultEl,
+    usersErrorEl,
+    facts.usersService as ServiceState,
+  );
+  renderServiceCard(
+    ordersStatusEl,
+    ordersResultEl,
+    ordersErrorEl,
+    facts.ordersService as ServiceState,
+  );
+  renderServiceCard(
+    analyticsStatusEl,
+    analyticsResultEl,
+    analyticsErrorEl,
+    facts.analyticsService as ServiceState,
+  );
 
   // Slider labels
   usersFailVal.textContent = `${facts.usersFailRate}%`;
@@ -424,7 +464,8 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="eb-timeline-empty">Events appear after interactions</div>';
+    timelineEl.innerHTML =
+      '<div class="eb-timeline-empty">Events appear after interactions</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {
@@ -488,7 +529,9 @@ document.getElementById("eb-reset")!.addEventListener("click", () => {
 
 // Strategy selector
 strategySelect.addEventListener("change", () => {
-  system.events.setStrategy({ value: strategySelect.value as RecoveryStrategy });
+  system.events.setStrategy({
+    value: strategySelect.value as RecoveryStrategy,
+  });
 });
 
 // Sliders
@@ -499,7 +542,9 @@ ordersFailSlider.addEventListener("input", () => {
   system.events.setOrdersFailRate({ value: Number(ordersFailSlider.value) });
 });
 analyticsFailSlider.addEventListener("input", () => {
-  system.events.setAnalyticsFailRate({ value: Number(analyticsFailSlider.value) });
+  system.events.setAnalyticsFailRate({
+    value: Number(analyticsFailSlider.value),
+  });
 });
 
 // ============================================================================

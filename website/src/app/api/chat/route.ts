@@ -1,3 +1,7 @@
+import { getFeatureFlagSystem } from "@/lib/feature-flags/config";
+import { createStreamingRunner } from "@directive-run/ai";
+import { createAnthropicStreamingRunner } from "@directive-run/ai/anthropic";
+import { createOpenAIStreamingRunner } from "@directive-run/ai/openai";
 /**
  * AI Docs Chatbot API Route
  *
@@ -13,55 +17,52 @@
  *    a Directive orchestrator with prompt-injection & PII guardrails + middleware
  * 4. Streams tokens back to the client as SSE `data:` frames
  */
-import { NextRequest } from 'next/server'
+import type { NextRequest } from "next/server";
 import {
-  chatbotSystem,
-  getOrchestrator,
-  getEnricher,
-  transport,
-  MAX_REQUESTS_PER_WINDOW,
   BASE_INSTRUCTIONS,
-} from './orchestrator-singleton'
-import { createStreamingRunner } from '@directive-run/ai'
-import { createAnthropicStreamingRunner } from '@directive-run/ai/anthropic'
-import { createOpenAIStreamingRunner } from '@directive-run/ai/openai'
-import { getFeatureFlagSystem } from '@/lib/feature-flags/config'
+  MAX_REQUESTS_PER_WINDOW,
+  chatbotSystem,
+  getEnricher,
+  getOrchestrator,
+  transport,
+} from "./orchestrator-singleton";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
+  role: "user" | "assistant";
+  content: string;
 }
 
 interface ChatRequestBody {
-  message: string
-  history?: ChatMessage[]
-  pageUrl?: string
+  message: string;
+  history?: ChatMessage[];
+  pageUrl?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_MESSAGE_LENGTH = 2000
-const MAX_HISTORY_MESSAGES = 20
-const ENRICH_TIMEOUT_MS = 5_000
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_HISTORY_MESSAGES = 20;
+const ENRICH_TIMEOUT_MS = 5_000;
 
 const ALLOWED_ORIGINS = new Set([
-  'https://directive.run',
-  'https://www.directive.run',
-])
+  "https://directive.run",
+  "https://www.directive.run",
+]);
 
 // ---------------------------------------------------------------------------
 // Query-Intent Classification
 // ---------------------------------------------------------------------------
 
-type QueryIntent = 'api' | 'conceptual'
+type QueryIntent = "api" | "conceptual";
 
-const API_SIGNAL_PATTERN = /\b(function|parameter|return|signature|api|method|createModule|createSystem|createEngine|t\.\w+|type\s+\w+|interface\s+\w+)\b/i
+const API_SIGNAL_PATTERN =
+  /\b(function|parameter|return|signature|api|method|createModule|createSystem|createEngine|t\.\w+|type\s+\w+|interface\s+\w+)\b/i;
 
 /**
  * Classify a user query as "api" (looking for specific function/type details)
@@ -70,10 +71,10 @@ const API_SIGNAL_PATTERN = /\b(function|parameter|return|signature|api|method|cr
  */
 function classifyIntent(msg: string): QueryIntent {
   if (API_SIGNAL_PATTERN.test(msg) || /`[^`]+`/.test(msg)) {
-    return 'api'
+    return "api";
   }
 
-  return 'conceptual'
+  return "conceptual";
 }
 
 // ---------------------------------------------------------------------------
@@ -81,12 +82,12 @@ function classifyIntent(msg: string): QueryIntent {
 // ---------------------------------------------------------------------------
 
 function isAllowedOrigin(origin: string): boolean {
-  if (ALLOWED_ORIGINS.has(origin)) return true
+  if (ALLOWED_ORIGINS.has(origin)) return true;
   try {
-    const url = new URL(origin)
-    return url.hostname === 'localhost'
+    const url = new URL(origin);
+    return url.hostname === "localhost";
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -95,12 +96,12 @@ function isAllowedOrigin(origin: string): boolean {
 // ---------------------------------------------------------------------------
 
 function sanitizePageUrl(url: string | undefined): string | undefined {
-  if (!url || typeof url !== 'string') return undefined
+  if (!url || typeof url !== "string") return undefined;
   try {
-    const parsed = new URL(url, 'https://directive.run')
-    return parsed.pathname + parsed.hash
+    const parsed = new URL(url, "https://directive.run");
+    return parsed.pathname + parsed.hash;
   } catch {
-    return undefined
+    return undefined;
   }
 }
 
@@ -110,10 +111,10 @@ function sanitizePageUrl(url: string | undefined): string | undefined {
 
 function getClientIp(request: NextRequest): string {
   return (
-    request.headers.get('x-real-ip') ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  )
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -121,33 +122,37 @@ function getClientIp(request: NextRequest): string {
 // ---------------------------------------------------------------------------
 
 function validateHistory(history: unknown[]): ChatMessage[] {
-  const valid: ChatMessage[] = []
-  let dropped = 0
+  const valid: ChatMessage[] = [];
+  let dropped = 0;
   for (const entry of history) {
     if (
       entry != null &&
-      typeof entry === 'object' &&
-      'role' in entry &&
-      'content' in entry &&
-      ((entry as ChatMessage).role === 'user' || (entry as ChatMessage).role === 'assistant') &&
-      typeof (entry as ChatMessage).content === 'string' &&
+      typeof entry === "object" &&
+      "role" in entry &&
+      "content" in entry &&
+      ((entry as ChatMessage).role === "user" ||
+        (entry as ChatMessage).role === "assistant") &&
+      typeof (entry as ChatMessage).content === "string" &&
       (entry as ChatMessage).content.length > 0 &&
       (entry as ChatMessage).content.length <= MAX_MESSAGE_LENGTH
     ) {
-      valid.push({ role: (entry as ChatMessage).role, content: (entry as ChatMessage).content })
+      valid.push({
+        role: (entry as ChatMessage).role,
+        content: (entry as ChatMessage).content,
+      });
     } else {
-      dropped++
+      dropped++;
     }
   }
   if (
     dropped > 0 &&
-    typeof process !== 'undefined' &&
-    process.env?.NODE_ENV === 'development'
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV === "development"
   ) {
-    console.warn(`[chat] Dropped ${dropped} invalid history entries`)
+    console.warn(`[chat] Dropped ${dropped} invalid history entries`);
   }
 
-  return valid.slice(-MAX_HISTORY_MESSAGES)
+  return valid.slice(-MAX_HISTORY_MESSAGES);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,165 +161,186 @@ function validateHistory(history: unknown[]): ChatMessage[] {
 
 export async function POST(request: NextRequest) {
   // Feature flag check
-  const ffSystem = getFeatureFlagSystem()
+  const ffSystem = getFeatureFlagSystem();
   if (!ffSystem || !ffSystem.derive.canUseChat) {
     return new Response(
-      JSON.stringify({ error: 'Chat is currently disabled.' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    )
+      JSON.stringify({ error: "Chat is currently disabled." }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   // Origin validation (exact domain matching)
-  const origin = request.headers.get('origin')
+  const origin = request.headers.get("origin");
   if (origin && !isAllowedOrigin(origin)) {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403,
-      headers: { 'Content-Type': 'application/json' },
-    })
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   // Track request in Directive module
-  const ip = getClientIp(request)
-  chatbotSystem.events.incomingRequest({ ip })
+  const ip = getClientIp(request);
+  chatbotSystem.events.incomingRequest({ ip });
 
   // -------------------------------------------------------------------------
   // Dual-path: BYOK (skip rate limit) vs server key (rate limited)
   // -------------------------------------------------------------------------
 
-  const clientApiKey = request.headers.get('x-api-key')
-  const isByok = Boolean(clientApiKey)
+  const clientApiKey = request.headers.get("x-api-key");
+  const isByok = Boolean(clientApiKey);
 
   // Rate limiting only applies to server key usage
-  const entry = chatbotSystem.facts.requestCounts[ip]
-  const hourlyCount = entry ? entry.count : 0
-  const hourlyRemaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - hourlyCount)
+  const entry = chatbotSystem.facts.requestCounts[ip];
+  const hourlyCount = entry ? entry.count : 0;
+  const hourlyRemaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - hourlyCount);
 
   if (!isByok && entry && entry.count > MAX_REQUESTS_PER_WINDOW) {
     return new Response(
-      JSON.stringify({ error: "You've used your 5 free tries this hour. Use your own API key for unlimited access." }),
+      JSON.stringify({
+        error:
+          "You've used your 5 free tries this hour. Use your own API key for unlimited access.",
+      }),
       {
         status: 429,
         headers: {
-          'Content-Type': 'application/json',
-          'X-Hourly-Remaining': '0',
-          'X-Hourly-Limit': String(MAX_REQUESTS_PER_WINDOW),
-          'Access-Control-Expose-Headers': 'X-Hourly-Remaining, X-Hourly-Limit',
+          "Content-Type": "application/json",
+          "X-Hourly-Remaining": "0",
+          "X-Hourly-Limit": String(MAX_REQUESTS_PER_WINDOW),
+          "Access-Control-Expose-Headers": "X-Hourly-Remaining, X-Hourly-Limit",
         },
       },
-    )
+    );
   }
 
   // System health check
   if (!chatbotSystem.derive.isHealthy) {
     return new Response(
-      JSON.stringify({ error: 'Service temporarily unavailable. Please try again later.' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    )
+      JSON.stringify({
+        error: "Service temporarily unavailable. Please try again later.",
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   // Parse body
-  let body: ChatRequestBody
+  let body: ChatRequestBody;
   try {
-    body = await request.json()
+    body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
-  const { message: rawMessage, history: rawHistory = [], pageUrl } = body
-  const message = typeof rawMessage === 'string' ? rawMessage.trim() : rawMessage
+  const { message: rawMessage, history: rawHistory = [], pageUrl } = body;
+  const message =
+    typeof rawMessage === "string" ? rawMessage.trim() : rawMessage;
 
-  if (!message || typeof message !== 'string' || message.length > MAX_MESSAGE_LENGTH) {
+  if (
+    !message ||
+    typeof message !== "string" ||
+    message.length > MAX_MESSAGE_LENGTH
+  ) {
     return new Response(
-      JSON.stringify({ error: `Message is required and must be under ${MAX_MESSAGE_LENGTH} characters.` }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } },
-    )
+      JSON.stringify({
+        error: `Message is required and must be under ${MAX_MESSAGE_LENGTH} characters.`,
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
   }
 
-  const instance = getOrchestrator()
+  const instance = getOrchestrator();
 
   // Validate history entries
-  const history = validateHistory(Array.isArray(rawHistory) ? rawHistory : [])
+  const history = validateHistory(Array.isArray(rawHistory) ? rawHistory : []);
 
   // Sanitize pageUrl to prevent prompt injection via URL
-  const safePath = sanitizePageUrl(pageUrl)
+  const safePath = sanitizePageUrl(pageUrl);
 
   // Build enriched input via RAG enricher (with timeout to prevent hanging)
   // Over-fetch top 7 chunks, re-rank with intent-aware boosting, slice to top 5
-  const enricher = await getEnricher()
-  let enrichedInput = message
+  const enricher = await getEnricher();
+  let enrichedInput = message;
   if (enricher) {
-    const intent = classifyIntent(message)
+    const intent = classifyIntent(message);
     try {
       const matches = await Promise.race([
         enricher.retrieve(message, 7),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('RAG retrieval timed out')), ENRICH_TIMEOUT_MS),
+          setTimeout(
+            () => reject(new Error("RAG retrieval timed out")),
+            ENRICH_TIMEOUT_MS,
+          ),
         ),
-      ])
+      ]);
 
       // Re-rank: apply source-type boost based on query intent
       const ranked = matches.map((chunk) => {
         const meta = chunk.metadata as {
-          sourceType?: string
-          symbolName?: string
-          url?: string
-        }
-        const sourceType = meta.sourceType ?? 'guide'
+          sourceType?: string;
+          symbolName?: string;
+          url?: string;
+        };
+        const sourceType = meta.sourceType ?? "guide";
 
-        let boost = 0
-        if (intent === 'api' && sourceType === 'api-reference') boost += 0.1
-        if (intent === 'conceptual' && sourceType === 'guide') boost += 0.05
-        if (safePath && meta.url?.startsWith(safePath)) boost += 0.05
+        let boost = 0;
+        if (intent === "api" && sourceType === "api-reference") boost += 0.1;
+        if (intent === "conceptual" && sourceType === "guide") boost += 0.05;
+        if (safePath && meta.url?.startsWith(safePath)) boost += 0.05;
 
-        return { ...chunk, boostedScore: chunk.similarity + boost }
-      })
+        return { ...chunk, boostedScore: chunk.similarity + boost };
+      });
 
       // Sort by boosted score
-      ranked.sort((a, b) => b.boostedScore - a.boostedScore)
+      ranked.sort((a, b) => b.boostedScore - a.boostedScore);
 
       // Diversity cap: max 2 chunks per symbolName
-      const symbolCounts = new Map<string, number>()
+      const symbolCounts = new Map<string, number>();
       const diverse = ranked.filter((chunk) => {
-        const sym = (chunk.metadata as { symbolName?: string }).symbolName
-        if (!sym) return true
-        const count = symbolCounts.get(sym) ?? 0
-        if (count >= 2) return false
-        symbolCounts.set(sym, count + 1)
+        const sym = (chunk.metadata as { symbolName?: string }).symbolName;
+        if (!sym) return true;
+        const count = symbolCounts.get(sym) ?? 0;
+        if (count >= 2) return false;
+        symbolCounts.set(sym, count + 1);
 
-        return true
-      })
+        return true;
+      });
 
       // Take top 5
-      const top5 = diverse.slice(0, 5)
+      const top5 = diverse.slice(0, 5);
 
       // Format into enriched input
       const contextParts = top5.map((chunk) => {
-        const title = (chunk.metadata.title as string) ?? ''
-        const section = (chunk.metadata.section as string) ?? ''
-        const url = (chunk.metadata.url as string) ?? ''
-        const header = title && section && url
-          ? `[${title} — ${section}](${url})`
-          : title || chunk.id
+        const title = (chunk.metadata.title as string) ?? "";
+        const section = (chunk.metadata.section as string) ?? "";
+        const url = (chunk.metadata.url as string) ?? "";
+        const header =
+          title && section && url
+            ? `[${title} — ${section}](${url})`
+            : title || chunk.id;
 
-        return `${header}\n${chunk.content}`
-      })
+        return `${header}\n${chunk.content}`;
+      });
 
-      const parts: string[] = []
-      if (safePath) parts.push(`The user is currently viewing: ${safePath}`)
+      const parts: string[] = [];
+      if (safePath) parts.push(`The user is currently viewing: ${safePath}`);
       if (contextParts.length > 0) {
-        parts.push(`Relevant documentation context:\n\n${contextParts.join('\n\n')}`)
+        parts.push(
+          `Relevant documentation context:\n\n${contextParts.join("\n\n")}`,
+        );
       }
       if (history.length > 0) {
         const historyBlock = history
-          .map((m) => `${m.role.charAt(0).toUpperCase() + m.role.slice(1)}: ${m.content}`)
-          .join('\n\n')
-        parts.push(`Previous conversation:\n${historyBlock}`)
+          .map(
+            (m) =>
+              `${m.role.charAt(0).toUpperCase() + m.role.slice(1)}: ${m.content}`,
+          )
+          .join("\n\n");
+        parts.push(`Previous conversation:\n${historyBlock}`);
       }
-      parts.push(message)
-      enrichedInput = parts.join('\n\n---\n\n')
+      parts.push(message);
+      enrichedInput = parts.join("\n\n---\n\n");
     } catch {
       // Enrichment failed or timed out — fall back to raw message
     }
@@ -324,98 +350,116 @@ export async function POST(request: NextRequest) {
   // Dual-path: BYOK (user key) vs server key
   // -------------------------------------------------------------------------
 
-  const clientProvider = request.headers.get('x-provider') || 'anthropic'
+  const clientProvider = request.headers.get("x-provider") || "anthropic";
 
   if (isByok) {
     // User-provided key: create a one-shot streaming runner (no budget/rate-limit tracking)
     const callbackRunner =
-      clientProvider === 'openai'
-        ? createOpenAIStreamingRunner({ apiKey: clientApiKey!, model: 'gpt-4o-mini' })
+      clientProvider === "openai"
+        ? createOpenAIStreamingRunner({
+            apiKey: clientApiKey!,
+            model: "gpt-4o-mini",
+          })
         : createAnthropicStreamingRunner({
             apiKey: clientApiKey!,
-            model: 'claude-haiku-4-5-20251001',
+            model: "claude-haiku-4-5-20251001",
             maxTokens: 2000,
-          })
+          });
 
-    const streamRunner = createStreamingRunner(callbackRunner)
+    const streamRunner = createStreamingRunner(callbackRunner);
     const agent = {
-      name: 'directive-docs-qa',
-      model: clientProvider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001',
+      name: "directive-docs-qa",
+      model:
+        clientProvider === "openai"
+          ? "gpt-4o-mini"
+          : "claude-haiku-4-5-20251001",
       instructions: BASE_INSTRUCTIONS,
-    }
+    };
 
-    const { stream, result } = streamRunner(agent, enrichedInput, { signal: request.signal })
+    const { stream, result } = streamRunner(agent, enrichedInput, {
+      signal: request.signal,
+    });
 
-    const encoder = new TextEncoder()
+    const encoder = new TextEncoder();
     const responseStream = new ReadableStream({
       async start(controller) {
         const send = (data: Record<string, unknown>) => {
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+            );
           } catch {
             // Stream closed
           }
-        }
+        };
 
         try {
           for await (const chunk of stream) {
-            if (chunk.type === 'token') {
-              send({ type: 'text', text: chunk.data })
+            if (chunk.type === "token") {
+              send({ type: "text", text: chunk.data });
             }
           }
 
-          await result
-          send({ type: 'done' })
+          await result;
+          send({ type: "done" });
         } catch (err) {
           send({
-            type: 'error',
-            message: err instanceof Error ? err.message : 'Stream failed',
-          })
+            type: "error",
+            message: err instanceof Error ? err.message : "Stream failed",
+          });
         } finally {
           try {
-            controller.close()
+            controller.close();
           } catch {
             // Already closed
           }
         }
       },
-    })
+    });
 
     const sseHeaders: Record<string, string> = {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    }
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    };
 
     if (origin) {
-      sseHeaders['Access-Control-Allow-Origin'] = origin
+      sseHeaders["Access-Control-Allow-Origin"] = origin;
     }
 
-    return new Response(responseStream, { headers: sseHeaders })
+    return new Response(responseStream, { headers: sseHeaders });
   }
 
   // Server key path — 503 if not configured
   if (!instance) {
-    return new Response(
-      JSON.stringify({ error: 'Service unavailable' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    )
+    return new Response(JSON.stringify({ error: "Service unavailable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   // Stream via SSE transport (propagate request abort signal)
-  const sseResponse = transport.toResponse(instance.streamable, 'docs-qa', enrichedInput, {
-    signal: request.signal,
-  })
+  const sseResponse = transport.toResponse(
+    instance.streamable,
+    "docs-qa",
+    enrichedInput,
+    {
+      signal: request.signal,
+    },
+  );
 
   // Add usage + CORS headers
-  sseResponse.headers.set('X-Hourly-Remaining', String(hourlyRemaining))
-  sseResponse.headers.set('X-Hourly-Limit', String(MAX_REQUESTS_PER_WINDOW))
-  sseResponse.headers.set('Access-Control-Expose-Headers', 'X-Hourly-Remaining, X-Hourly-Limit')
+  sseResponse.headers.set("X-Hourly-Remaining", String(hourlyRemaining));
+  sseResponse.headers.set("X-Hourly-Limit", String(MAX_REQUESTS_PER_WINDOW));
+  sseResponse.headers.set(
+    "Access-Control-Expose-Headers",
+    "X-Hourly-Remaining, X-Hourly-Limit",
+  );
 
   if (origin) {
-    sseResponse.headers.set('Access-Control-Allow-Origin', origin)
+    sseResponse.headers.set("Access-Control-Allow-Origin", origin);
   }
 
-  return sseResponse
+  return sseResponse;
 }

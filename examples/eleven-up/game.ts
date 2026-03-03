@@ -9,7 +9,7 @@
  * - Goal: Clear all cards from the table
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 
 // ============================================================================
 // Types
@@ -45,7 +45,19 @@ export interface Card {
 function createDeck(): Card[] {
   const suits: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
   const ranks: Rank[] = [
-    "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K",
+    "A",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "Q",
+    "K",
   ];
 
   const cards: Card[] = [];
@@ -54,7 +66,7 @@ function createDeck(): Card[] {
       let value: number;
       if (rank === "A") value = 1;
       else if (rank === "J" || rank === "Q" || rank === "K") value = 0;
-      else value = parseInt(rank);
+      else value = Number.parseInt(rank);
 
       cards.push({ id: `${rank}-${suit}`, suit, rank, value });
     }
@@ -84,7 +96,11 @@ export function isRedSuit(suit: Suit): boolean {
 }
 
 /** Find an auto-combo candidate that involves at least one newly-dealt card */
-function findAutoCombo(table: Card[], selected: string[], newCardIds: string[]): string[] | null {
+function findAutoCombo(
+  table: Card[],
+  selected: string[],
+  newCardIds: string[],
+): string[] | null {
   if (selected.length > 0) return null;
   if (newCardIds.length === 0) return null;
 
@@ -116,7 +132,10 @@ function findAutoCombo(table: Card[], selected: string[], newCardIds: string[]):
   return null;
 }
 
-function countValidMoves(table: Card[]): { pairs: number; faceCardSets: number } {
+function countValidMoves(table: Card[]): {
+  pairs: number;
+  faceCardSets: number;
+} {
   let pairs = 0;
   let faceCardSets = 0;
 
@@ -218,7 +237,7 @@ export const elevenUpGame = createModule("eleven-up", {
     // Feedback is computed, not set by constraints (avoids loops)
     selectionFeedback: (facts) => {
       const selected = facts.table.filter((c: Card) =>
-        facts.selected.includes(c.id)
+        facts.selected.includes(c.id),
       );
 
       if (selected.length === 0) {
@@ -249,7 +268,9 @@ export const elevenUpGame = createModule("eleven-up", {
 
         if (bothFace) {
           const ranks = [a.rank, b.rank];
-          const missing = ["J", "Q", "K"].find((r) => !ranks.includes(r as Rank));
+          const missing = ["J", "Q", "K"].find(
+            (r) => !ranks.includes(r as Rank),
+          );
           return `Need ${missing} to complete J+Q+K`;
         }
 
@@ -381,9 +402,12 @@ export const elevenUpGame = createModule("eleven-up", {
       // Auto-tracked: reads currentStreak
       run: (facts) => {
         const streak = facts.currentStreak;
-        if (streak === 3) console.log("[EFFECT] streak: Hat trick! 3 in a row!");
-        else if (streak === 5) console.log("[EFFECT] streak: On fire! 5 in a row!");
-        else if (streak === 10) console.log("[EFFECT] streak: Unstoppable! 10 in a row!");
+        if (streak === 3)
+          console.log("[EFFECT] streak: Hat trick! 3 in a row!");
+        else if (streak === 5)
+          console.log("[EFFECT] streak: On fire! 5 in a row!");
+        else if (streak === 10)
+          console.log("[EFFECT] streak: Unstoppable! 10 in a row!");
       },
     },
 
@@ -394,8 +418,8 @@ export const elevenUpGame = createModule("eleven-up", {
           const result = facts.won ? "WON" : "LOST";
           console.log(
             `[EFFECT] Game Over: ${result} | ${facts.moveCount} moves | ` +
-            `${facts.removed.length}/52 removed | Best streak: ${facts.maxStreak} | ` +
-            `Combos: ${facts.comboCount}`
+              `${facts.removed.length}/52 removed | Best streak: ${facts.maxStreak} | ` +
+              `Combos: ${facts.comboCount}`,
           );
         }
       },
@@ -413,7 +437,7 @@ export const elevenUpGame = createModule("eleven-up", {
       when: (facts) => {
         if (facts.gameOver) return false;
         const selected = facts.table.filter((c: Card) =>
-          facts.selected.includes(c.id)
+          facts.selected.includes(c.id),
         );
         if (selected.length !== 2) return false;
         const [a, b] = selected;
@@ -433,7 +457,7 @@ export const elevenUpGame = createModule("eleven-up", {
       when: (facts) => {
         if (facts.gameOver) return false;
         const selected = facts.table.filter((c: Card) =>
-          facts.selected.includes(c.id)
+          facts.selected.includes(c.id),
         );
         if (selected.length !== 3) return false;
         if (!selected.every((c: Card) => isFaceCard(c))) return false;
@@ -467,10 +491,16 @@ export const elevenUpGame = createModule("eleven-up", {
         if (facts.moveCount === 0) return false;
         if (facts.selected.length > 0) return false;
         if (facts.table.length === 0) return false;
-        return findAutoCombo(facts.table, facts.selected, facts.newCardIds) !== null;
+        return (
+          findAutoCombo(facts.table, facts.selected, facts.newCardIds) !== null
+        );
       },
       require: (facts) => {
-        const combo = findAutoCombo(facts.table, facts.selected, facts.newCardIds)!;
+        const combo = findAutoCombo(
+          facts.table,
+          facts.selected,
+          facts.newCardIds,
+        )!;
         return {
           type: "REMOVE_CARDS",
           cardIds: combo,
@@ -517,11 +547,11 @@ export const elevenUpGame = createModule("eleven-up", {
       requirement: "REMOVE_CARDS",
       resolve: async (req, context) => {
         const cardsToRemove = context.facts.table.filter((c: Card) =>
-          req.cardIds.includes(c.id)
+          req.cardIds.includes(c.id),
         );
 
         context.facts.table = context.facts.table.filter(
-          (c: Card) => !req.cardIds.includes(c.id)
+          (c: Card) => !req.cardIds.includes(c.id),
         );
         context.facts.removed = [...context.facts.removed, ...cardsToRemove];
         context.facts.selected = [];

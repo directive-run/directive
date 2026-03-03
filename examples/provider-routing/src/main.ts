@@ -5,8 +5,17 @@
  * on cost, error rates, circuit state. Provider fallback chain.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import {createCircuitBreaker, type CircuitState, devtoolsPlugin } from "@directive-run/core/plugins";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import {
+  type CircuitState,
+  createCircuitBreaker,
+  devtoolsPlugin,
+} from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
@@ -50,21 +59,24 @@ const circuitBreakers = {
     failureThreshold: 3,
     recoveryTimeMs: 5000,
     halfOpenMaxRequests: 2,
-    onStateChange: (from, to) => addTimeline("circuit", `openai: ${from} → ${to}`, "circuit"),
+    onStateChange: (from, to) =>
+      addTimeline("circuit", `openai: ${from} → ${to}`, "circuit"),
   }),
   anthropic: createCircuitBreaker({
     name: "anthropic",
     failureThreshold: 3,
     recoveryTimeMs: 5000,
     halfOpenMaxRequests: 2,
-    onStateChange: (from, to) => addTimeline("circuit", `anthropic: ${from} → ${to}`, "circuit"),
+    onStateChange: (from, to) =>
+      addTimeline("circuit", `anthropic: ${from} → ${to}`, "circuit"),
   }),
   ollama: createCircuitBreaker({
     name: "ollama",
     failureThreshold: 3,
     recoveryTimeMs: 5000,
     halfOpenMaxRequests: 2,
-    onStateChange: (from, to) => addTimeline("circuit", `ollama: ${from} → ${to}`, "circuit"),
+    onStateChange: (from, to) =>
+      addTimeline("circuit", `ollama: ${from} → ${to}`, "circuit"),
   }),
 };
 
@@ -74,7 +86,11 @@ const circuitBreakers = {
 
 const timeline: TimelineEntry[] = [];
 
-function addTimeline(event: string, detail: string, type: TimelineEntry["type"]) {
+function addTimeline(
+  event: string,
+  detail: string,
+  type: TimelineEntry["type"],
+) {
   timeline.unshift({ time: Date.now(), event, detail, type });
   if (timeline.length > 50) {
     timeline.length = 50;
@@ -118,7 +134,14 @@ const schema = {
 // ============================================================================
 
 function defaultStats(name: string): ProviderStats {
-  return { name, callCount: 0, errorCount: 0, totalCost: 0, avgLatencyMs: 0, circuitState: "CLOSED" };
+  return {
+    name,
+    callCount: 0,
+    errorCount: 0,
+    totalCost: 0,
+    avgLatencyMs: 0,
+    circuitState: "CLOSED",
+  };
 }
 
 const routerModule = createModule("router", {
@@ -192,7 +215,10 @@ const routerModule = createModule("router", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: routerModule, plugins: [devtoolsPlugin({ name: "provider-routing" })] });
+const system = createSystem({
+  module: routerModule,
+  plugins: [devtoolsPlugin({ name: "provider-routing" })],
+});
 system.start();
 
 // ============================================================================
@@ -236,11 +262,16 @@ function selectProvider(): string | null {
 async function executeProvider(providerId: string): Promise<boolean> {
   const breaker = circuitBreakers[providerId as keyof typeof circuitBreakers];
   const config = PROVIDERS[providerId as keyof typeof PROVIDERS]!;
-  const statsKey = `${providerId}Stats` as "openaiStats" | "anthropicStats" | "ollamaStats";
+  const statsKey = `${providerId}Stats` as
+    | "openaiStats"
+    | "anthropicStats"
+    | "ollamaStats";
 
   try {
     await breaker.execute(async () => {
-      await new Promise((resolve) => setTimeout(resolve, config.baseLatency + Math.random() * 100));
+      await new Promise((resolve) =>
+        setTimeout(resolve, config.baseLatency + Math.random() * 100),
+      );
 
       if (providerErrors[providerId]) {
         throw new Error(`${config.name}: simulated error`);
@@ -254,10 +285,15 @@ async function executeProvider(providerId: string): Promise<boolean> {
       ...stats,
       callCount: stats.callCount + 1,
       totalCost: Math.round((stats.totalCost + cost) * 1000) / 1000,
-      avgLatencyMs: Math.round(((stats.avgLatencyMs * stats.callCount + latency) / (stats.callCount + 1))),
+      avgLatencyMs: Math.round(
+        (stats.avgLatencyMs * stats.callCount + latency) /
+          (stats.callCount + 1),
+      ),
       circuitState: breaker.getState(),
     };
-    system.facts.budgetRemaining = Math.round(((system.facts.budgetRemaining as number) - cost) * 1000) / 1000;
+    system.facts.budgetRemaining =
+      Math.round(((system.facts.budgetRemaining as number) - cost) * 1000) /
+      1000;
     system.facts.lastError = "";
     addTimeline("success", `${config.name}: ok ($${cost})`, "success");
 
@@ -325,12 +361,17 @@ function escapeHtml(text: string): string {
 }
 
 function circuitBadge(state: CircuitState): string {
-  const cls = state === "CLOSED" ? "closed" : state === "OPEN" ? "open" : "half-open";
+  const cls =
+    state === "CLOSED" ? "closed" : state === "OPEN" ? "open" : "half-open";
 
   return `<span class="pr-circuit-badge ${cls}">${state}</span>`;
 }
 
-function renderProvider(el: HTMLElement, stats: ProviderStats, state: CircuitState): void {
+function renderProvider(
+  el: HTMLElement,
+  stats: ProviderStats,
+  state: CircuitState,
+): void {
   el.innerHTML = `
     ${circuitBadge(state)}
     <span style="font-size:0.55rem;color:var(--brand-text-dim)">${stats.callCount} calls, ${stats.errorCount} err, $${stats.totalCost}</span>
@@ -338,9 +379,21 @@ function renderProvider(el: HTMLElement, stats: ProviderStats, state: CircuitSta
 }
 
 function render(): void {
-  renderProvider(inspOpenai, system.facts.openaiStats as ProviderStats, circuitBreakers.openai.getState());
-  renderProvider(inspAnthropic, system.facts.anthropicStats as ProviderStats, circuitBreakers.anthropic.getState());
-  renderProvider(inspOllama, system.facts.ollamaStats as ProviderStats, circuitBreakers.ollama.getState());
+  renderProvider(
+    inspOpenai,
+    system.facts.openaiStats as ProviderStats,
+    circuitBreakers.openai.getState(),
+  );
+  renderProvider(
+    inspAnthropic,
+    system.facts.anthropicStats as ProviderStats,
+    circuitBreakers.anthropic.getState(),
+  );
+  renderProvider(
+    inspOllama,
+    system.facts.ollamaStats as ProviderStats,
+    circuitBreakers.ollama.getState(),
+  );
 
   // Error inject checkboxes
   for (const id of ["openai", "anthropic", "ollama"]) {
@@ -352,14 +405,19 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="pr-timeline-empty">Events appear after sending requests</div>';
+    timelineEl.innerHTML =
+      '<div class="pr-timeline-empty">Events appear after sending requests</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {
       const el = document.createElement("div");
       el.className = `pr-timeline-entry ${entry.type}`;
       const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const timeStr = time.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
       el.innerHTML = `
         <span class="pr-timeline-time">${timeStr}</span>
         <span class="pr-timeline-event">${escapeHtml(entry.event)}</span>
@@ -374,7 +432,10 @@ function render(): void {
 // Subscribe
 // ============================================================================
 
-const allKeys = [...Object.keys(schema.facts), ...Object.keys(schema.derivations)];
+const allKeys = [
+  ...Object.keys(schema.facts),
+  ...Object.keys(schema.derivations),
+];
 system.subscribe(allKeys, render);
 
 setInterval(render, 1000);
@@ -383,7 +444,9 @@ setInterval(render, 1000);
 // Controls
 // ============================================================================
 
-document.getElementById("pr-send")!.addEventListener("click", () => sendRequest());
+document
+  .getElementById("pr-send")!
+  .addEventListener("click", () => sendRequest());
 
 document.getElementById("pr-burst-10")!.addEventListener("click", async () => {
   for (let i = 0; i < 10; i++) {
@@ -397,15 +460,20 @@ for (const id of ["openai", "anthropic", "ollama"]) {
   });
 }
 
-(document.getElementById("pr-budget") as HTMLInputElement).addEventListener("input", (e) => {
-  const value = Number((e.target as HTMLInputElement).value);
-  document.getElementById("pr-budget-val")!.textContent = `$${value}`;
-  system.events.setBudget({ value });
-});
+(document.getElementById("pr-budget") as HTMLInputElement).addEventListener(
+  "input",
+  (e) => {
+    const value = Number((e.target as HTMLInputElement).value);
+    document.getElementById("pr-budget-val")!.textContent = `$${value}`;
+    system.events.setBudget({ value });
+  },
+);
 
-document.getElementById("pr-prefer-cheapest")!.addEventListener("change", () => {
-  system.events.togglePreferCheapest();
-});
+document
+  .getElementById("pr-prefer-cheapest")!
+  .addEventListener("change", () => {
+    system.events.togglePreferCheapest();
+  });
 
 document.getElementById("pr-reset")!.addEventListener("click", () => {
   system.events.resetStats();

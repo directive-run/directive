@@ -12,27 +12,27 @@ import type { Plugin, RequirementWithId } from "../core/types.js";
 
 /** Status of a requirement type */
 export interface RequirementTypeStatus {
-	/** Number of pending (unmet) requirements of this type */
-	pending: number;
-	/** Number of inflight (being resolved) requirements of this type */
-	inflight: number;
-	/** Number of failed requirements of this type */
-	failed: number;
-	/** Whether any requirements of this type are loading (pending or inflight) */
-	isLoading: boolean;
-	/** Whether any requirements of this type have failed */
-	hasError: boolean;
-	/** Last error for this type (if any) */
-	lastError: Error | null;
+  /** Number of pending (unmet) requirements of this type */
+  pending: number;
+  /** Number of inflight (being resolved) requirements of this type */
+  inflight: number;
+  /** Number of failed requirements of this type */
+  failed: number;
+  /** Whether any requirements of this type are loading (pending or inflight) */
+  isLoading: boolean;
+  /** Whether any requirements of this type have failed */
+  hasError: boolean;
+  /** Last error for this type (if any) */
+  lastError: Error | null;
 }
 
 /** Status tracking state */
 interface StatusState {
-	pending: Map<string, Set<string>>; // type -> set of requirement IDs
-	inflight: Map<string, Set<string>>; // type -> set of requirement IDs
-	failed: Map<string, Set<string>>; // type -> set of requirement IDs
-	errors: Map<string, Error>; // type -> last error
-	listeners: Set<() => void>;
+  pending: Map<string, Set<string>>; // type -> set of requirement IDs
+  inflight: Map<string, Set<string>>; // type -> set of requirement IDs
+  failed: Map<string, Set<string>>; // type -> set of requirement IDs
+  errors: Map<string, Error>; // type -> last error
+  listeners: Set<() => void>;
 }
 
 // ============================================================================
@@ -64,144 +64,150 @@ interface StatusState {
  * ```
  */
 export function createRequirementStatusPlugin(): {
-	plugin: Plugin<never>;
-	getStatus: (type: string) => RequirementTypeStatus;
-	getAllStatus: () => Map<string, RequirementTypeStatus>;
-	subscribe: (listener: () => void) => () => void;
-	reset: () => void;
+  plugin: Plugin<never>;
+  getStatus: (type: string) => RequirementTypeStatus;
+  getAllStatus: () => Map<string, RequirementTypeStatus>;
+  subscribe: (listener: () => void) => () => void;
+  reset: () => void;
 } {
-	const state: StatusState = {
-		pending: new Map(),
-		inflight: new Map(),
-		failed: new Map(),
-		errors: new Map(),
-		listeners: new Set(),
-	};
+  const state: StatusState = {
+    pending: new Map(),
+    inflight: new Map(),
+    failed: new Map(),
+    errors: new Map(),
+    listeners: new Set(),
+  };
 
-	/** Notify all listeners */
-	function notify(): void {
-		for (const listener of state.listeners) {
-			listener();
-		}
-	}
+  /** Notify all listeners */
+  function notify(): void {
+    for (const listener of state.listeners) {
+      listener();
+    }
+  }
 
-	/** Get or create a set for a type in a map */
-	function getOrCreateSet(map: Map<string, Set<string>>, type: string): Set<string> {
-		let set = map.get(type);
-		if (!set) {
-			set = new Set();
-			map.set(type, set);
-		}
-		return set;
-	}
+  /** Get or create a set for a type in a map */
+  function getOrCreateSet(
+    map: Map<string, Set<string>>,
+    type: string,
+  ): Set<string> {
+    let set = map.get(type);
+    if (!set) {
+      set = new Set();
+      map.set(type, set);
+    }
+    return set;
+  }
 
-	/** Get status for a requirement type */
-	function getStatus(type: string): RequirementTypeStatus {
-		const pendingSet = state.pending.get(type) ?? new Set();
-		const inflightSet = state.inflight.get(type) ?? new Set();
-		const failedSet = state.failed.get(type) ?? new Set();
-		const lastError = state.errors.get(type) ?? null;
+  /** Get status for a requirement type */
+  function getStatus(type: string): RequirementTypeStatus {
+    const pendingSet = state.pending.get(type) ?? new Set();
+    const inflightSet = state.inflight.get(type) ?? new Set();
+    const failedSet = state.failed.get(type) ?? new Set();
+    const lastError = state.errors.get(type) ?? null;
 
-		return {
-			pending: pendingSet.size,
-			inflight: inflightSet.size,
-			failed: failedSet.size,
-			isLoading: pendingSet.size > 0 || inflightSet.size > 0,
-			hasError: failedSet.size > 0,
-			lastError,
-		};
-	}
+    return {
+      pending: pendingSet.size,
+      inflight: inflightSet.size,
+      failed: failedSet.size,
+      isLoading: pendingSet.size > 0 || inflightSet.size > 0,
+      hasError: failedSet.size > 0,
+      lastError,
+    };
+  }
 
-	/** Get status for all tracked types */
-	function getAllStatus(): Map<string, RequirementTypeStatus> {
-		const allTypes = new Set([
-			...state.pending.keys(),
-			...state.inflight.keys(),
-			...state.failed.keys(),
-		]);
+  /** Get status for all tracked types */
+  function getAllStatus(): Map<string, RequirementTypeStatus> {
+    const allTypes = new Set([
+      ...state.pending.keys(),
+      ...state.inflight.keys(),
+      ...state.failed.keys(),
+    ]);
 
-		const result = new Map<string, RequirementTypeStatus>();
-		for (const type of allTypes) {
-			result.set(type, getStatus(type));
-		}
-		return result;
-	}
+    const result = new Map<string, RequirementTypeStatus>();
+    for (const type of allTypes) {
+      result.set(type, getStatus(type));
+    }
+    return result;
+  }
 
-	/** Subscribe to status changes */
-	function subscribe(listener: () => void): () => void {
-		state.listeners.add(listener);
-		return () => state.listeners.delete(listener);
-	}
+  /** Subscribe to status changes */
+  function subscribe(listener: () => void): () => void {
+    state.listeners.add(listener);
+    return () => state.listeners.delete(listener);
+  }
 
-	/** Reset all status */
-	function reset(): void {
-		state.pending.clear();
-		state.inflight.clear();
-		state.failed.clear();
-		state.errors.clear();
-		notify();
-	}
+  /** Reset all status */
+  function reset(): void {
+    state.pending.clear();
+    state.inflight.clear();
+    state.failed.clear();
+    state.errors.clear();
+    notify();
+  }
 
-	const plugin: Plugin<never> = {
-		name: "requirement-status",
+  const plugin: Plugin<never> = {
+    name: "requirement-status",
 
-		onRequirementCreated(req: RequirementWithId) {
-			const type = req.requirement.type;
-			getOrCreateSet(state.pending, type).add(req.id);
-			// Clear from failed when a new requirement is created
-			state.failed.get(type)?.delete(req.id);
-			notify();
-		},
+    onRequirementCreated(req: RequirementWithId) {
+      const type = req.requirement.type;
+      getOrCreateSet(state.pending, type).add(req.id);
+      // Clear from failed when a new requirement is created
+      state.failed.get(type)?.delete(req.id);
+      notify();
+    },
 
-		onResolverStart(_resolver: string, req: RequirementWithId) {
-			const type = req.requirement.type;
-			// Move from pending to inflight
-			state.pending.get(type)?.delete(req.id);
-			getOrCreateSet(state.inflight, type).add(req.id);
-			notify();
-		},
+    onResolverStart(_resolver: string, req: RequirementWithId) {
+      const type = req.requirement.type;
+      // Move from pending to inflight
+      state.pending.get(type)?.delete(req.id);
+      getOrCreateSet(state.inflight, type).add(req.id);
+      notify();
+    },
 
-		onResolverComplete(_resolver: string, req: RequirementWithId) {
-			const type = req.requirement.type;
-			// Remove from inflight
-			state.inflight.get(type)?.delete(req.id);
-			state.pending.get(type)?.delete(req.id);
-			notify();
-		},
+    onResolverComplete(_resolver: string, req: RequirementWithId) {
+      const type = req.requirement.type;
+      // Remove from inflight
+      state.inflight.get(type)?.delete(req.id);
+      state.pending.get(type)?.delete(req.id);
+      notify();
+    },
 
-		onResolverError(_resolver: string, req: RequirementWithId, error: unknown) {
-			const type = req.requirement.type;
-			// Move from inflight to failed
-			state.inflight.get(type)?.delete(req.id);
-			getOrCreateSet(state.failed, type).add(req.id);
-			state.errors.set(type, error instanceof Error ? error : new Error(String(error)));
-			notify();
-		},
+    onResolverError(_resolver: string, req: RequirementWithId, error: unknown) {
+      const type = req.requirement.type;
+      // Move from inflight to failed
+      state.inflight.get(type)?.delete(req.id);
+      getOrCreateSet(state.failed, type).add(req.id);
+      state.errors.set(
+        type,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      notify();
+    },
 
-		onResolverCancel(_resolver: string, req: RequirementWithId) {
-			const type = req.requirement.type;
-			// Remove from all tracking
-			state.pending.get(type)?.delete(req.id);
-			state.inflight.get(type)?.delete(req.id);
-			notify();
-		},
+    onResolverCancel(_resolver: string, req: RequirementWithId) {
+      const type = req.requirement.type;
+      // Remove from all tracking
+      state.pending.get(type)?.delete(req.id);
+      state.inflight.get(type)?.delete(req.id);
+      notify();
+    },
 
-		onRequirementMet(req: RequirementWithId) {
-			const type = req.requirement.type;
-			// Clean up when requirement is met
-			state.pending.get(type)?.delete(req.id);
-			state.inflight.get(type)?.delete(req.id);
-			notify();
-		},
-	};
+    onRequirementMet(req: RequirementWithId) {
+      const type = req.requirement.type;
+      // Clean up when requirement is met
+      state.pending.get(type)?.delete(req.id);
+      state.inflight.get(type)?.delete(req.id);
+      notify();
+    },
+  };
 
-	return {
-		plugin,
-		getStatus,
-		getAllStatus,
-		subscribe,
-		reset,
-	};
+  return {
+    plugin,
+    getStatus,
+    getAllStatus,
+    subscribe,
+    reset,
+  };
 }
 
 // ============================================================================
@@ -229,9 +235,9 @@ export function createRequirementStatusPlugin(): {
  * ```
  */
 export function createStatusHook(
-	statusPlugin: ReturnType<typeof createRequirementStatusPlugin>,
+  statusPlugin: ReturnType<typeof createRequirementStatusPlugin>,
 ): (type: string) => RequirementTypeStatus {
-	// This returns a function that can be used with useSyncExternalStore
-	// The actual hook implementation would be in the React adapter
-	return (type: string) => statusPlugin.getStatus(type);
+  // This returns a function that can be used with useSyncExternalStore
+  // The actual hook implementation would be in the React adapter
+  return (type: string) => statusPlugin.getStatus(type);
 }

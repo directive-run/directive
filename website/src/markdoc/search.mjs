@@ -1,53 +1,53 @@
-import Markdoc from '@markdoc/markdoc'
-import { slugifyWithCounter } from '@sindresorhus/slugify'
-import glob from 'fast-glob'
-import * as fs from 'fs'
-import * as path from 'path'
-import { createLoader } from 'simple-functional-loader'
-import * as url from 'url'
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as url from "node:url";
+import Markdoc from "@markdoc/markdoc";
+import { slugifyWithCounter } from "@sindresorhus/slugify";
+import glob from "fast-glob";
+import { createLoader } from "simple-functional-loader";
 
-const __filename = url.fileURLToPath(import.meta.url)
-const slugify = slugifyWithCounter()
+const __filename = url.fileURLToPath(import.meta.url);
+const slugify = slugifyWithCounter();
 
-function toString(node) {
+function nodeToString(node) {
   let str =
-    node.type === 'text' && typeof node.attributes?.content === 'string'
+    node.type === "text" && typeof node.attributes?.content === "string"
       ? node.attributes.content
-      : ''
-  if ('children' in node) {
-    for (let child of node.children) {
-      str += toString(child)
+      : "";
+  if ("children" in node) {
+    for (const child of node.children) {
+      str += nodeToString(child);
     }
   }
-  return str
+  return str;
 }
 
 function extractSections(node, sections, isRoot = true) {
   if (isRoot) {
-    slugify.reset()
+    slugify.reset();
   }
-  if (node.type === 'heading' || node.type === 'paragraph') {
-    let content = toString(node).trim()
-    if (node.type === 'heading' && node.attributes.level <= 2) {
+  if (node.type === "heading" || node.type === "paragraph") {
+    const content = nodeToString(node).trim();
+    if (node.type === "heading" && node.attributes.level <= 2) {
       // Only add if content is not empty
       if (content) {
-        let hash = node.attributes?.id ?? slugify(content)
-        sections.push([content, hash, []])
+        const hash = node.attributes?.id ?? slugify(content);
+        sections.push([content, hash, []]);
       }
     } else {
       if (sections.length > 0 && sections.at(-1) && content) {
-        sections.at(-1)[2].push(content)
+        sections.at(-1)[2].push(content);
       }
     }
-  } else if ('children' in node) {
-    for (let child of node.children) {
-      extractSections(child, sections, false)
+  } else if ("children" in node) {
+    for (const child of node.children) {
+      extractSections(child, sections, false);
     }
   }
 }
 
 export default function withSearch(nextConfig = {}) {
-  let cache = new Map()
+  const cache = new Map();
 
   return Object.assign({}, nextConfig, {
     webpack(config, options) {
@@ -55,35 +55,37 @@ export default function withSearch(nextConfig = {}) {
         test: __filename,
         use: [
           createLoader(function () {
-            let pagesDir = path.resolve('./src/app')
-            this.addContextDependency(pagesDir)
+            const pagesDir = path.resolve("./src/app");
+            this.addContextDependency(pagesDir);
 
-            let files = glob.sync('**/page.md', {
+            const files = glob.sync("**/page.md", {
               cwd: pagesDir,
-              ignore: ['**/docs/v[0-9]*/**'],
-            })
-            let data = files.map((file) => {
-              let url =
-                file === 'page.md' ? '/' : `/${file.replace(/\/page\.md$/, '')}`
-              let md = fs.readFileSync(path.join(pagesDir, file), 'utf8')
+              ignore: ["**/docs/v[0-9]*/**"],
+            });
+            const data = files.map((file) => {
+              const url =
+                file === "page.md"
+                  ? "/"
+                  : `/${file.replace(/\/page\.md$/, "")}`;
+              const md = fs.readFileSync(path.join(pagesDir, file), "utf8");
 
-              let sections
+              let sections;
 
               if (cache.get(file)?.[0] === md) {
-                sections = cache.get(file)[1]
+                sections = cache.get(file)[1];
               } else {
-                let ast = Markdoc.parse(md)
-                let title =
+                const ast = Markdoc.parse(md);
+                const title =
                   ast.attributes?.frontmatter?.match(
                     /^title:\s*(.*?)\s*$/m,
-                  )?.[1]
-                sections = [[title, null, []]]
-                extractSections(ast, sections)
-                cache.set(file, [md, sections])
+                  )?.[1];
+                sections = [[title, null, []]];
+                extractSections(ast, sections);
+                cache.set(file, [md, sections]);
               }
 
-              return { url, sections }
-            })
+              return { url, sections };
+            });
 
             // When this file is imported within the application
             // the following module is loaded:
@@ -168,16 +170,16 @@ export default function withSearch(nextConfig = {}) {
                   preview: getPreview(item.doc.content, query),
                 }))
               }
-            `
+            `;
           }),
         ],
-      })
+      });
 
-      if (typeof nextConfig.webpack === 'function') {
-        return nextConfig.webpack(config, options)
+      if (typeof nextConfig.webpack === "function") {
+        return nextConfig.webpack(config, options);
       }
 
-      return config
+      return config;
     },
-  })
+  });
 }

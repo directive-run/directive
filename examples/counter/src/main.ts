@@ -5,7 +5,12 @@
  * renders the game grid and event timeline.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
@@ -193,11 +198,14 @@ const numberMatch = createModule("number-match", {
       when: (facts) => {
         if (facts.gameOver) return false;
         const selected = facts.table.filter((tile: Tile) =>
-          facts.selected.includes(tile.id)
+          facts.selected.includes(tile.id),
         );
         if (selected.length !== 2) return false;
         const result = selected[0].value + selected[1].value === 10;
-        if (result) log(`CONSTRAINT pairAddsTen: TRUE (${selected[0].value} + ${selected[1].value})`);
+        if (result)
+          log(
+            `CONSTRAINT pairAddsTen: TRUE (${selected[0].value} + ${selected[1].value})`,
+          );
         return result;
       },
       require: (facts) => {
@@ -213,8 +221,12 @@ const numberMatch = createModule("number-match", {
     refillTable: {
       priority: 50,
       when: (facts) => {
-        const result = !facts.gameOver && facts.table.length < 9 && facts.pool.length > 0;
-        if (result) log(`CONSTRAINT refillTable: TRUE (table: ${facts.table.length}, pool: ${facts.pool.length})`);
+        const result =
+          !facts.gameOver && facts.table.length < 9 && facts.pool.length > 0;
+        if (result)
+          log(
+            `CONSTRAINT refillTable: TRUE (table: ${facts.table.length}, pool: ${facts.pool.length})`,
+          );
         return result;
       },
       require: (facts) => {
@@ -250,7 +262,10 @@ const numberMatch = createModule("number-match", {
     allCleared: {
       priority: 200,
       when: (facts) => {
-        const result = !facts.gameOver && facts.table.length === 0 && facts.pool.length === 0;
+        const result =
+          !facts.gameOver &&
+          facts.table.length === 0 &&
+          facts.pool.length === 0;
         if (result) log("CONSTRAINT allCleared: TRUE");
         return result;
       },
@@ -270,13 +285,13 @@ const numberMatch = createModule("number-match", {
       resolve: async (req, context) => {
         log("RESOLVER removeTiles: START");
         const tilesToRemove = context.facts.table.filter((tile: Tile) =>
-          req.tileIds.includes(tile.id)
+          req.tileIds.includes(tile.id),
         );
 
         // Multiple fact mutations
         log("RESOLVER removeTiles: setting table");
         context.facts.table = context.facts.table.filter(
-          (tile: Tile) => !req.tileIds.includes(tile.id)
+          (tile: Tile) => !req.tileIds.includes(tile.id),
         );
         log("RESOLVER removeTiles: setting removed");
         context.facts.removed = [...context.facts.removed, ...tilesToRemove];
@@ -297,7 +312,9 @@ const numberMatch = createModule("number-match", {
         const newTiles = context.facts.pool.slice(0, req.count);
         context.facts.pool = context.facts.pool.slice(req.count);
         context.facts.table = [...context.facts.table, ...newTiles];
-        log(`RESOLVER refillTable: DONE (table now: ${context.facts.table.length})`);
+        log(
+          `RESOLVER refillTable: DONE (table now: ${context.facts.table.length})`,
+        );
       },
     },
 
@@ -388,7 +405,8 @@ function render() {
 
   // --- Timeline ---
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="nm-timeline-empty">Events appear after interactions</div>';
+    timelineEl.innerHTML =
+      '<div class="nm-timeline-empty">Events appear after interactions</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {
@@ -418,9 +436,20 @@ function render() {
 // ============================================================================
 
 system.subscribe(
-  ["table", "selected", "pool", "removed", "moveCount", "message", "gameOver",
-   "poolCount", "removedCount", "selectedTiles", "hasValidMoves"],
-  render
+  [
+    "table",
+    "selected",
+    "pool",
+    "removed",
+    "moveCount",
+    "message",
+    "gameOver",
+    "poolCount",
+    "removedCount",
+    "selectedTiles",
+    "hasValidMoves",
+  ],
+  render,
 );
 
 // Button handlers

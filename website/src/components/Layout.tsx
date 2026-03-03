@@ -1,62 +1,62 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import clsx from 'clsx'
+import clsx from "clsx";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
-import { Heart } from '@phosphor-icons/react'
+import { Heart } from "@phosphor-icons/react";
 
-import { AIChatWidget } from '@/components/AIChatWidget'
-import { NotificationBanners } from '@/components/NotificationBanners'
-import { Footer } from '@/components/Footer'
-import { Newsletter } from '@/components/Newsletter'
-import { AIHero } from '@/components/AIHero'
-import { Hero } from '@/components/Hero'
-import { Logo, Logomark } from '@/components/Logo'
-import { MobileNavigation } from '@/components/MobileNavigation'
-import { Navigation } from '@/components/Navigation'
-import { Search } from '@/components/Search'
-import { ShareButton } from '@/components/ShareButton'
-import { ThemeToggle } from '@/components/ThemeSelector'
-import { BrandPresetSwitcher } from '@/components/BrandPresetSwitcher'
-import { VersionSelector } from '@/components/VersionSelector'
-import { GitHubIcon } from '@/components/icons/GitHubIcon'
-import { aiNavigation, getSiteSection } from '@/lib/navigation'
+import { AIChatWidget } from "@/components/AIChatWidget";
+import { AIHero } from "@/components/AIHero";
+import { BrandPresetSwitcher } from "@/components/BrandPresetSwitcher";
+import { Footer } from "@/components/Footer";
+import { Hero } from "@/components/Hero";
+import { Logo, Logomark } from "@/components/Logo";
+import { MobileNavigation } from "@/components/MobileNavigation";
+import { Navigation } from "@/components/Navigation";
+import { Newsletter } from "@/components/Newsletter";
+import { NotificationBanners } from "@/components/NotificationBanners";
+import { Search } from "@/components/Search";
+import { ShareButton } from "@/components/ShareButton";
+import { ThemeToggle } from "@/components/ThemeSelector";
+import { VersionSelector } from "@/components/VersionSelector";
+import { GitHubIcon } from "@/components/icons/GitHubIcon";
 import {
   useCanUseChat,
   useCanUseSearch,
+  useCanUseShareButton,
   useCanUseThemeSelector,
   useCanUseVersionSelector,
-  useCanUseShareButton,
-} from '@/lib/feature-flags'
+} from "@/lib/feature-flags";
+import { aiNavigation, getSiteSection } from "@/lib/navigation";
 
 function HeaderLink({
   href,
   activePrefix,
   children,
 }: {
-  href: string
-  activePrefix?: string
-  children: React.ReactNode
+  href: string;
+  activePrefix?: string;
+  children: React.ReactNode;
 }) {
-  let pathname = usePathname()
-  let isActive = pathname.startsWith(activePrefix ?? href)
+  const pathname = usePathname();
+  const isActive = pathname.startsWith(activePrefix ?? href);
 
   return (
     <Link
       href={href}
-      aria-current={isActive ? 'page' : undefined}
+      aria-current={isActive ? "page" : undefined}
       className={clsx(
-        'flex items-center text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary',
+        "flex items-center text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary",
         isActive
-          ? 'text-brand-primary'
-          : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300',
+          ? "text-brand-primary"
+          : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300",
       )}
     >
       {children}
     </Link>
-  )
+  );
 }
 
 function SkipLink() {
@@ -67,33 +67,33 @@ function SkipLink() {
     >
       Skip to main content
     </a>
-  )
+  );
 }
 
 function Header() {
-  let [isScrolled, setIsScrolled] = useState(false)
-  let canUseSearch = useCanUseSearch()
-  let canUseThemeSelector = useCanUseThemeSelector()
-  let canUseShareButton = useCanUseShareButton()
+  const [isScrolled, setIsScrolled] = useState(false);
+  const canUseSearch = useCanUseSearch();
+  const canUseThemeSelector = useCanUseThemeSelector();
+  const canUseShareButton = useCanUseShareButton();
 
   useEffect(() => {
     function onScroll() {
-      setIsScrolled(window.scrollY > 0)
+      setIsScrolled(window.scrollY > 0);
     }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      window.removeEventListener('scroll', onScroll)
-    }
-  }, [])
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
 
   return (
     <header
       className={clsx(
-        'sticky top-0 z-50 flex flex-none items-center justify-between bg-brand-surface px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none',
+        "sticky top-0 z-50 flex flex-none items-center justify-between bg-brand-surface px-4 py-5 shadow-md shadow-slate-900/5 transition duration-500 sm:px-6 lg:px-8 dark:shadow-none",
         isScrolled
-          ? 'dark:bg-brand-surface/95 dark:backdrop-blur-sm dark:[@supports(backdrop-filter:blur(0))]:bg-brand-surface/75'
-          : 'dark:bg-transparent',
+          ? "dark:bg-brand-surface/95 dark:backdrop-blur-sm dark:[@supports(backdrop-filter:blur(0))]:bg-brand-surface/75"
+          : "dark:bg-transparent",
       )}
     >
       <div className="mr-6 flex lg:hidden">
@@ -112,55 +112,63 @@ function Header() {
       )}
       <div className="relative flex basis-0 items-center justify-end gap-6 sm:gap-8 md:grow">
         <div className="hidden items-center gap-8 sm:gap-10 md:flex">
-          <HeaderLink href="/docs/quick-start" activePrefix="/docs">Docs</HeaderLink>
-          <HeaderLink href="/ai/overview" activePrefix="/ai">AI</HeaderLink>
+          <HeaderLink href="/docs/quick-start" activePrefix="/docs">
+            Docs
+          </HeaderLink>
+          <HeaderLink href="/ai/overview" activePrefix="/ai">
+            AI
+          </HeaderLink>
           <HeaderLink href="/blog">Blog</HeaderLink>
         </div>
         <div className="flex items-center gap-4">
           {canUseThemeSelector && <ThemeToggle />}
           <BrandPresetSwitcher className="relative z-10" />
           {canUseShareButton && <ShareButton />}
-          <Link href="https://github.com/directive-run/directive" className="group flex h-10 w-10 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary sm:h-6 sm:w-6" aria-label="GitHub">
+          <Link
+            href="https://github.com/directive-run/directive"
+            className="group flex h-10 w-10 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary sm:h-6 sm:w-6"
+            aria-label="GitHub"
+          >
             <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
           </Link>
         </div>
       </div>
     </header>
-  )
+  );
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  let pathname = usePathname()
-  let section = getSiteSection(pathname)
-  let isHomePage = section === 'home'
-  let isDocsPage = section === 'home' || section === 'docs'
-  let isAIPage = section === 'ai'
-  let hasSidebar = isDocsPage || isAIPage
-  let canUseVersionSelector = useCanUseVersionSelector()
-  let canUseChat = useCanUseChat()
+  const pathname = usePathname();
+  const section = getSiteSection(pathname);
+  const isHomePage = section === "home";
+  const isDocsPage = section === "home" || section === "docs";
+  const isAIPage = section === "ai";
+  const hasSidebar = isDocsPage || isAIPage;
+  const canUseVersionSelector = useCanUseVersionSelector();
+  const canUseChat = useCanUseChat();
 
   // Scroll to top on navigation (Link clicks), but not on back/forward
-  let isPopStateRef = useRef(false)
+  const isPopStateRef = useRef(false);
 
   useEffect(() => {
-    let handlePopState = () => {
-      isPopStateRef.current = true
-    }
+    const handlePopState = () => {
+      isPopStateRef.current = true;
+    };
 
-    window.addEventListener('popstate', handlePopState)
+    window.addEventListener("popstate", handlePopState);
 
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     if (isPopStateRef.current) {
-      isPopStateRef.current = false
+      isPopStateRef.current = false;
 
-      return
+      return;
     }
 
-    window.scrollTo(0, 0)
-  }, [pathname])
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   return (
     <div className="flex w-full flex-col">
@@ -169,10 +177,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <Header />
 
       {isHomePage && <Hero />}
-      {pathname === '/ai/overview' && <AIHero />}
+      {pathname === "/ai/overview" && <AIHero />}
 
       {hasSidebar ? (
-        <div id="main-content" className="relative mx-auto flex w-full max-w-8xl flex-auto justify-center sm:px-2 lg:px-8 xl:px-12">
+        <div
+          id="main-content"
+          className="relative mx-auto flex w-full max-w-8xl flex-auto justify-center sm:px-2 lg:px-8 xl:px-12"
+        >
           <div className="hidden lg:relative lg:block lg:flex-none">
             <div className="absolute inset-y-0 right-0 w-[50vw] bg-brand-surface-inset" />
             <div className="absolute top-16 right-0 bottom-0 h-12 w-px bg-linear-to-t from-slate-200 dark:from-slate-800" />
@@ -183,7 +194,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <VersionSelector className="w-full" />
                 </div>
               )}
-              <Navigation navigationOverride={isAIPage ? aiNavigation : undefined} />
+              <Navigation
+                navigationOverride={isAIPage ? aiNavigation : undefined}
+              />
               <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
                 {isAIPage ? (
                   <Link
@@ -224,5 +237,5 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <Footer />
       {canUseChat && <AIChatWidget />}
     </div>
-  )
+  );
 }

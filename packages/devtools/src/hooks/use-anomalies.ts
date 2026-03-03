@@ -56,7 +56,10 @@ const DEFAULT_THRESHOLDS: AnomalyThresholds = {
   tokenMultiplier: 2,
 };
 
-function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = DEFAULT_THRESHOLDS): Anomaly[] {
+function detectAnomalies(
+  events: DebugEvent[],
+  thresholds: AnomalyThresholds = DEFAULT_THRESHOLDS,
+): Anomaly[] {
   const anomalies: Anomaly[] = [];
 
   const durationMeans = computeMeansByAgent(events, "durationMs");
@@ -117,7 +120,10 @@ function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = D
       const durationMs = e.durationMs;
       if (typeof durationMs === "number") {
         const mean = durationMeans.get(e.agentId);
-        if (mean !== undefined && durationMs > thresholds.durationMultiplier * mean) {
+        if (
+          mean !== undefined &&
+          durationMs > thresholds.durationMultiplier * mean
+        ) {
           anomalies.push({
             eventId: e.id,
             type: "duration_outlier",
@@ -131,7 +137,10 @@ function detectAnomalies(events: DebugEvent[], thresholds: AnomalyThresholds = D
       const totalTokens = e.totalTokens;
       if (typeof totalTokens === "number") {
         const mean = tokenMeans.get(e.agentId);
-        if (mean !== undefined && totalTokens > thresholds.tokenMultiplier * mean) {
+        if (
+          mean !== undefined &&
+          totalTokens > thresholds.tokenMultiplier * mean
+        ) {
           anomalies.push({
             eventId: e.id,
             type: "token_spike",
@@ -185,7 +194,10 @@ function countSeverities(anomalies: Anomaly[]): {
   return counts;
 }
 
-export function useAnomalies(events: DebugEvent[], thresholds?: AnomalyThresholds): AnomalyResult {
+export function useAnomalies(
+  events: DebugEvent[],
+  thresholds?: AnomalyThresholds,
+): AnomalyResult {
   return useMemo(() => {
     const anomalies = detectAnomalies(events, thresholds);
     const severityCounts = countSeverities(anomalies);

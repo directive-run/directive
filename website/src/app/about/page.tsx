@@ -1,7 +1,7 @@
-import Link from 'next/link'
-import {
-  buildPageMetadata,
-} from '@/lib/metadata'
+import { CardLink } from "@/components/CardLink";
+import { ConstraintFlowDiagram } from "@/components/ConstraintFlowDiagram";
+import { DirectiveCallout } from "@/components/DirectiveCallout";
+import { buildPageMetadata } from "@/lib/metadata";
 import {
   Code,
   GithubLogo,
@@ -12,35 +12,33 @@ import {
   Package,
   ShieldCheck,
   Sparkle,
-} from '@phosphor-icons/react/dist/ssr'
-import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
-import { CardLink } from '@/components/CardLink'
-import { DirectiveCallout } from '@/components/DirectiveCallout'
+} from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 
 export const metadata = buildPageMetadata({
-  title: 'About — Directive',
+  title: "About — Directive",
   description:
-    'Learn about the Directive project, its constraint-driven philosophy, and the team behind it.',
-  path: '/about',
-})
+    "Learn about the Directive project, its constraint-driven philosophy, and the team behind it.",
+  path: "/about",
+});
 
 const projectStats = [
   {
-    label: '1,400+ Tests',
-    description: 'Defense-in-depth coverage across the full runtime',
+    label: "1,400+ Tests",
+    description: "Defense-in-depth coverage across the full runtime",
     icon: ShieldCheck,
   },
   {
-    label: '~3KB Gzipped',
-    description: 'Tree-shakeable, zero dependencies',
+    label: "~3KB Gzipped",
+    description: "Tree-shakeable, zero dependencies",
     icon: Package,
   },
   {
-    label: 'TypeScript-First',
-    description: 'Full type inference, zero codegen',
+    label: "TypeScript-First",
+    description: "Full type inference, zero codegen",
     icon: Code,
   },
-]
+];
 
 export default function AboutPage() {
   return (
@@ -51,10 +49,10 @@ export default function AboutPage() {
           State management shouldn&rsquo;t require you to be the runtime.
         </h1>
         <p className="mt-4 text-xl text-slate-600 dark:text-slate-400">
-          Directive is an open-source runtime for TypeScript that replaces manual
-          state orchestration with declarative constraints. Built by a solo
-          engineer, hardened by 1,400+ tests, designed to scale from UI state
-          to AI agent coordination.
+          Directive is an open-source runtime for TypeScript that replaces
+          manual state orchestration with declarative constraints. Built by a
+          solo engineer, hardened by 1,400+ tests, designed to scale from UI
+          state to AI agent coordination.
         </p>
 
         {/* Constraint Flow Diagram */}
@@ -101,13 +99,13 @@ export default function AboutPage() {
               </h3>
             </div>
             <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-400">
-              Most state management libraries ask you to describe{' '}
-              <em>how</em> things change. Directive asks you to describe{' '}
-              <em>what</em> must be true. You declare constraints &ndash; rules
-              about your system&rsquo;s valid states &ndash; and the runtime
-              resolves them automatically. When facts change, constraints
-              evaluate, requirements emerge, and resolvers execute. No manual
-              wiring, no action dispatching, no forgotten edge cases.
+              Most state management libraries ask you to describe <em>how</em>{" "}
+              things change. Directive asks you to describe <em>what</em> must
+              be true. You declare constraints &ndash; rules about your
+              system&rsquo;s valid states &ndash; and the runtime resolves them
+              automatically. When facts change, constraints evaluate,
+              requirements emerge, and resolvers execute. No manual wiring, no
+              action dispatching, no forgotten edge cases.
             </p>
           </div>
 
@@ -157,8 +155,11 @@ export default function AboutPage() {
 
         {/* Philosophy Link */}
         <p className="mt-8 text-base text-slate-600 dark:text-slate-400">
-          Directive is opinionated about how state should work.{' '}
-          <Link href="/philosophy" className="font-semibold text-brand-primary hover:underline dark:text-brand-primary-400">
+          Directive is opinionated about how state should work.{" "}
+          <Link
+            href="/philosophy"
+            className="font-semibold text-brand-primary hover:underline dark:text-brand-primary-400"
+          >
             Read the full philosophy &rarr;
           </Link>
         </p>
@@ -198,12 +199,12 @@ export default function AboutPage() {
           <div className="mt-8 space-y-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
             <p>
               20+ years building for the web &ndash; from freelance beginnings
-              to senior engineering roles. The idea behind Directive came
-              from a hobby project &ndash; building Minglingo, a real-time
-              social app where wrangling complex, interconnected systems
-              demanded something better. Instead of reaching for another
-              library, the answer was to build one that met entirely new
-              constraints. So Directive was born!
+              to senior engineering roles. The idea behind Directive came from a
+              hobby project &ndash; building Minglingo, a real-time social app
+              where wrangling complex, interconnected systems demanded something
+              better. Instead of reaching for another library, the answer was to
+              build one that met entirely new constraints. So Directive was
+              born!
             </p>
             <p>
               Equal parts engineer and visionary. Obsessed with application
@@ -214,18 +215,40 @@ export default function AboutPage() {
 
           {/* Social Links */}
           <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <CardLink href="https://www.linkedin.com/in/jasonwcomes/" external className="flex items-center gap-3 px-5 py-4">
-              <LinkedinLogo weight="fill" className="h-6 w-6 shrink-0 text-slate-400 group-hover:text-[#0A66C2]" />
+            <CardLink
+              href="https://www.linkedin.com/in/jasonwcomes/"
+              external
+              className="flex items-center gap-3 px-5 py-4"
+            >
+              <LinkedinLogo
+                weight="fill"
+                className="h-6 w-6 shrink-0 text-slate-400 group-hover:text-[#0A66C2]"
+              />
               <div>
-                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">LinkedIn</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Connect with Jason</p>
+                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">
+                  LinkedIn
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Connect with Jason
+                </p>
               </div>
             </CardLink>
-            <CardLink href="https://github.com/directive-run/directive" external className="flex items-center gap-3 px-5 py-4">
-              <GithubLogo weight="fill" className="h-6 w-6 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
+            <CardLink
+              href="https://github.com/directive-run/directive"
+              external
+              className="flex items-center gap-3 px-5 py-4"
+            >
+              <GithubLogo
+                weight="fill"
+                className="h-6 w-6 shrink-0 text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
+              />
               <div>
-                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">GitHub</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Star, contribute, or fork</p>
+                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary dark:text-white dark:group-hover:text-brand-primary-400">
+                  GitHub
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Star, contribute, or fork
+                </p>
               </div>
             </CardLink>
           </div>
@@ -243,8 +266,8 @@ export default function AboutPage() {
             </div>
             <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
               Every change goes through architecture review, security audit, and
-              runtime hardening analysis. The constraint engine, resolver pipeline,
-              and effects system are continuously stress-tested.
+              runtime hardening analysis. The constraint engine, resolver
+              pipeline, and effects system are continuously stress-tested.
             </p>
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
@@ -273,12 +296,11 @@ export default function AboutPage() {
               </div>
             </div>
             <p className="mt-5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Directive is built in the open. Contributions, bug reports, and RFCs
-              are welcome on GitHub.
+              Directive is built in the open. Contributions, bug reports, and
+              RFCs are welcome on GitHub.
             </p>
           </div>
         </div>
-
 
         {/* Directive Callout */}
         <div className="mt-6">
@@ -288,8 +310,7 @@ export default function AboutPage() {
             linkLabel="Get started"
           />
         </div>
-
       </div>
     </div>
-  )
+  );
 }

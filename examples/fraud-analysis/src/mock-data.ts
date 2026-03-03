@@ -96,55 +96,133 @@ export interface Scenario {
 const enrichmentDatabase: Record<string, EnrichmentSignal[]> = {
   "acct-1001": [
     { source: "account-history", risk: 30, detail: "3 years, good standing" },
-    { source: "geo-risk", risk: 15, detail: "Domestic transactions, consistent location" },
-    { source: "merchant-rep", risk: 60, detail: "Merchant flagged for card-present fraud" },
+    {
+      source: "geo-risk",
+      risk: 15,
+      detail: "Domestic transactions, consistent location",
+    },
+    {
+      source: "merchant-rep",
+      risk: 60,
+      detail: "Merchant flagged for card-present fraud",
+    },
   ],
   "acct-2002": [
-    { source: "account-history", risk: 70, detail: "Recent password change, new device" },
-    { source: "geo-risk", risk: 85, detail: "Transactions from 3 countries in 24h" },
+    {
+      source: "account-history",
+      risk: 70,
+      detail: "Recent password change, new device",
+    },
+    {
+      source: "geo-risk",
+      risk: 85,
+      detail: "Transactions from 3 countries in 24h",
+    },
     { source: "merchant-rep", risk: 40, detail: "Mixed merchant reputation" },
   ],
   "acct-3003": [
-    { source: "account-history", risk: 25, detail: "5 years, low activity until recently" },
+    {
+      source: "account-history",
+      risk: 25,
+      detail: "5 years, low activity until recently",
+    },
     { source: "geo-risk", risk: 20, detail: "Single region" },
-    { source: "velocity-check", risk: 90, detail: "Spend velocity 400% above 90-day average" },
+    {
+      source: "velocity-check",
+      risk: 90,
+      detail: "Spend velocity 400% above 90-day average",
+    },
   ],
   "acct-4004": [
-    { source: "account-history", risk: 45, detail: "1 year, moderate activity" },
+    {
+      source: "account-history",
+      risk: 45,
+      detail: "1 year, moderate activity",
+    },
     { source: "geo-risk", risk: 35, detail: "Two regions, consistent pattern" },
     { source: "merchant-rep", risk: 50, detail: "Standard merchants" },
   ],
   "acct-4005": [
-    { source: "account-history", risk: 10, detail: "10 years, excellent standing" },
+    {
+      source: "account-history",
+      risk: 10,
+      detail: "10 years, excellent standing",
+    },
     { source: "geo-risk", risk: 10, detail: "Single city" },
     { source: "merchant-rep", risk: 15, detail: "All verified merchants" },
   ],
   "acct-6001": [
-    { source: "account-history", risk: 40, detail: "2 years, moderate activity" },
+    {
+      source: "account-history",
+      risk: 40,
+      detail: "2 years, moderate activity",
+    },
     { source: "geo-risk", risk: 20, detail: "Single region, ACH deposits" },
-    { source: "name-verification", risk: 90, detail: "Deposit originator names do not match account holder" },
+    {
+      source: "name-verification",
+      risk: 90,
+      detail: "Deposit originator names do not match account holder",
+    },
   ],
   "acct-6002": [
-    { source: "account-history", risk: 85, detail: "Account opened 3 weeks ago, no prior history" },
+    {
+      source: "account-history",
+      risk: 85,
+      detail: "Account opened 3 weeks ago, no prior history",
+    },
     { source: "geo-risk", risk: 30, detail: "Single city, domestic" },
-    { source: "velocity-check", risk: 95, detail: "Deposit-withdrawal velocity 800% above baseline" },
+    {
+      source: "velocity-check",
+      risk: 95,
+      detail: "Deposit-withdrawal velocity 800% above baseline",
+    },
   ],
   "acct-6003": [
-    { source: "account-history", risk: 55, detail: "1 year, low activity until recently" },
-    { source: "merchant-rep", risk: 70, detail: "Refund volume exceeds purchase history" },
-    { source: "chargeback-history", risk: 80, detail: "Multiple merchant-initiated credits with no matching debits" },
+    {
+      source: "account-history",
+      risk: 55,
+      detail: "1 year, low activity until recently",
+    },
+    {
+      source: "merchant-rep",
+      risk: 70,
+      detail: "Refund volume exceeds purchase history",
+    },
+    {
+      source: "chargeback-history",
+      risk: 80,
+      detail: "Multiple merchant-initiated credits with no matching debits",
+    },
   ],
   "acct-6004": [
-    { source: "account-history", risk: 75, detail: "6 months, minimal legitimate activity" },
-    { source: "geo-risk", risk: 90, detail: "All outgoing wires to high-risk international destinations" },
-    { source: "velocity-check", risk: 85, detail: "Average dwell time under 2 hours for all funds" },
+    {
+      source: "account-history",
+      risk: 75,
+      detail: "6 months, minimal legitimate activity",
+    },
+    {
+      source: "geo-risk",
+      risk: 90,
+      detail: "All outgoing wires to high-risk international destinations",
+    },
+    {
+      source: "velocity-check",
+      risk: 85,
+      detail: "Average dwell time under 2 hours for all funds",
+    },
   ],
 };
 
 export function getMockEnrichment(accountId: string): EnrichmentSignal[] {
-  return enrichmentDatabase[accountId] ?? [
-    { source: "account-history", risk: 50, detail: "No enrichment data available" },
-  ];
+  return (
+    enrichmentDatabase[accountId] ?? [
+      {
+        source: "account-history",
+        risk: 50,
+        detail: "No enrichment data available",
+      },
+    ]
+  );
 }
 
 // ============================================================================
@@ -154,178 +232,1091 @@ export function getMockEnrichment(accountId: string): EnrichmentSignal[] {
 export const scenarios: Record<string, Scenario> = {
   "card-skimming": {
     name: "Card Skimming",
-    description: "A gas station processes 8 different credit cards in under an hour. Each transaction is a small fuel purchase, but every card number is different — the signature pattern of a skimming device installed on a payment terminal.",
+    description:
+      "A gas station processes 8 different credit cards in under an hour. Each transaction is a small fuel purchase, but every card number is different — the signature pattern of a skimming device installed on a payment terminal.",
     rules: [
-      { name: "Same-Merchant Clustering", description: "Multiple cards used at the same merchant in a short window", severity: "critical" },
-      { name: "Multi-Card Velocity", description: "High number of distinct cards at a single terminal", severity: "major" },
-      { name: "Small-Amount Probing", description: "Repeated small charges consistent with card testing", severity: "minor" },
+      {
+        name: "Same-Merchant Clustering",
+        description:
+          "Multiple cards used at the same merchant in a short window",
+        severity: "critical",
+      },
+      {
+        name: "Multi-Card Velocity",
+        description: "High number of distinct cards at a single terminal",
+        severity: "major",
+      },
+      {
+        name: "Small-Amount Probing",
+        description: "Repeated small charges consistent with card testing",
+        severity: "minor",
+      },
     ],
     events: [
-      { id: "cs-001", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel purchase", amount: 75.00, timestamp: "2026-02-24T10:05:00Z", cardLast4: "4421", location: "Houston, TX", grouped: false },
-      { id: "cs-002", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel + snacks", amount: 42.50, timestamp: "2026-02-24T10:12:00Z", cardLast4: "8832", location: "Houston, TX", grouped: false },
-      { id: "cs-003", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel purchase", amount: 68.00, timestamp: "2026-02-24T10:18:00Z", cardLast4: "1190", location: "Houston, TX", grouped: false },
-      { id: "cs-004", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "car wash + fuel", amount: 95.00, timestamp: "2026-02-24T10:25:00Z", cardLast4: "5567", location: "Houston, TX", grouped: false },
-      { id: "cs-005", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel", amount: 55.00, timestamp: "2026-02-24T10:31:00Z", cardLast4: "3344", location: "Houston, TX", grouped: false },
-      { id: "cs-006", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel purchase", amount: 82.00, timestamp: "2026-02-24T10:38:00Z", cardLast4: "9901", location: "Houston, TX", grouped: false },
-      { id: "cs-007", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel + drinks", amount: 38.50, timestamp: "2026-02-24T10:44:00Z", cardLast4: "2278", location: "Houston, TX", grouped: false },
-      { id: "cs-008", accountId: "acct-1001", merchant: "QuickGas Station #47", memo: "fuel purchase", amount: 71.00, timestamp: "2026-02-24T10:50:00Z", cardLast4: "6655", location: "Houston, TX", grouped: false },
+      {
+        id: "cs-001",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel purchase",
+        amount: 75.0,
+        timestamp: "2026-02-24T10:05:00Z",
+        cardLast4: "4421",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-002",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel + snacks",
+        amount: 42.5,
+        timestamp: "2026-02-24T10:12:00Z",
+        cardLast4: "8832",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-003",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel purchase",
+        amount: 68.0,
+        timestamp: "2026-02-24T10:18:00Z",
+        cardLast4: "1190",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-004",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "car wash + fuel",
+        amount: 95.0,
+        timestamp: "2026-02-24T10:25:00Z",
+        cardLast4: "5567",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-005",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel",
+        amount: 55.0,
+        timestamp: "2026-02-24T10:31:00Z",
+        cardLast4: "3344",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-006",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel purchase",
+        amount: 82.0,
+        timestamp: "2026-02-24T10:38:00Z",
+        cardLast4: "9901",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-007",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel + drinks",
+        amount: 38.5,
+        timestamp: "2026-02-24T10:44:00Z",
+        cardLast4: "2278",
+        location: "Houston, TX",
+        grouped: false,
+      },
+      {
+        id: "cs-008",
+        accountId: "acct-1001",
+        merchant: "QuickGas Station #47",
+        memo: "fuel purchase",
+        amount: 71.0,
+        timestamp: "2026-02-24T10:50:00Z",
+        cardLast4: "6655",
+        location: "Houston, TX",
+        grouped: false,
+      },
     ],
   },
 
   "account-takeover": {
     name: "Account Takeover",
-    description: "Five high-value purchases appear across four countries in a single day — Berlin, Paris, Tokyo, Dubai, Milan. The account holder's SSN and credit card number appear in transaction memos, suggesting compromised credentials being used for identity verification.",
+    description:
+      "Five high-value purchases appear across four countries in a single day — Berlin, Paris, Tokyo, Dubai, Milan. The account holder's SSN and credit card number appear in transaction memos, suggesting compromised credentials being used for identity verification.",
     rules: [
-      { name: "Impossible Travel", description: "Transactions from multiple countries within hours", severity: "critical" },
-      { name: "PII Exposure", description: "SSN or credit card numbers found in transaction memos", severity: "critical" },
-      { name: "High-Value Burst", description: "Multiple large purchases in rapid succession", severity: "major" },
+      {
+        name: "Impossible Travel",
+        description: "Transactions from multiple countries within hours",
+        severity: "critical",
+      },
+      {
+        name: "PII Exposure",
+        description: "SSN or credit card numbers found in transaction memos",
+        severity: "critical",
+      },
+      {
+        name: "High-Value Burst",
+        description: "Multiple large purchases in rapid succession",
+        severity: "major",
+      },
     ],
     events: [
-      { id: "at-001", accountId: "acct-2002", merchant: "ElectroMart Berlin", memo: "laptop purchase ref SSN 123-45-6789", amount: 2499.99, timestamp: "2026-02-24T03:15:00Z", cardLast4: "7712", location: "Berlin, DE", grouped: false },
-      { id: "at-002", accountId: "acct-2002", merchant: "LuxWatch Paris", memo: "timepiece — card 4532-1234-5678-9012", amount: 8750.00, timestamp: "2026-02-24T06:30:00Z", cardLast4: "7712", location: "Paris, FR", grouped: false },
-      { id: "at-003", accountId: "acct-2002", merchant: "TechHub Tokyo", memo: "electronics order", amount: 3200.00, timestamp: "2026-02-24T14:00:00Z", cardLast4: "7712", location: "Tokyo, JP", grouped: false },
-      { id: "at-004", accountId: "acct-2002", merchant: "GoldChain Dubai", memo: "jewelry — acct 9876543210", amount: 12000.00, timestamp: "2026-02-24T18:45:00Z", cardLast4: "7712", location: "Dubai, AE", grouped: false },
-      { id: "at-005", accountId: "acct-2002", merchant: "DesignerBags Milan", memo: "luxury goods purchase", amount: 5600.00, timestamp: "2026-02-24T22:10:00Z", cardLast4: "7712", location: "Milan, IT", grouped: false },
+      {
+        id: "at-001",
+        accountId: "acct-2002",
+        merchant: "ElectroMart Berlin",
+        memo: "laptop purchase ref SSN 123-45-6789",
+        amount: 2499.99,
+        timestamp: "2026-02-24T03:15:00Z",
+        cardLast4: "7712",
+        location: "Berlin, DE",
+        grouped: false,
+      },
+      {
+        id: "at-002",
+        accountId: "acct-2002",
+        merchant: "LuxWatch Paris",
+        memo: "timepiece — card 4532-1234-5678-9012",
+        amount: 8750.0,
+        timestamp: "2026-02-24T06:30:00Z",
+        cardLast4: "7712",
+        location: "Paris, FR",
+        grouped: false,
+      },
+      {
+        id: "at-003",
+        accountId: "acct-2002",
+        merchant: "TechHub Tokyo",
+        memo: "electronics order",
+        amount: 3200.0,
+        timestamp: "2026-02-24T14:00:00Z",
+        cardLast4: "7712",
+        location: "Tokyo, JP",
+        grouped: false,
+      },
+      {
+        id: "at-004",
+        accountId: "acct-2002",
+        merchant: "GoldChain Dubai",
+        memo: "jewelry — acct 9876543210",
+        amount: 12000.0,
+        timestamp: "2026-02-24T18:45:00Z",
+        cardLast4: "7712",
+        location: "Dubai, AE",
+        grouped: false,
+      },
+      {
+        id: "at-005",
+        accountId: "acct-2002",
+        merchant: "DesignerBags Milan",
+        memo: "luxury goods purchase",
+        amount: 5600.0,
+        timestamp: "2026-02-24T22:10:00Z",
+        cardLast4: "7712",
+        location: "Milan, IT",
+        grouped: false,
+      },
     ],
   },
 
   "bust-out": {
     name: "Bust-Out Fraud",
-    description: "Over 12 days, spending escalates from a $15 deli lunch to a $15,000 wire transfer. Each purchase is slightly larger than the last — a classic bust-out where a fraudster builds trust with small transactions before draining the account.",
+    description:
+      "Over 12 days, spending escalates from a $15 deli lunch to a $15,000 wire transfer. Each purchase is slightly larger than the last — a classic bust-out where a fraudster builds trust with small transactions before draining the account.",
     rules: [
-      { name: "Amount Escalation", description: "Transaction amounts increase steadily over time", severity: "critical" },
-      { name: "Category Escalation", description: "Purchases shift from low-risk to high-risk categories", severity: "major" },
-      { name: "Velocity Increase", description: "Transaction frequency accelerates toward the end", severity: "minor" },
+      {
+        name: "Amount Escalation",
+        description: "Transaction amounts increase steadily over time",
+        severity: "critical",
+      },
+      {
+        name: "Category Escalation",
+        description: "Purchases shift from low-risk to high-risk categories",
+        severity: "major",
+      },
+      {
+        name: "Velocity Increase",
+        description: "Transaction frequency accelerates toward the end",
+        severity: "minor",
+      },
     ],
     events: [
-      { id: "bo-001", accountId: "acct-3003", merchant: "Corner Deli", memo: "lunch", amount: 15.00, timestamp: "2026-02-10T12:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-002", accountId: "acct-3003", merchant: "Gas N Go", memo: "fuel", amount: 45.00, timestamp: "2026-02-12T08:30:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-003", accountId: "acct-3003", merchant: "MegaMart", memo: "groceries", amount: 120.00, timestamp: "2026-02-14T17:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-004", accountId: "acct-3003", merchant: "BestBuy Electronics", memo: "TV purchase", amount: 899.99, timestamp: "2026-02-16T11:15:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-005", accountId: "acct-3003", merchant: "AppleStore", memo: "MacBook Pro", amount: 2499.00, timestamp: "2026-02-17T14:30:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-006", accountId: "acct-3003", merchant: "Jewelry Palace", memo: "gold necklace", amount: 3500.00, timestamp: "2026-02-18T10:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-007", accountId: "acct-3003", merchant: "LuxAuto Dealer", memo: "vehicle deposit", amount: 5000.00, timestamp: "2026-02-19T09:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-008", accountId: "acct-3003", merchant: "CashAdvance ATM", memo: "cash withdrawal", amount: 2000.00, timestamp: "2026-02-19T15:30:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-009", accountId: "acct-3003", merchant: "WireTransfer Intl", memo: "outgoing wire", amount: 8000.00, timestamp: "2026-02-20T08:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-010", accountId: "acct-3003", merchant: "CryptoExchange", memo: "BTC purchase", amount: 10000.00, timestamp: "2026-02-20T12:45:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-011", accountId: "acct-3003", merchant: "WireTransfer Intl", memo: "outgoing wire #2", amount: 15000.00, timestamp: "2026-02-21T07:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
-      { id: "bo-012", accountId: "acct-3003", merchant: "CashAdvance ATM", memo: "max withdrawal", amount: 5000.00, timestamp: "2026-02-21T16:00:00Z", cardLast4: "3301", location: "Chicago, IL", grouped: false },
+      {
+        id: "bo-001",
+        accountId: "acct-3003",
+        merchant: "Corner Deli",
+        memo: "lunch",
+        amount: 15.0,
+        timestamp: "2026-02-10T12:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-002",
+        accountId: "acct-3003",
+        merchant: "Gas N Go",
+        memo: "fuel",
+        amount: 45.0,
+        timestamp: "2026-02-12T08:30:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-003",
+        accountId: "acct-3003",
+        merchant: "MegaMart",
+        memo: "groceries",
+        amount: 120.0,
+        timestamp: "2026-02-14T17:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-004",
+        accountId: "acct-3003",
+        merchant: "BestBuy Electronics",
+        memo: "TV purchase",
+        amount: 899.99,
+        timestamp: "2026-02-16T11:15:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-005",
+        accountId: "acct-3003",
+        merchant: "AppleStore",
+        memo: "MacBook Pro",
+        amount: 2499.0,
+        timestamp: "2026-02-17T14:30:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-006",
+        accountId: "acct-3003",
+        merchant: "Jewelry Palace",
+        memo: "gold necklace",
+        amount: 3500.0,
+        timestamp: "2026-02-18T10:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-007",
+        accountId: "acct-3003",
+        merchant: "LuxAuto Dealer",
+        memo: "vehicle deposit",
+        amount: 5000.0,
+        timestamp: "2026-02-19T09:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-008",
+        accountId: "acct-3003",
+        merchant: "CashAdvance ATM",
+        memo: "cash withdrawal",
+        amount: 2000.0,
+        timestamp: "2026-02-19T15:30:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-009",
+        accountId: "acct-3003",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire",
+        amount: 8000.0,
+        timestamp: "2026-02-20T08:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-010",
+        accountId: "acct-3003",
+        merchant: "CryptoExchange",
+        memo: "BTC purchase",
+        amount: 10000.0,
+        timestamp: "2026-02-20T12:45:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-011",
+        accountId: "acct-3003",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire #2",
+        amount: 15000.0,
+        timestamp: "2026-02-21T07:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "bo-012",
+        accountId: "acct-3003",
+        merchant: "CashAdvance ATM",
+        memo: "max withdrawal",
+        amount: 5000.0,
+        timestamp: "2026-02-21T16:00:00Z",
+        cardLast4: "3301",
+        location: "Chicago, IL",
+        grouped: false,
+      },
     ],
   },
 
   "mixed-batch": {
     name: "Mixed Batch",
-    description: "Three accounts with very different risk profiles: one with routine grocery and Netflix charges, one with luxury jewelry purchases, and one making offshore wire transfers. Shows how the system handles mixed legitimate and suspicious activity in a single batch.",
+    description:
+      "Three accounts with very different risk profiles: one with routine grocery and Netflix charges, one with luxury jewelry purchases, and one making offshore wire transfers. Shows how the system handles mixed legitimate and suspicious activity in a single batch.",
     rules: [
-      { name: "Cross-Account Risk Variance", description: "Wide spread in risk scores across accounts in the same batch", severity: "major" },
-      { name: "High-Value Outliers", description: "Individual transactions far exceeding account baseline", severity: "major" },
-      { name: "Legitimate Baseline", description: "Normal spending patterns providing comparison context", severity: "minor" },
+      {
+        name: "Cross-Account Risk Variance",
+        description:
+          "Wide spread in risk scores across accounts in the same batch",
+        severity: "major",
+      },
+      {
+        name: "High-Value Outliers",
+        description: "Individual transactions far exceeding account baseline",
+        severity: "major",
+      },
+      {
+        name: "Legitimate Baseline",
+        description: "Normal spending patterns providing comparison context",
+        severity: "minor",
+      },
     ],
     events: [
-      { id: "mb-001", accountId: "acct-4004", merchant: "Online Bookstore", memo: "textbooks", amount: 89.99, timestamp: "2026-02-24T09:00:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-002", accountId: "acct-4004", merchant: "Online Bookstore", memo: "novels", amount: 34.50, timestamp: "2026-02-24T09:05:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-003", accountId: "acct-4004", merchant: "ShadyElectronics", memo: "bulk phones — SSN 987-65-4321", amount: 4500.00, timestamp: "2026-02-24T10:00:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-004", accountId: "acct-4004", merchant: "ShadyElectronics", memo: "accessories", amount: 350.00, timestamp: "2026-02-24T10:15:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-005", accountId: "acct-4004", merchant: "CoffeeCo", memo: "morning coffee", amount: 5.75, timestamp: "2026-02-24T07:30:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-006", accountId: "acct-2002", merchant: "HighEnd Jewelers", memo: "diamond ring", amount: 15000.00, timestamp: "2026-02-24T11:00:00Z", cardLast4: "7712", location: "New York, NY", grouped: false },
-      { id: "mb-007", accountId: "acct-2002", merchant: "HighEnd Jewelers", memo: "matching earrings", amount: 8500.00, timestamp: "2026-02-24T11:20:00Z", cardLast4: "7712", location: "New York, NY", grouped: false },
-      { id: "mb-008", accountId: "acct-5005", merchant: "Grocery Mart", memo: "weekly groceries", amount: 67.30, timestamp: "2026-02-24T16:00:00Z", cardLast4: "5501", location: "Denver, CO", grouped: false },
-      { id: "mb-009", accountId: "acct-5005", merchant: "Gas Station", memo: "fuel", amount: 52.00, timestamp: "2026-02-24T16:30:00Z", cardLast4: "5501", location: "Denver, CO", grouped: false },
-      { id: "mb-010", accountId: "acct-4004", merchant: "FastCash ATM", memo: "cash withdrawal — ref 4111-2222-3333-4444", amount: 1000.00, timestamp: "2026-02-24T12:00:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-011", accountId: "acct-4004", merchant: "FastCash ATM", memo: "second withdrawal", amount: 1000.00, timestamp: "2026-02-24T12:30:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
-      { id: "mb-012", accountId: "acct-5005", merchant: "Netflix", memo: "monthly subscription", amount: 15.99, timestamp: "2026-02-24T00:00:00Z", cardLast4: "5501", location: "Denver, CO", grouped: false },
-      { id: "mb-013", accountId: "acct-5005", merchant: "Spotify", memo: "music subscription", amount: 10.99, timestamp: "2026-02-24T00:00:00Z", cardLast4: "5501", location: "Denver, CO", grouped: false },
-      { id: "mb-014", accountId: "acct-2002", merchant: "Offshore Trading Co", memo: "investment wire", amount: 25000.00, timestamp: "2026-02-24T14:00:00Z", cardLast4: "7712", location: "Cayman Islands", grouped: false },
-      { id: "mb-015", accountId: "acct-4004", merchant: "CoffeeCo", memo: "afternoon coffee", amount: 6.25, timestamp: "2026-02-24T14:30:00Z", cardLast4: "4401", location: "Austin, TX", grouped: false },
+      {
+        id: "mb-001",
+        accountId: "acct-4004",
+        merchant: "Online Bookstore",
+        memo: "textbooks",
+        amount: 89.99,
+        timestamp: "2026-02-24T09:00:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-002",
+        accountId: "acct-4004",
+        merchant: "Online Bookstore",
+        memo: "novels",
+        amount: 34.5,
+        timestamp: "2026-02-24T09:05:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-003",
+        accountId: "acct-4004",
+        merchant: "ShadyElectronics",
+        memo: "bulk phones — SSN 987-65-4321",
+        amount: 4500.0,
+        timestamp: "2026-02-24T10:00:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-004",
+        accountId: "acct-4004",
+        merchant: "ShadyElectronics",
+        memo: "accessories",
+        amount: 350.0,
+        timestamp: "2026-02-24T10:15:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-005",
+        accountId: "acct-4004",
+        merchant: "CoffeeCo",
+        memo: "morning coffee",
+        amount: 5.75,
+        timestamp: "2026-02-24T07:30:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-006",
+        accountId: "acct-2002",
+        merchant: "HighEnd Jewelers",
+        memo: "diamond ring",
+        amount: 15000.0,
+        timestamp: "2026-02-24T11:00:00Z",
+        cardLast4: "7712",
+        location: "New York, NY",
+        grouped: false,
+      },
+      {
+        id: "mb-007",
+        accountId: "acct-2002",
+        merchant: "HighEnd Jewelers",
+        memo: "matching earrings",
+        amount: 8500.0,
+        timestamp: "2026-02-24T11:20:00Z",
+        cardLast4: "7712",
+        location: "New York, NY",
+        grouped: false,
+      },
+      {
+        id: "mb-008",
+        accountId: "acct-5005",
+        merchant: "Grocery Mart",
+        memo: "weekly groceries",
+        amount: 67.3,
+        timestamp: "2026-02-24T16:00:00Z",
+        cardLast4: "5501",
+        location: "Denver, CO",
+        grouped: false,
+      },
+      {
+        id: "mb-009",
+        accountId: "acct-5005",
+        merchant: "Gas Station",
+        memo: "fuel",
+        amount: 52.0,
+        timestamp: "2026-02-24T16:30:00Z",
+        cardLast4: "5501",
+        location: "Denver, CO",
+        grouped: false,
+      },
+      {
+        id: "mb-010",
+        accountId: "acct-4004",
+        merchant: "FastCash ATM",
+        memo: "cash withdrawal — ref 4111-2222-3333-4444",
+        amount: 1000.0,
+        timestamp: "2026-02-24T12:00:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-011",
+        accountId: "acct-4004",
+        merchant: "FastCash ATM",
+        memo: "second withdrawal",
+        amount: 1000.0,
+        timestamp: "2026-02-24T12:30:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
+      {
+        id: "mb-012",
+        accountId: "acct-5005",
+        merchant: "Netflix",
+        memo: "monthly subscription",
+        amount: 15.99,
+        timestamp: "2026-02-24T00:00:00Z",
+        cardLast4: "5501",
+        location: "Denver, CO",
+        grouped: false,
+      },
+      {
+        id: "mb-013",
+        accountId: "acct-5005",
+        merchant: "Spotify",
+        memo: "music subscription",
+        amount: 10.99,
+        timestamp: "2026-02-24T00:00:00Z",
+        cardLast4: "5501",
+        location: "Denver, CO",
+        grouped: false,
+      },
+      {
+        id: "mb-014",
+        accountId: "acct-2002",
+        merchant: "Offshore Trading Co",
+        memo: "investment wire",
+        amount: 25000.0,
+        timestamp: "2026-02-24T14:00:00Z",
+        cardLast4: "7712",
+        location: "Cayman Islands",
+        grouped: false,
+      },
+      {
+        id: "mb-015",
+        accountId: "acct-4004",
+        merchant: "CoffeeCo",
+        memo: "afternoon coffee",
+        amount: 6.25,
+        timestamp: "2026-02-24T14:30:00Z",
+        cardLast4: "4401",
+        location: "Austin, TX",
+        grouped: false,
+      },
     ],
   },
 
   "deposit-name-mismatch": {
     name: "Deposit Name Mismatch",
-    description: "Incoming ACH deposits arrive from 'Johnson Industries LLC' and 'M. Rodriguez DBA QuickCash', but the account belongs to 'Sarah Chen'. None of the deposit originator names match the account holder — a red flag for money mule activity or payroll fraud.",
+    description:
+      "Incoming ACH deposits arrive from 'Johnson Industries LLC' and 'M. Rodriguez DBA QuickCash', but the account belongs to 'Sarah Chen'. None of the deposit originator names match the account holder — a red flag for money mule activity or payroll fraud.",
     rules: [
-      { name: "Name Mismatch", description: "Deposit originator names do not match account holder", severity: "critical" },
-      { name: "Multiple Originators", description: "Deposits from several unrelated entities to one account", severity: "major" },
-      { name: "Structuring Pattern", description: "Amounts cluster just below the $10,000 reporting threshold", severity: "minor" },
+      {
+        name: "Name Mismatch",
+        description: "Deposit originator names do not match account holder",
+        severity: "critical",
+      },
+      {
+        name: "Multiple Originators",
+        description: "Deposits from several unrelated entities to one account",
+        severity: "major",
+      },
+      {
+        name: "Structuring Pattern",
+        description:
+          "Amounts cluster just below the $10,000 reporting threshold",
+        severity: "minor",
+      },
     ],
     events: [
-      { id: "dnm-001", accountId: "acct-6001", merchant: "ACH Deposit — Johnson Industries LLC", memo: "payroll deposit", amount: 4800.00, timestamp: "2026-02-20T08:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-002", accountId: "acct-6001", merchant: "ACH Deposit — M. Rodriguez DBA QuickCash", memo: "vendor payment", amount: 9500.00, timestamp: "2026-02-20T14:30:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-003", accountId: "acct-6001", merchant: "ACH Deposit — Johnson Industries LLC", memo: "bonus payment", amount: 3200.00, timestamp: "2026-02-21T09:15:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-004", accountId: "acct-6001", merchant: "ACH Deposit — QuickCash Services", memo: "consulting fee", amount: 9800.00, timestamp: "2026-02-21T16:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-005", accountId: "acct-6001", merchant: "ACH Deposit — R. Patel Enterprises", memo: "invoice payment", amount: 7500.00, timestamp: "2026-02-22T10:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-006", accountId: "acct-6001", merchant: "ACH Deposit — Johnson Industries LLC", memo: "reimbursement", amount: 2100.00, timestamp: "2026-02-22T15:45:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-007", accountId: "acct-6001", merchant: "ACH Deposit — M. Rodriguez DBA QuickCash", memo: "service payment", amount: 9400.00, timestamp: "2026-02-23T08:30:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "dnm-008", accountId: "acct-6001", merchant: "ACH Deposit — Unknown Originator", memo: "transfer", amount: 500.00, timestamp: "2026-02-23T17:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
+      {
+        id: "dnm-001",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — Johnson Industries LLC",
+        memo: "payroll deposit",
+        amount: 4800.0,
+        timestamp: "2026-02-20T08:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-002",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — M. Rodriguez DBA QuickCash",
+        memo: "vendor payment",
+        amount: 9500.0,
+        timestamp: "2026-02-20T14:30:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-003",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — Johnson Industries LLC",
+        memo: "bonus payment",
+        amount: 3200.0,
+        timestamp: "2026-02-21T09:15:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-004",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — QuickCash Services",
+        memo: "consulting fee",
+        amount: 9800.0,
+        timestamp: "2026-02-21T16:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-005",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — R. Patel Enterprises",
+        memo: "invoice payment",
+        amount: 7500.0,
+        timestamp: "2026-02-22T10:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-006",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — Johnson Industries LLC",
+        memo: "reimbursement",
+        amount: 2100.0,
+        timestamp: "2026-02-22T15:45:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-007",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — M. Rodriguez DBA QuickCash",
+        memo: "service payment",
+        amount: 9400.0,
+        timestamp: "2026-02-23T08:30:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "dnm-008",
+        accountId: "acct-6001",
+        merchant: "ACH Deposit — Unknown Originator",
+        memo: "transfer",
+        amount: 500.0,
+        timestamp: "2026-02-23T17:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
     ],
   },
 
   "cash-in-cash-out": {
     name: "Cash In / Cash Out",
-    description: "A new account receives three large cash deposits totaling $28,000 over two days. Within hours of each deposit, nearly the same amount is withdrawn via ATM or wire — leaving the account near zero each time. The rapid deposit-withdrawal cycle is a hallmark of money laundering.",
+    description:
+      "A new account receives three large cash deposits totaling $28,000 over two days. Within hours of each deposit, nearly the same amount is withdrawn via ATM or wire — leaving the account near zero each time. The rapid deposit-withdrawal cycle is a hallmark of money laundering.",
     rules: [
-      { name: "High-Velocity Cash Movement", description: "Large cash deposits immediately followed by withdrawals", severity: "critical" },
-      { name: "Deposit-Withdrawal Symmetry", description: "Withdrawal amounts closely match preceding deposits", severity: "critical" },
-      { name: "New Account Risk", description: "Account opened within the last 30 days with unusual activity", severity: "major" },
+      {
+        name: "High-Velocity Cash Movement",
+        description: "Large cash deposits immediately followed by withdrawals",
+        severity: "critical",
+      },
+      {
+        name: "Deposit-Withdrawal Symmetry",
+        description: "Withdrawal amounts closely match preceding deposits",
+        severity: "critical",
+      },
+      {
+        name: "New Account Risk",
+        description:
+          "Account opened within the last 30 days with unusual activity",
+        severity: "major",
+      },
     ],
     events: [
-      { id: "cico-001", accountId: "acct-6002", merchant: "Branch Deposit", memo: "cash deposit", amount: 9500.00, timestamp: "2026-02-22T09:00:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
-      { id: "cico-002", accountId: "acct-6002", merchant: "Chase ATM #401", memo: "cash withdrawal", amount: 5000.00, timestamp: "2026-02-22T11:30:00Z", cardLast4: "6201", location: "Chicago, IL", grouped: false },
-      { id: "cico-003", accountId: "acct-6002", merchant: "WireTransfer Intl", memo: "outgoing wire", amount: 4200.00, timestamp: "2026-02-22T13:00:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
-      { id: "cico-004", accountId: "acct-6002", merchant: "Branch Deposit", memo: "cash deposit", amount: 8500.00, timestamp: "2026-02-22T15:00:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
-      { id: "cico-005", accountId: "acct-6002", merchant: "Wells Fargo ATM", memo: "cash withdrawal", amount: 5000.00, timestamp: "2026-02-22T17:15:00Z", cardLast4: "6201", location: "Chicago, IL", grouped: false },
-      { id: "cico-006", accountId: "acct-6002", merchant: "WireTransfer Intl", memo: "outgoing wire", amount: 3300.00, timestamp: "2026-02-22T18:00:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
-      { id: "cico-007", accountId: "acct-6002", merchant: "Branch Deposit", memo: "cash deposit", amount: 10000.00, timestamp: "2026-02-23T09:30:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
-      { id: "cico-008", accountId: "acct-6002", merchant: "Chase ATM #401", memo: "max withdrawal", amount: 5000.00, timestamp: "2026-02-23T11:00:00Z", cardLast4: "6201", location: "Chicago, IL", grouped: false },
-      { id: "cico-009", accountId: "acct-6002", merchant: "BOA ATM #220", memo: "cash withdrawal", amount: 3000.00, timestamp: "2026-02-23T12:30:00Z", cardLast4: "6201", location: "Chicago, IL", grouped: false },
-      { id: "cico-010", accountId: "acct-6002", merchant: "WireTransfer Intl", memo: "outgoing wire — final", amount: 1800.00, timestamp: "2026-02-23T14:00:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
-      { id: "cico-011", accountId: "acct-6002", merchant: "Citibank ATM", memo: "balance inquiry + withdraw", amount: 200.00, timestamp: "2026-02-23T16:00:00Z", cardLast4: "6201", location: "Chicago, IL", grouped: false },
-      { id: "cico-012", accountId: "acct-6002", merchant: "Branch Deposit", memo: "cash deposit", amount: 6000.00, timestamp: "2026-02-24T08:00:00Z", cardLast4: "0000", location: "Chicago, IL", grouped: false },
+      {
+        id: "cico-001",
+        accountId: "acct-6002",
+        merchant: "Branch Deposit",
+        memo: "cash deposit",
+        amount: 9500.0,
+        timestamp: "2026-02-22T09:00:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-002",
+        accountId: "acct-6002",
+        merchant: "Chase ATM #401",
+        memo: "cash withdrawal",
+        amount: 5000.0,
+        timestamp: "2026-02-22T11:30:00Z",
+        cardLast4: "6201",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-003",
+        accountId: "acct-6002",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire",
+        amount: 4200.0,
+        timestamp: "2026-02-22T13:00:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-004",
+        accountId: "acct-6002",
+        merchant: "Branch Deposit",
+        memo: "cash deposit",
+        amount: 8500.0,
+        timestamp: "2026-02-22T15:00:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-005",
+        accountId: "acct-6002",
+        merchant: "Wells Fargo ATM",
+        memo: "cash withdrawal",
+        amount: 5000.0,
+        timestamp: "2026-02-22T17:15:00Z",
+        cardLast4: "6201",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-006",
+        accountId: "acct-6002",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire",
+        amount: 3300.0,
+        timestamp: "2026-02-22T18:00:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-007",
+        accountId: "acct-6002",
+        merchant: "Branch Deposit",
+        memo: "cash deposit",
+        amount: 10000.0,
+        timestamp: "2026-02-23T09:30:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-008",
+        accountId: "acct-6002",
+        merchant: "Chase ATM #401",
+        memo: "max withdrawal",
+        amount: 5000.0,
+        timestamp: "2026-02-23T11:00:00Z",
+        cardLast4: "6201",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-009",
+        accountId: "acct-6002",
+        merchant: "BOA ATM #220",
+        memo: "cash withdrawal",
+        amount: 3000.0,
+        timestamp: "2026-02-23T12:30:00Z",
+        cardLast4: "6201",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-010",
+        accountId: "acct-6002",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire — final",
+        amount: 1800.0,
+        timestamp: "2026-02-23T14:00:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-011",
+        accountId: "acct-6002",
+        merchant: "Citibank ATM",
+        memo: "balance inquiry + withdraw",
+        amount: 200.0,
+        timestamp: "2026-02-23T16:00:00Z",
+        cardLast4: "6201",
+        location: "Chicago, IL",
+        grouped: false,
+      },
+      {
+        id: "cico-012",
+        accountId: "acct-6002",
+        merchant: "Branch Deposit",
+        memo: "cash deposit",
+        amount: 6000.0,
+        timestamp: "2026-02-24T08:00:00Z",
+        cardLast4: "0000",
+        location: "Chicago, IL",
+        grouped: false,
+      },
     ],
   },
 
   "merchant-credit-abuse": {
     name: "Merchant Credit Abuse",
-    description: "An account receives $47,000 in merchant refund credits from six different retailers over two weeks, but there are zero corresponding purchase debits. Credits without purchases suggest return fraud at scale, collusion with merchants, or compromised merchant terminals.",
+    description:
+      "An account receives $47,000 in merchant refund credits from six different retailers over two weeks, but there are zero corresponding purchase debits. Credits without purchases suggest return fraud at scale, collusion with merchants, or compromised merchant terminals.",
     rules: [
-      { name: "Credits Without Debits", description: "Refund credits with no matching purchase transactions", severity: "critical" },
-      { name: "Multi-Merchant Refunds", description: "Refunds from multiple unrelated merchants to one account", severity: "major" },
-      { name: "Refund Velocity", description: "High frequency of refund credits in a short period", severity: "major" },
+      {
+        name: "Credits Without Debits",
+        description: "Refund credits with no matching purchase transactions",
+        severity: "critical",
+      },
+      {
+        name: "Multi-Merchant Refunds",
+        description: "Refunds from multiple unrelated merchants to one account",
+        severity: "major",
+      },
+      {
+        name: "Refund Velocity",
+        description: "High frequency of refund credits in a short period",
+        severity: "major",
+      },
     ],
     events: [
-      { id: "mca-001", accountId: "acct-6003", merchant: "BestBuy — Refund", memo: "return credit — electronics", amount: 8500.00, timestamp: "2026-02-12T10:00:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-002", accountId: "acct-6003", merchant: "Target — Refund", memo: "return credit — home goods", amount: 3200.00, timestamp: "2026-02-13T14:30:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-003", accountId: "acct-6003", merchant: "Nordstrom — Refund", memo: "return credit — clothing", amount: 12000.00, timestamp: "2026-02-15T09:00:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-004", accountId: "acct-6003", merchant: "Apple Store — Refund", memo: "return credit — MacBook", amount: 2499.00, timestamp: "2026-02-16T11:15:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-005", accountId: "acct-6003", merchant: "Costco — Refund", memo: "return credit — bulk order", amount: 5600.00, timestamp: "2026-02-18T13:00:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-006", accountId: "acct-6003", merchant: "HomeDepot — Refund", memo: "return credit — tools", amount: 4200.00, timestamp: "2026-02-19T10:30:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-007", accountId: "acct-6003", merchant: "BestBuy — Refund", memo: "return credit — TV", amount: 3500.00, timestamp: "2026-02-21T15:00:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-008", accountId: "acct-6003", merchant: "Samsung Direct — Refund", memo: "return credit — phone", amount: 1299.00, timestamp: "2026-02-22T09:45:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-009", accountId: "acct-6003", merchant: "Target — Refund", memo: "return credit — appliances", amount: 4800.00, timestamp: "2026-02-23T16:00:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
-      { id: "mca-010", accountId: "acct-6003", merchant: "Walmart — Refund", memo: "return credit — electronics", amount: 1400.00, timestamp: "2026-02-24T08:30:00Z", cardLast4: "6301", location: "Dallas, TX", grouped: false },
+      {
+        id: "mca-001",
+        accountId: "acct-6003",
+        merchant: "BestBuy — Refund",
+        memo: "return credit — electronics",
+        amount: 8500.0,
+        timestamp: "2026-02-12T10:00:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-002",
+        accountId: "acct-6003",
+        merchant: "Target — Refund",
+        memo: "return credit — home goods",
+        amount: 3200.0,
+        timestamp: "2026-02-13T14:30:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-003",
+        accountId: "acct-6003",
+        merchant: "Nordstrom — Refund",
+        memo: "return credit — clothing",
+        amount: 12000.0,
+        timestamp: "2026-02-15T09:00:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-004",
+        accountId: "acct-6003",
+        merchant: "Apple Store — Refund",
+        memo: "return credit — MacBook",
+        amount: 2499.0,
+        timestamp: "2026-02-16T11:15:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-005",
+        accountId: "acct-6003",
+        merchant: "Costco — Refund",
+        memo: "return credit — bulk order",
+        amount: 5600.0,
+        timestamp: "2026-02-18T13:00:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-006",
+        accountId: "acct-6003",
+        merchant: "HomeDepot — Refund",
+        memo: "return credit — tools",
+        amount: 4200.0,
+        timestamp: "2026-02-19T10:30:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-007",
+        accountId: "acct-6003",
+        merchant: "BestBuy — Refund",
+        memo: "return credit — TV",
+        amount: 3500.0,
+        timestamp: "2026-02-21T15:00:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-008",
+        accountId: "acct-6003",
+        merchant: "Samsung Direct — Refund",
+        memo: "return credit — phone",
+        amount: 1299.0,
+        timestamp: "2026-02-22T09:45:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-009",
+        accountId: "acct-6003",
+        merchant: "Target — Refund",
+        memo: "return credit — appliances",
+        amount: 4800.0,
+        timestamp: "2026-02-23T16:00:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
+      {
+        id: "mca-010",
+        accountId: "acct-6003",
+        merchant: "Walmart — Refund",
+        memo: "return credit — electronics",
+        amount: 1400.0,
+        timestamp: "2026-02-24T08:30:00Z",
+        cardLast4: "6301",
+        location: "Dallas, TX",
+        grouped: false,
+      },
     ],
   },
 
   "rapid-funds-movement": {
     name: "Rapid Funds Movement",
-    description: "Money arrives via ACH, sits for under 2 hours, then leaves via wire transfer to an overseas account. This pattern repeats 5 times in a single week, each time with a different originator. The account is being used as a pass-through — funds never stay long enough for legitimate use.",
+    description:
+      "Money arrives via ACH, sits for under 2 hours, then leaves via wire transfer to an overseas account. This pattern repeats 5 times in a single week, each time with a different originator. The account is being used as a pass-through — funds never stay long enough for legitimate use.",
     rules: [
-      { name: "Pass-Through Pattern", description: "Funds received and forwarded with minimal dwell time", severity: "critical" },
-      { name: "Short Dwell Time", description: "Funds remain in account for less than 2 hours before transfer", severity: "critical" },
-      { name: "Multi-Originator", description: "Incoming funds from multiple unrelated sources", severity: "major" },
-      { name: "International Wire Destination", description: "Outgoing wires routed to overseas accounts", severity: "major" },
+      {
+        name: "Pass-Through Pattern",
+        description: "Funds received and forwarded with minimal dwell time",
+        severity: "critical",
+      },
+      {
+        name: "Short Dwell Time",
+        description:
+          "Funds remain in account for less than 2 hours before transfer",
+        severity: "critical",
+      },
+      {
+        name: "Multi-Originator",
+        description: "Incoming funds from multiple unrelated sources",
+        severity: "major",
+      },
+      {
+        name: "International Wire Destination",
+        description: "Outgoing wires routed to overseas accounts",
+        severity: "major",
+      },
     ],
     events: [
-      { id: "rfm-001", accountId: "acct-6004", merchant: "ACH Deposit — Apex Trading LLC", memo: "business payment", amount: 15000.00, timestamp: "2026-02-18T08:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "rfm-002", accountId: "acct-6004", merchant: "WireTransfer Intl", memo: "outgoing wire — Hong Kong", amount: 14800.00, timestamp: "2026-02-18T09:30:00Z", cardLast4: "0000", location: "New York, NY", grouped: false },
-      { id: "rfm-003", accountId: "acct-6004", merchant: "ACH Deposit — GlobalTech Solutions", memo: "consulting fee", amount: 22000.00, timestamp: "2026-02-19T10:15:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "rfm-004", accountId: "acct-6004", merchant: "WireTransfer Intl", memo: "outgoing wire — Singapore", amount: 21500.00, timestamp: "2026-02-19T11:45:00Z", cardLast4: "0000", location: "New York, NY", grouped: false },
-      { id: "rfm-005", accountId: "acct-6004", merchant: "ACH Deposit — Meridian Corp", memo: "invoice settlement", amount: 18500.00, timestamp: "2026-02-20T09:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "rfm-006", accountId: "acct-6004", merchant: "WireTransfer Intl", memo: "outgoing wire — Dubai", amount: 18200.00, timestamp: "2026-02-20T10:30:00Z", cardLast4: "0000", location: "New York, NY", grouped: false },
-      { id: "rfm-007", accountId: "acct-6004", merchant: "ACH Deposit — Pacific Rim Holdings", memo: "distribution payment", amount: 31000.00, timestamp: "2026-02-22T08:30:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "rfm-008", accountId: "acct-6004", merchant: "WireTransfer Intl", memo: "outgoing wire — Cayman Islands", amount: 30500.00, timestamp: "2026-02-22T10:00:00Z", cardLast4: "0000", location: "New York, NY", grouped: false },
-      { id: "rfm-009", accountId: "acct-6004", merchant: "ACH Deposit — Sterling Ventures", memo: "investment return", amount: 25000.00, timestamp: "2026-02-24T09:00:00Z", cardLast4: "0000", location: "ACH Network", grouped: false },
-      { id: "rfm-010", accountId: "acct-6004", merchant: "WireTransfer Intl", memo: "outgoing wire — Switzerland", amount: 24700.00, timestamp: "2026-02-24T10:15:00Z", cardLast4: "0000", location: "New York, NY", grouped: false },
+      {
+        id: "rfm-001",
+        accountId: "acct-6004",
+        merchant: "ACH Deposit — Apex Trading LLC",
+        memo: "business payment",
+        amount: 15000.0,
+        timestamp: "2026-02-18T08:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "rfm-002",
+        accountId: "acct-6004",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire — Hong Kong",
+        amount: 14800.0,
+        timestamp: "2026-02-18T09:30:00Z",
+        cardLast4: "0000",
+        location: "New York, NY",
+        grouped: false,
+      },
+      {
+        id: "rfm-003",
+        accountId: "acct-6004",
+        merchant: "ACH Deposit — GlobalTech Solutions",
+        memo: "consulting fee",
+        amount: 22000.0,
+        timestamp: "2026-02-19T10:15:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "rfm-004",
+        accountId: "acct-6004",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire — Singapore",
+        amount: 21500.0,
+        timestamp: "2026-02-19T11:45:00Z",
+        cardLast4: "0000",
+        location: "New York, NY",
+        grouped: false,
+      },
+      {
+        id: "rfm-005",
+        accountId: "acct-6004",
+        merchant: "ACH Deposit — Meridian Corp",
+        memo: "invoice settlement",
+        amount: 18500.0,
+        timestamp: "2026-02-20T09:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "rfm-006",
+        accountId: "acct-6004",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire — Dubai",
+        amount: 18200.0,
+        timestamp: "2026-02-20T10:30:00Z",
+        cardLast4: "0000",
+        location: "New York, NY",
+        grouped: false,
+      },
+      {
+        id: "rfm-007",
+        accountId: "acct-6004",
+        merchant: "ACH Deposit — Pacific Rim Holdings",
+        memo: "distribution payment",
+        amount: 31000.0,
+        timestamp: "2026-02-22T08:30:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "rfm-008",
+        accountId: "acct-6004",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire — Cayman Islands",
+        amount: 30500.0,
+        timestamp: "2026-02-22T10:00:00Z",
+        cardLast4: "0000",
+        location: "New York, NY",
+        grouped: false,
+      },
+      {
+        id: "rfm-009",
+        accountId: "acct-6004",
+        merchant: "ACH Deposit — Sterling Ventures",
+        memo: "investment return",
+        amount: 25000.0,
+        timestamp: "2026-02-24T09:00:00Z",
+        cardLast4: "0000",
+        location: "ACH Network",
+        grouped: false,
+      },
+      {
+        id: "rfm-010",
+        accountId: "acct-6004",
+        merchant: "WireTransfer Intl",
+        memo: "outgoing wire — Switzerland",
+        amount: 24700.0,
+        timestamp: "2026-02-24T10:15:00Z",
+        cardLast4: "0000",
+        location: "New York, NY",
+        grouped: false,
+      },
     ],
   },
 };
@@ -363,46 +1354,264 @@ function rngFloat(rng: () => number, min: number, max: number): number {
 // ============================================================================
 
 const MERCHANTS: Record<string, readonly string[]> = {
-  retail: ["Target", "Walmart", "Costco", "HomeDepot", "Nordstrom", "TJ Maxx", "Macy's", "Kohl's"],
-  gas: ["Shell Station #12", "BP Gas", "Chevron #88", "QuickStop Fuel", "Valero #5", "Mobil Express"],
+  retail: [
+    "Target",
+    "Walmart",
+    "Costco",
+    "HomeDepot",
+    "Nordstrom",
+    "TJ Maxx",
+    "Macy's",
+    "Kohl's",
+  ],
+  gas: [
+    "Shell Station #12",
+    "BP Gas",
+    "Chevron #88",
+    "QuickStop Fuel",
+    "Valero #5",
+    "Mobil Express",
+  ],
   food: ["Whole Foods", "Trader Joe's", "Kroger", "Safeway", "Publix", "Aldi"],
-  restaurant: ["Olive Garden", "Chipotle", "McDonald's", "Starbucks", "Panera Bread", "Chili's"],
-  electronics: ["Best Buy", "Micro Center", "B&H Photo", "Newegg Online", "Apple Store", "Samsung Direct"],
-  luxury: ["Tiffany & Co", "Louis Vuitton", "Gucci Boutique", "Cartier", "Rolex Boutique", "Hermès"],
-  online: ["Amazon.com", "eBay Inc", "Shopify Store", "Etsy Purchase", "Wish.com", "AliExpress"],
-  travel: ["Delta Airlines", "Marriott Hotels", "Expedia Booking", "Uber Rides", "Hertz Rental", "Airbnb"],
-  atm: ["Chase ATM #401", "Wells Fargo ATM", "BOA ATM #220", "Citibank ATM", "PNC ATM", "TD Bank ATM"],
-  wire: ["WireTransfer Intl", "Western Union", "MoneyGram", "Remitly Transfer", "TransferWise", "Zelle Business"],
-  crypto: ["Coinbase Exchange", "Binance US", "Kraken Trade", "Gemini Exchange", "Bitcoin ATM", "Crypto.com"],
-  gambling: ["DraftKings", "FanDuel", "BetMGM", "PokerStars", "Bovada Online", "Casino Royale"],
-  subscription: ["Netflix", "Spotify", "Adobe Creative", "Microsoft 365", "Hulu", "Disney+"],
-  suspicious: ["Fast Cash LLC", "Offshore Trading Co", "UnknownMerchant", "CashAdvance Express", "Foreign Wire Co", "AnonymousPay"],
+  restaurant: [
+    "Olive Garden",
+    "Chipotle",
+    "McDonald's",
+    "Starbucks",
+    "Panera Bread",
+    "Chili's",
+  ],
+  electronics: [
+    "Best Buy",
+    "Micro Center",
+    "B&H Photo",
+    "Newegg Online",
+    "Apple Store",
+    "Samsung Direct",
+  ],
+  luxury: [
+    "Tiffany & Co",
+    "Louis Vuitton",
+    "Gucci Boutique",
+    "Cartier",
+    "Rolex Boutique",
+    "Hermès",
+  ],
+  online: [
+    "Amazon.com",
+    "eBay Inc",
+    "Shopify Store",
+    "Etsy Purchase",
+    "Wish.com",
+    "AliExpress",
+  ],
+  travel: [
+    "Delta Airlines",
+    "Marriott Hotels",
+    "Expedia Booking",
+    "Uber Rides",
+    "Hertz Rental",
+    "Airbnb",
+  ],
+  atm: [
+    "Chase ATM #401",
+    "Wells Fargo ATM",
+    "BOA ATM #220",
+    "Citibank ATM",
+    "PNC ATM",
+    "TD Bank ATM",
+  ],
+  wire: [
+    "WireTransfer Intl",
+    "Western Union",
+    "MoneyGram",
+    "Remitly Transfer",
+    "TransferWise",
+    "Zelle Business",
+  ],
+  crypto: [
+    "Coinbase Exchange",
+    "Binance US",
+    "Kraken Trade",
+    "Gemini Exchange",
+    "Bitcoin ATM",
+    "Crypto.com",
+  ],
+  gambling: [
+    "DraftKings",
+    "FanDuel",
+    "BetMGM",
+    "PokerStars",
+    "Bovada Online",
+    "Casino Royale",
+  ],
+  subscription: [
+    "Netflix",
+    "Spotify",
+    "Adobe Creative",
+    "Microsoft 365",
+    "Hulu",
+    "Disney+",
+  ],
+  suspicious: [
+    "Fast Cash LLC",
+    "Offshore Trading Co",
+    "UnknownMerchant",
+    "CashAdvance Express",
+    "Foreign Wire Co",
+    "AnonymousPay",
+  ],
 };
 
 const LOCATIONS: Record<string, readonly string[]> = {
-  us_east: ["New York, NY", "Boston, MA", "Miami, FL", "Atlanta, GA", "Philadelphia, PA", "Washington, DC"],
-  us_central: ["Chicago, IL", "Dallas, TX", "Houston, TX", "Nashville, TN", "Minneapolis, MN", "St. Louis, MO"],
-  us_west: ["Los Angeles, CA", "San Francisco, CA", "Seattle, WA", "Portland, OR", "Denver, CO", "Phoenix, AZ"],
-  europe: ["London, UK", "Paris, FR", "Berlin, DE", "Amsterdam, NL", "Zurich, CH", "Rome, IT"],
-  asia: ["Tokyo, JP", "Singapore, SG", "Hong Kong, HK", "Seoul, KR", "Taipei, TW", "Shanghai, CN"],
-  high_risk: ["Lagos, NG", "Kyiv, UA", "Minsk, BY", "Caracas, VE", "Dhaka, BD", "Phnom Penh, KH"],
+  us_east: [
+    "New York, NY",
+    "Boston, MA",
+    "Miami, FL",
+    "Atlanta, GA",
+    "Philadelphia, PA",
+    "Washington, DC",
+  ],
+  us_central: [
+    "Chicago, IL",
+    "Dallas, TX",
+    "Houston, TX",
+    "Nashville, TN",
+    "Minneapolis, MN",
+    "St. Louis, MO",
+  ],
+  us_west: [
+    "Los Angeles, CA",
+    "San Francisco, CA",
+    "Seattle, WA",
+    "Portland, OR",
+    "Denver, CO",
+    "Phoenix, AZ",
+  ],
+  europe: [
+    "London, UK",
+    "Paris, FR",
+    "Berlin, DE",
+    "Amsterdam, NL",
+    "Zurich, CH",
+    "Rome, IT",
+  ],
+  asia: [
+    "Tokyo, JP",
+    "Singapore, SG",
+    "Hong Kong, HK",
+    "Seoul, KR",
+    "Taipei, TW",
+    "Shanghai, CN",
+  ],
+  high_risk: [
+    "Lagos, NG",
+    "Kyiv, UA",
+    "Minsk, BY",
+    "Caracas, VE",
+    "Dhaka, BD",
+    "Phnom Penh, KH",
+  ],
 };
 
 const CLEAN_MEMOS: Record<string, readonly string[]> = {
-  retail: ["in-store purchase", "online order", "returns exchange", "store pickup", "clearance sale"],
-  gas: ["fuel purchase", "fuel + snacks", "premium unleaded", "diesel fill-up", "car wash + fuel"],
-  food: ["weekly groceries", "produce + dairy", "bulk purchase", "organic items", "pantry restock"],
-  restaurant: ["dinner for two", "lunch order", "takeout", "catering order", "breakfast"],
-  electronics: ["laptop purchase", "phone accessories", "TV purchase", "headphones", "tablet order"],
-  luxury: ["jewelry purchase", "designer handbag", "timepiece", "accessories", "gift purchase"],
-  online: ["marketplace order", "digital download", "subscription box", "flash sale", "prime purchase"],
-  travel: ["flight booking", "hotel reservation", "car rental", "ride fare", "vacation package"],
-  atm: ["cash withdrawal", "balance inquiry + withdraw", "max withdrawal", "emergency cash"],
-  wire: ["outgoing wire", "international transfer", "domestic wire", "recurring transfer", "business payment"],
-  crypto: ["BTC purchase", "ETH trade", "crypto deposit", "exchange transfer", "wallet top-up"],
-  gambling: ["sports bet", "casino deposit", "tournament entry", "parlay wager", "daily fantasy"],
-  subscription: ["monthly subscription", "annual renewal", "plan upgrade", "auto-renewal", "premium tier"],
-  suspicious: ["urgent transfer", "business expense", "consulting fee", "investment deposit", "service charge"],
+  retail: [
+    "in-store purchase",
+    "online order",
+    "returns exchange",
+    "store pickup",
+    "clearance sale",
+  ],
+  gas: [
+    "fuel purchase",
+    "fuel + snacks",
+    "premium unleaded",
+    "diesel fill-up",
+    "car wash + fuel",
+  ],
+  food: [
+    "weekly groceries",
+    "produce + dairy",
+    "bulk purchase",
+    "organic items",
+    "pantry restock",
+  ],
+  restaurant: [
+    "dinner for two",
+    "lunch order",
+    "takeout",
+    "catering order",
+    "breakfast",
+  ],
+  electronics: [
+    "laptop purchase",
+    "phone accessories",
+    "TV purchase",
+    "headphones",
+    "tablet order",
+  ],
+  luxury: [
+    "jewelry purchase",
+    "designer handbag",
+    "timepiece",
+    "accessories",
+    "gift purchase",
+  ],
+  online: [
+    "marketplace order",
+    "digital download",
+    "subscription box",
+    "flash sale",
+    "prime purchase",
+  ],
+  travel: [
+    "flight booking",
+    "hotel reservation",
+    "car rental",
+    "ride fare",
+    "vacation package",
+  ],
+  atm: [
+    "cash withdrawal",
+    "balance inquiry + withdraw",
+    "max withdrawal",
+    "emergency cash",
+  ],
+  wire: [
+    "outgoing wire",
+    "international transfer",
+    "domestic wire",
+    "recurring transfer",
+    "business payment",
+  ],
+  crypto: [
+    "BTC purchase",
+    "ETH trade",
+    "crypto deposit",
+    "exchange transfer",
+    "wallet top-up",
+  ],
+  gambling: [
+    "sports bet",
+    "casino deposit",
+    "tournament entry",
+    "parlay wager",
+    "daily fantasy",
+  ],
+  subscription: [
+    "monthly subscription",
+    "annual renewal",
+    "plan upgrade",
+    "auto-renewal",
+    "premium tier",
+  ],
+  suspicious: [
+    "urgent transfer",
+    "business expense",
+    "consulting fee",
+    "investment deposit",
+    "service charge",
+  ],
 };
 
 const PII_TEMPLATES = [
@@ -576,9 +1785,18 @@ interface ScenarioConfig {
   eventCount: number;
   accountCount: number;
   merchantCategories: string[];
-  locationProfile: "single_city" | "single_region" | "multi_region" | "global" | "high_risk_global";
+  locationProfile:
+    | "single_city"
+    | "single_region"
+    | "multi_region"
+    | "global"
+    | "high_risk_global";
   amountRange: { min: number; max: number };
-  amountDistribution: "uniform" | "escalating" | "bimodal" | "small_with_spikes";
+  amountDistribution:
+    | "uniform"
+    | "escalating"
+    | "bimodal"
+    | "small_with_spikes";
   piiDensity: number;
   piiTypes: ("ssn" | "cc" | "bank")[];
   timeSpanHours: number;
@@ -693,7 +1911,11 @@ function generateTimestamp(
       const clusterCount = Math.ceil(total / clusterSize);
       const clusterStart = (clusterIndex / clusterCount) * spanMs;
       const clusterSpan = spanMs * 0.05;
-      const time = baseTime + clusterStart + (withinCluster / clusterSize) * clusterSpan + rngFloat(rng, 0, clusterSpan * 0.2);
+      const time =
+        baseTime +
+        clusterStart +
+        (withinCluster / clusterSize) * clusterSpan +
+        rngFloat(rng, 0, clusterSpan * 0.2);
 
       return new Date(time).toISOString();
     }
@@ -705,29 +1927,40 @@ function generateTimestamp(
       const burstCount = Math.ceil(total / burstSize);
       const burstStart = (burstIndex / burstCount) * spanMs;
       const burstSpan = 5 * 60 * 1000;
-      const time = baseTime + burstStart + (withinBurst / burstSize) * burstSpan + rngFloat(rng, 0, 30000);
+      const time =
+        baseTime +
+        burstStart +
+        (withinBurst / burstSize) * burstSpan +
+        rngFloat(rng, 0, 30000);
 
       return new Date(time).toISOString();
     }
   }
 }
 
-function generateScenario(
-  config: ScenarioConfig,
-): { scenario: Scenario; enrichments: Record<string, EnrichmentSignal[]> } {
+function generateScenario(config: ScenarioConfig): {
+  scenario: Scenario;
+  enrichments: Record<string, EnrichmentSignal[]>;
+} {
   const rng = createRng(config.seed);
-  const abbrev = config.key.split("-").map((w) => w[0]).join("");
+  const abbrev = config.key
+    .split("-")
+    .map((w) => w[0])
+    .join("");
 
-  const accountIds = Array.from({ length: config.accountCount }, (_, i) =>
-    `acct-${config.seed + i + 1}`,
+  const accountIds = Array.from(
+    { length: config.accountCount },
+    (_, i) => `acct-${config.seed + i + 1}`,
   );
 
   const accountCards: Record<string, string[]> = {};
   for (const acctId of accountIds) {
     const cardCount =
-      config.cardPattern === "same_card" ? 1 :
-      config.cardPattern === "few_cards" ? rngInt(rng, 2, 3) :
-      rngInt(rng, 3, 6);
+      config.cardPattern === "same_card"
+        ? 1
+        : config.cardPattern === "few_cards"
+          ? rngInt(rng, 2, 3)
+          : rngInt(rng, 3, 6);
     accountCards[acctId] = Array.from({ length: cardCount }, () =>
       String(rngInt(rng, 1000, 9999)),
     );
@@ -743,17 +1976,35 @@ function generateScenario(
     const merchants = MERCHANTS[category] ?? MERCHANTS.retail;
     const merchant = rngPick(rng, merchants);
     const location = rngPick(rng, locationPool);
-    const amount = generateAmount(rng, config.amountRange, config.amountDistribution, i, config.eventCount);
-    const timestamp = generateTimestamp(rng, baseTime, config.timeSpanHours, config.timePattern, i, config.eventCount);
+    const amount = generateAmount(
+      rng,
+      config.amountRange,
+      config.amountDistribution,
+      i,
+      config.eventCount,
+    );
+    const timestamp = generateTimestamp(
+      rng,
+      baseTime,
+      config.timeSpanHours,
+      config.timePattern,
+      i,
+      config.eventCount,
+    );
 
     const cards = accountCards[acctId];
-    const cardLast4 = config.cardPattern === "many_cards"
-      ? String(rngInt(rng, 1000, 9999))
-      : rngPick(rng, cards);
+    const cardLast4 =
+      config.cardPattern === "many_cards"
+        ? String(rngInt(rng, 1000, 9999))
+        : rngPick(rng, cards);
 
     const memos = CLEAN_MEMOS[category] ?? CLEAN_MEMOS.retail;
     let memo = rngPick(rng, memos);
-    if (config.piiDensity > 0 && rng() < config.piiDensity && config.piiTypes.length > 0) {
+    if (
+      config.piiDensity > 0 &&
+      rng() < config.piiDensity &&
+      config.piiTypes.length > 0
+    ) {
       memo = injectPii(rng, memo, config.piiTypes);
     }
 
@@ -770,14 +2021,24 @@ function generateScenario(
     });
   }
 
-  events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  events.sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
 
   const enrichments: Record<string, EnrichmentSignal[]> = {};
   for (const acctId of accountIds) {
     enrichments[acctId] = generateEnrichment(rng, config.riskProfile);
   }
 
-  return { scenario: { name: config.name, description: config.description, rules: config.rules, events }, enrichments };
+  return {
+    scenario: {
+      name: config.name,
+      description: config.description,
+      rules: config.rules,
+      events,
+    },
+    enrichments,
+  };
 }
 
 // ============================================================================
@@ -788,16 +2049,38 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "synthetic-identity",
     name: "Synthetic Identity",
-    description: "Sixty transactions spread across 12 accounts that were all opened within the same month, shopping at unrelated merchants across multiple regions. The spending patterns are too diverse and too consistent — synthetic identities built from stolen SSNs and fabricated personal details.",
+    description:
+      "Sixty transactions spread across 12 accounts that were all opened within the same month, shopping at unrelated merchants across multiple regions. The spending patterns are too diverse and too consistent — synthetic identities built from stolen SSNs and fabricated personal details.",
     rules: [
-      { name: "Coordinated Account Creation", description: "Multiple accounts opened in the same timeframe with similar patterns", severity: "critical" },
-      { name: "Identity Fabrication", description: "PII combinations that don't match known identity databases", severity: "critical" },
-      { name: "Diverse Merchant Spread", description: "Unusually wide variety of merchant categories for new accounts", severity: "major" },
+      {
+        name: "Coordinated Account Creation",
+        description:
+          "Multiple accounts opened in the same timeframe with similar patterns",
+        severity: "critical",
+      },
+      {
+        name: "Identity Fabrication",
+        description:
+          "PII combinations that don't match known identity databases",
+        severity: "critical",
+      },
+      {
+        name: "Diverse Merchant Spread",
+        description:
+          "Unusually wide variety of merchant categories for new accounts",
+        severity: "major",
+      },
     ],
     seed: 6000,
     eventCount: 60,
     accountCount: 12,
-    merchantCategories: ["retail", "electronics", "online", "subscription", "food"],
+    merchantCategories: [
+      "retail",
+      "electronics",
+      "online",
+      "subscription",
+      "food",
+    ],
     locationProfile: "multi_region",
     amountRange: { min: 50, max: 2000 },
     amountDistribution: "uniform",
@@ -811,11 +2094,26 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "friendly-fraud",
     name: "Friendly Fraud",
-    description: "A customer disputes 35 subscription charges and retail purchases over six accounts, claiming they never authorized any of them. The transactions all used the customer's real card, real device, and real IP address — this is first-party friendly fraud, not unauthorized access.",
+    description:
+      "A customer disputes 35 subscription charges and retail purchases over six accounts, claiming they never authorized any of them. The transactions all used the customer's real card, real device, and real IP address — this is first-party friendly fraud, not unauthorized access.",
     rules: [
-      { name: "First-Party Dispute Pattern", description: "Disputes filed on transactions matching the account holder's known devices", severity: "critical" },
-      { name: "Multi-Account Dispute", description: "Same individual disputing charges across multiple accounts", severity: "major" },
-      { name: "Subscription Abuse", description: "Repeated subscription sign-up and dispute cycles", severity: "minor" },
+      {
+        name: "First-Party Dispute Pattern",
+        description:
+          "Disputes filed on transactions matching the account holder's known devices",
+        severity: "critical",
+      },
+      {
+        name: "Multi-Account Dispute",
+        description:
+          "Same individual disputing charges across multiple accounts",
+        severity: "major",
+      },
+      {
+        name: "Subscription Abuse",
+        description: "Repeated subscription sign-up and dispute cycles",
+        severity: "minor",
+      },
     ],
     seed: 7000,
     eventCount: 35,
@@ -834,12 +2132,32 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "money-laundering",
     name: "Money Laundering",
-    description: "Eighty transactions moving money through 8 accounts via wire transfers, crypto exchanges, and ATM withdrawals. Amounts escalate from $500 to $50,000, hopping between global cities. The layering pattern is textbook anti-money-laundering (AML) territory.",
+    description:
+      "Eighty transactions moving money through 8 accounts via wire transfers, crypto exchanges, and ATM withdrawals. Amounts escalate from $500 to $50,000, hopping between global cities. The layering pattern is textbook anti-money-laundering (AML) territory.",
     rules: [
-      { name: "Layering Pattern", description: "Funds moved through multiple accounts and transaction types to obscure origin", severity: "critical" },
-      { name: "Cross-Border Movement", description: "Transactions spanning multiple countries and jurisdictions", severity: "critical" },
-      { name: "Amount Escalation", description: "Transaction amounts increase significantly over time", severity: "major" },
-      { name: "Crypto Obfuscation", description: "Cryptocurrency exchanges used as intermediate transfer points", severity: "major" },
+      {
+        name: "Layering Pattern",
+        description:
+          "Funds moved through multiple accounts and transaction types to obscure origin",
+        severity: "critical",
+      },
+      {
+        name: "Cross-Border Movement",
+        description:
+          "Transactions spanning multiple countries and jurisdictions",
+        severity: "critical",
+      },
+      {
+        name: "Amount Escalation",
+        description: "Transaction amounts increase significantly over time",
+        severity: "major",
+      },
+      {
+        name: "Crypto Obfuscation",
+        description:
+          "Cryptocurrency exchanges used as intermediate transfer points",
+        severity: "major",
+      },
     ],
     seed: 8000,
     eventCount: 80,
@@ -858,11 +2176,24 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "credential-stuffing",
     name: "Credential Stuffing",
-    description: "One hundred small online purchases burst across 20 accounts in a 4-hour window, each using a different credit card. Automated bots are testing stolen card numbers at scale — the purchases are just validation checks before the real fraud begins.",
+    description:
+      "One hundred small online purchases burst across 20 accounts in a 4-hour window, each using a different credit card. Automated bots are testing stolen card numbers at scale — the purchases are just validation checks before the real fraud begins.",
     rules: [
-      { name: "Automated Burst Pattern", description: "High volume of transactions in a very short time window", severity: "critical" },
-      { name: "Card Number Rotation", description: "Each transaction uses a different card number", severity: "critical" },
-      { name: "Validation Probing", description: "Small amounts consistent with card-testing behavior", severity: "major" },
+      {
+        name: "Automated Burst Pattern",
+        description: "High volume of transactions in a very short time window",
+        severity: "critical",
+      },
+      {
+        name: "Card Number Rotation",
+        description: "Each transaction uses a different card number",
+        severity: "critical",
+      },
+      {
+        name: "Validation Probing",
+        description: "Small amounts consistent with card-testing behavior",
+        severity: "major",
+      },
     ],
     seed: 9000,
     eventCount: 100,
@@ -881,11 +2212,26 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "return-fraud",
     name: "Return Fraud",
-    description: "Forty-five purchases at electronics and retail stores, all on the same card, with suspicious amount spikes between routine buys. The pattern suggests purchasing items specifically to return them for cash or store credit at inflated values.",
+    description:
+      "Forty-five purchases at electronics and retail stores, all on the same card, with suspicious amount spikes between routine buys. The pattern suggests purchasing items specifically to return them for cash or store credit at inflated values.",
     rules: [
-      { name: "Purchase-Return Cycling", description: "Items purchased and returned repeatedly at the same merchants", severity: "critical" },
-      { name: "Amount Spike Pattern", description: "Large purchases interspersed with small routine transactions", severity: "major" },
-      { name: "Single-Card Concentration", description: "All activity on one card across multiple merchants", severity: "minor" },
+      {
+        name: "Purchase-Return Cycling",
+        description:
+          "Items purchased and returned repeatedly at the same merchants",
+        severity: "critical",
+      },
+      {
+        name: "Amount Spike Pattern",
+        description:
+          "Large purchases interspersed with small routine transactions",
+        severity: "major",
+      },
+      {
+        name: "Single-Card Concentration",
+        description: "All activity on one card across multiple merchants",
+        severity: "minor",
+      },
     ],
     seed: 10000,
     eventCount: 45,
@@ -904,12 +2250,31 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "first-party-fraud",
     name: "First-Party Fraud",
-    description: "Fifty transactions across 4 accounts buying luxury goods and making ATM withdrawals, with amounts escalating to $25,000. Forty percent of memos contain PII — SSNs, bank account numbers — suggesting the account holders are intentionally creating a paper trail for a false identity claim.",
+    description:
+      "Fifty transactions across 4 accounts buying luxury goods and making ATM withdrawals, with amounts escalating to $25,000. Forty percent of memos contain PII — SSNs, bank account numbers — suggesting the account holders are intentionally creating a paper trail for a false identity claim.",
     rules: [
-      { name: "Intentional PII Exposure", description: "Unusually high rate of PII in transaction memos (40%+)", severity: "critical" },
-      { name: "Luxury Escalation", description: "Purchases shift from routine items to high-value luxury goods", severity: "major" },
-      { name: "ATM Cash Extraction", description: "Large ATM withdrawals interspersed with card purchases", severity: "major" },
-      { name: "Multi-Account Coordination", description: "Similar patterns across multiple accounts suggesting coordination", severity: "minor" },
+      {
+        name: "Intentional PII Exposure",
+        description: "Unusually high rate of PII in transaction memos (40%+)",
+        severity: "critical",
+      },
+      {
+        name: "Luxury Escalation",
+        description:
+          "Purchases shift from routine items to high-value luxury goods",
+        severity: "major",
+      },
+      {
+        name: "ATM Cash Extraction",
+        description: "Large ATM withdrawals interspersed with card purchases",
+        severity: "major",
+      },
+      {
+        name: "Multi-Account Coordination",
+        description:
+          "Similar patterns across multiple accounts suggesting coordination",
+        severity: "minor",
+      },
     ],
     seed: 11000,
     eventCount: 50,
@@ -928,11 +2293,26 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "geo-anomaly",
     name: "Geographic Anomaly",
-    description: "Forty transactions across 6 accounts showing physically impossible travel — purchases in London, then Tokyo, then S\u00e3o Paulo within hours. The timing and geography don't add up, pointing to cloned cards being used simultaneously across continents.",
+    description:
+      "Forty transactions across 6 accounts showing physically impossible travel — purchases in London, then Tokyo, then S\u00e3o Paulo within hours. The timing and geography don't add up, pointing to cloned cards being used simultaneously across continents.",
     rules: [
-      { name: "Impossible Travel", description: "Transactions in distant cities within physically impossible timeframes", severity: "critical" },
-      { name: "High-Risk Jurisdiction", description: "Transactions originating from flagged geographic regions", severity: "major" },
-      { name: "Simultaneous Multi-Location", description: "Same card used at multiple locations at overlapping times", severity: "major" },
+      {
+        name: "Impossible Travel",
+        description:
+          "Transactions in distant cities within physically impossible timeframes",
+        severity: "critical",
+      },
+      {
+        name: "High-Risk Jurisdiction",
+        description: "Transactions originating from flagged geographic regions",
+        severity: "major",
+      },
+      {
+        name: "Simultaneous Multi-Location",
+        description:
+          "Same card used at multiple locations at overlapping times",
+        severity: "major",
+      },
     ],
     seed: 12000,
     eventCount: 40,
@@ -951,11 +2331,26 @@ const GENERATED_CONFIGS: ScenarioConfig[] = [
   {
     key: "micro-transaction",
     name: "Micro Transaction Probe",
-    description: "Seventy tiny transactions ($0.50\u2013$15) spread across 15 accounts. Individually they look harmless — a coffee here, a parking meter there. But the volume and pattern suggest card-testing probes: verify the card works with a micro-charge before escalating.",
+    description:
+      "Seventy tiny transactions ($0.50\u2013$15) spread across 15 accounts. Individually they look harmless — a coffee here, a parking meter there. But the volume and pattern suggest card-testing probes: verify the card works with a micro-charge before escalating.",
     rules: [
-      { name: "Micro-Amount Pattern", description: "High volume of very small transactions across many accounts", severity: "major" },
-      { name: "Card Testing Indicators", description: "Small charges consistent with automated card validation", severity: "major" },
-      { name: "Low-Risk Camouflage", description: "Transaction types designed to blend with legitimate activity", severity: "minor" },
+      {
+        name: "Micro-Amount Pattern",
+        description:
+          "High volume of very small transactions across many accounts",
+        severity: "major",
+      },
+      {
+        name: "Card Testing Indicators",
+        description: "Small charges consistent with automated card validation",
+        severity: "major",
+      },
+      {
+        name: "Low-Risk Camouflage",
+        description:
+          "Transaction types designed to blend with legitimate activity",
+        severity: "minor",
+      },
     ],
     seed: 13000,
     eventCount: 70,
@@ -982,4 +2377,3 @@ for (const config of GENERATED_CONFIGS) {
   scenarios[config.key] = scenario;
   Object.assign(enrichmentDatabase, enrichments);
 }
-

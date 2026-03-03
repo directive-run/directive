@@ -1,6 +1,6 @@
-import { useDirectiveRef, useSelector, useEvents } from "@directive-run/react";
-import { testModule } from "../../../../shared/test-module";
+import { useDirectiveRef, useEvents, useSelector } from "@directive-run/react";
 import { TestIds } from "../../../../shared/test-ids";
+import { testModule } from "../../../../shared/test-module";
 
 export function UseSelectorDefaultPage() {
   // useDirectiveRef defers start() to useEffect — first render has undefined facts
@@ -16,7 +16,10 @@ export function UseSelectorDefaultPage() {
     <div>
       <span data-testid={TestIds.selectorRefDefault}>{name}</span>
       <span data-testid={TestIds.selectorRefLive}>{count}</span>
-      <button data-testid={TestIds.btnIncrement} onClick={() => events.increment()}>
+      <button
+        data-testid={TestIds.btnIncrement}
+        onClick={() => events.increment()}
+      >
         inc
       </button>
     </div>

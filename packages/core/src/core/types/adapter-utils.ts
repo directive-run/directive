@@ -7,11 +7,11 @@
  * - Plugin factory helpers
  */
 
-import type { Schema, InferSchema } from "./schema.js";
 import type { Facts } from "./facts.js";
-import type { Requirement, ConstraintDef } from "./requirements.js";
-import type { ResolverDef, ResolverContext } from "./resolvers.js";
 import type { Plugin } from "./plugins.js";
+import type { ConstraintDef, Requirement } from "./requirements.js";
+import type { ResolverContext, ResolverDef } from "./resolvers.js";
+import type { InferSchema, Schema } from "./schema.js";
 
 // ============================================================================
 // Schema Composition Types
@@ -27,10 +27,8 @@ import type { Plugin } from "./plugins.js";
  * type Combined = MergedSchema<UserSchema, BridgeFields>;
  * ```
  */
-export type MergedSchema<
-	Base extends Schema,
-	Extra extends Schema,
-> = Base & Extra;
+export type MergedSchema<Base extends Schema, Extra extends Schema> = Base &
+  Extra;
 
 /**
  * Create a schema type from a fields definition.
@@ -61,7 +59,7 @@ export type BridgeSchema<Fields extends Schema> = Fields;
  * ```
  */
 export function createBridgeSchema<S extends Schema>(schema: S): S {
-	return schema;
+  return schema;
 }
 
 // ============================================================================
@@ -78,11 +76,11 @@ export function createBridgeSchema<S extends Schema>(schema: S): S {
  * ```
  */
 export function setFact<S extends Schema, K extends keyof InferSchema<S>>(
-	facts: Facts<S>,
-	key: K,
-	value: InferSchema<S>[K],
+  facts: Facts<S>,
+  key: K,
+  value: InferSchema<S>[K],
 ): void {
-	(facts as Record<string, unknown>)[key as string] = value;
+  (facts as Record<string, unknown>)[key as string] = value;
 }
 
 /**
@@ -95,11 +93,11 @@ export function setFact<S extends Schema, K extends keyof InferSchema<S>>(
  * ```
  */
 export function setBridgeFact<V>(
-	facts: Facts<Schema>,
-	key: string,
-	value: V,
+  facts: Facts<Schema>,
+  key: string,
+  value: V,
 ): void {
-	(facts as Record<string, unknown>)[key] = value;
+  (facts as Record<string, unknown>)[key] = value;
 }
 
 /**
@@ -111,11 +109,8 @@ export function setBridgeFact<V>(
  * const state = getBridgeFact<MyState>(facts, "__adapterState");
  * ```
  */
-export function getBridgeFact<V>(
-	facts: Facts<Schema>,
-	key: string,
-): V {
-	return (facts as Record<string, unknown>)[key] as V;
+export function getBridgeFact<V>(facts: Facts<Schema>, key: string): V {
+  return (facts as Record<string, unknown>)[key] as V;
 }
 
 // ============================================================================
@@ -126,9 +121,9 @@ export function getBridgeFact<V>(
  * Adapter constraint definition (generic form used by adapters).
  */
 export interface AdapterConstraint<TState> {
-	when: (state: TState) => boolean | Promise<boolean>;
-	require: Requirement | ((state: TState) => Requirement | null);
-	priority?: number;
+  when: (state: TState) => boolean | Promise<boolean>;
+  require: Requirement | ((state: TState) => Requirement | null);
+  priority?: number;
 }
 
 /**
@@ -148,25 +143,26 @@ export interface AdapterConstraint<TState> {
  * ```
  */
 export function convertConstraints<TState, S extends Schema>(
-	constraints: Record<string, AdapterConstraint<TState>>,
-	extractState: (facts: Facts<S>) => TState,
+  constraints: Record<string, AdapterConstraint<TState>>,
+  extractState: (facts: Facts<S>) => TState,
 ): Record<string, ConstraintDef<S, Requirement>> {
-	const result: Record<string, ConstraintDef<S, Requirement>> = {};
+  const result: Record<string, ConstraintDef<S, Requirement>> = {};
 
-	for (const [id, constraint] of Object.entries(constraints)) {
-		result[id] = {
-			priority: constraint.priority ?? 0,
-			when: (facts) => constraint.when(extractState(facts)),
-			require: (facts) => {
-				const req = typeof constraint.require === "function"
-					? constraint.require(extractState(facts))
-					: constraint.require;
-				return req;
-			},
-		};
-	}
+  for (const [id, constraint] of Object.entries(constraints)) {
+    result[id] = {
+      priority: constraint.priority ?? 0,
+      when: (facts) => constraint.when(extractState(facts)),
+      require: (facts) => {
+        const req =
+          typeof constraint.require === "function"
+            ? constraint.require(extractState(facts))
+            : constraint.require;
+        return req;
+      },
+    };
+  }
 
-	return result;
+  return result;
 }
 
 // ============================================================================
@@ -177,17 +173,23 @@ export function convertConstraints<TState, S extends Schema>(
  * Adapter resolver context (generic form used by adapters).
  */
 export interface AdapterResolverContext<TContext> {
-	context: TContext;
-	signal: AbortSignal;
+  context: TContext;
+  signal: AbortSignal;
 }
 
 /**
  * Adapter resolver definition (generic form used by adapters).
  */
-export interface AdapterResolver<TContext, R extends Requirement = Requirement> {
-	requirement: (req: Requirement) => req is R;
-	key?: (req: R) => string;
-	resolve: (req: R, ctx: AdapterResolverContext<TContext>) => void | Promise<void>;
+export interface AdapterResolver<
+  TContext,
+  R extends Requirement = Requirement,
+> {
+  requirement: (req: Requirement) => req is R;
+  key?: (req: R) => string;
+  resolve: (
+    req: R,
+    ctx: AdapterResolverContext<TContext>,
+  ) => void | Promise<void>;
 }
 
 /**
@@ -211,23 +213,26 @@ export interface AdapterResolver<TContext, R extends Requirement = Requirement> 
  * ```
  */
 export function convertResolvers<TContext, S extends Schema>(
-	resolvers: Record<string, AdapterResolver<TContext, Requirement>>,
-	createContext: (ctx: ResolverContext<S>) => TContext,
+  resolvers: Record<string, AdapterResolver<TContext, Requirement>>,
+  createContext: (ctx: ResolverContext<S>) => TContext,
 ): Record<string, ResolverDef<S, Requirement>> {
-	const result: Record<string, ResolverDef<S, Requirement>> = {};
+  const result: Record<string, ResolverDef<S, Requirement>> = {};
 
-	for (const [id, resolver] of Object.entries(resolvers)) {
-		result[id] = {
-			requirement: resolver.requirement,
-			key: resolver.key,
-			resolve: async (req, ctx) => {
-				const adapterCtx = createContext(ctx);
-				await resolver.resolve(req, { context: adapterCtx, signal: ctx.signal });
-			},
-		};
-	}
+  for (const [id, resolver] of Object.entries(resolvers)) {
+    result[id] = {
+      requirement: resolver.requirement,
+      key: resolver.key,
+      resolve: async (req, ctx) => {
+        const adapterCtx = createContext(ctx);
+        await resolver.resolve(req, {
+          context: adapterCtx,
+          signal: ctx.signal,
+        });
+      },
+    };
+  }
 
-	return result;
+  return result;
 }
 
 // ============================================================================
@@ -238,9 +243,9 @@ export function convertResolvers<TContext, S extends Schema>(
  * Callback definitions for adapter plugins.
  */
 export interface AdapterCallbacks {
-	onRequirementCreated?: (req: Requirement) => void;
-	onRequirementResolved?: (req: Requirement) => void;
-	onError?: (error: Error) => void;
+  onRequirementCreated?: (req: Requirement) => void;
+  onRequirementResolved?: (req: Requirement) => void;
+  onError?: (error: Error) => void;
 }
 
 /**
@@ -260,19 +265,19 @@ export interface AdapterCallbacks {
  */
 // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema type
 export function createCallbackPlugin(
-	name: string,
-	callbacks: AdapterCallbacks,
+  name: string,
+  callbacks: AdapterCallbacks,
 ): Plugin<any> {
-	return {
-		name,
-		onRequirementCreated: callbacks.onRequirementCreated
-			? (req) => callbacks.onRequirementCreated!(req.requirement)
-			: undefined,
-		onRequirementMet: callbacks.onRequirementResolved
-			? (req) => callbacks.onRequirementResolved!(req.requirement)
-			: undefined,
-		onError: callbacks.onError,
-	};
+  return {
+    name,
+    onRequirementCreated: callbacks.onRequirementCreated
+      ? (req) => callbacks.onRequirementCreated!(req.requirement)
+      : undefined,
+    onRequirementMet: callbacks.onRequirementResolved
+      ? (req) => callbacks.onRequirementResolved!(req.requirement)
+      : undefined,
+    onError: callbacks.onError,
+  };
 }
 
 // ============================================================================
@@ -284,9 +289,9 @@ export function createCallbackPlugin(
  * Use this when TypeScript can't infer the constraint types correctly.
  */
 export function asConstraints<S extends Schema>(
-	constraints: Record<string, ConstraintDef<S, Requirement>>,
+  constraints: Record<string, ConstraintDef<S, Requirement>>,
 ): Record<string, ConstraintDef<S, Requirement>> {
-	return constraints;
+  return constraints;
 }
 
 /**
@@ -294,9 +299,9 @@ export function asConstraints<S extends Schema>(
  * Use this when TypeScript can't infer the resolver types correctly.
  */
 export function asResolvers<S extends Schema>(
-	resolvers: Record<string, ResolverDef<S, Requirement>>,
+  resolvers: Record<string, ResolverDef<S, Requirement>>,
 ): Record<string, ResolverDef<S, Requirement>> {
-	return resolvers;
+  return resolvers;
 }
 
 // ============================================================================
@@ -315,9 +320,9 @@ export function asResolvers<S extends Schema>(
  * ```
  */
 export function requirementGuard<R extends Requirement>(
-	type: R["type"],
+  type: R["type"],
 ): (req: Requirement) => req is R {
-	return (req): req is R => req.type === type;
+  return (req): req is R => req.type === type;
 }
 
 /**
@@ -329,8 +334,8 @@ export function requirementGuard<R extends Requirement>(
  * ```
  */
 export function requirementGuardMultiple<R extends Requirement>(
-	types: Array<R["type"]>,
+  types: Array<R["type"]>,
 ): (req: Requirement) => req is R {
-	const typeSet = new Set(types);
-	return (req): req is R => typeSet.has(req.type);
+  const typeSet = new Set(types);
+  return (req): req is R => typeSet.has(req.type);
 }

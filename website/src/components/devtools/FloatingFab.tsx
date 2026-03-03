@@ -1,75 +1,89 @@
-'use client'
+"use client";
 
-import { useEffect, useMemo, useState } from 'react'
-import { useSelector } from '@directive-run/react'
-import { useCanUseChat } from '@/lib/feature-flags'
-import { useDevToolsSystem } from './DevToolsSystemContext'
-import { DirectiveLogomark } from './DirectiveLogomark'
-import { Z_FAB } from './z-index'
-import type { ConnectionStatus } from './types'
+import { useCanUseChat } from "@/lib/feature-flags";
+import { useSelector } from "@directive-run/react";
+import { useEffect, useMemo, useState } from "react";
+import { useDevToolsSystem } from "./DevToolsSystemContext";
+import { DirectiveLogomark } from "./DirectiveLogomark";
+import type { ConnectionStatus } from "./types";
+import { Z_FAB } from "./z-index";
 
-const FAB_SEEN_KEY = 'directive-devtools-fab-seen'
+const FAB_SEEN_KEY = "directive-devtools-fab-seen";
 
 interface FloatingFabProps {
-  offset?: { bottom?: number; right?: number }
+  offset?: { bottom?: number; right?: number };
 }
 
 export function FloatingFab({ offset }: FloatingFabProps) {
-  const system = useDevToolsSystem()
-  const drawerOpen = useSelector(system, (s) => s.facts.shell.drawerOpen)
-  const aiStatus = useSelector(system, (s) => s.facts.connection.status) as ConnectionStatus
-  const aiEnabled = useSelector(system, (s) => s.facts.connection.aiEnabled) as boolean
-  const runtimeConnected = useSelector(system, (s) => s.facts.runtime.connected)
+  const system = useDevToolsSystem();
+  const drawerOpen = useSelector(system, (s) => s.facts.shell.drawerOpen);
+  const aiStatus = useSelector(
+    system,
+    (s) => s.facts.connection.status,
+  ) as ConnectionStatus;
+  const aiEnabled = useSelector(
+    system,
+    (s) => s.facts.connection.aiEnabled,
+  ) as boolean;
+  const runtimeConnected = useSelector(
+    system,
+    (s) => s.facts.runtime.connected,
+  );
 
   // All hooks MUST be called before any conditional returns
   const shortcutHint = useMemo(() => {
-    if (typeof navigator === 'undefined') {
-      return 'Ctrl+Shift+D'
+    if (typeof navigator === "undefined") {
+      return "Ctrl+Shift+D";
     }
 
-    return navigator.platform?.includes('Mac') ? 'Cmd+Shift+D' : 'Ctrl+Shift+D'
-  }, [])
+    return navigator.platform?.includes("Mac") ? "Cmd+Shift+D" : "Ctrl+Shift+D";
+  }, []);
 
   // First-visit pulse hint — show once per browser
-  const [showPulse, setShowPulse] = useState(false)
+  const [showPulse, setShowPulse] = useState(false);
   useEffect(() => {
     try {
       if (!localStorage.getItem(FAB_SEEN_KEY)) {
-        setShowPulse(true)
-        localStorage.setItem(FAB_SEEN_KEY, '1')
-        const timer = setTimeout(() => setShowPulse(false), 4000)
+        setShowPulse(true);
+        localStorage.setItem(FAB_SEEN_KEY, "1");
+        const timer = setTimeout(() => setShowPulse(false), 4000);
 
-        return () => clearTimeout(timer)
+        return () => clearTimeout(timer);
       }
     } catch {
       // localStorage unavailable (SSR, private mode)
     }
-  }, [])
+  }, []);
 
-  const canUseChat = useCanUseChat()
+  const canUseChat = useCanUseChat();
 
   // Hide FAB when drawer is open — after all hooks
   if (drawerOpen) {
-    return null
+    return null;
   }
 
-  const isConnected = runtimeConnected || (aiEnabled && aiStatus === 'connected')
-  const isConnecting = aiEnabled && aiStatus === 'connecting'
+  const isConnected =
+    runtimeConnected || (aiEnabled && aiStatus === "connected");
+  const isConnecting = aiEnabled && aiStatus === "connecting";
 
   const badgeClass = isConnected
-    ? 'bg-emerald-500'
+    ? "bg-emerald-500"
     : isConnecting
-      ? 'bg-amber-500 animate-pulse'
-      : 'bg-zinc-500'
+      ? "bg-amber-500 animate-pulse"
+      : "bg-zinc-500";
 
-  const statusLabel = isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'
+  const statusLabel = isConnected
+    ? "Connected"
+    : isConnecting
+      ? "Connecting"
+      : "Disconnected";
 
   // Chat button: h-14 (56px) at bottom-6 (24px). Add 12px gap.
-  const chatOffset = canUseChat ? 24 + 56 + 12 : 0
+  const chatOffset = canUseChat ? 24 + 56 + 12 : 0;
 
   // Next.js dev indicator sits at bottom-left — bump FAB up to avoid overlap
-  const isDev = process.env.NODE_ENV === 'development'
-  const defaultBottom = Math.max(isDev ? 72 : 24, chatOffset)
+  const isDev = process.env.NODE_ENV === "development";
+  const defaultBottom = Math.max(isDev ? 72 : 24, chatOffset);
 
   return (
     <button
@@ -96,9 +110,9 @@ export function FloatingFab({ offset }: FloatingFabProps) {
         <span
           className="absolute inset-0 animate-ping rounded-full bg-brand-primary-400 opacity-75"
           aria-hidden="true"
-          style={{ animationDuration: '1.5s', animationIterationCount: 3 }}
+          style={{ animationDuration: "1.5s", animationIterationCount: 3 }}
         />
       )}
     </button>
-  )
+  );
 }

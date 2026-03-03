@@ -4,45 +4,50 @@
  * Extracted so the debug timeline can be read by the DevTools SSE stream
  * without coupling the chat route to the DevTools routes.
  */
-import path from 'node:path'
+import path from "node:path";
 import {
-  createAgentOrchestrator,
+  type AgentLike,
+  type InputGuardrailData,
+  type NamedGuardrail,
+  type OutputGuardrailData,
   createAgentMemory,
+  createAgentOrchestrator,
+  createEnhancedPIIGuardrail,
+  createJSONFileStore,
+  createLengthGuardrail,
+  createPromptInjectionGuardrail,
+  createRAGEnricher,
+  createSSETransport,
   createSlidingWindowStrategy,
   createStreamingRunner,
-  createPromptInjectionGuardrail,
-  createEnhancedPIIGuardrail,
-  createRAGEnricher,
-  createJSONFileStore,
-  createSSETransport,
-  createLengthGuardrail,
-  withRetry,
-  withFallback,
   withBudget,
-  type AgentLike,
-  type RunResult,
-  type NamedGuardrail,
-  type InputGuardrailData,
-  type OutputGuardrailData,
-} from '@directive-run/ai'
-import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directive-run/ai/anthropic'
-import { createOpenAIRunner, createOpenAIEmbedder } from '@directive-run/ai/openai'
-import { createSystem } from '@directive-run/core'
-import { createCircuitBreaker } from '@directive-run/core/plugins'
-import { docsChatbot, MAX_REQUESTS_PER_WINDOW } from './module'
+  withFallback,
+  withRetry,
+} from "@directive-run/ai";
+import {
+  createAnthropicRunner,
+  createAnthropicStreamingRunner,
+} from "@directive-run/ai/anthropic";
+import {
+  createOpenAIEmbedder,
+  createOpenAIRunner,
+} from "@directive-run/ai/openai";
+import { createSystem } from "@directive-run/core";
+import { createCircuitBreaker } from "@directive-run/core/plugins";
+import { MAX_REQUESTS_PER_WINDOW, docsChatbot } from "./module";
 
 // ---------------------------------------------------------------------------
 // Re-exports (used by route.ts)
 // ---------------------------------------------------------------------------
 
-export { MAX_REQUESTS_PER_WINDOW }
+export { MAX_REQUESTS_PER_WINDOW };
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_RESPONSE_CHARS = 3_000
-const MAX_HISTORY_MESSAGES = 20
+const MAX_RESPONSE_CHARS = 3_000;
+const MAX_HISTORY_MESSAGES = 20;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,7 +55,11 @@ const MAX_HISTORY_MESSAGES = 20
 
 /** Streamable wrapper that adapts orchestrator + streaming runner for SSE transport */
 export interface Streamable {
-  stream(agentId: string, input: string, opts?: { signal?: AbortSignal }): AsyncIterable<string> & { result: Promise<unknown>; abort(): void }
+  stream(
+    agentId: string,
+    input: string,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<string> & { result: Promise<unknown>; abort(): void };
 }
 
 // ---------------------------------------------------------------------------
@@ -58,22 +67,24 @@ export interface Streamable {
 // Persisted on globalThis to survive HMR re-evaluations.
 // ---------------------------------------------------------------------------
 
-const SYSTEM_KEY = '__directive_chatbot_system' as const
+const SYSTEM_KEY = "__directive_chatbot_system" as const;
 
 function initChatbotSystem() {
-  const sys = createSystem({ module: docsChatbot })
-  sys.start()
+  const sys = createSystem({ module: docsChatbot });
+  sys.start();
 
-  return sys
+  return sys;
 }
 
-const gs = globalThis as typeof globalThis & { [SYSTEM_KEY]?: ReturnType<typeof initChatbotSystem> }
+const gs = globalThis as typeof globalThis & {
+  [SYSTEM_KEY]?: ReturnType<typeof initChatbotSystem>;
+};
 
 if (!gs[SYSTEM_KEY]) {
-  gs[SYSTEM_KEY] = initChatbotSystem()
+  gs[SYSTEM_KEY] = initChatbotSystem();
 }
 
-export const chatbotSystem = gs[SYSTEM_KEY]
+export const chatbotSystem = gs[SYSTEM_KEY];
 
 // ---------------------------------------------------------------------------
 // System Prompt
@@ -143,39 +154,43 @@ const mod = createModule("moduleName", {
 - \`req\` is the requirement object (not "request"). Never abbreviate \`context\` to \`ctx\`
 - context.facts is mutable; context.signal is an AbortSignal
 - Effects have a \`run(facts, prev)\` method — they fire on fact changes, NOT on resolver completion
-- In multi-module systems, the namespace separator is \`::\` (e.g. \`system.dispatch({ type: "auth::login" })\`)`
+- In multi-module systems, the namespace separator is \`::\` (e.g. \`system.dispatch({ type: "auth::login" })\`)`;
 
 // ---------------------------------------------------------------------------
 // RAG Enricher (singleton)
 // ---------------------------------------------------------------------------
 
-let enricherInstance: ReturnType<typeof createRAGEnricher> | null = null
-let enricherInitPromise: Promise<ReturnType<typeof createRAGEnricher> | null> | null = null
+let enricherInstance: ReturnType<typeof createRAGEnricher> | null = null;
+let enricherInitPromise: Promise<ReturnType<
+  typeof createRAGEnricher
+> | null> | null = null;
 
-export function getEnricher(): Promise<ReturnType<typeof createRAGEnricher> | null> {
-  if (enricherInstance) return Promise.resolve(enricherInstance)
-  if (enricherInitPromise) return enricherInitPromise
+export function getEnricher(): Promise<ReturnType<
+  typeof createRAGEnricher
+> | null> {
+  if (enricherInstance) return Promise.resolve(enricherInstance);
+  if (enricherInitPromise) return enricherInitPromise;
 
-  const openaiKey = process.env.OPENAI_API_KEY
-  if (!openaiKey) return Promise.resolve(null)
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return Promise.resolve(null);
 
   enricherInitPromise = (async () => {
     enricherInstance = createRAGEnricher({
       embedder: createOpenAIEmbedder({ apiKey: openaiKey }),
       storage: createJSONFileStore({
-        filePath: path.join(process.cwd(), 'public', 'embeddings.json'),
+        filePath: path.join(process.cwd(), "public", "embeddings.json"),
       }),
       onError: (err) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[chat] RAG enrichment failed:', err)
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[chat] RAG enrichment failed:", err);
         }
       },
-    })
+    });
 
-    return enricherInstance
-  })()
+    return enricherInstance;
+  })();
 
-  return enricherInitPromise
+  return enricherInitPromise;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,9 +201,9 @@ export const transport = createSSETransport({
   maxResponseChars: MAX_RESPONSE_CHARS,
   errorMessages: {
     INPUT_GUARDRAIL_FAILED:
-      'Your message was flagged by our safety filter. Please rephrase your question.',
+      "Your message was flagged by our safety filter. Please rephrase your question.",
   },
-})
+});
 
 // ---------------------------------------------------------------------------
 // Directive Agent Orchestrator (singleton)
@@ -198,94 +213,128 @@ export const transport = createSSETransport({
 // each hold their own (disconnected) orchestrator instance.
 // ---------------------------------------------------------------------------
 
-type OrchestratorInstance = { orchestrator: ReturnType<typeof createAgentOrchestrator>; streamable: Streamable; memory: ReturnType<typeof createAgentMemory> }
+type OrchestratorInstance = {
+  orchestrator: ReturnType<typeof createAgentOrchestrator>;
+  streamable: Streamable;
+  memory: ReturnType<typeof createAgentMemory>;
+};
 
-const GLOBAL_KEY = '__directive_orchestrator' as const
-const g = globalThis as typeof globalThis & { [GLOBAL_KEY]?: OrchestratorInstance }
+const GLOBAL_KEY = "__directive_orchestrator" as const;
+const g = globalThis as typeof globalThis & {
+  [GLOBAL_KEY]?: OrchestratorInstance;
+};
 
 export function getOrchestrator() {
-  if (g[GLOBAL_KEY]) return g[GLOBAL_KEY]
+  if (g[GLOBAL_KEY]) return g[GLOBAL_KEY];
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY
-  if (!anthropicKey) return null
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return null;
 
   let runner = createAnthropicRunner({
     apiKey: anthropicKey,
-    model: 'claude-haiku-4-5-20251001',
+    model: "claude-haiku-4-5-20251001",
     maxTokens: 2000,
-  })
+  });
 
   const streamingCallbackRunner = createAnthropicStreamingRunner({
     apiKey: anthropicKey,
-    model: 'claude-haiku-4-5-20251001',
+    model: "claude-haiku-4-5-20251001",
     maxTokens: 2000,
-  })
+  });
 
   // OpenAI fallback runner (only created if API key is available)
-  const openaiKey = process.env.OPENAI_API_KEY
+  const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
-    const fallbackRunner = createOpenAIRunner({ apiKey: openaiKey, model: 'gpt-4o-mini' })
-    runner = withFallback([runner, fallbackRunner])
+    const fallbackRunner = createOpenAIRunner({
+      apiKey: openaiKey,
+      model: "gpt-4o-mini",
+    });
+    runner = withFallback([runner, fallbackRunner]);
   }
 
   // Intelligent retry – retries 429/503, skips 400/401/403
-  runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 })
+  runner = withRetry(runner, {
+    maxRetries: 2,
+    baseDelayMs: 1_000,
+    maxDelayMs: 10_000,
+  });
 
   // Claude Haiku 4.5 pricing (per million tokens)
-  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 };
 
   // Cost budget – cap hourly spend at $5 using Haiku pricing
   runner = withBudget(runner, {
     budgets: [
-      { window: 'hour' as const, maxCost: 5.00, pricing: haikuPricing },
-      { window: 'day' as const, maxCost: 50.00, pricing: haikuPricing },
+      { window: "hour" as const, maxCost: 5.0, pricing: haikuPricing },
+      { window: "day" as const, maxCost: 50.0, pricing: haikuPricing },
     ],
-  })
+  });
 
   // Rate limiter as input guardrail
-  const rateLimitTimestamps: number[] = []
-  let rateLimitStartIdx = 0
-  const MAX_PER_MINUTE = 30
+  const rateLimitTimestamps: number[] = [];
+  let rateLimitStartIdx = 0;
+  const MAX_PER_MINUTE = 30;
 
   const rateLimitGuardrail: NamedGuardrail<InputGuardrailData> = {
-    name: 'rate-limit',
+    name: "rate-limit",
     fn: () => {
-      const now = Date.now()
-      const windowStart = now - 60_000
-      while (rateLimitStartIdx < rateLimitTimestamps.length && rateLimitTimestamps[rateLimitStartIdx]! < windowStart) {
-        rateLimitStartIdx++
+      const now = Date.now();
+      const windowStart = now - 60_000;
+      while (
+        rateLimitStartIdx < rateLimitTimestamps.length &&
+        rateLimitTimestamps[rateLimitStartIdx]! < windowStart
+      ) {
+        rateLimitStartIdx++;
       }
-      if (rateLimitStartIdx > rateLimitTimestamps.length / 2 && rateLimitStartIdx > 100) {
-        rateLimitTimestamps.splice(0, rateLimitStartIdx)
-        rateLimitStartIdx = 0
+      if (
+        rateLimitStartIdx > rateLimitTimestamps.length / 2 &&
+        rateLimitStartIdx > 100
+      ) {
+        rateLimitTimestamps.splice(0, rateLimitStartIdx);
+        rateLimitStartIdx = 0;
       }
-      const active = rateLimitTimestamps.length - rateLimitStartIdx
+      const active = rateLimitTimestamps.length - rateLimitStartIdx;
       if (active >= MAX_PER_MINUTE) {
-        return { passed: false, reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)` }
+        return {
+          passed: false,
+          reason: `Rate limit exceeded (${MAX_PER_MINUTE}/min)`,
+        };
       }
-      rateLimitTimestamps.push(now)
+      rateLimitTimestamps.push(now);
 
-      return { passed: true }
+      return { passed: true };
     },
-  }
+  };
 
   const memory = createAgentMemory({
     strategy: createSlidingWindowStrategy(),
-    strategyConfig: { maxMessages: MAX_HISTORY_MESSAGES, preserveRecentCount: 6 },
+    strategyConfig: {
+      maxMessages: MAX_HISTORY_MESSAGES,
+      preserveRecentCount: 6,
+    },
     autoManage: true,
-  })
+  });
 
-  const cb = createCircuitBreaker({ failureThreshold: 3, recoveryTimeMs: 30_000 })
+  const cb = createCircuitBreaker({
+    failureThreshold: 3,
+    recoveryTimeMs: 30_000,
+  });
 
   const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [
     rateLimitGuardrail,
-    { name: 'prompt-injection', fn: createPromptInjectionGuardrail({ strictMode: true }) },
-    { name: 'pii-detection', fn: createEnhancedPIIGuardrail({ redact: true }) },
-  ]
+    {
+      name: "prompt-injection",
+      fn: createPromptInjectionGuardrail({ strictMode: true }),
+    },
+    { name: "pii-detection", fn: createEnhancedPIIGuardrail({ redact: true }) },
+  ];
 
   const outputGuardrails: NamedGuardrail<OutputGuardrailData>[] = [
-    { name: 'length', fn: createLengthGuardrail({ maxCharacters: MAX_RESPONSE_CHARS }) },
-  ]
+    {
+      name: "length",
+      fn: createLengthGuardrail({ maxCharacters: MAX_RESPONSE_CHARS }),
+    },
+  ];
 
   const orchestrator = createAgentOrchestrator({
     runner,
@@ -299,77 +348,87 @@ export function getOrchestrator() {
     },
     hooks: {
       onAgentComplete: ({ tokenUsage }) => {
-        chatbotSystem.events.requestCompleted({ tokens: tokenUsage })
+        chatbotSystem.events.requestCompleted({ tokens: tokenUsage });
       },
       onAgentError: () => {
-        chatbotSystem.events.requestFailed()
+        chatbotSystem.events.requestFailed();
       },
       // Guardrail events are recorded directly in the streamable adapter
       // (since the streaming path bypasses orchestrator.run()).
     },
-  })
+  });
 
-  const streamRunner = createStreamingRunner(streamingCallbackRunner)
+  const streamRunner = createStreamingRunner(streamingCallbackRunner);
 
   const docsAgent: AgentLike = {
-    name: 'directive-docs-qa',
-    model: 'claude-haiku-4-5-20251001',
+    name: "directive-docs-qa",
+    model: "claude-haiku-4-5-20251001",
     instructions: BASE_INSTRUCTIONS,
-  }
+  };
 
   // Streamable adapter for SSE transport.
   // Uses the raw streaming runner for per-token streaming, but records
   // timeline events manually so the DevTools showcase works.
   const streamable: Streamable = {
     stream(_agentId: string, input: string, opts?: { signal?: AbortSignal }) {
-      const tl = orchestrator.timeline
-      const startTime = Date.now()
+      const tl = orchestrator.timeline;
+      const startTime = Date.now();
 
       // Run input guardrails BEFORE agent_start so timeline shows correct order.
       // Sync guardrails enforce (block on fail, apply transforms).
       // Async guardrails record timeline events when resolved.
-      let processedInput = input
-      let blocked: { guardrailName: string; reason?: string } | null = null
+      let processedInput = input;
+      let blocked: { guardrailName: string; reason?: string } | null = null;
 
       for (const guardrail of inputGuardrails) {
-        const gStart = Date.now()
+        const gStart = Date.now();
         try {
           const res = guardrail.fn(
             { input: processedInput, agentName: docsAgent.name },
             { agentName: docsAgent.name, input: processedInput, facts: {} },
-          )
+          );
 
-          const recordCheck = (result: { passed: boolean; reason?: string; transformed?: unknown }) => {
+          const recordCheck = (result: {
+            passed: boolean;
+            reason?: string;
+            transformed?: unknown;
+          }) => {
             if (tl) {
               tl.record({
-                type: 'guardrail_check',
+                type: "guardrail_check",
                 timestamp: gStart,
                 snapshotId: null,
                 guardrailName: guardrail.name,
-                guardrailType: 'input',
+                guardrailType: "input",
                 passed: result.passed,
                 reason: result.reason,
                 durationMs: Date.now() - gStart,
-              })
+              });
             }
-          }
+          };
 
           if (res instanceof Promise) {
-            res.then((result) => {
-              if (result && typeof result === 'object' && 'passed' in result) {
-                recordCheck(result)
-              }
-            }).catch(() => {
-              // Don't block streaming on async guardrail errors
-            })
-          } else if (res && typeof res === 'object' && 'passed' in res) {
-            recordCheck(res)
+            res
+              .then((result) => {
+                if (
+                  result &&
+                  typeof result === "object" &&
+                  "passed" in result
+                ) {
+                  recordCheck(result);
+                }
+              })
+              .catch(() => {
+                // Don't block streaming on async guardrail errors
+              });
+          } else if (res && typeof res === "object" && "passed" in res) {
+            recordCheck(res);
             if (!res.passed) {
-              blocked = { guardrailName: guardrail.name, reason: res.reason }
-              break
+              blocked = { guardrailName: guardrail.name, reason: res.reason };
+              break;
             }
             if ((res as { transformed?: unknown }).transformed !== undefined) {
-              processedInput = (res as { transformed: string }).transformed
+              processedInput = (res as { transformed: string }).transformed;
             }
           }
         } catch {
@@ -379,89 +438,111 @@ export function getOrchestrator() {
 
       // If a sync guardrail blocked, return an error stream instead of calling the LLM
       if (blocked) {
-        const errorMessage = 'Your message was flagged by our safety filter. Please rephrase your question.'
+        const errorMessage =
+          "Your message was flagged by our safety filter. Please rephrase your question.";
         async function* errorStream() {
-          yield errorMessage
+          yield errorMessage;
         }
         const errorResult = Promise.resolve({
           output: errorMessage,
           messages: [],
           totalTokens: 0,
           tokenUsage: { inputTokens: 0, outputTokens: 0 },
-        })
+        });
 
         return Object.assign(errorStream(), {
           result: errorResult,
           abort() {},
-        })
+        });
       }
 
       // Record agent_start (after guardrails pass)
       if (tl) {
         tl.record({
-          type: 'agent_start',
+          type: "agent_start",
           timestamp: Date.now(),
           snapshotId: null,
           agentId: docsAgent.name,
-          modelId: 'claude-haiku-4-5',
+          modelId: "claude-haiku-4-5",
           inputLength: processedInput.length,
-        })
+        });
       }
 
-      const { stream, result: rawResult, abort } = streamRunner(docsAgent, processedInput, {
+      const {
+        stream,
+        result: rawResult,
+        abort,
+      } = streamRunner(docsAgent, processedInput, {
         signal: opts?.signal,
-      })
+      });
 
       // Wrap result to record agent_complete when stream finishes
       const result = rawResult.then(
         async (res) => {
-          const tokens = res.totalTokens ?? 0
+          const tokens = res.totalTokens ?? 0;
           if (tl) {
             tl.record({
-              type: 'agent_complete',
+              type: "agent_complete",
               timestamp: Date.now(),
               snapshotId: null,
               agentId: docsAgent.name,
-              modelId: 'claude-haiku-4-5',
+              modelId: "claude-haiku-4-5",
               totalTokens: tokens,
               inputTokens: res.tokenUsage?.inputTokens ?? 0,
               outputTokens: res.tokenUsage?.outputTokens ?? 0,
               durationMs: Date.now() - startTime,
-              outputLength: typeof res.output === 'string' ? res.output.length : 0,
-            })
+              outputLength:
+                typeof res.output === "string" ? res.output.length : 0,
+            });
           }
 
           // Run output guardrails after stream completes
           for (const guardrail of outputGuardrails) {
-            const gStart = Date.now()
+            const gStart = Date.now();
             try {
               const guardRes = guardrail.fn(
-                { output: res.output, agentName: docsAgent.name, input: processedInput, messages: res.messages ?? [] },
+                {
+                  output: res.output,
+                  agentName: docsAgent.name,
+                  input: processedInput,
+                  messages: res.messages ?? [],
+                },
                 { agentName: docsAgent.name, input: processedInput, facts: {} },
-              )
+              );
 
-              const recordOutputCheck = (result: { passed: boolean; reason?: string }) => {
+              const recordOutputCheck = (result: {
+                passed: boolean;
+                reason?: string;
+              }) => {
                 if (tl) {
                   tl.record({
-                    type: 'guardrail_check',
+                    type: "guardrail_check",
                     timestamp: gStart,
                     snapshotId: null,
                     guardrailName: guardrail.name,
-                    guardrailType: 'output',
+                    guardrailType: "output",
                     passed: result.passed,
                     reason: result.reason,
                     durationMs: Date.now() - gStart,
-                  })
+                  });
                 }
-              }
+              };
 
               if (guardRes instanceof Promise) {
-                const result = await guardRes
-                if (result && typeof result === 'object' && 'passed' in result) {
-                  recordOutputCheck(result)
+                const result = await guardRes;
+                if (
+                  result &&
+                  typeof result === "object" &&
+                  "passed" in result
+                ) {
+                  recordOutputCheck(result);
                 }
-              } else if (guardRes && typeof guardRes === 'object' && 'passed' in guardRes) {
-                recordOutputCheck(guardRes)
+              } else if (
+                guardRes &&
+                typeof guardRes === "object" &&
+                "passed" in guardRes
+              ) {
+                recordOutputCheck(guardRes);
               }
             } catch {
               // Don't break streaming result on output guardrail errors
@@ -469,64 +550,67 @@ export function getOrchestrator() {
           }
 
           // Update chatbot system (streamable bypasses orchestrator.run())
-          chatbotSystem.events.requestCompleted({ tokens })
+          chatbotSystem.events.requestCompleted({ tokens });
 
           // Store messages in memory (streamable bypasses orchestrator.run())
           if (res.messages && res.messages.length > 0) {
             try {
-              memory.addMessages(res.messages)
+              memory.addMessages(res.messages);
             } catch {
               // Best-effort — don't break streaming on memory errors
             }
           }
 
-          return res
+          return res;
         },
         (err) => {
-          chatbotSystem.events.requestFailed()
+          chatbotSystem.events.requestFailed();
           if (tl) {
             tl.record({
-              type: 'agent_error',
+              type: "agent_error",
               timestamp: Date.now(),
               snapshotId: null,
               agentId: docsAgent.name,
               error: err instanceof Error ? err.message : String(err),
               durationMs: Date.now() - startTime,
-            })
+            });
           }
-          throw err
+          throw err;
         },
-      )
+      );
 
-      const tokenStream: AsyncIterable<string> & { result: Promise<unknown>; abort(): void } = {
+      const tokenStream: AsyncIterable<string> & {
+        result: Promise<unknown>;
+        abort(): void;
+      } = {
         result: result as Promise<unknown>,
         abort,
         [Symbol.asyncIterator]() {
-          const iter = stream[Symbol.asyncIterator]()
+          const iter = stream[Symbol.asyncIterator]();
 
           return {
             async next() {
-              const { done, value } = await iter.next()
+              const { done, value } = await iter.next();
               if (done) {
-                return { done: true, value: undefined }
+                return { done: true, value: undefined };
               }
-              if (value.type === 'token') {
-                return { done: false, value: value.data }
+              if (value.type === "token") {
+                return { done: false, value: value.data };
               }
 
-              return { done: false, value: '' }
+              return { done: false, value: "" };
             },
-          }
+          };
         },
-      }
+      };
 
-      return tokenStream
+      return tokenStream;
     },
-  }
+  };
 
-  g[GLOBAL_KEY] = { orchestrator, streamable, memory }
+  g[GLOBAL_KEY] = { orchestrator, streamable, memory };
 
-  return g[GLOBAL_KEY]
+  return g[GLOBAL_KEY];
 }
 
 // ---------------------------------------------------------------------------
@@ -534,5 +618,5 @@ export function getOrchestrator() {
 // ---------------------------------------------------------------------------
 
 export function getTimeline() {
-  return g[GLOBAL_KEY]?.orchestrator.timeline ?? null
+  return g[GLOBAL_KEY]?.orchestrator.timeline ?? null;
 }

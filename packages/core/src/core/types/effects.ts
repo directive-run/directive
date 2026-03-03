@@ -2,8 +2,8 @@
  * Effect Types - Type definitions for effects
  */
 
-import type { Schema, InferSchema } from "./schema.js";
 import type { Facts } from "./facts.js";
+import type { InferSchema, Schema } from "./schema.js";
 
 // ============================================================================
 // Effect Types
@@ -66,9 +66,12 @@ export type EffectCleanup = () => void;
  * ```
  */
 export interface EffectDef<S extends Schema> {
-	run(facts: Facts<S>, prev: InferSchema<S> | null): void | EffectCleanup | Promise<void | EffectCleanup>;
-	/** Optional explicit dependencies for optimization */
-	deps?: Array<keyof InferSchema<S>>;
+  run(
+    facts: Facts<S>,
+    prev: InferSchema<S> | null,
+  ): void | EffectCleanup | Promise<void | EffectCleanup>;
+  /** Optional explicit dependencies for optimization */
+  deps?: Array<keyof InferSchema<S>>;
 }
 
 /** Map of effect definitions */

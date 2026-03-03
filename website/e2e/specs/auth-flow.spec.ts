@@ -1,24 +1,42 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 /**
  * Helper: set a value on an input element via page.evaluate to bypass
  * Playwright's typing delay.
  */
-async function setInput(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setInput(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
-async function setSlider(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setSlider(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
 test.describe("Auth Flow example", () => {
@@ -28,11 +46,17 @@ test.describe("Auth Flow example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/auth-flow");
     try {
-      await page.waitForSelector("directive-auth-flow", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-auth-flow", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       // Dev server sometimes needs a second attempt under parallel load
       await page.reload();
-      await page.waitForSelector("directive-auth-flow", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-auth-flow", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
     await page.waitForSelector("[data-auth-flow-ready]", { timeout: 15_000 });
   });
@@ -58,15 +82,23 @@ test.describe("Auth Flow example", () => {
     await tid(page, "auth-flow-login-btn").click();
 
     // Should reach authenticated with user data
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
-    await expect(tid(page, "auth-flow-user-display")).not.toHaveText("\u2014", { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticated",
+      { timeout: 10_000 },
+    );
+    await expect(tid(page, "auth-flow-user-display")).not.toHaveText("\u2014", {
+      timeout: 10_000,
+    });
   });
 
   test("shows authenticating state during login", async ({ page }) => {
     await tid(page, "auth-flow-login-btn").click();
 
     // Should see authenticating badge briefly
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticating", { timeout: 5_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticating",
+      { timeout: 5_000 },
+    );
   });
 
   test("login failure shows error", async ({ page }) => {
@@ -75,7 +107,9 @@ test.describe("Auth Flow example", () => {
     await tid(page, "auth-flow-login-btn").click();
 
     // Should show error message
-    await expect(tid(page, "auth-flow-login-error")).toBeVisible({ timeout: 10_000 });
+    await expect(tid(page, "auth-flow-login-error")).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(tid(page, "auth-flow-login-error")).not.toBeEmpty();
   });
 
@@ -85,11 +119,16 @@ test.describe("Auth Flow example", () => {
     await setSlider(page, "auth-flow-refresh-buffer", "5");
 
     await tid(page, "auth-flow-login-btn").click();
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticated",
+      { timeout: 10_000 },
+    );
 
     // Wait for refresh event in timeline (should fire within ~3s)
     await expect(
-      tid(page, "auth-flow-timeline").locator(".af-timeline-entry.refresh-success")
+      tid(page, "auth-flow-timeline").locator(
+        ".af-timeline-entry.refresh-success",
+      ),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -98,48 +137,68 @@ test.describe("Auth Flow example", () => {
     await setSlider(page, "auth-flow-refresh-buffer", "5");
 
     await tid(page, "auth-flow-login-btn").click();
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticated",
+      { timeout: 10_000 },
+    );
 
     // Set 100% refresh fail and force expire
     await setSlider(page, "auth-flow-refresh-failrate", "100");
     await tid(page, "auth-flow-force-expire-btn").click();
 
     // Should end up expired after retries fail
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("expired", { timeout: 15_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText("expired", {
+      timeout: 15_000,
+    });
   });
 
   test("force expire triggers refresh", async ({ page }) => {
     await tid(page, "auth-flow-login-btn").click();
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticated",
+      { timeout: 10_000 },
+    );
 
     await tid(page, "auth-flow-force-expire-btn").click();
 
     // Should see refreshing state
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText(/refreshing|authenticated/, { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      /refreshing|authenticated/,
+      { timeout: 10_000 },
+    );
   });
 
   test("logout clears all state", async ({ page }) => {
     await tid(page, "auth-flow-login-btn").click();
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticated",
+      { timeout: 10_000 },
+    );
 
     await tid(page, "auth-flow-logout-btn").click();
 
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("idle", { timeout: 5_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText("idle", {
+      timeout: 5_000,
+    });
     await expect(tid(page, "auth-flow-user-display")).toContainText("\u2014");
   });
 
   test("needsUser waits for refreshNeeded", async ({ page }) => {
     await tid(page, "auth-flow-login-btn").click();
-    await expect(tid(page, "auth-flow-status-badge")).toHaveText("authenticated", { timeout: 10_000 });
+    await expect(tid(page, "auth-flow-status-badge")).toHaveText(
+      "authenticated",
+      { timeout: 10_000 },
+    );
 
     // Verify user was fetched (appears in timeline after login)
     await expect(
-      tid(page, "auth-flow-timeline").locator(".af-timeline-entry.fetch-user-success")
+      tid(page, "auth-flow-timeline").locator(
+        ".af-timeline-entry.fetch-user-success",
+      ),
     ).toBeVisible({ timeout: 10_000 });
   });
 
   test("code tabs visible below example", async ({ page }) => {
-
     const codeTabs = page.locator("[data-testid='code-tabs-bar']");
     await expect(codeTabs).toBeVisible();
   });

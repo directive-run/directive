@@ -1,24 +1,24 @@
-import { Callout } from '@/components/Callout'
-import { ComparisonTable } from '@/components/ComparisonTable'
-import { ConstraintFlowDiagram } from '@/components/ConstraintFlowDiagram'
-import { ModuleLifecycleDiagram } from '@/components/ModuleLifecycleDiagram'
-import { PluginLifecycleDiagram } from '@/components/PluginLifecycleDiagram'
-import { ConstraintPriorityDiagram } from '@/components/ConstraintPriorityDiagram'
-import { ConstraintDependencyDiagram } from '@/components/ConstraintDependencyDiagram'
-import { AiArchitectureDiagram } from '@/components/AiArchitectureDiagram'
-import { SecurityPipelineDiagram } from '@/components/SecurityPipelineDiagram'
-import { OrchestratorDiagram } from '@/components/OrchestratorDiagram'
-import { QuickLink, QuickLinks } from '@/components/QuickLinks'
-import { Playground, StackBlitzButton } from '@/components/Playground'
-import { UseCaseCards } from '@/components/UseCaseCards'
-import { DevToolsDemo } from '@/components/DevToolsDemo'
+import { AiArchitectureDiagram } from "@/components/AiArchitectureDiagram";
+import { Callout } from "@/components/Callout";
+import { ComparisonTable } from "@/components/ComparisonTable";
+import { ConstraintDependencyDiagram } from "@/components/ConstraintDependencyDiagram";
+import { ConstraintFlowDiagram } from "@/components/ConstraintFlowDiagram";
+import { ConstraintPriorityDiagram } from "@/components/ConstraintPriorityDiagram";
+import { DevToolsDemo } from "@/components/DevToolsDemo";
+import { ModuleLifecycleDiagram } from "@/components/ModuleLifecycleDiagram";
+import { OrchestratorDiagram } from "@/components/OrchestratorDiagram";
+import { Playground, StackBlitzButton } from "@/components/Playground";
+import { PluginLifecycleDiagram } from "@/components/PluginLifecycleDiagram";
+import { QuickLink, QuickLinks } from "@/components/QuickLinks";
+import { SecurityPipelineDiagram } from "@/components/SecurityPipelineDiagram";
+import { UseCaseCards } from "@/components/UseCaseCards";
 
 const tags = {
-  'comparison-table': {
+  "comparison-table": {
     render: ComparisonTable,
     selfClosing: true,
   },
-  'constraint-flow-diagram': {
+  "constraint-flow-diagram": {
     render: ConstraintFlowDiagram,
     selfClosing: true,
   },
@@ -27,9 +27,9 @@ const tags = {
       title: { type: String },
       type: {
         type: String,
-        default: 'note',
-        matches: ['note', 'warning'],
-        errorLevel: 'critical',
+        default: "note",
+        matches: ["note", "warning"],
+        errorLevel: "critical",
       },
     },
     render: Callout,
@@ -41,7 +41,7 @@ const tags = {
       alt: { type: String },
       caption: { type: String },
     },
-    render: ({ src, alt = '', caption }) => (
+    render: ({ src, alt = "", caption }) => (
       <figure>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} />
@@ -49,10 +49,10 @@ const tags = {
       </figure>
     ),
   },
-  'quick-links': {
+  "quick-links": {
     render: QuickLinks,
   },
-  'quick-link': {
+  "quick-link": {
     selfClosing: true,
     render: QuickLink,
     attributes: {
@@ -73,7 +73,7 @@ const tags = {
       view: { type: String },
     },
   },
-  'stackblitz-button': {
+  "stackblitz-button": {
     render: StackBlitzButton,
     selfClosing: true,
     attributes: {
@@ -81,42 +81,42 @@ const tags = {
       text: { type: String },
     },
   },
-  'use-case-cards': {
+  "use-case-cards": {
     render: UseCaseCards,
     selfClosing: true,
   },
-  'devtools-demo': {
+  "devtools-demo": {
     render: DevToolsDemo,
     selfClosing: true,
   },
-  'module-lifecycle-diagram': {
+  "module-lifecycle-diagram": {
     render: ModuleLifecycleDiagram,
     selfClosing: true,
   },
-  'plugin-lifecycle-diagram': {
+  "plugin-lifecycle-diagram": {
     render: PluginLifecycleDiagram,
     selfClosing: true,
   },
-  'constraint-priority-diagram': {
+  "constraint-priority-diagram": {
     render: ConstraintPriorityDiagram,
     selfClosing: true,
   },
-  'constraint-dependency-diagram': {
+  "constraint-dependency-diagram": {
     render: ConstraintDependencyDiagram,
     selfClosing: true,
   },
-  'ai-architecture-diagram': {
+  "ai-architecture-diagram": {
     render: AiArchitectureDiagram,
     selfClosing: true,
   },
-  'security-pipeline-diagram': {
+  "security-pipeline-diagram": {
     render: SecurityPipelineDiagram,
     selfClosing: true,
   },
-  'orchestrator-diagram': {
+  "orchestrator-diagram": {
     render: OrchestratorDiagram,
     selfClosing: true,
   },
-}
+};
 
-export default tags
+export default tags;

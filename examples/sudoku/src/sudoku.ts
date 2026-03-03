@@ -11,25 +11,25 @@
  * Pure Sudoku logic lives in rules.ts; puzzle generation in generator.ts.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
+import { generatePuzzle } from "./generator.js";
 import {
-  type Grid,
-  type Difficulty,
   type Conflict,
-  TIMER_DURATIONS,
+  type Difficulty,
+  type Grid,
   MAX_HINTS,
-  TIMER_WARNING_THRESHOLD,
   TIMER_CRITICAL_THRESHOLD,
-  TIMER_EFFECT_WARNING,
+  TIMER_DURATIONS,
   TIMER_EFFECT_CRITICAL,
+  TIMER_EFFECT_WARNING,
+  TIMER_WARNING_THRESHOLD,
+  createEmptyNotes,
   findConflicts,
+  getCandidates,
+  getPeers,
   isBoardComplete,
   toRowCol,
-  getPeers,
-  getCandidates,
-  createEmptyNotes,
 } from "./rules.js";
-import { generatePuzzle } from "./generator.js";
 
 // ============================================================================
 // Schema
@@ -125,7 +125,8 @@ export const sudokuGame = createModule("sudoku", {
     facts.timerRunning = true;
     facts.gameOver = false;
     facts.won = false;
-    facts.message = "Fill in the grid. No duplicates in rows, columns, or boxes.";
+    facts.message =
+      "Fill in the grid. No duplicates in rows, columns, or boxes.";
     facts.notesMode = false;
     facts.notes = createEmptyNotes();
     facts.hintsUsed = 0;
@@ -180,7 +181,9 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     isSolved: (_facts, derive) => {
-      return (derive.isComplete as boolean) && !(derive.hasConflicts as boolean);
+      return (
+        (derive.isComplete as boolean) && !(derive.hasConflicts as boolean)
+      );
     },
 
     selectedPeers: (facts) => {
@@ -271,7 +274,8 @@ export const sudokuGame = createModule("sudoku", {
       facts.timerRunning = true;
       facts.gameOver = false;
       facts.won = false;
-      facts.message = "Fill in the grid. No duplicates in rows, columns, or boxes.";
+      facts.message =
+        "Fill in the grid. No duplicates in rows, columns, or boxes.";
       facts.notesMode = false;
       facts.notes = createEmptyNotes();
       facts.hintsUsed = 0;
@@ -474,7 +478,10 @@ export const sudokuGame = createModule("sudoku", {
           return false;
         }
 
-        return isBoardComplete(facts.grid as Grid) && findConflicts(facts.grid as Grid).length === 0;
+        return (
+          isBoardComplete(facts.grid as Grid) &&
+          findConflicts(facts.grid as Grid).length === 0
+        );
       },
       require: (facts) => ({
         type: "GAME_WON",
@@ -535,8 +542,15 @@ export const sudokuGame = createModule("sudoku", {
         context.facts.gameOver = true;
         context.facts.won = true;
 
-        const mins = Math.floor((TIMER_DURATIONS[context.facts.difficulty as Difficulty] - req.timeLeft) / 60);
-        const secs = (TIMER_DURATIONS[context.facts.difficulty as Difficulty] - req.timeLeft) % 60;
+        const mins = Math.floor(
+          (TIMER_DURATIONS[context.facts.difficulty as Difficulty] -
+            req.timeLeft) /
+            60,
+        );
+        const secs =
+          (TIMER_DURATIONS[context.facts.difficulty as Difficulty] -
+            req.timeLeft) %
+          60;
         context.facts.message = `Solved in ${mins}m ${secs}s! Hints: ${req.hintsUsed}, Errors: ${req.errors}`;
       },
     },
@@ -599,7 +613,9 @@ export const sudokuGame = createModule("sudoku", {
       run: (facts) => {
         if (facts.gameOver) {
           if (facts.won) {
-            console.log(`[Sudoku] Puzzle solved! Difficulty: ${facts.difficulty}, Hints: ${facts.hintsUsed}, Errors: ${facts.errorsCount}`);
+            console.log(
+              `[Sudoku] Puzzle solved! Difficulty: ${facts.difficulty}, Hints: ${facts.hintsUsed}, Errors: ${facts.errorsCount}`,
+            );
           } else {
             console.log(`[Sudoku] Game over: ${facts.message}`);
           }

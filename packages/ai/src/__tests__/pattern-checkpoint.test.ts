@@ -1,38 +1,45 @@
-import { describe, it, expect } from "vitest";
-import { createTestMultiAgentOrchestrator } from "../testing.js";
+import { describe, expect, it } from "vitest";
+import { InMemoryCheckpointStore } from "../checkpoint.js";
 import {
-  sequential,
-  supervisor,
-  reflect,
-  debate,
   dag,
-  getPatternStep,
-  getCheckpointProgress,
+  debate,
   diffCheckpoints,
   forkFromCheckpoint,
+  getCheckpointProgress,
+  getPatternStep,
+  reflect,
+  sequential,
+  supervisor,
 } from "../multi-agent-orchestrator.js";
-import { InMemoryCheckpointStore } from "../checkpoint.js";
+import { createTestMultiAgentOrchestrator } from "../testing.js";
 import type {
+  DagCheckpointState,
+  DebateCheckpointState,
+  PatternCheckpointState,
+  ReflectCheckpointState,
   SequentialCheckpointState,
   SupervisorCheckpointState,
-  ReflectCheckpointState,
-  DebateCheckpointState,
-  DagCheckpointState,
-  PatternCheckpointState,
 } from "../types.js";
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
-function makeOrchestrator(agentIds: string[], mockOutput: string | Record<string, unknown> = "ok") {
+function makeOrchestrator(
+  agentIds: string[],
+  mockOutput: string | Record<string, unknown> = "ok",
+) {
   const agents: Record<string, { agent: { name: string } }> = {};
-  const mockResponses: Record<string, { output: string; totalTokens: number }> = {};
+  const mockResponses: Record<string, { output: string; totalTokens: number }> =
+    {};
 
   for (const id of agentIds) {
     agents[id] = { agent: { name: id } };
     mockResponses[id] = {
-      output: typeof mockOutput === "string" ? mockOutput : JSON.stringify(mockOutput),
+      output:
+        typeof mockOutput === "string"
+          ? mockOutput
+          : JSON.stringify(mockOutput),
       totalTokens: 10,
     };
   }
@@ -99,7 +106,10 @@ describe("Sequential Pattern Checkpoint", () => {
     };
 
     const pattern = sequential<string>(["a", "b", "c", "d"]);
-    const result = await orchestrator.resumeSequential(checkpointState, pattern);
+    const result = await orchestrator.resumeSequential(
+      checkpointState,
+      pattern,
+    );
 
     // Should have completed (ran agents c and d from step 2)
     expect(result).toBeDefined();
@@ -109,10 +119,7 @@ describe("Sequential Pattern Checkpoint", () => {
     const orchestrator = makeOrchestrator(["a"]);
 
     await expect(
-      orchestrator.resumeSequential(
-        { version: 2 } as any,
-        sequential(["a"]),
-      ),
+      orchestrator.resumeSequential({ version: 2 } as any, sequential(["a"])),
     ).rejects.toThrow("Invalid sequential checkpoint state");
   });
 });
@@ -138,10 +145,20 @@ describe("Supervisor Pattern Checkpoint", () => {
           generate: () => {
             bossCallCount++;
             if (bossCallCount <= 2) {
-              return { output: JSON.stringify({ action: "delegate", worker: "w1", workerInput: "do work" }), totalTokens: 15 };
+              return {
+                output: JSON.stringify({
+                  action: "delegate",
+                  worker: "w1",
+                  workerInput: "do work",
+                }),
+                totalTokens: 15,
+              };
             }
 
-            return { output: JSON.stringify({ action: "complete" }), totalTokens: 15 };
+            return {
+              output: JSON.stringify({ action: "complete" }),
+              totalTokens: 15,
+            };
           },
         },
         w1: { output: "w1-done", totalTokens: 10 },
@@ -170,7 +187,10 @@ describe("Supervisor Pattern Checkpoint", () => {
         w1: { agent: { name: "w1" } },
       },
       mockResponses: {
-        boss: { output: JSON.stringify({ action: "complete" }), totalTokens: 15 },
+        boss: {
+          output: JSON.stringify({ action: "complete" }),
+          totalTokens: 15,
+        },
         w1: { output: "done", totalTokens: 10 },
       },
     });
@@ -183,13 +203,21 @@ describe("Supervisor Pattern Checkpoint", () => {
       label: "sup:round-1",
       patternId: "__resume_test",
       round: 1,
-      supervisorOutput: { action: "delegate", worker: "w1", workerInput: "do work" },
+      supervisorOutput: {
+        action: "delegate",
+        worker: "w1",
+        workerInput: "do work",
+      },
       workerResults: [{ output: "partial", totalTokens: 10 }],
       currentInput: "task",
     };
 
     const pattern = supervisor("boss", ["w1"], { maxRounds: 3 });
-    const result = await orchestrator.resumeSupervisor(checkpointState, pattern, { input: "task" });
+    const result = await orchestrator.resumeSupervisor(
+      checkpointState,
+      pattern,
+      { input: "task" },
+    );
 
     expect(result).toBeDefined();
   });
@@ -220,7 +248,10 @@ describe("Reflect Pattern Checkpoint", () => {
       },
       mockResponses: {
         writer: { output: "draft text", totalTokens: 20 },
-        reviewer: { output: JSON.stringify({ passed: true, score: 0.9 }), totalTokens: 15 },
+        reviewer: {
+          output: JSON.stringify({ passed: true, score: 0.9 }),
+          totalTokens: 15,
+        },
       },
       patterns: {
         ref: {
@@ -250,7 +281,10 @@ describe("Reflect Pattern Checkpoint", () => {
       },
       mockResponses: {
         writer: { output: "revised text", totalTokens: 20 },
-        reviewer: { output: JSON.stringify({ passed: true, score: 0.95 }), totalTokens: 15 },
+        reviewer: {
+          output: JSON.stringify({ passed: true, score: 0.95 }),
+          totalTokens: 15,
+        },
       },
     });
 
@@ -262,16 +296,27 @@ describe("Reflect Pattern Checkpoint", () => {
       label: "ref:iter-1",
       patternId: "__resume_test",
       iteration: 1,
-      effectiveInput: "Previous feedback: needs more detail\n\nOriginal: write an essay",
+      effectiveInput:
+        "Previous feedback: needs more detail\n\nOriginal: write an essay",
       history: [
-        { iteration: 0, passed: false, score: 0.4, feedback: "needs more detail", durationMs: 100, producerTokens: 20, evaluatorTokens: 15 },
+        {
+          iteration: 0,
+          passed: false,
+          score: 0.4,
+          feedback: "needs more detail",
+          durationMs: 100,
+          producerTokens: 20,
+          evaluatorTokens: 15,
+        },
       ],
       producerOutputs: [{ output: "first draft", score: 0.4 }],
       lastProducerOutput: "first draft",
     };
 
     const pattern = reflect<string>("writer", "reviewer", { maxIterations: 3 });
-    const result = await orchestrator.resumeReflect(checkpointState, pattern, { input: "write an essay" });
+    const result = await orchestrator.resumeReflect(checkpointState, pattern, {
+      input: "write an essay",
+    });
 
     expect(result).toBeDefined();
   });
@@ -304,7 +349,13 @@ describe("Debate Pattern Checkpoint", () => {
       mockResponses: {
         d1: { output: "argument-1", totalTokens: 10 },
         d2: { output: "argument-2", totalTokens: 10 },
-        judge: { output: JSON.stringify({ winnerId: "d1", feedback: "better argument" }), totalTokens: 15 },
+        judge: {
+          output: JSON.stringify({
+            winnerId: "d1",
+            feedback: "better argument",
+          }),
+          totalTokens: 15,
+        },
       },
       patterns: {
         dbt: {
@@ -365,7 +416,11 @@ describe("Debate Pattern Checkpoint", () => {
       tokensConsumed: 35,
     };
 
-    const pattern = debate<string>({ handlers: ["d1", "d2"], evaluator: "judge", maxRounds: 3 });
+    const pattern = debate<string>({
+      handlers: ["d1", "d2"],
+      evaluator: "judge",
+      maxRounds: 3,
+    });
     const result = await orchestrator.resumeDebate(checkpointState, pattern);
 
     expect(result).toBeDefined();
@@ -449,7 +504,11 @@ describe("DAG Pattern Checkpoint", () => {
       createdAt: new Date().toISOString(),
       label: "dag:node-1",
       patternId: "__resume_test",
-      statuses: { fetch: "completed", analyze: "pending", summarize: "pending" },
+      statuses: {
+        fetch: "completed",
+        analyze: "pending",
+        summarize: "pending",
+      },
       outputs: { fetch: "data" },
       errors: {},
       completedCount: 1,
@@ -466,7 +525,9 @@ describe("DAG Pattern Checkpoint", () => {
       (context) => context.outputs.summarize as string,
     );
 
-    const result = await orchestrator.resumeDag(checkpointState, pattern, { input: "process this" });
+    const result = await orchestrator.resumeDag(checkpointState, pattern, {
+      input: "process this",
+    });
 
     // Should complete without re-running the fetch node
     expect(result).toBeDefined();
@@ -567,8 +628,22 @@ describe("getCheckpointProgress", () => {
       iteration: 2,
       effectiveInput: "input",
       history: [
-        { iteration: 0, passed: false, score: 0.3, durationMs: 100, producerTokens: 20, evaluatorTokens: 10 },
-        { iteration: 1, passed: false, score: 0.6, durationMs: 100, producerTokens: 25, evaluatorTokens: 10 },
+        {
+          iteration: 0,
+          passed: false,
+          score: 0.3,
+          durationMs: 100,
+          producerTokens: 20,
+          evaluatorTokens: 10,
+        },
+        {
+          iteration: 1,
+          passed: false,
+          score: 0.6,
+          durationMs: 100,
+          producerTokens: 25,
+          evaluatorTokens: 10,
+        },
       ],
       producerOutputs: [{ output: "v1" }, { output: "v2" }],
       lastProducerOutput: "v2",
@@ -643,7 +718,10 @@ describe("diffCheckpoints", () => {
       outputs: { x: "ok", y: "ok" },
       errors: {},
       completedCount: 2,
-      nodeResults: { x: { output: "ok", totalTokens: 10 }, y: { output: "ok", totalTokens: 20 } },
+      nodeResults: {
+        x: { output: "ok", totalTokens: 10 },
+        y: { output: "ok", totalTokens: 20 },
+      },
       input: "test",
     };
 
@@ -680,9 +758,9 @@ describe("diffCheckpoints", () => {
       tokensConsumed: 0,
     };
 
-    expect(() => diffCheckpoints(a, b as unknown as PatternCheckpointState)).toThrow(
-      "Cannot diff different pattern types",
-    );
+    expect(() =>
+      diffCheckpoints(a, b as unknown as PatternCheckpointState),
+    ).toThrow("Cannot diff different pattern types");
   });
 });
 
@@ -693,7 +771,7 @@ describe("diffCheckpoints", () => {
 describe("Conditional Checkpointing", () => {
   it("respects when() predicate — saves only when true", async () => {
     const store = new InMemoryCheckpointStore();
-    let stepsSeen: number[] = [];
+    const stepsSeen: number[] = [];
 
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
@@ -736,7 +814,9 @@ describe("Conditional Checkpointing", () => {
     for (const cp of checkpoints) {
       const loaded = await store.load(cp.id);
       if (loaded) {
-        const state = JSON.parse(loaded.systemExport) as SequentialCheckpointState;
+        const state = JSON.parse(
+          loaded.systemExport,
+        ) as SequentialCheckpointState;
         expect(state.step % 2).toBe(0);
       }
     }
@@ -910,7 +990,16 @@ describe("Replay", () => {
       label: checkpointState.label,
       systemExport: JSON.stringify(checkpointState),
       timelineExport: null,
-      localState: { type: "multi", globalTokenCount: 0, globalStatus: "idle", agentStates: {}, handoffCounter: 0, pendingHandoffs: [], handoffResults: [], roundRobinCounters: null },
+      localState: {
+        type: "multi",
+        globalTokenCount: 0,
+        globalStatus: "idle",
+        agentStates: {},
+        handoffCounter: 0,
+        pendingHandoffs: [],
+        handoffResults: [],
+        roundRobinCounters: null,
+      },
       memoryExport: null,
       orchestratorType: "multi",
     });
@@ -954,9 +1043,9 @@ describe("Replay", () => {
       mockResponses: { a: { output: "ok", totalTokens: 10 } },
     });
 
-    await expect(
-      orchestrator.replay("any", sequential(["a"])),
-    ).rejects.toThrow("No checkpoint store configured");
+    await expect(orchestrator.replay("any", sequential(["a"]))).rejects.toThrow(
+      "No checkpoint store configured",
+    );
   });
 
   it("rejects checkpoint with invalid state", async () => {
@@ -968,7 +1057,16 @@ describe("Replay", () => {
       createdAt: new Date().toISOString(),
       systemExport: JSON.stringify({ type: "unknown_type", version: 99 }),
       timelineExport: null,
-      localState: { type: "multi", globalTokenCount: 0, globalStatus: "idle", agentStates: {}, handoffCounter: 0, pendingHandoffs: [], handoffResults: [], roundRobinCounters: null },
+      localState: {
+        type: "multi",
+        globalTokenCount: 0,
+        globalStatus: "idle",
+        agentStates: {},
+        handoffCounter: 0,
+        pendingHandoffs: [],
+        handoffResults: [],
+        roundRobinCounters: null,
+      },
       memoryExport: null,
       orchestratorType: "multi",
     });
@@ -1013,7 +1111,16 @@ describe("forkFromCheckpoint", () => {
       label: checkpointState.label,
       systemExport: JSON.stringify(checkpointState),
       timelineExport: null,
-      localState: { type: "multi", globalTokenCount: 0, globalStatus: "idle", agentStates: {}, handoffCounter: 0, pendingHandoffs: [], handoffResults: [], roundRobinCounters: null },
+      localState: {
+        type: "multi",
+        globalTokenCount: 0,
+        globalStatus: "idle",
+        agentStates: {},
+        handoffCounter: 0,
+        pendingHandoffs: [],
+        handoffResults: [],
+        roundRobinCounters: null,
+      },
       memoryExport: null,
       orchestratorType: "multi",
     });
@@ -1025,7 +1132,12 @@ describe("forkFromCheckpoint", () => {
           a: { agent: mockAgent },
           b: { agent: mockAgent },
         },
-        runner: (async () => ({ output: "forked-output", messages: [], toolCalls: [], totalTokens: 5 })) as any,
+        runner: (async () => ({
+          output: "forked-output",
+          messages: [],
+          toolCalls: [],
+          totalTokens: 5,
+        })) as any,
         debug: true,
       },
       store,
@@ -1041,7 +1153,15 @@ describe("forkFromCheckpoint", () => {
 
     await expect(
       forkFromCheckpoint(
-        { agents: { a: { agent: { name: "a" } } }, runner: (async () => ({ output: "ok", messages: [], toolCalls: [], totalTokens: 5 })) as any },
+        {
+          agents: { a: { agent: { name: "a" } } },
+          runner: (async () => ({
+            output: "ok",
+            messages: [],
+            toolCalls: [],
+            totalTokens: 5,
+          })) as any,
+        },
         store,
         "nonexistent",
       ),
@@ -1055,22 +1175,86 @@ describe("forkFromCheckpoint", () => {
 
 describe("getPatternStep", () => {
   it("returns step for sequential", () => {
-    expect(getPatternStep({ type: "sequential", step: 3, version: 1, id: "x", createdAt: "", patternId: "p", currentInput: "", results: [] })).toBe(3);
+    expect(
+      getPatternStep({
+        type: "sequential",
+        step: 3,
+        version: 1,
+        id: "x",
+        createdAt: "",
+        patternId: "p",
+        currentInput: "",
+        results: [],
+      }),
+    ).toBe(3);
   });
 
   it("returns round for supervisor", () => {
-    expect(getPatternStep({ type: "supervisor", round: 5, version: 1, id: "x", createdAt: "", patternId: "p", supervisorOutput: null, workerResults: [], currentInput: "" })).toBe(5);
+    expect(
+      getPatternStep({
+        type: "supervisor",
+        round: 5,
+        version: 1,
+        id: "x",
+        createdAt: "",
+        patternId: "p",
+        supervisorOutput: null,
+        workerResults: [],
+        currentInput: "",
+      }),
+    ).toBe(5);
   });
 
   it("returns iteration for reflect", () => {
-    expect(getPatternStep({ type: "reflect", iteration: 2, version: 1, id: "x", createdAt: "", patternId: "p", effectiveInput: "", history: [], producerOutputs: [], lastProducerOutput: null })).toBe(2);
+    expect(
+      getPatternStep({
+        type: "reflect",
+        iteration: 2,
+        version: 1,
+        id: "x",
+        createdAt: "",
+        patternId: "p",
+        effectiveInput: "",
+        history: [],
+        producerOutputs: [],
+        lastProducerOutput: null,
+      }),
+    ).toBe(2);
   });
 
   it("returns round for debate", () => {
-    expect(getPatternStep({ type: "debate", round: 4, version: 1, id: "x", createdAt: "", patternId: "p", currentInput: "", rounds: [], lastWinnerId: "", lastWinnerOutput: "", tokensConsumed: 0 })).toBe(4);
+    expect(
+      getPatternStep({
+        type: "debate",
+        round: 4,
+        version: 1,
+        id: "x",
+        createdAt: "",
+        patternId: "p",
+        currentInput: "",
+        rounds: [],
+        lastWinnerId: "",
+        lastWinnerOutput: "",
+        tokensConsumed: 0,
+      }),
+    ).toBe(4);
   });
 
   it("returns completedCount for dag", () => {
-    expect(getPatternStep({ type: "dag", completedCount: 7, version: 1, id: "x", createdAt: "", patternId: "p", statuses: {}, outputs: {}, errors: {}, nodeResults: {}, input: "" })).toBe(7);
+    expect(
+      getPatternStep({
+        type: "dag",
+        completedCount: 7,
+        version: 1,
+        id: "x",
+        createdAt: "",
+        patternId: "p",
+        statuses: {},
+        outputs: {},
+        errors: {},
+        nodeResults: {},
+        input: "",
+      }),
+    ).toBe(7);
   });
 });

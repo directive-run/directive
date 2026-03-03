@@ -1,18 +1,22 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { CheckersDemo } from './CheckersDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { CheckersDemo } from "./CheckersDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Checkers',
+  title: "Checkers",
   description:
-    'Interactive checkers game built with Directive. Play it, then read the source.',
-  path: '/docs/examples/checkers',
-  section: 'Docs',
-})
+    "Interactive checkers game built with Directive. Play it, then read the source.",
+  path: "/docs/examples/checkers",
+  section: "Docs",
+});
 
 export default function CheckersPage() {
-  const build = parseExampleBuild('checkers')
-  const sources = readExampleSources('checkers', ['game.ts', 'main.ts', 'rules.ts'])
+  const build = parseExampleBuild("checkers");
+  const sources = readExampleSources("checkers", [
+    "game.ts",
+    "main.ts",
+    "rules.ts",
+  ]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -31,5 +35,5 @@ export default function CheckersPage() {
 
       <CheckersDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

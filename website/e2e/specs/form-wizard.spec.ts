@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Form Wizard example", () => {
@@ -10,10 +10,16 @@ test.describe("Form Wizard example", () => {
     await page.evaluate(() => localStorage.removeItem("form-wizard-draft"));
     await page.reload();
     try {
-      await page.waitForSelector("directive-form-wizard", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-form-wizard", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-form-wizard", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-form-wizard", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
     await page.waitForSelector("[data-form-wizard-ready]", { timeout: 15_000 });
   });
@@ -47,11 +53,17 @@ test.describe("Form Wizard example", () => {
     await tid(page, "fw-email").fill("taken@test.com");
 
     // Wait for async check (500ms)
-    await expect(tid(page, "fw-email-status")).toContainText("Email already taken", { timeout: 5_000 });
+    await expect(tid(page, "fw-email-status")).toContainText(
+      "Email already taken",
+      { timeout: 5_000 },
+    );
 
     // Change to available email
     await tid(page, "fw-email").fill("available@test.com");
-    await expect(tid(page, "fw-email-status")).toContainText("Email available", { timeout: 5_000 });
+    await expect(tid(page, "fw-email-status")).toContainText(
+      "Email available",
+      { timeout: 5_000 },
+    );
   });
 
   test("advance to step 2 and back preserves data", async ({ page }) => {

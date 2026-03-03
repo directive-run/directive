@@ -1,16 +1,16 @@
-'use client'
+"use client";
 
-import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CodeTabs } from '@/components/CodeTabs'
+import { CodeTabs } from "@/components/CodeTabs";
+import { ExampleEmbed } from "@/components/ExampleEmbed";
 
 export function ErrorBoundariesDemo({
   build,
   sources,
 }: {
-  build: import('@/lib/examples').ExampleBuild | null
-  sources: import('@/lib/examples').ExampleSource[]
+  build: import("@/lib/examples").ExampleBuild | null;
+  sources: import("@/lib/examples").ExampleSource[];
 }) {
-  const mainSource = sources.find((s) => s.filename === 'main.ts')
+  const mainSource = sources.find((s) => s.filename === "main.ts");
 
   return (
     <div className="space-y-8">
@@ -28,18 +28,18 @@ export function ErrorBoundariesDemo({
           />
         ) : (
           <div className="rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)] p-8 text-center text-sm text-slate-400">
-            Example not built yet. Run{' '}
+            Example not built yet. Run{" "}
             <code className="text-slate-300">
               pnpm build:example error-boundaries
-            </code>{' '}
+            </code>{" "}
             to generate the embed.
           </div>
         )}
 
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Use the fail-rate sliders to inject errors. Watch circuit breakers
-          open after 3 failures and auto-recover. Switch recovery strategies
-          to see retry-later backoff in action.
+          open after 3 failures and auto-recover. Switch recovery strategies to
+          see retry-later backoff in action.
         </p>
       </section>
 
@@ -54,21 +54,27 @@ export function ErrorBoundariesDemo({
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Circuit Breakers</strong>{' '}
-              &ndash; Each service has its own circuit breaker. After 3 consecutive
-              failures the circuit opens, blocking requests. After a recovery
-              timeout it enters half-open to test recovery.
+              <strong className="text-slate-900 dark:text-slate-200">
+                Circuit Breakers
+              </strong>{" "}
+              &ndash; Each service has its own circuit breaker. After 3
+              consecutive failures the circuit opens, blocking requests. After a
+              recovery timeout it enters half-open to test recovery.
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Recovery Strategies</strong>{' '}
-              &ndash; Choose between <code>skip</code> (swallow errors),{' '}
-              <code>retry-later</code> (exponential backoff), or{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                Recovery Strategies
+              </strong>{" "}
+              &ndash; Choose between <code>skip</code> (swallow errors),{" "}
+              <code>retry-later</code> (exponential backoff), or{" "}
               <code>throw</code> to see how the system responds.
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">Performance Metrics</strong>{' '}
-              &ndash; Average latency, error rates, and request counts update
-              in real-time.
+              <strong className="text-slate-900 dark:text-slate-200">
+                Performance Metrics
+              </strong>{" "}
+              &ndash; Average latency, error rates, and request counts update in
+              real-time.
             </li>
           </ol>
         </div>
@@ -81,14 +87,14 @@ export function ErrorBoundariesDemo({
         <CodeTabs
           tabs={[
             mainSource && {
-              filename: 'main.ts',
-              label: 'main.ts - System + DOM wiring',
+              filename: "main.ts",
+              label: "main.ts - System + DOM wiring",
               code: mainSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
           ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
         />
       </section>
     </div>
-  )
+  );
 }

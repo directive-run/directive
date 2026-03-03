@@ -10,21 +10,29 @@
  * can react to derivations/facts from another module.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  fetchPermissions as apiFetchPermissions,
-  fetchArticles as apiFetchArticles,
-  publishArticle as apiPublishArticle,
-  deleteArticle as apiDeleteArticle,
   type Article,
+  deleteArticle as apiDeleteArticle,
+  fetchArticles as apiFetchArticles,
+  fetchPermissions as apiFetchPermissions,
+  publishArticle as apiPublishArticle,
 } from "./mock-api.js";
 
 // ============================================================================
 // Preset Users
 // ============================================================================
 
-const presetUsers: Record<string, { userName: string; role: string; token: string }> = {
+const presetUsers: Record<
+  string,
+  { userName: string; role: string; token: string }
+> = {
   alice: { userName: "Alice", role: "admin", token: "tok-alice-admin" },
   bob: { userName: "Bob", role: "editor", token: "tok-bob-editor" },
   carol: { userName: "Carol", role: "viewer", token: "tok-carol-viewer" },
@@ -120,11 +128,16 @@ export const permissionsModule = createModule("permissions", {
   },
 
   derive: {
-    canEdit: (facts) => (facts.self.permissions as string[]).includes("content.edit"),
-    canPublish: (facts) => (facts.self.permissions as string[]).includes("content.publish"),
-    canDelete: (facts) => (facts.self.permissions as string[]).includes("content.delete"),
-    canManageUsers: (facts) => (facts.self.permissions as string[]).includes("users.manage"),
-    canViewAnalytics: (facts) => (facts.self.permissions as string[]).includes("analytics.view"),
+    canEdit: (facts) =>
+      (facts.self.permissions as string[]).includes("content.edit"),
+    canPublish: (facts) =>
+      (facts.self.permissions as string[]).includes("content.publish"),
+    canDelete: (facts) =>
+      (facts.self.permissions as string[]).includes("content.delete"),
+    canManageUsers: (facts) =>
+      (facts.self.permissions as string[]).includes("users.manage"),
+    canViewAnalytics: (facts) =>
+      (facts.self.permissions as string[]).includes("analytics.view"),
     isAdmin: (_facts, derive) => derive.canManageUsers as boolean,
     permissionCount: (facts) => (facts.self.permissions as string[]).length,
   },
@@ -140,8 +153,7 @@ export const permissionsModule = createModule("permissions", {
     loadPermissions: {
       when: (facts) => {
         return (
-          (facts.auth.token as string) !== "" &&
-          !(facts.self.loaded as boolean)
+          (facts.auth.token as string) !== "" && !(facts.self.loaded as boolean)
         );
       },
       require: (facts) => ({
@@ -206,8 +218,7 @@ export const contentModule = createModule("content", {
     loadContent: {
       when: (facts) => {
         return (
-          (facts.auth.token as string) !== "" &&
-          !(facts.self.loaded as boolean)
+          (facts.auth.token as string) !== "" && !(facts.self.loaded as boolean)
         );
       },
       require: { type: "LOAD_CONTENT" },
@@ -217,7 +228,9 @@ export const contentModule = createModule("content", {
       when: (facts) => {
         return (
           (facts.self.publishRequested as string) !== "" &&
-          (facts.permissions.permissions as string[]).includes("content.publish")
+          (facts.permissions.permissions as string[]).includes(
+            "content.publish",
+          )
         );
       },
       require: (facts) => ({

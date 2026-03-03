@@ -8,10 +8,10 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  topicGuardModule,
-  topicGuardSchema,
   type ChatMessage,
   type GuardrailLogEntry,
+  topicGuardModule,
+  topicGuardSchema,
 } from "./topic-guard.js";
 
 // ============================================================================
@@ -33,9 +33,15 @@ const allKeys = [
 // DOM References
 // ============================================================================
 
-const inputEl = document.getElementById("topic-guard-input") as HTMLInputElement;
-const sendBtn = document.getElementById("topic-guard-send") as HTMLButtonElement;
-const clearBtn = document.getElementById("topic-guard-clear") as HTMLButtonElement;
+const inputEl = document.getElementById(
+  "topic-guard-input",
+) as HTMLInputElement;
+const sendBtn = document.getElementById(
+  "topic-guard-send",
+) as HTMLButtonElement;
+const clearBtn = document.getElementById(
+  "topic-guard-clear",
+) as HTMLButtonElement;
 const messagesEl = document.getElementById("topic-guard-messages")!;
 const logEl = document.getElementById("topic-guard-log")!;
 const allowedCountEl = document.getElementById("topic-guard-allowed-count")!;
@@ -127,7 +133,8 @@ function render(): void {
 
   // Sync topic checkboxes with state
   const allowedTopics = facts.allowedTopics as string[];
-  const checkboxes = topicsEl.querySelectorAll<HTMLInputElement>("input[data-topic]");
+  const checkboxes =
+    topicsEl.querySelectorAll<HTMLInputElement>("input[data-topic]");
   checkboxes.forEach((cb) => {
     cb.checked = allowedTopics.includes(cb.dataset.topic!);
   });
@@ -170,14 +177,16 @@ clearBtn.addEventListener("click", () => {
 });
 
 // Example chips
-document.querySelectorAll<HTMLButtonElement>(".tg-chip[data-example]").forEach((chip) => {
-  chip.addEventListener("click", () => {
-    const text = chip.dataset.example!;
-    inputEl.value = text;
-    system.events.setInput({ value: text });
-    inputEl.focus();
+document
+  .querySelectorAll<HTMLButtonElement>(".tg-chip[data-example]")
+  .forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const text = chip.dataset.example!;
+      inputEl.value = text;
+      system.events.setInput({ value: text });
+      inputEl.focus();
+    });
   });
-});
 
 // Topic toggles
 topicsEl.addEventListener("change", (e) => {

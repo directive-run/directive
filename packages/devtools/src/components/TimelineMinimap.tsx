@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
+import type { DebugEvent } from "../lib/types";
 
 interface TimelineMinimapProps {
   events: DebugEvent[];
@@ -16,7 +16,13 @@ interface TimelineMinimapProps {
  * M4: Canvas-based minimap for performance.
  * Renders event ticks on a <canvas> instead of one DOM element per event.
  */
-export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }: TimelineMinimapProps) {
+export function TimelineMinimap({
+  events,
+  timeRange,
+  viewStart,
+  viewEnd,
+  onPan,
+}: TimelineMinimapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
@@ -49,11 +55,12 @@ export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }
 
     // Draw event ticks (sample if too many)
     const maxTicks = 500;
-    const step = events.length > maxTicks ? Math.ceil(events.length / maxTicks) : 1;
+    const step =
+      events.length > maxTicks ? Math.ceil(events.length / maxTicks) : 1;
 
     for (let i = 0; i < events.length; i += step) {
       const event = events[i]!;
-      const pos = ((event.timestamp - timeRange.start) / timeRange.duration);
+      const pos = (event.timestamp - timeRange.start) / timeRange.duration;
       const x = Math.min(pos * w, w - 1);
       const color = EVENT_COLORS[event.type] ?? "#666";
 
@@ -72,7 +79,10 @@ export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }
       }
 
       const rect = containerRef.current.getBoundingClientRect();
-      const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const fraction = Math.max(
+        0,
+        Math.min(1, (e.clientX - rect.left) / rect.width),
+      );
       onPan(fraction);
     },
     [onPan],
@@ -101,29 +111,32 @@ export function TimelineMinimap({ events, timeRange, viewStart, viewEnd, onPan }
   }, []);
 
   // Keyboard handling for WCAG 4.1.2 slider semantics
-  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const step = 0.05;
-    switch (e.key) {
-      case "ArrowLeft":
-      case "ArrowDown":
-        e.preventDefault();
-        onPan(Math.max(0, viewStart - step));
-        break;
-      case "ArrowRight":
-      case "ArrowUp":
-        e.preventDefault();
-        onPan(Math.min(1, viewStart + step));
-        break;
-      case "Home":
-        e.preventDefault();
-        onPan(0);
-        break;
-      case "End":
-        e.preventDefault();
-        onPan(1);
-        break;
-    }
-  }, [onPan, viewStart]);
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const step = 0.05;
+      switch (e.key) {
+        case "ArrowLeft":
+        case "ArrowDown":
+          e.preventDefault();
+          onPan(Math.max(0, viewStart - step));
+          break;
+        case "ArrowRight":
+        case "ArrowUp":
+          e.preventDefault();
+          onPan(Math.min(1, viewStart + step));
+          break;
+        case "Home":
+          e.preventDefault();
+          onPan(0);
+          break;
+        case "End":
+          e.preventDefault();
+          onPan(1);
+          break;
+      }
+    },
+    [onPan, viewStart],
+  );
 
   return (
     <div

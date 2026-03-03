@@ -1,6 +1,6 @@
-import type { Node } from '@xyflow/react'
+import type { Node } from "@xyflow/react";
 
-const SCALE = 1.5
+const SCALE = 1.5;
 
 /** Create a node positioned at an explicit (x, y). */
 export function positionNode<T extends Record<string, unknown>>(
@@ -10,7 +10,7 @@ export function positionNode<T extends Record<string, unknown>>(
   y: number,
   data: T,
 ): Node<T> {
-  return { id, type, position: { x: x * SCALE, y: y * SCALE }, data }
+  return { id, type, position: { x: x * SCALE, y: y * SCALE }, data };
 }
 
 /** Arrange nodes in a horizontal row, evenly spaced. */
@@ -23,7 +23,7 @@ export function horizontalRow<T extends Record<string, unknown>>(
   return nodes.map((n, i) => ({
     ...n,
     position: { x: (startX + i * spacing) * SCALE, y: y * SCALE },
-  }))
+  }));
 }
 
 /** Arrange nodes in a vertical column. */
@@ -36,7 +36,7 @@ export function verticalColumn<T extends Record<string, unknown>>(
   return nodes.map((n, i) => ({
     ...n,
     position: { x: x * SCALE, y: (startY + i * spacing) * SCALE },
-  }))
+  }));
 }
 
 /** Create a simple edge. */
@@ -44,13 +44,13 @@ export function edge(
   source: string,
   target: string,
   options?: {
-    label?: string
-    animated?: boolean
-    style?: React.CSSProperties
-    type?: string
-    data?: Record<string, unknown>
-    sourceHandle?: string
-    targetHandle?: string
+    label?: string;
+    animated?: boolean;
+    style?: React.CSSProperties;
+    type?: string;
+    data?: Record<string, unknown>;
+    sourceHandle?: string;
+    targetHandle?: string;
   },
 ) {
   return {
@@ -58,5 +58,5 @@ export function edge(
     source,
     target,
     ...options,
-  }
+  };
 }

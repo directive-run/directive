@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useSelector } from "@directive-run/vue";
 import { system } from "../system";
-import { TestIds } from "../../../../shared/test-ids";
 
 const tripled = useSelector(system, (state) => state.count * 3);
 </script>

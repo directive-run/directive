@@ -21,27 +21,27 @@
  * ```
  */
 
-import type {
-	ModuleSchema,
-	InferFacts,
-	InferDerivations,
-	InferEvents,
-} from "./schema.js";
+import type { ErrorBoundaryConfig } from "./errors.js";
 import type { Facts } from "./facts.js";
 import type { ModuleDef } from "./module.js";
-import type {
-	ConstraintsControl,
-	DebugConfig,
-	DistributableSnapshot,
-	DistributableSnapshotOptions,
-	EffectsControl,
-	RunChangelogEntry,
-	SystemInspection,
-	SystemSnapshot,
-	TimeTravelAPI,
-} from "./system.js";
 import type { Plugin } from "./plugins.js";
-import type { ErrorBoundaryConfig } from "./errors.js";
+import type {
+  InferDerivations,
+  InferEvents,
+  InferFacts,
+  ModuleSchema,
+} from "./schema.js";
+import type {
+  ConstraintsControl,
+  DebugConfig,
+  DistributableSnapshot,
+  DistributableSnapshotOptions,
+  EffectsControl,
+  RunChangelogEntry,
+  SystemInspection,
+  SystemSnapshot,
+  TimeTravelAPI,
+} from "./system.js";
 
 // ============================================================================
 // Module Map Types
@@ -103,7 +103,7 @@ export type SchemasMap = Record<string, ModuleSchema>;
  * ```
  */
 export type CrossModuleFacts<Schemas extends SchemasMap> = {
-	[K in keyof Schemas]: InferFacts<Schemas[K]>;
+  [K in keyof Schemas]: InferFacts<Schemas[K]>;
 };
 
 /**
@@ -121,7 +121,7 @@ export type CrossModuleFacts<Schemas extends SchemasMap> = {
  * ```
  */
 export type CrossModuleDerivations<Schemas extends SchemasMap> = {
-	readonly [K in keyof Schemas]: InferDerivations<Schemas[K]>;
+  readonly [K in keyof Schemas]: InferDerivations<Schemas[K]>;
 };
 
 // ============================================================================
@@ -146,10 +146,10 @@ export type CrossModuleDeps = Record<string, ModuleSchema>;
  * ```
  */
 export type CrossModuleFactsWithSelf<
-	OwnSchema extends ModuleSchema,
-	Deps extends CrossModuleDeps,
+  OwnSchema extends ModuleSchema,
+  Deps extends CrossModuleDeps,
 > = { self: InferFacts<OwnSchema> } & {
-	[K in keyof Deps]: InferFacts<Deps[K]>;
+  [K in keyof Deps]: InferFacts<Deps[K]>;
 };
 
 // ============================================================================
@@ -161,14 +161,14 @@ export type CrossModuleFactsWithSelf<
  * `facts.auth.token` instead of `facts.auth_token`
  */
 export type NamespacedFacts<Modules extends ModulesMap> = {
-	readonly [K in keyof Modules]: InferFacts<ExtractSchema<Modules[K]>>;
+  readonly [K in keyof Modules]: InferFacts<ExtractSchema<Modules[K]>>;
 };
 
 /**
  * Mutable version for constraint/resolver callbacks.
  */
 export type MutableNamespacedFacts<Modules extends ModulesMap> = {
-	[K in keyof Modules]: InferFacts<ExtractSchema<Modules[K]>>;
+  [K in keyof Modules]: InferFacts<ExtractSchema<Modules[K]>>;
 };
 
 // ============================================================================
@@ -180,7 +180,7 @@ export type MutableNamespacedFacts<Modules extends ModulesMap> = {
  * `derive.auth.status` instead of `derive.auth_status`
  */
 export type NamespacedDerivations<Modules extends ModulesMap> = {
-	readonly [K in keyof Modules]: InferDerivations<ExtractSchema<Modules[K]>>;
+  readonly [K in keyof Modules]: InferDerivations<ExtractSchema<Modules[K]>>;
 };
 
 // ============================================================================
@@ -192,7 +192,7 @@ export type NamespacedDerivations<Modules extends ModulesMap> = {
  * Events stay as discriminated union for dispatch.
  */
 export type UnionEvents<Modules extends ModulesMap> = {
-	[K in keyof Modules]: InferEvents<ExtractSchema<Modules[K]>>;
+  [K in keyof Modules]: InferEvents<ExtractSchema<Modules[K]>>;
 }[keyof Modules];
 
 // ============================================================================
@@ -203,47 +203,47 @@ export type UnionEvents<Modules extends ModulesMap> = {
  * Options for createSystem with object modules (namespaced mode).
  */
 export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
-	/** Modules as object = namespaced access */
-	modules: Modules;
-	/** Plugins to register */
-	plugins?: Array<Plugin<ModuleSchema>>;
-	/** Debug configuration */
-	debug?: DebugConfig;
-	/** Error boundary configuration */
-	errorBoundary?: ErrorBoundaryConfig;
-	/**
-	 * Tick interval for time-based systems (ms).
-	 */
-	tickMs?: number;
-	/**
-	 * Enable zero-config mode with sensible defaults.
-	 */
-	zeroConfig?: boolean;
-	/**
-	 * Initial facts to set after module init (namespaced format).
-	 * Applied after all module `init()` functions but before reconciliation.
-	 *
-	 * @example
-	 * ```typescript
-	 * createSystem({
-	 *   modules: { auth, data },
-	 *   initialFacts: {
-	 *     auth: { token: "restored-token", user: cachedUser },
-	 *     data: { users: preloadedUsers },
-	 *   },
-	 * });
-	 * ```
-	 */
-	initialFacts?: Partial<{
-		[K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
-	}>;
-	/**
-	 * Init order strategy:
-	 * - "auto" (default): Sort by crossModuleDeps topology
-	 * - "declaration": Use object key order (current behavior)
-	 * - string[]: Explicit order by namespace
-	 */
-	initOrder?: "auto" | "declaration" | Array<keyof Modules & string>;
+  /** Modules as object = namespaced access */
+  modules: Modules;
+  /** Plugins to register */
+  plugins?: Array<Plugin<ModuleSchema>>;
+  /** Debug configuration */
+  debug?: DebugConfig;
+  /** Error boundary configuration */
+  errorBoundary?: ErrorBoundaryConfig;
+  /**
+   * Tick interval for time-based systems (ms).
+   */
+  tickMs?: number;
+  /**
+   * Enable zero-config mode with sensible defaults.
+   */
+  zeroConfig?: boolean;
+  /**
+   * Initial facts to set after module init (namespaced format).
+   * Applied after all module `init()` functions but before reconciliation.
+   *
+   * @example
+   * ```typescript
+   * createSystem({
+   *   modules: { auth, data },
+   *   initialFacts: {
+   *     auth: { token: "restored-token", user: cachedUser },
+   *     data: { users: preloadedUsers },
+   *   },
+   * });
+   * ```
+   */
+  initialFacts?: Partial<{
+    [K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
+  }>;
+  /**
+   * Init order strategy:
+   * - "auto" (default): Sort by crossModuleDeps topology
+   * - "declaration": Use object key order (current behavior)
+   * - string[]: Explicit order by namespace
+   */
+  initOrder?: "auto" | "declaration" | Array<keyof Modules & string>;
 }
 
 // ============================================================================
@@ -255,247 +255,259 @@ export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
  * Facts and derivations are accessed via module namespaces.
  */
 export interface NamespacedSystem<Modules extends ModulesMap> {
-	/** System mode discriminator for type guards */
-	readonly _mode: "namespaced";
-	/** Namespaced facts accessor: system.facts.auth.token */
-	readonly facts: MutableNamespacedFacts<Modules>;
-	/** Time-travel debugging API (if enabled) */
-	readonly debug: TimeTravelAPI | null;
-	/** Namespaced derivations accessor: system.derive.auth.status */
-	readonly derive: NamespacedDerivations<Modules>;
-	/** Events accessor (union of all module events) */
-	readonly events: NamespacedEventsAccessor<Modules>;
-	/** Runtime control for constraints (disable/enable/isDisabled) */
-	readonly constraints: ConstraintsControl;
-	/** Runtime control for effects (disable/enable/isEnabled) */
-	readonly effects: EffectsControl;
-	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
-	readonly runHistory: RunChangelogEntry[] | null;
+  /** System mode discriminator for type guards */
+  readonly _mode: "namespaced";
+  /** Namespaced facts accessor: system.facts.auth.token */
+  readonly facts: MutableNamespacedFacts<Modules>;
+  /** Time-travel debugging API (if enabled) */
+  readonly debug: TimeTravelAPI | null;
+  /** Namespaced derivations accessor: system.derive.auth.status */
+  readonly derive: NamespacedDerivations<Modules>;
+  /** Events accessor (union of all module events) */
+  readonly events: NamespacedEventsAccessor<Modules>;
+  /** Runtime control for constraints (disable/enable/isDisabled) */
+  readonly constraints: ConstraintsControl;
+  /** Runtime control for effects (disable/enable/isEnabled) */
+  readonly effects: EffectsControl;
+  /** Per-run changelog entries (null if debug.runHistory is not enabled) */
+  readonly runHistory: RunChangelogEntry[] | null;
 
-	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
-	initialize(): void;
-	/** Start the system (initialize modules, begin reconciliation) */
-	start(): void;
-	/** Stop the system (cancel resolvers, stop reconciliation) */
-	stop(): void;
-	/** Destroy the system (stop and cleanup) */
-	destroy(): void;
+  /** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
+  initialize(): void;
+  /** Start the system (initialize modules, begin reconciliation) */
+  start(): void;
+  /** Stop the system (cancel resolvers, stop reconciliation) */
+  stop(): void;
+  /** Destroy the system (stop and cleanup) */
+  destroy(): void;
 
-	/** Whether the system is currently running */
-	readonly isRunning: boolean;
-	/** Whether all resolvers have completed */
-	readonly isSettled: boolean;
-	/** Whether all modules have completed initialization */
-	readonly isInitialized: boolean;
-	/** Whether system has completed first reconciliation */
-	readonly isReady: boolean;
+  /** Whether the system is currently running */
+  readonly isRunning: boolean;
+  /** Whether all resolvers have completed */
+  readonly isSettled: boolean;
+  /** Whether all modules have completed initialization */
+  readonly isInitialized: boolean;
+  /** Whether system has completed first reconciliation */
+  readonly isReady: boolean;
 
-	/** Wait for system to be fully ready (after first reconciliation) */
-	whenReady(): Promise<void>;
+  /** Wait for system to be fully ready (after first reconciliation) */
+  whenReady(): Promise<void>;
 
-	/**
-	 * Hydrate facts from async source (call before start).
-	 * Useful for restoring state from localStorage, API, etc.
-	 *
-	 * @example
-	 * ```typescript
-	 * const system = createSystem({ modules: { auth, data } });
-	 * await system.hydrate(async () => {
-	 *   const stored = localStorage.getItem("app-state");
-	 *   return stored ? JSON.parse(stored) : {};
-	 * });
-	 * system.start();
-	 * ```
-	 */
-	hydrate(
-		loader: () => Promise<Partial<{
-			[K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
-		}>> | Partial<{
-			[K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
-		}>,
-	): Promise<void>;
+  /**
+   * Hydrate facts from async source (call before start).
+   * Useful for restoring state from localStorage, API, etc.
+   *
+   * @example
+   * ```typescript
+   * const system = createSystem({ modules: { auth, data } });
+   * await system.hydrate(async () => {
+   *   const stored = localStorage.getItem("app-state");
+   *   return stored ? JSON.parse(stored) : {};
+   * });
+   * system.start();
+   * ```
+   */
+  hydrate(
+    loader: () =>
+      | Promise<
+          Partial<{
+            [K in keyof Modules]: Partial<
+              InferFacts<ExtractSchema<Modules[K]>>
+            >;
+          }>
+        >
+      | Partial<{
+          [K in keyof Modules]: Partial<InferFacts<ExtractSchema<Modules[K]>>>;
+        }>,
+  ): Promise<void>;
 
-	/** Dispatch an event (union of all module events) */
-	dispatch(event: UnionEvents<Modules>): void;
+  /** Dispatch an event (union of all module events) */
+  dispatch(event: UnionEvents<Modules>): void;
 
-	/** Batch multiple fact changes */
-	batch(fn: () => void): void;
+  /** Batch multiple fact changes */
+  batch(fn: () => void): void;
 
-	/**
-	 * Subscribe to settlement state changes.
-	 * Called whenever the system's settled state may have changed
-	 * (resolver starts/completes, reconcile starts/ends).
-	 */
-	onSettledChange(listener: () => void): () => void;
+  /**
+   * Subscribe to settlement state changes.
+   * Called whenever the system's settled state may have changed
+   * (resolver starts/completes, reconcile starts/ends).
+   */
+  onSettledChange(listener: () => void): () => void;
 
-	/** Subscribe to time-travel state changes (snapshot taken, navigation). */
-	onTimeTravelChange(listener: () => void): () => void;
+  /** Subscribe to time-travel state changes (snapshot taken, navigation). */
+  onTimeTravelChange(listener: () => void): () => void;
 
-	/**
-	 * Read a derivation value by namespaced key.
-	 * Accepts "namespace.key" format (e.g., "auth.status").
-	 *
-	 * @example
-	 * system.read("auth.status")  // → "authenticated"
-	 * system.read("data.count")   // → 5
-	 */
-	read<T = unknown>(derivationId: string): T;
+  /**
+   * Read a derivation value by namespaced key.
+   * Accepts "namespace.key" format (e.g., "auth.status").
+   *
+   * @example
+   * system.read("auth.status")  // → "authenticated"
+   * system.read("data.count")   // → 5
+   */
+  read<T = unknown>(derivationId: string): T;
 
-	/**
-	 * Subscribe to fact or derivation changes using namespaced keys.
-	 * Keys are auto-detected — pass any mix of fact keys and derivation keys.
-	 * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
-	 * Supports wildcard "namespace.*" to subscribe to all keys in a module.
-	 *
-	 * @example
-	 * system.subscribe(["auth.token", "data.count"], () => {
-	 *   console.log("Auth or data changed");
-	 * });
-	 *
-	 * @example Wildcard
-	 * system.subscribe(["game.*"], () => render());
-	 */
-	subscribe(ids: string[], listener: () => void): () => void;
+  /**
+   * Subscribe to fact or derivation changes using namespaced keys.
+   * Keys are auto-detected — pass any mix of fact keys and derivation keys.
+   * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
+   * Supports wildcard "namespace.*" to subscribe to all keys in a module.
+   *
+   * @example
+   * system.subscribe(["auth.token", "data.count"], () => {
+   *   console.log("Auth or data changed");
+   * });
+   *
+   * @example Wildcard
+   * system.subscribe(["game.*"], () => render());
+   */
+  subscribe(ids: string[], listener: () => void): () => void;
 
-	/**
-	 * Subscribe to ALL fact and derivation changes in a module namespace.
-	 * Shorthand for subscribing to every key in a module.
-	 *
-	 * @example
-	 * system.subscribeModule("game", () => render());
-	 * system.subscribeModule("chat", () => render());
-	 */
-	subscribeModule(namespace: keyof Modules & string, listener: () => void): () => void;
+  /**
+   * Subscribe to ALL fact and derivation changes in a module namespace.
+   * Shorthand for subscribing to every key in a module.
+   *
+   * @example
+   * system.subscribeModule("game", () => render());
+   * system.subscribeModule("chat", () => render());
+   */
+  subscribeModule(
+    namespace: keyof Modules & string,
+    listener: () => void,
+  ): () => void;
 
-	/**
-	 * Watch a fact or derivation for changes using namespaced key.
-	 * The key is auto-detected -- works with both fact keys and derivation keys.
-	 * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
-	 * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
-	 *
-	 * @example
-	 * system.watch("auth.token", (newVal, oldVal) => {
-	 *   console.log(`Token changed from ${oldVal} to ${newVal}`);
-	 * });
-	 */
-	watch<T = unknown>(
-		id: string,
-		callback: (newValue: T, previousValue: T | undefined) => void,
-		options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
-	): () => void;
+  /**
+   * Watch a fact or derivation for changes using namespaced key.
+   * The key is auto-detected -- works with both fact keys and derivation keys.
+   * Accepts "namespace.key" format (e.g., "auth.status", "auth.token").
+   * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
+   *
+   * @example
+   * system.watch("auth.token", (newVal, oldVal) => {
+   *   console.log(`Token changed from ${oldVal} to ${newVal}`);
+   * });
+   */
+  watch<T = unknown>(
+    id: string,
+    callback: (newValue: T, previousValue: T | undefined) => void,
+    options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
+  ): () => void;
 
-	/**
-	 * Returns a promise that resolves when the predicate becomes true.
-	 * The predicate is evaluated against current facts and re-evaluated on every change.
-	 * Uses namespaced facts: `facts.auth.token`, `facts.data.count`, etc.
-	 * Optionally pass a timeout in ms -- rejects with an error if exceeded.
-	 *
-	 * @example
-	 * await system.when((facts) => facts.auth.token !== null);
-	 * await system.when((facts) => facts.auth.token !== null, { timeout: 5000 });
-	 */
-	when(
-		predicate: (facts: Readonly<MutableNamespacedFacts<Modules>>) => boolean,
-		options?: { timeout?: number },
-	): Promise<void>;
+  /**
+   * Returns a promise that resolves when the predicate becomes true.
+   * The predicate is evaluated against current facts and re-evaluated on every change.
+   * Uses namespaced facts: `facts.auth.token`, `facts.data.count`, etc.
+   * Optionally pass a timeout in ms -- rejects with an error if exceeded.
+   *
+   * @example
+   * await system.when((facts) => facts.auth.token !== null);
+   * await system.when((facts) => facts.auth.token !== null, { timeout: 5000 });
+   */
+  when(
+    predicate: (facts: Readonly<MutableNamespacedFacts<Modules>>) => boolean,
+    options?: { timeout?: number },
+  ): Promise<void>;
 
-	/** Inspect system state */
-	inspect(): SystemInspection;
-	/** Wait for system to settle (all resolvers complete) */
-	settle(maxWait?: number): Promise<void>;
-	/** Explain why a requirement exists */
-	explain(requirementId: string): string | null;
-	/** Get serializable snapshot of system state */
-	getSnapshot(): SystemSnapshot;
-	/** Restore system state from snapshot */
-	restore(snapshot: SystemSnapshot): void;
+  /** Inspect system state */
+  inspect(): SystemInspection;
+  /** Wait for system to settle (all resolvers complete) */
+  settle(maxWait?: number): Promise<void>;
+  /** Explain why a requirement exists */
+  explain(requirementId: string): string | null;
+  /** Get serializable snapshot of system state */
+  getSnapshot(): SystemSnapshot;
+  /** Restore system state from snapshot */
+  restore(snapshot: SystemSnapshot): void;
 
-	/**
-	 * Register a new module into a running system.
-	 * The module is initialized, wired into constraint/resolver/derivation graphs,
-	 * and reconciliation is triggered.
-	 *
-	 * @example
-	 * ```typescript
-	 * // Lazy-load a module
-	 * const chatModule = await import('./modules/chat');
-	 * system.registerModule("chat", chatModule.default);
-	 * ```
-	 */
-	registerModule<S extends ModuleSchema>(
-		namespace: string,
-		moduleDef: ModuleDef<S>,
-	): void;
+  /**
+   * Register a new module into a running system.
+   * The module is initialized, wired into constraint/resolver/derivation graphs,
+   * and reconciliation is triggered.
+   *
+   * @example
+   * ```typescript
+   * // Lazy-load a module
+   * const chatModule = await import('./modules/chat');
+   * system.registerModule("chat", chatModule.default);
+   * ```
+   */
+  registerModule<S extends ModuleSchema>(
+    namespace: string,
+    moduleDef: ModuleDef<S>,
+  ): void;
 
-	/**
-	 * Get a distributable snapshot of computed derivations.
-	 * Use "namespace.key" format for derivation keys.
-	 *
-	 * @example
-	 * ```typescript
-	 * const snapshot = system.getDistributableSnapshot({
-	 *   includeDerivations: ['auth.effectivePlan', 'auth.canUseFeature'],
-	 *   ttlSeconds: 3600,
-	 * });
-	 * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
-	 * ```
-	 */
-	getDistributableSnapshot<T = Record<string, unknown>>(
-		options?: DistributableSnapshotOptions,
-	): DistributableSnapshot<T>;
+  /**
+   * Get a distributable snapshot of computed derivations.
+   * Use "namespace.key" format for derivation keys.
+   *
+   * @example
+   * ```typescript
+   * const snapshot = system.getDistributableSnapshot({
+   *   includeDerivations: ['auth.effectivePlan', 'auth.canUseFeature'],
+   *   ttlSeconds: 3600,
+   * });
+   * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+   * ```
+   */
+  getDistributableSnapshot<T = Record<string, unknown>>(
+    options?: DistributableSnapshotOptions,
+  ): DistributableSnapshot<T>;
 
-	/**
-	 * Watch for changes to distributable snapshot derivations.
-	 * Calls the callback whenever any of the included derivations change.
-	 * Use "namespace.key" format for derivation keys.
-	 * Returns an unsubscribe function.
-	 *
-	 * @example
-	 * ```typescript
-	 * const unsubscribe = system.watchDistributableSnapshot(
-	 *   { includeDerivations: ['auth.effectivePlan', 'auth.canUseFeature'] },
-	 *   (snapshot) => {
-	 *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
-	 *   }
-	 * );
-	 * ```
-	 */
-	watchDistributableSnapshot<T = Record<string, unknown>>(
-		options: DistributableSnapshotOptions,
-		callback: (snapshot: DistributableSnapshot<T>) => void,
-	): () => void;
+  /**
+   * Watch for changes to distributable snapshot derivations.
+   * Calls the callback whenever any of the included derivations change.
+   * Use "namespace.key" format for derivation keys.
+   * Returns an unsubscribe function.
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = system.watchDistributableSnapshot(
+   *   { includeDerivations: ['auth.effectivePlan', 'auth.canUseFeature'] },
+   *   (snapshot) => {
+   *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+   *   }
+   * );
+   * ```
+   */
+  watchDistributableSnapshot<T = Record<string, unknown>>(
+    options: DistributableSnapshotOptions,
+    callback: (snapshot: DistributableSnapshot<T>) => void,
+  ): () => void;
 }
 
 /**
  * Events accessor that groups event dispatchers by module namespace.
  */
 export type NamespacedEventsAccessor<Modules extends ModulesMap> = {
-	readonly [K in keyof Modules]: EventsDispatcherForModule<Modules[K]>;
+  readonly [K in keyof Modules]: EventsDispatcherForModule<Modules[K]>;
 };
 
 /**
  * Event dispatcher functions for a single module.
  */
 type EventsDispatcherForModule<M> = M extends ModuleDef<infer S>
-	? S extends ModuleSchema
-		? S["events"] extends Record<string, unknown>
-			? {
-					[E in keyof S["events"]]: S["events"][E] extends Record<string, unknown>
-						? keyof S["events"][E] extends never
-							? () => void
-							: (payload: InferEventPayload<S["events"][E]>) => void
-						: () => void;
-				}
-			: Record<string, never>
-		: Record<string, never>
-	: Record<string, never>;
+  ? S extends ModuleSchema
+    ? S["events"] extends Record<string, unknown>
+      ? {
+          [E in keyof S["events"]]: S["events"][E] extends Record<
+            string,
+            unknown
+          >
+            ? keyof S["events"][E] extends never
+              ? () => void
+              : (payload: InferEventPayload<S["events"][E]>) => void
+            : () => void;
+        }
+      : Record<string, never>
+    : Record<string, never>
+  : Record<string, never>;
 
 /**
  * Infer event payload from event schema.
  */
 type InferEventPayload<E> = E extends Record<string, unknown>
-	? { [K in keyof E]: E[K] extends { _type: infer T } ? T : E[K] }
-	: never;
+  ? { [K in keyof E]: E[K] extends { _type: infer T } ? T : E[K] }
+  : never;
 
 // ============================================================================
 // Merged Schema Type (for internal use)
@@ -513,38 +525,62 @@ type InferEventPayload<E> = E extends Record<string, unknown>
  * ```
  */
 export type MergedModuleSchema<Modules extends ModulesMap> = {
-	facts: MergeFactsWithPrefix<Modules>;
-	derivations: MergeDerivationsWithPrefix<Modules>;
-	events: MergeEventsWithPrefix<Modules>;
-	requirements: MergeRequirementsWithPrefix<Modules>;
+  facts: MergeFactsWithPrefix<Modules>;
+  derivations: MergeDerivationsWithPrefix<Modules>;
+  events: MergeEventsWithPrefix<Modules>;
+  requirements: MergeRequirementsWithPrefix<Modules>;
 };
 
 type MergeFactsWithPrefix<Modules extends ModulesMap> = {
-	[K in keyof Modules as `${K & string}::${keyof ExtractSchema<Modules[K]>["facts"] & string}`]: ExtractSchema<Modules[K]>["facts"][keyof ExtractSchema<Modules[K]>["facts"]];
+  [K in keyof Modules as `${K & string}::${keyof ExtractSchema<Modules[K]>["facts"] & string}`]: ExtractSchema<
+    Modules[K]
+  >["facts"][keyof ExtractSchema<Modules[K]>["facts"]];
 };
 
 type MergeDerivationsWithPrefix<Modules extends ModulesMap> = {
-	[K in keyof Modules as ExtractSchema<Modules[K]>["derivations"] extends Record<string, unknown>
-		? `${K & string}::${keyof ExtractSchema<Modules[K]>["derivations"] & string}`
-		: never]: ExtractSchema<Modules[K]>["derivations"] extends Record<string, unknown>
-		? ExtractSchema<Modules[K]>["derivations"][keyof ExtractSchema<Modules[K]>["derivations"]]
-		: never;
+  [K in keyof Modules as ExtractSchema<
+    Modules[K]
+  >["derivations"] extends Record<string, unknown>
+    ? `${K & string}::${keyof ExtractSchema<Modules[K]>["derivations"] & string}`
+    : never]: ExtractSchema<Modules[K]>["derivations"] extends Record<
+    string,
+    unknown
+  >
+    ? ExtractSchema<Modules[K]>["derivations"][keyof ExtractSchema<
+        Modules[K]
+      >["derivations"]]
+    : never;
 };
 
 type MergeEventsWithPrefix<Modules extends ModulesMap> = {
-	[K in keyof Modules as ExtractSchema<Modules[K]>["events"] extends Record<string, unknown>
-		? `${K & string}::${keyof ExtractSchema<Modules[K]>["events"] & string}`
-		: never]: ExtractSchema<Modules[K]>["events"] extends Record<string, unknown>
-		? ExtractSchema<Modules[K]>["events"][keyof ExtractSchema<Modules[K]>["events"]]
-		: never;
+  [K in keyof Modules as ExtractSchema<Modules[K]>["events"] extends Record<
+    string,
+    unknown
+  >
+    ? `${K & string}::${keyof ExtractSchema<Modules[K]>["events"] & string}`
+    : never]: ExtractSchema<Modules[K]>["events"] extends Record<
+    string,
+    unknown
+  >
+    ? ExtractSchema<Modules[K]>["events"][keyof ExtractSchema<
+        Modules[K]
+      >["events"]]
+    : never;
 };
 
 type MergeRequirementsWithPrefix<Modules extends ModulesMap> = {
-	[K in keyof Modules as ExtractSchema<Modules[K]>["requirements"] extends Record<string, unknown>
-		? keyof ExtractSchema<Modules[K]>["requirements"] & string
-		: never]: ExtractSchema<Modules[K]>["requirements"] extends Record<string, unknown>
-		? ExtractSchema<Modules[K]>["requirements"][keyof ExtractSchema<Modules[K]>["requirements"]]
-		: never;
+  [K in keyof Modules as ExtractSchema<
+    Modules[K]
+  >["requirements"] extends Record<string, unknown>
+    ? keyof ExtractSchema<Modules[K]>["requirements"] & string
+    : never]: ExtractSchema<Modules[K]>["requirements"] extends Record<
+    string,
+    unknown
+  >
+    ? ExtractSchema<Modules[K]>["requirements"][keyof ExtractSchema<
+        Modules[K]
+      >["requirements"]]
+    : never;
 };
 
 // ============================================================================
@@ -555,23 +591,23 @@ type MergeRequirementsWithPrefix<Modules extends ModulesMap> = {
  * Options for createSystem with a single module (no namespacing).
  */
 export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
-	/** Single module = direct access (use `modules` for multiple) */
-	module: ModuleDef<S>;
-	/** Plugins to register */
-	plugins?: Array<Plugin<ModuleSchema>>;
-	/** Debug configuration */
-	debug?: DebugConfig;
-	/** Error boundary configuration */
-	errorBoundary?: ErrorBoundaryConfig;
-	/** Tick interval for time-based systems (ms) */
-	tickMs?: number;
-	/** Enable zero-config mode with sensible defaults */
-	zeroConfig?: boolean;
-	/**
-	 * Initial facts to set after module init.
-	 * Applied after module `init()` but before reconciliation.
-	 */
-	initialFacts?: Partial<InferFacts<S>>;
+  /** Single module = direct access (use `modules` for multiple) */
+  module: ModuleDef<S>;
+  /** Plugins to register */
+  plugins?: Array<Plugin<ModuleSchema>>;
+  /** Debug configuration */
+  debug?: DebugConfig;
+  /** Error boundary configuration */
+  errorBoundary?: ErrorBoundaryConfig;
+  /** Tick interval for time-based systems (ms) */
+  tickMs?: number;
+  /** Enable zero-config mode with sensible defaults */
+  zeroConfig?: boolean;
+  /**
+   * Initial facts to set after module init.
+   * Applied after module `init()` but before reconciliation.
+   */
+  initialFacts?: Partial<InferFacts<S>>;
 }
 
 /**
@@ -579,183 +615,183 @@ export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
  * Facts, derivations, and events are accessed directly.
  */
 export interface SingleModuleSystem<S extends ModuleSchema> {
-	/** System mode discriminator for type guards */
-	readonly _mode: "single";
-	/** Direct facts accessor: system.facts.count */
-	readonly facts: Facts<S["facts"]>;
-	/** Time-travel debugging API (if enabled) */
-	readonly debug: TimeTravelAPI | null;
-	/** Direct derivations accessor: system.derive.doubled */
-	readonly derive: InferDerivations<S>;
-	/** Direct events accessor: system.events.increment() */
-	readonly events: SingleModuleEvents<S>;
-	/** Runtime control for constraints (disable/enable/isDisabled) */
-	readonly constraints: ConstraintsControl;
-	/** Runtime control for effects (disable/enable/isEnabled) */
-	readonly effects: EffectsControl;
-	/** Per-run changelog entries (null if debug.runHistory is not enabled) */
-	readonly runHistory: RunChangelogEntry[] | null;
+  /** System mode discriminator for type guards */
+  readonly _mode: "single";
+  /** Direct facts accessor: system.facts.count */
+  readonly facts: Facts<S["facts"]>;
+  /** Time-travel debugging API (if enabled) */
+  readonly debug: TimeTravelAPI | null;
+  /** Direct derivations accessor: system.derive.doubled */
+  readonly derive: InferDerivations<S>;
+  /** Direct events accessor: system.events.increment() */
+  readonly events: SingleModuleEvents<S>;
+  /** Runtime control for constraints (disable/enable/isDisabled) */
+  readonly constraints: ConstraintsControl;
+  /** Runtime control for effects (disable/enable/isEnabled) */
+  readonly effects: EffectsControl;
+  /** Per-run changelog entries (null if debug.runHistory is not enabled) */
+  readonly runHistory: RunChangelogEntry[] | null;
 
-	/** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
-	initialize(): void;
-	/** Start the system (initialize modules, begin reconciliation) */
-	start(): void;
-	/** Stop the system (cancel resolvers, stop reconciliation) */
-	stop(): void;
-	/** Destroy the system (stop and cleanup) */
-	destroy(): void;
+  /** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
+  initialize(): void;
+  /** Start the system (initialize modules, begin reconciliation) */
+  start(): void;
+  /** Stop the system (cancel resolvers, stop reconciliation) */
+  stop(): void;
+  /** Destroy the system (stop and cleanup) */
+  destroy(): void;
 
-	/** Whether the system is currently running */
-	readonly isRunning: boolean;
-	/** Whether all resolvers have completed */
-	readonly isSettled: boolean;
-	/** Whether module has completed initialization */
-	readonly isInitialized: boolean;
-	/** Whether system has completed first reconciliation */
-	readonly isReady: boolean;
+  /** Whether the system is currently running */
+  readonly isRunning: boolean;
+  /** Whether all resolvers have completed */
+  readonly isSettled: boolean;
+  /** Whether module has completed initialization */
+  readonly isInitialized: boolean;
+  /** Whether system has completed first reconciliation */
+  readonly isReady: boolean;
 
-	/** Wait for system to be fully ready (after first reconciliation) */
-	whenReady(): Promise<void>;
+  /** Wait for system to be fully ready (after first reconciliation) */
+  whenReady(): Promise<void>;
 
-	/**
-	 * Hydrate facts from async source (call before start).
-	 */
-	hydrate(
-		loader: () => Promise<Partial<InferFacts<S>>> | Partial<InferFacts<S>>,
-	): Promise<void>;
+  /**
+   * Hydrate facts from async source (call before start).
+   */
+  hydrate(
+    loader: () => Promise<Partial<InferFacts<S>>> | Partial<InferFacts<S>>,
+  ): Promise<void>;
 
-	/** Dispatch an event */
-	dispatch(event: InferEvents<S>): void;
+  /** Dispatch an event */
+  dispatch(event: InferEvents<S>): void;
 
-	/** Batch multiple fact changes */
-	batch(fn: () => void): void;
+  /** Batch multiple fact changes */
+  batch(fn: () => void): void;
 
-	/**
-	 * Subscribe to settlement state changes.
-	 * Called whenever the system's settled state may have changed
-	 * (resolver starts/completes, reconcile starts/ends).
-	 */
-	onSettledChange(listener: () => void): () => void;
+  /**
+   * Subscribe to settlement state changes.
+   * Called whenever the system's settled state may have changed
+   * (resolver starts/completes, reconcile starts/ends).
+   */
+  onSettledChange(listener: () => void): () => void;
 
-	/** Subscribe to time-travel state changes (snapshot taken, navigation). */
-	onTimeTravelChange(listener: () => void): () => void;
+  /** Subscribe to time-travel state changes (snapshot taken, navigation). */
+  onTimeTravelChange(listener: () => void): () => void;
 
-	/**
-	 * Read a derivation value by key.
-	 * @example system.read("doubled")
-	 */
-	read<T = unknown>(derivationId: string): T;
+  /**
+   * Read a derivation value by key.
+   * @example system.read("doubled")
+   */
+  read<T = unknown>(derivationId: string): T;
 
-	/**
-	 * Subscribe to fact or derivation changes.
-	 * Keys are auto-detected -- pass any mix of fact keys and derivation keys.
-	 * @example system.subscribe(["count", "doubled"], () => { ... })
-	 */
-	subscribe(ids: string[], listener: () => void): () => void;
+  /**
+   * Subscribe to fact or derivation changes.
+   * Keys are auto-detected -- pass any mix of fact keys and derivation keys.
+   * @example system.subscribe(["count", "doubled"], () => { ... })
+   */
+  subscribe(ids: string[], listener: () => void): () => void;
 
-	/**
-	 * Watch a fact or derivation for value changes.
-	 * The key is auto-detected -- works with both fact keys and derivation keys.
-	 * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
-	 * @example system.watch("count", (newVal, oldVal) => { ... })
-	 * @example system.watch("derived", cb, { equalityFn: shallowEqual })
-	 */
-	watch<T = unknown>(
-		id: string,
-		callback: (newValue: T, previousValue: T | undefined) => void,
-		options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
-	): () => void;
+  /**
+   * Watch a fact or derivation for value changes.
+   * The key is auto-detected -- works with both fact keys and derivation keys.
+   * Pass `options.equalityFn` for custom comparison (e.g., shallow equality for objects).
+   * @example system.watch("count", (newVal, oldVal) => { ... })
+   * @example system.watch("derived", cb, { equalityFn: shallowEqual })
+   */
+  watch<T = unknown>(
+    id: string,
+    callback: (newValue: T, previousValue: T | undefined) => void,
+    options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
+  ): () => void;
 
-	/**
-	 * Returns a promise that resolves when the predicate becomes true.
-	 * The predicate is evaluated against current facts and re-evaluated on every change.
-	 * Optionally pass a timeout in ms -- rejects with an error if exceeded.
-	 *
-	 * @example
-	 * await system.when((facts) => facts.count > 10);
-	 * await system.when((facts) => facts.count > 10, { timeout: 5000 });
-	 */
-	when(
-		predicate: (facts: Readonly<InferFacts<S>>) => boolean,
-		options?: { timeout?: number },
-	): Promise<void>;
+  /**
+   * Returns a promise that resolves when the predicate becomes true.
+   * The predicate is evaluated against current facts and re-evaluated on every change.
+   * Optionally pass a timeout in ms -- rejects with an error if exceeded.
+   *
+   * @example
+   * await system.when((facts) => facts.count > 10);
+   * await system.when((facts) => facts.count > 10, { timeout: 5000 });
+   */
+  when(
+    predicate: (facts: Readonly<InferFacts<S>>) => boolean,
+    options?: { timeout?: number },
+  ): Promise<void>;
 
-	/** Inspect system state */
-	inspect(): SystemInspection;
-	/** Wait for system to settle (all resolvers complete) */
-	settle(maxWait?: number): Promise<void>;
-	/** Explain why a requirement exists */
-	explain(requirementId: string): string | null;
-	/** Get serializable snapshot of system state */
-	getSnapshot(): SystemSnapshot;
-	/** Restore system state from snapshot */
-	restore(snapshot: SystemSnapshot): void;
+  /** Inspect system state */
+  inspect(): SystemInspection;
+  /** Wait for system to settle (all resolvers complete) */
+  settle(maxWait?: number): Promise<void>;
+  /** Explain why a requirement exists */
+  explain(requirementId: string): string | null;
+  /** Get serializable snapshot of system state */
+  getSnapshot(): SystemSnapshot;
+  /** Restore system state from snapshot */
+  restore(snapshot: SystemSnapshot): void;
 
-	/**
-	 * Register a new module into a running system.
-	 * Module facts, derivations, effects, constraints, and resolvers are merged
-	 * into the existing engine and reconciliation is triggered.
-	 *
-	 * @example
-	 * ```typescript
-	 * const analyticsModule = await import('./modules/analytics');
-	 * system.registerModule(analyticsModule.default);
-	 * ```
-	 */
-	registerModule<S2 extends ModuleSchema>(moduleDef: ModuleDef<S2>): void;
+  /**
+   * Register a new module into a running system.
+   * Module facts, derivations, effects, constraints, and resolvers are merged
+   * into the existing engine and reconciliation is triggered.
+   *
+   * @example
+   * ```typescript
+   * const analyticsModule = await import('./modules/analytics');
+   * system.registerModule(analyticsModule.default);
+   * ```
+   */
+  registerModule<S2 extends ModuleSchema>(moduleDef: ModuleDef<S2>): void;
 
-	/**
-	 * Get a distributable snapshot of computed derivations.
-	 *
-	 * @example
-	 * ```typescript
-	 * const snapshot = system.getDistributableSnapshot({
-	 *   includeDerivations: ['effectivePlan', 'canUseFeature'],
-	 *   ttlSeconds: 3600,
-	 * });
-	 * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
-	 * ```
-	 */
-	getDistributableSnapshot<T = Record<string, unknown>>(
-		options?: DistributableSnapshotOptions,
-	): DistributableSnapshot<T>;
+  /**
+   * Get a distributable snapshot of computed derivations.
+   *
+   * @example
+   * ```typescript
+   * const snapshot = system.getDistributableSnapshot({
+   *   includeDerivations: ['effectivePlan', 'canUseFeature'],
+   *   ttlSeconds: 3600,
+   * });
+   * await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+   * ```
+   */
+  getDistributableSnapshot<T = Record<string, unknown>>(
+    options?: DistributableSnapshotOptions,
+  ): DistributableSnapshot<T>;
 
-	/**
-	 * Watch for changes to distributable snapshot derivations.
-	 * Calls the callback whenever any of the included derivations change.
-	 * Returns an unsubscribe function.
-	 *
-	 * @example
-	 * ```typescript
-	 * const unsubscribe = system.watchDistributableSnapshot(
-	 *   { includeDerivations: ['effectivePlan', 'canUseFeature'] },
-	 *   (snapshot) => {
-	 *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
-	 *   }
-	 * );
-	 * ```
-	 */
-	watchDistributableSnapshot<T = Record<string, unknown>>(
-		options: DistributableSnapshotOptions,
-		callback: (snapshot: DistributableSnapshot<T>) => void,
-	): () => void;
+  /**
+   * Watch for changes to distributable snapshot derivations.
+   * Calls the callback whenever any of the included derivations change.
+   * Returns an unsubscribe function.
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = system.watchDistributableSnapshot(
+   *   { includeDerivations: ['effectivePlan', 'canUseFeature'] },
+   *   (snapshot) => {
+   *     await redis.setex(`entitlements:${userId}`, 3600, JSON.stringify(snapshot));
+   *   }
+   * );
+   * ```
+   */
+  watchDistributableSnapshot<T = Record<string, unknown>>(
+    options: DistributableSnapshotOptions,
+    callback: (snapshot: DistributableSnapshot<T>) => void,
+  ): () => void;
 }
 
 /**
  * Events dispatcher for a single module (direct access).
  */
 type SingleModuleEvents<S extends ModuleSchema> = S["events"] extends Record<
-	string,
-	unknown
+  string,
+  unknown
 >
-	? {
-			[E in keyof S["events"]]: S["events"][E] extends Record<string, unknown>
-				? keyof S["events"][E] extends never
-					? () => void
-					: (payload: InferEventPayload<S["events"][E]>) => void
-				: () => void;
-		}
-	: Record<string, never>;
+  ? {
+      [E in keyof S["events"]]: S["events"][E] extends Record<string, unknown>
+        ? keyof S["events"][E] extends never
+          ? () => void
+          : (payload: InferEventPayload<S["events"][E]>) => void
+        : () => void;
+    }
+  : Record<string, never>;
 
 // ============================================================================
 // Type Guards
@@ -773,15 +809,15 @@ export type SystemMode = "single" | "namespaced";
  * Use this for functions that accept either system type.
  */
 export interface AnySystem {
-	readonly _mode: SystemMode;
-	readonly isRunning: boolean;
-	readonly isSettled: boolean;
-	readonly isInitialized: boolean;
-	readonly isReady: boolean;
-	initialize(): void;
-	start(): void;
-	stop(): void;
-	destroy(): void;
+  readonly _mode: SystemMode;
+  readonly isRunning: boolean;
+  readonly isSettled: boolean;
+  readonly isInitialized: boolean;
+  readonly isReady: boolean;
+  initialize(): void;
+  start(): void;
+  stop(): void;
+  destroy(): void;
 }
 
 /**
@@ -799,7 +835,7 @@ export interface AnySystem {
  * ```
  */
 export function isSingleModuleSystem(system: AnySystem): boolean {
-	return system._mode === "single";
+  return system._mode === "single";
 }
 
 /**
@@ -817,5 +853,5 @@ export function isSingleModuleSystem(system: AnySystem): boolean {
  * ```
  */
 export function isNamespacedSystem(system: AnySystem): boolean {
-	return system._mode === "namespaced";
+  return system._mode === "namespaced";
 }

@@ -1,18 +1,18 @@
-'use client'
+"use client";
 
-import { CodeTabs } from '@/components/CodeTabs'
-import { ExampleEmbed } from '@/components/ExampleEmbed'
+import { CodeTabs } from "@/components/CodeTabs";
+import { ExampleEmbed } from "@/components/ExampleEmbed";
 
 export function CheckersDemo({
   build,
   sources,
 }: {
-  build: import('@/lib/examples').ExampleBuild | null
-  sources: import('@/lib/examples').ExampleSource[]
+  build: import("@/lib/examples").ExampleBuild | null;
+  sources: import("@/lib/examples").ExampleSource[];
 }) {
-  const gameSource = sources.find((s) => s.filename === 'game.ts')
-  const mainSource = sources.find((s) => s.filename === 'main.ts')
-  const rulesSource = sources.find((s) => s.filename === 'rules.ts')
+  const gameSource = sources.find((s) => s.filename === "game.ts");
+  const mainSource = sources.find((s) => s.filename === "main.ts");
+  const rulesSource = sources.find((s) => s.filename === "rules.ts");
 
   return (
     <div className="space-y-8">
@@ -31,8 +31,8 @@ export function CheckersDemo({
           />
         ) : (
           <div className="rounded-xl border border-slate-700 bg-[#0f172a] p-8 text-center text-sm text-slate-400">
-            Example not built yet. Run{' '}
-            <code className="text-slate-300">pnpm build:example checkers</code>{' '}
+            Example not built yet. Run{" "}
+            <code className="text-slate-300">pnpm build:example checkers</code>{" "}
             to generate the embed.
           </div>
         )}
@@ -50,11 +50,11 @@ export function CheckersDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            The game is built as a{' '}
+            The game is built as a{" "}
             <strong className="text-slate-900 dark:text-slate-200">
               multi-module Directive system
-            </strong>{' '}
-            with two modules: <code>game</code> (board logic) and{' '}
+            </strong>{" "}
+            with two modules: <code>game</code> (board logic) and{" "}
             <code>chat</code> (AI conversation). Pure game rules live in a
             separate <code>rules.ts</code> file with no Directive dependency.
           </p>
@@ -62,40 +62,40 @@ export function CheckersDemo({
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Facts
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Board state, current player, selection, game mode
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Derivations
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Valid moves, highlight squares, score (auto-tracked, no
               manual deps)
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Events
-              </strong>{' '}
+              </strong>{" "}
               &ndash; <code>clickSquare</code> sets selection and target
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Constraints
-              </strong>{' '}
+              </strong>{" "}
               &ndash; <code>executeMove</code> fires when a valid
-              selection+target exists, <code>kingPiece</code> when on back row,{' '}
+              selection+target exists, <code>kingPiece</code> when on back row,{" "}
               <code>gameOver</code> when no moves remain
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Resolvers
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Apply the move, handle multi-jump chains, switch turns
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Effects
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Log moves and game results
             </li>
           </ol>
@@ -109,13 +109,15 @@ export function CheckersDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">
+              What:
+            </strong>{" "}
             A two-player checkers game with optional AI opponent, multi-jump
             chains, king promotion, and move validation.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
-            Built as a multi-module Directive system. The <code>game</code>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{" "}
+            Built as a multi-module Directive system. The <code>game</code>{" "}
             module tracks board state, selection, and turns. Derivations compute
             valid moves and highlights. Constraints fire when a valid move is
             selected, a piece reaches the back row, or no moves remain. Pure
@@ -125,11 +127,11 @@ export function CheckersDemo({
           <p>
             <strong className="text-slate-900 dark:text-slate-200">
               Why it works:
-            </strong>{' '}
+            </strong>{" "}
             Checkers has complex cascading logic (move &rarr; capture &rarr;
             multi-jump &rarr; king &rarr; game over). Directive&rsquo;s
-            constraint priorities handle the cascade automatically &ndash; the{' '}
-            <code>executeMove</code> constraint fires first, then{' '}
+            constraint priorities handle the cascade automatically &ndash; the{" "}
+            <code>executeMove</code> constraint fires first, then{" "}
             <code>kingPiece</code>, then <code>gameOver</code>, each reacting to
             the state the previous one left behind.
           </p>
@@ -144,26 +146,26 @@ export function CheckersDemo({
         <CodeTabs
           tabs={[
             gameSource && {
-              filename: 'game.ts',
-              label: 'game.ts - Directive module',
+              filename: "game.ts",
+              label: "game.ts - Directive module",
               code: gameSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             mainSource && {
-              filename: 'main.ts',
-              label: 'main.ts - DOM wiring',
+              filename: "main.ts",
+              label: "main.ts - DOM wiring",
               code: mainSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             rulesSource && {
-              filename: 'rules.ts',
-              label: 'rules.ts - Pure game logic',
+              filename: "rules.ts",
+              label: "rules.ts - Pure game logic",
               code: rulesSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
           ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
         />
       </section>
     </div>
-  )
+  );
 }

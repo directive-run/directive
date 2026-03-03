@@ -5,7 +5,12 @@
  * renders the form and event timeline.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
@@ -251,9 +256,7 @@ const contactForm = createModule("contact-form", {
         context.facts.status = "success";
         context.facts.lastSubmittedAt = Date.now();
         context.facts.submissionCount++;
-        log(
-          `Submission #${context.facts.submissionCount} succeeded`,
-        );
+        log(`Submission #${context.facts.submissionCount} succeeded`);
       },
     },
 
@@ -294,7 +297,10 @@ const contactForm = createModule("contact-form", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: contactForm, plugins: [devtoolsPlugin({ name: "contact-form" })] });
+const system = createSystem({
+  module: contactForm,
+  plugins: [devtoolsPlugin({ name: "contact-form" })],
+});
 system.start();
 
 // ============================================================================
@@ -403,7 +409,8 @@ function render() {
 
   // --- Timeline ---
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="cf-timeline-empty">Events appear after interactions</div>';
+    timelineEl.innerHTML =
+      '<div class="cf-timeline-empty">Events appear after interactions</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {

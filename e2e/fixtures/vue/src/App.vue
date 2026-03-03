@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import UseFact from "./hooks/UseFact.vue";
+import { onMounted, onUnmounted, ref } from "vue";
+import UseConstraintStatus from "./hooks/UseConstraintStatus.vue";
 import UseDerived from "./hooks/UseDerived.vue";
-import UseSelector from "./hooks/UseSelector.vue";
+import UseDirective from "./hooks/UseDirective.vue";
 import UseDispatch from "./hooks/UseDispatch.vue";
-import UseWatch from "./hooks/UseWatch.vue";
-import UseInspect from "./hooks/UseInspect.vue";
 import UseEvents from "./hooks/UseEvents.vue";
 import UseExplain from "./hooks/UseExplain.vue";
-import UseConstraintStatus from "./hooks/UseConstraintStatus.vue";
+import UseFact from "./hooks/UseFact.vue";
+import UseInspect from "./hooks/UseInspect.vue";
 import UseOptimisticUpdate from "./hooks/UseOptimisticUpdate.vue";
 import UseRequirementStatus from "./hooks/UseRequirementStatus.vue";
+import UseSelector from "./hooks/UseSelector.vue";
 import UseTimeTravel from "./hooks/UseTimeTravel.vue";
-import UseDirective from "./hooks/UseDirective.vue";
+import UseWatch from "./hooks/UseWatch.vue";
 
 const routes: Record<string, any> = {
   useFact: UseFact,

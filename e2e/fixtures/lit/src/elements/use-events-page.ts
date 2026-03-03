@@ -1,8 +1,8 @@
+import { FactController, useEvents } from "@directive-run/lit";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController, useEvents } from "@directive-run/lit";
-import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 const events = useEvents(system);
 

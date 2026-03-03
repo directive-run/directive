@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Shopping Cart example", () => {
@@ -7,12 +7,20 @@ test.describe("Shopping Cart example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/shopping-cart");
     try {
-      await page.waitForSelector("directive-shopping-cart", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-shopping-cart", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-shopping-cart", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-shopping-cart", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-shopping-cart-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-shopping-cart-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads with initial cart items", async ({ page }) => {
@@ -27,7 +35,10 @@ test.describe("Shopping Cart example", () => {
     const beforeSubtotal = await tid(page, "sc-subtotal").textContent();
 
     // Click + on first item
-    const firstIncrease = tid(page, "sc-item-list").locator(".sc-item").first().locator('[data-action="increase"]');
+    const firstIncrease = tid(page, "sc-item-list")
+      .locator(".sc-item")
+      .first()
+      .locator('[data-action="increase"]');
     await firstIncrease.click();
     await page.waitForTimeout(300);
 
@@ -39,7 +50,10 @@ test.describe("Shopping Cart example", () => {
   });
 
   test("remove item from cart", async ({ page }) => {
-    const removeBtn = tid(page, "sc-item-list").locator(".sc-item").first().locator('[data-action="remove"]');
+    const removeBtn = tid(page, "sc-item-list")
+      .locator(".sc-item")
+      .first()
+      .locator('[data-action="remove"]');
     await removeBtn.click();
     await page.waitForTimeout(300);
 
@@ -51,7 +65,10 @@ test.describe("Shopping Cart example", () => {
     await tid(page, "sc-coupon-input").fill("SAVE10");
     await tid(page, "sc-coupon-apply").click();
 
-    await expect(tid(page, "sc-coupon-status")).toContainText("10% off applied", { timeout: 5_000 });
+    await expect(tid(page, "sc-coupon-status")).toContainText(
+      "10% off applied",
+      { timeout: 5_000 },
+    );
     await expect(tid(page, "sc-discount")).toBeVisible();
     await expect(tid(page, "sc-discount")).toHaveText(/^-\$/);
   });
@@ -60,7 +77,9 @@ test.describe("Shopping Cart example", () => {
     await tid(page, "sc-coupon-input").fill("BOGUS");
     await tid(page, "sc-coupon-apply").click();
 
-    await expect(tid(page, "sc-coupon-status")).toContainText("Invalid code", { timeout: 5_000 });
+    await expect(tid(page, "sc-coupon-status")).toContainText("Invalid code", {
+      timeout: 5_000,
+    });
   });
 
   test("free shipping threshold", async ({ page }) => {
@@ -68,10 +87,15 @@ test.describe("Shopping Cart example", () => {
     await expect(tid(page, "sc-free-shipping")).toBeVisible();
 
     // Remove items until below threshold
-    const removeButtons = tid(page, "sc-item-list").locator('[data-action="remove"]');
+    const removeButtons = tid(page, "sc-item-list").locator(
+      '[data-action="remove"]',
+    );
     const count = await removeButtons.count();
     for (let i = 0; i < count; i++) {
-      await tid(page, "sc-item-list").locator('[data-action="remove"]').first().click();
+      await tid(page, "sc-item-list")
+        .locator('[data-action="remove"]')
+        .first()
+        .click();
       await page.waitForTimeout(300);
     }
 
