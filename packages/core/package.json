@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Constraint-driven runtime for TypeScript. Declare requirements, let the runtime resolve them.",
   "license": "MIT",
   "author": "Jason Comes",

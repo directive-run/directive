@@ -1,5 +1,12 @@
 # @directive-run/example-schema-patterns
 
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`5cbb005`](https://github.com/directive-run/directive/commit/5cbb005a9e1536b147dd7b468ba22c6a3c95dec4)]:
+  - @directive-run/core@0.4.0
+
 ## 1.0.2
 
 ### Patch Changes

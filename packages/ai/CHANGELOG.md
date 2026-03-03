@@ -1,5 +1,11 @@
 # @directive-run/ai
 
+## 0.4.0
+
+### Minor Changes
+
+- [`5cbb005`](https://github.com/directive-run/directive/commit/5cbb005a9e1536b147dd7b468ba22c6a3c95dec4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add tasks system, supervisor resilience, and enriched debug timeline to the AI orchestrator. Consolidate error handling and harden resolvers in core. Simplify DevTools with rewritten session panel and removed dead views. Fix memory message deduplication in multi-agent orchestrator.
+
 ## 0.3.0
 
 ### Minor Changes
