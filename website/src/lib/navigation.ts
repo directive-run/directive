@@ -189,9 +189,9 @@ export const aiNavigation: NavigationSection[] = [
       { title: 'Pattern Checkpoints', href: '/ai/checkpoints' },
       { title: 'Breakpoints & Checkpoints', href: '/ai/breakpoints' },
       { title: 'DevTools', href: '/ai/devtools' },
-      { title: 'Evals', href: '/ai/evals' },
-      { title: 'OpenTelemetry', href: '/ai/otel' },
-      { title: 'Testing', href: '/ai/testing' },
+      // { title: 'Evals', href: '/ai/evals' },
+      // { title: 'OpenTelemetry', href: '/ai/otel' },
+      // { title: 'Testing', href: '/ai/testing' },
     ],
   },
   {
