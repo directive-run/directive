@@ -97,6 +97,22 @@
           }
         }
       }
+    },
+    {
+      "include": [
+        "website/src/lib/notifications/**",
+        "website/src/lib/contact-form/**",
+        "website/src/lib/feature-flags/**",
+        "website/src/lib/newsletter/**",
+        "website/src/components/devtools/modules/**",
+        "website/src/components/devtools/views/graph-draw-module.ts",
+        "website/src/components/NotificationBanners.tsx",
+        "website/src/app/contact/page.tsx",
+        "website/src/app/ai/examples/chat/**"
+      ],
+      "organizeImports": {
+        "enabled": false
+      }
     }
   ]
 }
