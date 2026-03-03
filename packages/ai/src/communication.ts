@@ -141,14 +141,18 @@ export type TypedAgentMessage =
   | InformMessage
   | SubscribeMessage
   | UpdateMessage
-  | (AgentMessage & { type: "UNSUBSCRIBE" | "ACK" | "NACK" | "PING" | "PONG" | "CUSTOM" });
+  | (AgentMessage & {
+      type: "UNSUBSCRIBE" | "ACK" | "NACK" | "PING" | "PONG" | "CUSTOM";
+    });
 
 // ============================================================================
 // Message Bus Types
 // ============================================================================
 
 /** Message handler function */
-export type MessageHandler = (message: TypedAgentMessage) => void | Promise<void>;
+export type MessageHandler = (
+  message: TypedAgentMessage,
+) => void | Promise<void>;
 
 /** Subscription to messages */
 export interface Subscription {
@@ -197,7 +201,11 @@ export interface MessageBus {
   /** Publish a message */
   publish(message: Omit<TypedAgentMessage, "id" | "timestamp">): string;
   /** Subscribe to messages */
-  subscribe(agentId: string, handler: MessageHandler, filter?: MessageFilter): Subscription;
+  subscribe(
+    agentId: string,
+    handler: MessageHandler,
+    filter?: MessageFilter,
+  ): Subscription;
   /** Get message history */
   getHistory(filter?: MessageFilter, limit?: number): TypedAgentMessage[];
   /** Get a specific message by ID */
@@ -215,7 +223,10 @@ export interface MessageBus {
 // ============================================================================
 
 function generateId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`
+  );
 }
 
 /**
@@ -260,7 +271,10 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
   const messageIndex = new Map<string, TypedAgentMessage>(); // O(1) lookup by ID
   const pendingMessages = new Map<string, TypedAgentMessage[]>();
 
-  function matchesFilter(message: TypedAgentMessage, filter: MessageFilter): boolean {
+  function matchesFilter(
+    message: TypedAgentMessage,
+    filter: MessageFilter,
+  ): boolean {
     if (filter.types && !filter.types.includes(message.type)) {
       return false;
     }
@@ -276,7 +290,11 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
         return false;
       }
     }
-    if (filter.priority && message.priority && !filter.priority.includes(message.priority)) {
+    if (
+      filter.priority &&
+      message.priority &&
+      !filter.priority.includes(message.priority)
+    ) {
       return false;
     }
     if (filter.custom && !filter.custom(message)) {
@@ -329,9 +347,16 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
         if (!sub.filter || matchesFilter(message, sub.filter)) {
           deliveryPromises.push(
             Promise.resolve(sub.handler(message)).then(
-              () => { deliveredTo.push(recipientId); },
-              (error) => { onDeliveryError?.(message, error instanceof Error ? error : new Error(String(error))); }
-            )
+              () => {
+                deliveredTo.push(recipientId);
+              },
+              (error) => {
+                onDeliveryError?.(
+                  message,
+                  error instanceof Error ? error : new Error(String(error)),
+                );
+              },
+            ),
           );
         }
       }
@@ -387,7 +412,11 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
       return message.id;
     },
 
-    subscribe(agentId: string, handler: MessageHandler, filter?: MessageFilter): Subscription {
+    subscribe(
+      agentId: string,
+      handler: MessageHandler,
+      filter?: MessageFilter,
+    ): Subscription {
       const subId = generateId();
 
       const subscription: Subscription = {
@@ -416,11 +445,15 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
           const result = handler(msg);
           if (result instanceof Promise) {
             result.catch((error) => {
-              const err = error instanceof Error ? error : new Error(String(error));
+              const err =
+                error instanceof Error ? error : new Error(String(error));
               if (onDeliveryError) {
                 onDeliveryError(msg, err);
               } else {
-                console.error("[Directive MessageBus] Pending delivery error:", err);
+                console.error(
+                  "[Directive MessageBus] Pending delivery error:",
+                  err,
+                );
               }
             });
           }
@@ -496,7 +529,10 @@ export interface AgentNetworkConfig {
 /** Agent network instance */
 export interface AgentNetwork {
   /** Register an agent */
-  register(id: string, info: Omit<AgentInfo, "id" | "lastSeen" | "status">): void;
+  register(
+    id: string,
+    info: Omit<AgentInfo, "id" | "lastSeen" | "status">,
+  ): void;
   /** Unregister an agent */
   unregister(id: string): void;
   /** Get agent info */
@@ -506,17 +542,41 @@ export interface AgentNetwork {
   /** Find agents by capability */
   findByCapability(capability: string): AgentInfo[];
   /** Send a message */
-  send(from: string, to: string | string[], message: Partial<TypedAgentMessage>): string;
+  send(
+    from: string,
+    to: string | string[],
+    message: Partial<TypedAgentMessage>,
+  ): string;
   /** Send a request and wait for response */
-  request(from: string, to: string, action: string, payload: Record<string, unknown>, timeout?: number): Promise<ResponseMessage>;
+  request(
+    from: string,
+    to: string,
+    action: string,
+    payload: Record<string, unknown>,
+    timeout?: number,
+  ): Promise<ResponseMessage>;
   /** Delegate a task */
-  delegate(from: string, to: string, task: string, context: Record<string, unknown>): Promise<DelegationResultMessage>;
+  delegate(
+    from: string,
+    to: string,
+    task: string,
+    context: Record<string, unknown>,
+  ): Promise<DelegationResultMessage>;
   /** Query an agent */
-  query(from: string, to: string, question: string, context?: Record<string, unknown>): Promise<ResponseMessage>;
+  query(
+    from: string,
+    to: string,
+    question: string,
+    context?: Record<string, unknown>,
+  ): Promise<ResponseMessage>;
   /** Broadcast to all agents */
   broadcast(from: string, message: Partial<TypedAgentMessage>): string;
   /** Subscribe an agent to messages */
-  listen(agentId: string, handler: MessageHandler, filter?: MessageFilter): Subscription;
+  listen(
+    agentId: string,
+    handler: MessageHandler,
+    filter?: MessageFilter,
+  ): Subscription;
   /** Get the message bus */
   getBus(): MessageBus;
   /** Dispose of the network, clearing pending waiters and timers */
@@ -568,11 +628,14 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
   } = config;
 
   const agents = new Map<string, AgentInfo>();
-  const responseWaiters = new Map<string, {
-    resolve: (msg: ResponseMessage | DelegationResultMessage) => void;
-    reject: (error: Error) => void;
-    timer: ReturnType<typeof setTimeout>;
-  }>();
+  const responseWaiters = new Map<
+    string,
+    {
+      resolve: (msg: ResponseMessage | DelegationResultMessage) => void;
+      reject: (error: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
 
   // Initialize agents
   for (const [id, info] of Object.entries(initialAgents)) {
@@ -602,8 +665,12 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
   }
 
   return {
-    register(id: string, info: Omit<AgentInfo, "id" | "lastSeen" | "status">): void {
-      const wasOffline = !agents.has(id) || agents.get(id)?.status === "offline";
+    register(
+      id: string,
+      info: Omit<AgentInfo, "id" | "lastSeen" | "status">,
+    ): void {
+      const wasOffline =
+        !agents.has(id) || agents.get(id)?.status === "offline";
 
       agents.set(id, {
         ...info,
@@ -635,11 +702,16 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
 
     findByCapability(capability: string): AgentInfo[] {
       return Array.from(agents.values()).filter(
-        (agent) => agent.capabilities.includes(capability) && agent.status === "online"
+        (agent) =>
+          agent.capabilities.includes(capability) && agent.status === "online",
       );
     },
 
-    send(from: string, to: string | string[], message: Partial<TypedAgentMessage>): string {
+    send(
+      from: string,
+      to: string | string[],
+      message: Partial<TypedAgentMessage>,
+    ): string {
       // Update sender's lastSeen
       const sender = agents.get(from);
       if (sender) {
@@ -660,27 +732,44 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
       to: string,
       action: string,
       payload: Record<string, unknown>,
-      timeout = defaultTimeout
+      timeout = defaultTimeout,
     ): Promise<ResponseMessage> {
       return new Promise((resolve, reject) => {
         // Generate a correlation ID upfront so subscription can listen before publish
         const correlationId = generateId();
 
         // Subscribe BEFORE publishing to avoid race condition with fast responders
-        const sub = bus.subscribe(from, (msg) => {
-          if (msg.correlationId === correlationId || msg.replyTo === correlationId) {
-            sub.unsubscribe();
-            handleResponse(msg);
-          }
-        }, { types: ["RESPONSE"] });
+        const sub = bus.subscribe(
+          from,
+          (msg) => {
+            if (
+              msg.correlationId === correlationId ||
+              msg.replyTo === correlationId
+            ) {
+              sub.unsubscribe();
+              handleResponse(msg);
+            }
+          },
+          { types: ["RESPONSE"] },
+        );
 
         const timer = setTimeout(() => {
           sub.unsubscribe(); // Clean up subscription on timeout
           responseWaiters.delete(correlationId);
-          reject(new Error(`[Directive Communication] Request timeout after ${timeout}ms`));
+          reject(
+            new Error(
+              `[Directive Communication] Request timeout after ${timeout}ms`,
+            ),
+          );
         }, timeout);
 
-        responseWaiters.set(correlationId, { resolve: resolve as (msg: ResponseMessage | DelegationResultMessage) => void, reject, timer });
+        responseWaiters.set(correlationId, {
+          resolve: resolve as (
+            msg: ResponseMessage | DelegationResultMessage,
+          ) => void,
+          reject,
+          timer,
+        });
 
         bus.publish({
           type: "REQUEST",
@@ -690,7 +779,9 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
           payload,
           timeout,
           correlationId,
-        } as Omit<RequestMessage, "id" | "timestamp"> & { correlationId: string });
+        } as Omit<RequestMessage, "id" | "timestamp"> & {
+          correlationId: string;
+        });
       });
     },
 
@@ -698,26 +789,43 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
       from: string,
       to: string,
       task: string,
-      context: Record<string, unknown>
+      context: Record<string, unknown>,
     ): Promise<DelegationResultMessage> {
       return new Promise((resolve, reject) => {
         const correlationId = generateId();
 
         // Subscribe BEFORE publishing to avoid race condition
-        const sub = bus.subscribe(from, (msg) => {
-          if (msg.correlationId === correlationId || msg.replyTo === correlationId) {
-            sub.unsubscribe();
-            handleResponse(msg);
-          }
-        }, { types: ["DELEGATION_RESULT"] });
+        const sub = bus.subscribe(
+          from,
+          (msg) => {
+            if (
+              msg.correlationId === correlationId ||
+              msg.replyTo === correlationId
+            ) {
+              sub.unsubscribe();
+              handleResponse(msg);
+            }
+          },
+          { types: ["DELEGATION_RESULT"] },
+        );
 
         const timer = setTimeout(() => {
           sub.unsubscribe();
           responseWaiters.delete(correlationId);
-          reject(new Error(`[Directive Communication] Delegation timeout after ${defaultTimeout}ms`));
+          reject(
+            new Error(
+              `[Directive Communication] Delegation timeout after ${defaultTimeout}ms`,
+            ),
+          );
         }, defaultTimeout);
 
-        responseWaiters.set(correlationId, { resolve: resolve as (msg: ResponseMessage | DelegationResultMessage) => void, reject, timer });
+        responseWaiters.set(correlationId, {
+          resolve: resolve as (
+            msg: ResponseMessage | DelegationResultMessage,
+          ) => void,
+          reject,
+          timer,
+        });
 
         bus.publish({
           type: "DELEGATION",
@@ -726,7 +834,9 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
           task,
           context,
           correlationId,
-        } as Omit<DelegationMessage, "id" | "timestamp"> & { correlationId: string });
+        } as Omit<DelegationMessage, "id" | "timestamp"> & {
+          correlationId: string;
+        });
       });
     },
 
@@ -734,26 +844,43 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
       from: string,
       to: string,
       question: string,
-      context?: Record<string, unknown>
+      context?: Record<string, unknown>,
     ): Promise<ResponseMessage> {
       return new Promise((resolve, reject) => {
         const correlationId = generateId();
 
         // Subscribe BEFORE publishing to avoid race condition
-        const sub = bus.subscribe(from, (msg) => {
-          if (msg.correlationId === correlationId || msg.replyTo === correlationId) {
-            sub.unsubscribe();
-            handleResponse(msg);
-          }
-        }, { types: ["RESPONSE"] });
+        const sub = bus.subscribe(
+          from,
+          (msg) => {
+            if (
+              msg.correlationId === correlationId ||
+              msg.replyTo === correlationId
+            ) {
+              sub.unsubscribe();
+              handleResponse(msg);
+            }
+          },
+          { types: ["RESPONSE"] },
+        );
 
         const timer = setTimeout(() => {
           sub.unsubscribe();
           responseWaiters.delete(correlationId);
-          reject(new Error(`[Directive Communication] Query timeout after ${defaultTimeout}ms`));
+          reject(
+            new Error(
+              `[Directive Communication] Query timeout after ${defaultTimeout}ms`,
+            ),
+          );
         }, defaultTimeout);
 
-        responseWaiters.set(correlationId, { resolve: resolve as (msg: ResponseMessage | DelegationResultMessage) => void, reject, timer });
+        responseWaiters.set(correlationId, {
+          resolve: resolve as (
+            msg: ResponseMessage | DelegationResultMessage,
+          ) => void,
+          reject,
+          timer,
+        });
 
         bus.publish({
           type: "QUERY",
@@ -762,7 +889,9 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
           question,
           context,
           correlationId,
-        } as Omit<QueryMessage, "id" | "timestamp"> & { correlationId: string });
+        } as Omit<QueryMessage, "id" | "timestamp"> & {
+          correlationId: string;
+        });
       });
     },
 
@@ -775,7 +904,11 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
       } as Omit<TypedAgentMessage, "id" | "timestamp">);
     },
 
-    listen(agentId: string, handler: MessageHandler, filter?: MessageFilter): Subscription {
+    listen(
+      agentId: string,
+      handler: MessageHandler,
+      filter?: MessageFilter,
+    ): Subscription {
       // Mark agent as online
       const agent = agents.get(agentId);
       if (agent) {
@@ -820,50 +953,61 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
  * ```
  */
 export function createResponder(network: AgentNetwork, agentId: string) {
-  const handlers = new Map<string, (payload: Record<string, unknown>) => Promise<{ success: boolean; result?: unknown; error?: string }>>();
+  const handlers = new Map<
+    string,
+    (
+      payload: Record<string, unknown>,
+    ) => Promise<{ success: boolean; result?: unknown; error?: string }>
+  >();
 
-  const subscription = network.listen(agentId, async (message) => {
-    if (message.type === "REQUEST") {
-      const request = message as RequestMessage;
-      const handler = handlers.get(request.action);
+  const subscription = network.listen(
+    agentId,
+    async (message) => {
+      if (message.type === "REQUEST") {
+        const request = message as RequestMessage;
+        const handler = handlers.get(request.action);
 
-      let response: Partial<ResponseMessage>;
-      if (handler) {
-        try {
-          const result = await handler(request.payload);
-          response = {
-            type: "RESPONSE",
-            success: result.success,
-            result: result.result,
-            error: result.error,
-          };
-        } catch (error) {
+        let response: Partial<ResponseMessage>;
+        if (handler) {
+          try {
+            const result = await handler(request.payload);
+            response = {
+              type: "RESPONSE",
+              success: result.success,
+              result: result.result,
+              error: result.error,
+            };
+          } catch (error) {
+            response = {
+              type: "RESPONSE",
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        } else {
           response = {
             type: "RESPONSE",
             success: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: `Unknown action: ${request.action}`,
           };
         }
-      } else {
-        response = {
-          type: "RESPONSE",
-          success: false,
-          error: `Unknown action: ${request.action}`,
-        };
-      }
 
-      network.send(agentId, message.from, {
-        ...response,
-        correlationId: message.correlationId ?? message.id,
-        replyTo: message.correlationId ?? message.id,
-      });
-    }
-  }, { types: ["REQUEST"] });
+        network.send(agentId, message.from, {
+          ...response,
+          correlationId: message.correlationId ?? message.id,
+          replyTo: message.correlationId ?? message.id,
+        });
+      }
+    },
+    { types: ["REQUEST"] },
+  );
 
   return {
     onRequest(
       action: string,
-      handler: (payload: Record<string, unknown>) => Promise<{ success: boolean; result?: unknown; error?: string }>
+      handler: (
+        payload: Record<string, unknown>,
+      ) => Promise<{ success: boolean; result?: unknown; error?: string }>,
     ): void {
       handlers.set(action, handler);
     },
@@ -899,53 +1043,68 @@ export function createResponder(network: AgentNetwork, agentId: string) {
  * ```
  */
 export function createDelegator(network: AgentNetwork, agentId: string) {
-  let delegationHandler: ((task: string, context: Record<string, unknown>) => Promise<{
-    success: boolean;
-    result?: unknown;
-    error?: string;
-    metrics?: { durationMs: number; tokensUsed?: number; cost?: number };
-  }>) | null = null;
-
-  const subscription = network.listen(agentId, async (message) => {
-    if (message.type === "DELEGATION" && delegationHandler) {
-      const delegation = message as DelegationMessage;
-      const start = Date.now();
-
-      let result: Partial<DelegationResultMessage>;
-      try {
-        const response = await delegationHandler(delegation.task, delegation.context);
-        result = {
-          type: "DELEGATION_RESULT",
-          success: response.success,
-          result: response.result,
-          error: response.error,
-          metrics: response.metrics ?? { durationMs: Date.now() - start },
-        };
-      } catch (error) {
-        result = {
-          type: "DELEGATION_RESULT",
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          metrics: { durationMs: Date.now() - start },
-        };
-      }
-
-      network.send(agentId, message.from, {
-        ...result,
-        correlationId: message.correlationId ?? message.id,
-        replyTo: message.correlationId ?? message.id,
-      });
-    }
-  }, { types: ["DELEGATION"] });
-
-  return {
-    onDelegation(
-      handler: (task: string, context: Record<string, unknown>) => Promise<{
+  let delegationHandler:
+    | ((
+        task: string,
+        context: Record<string, unknown>,
+      ) => Promise<{
         success: boolean;
         result?: unknown;
         error?: string;
         metrics?: { durationMs: number; tokensUsed?: number; cost?: number };
-      }>
+      }>)
+    | null = null;
+
+  const subscription = network.listen(
+    agentId,
+    async (message) => {
+      if (message.type === "DELEGATION" && delegationHandler) {
+        const delegation = message as DelegationMessage;
+        const start = Date.now();
+
+        let result: Partial<DelegationResultMessage>;
+        try {
+          const response = await delegationHandler(
+            delegation.task,
+            delegation.context,
+          );
+          result = {
+            type: "DELEGATION_RESULT",
+            success: response.success,
+            result: response.result,
+            error: response.error,
+            metrics: response.metrics ?? { durationMs: Date.now() - start },
+          };
+        } catch (error) {
+          result = {
+            type: "DELEGATION_RESULT",
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+            metrics: { durationMs: Date.now() - start },
+          };
+        }
+
+        network.send(agentId, message.from, {
+          ...result,
+          correlationId: message.correlationId ?? message.id,
+          replyTo: message.correlationId ?? message.id,
+        });
+      }
+    },
+    { types: ["DELEGATION"] },
+  );
+
+  return {
+    onDelegation(
+      handler: (
+        task: string,
+        context: Record<string, unknown>,
+      ) => Promise<{
+        success: boolean;
+        result?: unknown;
+        error?: string;
+        metrics?: { durationMs: number; tokensUsed?: number; cost?: number };
+      }>,
     ): void {
       delegationHandler = handler;
     },
@@ -982,18 +1141,25 @@ export function createDelegator(network: AgentNetwork, agentId: string) {
 export function createPubSub(network: AgentNetwork, agentId: string) {
   const topicHandlers = new Map<string, Array<(content: unknown) => void>>();
 
-  const subscription = network.listen(agentId, (message) => {
-    if (message.type === "UPDATE") {
-      const update = message as UpdateMessage;
-      const handlers = topicHandlers.get(update.topic) ?? [];
-      for (const handler of handlers) {
-        handler(update.content);
+  const subscription = network.listen(
+    agentId,
+    (message) => {
+      if (message.type === "UPDATE") {
+        const update = message as UpdateMessage;
+        const handlers = topicHandlers.get(update.topic) ?? [];
+        for (const handler of handlers) {
+          handler(update.content);
+        }
       }
-    }
-  }, { types: ["UPDATE"] });
+    },
+    { types: ["UPDATE"] },
+  );
 
   return {
-    subscribe(topics: string[], handler: (topic: string, content: unknown) => void): () => void {
+    subscribe(
+      topics: string[],
+      handler: (topic: string, content: unknown) => void,
+    ): () => void {
       // Track wrapped handlers per-subscribe call for proper cleanup
       const wrappedHandlers = new Map<string, (content: unknown) => void>();
 

@@ -4,9 +4,21 @@ export interface WeatherData {
   humidity: number;
 }
 
-const CONDITIONS = ["Sunny", "Cloudy", "Rainy", "Windy", "Foggy", "Stormy", "Clear", "Snowy"];
+const CONDITIONS = [
+  "Sunny",
+  "Cloudy",
+  "Rainy",
+  "Windy",
+  "Foggy",
+  "Stormy",
+  "Clear",
+  "Snowy",
+];
 
-export async function mockFetchWeather(city: string, delay: number): Promise<WeatherData> {
+export async function mockFetchWeather(
+  city: string,
+  delay: number,
+): Promise<WeatherData> {
   await new Promise((resolve) => setTimeout(resolve, delay));
   const hash = [...city.toLowerCase()].reduce((a, c) => a + c.charCodeAt(0), 0);
 

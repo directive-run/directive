@@ -1,12 +1,19 @@
+import {
+  FactController,
+  RequirementStatusController,
+} from "@directive-run/lit";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController, RequirementStatusController } from "@directive-run/lit";
-import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { statusPlugin, system } from "../system";
 
 @customElement("use-requirement-status-page")
 export class UseRequirementStatusPage extends LitElement {
-  private _reqStatus = new RequirementStatusController(this, statusPlugin, "LOAD_DATA");
+  private _reqStatus = new RequirementStatusController(
+    this,
+    statusPlugin,
+    "LOAD_DATA",
+  );
   private _status = new FactController<string>(this, system, "status");
 
   render() {

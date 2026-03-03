@@ -1,11 +1,14 @@
-import type { Page, Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 /**
  * Navigate to an example page and wait for the custom element to mount.
  */
 export async function gotoExample(page: Page, name: string): Promise<void> {
   await page.goto(`/docs/examples/${name}`);
-  await page.waitForSelector(`directive-${name}`, { state: "attached", timeout: 15_000 });
+  await page.waitForSelector(`directive-${name}`, {
+    state: "attached",
+    timeout: 15_000,
+  });
 }
 
 /**

@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { composePatterns, dag } from "../multi-agent-orchestrator.js";
 import {
-  createTestMultiAgentOrchestrator,
   assertDagExecution,
   createTestDag,
+  createTestMultiAgentOrchestrator,
 } from "../testing.js";
-import { dag, composePatterns } from "../multi-agent-orchestrator.js";
 import type { DagExecutionContext } from "../types.js";
 
 // ============================================================================
@@ -33,7 +33,10 @@ describe("DAG: linear chain (A → B → C)", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, unknown>>("chain", "start");
+    const result = await orchestrator.runPattern<Record<string, unknown>>(
+      "chain",
+      "start",
+    );
 
     expect(result).toHaveProperty("A", "a-out");
     expect(result).toHaveProperty("B", "b-out");
@@ -274,7 +277,10 @@ describe("DAG: conditional branch (when)", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, string>>("cond", "go");
+    const result = await orchestrator.runPattern<Record<string, string>>(
+      "cond",
+      "go",
+    );
 
     expect(result.A).toBe("completed");
     expect(result.B).toBe("completed");
@@ -358,7 +364,10 @@ describe("DAG: parallel roots", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, string>>("par", "go");
+    const result = await orchestrator.runPattern<Record<string, string>>(
+      "par",
+      "go",
+    );
 
     expect(result.A).toBe("completed");
     expect(result.B).toBe("completed");
@@ -499,7 +508,10 @@ describe("DAG: error — skip-downstream mode", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, string>>("skip", "go");
+    const result = await orchestrator.runPattern<Record<string, string>>(
+      "skip",
+      "go",
+    );
 
     expect(result.A).toBe("error");
     // B is skipped (direct dep errored), C is also skipped (transitive: dep B is skipped)
@@ -559,7 +571,11 @@ describe("DAG: error — continue mode", () => {
         b: { agent: { name: "b" } },
       },
       mockResponses: {
-        a: { output: "ok", totalTokens: 10, error: new Error("specific failure") },
+        a: {
+          output: "ok",
+          totalTokens: 10,
+          error: new Error("specific failure"),
+        },
         b: { output: "b-out", totalTokens: 10 },
       },
       patterns: {
@@ -657,7 +673,10 @@ describe("DAG: graph-level timeout", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, string>>("gto", "go");
+    const result = await orchestrator.runPattern<Record<string, string>>(
+      "gto",
+      "go",
+    );
 
     // Both complete because the mock runner's delay doesn't respect abort signals —
     // the graph timeout fires but mock nodes keep sleeping and return normally
@@ -801,7 +820,10 @@ describe("DAG: dynamic routing via when()", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, string>>("route", "go");
+    const result = await orchestrator.runPattern<Record<string, string>>(
+      "route",
+      "go",
+    );
 
     expect(result.router).toBe("completed");
     expect(result.branchB).toBe("completed");
@@ -877,7 +899,10 @@ describe("DAG: dynamic routing via when()", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<Record<string, string>>("throwing", "go");
+    const result = await orchestrator.runPattern<Record<string, string>>(
+      "throwing",
+      "go",
+    );
 
     expect(result.A).toBe("completed");
     expect(result.B).toBe("skipped");
@@ -1053,18 +1078,15 @@ describe("DAG: single-node (degenerate)", () => {
         a: { output: "result", totalTokens: 42 },
       },
       patterns: {
-        single: createTestDag(
-          { only: { handler: "a" } },
-          (context) => {
-            mergeContext = {
-              ...context,
-              outputs: { ...context.outputs },
-              statuses: { ...context.statuses },
-            };
+        single: createTestDag({ only: { handler: "a" } }, (context) => {
+          mergeContext = {
+            ...context,
+            outputs: { ...context.outputs },
+            statuses: { ...context.statuses },
+          };
 
-            return context.outputs.only;
-          },
-        ),
+          return context.outputs.only;
+        }),
       },
     });
 
@@ -1141,9 +1163,8 @@ describe("DAG: composePatterns integration", () => {
       },
     });
 
-    const dagPat = dag<string>(
-      { A: { handler: "a" } },
-      (context) => String(context.outputs.A),
+    const dagPat = dag<string>({ A: { handler: "a" } }, (context) =>
+      String(context.outputs.A),
     );
 
     const seqPat = {
@@ -1193,9 +1214,9 @@ describe("DAG: same agent in multiple nodes", () => {
     const result = await orchestrator.runPattern<unknown[]>("multi", "query");
 
     expect(result).toHaveLength(3);
-    const researcherCalls = orchestrator.getCalls().filter(
-      (c) => c.agent.name === "researcher",
-    );
+    const researcherCalls = orchestrator
+      .getCalls()
+      .filter((c) => c.agent.name === "researcher");
     expect(researcherCalls).toHaveLength(3);
   });
 
@@ -1285,11 +1306,11 @@ describe("DAG: factory and test helpers", () => {
   });
 
   it("dag() factory passes through options", () => {
-    const pattern = dag(
-      { A: { handler: "a" } },
-      (context) => context.outputs,
-      { timeout: 5000, maxConcurrent: 2, onNodeError: "skip-downstream" },
-    );
+    const pattern = dag({ A: { handler: "a" } }, (context) => context.outputs, {
+      timeout: 5000,
+      maxConcurrent: 2,
+      onNodeError: "skip-downstream",
+    });
 
     expect(pattern.timeout).toBe(5000);
     expect(pattern.maxConcurrent).toBe(2);

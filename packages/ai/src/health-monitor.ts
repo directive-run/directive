@@ -79,10 +79,14 @@ const DEFAULT_WEIGHTS = {
  * console.log(score); // 0-100
  * ```
  */
-export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMonitor {
+export function createHealthMonitor(
+  config: HealthMonitorConfig = {},
+): HealthMonitor {
   const windowMs = config.windowMs ?? DEFAULT_WINDOW_MS;
-  const maxNormalLatencyMs = config.maxNormalLatencyMs ?? DEFAULT_MAX_NORMAL_LATENCY_MS;
-  const maxEventsPerAgent = config.maxEventsPerAgent ?? DEFAULT_MAX_EVENTS_PER_AGENT;
+  const maxNormalLatencyMs =
+    config.maxNormalLatencyMs ?? DEFAULT_MAX_NORMAL_LATENCY_MS;
+  const maxEventsPerAgent =
+    config.maxEventsPerAgent ?? DEFAULT_MAX_EVENTS_PER_AGENT;
   const weights = {
     successRate: config.weights?.successRate ?? DEFAULT_WEIGHTS.successRate,
     latency: config.weights?.latency ?? DEFAULT_WEIGHTS.latency,
@@ -91,10 +95,14 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
 
   // Validate config
   if (!Number.isFinite(windowMs) || windowMs <= 0) {
-    throw new Error("[Directive HealthMonitor] windowMs must be a positive number");
+    throw new Error(
+      "[Directive HealthMonitor] windowMs must be a positive number",
+    );
   }
   if (!Number.isFinite(maxNormalLatencyMs) || maxNormalLatencyMs <= 0) {
-    throw new Error("[Directive HealthMonitor] maxNormalLatencyMs must be a positive number");
+    throw new Error(
+      "[Directive HealthMonitor] maxNormalLatencyMs must be a positive number",
+    );
   }
   if (!Number.isFinite(maxEventsPerAgent) || maxEventsPerAgent < 1) {
     throw new Error("[Directive HealthMonitor] maxEventsPerAgent must be >= 1");
@@ -103,14 +111,19 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
   // A14: Validate individual weight bounds
   for (const [key, value] of Object.entries(weights)) {
     if (value < 0 || value > 1) {
-      throw new Error(`[Directive HealthMonitor] weight "${key}" must be between 0 and 1 (got ${value})`);
+      throw new Error(
+        `[Directive HealthMonitor] weight "${key}" must be between 0 and 1 (got ${value})`,
+      );
     }
   }
 
   // Validate weights sum approximately to 1.0
-  const weightSum = weights.successRate + weights.latency + weights.circuitState;
+  const weightSum =
+    weights.successRate + weights.latency + weights.circuitState;
   if (Math.abs(weightSum - 1.0) > 0.01) {
-    throw new Error(`[Directive HealthMonitor] weights must sum to ~1.0 (tolerance: ±0.01, got ${weightSum.toFixed(4)})`);
+    throw new Error(
+      `[Directive HealthMonitor] weights must sum to ~1.0 (tolerance: ±0.01, got ${weightSum.toFixed(4)})`,
+    );
   }
 
   const events = new Map<string, HealthEvent[]>();
@@ -135,12 +148,15 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     // Time-based pruning: find first event within the window
     const cutoff = now - windowMs;
     let firstValid = 0;
-    while (firstValid < agentEvents.length && agentEvents[firstValid]!.timestamp < cutoff) {
+    while (
+      firstValid < agentEvents.length &&
+      agentEvents[firstValid]!.timestamp < cutoff
+    ) {
       firstValid++;
     }
 
     // Cap-based pruning: ensure we don't exceed maxEventsPerAgent
-    const excessFromCap = (agentEvents.length - firstValid) - maxEventsPerAgent;
+    const excessFromCap = agentEvents.length - firstValid - maxEventsPerAgent;
     if (excessFromCap > 0) {
       firstValid += excessFromCap;
     }
@@ -167,11 +183,13 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
     const successes = agentEvents.filter((e) => e.success).length;
     const successRate = successes / agentEvents.length;
 
-    const avgLatency = agentEvents.reduce((s, e) => s + e.latencyMs, 0) / agentEvents.length;
+    const avgLatency =
+      agentEvents.reduce((s, e) => s + e.latencyMs, 0) / agentEvents.length;
     const normalizedLatency = Math.min(avgLatency / maxNormalLatencyMs, 1);
 
     const state = circuitStates.get(agentId) ?? "CLOSED";
-    const circuitScore = state === "CLOSED" ? 1 : state === "HALF_OPEN" ? 0.5 : 0;
+    const circuitScore =
+      state === "CLOSED" ? 1 : state === "HALF_OPEN" ? 0.5 : 0;
 
     const raw =
       successRate * weights.successRate +
@@ -188,14 +206,20 @@ export function createHealthMonitor(config: HealthMonitorConfig = {}): HealthMon
 
     const successes = agentEvents.filter((e) => e.success).length;
     const failures = agentEvents.length - successes;
-    const successRate = agentEvents.length > 0 ? successes / agentEvents.length : 0;
-    const avgLatencyMs = agentEvents.length > 0
-      ? agentEvents.reduce((s, e) => s + e.latencyMs, 0) / agentEvents.length
-      : 0;
+    const successRate =
+      agentEvents.length > 0 ? successes / agentEvents.length : 0;
+    const avgLatencyMs =
+      agentEvents.length > 0
+        ? agentEvents.reduce((s, e) => s + e.latencyMs, 0) / agentEvents.length
+        : 0;
 
     // Collect last N error messages
     const lastErrors: string[] = [];
-    for (let i = agentEvents.length - 1; i >= 0 && lastErrors.length < DEFAULT_MAX_STORED_ERRORS; i--) {
+    for (
+      let i = agentEvents.length - 1;
+      i >= 0 && lastErrors.length < DEFAULT_MAX_STORED_ERRORS;
+      i--
+    ) {
       if (agentEvents[i]!.errorMessage) {
         lastErrors.unshift(agentEvents[i]!.errorMessage!);
       }

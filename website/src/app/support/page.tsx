@@ -1,6 +1,5 @@
-import {
-  buildPageMetadata,
-} from '@/lib/metadata'
+import { CardLink } from "@/components/CardLink";
+import { buildPageMetadata } from "@/lib/metadata";
 import {
   ArrowRight,
   Coffee,
@@ -10,69 +9,159 @@ import {
   ShieldCheck,
   Star,
   Terminal,
-} from '@phosphor-icons/react/dist/ssr'
-import { CardLink } from '@/components/CardLink'
+} from "@phosphor-icons/react/dist/ssr";
 
 export const metadata = buildPageMetadata({
-  title: 'Support — Directive',
+  title: "Support — Directive",
   description:
-    'Support the Directive project through sponsorship, donations, or by starring us on GitHub.',
-  path: '/support',
-})
+    "Support the Directive project through sponsorship, donations, or by starring us on GitHub.",
+  path: "/support",
+});
 
 // Inline SVG logos for fictional sponsors
 function AxiomLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <path d="M16 4L28 28H4L16 4Z" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+      <path
+        d="M16 4L28 28H4L16 4Z"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
       <circle cx="16" cy="20" r="3" fill="currentColor" />
     </svg>
-  )
+  );
 }
 
 function MeridianLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <path d="M4 16C4 9.373 9.373 4 16 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M8 16C8 11.582 11.582 8 16 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M12 16C12 13.791 13.791 12 16 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d="M4 16C4 9.373 9.373 4 16 4"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M8 16C8 11.582 11.582 8 16 8"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 16C12 13.791 13.791 12 16 12"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       <circle cx="16" cy="16" r="2" fill="currentColor" />
-      <path d="M28 16C28 22.627 22.627 28 16 28" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M24 16C24 20.418 20.418 24 16 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M20 16C20 18.209 18.209 20 16 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d="M28 16C28 22.627 22.627 28 16 28"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M24 16C24 20.418 20.418 24 16 24"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M20 16C20 18.209 18.209 20 16 20"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
     </svg>
-  )
+  );
 }
 
 function TerrafoldLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <rect x="4" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.3" />
-      <rect x="18" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.6" />
-      <rect x="4" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.6" />
+      <rect
+        x="4"
+        y="4"
+        width="10"
+        height="10"
+        rx="2"
+        fill="currentColor"
+        opacity="0.3"
+      />
+      <rect
+        x="18"
+        y="4"
+        width="10"
+        height="10"
+        rx="2"
+        fill="currentColor"
+        opacity="0.6"
+      />
+      <rect
+        x="4"
+        y="18"
+        width="10"
+        height="10"
+        rx="2"
+        fill="currentColor"
+        opacity="0.6"
+      />
       <rect x="18" y="18" width="10" height="10" rx="2" fill="currentColor" />
     </svg>
-  )
+  );
 }
 
 function VortexLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <path d="M16 4C16 4 24 8 24 16C24 24 16 28 16 28" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M16 8C16 8 20 10.5 20 16C20 21.5 16 24 16 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M16 28C16 28 8 24 8 16C8 8 16 4 16 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+      <path
+        d="M16 4C16 4 24 8 24 16C24 24 16 28 16 28"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16 8C16 8 20 10.5 20 16C20 21.5 16 24 16 24"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16 28C16 28 8 24 8 16C8 8 16 4 16 4"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.4"
+      />
     </svg>
-  )
+  );
 }
 
 function StacklineLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <rect x="6" y="6" width="20" height="4" rx="1" fill="currentColor" opacity="0.3" />
-      <rect x="6" y="14" width="20" height="4" rx="1" fill="currentColor" opacity="0.6" />
+      <rect
+        x="6"
+        y="6"
+        width="20"
+        height="4"
+        rx="1"
+        fill="currentColor"
+        opacity="0.3"
+      />
+      <rect
+        x="6"
+        y="14"
+        width="20"
+        height="4"
+        rx="1"
+        fill="currentColor"
+        opacity="0.6"
+      />
       <rect x="6" y="22" width="20" height="4" rx="1" fill="currentColor" />
     </svg>
-  )
+  );
 }
 
 function CanopyLogo({ className }: { className?: string }) {
@@ -81,28 +170,47 @@ function CanopyLogo({ className }: { className?: string }) {
       <path d="M16 4L26 14H6L16 4Z" fill="currentColor" opacity="0.4" />
       <path d="M16 10L24 18H8L16 10Z" fill="currentColor" opacity="0.7" />
       <path d="M16 16L22 22H10L16 16Z" fill="currentColor" />
-      <rect x="14" y="22" width="4" height="6" rx="1" fill="currentColor" opacity="0.6" />
+      <rect
+        x="14"
+        y="22"
+        width="4"
+        height="6"
+        rx="1"
+        fill="currentColor"
+        opacity="0.6"
+      />
     </svg>
-  )
+  );
 }
 
 function IronbarkLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <path d="M8 28V8L16 4L24 8V28" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+      <path
+        d="M8 28V8L16 4L24 8V28"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
       <path d="M8 16H24" stroke="currentColor" strokeWidth="2.5" />
       <circle cx="16" cy="22" r="2.5" fill="currentColor" />
     </svg>
-  )
+  );
 }
 
 function LumenwaveLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <path d="M4 20C8 12 12 24 16 16C20 8 24 20 28 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4 20C8 12 12 24 16 16C20 8 24 20 28 12"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <circle cx="16" cy="16" r="3" fill="currentColor" opacity="0.3" />
     </svg>
-  )
+  );
 }
 
 function MinglingoLogo({ className }: { className?: string }) {
@@ -110,89 +218,171 @@ function MinglingoLogo({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 32 32" fill="none">
       <circle cx="10" cy="16" r="5" stroke="currentColor" strokeWidth="2.5" />
       <circle cx="22" cy="16" r="5" stroke="currentColor" strokeWidth="2.5" />
-      <path d="M15 14C15 14 16 18 17 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M15 14C15 14 16 18 17 14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
-  )
+  );
 }
 
 function UpklipLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <path d="M16 24V8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M10 14L16 8L22 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="6" y="22" width="20" height="4" rx="2" fill="currentColor" opacity="0.3" />
+      <path
+        d="M16 24V8"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10 14L16 8L22 14"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="6"
+        y="22"
+        width="20"
+        height="4"
+        rx="2"
+        fill="currentColor"
+        opacity="0.3"
+      />
     </svg>
-  )
+  );
 }
 
 function FreeAgencyLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
       <circle cx="16" cy="10" r="4" fill="currentColor" opacity="0.4" />
-      <path d="M8 26C8 21.582 11.582 18 16 18C20.418 18 24 21.582 24 26" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M22 8L26 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M26 4L26 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M26 4L22 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M8 26C8 21.582 11.582 18 16 18C20.418 18 24 21.582 24 26"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M22 8L26 4"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M26 4L26 8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M26 4L22 4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
-  )
+  );
 }
 
 function TradeDeadlineLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
       <circle cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.5" />
-      <path d="M16 9V16L21 19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M16 9V16L21 19"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
-  )
+  );
 }
 
 function WorkspacesLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <rect x="4" y="4" width="11" height="11" rx="2.5" fill="currentColor" opacity="0.6" />
-      <rect x="17" y="4" width="11" height="11" rx="2.5" fill="currentColor" opacity="0.4" />
-      <rect x="4" y="17" width="11" height="11" rx="2.5" fill="currentColor" opacity="0.4" />
-      <rect x="17" y="17" width="11" height="11" rx="2.5" fill="currentColor" opacity="0.8" />
+      <rect
+        x="4"
+        y="4"
+        width="11"
+        height="11"
+        rx="2.5"
+        fill="currentColor"
+        opacity="0.6"
+      />
+      <rect
+        x="17"
+        y="4"
+        width="11"
+        height="11"
+        rx="2.5"
+        fill="currentColor"
+        opacity="0.4"
+      />
+      <rect
+        x="4"
+        y="17"
+        width="11"
+        height="11"
+        rx="2.5"
+        fill="currentColor"
+        opacity="0.4"
+      />
+      <rect
+        x="17"
+        y="17"
+        width="11"
+        height="11"
+        rx="2.5"
+        fill="currentColor"
+        opacity="0.8"
+      />
     </svg>
-  )
+  );
 }
 
 const GOLD_LOGOS: Record<string, React.FC<{ className?: string }>> = {
-  'Minglingo': MinglingoLogo,
-  'Upklip': UpklipLogo,
-  'Free Agent Tracker': FreeAgencyLogo,
-  'Trade Deadline Tracker': TradeDeadlineLogo,
-  'Workspaces': WorkspacesLogo,
-  'Axiom Labs': AxiomLogo,
-  'Meridian Cloud': MeridianLogo,
-  'Terrafold': TerrafoldLogo,
-}
+  Minglingo: MinglingoLogo,
+  Upklip: UpklipLogo,
+  "Free Agent Tracker": FreeAgencyLogo,
+  "Trade Deadline Tracker": TradeDeadlineLogo,
+  Workspaces: WorkspacesLogo,
+  "Axiom Labs": AxiomLogo,
+  "Meridian Cloud": MeridianLogo,
+  Terrafold: TerrafoldLogo,
+};
 
 const SILVER_LOGOS: Record<string, React.FC<{ className?: string }>> = {
-  'Vortex AI': VortexLogo,
-  'Stackline': StacklineLogo,
-  'Canopy Data': CanopyLogo,
-  'Ironbark': IronbarkLogo,
-  'Lumenwave': LumenwaveLogo,
-}
+  "Vortex AI": VortexLogo,
+  Stackline: StacklineLogo,
+  "Canopy Data": CanopyLogo,
+  Ironbark: IronbarkLogo,
+  Lumenwave: LumenwaveLogo,
+};
 
 const stats = [
   {
-    label: 'Zero VC funding',
-    description: 'Independent and community-sustained',
+    label: "Zero VC funding",
+    description: "Independent and community-sustained",
     icon: ShieldCheck,
   },
   {
-    label: 'MIT Licensed',
-    description: 'Free forever, for everyone',
+    label: "MIT Licensed",
+    description: "Free forever, for everyone",
     icon: Scales,
   },
   {
-    label: 'Built in the open',
-    description: 'Every line of code is public',
+    label: "Built in the open",
+    description: "Every line of code is public",
     icon: Terminal,
   },
-]
+];
 
 export default function SupportPage() {
   return (
@@ -203,8 +393,8 @@ export default function SupportPage() {
           Support Directive
         </h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
-          Built by a small team working in the open. Every contribution
-          helps keep this project alive, independent, and free.
+          Built by a small team working in the open. Every contribution helps
+          keep this project alive, independent, and free.
         </p>
 
         {/* Impact stats */}
@@ -317,7 +507,8 @@ export default function SupportPage() {
             Sponsors &amp; Supporters
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Larger contributors get priority placement here and on the GitHub README.
+            Larger contributors get priority placement here and on the GitHub
+            README.
           </p>
 
           {/* Gold tier */}
@@ -327,16 +518,22 @@ export default function SupportPage() {
             </p>
             <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
               {[
-                { name: 'Minglingo', description: 'Social discovery platform' },
-                { name: 'Upklip', description: 'Content clipping tool' },
-                { name: 'Free Agent Tracker', description: 'Sports free agency tracker' },
-                { name: 'Trade Deadline Tracker', description: 'Trade deadline coverage' },
-                { name: 'Workspaces', description: 'Team collaboration hub' },
-                { name: 'Axiom Labs', description: 'Observability platform' },
-                { name: 'Meridian Cloud', description: 'Edge infrastructure' },
-                { name: 'Terrafold', description: 'Infrastructure automation' },
+                { name: "Minglingo", description: "Social discovery platform" },
+                { name: "Upklip", description: "Content clipping tool" },
+                {
+                  name: "Free Agent Tracker",
+                  description: "Sports free agency tracker",
+                },
+                {
+                  name: "Trade Deadline Tracker",
+                  description: "Trade deadline coverage",
+                },
+                { name: "Workspaces", description: "Team collaboration hub" },
+                { name: "Axiom Labs", description: "Observability platform" },
+                { name: "Meridian Cloud", description: "Edge infrastructure" },
+                { name: "Terrafold", description: "Infrastructure automation" },
               ].map((sponsor) => {
-                const Logo = GOLD_LOGOS[sponsor.name]
+                const Logo = GOLD_LOGOS[sponsor.name];
 
                 return (
                   <div
@@ -359,7 +556,7 @@ export default function SupportPage() {
                       {sponsor.description}
                     </p>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
@@ -371,13 +568,13 @@ export default function SupportPage() {
             </p>
             <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
               {[
-                { name: 'Vortex AI', description: 'ML pipelines' },
-                { name: 'Stackline', description: 'Developer tools' },
-                { name: 'Canopy Data', description: 'Data warehouse' },
-                { name: 'Ironbark', description: 'CI/CD platform' },
-                { name: 'Lumenwave', description: 'Real-time analytics' },
+                { name: "Vortex AI", description: "ML pipelines" },
+                { name: "Stackline", description: "Developer tools" },
+                { name: "Canopy Data", description: "Data warehouse" },
+                { name: "Ironbark", description: "CI/CD platform" },
+                { name: "Lumenwave", description: "Real-time analytics" },
               ].map((sponsor) => {
-                const Logo = SILVER_LOGOS[sponsor.name]
+                const Logo = SILVER_LOGOS[sponsor.name];
 
                 return (
                   <div
@@ -400,7 +597,7 @@ export default function SupportPage() {
                       {sponsor.description}
                     </p>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
@@ -412,16 +609,16 @@ export default function SupportPage() {
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {[
-                'Nimbus Systems',
-                'Polaris Dev',
-                'Fern Studio',
-                'Keystone AI',
-                'Railyard',
-                'Cobalt Labs',
-                'Drift Protocol',
-                'Helix Runtime',
-                'Pinecone Studios',
-                'Waypoint HQ',
+                "Nimbus Systems",
+                "Polaris Dev",
+                "Fern Studio",
+                "Keystone AI",
+                "Railyard",
+                "Cobalt Labs",
+                "Drift Protocol",
+                "Helix Runtime",
+                "Pinecone Studios",
+                "Waypoint HQ",
               ].map((name) => (
                 <span
                   key={name}
@@ -435,5 +632,5 @@ export default function SupportPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,12 +1,24 @@
-import { defineConfig } from "vite";
 import { apiProxy } from "@directive-run/vite-plugin-api-proxy";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "/examples/checkers/",
   build: {
     target: "esnext",
     rollupOptions: {
-      external: ["ws", "fs", "path", "http", "https", "net", "tls", "crypto", "stream", "url", "zlib"],
+      external: [
+        "ws",
+        "fs",
+        "path",
+        "http",
+        "https",
+        "net",
+        "tls",
+        "crypto",
+        "stream",
+        "url",
+        "zlib",
+      ],
     },
   },
   plugins: [

@@ -1,5 +1,5 @@
-import type { DebugEvent } from "./types";
 import { EVENT_COLORS } from "./colors";
+import type { DebugEvent } from "./types";
 
 export interface HtmlExportOptions {
   title?: string;
@@ -28,8 +28,7 @@ export function generateStandaloneHTML(
     .replace(/\u2029/g, "\\u2029");
 
   // Inject EVENT_COLORS as a safe JSON object
-  const colorsJson = JSON.stringify(EVENT_COLORS)
-    .replace(/<\//g, "<\\/");
+  const colorsJson = JSON.stringify(EVENT_COLORS).replace(/<\//g, "<\\/");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -215,5 +214,9 @@ export function generateStandaloneHTML(
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

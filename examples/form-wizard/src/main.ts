@@ -6,7 +6,7 @@
  * navigation buttons, and validation feedback.
  */
 
-import { system, wizardSchema, validationSchema } from "./form-wizard.js";
+import { system, validationSchema, wizardSchema } from "./form-wizard.js";
 
 // ============================================================================
 // Start System
@@ -27,7 +27,8 @@ const allKeys = [
 // Progress
 const progressFill = document.getElementById("fw-progress-fill")!;
 const progressText = document.getElementById("fw-progress-text")!;
-const stepIndicators = document.querySelectorAll<HTMLElement>(".fw-step-indicator");
+const stepIndicators =
+  document.querySelectorAll<HTMLElement>(".fw-step-indicator");
 
 // Step containers
 const step0 = document.getElementById("fw-step-0")!;
@@ -37,13 +38,19 @@ const steps = [step0, step1, step2];
 
 // Inputs
 const emailInput = document.getElementById("fw-email") as HTMLInputElement;
-const passwordInput = document.getElementById("fw-password") as HTMLInputElement;
+const passwordInput = document.getElementById(
+  "fw-password",
+) as HTMLInputElement;
 const nameInput = document.getElementById("fw-name") as HTMLInputElement;
 const companyInput = document.getElementById("fw-company") as HTMLInputElement;
 const planFree = document.getElementById("fw-plan-free") as HTMLInputElement;
 const planPro = document.getElementById("fw-plan-pro") as HTMLInputElement;
-const planEnterprise = document.getElementById("fw-plan-enterprise") as HTMLInputElement;
-const newsletterInput = document.getElementById("fw-newsletter") as HTMLInputElement;
+const planEnterprise = document.getElementById(
+  "fw-plan-enterprise",
+) as HTMLInputElement;
+const newsletterInput = document.getElementById(
+  "fw-newsletter",
+) as HTMLInputElement;
 
 // Navigation
 const backBtn = document.getElementById("fw-back-btn") as HTMLButtonElement;
@@ -169,7 +176,6 @@ function render(): void {
   submitBtn.style.display = isLastStep ? "" : "none";
   nextBtn.disabled = !canAdvance;
   submitBtn.disabled = !currentStepValid;
-
 }
 
 // ============================================================================
@@ -188,7 +194,10 @@ emailInput.addEventListener("input", () => {
 });
 
 passwordInput.addEventListener("input", () => {
-  system.events.wizard.setField({ field: "password", value: passwordInput.value });
+  system.events.wizard.setField({
+    field: "password",
+    value: passwordInput.value,
+  });
 });
 
 // Step 1: Profile
@@ -197,7 +206,10 @@ nameInput.addEventListener("input", () => {
 });
 
 companyInput.addEventListener("input", () => {
-  system.events.wizard.setField({ field: "company", value: companyInput.value });
+  system.events.wizard.setField({
+    field: "company",
+    value: companyInput.value,
+  });
 });
 
 // Step 2: Preferences
@@ -220,7 +232,10 @@ planEnterprise.addEventListener("change", () => {
 });
 
 newsletterInput.addEventListener("change", () => {
-  system.events.wizard.setField({ field: "newsletter", value: newsletterInput.checked });
+  system.events.wizard.setField({
+    field: "newsletter",
+    value: newsletterInput.checked,
+  });
 });
 
 // Navigation

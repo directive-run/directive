@@ -1,17 +1,17 @@
-'use client'
+"use client";
 
-import { memo } from 'react'
-import clsx from 'clsx'
+import clsx from "clsx";
+import { memo } from "react";
 
+import { ThemeToggle } from "@/components/ThemeSelector";
 import {
   COLOR_PRESETS,
-  TYPO_PRESETS,
   DEFAULT_COLOR_PRESET,
   DEFAULT_TYPO_PRESET,
+  TYPO_PRESETS,
   findColorPreset,
-} from '@/lib/brand-presets'
-import { useThemePresets } from '@/lib/useThemePresets'
-import { ThemeToggle } from '@/components/ThemeSelector'
+} from "@/lib/brand-presets";
+import { useThemePresets } from "@/lib/useThemePresets";
 
 export const LabsThemePanel = memo(function LabsThemePanel() {
   const {
@@ -25,15 +25,17 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
     handleReset,
     handleColorHover,
     handleColorLeave,
-  } = useThemePresets()
+  } = useThemePresets();
 
   if (!mounted) {
-    return <div className="h-96 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+    return (
+      <div className="h-96 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+    );
   }
 
-  const allColors = [DEFAULT_COLOR_PRESET, ...COLOR_PRESETS]
-  const allTypos = [DEFAULT_TYPO_PRESET, ...TYPO_PRESETS]
-  const currentColor = findColorPreset(colorId) ?? DEFAULT_COLOR_PRESET
+  const allColors = [DEFAULT_COLOR_PRESET, ...COLOR_PRESETS];
+  const allTypos = [DEFAULT_TYPO_PRESET, ...TYPO_PRESETS];
+  const currentColor = findColorPreset(colorId) ?? DEFAULT_COLOR_PRESET;
 
   return (
     <div className="space-y-8">
@@ -80,10 +82,10 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
               onClick={() => handleColorChange(preset)}
               onMouseEnter={() => handleColorHover(preset)}
               className={clsx(
-                'group relative flex cursor-pointer flex-col items-center gap-1.5 rounded-xl px-1 pt-3 pb-2 transition',
+                "group relative flex cursor-pointer flex-col items-center gap-1.5 rounded-xl px-1 pt-3 pb-2 transition",
                 colorId === preset.id
-                  ? 'bg-slate-100 ring-2 ring-brand-primary dark:bg-slate-700'
-                  : 'hover:bg-slate-50 dark:hover:bg-slate-700/50',
+                  ? "bg-slate-100 ring-2 ring-brand-primary dark:bg-slate-700"
+                  : "hover:bg-slate-50 dark:hover:bg-slate-700/50",
               )}
               aria-label={`${preset.name}: ${preset.primary.name} + ${preset.accent.name}`}
               title={`${preset.name}: ${preset.primary.name} + ${preset.accent.name}`}
@@ -99,7 +101,7 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
                 />
               </div>
               <span className="max-w-full truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                {preset.id === 'default' ? 'Default' : preset.id}
+                {preset.id === "default" ? "Default" : preset.id}
               </span>
             </button>
           ))}
@@ -117,10 +119,10 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
               key={preset.id}
               onClick={() => handleTypoChange(preset)}
               className={clsx(
-                'flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-3 text-left transition',
+                "flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-3 text-left transition",
                 typoId === preset.id
-                  ? 'bg-slate-100 ring-2 ring-brand-primary dark:bg-slate-700'
-                  : 'hover:bg-slate-50 dark:hover:bg-slate-700/50',
+                  ? "bg-slate-100 ring-2 ring-brand-primary dark:bg-slate-700"
+                  : "hover:bg-slate-50 dark:hover:bg-slate-700/50",
               )}
             >
               <span
@@ -134,7 +136,8 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
                   {preset.name}
                 </span>
                 <span className="block truncate text-xs text-slate-400">
-                  {preset.display.name} &middot; {preset.body.name} &middot; {preset.code.name}
+                  {preset.display.name} &middot; {preset.body.name} &middot;{" "}
+                  {preset.code.name}
                 </span>
               </div>
             </button>
@@ -169,6 +172,5 @@ export const LabsThemePanel = memo(function LabsThemePanel() {
         </div>
       </div>
     </div>
-  )
-})
-
+  );
+});

@@ -15,16 +15,24 @@ forEachFramework("useTimeTravel", async (_fw, { page }) => {
   await expect(tid(page, TestIds.factSingle)).toHaveText("1");
 
   // Can now undo
-  await expect(tid(page, TestIds.timeTravelCanUndo)).toHaveText("true", { timeout: 2000 });
+  await expect(tid(page, TestIds.timeTravelCanUndo)).toHaveText("true", {
+    timeout: 2000,
+  });
 
   // Undo restores previous count
   await tid(page, TestIds.btnUndo).click();
-  await expect(tid(page, TestIds.factSingle)).toHaveText("0", { timeout: 2000 });
+  await expect(tid(page, TestIds.factSingle)).toHaveText("0", {
+    timeout: 2000,
+  });
 
   // Can now redo
-  await expect(tid(page, TestIds.timeTravelCanRedo)).toHaveText("true", { timeout: 2000 });
+  await expect(tid(page, TestIds.timeTravelCanRedo)).toHaveText("true", {
+    timeout: 2000,
+  });
 
   // Redo goes forward
   await tid(page, TestIds.btnRedo).click();
-  await expect(tid(page, TestIds.factSingle)).toHaveText("1", { timeout: 2000 });
+  await expect(tid(page, TestIds.factSingle)).toHaveText("1", {
+    timeout: 2000,
+  });
 });

@@ -3,121 +3,128 @@
  *
  * Same pattern as /api/devtools/stream but reads from the DAG orchestrator.
  */
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-import { isAllowedOrigin, forbiddenResponse } from '@/lib/origin-check'
-import { getDagTimeline } from '../../dag-chat/orchestrator-singleton'
+import { forbiddenResponse, isAllowedOrigin } from "@/lib/origin-check";
+import { getDagTimeline } from "../../dag-chat/orchestrator-singleton";
 
-let activeStreams = 0
-const MAX_STREAMS = 10
+let activeStreams = 0;
+const MAX_STREAMS = 10;
 
 export async function GET(request: Request) {
   if (!isAllowedOrigin(request)) {
-    return forbiddenResponse(request)
+    return forbiddenResponse(request);
   }
 
   if (activeStreams >= MAX_STREAMS) {
-    return Response.json({ error: 'Too many DevTools connections' }, { status: 429 })
+    return Response.json(
+      { error: "Too many DevTools connections" },
+      { status: 429 },
+    );
   }
 
-  activeStreams++
+  activeStreams++;
 
-  let unsubscribe: (() => void) | null = null
-  let pollTimer: ReturnType<typeof setInterval> | null = null
-  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
-  let cleaned = false
+  let unsubscribe: (() => void) | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let cleaned = false;
 
   const cleanup = () => {
     if (cleaned) {
-      return
+      return;
     }
-    cleaned = true
-    activeStreams--
-    unsubscribe?.()
-    unsubscribe = null
+    cleaned = true;
+    activeStreams--;
+    unsubscribe?.();
+    unsubscribe = null;
     if (pollTimer) {
-      clearInterval(pollTimer)
-      pollTimer = null
+      clearInterval(pollTimer);
+      pollTimer = null;
     }
     if (heartbeatTimer) {
-      clearInterval(heartbeatTimer)
-      heartbeatTimer = null
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
     }
-  }
+  };
 
   const stream = new ReadableStream({
     start(controller) {
-      const encoder = new TextEncoder()
+      const encoder = new TextEncoder();
 
       const send = (data: unknown) => {
         try {
-          const payload = data as { id?: number }
-          const id = payload.id
-          controller.enqueue(encoder.encode(`${id != null ? `id: ${id}\n` : ''}data: ${JSON.stringify(data)}\n\n`))
+          const payload = data as { id?: number };
+          const id = payload.id;
+          controller.enqueue(
+            encoder.encode(
+              `${id != null ? `id: ${id}\n` : ""}data: ${JSON.stringify(data)}\n\n`,
+            ),
+          );
         } catch {
           // Stream closed
         }
-      }
+      };
 
       const attachToTimeline = () => {
-        const timeline = getDagTimeline()
+        const timeline = getDagTimeline();
         if (!timeline) {
-          return false
+          return false;
         }
 
         if (pollTimer) {
-          clearInterval(pollTimer)
-          pollTimer = null
+          clearInterval(pollTimer);
+          pollTimer = null;
         }
 
-        const existing = timeline.getEvents()
+        const existing = timeline.getEvents();
         for (const event of existing) {
-          send(event)
+          send(event);
         }
 
         unsubscribe = timeline.subscribe((event) => {
-          send(event)
-        })
+          send(event);
+        });
 
-        return true
-      }
+        return true;
+      };
 
       if (!attachToTimeline()) {
         pollTimer = setInterval(() => {
-          attachToTimeline()
-        }, 1000)
+          attachToTimeline();
+        }, 1000);
       }
 
       heartbeatTimer = setInterval(() => {
         try {
-          controller.enqueue(encoder.encode(': heartbeat\n\n'))
+          controller.enqueue(encoder.encode(": heartbeat\n\n"));
         } catch {
           // Stream closed
         }
-      }, 15000)
+      }, 15000);
 
-      request.signal.addEventListener('abort', () => {
-        cleanup()
+      request.signal.addEventListener("abort", () => {
+        cleanup();
         try {
-          controller.close()
+          controller.close();
         } catch {
           // Already closed
         }
-      })
+      });
     },
 
     cancel() {
-      cleanup()
+      cleanup();
     },
-  })
+  });
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
-  })
+  });
 }

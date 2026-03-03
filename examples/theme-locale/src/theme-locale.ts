@@ -9,7 +9,7 @@
  * effects for DOM side-effects, and persistence plugin for user prefs.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 
 // ============================================================================
 // Types
@@ -166,10 +166,16 @@ export const preferencesModule = createModule("preferences", {
   effects: {
     applyTheme: {
       run: (facts) => {
-        const effective = facts.theme === "system"
-          ? (facts.systemPrefersDark ? "dark" : "light")
-          : facts.theme;
-        document.documentElement.setAttribute("data-theme", effective as string);
+        const effective =
+          facts.theme === "system"
+            ? facts.systemPrefersDark
+              ? "dark"
+              : "light"
+            : facts.theme;
+        document.documentElement.setAttribute(
+          "data-theme",
+          effective as string,
+        );
       },
     },
   },

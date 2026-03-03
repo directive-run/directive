@@ -1,9 +1,13 @@
 // @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
-import { createModule, t } from '@directive-run/core'
-import type { DebugEvent, ConnectionStatus, BreakpointDef } from '../types'
-import { MAX_EVENTS, MAX_RECONNECT_RETRIES, RECONNECT_DELAY } from '../constants'
+import { createModule, t } from "@directive-run/core";
+import {
+  MAX_EVENTS,
+  MAX_RECONNECT_RETRIES,
+  RECONNECT_DELAY,
+} from "../constants";
+import type { BreakpointDef, ConnectionStatus, DebugEvent } from "../types";
 
-export const devtoolsConnection = createModule('connection', {
+export const devtoolsConnection = createModule("connection", {
   schema: {
     facts: {
       status: t.string<ConnectionStatus>(),
@@ -56,100 +60,101 @@ export const devtoolsConnection = createModule('connection', {
   },
 
   init: (facts) => {
-    facts.status = 'connecting'
-    facts.retryCount = 0
-    facts.events = []
-    facts.streamUrl = '/api/devtools/stream'
-    facts.resetUrl = '/api/devtools/reset'
-    facts.replayMode = false
-    facts.aiEnabled = true
-    facts.clientOnly = false
-    facts.isPaused = false
-    facts.breakpoints = []
-    facts.pausedOnEvent = null
+    facts.status = "connecting";
+    facts.retryCount = 0;
+    facts.events = [];
+    facts.streamUrl = "/api/devtools/stream";
+    facts.resetUrl = "/api/devtools/reset";
+    facts.replayMode = false;
+    facts.aiEnabled = true;
+    facts.clientOnly = false;
+    facts.isPaused = false;
+    facts.breakpoints = [];
+    facts.pausedOnEvent = null;
   },
 
   derive: {
     exhaustedRetries: (facts) =>
-      facts.retryCount >= MAX_RECONNECT_RETRIES && facts.status === 'disconnected',
+      facts.retryCount >= MAX_RECONNECT_RETRIES &&
+      facts.status === "disconnected",
     eventCount: (facts) => facts.events.length,
     totalTokens: (facts) =>
       facts.events
-        .filter((e) => e.type === 'agent_complete')
+        .filter((e) => e.type === "agent_complete")
         .reduce((s, e) => s + (e.totalTokens ?? 0), 0),
     activeBreakpoints: (facts) => facts.breakpoints.filter((b) => b.enabled),
   },
 
   events: {
     connected: (facts) => {
-      facts.status = 'connected'
-      facts.retryCount = 0
+      facts.status = "connected";
+      facts.retryCount = 0;
     },
     connecting: (facts) => {
-      facts.status = 'connecting'
+      facts.status = "connecting";
     },
     disconnected: (facts) => {
-      facts.status = 'disconnected'
+      facts.status = "disconnected";
     },
     incrementRetry: (facts) => {
-      facts.retryCount++
+      facts.retryCount++;
     },
     resetRetries: (facts) => {
-      facts.retryCount = 0
+      facts.retryCount = 0;
     },
     pushEvents: (facts, { batch }) => {
       // Deduplicate: skip events already in the list (handles SSE replay on remount)
-      const maxId = facts.events.length > 0
-        ? facts.events[facts.events.length - 1].id
-        : -1
-      const fresh = batch.filter((e) => e.id > maxId)
+      const maxId =
+        facts.events.length > 0 ? facts.events[facts.events.length - 1].id : -1;
+      const fresh = batch.filter((e) => e.id > maxId);
       if (fresh.length === 0) {
-        return
+        return;
       }
 
-      const next = [...facts.events, ...fresh]
-      facts.events = next.length > MAX_EVENTS ? next.slice(next.length - MAX_EVENTS) : next
+      const next = [...facts.events, ...fresh];
+      facts.events =
+        next.length > MAX_EVENTS ? next.slice(next.length - MAX_EVENTS) : next;
     },
     clearEvents: (facts) => {
-      facts.events = []
+      facts.events = [];
     },
     enableAi: (facts) => {
-      facts.aiEnabled = true
-      facts.clientOnly = true
+      facts.aiEnabled = true;
+      facts.clientOnly = true;
     },
     importEvents: (facts, { imported }) => {
-      facts.events = imported
+      facts.events = imported;
     },
     // Atomic replacement — avoids intermediate empty state that triggers serverReset
     replaceEvents: (facts, { events }) => {
-      facts.events = events
+      facts.events = events;
     },
     setStreamUrl: (facts, { url }) => {
-      facts.streamUrl = url
+      facts.streamUrl = url;
       // Derive resetUrl from streamUrl
-      facts.resetUrl = url.replace(/\/stream$/, '/reset')
+      facts.resetUrl = url.replace(/\/stream$/, "/reset");
     },
     enterReplayMode: (facts) => {
-      facts.replayMode = true
+      facts.replayMode = true;
     },
     addBreakpoint: (facts, { breakpoint }) => {
-      facts.breakpoints = [...facts.breakpoints, breakpoint]
+      facts.breakpoints = [...facts.breakpoints, breakpoint];
     },
     removeBreakpoint: (facts, { id }) => {
-      facts.breakpoints = facts.breakpoints.filter((b) => b.id !== id)
+      facts.breakpoints = facts.breakpoints.filter((b) => b.id !== id);
     },
     toggleBreakpoint: (facts, { id }) => {
       facts.breakpoints = facts.breakpoints.map((b) =>
         b.id === id ? { ...b, enabled: !b.enabled } : b,
-      )
+      );
     },
     pauseStream: (facts, { event }) => {
-      facts.isPaused = true
-      facts.pausedOnEvent = event
+      facts.isPaused = true;
+      facts.pausedOnEvent = event;
     },
     resumeStream: (facts) => {
-      facts.isPaused = false
-      facts.pausedOnEvent = null
+      facts.isPaused = false;
+      facts.pausedOnEvent = null;
     },
   },
 
@@ -160,9 +165,9 @@ export const devtoolsConnection = createModule('connection', {
         facts.aiEnabled &&
         !facts.clientOnly &&
         !facts.replayMode &&
-        facts.status === 'disconnected' &&
+        facts.status === "disconnected" &&
         facts.retryCount < MAX_RECONNECT_RETRIES,
-      require: { type: 'RECONNECT' },
+      require: { type: "RECONNECT" },
     },
   },
 
@@ -170,13 +175,13 @@ export const devtoolsConnection = createModule('connection', {
   // The actual EventSource creation is handled by the React hook
   resolvers: {
     reconnect: {
-      requirement: 'RECONNECT',
-      key: () => 'reconnect',
+      requirement: "RECONNECT",
+      key: () => "reconnect",
       resolve: async (req, context) => {
-        await new Promise((r) => setTimeout(r, RECONNECT_DELAY))
+        await new Promise((r) => setTimeout(r, RECONNECT_DELAY));
         // Guard against overwriting a manual reconnect that already succeeded
-        if (context.facts.status === 'disconnected') {
-          context.facts.status = 'connecting'
+        if (context.facts.status === "disconnected") {
+          context.facts.status = "connecting";
         }
       },
     },
@@ -187,14 +192,14 @@ export const devtoolsConnection = createModule('connection', {
     serverReset: {
       run: (facts, prev) => {
         if (facts.clientOnly) {
-          return
+          return;
         }
 
         if (prev && prev.events.length > 0 && facts.events.length === 0) {
           // Use dedicated resetUrl fact
-          fetch(facts.resetUrl, { method: 'POST' }).catch(() => {})
+          fetch(facts.resetUrl, { method: "POST" }).catch(() => {});
         }
       },
     },
   },
-})
+});

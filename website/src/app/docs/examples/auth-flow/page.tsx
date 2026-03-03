@@ -1,22 +1,22 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { AuthFlowDemo } from './AuthFlowDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { AuthFlowDemo } from "./AuthFlowDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Auth Flow',
+  title: "Auth Flow",
   description:
-    'Interactive authentication flow demo built with Directive. Login, token refresh with countdown, constraint ordering, and session management.',
-  path: '/docs/examples/auth-flow',
-  section: 'Docs',
-})
+    "Interactive authentication flow demo built with Directive. Login, token refresh with countdown, constraint ordering, and session management.",
+  path: "/docs/examples/auth-flow",
+  section: "Docs",
+});
 
 export default function AuthFlowPage() {
-  const build = parseExampleBuild('auth-flow')
-  const sources = readExampleSources('auth-flow', [
-    'auth-flow.ts',
-    'mock-auth.ts',
-    'main.ts',
-  ])
+  const build = parseExampleBuild("auth-flow");
+  const sources = readExampleSources("auth-flow", [
+    "auth-flow.ts",
+    "mock-auth.ts",
+    "main.ts",
+  ]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -35,5 +35,5 @@ export default function AuthFlowPage() {
 
       <AuthFlowDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

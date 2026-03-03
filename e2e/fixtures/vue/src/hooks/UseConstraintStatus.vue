@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { useConstraintStatus, useFact } from "@directive-run/vue";
 import { computed } from "vue";
-import { useFact, useConstraintStatus } from "@directive-run/vue";
 import { system } from "../system";
-import { TestIds } from "../../../../shared/test-ids";
 
 const constraints = useConstraintStatus(system);
 const status = useFact(system, "status");
 
-const activeCount = computed(() => constraints.value.filter((c) => c.active).length);
+const activeCount = computed(
+  () => constraints.value.filter((c) => c.active).length,
+);
 </script>
 
 <template>

@@ -10,15 +10,15 @@
  * In-progress strokes (60fps pointer events) stay in React refs
  * for performance — only committed strokes live here.
  */
-import { createModule, t } from '@directive-run/core'
+import { createModule, t } from "@directive-run/core";
 
 export interface Stroke {
-  points: number[][] // Raw [x, y] in flow coordinates
-  color: string
-  size: number
+  points: number[][]; // Raw [x, y] in flow coordinates
+  color: string;
+  size: number;
 }
 
-export const graphDraw = createModule('graph-draw', {
+export const graphDraw = createModule("graph-draw", {
   schema: {
     facts: {
       drawMode: t.boolean(),
@@ -42,10 +42,10 @@ export const graphDraw = createModule('graph-draw', {
   },
 
   init: (facts) => {
-    facts.drawMode = false
-    facts.strokes = []
-    facts.strokeColor = '#f59e0b'
-    facts.strokeSize = 4
+    facts.drawMode = false;
+    facts.strokes = [];
+    facts.strokeColor = "#f59e0b";
+    facts.strokeSize = 4;
   },
 
   derive: {
@@ -56,22 +56,22 @@ export const graphDraw = createModule('graph-draw', {
 
   events: {
     toggleDraw: (facts) => {
-      facts.drawMode = !facts.drawMode
+      facts.drawMode = !facts.drawMode;
     },
     addStroke: (facts, { stroke }) => {
-      facts.strokes = [...(facts.strokes ?? []), stroke]
+      facts.strokes = [...(facts.strokes ?? []), stroke];
     },
     undoStroke: (facts) => {
-      facts.strokes = (facts.strokes ?? []).slice(0, -1)
+      facts.strokes = (facts.strokes ?? []).slice(0, -1);
     },
     clearStrokes: (facts) => {
-      facts.strokes = []
+      facts.strokes = [];
     },
     setColor: (facts, { color }) => {
-      facts.strokeColor = color
+      facts.strokeColor = color;
     },
     setSize: (facts, { size }) => {
-      facts.strokeSize = size
+      facts.strokeSize = size;
     },
   },
-})
+});

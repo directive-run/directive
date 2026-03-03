@@ -34,13 +34,13 @@ export type RunnerMiddleware = (runner: AgentRunner) => AgentRunner;
  * @returns A new `AgentRunner` with all middleware applied.
  */
 export function pipe(
-	runner: AgentRunner,
-	...middlewares: RunnerMiddleware[]
+  runner: AgentRunner,
+  ...middlewares: RunnerMiddleware[]
 ): AgentRunner {
-	let result = runner;
-	for (const mw of middlewares) {
-		result = mw(result);
-	}
+  let result = runner;
+  for (const mw of middlewares) {
+    result = mw(result);
+  }
 
-	return result;
+  return result;
 }

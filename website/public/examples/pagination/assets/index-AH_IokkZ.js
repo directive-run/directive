@@ -1,5 +1,2924 @@
-(function(){const r=document.createElement("link").relList;if(r&&r.supports&&r.supports("modulepreload"))return;for(const o of document.querySelectorAll('link[rel="modulepreload"]'))i(o);new MutationObserver(o=>{for(const s of o)if(s.type==="childList")for(const u of s.addedNodes)u.tagName==="LINK"&&u.rel==="modulepreload"&&i(u)}).observe(document,{childList:!0,subtree:!0});function c(o){const s={};return o.integrity&&(s.integrity=o.integrity),o.referrerPolicy&&(s.referrerPolicy=o.referrerPolicy),o.crossOrigin==="use-credentials"?s.credentials="include":o.crossOrigin==="anonymous"?s.credentials="omit":s.credentials="same-origin",s}function i(o){if(o.ep)return;o.ep=!0;const s=c(o);fetch(o.href,s)}})();var Ke=class extends Error{constructor(r,c,i,o,s=!0){super(r),this.source=c,this.sourceId=i,this.context=o,this.recoverable=s,this.name="DirectiveError"}},fe=[];function wt(){let e=new Set;return{get isTracking(){return!0},track(r){e.add(r)},getDependencies(){return e}}}var St={isTracking:!1,track(){},getDependencies(){return new Set}};function Et(){return fe[fe.length-1]??St}function xe(e){let r=wt();fe.push(r);try{return{value:e(),deps:r.getDependencies()}}finally{fe.pop()}}function He(e){let r=fe.splice(0,fe.length);try{return e()}finally{fe.push(...r)}}function Be(e){Et().track(e)}function xt(e,r=100){try{return JSON.stringify(e)?.slice(0,r)??String(e)}catch{return"[circular or non-serializable]"}}function $e(e=[],r,c,i,o,s){return{_type:void 0,_validators:e,_typeName:r,_default:c,_transform:i,_description:o,_refinements:s,validate(u){return $e([...e,u],r,c,i,o,s)}}}function te(e,r,c,i,o,s){return{...$e(e,r,c,i,o,s),default(u){return te(e,r,u,i,o,s)},transform(u){return te([],r,void 0,l=>{let f=i?i(l):l;return u(f)},o)},brand(){return te(e,`Branded<${r}>`,c,i,o,s)},describe(u){return te(e,r,c,i,u,s)},refine(u,l){let f=[...s??[],{predicate:u,message:l}];return te([...e,u],r,c,i,o,f)},nullable(){return te([u=>u===null||e.every(l=>l(u))],`${r} | null`,c,i,o)},optional(){return te([u=>u===void 0||e.every(l=>l(u))],`${r} | undefined`,c,i,o)}}}var ee={string(){return te([e=>typeof e=="string"],"string")},number(){let e=(r,c,i,o,s)=>({...te(r,"number",c,i,o,s),min(u){return e([...r,l=>l>=u],c,i,o,s)},max(u){return e([...r,l=>l<=u],c,i,o,s)},default(u){return e(r,u,i,o,s)},describe(u){return e(r,c,i,u,s)},refine(u,l){let f=[...s??[],{predicate:u,message:l}];return e([...r,u],c,i,o,f)}});return e([r=>typeof r=="number"])},boolean(){return te([e=>typeof e=="boolean"],"boolean")},array(){let e=(r,c,i,o,s)=>{let u=te(r,"array",i,void 0,o),l=s??{value:-1};return{...u,get _lastFailedIndex(){return l.value},set _lastFailedIndex(f){l.value=f},of(f){let d={value:-1};return e([...r,p=>{for(let x=0;x<p.length;x++){let T=p[x];if(!f._validators.every(O=>O(T)))return d.value=x,!1}return!0}],f,i,o,d)},nonEmpty(){return e([...r,f=>f.length>0],c,i,o,l)},maxLength(f){return e([...r,d=>d.length<=f],c,i,o,l)},minLength(f){return e([...r,d=>d.length>=f],c,i,o,l)},default(f){return e(r,c,f,o,l)},describe(f){return e(r,c,i,f,l)}}};return e([r=>Array.isArray(r)])},object(){let e=(r,c,i)=>({...te(r,"object",c,void 0,i),shape(o){return e([...r,s=>{for(let[u,l]of Object.entries(o)){let f=s[u],d=l;if(d&&!d._validators.every(p=>p(f)))return!1}return!0}],c,i)},nonNull(){return e([...r,o=>o!=null],c,i)},hasKeys(...o){return e([...r,s=>o.every(u=>u in s)],c,i)},default(o){return e(r,o,i)},describe(o){return e(r,c,o)}});return e([r=>typeof r=="object"&&r!==null&&!Array.isArray(r)])},enum(...e){let r=new Set(e);return te([c=>typeof c=="string"&&r.has(c)],`enum(${e.join("|")})`)},literal(e){return te([r=>r===e],`literal(${String(e)})`)},nullable(e){let r=e._typeName??"unknown";return $e([c=>c===null?!0:e._validators.every(i=>i(c))],`${r} | null`)},optional(e){let r=e._typeName??"unknown";return $e([c=>c===void 0?!0:e._validators.every(i=>i(c))],`${r} | undefined`)},union(...e){let r=e.map(c=>c._typeName??"unknown");return te([c=>e.some(i=>i._validators.every(o=>o(c)))],r.join(" | "))},record(e){let r=e._typeName??"unknown";return te([c=>typeof c!="object"||c===null||Array.isArray(c)?!1:Object.values(c).every(i=>e._validators.every(o=>o(i)))],`Record<string, ${r}>`)},tuple(...e){let r=e.map(c=>c._typeName??"unknown");return te([c=>!Array.isArray(c)||c.length!==e.length?!1:e.every((i,o)=>i._validators.every(s=>s(c[o])))],`[${r.join(", ")}]`)},date(){return te([e=>e instanceof Date&&!isNaN(e.getTime())],"Date")},uuid(){let e=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;return te([r=>typeof r=="string"&&e.test(r)],"uuid")},email(){let e=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;return te([r=>typeof r=="string"&&e.test(r)],"email")},url(){return te([e=>{if(typeof e!="string")return!1;try{return new URL(e),!0}catch{return!1}}],"url")},bigint(){return te([e=>typeof e=="bigint"],"bigint")}};function $t(e){let{schema:r,onChange:c,onBatch:i}=e;Object.keys(r).length;let o=e.validate??!1,s=e.strictKeys??!1,u=e.redactErrors??!1,l=new Map,f=new Set,d=new Map,p=new Set,x=0,T=[],O=new Set,M=!1,D=[],R=100;function A(m){return m!==null&&typeof m=="object"&&"safeParse"in m&&typeof m.safeParse=="function"&&"_def"in m&&"parse"in m&&typeof m.parse=="function"}function F(m){let b=m;if(b._typeName)return b._typeName;if(A(m)){let w=m._def;if(w?.typeName)return w.typeName.replace(/^Zod/,"").toLowerCase()}return"unknown"}function q(m){return u?"[redacted]":xt(m)}function h(m,b){if(!o)return;let w=r[m];if(!w){if(s)throw new Error(`[Directive] Unknown fact key: "${m}". Key not defined in schema.`);console.warn(`[Directive] Unknown fact key: "${m}"`);return}if(A(w)){let z=w.safeParse(b);if(!z.success){let y=b===null?"null":Array.isArray(b)?"array":typeof b,C=q(b),t=z.error?.message??z.error?.issues?.[0]?.message??"Validation failed",n=F(w);throw new Error(`[Directive] Validation failed for "${m}": expected ${n}, got ${y} ${C}. ${t}`)}return}let I=w,N=I._validators;if(!N||!Array.isArray(N)||N.length===0)return;let K=I._typeName??"unknown";for(let z=0;z<N.length;z++){let y=N[z];if(typeof y=="function"&&!y(b)){let C=b===null?"null":Array.isArray(b)?"array":typeof b,t=q(b),n="";typeof I._lastFailedIndex=="number"&&I._lastFailedIndex>=0&&(n=` (element at index ${I._lastFailedIndex} failed)`,I._lastFailedIndex=-1);let a=z===0?"":` (validator ${z+1} failed)`;throw new Error(`[Directive] Validation failed for "${m}": expected ${K}, got ${C} ${t}${a}${n}`)}}}function E(m){d.get(m)?.forEach(b=>b())}function v(){p.forEach(m=>m())}function $(m,b,w){if(M){D.push({key:m,value:b,prev:w});return}M=!0;try{c?.(m,b,w),E(m),v();let I=0;for(;D.length>0;){if(++I>R)throw D.length=0,new Error(`[Directive] Infinite notification loop detected after ${R} iterations. A listener is repeatedly mutating facts that re-trigger notifications.`);let N=[...D];D.length=0;for(let K of N)c?.(K.key,K.value,K.prev),E(K.key);v()}}finally{M=!1}}function k(){if(!(x>0)){if(i&&T.length>0&&i([...T]),O.size>0){M=!0;try{for(let b of O)E(b);v();let m=0;for(;D.length>0;){if(++m>R)throw D.length=0,new Error(`[Directive] Infinite notification loop detected during flush after ${R} iterations.`);let b=[...D];D.length=0;for(let w of b)c?.(w.key,w.value,w.prev),E(w.key);v()}}finally{M=!1}}T.length=0,O.clear()}}let L={get(m){return Be(m),l.get(m)},has(m){return Be(m),l.has(m)},set(m,b){h(m,b);let w=l.get(m);Object.is(w,b)||(l.set(m,b),f.add(m),x>0?(T.push({key:m,value:b,prev:w,type:"set"}),O.add(m)):$(m,b,w))},delete(m){let b=l.get(m);l.delete(m),f.delete(m),x>0?(T.push({key:m,value:void 0,prev:b,type:"delete"}),O.add(m)):$(m,void 0,b)},batch(m){x++;try{m()}finally{x--,k()}},subscribe(m,b){for(let w of m){let I=w;d.has(I)||d.set(I,new Set),d.get(I).add(b)}return()=>{for(let w of m){let I=d.get(w);I&&(I.delete(b),I.size===0&&d.delete(w))}}},subscribeAll(m){return p.add(m),()=>p.delete(m)},toObject(){let m={};for(let b of f)l.has(b)&&(m[b]=l.get(b));return m}};return L.registerKeys=m=>{for(let b of Object.keys(m))ye.has(b)||(r[b]=m[b],f.add(b))},L}var ye=Object.freeze(new Set(["__proto__","constructor","prototype"]));function Ct(e,r){let c=()=>({get:i=>He(()=>e.get(i)),has:i=>He(()=>e.has(i))});return new Proxy({},{get(i,o){if(o==="$store")return e;if(o==="$snapshot")return c;if(typeof o!="symbol"&&!ye.has(o))return e.get(o)},set(i,o,s){return typeof o=="symbol"||o==="$store"||o==="$snapshot"||ye.has(o)?!1:(e.set(o,s),!0)},deleteProperty(i,o){return typeof o=="symbol"||o==="$store"||o==="$snapshot"||ye.has(o)?!1:(e.delete(o),!0)},has(i,o){return o==="$store"||o==="$snapshot"?!0:typeof o=="symbol"||ye.has(o)?!1:e.has(o)},ownKeys(){return Object.keys(r)},getOwnPropertyDescriptor(i,o){return o==="$store"||o==="$snapshot"?{configurable:!0,enumerable:!1,writable:!1}:{configurable:!0,enumerable:!0,writable:!0}}})}function Rt(e){let r=$t(e),c=Ct(r,e.schema);return{store:r,facts:c}}function dt(e,r){let c="crossModuleDeps"in r?r.crossModuleDeps:void 0;return{id:e,schema:r.schema,init:r.init,derive:r.derive??{},events:r.events??{},effects:r.effects,constraints:r.constraints,resolvers:r.resolvers,hooks:r.hooks,snapshotEvents:r.snapshotEvents,crossModuleDeps:c}}async function we(e,r,c){let i,o=new Promise((s,u)=>{i=setTimeout(()=>u(new Error(c)),r)});try{return await Promise.race([e,o])}finally{clearTimeout(i)}}function ft(e,r=50){let c=new WeakSet;function i(o,s){if(s>r)return'"[max depth exceeded]"';if(o===null)return"null";if(o===void 0)return"undefined";let u=typeof o;if(u==="string")return JSON.stringify(o);if(u==="number"||u==="boolean")return String(o);if(u==="function")return'"[function]"';if(u==="symbol")return'"[symbol]"';if(Array.isArray(o)){if(c.has(o))return'"[circular]"';c.add(o);let l=`[${o.map(f=>i(f,s+1)).join(",")}]`;return c.delete(o),l}if(u==="object"){let l=o;if(c.has(l))return'"[circular]"';c.add(l);let f=`{${Object.keys(l).sort().map(d=>`${JSON.stringify(d)}:${i(l[d],s+1)}`).join(",")}}`;return c.delete(l),f}return'"[unknown]"'}return i(e,0)}function ve(e,r=50){let c=new Set(["__proto__","constructor","prototype"]),i=new WeakSet;function o(s,u){if(u>r)return!1;if(s==null||typeof s!="object")return!0;let l=s;if(i.has(l))return!0;if(i.add(l),Array.isArray(l)){for(let f of l)if(!o(f,u+1))return i.delete(l),!1;return i.delete(l),!0}for(let f of Object.keys(l))if(c.has(f)||!o(l[f],u+1))return i.delete(l),!1;return i.delete(l),!0}return o(e,0)}function kt(e){let r=ft(e),c=5381;for(let i=0;i<r.length;i++)c=(c<<5)+c^r.charCodeAt(i);return(c>>>0).toString(16)}function At(e,r){if(r)return r(e);let{type:c,...i}=e,o=ft(i);return`${c}:${o}`}function Dt(e,r,c){return{requirement:e,id:At(e,c),fromConstraint:r}}var qe=class pt{map=new Map;add(r){this.map.has(r.id)||this.map.set(r.id,r)}remove(r){return this.map.delete(r)}has(r){return this.map.has(r)}get(r){return this.map.get(r)}all(){return[...this.map.values()]}ids(){return[...this.map.keys()]}get size(){return this.map.size}clear(){this.map.clear()}clone(){let r=new pt;for(let c of this.map.values())r.add(c);return r}diff(r){let c=[],i=[],o=[];for(let s of this.map.values())r.has(s.id)?o.push(s):c.push(s);for(let s of r.map.values())this.map.has(s.id)||i.push(s);return{added:c,removed:i,unchanged:o}}},Ot=5e3;function Mt(e){let{definitions:r,facts:c,requirementKeys:i={},defaultTimeout:o=Ot,onEvaluate:s,onError:u}=e,l=new Map,f=new Set,d=new Set,p=new Map,x=new Map,T=new Set,O=new Map,M=new Map,D=!1,R=new Set,A=new Set,F=new Map,q=[],h=new Map;function E(){for(let[t,n]of Object.entries(r))if(n.after)for(let a of n.after)r[a]&&(F.has(a)||F.set(a,new Set),F.get(a).add(t))}function v(){let t=new Set,n=new Set,a=[];function g(S,j){if(t.has(S))return;if(n.has(S)){let W=j.indexOf(S),_=[...j.slice(W),S].join(" → ");throw new Error(`[Directive] Constraint cycle detected: ${_}. Remove one of the \`after\` dependencies to break the cycle.`)}n.add(S),j.push(S);let P=r[S];if(P?.after)for(let W of P.after)r[W]&&g(W,j);j.pop(),n.delete(S),t.add(S),a.push(S)}for(let S of Object.keys(r))g(S,[]);q=a,h=new Map(q.map((S,j)=>[S,j]))}v(),E();function $(t,n){return n.async!==void 0?n.async:!!d.has(t)}function k(t){let n=r[t];if(!n)throw new Error(`[Directive] Unknown constraint: ${t}`);let a=$(t,n);a&&d.add(t);let g={id:t,priority:n.priority??0,isAsync:a,lastResult:null,isEvaluating:!1,error:null,lastResolvedAt:null,after:n.after??[]};return l.set(t,g),g}function L(t){return l.get(t)??k(t)}function m(t,n){let a=p.get(t)??new Set;for(let g of a){let S=x.get(g);S?.delete(t),S&&S.size===0&&x.delete(g)}for(let g of n)x.has(g)||x.set(g,new Set),x.get(g).add(t);p.set(t,n)}function b(t){let n=r[t];if(!n)return!1;let a=L(t);a.isEvaluating=!0,a.error=null;try{let g;if(n.deps)g=n.when(c),O.set(t,new Set(n.deps));else{let S=xe(()=>n.when(c));g=S.value,O.set(t,S.deps)}return g instanceof Promise?(d.add(t),a.isAsync=!0,g.then(S=>(a.lastResult=S,a.isEvaluating=!1,s?.(t,S),S)).catch(S=>(a.error=S instanceof Error?S:new Error(String(S)),a.lastResult=!1,a.isEvaluating=!1,u?.(t,S),!1))):(a.lastResult=g,a.isEvaluating=!1,s?.(t,g),g)}catch(g){return a.error=g instanceof Error?g:new Error(String(g)),a.lastResult=!1,a.isEvaluating=!1,u?.(t,g),!1}}async function w(t){let n=r[t];if(!n)return!1;let a=L(t),g=n.timeout??o;if(a.isEvaluating=!0,a.error=null,n.deps?.length){let S=new Set(n.deps);m(t,S),O.set(t,S)}try{let S=n.when(c),j=await we(S,g,`Constraint "${t}" timed out after ${g}ms`);return a.lastResult=j,a.isEvaluating=!1,s?.(t,j),j}catch(S){return a.error=S instanceof Error?S:new Error(String(S)),a.lastResult=!1,a.isEvaluating=!1,u?.(t,S),!1}}function I(t,n){return t==null?[]:Array.isArray(t)?t.filter(g=>g!=null):[t]}function N(t){let n=r[t];if(!n)return{requirements:[],deps:new Set};let a=n.require;if(typeof a=="function"){let{value:g,deps:S}=xe(()=>a(c));return{requirements:I(g),deps:S}}return{requirements:I(a),deps:new Set}}function K(t,n){if(n.size===0)return;let a=p.get(t)??new Set;for(let g of n)a.add(g),x.has(g)||x.set(g,new Set),x.get(g).add(t);p.set(t,a)}let z=null;function y(){return z||(z=Object.keys(r).sort((t,n)=>{let a=L(t),g=L(n).priority-a.priority;if(g!==0)return g;let S=h.get(t)??0,j=h.get(n)??0;return S-j})),z}for(let t of Object.keys(r))k(t);function C(t){let n=l.get(t);if(!n||n.after.length===0)return!0;for(let a of n.after)if(r[a]&&!f.has(a)&&!A.has(a)&&!R.has(a))return!1;return!0}return{async evaluate(t){let n=new qe;A.clear();let a=y().filter(_=>!f.has(_)),g;if(!D||!t||t.size===0)g=a,D=!0;else{let _=new Set;for(let V of t){let J=x.get(V);if(J)for(let re of J)f.has(re)||_.add(re)}for(let V of T)f.has(V)||_.add(V);T.clear(),g=[..._];for(let V of a)if(!_.has(V)){let J=M.get(V);if(J)for(let re of J)n.add(re)}}function S(_,V){if(f.has(_))return;let J=O.get(_);if(!V){J!==void 0&&m(_,J),A.add(_),M.set(_,[]);return}A.delete(_);let re,Z;try{let X=N(_);re=X.requirements,Z=X.deps}catch(X){u?.(_,X),J!==void 0&&m(_,J),M.set(_,[]);return}if(J!==void 0){let X=new Set(J);for(let U of Z)X.add(U);m(_,X)}else K(_,Z);if(re.length>0){let X=i[_],U=re.map(G=>Dt(G,_,X));for(let G of U)n.add(G);M.set(_,U)}else M.set(_,[])}async function j(_){let V=[],J=[];for(let U of _)if(C(U))J.push(U);else{V.push(U);let G=M.get(U);if(G)for(let Y of G)n.add(Y)}if(J.length===0)return V;let re=[],Z=[];for(let U of J)L(U).isAsync?Z.push(U):re.push(U);let X=[];for(let U of re){let G=b(U);if(G instanceof Promise){X.push({id:U,promise:G});continue}S(U,G)}if(X.length>0){let U=await Promise.all(X.map(async({id:G,promise:Y})=>({id:G,active:await Y})));for(let{id:G,active:Y}of U)S(G,Y)}if(Z.length>0){let U=await Promise.all(Z.map(async G=>({id:G,active:await w(G)})));for(let{id:G,active:Y}of U)S(G,Y)}return V}let P=g,W=g.length+1;for(;P.length>0&&W>0;){let _=P.length;if(P=await j(P),P.length===_)break;W--}return n.all()},getState(t){return l.get(t)},getAllStates(){return[...l.values()]},disable(t){f.add(t),z=null,M.delete(t);let n=p.get(t);if(n){for(let a of n){let g=x.get(a);g&&(g.delete(t),g.size===0&&x.delete(a))}p.delete(t)}O.delete(t)},enable(t){f.delete(t),z=null,T.add(t)},invalidate(t){let n=x.get(t);if(n)for(let a of n)T.add(a)},markResolved(t){R.add(t);let n=l.get(t);n&&(n.lastResolvedAt=Date.now());let a=F.get(t);if(a)for(let g of a)T.add(g)},isResolved(t){return R.has(t)},registerDefinitions(t){for(let[n,a]of Object.entries(t))r[n]=a,k(n),T.add(n);z=null,v(),E()}}}function jt(e){let{definitions:r,facts:c,onCompute:i,onInvalidate:o,onError:s}=e,u=new Map,l=new Map,f=new Map,d=new Map,p=new Set(["__proto__","constructor","prototype"]),x=0,T=new Set,O=!1,M=100,D;function R(v){if(!r[v])throw new Error(`[Directive] Unknown derivation: ${v}`);let $={id:v,compute:()=>F(v),cachedValue:void 0,dependencies:new Set,isStale:!0,isComputing:!1};return u.set(v,$),$}function A(v){return u.get(v)??R(v)}function F(v){let $=A(v),k=r[v];if(!k)throw new Error(`[Directive] Unknown derivation: ${v}`);if($.isComputing)throw new Error(`[Directive] Circular dependency detected in derivation: ${v}`);$.isComputing=!0;try{let{value:L,deps:m}=xe(()=>k(c,D));return $.cachedValue=L,$.isStale=!1,q(v,m),i?.(v,L,[...m]),L}catch(L){throw s?.(v,L),L}finally{$.isComputing=!1}}function q(v,$){let k=A(v),L=k.dependencies;for(let m of L)if(u.has(m)){let b=d.get(m);b?.delete(v),b&&b.size===0&&d.delete(m)}else{let b=f.get(m);b?.delete(v),b&&b.size===0&&f.delete(m)}for(let m of $)r[m]?(d.has(m)||d.set(m,new Set),d.get(m).add(v)):(f.has(m)||f.set(m,new Set),f.get(m).add(v));k.dependencies=$}function h(){if(!(x>0||O)){O=!0;try{let v=0;for(;T.size>0;){if(++v>M){let k=[...T];throw T.clear(),new Error(`[Directive] Infinite derivation notification loop detected after ${M} iterations. Remaining: ${k.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`)}let $=[...T];T.clear();for(let k of $)l.get(k)?.forEach(L=>L())}}finally{O=!1}}}function E(v,$=new Set){if($.has(v))return;$.add(v);let k=u.get(v);if(!k||k.isStale)return;k.isStale=!0,o?.(v),T.add(v);let L=d.get(v);if(L)for(let m of L)E(m,$)}return D=new Proxy({},{get(v,$){if(typeof $=="symbol"||p.has($))return;Be($);let k=A($);return k.isStale&&F($),k.cachedValue}}),{get(v){let $=A(v);return $.isStale&&F(v),$.cachedValue},isStale(v){return u.get(v)?.isStale??!0},invalidate(v){let $=f.get(v);if($){x++;try{for(let k of $)E(k)}finally{x--,h()}}},invalidateMany(v){x++;try{for(let $ of v){let k=f.get($);if(k)for(let L of k)E(L)}}finally{x--,h()}},invalidateAll(){x++;try{for(let v of u.values())v.isStale||(v.isStale=!0,T.add(v.id))}finally{x--,h()}},subscribe(v,$){for(let k of v){let L=k;l.has(L)||l.set(L,new Set),l.get(L).add($)}return()=>{for(let k of v){let L=k,m=l.get(L);m?.delete($),m&&m.size===0&&l.delete(L)}}},getProxy(){return D},getDependencies(v){return A(v).dependencies},registerDefinitions(v){for(let[$,k]of Object.entries(v))r[$]=k,R($)}}}function It(e){let{definitions:r,facts:c,store:i,onRun:o,onError:s}=e,u=new Map,l=null,f=!1;function d(R){let A=r[R];if(!A)throw new Error(`[Directive] Unknown effect: ${R}`);let F={id:R,enabled:!0,hasExplicitDeps:!!A.deps,dependencies:A.deps?new Set(A.deps):null,cleanup:null};return u.set(R,F),F}function p(R){return u.get(R)??d(R)}function x(){return i.toObject()}function T(R,A){let F=p(R);if(!F.enabled)return!1;if(F.dependencies){for(let q of F.dependencies)if(A.has(q))return!0;return!1}return!0}function O(R){if(R.cleanup){try{R.cleanup()}catch(A){s?.(R.id,A),console.error(`[Directive] Effect "${R.id}" cleanup threw an error:`,A)}R.cleanup=null}}function M(R,A){if(typeof A=="function")if(f)try{A()}catch(F){s?.(R.id,F),console.error(`[Directive] Effect "${R.id}" cleanup threw an error:`,F)}else R.cleanup=A}async function D(R){let A=p(R),F=r[R];if(!(!A.enabled||!F)){O(A),o?.(R);try{if(A.hasExplicitDeps){let q;if(i.batch(()=>{q=F.run(c,l)}),q instanceof Promise){let h=await q;M(A,h)}else M(A,q)}else{let q=null,h,E=xe(()=>(i.batch(()=>{h=F.run(c,l)}),h));q=E.deps;let v=E.value;v instanceof Promise&&(v=await v),M(A,v),A.dependencies=q.size>0?q:null}}catch(q){s?.(R,q),console.error(`[Directive] Effect "${R}" threw an error:`,q)}}}for(let R of Object.keys(r))d(R);return{async runEffects(R){let A=[];for(let F of Object.keys(r))T(F,R)&&A.push(F);await Promise.all(A.map(D)),l=x()},async runAll(){let R=Object.keys(r);await Promise.all(R.map(A=>p(A).enabled?D(A):Promise.resolve())),l=x()},disable(R){let A=p(R);A.enabled=!1},enable(R){let A=p(R);A.enabled=!0},isEnabled(R){return p(R).enabled},cleanupAll(){f=!0;for(let R of u.values())O(R)},registerDefinitions(R){for(let[A,F]of Object.entries(R))r[A]=F,d(A)}}}function Bt(e={}){let{delayMs:r=1e3,maxRetries:c=3,backoffMultiplier:i=2,maxDelayMs:o=3e4}=e,s=new Map;function u(l){let f=r*Math.pow(i,l-1);return Math.min(f,o)}return{scheduleRetry(l,f,d,p,x){if(p>c)return null;let T=u(p),O={source:l,sourceId:f,context:d,attempt:p,nextRetryTime:Date.now()+T,callback:x};return s.set(f,O),O},getPendingRetries(){return Array.from(s.values())},processDueRetries(){let l=Date.now(),f=[];for(let[d,p]of s)p.nextRetryTime<=l&&(f.push(p),s.delete(d));return f},cancelRetry(l){s.delete(l)},clearAll(){s.clear()}}}var qt={constraint:"skip",resolver:"skip",effect:"skip",derivation:"skip",system:"throw"};function _t(e={}){let{config:r={},onError:c,onRecovery:i}=e,o=[],s=100,u=Bt(r.retryLater),l=new Map;function f(p,x,T,O){if(T instanceof Ke)return T;let M=T instanceof Error?T.message:String(T),D=p!=="system";return new Ke(M,p,x,O,D)}function d(p,x,T){let O=(()=>{switch(p){case"constraint":return r.onConstraintError;case"resolver":return r.onResolverError;case"effect":return r.onEffectError;case"derivation":return r.onDerivationError;default:return}})();if(typeof O=="function"){try{O(T,x)}catch(M){console.error("[Directive] Error in error handler callback:",M)}return"skip"}return typeof O=="string"?O:qt[p]}return{handleError(p,x,T,O){let M=f(p,x,T,O);o.push(M),o.length>s&&o.shift();try{c?.(M)}catch(R){console.error("[Directive] Error in onError callback:",R)}try{r.onError?.(M)}catch(R){console.error("[Directive] Error in config.onError callback:",R)}let D=d(p,x,T instanceof Error?T:new Error(String(T)));if(D==="retry-later"){let R=(l.get(x)??0)+1;l.set(x,R),u.scheduleRetry(p,x,O,R)||(D="skip",l.delete(x),typeof process<"u")}try{i?.(M,D)}catch(R){console.error("[Directive] Error in onRecovery callback:",R)}if(D==="throw")throw M;return D},getLastError(){return o[o.length-1]??null},getAllErrors(){return[...o]},clearErrors(){o.length=0},getRetryLaterManager(){return u},processDueRetries(){return u.processDueRetries()},clearRetryAttempts(p){l.delete(p),u.cancelRetry(p)}}}function Tt(){let e=[];function r(i){if(i)try{return i()}catch(o){console.error("[Directive] Plugin error:",o);return}}async function c(i){if(i)try{return await i()}catch(o){console.error("[Directive] Plugin error:",o);return}}return{register(i){e.some(o=>o.name===i.name)&&(console.warn(`[Directive] Plugin "${i.name}" is already registered, replacing...`),this.unregister(i.name)),e.push(i)},unregister(i){let o=e.findIndex(s=>s.name===i);o!==-1&&e.splice(o,1)},getPlugins(){return[...e]},async emitInit(i){for(let o of e)await c(()=>o.onInit?.(i))},emitStart(i){for(let o of e)r(()=>o.onStart?.(i))},emitStop(i){for(let o of e)r(()=>o.onStop?.(i))},emitDestroy(i){for(let o of e)r(()=>o.onDestroy?.(i))},emitFactSet(i,o,s){for(let u of e)r(()=>u.onFactSet?.(i,o,s))},emitFactDelete(i,o){for(let s of e)r(()=>s.onFactDelete?.(i,o))},emitFactsBatch(i){for(let o of e)r(()=>o.onFactsBatch?.(i))},emitDerivationCompute(i,o,s){for(let u of e)r(()=>u.onDerivationCompute?.(i,o,s))},emitDerivationInvalidate(i){for(let o of e)r(()=>o.onDerivationInvalidate?.(i))},emitReconcileStart(i){for(let o of e)r(()=>o.onReconcileStart?.(i))},emitReconcileEnd(i){for(let o of e)r(()=>o.onReconcileEnd?.(i))},emitConstraintEvaluate(i,o){for(let s of e)r(()=>s.onConstraintEvaluate?.(i,o))},emitConstraintError(i,o){for(let s of e)r(()=>s.onConstraintError?.(i,o))},emitRequirementCreated(i){for(let o of e)r(()=>o.onRequirementCreated?.(i))},emitRequirementMet(i,o){for(let s of e)r(()=>s.onRequirementMet?.(i,o))},emitRequirementCanceled(i){for(let o of e)r(()=>o.onRequirementCanceled?.(i))},emitResolverStart(i,o){for(let s of e)r(()=>s.onResolverStart?.(i,o))},emitResolverComplete(i,o,s){for(let u of e)r(()=>u.onResolverComplete?.(i,o,s))},emitResolverError(i,o,s){for(let u of e)r(()=>u.onResolverError?.(i,o,s))},emitResolverRetry(i,o,s){for(let u of e)r(()=>u.onResolverRetry?.(i,o,s))},emitResolverCancel(i,o){for(let s of e)r(()=>s.onResolverCancel?.(i,o))},emitEffectRun(i){for(let o of e)r(()=>o.onEffectRun?.(i))},emitEffectError(i,o){for(let s of e)r(()=>s.onEffectError?.(i,o))},emitSnapshot(i){for(let o of e)r(()=>o.onSnapshot?.(i))},emitTimeTravel(i,o){for(let s of e)r(()=>s.onTimeTravel?.(i,o))},emitError(i){for(let o of e)r(()=>o.onError?.(i))},emitErrorRecovery(i,o){for(let s of e)r(()=>s.onErrorRecovery?.(i,o))}}}var Ue={attempts:1,backoff:"none",initialDelay:100,maxDelay:3e4},Ve={enabled:!1,windowMs:50};function Ge(e,r){let{backoff:c,initialDelay:i=100,maxDelay:o=3e4}=e,s;switch(c){case"none":s=i;break;case"linear":s=i*r;break;case"exponential":s=i*Math.pow(2,r-1);break;default:s=i}return Math.max(1,Math.min(s,o))}function Lt(e){let{definitions:r,facts:c,store:i,onStart:o,onComplete:s,onError:u,onRetry:l,onCancel:f,onResolutionComplete:d}=e,p=new Map,x=new Map,T=1e3,O=new Map,M=new Map,D=1e3;function R(){if(x.size>T){let m=x.size-T,b=x.keys();for(let w=0;w<m;w++){let I=b.next().value;I&&x.delete(I)}}}function A(m){return typeof m=="object"&&m!==null&&"requirement"in m&&typeof m.requirement=="string"}function F(m){return typeof m=="object"&&m!==null&&"requirement"in m&&typeof m.requirement=="function"}function q(m,b){return A(m)?b.type===m.requirement:F(m)?m.requirement(b):!1}function h(m){let b=m.type,w=M.get(b);if(w)for(let I of w){let N=r[I];if(N&&q(N,m))return I}for(let[I,N]of Object.entries(r))if(q(N,m)){if(!M.has(b)){if(M.size>=D){let z=M.keys().next().value;z!==void 0&&M.delete(z)}M.set(b,[])}let K=M.get(b);return K.includes(I)||K.push(I),I}return null}function E(m){return{facts:c,signal:m,snapshot:()=>c.$snapshot()}}async function v(m,b,w){let I=r[m];if(!I)return;let N={...Ue,...I.retry},K=null;for(let z=1;z<=N.attempts;z++){if(w.signal.aborted)return;let y=p.get(b.id);y&&(y.attempt=z,y.status={state:"running",requirementId:b.id,startedAt:y.startedAt,attempt:z});try{let C=E(w.signal);if(I.resolve){let n;i.batch(()=>{n=I.resolve(b.requirement,C)});let a=I.timeout;a&&a>0?await we(n,a,`Resolver "${m}" timed out after ${a}ms`):await n}let t=Date.now()-(y?.startedAt??Date.now());x.set(b.id,{state:"success",requirementId:b.id,completedAt:Date.now(),duration:t}),R(),s?.(m,b,t);return}catch(C){if(K=C instanceof Error?C:new Error(String(C)),w.signal.aborted)return;if(N.shouldRetry&&!N.shouldRetry(K,z))break;if(z<N.attempts){if(w.signal.aborted)return;let t=Ge(N,z);if(l?.(m,b,z+1),await new Promise(n=>{let a=setTimeout(n,t),g=()=>{clearTimeout(a),n()};w.signal.addEventListener("abort",g,{once:!0})}),w.signal.aborted)return}}}x.set(b.id,{state:"error",requirementId:b.id,error:K,failedAt:Date.now(),attempts:N.attempts}),R(),u?.(m,b,K)}async function $(m,b){let w=r[m];if(!w)return;if(!w.resolveBatch&&!w.resolveBatchWithResults){await Promise.all(b.map(t=>{let n=new AbortController;return v(m,t,n)}));return}let I={...Ue,...w.retry},N={...Ve,...w.batch},K=new AbortController,z=Date.now(),y=null,C=N.timeoutMs??w.timeout;for(let t=1;t<=I.attempts;t++){if(K.signal.aborted)return;try{let n=E(K.signal),a=b.map(g=>g.requirement);if(w.resolveBatchWithResults){let g,S;if(i.batch(()=>{S=w.resolveBatchWithResults(a,n)}),C&&C>0?g=await we(S,C,`Batch resolver "${m}" timed out after ${C}ms`):g=await S,g.length!==b.length)throw new Error(`[Directive] Batch resolver "${m}" returned ${g.length} results but expected ${b.length}. Results array must match input order.`);let j=Date.now()-z,P=!1;for(let W=0;W<b.length;W++){let _=b[W],V=g[W];if(V.success)x.set(_.id,{state:"success",requirementId:_.id,completedAt:Date.now(),duration:j}),s?.(m,_,j);else{P=!0;let J=V.error??new Error("Batch item failed");x.set(_.id,{state:"error",requirementId:_.id,error:J,failedAt:Date.now(),attempts:t}),u?.(m,_,J)}}if(!P||b.some((W,_)=>g[_]?.success))return}else{let g;i.batch(()=>{g=w.resolveBatch(a,n)}),C&&C>0?await we(g,C,`Batch resolver "${m}" timed out after ${C}ms`):await g;let S=Date.now()-z;for(let j of b)x.set(j.id,{state:"success",requirementId:j.id,completedAt:Date.now(),duration:S}),s?.(m,j,S);return}}catch(n){if(y=n instanceof Error?n:new Error(String(n)),K.signal.aborted)return;if(I.shouldRetry&&!I.shouldRetry(y,t))break;if(t<I.attempts){let a=Ge(I,t);for(let g of b)l?.(m,g,t+1);if(await new Promise(g=>{let S=setTimeout(g,a),j=()=>{clearTimeout(S),g()};K.signal.addEventListener("abort",j,{once:!0})}),K.signal.aborted)return}}}for(let t of b)x.set(t.id,{state:"error",requirementId:t.id,error:y,failedAt:Date.now(),attempts:I.attempts}),u?.(m,t,y);R()}function k(m,b){let w=r[m];if(!w)return;let I={...Ve,...w.batch};O.has(m)||O.set(m,{resolverId:m,requirements:[],timer:null});let N=O.get(m);N.requirements.push(b),N.timer&&clearTimeout(N.timer),N.timer=setTimeout(()=>{L(m)},I.windowMs)}function L(m){let b=O.get(m);if(!b||b.requirements.length===0)return;let w=[...b.requirements];b.requirements=[],b.timer=null,$(m,w).then(()=>{d?.()})}return{resolve(m){if(p.has(m.id))return;let b=h(m.requirement);if(!b){console.warn(`[Directive] No resolver found for requirement: ${m.id}`);return}let w=r[b];if(!w)return;if(w.batch?.enabled){k(b,m);return}let I=new AbortController,N=Date.now(),K={requirementId:m.id,resolverId:b,controller:I,startedAt:N,attempt:1,status:{state:"pending",requirementId:m.id,startedAt:N},originalRequirement:m};p.set(m.id,K),o?.(b,m),v(b,m,I).finally(()=>{p.delete(m.id)&&d?.()})},cancel(m){let b=p.get(m);b&&(b.controller.abort(),p.delete(m),x.set(m,{state:"canceled",requirementId:m,canceledAt:Date.now()}),R(),f?.(b.resolverId,b.originalRequirement))},cancelAll(){for(let[m]of p)this.cancel(m);for(let m of O.values())m.timer&&clearTimeout(m.timer);O.clear()},getStatus(m){let b=p.get(m);return b?b.status:x.get(m)||{state:"idle"}},getInflight(){return[...p.keys()]},getInflightInfo(){return[...p.values()].map(m=>({id:m.requirementId,resolverId:m.resolverId,startedAt:m.startedAt}))},isResolving(m){return p.has(m)},processBatches(){for(let m of O.keys())L(m)},registerDefinitions(m){for(let[b,w]of Object.entries(m))r[b]=w;M.clear()}}}function zt(e){let{config:r,facts:c,store:i,onSnapshot:o,onTimeTravel:s}=e,u=r.timeTravel??!1,l=r.maxSnapshots??100,f=[],d=-1,p=1,x=!1,T=!1,O=[],M=null,D=-1;function R(){return i.toObject()}function A(){let q=R();return structuredClone(q)}function F(q){if(!ve(q)){console.error("[Directive] Potential prototype pollution detected in snapshot data, skipping restore");return}i.batch(()=>{for(let[h,E]of Object.entries(q)){if(h==="__proto__"||h==="constructor"||h==="prototype"){console.warn(`[Directive] Skipping dangerous key "${h}" during fact restoration`);continue}c[h]=E}})}return{get isEnabled(){return u},get isRestoring(){return T},get isPaused(){return x},get snapshots(){return[...f]},get currentIndex(){return d},takeSnapshot(q){if(!u||x)return{id:-1,timestamp:Date.now(),facts:{},trigger:q};let h={id:p++,timestamp:Date.now(),facts:A(),trigger:q};for(d<f.length-1&&f.splice(d+1),f.push(h),d=f.length-1;f.length>l;)f.shift(),d--;return o?.(h),h},restore(q){if(u){x=!0,T=!0;try{F(q.facts)}finally{x=!1,T=!1}}},goBack(q=1){if(!u||f.length===0)return;let h=d,E=d,v=O.find(k=>d>k.startIndex&&d<=k.endIndex);if(v)E=v.startIndex;else if(O.find(k=>d===k.startIndex)){let k=O.find(L=>L.endIndex<d&&d-L.endIndex<=q);E=k?k.startIndex:Math.max(0,d-q)}else E=Math.max(0,d-q);if(h===E)return;d=E;let $=f[d];$&&(this.restore($),s?.(h,E))},goForward(q=1){if(!u||f.length===0)return;let h=d,E=d,v=O.find(k=>d>=k.startIndex&&d<k.endIndex);if(v?E=v.endIndex:E=Math.min(f.length-1,d+q),h===E)return;d=E;let $=f[d];$&&(this.restore($),s?.(h,E))},goTo(q){if(!u)return;let h=f.findIndex($=>$.id===q);if(h===-1){console.warn(`[Directive] Snapshot ${q} not found`);return}let E=d;d=h;let v=f[d];v&&(this.restore(v),s?.(E,h))},replay(){if(!u||f.length===0)return;d=0;let q=f[0];q&&this.restore(q)},export(){return JSON.stringify({version:1,snapshots:f,currentIndex:d})},import(q){if(u)try{let h=JSON.parse(q);if(typeof h!="object"||h===null)throw new Error("Invalid time-travel data: expected object");if(h.version!==1)throw new Error(`Unsupported time-travel export version: ${h.version}`);if(!Array.isArray(h.snapshots))throw new Error("Invalid time-travel data: snapshots must be an array");if(typeof h.currentIndex!="number")throw new Error("Invalid time-travel data: currentIndex must be a number");for(let v of h.snapshots){if(typeof v!="object"||v===null)throw new Error("Invalid snapshot: expected object");if(typeof v.id!="number"||typeof v.timestamp!="number"||typeof v.trigger!="string"||typeof v.facts!="object")throw new Error("Invalid snapshot structure");if(!ve(v.facts))throw new Error("Invalid fact data: potential prototype pollution detected in nested objects")}f.length=0,f.push(...h.snapshots),d=h.currentIndex;let E=f[d];E&&this.restore(E)}catch(h){console.error("[Directive] Failed to import time-travel data:",h)}},beginChangeset(q){u&&(M=q,D=d)},endChangeset(){!u||M===null||(d>D&&O.push({label:M,startIndex:D,endIndex:d}),M=null,D=-1)},pause(){x=!0},resume(){x=!1}}}function Pt(){let e={id:-1,timestamp:0,facts:{},trigger:""};return{isEnabled:!1,isRestoring:!1,isPaused:!1,snapshots:[],currentIndex:-1,takeSnapshot:()=>e,restore:()=>{},goBack:()=>{},goForward:()=>{},goTo:()=>{},replay:()=>{},export:()=>"{}",import:()=>{},beginChangeset:()=>{},endChangeset:()=>{},pause:()=>{},resume:()=>{}}}var se=new Set(["__proto__","constructor","prototype"]);function mt(e){let r=Object.create(null),c=Object.create(null),i=Object.create(null),o=Object.create(null),s=Object.create(null),u=Object.create(null);for(let t of e.modules){let n=(a,g)=>{if(a){for(let S of Object.keys(a))if(se.has(S))throw new Error(`[Directive] Security: Module "${t.id}" has dangerous key "${S}" in ${g}. This could indicate a prototype pollution attempt.`)}};n(t.schema,"schema"),n(t.events,"events"),n(t.derive,"derive"),n(t.effects,"effects"),n(t.constraints,"constraints"),n(t.resolvers,"resolvers"),Object.assign(r,t.schema),t.events&&Object.assign(c,t.events),t.derive&&Object.assign(i,t.derive),t.effects&&Object.assign(o,t.effects),t.constraints&&Object.assign(s,t.constraints),t.resolvers&&Object.assign(u,t.resolvers)}let l=null;if(e.modules.some(t=>t.snapshotEvents)){l=new Set;for(let t of e.modules){let n=t;if(n.snapshotEvents)for(let a of n.snapshotEvents)l.add(a);else if(n.events)for(let a of Object.keys(n.events))l.add(a)}}let f=0,d=!1,p=Tt();for(let t of e.plugins??[])p.register(t);let x=_t({config:e.errorBoundary,onError:t=>p.emitError(t),onRecovery:(t,n)=>p.emitErrorRecovery(t,n)}),T=()=>{},O=()=>{},M=null,{store:D,facts:R}=Rt({schema:r,onChange:(t,n,a)=>{p.emitFactSet(t,n,a),T(t),!M?.isRestoring&&(f===0&&(d=!0),w.changedKeys.add(t),I())},onBatch:t=>{p.emitFactsBatch(t);let n=[];for(let a of t)n.push(a.key);if(O(n),!M?.isRestoring){f===0&&(d=!0);for(let a of t)w.changedKeys.add(a.key);I()}}}),A=jt({definitions:i,facts:R,onCompute:(t,n,a)=>p.emitDerivationCompute(t,n,a),onInvalidate:t=>p.emitDerivationInvalidate(t),onError:(t,n)=>{x.handleError("derivation",t,n)}});T=t=>A.invalidate(t),O=t=>A.invalidateMany(t);let F=It({definitions:o,facts:R,store:D,onRun:t=>p.emitEffectRun(t),onError:(t,n)=>{x.handleError("effect",t,n),p.emitEffectError(t,n)}}),q=Mt({definitions:s,facts:R,onEvaluate:(t,n)=>p.emitConstraintEvaluate(t,n),onError:(t,n)=>{x.handleError("constraint",t,n),p.emitConstraintError(t,n)}}),h=Lt({definitions:u,facts:R,store:D,onStart:(t,n)=>p.emitResolverStart(t,n),onComplete:(t,n,a)=>{p.emitResolverComplete(t,n,a),p.emitRequirementMet(n,t),q.markResolved(n.fromConstraint)},onError:(t,n,a)=>{x.handleError("resolver",t,a,n),p.emitResolverError(t,n,a)},onRetry:(t,n,a)=>p.emitResolverRetry(t,n,a),onCancel:(t,n)=>{p.emitResolverCancel(t,n),p.emitRequirementCanceled(n)},onResolutionComplete:()=>{L(),I()}}),E=new Set;function v(){for(let t of E)t()}let $=e.debug?.timeTravel?zt({config:e.debug,facts:R,store:D,onSnapshot:t=>{p.emitSnapshot(t),v()},onTimeTravel:(t,n)=>{p.emitTimeTravel(t,n),v()}}):Pt();M=$;let k=new Set;function L(){for(let t of k)t()}let m=50,b=0,w={isRunning:!1,isReconciling:!1,reconcileScheduled:!1,isInitializing:!1,isInitialized:!1,isReady:!1,isDestroyed:!1,changedKeys:new Set,previousRequirements:new qe,readyPromise:null,readyResolve:null};function I(){!w.isRunning||w.reconcileScheduled||w.isInitializing||(w.reconcileScheduled=!0,L(),queueMicrotask(()=>{w.reconcileScheduled=!1,w.isRunning&&!w.isInitializing&&N().catch(t=>{})}))}async function N(){if(!w.isReconciling){if(b++,b>m){b=0;return}w.isReconciling=!0,L();try{w.changedKeys.size>0&&((l===null||d)&&$.takeSnapshot(`facts-changed:${[...w.changedKeys].join(",")}`),d=!1);let t=R.$snapshot();p.emitReconcileStart(t),await F.runEffects(w.changedKeys);let n=new Set(w.changedKeys);w.changedKeys.clear();let a=await q.evaluate(n),g=new qe;for(let _ of a)g.add(_),p.emitRequirementCreated(_);let{added:S,removed:j}=g.diff(w.previousRequirements);for(let _ of j)h.cancel(_.id);for(let _ of S)h.resolve(_);w.previousRequirements=g;let P=h.getInflightInfo(),W={unmet:a.filter(_=>!h.isResolving(_.id)),inflight:P,completed:[],canceled:j.map(_=>({id:_.id,resolverId:P.find(V=>V.id===_.id)?.resolverId??"unknown"}))};p.emitReconcileEnd(W),w.isReady||(w.isReady=!0,w.readyResolve&&(w.readyResolve(),w.readyResolve=null))}finally{w.isReconciling=!1,w.changedKeys.size>0?I():w.reconcileScheduled||(b=0),L()}}}let K=new Proxy({},{get(t,n){if(typeof n!="symbol"&&!se.has(n))return A.get(n)},has(t,n){return typeof n=="symbol"||se.has(n)?!1:n in i},ownKeys(){return Object.keys(i)},getOwnPropertyDescriptor(t,n){if(typeof n!="symbol"&&!se.has(n)&&n in i)return{configurable:!0,enumerable:!0}}}),z=new Proxy({},{get(t,n){if(typeof n!="symbol"&&!se.has(n))return a=>{let g=c[n];if(g){f++,(l===null||l.has(n))&&(d=!0);try{D.batch(()=>{g(R,{type:n,...a})})}finally{f--}}}},has(t,n){return typeof n=="symbol"||se.has(n)?!1:n in c},ownKeys(){return Object.keys(c)},getOwnPropertyDescriptor(t,n){if(typeof n!="symbol"&&!se.has(n)&&n in c)return{configurable:!0,enumerable:!0}}}),y={facts:R,debug:$.isEnabled?$:null,derive:K,events:z,constraints:{disable:t=>q.disable(t),enable:t=>q.enable(t)},effects:{disable:t=>F.disable(t),enable:t=>F.enable(t),isEnabled:t=>F.isEnabled(t)},initialize(){if(!w.isInitialized){w.isInitializing=!0;for(let t of e.modules)t.init&&D.batch(()=>{t.init(R)});e.onAfterModuleInit&&D.batch(()=>{e.onAfterModuleInit()}),w.isInitializing=!1,w.isInitialized=!0;for(let t of Object.keys(i))A.get(t)}},start(){if(!w.isRunning){w.isInitialized||this.initialize(),w.isRunning=!0;for(let t of e.modules)t.hooks?.onStart?.(y);p.emitStart(y),I()}},stop(){if(w.isRunning){w.isRunning=!1,h.cancelAll(),F.cleanupAll();for(let t of e.modules)t.hooks?.onStop?.(y);p.emitStop(y)}},destroy(){this.stop(),w.isDestroyed=!0,k.clear(),E.clear(),p.emitDestroy(y)},dispatch(t){if(se.has(t.type))return;let n=c[t.type];if(n){f++,(l===null||l.has(t.type))&&(d=!0);try{D.batch(()=>{n(R,t)})}finally{f--}}},read(t){return A.get(t)},subscribe(t,n){let a=[],g=[];for(let j of t)j in i?a.push(j):j in r&&g.push(j);let S=[];return a.length>0&&S.push(A.subscribe(a,n)),g.length>0&&S.push(D.subscribe(g,n)),()=>{for(let j of S)j()}},watch(t,n,a){let g=a?.equalityFn?(j,P)=>a.equalityFn(j,P):(j,P)=>Object.is(j,P);if(t in i){let j=A.get(t);return A.subscribe([t],()=>{let P=A.get(t);if(!g(P,j)){let W=j;j=P,n(P,W)}})}let S=D.get(t);return D.subscribe([t],()=>{let j=D.get(t);if(!g(j,S)){let P=S;S=j,n(j,P)}})},when(t,n){return new Promise((a,g)=>{let S=D.toObject();if(t(S)){a();return}let j,P,W=()=>{j?.(),P!==void 0&&clearTimeout(P)};j=D.subscribeAll(()=>{let _=D.toObject();t(_)&&(W(),a())}),n?.timeout!==void 0&&n.timeout>0&&(P=setTimeout(()=>{W(),g(new Error(`[Directive] when: timed out after ${n.timeout}ms`))},n.timeout))})},inspect(){return{unmet:w.previousRequirements.all(),inflight:h.getInflightInfo(),constraints:q.getAllStates().map(t=>({id:t.id,active:t.lastResult??!1,priority:t.priority})),resolvers:Object.fromEntries(h.getInflight().map(t=>[t,h.getStatus(t)]))}},explain(t){let n=w.previousRequirements.all().find(V=>V.id===t);if(!n)return null;let a=q.getState(n.fromConstraint),g=h.getStatus(t),S={},j=D.toObject();for(let[V,J]of Object.entries(j))S[V]=J;let P=[`Requirement "${n.requirement.type}" (id: ${n.id})`,`├─ Produced by constraint: ${n.fromConstraint}`,`├─ Constraint priority: ${a?.priority??0}`,`├─ Constraint active: ${a?.lastResult??"unknown"}`,`├─ Resolver status: ${g.state}`],W=Object.entries(n.requirement).filter(([V])=>V!=="type").map(([V,J])=>`${V}=${JSON.stringify(J)}`).join(", ");W&&P.push(`├─ Requirement payload: { ${W} }`);let _=Object.entries(S).slice(0,10);return _.length>0&&(P.push("└─ Relevant facts:"),_.forEach(([V,J],re)=>{let Z=re===_.length-1?"   └─":"   ├─",X=typeof J=="object"?JSON.stringify(J):String(J);P.push(`${Z} ${V} = ${X.slice(0,50)}${X.length>50?"...":""}`)})),P.join(`
-`)},async settle(t=5e3){let n=Date.now();for(;;){await new Promise(g=>setTimeout(g,0));let a=this.inspect();if(a.inflight.length===0&&!w.isReconciling&&!w.reconcileScheduled)return;if(Date.now()-n>t){let g=[];a.inflight.length>0&&g.push(`${a.inflight.length} resolvers inflight: ${a.inflight.map(j=>j.resolverId).join(", ")}`),w.isReconciling&&g.push("reconciliation in progress"),w.reconcileScheduled&&g.push("reconcile scheduled");let S=w.previousRequirements.all();throw S.length>0&&g.push(`${S.length} unmet requirements: ${S.map(j=>j.requirement.type).join(", ")}`),new Error(`[Directive] settle() timed out after ${t}ms. ${g.join("; ")}`)}await new Promise(g=>setTimeout(g,10))}},getSnapshot(){return{facts:D.toObject(),version:1}},getDistributableSnapshot(t={}){let{includeDerivations:n,excludeDerivations:a,includeFacts:g,ttlSeconds:S,metadata:j,includeVersion:P}=t,W={},_=Object.keys(i),V;if(n?V=n.filter(Z=>_.includes(Z)):V=_,a){let Z=new Set(a);V=V.filter(X=>!Z.has(X))}for(let Z of V)try{W[Z]=A.get(Z)}catch{}if(g&&g.length>0){let Z=D.toObject();for(let X of g)X in Z&&(W[X]=Z[X])}let J=Date.now(),re={data:W,createdAt:J};return S!==void 0&&S>0&&(re.expiresAt=J+S*1e3),P&&(re.version=kt(W)),j&&(re.metadata=j),re},watchDistributableSnapshot(t,n){let{includeDerivations:a,excludeDerivations:g}=t,S=Object.keys(i),j;if(a?j=a.filter(W=>S.includes(W)):j=S,g){let W=new Set(g);j=j.filter(_=>!W.has(_))}if(j.length===0)return()=>{};let P=this.getDistributableSnapshot({...t,includeVersion:!0}).version;return A.subscribe(j,()=>{let W=this.getDistributableSnapshot({...t,includeVersion:!0});W.version!==P&&(P=W.version,n(W))})},restore(t){if(!t||typeof t!="object")throw new Error("[Directive] restore() requires a valid snapshot object");if(!t.facts||typeof t.facts!="object")throw new Error("[Directive] restore() snapshot must have a facts object");if(!ve(t))throw new Error("[Directive] restore() rejected: snapshot contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.");D.batch(()=>{for(let[n,a]of Object.entries(t.facts))se.has(n)||D.set(n,a)})},onSettledChange(t){return k.add(t),()=>{k.delete(t)}},onTimeTravelChange(t){return E.add(t),()=>{E.delete(t)}},batch(t){D.batch(t)},get isSettled(){return this.inspect().inflight.length===0&&!w.isReconciling&&!w.reconcileScheduled},get isRunning(){return w.isRunning},get isInitialized(){return w.isInitialized},get isReady(){return w.isReady},whenReady(){return w.isReady?Promise.resolve():w.isRunning?(w.readyPromise||(w.readyPromise=new Promise(t=>{w.readyResolve=t})),w.readyPromise):Promise.reject(new Error("[Directive] whenReady() called before start(). Call system.start() first, then await system.whenReady()."))}};function C(t){if(w.isReconciling)throw new Error(`[Directive] Cannot register module "${t.id}" during reconciliation. Wait for the current reconciliation cycle to complete.`);if(w.isDestroyed)throw new Error(`[Directive] Cannot register module "${t.id}" on a destroyed system.`);let n=(a,g)=>{if(a){for(let S of Object.keys(a))if(se.has(S))throw new Error(`[Directive] Security: Module "${t.id}" has dangerous key "${S}" in ${g}.`)}};n(t.schema,"schema"),n(t.events,"events"),n(t.derive,"derive"),n(t.effects,"effects"),n(t.constraints,"constraints"),n(t.resolvers,"resolvers");for(let a of Object.keys(t.schema))if(a in r)throw new Error(`[Directive] Schema collision: Fact "${a}" already exists. Cannot register module "${t.id}".`);if(t.snapshotEvents){l===null&&(l=new Set(Object.keys(c)));for(let a of t.snapshotEvents)l.add(a)}else if(l!==null&&t.events)for(let a of Object.keys(t.events))l.add(a);Object.assign(r,t.schema),t.events&&Object.assign(c,t.events),t.derive&&(Object.assign(i,t.derive),A.registerDefinitions(t.derive)),t.effects&&(Object.assign(o,t.effects),F.registerDefinitions(t.effects)),t.constraints&&(Object.assign(s,t.constraints),q.registerDefinitions(t.constraints)),t.resolvers&&(Object.assign(u,t.resolvers),h.registerDefinitions(t.resolvers)),D.registerKeys(t.schema),e.modules.push(t),t.init&&D.batch(()=>{t.init(R)}),t.hooks?.onInit?.(y),w.isRunning&&(t.hooks?.onStart?.(y),I())}y.registerModule=C,p.emitInit(y);for(let t of e.modules)t.hooks?.onInit?.(y);return y}var ne=Object.freeze(new Set(["__proto__","constructor","prototype"])),H="::";function Ft(e){let r=Object.keys(e),c=new Set,i=new Set,o=[],s=[];function u(l){if(c.has(l))return;if(i.has(l)){let d=s.indexOf(l),p=[...s.slice(d),l].join(" → ");throw new Error(`[Directive] Circular dependency detected: ${p}. Modules cannot have circular crossModuleDeps. Break the cycle by removing one of the cross-module references.`)}i.add(l),s.push(l);let f=e[l];if(f?.crossModuleDeps)for(let d of Object.keys(f.crossModuleDeps))r.includes(d)&&u(d);s.pop(),i.delete(l),c.add(l),o.push(l)}for(let l of r)u(l);return o}var Je=new WeakMap,Ye=new WeakMap,Xe=new WeakMap,Qe=new WeakMap;function Nt(e){if("module"in e){if(!e.module)throw new Error("[Directive] createSystem requires a module. Got: "+typeof e.module);return Ut(e)}let r=e;if(Array.isArray(r.modules))throw new Error(`[Directive] createSystem expects modules as an object, not an array.
+(() => {
+  const r = document.createElement("link").relList;
+  if (r && r.supports && r.supports("modulepreload")) return;
+  for (const o of document.querySelectorAll('link[rel="modulepreload"]')) i(o);
+  new MutationObserver((o) => {
+    for (const s of o)
+      if (s.type === "childList")
+        for (const u of s.addedNodes)
+          u.tagName === "LINK" && u.rel === "modulepreload" && i(u);
+  }).observe(document, { childList: !0, subtree: !0 });
+  function c(o) {
+    const s = {};
+    return (
+      o.integrity && (s.integrity = o.integrity),
+      o.referrerPolicy && (s.referrerPolicy = o.referrerPolicy),
+      o.crossOrigin === "use-credentials"
+        ? (s.credentials = "include")
+        : o.crossOrigin === "anonymous"
+          ? (s.credentials = "omit")
+          : (s.credentials = "same-origin"),
+      s
+    );
+  }
+  function i(o) {
+    if (o.ep) return;
+    o.ep = !0;
+    const s = c(o);
+    fetch(o.href, s);
+  }
+})();
+var Ke = class extends Error {
+    constructor(r, c, i, o, s = !0) {
+      super(r),
+        (this.source = c),
+        (this.sourceId = i),
+        (this.context = o),
+        (this.recoverable = s),
+        (this.name = "DirectiveError");
+    }
+  },
+  fe = [];
+function wt() {
+  const e = new Set();
+  return {
+    get isTracking() {
+      return !0;
+    },
+    track(r) {
+      e.add(r);
+    },
+    getDependencies() {
+      return e;
+    },
+  };
+}
+var St = {
+  isTracking: !1,
+  track() {},
+  getDependencies() {
+    return new Set();
+  },
+};
+function Et() {
+  return fe[fe.length - 1] ?? St;
+}
+function xe(e) {
+  const r = wt();
+  fe.push(r);
+  try {
+    return { value: e(), deps: r.getDependencies() };
+  } finally {
+    fe.pop();
+  }
+}
+function He(e) {
+  const r = fe.splice(0, fe.length);
+  try {
+    return e();
+  } finally {
+    fe.push(...r);
+  }
+}
+function Be(e) {
+  Et().track(e);
+}
+function xt(e, r = 100) {
+  try {
+    return JSON.stringify(e)?.slice(0, r) ?? String(e);
+  } catch {
+    return "[circular or non-serializable]";
+  }
+}
+function $e(e = [], r, c, i, o, s) {
+  return {
+    _type: void 0,
+    _validators: e,
+    _typeName: r,
+    _default: c,
+    _transform: i,
+    _description: o,
+    _refinements: s,
+    validate(u) {
+      return $e([...e, u], r, c, i, o, s);
+    },
+  };
+}
+function te(e, r, c, i, o, s) {
+  return {
+    ...$e(e, r, c, i, o, s),
+    default(u) {
+      return te(e, r, u, i, o, s);
+    },
+    transform(u) {
+      return te(
+        [],
+        r,
+        void 0,
+        (l) => {
+          const f = i ? i(l) : l;
+          return u(f);
+        },
+        o,
+      );
+    },
+    brand() {
+      return te(e, `Branded<${r}>`, c, i, o, s);
+    },
+    describe(u) {
+      return te(e, r, c, i, u, s);
+    },
+    refine(u, l) {
+      const f = [...(s ?? []), { predicate: u, message: l }];
+      return te([...e, u], r, c, i, o, f);
+    },
+    nullable() {
+      return te(
+        [(u) => u === null || e.every((l) => l(u))],
+        `${r} | null`,
+        c,
+        i,
+        o,
+      );
+    },
+    optional() {
+      return te(
+        [(u) => u === void 0 || e.every((l) => l(u))],
+        `${r} | undefined`,
+        c,
+        i,
+        o,
+      );
+    },
+  };
+}
+var ee = {
+  string() {
+    return te([(e) => typeof e == "string"], "string");
+  },
+  number() {
+    const e = (r, c, i, o, s) => ({
+      ...te(r, "number", c, i, o, s),
+      min(u) {
+        return e([...r, (l) => l >= u], c, i, o, s);
+      },
+      max(u) {
+        return e([...r, (l) => l <= u], c, i, o, s);
+      },
+      default(u) {
+        return e(r, u, i, o, s);
+      },
+      describe(u) {
+        return e(r, c, i, u, s);
+      },
+      refine(u, l) {
+        const f = [...(s ?? []), { predicate: u, message: l }];
+        return e([...r, u], c, i, o, f);
+      },
+    });
+    return e([(r) => typeof r == "number"]);
+  },
+  boolean() {
+    return te([(e) => typeof e == "boolean"], "boolean");
+  },
+  array() {
+    const e = (r, c, i, o, s) => {
+      const u = te(r, "array", i, void 0, o),
+        l = s ?? { value: -1 };
+      return {
+        ...u,
+        get _lastFailedIndex() {
+          return l.value;
+        },
+        set _lastFailedIndex(f) {
+          l.value = f;
+        },
+        of(f) {
+          const d = { value: -1 };
+          return e(
+            [
+              ...r,
+              (p) => {
+                for (let x = 0; x < p.length; x++) {
+                  const T = p[x];
+                  if (!f._validators.every((O) => O(T)))
+                    return (d.value = x), !1;
+                }
+                return !0;
+              },
+            ],
+            f,
+            i,
+            o,
+            d,
+          );
+        },
+        nonEmpty() {
+          return e([...r, (f) => f.length > 0], c, i, o, l);
+        },
+        maxLength(f) {
+          return e([...r, (d) => d.length <= f], c, i, o, l);
+        },
+        minLength(f) {
+          return e([...r, (d) => d.length >= f], c, i, o, l);
+        },
+        default(f) {
+          return e(r, c, f, o, l);
+        },
+        describe(f) {
+          return e(r, c, i, f, l);
+        },
+      };
+    };
+    return e([(r) => Array.isArray(r)]);
+  },
+  object() {
+    const e = (r, c, i) => ({
+      ...te(r, "object", c, void 0, i),
+      shape(o) {
+        return e(
+          [
+            ...r,
+            (s) => {
+              for (const [u, l] of Object.entries(o)) {
+                const f = s[u],
+                  d = l;
+                if (d && !d._validators.every((p) => p(f))) return !1;
+              }
+              return !0;
+            },
+          ],
+          c,
+          i,
+        );
+      },
+      nonNull() {
+        return e([...r, (o) => o != null], c, i);
+      },
+      hasKeys(...o) {
+        return e([...r, (s) => o.every((u) => u in s)], c, i);
+      },
+      default(o) {
+        return e(r, o, i);
+      },
+      describe(o) {
+        return e(r, c, o);
+      },
+    });
+    return e([(r) => typeof r == "object" && r !== null && !Array.isArray(r)]);
+  },
+  enum(...e) {
+    const r = new Set(e);
+    return te(
+      [(c) => typeof c == "string" && r.has(c)],
+      `enum(${e.join("|")})`,
+    );
+  },
+  literal(e) {
+    return te([(r) => r === e], `literal(${String(e)})`);
+  },
+  nullable(e) {
+    const r = e._typeName ?? "unknown";
+    return $e(
+      [(c) => (c === null ? !0 : e._validators.every((i) => i(c)))],
+      `${r} | null`,
+    );
+  },
+  optional(e) {
+    const r = e._typeName ?? "unknown";
+    return $e(
+      [(c) => (c === void 0 ? !0 : e._validators.every((i) => i(c)))],
+      `${r} | undefined`,
+    );
+  },
+  union(...e) {
+    const r = e.map((c) => c._typeName ?? "unknown");
+    return te(
+      [(c) => e.some((i) => i._validators.every((o) => o(c)))],
+      r.join(" | "),
+    );
+  },
+  record(e) {
+    const r = e._typeName ?? "unknown";
+    return te(
+      [
+        (c) =>
+          typeof c != "object" || c === null || Array.isArray(c)
+            ? !1
+            : Object.values(c).every((i) => e._validators.every((o) => o(i))),
+      ],
+      `Record<string, ${r}>`,
+    );
+  },
+  tuple(...e) {
+    const r = e.map((c) => c._typeName ?? "unknown");
+    return te(
+      [
+        (c) =>
+          !Array.isArray(c) || c.length !== e.length
+            ? !1
+            : e.every((i, o) => i._validators.every((s) => s(c[o]))),
+      ],
+      `[${r.join(", ")}]`,
+    );
+  },
+  date() {
+    return te([(e) => e instanceof Date && !isNaN(e.getTime())], "Date");
+  },
+  uuid() {
+    const e =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return te([(r) => typeof r == "string" && e.test(r)], "uuid");
+  },
+  email() {
+    const e = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return te([(r) => typeof r == "string" && e.test(r)], "email");
+  },
+  url() {
+    return te(
+      [
+        (e) => {
+          if (typeof e != "string") return !1;
+          try {
+            return new URL(e), !0;
+          } catch {
+            return !1;
+          }
+        },
+      ],
+      "url",
+    );
+  },
+  bigint() {
+    return te([(e) => typeof e == "bigint"], "bigint");
+  },
+};
+function $t(e) {
+  const { schema: r, onChange: c, onBatch: i } = e;
+  Object.keys(r).length;
+  let o = e.validate ?? !1,
+    s = e.strictKeys ?? !1,
+    u = e.redactErrors ?? !1,
+    l = new Map(),
+    f = new Set(),
+    d = new Map(),
+    p = new Set(),
+    x = 0,
+    T = [],
+    O = new Set(),
+    M = !1,
+    D = [],
+    R = 100;
+  function A(m) {
+    return (
+      m !== null &&
+      typeof m == "object" &&
+      "safeParse" in m &&
+      typeof m.safeParse == "function" &&
+      "_def" in m &&
+      "parse" in m &&
+      typeof m.parse == "function"
+    );
+  }
+  function F(m) {
+    const b = m;
+    if (b._typeName) return b._typeName;
+    if (A(m)) {
+      const w = m._def;
+      if (w?.typeName) return w.typeName.replace(/^Zod/, "").toLowerCase();
+    }
+    return "unknown";
+  }
+  function q(m) {
+    return u ? "[redacted]" : xt(m);
+  }
+  function h(m, b) {
+    if (!o) return;
+    const w = r[m];
+    if (!w) {
+      if (s)
+        throw new Error(
+          `[Directive] Unknown fact key: "${m}". Key not defined in schema.`,
+        );
+      console.warn(`[Directive] Unknown fact key: "${m}"`);
+      return;
+    }
+    if (A(w)) {
+      const z = w.safeParse(b);
+      if (!z.success) {
+        const y = b === null ? "null" : Array.isArray(b) ? "array" : typeof b,
+          C = q(b),
+          t =
+            z.error?.message ??
+            z.error?.issues?.[0]?.message ??
+            "Validation failed",
+          n = F(w);
+        throw new Error(
+          `[Directive] Validation failed for "${m}": expected ${n}, got ${y} ${C}. ${t}`,
+        );
+      }
+      return;
+    }
+    const I = w,
+      N = I._validators;
+    if (!N || !Array.isArray(N) || N.length === 0) return;
+    const K = I._typeName ?? "unknown";
+    for (let z = 0; z < N.length; z++) {
+      const y = N[z];
+      if (typeof y == "function" && !y(b)) {
+        let C = b === null ? "null" : Array.isArray(b) ? "array" : typeof b,
+          t = q(b),
+          n = "";
+        typeof I._lastFailedIndex == "number" &&
+          I._lastFailedIndex >= 0 &&
+          ((n = ` (element at index ${I._lastFailedIndex} failed)`),
+          (I._lastFailedIndex = -1));
+        const a = z === 0 ? "" : ` (validator ${z + 1} failed)`;
+        throw new Error(
+          `[Directive] Validation failed for "${m}": expected ${K}, got ${C} ${t}${a}${n}`,
+        );
+      }
+    }
+  }
+  function E(m) {
+    d.get(m)?.forEach((b) => b());
+  }
+  function v() {
+    p.forEach((m) => m());
+  }
+  function $(m, b, w) {
+    if (M) {
+      D.push({ key: m, value: b, prev: w });
+      return;
+    }
+    M = !0;
+    try {
+      c?.(m, b, w), E(m), v();
+      let I = 0;
+      while (D.length > 0) {
+        if (++I > R)
+          throw (
+            ((D.length = 0),
+            new Error(
+              `[Directive] Infinite notification loop detected after ${R} iterations. A listener is repeatedly mutating facts that re-trigger notifications.`,
+            ))
+          );
+        const N = [...D];
+        D.length = 0;
+        for (const K of N) c?.(K.key, K.value, K.prev), E(K.key);
+        v();
+      }
+    } finally {
+      M = !1;
+    }
+  }
+  function k() {
+    if (!(x > 0)) {
+      if ((i && T.length > 0 && i([...T]), O.size > 0)) {
+        M = !0;
+        try {
+          for (const b of O) E(b);
+          v();
+          let m = 0;
+          while (D.length > 0) {
+            if (++m > R)
+              throw (
+                ((D.length = 0),
+                new Error(
+                  `[Directive] Infinite notification loop detected during flush after ${R} iterations.`,
+                ))
+              );
+            const b = [...D];
+            D.length = 0;
+            for (const w of b) c?.(w.key, w.value, w.prev), E(w.key);
+            v();
+          }
+        } finally {
+          M = !1;
+        }
+      }
+      (T.length = 0), O.clear();
+    }
+  }
+  const L = {
+    get(m) {
+      return Be(m), l.get(m);
+    },
+    has(m) {
+      return Be(m), l.has(m);
+    },
+    set(m, b) {
+      h(m, b);
+      const w = l.get(m);
+      Object.is(w, b) ||
+        (l.set(m, b),
+        f.add(m),
+        x > 0
+          ? (T.push({ key: m, value: b, prev: w, type: "set" }), O.add(m))
+          : $(m, b, w));
+    },
+    delete(m) {
+      const b = l.get(m);
+      l.delete(m),
+        f.delete(m),
+        x > 0
+          ? (T.push({ key: m, value: void 0, prev: b, type: "delete" }),
+            O.add(m))
+          : $(m, void 0, b);
+    },
+    batch(m) {
+      x++;
+      try {
+        m();
+      } finally {
+        x--, k();
+      }
+    },
+    subscribe(m, b) {
+      for (const w of m) {
+        const I = w;
+        d.has(I) || d.set(I, new Set()), d.get(I).add(b);
+      }
+      return () => {
+        for (const w of m) {
+          const I = d.get(w);
+          I && (I.delete(b), I.size === 0 && d.delete(w));
+        }
+      };
+    },
+    subscribeAll(m) {
+      return p.add(m), () => p.delete(m);
+    },
+    toObject() {
+      const m = {};
+      for (const b of f) l.has(b) && (m[b] = l.get(b));
+      return m;
+    },
+  };
+  return (
+    (L.registerKeys = (m) => {
+      for (const b of Object.keys(m)) ye.has(b) || ((r[b] = m[b]), f.add(b));
+    }),
+    L
+  );
+}
+var ye = Object.freeze(new Set(["__proto__", "constructor", "prototype"]));
+function Ct(e, r) {
+  const c = () => ({
+    get: (i) => He(() => e.get(i)),
+    has: (i) => He(() => e.has(i)),
+  });
+  return new Proxy(
+    {},
+    {
+      get(i, o) {
+        if (o === "$store") return e;
+        if (o === "$snapshot") return c;
+        if (typeof o != "symbol" && !ye.has(o)) return e.get(o);
+      },
+      set(i, o, s) {
+        return typeof o == "symbol" ||
+          o === "$store" ||
+          o === "$snapshot" ||
+          ye.has(o)
+          ? !1
+          : (e.set(o, s), !0);
+      },
+      deleteProperty(i, o) {
+        return typeof o == "symbol" ||
+          o === "$store" ||
+          o === "$snapshot" ||
+          ye.has(o)
+          ? !1
+          : (e.delete(o), !0);
+      },
+      has(i, o) {
+        return o === "$store" || o === "$snapshot"
+          ? !0
+          : typeof o == "symbol" || ye.has(o)
+            ? !1
+            : e.has(o);
+      },
+      ownKeys() {
+        return Object.keys(r);
+      },
+      getOwnPropertyDescriptor(i, o) {
+        return o === "$store" || o === "$snapshot"
+          ? { configurable: !0, enumerable: !1, writable: !1 }
+          : { configurable: !0, enumerable: !0, writable: !0 };
+      },
+    },
+  );
+}
+function Rt(e) {
+  const r = $t(e),
+    c = Ct(r, e.schema);
+  return { store: r, facts: c };
+}
+function dt(e, r) {
+  const c = "crossModuleDeps" in r ? r.crossModuleDeps : void 0;
+  return {
+    id: e,
+    schema: r.schema,
+    init: r.init,
+    derive: r.derive ?? {},
+    events: r.events ?? {},
+    effects: r.effects,
+    constraints: r.constraints,
+    resolvers: r.resolvers,
+    hooks: r.hooks,
+    snapshotEvents: r.snapshotEvents,
+    crossModuleDeps: c,
+  };
+}
+async function we(e, r, c) {
+  let i,
+    o = new Promise((s, u) => {
+      i = setTimeout(() => u(new Error(c)), r);
+    });
+  try {
+    return await Promise.race([e, o]);
+  } finally {
+    clearTimeout(i);
+  }
+}
+function ft(e, r = 50) {
+  const c = new WeakSet();
+  function i(o, s) {
+    if (s > r) return '"[max depth exceeded]"';
+    if (o === null) return "null";
+    if (o === void 0) return "undefined";
+    const u = typeof o;
+    if (u === "string") return JSON.stringify(o);
+    if (u === "number" || u === "boolean") return String(o);
+    if (u === "function") return '"[function]"';
+    if (u === "symbol") return '"[symbol]"';
+    if (Array.isArray(o)) {
+      if (c.has(o)) return '"[circular]"';
+      c.add(o);
+      const l = `[${o.map((f) => i(f, s + 1)).join(",")}]`;
+      return c.delete(o), l;
+    }
+    if (u === "object") {
+      const l = o;
+      if (c.has(l)) return '"[circular]"';
+      c.add(l);
+      const f = `{${Object.keys(l)
+        .sort()
+        .map((d) => `${JSON.stringify(d)}:${i(l[d], s + 1)}`)
+        .join(",")}}`;
+      return c.delete(l), f;
+    }
+    return '"[unknown]"';
+  }
+  return i(e, 0);
+}
+function ve(e, r = 50) {
+  const c = new Set(["__proto__", "constructor", "prototype"]),
+    i = new WeakSet();
+  function o(s, u) {
+    if (u > r) return !1;
+    if (s == null || typeof s != "object") return !0;
+    const l = s;
+    if (i.has(l)) return !0;
+    if ((i.add(l), Array.isArray(l))) {
+      for (const f of l) if (!o(f, u + 1)) return i.delete(l), !1;
+      return i.delete(l), !0;
+    }
+    for (const f of Object.keys(l))
+      if (c.has(f) || !o(l[f], u + 1)) return i.delete(l), !1;
+    return i.delete(l), !0;
+  }
+  return o(e, 0);
+}
+function kt(e) {
+  let r = ft(e),
+    c = 5381;
+  for (let i = 0; i < r.length; i++) c = ((c << 5) + c) ^ r.charCodeAt(i);
+  return (c >>> 0).toString(16);
+}
+function At(e, r) {
+  if (r) return r(e);
+  const { type: c, ...i } = e,
+    o = ft(i);
+  return `${c}:${o}`;
+}
+function Dt(e, r, c) {
+  return { requirement: e, id: At(e, c), fromConstraint: r };
+}
+var qe = class pt {
+    map = new Map();
+    add(r) {
+      this.map.has(r.id) || this.map.set(r.id, r);
+    }
+    remove(r) {
+      return this.map.delete(r);
+    }
+    has(r) {
+      return this.map.has(r);
+    }
+    get(r) {
+      return this.map.get(r);
+    }
+    all() {
+      return [...this.map.values()];
+    }
+    ids() {
+      return [...this.map.keys()];
+    }
+    get size() {
+      return this.map.size;
+    }
+    clear() {
+      this.map.clear();
+    }
+    clone() {
+      const r = new pt();
+      for (const c of this.map.values()) r.add(c);
+      return r;
+    }
+    diff(r) {
+      const c = [],
+        i = [],
+        o = [];
+      for (const s of this.map.values()) r.has(s.id) ? o.push(s) : c.push(s);
+      for (const s of r.map.values()) this.map.has(s.id) || i.push(s);
+      return { added: c, removed: i, unchanged: o };
+    }
+  },
+  Ot = 5e3;
+function Mt(e) {
+  let {
+      definitions: r,
+      facts: c,
+      requirementKeys: i = {},
+      defaultTimeout: o = Ot,
+      onEvaluate: s,
+      onError: u,
+    } = e,
+    l = new Map(),
+    f = new Set(),
+    d = new Set(),
+    p = new Map(),
+    x = new Map(),
+    T = new Set(),
+    O = new Map(),
+    M = new Map(),
+    D = !1,
+    R = new Set(),
+    A = new Set(),
+    F = new Map(),
+    q = [],
+    h = new Map();
+  function E() {
+    for (const [t, n] of Object.entries(r))
+      if (n.after)
+        for (const a of n.after)
+          r[a] && (F.has(a) || F.set(a, new Set()), F.get(a).add(t));
+  }
+  function v() {
+    const t = new Set(),
+      n = new Set(),
+      a = [];
+    function g(S, j) {
+      if (t.has(S)) return;
+      if (n.has(S)) {
+        const W = j.indexOf(S),
+          _ = [...j.slice(W), S].join(" → ");
+        throw new Error(
+          `[Directive] Constraint cycle detected: ${_}. Remove one of the \`after\` dependencies to break the cycle.`,
+        );
+      }
+      n.add(S), j.push(S);
+      const P = r[S];
+      if (P?.after) for (const W of P.after) r[W] && g(W, j);
+      j.pop(), n.delete(S), t.add(S), a.push(S);
+    }
+    for (const S of Object.keys(r)) g(S, []);
+    (q = a), (h = new Map(q.map((S, j) => [S, j])));
+  }
+  v(), E();
+  function $(t, n) {
+    return n.async !== void 0 ? n.async : !!d.has(t);
+  }
+  function k(t) {
+    const n = r[t];
+    if (!n) throw new Error(`[Directive] Unknown constraint: ${t}`);
+    const a = $(t, n);
+    a && d.add(t);
+    const g = {
+      id: t,
+      priority: n.priority ?? 0,
+      isAsync: a,
+      lastResult: null,
+      isEvaluating: !1,
+      error: null,
+      lastResolvedAt: null,
+      after: n.after ?? [],
+    };
+    return l.set(t, g), g;
+  }
+  function L(t) {
+    return l.get(t) ?? k(t);
+  }
+  function m(t, n) {
+    const a = p.get(t) ?? new Set();
+    for (const g of a) {
+      const S = x.get(g);
+      S?.delete(t), S && S.size === 0 && x.delete(g);
+    }
+    for (const g of n) x.has(g) || x.set(g, new Set()), x.get(g).add(t);
+    p.set(t, n);
+  }
+  function b(t) {
+    const n = r[t];
+    if (!n) return !1;
+    const a = L(t);
+    (a.isEvaluating = !0), (a.error = null);
+    try {
+      let g;
+      if (n.deps) (g = n.when(c)), O.set(t, new Set(n.deps));
+      else {
+        const S = xe(() => n.when(c));
+        (g = S.value), O.set(t, S.deps);
+      }
+      return g instanceof Promise
+        ? (d.add(t),
+          (a.isAsync = !0),
+          g
+            .then(
+              (S) => ((a.lastResult = S), (a.isEvaluating = !1), s?.(t, S), S),
+            )
+            .catch(
+              (S) => (
+                (a.error = S instanceof Error ? S : new Error(String(S))),
+                (a.lastResult = !1),
+                (a.isEvaluating = !1),
+                u?.(t, S),
+                !1
+              ),
+            ))
+        : ((a.lastResult = g), (a.isEvaluating = !1), s?.(t, g), g);
+    } catch (g) {
+      return (
+        (a.error = g instanceof Error ? g : new Error(String(g))),
+        (a.lastResult = !1),
+        (a.isEvaluating = !1),
+        u?.(t, g),
+        !1
+      );
+    }
+  }
+  async function w(t) {
+    const n = r[t];
+    if (!n) return !1;
+    const a = L(t),
+      g = n.timeout ?? o;
+    if (((a.isEvaluating = !0), (a.error = null), n.deps?.length)) {
+      const S = new Set(n.deps);
+      m(t, S), O.set(t, S);
+    }
+    try {
+      const S = n.when(c),
+        j = await we(S, g, `Constraint "${t}" timed out after ${g}ms`);
+      return (a.lastResult = j), (a.isEvaluating = !1), s?.(t, j), j;
+    } catch (S) {
+      return (
+        (a.error = S instanceof Error ? S : new Error(String(S))),
+        (a.lastResult = !1),
+        (a.isEvaluating = !1),
+        u?.(t, S),
+        !1
+      );
+    }
+  }
+  function I(t, n) {
+    return t == null ? [] : Array.isArray(t) ? t.filter((g) => g != null) : [t];
+  }
+  function N(t) {
+    const n = r[t];
+    if (!n) return { requirements: [], deps: new Set() };
+    const a = n.require;
+    if (typeof a == "function") {
+      const { value: g, deps: S } = xe(() => a(c));
+      return { requirements: I(g), deps: S };
+    }
+    return { requirements: I(a), deps: new Set() };
+  }
+  function K(t, n) {
+    if (n.size === 0) return;
+    const a = p.get(t) ?? new Set();
+    for (const g of n)
+      a.add(g), x.has(g) || x.set(g, new Set()), x.get(g).add(t);
+    p.set(t, a);
+  }
+  let z = null;
+  function y() {
+    return (
+      z ||
+        (z = Object.keys(r).sort((t, n) => {
+          const a = L(t),
+            g = L(n).priority - a.priority;
+          if (g !== 0) return g;
+          const S = h.get(t) ?? 0,
+            j = h.get(n) ?? 0;
+          return S - j;
+        })),
+      z
+    );
+  }
+  for (const t of Object.keys(r)) k(t);
+  function C(t) {
+    const n = l.get(t);
+    if (!n || n.after.length === 0) return !0;
+    for (const a of n.after)
+      if (r[a] && !f.has(a) && !A.has(a) && !R.has(a)) return !1;
+    return !0;
+  }
+  return {
+    async evaluate(t) {
+      const n = new qe();
+      A.clear();
+      let a = y().filter((_) => !f.has(_)),
+        g;
+      if (!D || !t || t.size === 0) (g = a), (D = !0);
+      else {
+        const _ = new Set();
+        for (const V of t) {
+          const J = x.get(V);
+          if (J) for (const re of J) f.has(re) || _.add(re);
+        }
+        for (const V of T) f.has(V) || _.add(V);
+        T.clear(), (g = [..._]);
+        for (const V of a)
+          if (!_.has(V)) {
+            const J = M.get(V);
+            if (J) for (const re of J) n.add(re);
+          }
+      }
+      function S(_, V) {
+        if (f.has(_)) return;
+        const J = O.get(_);
+        if (!V) {
+          J !== void 0 && m(_, J), A.add(_), M.set(_, []);
+          return;
+        }
+        A.delete(_);
+        let re, Z;
+        try {
+          const X = N(_);
+          (re = X.requirements), (Z = X.deps);
+        } catch (X) {
+          u?.(_, X), J !== void 0 && m(_, J), M.set(_, []);
+          return;
+        }
+        if (J !== void 0) {
+          const X = new Set(J);
+          for (const U of Z) X.add(U);
+          m(_, X);
+        } else K(_, Z);
+        if (re.length > 0) {
+          const X = i[_],
+            U = re.map((G) => Dt(G, _, X));
+          for (const G of U) n.add(G);
+          M.set(_, U);
+        } else M.set(_, []);
+      }
+      async function j(_) {
+        const V = [],
+          J = [];
+        for (const U of _)
+          if (C(U)) J.push(U);
+          else {
+            V.push(U);
+            const G = M.get(U);
+            if (G) for (const Y of G) n.add(Y);
+          }
+        if (J.length === 0) return V;
+        const re = [],
+          Z = [];
+        for (const U of J) L(U).isAsync ? Z.push(U) : re.push(U);
+        const X = [];
+        for (const U of re) {
+          const G = b(U);
+          if (G instanceof Promise) {
+            X.push({ id: U, promise: G });
+            continue;
+          }
+          S(U, G);
+        }
+        if (X.length > 0) {
+          const U = await Promise.all(
+            X.map(async ({ id: G, promise: Y }) => ({
+              id: G,
+              active: await Y,
+            })),
+          );
+          for (const { id: G, active: Y } of U) S(G, Y);
+        }
+        if (Z.length > 0) {
+          const U = await Promise.all(
+            Z.map(async (G) => ({ id: G, active: await w(G) })),
+          );
+          for (const { id: G, active: Y } of U) S(G, Y);
+        }
+        return V;
+      }
+      let P = g,
+        W = g.length + 1;
+      while (P.length > 0 && W > 0) {
+        const _ = P.length;
+        if (((P = await j(P)), P.length === _)) break;
+        W--;
+      }
+      return n.all();
+    },
+    getState(t) {
+      return l.get(t);
+    },
+    getAllStates() {
+      return [...l.values()];
+    },
+    disable(t) {
+      f.add(t), (z = null), M.delete(t);
+      const n = p.get(t);
+      if (n) {
+        for (const a of n) {
+          const g = x.get(a);
+          g && (g.delete(t), g.size === 0 && x.delete(a));
+        }
+        p.delete(t);
+      }
+      O.delete(t);
+    },
+    enable(t) {
+      f.delete(t), (z = null), T.add(t);
+    },
+    invalidate(t) {
+      const n = x.get(t);
+      if (n) for (const a of n) T.add(a);
+    },
+    markResolved(t) {
+      R.add(t);
+      const n = l.get(t);
+      n && (n.lastResolvedAt = Date.now());
+      const a = F.get(t);
+      if (a) for (const g of a) T.add(g);
+    },
+    isResolved(t) {
+      return R.has(t);
+    },
+    registerDefinitions(t) {
+      for (const [n, a] of Object.entries(t)) (r[n] = a), k(n), T.add(n);
+      (z = null), v(), E();
+    },
+  };
+}
+function jt(e) {
+  let {
+      definitions: r,
+      facts: c,
+      onCompute: i,
+      onInvalidate: o,
+      onError: s,
+    } = e,
+    u = new Map(),
+    l = new Map(),
+    f = new Map(),
+    d = new Map(),
+    p = new Set(["__proto__", "constructor", "prototype"]),
+    x = 0,
+    T = new Set(),
+    O = !1,
+    M = 100,
+    D;
+  function R(v) {
+    if (!r[v]) throw new Error(`[Directive] Unknown derivation: ${v}`);
+    const $ = {
+      id: v,
+      compute: () => F(v),
+      cachedValue: void 0,
+      dependencies: new Set(),
+      isStale: !0,
+      isComputing: !1,
+    };
+    return u.set(v, $), $;
+  }
+  function A(v) {
+    return u.get(v) ?? R(v);
+  }
+  function F(v) {
+    const $ = A(v),
+      k = r[v];
+    if (!k) throw new Error(`[Directive] Unknown derivation: ${v}`);
+    if ($.isComputing)
+      throw new Error(
+        `[Directive] Circular dependency detected in derivation: ${v}`,
+      );
+    $.isComputing = !0;
+    try {
+      const { value: L, deps: m } = xe(() => k(c, D));
+      return (
+        ($.cachedValue = L), ($.isStale = !1), q(v, m), i?.(v, L, [...m]), L
+      );
+    } catch (L) {
+      throw (s?.(v, L), L);
+    } finally {
+      $.isComputing = !1;
+    }
+  }
+  function q(v, $) {
+    const k = A(v),
+      L = k.dependencies;
+    for (const m of L)
+      if (u.has(m)) {
+        const b = d.get(m);
+        b?.delete(v), b && b.size === 0 && d.delete(m);
+      } else {
+        const b = f.get(m);
+        b?.delete(v), b && b.size === 0 && f.delete(m);
+      }
+    for (const m of $)
+      r[m]
+        ? (d.has(m) || d.set(m, new Set()), d.get(m).add(v))
+        : (f.has(m) || f.set(m, new Set()), f.get(m).add(v));
+    k.dependencies = $;
+  }
+  function h() {
+    if (!(x > 0 || O)) {
+      O = !0;
+      try {
+        let v = 0;
+        while (T.size > 0) {
+          if (++v > M) {
+            const k = [...T];
+            throw (
+              (T.clear(),
+              new Error(
+                `[Directive] Infinite derivation notification loop detected after ${M} iterations. Remaining: ${k.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+              ))
+            );
+          }
+          const $ = [...T];
+          T.clear();
+          for (const k of $) l.get(k)?.forEach((L) => L());
+        }
+      } finally {
+        O = !1;
+      }
+    }
+  }
+  function E(v, $ = new Set()) {
+    if ($.has(v)) return;
+    $.add(v);
+    const k = u.get(v);
+    if (!k || k.isStale) return;
+    (k.isStale = !0), o?.(v), T.add(v);
+    const L = d.get(v);
+    if (L) for (const m of L) E(m, $);
+  }
+  return (
+    (D = new Proxy(
+      {},
+      {
+        get(v, $) {
+          if (typeof $ == "symbol" || p.has($)) return;
+          Be($);
+          const k = A($);
+          return k.isStale && F($), k.cachedValue;
+        },
+      },
+    )),
+    {
+      get(v) {
+        const $ = A(v);
+        return $.isStale && F(v), $.cachedValue;
+      },
+      isStale(v) {
+        return u.get(v)?.isStale ?? !0;
+      },
+      invalidate(v) {
+        const $ = f.get(v);
+        if ($) {
+          x++;
+          try {
+            for (const k of $) E(k);
+          } finally {
+            x--, h();
+          }
+        }
+      },
+      invalidateMany(v) {
+        x++;
+        try {
+          for (const $ of v) {
+            const k = f.get($);
+            if (k) for (const L of k) E(L);
+          }
+        } finally {
+          x--, h();
+        }
+      },
+      invalidateAll() {
+        x++;
+        try {
+          for (const v of u.values())
+            v.isStale || ((v.isStale = !0), T.add(v.id));
+        } finally {
+          x--, h();
+        }
+      },
+      subscribe(v, $) {
+        for (const k of v) {
+          const L = k;
+          l.has(L) || l.set(L, new Set()), l.get(L).add($);
+        }
+        return () => {
+          for (const k of v) {
+            const L = k,
+              m = l.get(L);
+            m?.delete($), m && m.size === 0 && l.delete(L);
+          }
+        };
+      },
+      getProxy() {
+        return D;
+      },
+      getDependencies(v) {
+        return A(v).dependencies;
+      },
+      registerDefinitions(v) {
+        for (const [$, k] of Object.entries(v)) (r[$] = k), R($);
+      },
+    }
+  );
+}
+function It(e) {
+  let { definitions: r, facts: c, store: i, onRun: o, onError: s } = e,
+    u = new Map(),
+    l = null,
+    f = !1;
+  function d(R) {
+    const A = r[R];
+    if (!A) throw new Error(`[Directive] Unknown effect: ${R}`);
+    const F = {
+      id: R,
+      enabled: !0,
+      hasExplicitDeps: !!A.deps,
+      dependencies: A.deps ? new Set(A.deps) : null,
+      cleanup: null,
+    };
+    return u.set(R, F), F;
+  }
+  function p(R) {
+    return u.get(R) ?? d(R);
+  }
+  function x() {
+    return i.toObject();
+  }
+  function T(R, A) {
+    const F = p(R);
+    if (!F.enabled) return !1;
+    if (F.dependencies) {
+      for (const q of F.dependencies) if (A.has(q)) return !0;
+      return !1;
+    }
+    return !0;
+  }
+  function O(R) {
+    if (R.cleanup) {
+      try {
+        R.cleanup();
+      } catch (A) {
+        s?.(R.id, A),
+          console.error(
+            `[Directive] Effect "${R.id}" cleanup threw an error:`,
+            A,
+          );
+      }
+      R.cleanup = null;
+    }
+  }
+  function M(R, A) {
+    if (typeof A == "function")
+      if (f)
+        try {
+          A();
+        } catch (F) {
+          s?.(R.id, F),
+            console.error(
+              `[Directive] Effect "${R.id}" cleanup threw an error:`,
+              F,
+            );
+        }
+      else R.cleanup = A;
+  }
+  async function D(R) {
+    const A = p(R),
+      F = r[R];
+    if (!(!A.enabled || !F)) {
+      O(A), o?.(R);
+      try {
+        if (A.hasExplicitDeps) {
+          let q;
+          if (
+            (i.batch(() => {
+              q = F.run(c, l);
+            }),
+            q instanceof Promise)
+          ) {
+            const h = await q;
+            M(A, h);
+          } else M(A, q);
+        } else {
+          let q = null,
+            h,
+            E = xe(
+              () => (
+                i.batch(() => {
+                  h = F.run(c, l);
+                }),
+                h
+              ),
+            );
+          q = E.deps;
+          let v = E.value;
+          v instanceof Promise && (v = await v),
+            M(A, v),
+            (A.dependencies = q.size > 0 ? q : null);
+        }
+      } catch (q) {
+        s?.(R, q),
+          console.error(`[Directive] Effect "${R}" threw an error:`, q);
+      }
+    }
+  }
+  for (const R of Object.keys(r)) d(R);
+  return {
+    async runEffects(R) {
+      const A = [];
+      for (const F of Object.keys(r)) T(F, R) && A.push(F);
+      await Promise.all(A.map(D)), (l = x());
+    },
+    async runAll() {
+      const R = Object.keys(r);
+      await Promise.all(
+        R.map((A) => (p(A).enabled ? D(A) : Promise.resolve())),
+      ),
+        (l = x());
+    },
+    disable(R) {
+      const A = p(R);
+      A.enabled = !1;
+    },
+    enable(R) {
+      const A = p(R);
+      A.enabled = !0;
+    },
+    isEnabled(R) {
+      return p(R).enabled;
+    },
+    cleanupAll() {
+      f = !0;
+      for (const R of u.values()) O(R);
+    },
+    registerDefinitions(R) {
+      for (const [A, F] of Object.entries(R)) (r[A] = F), d(A);
+    },
+  };
+}
+function Bt(e = {}) {
+  const {
+      delayMs: r = 1e3,
+      maxRetries: c = 3,
+      backoffMultiplier: i = 2,
+      maxDelayMs: o = 3e4,
+    } = e,
+    s = new Map();
+  function u(l) {
+    const f = r * Math.pow(i, l - 1);
+    return Math.min(f, o);
+  }
+  return {
+    scheduleRetry(l, f, d, p, x) {
+      if (p > c) return null;
+      const T = u(p),
+        O = {
+          source: l,
+          sourceId: f,
+          context: d,
+          attempt: p,
+          nextRetryTime: Date.now() + T,
+          callback: x,
+        };
+      return s.set(f, O), O;
+    },
+    getPendingRetries() {
+      return Array.from(s.values());
+    },
+    processDueRetries() {
+      const l = Date.now(),
+        f = [];
+      for (const [d, p] of s) p.nextRetryTime <= l && (f.push(p), s.delete(d));
+      return f;
+    },
+    cancelRetry(l) {
+      s.delete(l);
+    },
+    clearAll() {
+      s.clear();
+    },
+  };
+}
+var qt = {
+  constraint: "skip",
+  resolver: "skip",
+  effect: "skip",
+  derivation: "skip",
+  system: "throw",
+};
+function _t(e = {}) {
+  const { config: r = {}, onError: c, onRecovery: i } = e,
+    o = [],
+    s = 100,
+    u = Bt(r.retryLater),
+    l = new Map();
+  function f(p, x, T, O) {
+    if (T instanceof Ke) return T;
+    const M = T instanceof Error ? T.message : String(T),
+      D = p !== "system";
+    return new Ke(M, p, x, O, D);
+  }
+  function d(p, x, T) {
+    const O = (() => {
+      switch (p) {
+        case "constraint":
+          return r.onConstraintError;
+        case "resolver":
+          return r.onResolverError;
+        case "effect":
+          return r.onEffectError;
+        case "derivation":
+          return r.onDerivationError;
+        default:
+          return;
+      }
+    })();
+    if (typeof O == "function") {
+      try {
+        O(T, x);
+      } catch (M) {
+        console.error("[Directive] Error in error handler callback:", M);
+      }
+      return "skip";
+    }
+    return typeof O == "string" ? O : qt[p];
+  }
+  return {
+    handleError(p, x, T, O) {
+      const M = f(p, x, T, O);
+      o.push(M), o.length > s && o.shift();
+      try {
+        c?.(M);
+      } catch (R) {
+        console.error("[Directive] Error in onError callback:", R);
+      }
+      try {
+        r.onError?.(M);
+      } catch (R) {
+        console.error("[Directive] Error in config.onError callback:", R);
+      }
+      let D = d(p, x, T instanceof Error ? T : new Error(String(T)));
+      if (D === "retry-later") {
+        const R = (l.get(x) ?? 0) + 1;
+        l.set(x, R),
+          u.scheduleRetry(p, x, O, R) ||
+            ((D = "skip"), l.delete(x), typeof process < "u");
+      }
+      try {
+        i?.(M, D);
+      } catch (R) {
+        console.error("[Directive] Error in onRecovery callback:", R);
+      }
+      if (D === "throw") throw M;
+      return D;
+    },
+    getLastError() {
+      return o[o.length - 1] ?? null;
+    },
+    getAllErrors() {
+      return [...o];
+    },
+    clearErrors() {
+      o.length = 0;
+    },
+    getRetryLaterManager() {
+      return u;
+    },
+    processDueRetries() {
+      return u.processDueRetries();
+    },
+    clearRetryAttempts(p) {
+      l.delete(p), u.cancelRetry(p);
+    },
+  };
+}
+function Tt() {
+  const e = [];
+  function r(i) {
+    if (i)
+      try {
+        return i();
+      } catch (o) {
+        console.error("[Directive] Plugin error:", o);
+        return;
+      }
+  }
+  async function c(i) {
+    if (i)
+      try {
+        return await i();
+      } catch (o) {
+        console.error("[Directive] Plugin error:", o);
+        return;
+      }
+  }
+  return {
+    register(i) {
+      e.some((o) => o.name === i.name) &&
+        (console.warn(
+          `[Directive] Plugin "${i.name}" is already registered, replacing...`,
+        ),
+        this.unregister(i.name)),
+        e.push(i);
+    },
+    unregister(i) {
+      const o = e.findIndex((s) => s.name === i);
+      o !== -1 && e.splice(o, 1);
+    },
+    getPlugins() {
+      return [...e];
+    },
+    async emitInit(i) {
+      for (const o of e) await c(() => o.onInit?.(i));
+    },
+    emitStart(i) {
+      for (const o of e) r(() => o.onStart?.(i));
+    },
+    emitStop(i) {
+      for (const o of e) r(() => o.onStop?.(i));
+    },
+    emitDestroy(i) {
+      for (const o of e) r(() => o.onDestroy?.(i));
+    },
+    emitFactSet(i, o, s) {
+      for (const u of e) r(() => u.onFactSet?.(i, o, s));
+    },
+    emitFactDelete(i, o) {
+      for (const s of e) r(() => s.onFactDelete?.(i, o));
+    },
+    emitFactsBatch(i) {
+      for (const o of e) r(() => o.onFactsBatch?.(i));
+    },
+    emitDerivationCompute(i, o, s) {
+      for (const u of e) r(() => u.onDerivationCompute?.(i, o, s));
+    },
+    emitDerivationInvalidate(i) {
+      for (const o of e) r(() => o.onDerivationInvalidate?.(i));
+    },
+    emitReconcileStart(i) {
+      for (const o of e) r(() => o.onReconcileStart?.(i));
+    },
+    emitReconcileEnd(i) {
+      for (const o of e) r(() => o.onReconcileEnd?.(i));
+    },
+    emitConstraintEvaluate(i, o) {
+      for (const s of e) r(() => s.onConstraintEvaluate?.(i, o));
+    },
+    emitConstraintError(i, o) {
+      for (const s of e) r(() => s.onConstraintError?.(i, o));
+    },
+    emitRequirementCreated(i) {
+      for (const o of e) r(() => o.onRequirementCreated?.(i));
+    },
+    emitRequirementMet(i, o) {
+      for (const s of e) r(() => s.onRequirementMet?.(i, o));
+    },
+    emitRequirementCanceled(i) {
+      for (const o of e) r(() => o.onRequirementCanceled?.(i));
+    },
+    emitResolverStart(i, o) {
+      for (const s of e) r(() => s.onResolverStart?.(i, o));
+    },
+    emitResolverComplete(i, o, s) {
+      for (const u of e) r(() => u.onResolverComplete?.(i, o, s));
+    },
+    emitResolverError(i, o, s) {
+      for (const u of e) r(() => u.onResolverError?.(i, o, s));
+    },
+    emitResolverRetry(i, o, s) {
+      for (const u of e) r(() => u.onResolverRetry?.(i, o, s));
+    },
+    emitResolverCancel(i, o) {
+      for (const s of e) r(() => s.onResolverCancel?.(i, o));
+    },
+    emitEffectRun(i) {
+      for (const o of e) r(() => o.onEffectRun?.(i));
+    },
+    emitEffectError(i, o) {
+      for (const s of e) r(() => s.onEffectError?.(i, o));
+    },
+    emitSnapshot(i) {
+      for (const o of e) r(() => o.onSnapshot?.(i));
+    },
+    emitTimeTravel(i, o) {
+      for (const s of e) r(() => s.onTimeTravel?.(i, o));
+    },
+    emitError(i) {
+      for (const o of e) r(() => o.onError?.(i));
+    },
+    emitErrorRecovery(i, o) {
+      for (const s of e) r(() => s.onErrorRecovery?.(i, o));
+    },
+  };
+}
+var Ue = { attempts: 1, backoff: "none", initialDelay: 100, maxDelay: 3e4 },
+  Ve = { enabled: !1, windowMs: 50 };
+function Ge(e, r) {
+  let { backoff: c, initialDelay: i = 100, maxDelay: o = 3e4 } = e,
+    s;
+  switch (c) {
+    case "none":
+      s = i;
+      break;
+    case "linear":
+      s = i * r;
+      break;
+    case "exponential":
+      s = i * Math.pow(2, r - 1);
+      break;
+    default:
+      s = i;
+  }
+  return Math.max(1, Math.min(s, o));
+}
+function Lt(e) {
+  const {
+      definitions: r,
+      facts: c,
+      store: i,
+      onStart: o,
+      onComplete: s,
+      onError: u,
+      onRetry: l,
+      onCancel: f,
+      onResolutionComplete: d,
+    } = e,
+    p = new Map(),
+    x = new Map(),
+    T = 1e3,
+    O = new Map(),
+    M = new Map(),
+    D = 1e3;
+  function R() {
+    if (x.size > T) {
+      const m = x.size - T,
+        b = x.keys();
+      for (let w = 0; w < m; w++) {
+        const I = b.next().value;
+        I && x.delete(I);
+      }
+    }
+  }
+  function A(m) {
+    return (
+      typeof m == "object" &&
+      m !== null &&
+      "requirement" in m &&
+      typeof m.requirement == "string"
+    );
+  }
+  function F(m) {
+    return (
+      typeof m == "object" &&
+      m !== null &&
+      "requirement" in m &&
+      typeof m.requirement == "function"
+    );
+  }
+  function q(m, b) {
+    return A(m) ? b.type === m.requirement : F(m) ? m.requirement(b) : !1;
+  }
+  function h(m) {
+    const b = m.type,
+      w = M.get(b);
+    if (w)
+      for (const I of w) {
+        const N = r[I];
+        if (N && q(N, m)) return I;
+      }
+    for (const [I, N] of Object.entries(r))
+      if (q(N, m)) {
+        if (!M.has(b)) {
+          if (M.size >= D) {
+            const z = M.keys().next().value;
+            z !== void 0 && M.delete(z);
+          }
+          M.set(b, []);
+        }
+        const K = M.get(b);
+        return K.includes(I) || K.push(I), I;
+      }
+    return null;
+  }
+  function E(m) {
+    return { facts: c, signal: m, snapshot: () => c.$snapshot() };
+  }
+  async function v(m, b, w) {
+    const I = r[m];
+    if (!I) return;
+    let N = { ...Ue, ...I.retry },
+      K = null;
+    for (let z = 1; z <= N.attempts; z++) {
+      if (w.signal.aborted) return;
+      const y = p.get(b.id);
+      y &&
+        ((y.attempt = z),
+        (y.status = {
+          state: "running",
+          requirementId: b.id,
+          startedAt: y.startedAt,
+          attempt: z,
+        }));
+      try {
+        const C = E(w.signal);
+        if (I.resolve) {
+          let n;
+          i.batch(() => {
+            n = I.resolve(b.requirement, C);
+          });
+          const a = I.timeout;
+          a && a > 0
+            ? await we(n, a, `Resolver "${m}" timed out after ${a}ms`)
+            : await n;
+        }
+        const t = Date.now() - (y?.startedAt ?? Date.now());
+        x.set(b.id, {
+          state: "success",
+          requirementId: b.id,
+          completedAt: Date.now(),
+          duration: t,
+        }),
+          R(),
+          s?.(m, b, t);
+        return;
+      } catch (C) {
+        if (
+          ((K = C instanceof Error ? C : new Error(String(C))),
+          w.signal.aborted)
+        )
+          return;
+        if (N.shouldRetry && !N.shouldRetry(K, z)) break;
+        if (z < N.attempts) {
+          if (w.signal.aborted) return;
+          const t = Ge(N, z);
+          if (
+            (l?.(m, b, z + 1),
+            await new Promise((n) => {
+              const a = setTimeout(n, t),
+                g = () => {
+                  clearTimeout(a), n();
+                };
+              w.signal.addEventListener("abort", g, { once: !0 });
+            }),
+            w.signal.aborted)
+          )
+            return;
+        }
+      }
+    }
+    x.set(b.id, {
+      state: "error",
+      requirementId: b.id,
+      error: K,
+      failedAt: Date.now(),
+      attempts: N.attempts,
+    }),
+      R(),
+      u?.(m, b, K);
+  }
+  async function $(m, b) {
+    const w = r[m];
+    if (!w) return;
+    if (!w.resolveBatch && !w.resolveBatchWithResults) {
+      await Promise.all(
+        b.map((t) => {
+          const n = new AbortController();
+          return v(m, t, n);
+        }),
+      );
+      return;
+    }
+    let I = { ...Ue, ...w.retry },
+      N = { ...Ve, ...w.batch },
+      K = new AbortController(),
+      z = Date.now(),
+      y = null,
+      C = N.timeoutMs ?? w.timeout;
+    for (let t = 1; t <= I.attempts; t++) {
+      if (K.signal.aborted) return;
+      try {
+        const n = E(K.signal),
+          a = b.map((g) => g.requirement);
+        if (w.resolveBatchWithResults) {
+          let g, S;
+          if (
+            (i.batch(() => {
+              S = w.resolveBatchWithResults(a, n);
+            }),
+            C && C > 0
+              ? (g = await we(
+                  S,
+                  C,
+                  `Batch resolver "${m}" timed out after ${C}ms`,
+                ))
+              : (g = await S),
+            g.length !== b.length)
+          )
+            throw new Error(
+              `[Directive] Batch resolver "${m}" returned ${g.length} results but expected ${b.length}. Results array must match input order.`,
+            );
+          let j = Date.now() - z,
+            P = !1;
+          for (let W = 0; W < b.length; W++) {
+            const _ = b[W],
+              V = g[W];
+            if (V.success)
+              x.set(_.id, {
+                state: "success",
+                requirementId: _.id,
+                completedAt: Date.now(),
+                duration: j,
+              }),
+                s?.(m, _, j);
+            else {
+              P = !0;
+              const J = V.error ?? new Error("Batch item failed");
+              x.set(_.id, {
+                state: "error",
+                requirementId: _.id,
+                error: J,
+                failedAt: Date.now(),
+                attempts: t,
+              }),
+                u?.(m, _, J);
+            }
+          }
+          if (!P || b.some((W, _) => g[_]?.success)) return;
+        } else {
+          let g;
+          i.batch(() => {
+            g = w.resolveBatch(a, n);
+          }),
+            C && C > 0
+              ? await we(g, C, `Batch resolver "${m}" timed out after ${C}ms`)
+              : await g;
+          const S = Date.now() - z;
+          for (const j of b)
+            x.set(j.id, {
+              state: "success",
+              requirementId: j.id,
+              completedAt: Date.now(),
+              duration: S,
+            }),
+              s?.(m, j, S);
+          return;
+        }
+      } catch (n) {
+        if (
+          ((y = n instanceof Error ? n : new Error(String(n))),
+          K.signal.aborted)
+        )
+          return;
+        if (I.shouldRetry && !I.shouldRetry(y, t)) break;
+        if (t < I.attempts) {
+          const a = Ge(I, t);
+          for (const g of b) l?.(m, g, t + 1);
+          if (
+            (await new Promise((g) => {
+              const S = setTimeout(g, a),
+                j = () => {
+                  clearTimeout(S), g();
+                };
+              K.signal.addEventListener("abort", j, { once: !0 });
+            }),
+            K.signal.aborted)
+          )
+            return;
+        }
+      }
+    }
+    for (const t of b)
+      x.set(t.id, {
+        state: "error",
+        requirementId: t.id,
+        error: y,
+        failedAt: Date.now(),
+        attempts: I.attempts,
+      }),
+        u?.(m, t, y);
+    R();
+  }
+  function k(m, b) {
+    const w = r[m];
+    if (!w) return;
+    const I = { ...Ve, ...w.batch };
+    O.has(m) || O.set(m, { resolverId: m, requirements: [], timer: null });
+    const N = O.get(m);
+    N.requirements.push(b),
+      N.timer && clearTimeout(N.timer),
+      (N.timer = setTimeout(() => {
+        L(m);
+      }, I.windowMs));
+  }
+  function L(m) {
+    const b = O.get(m);
+    if (!b || b.requirements.length === 0) return;
+    const w = [...b.requirements];
+    (b.requirements = []),
+      (b.timer = null),
+      $(m, w).then(() => {
+        d?.();
+      });
+  }
+  return {
+    resolve(m) {
+      if (p.has(m.id)) return;
+      const b = h(m.requirement);
+      if (!b) {
+        console.warn(`[Directive] No resolver found for requirement: ${m.id}`);
+        return;
+      }
+      const w = r[b];
+      if (!w) return;
+      if (w.batch?.enabled) {
+        k(b, m);
+        return;
+      }
+      const I = new AbortController(),
+        N = Date.now(),
+        K = {
+          requirementId: m.id,
+          resolverId: b,
+          controller: I,
+          startedAt: N,
+          attempt: 1,
+          status: { state: "pending", requirementId: m.id, startedAt: N },
+          originalRequirement: m,
+        };
+      p.set(m.id, K),
+        o?.(b, m),
+        v(b, m, I).finally(() => {
+          p.delete(m.id) && d?.();
+        });
+    },
+    cancel(m) {
+      const b = p.get(m);
+      b &&
+        (b.controller.abort(),
+        p.delete(m),
+        x.set(m, {
+          state: "canceled",
+          requirementId: m,
+          canceledAt: Date.now(),
+        }),
+        R(),
+        f?.(b.resolverId, b.originalRequirement));
+    },
+    cancelAll() {
+      for (const [m] of p) this.cancel(m);
+      for (const m of O.values()) m.timer && clearTimeout(m.timer);
+      O.clear();
+    },
+    getStatus(m) {
+      const b = p.get(m);
+      return b ? b.status : x.get(m) || { state: "idle" };
+    },
+    getInflight() {
+      return [...p.keys()];
+    },
+    getInflightInfo() {
+      return [...p.values()].map((m) => ({
+        id: m.requirementId,
+        resolverId: m.resolverId,
+        startedAt: m.startedAt,
+      }));
+    },
+    isResolving(m) {
+      return p.has(m);
+    },
+    processBatches() {
+      for (const m of O.keys()) L(m);
+    },
+    registerDefinitions(m) {
+      for (const [b, w] of Object.entries(m)) r[b] = w;
+      M.clear();
+    },
+  };
+}
+function zt(e) {
+  let { config: r, facts: c, store: i, onSnapshot: o, onTimeTravel: s } = e,
+    u = r.timeTravel ?? !1,
+    l = r.maxSnapshots ?? 100,
+    f = [],
+    d = -1,
+    p = 1,
+    x = !1,
+    T = !1,
+    O = [],
+    M = null,
+    D = -1;
+  function R() {
+    return i.toObject();
+  }
+  function A() {
+    const q = R();
+    return structuredClone(q);
+  }
+  function F(q) {
+    if (!ve(q)) {
+      console.error(
+        "[Directive] Potential prototype pollution detected in snapshot data, skipping restore",
+      );
+      return;
+    }
+    i.batch(() => {
+      for (const [h, E] of Object.entries(q)) {
+        if (h === "__proto__" || h === "constructor" || h === "prototype") {
+          console.warn(
+            `[Directive] Skipping dangerous key "${h}" during fact restoration`,
+          );
+          continue;
+        }
+        c[h] = E;
+      }
+    });
+  }
+  return {
+    get isEnabled() {
+      return u;
+    },
+    get isRestoring() {
+      return T;
+    },
+    get isPaused() {
+      return x;
+    },
+    get snapshots() {
+      return [...f];
+    },
+    get currentIndex() {
+      return d;
+    },
+    takeSnapshot(q) {
+      if (!u || x)
+        return { id: -1, timestamp: Date.now(), facts: {}, trigger: q };
+      const h = { id: p++, timestamp: Date.now(), facts: A(), trigger: q };
+      for (
+        d < f.length - 1 && f.splice(d + 1), f.push(h), d = f.length - 1;
+        f.length > l;
+      )
+        f.shift(), d--;
+      return o?.(h), h;
+    },
+    restore(q) {
+      if (u) {
+        (x = !0), (T = !0);
+        try {
+          F(q.facts);
+        } finally {
+          (x = !1), (T = !1);
+        }
+      }
+    },
+    goBack(q = 1) {
+      if (!u || f.length === 0) return;
+      let h = d,
+        E = d,
+        v = O.find((k) => d > k.startIndex && d <= k.endIndex);
+      if (v) E = v.startIndex;
+      else if (O.find((k) => d === k.startIndex)) {
+        const k = O.find((L) => L.endIndex < d && d - L.endIndex <= q);
+        E = k ? k.startIndex : Math.max(0, d - q);
+      } else E = Math.max(0, d - q);
+      if (h === E) return;
+      d = E;
+      const $ = f[d];
+      $ && (this.restore($), s?.(h, E));
+    },
+    goForward(q = 1) {
+      if (!u || f.length === 0) return;
+      let h = d,
+        E = d,
+        v = O.find((k) => d >= k.startIndex && d < k.endIndex);
+      if ((v ? (E = v.endIndex) : (E = Math.min(f.length - 1, d + q)), h === E))
+        return;
+      d = E;
+      const $ = f[d];
+      $ && (this.restore($), s?.(h, E));
+    },
+    goTo(q) {
+      if (!u) return;
+      const h = f.findIndex(($) => $.id === q);
+      if (h === -1) {
+        console.warn(`[Directive] Snapshot ${q} not found`);
+        return;
+      }
+      const E = d;
+      d = h;
+      const v = f[d];
+      v && (this.restore(v), s?.(E, h));
+    },
+    replay() {
+      if (!u || f.length === 0) return;
+      d = 0;
+      const q = f[0];
+      q && this.restore(q);
+    },
+    export() {
+      return JSON.stringify({ version: 1, snapshots: f, currentIndex: d });
+    },
+    import(q) {
+      if (u)
+        try {
+          const h = JSON.parse(q);
+          if (typeof h != "object" || h === null)
+            throw new Error("Invalid time-travel data: expected object");
+          if (h.version !== 1)
+            throw new Error(
+              `Unsupported time-travel export version: ${h.version}`,
+            );
+          if (!Array.isArray(h.snapshots))
+            throw new Error(
+              "Invalid time-travel data: snapshots must be an array",
+            );
+          if (typeof h.currentIndex != "number")
+            throw new Error(
+              "Invalid time-travel data: currentIndex must be a number",
+            );
+          for (const v of h.snapshots) {
+            if (typeof v != "object" || v === null)
+              throw new Error("Invalid snapshot: expected object");
+            if (
+              typeof v.id != "number" ||
+              typeof v.timestamp != "number" ||
+              typeof v.trigger != "string" ||
+              typeof v.facts != "object"
+            )
+              throw new Error("Invalid snapshot structure");
+            if (!ve(v.facts))
+              throw new Error(
+                "Invalid fact data: potential prototype pollution detected in nested objects",
+              );
+          }
+          (f.length = 0), f.push(...h.snapshots), (d = h.currentIndex);
+          const E = f[d];
+          E && this.restore(E);
+        } catch (h) {
+          console.error("[Directive] Failed to import time-travel data:", h);
+        }
+    },
+    beginChangeset(q) {
+      u && ((M = q), (D = d));
+    },
+    endChangeset() {
+      !u ||
+        M === null ||
+        (d > D && O.push({ label: M, startIndex: D, endIndex: d }),
+        (M = null),
+        (D = -1));
+    },
+    pause() {
+      x = !0;
+    },
+    resume() {
+      x = !1;
+    },
+  };
+}
+function Pt() {
+  const e = { id: -1, timestamp: 0, facts: {}, trigger: "" };
+  return {
+    isEnabled: !1,
+    isRestoring: !1,
+    isPaused: !1,
+    snapshots: [],
+    currentIndex: -1,
+    takeSnapshot: () => e,
+    restore: () => {},
+    goBack: () => {},
+    goForward: () => {},
+    goTo: () => {},
+    replay: () => {},
+    export: () => "{}",
+    import: () => {},
+    beginChangeset: () => {},
+    endChangeset: () => {},
+    pause: () => {},
+    resume: () => {},
+  };
+}
+var se = new Set(["__proto__", "constructor", "prototype"]);
+function mt(e) {
+  const r = Object.create(null),
+    c = Object.create(null),
+    i = Object.create(null),
+    o = Object.create(null),
+    s = Object.create(null),
+    u = Object.create(null);
+  for (const t of e.modules) {
+    const n = (a, g) => {
+      if (a) {
+        for (const S of Object.keys(a))
+          if (se.has(S))
+            throw new Error(
+              `[Directive] Security: Module "${t.id}" has dangerous key "${S}" in ${g}. This could indicate a prototype pollution attempt.`,
+            );
+      }
+    };
+    n(t.schema, "schema"),
+      n(t.events, "events"),
+      n(t.derive, "derive"),
+      n(t.effects, "effects"),
+      n(t.constraints, "constraints"),
+      n(t.resolvers, "resolvers"),
+      Object.assign(r, t.schema),
+      t.events && Object.assign(c, t.events),
+      t.derive && Object.assign(i, t.derive),
+      t.effects && Object.assign(o, t.effects),
+      t.constraints && Object.assign(s, t.constraints),
+      t.resolvers && Object.assign(u, t.resolvers);
+  }
+  let l = null;
+  if (e.modules.some((t) => t.snapshotEvents)) {
+    l = new Set();
+    for (const t of e.modules) {
+      const n = t;
+      if (n.snapshotEvents) for (const a of n.snapshotEvents) l.add(a);
+      else if (n.events) for (const a of Object.keys(n.events)) l.add(a);
+    }
+  }
+  let f = 0,
+    d = !1,
+    p = Tt();
+  for (const t of e.plugins ?? []) p.register(t);
+  let x = _t({
+      config: e.errorBoundary,
+      onError: (t) => p.emitError(t),
+      onRecovery: (t, n) => p.emitErrorRecovery(t, n),
+    }),
+    T = () => {},
+    O = () => {},
+    M = null,
+    { store: D, facts: R } = Rt({
+      schema: r,
+      onChange: (t, n, a) => {
+        p.emitFactSet(t, n, a),
+          T(t),
+          !M?.isRestoring && (f === 0 && (d = !0), w.changedKeys.add(t), I());
+      },
+      onBatch: (t) => {
+        p.emitFactsBatch(t);
+        const n = [];
+        for (const a of t) n.push(a.key);
+        if ((O(n), !M?.isRestoring)) {
+          f === 0 && (d = !0);
+          for (const a of t) w.changedKeys.add(a.key);
+          I();
+        }
+      },
+    }),
+    A = jt({
+      definitions: i,
+      facts: R,
+      onCompute: (t, n, a) => p.emitDerivationCompute(t, n, a),
+      onInvalidate: (t) => p.emitDerivationInvalidate(t),
+      onError: (t, n) => {
+        x.handleError("derivation", t, n);
+      },
+    });
+  (T = (t) => A.invalidate(t)), (O = (t) => A.invalidateMany(t));
+  const F = It({
+      definitions: o,
+      facts: R,
+      store: D,
+      onRun: (t) => p.emitEffectRun(t),
+      onError: (t, n) => {
+        x.handleError("effect", t, n), p.emitEffectError(t, n);
+      },
+    }),
+    q = Mt({
+      definitions: s,
+      facts: R,
+      onEvaluate: (t, n) => p.emitConstraintEvaluate(t, n),
+      onError: (t, n) => {
+        x.handleError("constraint", t, n), p.emitConstraintError(t, n);
+      },
+    }),
+    h = Lt({
+      definitions: u,
+      facts: R,
+      store: D,
+      onStart: (t, n) => p.emitResolverStart(t, n),
+      onComplete: (t, n, a) => {
+        p.emitResolverComplete(t, n, a),
+          p.emitRequirementMet(n, t),
+          q.markResolved(n.fromConstraint);
+      },
+      onError: (t, n, a) => {
+        x.handleError("resolver", t, a, n), p.emitResolverError(t, n, a);
+      },
+      onRetry: (t, n, a) => p.emitResolverRetry(t, n, a),
+      onCancel: (t, n) => {
+        p.emitResolverCancel(t, n), p.emitRequirementCanceled(n);
+      },
+      onResolutionComplete: () => {
+        L(), I();
+      },
+    }),
+    E = new Set();
+  function v() {
+    for (const t of E) t();
+  }
+  const $ = e.debug?.timeTravel
+    ? zt({
+        config: e.debug,
+        facts: R,
+        store: D,
+        onSnapshot: (t) => {
+          p.emitSnapshot(t), v();
+        },
+        onTimeTravel: (t, n) => {
+          p.emitTimeTravel(t, n), v();
+        },
+      })
+    : Pt();
+  M = $;
+  const k = new Set();
+  function L() {
+    for (const t of k) t();
+  }
+  let m = 50,
+    b = 0,
+    w = {
+      isRunning: !1,
+      isReconciling: !1,
+      reconcileScheduled: !1,
+      isInitializing: !1,
+      isInitialized: !1,
+      isReady: !1,
+      isDestroyed: !1,
+      changedKeys: new Set(),
+      previousRequirements: new qe(),
+      readyPromise: null,
+      readyResolve: null,
+    };
+  function I() {
+    !w.isRunning ||
+      w.reconcileScheduled ||
+      w.isInitializing ||
+      ((w.reconcileScheduled = !0),
+      L(),
+      queueMicrotask(() => {
+        (w.reconcileScheduled = !1),
+          w.isRunning && !w.isInitializing && N().catch((t) => {});
+      }));
+  }
+  async function N() {
+    if (!w.isReconciling) {
+      if ((b++, b > m)) {
+        b = 0;
+        return;
+      }
+      (w.isReconciling = !0), L();
+      try {
+        w.changedKeys.size > 0 &&
+          ((l === null || d) &&
+            $.takeSnapshot(`facts-changed:${[...w.changedKeys].join(",")}`),
+          (d = !1));
+        const t = R.$snapshot();
+        p.emitReconcileStart(t), await F.runEffects(w.changedKeys);
+        const n = new Set(w.changedKeys);
+        w.changedKeys.clear();
+        const a = await q.evaluate(n),
+          g = new qe();
+        for (const _ of a) g.add(_), p.emitRequirementCreated(_);
+        const { added: S, removed: j } = g.diff(w.previousRequirements);
+        for (const _ of j) h.cancel(_.id);
+        for (const _ of S) h.resolve(_);
+        w.previousRequirements = g;
+        const P = h.getInflightInfo(),
+          W = {
+            unmet: a.filter((_) => !h.isResolving(_.id)),
+            inflight: P,
+            completed: [],
+            canceled: j.map((_) => ({
+              id: _.id,
+              resolverId: P.find((V) => V.id === _.id)?.resolverId ?? "unknown",
+            })),
+          };
+        p.emitReconcileEnd(W),
+          w.isReady ||
+            ((w.isReady = !0),
+            w.readyResolve && (w.readyResolve(), (w.readyResolve = null)));
+      } finally {
+        (w.isReconciling = !1),
+          w.changedKeys.size > 0 ? I() : w.reconcileScheduled || (b = 0),
+          L();
+      }
+    }
+  }
+  const K = new Proxy(
+      {},
+      {
+        get(t, n) {
+          if (typeof n != "symbol" && !se.has(n)) return A.get(n);
+        },
+        has(t, n) {
+          return typeof n == "symbol" || se.has(n) ? !1 : n in i;
+        },
+        ownKeys() {
+          return Object.keys(i);
+        },
+        getOwnPropertyDescriptor(t, n) {
+          if (typeof n != "symbol" && !se.has(n) && n in i)
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    ),
+    z = new Proxy(
+      {},
+      {
+        get(t, n) {
+          if (typeof n != "symbol" && !se.has(n))
+            return (a) => {
+              const g = c[n];
+              if (g) {
+                f++, (l === null || l.has(n)) && (d = !0);
+                try {
+                  D.batch(() => {
+                    g(R, { type: n, ...a });
+                  });
+                } finally {
+                  f--;
+                }
+              }
+            };
+        },
+        has(t, n) {
+          return typeof n == "symbol" || se.has(n) ? !1 : n in c;
+        },
+        ownKeys() {
+          return Object.keys(c);
+        },
+        getOwnPropertyDescriptor(t, n) {
+          if (typeof n != "symbol" && !se.has(n) && n in c)
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    ),
+    y = {
+      facts: R,
+      debug: $.isEnabled ? $ : null,
+      derive: K,
+      events: z,
+      constraints: { disable: (t) => q.disable(t), enable: (t) => q.enable(t) },
+      effects: {
+        disable: (t) => F.disable(t),
+        enable: (t) => F.enable(t),
+        isEnabled: (t) => F.isEnabled(t),
+      },
+      initialize() {
+        if (!w.isInitialized) {
+          w.isInitializing = !0;
+          for (const t of e.modules)
+            t.init &&
+              D.batch(() => {
+                t.init(R);
+              });
+          e.onAfterModuleInit &&
+            D.batch(() => {
+              e.onAfterModuleInit();
+            }),
+            (w.isInitializing = !1),
+            (w.isInitialized = !0);
+          for (const t of Object.keys(i)) A.get(t);
+        }
+      },
+      start() {
+        if (!w.isRunning) {
+          w.isInitialized || this.initialize(), (w.isRunning = !0);
+          for (const t of e.modules) t.hooks?.onStart?.(y);
+          p.emitStart(y), I();
+        }
+      },
+      stop() {
+        if (w.isRunning) {
+          (w.isRunning = !1), h.cancelAll(), F.cleanupAll();
+          for (const t of e.modules) t.hooks?.onStop?.(y);
+          p.emitStop(y);
+        }
+      },
+      destroy() {
+        this.stop(),
+          (w.isDestroyed = !0),
+          k.clear(),
+          E.clear(),
+          p.emitDestroy(y);
+      },
+      dispatch(t) {
+        if (se.has(t.type)) return;
+        const n = c[t.type];
+        if (n) {
+          f++, (l === null || l.has(t.type)) && (d = !0);
+          try {
+            D.batch(() => {
+              n(R, t);
+            });
+          } finally {
+            f--;
+          }
+        }
+      },
+      read(t) {
+        return A.get(t);
+      },
+      subscribe(t, n) {
+        const a = [],
+          g = [];
+        for (const j of t) j in i ? a.push(j) : j in r && g.push(j);
+        const S = [];
+        return (
+          a.length > 0 && S.push(A.subscribe(a, n)),
+          g.length > 0 && S.push(D.subscribe(g, n)),
+          () => {
+            for (const j of S) j();
+          }
+        );
+      },
+      watch(t, n, a) {
+        const g = a?.equalityFn
+          ? (j, P) => a.equalityFn(j, P)
+          : (j, P) => Object.is(j, P);
+        if (t in i) {
+          let j = A.get(t);
+          return A.subscribe([t], () => {
+            const P = A.get(t);
+            if (!g(P, j)) {
+              const W = j;
+              (j = P), n(P, W);
+            }
+          });
+        }
+        let S = D.get(t);
+        return D.subscribe([t], () => {
+          const j = D.get(t);
+          if (!g(j, S)) {
+            const P = S;
+            (S = j), n(j, P);
+          }
+        });
+      },
+      when(t, n) {
+        return new Promise((a, g) => {
+          const S = D.toObject();
+          if (t(S)) {
+            a();
+            return;
+          }
+          let j,
+            P,
+            W = () => {
+              j?.(), P !== void 0 && clearTimeout(P);
+            };
+          (j = D.subscribeAll(() => {
+            const _ = D.toObject();
+            t(_) && (W(), a());
+          })),
+            n?.timeout !== void 0 &&
+              n.timeout > 0 &&
+              (P = setTimeout(() => {
+                W(),
+                  g(
+                    new Error(
+                      `[Directive] when: timed out after ${n.timeout}ms`,
+                    ),
+                  );
+              }, n.timeout));
+        });
+      },
+      inspect() {
+        return {
+          unmet: w.previousRequirements.all(),
+          inflight: h.getInflightInfo(),
+          constraints: q.getAllStates().map((t) => ({
+            id: t.id,
+            active: t.lastResult ?? !1,
+            priority: t.priority,
+          })),
+          resolvers: Object.fromEntries(
+            h.getInflight().map((t) => [t, h.getStatus(t)]),
+          ),
+        };
+      },
+      explain(t) {
+        const n = w.previousRequirements.all().find((V) => V.id === t);
+        if (!n) return null;
+        const a = q.getState(n.fromConstraint),
+          g = h.getStatus(t),
+          S = {},
+          j = D.toObject();
+        for (const [V, J] of Object.entries(j)) S[V] = J;
+        const P = [
+            `Requirement "${n.requirement.type}" (id: ${n.id})`,
+            `├─ Produced by constraint: ${n.fromConstraint}`,
+            `├─ Constraint priority: ${a?.priority ?? 0}`,
+            `├─ Constraint active: ${a?.lastResult ?? "unknown"}`,
+            `├─ Resolver status: ${g.state}`,
+          ],
+          W = Object.entries(n.requirement)
+            .filter(([V]) => V !== "type")
+            .map(([V, J]) => `${V}=${JSON.stringify(J)}`)
+            .join(", ");
+        W && P.push(`├─ Requirement payload: { ${W} }`);
+        const _ = Object.entries(S).slice(0, 10);
+        return (
+          _.length > 0 &&
+            (P.push("└─ Relevant facts:"),
+            _.forEach(([V, J], re) => {
+              const Z = re === _.length - 1 ? "   └─" : "   ├─",
+                X = typeof J == "object" ? JSON.stringify(J) : String(J);
+              P.push(
+                `${Z} ${V} = ${X.slice(0, 50)}${X.length > 50 ? "..." : ""}`,
+              );
+            })),
+          P.join(`
+`)
+        );
+      },
+      async settle(t = 5e3) {
+        const n = Date.now();
+        for (;;) {
+          await new Promise((g) => setTimeout(g, 0));
+          const a = this.inspect();
+          if (
+            a.inflight.length === 0 &&
+            !w.isReconciling &&
+            !w.reconcileScheduled
+          )
+            return;
+          if (Date.now() - n > t) {
+            const g = [];
+            a.inflight.length > 0 &&
+              g.push(
+                `${a.inflight.length} resolvers inflight: ${a.inflight.map((j) => j.resolverId).join(", ")}`,
+              ),
+              w.isReconciling && g.push("reconciliation in progress"),
+              w.reconcileScheduled && g.push("reconcile scheduled");
+            const S = w.previousRequirements.all();
+            throw (
+              (S.length > 0 &&
+                g.push(
+                  `${S.length} unmet requirements: ${S.map((j) => j.requirement.type).join(", ")}`,
+                ),
+              new Error(
+                `[Directive] settle() timed out after ${t}ms. ${g.join("; ")}`,
+              ))
+            );
+          }
+          await new Promise((g) => setTimeout(g, 10));
+        }
+      },
+      getSnapshot() {
+        return { facts: D.toObject(), version: 1 };
+      },
+      getDistributableSnapshot(t = {}) {
+        let {
+            includeDerivations: n,
+            excludeDerivations: a,
+            includeFacts: g,
+            ttlSeconds: S,
+            metadata: j,
+            includeVersion: P,
+          } = t,
+          W = {},
+          _ = Object.keys(i),
+          V;
+        if ((n ? (V = n.filter((Z) => _.includes(Z))) : (V = _), a)) {
+          const Z = new Set(a);
+          V = V.filter((X) => !Z.has(X));
+        }
+        for (const Z of V)
+          try {
+            W[Z] = A.get(Z);
+          } catch {}
+        if (g && g.length > 0) {
+          const Z = D.toObject();
+          for (const X of g) X in Z && (W[X] = Z[X]);
+        }
+        const J = Date.now(),
+          re = { data: W, createdAt: J };
+        return (
+          S !== void 0 && S > 0 && (re.expiresAt = J + S * 1e3),
+          P && (re.version = kt(W)),
+          j && (re.metadata = j),
+          re
+        );
+      },
+      watchDistributableSnapshot(t, n) {
+        let { includeDerivations: a, excludeDerivations: g } = t,
+          S = Object.keys(i),
+          j;
+        if ((a ? (j = a.filter((W) => S.includes(W))) : (j = S), g)) {
+          const W = new Set(g);
+          j = j.filter((_) => !W.has(_));
+        }
+        if (j.length === 0) return () => {};
+        let P = this.getDistributableSnapshot({
+          ...t,
+          includeVersion: !0,
+        }).version;
+        return A.subscribe(j, () => {
+          const W = this.getDistributableSnapshot({ ...t, includeVersion: !0 });
+          W.version !== P && ((P = W.version), n(W));
+        });
+      },
+      restore(t) {
+        if (!t || typeof t != "object")
+          throw new Error(
+            "[Directive] restore() requires a valid snapshot object",
+          );
+        if (!t.facts || typeof t.facts != "object")
+          throw new Error(
+            "[Directive] restore() snapshot must have a facts object",
+          );
+        if (!ve(t))
+          throw new Error(
+            "[Directive] restore() rejected: snapshot contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.",
+          );
+        D.batch(() => {
+          for (const [n, a] of Object.entries(t.facts))
+            se.has(n) || D.set(n, a);
+        });
+      },
+      onSettledChange(t) {
+        return (
+          k.add(t),
+          () => {
+            k.delete(t);
+          }
+        );
+      },
+      onTimeTravelChange(t) {
+        return (
+          E.add(t),
+          () => {
+            E.delete(t);
+          }
+        );
+      },
+      batch(t) {
+        D.batch(t);
+      },
+      get isSettled() {
+        return (
+          this.inspect().inflight.length === 0 &&
+          !w.isReconciling &&
+          !w.reconcileScheduled
+        );
+      },
+      get isRunning() {
+        return w.isRunning;
+      },
+      get isInitialized() {
+        return w.isInitialized;
+      },
+      get isReady() {
+        return w.isReady;
+      },
+      whenReady() {
+        return w.isReady
+          ? Promise.resolve()
+          : w.isRunning
+            ? (w.readyPromise ||
+                (w.readyPromise = new Promise((t) => {
+                  w.readyResolve = t;
+                })),
+              w.readyPromise)
+            : Promise.reject(
+                new Error(
+                  "[Directive] whenReady() called before start(). Call system.start() first, then await system.whenReady().",
+                ),
+              );
+      },
+    };
+  function C(t) {
+    if (w.isReconciling)
+      throw new Error(
+        `[Directive] Cannot register module "${t.id}" during reconciliation. Wait for the current reconciliation cycle to complete.`,
+      );
+    if (w.isDestroyed)
+      throw new Error(
+        `[Directive] Cannot register module "${t.id}" on a destroyed system.`,
+      );
+    const n = (a, g) => {
+      if (a) {
+        for (const S of Object.keys(a))
+          if (se.has(S))
+            throw new Error(
+              `[Directive] Security: Module "${t.id}" has dangerous key "${S}" in ${g}.`,
+            );
+      }
+    };
+    n(t.schema, "schema"),
+      n(t.events, "events"),
+      n(t.derive, "derive"),
+      n(t.effects, "effects"),
+      n(t.constraints, "constraints"),
+      n(t.resolvers, "resolvers");
+    for (const a of Object.keys(t.schema))
+      if (a in r)
+        throw new Error(
+          `[Directive] Schema collision: Fact "${a}" already exists. Cannot register module "${t.id}".`,
+        );
+    if (t.snapshotEvents) {
+      l === null && (l = new Set(Object.keys(c)));
+      for (const a of t.snapshotEvents) l.add(a);
+    } else if (l !== null && t.events)
+      for (const a of Object.keys(t.events)) l.add(a);
+    Object.assign(r, t.schema),
+      t.events && Object.assign(c, t.events),
+      t.derive && (Object.assign(i, t.derive), A.registerDefinitions(t.derive)),
+      t.effects &&
+        (Object.assign(o, t.effects), F.registerDefinitions(t.effects)),
+      t.constraints &&
+        (Object.assign(s, t.constraints), q.registerDefinitions(t.constraints)),
+      t.resolvers &&
+        (Object.assign(u, t.resolvers), h.registerDefinitions(t.resolvers)),
+      D.registerKeys(t.schema),
+      e.modules.push(t),
+      t.init &&
+        D.batch(() => {
+          t.init(R);
+        }),
+      t.hooks?.onInit?.(y),
+      w.isRunning && (t.hooks?.onStart?.(y), I());
+  }
+  (y.registerModule = C), p.emitInit(y);
+  for (const t of e.modules) t.hooks?.onInit?.(y);
+  return y;
+}
+var ne = Object.freeze(new Set(["__proto__", "constructor", "prototype"])),
+  H = "::";
+function Ft(e) {
+  const r = Object.keys(e),
+    c = new Set(),
+    i = new Set(),
+    o = [],
+    s = [];
+  function u(l) {
+    if (c.has(l)) return;
+    if (i.has(l)) {
+      const d = s.indexOf(l),
+        p = [...s.slice(d), l].join(" → ");
+      throw new Error(
+        `[Directive] Circular dependency detected: ${p}. Modules cannot have circular crossModuleDeps. Break the cycle by removing one of the cross-module references.`,
+      );
+    }
+    i.add(l), s.push(l);
+    const f = e[l];
+    if (f?.crossModuleDeps)
+      for (const d of Object.keys(f.crossModuleDeps)) r.includes(d) && u(d);
+    s.pop(), i.delete(l), c.add(l), o.push(l);
+  }
+  for (const l of r) u(l);
+  return o;
+}
+var Je = new WeakMap(),
+  Ye = new WeakMap(),
+  Xe = new WeakMap(),
+  Qe = new WeakMap();
+function Nt(e) {
+  if ("module" in e) {
+    if (!e.module)
+      throw new Error(
+        "[Directive] createSystem requires a module. Got: " + typeof e.module,
+      );
+    return Ut(e);
+  }
+  const r = e;
+  if (Array.isArray(r.modules))
+    throw new Error(`[Directive] createSystem expects modules as an object, not an array.
 
 Instead of:
   createSystem({ modules: [authModule, dataModule] })
@@ -8,10 +2927,2922 @@ Use:
   createSystem({ modules: { auth: authModule, data: dataModule } })
 
 Or for a single module:
-  createSystem({ module: counterModule })`);return Wt(r)}function Wt(e){let r=e.modules,c=new Set(Object.keys(r)),i=e.debug?.snapshotModules?new Set(e.debug.snapshotModules):null;if(e.tickMs!==void 0&&e.tickMs<=0)throw new Error("[Directive] tickMs must be a positive number");let o,s=e.initOrder??"auto";if(Array.isArray(s)){let h=s,E=Object.keys(r).filter(v=>!h.includes(v));if(E.length>0)throw new Error(`[Directive] initOrder is missing modules: ${E.join(", ")}. All modules must be included in the explicit order.`);o=h}else s==="declaration"?o=Object.keys(r):o=Ft(r);let u=e.debug,l=e.errorBoundary;e.zeroConfig&&(u={timeTravel:!1,maxSnapshots:100,...e.debug},l={onConstraintError:"skip",onResolverError:"skip",onEffectError:"skip",onDerivationError:"skip",...e.errorBoundary});for(let h of Object.keys(r)){if(h.includes(H))throw new Error(`[Directive] Module name "${h}" contains the reserved separator "${H}". Module names cannot contain "${H}".`);let E=r[h];if(E){for(let v of Object.keys(E.schema.facts))if(v.includes(H))throw new Error(`[Directive] Schema key "${v}" in module "${h}" contains the reserved separator "${H}". Schema keys cannot contain "${H}".`)}}let f=[];for(let h of o){let E=r[h];if(!E)continue;let v=E.crossModuleDeps&&Object.keys(E.crossModuleDeps).length>0,$=v?Object.keys(E.crossModuleDeps):[],k={};for(let[y,C]of Object.entries(E.schema.facts))k[`${h}${H}${y}`]=C;let L={};if(E.schema.derivations)for(let[y,C]of Object.entries(E.schema.derivations))L[`${h}${H}${y}`]=C;let m={};if(E.schema.events)for(let[y,C]of Object.entries(E.schema.events))m[`${h}${H}${y}`]=C;let b=E.init?y=>{let C=ie(y,h);E.init(C)}:void 0,w={};if(E.derive)for(let[y,C]of Object.entries(E.derive))w[`${h}${H}${y}`]=(t,n)=>{let a=v?le(t,h,$):ie(t,h),g=_e(n,h);return C(a,g)};let I={};if(E.events)for(let[y,C]of Object.entries(E.events))I[`${h}${H}${y}`]=(t,n)=>{let a=ie(t,h);C(a,n)};let N={};if(E.constraints)for(let[y,C]of Object.entries(E.constraints)){let t=C;N[`${h}${H}${y}`]={...t,deps:t.deps?.map(n=>`${h}${H}${n}`),when:n=>{let a=v?le(n,h,$):ie(n,h);return t.when(a)},require:typeof t.require=="function"?n=>{let a=v?le(n,h,$):ie(n,h);return t.require(a)}:t.require}}let K={};if(E.resolvers)for(let[y,C]of Object.entries(E.resolvers)){let t=C;K[`${h}${H}${y}`]={...t,resolve:async(n,a)=>{let g=ke(a.facts,r,()=>Object.keys(r));await t.resolve(n,{facts:g[h],signal:a.signal})}}}let z={};if(E.effects)for(let[y,C]of Object.entries(E.effects)){let t=C;z[`${h}${H}${y}`]={...t,run:(n,a)=>{let g=v?le(n,h,$):ie(n,h),S=a?v?le(a,h,$):ie(a,h):void 0;return t.run(g,S)},deps:t.deps?.map(n=>`${h}${H}${n}`)}}f.push({id:E.id,schema:{facts:k,derivations:L,events:m,requirements:E.schema.requirements??{}},init:b,derive:w,events:I,effects:z,constraints:N,resolvers:K,hooks:E.hooks,snapshotEvents:i&&!i.has(h)?[]:E.snapshotEvents?.map(y=>`${h}${H}${y}`)})}let d=null,p=null;function x(h){for(let[E,v]of Object.entries(h))if(!ne.has(E)&&c.has(E)){if(v&&typeof v=="object"&&!ve(v))throw new Error(`[Directive] initialFacts/hydrate for namespace "${E}" contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.`);for(let[$,k]of Object.entries(v))ne.has($)||(p.facts[`${E}${H}${$}`]=k)}}p=mt({modules:f.map(h=>({id:h.id,schema:h.schema.facts,requirements:h.schema.requirements,init:h.init,derive:h.derive,events:h.events,effects:h.effects,constraints:h.constraints,resolvers:h.resolvers,hooks:h.hooks,snapshotEvents:h.snapshotEvents})),plugins:e.plugins,debug:u,errorBoundary:l,tickMs:e.tickMs,onAfterModuleInit:()=>{e.initialFacts&&x(e.initialFacts),d&&(x(d),d=null)}});let T=new Map;for(let h of Object.keys(r)){let E=r[h];if(!E)continue;let v=[];for(let $ of Object.keys(E.schema.facts))v.push(`${h}${H}${$}`);if(E.schema.derivations)for(let $ of Object.keys(E.schema.derivations))v.push(`${h}${H}${$}`);T.set(h,v)}let O={names:null};function M(){return O.names===null&&(O.names=Object.keys(r)),O.names}let D=ke(p.facts,r,M),R=Kt(p.derive,r,M),A=Ht(p,r,M),F=null,q=e.tickMs;return{_mode:"namespaced",facts:D,debug:p.debug,derive:R,events:A,constraints:p.constraints,effects:p.effects,get isRunning(){return p.isRunning},get isSettled(){return p.isSettled},get isInitialized(){return p.isInitialized},get isReady(){return p.isReady},whenReady:p.whenReady.bind(p),async hydrate(h){if(p.isRunning)throw new Error("[Directive] hydrate() must be called before start(). The system is already running.");let E=await h();E&&typeof E=="object"&&(d=E)},initialize(){p.initialize()},start(){if(p.start(),q&&q>0){let h=Object.keys(f[0]?.events??{}).find(E=>E.endsWith(`${H}tick`));h&&(F=setInterval(()=>{p.dispatch({type:h})},q))}},stop(){F&&(clearInterval(F),F=null),p.stop()},destroy(){this.stop(),p.destroy()},dispatch(h){p.dispatch(h)},batch:p.batch.bind(p),read(h){return p.read(ae(h))},subscribe(h,E){let v=[];for(let $ of h)if($.endsWith(".*")){let k=$.slice(0,-2),L=T.get(k);L&&v.push(...L)}else v.push(ae($));return p.subscribe(v,E)},subscribeModule(h,E){let v=T.get(h);return!v||v.length===0?()=>{}:p.subscribe(v,E)},watch(h,E,v){return p.watch(ae(h),E,v)},when(h,E){return p.when(()=>h(D),E)},onSettledChange:p.onSettledChange.bind(p),onTimeTravelChange:p.onTimeTravelChange.bind(p),inspect:p.inspect.bind(p),settle:p.settle.bind(p),explain:p.explain.bind(p),getSnapshot:p.getSnapshot.bind(p),restore:p.restore.bind(p),getDistributableSnapshot(h){let E={...h,includeDerivations:h?.includeDerivations?.map(ae),excludeDerivations:h?.excludeDerivations?.map(ae),includeFacts:h?.includeFacts?.map(ae)},v=p.getDistributableSnapshot(E),$={};for(let[k,L]of Object.entries(v.data)){let m=k.indexOf(H);if(m>0){let b=k.slice(0,m),w=k.slice(m+H.length);$[b]||($[b]={}),$[b][w]=L}else $._root||($._root={}),$._root[k]=L}return{...v,data:$}},watchDistributableSnapshot(h,E){let v={...h,includeDerivations:h?.includeDerivations?.map(ae),excludeDerivations:h?.excludeDerivations?.map(ae),includeFacts:h?.includeFacts?.map(ae)};return p.watchDistributableSnapshot(v,$=>{let k={};for(let[L,m]of Object.entries($.data)){let b=L.indexOf(H);if(b>0){let w=L.slice(0,b),I=L.slice(b+H.length);k[w]||(k[w]={}),k[w][I]=m}else k._root||(k._root={}),k._root[L]=m}E({...$,data:k})})},registerModule(h,E){if(c.has(h))throw new Error(`[Directive] Module namespace "${h}" already exists. Cannot register a duplicate namespace.`);if(h.includes(H))throw new Error(`[Directive] Module name "${h}" contains the reserved separator "${H}".`);if(ne.has(h))throw new Error(`[Directive] Module name "${h}" is a blocked property.`);for(let y of Object.keys(E.schema.facts))if(y.includes(H))throw new Error(`[Directive] Schema key "${y}" in module "${h}" contains the reserved separator "${H}".`);let v=E,$=v.crossModuleDeps&&Object.keys(v.crossModuleDeps).length>0,k=$?Object.keys(v.crossModuleDeps):[],L={};for(let[y,C]of Object.entries(v.schema.facts))L[`${h}${H}${y}`]=C;let m=v.init?y=>{let C=ie(y,h);v.init(C)}:void 0,b={};if(v.derive)for(let[y,C]of Object.entries(v.derive))b[`${h}${H}${y}`]=(t,n)=>{let a=$?le(t,h,k):ie(t,h),g=_e(n,h);return C(a,g)};let w={};if(v.events)for(let[y,C]of Object.entries(v.events))w[`${h}${H}${y}`]=(t,n)=>{let a=ie(t,h);C(a,n)};let I={};if(v.constraints)for(let[y,C]of Object.entries(v.constraints)){let t=C;I[`${h}${H}${y}`]={...t,deps:t.deps?.map(n=>`${h}${H}${n}`),when:n=>{let a=$?le(n,h,k):ie(n,h);return t.when(a)},require:typeof t.require=="function"?n=>{let a=$?le(n,h,k):ie(n,h);return t.require(a)}:t.require}}let N={};if(v.resolvers)for(let[y,C]of Object.entries(v.resolvers)){let t=C;N[`${h}${H}${y}`]={...t,resolve:async(n,a)=>{let g=ke(a.facts,r,M);await t.resolve(n,{facts:g[h],signal:a.signal})}}}let K={};if(v.effects)for(let[y,C]of Object.entries(v.effects)){let t=C;K[`${h}${H}${y}`]={...t,run:(n,a)=>{let g=$?le(n,h,k):ie(n,h),S=a?$?le(a,h,k):ie(a,h):void 0;return t.run(g,S)},deps:t.deps?.map(n=>`${h}${H}${n}`)}}c.add(h),r[h]=v,O.names=null;let z=[];for(let y of Object.keys(v.schema.facts))z.push(`${h}${H}${y}`);if(v.schema.derivations)for(let y of Object.keys(v.schema.derivations))z.push(`${h}${H}${y}`);T.set(h,z),p.registerModule({id:v.id,schema:L,requirements:v.schema.requirements??{},init:m,derive:Object.keys(b).length>0?b:void 0,events:Object.keys(w).length>0?w:void 0,effects:Object.keys(K).length>0?K:void 0,constraints:Object.keys(I).length>0?I:void 0,resolvers:Object.keys(N).length>0?N:void 0,hooks:v.hooks,snapshotEvents:i&&!i.has(h)?[]:v.snapshotEvents?.map(y=>`${h}${H}${y}`)})}}}function ae(e){if(e.includes(".")){let[r,...c]=e.split(".");return`${r}${H}${c.join(H)}`}return e}function ie(e,r){let c=Je.get(e);if(c){let o=c.get(r);if(o)return o}else c=new Map,Je.set(e,c);let i=new Proxy({},{get(o,s){if(typeof s!="symbol"&&!ne.has(s))return s==="$store"||s==="$snapshot"?e[s]:e[`${r}${H}${s}`]},set(o,s,u){return typeof s=="symbol"||ne.has(s)?!1:(e[`${r}${H}${s}`]=u,!0)},has(o,s){return typeof s=="symbol"||ne.has(s)?!1:`${r}${H}${s}`in e},deleteProperty(o,s){return typeof s=="symbol"||ne.has(s)?!1:(delete e[`${r}${H}${s}`],!0)}});return c.set(r,i),i}function ke(e,r,c){let i=Ye.get(e);if(i)return i;let o=new Proxy({},{get(s,u){if(typeof u!="symbol"&&!ne.has(u)&&Object.hasOwn(r,u))return ie(e,u)},has(s,u){return typeof u=="symbol"||ne.has(u)?!1:Object.hasOwn(r,u)},ownKeys(){return c()},getOwnPropertyDescriptor(s,u){if(typeof u!="symbol"&&Object.hasOwn(r,u))return{configurable:!0,enumerable:!0}}});return Ye.set(e,o),o}var Ze=new WeakMap;function le(e,r,c){let i=`${r}:${JSON.stringify([...c].sort())}`,o=Ze.get(e);if(o){let f=o.get(i);if(f)return f}else o=new Map,Ze.set(e,o);let s=new Set(c),u=["self",...c],l=new Proxy({},{get(f,d){if(typeof d!="symbol"&&!ne.has(d)){if(d==="self")return ie(e,r);if(s.has(d))return ie(e,d)}},has(f,d){return typeof d=="symbol"||ne.has(d)?!1:d==="self"||s.has(d)},ownKeys(){return u},getOwnPropertyDescriptor(f,d){if(typeof d!="symbol"&&(d==="self"||s.has(d)))return{configurable:!0,enumerable:!0}}});return o.set(i,l),l}function _e(e,r){let c=Qe.get(e);if(c){let o=c.get(r);if(o)return o}else c=new Map,Qe.set(e,c);let i=new Proxy({},{get(o,s){if(typeof s!="symbol"&&!ne.has(s))return e[`${r}${H}${s}`]},has(o,s){return typeof s=="symbol"||ne.has(s)?!1:`${r}${H}${s}`in e}});return c.set(r,i),i}function Kt(e,r,c){let i=Xe.get(e);if(i)return i;let o=new Proxy({},{get(s,u){if(typeof u!="symbol"&&!ne.has(u)&&Object.hasOwn(r,u))return _e(e,u)},has(s,u){return typeof u=="symbol"||ne.has(u)?!1:Object.hasOwn(r,u)},ownKeys(){return c()},getOwnPropertyDescriptor(s,u){if(typeof u!="symbol"&&Object.hasOwn(r,u))return{configurable:!0,enumerable:!0}}});return Xe.set(e,o),o}var et=new WeakMap;function Ht(e,r,c){let i=et.get(e);return i||(i=new Map,et.set(e,i)),new Proxy({},{get(o,s){if(typeof s=="symbol"||ne.has(s)||!Object.hasOwn(r,s))return;let u=i.get(s);if(u)return u;let l=new Proxy({},{get(f,d){if(typeof d!="symbol"&&!ne.has(d))return p=>{e.dispatch({type:`${s}${H}${d}`,...p})}}});return i.set(s,l),l},has(o,s){return typeof s=="symbol"||ne.has(s)?!1:Object.hasOwn(r,s)},ownKeys(){return c()},getOwnPropertyDescriptor(o,s){if(typeof s!="symbol"&&Object.hasOwn(r,s))return{configurable:!0,enumerable:!0}}})}function Ut(e){let r=e.module;if(!r)throw new Error("[Directive] createSystem requires a module. Got: "+typeof r);if(e.tickMs!==void 0&&e.tickMs<=0)throw new Error("[Directive] tickMs must be a positive number");if(e.initialFacts&&!ve(e.initialFacts))throw new Error("[Directive] initialFacts contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.");let c=e.debug,i=e.errorBoundary;e.zeroConfig&&(c={timeTravel:!1,maxSnapshots:100,...e.debug},i={onConstraintError:"skip",onResolverError:"skip",onEffectError:"skip",onDerivationError:"skip",...e.errorBoundary});let o=null,s=null;s=mt({modules:[{id:r.id,schema:r.schema.facts,requirements:r.schema.requirements,init:r.init,derive:r.derive,events:r.events,effects:r.effects,constraints:r.constraints,resolvers:r.resolvers,hooks:r.hooks,snapshotEvents:r.snapshotEvents}],plugins:e.plugins,debug:c,errorBoundary:i,tickMs:e.tickMs,onAfterModuleInit:()=>{if(e.initialFacts)for(let[d,p]of Object.entries(e.initialFacts))ne.has(d)||(s.facts[d]=p);if(o){for(let[d,p]of Object.entries(o))ne.has(d)||(s.facts[d]=p);o=null}}});let u=new Proxy({},{get(d,p){if(typeof p!="symbol"&&!ne.has(p))return x=>{s.dispatch({type:p,...x})}}}),l=null,f=e.tickMs;return{_mode:"single",facts:s.facts,debug:s.debug,derive:s.derive,events:u,constraints:s.constraints,effects:s.effects,get isRunning(){return s.isRunning},get isSettled(){return s.isSettled},get isInitialized(){return s.isInitialized},get isReady(){return s.isReady},whenReady:s.whenReady.bind(s),async hydrate(d){if(s.isRunning)throw new Error("[Directive] hydrate() must be called before start(). The system is already running.");let p=await d();p&&typeof p=="object"&&(o=p)},initialize(){s.initialize()},start(){s.start(),f&&f>0&&r.events&&"tick"in r.events&&(l=setInterval(()=>{s.dispatch({type:"tick"})},f))},stop(){l&&(clearInterval(l),l=null),s.stop()},destroy(){this.stop(),s.destroy()},dispatch(d){s.dispatch(d)},batch:s.batch.bind(s),read(d){return s.read(d)},subscribe(d,p){return s.subscribe(d,p)},watch(d,p,x){return s.watch(d,p,x)},when(d,p){return s.when(d,p)},onSettledChange:s.onSettledChange.bind(s),onTimeTravelChange:s.onTimeTravelChange.bind(s),inspect:s.inspect.bind(s),settle:s.settle.bind(s),explain:s.explain.bind(s),getSnapshot:s.getSnapshot.bind(s),restore:s.restore.bind(s),getDistributableSnapshot:s.getDistributableSnapshot.bind(s),watchDistributableSnapshot:s.watchDistributableSnapshot.bind(s),registerModule(d){s.registerModule({id:d.id,schema:d.schema.facts,requirements:d.schema.requirements,init:d.init,derive:d.derive,events:d.events,effects:d.effects,constraints:d.constraints,resolvers:d.resolvers,hooks:d.hooks,snapshotEvents:d.snapshotEvents})}}}var tt={debug:0,info:1,warn:2,error:3};function Vt(e={}){let{level:r="info",filter:c=()=>!0,logger:i=console,prefix:o="[Directive]"}=e,s=tt[r],u=(l,f,...d)=>{tt[l]<s||c(f)&&i[l](`${o} ${f}`,...d)};return{name:"logging",onInit:()=>u("debug","init"),onStart:()=>u("info","start"),onStop:()=>u("info","stop"),onDestroy:()=>u("debug","destroy"),onFactSet:(l,f,d)=>{u("debug","fact.set",{key:l,value:f,prev:d})},onFactDelete:(l,f)=>{u("debug","fact.delete",{key:l,prev:f})},onFactsBatch:l=>{u("debug","facts.batch",{count:l.length,changes:l})},onDerivationCompute:(l,f,d)=>{u("debug","derivation.compute",{id:l,value:f,deps:d})},onDerivationInvalidate:l=>{u("debug","derivation.invalidate",{id:l})},onReconcileStart:()=>{u("debug","reconcile.start")},onReconcileEnd:l=>{u("debug","reconcile.end",{unmet:l.unmet.length,inflight:l.inflight.length,completed:l.completed.length,canceled:l.canceled.length})},onConstraintEvaluate:(l,f)=>{u("debug","constraint.evaluate",{id:l,active:f})},onConstraintError:(l,f)=>{u("error","constraint.error",{id:l,error:f})},onRequirementCreated:l=>{u("debug","requirement.created",{id:l.id,type:l.requirement.type})},onRequirementMet:(l,f)=>{u("info","requirement.met",{id:l.id,byResolver:f})},onRequirementCanceled:l=>{u("debug","requirement.canceled",{id:l.id})},onResolverStart:(l,f)=>{u("debug","resolver.start",{resolver:l,requirementId:f.id})},onResolverComplete:(l,f,d)=>{u("info","resolver.complete",{resolver:l,requirementId:f.id,duration:d})},onResolverError:(l,f,d)=>{u("error","resolver.error",{resolver:l,requirementId:f.id,error:d})},onResolverRetry:(l,f,d)=>{u("warn","resolver.retry",{resolver:l,requirementId:f.id,attempt:d})},onResolverCancel:(l,f)=>{u("debug","resolver.cancel",{resolver:l,requirementId:f.id})},onEffectRun:l=>{u("debug","effect.run",{id:l})},onEffectError:(l,f)=>{u("error","effect.error",{id:l,error:f})},onSnapshot:l=>{u("debug","timetravel.snapshot",{id:l.id,trigger:l.trigger})},onTimeTravel:(l,f)=>{u("info","timetravel.jump",{from:l,to:f})},onError:l=>{u("error","error",{source:l.source,sourceId:l.sourceId,message:l.message})},onErrorRecovery:(l,f)=>{u("warn","error.recovery",{source:l.source,sourceId:l.sourceId,strategy:f})}}}var ht=class{constructor(e){this.capacity=e,this.buf=new Array(e)}buf;head=0;_size=0;get size(){return this._size}push(e){this.buf[this.head]=e,this.head=(this.head+1)%this.capacity,this._size<this.capacity&&this._size++}toArray(){return this._size===0?[]:this._size<this.capacity?this.buf.slice(0,this._size):[...this.buf.slice(this.head),...this.buf.slice(0,this.head)]}clear(){this.buf=new Array(this.capacity),this.head=0,this._size=0}};function ze(){try{if(typeof process<"u")return!1}catch{}try{if(typeof import.meta<"u")return!1}catch{}return!0}function gt(e){try{if(e===void 0)return"undefined";if(e===null)return"null";if(typeof e=="bigint")return String(e)+"n";if(typeof e=="symbol")return String(e);if(typeof e=="object"){let r=JSON.stringify(e,(c,i)=>typeof i=="bigint"?String(i)+"n":typeof i=="symbol"?String(i):i);return r.length>120?r.slice(0,117)+"...":r}return String(e)}catch{return"<error>"}}function de(e,r){return e.length<=r?e:e.slice(0,r-3)+"..."}function Se(e){try{return e.inspect()}catch{return null}}function Gt(e){try{return e==null||typeof e!="object"?e:JSON.parse(JSON.stringify(e))}catch{return null}}function Jt(e){return e===void 0?1e3:!Number.isFinite(e)||e<1?(ze()&&console.warn(`[directive:devtools] Invalid maxEvents value (${e}), using default 1000`),1e3):Math.floor(e)}function Yt(){return{reconcileCount:0,reconcileTotalMs:0,resolverStats:new Map,effectRunCount:0,effectErrorCount:0,lastReconcileStartMs:0}}var Xt=200,Ce=340,me=16,he=80,rt=2,nt=["#8b9aff","#4ade80","#fbbf24","#c084fc","#f472b6","#22d3ee"];function Qt(){return{entries:new ht(Xt),inflight:new Map}}function Zt(){return{derivationDeps:new Map,activeConstraints:new Set,recentlyChangedFacts:new Set,recentlyComputedDerivations:new Set,recentlyActiveConstraints:new Set,animationTimer:null}}var er=1e4,tr=100;function rr(){return{isRecording:!1,recordedEvents:[],snapshots:[]}}var nr=50,it=200,B={bg:"#1a1a2e",text:"#e0e0e0",accent:"#8b9aff",muted:"#b0b0d0",border:"#333",rowBorder:"#2a2a4a",green:"#4ade80",yellow:"#fbbf24",red:"#f87171",closeBtn:"#aaa",font:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"},Q={nodeW:90,nodeH:16,nodeGap:6,startY:16,colGap:20,fontSize:10,labelMaxChars:11};function ir(e,r,c,i){let o=!1,s={position:"fixed",zIndex:"99999",...r.includes("bottom")?{bottom:"12px"}:{top:"12px"},...r.includes("right")?{right:"12px"}:{left:"12px"}},u=document.createElement("style");u.textContent=`[data-directive-devtools] summary:focus-visible{outline:2px solid ${B.accent};outline-offset:2px;border-radius:2px}[data-directive-devtools] button:focus-visible{outline:2px solid ${B.accent};outline-offset:2px}`,document.head.appendChild(u);let l=document.createElement("button");l.setAttribute("aria-label","Open Directive DevTools"),l.setAttribute("aria-expanded",String(c)),l.title="Ctrl+Shift+D to toggle",Object.assign(l.style,{...s,background:B.bg,color:B.text,border:`1px solid ${B.border}`,borderRadius:"6px",padding:"10px 14px",minWidth:"44px",minHeight:"44px",cursor:"pointer",fontFamily:B.font,fontSize:"12px",display:c?"none":"block"}),l.textContent="Directive";let f=document.createElement("div");f.setAttribute("role","region"),f.setAttribute("aria-label","Directive DevTools"),f.setAttribute("data-directive-devtools",""),f.tabIndex=-1,Object.assign(f.style,{...s,background:B.bg,color:B.text,border:`1px solid ${B.border}`,borderRadius:"8px",padding:"12px",fontFamily:B.font,fontSize:"11px",maxWidth:"min(380px, calc(100vw - 24px))",maxHeight:"min(500px, calc(100vh - 24px))",overflow:"auto",boxShadow:"0 4px 20px rgba(0,0,0,0.5)",display:c?"block":"none"});let d=document.createElement("div");Object.assign(d.style,{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"});let p=document.createElement("strong");p.style.color=B.accent,p.textContent=e==="default"?"Directive DevTools":`DevTools (${e})`;let x=document.createElement("button");x.setAttribute("aria-label","Close DevTools"),Object.assign(x.style,{background:"none",border:"none",color:B.closeBtn,cursor:"pointer",fontSize:"16px",padding:"8px 12px",minWidth:"44px",minHeight:"44px",lineHeight:"1",display:"flex",alignItems:"center",justifyContent:"center"}),x.textContent="×",d.appendChild(p),d.appendChild(x),f.appendChild(d);let T=document.createElement("div");T.style.marginBottom="6px",T.setAttribute("aria-live","polite");let O=document.createElement("span");O.style.color=B.green,O.textContent="Settled",T.appendChild(O),f.appendChild(T);let M=document.createElement("div");Object.assign(M.style,{display:"none",marginBottom:"8px",padding:"4px 8px",background:"#252545",borderRadius:"4px",alignItems:"center",gap:"6px"});let D=document.createElement("button");Object.assign(D.style,{background:"none",border:`1px solid ${B.border}`,color:B.text,cursor:"pointer",padding:"4px 10px",borderRadius:"3px",fontFamily:B.font,fontSize:"11px",minWidth:"44px",minHeight:"44px"}),D.textContent="◀ Undo",D.disabled=!0;let R=document.createElement("button");Object.assign(R.style,{background:"none",border:`1px solid ${B.border}`,color:B.text,cursor:"pointer",padding:"4px 10px",borderRadius:"3px",fontFamily:B.font,fontSize:"11px",minWidth:"44px",minHeight:"44px"}),R.textContent="Redo ▶",R.disabled=!0;let A=document.createElement("span");A.style.color=B.muted,A.style.fontSize="10px",M.appendChild(D),M.appendChild(R),M.appendChild(A),f.appendChild(M);function F(U,G){let Y=document.createElement("details");G&&(Y.open=!0),Y.style.marginBottom="4px";let oe=document.createElement("summary");Object.assign(oe.style,{cursor:"pointer",color:B.accent,marginBottom:"4px"});let ue=document.createElement("span");oe.textContent=`${U} (`,oe.appendChild(ue),oe.appendChild(document.createTextNode(")")),ue.textContent="0",Y.appendChild(oe);let ce=document.createElement("table");Object.assign(ce.style,{width:"100%",borderCollapse:"collapse",fontSize:"11px"});let Fe=document.createElement("thead"),Ne=document.createElement("tr");for(let bt of["Key","Value"]){let be=document.createElement("th");be.scope="col",Object.assign(be.style,{textAlign:"left",padding:"2px 4px",color:B.accent}),be.textContent=bt,Ne.appendChild(be)}Fe.appendChild(Ne),ce.appendChild(Fe);let We=document.createElement("tbody");return ce.appendChild(We),Y.appendChild(ce),{details:Y,tbody:We,countSpan:ue}}function q(U,G){let Y=document.createElement("details");Y.style.marginBottom="4px";let oe=document.createElement("summary");Object.assign(oe.style,{cursor:"pointer",color:G,marginBottom:"4px"});let ue=document.createElement("span");oe.textContent=`${U} (`,oe.appendChild(ue),oe.appendChild(document.createTextNode(")")),ue.textContent="0",Y.appendChild(oe);let ce=document.createElement("ul");return Object.assign(ce.style,{margin:"0",paddingLeft:"16px"}),Y.appendChild(ce),{details:Y,list:ce,countSpan:ue}}let h=F("Facts",!0);f.appendChild(h.details);let E=F("Derivations",!1);f.appendChild(E.details);let v=q("Inflight",B.yellow);f.appendChild(v.details);let $=q("Unmet",B.red);f.appendChild($.details);let k=document.createElement("details");k.style.marginBottom="4px";let L=document.createElement("summary");Object.assign(L.style,{cursor:"pointer",color:B.accent,marginBottom:"4px"}),L.textContent="Performance",k.appendChild(L);let m=document.createElement("div");m.style.fontSize="10px",m.style.color=B.muted,m.textContent="No data yet",k.appendChild(m),f.appendChild(k);let b=document.createElement("details");b.style.marginBottom="4px";let w=document.createElement("summary");Object.assign(w.style,{cursor:"pointer",color:B.accent,marginBottom:"4px"}),w.textContent="Dependency Graph",b.appendChild(w);let I=document.createElementNS("http://www.w3.org/2000/svg","svg");I.setAttribute("width","100%"),I.setAttribute("height","120"),I.setAttribute("role","img"),I.setAttribute("aria-label","System dependency graph"),I.style.display="block",I.setAttribute("viewBox","0 0 460 120"),I.setAttribute("preserveAspectRatio","xMinYMin meet"),b.appendChild(I),f.appendChild(b);let N=document.createElement("details");N.style.marginBottom="4px";let K=document.createElement("summary");Object.assign(K.style,{cursor:"pointer",color:B.accent,marginBottom:"4px"}),K.textContent="Timeline",N.appendChild(K);let z=document.createElementNS("http://www.w3.org/2000/svg","svg");z.setAttribute("width","100%"),z.setAttribute("height","60"),z.setAttribute("role","img"),z.setAttribute("aria-label","Resolver execution timeline"),z.style.display="block",z.setAttribute("viewBox",`0 0 ${Ce} 60`),z.setAttribute("preserveAspectRatio","xMinYMin meet");let y=document.createElementNS("http://www.w3.org/2000/svg","text");y.setAttribute("x",String(Ce/2)),y.setAttribute("y","30"),y.setAttribute("text-anchor","middle"),y.setAttribute("fill",B.muted),y.setAttribute("font-size","10"),y.setAttribute("font-family",B.font),y.textContent="No resolver activity yet",z.appendChild(y),N.appendChild(z),f.appendChild(N);let C,t,n,a;if(i){let U=document.createElement("details");U.style.marginBottom="4px";let G=document.createElement("summary");Object.assign(G.style,{cursor:"pointer",color:B.accent,marginBottom:"4px"}),n=document.createElement("span"),n.textContent="0",G.textContent="Events (",G.appendChild(n),G.appendChild(document.createTextNode(")")),U.appendChild(G),t=document.createElement("div"),Object.assign(t.style,{maxHeight:"150px",overflow:"auto",fontSize:"10px"}),t.setAttribute("role","log"),t.setAttribute("aria-live","polite"),t.tabIndex=0;let Y=document.createElement("div");Y.style.color=B.muted,Y.style.padding="4px",Y.textContent="Waiting for events...",Y.className="dt-events-empty",t.appendChild(Y),U.appendChild(t),f.appendChild(U),C=U,a=document.createElement("div")}else C=document.createElement("details"),t=document.createElement("div"),n=document.createElement("span"),a=document.createElement("div"),a.style.fontSize="10px",a.style.color=B.muted,a.style.marginTop="4px",a.style.fontStyle="italic",a.textContent="Enable trace: true for event log",f.appendChild(a);let g=document.createElement("div");Object.assign(g.style,{display:"flex",gap:"6px",marginTop:"6px"});let S=document.createElement("button");Object.assign(S.style,{background:"none",border:`1px solid ${B.border}`,color:B.text,cursor:"pointer",padding:"8px 12px",borderRadius:"3px",fontFamily:B.font,fontSize:"10px",minWidth:"44px",minHeight:"44px"}),S.textContent="⏺ Record";let j=document.createElement("button");Object.assign(j.style,{background:"none",border:`1px solid ${B.border}`,color:B.text,cursor:"pointer",padding:"8px 12px",borderRadius:"3px",fontFamily:B.font,fontSize:"10px",minWidth:"44px",minHeight:"44px"}),j.textContent="⤓ Export",g.appendChild(S),g.appendChild(j),f.appendChild(g),f.addEventListener("wheel",U=>{let G=f,Y=G.scrollTop===0&&U.deltaY<0,oe=G.scrollTop+G.clientHeight>=G.scrollHeight&&U.deltaY>0;(Y||oe)&&U.preventDefault()},{passive:!1});let P=c,W=new Set;function _(){P=!0,f.style.display="block",l.style.display="none",l.setAttribute("aria-expanded","true"),x.focus()}function V(){P=!1,f.style.display="none",l.style.display="block",l.setAttribute("aria-expanded","false"),l.focus()}l.addEventListener("click",_),x.addEventListener("click",V);function J(U){U.key==="Escape"&&P&&V()}f.addEventListener("keydown",J);function re(U){U.key==="d"&&U.shiftKey&&(U.ctrlKey||U.metaKey)&&(U.preventDefault(),P?V():_())}document.addEventListener("keydown",re);function Z(){o||(document.body.appendChild(l),document.body.appendChild(f))}document.body?Z():document.addEventListener("DOMContentLoaded",Z,{once:!0});function X(){o=!0,l.removeEventListener("click",_),x.removeEventListener("click",V),f.removeEventListener("keydown",J),document.removeEventListener("keydown",re),document.removeEventListener("DOMContentLoaded",Z);for(let U of W)clearTimeout(U);W.clear(),l.remove(),f.remove(),u.remove()}return{refs:{container:f,toggleBtn:l,titleEl:p,statusEl:O,factsBody:h.tbody,factsCount:h.countSpan,derivBody:E.tbody,derivCount:E.countSpan,derivSection:E.details,inflightList:v.list,inflightSection:v.details,inflightCount:v.countSpan,unmetList:$.list,unmetSection:$.details,unmetCount:$.countSpan,perfSection:k,perfBody:m,timeTravelSection:M,timeTravelLabel:A,undoBtn:D,redoBtn:R,flowSection:b,flowSvg:I,timelineSection:N,timelineSvg:z,eventsSection:C,eventsList:t,eventsCount:n,traceHint:a,recordBtn:S,exportBtn:j},destroy:X,isOpen:()=>P,flashTimers:W}}function Ee(e,r,c,i,o,s){let u=gt(i),l=e.get(c);if(l){let f=l.cells;if(f[1]&&(f[1].textContent=u,o&&s)){let d=f[1];d.style.background="rgba(139, 154, 255, 0.25)";let p=setTimeout(()=>{d.style.background="",s.delete(p)},300);s.add(p)}}else{l=document.createElement("tr"),l.style.borderBottom=`1px solid ${B.rowBorder}`;let f=document.createElement("td");Object.assign(f.style,{padding:"2px 4px",color:B.muted}),f.textContent=c;let d=document.createElement("td");d.style.padding="2px 4px",d.textContent=u,l.appendChild(f),l.appendChild(d),r.appendChild(l),e.set(c,l)}}function or(e,r){let c=e.get(r);c&&(c.remove(),e.delete(r))}function Ae(e,r,c){if(e.inflightList.replaceChildren(),e.inflightCount.textContent=String(r.length),r.length>0)for(let i of r){let o=document.createElement("li");o.style.fontSize="11px",o.textContent=`${i.resolverId} (${i.id})`,e.inflightList.appendChild(o)}else{let i=document.createElement("li");i.style.fontSize="10px",i.style.color=B.muted,i.textContent="None",e.inflightList.appendChild(i)}if(e.unmetList.replaceChildren(),e.unmetCount.textContent=String(c.length),c.length>0)for(let i of c){let o=document.createElement("li");o.style.fontSize="11px",o.textContent=`${i.requirement.type} from ${i.fromConstraint}`,e.unmetList.appendChild(o)}else{let i=document.createElement("li");i.style.fontSize="10px",i.style.color=B.muted,i.textContent="None",e.unmetList.appendChild(i)}}function De(e,r,c){let i=r===0&&c===0;e.statusEl.style.color=i?B.green:B.yellow,e.statusEl.textContent=i?"Settled":"Working...",e.toggleBtn.textContent=i?"Directive":"Directive...",e.toggleBtn.setAttribute("aria-label",`Open Directive DevTools${i?"":" (system working)"}`)}function ot(e,r,c,i){let o=Object.keys(c.derive);if(e.derivCount.textContent=String(o.length),o.length===0){r.clear(),e.derivBody.replaceChildren();let u=document.createElement("tr"),l=document.createElement("td");l.colSpan=2,l.style.color=B.muted,l.style.fontSize="10px",l.textContent="No derivations defined",u.appendChild(l),e.derivBody.appendChild(u);return}let s=new Set(o);for(let[u,l]of r)s.has(u)||(l.remove(),r.delete(u));for(let u of o){let l;try{l=gt(c.read(u))}catch{l="<error>"}Ee(r,e.derivBody,u,l,!0,i)}}function sr(e,r,c,i){let o=e.eventsList.querySelector(".dt-events-empty");o&&o.remove();let s=document.createElement("div");Object.assign(s.style,{padding:"2px 4px",borderBottom:`1px solid ${B.rowBorder}`,fontFamily:"inherit"});let u=new Date,l=`${String(u.getHours()).padStart(2,"0")}:${String(u.getMinutes()).padStart(2,"0")}:${String(u.getSeconds()).padStart(2,"0")}.${String(u.getMilliseconds()).padStart(3,"0")}`,f;try{let T=JSON.stringify(c);f=de(T,60)}catch{f="{}"}let d=document.createElement("span");d.style.color=B.closeBtn,d.textContent=l;let p=document.createElement("span");p.style.color=B.accent,p.textContent=` ${r} `;let x=document.createElement("span");for(x.style.color=B.muted,x.textContent=f,s.appendChild(d),s.appendChild(p),s.appendChild(x),e.eventsList.prepend(s);e.eventsList.childElementCount>nr;)e.eventsList.lastElementChild?.remove();e.eventsCount.textContent=String(i)}function lr(e,r){e.perfBody.replaceChildren();let c=r.reconcileCount>0?(r.reconcileTotalMs/r.reconcileCount).toFixed(1):"—",i=[`Reconciles: ${r.reconcileCount}  (avg ${c}ms)`,`Effects: ${r.effectRunCount} run, ${r.effectErrorCount} errors`];for(let o of i){let s=document.createElement("div");s.style.marginBottom="2px",s.textContent=o,e.perfBody.appendChild(s)}if(r.resolverStats.size>0){let o=document.createElement("div");o.style.marginTop="4px",o.style.marginBottom="2px",o.style.color=B.accent,o.textContent="Resolvers:",e.perfBody.appendChild(o);let s=[...r.resolverStats.entries()].sort((u,l)=>l[1].totalMs-u[1].totalMs);for(let[u,l]of s){let f=l.count>0?(l.totalMs/l.count).toFixed(1):"0",d=document.createElement("div");d.style.paddingLeft="8px",d.textContent=`${u}: ${l.count}x, avg ${f}ms${l.errors>0?`, ${l.errors} err`:""}`,l.errors>0&&(d.style.color=B.red),e.perfBody.appendChild(d)}}}function st(e,r){let c=r.debug;if(!c){e.timeTravelSection.style.display="none";return}e.timeTravelSection.style.display="flex";let i=c.currentIndex,o=c.snapshots.length;e.timeTravelLabel.textContent=o>0?`${i+1} / ${o}`:"0 snapshots";let s=i>0,u=i<o-1;e.undoBtn.disabled=!s,e.undoBtn.style.opacity=s?"1":"0.4",e.redoBtn.disabled=!u,e.redoBtn.style.opacity=u?"1":"0.4"}function ar(e,r){e.undoBtn.addEventListener("click",()=>{r.debug&&r.debug.currentIndex>0&&r.debug.goBack(1)}),e.redoBtn.addEventListener("click",()=>{r.debug&&r.debug.currentIndex<r.debug.snapshots.length-1&&r.debug.goForward(1)})}var Oe=new WeakMap;function cr(e,r,c,i,o,s){return[e.join(","),r.join(","),c.map(u=>`${u.id}:${u.active}`).join(","),[...i.entries()].map(([u,l])=>`${u}:${l.status}:${l.type}`).join(","),o.join(","),s.join(",")].join("|")}function ur(e,r,c,i,o){for(let s of c){let u=e.nodes.get(`0:${s}`);if(!u)continue;let l=r.recentlyChangedFacts.has(s);u.rect.setAttribute("fill",l?B.text+"33":"none"),u.rect.setAttribute("stroke-width",l?"2":"1")}for(let s of i){let u=e.nodes.get(`1:${s}`);if(!u)continue;let l=r.recentlyComputedDerivations.has(s);u.rect.setAttribute("fill",l?B.accent+"33":"none"),u.rect.setAttribute("stroke-width",l?"2":"1")}for(let s of o){let u=e.nodes.get(`2:${s}`);if(!u)continue;let l=r.recentlyActiveConstraints.has(s),f=u.rect.getAttribute("stroke")??B.muted;u.rect.setAttribute("fill",l?f+"33":"none"),u.rect.setAttribute("stroke-width",l?"2":"1")}}function lt(e,r,c){let i=Se(r);if(!i)return;let o;try{o=Object.keys(r.facts.$store.toObject())}catch{o=[]}let s=Object.keys(r.derive),u=i.constraints,l=i.unmet,f=i.inflight,d=Object.keys(i.resolvers),p=new Map;for(let y of l)p.set(y.id,{type:y.requirement.type,fromConstraint:y.fromConstraint,status:"unmet"});for(let y of f)p.set(y.id,{type:y.resolverId,fromConstraint:"",status:"inflight"});if(o.length===0&&s.length===0&&u.length===0&&d.length===0){Oe.delete(e.flowSvg),e.flowSvg.replaceChildren(),e.flowSvg.setAttribute("viewBox","0 0 460 40");let y=document.createElementNS("http://www.w3.org/2000/svg","text");y.setAttribute("x","230"),y.setAttribute("y","24"),y.setAttribute("text-anchor","middle"),y.setAttribute("fill",B.muted),y.setAttribute("font-size","10"),y.setAttribute("font-family",B.font),y.textContent="No system topology",e.flowSvg.appendChild(y);return}let x=f.map(y=>y.resolverId).sort(),T=cr(o,s,u,p,d,x),O=Oe.get(e.flowSvg);if(O&&O.fingerprint===T){ur(O,c,o,s,u.map(y=>y.id));return}let M=Q.nodeW+Q.colGap,D=[5,5+M,5+M*2,5+M*3,5+M*4],R=D[4]+Q.nodeW+5;function A(y){let C=Q.startY+12;return y.map(t=>{let n={...t,y:C};return C+=Q.nodeH+Q.nodeGap,n})}let F=A(o.map(y=>({id:y,label:de(y,Q.labelMaxChars)}))),q=A(s.map(y=>({id:y,label:de(y,Q.labelMaxChars)}))),h=A(u.map(y=>({id:y.id,label:de(y.id,Q.labelMaxChars),active:y.active,priority:y.priority}))),E=A([...p.entries()].map(([y,C])=>({id:y,type:C.type,fromConstraint:C.fromConstraint,status:C.status}))),v=A(d.map(y=>({id:y,label:de(y,Q.labelMaxChars)}))),$=Math.max(F.length,q.length,h.length,E.length,v.length,1),k=Q.startY+12+$*(Q.nodeH+Q.nodeGap)+8;e.flowSvg.replaceChildren(),e.flowSvg.setAttribute("viewBox",`0 0 ${R} ${k}`),e.flowSvg.setAttribute("aria-label",`Dependency graph: ${o.length} facts, ${s.length} derivations, ${u.length} constraints, ${p.size} requirements, ${d.length} resolvers`);let L=["Facts","Derivations","Constraints","Reqs","Resolvers"];for(let[y,C]of L.entries()){let t=document.createElementNS("http://www.w3.org/2000/svg","text");t.setAttribute("x",String(D[y]??0)),t.setAttribute("y","10"),t.setAttribute("fill",B.accent),t.setAttribute("font-size",String(Q.fontSize)),t.setAttribute("font-family",B.font),t.textContent=C,e.flowSvg.appendChild(t)}let m={fingerprint:T,nodes:new Map};function b(y,C,t,n,a,g,S,j){let P=document.createElementNS("http://www.w3.org/2000/svg","g"),W=document.createElementNS("http://www.w3.org/2000/svg","rect");W.setAttribute("x",String(C)),W.setAttribute("y",String(t-6)),W.setAttribute("width",String(Q.nodeW)),W.setAttribute("height",String(Q.nodeH)),W.setAttribute("rx","3"),W.setAttribute("fill",j?g+"33":"none"),W.setAttribute("stroke",g),W.setAttribute("stroke-width",j?"2":"1"),W.setAttribute("opacity",S?"0.35":"1"),P.appendChild(W);let _=document.createElementNS("http://www.w3.org/2000/svg","text");return _.setAttribute("x",String(C+4)),_.setAttribute("y",String(t+4)),_.setAttribute("fill",g),_.setAttribute("font-size",String(Q.fontSize)),_.setAttribute("font-family",B.font),_.setAttribute("opacity",S?"0.35":"1"),_.textContent=a,P.appendChild(_),e.flowSvg.appendChild(P),m.nodes.set(`${y}:${n}`,{g:P,rect:W,text:_}),{midX:C+Q.nodeW/2,midY:t}}function w(y,C,t,n,a,g){let S=document.createElementNS("http://www.w3.org/2000/svg","line");S.setAttribute("x1",String(y)),S.setAttribute("y1",String(C)),S.setAttribute("x2",String(t)),S.setAttribute("y2",String(n)),S.setAttribute("stroke",a),S.setAttribute("stroke-width","1"),S.setAttribute("stroke-dasharray","3,2"),S.setAttribute("opacity","0.7"),e.flowSvg.appendChild(S)}let I=new Map,N=new Map,K=new Map,z=new Map;for(let y of F){let C=c.recentlyChangedFacts.has(y.id),t=b(0,D[0],y.y,y.id,y.label,B.text,!1,C);I.set(y.id,t)}for(let y of q){let C=c.recentlyComputedDerivations.has(y.id),t=b(1,D[1],y.y,y.id,y.label,B.accent,!1,C);N.set(y.id,t)}for(let y of h){let C=c.recentlyActiveConstraints.has(y.id),t=b(2,D[2],y.y,y.id,y.label,y.active?B.yellow:B.muted,!y.active,C);K.set(y.id,t)}for(let y of E){let C=y.status==="unmet"?B.red:B.yellow,t=b(3,D[3],y.y,y.id,de(y.type,Q.labelMaxChars),C,!1,!1);z.set(y.id,t)}for(let y of v){let C=f.some(t=>t.resolverId===y.id);b(4,D[4],y.y,y.id,y.label,C?B.green:B.muted,!C,!1)}for(let y of q){let C=c.derivationDeps.get(y.id),t=N.get(y.id);if(C&&t)for(let n of C){let a=I.get(n);a&&w(a.midX+Q.nodeW/2,a.midY,t.midX-Q.nodeW/2,t.midY,B.accent)}}for(let y of E){let C=K.get(y.fromConstraint),t=z.get(y.id);C&&t&&w(C.midX+Q.nodeW/2,C.midY,t.midX-Q.nodeW/2,t.midY,B.muted)}for(let y of f){let C=z.get(y.id);if(C){let t=v.find(n=>n.id===y.resolverId);t&&w(C.midX+Q.nodeW/2,C.midY,D[4],t.y,B.green)}}Oe.set(e.flowSvg,m)}function dr(e){e.animationTimer&&clearTimeout(e.animationTimer),e.animationTimer=setTimeout(()=>{e.recentlyChangedFacts.clear(),e.recentlyComputedDerivations.clear(),e.recentlyActiveConstraints.clear(),e.animationTimer=null},600)}function fr(e,r){let c=r.entries.toArray();if(c.length===0)return;e.timelineSvg.replaceChildren();let i=1/0,o=-1/0;for(let O of c)O.startMs<i&&(i=O.startMs),O.endMs>o&&(o=O.endMs);let s=performance.now();for(let O of r.inflight.values())O<i&&(i=O),s>o&&(o=s);let u=o-i||1,l=Ce-he-10,f=[],d=new Set;for(let O of c)d.has(O.resolver)||(d.add(O.resolver),f.push(O.resolver));for(let O of r.inflight.keys())d.has(O)||(d.add(O),f.push(O));let p=f.slice(-12),x=me*p.length+20;e.timelineSvg.setAttribute("viewBox",`0 0 ${Ce} ${x}`),e.timelineSvg.setAttribute("height",String(Math.min(x,200)));let T=5;for(let O=0;O<=T;O++){let M=he+l*O/T,D=u*O/T,R=document.createElementNS("http://www.w3.org/2000/svg","text");R.setAttribute("x",String(M)),R.setAttribute("y","8"),R.setAttribute("fill",B.muted),R.setAttribute("font-size","6"),R.setAttribute("font-family",B.font),R.setAttribute("text-anchor","middle"),R.textContent=D<1e3?`${D.toFixed(0)}ms`:`${(D/1e3).toFixed(1)}s`,e.timelineSvg.appendChild(R);let A=document.createElementNS("http://www.w3.org/2000/svg","line");A.setAttribute("x1",String(M)),A.setAttribute("y1","10"),A.setAttribute("x2",String(M)),A.setAttribute("y2",String(x)),A.setAttribute("stroke",B.border),A.setAttribute("stroke-width","0.5"),e.timelineSvg.appendChild(A)}for(let O=0;O<p.length;O++){let M=p[O],D=12+O*me,R=O%nt.length,A=nt[R],F=document.createElementNS("http://www.w3.org/2000/svg","text");F.setAttribute("x",String(he-4)),F.setAttribute("y",String(D+me/2+3)),F.setAttribute("fill",B.muted),F.setAttribute("font-size","7"),F.setAttribute("font-family",B.font),F.setAttribute("text-anchor","end"),F.textContent=de(M,12),e.timelineSvg.appendChild(F);let q=c.filter(E=>E.resolver===M);for(let E of q){let v=he+(E.startMs-i)/u*l,$=Math.max((E.endMs-E.startMs)/u*l,rt),k=document.createElementNS("http://www.w3.org/2000/svg","rect");k.setAttribute("x",String(v)),k.setAttribute("y",String(D+2)),k.setAttribute("width",String($)),k.setAttribute("height",String(me-4)),k.setAttribute("rx","2"),k.setAttribute("fill",E.error?B.red:A),k.setAttribute("opacity","0.8");let L=document.createElementNS("http://www.w3.org/2000/svg","title"),m=E.endMs-E.startMs;L.textContent=`${M}: ${m.toFixed(1)}ms${E.error?" (error)":""}`,k.appendChild(L),e.timelineSvg.appendChild(k)}let h=r.inflight.get(M);if(h!==void 0){let E=he+(h-i)/u*l,v=Math.max((s-h)/u*l,rt),$=document.createElementNS("http://www.w3.org/2000/svg","rect");$.setAttribute("x",String(E)),$.setAttribute("y",String(D+2)),$.setAttribute("width",String(v)),$.setAttribute("height",String(me-4)),$.setAttribute("rx","2"),$.setAttribute("fill",A),$.setAttribute("opacity","0.4"),$.setAttribute("stroke",A),$.setAttribute("stroke-width","1"),$.setAttribute("stroke-dasharray","3,2");let k=document.createElementNS("http://www.w3.org/2000/svg","title");k.textContent=`${M}: inflight ${(s-h).toFixed(0)}ms`,$.appendChild(k),e.timelineSvg.appendChild($)}}e.timelineSvg.setAttribute("aria-label",`Timeline: ${c.length} resolver executions across ${p.length} resolvers`)}function pr(){if(typeof window>"u")return{systems:new Map,getSystem:()=>null,getSystems:()=>[],inspect:()=>null,getEvents:()=>[],explain:()=>null,exportSession:()=>null,importSession:()=>!1,clearEvents:()=>{},subscribe:()=>()=>{}};if(!window.__DIRECTIVE__){let e=new Map,r={systems:e,getSystem(c){return c?e.get(c)?.system??null:e.values().next().value?.system??null},getSystems(){return[...e.keys()]},inspect(c){return this.getSystem(c)?.inspect()??null},getEvents(c){return c?e.get(c)?.events.toArray()??[]:e.values().next().value?.events.toArray()??[]},explain(c,i){return this.getSystem(i)?.explain(c)??null},subscribe(c,i){let o=i?e.get(i):e.values().next().value;if(!o){let s=!1,u=setInterval(()=>{let f=i?e.get(i):e.values().next().value;f&&!s&&(s=!0,f.subscribers.add(c))},100),l=setTimeout(()=>clearInterval(u),1e4);return()=>{clearInterval(u),clearTimeout(l);for(let f of e.values())f.subscribers.delete(c)}}return o.subscribers.add(c),()=>{o.subscribers.delete(c)}},exportSession(c){let i=c?e.get(c):e.values().next().value;return i?JSON.stringify({version:1,name:c??e.keys().next().value??"default",exportedAt:Date.now(),events:i.events.toArray()}):null},importSession(c,i){try{if(c.length>10*1024*1024)return!1;let o=JSON.parse(c);if(!o||typeof o!="object"||Array.isArray(o)||!Array.isArray(o.events))return!1;let s=i?e.get(i):e.values().next().value;if(!s)return!1;let u=s.maxEvents,l=o.events,f=l.length>u?l.length-u:0;s.events.clear();for(let d=f;d<l.length;d++){let p=l[d];p&&typeof p=="object"&&!Array.isArray(p)&&typeof p.timestamp=="number"&&typeof p.type=="string"&&p.type!=="__proto__"&&p.type!=="constructor"&&p.type!=="prototype"&&s.events.push({timestamp:p.timestamp,type:p.type,data:p.data??null})}return!0}catch{return!1}},clearEvents(c){let i=c?e.get(c):e.values().next().value;i&&i.events.clear()}};return Object.defineProperty(window,"__DIRECTIVE__",{value:r,writable:!1,configurable:ze(),enumerable:!0}),r}return window.__DIRECTIVE__}function mr(e={}){let{name:r="default",trace:c=!1,maxEvents:i,panel:o=!1,position:s="bottom-right",defaultOpen:u=!1}=e,l=Jt(i),f=pr(),d={system:null,events:new ht(l),maxEvents:l,subscribers:new Set};f.systems.set(r,d);let p=(n,a)=>{let g={timestamp:Date.now(),type:n,data:a};c&&d.events.push(g);for(let S of d.subscribers)try{S(g)}catch{}},x=null,T=new Map,O=new Map,M=Yt(),D=Zt(),R=rr(),A=Qt(),F=o&&typeof window<"u"&&typeof document<"u"&&ze(),q=null,h=0,E=1,v=2,$=4,k=8,L=16,m=32,b=64,w=128,I=new Map,N=new Set,K=null;function z(n){h|=n,q===null&&typeof requestAnimationFrame<"u"&&(q=requestAnimationFrame(y))}function y(){if(q=null,!x||!d.system){h=0;return}let n=x.refs,a=d.system,g=h;if(h=0,g&E){for(let S of N)or(T,S);N.clear();for(let[S,{value:j,flash:P}]of I)Ee(T,n.factsBody,S,j,P,x.flashTimers);I.clear(),n.factsCount.textContent=String(T.size)}if(g&v&&ot(n,O,a,x.flashTimers),g&k)if(K)De(n,K.inflight.length,K.unmet.length);else{let S=Se(a);S&&De(n,S.inflight.length,S.unmet.length)}if(g&$)if(K)Ae(n,K.inflight,K.unmet);else{let S=Se(a);S&&Ae(n,S.inflight,S.unmet)}g&L&&lr(n,M),g&m&&lt(n,a,D),g&b&&st(n,a),g&w&&fr(n,A)}function C(n,a){x&&c&&sr(x.refs,n,a,d.events.size)}function t(n,a){R.isRecording&&R.recordedEvents.length<er&&R.recordedEvents.push({timestamp:Date.now(),type:n,data:Gt(a)})}return{name:"devtools",onInit:n=>{if(d.system=n,p("init",{}),typeof window<"u"&&console.log(`%c[Directive Devtools]%c System "${r}" initialized. Access via window.__DIRECTIVE__`,"color: #7c3aed; font-weight: bold","color: inherit"),F){let a=d.system;x=ir(r,s,u,c);let g=x.refs;try{let j=a.facts.$store.toObject();for(let[P,W]of Object.entries(j))Ee(T,g.factsBody,P,W,!1);g.factsCount.textContent=String(Object.keys(j).length)}catch{}ot(g,O,a);let S=Se(a);S&&(De(g,S.inflight.length,S.unmet.length),Ae(g,S.inflight,S.unmet)),st(g,a),ar(g,a),lt(g,a,D),g.recordBtn.addEventListener("click",()=>{if(R.isRecording=!R.isRecording,g.recordBtn.textContent=R.isRecording?"⏹ Stop":"⏺ Record",g.recordBtn.style.color=R.isRecording?B.red:B.text,R.isRecording){R.recordedEvents=[],R.snapshots=[];try{R.snapshots.push({timestamp:Date.now(),facts:a.facts.$store.toObject()})}catch{}}}),g.exportBtn.addEventListener("click",()=>{let j=R.recordedEvents.length>0?R.recordedEvents:d.events.toArray(),P=JSON.stringify({version:1,name:r,exportedAt:Date.now(),events:j,snapshots:R.snapshots},null,2),W=new Blob([P],{type:"application/json"}),_=URL.createObjectURL(W),V=document.createElement("a");V.href=_,V.download=`directive-session-${r}-${Date.now()}.json`,V.click(),URL.revokeObjectURL(_)})}},onStart:n=>{p("start",{}),C("start",{}),t("start",{})},onStop:n=>{p("stop",{}),C("stop",{}),t("stop",{})},onDestroy:n=>{p("destroy",{}),f.systems.delete(r),q!==null&&typeof cancelAnimationFrame<"u"&&(cancelAnimationFrame(q),q=null),D.animationTimer&&clearTimeout(D.animationTimer),x&&(x.destroy(),x=null,T.clear(),O.clear())},onFactSet:(n,a,g)=>{p("fact.set",{key:n,value:a,prev:g}),t("fact.set",{key:n,value:a,prev:g}),D.recentlyChangedFacts.add(n),x&&d.system&&(I.set(n,{value:a,flash:!0}),N.delete(n),z(E),C("fact.set",{key:n,value:a}))},onFactDelete:(n,a)=>{p("fact.delete",{key:n,prev:a}),t("fact.delete",{key:n,prev:a}),x&&(N.add(n),I.delete(n),z(E),C("fact.delete",{key:n}))},onFactsBatch:n=>{if(p("facts.batch",{changes:n}),t("facts.batch",{count:n.length}),x&&d.system){for(let a of n)a.type==="delete"?(N.add(a.key),I.delete(a.key)):(D.recentlyChangedFacts.add(a.key),I.set(a.key,{value:a.value,flash:!0}),N.delete(a.key));z(E),C("facts.batch",{count:n.length})}},onDerivationCompute:(n,a,g)=>{p("derivation.compute",{id:n,value:a,deps:g}),t("derivation.compute",{id:n,deps:g}),D.derivationDeps.set(n,g),D.recentlyComputedDerivations.add(n),C("derivation.compute",{id:n,deps:g})},onDerivationInvalidate:n=>{p("derivation.invalidate",{id:n}),C("derivation.invalidate",{id:n})},onReconcileStart:n=>{p("reconcile.start",{}),M.lastReconcileStartMs=performance.now(),C("reconcile.start",{}),t("reconcile.start",{})},onReconcileEnd:n=>{if(p("reconcile.end",n),t("reconcile.end",{unmet:n.unmet.length,inflight:n.inflight.length,completed:n.completed.length}),M.lastReconcileStartMs>0){let a=performance.now()-M.lastReconcileStartMs;M.reconcileCount++,M.reconcileTotalMs+=a,M.lastReconcileStartMs=0}if(R.isRecording&&d.system&&R.snapshots.length<tr)try{R.snapshots.push({timestamp:Date.now(),facts:d.system.facts.$store.toObject()})}catch{}x&&d.system&&(K=n,dr(D),z(v|k|$|L|m|b),C("reconcile.end",{unmet:n.unmet.length,inflight:n.inflight.length}))},onConstraintEvaluate:(n,a)=>{p("constraint.evaluate",{id:n,active:a}),t("constraint.evaluate",{id:n,active:a}),a?(D.activeConstraints.add(n),D.recentlyActiveConstraints.add(n)):D.activeConstraints.delete(n),C("constraint.evaluate",{id:n,active:a})},onConstraintError:(n,a)=>{p("constraint.error",{id:n,error:String(a)}),C("constraint.error",{id:n,error:String(a)})},onRequirementCreated:n=>{p("requirement.created",{id:n.id,type:n.requirement.type}),t("requirement.created",{id:n.id,type:n.requirement.type}),C("requirement.created",{id:n.id,type:n.requirement.type})},onRequirementMet:(n,a)=>{p("requirement.met",{id:n.id,byResolver:a}),t("requirement.met",{id:n.id,byResolver:a}),C("requirement.met",{id:n.id,byResolver:a})},onRequirementCanceled:n=>{p("requirement.canceled",{id:n.id}),t("requirement.canceled",{id:n.id}),C("requirement.canceled",{id:n.id})},onResolverStart:(n,a)=>{p("resolver.start",{resolver:n,requirementId:a.id}),t("resolver.start",{resolver:n,requirementId:a.id}),A.inflight.set(n,performance.now()),x&&d.system&&(z($|k|w),C("resolver.start",{resolver:n,requirementId:a.id}))},onResolverComplete:(n,a,g)=>{p("resolver.complete",{resolver:n,requirementId:a.id,duration:g}),t("resolver.complete",{resolver:n,requirementId:a.id,duration:g});let S=M.resolverStats.get(n)??{count:0,totalMs:0,errors:0};if(S.count++,S.totalMs+=g,M.resolverStats.set(n,S),M.resolverStats.size>it){let P=M.resolverStats.keys().next().value;P!==void 0&&M.resolverStats.delete(P)}let j=A.inflight.get(n);A.inflight.delete(n),j!==void 0&&A.entries.push({resolver:n,startMs:j,endMs:performance.now(),error:!1}),x&&d.system&&(z($|k|L|w),C("resolver.complete",{resolver:n,duration:g}))},onResolverError:(n,a,g)=>{p("resolver.error",{resolver:n,requirementId:a.id,error:String(g)}),t("resolver.error",{resolver:n,requirementId:a.id,error:String(g)});let S=M.resolverStats.get(n)??{count:0,totalMs:0,errors:0};if(S.errors++,M.resolverStats.set(n,S),M.resolverStats.size>it){let P=M.resolverStats.keys().next().value;P!==void 0&&M.resolverStats.delete(P)}let j=A.inflight.get(n);A.inflight.delete(n),j!==void 0&&A.entries.push({resolver:n,startMs:j,endMs:performance.now(),error:!0}),x&&d.system&&(z($|k|L|w),C("resolver.error",{resolver:n,error:String(g)}))},onResolverRetry:(n,a,g)=>{p("resolver.retry",{resolver:n,requirementId:a.id,attempt:g}),t("resolver.retry",{resolver:n,requirementId:a.id,attempt:g}),C("resolver.retry",{resolver:n,attempt:g})},onResolverCancel:(n,a)=>{p("resolver.cancel",{resolver:n,requirementId:a.id}),t("resolver.cancel",{resolver:n,requirementId:a.id}),A.inflight.delete(n),C("resolver.cancel",{resolver:n})},onEffectRun:n=>{p("effect.run",{id:n}),t("effect.run",{id:n}),M.effectRunCount++,C("effect.run",{id:n})},onEffectError:(n,a)=>{p("effect.error",{id:n,error:String(a)}),M.effectErrorCount++,C("effect.error",{id:n,error:String(a)})},onSnapshot:n=>{p("timetravel.snapshot",{id:n.id,trigger:n.trigger}),x&&d.system&&z(b),C("timetravel.snapshot",{id:n.id,trigger:n.trigger})},onTimeTravel:(n,a)=>{if(p("timetravel.jump",{from:n,to:a}),t("timetravel.jump",{from:n,to:a}),x&&d.system){let g=d.system;try{let S=g.facts.$store.toObject();T.clear(),x.refs.factsBody.replaceChildren();for(let[j,P]of Object.entries(S))Ee(T,x.refs.factsBody,j,P,!1);x.refs.factsCount.textContent=String(Object.keys(S).length)}catch{}O.clear(),D.derivationDeps.clear(),x.refs.derivBody.replaceChildren(),K=null,z(v|k|$|m|b),C("timetravel.jump",{from:n,to:a})}},onError:n=>{p("error",{source:n.source,sourceId:n.sourceId,message:n.message}),t("error",{source:n.source,message:n.message}),C("error",{source:n.source,message:n.message})},onErrorRecovery:(n,a)=>{p("error.recovery",{source:n.source,sourceId:n.sourceId,strategy:a}),C("error.recovery",{source:n.source,strategy:a})}}}const Me=["technology","science","design","business"],at=["Introduction to","Advanced","Understanding","Building","Exploring","Mastering","The Future of","Practical","Deep Dive into","Getting Started with"],hr={technology:["Distributed Systems","WebAssembly","Edge Computing","Rust Programming","Container Orchestration","GraphQL APIs","Serverless Architecture","TypeScript Patterns","Micro-Frontends","WASM Runtimes"],science:["Quantum Computing","Neural Networks","Gene Editing","Climate Models","Protein Folding","Dark Matter","Synthetic Biology","Fusion Energy","Exoplanet Detection","Gravitational Waves"],design:["Design Systems","Motion Design","Accessibility","Color Theory","Typography","Layout Grids","Responsive Patterns","Icon Design","Dark Mode","Micro-Interactions"],business:["Market Strategy","Product Analytics","Growth Hacking","Team Scaling","OKR Frameworks","Revenue Models","Customer Retention","Pricing Strategy","Remote Culture","Lean Operations"]};function gr(e,r){const c=[];for(let i=0;i<e;i++){const o=r+i,s=Me[o%Me.length],u=hr[s],l=at[o%at.length],f=u[Math.floor(o/Me.length)%u.length];c.push({id:`item-${o}`,title:`${l} ${f}`,category:s})}return c}const yr=gr(100,1);function vr(e){return new Promise(r=>setTimeout(r,e))}async function ct(e,r,c){await vr(500);let i=yr;if(c.category!=="all"&&(i=i.filter(f=>f.category===c.category)),c.search.trim()!==""){const f=c.search.toLowerCase();i=i.filter(d=>d.title.toLowerCase().includes(f))}c.sortBy==="oldest"?i=[...i].reverse():c.sortBy==="title"&&(i=[...i].sort((f,d)=>f.title.localeCompare(d.title)));const o=e===""?0:parseInt(e,10),s=i.slice(o,o+r),u=o+r,l=u<i.length;return{items:s,nextCursor:l?String(u):"",hasMore:l}}const Pe={facts:{search:ee.string(),sortBy:ee.string(),category:ee.string()},events:{setSearch:{value:ee.string()},setSortBy:{value:ee.string()},setCategory:{value:ee.string()}}},br=dt("filters",{schema:Pe,init:e=>{e.search="",e.sortBy="newest",e.category="all"},events:{setSearch:(e,{value:r})=>{e.search=r},setSortBy:(e,{value:r})=>{e.sortBy=r},setCategory:(e,{value:r})=>{e.category=r}}}),Te={facts:{items:ee.object(),cursor:ee.string(),hasMore:ee.boolean(),isLoadingMore:ee.boolean(),scrollNearBottom:ee.boolean(),lastFilterHash:ee.string()},derivations:{totalLoaded:ee.number(),isEmpty:ee.boolean()},events:{setScrollNearBottom:{value:ee.boolean()}},requirements:{LOAD_PAGE:{cursor:ee.string(),search:ee.string(),sortBy:ee.string(),category:ee.string()},RESET_AND_LOAD:{search:ee.string(),sortBy:ee.string(),category:ee.string()}}},wr=dt("list",{schema:Te,crossModuleDeps:{filters:Pe},init:e=>{e.items=[],e.cursor="",e.hasMore=!0,e.isLoadingMore=!1,e.scrollNearBottom=!1,e.lastFilterHash=""},derive:{totalLoaded:e=>e.self.items.length,isEmpty:e=>e.self.items.length===0&&!e.self.hasMore},events:{setScrollNearBottom:(e,{value:r})=>{e.scrollNearBottom=r}},constraints:{loadMore:{when:e=>e.self.hasMore&&!e.self.isLoadingMore&&e.self.scrollNearBottom,require:e=>({type:"LOAD_PAGE",cursor:e.self.cursor,search:e.filters.search,sortBy:e.filters.sortBy,category:e.filters.category})},filterChanged:{when:e=>`${e.filters.search}|${e.filters.sortBy}|${e.filters.category}`!==e.self.lastFilterHash,require:e=>({type:"RESET_AND_LOAD",search:e.filters.search,sortBy:e.filters.sortBy,category:e.filters.category})}},resolvers:{loadPage:{requirement:"LOAD_PAGE",resolve:async(e,r)=>{r.facts.isLoadingMore=!0;try{const c=await ct(e.cursor,20,{search:e.search,sortBy:e.sortBy,category:e.category});r.facts.items=[...r.facts.items,...c.items],r.facts.cursor=c.nextCursor,r.facts.hasMore=c.hasMore}finally{r.facts.isLoadingMore=!1}}},resetAndLoad:{requirement:"RESET_AND_LOAD",resolve:async(e,r)=>{const c=`${e.search}|${e.sortBy}|${e.category}`;r.facts.items=[],r.facts.cursor="",r.facts.hasMore=!0,r.facts.isLoadingMore=!0,r.facts.lastFilterHash=c;try{const i=await ct("",20,{search:e.search,sortBy:e.sortBy,category:e.category});r.facts.items=i.items,r.facts.cursor=i.nextCursor,r.facts.hasMore=i.hasMore}finally{r.facts.isLoadingMore=!1}}}},effects:{observeScroll:{run:e=>{const r=document.getElementById("pg-scroll-sentinel");if(!r)return;const c=new IntersectionObserver(([i])=>{e.self.scrollNearBottom=i.isIntersecting},{rootMargin:"200px"});return c.observe(r),()=>c.disconnect()}}}}),pe=Nt({modules:{filters:br,list:wr},plugins:[Vt(),mr({name:"pagination"})]});pe.start();const Sr=[...Object.keys(Pe.facts).map(e=>`filters::${e}`),...Object.keys(Te.facts).map(e=>`list::${e}`),...Object.keys(Te.derivations??{}).map(e=>`list::${e}`)],Re=document.getElementById("pg-search"),yt=document.querySelectorAll("[data-category]"),Le=document.getElementById("pg-sort-select"),ut=document.getElementById("pg-item-list"),Er=document.getElementById("pg-loading"),ge=document.getElementById("pg-end-message"),xr={technology:"var(--brand-primary)",science:"var(--brand-success)",design:"var(--brand-warning)",business:"var(--brand-error)"};function $r(e){if(e.length===0){ut.innerHTML="";return}let r="";for(const c of e){const i=xr[c.category]??"var(--brand-text-dim)";r+=`
+  createSystem({ module: counterModule })`);
+  return Wt(r);
+}
+function Wt(e) {
+  const r = e.modules,
+    c = new Set(Object.keys(r)),
+    i = e.debug?.snapshotModules ? new Set(e.debug.snapshotModules) : null;
+  if (e.tickMs !== void 0 && e.tickMs <= 0)
+    throw new Error("[Directive] tickMs must be a positive number");
+  let o,
+    s = e.initOrder ?? "auto";
+  if (Array.isArray(s)) {
+    const h = s,
+      E = Object.keys(r).filter((v) => !h.includes(v));
+    if (E.length > 0)
+      throw new Error(
+        `[Directive] initOrder is missing modules: ${E.join(", ")}. All modules must be included in the explicit order.`,
+      );
+    o = h;
+  } else s === "declaration" ? (o = Object.keys(r)) : (o = Ft(r));
+  let u = e.debug,
+    l = e.errorBoundary;
+  e.zeroConfig &&
+    ((u = { timeTravel: !1, maxSnapshots: 100, ...e.debug }),
+    (l = {
+      onConstraintError: "skip",
+      onResolverError: "skip",
+      onEffectError: "skip",
+      onDerivationError: "skip",
+      ...e.errorBoundary,
+    }));
+  for (const h of Object.keys(r)) {
+    if (h.includes(H))
+      throw new Error(
+        `[Directive] Module name "${h}" contains the reserved separator "${H}". Module names cannot contain "${H}".`,
+      );
+    const E = r[h];
+    if (E) {
+      for (const v of Object.keys(E.schema.facts))
+        if (v.includes(H))
+          throw new Error(
+            `[Directive] Schema key "${v}" in module "${h}" contains the reserved separator "${H}". Schema keys cannot contain "${H}".`,
+          );
+    }
+  }
+  const f = [];
+  for (const h of o) {
+    const E = r[h];
+    if (!E) continue;
+    const v = E.crossModuleDeps && Object.keys(E.crossModuleDeps).length > 0,
+      $ = v ? Object.keys(E.crossModuleDeps) : [],
+      k = {};
+    for (const [y, C] of Object.entries(E.schema.facts)) k[`${h}${H}${y}`] = C;
+    const L = {};
+    if (E.schema.derivations)
+      for (const [y, C] of Object.entries(E.schema.derivations))
+        L[`${h}${H}${y}`] = C;
+    const m = {};
+    if (E.schema.events)
+      for (const [y, C] of Object.entries(E.schema.events))
+        m[`${h}${H}${y}`] = C;
+    const b = E.init
+        ? (y) => {
+            const C = ie(y, h);
+            E.init(C);
+          }
+        : void 0,
+      w = {};
+    if (E.derive)
+      for (const [y, C] of Object.entries(E.derive))
+        w[`${h}${H}${y}`] = (t, n) => {
+          const a = v ? le(t, h, $) : ie(t, h),
+            g = _e(n, h);
+          return C(a, g);
+        };
+    const I = {};
+    if (E.events)
+      for (const [y, C] of Object.entries(E.events))
+        I[`${h}${H}${y}`] = (t, n) => {
+          const a = ie(t, h);
+          C(a, n);
+        };
+    const N = {};
+    if (E.constraints)
+      for (const [y, C] of Object.entries(E.constraints)) {
+        const t = C;
+        N[`${h}${H}${y}`] = {
+          ...t,
+          deps: t.deps?.map((n) => `${h}${H}${n}`),
+          when: (n) => {
+            const a = v ? le(n, h, $) : ie(n, h);
+            return t.when(a);
+          },
+          require:
+            typeof t.require == "function"
+              ? (n) => {
+                  const a = v ? le(n, h, $) : ie(n, h);
+                  return t.require(a);
+                }
+              : t.require,
+        };
+      }
+    const K = {};
+    if (E.resolvers)
+      for (const [y, C] of Object.entries(E.resolvers)) {
+        const t = C;
+        K[`${h}${H}${y}`] = {
+          ...t,
+          resolve: async (n, a) => {
+            const g = ke(a.facts, r, () => Object.keys(r));
+            await t.resolve(n, { facts: g[h], signal: a.signal });
+          },
+        };
+      }
+    const z = {};
+    if (E.effects)
+      for (const [y, C] of Object.entries(E.effects)) {
+        const t = C;
+        z[`${h}${H}${y}`] = {
+          ...t,
+          run: (n, a) => {
+            const g = v ? le(n, h, $) : ie(n, h),
+              S = a ? (v ? le(a, h, $) : ie(a, h)) : void 0;
+            return t.run(g, S);
+          },
+          deps: t.deps?.map((n) => `${h}${H}${n}`),
+        };
+      }
+    f.push({
+      id: E.id,
+      schema: {
+        facts: k,
+        derivations: L,
+        events: m,
+        requirements: E.schema.requirements ?? {},
+      },
+      init: b,
+      derive: w,
+      events: I,
+      effects: z,
+      constraints: N,
+      resolvers: K,
+      hooks: E.hooks,
+      snapshotEvents:
+        i && !i.has(h) ? [] : E.snapshotEvents?.map((y) => `${h}${H}${y}`),
+    });
+  }
+  let d = null,
+    p = null;
+  function x(h) {
+    for (const [E, v] of Object.entries(h))
+      if (!ne.has(E) && c.has(E)) {
+        if (v && typeof v == "object" && !ve(v))
+          throw new Error(
+            `[Directive] initialFacts/hydrate for namespace "${E}" contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.`,
+          );
+        for (const [$, k] of Object.entries(v))
+          ne.has($) || (p.facts[`${E}${H}${$}`] = k);
+      }
+  }
+  p = mt({
+    modules: f.map((h) => ({
+      id: h.id,
+      schema: h.schema.facts,
+      requirements: h.schema.requirements,
+      init: h.init,
+      derive: h.derive,
+      events: h.events,
+      effects: h.effects,
+      constraints: h.constraints,
+      resolvers: h.resolvers,
+      hooks: h.hooks,
+      snapshotEvents: h.snapshotEvents,
+    })),
+    plugins: e.plugins,
+    debug: u,
+    errorBoundary: l,
+    tickMs: e.tickMs,
+    onAfterModuleInit: () => {
+      e.initialFacts && x(e.initialFacts), d && (x(d), (d = null));
+    },
+  });
+  const T = new Map();
+  for (const h of Object.keys(r)) {
+    const E = r[h];
+    if (!E) continue;
+    const v = [];
+    for (const $ of Object.keys(E.schema.facts)) v.push(`${h}${H}${$}`);
+    if (E.schema.derivations)
+      for (const $ of Object.keys(E.schema.derivations)) v.push(`${h}${H}${$}`);
+    T.set(h, v);
+  }
+  const O = { names: null };
+  function M() {
+    return O.names === null && (O.names = Object.keys(r)), O.names;
+  }
+  let D = ke(p.facts, r, M),
+    R = Kt(p.derive, r, M),
+    A = Ht(p, r, M),
+    F = null,
+    q = e.tickMs;
+  return {
+    _mode: "namespaced",
+    facts: D,
+    debug: p.debug,
+    derive: R,
+    events: A,
+    constraints: p.constraints,
+    effects: p.effects,
+    get isRunning() {
+      return p.isRunning;
+    },
+    get isSettled() {
+      return p.isSettled;
+    },
+    get isInitialized() {
+      return p.isInitialized;
+    },
+    get isReady() {
+      return p.isReady;
+    },
+    whenReady: p.whenReady.bind(p),
+    async hydrate(h) {
+      if (p.isRunning)
+        throw new Error(
+          "[Directive] hydrate() must be called before start(). The system is already running.",
+        );
+      const E = await h();
+      E && typeof E == "object" && (d = E);
+    },
+    initialize() {
+      p.initialize();
+    },
+    start() {
+      if ((p.start(), q && q > 0)) {
+        const h = Object.keys(f[0]?.events ?? {}).find((E) =>
+          E.endsWith(`${H}tick`),
+        );
+        h &&
+          (F = setInterval(() => {
+            p.dispatch({ type: h });
+          }, q));
+      }
+    },
+    stop() {
+      F && (clearInterval(F), (F = null)), p.stop();
+    },
+    destroy() {
+      this.stop(), p.destroy();
+    },
+    dispatch(h) {
+      p.dispatch(h);
+    },
+    batch: p.batch.bind(p),
+    read(h) {
+      return p.read(ae(h));
+    },
+    subscribe(h, E) {
+      const v = [];
+      for (const $ of h)
+        if ($.endsWith(".*")) {
+          const k = $.slice(0, -2),
+            L = T.get(k);
+          L && v.push(...L);
+        } else v.push(ae($));
+      return p.subscribe(v, E);
+    },
+    subscribeModule(h, E) {
+      const v = T.get(h);
+      return !v || v.length === 0 ? () => {} : p.subscribe(v, E);
+    },
+    watch(h, E, v) {
+      return p.watch(ae(h), E, v);
+    },
+    when(h, E) {
+      return p.when(() => h(D), E);
+    },
+    onSettledChange: p.onSettledChange.bind(p),
+    onTimeTravelChange: p.onTimeTravelChange.bind(p),
+    inspect: p.inspect.bind(p),
+    settle: p.settle.bind(p),
+    explain: p.explain.bind(p),
+    getSnapshot: p.getSnapshot.bind(p),
+    restore: p.restore.bind(p),
+    getDistributableSnapshot(h) {
+      const E = {
+          ...h,
+          includeDerivations: h?.includeDerivations?.map(ae),
+          excludeDerivations: h?.excludeDerivations?.map(ae),
+          includeFacts: h?.includeFacts?.map(ae),
+        },
+        v = p.getDistributableSnapshot(E),
+        $ = {};
+      for (const [k, L] of Object.entries(v.data)) {
+        const m = k.indexOf(H);
+        if (m > 0) {
+          const b = k.slice(0, m),
+            w = k.slice(m + H.length);
+          $[b] || ($[b] = {}), ($[b][w] = L);
+        } else $._root || ($._root = {}), ($._root[k] = L);
+      }
+      return { ...v, data: $ };
+    },
+    watchDistributableSnapshot(h, E) {
+      const v = {
+        ...h,
+        includeDerivations: h?.includeDerivations?.map(ae),
+        excludeDerivations: h?.excludeDerivations?.map(ae),
+        includeFacts: h?.includeFacts?.map(ae),
+      };
+      return p.watchDistributableSnapshot(v, ($) => {
+        const k = {};
+        for (const [L, m] of Object.entries($.data)) {
+          const b = L.indexOf(H);
+          if (b > 0) {
+            const w = L.slice(0, b),
+              I = L.slice(b + H.length);
+            k[w] || (k[w] = {}), (k[w][I] = m);
+          } else k._root || (k._root = {}), (k._root[L] = m);
+        }
+        E({ ...$, data: k });
+      });
+    },
+    registerModule(h, E) {
+      if (c.has(h))
+        throw new Error(
+          `[Directive] Module namespace "${h}" already exists. Cannot register a duplicate namespace.`,
+        );
+      if (h.includes(H))
+        throw new Error(
+          `[Directive] Module name "${h}" contains the reserved separator "${H}".`,
+        );
+      if (ne.has(h))
+        throw new Error(
+          `[Directive] Module name "${h}" is a blocked property.`,
+        );
+      for (const y of Object.keys(E.schema.facts))
+        if (y.includes(H))
+          throw new Error(
+            `[Directive] Schema key "${y}" in module "${h}" contains the reserved separator "${H}".`,
+          );
+      const v = E,
+        $ = v.crossModuleDeps && Object.keys(v.crossModuleDeps).length > 0,
+        k = $ ? Object.keys(v.crossModuleDeps) : [],
+        L = {};
+      for (const [y, C] of Object.entries(v.schema.facts))
+        L[`${h}${H}${y}`] = C;
+      const m = v.init
+          ? (y) => {
+              const C = ie(y, h);
+              v.init(C);
+            }
+          : void 0,
+        b = {};
+      if (v.derive)
+        for (const [y, C] of Object.entries(v.derive))
+          b[`${h}${H}${y}`] = (t, n) => {
+            const a = $ ? le(t, h, k) : ie(t, h),
+              g = _e(n, h);
+            return C(a, g);
+          };
+      const w = {};
+      if (v.events)
+        for (const [y, C] of Object.entries(v.events))
+          w[`${h}${H}${y}`] = (t, n) => {
+            const a = ie(t, h);
+            C(a, n);
+          };
+      const I = {};
+      if (v.constraints)
+        for (const [y, C] of Object.entries(v.constraints)) {
+          const t = C;
+          I[`${h}${H}${y}`] = {
+            ...t,
+            deps: t.deps?.map((n) => `${h}${H}${n}`),
+            when: (n) => {
+              const a = $ ? le(n, h, k) : ie(n, h);
+              return t.when(a);
+            },
+            require:
+              typeof t.require == "function"
+                ? (n) => {
+                    const a = $ ? le(n, h, k) : ie(n, h);
+                    return t.require(a);
+                  }
+                : t.require,
+          };
+        }
+      const N = {};
+      if (v.resolvers)
+        for (const [y, C] of Object.entries(v.resolvers)) {
+          const t = C;
+          N[`${h}${H}${y}`] = {
+            ...t,
+            resolve: async (n, a) => {
+              const g = ke(a.facts, r, M);
+              await t.resolve(n, { facts: g[h], signal: a.signal });
+            },
+          };
+        }
+      const K = {};
+      if (v.effects)
+        for (const [y, C] of Object.entries(v.effects)) {
+          const t = C;
+          K[`${h}${H}${y}`] = {
+            ...t,
+            run: (n, a) => {
+              const g = $ ? le(n, h, k) : ie(n, h),
+                S = a ? ($ ? le(a, h, k) : ie(a, h)) : void 0;
+              return t.run(g, S);
+            },
+            deps: t.deps?.map((n) => `${h}${H}${n}`),
+          };
+        }
+      c.add(h), (r[h] = v), (O.names = null);
+      const z = [];
+      for (const y of Object.keys(v.schema.facts)) z.push(`${h}${H}${y}`);
+      if (v.schema.derivations)
+        for (const y of Object.keys(v.schema.derivations))
+          z.push(`${h}${H}${y}`);
+      T.set(h, z),
+        p.registerModule({
+          id: v.id,
+          schema: L,
+          requirements: v.schema.requirements ?? {},
+          init: m,
+          derive: Object.keys(b).length > 0 ? b : void 0,
+          events: Object.keys(w).length > 0 ? w : void 0,
+          effects: Object.keys(K).length > 0 ? K : void 0,
+          constraints: Object.keys(I).length > 0 ? I : void 0,
+          resolvers: Object.keys(N).length > 0 ? N : void 0,
+          hooks: v.hooks,
+          snapshotEvents:
+            i && !i.has(h) ? [] : v.snapshotEvents?.map((y) => `${h}${H}${y}`),
+        });
+    },
+  };
+}
+function ae(e) {
+  if (e.includes(".")) {
+    const [r, ...c] = e.split(".");
+    return `${r}${H}${c.join(H)}`;
+  }
+  return e;
+}
+function ie(e, r) {
+  let c = Je.get(e);
+  if (c) {
+    const o = c.get(r);
+    if (o) return o;
+  } else (c = new Map()), Je.set(e, c);
+  const i = new Proxy(
+    {},
+    {
+      get(o, s) {
+        if (typeof s != "symbol" && !ne.has(s))
+          return s === "$store" || s === "$snapshot" ? e[s] : e[`${r}${H}${s}`];
+      },
+      set(o, s, u) {
+        return typeof s == "symbol" || ne.has(s)
+          ? !1
+          : ((e[`${r}${H}${s}`] = u), !0);
+      },
+      has(o, s) {
+        return typeof s == "symbol" || ne.has(s) ? !1 : `${r}${H}${s}` in e;
+      },
+      deleteProperty(o, s) {
+        return typeof s == "symbol" || ne.has(s)
+          ? !1
+          : (delete e[`${r}${H}${s}`], !0);
+      },
+    },
+  );
+  return c.set(r, i), i;
+}
+function ke(e, r, c) {
+  const i = Ye.get(e);
+  if (i) return i;
+  const o = new Proxy(
+    {},
+    {
+      get(s, u) {
+        if (typeof u != "symbol" && !ne.has(u) && Object.hasOwn(r, u))
+          return ie(e, u);
+      },
+      has(s, u) {
+        return typeof u == "symbol" || ne.has(u) ? !1 : Object.hasOwn(r, u);
+      },
+      ownKeys() {
+        return c();
+      },
+      getOwnPropertyDescriptor(s, u) {
+        if (typeof u != "symbol" && Object.hasOwn(r, u))
+          return { configurable: !0, enumerable: !0 };
+      },
+    },
+  );
+  return Ye.set(e, o), o;
+}
+var Ze = new WeakMap();
+function le(e, r, c) {
+  let i = `${r}:${JSON.stringify([...c].sort())}`,
+    o = Ze.get(e);
+  if (o) {
+    const f = o.get(i);
+    if (f) return f;
+  } else (o = new Map()), Ze.set(e, o);
+  const s = new Set(c),
+    u = ["self", ...c],
+    l = new Proxy(
+      {},
+      {
+        get(f, d) {
+          if (typeof d != "symbol" && !ne.has(d)) {
+            if (d === "self") return ie(e, r);
+            if (s.has(d)) return ie(e, d);
+          }
+        },
+        has(f, d) {
+          return typeof d == "symbol" || ne.has(d)
+            ? !1
+            : d === "self" || s.has(d);
+        },
+        ownKeys() {
+          return u;
+        },
+        getOwnPropertyDescriptor(f, d) {
+          if (typeof d != "symbol" && (d === "self" || s.has(d)))
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    );
+  return o.set(i, l), l;
+}
+function _e(e, r) {
+  let c = Qe.get(e);
+  if (c) {
+    const o = c.get(r);
+    if (o) return o;
+  } else (c = new Map()), Qe.set(e, c);
+  const i = new Proxy(
+    {},
+    {
+      get(o, s) {
+        if (typeof s != "symbol" && !ne.has(s)) return e[`${r}${H}${s}`];
+      },
+      has(o, s) {
+        return typeof s == "symbol" || ne.has(s) ? !1 : `${r}${H}${s}` in e;
+      },
+    },
+  );
+  return c.set(r, i), i;
+}
+function Kt(e, r, c) {
+  const i = Xe.get(e);
+  if (i) return i;
+  const o = new Proxy(
+    {},
+    {
+      get(s, u) {
+        if (typeof u != "symbol" && !ne.has(u) && Object.hasOwn(r, u))
+          return _e(e, u);
+      },
+      has(s, u) {
+        return typeof u == "symbol" || ne.has(u) ? !1 : Object.hasOwn(r, u);
+      },
+      ownKeys() {
+        return c();
+      },
+      getOwnPropertyDescriptor(s, u) {
+        if (typeof u != "symbol" && Object.hasOwn(r, u))
+          return { configurable: !0, enumerable: !0 };
+      },
+    },
+  );
+  return Xe.set(e, o), o;
+}
+var et = new WeakMap();
+function Ht(e, r, c) {
+  let i = et.get(e);
+  return (
+    i || ((i = new Map()), et.set(e, i)),
+    new Proxy(
+      {},
+      {
+        get(o, s) {
+          if (typeof s == "symbol" || ne.has(s) || !Object.hasOwn(r, s)) return;
+          const u = i.get(s);
+          if (u) return u;
+          const l = new Proxy(
+            {},
+            {
+              get(f, d) {
+                if (typeof d != "symbol" && !ne.has(d))
+                  return (p) => {
+                    e.dispatch({ type: `${s}${H}${d}`, ...p });
+                  };
+              },
+            },
+          );
+          return i.set(s, l), l;
+        },
+        has(o, s) {
+          return typeof s == "symbol" || ne.has(s) ? !1 : Object.hasOwn(r, s);
+        },
+        ownKeys() {
+          return c();
+        },
+        getOwnPropertyDescriptor(o, s) {
+          if (typeof s != "symbol" && Object.hasOwn(r, s))
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    )
+  );
+}
+function Ut(e) {
+  const r = e.module;
+  if (!r)
+    throw new Error(
+      "[Directive] createSystem requires a module. Got: " + typeof r,
+    );
+  if (e.tickMs !== void 0 && e.tickMs <= 0)
+    throw new Error("[Directive] tickMs must be a positive number");
+  if (e.initialFacts && !ve(e.initialFacts))
+    throw new Error(
+      "[Directive] initialFacts contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.",
+    );
+  let c = e.debug,
+    i = e.errorBoundary;
+  e.zeroConfig &&
+    ((c = { timeTravel: !1, maxSnapshots: 100, ...e.debug }),
+    (i = {
+      onConstraintError: "skip",
+      onResolverError: "skip",
+      onEffectError: "skip",
+      onDerivationError: "skip",
+      ...e.errorBoundary,
+    }));
+  let o = null,
+    s = null;
+  s = mt({
+    modules: [
+      {
+        id: r.id,
+        schema: r.schema.facts,
+        requirements: r.schema.requirements,
+        init: r.init,
+        derive: r.derive,
+        events: r.events,
+        effects: r.effects,
+        constraints: r.constraints,
+        resolvers: r.resolvers,
+        hooks: r.hooks,
+        snapshotEvents: r.snapshotEvents,
+      },
+    ],
+    plugins: e.plugins,
+    debug: c,
+    errorBoundary: i,
+    tickMs: e.tickMs,
+    onAfterModuleInit: () => {
+      if (e.initialFacts)
+        for (const [d, p] of Object.entries(e.initialFacts))
+          ne.has(d) || (s.facts[d] = p);
+      if (o) {
+        for (const [d, p] of Object.entries(o)) ne.has(d) || (s.facts[d] = p);
+        o = null;
+      }
+    },
+  });
+  let u = new Proxy(
+      {},
+      {
+        get(d, p) {
+          if (typeof p != "symbol" && !ne.has(p))
+            return (x) => {
+              s.dispatch({ type: p, ...x });
+            };
+        },
+      },
+    ),
+    l = null,
+    f = e.tickMs;
+  return {
+    _mode: "single",
+    facts: s.facts,
+    debug: s.debug,
+    derive: s.derive,
+    events: u,
+    constraints: s.constraints,
+    effects: s.effects,
+    get isRunning() {
+      return s.isRunning;
+    },
+    get isSettled() {
+      return s.isSettled;
+    },
+    get isInitialized() {
+      return s.isInitialized;
+    },
+    get isReady() {
+      return s.isReady;
+    },
+    whenReady: s.whenReady.bind(s),
+    async hydrate(d) {
+      if (s.isRunning)
+        throw new Error(
+          "[Directive] hydrate() must be called before start(). The system is already running.",
+        );
+      const p = await d();
+      p && typeof p == "object" && (o = p);
+    },
+    initialize() {
+      s.initialize();
+    },
+    start() {
+      s.start(),
+        f &&
+          f > 0 &&
+          r.events &&
+          "tick" in r.events &&
+          (l = setInterval(() => {
+            s.dispatch({ type: "tick" });
+          }, f));
+    },
+    stop() {
+      l && (clearInterval(l), (l = null)), s.stop();
+    },
+    destroy() {
+      this.stop(), s.destroy();
+    },
+    dispatch(d) {
+      s.dispatch(d);
+    },
+    batch: s.batch.bind(s),
+    read(d) {
+      return s.read(d);
+    },
+    subscribe(d, p) {
+      return s.subscribe(d, p);
+    },
+    watch(d, p, x) {
+      return s.watch(d, p, x);
+    },
+    when(d, p) {
+      return s.when(d, p);
+    },
+    onSettledChange: s.onSettledChange.bind(s),
+    onTimeTravelChange: s.onTimeTravelChange.bind(s),
+    inspect: s.inspect.bind(s),
+    settle: s.settle.bind(s),
+    explain: s.explain.bind(s),
+    getSnapshot: s.getSnapshot.bind(s),
+    restore: s.restore.bind(s),
+    getDistributableSnapshot: s.getDistributableSnapshot.bind(s),
+    watchDistributableSnapshot: s.watchDistributableSnapshot.bind(s),
+    registerModule(d) {
+      s.registerModule({
+        id: d.id,
+        schema: d.schema.facts,
+        requirements: d.schema.requirements,
+        init: d.init,
+        derive: d.derive,
+        events: d.events,
+        effects: d.effects,
+        constraints: d.constraints,
+        resolvers: d.resolvers,
+        hooks: d.hooks,
+        snapshotEvents: d.snapshotEvents,
+      });
+    },
+  };
+}
+var tt = { debug: 0, info: 1, warn: 2, error: 3 };
+function Vt(e = {}) {
+  const {
+      level: r = "info",
+      filter: c = () => !0,
+      logger: i = console,
+      prefix: o = "[Directive]",
+    } = e,
+    s = tt[r],
+    u = (l, f, ...d) => {
+      tt[l] < s || (c(f) && i[l](`${o} ${f}`, ...d));
+    };
+  return {
+    name: "logging",
+    onInit: () => u("debug", "init"),
+    onStart: () => u("info", "start"),
+    onStop: () => u("info", "stop"),
+    onDestroy: () => u("debug", "destroy"),
+    onFactSet: (l, f, d) => {
+      u("debug", "fact.set", { key: l, value: f, prev: d });
+    },
+    onFactDelete: (l, f) => {
+      u("debug", "fact.delete", { key: l, prev: f });
+    },
+    onFactsBatch: (l) => {
+      u("debug", "facts.batch", { count: l.length, changes: l });
+    },
+    onDerivationCompute: (l, f, d) => {
+      u("debug", "derivation.compute", { id: l, value: f, deps: d });
+    },
+    onDerivationInvalidate: (l) => {
+      u("debug", "derivation.invalidate", { id: l });
+    },
+    onReconcileStart: () => {
+      u("debug", "reconcile.start");
+    },
+    onReconcileEnd: (l) => {
+      u("debug", "reconcile.end", {
+        unmet: l.unmet.length,
+        inflight: l.inflight.length,
+        completed: l.completed.length,
+        canceled: l.canceled.length,
+      });
+    },
+    onConstraintEvaluate: (l, f) => {
+      u("debug", "constraint.evaluate", { id: l, active: f });
+    },
+    onConstraintError: (l, f) => {
+      u("error", "constraint.error", { id: l, error: f });
+    },
+    onRequirementCreated: (l) => {
+      u("debug", "requirement.created", { id: l.id, type: l.requirement.type });
+    },
+    onRequirementMet: (l, f) => {
+      u("info", "requirement.met", { id: l.id, byResolver: f });
+    },
+    onRequirementCanceled: (l) => {
+      u("debug", "requirement.canceled", { id: l.id });
+    },
+    onResolverStart: (l, f) => {
+      u("debug", "resolver.start", { resolver: l, requirementId: f.id });
+    },
+    onResolverComplete: (l, f, d) => {
+      u("info", "resolver.complete", {
+        resolver: l,
+        requirementId: f.id,
+        duration: d,
+      });
+    },
+    onResolverError: (l, f, d) => {
+      u("error", "resolver.error", {
+        resolver: l,
+        requirementId: f.id,
+        error: d,
+      });
+    },
+    onResolverRetry: (l, f, d) => {
+      u("warn", "resolver.retry", {
+        resolver: l,
+        requirementId: f.id,
+        attempt: d,
+      });
+    },
+    onResolverCancel: (l, f) => {
+      u("debug", "resolver.cancel", { resolver: l, requirementId: f.id });
+    },
+    onEffectRun: (l) => {
+      u("debug", "effect.run", { id: l });
+    },
+    onEffectError: (l, f) => {
+      u("error", "effect.error", { id: l, error: f });
+    },
+    onSnapshot: (l) => {
+      u("debug", "timetravel.snapshot", { id: l.id, trigger: l.trigger });
+    },
+    onTimeTravel: (l, f) => {
+      u("info", "timetravel.jump", { from: l, to: f });
+    },
+    onError: (l) => {
+      u("error", "error", {
+        source: l.source,
+        sourceId: l.sourceId,
+        message: l.message,
+      });
+    },
+    onErrorRecovery: (l, f) => {
+      u("warn", "error.recovery", {
+        source: l.source,
+        sourceId: l.sourceId,
+        strategy: f,
+      });
+    },
+  };
+}
+var ht = class {
+  constructor(e) {
+    (this.capacity = e), (this.buf = new Array(e));
+  }
+  buf;
+  head = 0;
+  _size = 0;
+  get size() {
+    return this._size;
+  }
+  push(e) {
+    (this.buf[this.head] = e),
+      (this.head = (this.head + 1) % this.capacity),
+      this._size < this.capacity && this._size++;
+  }
+  toArray() {
+    return this._size === 0
+      ? []
+      : this._size < this.capacity
+        ? this.buf.slice(0, this._size)
+        : [...this.buf.slice(this.head), ...this.buf.slice(0, this.head)];
+  }
+  clear() {
+    (this.buf = new Array(this.capacity)), (this.head = 0), (this._size = 0);
+  }
+};
+function ze() {
+  try {
+    if (typeof process < "u") return !1;
+  } catch {}
+  try {
+    if (typeof import.meta < "u") return !1;
+  } catch {}
+  return !0;
+}
+function gt(e) {
+  try {
+    if (e === void 0) return "undefined";
+    if (e === null) return "null";
+    if (typeof e == "bigint") return String(e) + "n";
+    if (typeof e == "symbol") return String(e);
+    if (typeof e == "object") {
+      const r = JSON.stringify(e, (c, i) =>
+        typeof i == "bigint"
+          ? String(i) + "n"
+          : typeof i == "symbol"
+            ? String(i)
+            : i,
+      );
+      return r.length > 120 ? r.slice(0, 117) + "..." : r;
+    }
+    return String(e);
+  } catch {
+    return "<error>";
+  }
+}
+function de(e, r) {
+  return e.length <= r ? e : e.slice(0, r - 3) + "...";
+}
+function Se(e) {
+  try {
+    return e.inspect();
+  } catch {
+    return null;
+  }
+}
+function Gt(e) {
+  try {
+    return e == null || typeof e != "object"
+      ? e
+      : JSON.parse(JSON.stringify(e));
+  } catch {
+    return null;
+  }
+}
+function Jt(e) {
+  return e === void 0
+    ? 1e3
+    : !Number.isFinite(e) || e < 1
+      ? (ze() &&
+          console.warn(
+            `[directive:devtools] Invalid maxEvents value (${e}), using default 1000`,
+          ),
+        1e3)
+      : Math.floor(e);
+}
+function Yt() {
+  return {
+    reconcileCount: 0,
+    reconcileTotalMs: 0,
+    resolverStats: new Map(),
+    effectRunCount: 0,
+    effectErrorCount: 0,
+    lastReconcileStartMs: 0,
+  };
+}
+var Xt = 200,
+  Ce = 340,
+  me = 16,
+  he = 80,
+  rt = 2,
+  nt = ["#8b9aff", "#4ade80", "#fbbf24", "#c084fc", "#f472b6", "#22d3ee"];
+function Qt() {
+  return { entries: new ht(Xt), inflight: new Map() };
+}
+function Zt() {
+  return {
+    derivationDeps: new Map(),
+    activeConstraints: new Set(),
+    recentlyChangedFacts: new Set(),
+    recentlyComputedDerivations: new Set(),
+    recentlyActiveConstraints: new Set(),
+    animationTimer: null,
+  };
+}
+var er = 1e4,
+  tr = 100;
+function rr() {
+  return { isRecording: !1, recordedEvents: [], snapshots: [] };
+}
+var nr = 50,
+  it = 200,
+  B = {
+    bg: "#1a1a2e",
+    text: "#e0e0e0",
+    accent: "#8b9aff",
+    muted: "#b0b0d0",
+    border: "#333",
+    rowBorder: "#2a2a4a",
+    green: "#4ade80",
+    yellow: "#fbbf24",
+    red: "#f87171",
+    closeBtn: "#aaa",
+    font: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  Q = {
+    nodeW: 90,
+    nodeH: 16,
+    nodeGap: 6,
+    startY: 16,
+    colGap: 20,
+    fontSize: 10,
+    labelMaxChars: 11,
+  };
+function ir(e, r, c, i) {
+  let o = !1,
+    s = {
+      position: "fixed",
+      zIndex: "99999",
+      ...(r.includes("bottom") ? { bottom: "12px" } : { top: "12px" }),
+      ...(r.includes("right") ? { right: "12px" } : { left: "12px" }),
+    },
+    u = document.createElement("style");
+  (u.textContent = `[data-directive-devtools] summary:focus-visible{outline:2px solid ${B.accent};outline-offset:2px;border-radius:2px}[data-directive-devtools] button:focus-visible{outline:2px solid ${B.accent};outline-offset:2px}`),
+    document.head.appendChild(u);
+  const l = document.createElement("button");
+  l.setAttribute("aria-label", "Open Directive DevTools"),
+    l.setAttribute("aria-expanded", String(c)),
+    (l.title = "Ctrl+Shift+D to toggle"),
+    Object.assign(l.style, {
+      ...s,
+      background: B.bg,
+      color: B.text,
+      border: `1px solid ${B.border}`,
+      borderRadius: "6px",
+      padding: "10px 14px",
+      minWidth: "44px",
+      minHeight: "44px",
+      cursor: "pointer",
+      fontFamily: B.font,
+      fontSize: "12px",
+      display: c ? "none" : "block",
+    }),
+    (l.textContent = "Directive");
+  const f = document.createElement("div");
+  f.setAttribute("role", "region"),
+    f.setAttribute("aria-label", "Directive DevTools"),
+    f.setAttribute("data-directive-devtools", ""),
+    (f.tabIndex = -1),
+    Object.assign(f.style, {
+      ...s,
+      background: B.bg,
+      color: B.text,
+      border: `1px solid ${B.border}`,
+      borderRadius: "8px",
+      padding: "12px",
+      fontFamily: B.font,
+      fontSize: "11px",
+      maxWidth: "min(380px, calc(100vw - 24px))",
+      maxHeight: "min(500px, calc(100vh - 24px))",
+      overflow: "auto",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+      display: c ? "block" : "none",
+    });
+  const d = document.createElement("div");
+  Object.assign(d.style, {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "8px",
+  });
+  const p = document.createElement("strong");
+  (p.style.color = B.accent),
+    (p.textContent =
+      e === "default" ? "Directive DevTools" : `DevTools (${e})`);
+  const x = document.createElement("button");
+  x.setAttribute("aria-label", "Close DevTools"),
+    Object.assign(x.style, {
+      background: "none",
+      border: "none",
+      color: B.closeBtn,
+      cursor: "pointer",
+      fontSize: "16px",
+      padding: "8px 12px",
+      minWidth: "44px",
+      minHeight: "44px",
+      lineHeight: "1",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }),
+    (x.textContent = "×"),
+    d.appendChild(p),
+    d.appendChild(x),
+    f.appendChild(d);
+  const T = document.createElement("div");
+  (T.style.marginBottom = "6px"), T.setAttribute("aria-live", "polite");
+  const O = document.createElement("span");
+  (O.style.color = B.green),
+    (O.textContent = "Settled"),
+    T.appendChild(O),
+    f.appendChild(T);
+  const M = document.createElement("div");
+  Object.assign(M.style, {
+    display: "none",
+    marginBottom: "8px",
+    padding: "4px 8px",
+    background: "#252545",
+    borderRadius: "4px",
+    alignItems: "center",
+    gap: "6px",
+  });
+  const D = document.createElement("button");
+  Object.assign(D.style, {
+    background: "none",
+    border: `1px solid ${B.border}`,
+    color: B.text,
+    cursor: "pointer",
+    padding: "4px 10px",
+    borderRadius: "3px",
+    fontFamily: B.font,
+    fontSize: "11px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (D.textContent = "◀ Undo"),
+    (D.disabled = !0);
+  const R = document.createElement("button");
+  Object.assign(R.style, {
+    background: "none",
+    border: `1px solid ${B.border}`,
+    color: B.text,
+    cursor: "pointer",
+    padding: "4px 10px",
+    borderRadius: "3px",
+    fontFamily: B.font,
+    fontSize: "11px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (R.textContent = "Redo ▶"),
+    (R.disabled = !0);
+  const A = document.createElement("span");
+  (A.style.color = B.muted),
+    (A.style.fontSize = "10px"),
+    M.appendChild(D),
+    M.appendChild(R),
+    M.appendChild(A),
+    f.appendChild(M);
+  function F(U, G) {
+    const Y = document.createElement("details");
+    G && (Y.open = !0), (Y.style.marginBottom = "4px");
+    const oe = document.createElement("summary");
+    Object.assign(oe.style, {
+      cursor: "pointer",
+      color: B.accent,
+      marginBottom: "4px",
+    });
+    const ue = document.createElement("span");
+    (oe.textContent = `${U} (`),
+      oe.appendChild(ue),
+      oe.appendChild(document.createTextNode(")")),
+      (ue.textContent = "0"),
+      Y.appendChild(oe);
+    const ce = document.createElement("table");
+    Object.assign(ce.style, {
+      width: "100%",
+      borderCollapse: "collapse",
+      fontSize: "11px",
+    });
+    const Fe = document.createElement("thead"),
+      Ne = document.createElement("tr");
+    for (const bt of ["Key", "Value"]) {
+      const be = document.createElement("th");
+      (be.scope = "col"),
+        Object.assign(be.style, {
+          textAlign: "left",
+          padding: "2px 4px",
+          color: B.accent,
+        }),
+        (be.textContent = bt),
+        Ne.appendChild(be);
+    }
+    Fe.appendChild(Ne), ce.appendChild(Fe);
+    const We = document.createElement("tbody");
+    return (
+      ce.appendChild(We),
+      Y.appendChild(ce),
+      { details: Y, tbody: We, countSpan: ue }
+    );
+  }
+  function q(U, G) {
+    const Y = document.createElement("details");
+    Y.style.marginBottom = "4px";
+    const oe = document.createElement("summary");
+    Object.assign(oe.style, {
+      cursor: "pointer",
+      color: G,
+      marginBottom: "4px",
+    });
+    const ue = document.createElement("span");
+    (oe.textContent = `${U} (`),
+      oe.appendChild(ue),
+      oe.appendChild(document.createTextNode(")")),
+      (ue.textContent = "0"),
+      Y.appendChild(oe);
+    const ce = document.createElement("ul");
+    return (
+      Object.assign(ce.style, { margin: "0", paddingLeft: "16px" }),
+      Y.appendChild(ce),
+      { details: Y, list: ce, countSpan: ue }
+    );
+  }
+  const h = F("Facts", !0);
+  f.appendChild(h.details);
+  const E = F("Derivations", !1);
+  f.appendChild(E.details);
+  const v = q("Inflight", B.yellow);
+  f.appendChild(v.details);
+  const $ = q("Unmet", B.red);
+  f.appendChild($.details);
+  const k = document.createElement("details");
+  k.style.marginBottom = "4px";
+  const L = document.createElement("summary");
+  Object.assign(L.style, {
+    cursor: "pointer",
+    color: B.accent,
+    marginBottom: "4px",
+  }),
+    (L.textContent = "Performance"),
+    k.appendChild(L);
+  const m = document.createElement("div");
+  (m.style.fontSize = "10px"),
+    (m.style.color = B.muted),
+    (m.textContent = "No data yet"),
+    k.appendChild(m),
+    f.appendChild(k);
+  const b = document.createElement("details");
+  b.style.marginBottom = "4px";
+  const w = document.createElement("summary");
+  Object.assign(w.style, {
+    cursor: "pointer",
+    color: B.accent,
+    marginBottom: "4px",
+  }),
+    (w.textContent = "Dependency Graph"),
+    b.appendChild(w);
+  const I = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  I.setAttribute("width", "100%"),
+    I.setAttribute("height", "120"),
+    I.setAttribute("role", "img"),
+    I.setAttribute("aria-label", "System dependency graph"),
+    (I.style.display = "block"),
+    I.setAttribute("viewBox", "0 0 460 120"),
+    I.setAttribute("preserveAspectRatio", "xMinYMin meet"),
+    b.appendChild(I),
+    f.appendChild(b);
+  const N = document.createElement("details");
+  N.style.marginBottom = "4px";
+  const K = document.createElement("summary");
+  Object.assign(K.style, {
+    cursor: "pointer",
+    color: B.accent,
+    marginBottom: "4px",
+  }),
+    (K.textContent = "Timeline"),
+    N.appendChild(K);
+  const z = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  z.setAttribute("width", "100%"),
+    z.setAttribute("height", "60"),
+    z.setAttribute("role", "img"),
+    z.setAttribute("aria-label", "Resolver execution timeline"),
+    (z.style.display = "block"),
+    z.setAttribute("viewBox", `0 0 ${Ce} 60`),
+    z.setAttribute("preserveAspectRatio", "xMinYMin meet");
+  const y = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  y.setAttribute("x", String(Ce / 2)),
+    y.setAttribute("y", "30"),
+    y.setAttribute("text-anchor", "middle"),
+    y.setAttribute("fill", B.muted),
+    y.setAttribute("font-size", "10"),
+    y.setAttribute("font-family", B.font),
+    (y.textContent = "No resolver activity yet"),
+    z.appendChild(y),
+    N.appendChild(z),
+    f.appendChild(N);
+  let C, t, n, a;
+  if (i) {
+    const U = document.createElement("details");
+    U.style.marginBottom = "4px";
+    const G = document.createElement("summary");
+    Object.assign(G.style, {
+      cursor: "pointer",
+      color: B.accent,
+      marginBottom: "4px",
+    }),
+      (n = document.createElement("span")),
+      (n.textContent = "0"),
+      (G.textContent = "Events ("),
+      G.appendChild(n),
+      G.appendChild(document.createTextNode(")")),
+      U.appendChild(G),
+      (t = document.createElement("div")),
+      Object.assign(t.style, {
+        maxHeight: "150px",
+        overflow: "auto",
+        fontSize: "10px",
+      }),
+      t.setAttribute("role", "log"),
+      t.setAttribute("aria-live", "polite"),
+      (t.tabIndex = 0);
+    const Y = document.createElement("div");
+    (Y.style.color = B.muted),
+      (Y.style.padding = "4px"),
+      (Y.textContent = "Waiting for events..."),
+      (Y.className = "dt-events-empty"),
+      t.appendChild(Y),
+      U.appendChild(t),
+      f.appendChild(U),
+      (C = U),
+      (a = document.createElement("div"));
+  } else
+    (C = document.createElement("details")),
+      (t = document.createElement("div")),
+      (n = document.createElement("span")),
+      (a = document.createElement("div")),
+      (a.style.fontSize = "10px"),
+      (a.style.color = B.muted),
+      (a.style.marginTop = "4px"),
+      (a.style.fontStyle = "italic"),
+      (a.textContent = "Enable trace: true for event log"),
+      f.appendChild(a);
+  const g = document.createElement("div");
+  Object.assign(g.style, { display: "flex", gap: "6px", marginTop: "6px" });
+  const S = document.createElement("button");
+  Object.assign(S.style, {
+    background: "none",
+    border: `1px solid ${B.border}`,
+    color: B.text,
+    cursor: "pointer",
+    padding: "8px 12px",
+    borderRadius: "3px",
+    fontFamily: B.font,
+    fontSize: "10px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (S.textContent = "⏺ Record");
+  const j = document.createElement("button");
+  Object.assign(j.style, {
+    background: "none",
+    border: `1px solid ${B.border}`,
+    color: B.text,
+    cursor: "pointer",
+    padding: "8px 12px",
+    borderRadius: "3px",
+    fontFamily: B.font,
+    fontSize: "10px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (j.textContent = "⤓ Export"),
+    g.appendChild(S),
+    g.appendChild(j),
+    f.appendChild(g),
+    f.addEventListener(
+      "wheel",
+      (U) => {
+        const G = f,
+          Y = G.scrollTop === 0 && U.deltaY < 0,
+          oe = G.scrollTop + G.clientHeight >= G.scrollHeight && U.deltaY > 0;
+        (Y || oe) && U.preventDefault();
+      },
+      { passive: !1 },
+    );
+  let P = c,
+    W = new Set();
+  function _() {
+    (P = !0),
+      (f.style.display = "block"),
+      (l.style.display = "none"),
+      l.setAttribute("aria-expanded", "true"),
+      x.focus();
+  }
+  function V() {
+    (P = !1),
+      (f.style.display = "none"),
+      (l.style.display = "block"),
+      l.setAttribute("aria-expanded", "false"),
+      l.focus();
+  }
+  l.addEventListener("click", _), x.addEventListener("click", V);
+  function J(U) {
+    U.key === "Escape" && P && V();
+  }
+  f.addEventListener("keydown", J);
+  function re(U) {
+    U.key === "d" &&
+      U.shiftKey &&
+      (U.ctrlKey || U.metaKey) &&
+      (U.preventDefault(), P ? V() : _());
+  }
+  document.addEventListener("keydown", re);
+  function Z() {
+    o || (document.body.appendChild(l), document.body.appendChild(f));
+  }
+  document.body
+    ? Z()
+    : document.addEventListener("DOMContentLoaded", Z, { once: !0 });
+  function X() {
+    (o = !0),
+      l.removeEventListener("click", _),
+      x.removeEventListener("click", V),
+      f.removeEventListener("keydown", J),
+      document.removeEventListener("keydown", re),
+      document.removeEventListener("DOMContentLoaded", Z);
+    for (const U of W) clearTimeout(U);
+    W.clear(), l.remove(), f.remove(), u.remove();
+  }
+  return {
+    refs: {
+      container: f,
+      toggleBtn: l,
+      titleEl: p,
+      statusEl: O,
+      factsBody: h.tbody,
+      factsCount: h.countSpan,
+      derivBody: E.tbody,
+      derivCount: E.countSpan,
+      derivSection: E.details,
+      inflightList: v.list,
+      inflightSection: v.details,
+      inflightCount: v.countSpan,
+      unmetList: $.list,
+      unmetSection: $.details,
+      unmetCount: $.countSpan,
+      perfSection: k,
+      perfBody: m,
+      timeTravelSection: M,
+      timeTravelLabel: A,
+      undoBtn: D,
+      redoBtn: R,
+      flowSection: b,
+      flowSvg: I,
+      timelineSection: N,
+      timelineSvg: z,
+      eventsSection: C,
+      eventsList: t,
+      eventsCount: n,
+      traceHint: a,
+      recordBtn: S,
+      exportBtn: j,
+    },
+    destroy: X,
+    isOpen: () => P,
+    flashTimers: W,
+  };
+}
+function Ee(e, r, c, i, o, s) {
+  let u = gt(i),
+    l = e.get(c);
+  if (l) {
+    const f = l.cells;
+    if (f[1] && ((f[1].textContent = u), o && s)) {
+      const d = f[1];
+      d.style.background = "rgba(139, 154, 255, 0.25)";
+      const p = setTimeout(() => {
+        (d.style.background = ""), s.delete(p);
+      }, 300);
+      s.add(p);
+    }
+  } else {
+    (l = document.createElement("tr")),
+      (l.style.borderBottom = `1px solid ${B.rowBorder}`);
+    const f = document.createElement("td");
+    Object.assign(f.style, { padding: "2px 4px", color: B.muted }),
+      (f.textContent = c);
+    const d = document.createElement("td");
+    (d.style.padding = "2px 4px"),
+      (d.textContent = u),
+      l.appendChild(f),
+      l.appendChild(d),
+      r.appendChild(l),
+      e.set(c, l);
+  }
+}
+function or(e, r) {
+  const c = e.get(r);
+  c && (c.remove(), e.delete(r));
+}
+function Ae(e, r, c) {
+  if (
+    (e.inflightList.replaceChildren(),
+    (e.inflightCount.textContent = String(r.length)),
+    r.length > 0)
+  )
+    for (const i of r) {
+      const o = document.createElement("li");
+      (o.style.fontSize = "11px"),
+        (o.textContent = `${i.resolverId} (${i.id})`),
+        e.inflightList.appendChild(o);
+    }
+  else {
+    const i = document.createElement("li");
+    (i.style.fontSize = "10px"),
+      (i.style.color = B.muted),
+      (i.textContent = "None"),
+      e.inflightList.appendChild(i);
+  }
+  if (
+    (e.unmetList.replaceChildren(),
+    (e.unmetCount.textContent = String(c.length)),
+    c.length > 0)
+  )
+    for (const i of c) {
+      const o = document.createElement("li");
+      (o.style.fontSize = "11px"),
+        (o.textContent = `${i.requirement.type} from ${i.fromConstraint}`),
+        e.unmetList.appendChild(o);
+    }
+  else {
+    const i = document.createElement("li");
+    (i.style.fontSize = "10px"),
+      (i.style.color = B.muted),
+      (i.textContent = "None"),
+      e.unmetList.appendChild(i);
+  }
+}
+function De(e, r, c) {
+  const i = r === 0 && c === 0;
+  (e.statusEl.style.color = i ? B.green : B.yellow),
+    (e.statusEl.textContent = i ? "Settled" : "Working..."),
+    (e.toggleBtn.textContent = i ? "Directive" : "Directive..."),
+    e.toggleBtn.setAttribute(
+      "aria-label",
+      `Open Directive DevTools${i ? "" : " (system working)"}`,
+    );
+}
+function ot(e, r, c, i) {
+  const o = Object.keys(c.derive);
+  if (((e.derivCount.textContent = String(o.length)), o.length === 0)) {
+    r.clear(), e.derivBody.replaceChildren();
+    const u = document.createElement("tr"),
+      l = document.createElement("td");
+    (l.colSpan = 2),
+      (l.style.color = B.muted),
+      (l.style.fontSize = "10px"),
+      (l.textContent = "No derivations defined"),
+      u.appendChild(l),
+      e.derivBody.appendChild(u);
+    return;
+  }
+  const s = new Set(o);
+  for (const [u, l] of r) s.has(u) || (l.remove(), r.delete(u));
+  for (const u of o) {
+    let l;
+    try {
+      l = gt(c.read(u));
+    } catch {
+      l = "<error>";
+    }
+    Ee(r, e.derivBody, u, l, !0, i);
+  }
+}
+function sr(e, r, c, i) {
+  const o = e.eventsList.querySelector(".dt-events-empty");
+  o && o.remove();
+  const s = document.createElement("div");
+  Object.assign(s.style, {
+    padding: "2px 4px",
+    borderBottom: `1px solid ${B.rowBorder}`,
+    fontFamily: "inherit",
+  });
+  let u = new Date(),
+    l = `${String(u.getHours()).padStart(2, "0")}:${String(u.getMinutes()).padStart(2, "0")}:${String(u.getSeconds()).padStart(2, "0")}.${String(u.getMilliseconds()).padStart(3, "0")}`,
+    f;
+  try {
+    const T = JSON.stringify(c);
+    f = de(T, 60);
+  } catch {
+    f = "{}";
+  }
+  const d = document.createElement("span");
+  (d.style.color = B.closeBtn), (d.textContent = l);
+  const p = document.createElement("span");
+  (p.style.color = B.accent), (p.textContent = ` ${r} `);
+  const x = document.createElement("span");
+  for (
+    x.style.color = B.muted,
+      x.textContent = f,
+      s.appendChild(d),
+      s.appendChild(p),
+      s.appendChild(x),
+      e.eventsList.prepend(s);
+    e.eventsList.childElementCount > nr;
+  )
+    e.eventsList.lastElementChild?.remove();
+  e.eventsCount.textContent = String(i);
+}
+function lr(e, r) {
+  e.perfBody.replaceChildren();
+  const c =
+      r.reconcileCount > 0
+        ? (r.reconcileTotalMs / r.reconcileCount).toFixed(1)
+        : "—",
+    i = [
+      `Reconciles: ${r.reconcileCount}  (avg ${c}ms)`,
+      `Effects: ${r.effectRunCount} run, ${r.effectErrorCount} errors`,
+    ];
+  for (const o of i) {
+    const s = document.createElement("div");
+    (s.style.marginBottom = "2px"),
+      (s.textContent = o),
+      e.perfBody.appendChild(s);
+  }
+  if (r.resolverStats.size > 0) {
+    const o = document.createElement("div");
+    (o.style.marginTop = "4px"),
+      (o.style.marginBottom = "2px"),
+      (o.style.color = B.accent),
+      (o.textContent = "Resolvers:"),
+      e.perfBody.appendChild(o);
+    const s = [...r.resolverStats.entries()].sort(
+      (u, l) => l[1].totalMs - u[1].totalMs,
+    );
+    for (const [u, l] of s) {
+      const f = l.count > 0 ? (l.totalMs / l.count).toFixed(1) : "0",
+        d = document.createElement("div");
+      (d.style.paddingLeft = "8px"),
+        (d.textContent = `${u}: ${l.count}x, avg ${f}ms${l.errors > 0 ? `, ${l.errors} err` : ""}`),
+        l.errors > 0 && (d.style.color = B.red),
+        e.perfBody.appendChild(d);
+    }
+  }
+}
+function st(e, r) {
+  const c = r.debug;
+  if (!c) {
+    e.timeTravelSection.style.display = "none";
+    return;
+  }
+  e.timeTravelSection.style.display = "flex";
+  const i = c.currentIndex,
+    o = c.snapshots.length;
+  e.timeTravelLabel.textContent = o > 0 ? `${i + 1} / ${o}` : "0 snapshots";
+  const s = i > 0,
+    u = i < o - 1;
+  (e.undoBtn.disabled = !s),
+    (e.undoBtn.style.opacity = s ? "1" : "0.4"),
+    (e.redoBtn.disabled = !u),
+    (e.redoBtn.style.opacity = u ? "1" : "0.4");
+}
+function ar(e, r) {
+  e.undoBtn.addEventListener("click", () => {
+    r.debug && r.debug.currentIndex > 0 && r.debug.goBack(1);
+  }),
+    e.redoBtn.addEventListener("click", () => {
+      r.debug &&
+        r.debug.currentIndex < r.debug.snapshots.length - 1 &&
+        r.debug.goForward(1);
+    });
+}
+var Oe = new WeakMap();
+function cr(e, r, c, i, o, s) {
+  return [
+    e.join(","),
+    r.join(","),
+    c.map((u) => `${u.id}:${u.active}`).join(","),
+    [...i.entries()].map(([u, l]) => `${u}:${l.status}:${l.type}`).join(","),
+    o.join(","),
+    s.join(","),
+  ].join("|");
+}
+function ur(e, r, c, i, o) {
+  for (const s of c) {
+    const u = e.nodes.get(`0:${s}`);
+    if (!u) continue;
+    const l = r.recentlyChangedFacts.has(s);
+    u.rect.setAttribute("fill", l ? B.text + "33" : "none"),
+      u.rect.setAttribute("stroke-width", l ? "2" : "1");
+  }
+  for (const s of i) {
+    const u = e.nodes.get(`1:${s}`);
+    if (!u) continue;
+    const l = r.recentlyComputedDerivations.has(s);
+    u.rect.setAttribute("fill", l ? B.accent + "33" : "none"),
+      u.rect.setAttribute("stroke-width", l ? "2" : "1");
+  }
+  for (const s of o) {
+    const u = e.nodes.get(`2:${s}`);
+    if (!u) continue;
+    const l = r.recentlyActiveConstraints.has(s),
+      f = u.rect.getAttribute("stroke") ?? B.muted;
+    u.rect.setAttribute("fill", l ? f + "33" : "none"),
+      u.rect.setAttribute("stroke-width", l ? "2" : "1");
+  }
+}
+function lt(e, r, c) {
+  const i = Se(r);
+  if (!i) return;
+  let o;
+  try {
+    o = Object.keys(r.facts.$store.toObject());
+  } catch {
+    o = [];
+  }
+  const s = Object.keys(r.derive),
+    u = i.constraints,
+    l = i.unmet,
+    f = i.inflight,
+    d = Object.keys(i.resolvers),
+    p = new Map();
+  for (const y of l)
+    p.set(y.id, {
+      type: y.requirement.type,
+      fromConstraint: y.fromConstraint,
+      status: "unmet",
+    });
+  for (const y of f)
+    p.set(y.id, { type: y.resolverId, fromConstraint: "", status: "inflight" });
+  if (o.length === 0 && s.length === 0 && u.length === 0 && d.length === 0) {
+    Oe.delete(e.flowSvg),
+      e.flowSvg.replaceChildren(),
+      e.flowSvg.setAttribute("viewBox", "0 0 460 40");
+    const y = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    y.setAttribute("x", "230"),
+      y.setAttribute("y", "24"),
+      y.setAttribute("text-anchor", "middle"),
+      y.setAttribute("fill", B.muted),
+      y.setAttribute("font-size", "10"),
+      y.setAttribute("font-family", B.font),
+      (y.textContent = "No system topology"),
+      e.flowSvg.appendChild(y);
+    return;
+  }
+  const x = f.map((y) => y.resolverId).sort(),
+    T = cr(o, s, u, p, d, x),
+    O = Oe.get(e.flowSvg);
+  if (O && O.fingerprint === T) {
+    ur(
+      O,
+      c,
+      o,
+      s,
+      u.map((y) => y.id),
+    );
+    return;
+  }
+  const M = Q.nodeW + Q.colGap,
+    D = [5, 5 + M, 5 + M * 2, 5 + M * 3, 5 + M * 4],
+    R = D[4] + Q.nodeW + 5;
+  function A(y) {
+    let C = Q.startY + 12;
+    return y.map((t) => {
+      const n = { ...t, y: C };
+      return (C += Q.nodeH + Q.nodeGap), n;
+    });
+  }
+  const F = A(o.map((y) => ({ id: y, label: de(y, Q.labelMaxChars) }))),
+    q = A(s.map((y) => ({ id: y, label: de(y, Q.labelMaxChars) }))),
+    h = A(
+      u.map((y) => ({
+        id: y.id,
+        label: de(y.id, Q.labelMaxChars),
+        active: y.active,
+        priority: y.priority,
+      })),
+    ),
+    E = A(
+      [...p.entries()].map(([y, C]) => ({
+        id: y,
+        type: C.type,
+        fromConstraint: C.fromConstraint,
+        status: C.status,
+      })),
+    ),
+    v = A(d.map((y) => ({ id: y, label: de(y, Q.labelMaxChars) }))),
+    $ = Math.max(F.length, q.length, h.length, E.length, v.length, 1),
+    k = Q.startY + 12 + $ * (Q.nodeH + Q.nodeGap) + 8;
+  e.flowSvg.replaceChildren(),
+    e.flowSvg.setAttribute("viewBox", `0 0 ${R} ${k}`),
+    e.flowSvg.setAttribute(
+      "aria-label",
+      `Dependency graph: ${o.length} facts, ${s.length} derivations, ${u.length} constraints, ${p.size} requirements, ${d.length} resolvers`,
+    );
+  const L = ["Facts", "Derivations", "Constraints", "Reqs", "Resolvers"];
+  for (const [y, C] of L.entries()) {
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", String(D[y] ?? 0)),
+      t.setAttribute("y", "10"),
+      t.setAttribute("fill", B.accent),
+      t.setAttribute("font-size", String(Q.fontSize)),
+      t.setAttribute("font-family", B.font),
+      (t.textContent = C),
+      e.flowSvg.appendChild(t);
+  }
+  const m = { fingerprint: T, nodes: new Map() };
+  function b(y, C, t, n, a, g, S, j) {
+    const P = document.createElementNS("http://www.w3.org/2000/svg", "g"),
+      W = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    W.setAttribute("x", String(C)),
+      W.setAttribute("y", String(t - 6)),
+      W.setAttribute("width", String(Q.nodeW)),
+      W.setAttribute("height", String(Q.nodeH)),
+      W.setAttribute("rx", "3"),
+      W.setAttribute("fill", j ? g + "33" : "none"),
+      W.setAttribute("stroke", g),
+      W.setAttribute("stroke-width", j ? "2" : "1"),
+      W.setAttribute("opacity", S ? "0.35" : "1"),
+      P.appendChild(W);
+    const _ = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    return (
+      _.setAttribute("x", String(C + 4)),
+      _.setAttribute("y", String(t + 4)),
+      _.setAttribute("fill", g),
+      _.setAttribute("font-size", String(Q.fontSize)),
+      _.setAttribute("font-family", B.font),
+      _.setAttribute("opacity", S ? "0.35" : "1"),
+      (_.textContent = a),
+      P.appendChild(_),
+      e.flowSvg.appendChild(P),
+      m.nodes.set(`${y}:${n}`, { g: P, rect: W, text: _ }),
+      { midX: C + Q.nodeW / 2, midY: t }
+    );
+  }
+  function w(y, C, t, n, a, g) {
+    const S = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    S.setAttribute("x1", String(y)),
+      S.setAttribute("y1", String(C)),
+      S.setAttribute("x2", String(t)),
+      S.setAttribute("y2", String(n)),
+      S.setAttribute("stroke", a),
+      S.setAttribute("stroke-width", "1"),
+      S.setAttribute("stroke-dasharray", "3,2"),
+      S.setAttribute("opacity", "0.7"),
+      e.flowSvg.appendChild(S);
+  }
+  const I = new Map(),
+    N = new Map(),
+    K = new Map(),
+    z = new Map();
+  for (const y of F) {
+    const C = c.recentlyChangedFacts.has(y.id),
+      t = b(0, D[0], y.y, y.id, y.label, B.text, !1, C);
+    I.set(y.id, t);
+  }
+  for (const y of q) {
+    const C = c.recentlyComputedDerivations.has(y.id),
+      t = b(1, D[1], y.y, y.id, y.label, B.accent, !1, C);
+    N.set(y.id, t);
+  }
+  for (const y of h) {
+    const C = c.recentlyActiveConstraints.has(y.id),
+      t = b(
+        2,
+        D[2],
+        y.y,
+        y.id,
+        y.label,
+        y.active ? B.yellow : B.muted,
+        !y.active,
+        C,
+      );
+    K.set(y.id, t);
+  }
+  for (const y of E) {
+    const C = y.status === "unmet" ? B.red : B.yellow,
+      t = b(3, D[3], y.y, y.id, de(y.type, Q.labelMaxChars), C, !1, !1);
+    z.set(y.id, t);
+  }
+  for (const y of v) {
+    const C = f.some((t) => t.resolverId === y.id);
+    b(4, D[4], y.y, y.id, y.label, C ? B.green : B.muted, !C, !1);
+  }
+  for (const y of q) {
+    const C = c.derivationDeps.get(y.id),
+      t = N.get(y.id);
+    if (C && t)
+      for (const n of C) {
+        const a = I.get(n);
+        a &&
+          w(
+            a.midX + Q.nodeW / 2,
+            a.midY,
+            t.midX - Q.nodeW / 2,
+            t.midY,
+            B.accent,
+          );
+      }
+  }
+  for (const y of E) {
+    const C = K.get(y.fromConstraint),
+      t = z.get(y.id);
+    C &&
+      t &&
+      w(C.midX + Q.nodeW / 2, C.midY, t.midX - Q.nodeW / 2, t.midY, B.muted);
+  }
+  for (const y of f) {
+    const C = z.get(y.id);
+    if (C) {
+      const t = v.find((n) => n.id === y.resolverId);
+      t && w(C.midX + Q.nodeW / 2, C.midY, D[4], t.y, B.green);
+    }
+  }
+  Oe.set(e.flowSvg, m);
+}
+function dr(e) {
+  e.animationTimer && clearTimeout(e.animationTimer),
+    (e.animationTimer = setTimeout(() => {
+      e.recentlyChangedFacts.clear(),
+        e.recentlyComputedDerivations.clear(),
+        e.recentlyActiveConstraints.clear(),
+        (e.animationTimer = null);
+    }, 600));
+}
+function fr(e, r) {
+  const c = r.entries.toArray();
+  if (c.length === 0) return;
+  e.timelineSvg.replaceChildren();
+  let i = 1 / 0,
+    o = -1 / 0;
+  for (const O of c)
+    O.startMs < i && (i = O.startMs), O.endMs > o && (o = O.endMs);
+  const s = performance.now();
+  for (const O of r.inflight.values()) O < i && (i = O), s > o && (o = s);
+  const u = o - i || 1,
+    l = Ce - he - 10,
+    f = [],
+    d = new Set();
+  for (const O of c)
+    d.has(O.resolver) || (d.add(O.resolver), f.push(O.resolver));
+  for (const O of r.inflight.keys()) d.has(O) || (d.add(O), f.push(O));
+  const p = f.slice(-12),
+    x = me * p.length + 20;
+  e.timelineSvg.setAttribute("viewBox", `0 0 ${Ce} ${x}`),
+    e.timelineSvg.setAttribute("height", String(Math.min(x, 200)));
+  const T = 5;
+  for (let O = 0; O <= T; O++) {
+    const M = he + (l * O) / T,
+      D = (u * O) / T,
+      R = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    R.setAttribute("x", String(M)),
+      R.setAttribute("y", "8"),
+      R.setAttribute("fill", B.muted),
+      R.setAttribute("font-size", "6"),
+      R.setAttribute("font-family", B.font),
+      R.setAttribute("text-anchor", "middle"),
+      (R.textContent =
+        D < 1e3 ? `${D.toFixed(0)}ms` : `${(D / 1e3).toFixed(1)}s`),
+      e.timelineSvg.appendChild(R);
+    const A = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    A.setAttribute("x1", String(M)),
+      A.setAttribute("y1", "10"),
+      A.setAttribute("x2", String(M)),
+      A.setAttribute("y2", String(x)),
+      A.setAttribute("stroke", B.border),
+      A.setAttribute("stroke-width", "0.5"),
+      e.timelineSvg.appendChild(A);
+  }
+  for (let O = 0; O < p.length; O++) {
+    const M = p[O],
+      D = 12 + O * me,
+      R = O % nt.length,
+      A = nt[R],
+      F = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    F.setAttribute("x", String(he - 4)),
+      F.setAttribute("y", String(D + me / 2 + 3)),
+      F.setAttribute("fill", B.muted),
+      F.setAttribute("font-size", "7"),
+      F.setAttribute("font-family", B.font),
+      F.setAttribute("text-anchor", "end"),
+      (F.textContent = de(M, 12)),
+      e.timelineSvg.appendChild(F);
+    const q = c.filter((E) => E.resolver === M);
+    for (const E of q) {
+      const v = he + ((E.startMs - i) / u) * l,
+        $ = Math.max(((E.endMs - E.startMs) / u) * l, rt),
+        k = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      k.setAttribute("x", String(v)),
+        k.setAttribute("y", String(D + 2)),
+        k.setAttribute("width", String($)),
+        k.setAttribute("height", String(me - 4)),
+        k.setAttribute("rx", "2"),
+        k.setAttribute("fill", E.error ? B.red : A),
+        k.setAttribute("opacity", "0.8");
+      const L = document.createElementNS("http://www.w3.org/2000/svg", "title"),
+        m = E.endMs - E.startMs;
+      (L.textContent = `${M}: ${m.toFixed(1)}ms${E.error ? " (error)" : ""}`),
+        k.appendChild(L),
+        e.timelineSvg.appendChild(k);
+    }
+    const h = r.inflight.get(M);
+    if (h !== void 0) {
+      const E = he + ((h - i) / u) * l,
+        v = Math.max(((s - h) / u) * l, rt),
+        $ = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      $.setAttribute("x", String(E)),
+        $.setAttribute("y", String(D + 2)),
+        $.setAttribute("width", String(v)),
+        $.setAttribute("height", String(me - 4)),
+        $.setAttribute("rx", "2"),
+        $.setAttribute("fill", A),
+        $.setAttribute("opacity", "0.4"),
+        $.setAttribute("stroke", A),
+        $.setAttribute("stroke-width", "1"),
+        $.setAttribute("stroke-dasharray", "3,2");
+      const k = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      (k.textContent = `${M}: inflight ${(s - h).toFixed(0)}ms`),
+        $.appendChild(k),
+        e.timelineSvg.appendChild($);
+    }
+  }
+  e.timelineSvg.setAttribute(
+    "aria-label",
+    `Timeline: ${c.length} resolver executions across ${p.length} resolvers`,
+  );
+}
+function pr() {
+  if (typeof window > "u")
+    return {
+      systems: new Map(),
+      getSystem: () => null,
+      getSystems: () => [],
+      inspect: () => null,
+      getEvents: () => [],
+      explain: () => null,
+      exportSession: () => null,
+      importSession: () => !1,
+      clearEvents: () => {},
+      subscribe: () => () => {},
+    };
+  if (!window.__DIRECTIVE__) {
+    const e = new Map(),
+      r = {
+        systems: e,
+        getSystem(c) {
+          return c
+            ? (e.get(c)?.system ?? null)
+            : (e.values().next().value?.system ?? null);
+        },
+        getSystems() {
+          return [...e.keys()];
+        },
+        inspect(c) {
+          return this.getSystem(c)?.inspect() ?? null;
+        },
+        getEvents(c) {
+          return c
+            ? (e.get(c)?.events.toArray() ?? [])
+            : (e.values().next().value?.events.toArray() ?? []);
+        },
+        explain(c, i) {
+          return this.getSystem(i)?.explain(c) ?? null;
+        },
+        subscribe(c, i) {
+          const o = i ? e.get(i) : e.values().next().value;
+          if (!o) {
+            let s = !1,
+              u = setInterval(() => {
+                const f = i ? e.get(i) : e.values().next().value;
+                f && !s && ((s = !0), f.subscribers.add(c));
+              }, 100),
+              l = setTimeout(() => clearInterval(u), 1e4);
+            return () => {
+              clearInterval(u), clearTimeout(l);
+              for (const f of e.values()) f.subscribers.delete(c);
+            };
+          }
+          return (
+            o.subscribers.add(c),
+            () => {
+              o.subscribers.delete(c);
+            }
+          );
+        },
+        exportSession(c) {
+          const i = c ? e.get(c) : e.values().next().value;
+          return i
+            ? JSON.stringify({
+                version: 1,
+                name: c ?? e.keys().next().value ?? "default",
+                exportedAt: Date.now(),
+                events: i.events.toArray(),
+              })
+            : null;
+        },
+        importSession(c, i) {
+          try {
+            if (c.length > 10 * 1024 * 1024) return !1;
+            const o = JSON.parse(c);
+            if (
+              !o ||
+              typeof o != "object" ||
+              Array.isArray(o) ||
+              !Array.isArray(o.events)
+            )
+              return !1;
+            const s = i ? e.get(i) : e.values().next().value;
+            if (!s) return !1;
+            const u = s.maxEvents,
+              l = o.events,
+              f = l.length > u ? l.length - u : 0;
+            s.events.clear();
+            for (let d = f; d < l.length; d++) {
+              const p = l[d];
+              p &&
+                typeof p == "object" &&
+                !Array.isArray(p) &&
+                typeof p.timestamp == "number" &&
+                typeof p.type == "string" &&
+                p.type !== "__proto__" &&
+                p.type !== "constructor" &&
+                p.type !== "prototype" &&
+                s.events.push({
+                  timestamp: p.timestamp,
+                  type: p.type,
+                  data: p.data ?? null,
+                });
+            }
+            return !0;
+          } catch {
+            return !1;
+          }
+        },
+        clearEvents(c) {
+          const i = c ? e.get(c) : e.values().next().value;
+          i && i.events.clear();
+        },
+      };
+    return (
+      Object.defineProperty(window, "__DIRECTIVE__", {
+        value: r,
+        writable: !1,
+        configurable: ze(),
+        enumerable: !0,
+      }),
+      r
+    );
+  }
+  return window.__DIRECTIVE__;
+}
+function mr(e = {}) {
+  const {
+      name: r = "default",
+      trace: c = !1,
+      maxEvents: i,
+      panel: o = !1,
+      position: s = "bottom-right",
+      defaultOpen: u = !1,
+    } = e,
+    l = Jt(i),
+    f = pr(),
+    d = {
+      system: null,
+      events: new ht(l),
+      maxEvents: l,
+      subscribers: new Set(),
+    };
+  f.systems.set(r, d);
+  let p = (n, a) => {
+      const g = { timestamp: Date.now(), type: n, data: a };
+      c && d.events.push(g);
+      for (const S of d.subscribers)
+        try {
+          S(g);
+        } catch {}
+    },
+    x = null,
+    T = new Map(),
+    O = new Map(),
+    M = Yt(),
+    D = Zt(),
+    R = rr(),
+    A = Qt(),
+    F = o && typeof window < "u" && typeof document < "u" && ze(),
+    q = null,
+    h = 0,
+    E = 1,
+    v = 2,
+    $ = 4,
+    k = 8,
+    L = 16,
+    m = 32,
+    b = 64,
+    w = 128,
+    I = new Map(),
+    N = new Set(),
+    K = null;
+  function z(n) {
+    (h |= n),
+      q === null &&
+        typeof requestAnimationFrame < "u" &&
+        (q = requestAnimationFrame(y));
+  }
+  function y() {
+    if (((q = null), !x || !d.system)) {
+      h = 0;
+      return;
+    }
+    const n = x.refs,
+      a = d.system,
+      g = h;
+    if (((h = 0), g & E)) {
+      for (const S of N) or(T, S);
+      N.clear();
+      for (const [S, { value: j, flash: P }] of I)
+        Ee(T, n.factsBody, S, j, P, x.flashTimers);
+      I.clear(), (n.factsCount.textContent = String(T.size));
+    }
+    if ((g & v && ot(n, O, a, x.flashTimers), g & k))
+      if (K) De(n, K.inflight.length, K.unmet.length);
+      else {
+        const S = Se(a);
+        S && De(n, S.inflight.length, S.unmet.length);
+      }
+    if (g & $)
+      if (K) Ae(n, K.inflight, K.unmet);
+      else {
+        const S = Se(a);
+        S && Ae(n, S.inflight, S.unmet);
+      }
+    g & L && lr(n, M),
+      g & m && lt(n, a, D),
+      g & b && st(n, a),
+      g & w && fr(n, A);
+  }
+  function C(n, a) {
+    x && c && sr(x.refs, n, a, d.events.size);
+  }
+  function t(n, a) {
+    R.isRecording &&
+      R.recordedEvents.length < er &&
+      R.recordedEvents.push({ timestamp: Date.now(), type: n, data: Gt(a) });
+  }
+  return {
+    name: "devtools",
+    onInit: (n) => {
+      if (
+        ((d.system = n),
+        p("init", {}),
+        typeof window < "u" &&
+          console.log(
+            `%c[Directive Devtools]%c System "${r}" initialized. Access via window.__DIRECTIVE__`,
+            "color: #7c3aed; font-weight: bold",
+            "color: inherit",
+          ),
+        F)
+      ) {
+        const a = d.system;
+        x = ir(r, s, u, c);
+        const g = x.refs;
+        try {
+          const j = a.facts.$store.toObject();
+          for (const [P, W] of Object.entries(j)) Ee(T, g.factsBody, P, W, !1);
+          g.factsCount.textContent = String(Object.keys(j).length);
+        } catch {}
+        ot(g, O, a);
+        const S = Se(a);
+        S &&
+          (De(g, S.inflight.length, S.unmet.length),
+          Ae(g, S.inflight, S.unmet)),
+          st(g, a),
+          ar(g, a),
+          lt(g, a, D),
+          g.recordBtn.addEventListener("click", () => {
+            if (
+              ((R.isRecording = !R.isRecording),
+              (g.recordBtn.textContent = R.isRecording ? "⏹ Stop" : "⏺ Record"),
+              (g.recordBtn.style.color = R.isRecording ? B.red : B.text),
+              R.isRecording)
+            ) {
+              (R.recordedEvents = []), (R.snapshots = []);
+              try {
+                R.snapshots.push({
+                  timestamp: Date.now(),
+                  facts: a.facts.$store.toObject(),
+                });
+              } catch {}
+            }
+          }),
+          g.exportBtn.addEventListener("click", () => {
+            const j =
+                R.recordedEvents.length > 0
+                  ? R.recordedEvents
+                  : d.events.toArray(),
+              P = JSON.stringify(
+                {
+                  version: 1,
+                  name: r,
+                  exportedAt: Date.now(),
+                  events: j,
+                  snapshots: R.snapshots,
+                },
+                null,
+                2,
+              ),
+              W = new Blob([P], { type: "application/json" }),
+              _ = URL.createObjectURL(W),
+              V = document.createElement("a");
+            (V.href = _),
+              (V.download = `directive-session-${r}-${Date.now()}.json`),
+              V.click(),
+              URL.revokeObjectURL(_);
+          });
+      }
+    },
+    onStart: (n) => {
+      p("start", {}), C("start", {}), t("start", {});
+    },
+    onStop: (n) => {
+      p("stop", {}), C("stop", {}), t("stop", {});
+    },
+    onDestroy: (n) => {
+      p("destroy", {}),
+        f.systems.delete(r),
+        q !== null &&
+          typeof cancelAnimationFrame < "u" &&
+          (cancelAnimationFrame(q), (q = null)),
+        D.animationTimer && clearTimeout(D.animationTimer),
+        x && (x.destroy(), (x = null), T.clear(), O.clear());
+    },
+    onFactSet: (n, a, g) => {
+      p("fact.set", { key: n, value: a, prev: g }),
+        t("fact.set", { key: n, value: a, prev: g }),
+        D.recentlyChangedFacts.add(n),
+        x &&
+          d.system &&
+          (I.set(n, { value: a, flash: !0 }),
+          N.delete(n),
+          z(E),
+          C("fact.set", { key: n, value: a }));
+    },
+    onFactDelete: (n, a) => {
+      p("fact.delete", { key: n, prev: a }),
+        t("fact.delete", { key: n, prev: a }),
+        x && (N.add(n), I.delete(n), z(E), C("fact.delete", { key: n }));
+    },
+    onFactsBatch: (n) => {
+      if (
+        (p("facts.batch", { changes: n }),
+        t("facts.batch", { count: n.length }),
+        x && d.system)
+      ) {
+        for (const a of n)
+          a.type === "delete"
+            ? (N.add(a.key), I.delete(a.key))
+            : (D.recentlyChangedFacts.add(a.key),
+              I.set(a.key, { value: a.value, flash: !0 }),
+              N.delete(a.key));
+        z(E), C("facts.batch", { count: n.length });
+      }
+    },
+    onDerivationCompute: (n, a, g) => {
+      p("derivation.compute", { id: n, value: a, deps: g }),
+        t("derivation.compute", { id: n, deps: g }),
+        D.derivationDeps.set(n, g),
+        D.recentlyComputedDerivations.add(n),
+        C("derivation.compute", { id: n, deps: g });
+    },
+    onDerivationInvalidate: (n) => {
+      p("derivation.invalidate", { id: n }),
+        C("derivation.invalidate", { id: n });
+    },
+    onReconcileStart: (n) => {
+      p("reconcile.start", {}),
+        (M.lastReconcileStartMs = performance.now()),
+        C("reconcile.start", {}),
+        t("reconcile.start", {});
+    },
+    onReconcileEnd: (n) => {
+      if (
+        (p("reconcile.end", n),
+        t("reconcile.end", {
+          unmet: n.unmet.length,
+          inflight: n.inflight.length,
+          completed: n.completed.length,
+        }),
+        M.lastReconcileStartMs > 0)
+      ) {
+        const a = performance.now() - M.lastReconcileStartMs;
+        M.reconcileCount++,
+          (M.reconcileTotalMs += a),
+          (M.lastReconcileStartMs = 0);
+      }
+      if (R.isRecording && d.system && R.snapshots.length < tr)
+        try {
+          R.snapshots.push({
+            timestamp: Date.now(),
+            facts: d.system.facts.$store.toObject(),
+          });
+        } catch {}
+      x &&
+        d.system &&
+        ((K = n),
+        dr(D),
+        z(v | k | $ | L | m | b),
+        C("reconcile.end", {
+          unmet: n.unmet.length,
+          inflight: n.inflight.length,
+        }));
+    },
+    onConstraintEvaluate: (n, a) => {
+      p("constraint.evaluate", { id: n, active: a }),
+        t("constraint.evaluate", { id: n, active: a }),
+        a
+          ? (D.activeConstraints.add(n), D.recentlyActiveConstraints.add(n))
+          : D.activeConstraints.delete(n),
+        C("constraint.evaluate", { id: n, active: a });
+    },
+    onConstraintError: (n, a) => {
+      p("constraint.error", { id: n, error: String(a) }),
+        C("constraint.error", { id: n, error: String(a) });
+    },
+    onRequirementCreated: (n) => {
+      p("requirement.created", { id: n.id, type: n.requirement.type }),
+        t("requirement.created", { id: n.id, type: n.requirement.type }),
+        C("requirement.created", { id: n.id, type: n.requirement.type });
+    },
+    onRequirementMet: (n, a) => {
+      p("requirement.met", { id: n.id, byResolver: a }),
+        t("requirement.met", { id: n.id, byResolver: a }),
+        C("requirement.met", { id: n.id, byResolver: a });
+    },
+    onRequirementCanceled: (n) => {
+      p("requirement.canceled", { id: n.id }),
+        t("requirement.canceled", { id: n.id }),
+        C("requirement.canceled", { id: n.id });
+    },
+    onResolverStart: (n, a) => {
+      p("resolver.start", { resolver: n, requirementId: a.id }),
+        t("resolver.start", { resolver: n, requirementId: a.id }),
+        A.inflight.set(n, performance.now()),
+        x &&
+          d.system &&
+          (z($ | k | w),
+          C("resolver.start", { resolver: n, requirementId: a.id }));
+    },
+    onResolverComplete: (n, a, g) => {
+      p("resolver.complete", { resolver: n, requirementId: a.id, duration: g }),
+        t("resolver.complete", {
+          resolver: n,
+          requirementId: a.id,
+          duration: g,
+        });
+      const S = M.resolverStats.get(n) ?? { count: 0, totalMs: 0, errors: 0 };
+      if (
+        (S.count++,
+        (S.totalMs += g),
+        M.resolverStats.set(n, S),
+        M.resolverStats.size > it)
+      ) {
+        const P = M.resolverStats.keys().next().value;
+        P !== void 0 && M.resolverStats.delete(P);
+      }
+      const j = A.inflight.get(n);
+      A.inflight.delete(n),
+        j !== void 0 &&
+          A.entries.push({
+            resolver: n,
+            startMs: j,
+            endMs: performance.now(),
+            error: !1,
+          }),
+        x &&
+          d.system &&
+          (z($ | k | L | w),
+          C("resolver.complete", { resolver: n, duration: g }));
+    },
+    onResolverError: (n, a, g) => {
+      p("resolver.error", {
+        resolver: n,
+        requirementId: a.id,
+        error: String(g),
+      }),
+        t("resolver.error", {
+          resolver: n,
+          requirementId: a.id,
+          error: String(g),
+        });
+      const S = M.resolverStats.get(n) ?? { count: 0, totalMs: 0, errors: 0 };
+      if ((S.errors++, M.resolverStats.set(n, S), M.resolverStats.size > it)) {
+        const P = M.resolverStats.keys().next().value;
+        P !== void 0 && M.resolverStats.delete(P);
+      }
+      const j = A.inflight.get(n);
+      A.inflight.delete(n),
+        j !== void 0 &&
+          A.entries.push({
+            resolver: n,
+            startMs: j,
+            endMs: performance.now(),
+            error: !0,
+          }),
+        x &&
+          d.system &&
+          (z($ | k | L | w),
+          C("resolver.error", { resolver: n, error: String(g) }));
+    },
+    onResolverRetry: (n, a, g) => {
+      p("resolver.retry", { resolver: n, requirementId: a.id, attempt: g }),
+        t("resolver.retry", { resolver: n, requirementId: a.id, attempt: g }),
+        C("resolver.retry", { resolver: n, attempt: g });
+    },
+    onResolverCancel: (n, a) => {
+      p("resolver.cancel", { resolver: n, requirementId: a.id }),
+        t("resolver.cancel", { resolver: n, requirementId: a.id }),
+        A.inflight.delete(n),
+        C("resolver.cancel", { resolver: n });
+    },
+    onEffectRun: (n) => {
+      p("effect.run", { id: n }),
+        t("effect.run", { id: n }),
+        M.effectRunCount++,
+        C("effect.run", { id: n });
+    },
+    onEffectError: (n, a) => {
+      p("effect.error", { id: n, error: String(a) }),
+        M.effectErrorCount++,
+        C("effect.error", { id: n, error: String(a) });
+    },
+    onSnapshot: (n) => {
+      p("timetravel.snapshot", { id: n.id, trigger: n.trigger }),
+        x && d.system && z(b),
+        C("timetravel.snapshot", { id: n.id, trigger: n.trigger });
+    },
+    onTimeTravel: (n, a) => {
+      if (
+        (p("timetravel.jump", { from: n, to: a }),
+        t("timetravel.jump", { from: n, to: a }),
+        x && d.system)
+      ) {
+        const g = d.system;
+        try {
+          const S = g.facts.$store.toObject();
+          T.clear(), x.refs.factsBody.replaceChildren();
+          for (const [j, P] of Object.entries(S))
+            Ee(T, x.refs.factsBody, j, P, !1);
+          x.refs.factsCount.textContent = String(Object.keys(S).length);
+        } catch {}
+        O.clear(),
+          D.derivationDeps.clear(),
+          x.refs.derivBody.replaceChildren(),
+          (K = null),
+          z(v | k | $ | m | b),
+          C("timetravel.jump", { from: n, to: a });
+      }
+    },
+    onError: (n) => {
+      p("error", {
+        source: n.source,
+        sourceId: n.sourceId,
+        message: n.message,
+      }),
+        t("error", { source: n.source, message: n.message }),
+        C("error", { source: n.source, message: n.message });
+    },
+    onErrorRecovery: (n, a) => {
+      p("error.recovery", {
+        source: n.source,
+        sourceId: n.sourceId,
+        strategy: a,
+      }),
+        C("error.recovery", { source: n.source, strategy: a });
+    },
+  };
+}
+const Me = ["technology", "science", "design", "business"],
+  at = [
+    "Introduction to",
+    "Advanced",
+    "Understanding",
+    "Building",
+    "Exploring",
+    "Mastering",
+    "The Future of",
+    "Practical",
+    "Deep Dive into",
+    "Getting Started with",
+  ],
+  hr = {
+    technology: [
+      "Distributed Systems",
+      "WebAssembly",
+      "Edge Computing",
+      "Rust Programming",
+      "Container Orchestration",
+      "GraphQL APIs",
+      "Serverless Architecture",
+      "TypeScript Patterns",
+      "Micro-Frontends",
+      "WASM Runtimes",
+    ],
+    science: [
+      "Quantum Computing",
+      "Neural Networks",
+      "Gene Editing",
+      "Climate Models",
+      "Protein Folding",
+      "Dark Matter",
+      "Synthetic Biology",
+      "Fusion Energy",
+      "Exoplanet Detection",
+      "Gravitational Waves",
+    ],
+    design: [
+      "Design Systems",
+      "Motion Design",
+      "Accessibility",
+      "Color Theory",
+      "Typography",
+      "Layout Grids",
+      "Responsive Patterns",
+      "Icon Design",
+      "Dark Mode",
+      "Micro-Interactions",
+    ],
+    business: [
+      "Market Strategy",
+      "Product Analytics",
+      "Growth Hacking",
+      "Team Scaling",
+      "OKR Frameworks",
+      "Revenue Models",
+      "Customer Retention",
+      "Pricing Strategy",
+      "Remote Culture",
+      "Lean Operations",
+    ],
+  };
+function gr(e, r) {
+  const c = [];
+  for (let i = 0; i < e; i++) {
+    const o = r + i,
+      s = Me[o % Me.length],
+      u = hr[s],
+      l = at[o % at.length],
+      f = u[Math.floor(o / Me.length) % u.length];
+    c.push({ id: `item-${o}`, title: `${l} ${f}`, category: s });
+  }
+  return c;
+}
+const yr = gr(100, 1);
+function vr(e) {
+  return new Promise((r) => setTimeout(r, e));
+}
+async function ct(e, r, c) {
+  await vr(500);
+  let i = yr;
+  if (
+    (c.category !== "all" && (i = i.filter((f) => f.category === c.category)),
+    c.search.trim() !== "")
+  ) {
+    const f = c.search.toLowerCase();
+    i = i.filter((d) => d.title.toLowerCase().includes(f));
+  }
+  c.sortBy === "oldest"
+    ? (i = [...i].reverse())
+    : c.sortBy === "title" &&
+      (i = [...i].sort((f, d) => f.title.localeCompare(d.title)));
+  const o = e === "" ? 0 : Number.parseInt(e, 10),
+    s = i.slice(o, o + r),
+    u = o + r,
+    l = u < i.length;
+  return { items: s, nextCursor: l ? String(u) : "", hasMore: l };
+}
+const Pe = {
+    facts: { search: ee.string(), sortBy: ee.string(), category: ee.string() },
+    events: {
+      setSearch: { value: ee.string() },
+      setSortBy: { value: ee.string() },
+      setCategory: { value: ee.string() },
+    },
+  },
+  br = dt("filters", {
+    schema: Pe,
+    init: (e) => {
+      (e.search = ""), (e.sortBy = "newest"), (e.category = "all");
+    },
+    events: {
+      setSearch: (e, { value: r }) => {
+        e.search = r;
+      },
+      setSortBy: (e, { value: r }) => {
+        e.sortBy = r;
+      },
+      setCategory: (e, { value: r }) => {
+        e.category = r;
+      },
+    },
+  }),
+  Te = {
+    facts: {
+      items: ee.object(),
+      cursor: ee.string(),
+      hasMore: ee.boolean(),
+      isLoadingMore: ee.boolean(),
+      scrollNearBottom: ee.boolean(),
+      lastFilterHash: ee.string(),
+    },
+    derivations: { totalLoaded: ee.number(), isEmpty: ee.boolean() },
+    events: { setScrollNearBottom: { value: ee.boolean() } },
+    requirements: {
+      LOAD_PAGE: {
+        cursor: ee.string(),
+        search: ee.string(),
+        sortBy: ee.string(),
+        category: ee.string(),
+      },
+      RESET_AND_LOAD: {
+        search: ee.string(),
+        sortBy: ee.string(),
+        category: ee.string(),
+      },
+    },
+  },
+  wr = dt("list", {
+    schema: Te,
+    crossModuleDeps: { filters: Pe },
+    init: (e) => {
+      (e.items = []),
+        (e.cursor = ""),
+        (e.hasMore = !0),
+        (e.isLoadingMore = !1),
+        (e.scrollNearBottom = !1),
+        (e.lastFilterHash = "");
+    },
+    derive: {
+      totalLoaded: (e) => e.self.items.length,
+      isEmpty: (e) => e.self.items.length === 0 && !e.self.hasMore,
+    },
+    events: {
+      setScrollNearBottom: (e, { value: r }) => {
+        e.scrollNearBottom = r;
+      },
+    },
+    constraints: {
+      loadMore: {
+        when: (e) =>
+          e.self.hasMore && !e.self.isLoadingMore && e.self.scrollNearBottom,
+        require: (e) => ({
+          type: "LOAD_PAGE",
+          cursor: e.self.cursor,
+          search: e.filters.search,
+          sortBy: e.filters.sortBy,
+          category: e.filters.category,
+        }),
+      },
+      filterChanged: {
+        when: (e) =>
+          `${e.filters.search}|${e.filters.sortBy}|${e.filters.category}` !==
+          e.self.lastFilterHash,
+        require: (e) => ({
+          type: "RESET_AND_LOAD",
+          search: e.filters.search,
+          sortBy: e.filters.sortBy,
+          category: e.filters.category,
+        }),
+      },
+    },
+    resolvers: {
+      loadPage: {
+        requirement: "LOAD_PAGE",
+        resolve: async (e, r) => {
+          r.facts.isLoadingMore = !0;
+          try {
+            const c = await ct(e.cursor, 20, {
+              search: e.search,
+              sortBy: e.sortBy,
+              category: e.category,
+            });
+            (r.facts.items = [...r.facts.items, ...c.items]),
+              (r.facts.cursor = c.nextCursor),
+              (r.facts.hasMore = c.hasMore);
+          } finally {
+            r.facts.isLoadingMore = !1;
+          }
+        },
+      },
+      resetAndLoad: {
+        requirement: "RESET_AND_LOAD",
+        resolve: async (e, r) => {
+          const c = `${e.search}|${e.sortBy}|${e.category}`;
+          (r.facts.items = []),
+            (r.facts.cursor = ""),
+            (r.facts.hasMore = !0),
+            (r.facts.isLoadingMore = !0),
+            (r.facts.lastFilterHash = c);
+          try {
+            const i = await ct("", 20, {
+              search: e.search,
+              sortBy: e.sortBy,
+              category: e.category,
+            });
+            (r.facts.items = i.items),
+              (r.facts.cursor = i.nextCursor),
+              (r.facts.hasMore = i.hasMore);
+          } finally {
+            r.facts.isLoadingMore = !1;
+          }
+        },
+      },
+    },
+    effects: {
+      observeScroll: {
+        run: (e) => {
+          const r = document.getElementById("pg-scroll-sentinel");
+          if (!r) return;
+          const c = new IntersectionObserver(
+            ([i]) => {
+              e.self.scrollNearBottom = i.isIntersecting;
+            },
+            { rootMargin: "200px" },
+          );
+          return c.observe(r), () => c.disconnect();
+        },
+      },
+    },
+  }),
+  pe = Nt({
+    modules: { filters: br, list: wr },
+    plugins: [Vt(), mr({ name: "pagination" })],
+  });
+pe.start();
+const Sr = [
+    ...Object.keys(Pe.facts).map((e) => `filters::${e}`),
+    ...Object.keys(Te.facts).map((e) => `list::${e}`),
+    ...Object.keys(Te.derivations ?? {}).map((e) => `list::${e}`),
+  ],
+  Re = document.getElementById("pg-search"),
+  yt = document.querySelectorAll("[data-category]"),
+  Le = document.getElementById("pg-sort-select"),
+  ut = document.getElementById("pg-item-list"),
+  Er = document.getElementById("pg-loading"),
+  ge = document.getElementById("pg-end-message"),
+  xr = {
+    technology: "var(--brand-primary)",
+    science: "var(--brand-success)",
+    design: "var(--brand-warning)",
+    business: "var(--brand-error)",
+  };
+function $r(e) {
+  if (e.length === 0) {
+    ut.innerHTML = "";
+    return;
+  }
+  let r = "";
+  for (const c of e) {
+    const i = xr[c.category] ?? "var(--brand-text-dim)";
+    r += `
       <div class="pg-item">
         <span class="pg-item-category" style="background: ${i}">${Ie(c.category)}</span>
         <span class="pg-item-title">${Ie(c.title)}</span>
         <span class="pg-item-id">${Ie(c.id)}</span>
       </div>
-    `}ut.innerHTML=r}function vt(){const e=pe.facts,r=pe.derive,c=e.list.items,i=e.list.hasMore,o=e.list.isLoadingMore,s=e.filters.search,u=e.filters.sortBy,l=e.filters.category,f=r.list.isEmpty;$r(c),Er.classList.toggle("visible",o),f?(ge.textContent="No items match your filters",ge.classList.add("visible")):!i&&c.length>0?(ge.textContent="All items loaded",ge.classList.add("visible")):ge.classList.remove("visible");for(const d of yt)d.classList.toggle("active",d.dataset.category===l);document.activeElement!==Re&&(Re.value=s),Le.value=u}pe.subscribe(Sr,vt);let je=null;Re.addEventListener("input",()=>{je&&clearTimeout(je),je=setTimeout(()=>{pe.events.filters.setSearch({value:Re.value})},300)});for(const e of yt)e.addEventListener("click",()=>{const r=e.dataset.category;r&&pe.events.filters.setCategory({value:r})});Le.addEventListener("change",()=>{pe.events.filters.setSortBy({value:Le.value})});function Ie(e){const r=document.createElement("div");return r.textContent=e,r.innerHTML}vt();document.body.setAttribute("data-pagination-ready","true");
+    `;
+  }
+  ut.innerHTML = r;
+}
+function vt() {
+  const e = pe.facts,
+    r = pe.derive,
+    c = e.list.items,
+    i = e.list.hasMore,
+    o = e.list.isLoadingMore,
+    s = e.filters.search,
+    u = e.filters.sortBy,
+    l = e.filters.category,
+    f = r.list.isEmpty;
+  $r(c),
+    Er.classList.toggle("visible", o),
+    f
+      ? ((ge.textContent = "No items match your filters"),
+        ge.classList.add("visible"))
+      : !i && c.length > 0
+        ? ((ge.textContent = "All items loaded"), ge.classList.add("visible"))
+        : ge.classList.remove("visible");
+  for (const d of yt) d.classList.toggle("active", d.dataset.category === l);
+  document.activeElement !== Re && (Re.value = s), (Le.value = u);
+}
+pe.subscribe(Sr, vt);
+let je = null;
+Re.addEventListener("input", () => {
+  je && clearTimeout(je),
+    (je = setTimeout(() => {
+      pe.events.filters.setSearch({ value: Re.value });
+    }, 300));
+});
+for (const e of yt)
+  e.addEventListener("click", () => {
+    const r = e.dataset.category;
+    r && pe.events.filters.setCategory({ value: r });
+  });
+Le.addEventListener("change", () => {
+  pe.events.filters.setSortBy({ value: Le.value });
+});
+function Ie(e) {
+  const r = document.createElement("div");
+  return (r.textContent = e), r.innerHTML;
+}
+vt();
+document.body.setAttribute("data-pagination-ready", "true");

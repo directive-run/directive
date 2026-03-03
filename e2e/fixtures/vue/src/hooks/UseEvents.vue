@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { useFact, useEvents } from "@directive-run/vue";
+import { useEvents, useFact } from "@directive-run/vue";
 import { system } from "../system";
-import { TestIds } from "../../../../shared/test-ids";
 
 const count = useFact(system, "count");
 const events = useEvents(system);

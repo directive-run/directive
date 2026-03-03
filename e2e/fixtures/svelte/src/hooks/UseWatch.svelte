@@ -1,18 +1,17 @@
 <script lang="ts">
-  import { writable } from "svelte/store";
-  import { useWatch } from "@directive-run/svelte";
-  import { system } from "../system";
-  import { TestIds } from "../../../../shared/test-ids";
+import { useWatch } from "@directive-run/svelte";
+import { writable } from "svelte/store";
+import { system } from "../system";
 
-  const prev = writable("none");
-  const next = writable("none");
-  const watchCount = writable(0);
+const prev = writable("none");
+const next = writable("none");
+const watchCount = writable(0);
 
-  useWatch(system, "count", (newVal: unknown, prevVal: unknown) => {
-    prev.set(String(prevVal ?? "none"));
-    next.set(String(newVal));
-    watchCount.update((c) => c + 1);
-  });
+useWatch(system, "count", (newVal: unknown, prevVal: unknown) => {
+  prev.set(String(prevVal ?? "none"));
+  next.set(String(newVal));
+  watchCount.update((c) => c + 1);
+});
 </script>
 
 <div>

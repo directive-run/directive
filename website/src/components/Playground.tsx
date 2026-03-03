@@ -1,42 +1,42 @@
-'use client'
+"use client";
 
-import { memo, useState } from 'react'
-import clsx from 'clsx'
+import clsx from "clsx";
+import { memo, useState } from "react";
 
 interface PlaygroundProps {
-  projectId?: string
-  title?: string
-  file?: string
-  height?: number
-  view?: 'editor' | 'preview' | 'both'
+  projectId?: string;
+  title?: string;
+  file?: string;
+  height?: number;
+  view?: "editor" | "preview" | "both";
 }
 
 const EXAMPLES = {
   counter: {
-    title: 'Counter Example',
-    projectId: 'directive-counter-example',
-    file: 'src/main.ts',
+    title: "Counter Example",
+    projectId: "directive-counter-example",
+    file: "src/main.ts",
   },
-  'data-fetching': {
-    title: 'Data Fetching',
-    projectId: 'directive-data-fetching',
-    file: 'src/main.ts',
+  "data-fetching": {
+    title: "Data Fetching",
+    projectId: "directive-data-fetching",
+    file: "src/main.ts",
   },
-  'form-validation': {
-    title: 'Form Validation',
-    projectId: 'directive-form-validation',
-    file: 'src/main.ts',
+  "form-validation": {
+    title: "Form Validation",
+    projectId: "directive-form-validation",
+    file: "src/main.ts",
   },
-} as const
+} as const;
 
-type ExampleKey = keyof typeof EXAMPLES
+type ExampleKey = keyof typeof EXAMPLES;
 
 function PlaygroundTabs({
   activeExample,
   onChange,
 }: {
-  activeExample: ExampleKey
-  onChange: (example: ExampleKey) => void
+  activeExample: ExampleKey;
+  onChange: (example: ExampleKey) => void;
 }) {
   return (
     <div className="flex gap-2 border-b border-slate-200 pb-2 dark:border-slate-700">
@@ -45,32 +45,32 @@ function PlaygroundTabs({
           key={key}
           onClick={() => onChange(key)}
           className={clsx(
-            'cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition',
+            "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition",
             activeExample === key
-              ? 'bg-brand-primary text-white'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              ? "bg-brand-primary text-white"
+              : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800",
           )}
         >
           {EXAMPLES[key].title}
         </button>
       ))}
     </div>
-  )
+  );
 }
 
 function StackBlitzEmbed({
   projectId,
   file,
   height = 500,
-  view = 'both',
+  view = "both",
 }: {
-  projectId: string
-  file: string
-  height: number
-  view: 'editor' | 'preview' | 'both'
+  projectId: string;
+  file: string;
+  height: number;
+  view: "editor" | "preview" | "both";
 }) {
   // Using StackBlitz SDK embed URL format
-  const embedUrl = `https://stackblitz.com/edit/${projectId}?embed=1&file=${encodeURIComponent(file)}&view=${view}&hideNavigation=1&hideDevTools=1`
+  const embedUrl = `https://stackblitz.com/edit/${projectId}?embed=1&file=${encodeURIComponent(file)}&view=${view}&hideNavigation=1&hideDevTools=1`;
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
@@ -84,27 +84,30 @@ function StackBlitzEmbed({
         loading="lazy"
       />
     </div>
-  )
+  );
 }
 
 function FallbackEditor({
   code,
   height = 400,
 }: {
-  code: string
-  height: number
+  code: string;
+  height: number;
 }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err instanceof Error ? err.message : 'Unknown error')
+      console.error(
+        "Failed to copy:",
+        err instanceof Error ? err.message : "Unknown error",
+      );
     }
-  }
+  };
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
@@ -117,7 +120,7 @@ function FallbackEditor({
             onClick={handleCopy}
             className="cursor-pointer rounded-md bg-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
           >
-            {copied ? 'Copied!' : 'Copy Code'}
+            {copied ? "Copied!" : "Copy Code"}
           </button>
           <a
             href="https://stackblitz.com/fork/directive-starter"
@@ -136,7 +139,7 @@ function FallbackEditor({
         <code>{code}</code>
       </pre>
     </div>
-  )
+  );
 }
 
 const STARTER_CODE = `import { createModule, createSystem, t } from '@directive-run/core';
@@ -169,17 +172,17 @@ system.facts.count = 5;
 console.log(system.facts.count);      // 5
 console.log(system.derive.doubled);   // 10
 console.log(system.derive.isEven);    // false
-`
+`;
 
 export const Playground = memo(function Playground({
   projectId,
   title,
-  file = 'src/main.ts',
+  file = "src/main.ts",
   height = 500,
-  view = 'both',
+  view = "both",
 }: PlaygroundProps) {
-  const [activeExample, setActiveExample] = useState<ExampleKey>('counter')
-  const [useStackBlitz, setUseStackBlitz] = useState(true)
+  const [activeExample, setActiveExample] = useState<ExampleKey>("counter");
+  const [useStackBlitz, setUseStackBlitz] = useState(true);
 
   // If a specific projectId is provided, use that directly
   if (projectId) {
@@ -197,7 +200,7 @@ export const Playground = memo(function Playground({
           view={view}
         />
       </div>
-    )
+    );
   }
 
   // Otherwise, show the example picker with fallback
@@ -237,16 +240,16 @@ export const Playground = memo(function Playground({
         <FallbackEditor code={STARTER_CODE} height={height - 100} />
       )}
     </div>
-  )
-})
+  );
+});
 
 // Export a simple embed component for docs
 export const StackBlitzButton = memo(function StackBlitzButton({
-  projectId = 'directive-starter',
-  text = 'Open in StackBlitz',
+  projectId = "directive-starter",
+  text = "Open in StackBlitz",
 }: {
-  projectId?: string
-  text?: string
+  projectId?: string;
+  text?: string;
 }) {
   return (
     <a
@@ -260,5 +263,5 @@ export const StackBlitzButton = memo(function StackBlitzButton({
       </svg>
       {text}
     </a>
-  )
-})
+  );
+});

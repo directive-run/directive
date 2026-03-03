@@ -1,6 +1,6 @@
 import { useSelector } from "@directive-run/react";
-import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 export function UseSelectorPage() {
   const tripled = useSelector(system, (state) => state.count * 3);
@@ -10,7 +10,10 @@ export function UseSelectorPage() {
     <div>
       <span data-testid={TestIds.selectorResult}>{tripled}</span>
       <span data-testid={TestIds.selectorDefault}>{name}</span>
-      <button data-testid={TestIds.btnIncrement} onClick={() => system.events.increment()}>
+      <button
+        data-testid={TestIds.btnIncrement}
+        onClick={() => system.events.increment()}
+      >
         inc
       </button>
     </div>

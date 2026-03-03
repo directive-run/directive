@@ -17,7 +17,9 @@ import { z } from "zod";
 // Email can be empty string or valid email
 const EmailSchema = z.union([z.literal(""), z.string().email()]);
 const UrlSchema = z.string().url();
-const PhoneSchema = z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number");
+const PhoneSchema = z
+  .string()
+  .regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number");
 
 const AddressSchema = z.object({
   street: z.string().min(1),
@@ -93,9 +95,12 @@ const userProfileModule = createModule("user-profile", {
     hasContact: (facts) => facts.email !== "" || facts.phone !== null,
     displayRole: (facts) => {
       switch (facts.role) {
-        case "admin": return "Administrator";
-        case "user": return "User";
-        case "guest": return "Guest";
+        case "admin":
+          return "Administrator";
+        case "user":
+          return "User";
+        case "guest":
+          return "Guest";
       }
     },
     profileCompleteness: (facts) => {
@@ -161,7 +166,9 @@ const userProfileModule = createModule("user-profile", {
     geocodeAddress: {
       requirement: "GEOCODE_ADDRESS",
       resolve: async (req, context) => {
-        console.log(`[Resolver] Geocoding address: ${req.address.city}, ${req.address.state}`);
+        console.log(
+          `[Resolver] Geocoding address: ${req.address.city}, ${req.address.state}`,
+        );
         await new Promise((r) => setTimeout(r, 50));
         // In real app, would add lat/lng to address
       },
@@ -184,7 +191,10 @@ async function main() {
   console.log("  userId:", system.facts.userId);
   console.log("  role:", system.facts.role);
   console.log("  isAdmin:", system.derive.isAdmin);
-  console.log("  profileCompleteness:", system.derive.profileCompleteness + "%");
+  console.log(
+    "  profileCompleteness:",
+    system.derive.profileCompleteness + "%",
+  );
 
   // Use t.*() typed event
   console.log("\n--- Using t.*() event (setRole) ---");
@@ -213,14 +223,20 @@ async function main() {
   });
   await system.settle();
   console.log("  address:", system.facts.address);
-  console.log("  profileCompleteness:", system.derive.profileCompleteness + "%");
+  console.log(
+    "  profileCompleteness:",
+    system.derive.profileCompleteness + "%",
+  );
 
   // Add tags
   console.log("\n--- Using Zod event (addTag) ---");
   system.dispatch({ type: "addTag", tag: "typescript" });
   system.dispatch({ type: "addTag", tag: "directive" });
   console.log("  tags:", system.facts.tags);
-  console.log("  profileCompleteness:", system.derive.profileCompleteness + "%");
+  console.log(
+    "  profileCompleteness:",
+    system.derive.profileCompleteness + "%",
+  );
 
   // Activate
   console.log("\n--- Using simple event (activate) ---");

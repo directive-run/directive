@@ -5,25 +5,42 @@
  * Features: real-time token streaming, lightweight markdown rendering with
  * syntax-highlighted code blocks, dark mode support, conversation history.
  */
-'use client'
+"use client";
 
-import { Fragment, memo, useCallback, useEffect, useRef, useState } from 'react'
-import { Dialog, DialogPanel, Transition, TransitionChild } from '@headlessui/react'
-import { ChatCircleDots, PaperPlaneTilt, Sparkle, X } from '@phosphor-icons/react'
-import clsx from 'clsx'
+import {
+  Dialog,
+  DialogPanel,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
+import {
+  ChatCircleDots,
+  PaperPlaneTilt,
+  Sparkle,
+  X,
+} from "@phosphor-icons/react";
+import clsx from "clsx";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-import { DirectiveCallout } from '@/components/DirectiveCallout'
-import { MarkdownContent } from '@/components/ChatMarkdown'
+import { MarkdownContent } from "@/components/ChatMarkdown";
+import { DirectiveCallout } from "@/components/DirectiveCallout";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,11 +48,11 @@ interface Message {
 // ---------------------------------------------------------------------------
 
 const EXAMPLE_QUESTIONS = [
-  'How do constraints work?',
-  'What is the difference between effects and resolvers?',
-  'How do I use Directive with React?',
-  'Can you show me a data fetching example?',
-]
+  "How do constraints work?",
+  "What is the difference between effects and resolvers?",
+  "How do I use Directive with React?",
+  "Can you show me a data fetching example?",
+];
 
 function LoadingDots() {
   return (
@@ -44,7 +61,7 @@ function LoadingDots() {
       <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" />
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -56,14 +73,16 @@ function LoadingDots() {
 // ---------------------------------------------------------------------------
 
 function MessageBubble({ message }: { message: Message }) {
-  const isUser = message.role === 'user'
+  const isUser = message.role === "user";
 
   return (
-    <div className={clsx('flex gap-3', isUser && 'flex-row-reverse')}>
+    <div className={clsx("flex gap-3", isUser && "flex-row-reverse")}>
       <div
         className={clsx(
-          'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-brand-primary' : '[background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]'
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
+          isUser
+            ? "bg-brand-primary"
+            : "[background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]",
         )}
       >
         {isUser ? (
@@ -74,10 +93,10 @@ function MessageBubble({ message }: { message: Message }) {
       </div>
       <div
         className={clsx(
-          'max-w-[80%] rounded-2xl px-4 py-2',
+          "max-w-[80%] rounded-2xl px-4 py-2",
           isUser
-            ? 'bg-brand-primary text-white'
-            : 'bg-slate-100 text-slate-900 dark:bg-brand-surface-raised dark:text-slate-100'
+            ? "bg-brand-primary text-white"
+            : "bg-slate-100 text-slate-900 dark:bg-brand-surface-raised dark:text-slate-100",
         )}
       >
         {isUser ? (
@@ -87,7 +106,7 @@ function MessageBubble({ message }: { message: Message }) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -98,140 +117,147 @@ const ChatDialog = memo(function ChatDialog({
   isOpen,
   onClose,
 }: {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [streamingContent, setStreamingContent] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [hourlyRemaining, setHourlyRemaining] = useState<number | null>(null)
-  const [hourlyLimit, setHourlyLimit] = useState(5)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [hourlyRemaining, setHourlyRemaining] = useState<number | null>(null);
+  const [hourlyLimit, setHourlyLimit] = useState(5);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Scroll to bottom when messages change, streaming updates, or dialog opens
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent, isOpen])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingContent, isOpen]);
 
   // Focus input when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100)
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen])
+  }, [isOpen]);
 
   const handleSend = useCallback(
     async (messageText?: string) => {
-      const text = (messageText ?? input).trim()
-      if (!text || isLoading || hourlyRemaining === 0) return
+      const text = (messageText ?? input).trim();
+      if (!text || isLoading || hourlyRemaining === 0) return;
 
       const userMessage: Message = {
         id: `user-${Date.now()}`,
-        role: 'user',
+        role: "user",
         content: text,
         timestamp: new Date(),
-      }
+      };
 
-      setMessages((prev) => [...prev, userMessage])
-      setInput('')
-      setIsLoading(true)
-      setStreamingContent('')
-      setError(null)
+      setMessages((prev) => [...prev, userMessage]);
+      setInput("");
+      setIsLoading(true);
+      setStreamingContent("");
+      setError(null);
 
       // Build history for context
       const history = messages.map((m) => ({
         role: m.role,
         content: m.content,
-      }))
+      }));
 
-      const controller = new AbortController()
-      abortControllerRef.current = controller
-      let accumulated = ''
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      let accumulated = "";
 
       try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text,
             history,
-            pageUrl: typeof window !== 'undefined' ? window.location.pathname : undefined,
+            pageUrl:
+              typeof window !== "undefined"
+                ? window.location.pathname
+                : undefined,
           }),
           signal: controller.signal,
-        })
+        });
 
         // Read hourly usage headers (available on both success and 429 responses)
-        const remainingHeader = response.headers.get('X-Hourly-Remaining')
-        const limitHeader = response.headers.get('X-Hourly-Limit')
+        const remainingHeader = response.headers.get("X-Hourly-Remaining");
+        const limitHeader = response.headers.get("X-Hourly-Limit");
         if (remainingHeader !== null) {
-          setHourlyRemaining(parseInt(remainingHeader, 10))
+          setHourlyRemaining(Number.parseInt(remainingHeader, 10));
         }
         if (limitHeader !== null) {
-          setHourlyLimit(parseInt(limitHeader, 10))
+          setHourlyLimit(Number.parseInt(limitHeader, 10));
         }
 
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({ error: 'Request failed' }))
-          throw new Error(errData.error || `Request failed (${response.status})`)
+          const errData = await response
+            .json()
+            .catch(() => ({ error: "Request failed" }));
+          throw new Error(
+            errData.error || `Request failed (${response.status})`,
+          );
         }
 
         // Read SSE stream
-        const reader = response.body?.getReader()
+        const reader = response.body?.getReader();
         if (!reader) {
-          throw new Error('No response body')
+          throw new Error("No response body");
         }
 
-        const decoder = new TextDecoder()
-        let buffer = ''
+        const decoder = new TextDecoder();
+        let buffer = "";
 
         while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+          const { done, value } = await reader.read();
+          if (done) break;
 
-          buffer += decoder.decode(value, { stream: true })
+          buffer += decoder.decode(value, { stream: true });
 
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
 
           for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const data = line.slice(6).trim()
-            if (!data) continue
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (!data) continue;
 
             try {
-              const event = JSON.parse(data)
+              const event = JSON.parse(data);
 
-              if (event.type === 'text') {
-                accumulated += event.text
-                setStreamingContent(accumulated)
-              } else if (event.type === 'done') {
+              if (event.type === "text") {
+                accumulated += event.text;
+                setStreamingContent(accumulated);
+              } else if (event.type === "done") {
                 // Finalize the message
                 const assistantMessage: Message = {
                   id: `assistant-${Date.now()}`,
-                  role: 'assistant',
+                  role: "assistant",
                   content: accumulated,
                   timestamp: new Date(),
-                }
-                setMessages((prev) => [...prev, assistantMessage])
-                setStreamingContent('')
-                accumulated = '' // Prevent duplicate finalization
-              } else if (event.type === 'truncated') {
-                accumulated += event.text
-                setStreamingContent(accumulated)
-              } else if (event.type === 'heartbeat') {
+                };
+                setMessages((prev) => [...prev, assistantMessage]);
+                setStreamingContent("");
+                accumulated = ""; // Prevent duplicate finalization
+              } else if (event.type === "truncated") {
+                accumulated += event.text;
+                setStreamingContent(accumulated);
+              } else if (event.type === "heartbeat") {
                 // Keep-alive signal, no action needed
-              } else if (event.type === 'error') {
-                throw new Error(event.message || 'Stream error')
+              } else if (event.type === "error") {
+                throw new Error(event.message || "Stream error");
               }
             } catch (parseErr) {
               // Re-throw stream errors (from the 'error' event handler above);
               // silently skip JSON.parse failures from malformed SSE frames.
-              if (parseErr instanceof SyntaxError) continue
-              throw parseErr
+              if (parseErr instanceof SyntaxError) continue;
+              throw parseErr;
             }
           }
         }
@@ -242,48 +268,50 @@ const ChatDialog = memo(function ChatDialog({
         if (accumulated) {
           const assistantMessage: Message = {
             id: `assistant-${Date.now()}`,
-            role: 'assistant',
+            role: "assistant",
             content: accumulated,
             timestamp: new Date(),
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setStreamingContent('')
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+          setStreamingContent("");
         }
       } catch (err: unknown) {
-        if (err instanceof Error && err.name === 'AbortError') return // User cancelled
+        if (err instanceof Error && err.name === "AbortError") return; // User cancelled
         const errorMessage =
-          err instanceof Error ? err.message : 'Something went wrong. Try the search feature instead.'
-        setError(errorMessage)
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. Try the search feature instead.";
+        setError(errorMessage);
 
         // If we have partial content, save it
         if (accumulated) {
           const partialMessage: Message = {
             id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: accumulated + '\n\n*[Connection interrupted]*',
+            role: "assistant",
+            content: accumulated + "\n\n*[Connection interrupted]*",
             timestamp: new Date(),
-          }
-          setMessages((prev) => [...prev, partialMessage])
-          setStreamingContent('')
+          };
+          setMessages((prev) => [...prev, partialMessage]);
+          setStreamingContent("");
         }
       } finally {
-        setIsLoading(false)
-        abortControllerRef.current = null
+        setIsLoading(false);
+        abortControllerRef.current = null;
       }
     },
     [input, isLoading, messages, hourlyRemaining],
-  )
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   const handleExampleClick = (question: string) => {
-    handleSend(question)
-  }
+    handleSend(question);
+  };
 
   return (
     <Transition show={isOpen} as={Fragment}>
@@ -339,13 +367,17 @@ const ChatDialog = memo(function ChatDialog({
                 {messages.length === 0 && !streamingContent ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                      <Sparkle weight="duotone" className="h-8 w-8 text-white" />
+                      <Sparkle
+                        weight="duotone"
+                        className="h-8 w-8 text-white"
+                      />
                     </div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                       Ask anything about Directive
                     </h3>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      I can help you understand concepts, write code, and debug issues.
+                      I can help you understand concepts, write code, and debug
+                      issues.
                     </p>
                     <div className="mt-6 flex flex-wrap justify-center gap-2">
                       {EXAMPLE_QUESTIONS.map((question) => (
@@ -369,7 +401,10 @@ const ChatDialog = memo(function ChatDialog({
                     {streamingContent && (
                       <div className="flex gap-3">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                          <Sparkle weight="duotone" className="h-4 w-4 text-white" />
+                          <Sparkle
+                            weight="duotone"
+                            className="h-4 w-4 text-white"
+                          />
                         </div>
                         <div className="max-w-[80%] rounded-2xl bg-slate-100 px-4 py-2 text-slate-900 dark:bg-brand-surface-raised dark:text-slate-100">
                           <MarkdownContent content={streamingContent} />
@@ -381,7 +416,10 @@ const ChatDialog = memo(function ChatDialog({
                     {isLoading && !streamingContent && (
                       <div className="flex gap-3">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full [background:linear-gradient(to_bottom_right,var(--brand-primary-500),var(--brand-accent-600))]">
-                          <Sparkle weight="duotone" className="h-4 w-4 text-white" />
+                          <Sparkle
+                            weight="duotone"
+                            className="h-4 w-4 text-white"
+                          />
                         </div>
                         <div className="flex items-center rounded-2xl bg-slate-100 px-4 py-3 dark:bg-brand-surface-raised">
                           <LoadingDots />
@@ -410,13 +448,19 @@ const ChatDialog = memo(function ChatDialog({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={hourlyRemaining === 0 ? 'Hourly limit reached' : 'Ask about Directive...'}
+                    placeholder={
+                      hourlyRemaining === 0
+                        ? "Hourly limit reached"
+                        : "Ask about Directive..."
+                    }
                     disabled={hourlyRemaining === 0}
                     className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-brand-surface-raised dark:text-white dark:placeholder-slate-400"
                   />
                   <button
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isLoading || hourlyRemaining === 0}
+                    disabled={
+                      !input.trim() || isLoading || hourlyRemaining === 0
+                    }
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-brand-primary text-white transition hover:bg-brand-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <PaperPlaneTilt weight="fill" className="h-5 w-5" />
@@ -428,10 +472,10 @@ const ChatDialog = memo(function ChatDialog({
                 {hourlyRemaining !== null && (
                   <p
                     className={clsx(
-                      'mt-1 text-center text-xs',
+                      "mt-1 text-center text-xs",
                       hourlyRemaining <= 5
-                        ? 'font-medium text-amber-500 dark:text-amber-400'
-                        : 'text-slate-400',
+                        ? "font-medium text-amber-500 dark:text-amber-400"
+                        : "text-slate-400",
                     )}
                   >
                     {hourlyRemaining} of {hourlyLimit} tries remaining this hour
@@ -451,15 +495,15 @@ const ChatDialog = memo(function ChatDialog({
         </div>
       </Dialog>
     </Transition>
-  )
-})
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Widget Entry Point
 // ---------------------------------------------------------------------------
 
 export const AIChatWidget = memo(function AIChatWidget() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <>
@@ -475,5 +519,5 @@ export const AIChatWidget = memo(function AIChatWidget() {
       {/* Chat dialog */}
       <ChatDialog isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </>
-  )
-})
+  );
+});

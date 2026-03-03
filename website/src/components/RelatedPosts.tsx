@@ -1,17 +1,17 @@
-import Link from 'next/link'
+import Link from "next/link";
 
-import { Prose } from '@/components/Prose'
-import { getRelatedPosts } from '@/lib/blog'
+import { Prose } from "@/components/Prose";
+import { getRelatedPosts } from "@/lib/blog";
 
 interface RelatedPostsProps {
-  slug: string
+  slug: string;
 }
 
 export function RelatedPosts({ slug }: RelatedPostsProps) {
-  const related = getRelatedPosts(slug)
+  const related = getRelatedPosts(slug);
 
   if (related.length === 0) {
-    return null
+    return null;
   }
 
   return (
@@ -23,11 +23,11 @@ export function RelatedPosts({ slug }: RelatedPostsProps) {
           <li key={post.slug}>
             <strong>
               <Link href={`/blog/${post.slug}`}>{post.title}</Link>
-            </strong>
-            {' '}&ndash; {post.description}
+            </strong>{" "}
+            &ndash; {post.description}
           </li>
         ))}
       </ul>
     </Prose>
-  )
+  );
 }

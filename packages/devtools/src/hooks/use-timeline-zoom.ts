@@ -26,7 +26,9 @@ export interface TimelineZoom {
   /** Time axis labels for visible range */
   timeAxisLabels: string[];
   /** Replay cursor percentage position in visible range */
-  getReplayCursorPct: (replayCursor: number | null | undefined) => number | null;
+  getReplayCursorPct: (
+    replayCursor: number | null | undefined,
+  ) => number | null;
 
   handleZoomIn: () => void;
   handleZoomOut: () => void;
@@ -43,7 +45,9 @@ export function useTimelineZoom(events: { timestamp: number }[]): TimelineZoom {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState(0);
 
-  const panDragRef = useRef<{ startX: number; startOffset: number } | null>(null);
+  const panDragRef = useRef<{ startX: number; startOffset: number } | null>(
+    null,
+  );
   const laneContainerRef = useRef<HTMLDivElement>(null);
 
   // Compute time range (full, unzoomed)
@@ -74,14 +78,21 @@ export function useTimelineZoom(events: { timestamp: number }[]): TimelineZoom {
   }, [timeRange, zoomLevel, panOffset]);
 
   // Minimap fractions
-  const viewStart = timeRange.duration > 0 ? (visibleRange.start - timeRange.start) / timeRange.duration : 0;
-  const viewEnd = timeRange.duration > 0 ? (visibleRange.end - timeRange.start) / timeRange.duration : 1;
+  const viewStart =
+    timeRange.duration > 0
+      ? (visibleRange.start - timeRange.start) / timeRange.duration
+      : 0;
+  const viewEnd =
+    timeRange.duration > 0
+      ? (visibleRange.end - timeRange.start) / timeRange.duration
+      : 1;
 
   // Time axis labels for visible range
   const timeAxisLabels = useMemo(() => {
     const labels: string[] = [];
     for (let i = 0; i <= 4; i++) {
-      const ms = (visibleRange.start - timeRange.start) + (visibleRange.duration * i / 4);
+      const ms =
+        visibleRange.start - timeRange.start + (visibleRange.duration * i) / 4;
       labels.push(`${Math.round(ms)}ms`);
     }
 
@@ -94,7 +105,9 @@ export function useTimelineZoom(events: { timestamp: number }[]): TimelineZoom {
         return null;
       }
 
-      return ((replayCursor - visibleRange.start) / visibleRange.duration) * 100;
+      return (
+        ((replayCursor - visibleRange.start) / visibleRange.duration) * 100
+      );
     },
     [visibleRange],
   );
@@ -134,7 +147,8 @@ export function useTimelineZoom(events: { timestamp: number }[]): TimelineZoom {
           return next;
         });
       } else if (zoomLevel > 1) {
-        const panDelta = (e.deltaX || e.deltaY) * (timeRange.duration / zoomLevel / 500);
+        const panDelta =
+          (e.deltaX || e.deltaY) * (timeRange.duration / zoomLevel / 500);
         setPanOffset((p) => {
           const maxOffset = timeRange.duration - timeRange.duration / zoomLevel;
 
@@ -151,7 +165,7 @@ export function useTimelineZoom(events: { timestamp: number }[]): TimelineZoom {
       if (zoomLevel <= 1) {
         return;
       }
-      if (e.button === 1 || (e.target === e.currentTarget)) {
+      if (e.button === 1 || e.target === e.currentTarget) {
         e.preventDefault();
         panDragRef.current = { startX: e.clientX, startOffset: panOffset };
       }
@@ -167,9 +181,15 @@ export function useTimelineZoom(events: { timestamp: number }[]): TimelineZoom {
 
       const containerWidth = laneContainerRef.current.clientWidth;
       const pxDelta = panDragRef.current.startX - e.clientX;
-      const msDelta = (pxDelta / containerWidth) * (timeRange.duration / zoomLevel);
+      const msDelta =
+        (pxDelta / containerWidth) * (timeRange.duration / zoomLevel);
       const maxOffset = timeRange.duration - timeRange.duration / zoomLevel;
-      setPanOffset(Math.max(0, Math.min(panDragRef.current.startOffset + msDelta, maxOffset)));
+      setPanOffset(
+        Math.max(
+          0,
+          Math.min(panDragRef.current.startOffset + msDelta, maxOffset),
+        ),
+      );
     },
     [timeRange.duration, zoomLevel],
   );

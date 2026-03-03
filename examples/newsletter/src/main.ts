@@ -12,7 +12,12 @@
  * Uses a simulated setTimeout instead of a real API so no account is needed.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 
 // ============================================================================
@@ -187,7 +192,10 @@ const newsletter = createModule("newsletter", {
 // System
 // ============================================================================
 
-const system = createSystem({ module: newsletter, plugins: [devtoolsPlugin({ name: "newsletter" })] });
+const system = createSystem({
+  module: newsletter,
+  plugins: [devtoolsPlugin({ name: "newsletter" })],
+});
 system.start();
 
 // ============================================================================

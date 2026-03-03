@@ -7,9 +7,9 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import { sudokuGame, sudokuSchema } from "./sudoku.js";
-import type { Grid, Difficulty, Conflict } from "./rules.js";
+import type { Conflict, Difficulty, Grid } from "./rules.js";
 import { MAX_HINTS } from "./rules.js";
+import { sudokuGame, sudokuSchema } from "./sudoku.js";
 
 // ============================================================================
 // System (single module – direct access, no namespace)
@@ -163,7 +163,10 @@ function render(): void {
 
     cell.className = "sudoku-cell";
     cell.dataset.testid = `sudoku-cell-${i}`;
-    cell.setAttribute("aria-label", `Row ${row + 1}, Column ${col + 1}${value ? `, value ${value}` : ", empty"}`);
+    cell.setAttribute(
+      "aria-label",
+      `Row ${row + 1}, Column ${col + 1}${value ? `, value ${value}` : ", empty"}`,
+    );
     if (isGiven) {
       cell.classList.add("given");
     }
@@ -349,7 +352,7 @@ document.addEventListener("keydown", (e) => {
   // Number keys 1-9: input number
   if (e.key >= "1" && e.key <= "9") {
     e.preventDefault();
-    const value = parseInt(e.key, 10);
+    const value = Number.parseInt(e.key, 10);
     if (facts.notesMode) {
       system.events.toggleNote({ value });
     } else {

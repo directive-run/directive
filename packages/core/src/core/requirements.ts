@@ -8,8 +8,12 @@
  * - Requirement comparison and hashing
  */
 
-import type { Requirement, RequirementKeyFn, RequirementWithId } from "./types.js";
 import { stableStringify } from "../utils/utils.js";
+import type {
+  Requirement,
+  RequirementKeyFn,
+  RequirementWithId,
+} from "./types.js";
 
 // ============================================================================
 // Requirement Identity
@@ -20,43 +24,43 @@ import { stableStringify } from "../utils/utils.js";
  * Uses type + sorted properties by default.
  */
 export function generateRequirementId(
-	req: Requirement,
-	keyFn?: RequirementKeyFn,
+  req: Requirement,
+  keyFn?: RequirementKeyFn,
 ): string {
-	// Use custom key function if provided
-	if (keyFn) {
-		return keyFn(req);
-	}
+  // Use custom key function if provided
+  if (keyFn) {
+    return keyFn(req);
+  }
 
-	// Default: type + stable JSON of other properties
-	const { type, ...rest } = req;
-	const sortedRest = stableStringify(rest);
-	return `${type}:${sortedRest}`;
+  // Default: type + stable JSON of other properties
+  const { type, ...rest } = req;
+  const sortedRest = stableStringify(rest);
+  return `${type}:${sortedRest}`;
 }
 
 /**
  * Check if two requirements are equal by their IDs.
  */
 export function requirementsEqual(
-	a: RequirementWithId,
-	b: RequirementWithId,
+  a: RequirementWithId,
+  b: RequirementWithId,
 ): boolean {
-	return a.id === b.id;
+  return a.id === b.id;
 }
 
 /**
  * Create a requirement with its computed ID.
  */
 export function createRequirementWithId(
-	requirement: Requirement,
-	fromConstraint: string,
-	keyFn?: RequirementKeyFn,
+  requirement: Requirement,
+  fromConstraint: string,
+  keyFn?: RequirementKeyFn,
 ): RequirementWithId {
-	return {
-		requirement,
-		id: generateRequirementId(requirement, keyFn),
-		fromConstraint,
-	};
+  return {
+    requirement,
+    id: generateRequirementId(requirement, keyFn),
+    fromConstraint,
+  };
 }
 
 // ============================================================================
@@ -89,20 +93,21 @@ export function createRequirementWithId(
  * ```
  */
 export function req<T extends string>(type: T) {
-	return <P extends Record<string, unknown>>(props: P) => ({
-		type,
-		...props,
-	}) as Requirement & { type: T } & P;
+  return <P extends Record<string, unknown>>(props: P) =>
+    ({
+      type,
+      ...props,
+    }) as Requirement & { type: T } & P;
 }
 
 /**
  * Check if a requirement matches a type.
  */
 export function isRequirementType<T extends string>(
-	req: Requirement,
-	type: T,
+  req: Requirement,
+  type: T,
 ): req is Requirement & { type: T } {
-	return req.type === type;
+  return req.type === type;
 }
 
 /**
@@ -122,15 +127,15 @@ export function isRequirementType<T extends string>(
  * ```
  */
 export function forType<R extends Requirement>(
-	type: R["type"],
+  type: R["type"],
 ): (req: Requirement) => req is R;
 export function forType<T extends string>(
-	type: T,
+  type: T,
 ): (req: Requirement) => req is Requirement & { type: T };
 export function forType<T extends string>(
-	type: T,
+  type: T,
 ): (req: Requirement) => req is Requirement & { type: T } {
-	return (req): req is Requirement & { type: T } => req.type === type;
+  return (req): req is Requirement & { type: T } => req.type === type;
 }
 
 // ============================================================================
@@ -164,90 +169,90 @@ export function forType<T extends string>(
  * ```
  */
 export class RequirementSet {
-	private map = new Map<string, RequirementWithId>();
+  private map = new Map<string, RequirementWithId>();
 
-	/**
-	 * Add a requirement to the set.
-	 * If a requirement with the same ID already exists, it is ignored (first wins).
-	 * @param req - The requirement with its computed ID
-	 */
-	add(req: RequirementWithId): void {
-		// If already exists, keep the existing one (first wins)
-		if (!this.map.has(req.id)) {
-			this.map.set(req.id, req);
-		}
-	}
+  /**
+   * Add a requirement to the set.
+   * If a requirement with the same ID already exists, it is ignored (first wins).
+   * @param req - The requirement with its computed ID
+   */
+  add(req: RequirementWithId): void {
+    // If already exists, keep the existing one (first wins)
+    if (!this.map.has(req.id)) {
+      this.map.set(req.id, req);
+    }
+  }
 
-	/** Remove a requirement by ID */
-	remove(id: string): boolean {
-		return this.map.delete(id);
-	}
+  /** Remove a requirement by ID */
+  remove(id: string): boolean {
+    return this.map.delete(id);
+  }
 
-	/** Check if a requirement exists */
-	has(id: string): boolean {
-		return this.map.has(id);
-	}
+  /** Check if a requirement exists */
+  has(id: string): boolean {
+    return this.map.has(id);
+  }
 
-	/** Get a requirement by ID */
-	get(id: string): RequirementWithId | undefined {
-		return this.map.get(id);
-	}
+  /** Get a requirement by ID */
+  get(id: string): RequirementWithId | undefined {
+    return this.map.get(id);
+  }
 
-	/** Get all requirements */
-	all(): RequirementWithId[] {
-		return [...this.map.values()];
-	}
+  /** Get all requirements */
+  all(): RequirementWithId[] {
+    return [...this.map.values()];
+  }
 
-	/** Get all requirement IDs */
-	ids(): string[] {
-		return [...this.map.keys()];
-	}
+  /** Get all requirement IDs */
+  ids(): string[] {
+    return [...this.map.keys()];
+  }
 
-	/** Get the count of requirements */
-	get size(): number {
-		return this.map.size;
-	}
+  /** Get the count of requirements */
+  get size(): number {
+    return this.map.size;
+  }
 
-	/** Clear all requirements */
-	clear(): void {
-		this.map.clear();
-	}
+  /** Clear all requirements */
+  clear(): void {
+    this.map.clear();
+  }
 
-	/** Create a copy */
-	clone(): RequirementSet {
-		const copy = new RequirementSet();
-		for (const req of this.map.values()) {
-			copy.add(req);
-		}
-		return copy;
-	}
+  /** Create a copy */
+  clone(): RequirementSet {
+    const copy = new RequirementSet();
+    for (const req of this.map.values()) {
+      copy.add(req);
+    }
+    return copy;
+  }
 
-	/** Diff with another set - returns added and removed */
-	diff(other: RequirementSet): {
-		added: RequirementWithId[];
-		removed: RequirementWithId[];
-		unchanged: RequirementWithId[];
-	} {
-		const added: RequirementWithId[] = [];
-		const removed: RequirementWithId[] = [];
-		const unchanged: RequirementWithId[] = [];
+  /** Diff with another set - returns added and removed */
+  diff(other: RequirementSet): {
+    added: RequirementWithId[];
+    removed: RequirementWithId[];
+    unchanged: RequirementWithId[];
+  } {
+    const added: RequirementWithId[] = [];
+    const removed: RequirementWithId[] = [];
+    const unchanged: RequirementWithId[] = [];
 
-		// Find added (in this but not in other)
-		for (const req of this.map.values()) {
-			if (!other.has(req.id)) {
-				added.push(req);
-			} else {
-				unchanged.push(req);
-			}
-		}
+    // Find added (in this but not in other)
+    for (const req of this.map.values()) {
+      if (!other.has(req.id)) {
+        added.push(req);
+      } else {
+        unchanged.push(req);
+      }
+    }
 
-		// Find removed (in other but not in this)
-		for (const req of other.map.values()) {
-			if (!this.map.has(req.id)) {
-				removed.push(req);
-			}
-		}
+    // Find removed (in other but not in this)
+    for (const req of other.map.values()) {
+      if (!this.map.has(req.id)) {
+        removed.push(req);
+      }
+    }
 
-		return { added, removed, unchanged };
-	}
+    return { added, removed, unchanged };
+  }
 }

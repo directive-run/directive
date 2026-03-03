@@ -3,17 +3,17 @@ import { useDevToolsConnection } from "./hooks/use-devtools-connection";
 import { useReplay } from "./hooks/use-replay";
 
 import { useAnomalies } from "./hooks/use-anomalies";
-import { TimelineView } from "./views/TimelineView";
 import { DagView } from "./views/DagView";
+import { TimelineView } from "./views/TimelineView";
 
-import { BreakpointView } from "./views/BreakpointView";
-import { StateView } from "./views/StateView";
-import { CostView } from "./views/CostView";
-import { SessionPanel } from "./components/SessionPanel";
 import { ReplayControls } from "./components/ReplayControls";
+import { SessionPanel } from "./components/SessionPanel";
 import { TimeTravelEditor } from "./components/TimeTravelEditor";
-import type { ConnectionStatus, DevToolsSnapshot } from "./lib/types";
 import type { TimeFormat } from "./lib/time-format";
+import type { ConnectionStatus, DevToolsSnapshot } from "./lib/types";
+import { BreakpointView } from "./views/BreakpointView";
+import { CostView } from "./views/CostView";
+import { StateView } from "./views/StateView";
 
 type View = "timeline" | "dag" | "breakpoints" | "state" | "cost";
 
@@ -33,7 +33,13 @@ const STATUS_DOT_COLORS: Record<ConnectionStatus, string> = {
 };
 
 function StatusDot({ status }: { status: ConnectionStatus }) {
-  return <span className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT_COLORS[status]}`} role="status" aria-label={`Connection ${status}`} />;
+  return (
+    <span
+      className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT_COLORS[status]}`}
+      role="status"
+      aria-label={`Connection ${status}`}
+    />
+  );
 }
 
 class ViewErrorBoundary extends React.Component<
@@ -54,11 +60,18 @@ class ViewErrorBoundary extends React.Component<
   render() {
     if (this.state.error) {
       return (
-        <div className="flex h-full items-center justify-center text-zinc-500" role="alert">
+        <div
+          className="flex h-full items-center justify-center text-zinc-500"
+          role="alert"
+        >
           <div className="text-center">
-            <div className="mb-2 text-4xl" aria-hidden="true">⚠</div>
+            <div className="mb-2 text-4xl" aria-hidden="true">
+              ⚠
+            </div>
             <p className="text-red-400">View crashed</p>
-            <p className="mt-1 text-xs text-zinc-400">{this.state.error.message}</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              {this.state.error.message}
+            </p>
             <button
               onClick={() => this.setState({ error: null })}
               className="mt-3 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
@@ -112,7 +125,8 @@ export function App() {
   }, []);
 
   // I2: Time-travel editor state
-  const [editingSnapshot, setEditingSnapshot] = useState<DevToolsSnapshot | null>(null);
+  const [editingSnapshot, setEditingSnapshot] =
+    useState<DevToolsSnapshot | null>(null);
 
   // Events visible to downstream views (replay-filtered or live)
   const visibleEvents = replay.visibleEvents;
@@ -136,7 +150,14 @@ export function App() {
       conn.requestScratchpad();
       conn.requestDerived();
     }
-  }, [conn.status, conn.requestEvents, conn.requestBreakpoints, conn.requestSnapshot, conn.requestScratchpad, conn.requestDerived]);
+  }, [
+    conn.status,
+    conn.requestEvents,
+    conn.requestBreakpoints,
+    conn.requestSnapshot,
+    conn.requestScratchpad,
+    conn.requestDerived,
+  ]);
 
   const handleConnect = useCallback(() => {
     // Persist token to localStorage
@@ -154,23 +175,29 @@ export function App() {
   }, [conn.disconnect, conn.connect, wsUrl, authToken]);
 
   // E9: Replay from event handler
-  const handleReplayFromEvent = useCallback((eventId: number) => {
-    const index = conn.events.findIndex((e) => e.id === eventId);
-    if (index !== -1) {
-      replay.replayFromIndex(index);
-    }
-  }, [conn.events, replay.replayFromIndex]);
+  const handleReplayFromEvent = useCallback(
+    (eventId: number) => {
+      const index = conn.events.findIndex((e) => e.id === eventId);
+      if (index !== -1) {
+        replay.replayFromIndex(index);
+      }
+    },
+    [conn.events, replay.replayFromIndex],
+  );
 
   // I2: Time-travel editor handlers
   const handleEditSnapshot = useCallback(() => {
     setEditingSnapshot(conn.snapshot);
   }, [conn.snapshot]);
 
-  const handleForkFromEditor = useCallback((snapshot: DevToolsSnapshot) => {
-    // Send modified snapshot to server via fork mechanism
-    conn.send({ type: "fork_from_snapshot", eventId: snapshot.eventCount });
-    setEditingSnapshot(null);
-  }, [conn.send]);
+  const handleForkFromEditor = useCallback(
+    (snapshot: DevToolsSnapshot) => {
+      // Send modified snapshot to server via fork mechanism
+      conn.send({ type: "fork_from_snapshot", eventId: snapshot.eventCount });
+      setEditingSnapshot(null);
+    },
+    [conn.send],
+  );
 
   const handleCloseEditor = useCallback(() => {
     setEditingSnapshot(null);
@@ -198,7 +225,12 @@ export function App() {
 
         {/* Connection */}
         <div className="border-b border-zinc-800 px-4 py-3">
-          <label htmlFor="ws-url-input" className="mb-1 block text-xs text-zinc-500">Server URL</label>
+          <label
+            htmlFor="ws-url-input"
+            className="mb-1 block text-xs text-zinc-500"
+          >
+            Server URL
+          </label>
           <div className="flex gap-1">
             <input
               id="ws-url-input"
@@ -216,7 +248,12 @@ export function App() {
               {conn.status === "connected" ? "↻" : "⚡"}
             </button>
           </div>
-          <label htmlFor="auth-token-input" className="mb-1 mt-2 block text-xs text-zinc-500">Auth Token (optional)</label>
+          <label
+            htmlFor="auth-token-input"
+            className="mb-1 mt-2 block text-xs text-zinc-500"
+          >
+            Auth Token (optional)
+          </label>
           <div className="flex gap-1">
             <input
               id="auth-token-input"
@@ -230,7 +267,11 @@ export function App() {
               <button
                 onClick={() => {
                   setAuthToken("");
-                  try { localStorage.removeItem("directive-devtools-auth-token"); } catch { /* ignore */ }
+                  try {
+                    localStorage.removeItem("directive-devtools-auth-token");
+                  } catch {
+                    /* ignore */
+                  }
                 }}
                 aria-label="Clear auth token"
                 className="rounded bg-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200"
@@ -242,7 +283,11 @@ export function App() {
         </div>
 
         {/* Nav items */}
-        <div className="flex-1 py-2" role="navigation" aria-label="DevTools views">
+        <div
+          className="flex-1 py-2"
+          role="navigation"
+          aria-label="DevTools views"
+        >
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -254,26 +299,34 @@ export function App() {
                   : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
               }`}
             >
-              <span className="text-base" aria-hidden="true">{item.icon}</span>
+              <span className="text-base" aria-hidden="true">
+                {item.icon}
+              </span>
               <span>{item.label}</span>
-              {item.id === "breakpoints" && conn.breakpointState.pending.length > 0 && (
-                <span className="ml-auto rounded-full bg-amber-500 px-1.5 text-xs font-medium text-black">
-                  {conn.breakpointState.pending.length}
-                </span>
-              )}
-              {item.id === "state" && (Object.keys(conn.scratchpadState).length + Object.keys(conn.derivedState).length) > 0 && (
-                <span className="ml-auto rounded-full bg-fuchsia-500/30 px-1.5 text-[10px] text-fuchsia-400">
-                  {Object.keys(conn.scratchpadState).length + Object.keys(conn.derivedState).length}
-                </span>
-              )}
-              {item.id === "timeline" && anomalyResult.severityCounts.critical > 0 && (
-                <span
-                  className="ml-auto rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white"
-                  title={`${anomalyResult.severityCounts.critical} critical anomal${anomalyResult.severityCounts.critical === 1 ? "y" : "ies"} detected`}
-                >
-                  {anomalyResult.severityCounts.critical}
-                </span>
-              )}
+              {item.id === "breakpoints" &&
+                conn.breakpointState.pending.length > 0 && (
+                  <span className="ml-auto rounded-full bg-amber-500 px-1.5 text-xs font-medium text-black">
+                    {conn.breakpointState.pending.length}
+                  </span>
+                )}
+              {item.id === "state" &&
+                Object.keys(conn.scratchpadState).length +
+                  Object.keys(conn.derivedState).length >
+                  0 && (
+                  <span className="ml-auto rounded-full bg-fuchsia-500/30 px-1.5 text-[10px] text-fuchsia-400">
+                    {Object.keys(conn.scratchpadState).length +
+                      Object.keys(conn.derivedState).length}
+                  </span>
+                )}
+              {item.id === "timeline" &&
+                anomalyResult.severityCounts.critical > 0 && (
+                  <span
+                    className="ml-auto rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white"
+                    title={`${anomalyResult.severityCounts.critical} critical anomal${anomalyResult.severityCounts.critical === 1 ? "y" : "ies"} detected`}
+                  >
+                    {anomalyResult.severityCounts.critical}
+                  </span>
+                )}
             </button>
           ))}
         </div>
@@ -286,25 +339,57 @@ export function App() {
         />
 
         {/* Stats footer */}
-        <div className="overflow-y-auto border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500" style={{ maxHeight: "120px" }} aria-live="polite">
-          <div>Events: {replay.state.active ? `${visibleEvents.length}/${conn.events.length}` : conn.events.length}</div>
-          <div>Agents: {new Set(conn.events.filter((e) => e.agentId).map((e) => e.agentId)).size}</div>
+        <div
+          className="overflow-y-auto border-t border-zinc-800 px-4 py-3 text-xs text-zinc-500"
+          style={{ maxHeight: "120px" }}
+          aria-live="polite"
+        >
+          <div>
+            Events:{" "}
+            {replay.state.active
+              ? `${visibleEvents.length}/${conn.events.length}`
+              : conn.events.length}
+          </div>
+          <div>
+            Agents:{" "}
+            {
+              new Set(
+                conn.events.filter((e) => e.agentId).map((e) => e.agentId),
+              ).size
+            }
+          </div>
           {replay.state.active && (
-            <div className="text-blue-400">Replay: {replay.state.cursorIndex + 1}/{conn.events.length}</div>
+            <div className="text-blue-400">
+              Replay: {replay.state.cursorIndex + 1}/{conn.events.length}
+            </div>
           )}
           {/* E12: Pause indicator */}
           {conn.isPaused && (
-            <div className="text-amber-400">Paused ({conn.pendingCount} pending)</div>
+            <div className="text-amber-400">
+              Paused ({conn.pendingCount} pending)
+            </div>
           )}
           {anomalyResult.anomalies.length > 0 && (
             <div className="text-amber-400">
-              Anomalies: {anomalyResult.severityCounts.critical > 0 && <span className="text-red-400">{anomalyResult.severityCounts.critical} critical</span>}
-              {anomalyResult.severityCounts.critical > 0 && anomalyResult.severityCounts.warning > 0 && ", "}
-              {anomalyResult.severityCounts.warning > 0 && `${anomalyResult.severityCounts.warning} warn`}
+              Anomalies:{" "}
+              {anomalyResult.severityCounts.critical > 0 && (
+                <span className="text-red-400">
+                  {anomalyResult.severityCounts.critical} critical
+                </span>
+              )}
+              {anomalyResult.severityCounts.critical > 0 &&
+                anomalyResult.severityCounts.warning > 0 &&
+                ", "}
+              {anomalyResult.severityCounts.warning > 0 &&
+                `${anomalyResult.severityCounts.warning} warn`}
             </div>
           )}
           {conn.error && (
-            <div className="mt-1 text-red-400">{conn.error.length > 200 ? `${conn.error.slice(0, 200)}...` : conn.error}</div>
+            <div className="mt-1 text-red-400">
+              {conn.error.length > 200
+                ? `${conn.error.slice(0, 200)}...`
+                : conn.error}
+            </div>
           )}
         </div>
       </nav>
@@ -319,19 +404,35 @@ export function App() {
         )}
 
         {conn.status !== "connected" ? (
-          <div className="flex h-full items-center justify-center text-zinc-500" role={conn.status === "error" ? "alert" : undefined}>
+          <div
+            className="flex h-full items-center justify-center text-zinc-500"
+            role={conn.status === "error" ? "alert" : undefined}
+          >
             <div className="text-center">
               {conn.status === "error" ? (
                 <>
-                  <div className="mb-2 text-4xl" aria-hidden="true">⚠</div>
+                  <div className="mb-2 text-4xl" aria-hidden="true">
+                    ⚠
+                  </div>
                   <p className="text-red-400">Connection failed</p>
-                  {conn.error && <p className="mt-1 text-xs text-red-400/70">{conn.error}</p>}
+                  {conn.error && (
+                    <p className="mt-1 text-xs text-red-400/70">{conn.error}</p>
+                  )}
                   <div className="mt-3 rounded border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-left text-xs text-zinc-400">
-                    <p className="mb-1 font-medium text-zinc-300">Troubleshooting:</p>
+                    <p className="mb-1 font-medium text-zinc-300">
+                      Troubleshooting:
+                    </p>
                     <ul className="list-inside list-disc space-y-0.5">
                       <li>Is the orchestrator running?</li>
-                      <li>Check the port matches (current: <code className="text-zinc-300">{wsUrl}</code>)</li>
-                      <li>Ensure <code className="text-zinc-300">connectDevTools()</code> is called before agent runs</li>
+                      <li>
+                        Check the port matches (current:{" "}
+                        <code className="text-zinc-300">{wsUrl}</code>)
+                      </li>
+                      <li>
+                        Ensure{" "}
+                        <code className="text-zinc-300">connectDevTools()</code>{" "}
+                        is called before agent runs
+                      </li>
                     </ul>
                   </div>
                   <button
@@ -343,13 +444,22 @@ export function App() {
                 </>
               ) : conn.status === "connecting" ? (
                 <>
-                  <div className="mb-2 text-4xl motion-safe:animate-pulse" aria-hidden="true">⏳</div>
+                  <div
+                    className="mb-2 text-4xl motion-safe:animate-pulse"
+                    aria-hidden="true"
+                  >
+                    ⏳
+                  </div>
                   <p>Connecting to {wsUrl}...</p>
-                  <p className="mt-1 text-xs">Attempting to establish connection</p>
+                  <p className="mt-1 text-xs">
+                    Attempting to establish connection
+                  </p>
                 </>
               ) : (
                 <>
-                  <div className="mb-2 text-4xl" aria-hidden="true">⏳</div>
+                  <div className="mb-2 text-4xl" aria-hidden="true">
+                    ⏳
+                  </div>
                   <p>Not connected</p>
                   <p className="mt-1 text-xs">
                     Start your orchestrator with{" "}
@@ -358,7 +468,8 @@ export function App() {
                     </code>
                   </p>
                   <p className="mt-2 text-[10px] text-zinc-500">
-                    Default port is 4040. Change the Server URL in the sidebar if needed.
+                    Default port is 4040. Change the Server URL in the sidebar
+                    if needed.
                   </p>
                 </>
               )}
@@ -392,7 +503,9 @@ export function App() {
                     onReplayFromHere={handleReplayFromEvent}
                   />
                 )}
-                {view === "dag" && <DagView events={visibleEvents} snapshot={conn.snapshot} />}
+                {view === "dag" && (
+                  <DagView events={visibleEvents} snapshot={conn.snapshot} />
+                )}
                 {view === "cost" && <CostView events={visibleEvents} />}
                 {view === "breakpoints" && (
                   <BreakpointView

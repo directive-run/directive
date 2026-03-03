@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Time Machine example", () => {
@@ -7,12 +7,20 @@ test.describe("Time Machine example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/time-machine");
     try {
-      await page.waitForSelector("directive-time-machine", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-time-machine", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-time-machine", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-time-machine", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-time-machine-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-time-machine-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and UI renders", async ({ page }) => {
@@ -240,6 +248,8 @@ test.describe("Time Machine example", () => {
     await tid(page, "tm-replay").click();
 
     // Timeline should show replay event
-    await expect(tid(page, "tm-timeline").locator(".tm-timeline-entry")).toBeVisible({ timeout: 10_000 });
+    await expect(
+      tid(page, "tm-timeline").locator(".tm-timeline-entry"),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

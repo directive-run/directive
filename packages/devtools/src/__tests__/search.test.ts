@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // Test the pure search logic from SearchBar
 
@@ -190,9 +190,7 @@ describe("executeSearch", () => {
   });
 
   it("handles backslash in pattern", () => {
-    const indexWithBackslash = [
-      { id: 1, text: "path\\to\\file" },
-    ];
+    const indexWithBackslash = [{ id: 1, text: "path\\to\\file" }];
     // Double backslash is valid regex matching literal backslash
     const result = executeSearch("path\\\\to", indexWithBackslash);
     expect(result!.isInvalid).toBe(false);

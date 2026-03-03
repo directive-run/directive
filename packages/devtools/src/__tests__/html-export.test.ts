@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { generateStandaloneHTML } from "../lib/html-export";
 import type { DebugEvent } from "../lib/types";
 
-function makeEvent(overrides: Partial<DebugEvent> & { id: number; type: DebugEvent["type"]; timestamp: number }): DebugEvent {
+function makeEvent(
+  overrides: Partial<DebugEvent> & {
+    id: number;
+    type: DebugEvent["type"];
+    timestamp: number;
+  },
+): DebugEvent {
   return { snapshotId: null, ...overrides } as DebugEvent;
 }
 
@@ -15,7 +21,12 @@ describe("generateStandaloneHTML", () => {
 
   it("generates HTML with events embedded as JSON", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_start", timestamp: 1000, agentId: "test" }),
+      makeEvent({
+        id: 1,
+        type: "agent_start",
+        timestamp: 1000,
+        agentId: "test",
+      }),
     ];
     const html = generateStandaloneHTML(events);
     expect(html).toContain("<!DOCTYPE html>");
@@ -26,7 +37,12 @@ describe("generateStandaloneHTML", () => {
 
   it("escapes </script> sequences in JSON", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_error", timestamp: 1000, errorMessage: "</script><script>alert(1)</script>" }),
+      makeEvent({
+        id: 1,
+        type: "agent_error",
+        timestamp: 1000,
+        errorMessage: "</script><script>alert(1)</script>",
+      }),
     ];
     const html = generateStandaloneHTML(events);
     // Should NOT contain raw </script> in the JSON (would break the HTML)
@@ -38,7 +54,12 @@ describe("generateStandaloneHTML", () => {
 
   it("escapes Unicode line separators", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_start", timestamp: 1000, agentId: "test\u2028\u2029" }),
+      makeEvent({
+        id: 1,
+        type: "agent_start",
+        timestamp: 1000,
+        agentId: "test\u2028\u2029",
+      }),
     ];
     const html = generateStandaloneHTML(events);
     expect(html).toContain("\\u2028");
@@ -46,7 +67,9 @@ describe("generateStandaloneHTML", () => {
   });
 
   it("escapes HTML in title", () => {
-    const html = generateStandaloneHTML([], { title: '<script>alert("xss")</script>' });
+    const html = generateStandaloneHTML([], {
+      title: '<script>alert("xss")</script>',
+    });
     expect(html).not.toContain('<script>alert("xss")</script>');
     expect(html).toContain("&lt;script&gt;");
   });
@@ -79,7 +102,12 @@ describe("generateStandaloneHTML", () => {
 
   it("handles special characters in agentId safely", () => {
     const events = [
-      makeEvent({ id: 1, type: "agent_start", timestamp: 1000, agentId: 'agent<"with&special>chars' }),
+      makeEvent({
+        id: 1,
+        type: "agent_start",
+        timestamp: 1000,
+        agentId: 'agent<"with&special>chars',
+      }),
     ];
     // Should not throw
     const html = generateStandaloneHTML(events);
@@ -91,7 +119,12 @@ describe("generateStandaloneHTML", () => {
   it("handles very large event data without crashing", () => {
     const bigString = "x".repeat(10_000);
     const events = [
-      makeEvent({ id: 1, type: "agent_complete", timestamp: 1000, output: bigString }),
+      makeEvent({
+        id: 1,
+        type: "agent_complete",
+        timestamp: 1000,
+        output: bigString,
+      }),
     ];
     const html = generateStandaloneHTML(events);
     expect(html).toContain("<!DOCTYPE html>");
@@ -104,7 +137,9 @@ describe("generateStandaloneHTML", () => {
     // The detail panel should use createTextNode for user-provided data
     expect(html).toContain("createTextNode");
     // The showDetail function should use textContent, not `.innerHTML =` assignments
-    const showDetailSection = html.split("function showDetail")[1]!.split("})();")[0]!;
+    const showDetailSection = html
+      .split("function showDetail")[1]!
+      .split("})();")[0]!;
     expect(showDetailSection).toContain("textContent");
     // Verify no innerHTML assignments (`.innerHTML =`) in the detail renderer
     // The comment "no innerHTML with user data" is fine — it's the assignments we're guarding against

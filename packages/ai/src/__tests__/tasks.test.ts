@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  createTestMultiAgentOrchestrator,
-  createMockTask,
-} from "../testing.js";
-import { dag, sequential, parallel } from "../multi-agent-orchestrator.js";
+import { describe, expect, it, vi } from "vitest";
+import { dag, parallel, sequential } from "../multi-agent-orchestrator.js";
 import type { TaskContext } from "../multi-agent-orchestrator.js";
+import {
+  createMockTask,
+  createTestMultiAgentOrchestrator,
+} from "../testing.js";
 
 // ============================================================================
 // Basic task execution
@@ -43,7 +43,10 @@ describe("tasks: basic execution", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<string>("pipeline", "analyze this");
+    const result = await orchestrator.runPattern<string>(
+      "pipeline",
+      "analyze this",
+    );
 
     expect(result).toBe("final report");
   });
@@ -87,9 +90,8 @@ describe("tasks: basic execution", () => {
         },
       },
       patterns: {
-        fan: parallel(
-          ["agent1", "transform"],
-          (results) => results.map((r) => String(r.output)).join("|"),
+        fan: parallel(["agent1", "transform"], (results) =>
+          results.map((r) => String(r.output)).join("|"),
         ),
       },
     });
@@ -343,9 +345,22 @@ describe("tasks: TaskContext", () => {
     const progressEvents = events.filter((e) => e.type === "task_progress");
 
     expect(progressEvents).toHaveLength(3);
-    expect(progressEvents[0]).toMatchObject({ type: "task_progress", taskId: "prog", percent: 25, message: "Quarter done" });
-    expect(progressEvents[1]).toMatchObject({ type: "task_progress", taskId: "prog", percent: 75 });
-    expect(progressEvents[2]).toMatchObject({ type: "task_progress", taskId: "prog", percent: 100 });
+    expect(progressEvents[0]).toMatchObject({
+      type: "task_progress",
+      taskId: "prog",
+      percent: 25,
+      message: "Quarter done",
+    });
+    expect(progressEvents[1]).toMatchObject({
+      type: "task_progress",
+      taskId: "prog",
+      percent: 75,
+    });
+    expect(progressEvents[2]).toMatchObject({
+      type: "task_progress",
+      taskId: "prog",
+      percent: 100,
+    });
   });
 
   it("reportProgress clamps NaN to 0", async () => {
@@ -355,7 +370,7 @@ describe("tasks: TaskContext", () => {
       tasks: {
         nanTask: {
           run: async (_input, _signal, context) => {
-            context.reportProgress(NaN, "NaN progress");
+            context.reportProgress(Number.NaN, "NaN progress");
 
             return "ok";
           },
@@ -451,7 +466,9 @@ describe("tasks: retry", () => {
       },
     });
 
-    await expect(orchestrator.run("broken", "x")).rejects.toThrow("permanent error");
+    await expect(orchestrator.run("broken", "x")).rejects.toThrow(
+      "permanent error",
+    );
   });
 
   it("emits per-attempt error timeline events during retry", async () => {
@@ -510,7 +527,7 @@ describe("tasks: retry", () => {
         tasks: {
           bad: {
             run: async () => "ok",
-            retry: { attempts: Infinity },
+            retry: { attempts: Number.POSITIVE_INFINITY },
             label: "Bad",
           },
         },
@@ -542,7 +559,7 @@ describe("tasks: retry", () => {
         tasks: {
           bad: {
             run: async () => "ok",
-            retry: { attempts: NaN },
+            retry: { attempts: Number.NaN },
             label: "Bad",
           },
         },
@@ -558,7 +575,7 @@ describe("tasks: retry", () => {
         tasks: {
           bad: {
             run: async () => "ok",
-            retry: { attempts: 2, delayMs: NaN },
+            retry: { attempts: 2, delayMs: Number.NaN },
             label: "Bad",
           },
         },
@@ -623,10 +640,14 @@ describe("tasks: timeout and abort", () => {
           run: async (_input, signal) => {
             return new Promise((_resolve, reject) => {
               const timer = setTimeout(() => _resolve("done"), 5000);
-              signal.addEventListener("abort", () => {
-                clearTimeout(timer);
-                reject(new Error("aborted"));
-              }, { once: true });
+              signal.addEventListener(
+                "abort",
+                () => {
+                  clearTimeout(timer);
+                  reject(new Error("aborted"));
+                },
+                { once: true },
+              );
             });
           },
           timeout: 10,
@@ -649,10 +670,14 @@ describe("tasks: timeout and abort", () => {
           run: async (_input, signal) => {
             return new Promise((_resolve, reject) => {
               const timer = setTimeout(() => _resolve("done"), 5000);
-              signal.addEventListener("abort", () => {
-                clearTimeout(timer);
-                reject(new Error("cancelled"));
-              }, { once: true });
+              signal.addEventListener(
+                "abort",
+                () => {
+                  clearTimeout(timer);
+                  reject(new Error("cancelled"));
+                },
+                { once: true },
+              );
             });
           },
           label: "Cancelable",
@@ -784,7 +809,9 @@ describe("tasks: registration lifecycle", () => {
       tasks: {
         longRunning: {
           run: async () => {
-            await new Promise<void>((r) => { resolveTask = r; });
+            await new Promise<void>((r) => {
+              resolveTask = r;
+            });
 
             return "ok";
           },
@@ -798,7 +825,9 @@ describe("tasks: registration lifecycle", () => {
     // Give it a tick to start
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(() => orchestrator.unregisterTask("longRunning")).toThrow("while it is running");
+    expect(() => orchestrator.unregisterTask("longRunning")).toThrow(
+      "while it is running",
+    );
 
     resolveTask?.();
     await runPromise;
@@ -812,7 +841,10 @@ describe("tasks: registration lifecycle", () => {
     });
 
     expect(() =>
-      orchestrator.registerTask("__coord", { run: async () => "ok", label: "Bad" }),
+      orchestrator.registerTask("__coord", {
+        run: async () => "ok",
+        label: "Bad",
+      }),
     ).toThrow("reserved");
   });
 
@@ -856,7 +888,7 @@ describe("tasks: registration lifecycle", () => {
         agents: {},
         mockResponses: {},
         tasks: {
-          bad: { run: async () => "ok", timeout: NaN, label: "Bad" },
+          bad: { run: async () => "ok", timeout: Number.NaN, label: "Bad" },
         },
       }),
     ).toThrow("timeout must be a finite number > 0");
@@ -878,7 +910,11 @@ describe("tasks: registration lifecycle", () => {
         agents: {},
         mockResponses: {},
         tasks: {
-          bad: { run: async () => "ok", maxConcurrent: NaN, label: "Bad" },
+          bad: {
+            run: async () => "ok",
+            maxConcurrent: Number.NaN,
+            label: "Bad",
+          },
         },
       }),
     ).toThrow("maxConcurrent must be a finite integer >= 1");
@@ -896,7 +932,10 @@ describe("tasks: registration lifecycle", () => {
     ).toThrow("timeout must be a finite number > 0");
 
     expect(() =>
-      orchestrator.registerTask("bad2", { run: async () => "ok", maxConcurrent: 0 }),
+      orchestrator.registerTask("bad2", {
+        run: async () => "ok",
+        maxConcurrent: 0,
+      }),
     ).toThrow("maxConcurrent must be a finite integer >= 1");
   });
 
@@ -991,7 +1030,9 @@ describe("tasks: state tracking", () => {
       },
     });
 
-    await expect(orchestrator.run("failing", "x")).rejects.toThrow("task failed");
+    await expect(orchestrator.run("failing", "x")).rejects.toThrow(
+      "task failed",
+    );
 
     const state = orchestrator.getTaskState("failing");
 
@@ -1010,7 +1051,11 @@ describe("tasks: timeline events", () => {
       agents: {},
       mockResponses: {},
       tasks: {
-        t: { run: async () => "ok", label: "My Task", description: "A test task" },
+        t: {
+          run: async () => "ok",
+          label: "My Task",
+          description: "A test task",
+        },
       },
       debug: true,
     });
@@ -1083,8 +1128,10 @@ describe("tasks: lifecycle hooks", () => {
         t: { run: async () => "ok", label: "T" },
       },
       hooks: {
-        onTaskStart: (e) => hookEvents.push({ hook: "start", taskId: e.taskId }),
-        onTaskComplete: (e) => hookEvents.push({ hook: "complete", taskId: e.taskId }),
+        onTaskStart: (e) =>
+          hookEvents.push({ hook: "start", taskId: e.taskId }),
+        onTaskComplete: (e) =>
+          hookEvents.push({ hook: "complete", taskId: e.taskId }),
       },
     });
 
@@ -1111,7 +1158,8 @@ describe("tasks: lifecycle hooks", () => {
         },
       },
       hooks: {
-        onTaskError: (e) => errors.push({ taskId: e.taskId, error: e.error.message }),
+        onTaskError: (e) =>
+          errors.push({ taskId: e.taskId, error: e.error.message }),
       },
     });
 
@@ -1121,7 +1169,11 @@ describe("tasks: lifecycle hooks", () => {
   });
 
   it("fires onTaskProgress hook from reportProgress", async () => {
-    const progressEvents: Array<{ taskId: string; percent: number; message?: string }> = [];
+    const progressEvents: Array<{
+      taskId: string;
+      percent: number;
+      message?: string;
+    }> = [];
 
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {},
@@ -1137,13 +1189,20 @@ describe("tasks: lifecycle hooks", () => {
         },
       },
       hooks: {
-        onTaskProgress: (e) => progressEvents.push({ taskId: e.taskId, percent: e.percent, message: e.message }),
+        onTaskProgress: (e) =>
+          progressEvents.push({
+            taskId: e.taskId,
+            percent: e.percent,
+            message: e.message,
+          }),
       },
     });
 
     await orchestrator.run("t", "x");
 
-    expect(progressEvents).toEqual([{ taskId: "t", percent: 50, message: "halfway" }]);
+    expect(progressEvents).toEqual([
+      { taskId: "t", percent: 50, message: "halfway" },
+    ]);
   });
 
   it("hooks receive patternId when run via pattern", async () => {
@@ -1201,7 +1260,11 @@ describe("tasks: pause and waitForIdle", () => {
 describe("createMockTask", () => {
   it("creates a basic mock task", async () => {
     const task = createMockTask("mock output");
-    const result = await task.run("input", new AbortController().signal, {} as TaskContext);
+    const result = await task.run(
+      "input",
+      new AbortController().signal,
+      {} as TaskContext,
+    );
 
     expect(result).toBe("mock output");
     expect(task.label).toBe("Mock Task");
@@ -1235,7 +1298,10 @@ describe("createMockTask", () => {
   });
 
   it("custom label and description", () => {
-    const task = createMockTask("output", { label: "Custom", description: "A custom task" });
+    const task = createMockTask("output", {
+      label: "Custom",
+      description: "A custom task",
+    });
 
     expect(task.label).toBe("Custom");
     expect(task.description).toBe("A custom task");
@@ -1256,7 +1322,9 @@ describe("tasks: streaming", () => {
       tasks: {
         slow: {
           run: async () => {
-            await new Promise<void>((r) => { resolveTask = r; });
+            await new Promise<void>((r) => {
+              resolveTask = r;
+            });
 
             return "stream result";
           },
@@ -1269,7 +1337,9 @@ describe("tasks: streaming", () => {
 
     // waitForIdle should not resolve yet since task is running
     let idleResolved = false;
-    const idlePromise = orchestrator.waitForIdle(100).then(() => { idleResolved = true; });
+    const idlePromise = orchestrator.waitForIdle(100).then(() => {
+      idleResolved = true;
+    });
 
     await new Promise((r) => setTimeout(r, 20));
     expect(idleResolved).toBe(false);
@@ -1297,7 +1367,9 @@ describe("tasks: checkpoint", () => {
       tasks: {
         blocking: {
           run: async () => {
-            await new Promise<void>((r) => { resolveTask = r; });
+            await new Promise<void>((r) => {
+              resolveTask = r;
+            });
 
             return "ok";
           },
@@ -1311,7 +1383,9 @@ describe("tasks: checkpoint", () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    await expect(orchestrator.checkpoint()).rejects.toThrow('Cannot checkpoint while task "blocking" is running');
+    await expect(orchestrator.checkpoint()).rejects.toThrow(
+      'Cannot checkpoint while task "blocking" is running',
+    );
 
     resolveTask?.();
     await runPromise;
@@ -1346,7 +1420,9 @@ describe("tasks: self-healing exclusion", () => {
     });
 
     // Task failure should NOT be caught by self-healing — should propagate directly
-    await expect(orchestrator.run("failingTask", "x")).rejects.toThrow("task failure");
+    await expect(orchestrator.run("failingTask", "x")).rejects.toThrow(
+      "task failure",
+    );
   });
 });
 

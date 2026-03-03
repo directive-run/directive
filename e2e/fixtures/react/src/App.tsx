@@ -1,34 +1,34 @@
-import { useState, useEffect } from "react";
-import { UseFactPage } from "./hooks/UseFact";
+import { useEffect, useState } from "react";
+import { UseConstraintStatusPage } from "./hooks/UseConstraintStatus";
 import { UseDerivedPage } from "./hooks/UseDerived";
-import { UseSelectorPage } from "./hooks/UseSelector";
-import { UseSelectorDefaultPage } from "./hooks/UseSelectorDefault";
+import { UseDirectivePage } from "./hooks/UseDirective";
 import { UseDispatchPage } from "./hooks/UseDispatch";
-import { UseWatchPage } from "./hooks/UseWatch";
-import { UseInspectPage } from "./hooks/UseInspect";
 import { UseEventsPage } from "./hooks/UseEvents";
 import { UseExplainPage } from "./hooks/UseExplain";
-import { UseConstraintStatusPage } from "./hooks/UseConstraintStatus";
+import { UseFactPage } from "./hooks/UseFact";
+import { UseInspectPage } from "./hooks/UseInspect";
 import { UseOptimisticUpdatePage } from "./hooks/UseOptimisticUpdate";
 import { UseRequirementStatusPage } from "./hooks/UseRequirementStatus";
+import { UseSelectorPage } from "./hooks/UseSelector";
+import { UseSelectorDefaultPage } from "./hooks/UseSelectorDefault";
 import { UseTimeTravelPage } from "./hooks/UseTimeTravel";
-import { UseDirectivePage } from "./hooks/UseDirective";
+import { UseWatchPage } from "./hooks/UseWatch";
 
 const routes: Record<string, () => JSX.Element> = {
-  "useFact": UseFactPage,
-  "useDerived": UseDerivedPage,
-  "useSelector": UseSelectorPage,
-  "useSelectorDefault": UseSelectorDefaultPage,
-  "useDispatch": UseDispatchPage,
-  "useWatch": UseWatchPage,
-  "useInspect": UseInspectPage,
-  "useEvents": UseEventsPage,
-  "useExplain": UseExplainPage,
-  "useConstraintStatus": UseConstraintStatusPage,
-  "useOptimisticUpdate": UseOptimisticUpdatePage,
-  "useRequirementStatus": UseRequirementStatusPage,
-  "useTimeTravel": UseTimeTravelPage,
-  "useDirective": UseDirectivePage,
+  useFact: UseFactPage,
+  useDerived: UseDerivedPage,
+  useSelector: UseSelectorPage,
+  useSelectorDefault: UseSelectorDefaultPage,
+  useDispatch: UseDispatchPage,
+  useWatch: UseWatchPage,
+  useInspect: UseInspectPage,
+  useEvents: UseEventsPage,
+  useExplain: UseExplainPage,
+  useConstraintStatus: UseConstraintStatusPage,
+  useOptimisticUpdate: UseOptimisticUpdatePage,
+  useRequirementStatus: UseRequirementStatusPage,
+  useTimeTravel: UseTimeTravelPage,
+  useDirective: UseDirectivePage,
 };
 
 export function App() {

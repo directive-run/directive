@@ -62,7 +62,11 @@ export interface ReflectionConfig<T = unknown> {
   /** Maximum iterations (including the first). Default: 2 (conservative) */
   maxIterations?: number;
   /** Build the retry input from original input + feedback */
-  buildRetryInput?: (input: string, feedback: string, iteration: number) => string;
+  buildRetryInput?: (
+    input: string,
+    feedback: string,
+    iteration: number,
+  ) => string;
   /** Callback on each iteration */
   onIteration?: (event: {
     iteration: number;
@@ -96,7 +100,7 @@ export class ReflectionExhaustedError extends Error {
   }) {
     super(
       `[Directive Reflection] Exhausted ${options.iterations} iterations without passing evaluation. ` +
-      `Last feedback: ${options.history[options.history.length - 1]?.feedback ?? "(none)"}`,
+        `Last feedback: ${options.history[options.history.length - 1]?.feedback ?? "(none)"}`,
     );
     this.name = "ReflectionExhaustedError";
     this.iterations = options.iterations;
@@ -111,7 +115,11 @@ export class ReflectionExhaustedError extends Error {
 // ============================================================================
 
 /** Default retry input format */
-function defaultBuildRetryInput(input: string, feedback: string, _iteration: number): string {
+function defaultBuildRetryInput(
+  input: string,
+  feedback: string,
+  _iteration: number,
+): string {
   return `${input}\n\nFeedback on your previous response:\n${feedback}\n\nPlease improve your response.`;
 }
 
@@ -146,10 +154,14 @@ export function withReflection<T = unknown>(
     throw new Error("[Directive Reflection] maxIterations must be >= 1");
   }
 
-  if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production" && maxIterations > 3) {
+  if (
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV !== "production" &&
+    maxIterations > 3
+  ) {
     console.warn(
       "[Directive Reflection] maxIterations > 3 rarely improves quality. " +
-      "Consider using maxIterations <= 3 to avoid unbounded token burn.",
+        "Consider using maxIterations <= 3 to avoid unbounded token burn.",
     );
   }
 
@@ -206,7 +218,10 @@ export function withReflection<T = unknown>(
       }
 
       // Check budget threshold
-      if (config.budgetThreshold !== undefined && accumulatedTokens >= config.budgetThreshold) {
+      if (
+        config.budgetThreshold !== undefined &&
+        accumulatedTokens >= config.budgetThreshold
+      ) {
         break;
       }
 

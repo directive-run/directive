@@ -68,10 +68,14 @@ const userModule = createModule("user", {
     displayName: (facts) => facts.user?.name ?? "Guest",
     statusMessage: (facts) => {
       switch (facts.status) {
-        case "idle": return "Ready";
-        case "loading": return "Loading...";
-        case "success": return `Welcome, ${facts.user?.name}!`;
-        case "error": return `Error: ${facts.errorMessage}`;
+        case "idle":
+          return "Ready";
+        case "loading":
+          return "Loading...";
+        case "success":
+          return `Welcome, ${facts.user?.name}!`;
+        case "error":
+          return `Error: ${facts.errorMessage}`;
       }
     },
   },
@@ -92,7 +96,8 @@ const userModule = createModule("user", {
 
   constraints: {
     needsUser: {
-      when: (facts) => facts.userId > 0 && facts.user === null && facts.status === "loading",
+      when: (facts) =>
+        facts.userId > 0 && facts.user === null && facts.status === "loading",
       require: (facts) => ({
         type: "FETCH_USER",
         userId: facts.userId, // typed as number

@@ -46,7 +46,9 @@ body {
 }
 
 @media (max-width: 800px) {
-  .ff-main { grid-template-columns: 1fr; }
+  .ff-main {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ===== Panel ===== */
@@ -84,7 +86,9 @@ body {
   margin-bottom: 0.5rem;
 }
 
-.ff-flag-group:last-child { margin-bottom: 0; }
+.ff-flag-group:last-child {
+  margin-bottom: 0;
+}
 
 .ff-flag-group-title {
   font-size: 0.6rem;
@@ -103,7 +107,9 @@ body {
   border-bottom: 1px solid var(--brand-border);
 }
 
-.ff-flag-row:last-child { border-bottom: none; }
+.ff-flag-row:last-child {
+  border-bottom: none;
+}
 
 .ff-flag-label {
   font-size: 0.75rem;
@@ -202,7 +208,9 @@ body {
   margin-bottom: 0.5rem;
 }
 
-.ff-inspector-section:last-child { margin-bottom: 0; }
+.ff-inspector-section:last-child {
+  margin-bottom: 0;
+}
 
 .ff-inspector-title {
   font-size: 0.65rem;
@@ -243,8 +251,12 @@ body {
   vertical-align: middle;
 }
 
-.ff-deriv-indicator.true { background: var(--brand-success); }
-.ff-deriv-indicator.false { background: var(--brand-text-faint); }
+.ff-deriv-indicator.true {
+  background: var(--brand-success);
+}
+.ff-deriv-indicator.false {
+  background: var(--brand-text-faint);
+}
 
 /* ===== Preview Cards (Right top) ===== */
 .ff-preview-grid {
@@ -289,8 +301,12 @@ body {
   flex-shrink: 0;
 }
 
-.ff-status-dot.on { background: var(--brand-success); }
-.ff-status-dot.off { background: var(--brand-text-faint); }
+.ff-status-dot.on {
+  background: var(--brand-success);
+}
+.ff-status-dot.off {
+  background: var(--brand-text-faint);
+}
 
 .ff-stats-bar {
   display: flex;
@@ -350,10 +366,18 @@ body {
   align-items: baseline;
 }
 
-.ff-timeline-entry.flag { border-left: 3px solid var(--brand-primary); }
-.ff-timeline-entry.constraint { border-left: 3px solid var(--brand-success); }
-.ff-timeline-entry.maintenance { border-left: 3px solid var(--brand-warning); }
-.ff-timeline-entry.system { border-left: 3px solid var(--brand-error); }
+.ff-timeline-entry.flag {
+  border-left: 3px solid var(--brand-primary);
+}
+.ff-timeline-entry.constraint {
+  border-left: 3px solid var(--brand-success);
+}
+.ff-timeline-entry.maintenance {
+  border-left: 3px solid var(--brand-warning);
+}
+.ff-timeline-entry.system {
+  border-left: 3px solid var(--brand-error);
+}
 
 .ff-timeline-time {
   color: var(--brand-text-faint);
@@ -392,8 +416,12 @@ body {
   margin-bottom: 0.4rem;
 }
 
-.ff-how-it-works ul { padding-left: 1.2rem; }
-.ff-how-it-works li { margin-bottom: 0.2rem; }
+.ff-how-it-works ul {
+  padding-left: 1.2rem;
+}
+.ff-how-it-works li {
+  margin-bottom: 0.2rem;
+}
 
 .ff-how-it-works .directive-note {
   margin-top: 0.4rem;

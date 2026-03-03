@@ -23,7 +23,9 @@ export function Timeline({ entries }: TimelineProps) {
       <div className="ff-timeline-header">Event Timeline</div>
       <div className="ff-timeline">
         {entries.length === 0 ? (
-          <div className="ff-timeline-empty">Events appear after interactions</div>
+          <div className="ff-timeline-empty">
+            Events appear after interactions
+          </div>
         ) : (
           entries.map((entry, i) => (
             <div key={i} className={`ff-timeline-entry ${entry.type}`}>

@@ -1,12 +1,18 @@
-'use client'
+"use client";
 
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, type EdgeProps } from '@xyflow/react'
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getBezierPath,
+  getSmoothStepPath,
+} from "@xyflow/react";
 
 interface LabeledEdgeData {
-  label?: string
-  active?: boolean
-  dashed?: boolean
-  smooth?: boolean
+  label?: string;
+  active?: boolean;
+  dashed?: boolean;
+  smooth?: boolean;
 }
 
 export function LabeledEdge({
@@ -25,10 +31,10 @@ export function LabeledEdge({
     active = false,
     dashed = false,
     smooth = false,
-  } = (data ?? {}) as LabeledEdgeData
-  const gradientId = `edge-grad-${id}`
+  } = (data ?? {}) as LabeledEdgeData;
+  const gradientId = `edge-grad-${id}`;
 
-  const pathFn = smooth ? getSmoothStepPath : getBezierPath
+  const pathFn = smooth ? getSmoothStepPath : getBezierPath;
   const [edgePath, labelX, labelY] = pathFn({
     sourceX,
     sourceY,
@@ -36,7 +42,7 @@ export function LabeledEdge({
     targetY,
     sourcePosition,
     targetPosition,
-  })
+  });
 
   return (
     <>
@@ -59,16 +65,21 @@ export function LabeledEdge({
         path={edgePath}
         markerEnd={markerEnd}
         style={{
-          stroke: active ? `url(#${gradientId})` : '#334155',
+          stroke: active ? `url(#${gradientId})` : "#334155",
           strokeWidth: active ? 4 : 3.5,
-          strokeDasharray: dashed ? '6 3' : undefined,
+          strokeDasharray: dashed ? "6 3" : undefined,
           opacity: active ? 0.8 : 0.5,
-          transition: 'stroke 0.3s, stroke-width 0.3s, opacity 0.3s',
+          transition: "stroke 0.3s, stroke-width 0.3s, opacity 0.3s",
         }}
       />
       {active && (
         <circle r="6" fill="var(--accent)">
-          <animateMotion dur="1.2s" repeatCount="1" fill="freeze" path={edgePath} />
+          <animateMotion
+            dur="1.2s"
+            repeatCount="1"
+            fill="freeze"
+            path={edgePath}
+          />
         </circle>
       )}
       {label && (
@@ -76,9 +87,9 @@ export function LabeledEdge({
           <div
             className="turbo-edge-label"
             style={{
-              position: 'absolute',
+              position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: 'none',
+              pointerEvents: "none",
             }}
           >
             {label}
@@ -86,5 +97,5 @@ export function LabeledEdge({
         </EdgeLabelRenderer>
       )}
     </>
-  )
+  );
 }

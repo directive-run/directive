@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ERROR_EVENT_TYPES, type DebugEvent, type DebugEventType } from "../lib/types";
-import type { Anomaly } from "../hooks/use-anomalies";
-import { EVENT_COLORS } from "../lib/colors";
 import { EventDetail } from "../components/EventDetail";
+import { SearchBar } from "../components/SearchBar";
 import { TimelineBar } from "../components/TimelineBar";
 import { TimelineMinimap } from "../components/TimelineMinimap";
-import { SearchBar } from "../components/SearchBar";
-import { useTimelineZoom } from "../hooks/use-timeline-zoom";
+import type { Anomaly } from "../hooks/use-anomalies";
 import { useTimelineFilters } from "../hooks/use-timeline-filters";
+import { useTimelineZoom } from "../hooks/use-timeline-zoom";
+import { EVENT_COLORS } from "../lib/colors";
 import type { TimeFormat } from "../lib/time-format";
 import { formatTimestamp } from "../lib/time-format";
+import {
+  type DebugEvent,
+  type DebugEventType,
+  ERROR_EVENT_TYPES,
+} from "../lib/types";
 
 interface TimelineViewProps {
   events: DebugEvent[];
@@ -62,11 +66,18 @@ const EVENT_TYPE_LABELS: Partial<Record<DebugEventType, string>> = {
 };
 
 /** Compute row packing for overlapping events in a lane */
-function computeRows(laneEvts: DebugEvent[], range: { start: number; duration: number }): Map<number, number> {
+function computeRows(
+  laneEvts: DebugEvent[],
+  range: { start: number; duration: number },
+): Map<number, number> {
   const rowMap = new Map<number, number>();
-  const getLeft = (e: DebugEvent) => ((e.timestamp - range.start) / range.duration) * 100;
+  const getLeft = (e: DebugEvent) =>
+    ((e.timestamp - range.start) / range.duration) * 100;
   const getRight = (e: DebugEvent) => {
-    const w = typeof e.durationMs === "number" && e.durationMs > 0 ? (e.durationMs / range.duration) * 100 : 0.5;
+    const w =
+      typeof e.durationMs === "number" && e.durationMs > 0
+        ? (e.durationMs / range.duration) * 100
+        : 0.5;
 
     return getLeft(e) + w;
   };
@@ -106,7 +117,7 @@ export function TimelineView({
 
   // D1: Stable callback for TimelineBar — toggles selection without creating new closures per bar
   const handleSelectEvent = useCallback((event: DebugEvent) => {
-    setSelectedEvent((prev) => prev?.id === event.id ? null : event);
+    setSelectedEvent((prev) => (prev?.id === event.id ? null : event));
   }, []);
 
   const handleCloseDetail = useCallback(() => {
@@ -120,7 +131,13 @@ export function TimelineView({
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+      if (
+        e.key === "Escape" &&
+        !(
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement
+        )
+      ) {
         setSelectedEvent(null);
       }
     };
@@ -161,7 +178,10 @@ export function TimelineView({
     }
 
     // Remove empty lanes, compute rows
-    const result = new Map<string, { events: DebugEvent[]; rowMap: Map<number, number>; maxRow: number }>();
+    const result = new Map<
+      string,
+      { events: DebugEvent[]; rowMap: Map<number, number>; maxRow: number }
+    >();
 
     for (const [key, laneEvents] of laneMap) {
       if (laneEvents.length === 0) {
@@ -188,7 +208,9 @@ export function TimelineView({
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-4xl" aria-hidden="true">📊</div>
+          <div className="mb-2 text-4xl" aria-hidden="true">
+            📊
+          </div>
           <p>No events recorded yet</p>
           <p className="mt-1 text-xs">Run an agent to see timeline events</p>
         </div>
@@ -209,24 +231,31 @@ export function TimelineView({
         >
           <option value="">All agents</option>
           {filters.agents.map((a) => (
-            <option key={a} value={a}>{a}</option>
+            <option key={a} value={a}>
+              {a}
+            </option>
           ))}
         </select>
 
         {/* Type filter chips */}
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by event type">
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label="Filter by event type"
+        >
           {filters.presentTypes.map((type) => {
-            const isActive = filters.typeFilter.size === 0 || filters.typeFilter.has(type);
+            const isActive =
+              filters.typeFilter.size === 0 || filters.typeFilter.has(type);
 
             return (
               <button
                 key={type}
                 onClick={() => filters.toggleType(type)}
-                aria-pressed={filters.typeFilter.size === 0 || filters.typeFilter.has(type)}
+                aria-pressed={
+                  filters.typeFilter.size === 0 || filters.typeFilter.has(type)
+                }
                 className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                  isActive
-                    ? ""
-                    : "!bg-zinc-800 !text-zinc-300 !border-zinc-600"
+                  isActive ? "" : "!bg-zinc-800 !text-zinc-300 !border-zinc-600"
                 }`}
                 style={{
                   backgroundColor: `${EVENT_COLORS[type]}20`,
@@ -243,7 +272,8 @@ export function TimelineView({
         {/* M7/E1/E15: Error filter shortcut — uses ERROR_EVENT_TYPES constant */}
         <button
           onClick={() => {
-            const isErrorOnly = filters.typeFilter.size === ERROR_EVENT_TYPES.size &&
+            const isErrorOnly =
+              filters.typeFilter.size === ERROR_EVENT_TYPES.size &&
               [...ERROR_EVENT_TYPES].every((t) => filters.typeFilter.has(t));
 
             if (isErrorOnly) {
@@ -262,7 +292,9 @@ export function TimelineView({
 
         {/* E10: AND/OR filter mode toggle */}
         <button
-          onClick={() => filters.setFilterMode(filters.filterMode === "and" ? "or" : "and")}
+          onClick={() =>
+            filters.setFilterMode(filters.filterMode === "and" ? "or" : "and")
+          }
           className={`rounded border px-2 py-0.5 text-[10px] font-medium ${
             filters.filterMode === "or"
               ? "border-blue-500/50 bg-blue-950/30 text-blue-400"
@@ -307,7 +339,11 @@ export function TimelineView({
 
         {/* E7: Time format toggle */}
         {onTimeFormatChange && (
-          <div className="flex rounded border border-zinc-700" role="group" aria-label="Time format">
+          <div
+            className="flex rounded border border-zinc-700"
+            role="group"
+            aria-label="Time format"
+          >
             {(["ms", "elapsed", "clock"] as const).map((fmt) => (
               <button
                 key={fmt}
@@ -364,7 +400,8 @@ export function TimelineView({
           style={{ cursor: zoom.zoomLevel > 1 ? "grab" : undefined }}
         >
           <div className="min-w-[600px]">
-            {Array.from(lanesWithRows).map(([laneId, { events: laneEvents, rowMap, maxRow }]) => (
+            {Array.from(lanesWithRows).map(
+              ([laneId, { events: laneEvents, rowMap, maxRow }]) => (
                 <div key={laneId} className="flex border-b border-zinc-800/50">
                   {/* Lane label */}
                   <div className="sticky left-0 z-10 flex w-32 shrink-0 items-center border-r border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-400">
@@ -372,7 +409,12 @@ export function TimelineView({
                   </div>
 
                   {/* Event bars */}
-                  <div className="relative flex-1 px-1" style={{ minHeight: `${Math.max(36, 4 + maxRow * 24 + 24)}px` }}>
+                  <div
+                    className="relative flex-1 px-1"
+                    style={{
+                      minHeight: `${Math.max(36, 4 + maxRow * 24 + 24)}px`,
+                    }}
+                  >
                     {laneEvents.map((event) => (
                       <TimelineBar
                         key={event.id}
@@ -386,15 +428,18 @@ export function TimelineView({
                     ))}
 
                     {/* Replay cursor line */}
-                    {replayCursorPct != null && replayCursorPct >= 0 && replayCursorPct <= 100 && (
-                      <div
-                        className="absolute top-0 bottom-0 z-30 w-px bg-red-500"
-                        style={{ left: `${replayCursorPct}%` }}
-                      />
-                    )}
+                    {replayCursorPct != null &&
+                      replayCursorPct >= 0 &&
+                      replayCursorPct <= 100 && (
+                        <div
+                          className="absolute top-0 bottom-0 z-30 w-px bg-red-500"
+                          style={{ left: `${replayCursorPct}%` }}
+                        />
+                      )}
                   </div>
                 </div>
-              ))}
+              ),
+            )}
           </div>
         </div>
 
@@ -416,11 +461,15 @@ export function TimelineView({
       {/* Token stream panel */}
       {streamingTokens && streamingTokens.size > 0 && (
         <div className="border-t border-zinc-800 bg-zinc-900 px-4 py-2">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Live Tokens</div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            Live Tokens
+          </div>
           <div className="flex gap-3 overflow-x-auto">
             {Array.from(streamingTokens).map(([agentId, data]) => (
               <div key={agentId} className="min-w-[200px] max-w-[400px]">
-                <div className="mb-0.5 text-[10px] text-zinc-500">{agentId} ({data.count} tokens)</div>
+                <div className="mb-0.5 text-[10px] text-zinc-500">
+                  {agentId} ({data.count} tokens)
+                </div>
                 <div className="max-h-16 overflow-y-auto rounded bg-zinc-800/80 px-2 py-1 font-mono text-[11px] text-zinc-300 whitespace-pre-wrap break-all">
                   {data.tokens.slice(-500)}
                 </div>
@@ -451,9 +500,14 @@ export function TimelineView({
         <div className="w-32 shrink-0" />
         <div className="flex flex-1 justify-between text-[10px] text-zinc-500">
           {Array.from({ length: 5 }, (_, i) => {
-            const ts = zoom.visibleRange.start + (zoom.visibleRange.duration * i) / 4;
+            const ts =
+              zoom.visibleRange.start + (zoom.visibleRange.duration * i) / 4;
 
-            return <span key={i}>{formatTimestamp(ts, timeFormat, events[0]?.timestamp)}</span>;
+            return (
+              <span key={i}>
+                {formatTimestamp(ts, timeFormat, events[0]?.timestamp)}
+              </span>
+            );
           })}
         </div>
       </div>

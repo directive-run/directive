@@ -1,18 +1,24 @@
 // Shared empty state component (replaces 8 duplicate patterns)
 
 interface EmptyStateProps {
-  message: string
-  icon?: React.ReactNode
-  action?: { label: string; onClick: () => void }
-  docsUrl?: string
+  message: string;
+  icon?: React.ReactNode;
+  action?: { label: string; onClick: () => void };
+  docsUrl?: string;
 }
 
-export function EmptyState({ message, icon, action, docsUrl }: EmptyStateProps) {
+export function EmptyState({
+  message,
+  icon,
+  action,
+  docsUrl,
+}: EmptyStateProps) {
   return (
-    <div role="status" className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-center">
-      {icon && (
-        <div className="text-zinc-300 dark:text-zinc-600">{icon}</div>
-      )}
+    <div
+      role="status"
+      className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-center"
+    >
+      {icon && <div className="text-zinc-300 dark:text-zinc-600">{icon}</div>}
       <p className="text-sm text-zinc-400 dark:text-zinc-500">{message}</p>
       {action && (
         <button
@@ -33,5 +39,5 @@ export function EmptyState({ message, icon, action, docsUrl }: EmptyStateProps) 
         </a>
       )}
     </div>
-  )
+  );
 }

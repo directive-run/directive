@@ -13,21 +13,21 @@
  * @throws Error if timeout is exceeded
  */
 export async function withTimeout<T>(
-	promise: Promise<T>,
-	ms: number,
-	errorMessage: string,
+  promise: Promise<T>,
+  ms: number,
+  errorMessage: string,
 ): Promise<T> {
-	let timeoutId: ReturnType<typeof setTimeout>;
+  let timeoutId: ReturnType<typeof setTimeout>;
 
-	const timeoutPromise = new Promise<never>((_, reject) => {
-		timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
-	});
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
+  });
 
-	try {
-		return await Promise.race([promise, timeoutPromise]);
-	} finally {
-		clearTimeout(timeoutId!);
-	}
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
 }
 
 /**
@@ -38,10 +38,10 @@ export async function withTimeout<T>(
  * @returns An Error instance
  */
 export function normalizeError(error: unknown): Error {
-	if (error instanceof Error) {
-		return error;
-	}
-	return new Error(String(error));
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error(String(error));
 }
 
 /**
@@ -53,52 +53,54 @@ export function normalizeError(error: unknown): Error {
  * @returns A stable JSON string
  */
 export function stableStringify(value: unknown, maxDepth = 50): string {
-	const seen = new WeakSet();
+  const seen = new WeakSet();
 
-	function stringify(val: unknown, depth: number): string {
-		if (depth > maxDepth) {
-			return '"[max depth exceeded]"';
-		}
+  function stringify(val: unknown, depth: number): string {
+    if (depth > maxDepth) {
+      return '"[max depth exceeded]"';
+    }
 
-		if (val === null) return "null";
-		if (val === undefined) return "undefined";
+    if (val === null) return "null";
+    if (val === undefined) return "undefined";
 
-		const type = typeof val;
+    const type = typeof val;
 
-		if (type === "string") return JSON.stringify(val);
-		if (type === "number" || type === "boolean") return String(val);
-		if (type === "function") return '"[function]"';
-		if (type === "symbol") return '"[symbol]"';
+    if (type === "string") return JSON.stringify(val);
+    if (type === "number" || type === "boolean") return String(val);
+    if (type === "function") return '"[function]"';
+    if (type === "symbol") return '"[symbol]"';
 
-		if (Array.isArray(val)) {
-			// Check for circular reference
-			if (seen.has(val)) {
-				return '"[circular]"';
-			}
-			seen.add(val);
-			const result = `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`;
-			seen.delete(val);
-			return result;
-		}
+    if (Array.isArray(val)) {
+      // Check for circular reference
+      if (seen.has(val)) {
+        return '"[circular]"';
+      }
+      seen.add(val);
+      const result = `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`;
+      seen.delete(val);
+      return result;
+    }
 
-		if (type === "object") {
-			const obj = val as Record<string, unknown>;
-			// Check for circular reference
-			if (seen.has(obj)) {
-				return '"[circular]"';
-			}
-			seen.add(obj);
-			const keys = Object.keys(obj).sort();
-			const pairs = keys.map((k) => `${JSON.stringify(k)}:${stringify(obj[k], depth + 1)}`);
-			const result = `{${pairs.join(",")}}`;
-			seen.delete(obj);
-			return result;
-		}
+    if (type === "object") {
+      const obj = val as Record<string, unknown>;
+      // Check for circular reference
+      if (seen.has(obj)) {
+        return '"[circular]"';
+      }
+      seen.add(obj);
+      const keys = Object.keys(obj).sort();
+      const pairs = keys.map(
+        (k) => `${JSON.stringify(k)}:${stringify(obj[k], depth + 1)}`,
+      );
+      const result = `{${pairs.join(",")}}`;
+      seen.delete(obj);
+      return result;
+    }
 
-		return '"[unknown]"';
-	}
+    return '"[unknown]"';
+  }
 
-	return stringify(value, 0);
+  return stringify(value, 0);
 }
 
 /**
@@ -110,49 +112,49 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
  * @returns True if safe, false if dangerous keys found
  */
 export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
-	const dangerousKeys = new Set(["__proto__", "constructor", "prototype"]);
-	const seen = new WeakSet();
+  const dangerousKeys = new Set(["__proto__", "constructor", "prototype"]);
+  const seen = new WeakSet();
 
-	function check(val: unknown, depth: number): boolean {
-		if (depth > maxDepth) return false; // Fail safe at max depth - don't assume safety
-		if (val === null || val === undefined) return true;
-		if (typeof val !== "object") return true;
+  function check(val: unknown, depth: number): boolean {
+    if (depth > maxDepth) return false; // Fail safe at max depth - don't assume safety
+    if (val === null || val === undefined) return true;
+    if (typeof val !== "object") return true;
 
-		const objVal = val as Record<string, unknown>;
+    const objVal = val as Record<string, unknown>;
 
-		// Check for circular reference
-		if (seen.has(objVal)) return true;
-		seen.add(objVal);
+    // Check for circular reference
+    if (seen.has(objVal)) return true;
+    seen.add(objVal);
 
-		// Check array elements
-		if (Array.isArray(objVal)) {
-			for (const item of objVal) {
-				if (!check(item, depth + 1)) {
-					seen.delete(objVal);
-					return false;
-				}
-			}
-			seen.delete(objVal);
-			return true;
-		}
+    // Check array elements
+    if (Array.isArray(objVal)) {
+      for (const item of objVal) {
+        if (!check(item, depth + 1)) {
+          seen.delete(objVal);
+          return false;
+        }
+      }
+      seen.delete(objVal);
+      return true;
+    }
 
-		// Check object keys and values
-		for (const key of Object.keys(objVal)) {
-			if (dangerousKeys.has(key)) {
-				seen.delete(objVal);
-				return false;
-			}
-			if (!check(objVal[key], depth + 1)) {
-				seen.delete(objVal);
-				return false;
-			}
-		}
+    // Check object keys and values
+    for (const key of Object.keys(objVal)) {
+      if (dangerousKeys.has(key)) {
+        seen.delete(objVal);
+        return false;
+      }
+      if (!check(objVal[key], depth + 1)) {
+        seen.delete(objVal);
+        return false;
+      }
+    }
 
-		seen.delete(objVal);
-		return true;
-	}
+    seen.delete(objVal);
+    return true;
+  }
 
-	return check(obj, 0);
+  return check(obj, 0);
 }
 
 /**
@@ -163,20 +165,23 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
  * @param b - Second object
  * @returns True if objects are shallowly equal
  */
-export function shallowEqual<T extends Record<string, unknown>>(a: T, b: T): boolean {
-	if (a === b) return true;
-	if (!a || !b) return false;
+export function shallowEqual<T extends Record<string, unknown>>(
+  a: T,
+  b: T,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
 
-	const keysA = Object.keys(a);
-	const keysB = Object.keys(b);
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
 
-	if (keysA.length !== keysB.length) return false;
+  if (keysA.length !== keysB.length) return false;
 
-	for (const key of keysA) {
-		if (a[key] !== b[key]) return false;
-	}
+  for (const key of keysA) {
+    if (a[key] !== b[key]) return false;
+  }
 
-	return true;
+  return true;
 }
 
 /**
@@ -196,13 +201,13 @@ export function shallowEqual<T extends Record<string, unknown>>(a: T, b: T): boo
  * @returns A hex hash string (8 characters, 32 bits)
  */
 export function hashObject(value: unknown): string {
-	const str = stableStringify(value);
-	let hash = 5381;
-	for (let i = 0; i < str.length; i++) {
-		hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
-	}
-	// Convert to unsigned 32-bit and then to hex
-	return (hash >>> 0).toString(16);
+  const str = stableStringify(value);
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+  }
+  // Convert to unsigned 32-bit and then to hex
+  return (hash >>> 0).toString(16);
 }
 
 // ============================================================================
@@ -213,11 +218,11 @@ export function hashObject(value: unknown): string {
  * Distributable snapshot type for type-safe helper functions.
  */
 export interface DistributableSnapshotLike<T = Record<string, unknown>> {
-	data: T;
-	createdAt: number;
-	expiresAt?: number;
-	version?: string;
-	metadata?: Record<string, unknown>;
+  data: T;
+  createdAt: number;
+  expiresAt?: number;
+  version?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -238,10 +243,10 @@ export interface DistributableSnapshotLike<T = Record<string, unknown>> {
  * @returns True if the snapshot has expired, false otherwise
  */
 export function isSnapshotExpired<T>(
-	snapshot: DistributableSnapshotLike<T>,
-	now: number = Date.now(),
+  snapshot: DistributableSnapshotLike<T>,
+  now: number = Date.now(),
 ): boolean {
-	return snapshot.expiresAt !== undefined && now > snapshot.expiresAt;
+  return snapshot.expiresAt !== undefined && now > snapshot.expiresAt;
 }
 
 /**
@@ -272,64 +277,64 @@ export function isSnapshotExpired<T>(
  * @throws Error if the snapshot is malformed or has expired
  */
 export function validateSnapshot<T>(
-	snapshot: DistributableSnapshotLike<T>,
-	now: number = Date.now(),
+  snapshot: DistributableSnapshotLike<T>,
+  now: number = Date.now(),
 ): T {
-	// Structural validation
-	if (!snapshot || typeof snapshot !== "object") {
-		throw new Error(
-			"[Directive] Invalid snapshot: expected an object with 'data' and 'createdAt' properties.",
-		);
-	}
-	if (!("data" in snapshot)) {
-		throw new Error(
-			"[Directive] Invalid snapshot: missing required 'data' property.",
-		);
-	}
-	if (!("createdAt" in snapshot) || typeof snapshot.createdAt !== "number") {
-		throw new Error(
-			"[Directive] Invalid snapshot: missing or invalid 'createdAt' property (expected number).",
-		);
-	}
+  // Structural validation
+  if (!snapshot || typeof snapshot !== "object") {
+    throw new Error(
+      "[Directive] Invalid snapshot: expected an object with 'data' and 'createdAt' properties.",
+    );
+  }
+  if (!("data" in snapshot)) {
+    throw new Error(
+      "[Directive] Invalid snapshot: missing required 'data' property.",
+    );
+  }
+  if (!("createdAt" in snapshot) || typeof snapshot.createdAt !== "number") {
+    throw new Error(
+      "[Directive] Invalid snapshot: missing or invalid 'createdAt' property (expected number).",
+    );
+  }
 
-	// Expiration validation
-	if (isSnapshotExpired(snapshot, now)) {
-		const expiredAt = new Date(snapshot.expiresAt!).toISOString();
-		throw new Error(
-			`[Directive] Snapshot expired at ${expiredAt}. Obtain a fresh snapshot from the source.`,
-		);
-	}
-	return snapshot.data;
+  // Expiration validation
+  if (isSnapshotExpired(snapshot, now)) {
+    const expiredAt = new Date(snapshot.expiresAt!).toISOString();
+    throw new Error(
+      `[Directive] Snapshot expired at ${expiredAt}. Obtain a fresh snapshot from the source.`,
+    );
+  }
+  return snapshot.data;
 }
 
 /**
  * Diff result for a single changed value.
  */
 export interface SnapshotDiffEntry {
-	/** The key path that changed (e.g., "canUseApi" or "limits.apiCalls") */
-	path: string;
-	/** The value in the old snapshot */
-	oldValue: unknown;
-	/** The value in the new snapshot */
-	newValue: unknown;
-	/** Type of change: "added", "removed", or "changed" */
-	type: "added" | "removed" | "changed";
+  /** The key path that changed (e.g., "canUseApi" or "limits.apiCalls") */
+  path: string;
+  /** The value in the old snapshot */
+  oldValue: unknown;
+  /** The value in the new snapshot */
+  newValue: unknown;
+  /** Type of change: "added", "removed", or "changed" */
+  type: "added" | "removed" | "changed";
 }
 
 /**
  * Result of diffing two snapshots.
  */
 export interface SnapshotDiff {
-	/** Whether the snapshots are identical */
-	identical: boolean;
-	/** List of changes between snapshots */
-	changes: SnapshotDiffEntry[];
-	/** Whether the version changed (if both have versions) */
-	versionChanged: boolean;
-	/** Old version (if available) */
-	oldVersion?: string;
-	/** New version (if available) */
-	newVersion?: string;
+  /** Whether the snapshots are identical */
+  identical: boolean;
+  /** List of changes between snapshots */
+  changes: SnapshotDiffEntry[];
+  /** Whether the version changed (if both have versions) */
+  versionChanged: boolean;
+  /** Old version (if available) */
+  oldVersion?: string;
+  /** New version (if available) */
+  newVersion?: string;
 }
 
 /**
@@ -354,80 +359,110 @@ export interface SnapshotDiff {
  * @returns A diff result with all changes
  */
 export function diffSnapshots<T = Record<string, unknown>>(
-	oldSnapshot: DistributableSnapshotLike<T>,
-	newSnapshot: DistributableSnapshotLike<T>,
+  oldSnapshot: DistributableSnapshotLike<T>,
+  newSnapshot: DistributableSnapshotLike<T>,
 ): SnapshotDiff {
-	const changes: SnapshotDiffEntry[] = [];
+  const changes: SnapshotDiffEntry[] = [];
 
-	// Deep compare function
-	function compare(
-		oldObj: unknown,
-		newObj: unknown,
-		path: string,
-	): void {
-		// Handle null/undefined
-		if (oldObj === null || oldObj === undefined) {
-			if (newObj !== null && newObj !== undefined) {
-				changes.push({ path, oldValue: oldObj, newValue: newObj, type: "added" });
-			}
-			return;
-		}
-		if (newObj === null || newObj === undefined) {
-			changes.push({ path, oldValue: oldObj, newValue: newObj, type: "removed" });
-			return;
-		}
+  // Deep compare function
+  function compare(oldObj: unknown, newObj: unknown, path: string): void {
+    // Handle null/undefined
+    if (oldObj === null || oldObj === undefined) {
+      if (newObj !== null && newObj !== undefined) {
+        changes.push({
+          path,
+          oldValue: oldObj,
+          newValue: newObj,
+          type: "added",
+        });
+      }
+      return;
+    }
+    if (newObj === null || newObj === undefined) {
+      changes.push({
+        path,
+        oldValue: oldObj,
+        newValue: newObj,
+        type: "removed",
+      });
+      return;
+    }
 
-		// Handle primitives
-		if (typeof oldObj !== "object" || typeof newObj !== "object") {
-			if (!Object.is(oldObj, newObj)) {
-				changes.push({ path, oldValue: oldObj, newValue: newObj, type: "changed" });
-			}
-			return;
-		}
+    // Handle primitives
+    if (typeof oldObj !== "object" || typeof newObj !== "object") {
+      if (!Object.is(oldObj, newObj)) {
+        changes.push({
+          path,
+          oldValue: oldObj,
+          newValue: newObj,
+          type: "changed",
+        });
+      }
+      return;
+    }
 
-		// Handle arrays
-		if (Array.isArray(oldObj) && Array.isArray(newObj)) {
-			if (oldObj.length !== newObj.length) {
-				changes.push({ path, oldValue: oldObj, newValue: newObj, type: "changed" });
-				return;
-			}
-			for (let i = 0; i < oldObj.length; i++) {
-				compare(oldObj[i], newObj[i], `${path}[${i}]`);
-			}
-			return;
-		}
+    // Handle arrays
+    if (Array.isArray(oldObj) && Array.isArray(newObj)) {
+      if (oldObj.length !== newObj.length) {
+        changes.push({
+          path,
+          oldValue: oldObj,
+          newValue: newObj,
+          type: "changed",
+        });
+        return;
+      }
+      for (let i = 0; i < oldObj.length; i++) {
+        compare(oldObj[i], newObj[i], `${path}[${i}]`);
+      }
+      return;
+    }
 
-		// Handle objects
-		const oldRecord = oldObj as Record<string, unknown>;
-		const newRecord = newObj as Record<string, unknown>;
-		const allKeys = new Set([...Object.keys(oldRecord), ...Object.keys(newRecord)]);
+    // Handle objects
+    const oldRecord = oldObj as Record<string, unknown>;
+    const newRecord = newObj as Record<string, unknown>;
+    const allKeys = new Set([
+      ...Object.keys(oldRecord),
+      ...Object.keys(newRecord),
+    ]);
 
-		for (const key of allKeys) {
-			const childPath = path ? `${path}.${key}` : key;
-			if (!(key in oldRecord)) {
-				changes.push({ path: childPath, oldValue: undefined, newValue: newRecord[key], type: "added" });
-			} else if (!(key in newRecord)) {
-				changes.push({ path: childPath, oldValue: oldRecord[key], newValue: undefined, type: "removed" });
-			} else {
-				compare(oldRecord[key], newRecord[key], childPath);
-			}
-		}
-	}
+    for (const key of allKeys) {
+      const childPath = path ? `${path}.${key}` : key;
+      if (!(key in oldRecord)) {
+        changes.push({
+          path: childPath,
+          oldValue: undefined,
+          newValue: newRecord[key],
+          type: "added",
+        });
+      } else if (!(key in newRecord)) {
+        changes.push({
+          path: childPath,
+          oldValue: oldRecord[key],
+          newValue: undefined,
+          type: "removed",
+        });
+      } else {
+        compare(oldRecord[key], newRecord[key], childPath);
+      }
+    }
+  }
 
-	// Compare data
-	compare(oldSnapshot.data, newSnapshot.data, "");
+  // Compare data
+  compare(oldSnapshot.data, newSnapshot.data, "");
 
-	// Check version change
-	const versionChanged = oldSnapshot.version !== newSnapshot.version &&
-		(oldSnapshot.version !== undefined || newSnapshot.version !== undefined);
+  // Check version change
+  const versionChanged =
+    oldSnapshot.version !== newSnapshot.version &&
+    (oldSnapshot.version !== undefined || newSnapshot.version !== undefined);
 
-	return {
-		identical: changes.length === 0,
-		changes,
-		versionChanged,
-		oldVersion: oldSnapshot.version,
-		newVersion: newSnapshot.version,
-	};
+  return {
+    identical: changes.length === 0,
+    changes,
+    versionChanged,
+    oldVersion: oldSnapshot.version,
+    newVersion: newSnapshot.version,
+  };
 }
 
 // ============================================================================
@@ -439,11 +474,11 @@ export function diffSnapshots<T = Record<string, unknown>>(
  * Contains the original snapshot plus a cryptographic signature.
  */
 export interface SignedSnapshot<T = Record<string, unknown>>
-	extends DistributableSnapshotLike<T> {
-	/** HMAC-SHA256 signature in hex format */
-	signature: string;
-	/** Signing algorithm used */
-	algorithm: "hmac-sha256";
+  extends DistributableSnapshotLike<T> {
+  /** HMAC-SHA256 signature in hex format */
+  signature: string;
+  /** Signing algorithm used */
+  algorithm: "hmac-sha256";
 }
 
 /**
@@ -453,9 +488,9 @@ export interface SignedSnapshot<T = Record<string, unknown>>
  * @returns True if the snapshot has a signature
  */
 export function isSignedSnapshot<T>(
-	snapshot: DistributableSnapshotLike<T> | SignedSnapshot<T>,
+  snapshot: DistributableSnapshotLike<T> | SignedSnapshot<T>,
 ): snapshot is SignedSnapshot<T> {
-	return "signature" in snapshot && typeof snapshot.signature === "string";
+  return "signature" in snapshot && typeof snapshot.signature === "string";
 }
 
 /**
@@ -493,25 +528,25 @@ export function isSignedSnapshot<T>(
  * @returns A signed snapshot with the signature attached
  */
 export async function signSnapshot<T>(
-	snapshot: DistributableSnapshotLike<T>,
-	secret: string | Uint8Array,
+  snapshot: DistributableSnapshotLike<T>,
+  secret: string | Uint8Array,
 ): Promise<SignedSnapshot<T>> {
-	// Create a canonical representation for signing
-	const payload = stableStringify({
-		data: snapshot.data,
-		createdAt: snapshot.createdAt,
-		expiresAt: snapshot.expiresAt,
-		version: snapshot.version,
-		metadata: snapshot.metadata,
-	});
+  // Create a canonical representation for signing
+  const payload = stableStringify({
+    data: snapshot.data,
+    createdAt: snapshot.createdAt,
+    expiresAt: snapshot.expiresAt,
+    version: snapshot.version,
+    metadata: snapshot.metadata,
+  });
 
-	const signature = await hmacSha256(payload, secret);
+  const signature = await hmacSha256(payload, secret);
 
-	return {
-		...snapshot,
-		signature,
-		algorithm: "hmac-sha256",
-	};
+  return {
+    ...snapshot,
+    signature,
+    algorithm: "hmac-sha256",
+  };
 }
 
 /**
@@ -543,26 +578,26 @@ export async function signSnapshot<T>(
  * @returns True if signature is valid, false otherwise
  */
 export async function verifySnapshotSignature<T>(
-	signedSnapshot: SignedSnapshot<T>,
-	secret: string | Uint8Array,
+  signedSnapshot: SignedSnapshot<T>,
+  secret: string | Uint8Array,
 ): Promise<boolean> {
-	if (!signedSnapshot.signature || signedSnapshot.algorithm !== "hmac-sha256") {
-		return false;
-	}
+  if (!signedSnapshot.signature || signedSnapshot.algorithm !== "hmac-sha256") {
+    return false;
+  }
 
-	// Recreate the canonical payload (same as signing)
-	const payload = stableStringify({
-		data: signedSnapshot.data,
-		createdAt: signedSnapshot.createdAt,
-		expiresAt: signedSnapshot.expiresAt,
-		version: signedSnapshot.version,
-		metadata: signedSnapshot.metadata,
-	});
+  // Recreate the canonical payload (same as signing)
+  const payload = stableStringify({
+    data: signedSnapshot.data,
+    createdAt: signedSnapshot.createdAt,
+    expiresAt: signedSnapshot.expiresAt,
+    version: signedSnapshot.version,
+    metadata: signedSnapshot.metadata,
+  });
 
-	const expectedSignature = await hmacSha256(payload, secret);
+  const expectedSignature = await hmacSha256(payload, secret);
 
-	// Use timing-safe comparison
-	return timingSafeEqual(signedSnapshot.signature, expectedSignature);
+  // Use timing-safe comparison
+  return timingSafeEqual(signedSnapshot.signature, expectedSignature);
 }
 
 /**
@@ -570,31 +605,34 @@ export async function verifySnapshotSignature<T>(
  * Uses Web Crypto API for cross-platform support (Node.js, browsers, Deno, Bun).
  */
 async function hmacSha256(
-	message: string,
-	secret: string | Uint8Array,
+  message: string,
+  secret: string | Uint8Array,
 ): Promise<string> {
-	// Convert secret to Uint8Array if string
-	const secretBytes: Uint8Array =
-		typeof secret === "string" ? new TextEncoder().encode(secret) : secret;
+  // Convert secret to Uint8Array if string
+  const secretBytes: Uint8Array =
+    typeof secret === "string" ? new TextEncoder().encode(secret) : secret;
 
-	// Import key for HMAC
-	const algorithm: HmacImportParams = { name: "HMAC", hash: { name: "SHA-256" } };
-	const key = await crypto.subtle.importKey(
-		"raw",
-		secretBytes as unknown as ArrayBuffer,
-		algorithm,
-		false,
-		["sign"],
-	);
+  // Import key for HMAC
+  const algorithm: HmacImportParams = {
+    name: "HMAC",
+    hash: { name: "SHA-256" },
+  };
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretBytes as unknown as ArrayBuffer,
+    algorithm,
+    false,
+    ["sign"],
+  );
 
-	// Sign the message
-	const messageBytes = new TextEncoder().encode(message);
-	const signature = await crypto.subtle.sign("HMAC", key, messageBytes);
+  // Sign the message
+  const messageBytes = new TextEncoder().encode(message);
+  const signature = await crypto.subtle.sign("HMAC", key, messageBytes);
 
-	// Convert to hex string
-	return Array.from(new Uint8Array(signature))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
+  // Convert to hex string
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**
@@ -602,13 +640,13 @@ async function hmacSha256(
  * Both strings should be the same length (hex signatures from same algorithm).
  */
 function timingSafeEqual(a: string, b: string): boolean {
-	if (a.length !== b.length) {
-		return false;
-	}
+  if (a.length !== b.length) {
+    return false;
+  }
 
-	let result = 0;
-	for (let i = 0; i < a.length; i++) {
-		result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-	}
-	return result === 0;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
 }

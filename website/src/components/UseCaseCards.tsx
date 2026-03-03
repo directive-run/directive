@@ -1,29 +1,29 @@
-import { Flag, TextAa, Robot } from '@phosphor-icons/react/dist/ssr'
-import { CardLink } from '@/components/CardLink'
+import { CardLink } from "@/components/CardLink";
+import { Flag, Robot, TextAa } from "@phosphor-icons/react/dist/ssr";
 
 const useCases = [
   {
     icon: Flag,
-    title: 'Feature Flags',
+    title: "Feature Flags",
     description:
-      'Ship features safely with constraint-driven flags \u2013 no third-party service needed.',
-    href: '/blog/feature-flags-without-a-service',
+      "Ship features safely with constraint-driven flags \u2013 no third-party service needed.",
+    href: "/blog/feature-flags-without-a-service",
   },
   {
     icon: TextAa,
-    title: 'Declarative Forms',
+    title: "Declarative Forms",
     description:
-      'Model validation, submission, and error states as constraints.',
-    href: '/blog/declarative-forms-with-directive',
+      "Model validation, submission, and error states as constraints.",
+    href: "/blog/declarative-forms-with-directive",
   },
   {
     icon: Robot,
-    title: 'AI Agents',
+    title: "AI Agents",
     description:
-      'Orchestrate LLM calls, guardrails, and tool use with constraints.',
-    href: '/blog/building-ai-agents',
+      "Orchestrate LLM calls, guardrails, and tool use with constraints.",
+    href: "/blog/building-ai-agents",
   },
-]
+];
 
 export function UseCaseCards() {
   return (
@@ -43,5 +43,5 @@ export function UseCaseCards() {
         </CardLink>
       ))}
     </div>
-  )
+  );
 }

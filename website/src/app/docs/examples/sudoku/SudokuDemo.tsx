@@ -1,19 +1,19 @@
-'use client'
+"use client";
 
-import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CodeTabs } from '@/components/CodeTabs'
+import { CodeTabs } from "@/components/CodeTabs";
+import { ExampleEmbed } from "@/components/ExampleEmbed";
 
 export function SudokuDemo({
   build,
   sources,
 }: {
-  build: import('@/lib/examples').ExampleBuild | null
-  sources: import('@/lib/examples').ExampleSource[]
+  build: import("@/lib/examples").ExampleBuild | null;
+  sources: import("@/lib/examples").ExampleSource[];
 }) {
-  const sudokuSource = sources.find((s) => s.filename === 'sudoku.ts')
-  const mainSource = sources.find((s) => s.filename === 'main.ts')
-  const rulesSource = sources.find((s) => s.filename === 'rules.ts')
-  const generatorSource = sources.find((s) => s.filename === 'generator.ts')
+  const sudokuSource = sources.find((s) => s.filename === "sudoku.ts");
+  const mainSource = sources.find((s) => s.filename === "main.ts");
+  const rulesSource = sources.find((s) => s.filename === "rules.ts");
+  const generatorSource = sources.find((s) => s.filename === "generator.ts");
 
   return (
     <div className="space-y-8">
@@ -32,11 +32,9 @@ export function SudokuDemo({
           />
         ) : (
           <div className="rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)] p-8 text-center text-sm text-slate-400">
-            Example not built yet. Run{' '}
-            <code className="text-slate-300">
-              pnpm build:example sudoku
-            </code>{' '}
-            to generate the embed.
+            Example not built yet. Run{" "}
+            <code className="text-slate-300">pnpm build:example sudoku</code> to
+            generate the embed.
           </div>
         )}
 
@@ -53,63 +51,63 @@ export function SudokuDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            Sudoku is literally a{' '}
+            Sudoku is literally a{" "}
             <strong className="text-slate-900 dark:text-slate-200">
               constraint satisfaction problem
             </strong>
-            : no duplicates in rows, columns, or 3&times;3 boxes. The game
-            rules map 1:1 to Directive&rsquo;s constraint&ndash;resolver flow.
+            : no duplicates in rows, columns, or 3&times;3 boxes. The game rules
+            map 1:1 to Directive&rsquo;s constraint&ndash;resolver flow.
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Facts
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Grid state, solution, givens, timer, selection, notes,
               difficulty
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Derivations
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Conflicts, progress, timer display, same-number
               highlighting, candidates (auto-tracked, no manual deps)
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Events
-              </strong>{' '}
-              &ndash; <code>selectCell</code>, <code>inputNumber</code>,{' '}
-              <code>toggleNote</code>, <code>requestHint</code>,{' '}
+              </strong>{" "}
+              &ndash; <code>selectCell</code>, <code>inputNumber</code>,{" "}
+              <code>toggleNote</code>, <code>requestHint</code>,{" "}
               <code>tick</code>, <code>newGame</code>
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Constraints
-              </strong>{' '}
-              &ndash; <code>timerExpired</code> (priority 200),{' '}
-              <code>detectConflict</code> (100), <code>puzzleSolved</code>{' '}
-              (90), <code>hintAvailable</code> (70) &ndash; evaluated by
-              priority after every fact change
+              </strong>{" "}
+              &ndash; <code>timerExpired</code> (priority 200),{" "}
+              <code>detectConflict</code> (100), <code>puzzleSolved</code> (90),{" "}
+              <code>hintAvailable</code> (70) &ndash; evaluated by priority
+              after every fact change
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Resolvers
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Handle game won/lost, increment error count, reveal hints
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Effects
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Timer warnings at 60s and 30s, game result logging
             </li>
           </ol>
           <p>
-            The{' '}
+            The{" "}
             <strong className="text-slate-900 dark:text-slate-200">
               constraint cascade
-            </strong>{' '}
+            </strong>{" "}
             is the key insight: when a player types &ldquo;5&rdquo;, the grid
             fact updates, derivations recompute (conflicts, progress, isSolved),
             then constraints evaluate by priority &ndash; detecting conflicts,
@@ -125,12 +123,14 @@ export function SudokuDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">
+              What:
+            </strong>{" "}
             A fully playable Sudoku puzzle with multiple difficulties, notes,
             hints, undo/redo, and a countdown timer.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{" "}
             The game is a single Directive module with 14 facts tracking
             grid/selection/timer state. Derivations auto-compute conflicts,
             progress, and candidates. Four prioritized constraints cascade on
@@ -141,7 +141,7 @@ export function SudokuDemo({
           <p>
             <strong className="text-slate-900 dark:text-slate-200">
               Why it works:
-            </strong>{' '}
+            </strong>{" "}
             Sudoku is a constraint satisfaction problem &ndash;
             Directive&rsquo;s constraint&ndash;resolver flow maps 1:1 to the
             game rules. No imperative state machine needed; declare what must be
@@ -158,32 +158,32 @@ export function SudokuDemo({
         <CodeTabs
           tabs={[
             sudokuSource && {
-              filename: 'sudoku.ts',
-              label: 'sudoku.ts - Directive module',
+              filename: "sudoku.ts",
+              label: "sudoku.ts - Directive module",
               code: sudokuSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             mainSource && {
-              filename: 'main.ts',
-              label: 'main.ts - DOM wiring',
+              filename: "main.ts",
+              label: "main.ts - DOM wiring",
               code: mainSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             rulesSource && {
-              filename: 'rules.ts',
-              label: 'rules.ts - Pure Sudoku logic',
+              filename: "rules.ts",
+              label: "rules.ts - Pure Sudoku logic",
               code: rulesSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             generatorSource && {
-              filename: 'generator.ts',
-              label: 'generator.ts - Puzzle generation',
+              filename: "generator.ts",
+              label: "generator.ts - Puzzle generation",
               code: generatorSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
           ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
         />
       </section>
     </div>
-  )
+  );
 }

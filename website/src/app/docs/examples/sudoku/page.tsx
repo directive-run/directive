@@ -1,23 +1,23 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { SudokuDemo } from './SudokuDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { SudokuDemo } from "./SudokuDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Sudoku',
+  title: "Sudoku",
   description:
-    'Interactive Sudoku puzzle built with Directive. Constraint satisfaction maps 1:1 to the constraint-resolver flow.',
-  path: '/docs/examples/sudoku',
-  section: 'Docs',
-})
+    "Interactive Sudoku puzzle built with Directive. Constraint satisfaction maps 1:1 to the constraint-resolver flow.",
+  path: "/docs/examples/sudoku",
+  section: "Docs",
+});
 
 export default function SudokuPage() {
-  const build = parseExampleBuild('sudoku')
-  const sources = readExampleSources('sudoku', [
-    'sudoku.ts',
-    'main.ts',
-    'rules.ts',
-    'generator.ts',
-  ])
+  const build = parseExampleBuild("sudoku");
+  const sources = readExampleSources("sudoku", [
+    "sudoku.ts",
+    "main.ts",
+    "rules.ts",
+    "generator.ts",
+  ]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -36,5 +36,5 @@ export default function SudokuPage() {
 
       <SudokuDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

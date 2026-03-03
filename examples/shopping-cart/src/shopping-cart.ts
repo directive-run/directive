@@ -10,12 +10,14 @@
  * and retry with exponential backoff.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
-import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  validateCoupon,
-  processCheckout,
-} from "./mock-api.js";
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { processCheckout, validateCoupon } from "./mock-api.js";
 
 // ============================================================================
 // Types
@@ -297,7 +299,9 @@ export const cartModule = createModule("cart", {
     couponValidation: {
       priority: 70,
       when: (facts) => {
-        return facts.self.couponCode !== "" && facts.self.couponStatus === "idle";
+        return (
+          facts.self.couponCode !== "" && facts.self.couponStatus === "idle"
+        );
       },
       require: (facts) => ({
         type: "VALIDATE_COUPON",
@@ -405,9 +409,7 @@ export const system = createSystem({
     cart: cartModule,
     auth: authModule,
   },
-  plugins: [
-    devtoolsPlugin({ name: "shopping-cart", panel: true }),
-  ],
+  plugins: [devtoolsPlugin({ name: "shopping-cart", panel: true })],
   debug: {
     timeTravel: true,
     maxSnapshots: 50,

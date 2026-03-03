@@ -2,9 +2,16 @@
  * Shared types for AI adapter — used by orchestrator, guardrails, helpers, and stack.
  */
 
-import type { Requirement, ModuleSchema, SchemaType } from "@directive-run/core";
-import type { BreakpointState as BreakpointStateFromBreakpoints, BreakpointRequest } from "./breakpoints.js";
+import type {
+  ModuleSchema,
+  Requirement,
+  SchemaType,
+} from "@directive-run/core";
 import { t } from "@directive-run/core";
+import type {
+  BreakpointRequest,
+  BreakpointState as BreakpointStateFromBreakpoints,
+} from "./breakpoints.js";
 
 // ============================================================================
 // Agent Types (LLM-agnostic)
@@ -55,7 +62,7 @@ export interface ToolCall {
 export type AgentRunner = <T = unknown>(
   agent: AgentLike,
   input: string,
-  options?: RunOptions
+  options?: RunOptions,
 ) => Promise<RunResult<T>>;
 
 /** Callback-based streaming run function (e.g. for SSE-based LLM APIs) */
@@ -139,7 +146,7 @@ export interface AdapterHooks {
 /** Guardrail function */
 export type GuardrailFn<T = unknown> = (
   data: T,
-  context: GuardrailContext
+  context: GuardrailContext,
 ) => GuardrailResult | Promise<GuardrailResult>;
 
 /** Guardrail context */
@@ -200,9 +207,15 @@ export interface NamedGuardrail<T = unknown> {
 
 /** Guardrails configuration */
 export interface GuardrailsConfig {
-  input?: Array<GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>>;
-  output?: Array<GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>>;
-  toolCall?: Array<GuardrailFn<ToolCallGuardrailData> | NamedGuardrail<ToolCallGuardrailData>>;
+  input?: Array<
+    GuardrailFn<InputGuardrailData> | NamedGuardrail<InputGuardrailData>
+  >;
+  output?: Array<
+    GuardrailFn<OutputGuardrailData> | NamedGuardrail<OutputGuardrailData>
+  >;
+  toolCall?: Array<
+    GuardrailFn<ToolCallGuardrailData> | NamedGuardrail<ToolCallGuardrailData>
+  >;
 }
 
 // ============================================================================
@@ -284,20 +297,29 @@ export interface OrchestratorConstraint<F extends Record<string, unknown>> {
 }
 
 /** Resolver context for orchestrator */
-export interface OrchestratorResolverContext<F extends Record<string, unknown>> {
+export interface OrchestratorResolverContext<
+  F extends Record<string, unknown>,
+> {
   facts: F & OrchestratorState;
-  runAgent: <T>(agent: AgentLike, input: string, options?: RunOptions) => Promise<RunResult<T>>;
+  runAgent: <T>(
+    agent: AgentLike,
+    input: string,
+    options?: RunOptions,
+  ) => Promise<RunResult<T>>;
   signal: AbortSignal;
 }
 
 /** Resolver for orchestrator */
 export interface OrchestratorResolver<
   F extends Record<string, unknown>,
-  R extends Requirement = Requirement
+  R extends Requirement = Requirement,
 > {
   requirement: (req: Requirement) => req is R;
   key?: (req: R) => string;
-  resolve: (req: R, context: OrchestratorResolverContext<F>) => void | Promise<void>;
+  resolve: (
+    req: R,
+    context: OrchestratorResolverContext<F>,
+  ) => void | Promise<void>;
 }
 
 /** Lifecycle hooks for observability */
@@ -386,17 +408,42 @@ export interface MultiAgentLifecycleHooks {
     delayMs: number;
     timestamp: number;
   }) => void;
-  onHandoff?: (request: { id: string; fromAgent: string; toAgent: string; input: string; requestedAt: number }) => void;
-  onHandoffComplete?: (result: { request: { id: string; fromAgent: string; toAgent: string }; completedAt: number }) => void;
+  onHandoff?: (request: {
+    id: string;
+    fromAgent: string;
+    toAgent: string;
+    input: string;
+    requestedAt: number;
+  }) => void;
+  onHandoffComplete?: (result: {
+    request: { id: string; fromAgent: string; toAgent: string };
+    completedAt: number;
+  }) => void;
   onPatternStart?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
+    patternType:
+      | "parallel"
+      | "sequential"
+      | "supervisor"
+      | "dag"
+      | "reflect"
+      | "race"
+      | "debate"
+      | "goal";
     input: string;
     timestamp: number;
   }) => void;
   onPatternComplete?: (event: {
     patternId: string;
-    patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
+    patternType:
+      | "parallel"
+      | "sequential"
+      | "supervisor"
+      | "dag"
+      | "reflect"
+      | "race"
+      | "debate"
+      | "goal";
     durationMs: number;
     timestamp: number;
     error?: Error;
@@ -443,19 +490,52 @@ export interface MultiAgentLifecycleHooks {
   /** Called when a breakpoint is hit and waiting for resolution. */
   onBreakpoint?: (request: BreakpointRequest) => void;
   /** Called when a cross-agent derivation value updates */
-  onDerivationUpdate?: (event: { derivationId: string; value: unknown; timestamp: number }) => void;
+  onDerivationUpdate?: (event: {
+    derivationId: string;
+    value: unknown;
+    timestamp: number;
+  }) => void;
   /** Called when a cross-agent derivation throws an error */
-  onDerivationError?: (event: { derivationId: string; error: Error; timestamp: number }) => void;
+  onDerivationError?: (event: {
+    derivationId: string;
+    error: Error;
+    timestamp: number;
+  }) => void;
   /** Called when scratchpad values are updated */
   onScratchpadUpdate?: (event: { keys: string[]; timestamp: number }) => void;
   /** Called when a task starts executing */
-  onTaskStart?: (event: { patternId: string; taskId: string; label: string; timestamp: number }) => void;
+  onTaskStart?: (event: {
+    patternId: string;
+    taskId: string;
+    label: string;
+    timestamp: number;
+  }) => void;
   /** Called when a task completes successfully */
-  onTaskComplete?: (event: { patternId: string; taskId: string; label: string; durationMs: number; timestamp: number }) => void;
+  onTaskComplete?: (event: {
+    patternId: string;
+    taskId: string;
+    label: string;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
   /** Called when a task fails */
-  onTaskError?: (event: { patternId: string; taskId: string; label: string; error: Error; durationMs: number; timestamp: number }) => void;
+  onTaskError?: (event: {
+    patternId: string;
+    taskId: string;
+    label: string;
+    error: Error;
+    durationMs: number;
+    timestamp: number;
+  }) => void;
   /** Called when a task reports progress */
-  onTaskProgress?: (event: { patternId: string; taskId: string; label: string; percent: number; message?: string; timestamp: number }) => void;
+  onTaskProgress?: (event: {
+    patternId: string;
+    taskId: string;
+    label: string;
+    percent: number;
+    message?: string;
+    timestamp: number;
+  }) => void;
   /** Called when a pattern checkpoint is saved */
   onCheckpointSave?: (event: {
     checkpointId: string;
@@ -564,7 +644,7 @@ export interface SchemaValidationResult {
 
 /** Schema validator function type */
 export type SchemaValidator<_T = unknown> = (
-  value: unknown
+  value: unknown,
 ) => SchemaValidationResult | boolean;
 
 // ============================================================================
@@ -582,7 +662,13 @@ export const BREAKPOINT_KEY = "__breakpoints" as const;
 // ============================================================================
 
 /** Status of a DAG node during execution */
-export type DagNodeStatus = "pending" | "ready" | "running" | "completed" | "error" | "skipped";
+export type DagNodeStatus =
+  | "pending"
+  | "ready"
+  | "running"
+  | "completed"
+  | "error"
+  | "skipped";
 
 /** Execution context available to DAG node callbacks */
 export interface DagExecutionContext {
@@ -802,7 +888,15 @@ export interface HandoffCompleteEvent extends DebugEventBase {
 export interface PatternStartEvent extends DebugEventBase {
   type: "pattern_start";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
+  patternType:
+    | "parallel"
+    | "sequential"
+    | "supervisor"
+    | "dag"
+    | "reflect"
+    | "race"
+    | "debate"
+    | "goal";
   /** All handler IDs in this pattern (agents + tasks) */
   handlers?: string[];
   /** Which handler IDs are tasks (rest are agents) */
@@ -813,7 +907,15 @@ export interface PatternStartEvent extends DebugEventBase {
 export interface PatternCompleteEvent extends DebugEventBase {
   type: "pattern_complete";
   patternId: string;
-  patternType: "parallel" | "sequential" | "supervisor" | "dag" | "reflect" | "race" | "debate" | "goal";
+  patternType:
+    | "parallel"
+    | "sequential"
+    | "supervisor"
+    | "dag"
+    | "reflect"
+    | "race"
+    | "debate"
+    | "goal";
   durationMs: number;
   error?: string;
 }
@@ -1082,7 +1184,11 @@ export interface MultiAgentSelfHealingConfig {
   /** Callback when reroute occurs */
   onReroute?: (event: RerouteEvent) => void;
   /** Callback when agent health changes */
-  onHealthChange?: (event: { agentId: string; oldScore: number; newScore: number }) => void;
+  onHealthChange?: (event: {
+    agentId: string;
+    oldScore: number;
+    newScore: number;
+  }) => void;
   /** Health monitor configuration */
   healthMonitor?: HealthMonitorConfig;
 }
@@ -1111,20 +1217,25 @@ export type BreakpointState = BreakpointStateFromBreakpoints;
 
 /** Snapshot of all agent states for cross-agent derivations */
 export interface CrossAgentSnapshot {
-  agents: Record<string, {
-    status: "idle" | "running" | "completed" | "error";
-    lastInput?: string;
-    lastOutput?: unknown;
-    lastError?: string;
-    runCount: number;
-    totalTokens: number;
-  }>;
+  agents: Record<
+    string,
+    {
+      status: "idle" | "running" | "completed" | "error";
+      lastInput?: string;
+      lastOutput?: unknown;
+      lastError?: string;
+      runCount: number;
+      totalTokens: number;
+    }
+  >;
   coordinator: { globalTokens: number; status: string };
   scratchpad?: Record<string, unknown>;
 }
 
 /** Function that computes a derived value from a cross-agent snapshot */
-export type CrossAgentDerivationFn<T = unknown> = (snapshot: CrossAgentSnapshot) => T;
+export type CrossAgentDerivationFn<T = unknown> = (
+  snapshot: CrossAgentSnapshot,
+) => T;
 
 // ============================================================================
 // Shared Scratchpad Types
@@ -1134,7 +1245,9 @@ export type CrossAgentDerivationFn<T = unknown> = (snapshot: CrossAgentSnapshot)
 export const SCRATCHPAD_KEY = "__scratchpad" as const;
 
 /** Shared scratchpad interface for multi-agent collaboration */
-export interface Scratchpad<T extends Record<string, unknown> = Record<string, unknown>> {
+export interface Scratchpad<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> {
   get<K extends keyof T>(key: K): T[K];
   set<K extends keyof T>(key: K, value: T[K]): void;
   /** Check if a key exists in the scratchpad */
@@ -1143,7 +1256,10 @@ export interface Scratchpad<T extends Record<string, unknown> = Record<string, u
   delete<K extends keyof T>(key: K): void;
   update(values: Partial<T>): void;
   getAll(): T;
-  subscribe(keys: (keyof T)[], callback: (key: keyof T, value: unknown) => void): () => void;
+  subscribe(
+    keys: (keyof T)[],
+    callback: (key: keyof T, value: unknown) => void,
+  ): () => void;
   onChange(callback: (key: string, value: unknown) => void): () => void;
   reset(): void;
 }
@@ -1202,7 +1318,10 @@ export interface AgentSelectionStrategy {
    */
   select: (
     readyAgents: string[],
-    metrics: Record<string, { runs: number; avgSatisfactionDelta: number; tokens: number }>,
+    metrics: Record<
+      string,
+      { runs: number; avgSatisfactionDelta: number; tokens: number }
+    >,
     goalMetrics: GoalMetrics,
   ) => string[];
 }
@@ -1222,7 +1341,10 @@ export type RelaxationStrategy =
   | { type: "alternative_nodes"; nodes: GoalNode[] }
   | { type: "inject_facts"; facts: Record<string, unknown> }
   | { type: "accept_partial" }
-  | { type: "custom"; apply: (context: RelaxationContext) => void | Promise<void> };
+  | {
+      type: "custom";
+      apply: (context: RelaxationContext) => void | Promise<void>;
+    };
 
 /** Relaxation tier — progressively applied when goal pursuit stalls */
 export interface RelaxationTier {
@@ -1263,7 +1385,11 @@ export interface GoalPattern<T = unknown> {
   /** Relaxation tiers — progressively applied when goal pursuit stalls */
   relaxation?: RelaxationTier[];
   /** Lifecycle hooks */
-  onStep?: (step: number, facts: Record<string, unknown>, readyAgents: string[]) => void;
+  onStep?: (
+    step: number,
+    facts: Record<string, unknown>,
+    readyAgents: string[],
+  ) => void;
   onStall?: (step: number, metrics: GoalMetrics) => void;
   /** Checkpoint configuration for mid-execution fault tolerance */
   checkpoint?: PatternCheckpointConfig;
@@ -1458,7 +1584,10 @@ export interface GoalCheckpointState extends PatternCheckpointBase {
   /** Last satisfaction value */
   lastSatisfaction: number;
   /** Per-agent metrics */
-  agentMetrics: Record<string, { runs: number; totalDelta: number; tokens: number }>;
+  agentMetrics: Record<
+    string,
+    { runs: number; totalDelta: number; tokens: number }
+  >;
 }
 
 /** Discriminated union of all pattern checkpoint states */

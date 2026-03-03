@@ -5,8 +5,8 @@
  * and renders the product grid, filters, and pagination.
  */
 
-import { system, urlSchema, productsSchema } from "./url-sync.js";
 import type { Product } from "./mock-products.js";
+import { productsSchema, system, urlSchema } from "./url-sync.js";
 
 // ============================================================================
 // System
@@ -25,8 +25,11 @@ const allKeys = [
 // ============================================================================
 
 const searchInput = document.getElementById("us-search") as HTMLInputElement;
-const categoryBtns = document.querySelectorAll<HTMLButtonElement>("[data-category]");
-const sortSelect = document.getElementById("us-sort-select") as HTMLSelectElement;
+const categoryBtns =
+  document.querySelectorAll<HTMLButtonElement>("[data-category]");
+const sortSelect = document.getElementById(
+  "us-sort-select",
+) as HTMLSelectElement;
 const productList = document.getElementById("us-product-list")!;
 const prevBtn = document.getElementById("us-page-prev") as HTMLButtonElement;
 const nextBtn = document.getElementById("us-page-next") as HTMLButtonElement;
@@ -95,7 +98,8 @@ function render(): void {
   // Product list
   const items = productFacts.items as Product[];
   if (items.length === 0 && !productFacts.isLoading) {
-    productList.innerHTML = '<div class="us-empty">No products found. Try adjusting your filters.</div>';
+    productList.innerHTML =
+      '<div class="us-empty">No products found. Try adjusting your filters.</div>';
   } else {
     productList.innerHTML = "";
     for (const product of items) {
@@ -156,7 +160,6 @@ function render(): void {
   // URL display
   const search = window.location.search || "(no params)";
   currentUrl.textContent = `${window.location.pathname}${search}`;
-
 }
 
 function makePageBtn(page: number, currentPage: number): HTMLButtonElement {

@@ -17,50 +17,52 @@
  * - Checkpoint store                               → State tab
  */
 import {
-  createMultiAgentOrchestrator,
-  dag,
-  withRetry,
-  withBudget,
-  createAgentMemory,
-  createSlidingWindowStrategy,
-  createPromptInjectionGuardrail,
-  createLengthGuardrail,
-  createAuditTrail,
-  createAgentAuditHandlers,
-  InMemoryCheckpointStore,
-  type MultiAgentOrchestrator,
-  type DagExecutionContext,
-  type NamedGuardrail,
-  type InputGuardrailData,
-  type OutputGuardrailData,
   type CrossAgentSnapshot,
+  type DagExecutionContext,
+  InMemoryCheckpointStore,
+  type InputGuardrailData,
+  type MultiAgentOrchestrator,
+  type NamedGuardrail,
+  type OutputGuardrailData,
   type TaskRegistration,
-} from '@directive-run/ai'
-import { createAnthropicRunner } from '@directive-run/ai/anthropic'
-import { createCircuitBreaker } from '@directive-run/core/plugins'
+  createAgentAuditHandlers,
+  createAgentMemory,
+  createAuditTrail,
+  createLengthGuardrail,
+  createMultiAgentOrchestrator,
+  createPromptInjectionGuardrail,
+  createSlidingWindowStrategy,
+  dag,
+  withBudget,
+  withRetry,
+} from "@directive-run/ai";
+import { createAnthropicRunner } from "@directive-run/ai/anthropic";
+import { createCircuitBreaker } from "@directive-run/core/plugins";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface DataPipelineInstance {
-  orchestrator: MultiAgentOrchestrator
-  memory: ReturnType<typeof createAgentMemory>
-  audit: ReturnType<typeof createAuditTrail>
+  orchestrator: MultiAgentOrchestrator;
+  memory: ReturnType<typeof createAgentMemory>;
+  audit: ReturnType<typeof createAuditTrail>;
 }
 
 // ---------------------------------------------------------------------------
 // Singleton cache
 // ---------------------------------------------------------------------------
 
-const GLOBAL_KEY = '__directive_data_pipeline__'
+const GLOBAL_KEY = "__directive_data_pipeline__";
 
 function getCached(): DataPipelineInstance | undefined {
-  return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as DataPipelineInstance | undefined
+  return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as
+    | DataPipelineInstance
+    | undefined;
 }
 
 function setCached(instance: DataPipelineInstance) {
-  (globalThis as Record<string, unknown>)[GLOBAL_KEY] = instance
+  (globalThis as Record<string, unknown>)[GLOBAL_KEY] = instance;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,22 +70,22 @@ function setCached(instance: DataPipelineInstance) {
 // ---------------------------------------------------------------------------
 
 const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [
-  { name: 'prompt-injection', fn: createPromptInjectionGuardrail() },
+  { name: "prompt-injection", fn: createPromptInjectionGuardrail() },
   {
-    name: 'content-filter',
+    name: "content-filter",
     fn: (data) => {
-      const lower = data.input.toLowerCase()
-      const blocked = ['hack', 'exploit', 'malware']
+      const lower = data.input.toLowerCase();
+      const blocked = ["hack", "exploit", "malware"];
       for (const word of blocked) {
         if (lower.includes(word)) {
-          return { passed: false, reason: `Blocked content: "${word}"` }
+          return { passed: false, reason: `Blocked content: "${word}"` };
         }
       }
 
-      return { passed: true }
+      return { passed: true };
     },
   },
-]
+];
 
 // ---------------------------------------------------------------------------
 // Tasks
@@ -92,108 +94,113 @@ const inputGuardrails: NamedGuardrail<InputGuardrailData>[] = [
 /** DAG wraps upstream output as `{"depName": "<stringified>"}`. Unwrap to the raw value. */
 function unwrapDagInput(input: string): string {
   try {
-    const envelope = JSON.parse(input)
-    if (envelope && typeof envelope === 'object' && !Array.isArray(envelope)) {
-      const values = Object.values(envelope)
-      if (values.length === 1 && typeof values[0] === 'string') {
-        return values[0]
+    const envelope = JSON.parse(input);
+    if (envelope && typeof envelope === "object" && !Array.isArray(envelope)) {
+      const values = Object.values(envelope);
+      if (values.length === 1 && typeof values[0] === "string") {
+        return values[0];
       }
     }
   } catch {
     // Not JSON — return as-is
   }
 
-  return input
+  return input;
 }
 
 /** Strip markdown code fences (```json ... ```) if present. */
 function stripCodeFences(text: string): string {
-  const fenced = text.match(/^```[\w]*\n([\s\S]*?)\n```$/m)
+  const fenced = text.match(/^```[\w]*\n([\s\S]*?)\n```$/m);
 
-  return fenced ? fenced[1].trim() : text.trim()
+  return fenced ? fenced[1].trim() : text.trim();
 }
 
 /** Parse JSON from an agent response, handling DAG envelope + code fences. */
-function parseAgentJson(input: string, fallbackKey: string): Record<string, unknown> {
-  const raw = stripCodeFences(unwrapDagInput(input))
+function parseAgentJson(
+  input: string,
+  fallbackKey: string,
+): Record<string, unknown> {
+  const raw = stripCodeFences(unwrapDagInput(input));
   try {
-    return JSON.parse(raw)
+    return JSON.parse(raw);
   } catch {
-    return { [fallbackKey]: raw }
+    return { [fallbackKey]: raw };
   }
 }
 
 const transformTask: TaskRegistration = {
   run: async (input, _signal, context) => {
-    context.reportProgress(10, 'Parsing classification')
+    context.reportProgress(10, "Parsing classification");
 
-    const data = parseAgentJson(input, 'classification')
+    const data = parseAgentJson(input, "classification");
 
-    context.reportProgress(40, 'Normalizing structure')
+    context.reportProgress(40, "Normalizing structure");
 
     // Normalize the classification into a structured format
     const normalized = {
-      topic: data.topic ?? data.classification ?? 'unknown',
-      category: data.category ?? 'general',
+      topic: data.topic ?? data.classification ?? "unknown",
+      category: data.category ?? "general",
       keywords: Array.isArray(data.keywords) ? data.keywords : [],
-      confidence: typeof data.confidence === 'number' ? data.confidence : 0.8,
+      confidence: typeof data.confidence === "number" ? data.confidence : 0.8,
       timestamp: new Date().toISOString(),
-      source: 'classification-agent',
-    }
+      source: "classification-agent",
+    };
 
-    context.reportProgress(100, 'Transform complete')
+    context.reportProgress(100, "Transform complete");
 
-    return JSON.stringify(normalized)
+    return JSON.stringify(normalized);
   },
-  label: 'Data Transform',
-  description: 'Parses agent classification and normalizes data structure for downstream analysis',
-}
+  label: "Data Transform",
+  description:
+    "Parses agent classification and normalizes data structure for downstream analysis",
+};
 
 const validateTask: TaskRegistration = {
   run: async (input, _signal, context) => {
-    context.reportProgress(25, 'Parsing analysis')
+    context.reportProgress(25, "Parsing analysis");
 
-    const data = parseAgentJson(input, 'analysis')
+    const data = parseAgentJson(input, "analysis");
 
-    context.reportProgress(50, 'Validating fields')
+    context.reportProgress(50, "Validating fields");
 
     if (!data.analysis && !data.findings) {
-      throw new Error('Missing analysis or findings field')
+      throw new Error("Missing analysis or findings field");
     }
 
-    context.reportProgress(75, 'Computing quality score')
+    context.reportProgress(75, "Computing quality score");
 
     // Compute a simple quality score
-    const contentLength = JSON.stringify(data).length
-    const score = Math.min(100, Math.round((contentLength / 500) * 100))
+    const contentLength = JSON.stringify(data).length;
+    const score = Math.min(100, Math.round((contentLength / 500) * 100));
 
-    context.reportProgress(100, 'Validation complete')
+    context.reportProgress(100, "Validation complete");
 
     return JSON.stringify({
       ...data,
       validated: true,
       qualityScore: score,
       validatedAt: new Date().toISOString(),
-    })
+    });
   },
-  label: 'Validate & Score',
-  description: 'Validates required fields and computes quality score for the analysis',
-  retry: { attempts: 2, backoff: 'fixed', delayMs: 500 },
-}
+  label: "Validate & Score",
+  description:
+    "Validates required fields and computes quality score for the analysis",
+  retry: { attempts: 2, backoff: "fixed", delayMs: 500 },
+};
 
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
 export function getDataPipelineOrchestrator(): DataPipelineInstance | null {
-  const cached = getCached()
+  const cached = getCached();
   if (cached) {
-    return cached
+    return cached;
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return null
+    return null;
   }
 
   // -------------------------------------------------------------------------
@@ -202,31 +209,40 @@ export function getDataPipelineOrchestrator(): DataPipelineInstance | null {
 
   const baseRunner = createAnthropicRunner({
     apiKey,
-    model: 'claude-haiku-4-5-20251001',
+    model: "claude-haiku-4-5-20251001",
     maxTokens: 1500,
-  })
+  });
 
-  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 }
+  const haikuPricing = { inputPerMillion: 0.8, outputPerMillion: 4 };
   const runner = withBudget(
-    withRetry(baseRunner, { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 }),
+    withRetry(baseRunner, {
+      maxRetries: 2,
+      baseDelayMs: 1000,
+      maxDelayMs: 10000,
+    }),
     {
-      budgets: [{ window: 'hour' as const, maxCost: 5.0, pricing: haikuPricing }],
+      budgets: [
+        { window: "hour" as const, maxCost: 5.0, pricing: haikuPricing },
+      ],
     },
-  )
+  );
 
   // -------------------------------------------------------------------------
   // Memory
   // -------------------------------------------------------------------------
 
   const memory = createAgentMemory({
-    strategy: createSlidingWindowStrategy({ maxMessages: 20, preserveRecentCount: 4 }),
-  })
+    strategy: createSlidingWindowStrategy({
+      maxMessages: 20,
+      preserveRecentCount: 4,
+    }),
+  });
 
   // -------------------------------------------------------------------------
   // Audit
   // -------------------------------------------------------------------------
 
-  const audit = createAuditTrail()
+  const audit = createAuditTrail();
 
   // -------------------------------------------------------------------------
   // Agents
@@ -235,8 +251,8 @@ export function getDataPipelineOrchestrator(): DataPipelineInstance | null {
   const agents = {
     classify: {
       agent: {
-        name: 'classify',
-        model: 'claude-haiku-4-5-20251001',
+        name: "classify",
+        model: "claude-haiku-4-5-20251001",
         instructions: `You are a data classification agent. Given a topic, classify it into a structured JSON format.
 
 Return a JSON object with these fields:
@@ -247,12 +263,12 @@ Return a JSON object with these fields:
 
 Return ONLY valid JSON, no markdown or explanation.`,
       },
-      capabilities: ['classification', 'categorization'],
+      capabilities: ["classification", "categorization"],
     },
     analyze: {
       agent: {
-        name: 'analyze',
-        model: 'claude-haiku-4-5-20251001',
+        name: "analyze",
+        model: "claude-haiku-4-5-20251001",
         instructions: `You are a data analysis agent. Given structured data about a topic, produce a deep analysis.
 
 Return a JSON object with these fields:
@@ -263,12 +279,12 @@ Return a JSON object with these fields:
 
 Return ONLY valid JSON, no markdown or explanation.`,
       },
-      capabilities: ['analysis', 'research'],
+      capabilities: ["analysis", "research"],
     },
     report: {
       agent: {
-        name: 'report',
-        model: 'claude-haiku-4-5-20251001',
+        name: "report",
+        model: "claude-haiku-4-5-20251001",
         instructions: `You are a report writing agent. Given validated analysis data, write a polished, readable report.
 
 Structure your report with:
@@ -280,9 +296,9 @@ Structure your report with:
 
 Write in clear, professional prose. This is the final output the user will read.`,
       },
-      capabilities: ['writing', 'summarization'],
+      capabilities: ["writing", "summarization"],
     },
-  }
+  };
 
   // -------------------------------------------------------------------------
   // Tasks
@@ -291,7 +307,7 @@ Write in clear, professional prose. This is the final output the user will read.
   const tasks: Record<string, TaskRegistration> = {
     transform: transformTask,
     validate: validateTask,
-  }
+  };
 
   // -------------------------------------------------------------------------
   // Patterns
@@ -300,26 +316,29 @@ Write in clear, professional prose. This is the final output the user will read.
   const patterns = {
     process: dag<string>(
       {
-        classify: { handler: 'classify' },
-        transform: { handler: 'transform', deps: ['classify'] },
-        analyze: { handler: 'analyze', deps: ['transform'] },
-        validate: { handler: 'validate', deps: ['analyze'] },
-        report: { handler: 'report', deps: ['validate'] },
+        classify: { handler: "classify" },
+        transform: { handler: "transform", deps: ["classify"] },
+        analyze: { handler: "analyze", deps: ["transform"] },
+        validate: { handler: "validate", deps: ["analyze"] },
+        report: { handler: "report", deps: ["validate"] },
       },
       (context: DagExecutionContext) => {
-        return (context.outputs.report as string) ?? 'No report generated.'
+        return (context.outputs.report as string) ?? "No report generated.";
       },
       { timeout: 120_000, maxConcurrent: 3 },
     ),
-  }
+  };
 
   // -------------------------------------------------------------------------
   // Output guardrails
   // -------------------------------------------------------------------------
 
   const outputGuardrails: NamedGuardrail<OutputGuardrailData>[] = [
-    { name: 'output-length', fn: createLengthGuardrail({ maxCharacters: 5000 }) },
-  ]
+    {
+      name: "output-length",
+      fn: createLengthGuardrail({ maxCharacters: 5000 }),
+    },
+  ];
 
   // -------------------------------------------------------------------------
   // Circuit breaker
@@ -328,19 +347,19 @@ Write in clear, professional prose. This is the final output the user will read.
   const circuitBreaker = createCircuitBreaker({
     failureThreshold: 5,
     recoveryTimeMs: 30_000,
-  })
+  });
 
   // -------------------------------------------------------------------------
   // Checkpoint store
   // -------------------------------------------------------------------------
 
-  const checkpointStore = new InMemoryCheckpointStore({ maxCheckpoints: 30 })
+  const checkpointStore = new InMemoryCheckpointStore({ maxCheckpoints: 30 });
 
   // -------------------------------------------------------------------------
   // Lifecycle hooks
   // -------------------------------------------------------------------------
 
-  const auditHandlers = createAgentAuditHandlers(audit)
+  const auditHandlers = createAgentAuditHandlers(audit);
 
   // -------------------------------------------------------------------------
   // Derivations
@@ -348,24 +367,28 @@ Write in clear, professional prose. This is the final output the user will read.
 
   const derivations = {
     pipelineComplete: (snapshot: CrossAgentSnapshot) => {
-      const agents = snapshot.agents
-      const classify = agents.classify
-      const analyze = agents.analyze
-      const report = agents.report
+      const agents = snapshot.agents;
+      const classify = agents.classify;
+      const analyze = agents.analyze;
+      const report = agents.report;
       if (!classify || !analyze || !report) {
-        return false
+        return false;
       }
 
-      return classify.status === 'completed' && analyze.status === 'completed' && report.status === 'completed'
+      return (
+        classify.status === "completed" &&
+        analyze.status === "completed" &&
+        report.status === "completed"
+      );
     },
     totalCost: (snapshot: CrossAgentSnapshot) => {
-      const tokens = snapshot.coordinator.globalTokens
-      const inputTokens = tokens * 0.6
-      const outputTokens = tokens * 0.4
+      const tokens = snapshot.coordinator.globalTokens;
+      const inputTokens = tokens * 0.6;
+      const outputTokens = tokens * 0.4;
 
-      return (inputTokens * 0.8 + outputTokens * 4) / 1_000_000
+      return (inputTokens * 0.8 + outputTokens * 4) / 1_000_000;
     },
-  }
+  };
 
   // -------------------------------------------------------------------------
   // Create orchestrator
@@ -380,43 +403,46 @@ Write in clear, professional prose. This is the final output the user will read.
     derive: derivations,
     scratchpad: {
       init: {
-        topic: '',
+        topic: "",
         confidence: 0,
         lastError: null,
       },
     },
     hooks: {
       onAgentStart: ({ agentId }) => {
-        auditHandlers.onAgentStart(agentId, '')
+        auditHandlers.onAgentStart(agentId, "");
       },
       onAgentComplete: ({ agentId, tokenUsage }) => {
-        auditHandlers.onAgentComplete(agentId, '', tokenUsage ?? 0, 0)
+        auditHandlers.onAgentComplete(agentId, "", tokenUsage ?? 0, 0);
       },
       onAgentError: ({ agentId, error }) => {
-        auditHandlers.onAgentError(agentId, error instanceof Error ? error : new Error(String(error)))
+        auditHandlers.onAgentError(
+          agentId,
+          error instanceof Error ? error : new Error(String(error)),
+        );
       },
       onTaskStart: (event) => {
-        audit.addEntry('agent.run.start', {
+        audit.addEntry("agent.run.start", {
           taskId: event.taskId,
           label: event.label,
           patternId: event.patternId,
-        })
+        });
       },
       onTaskComplete: (event) => {
-        audit.addEntry('agent.run.complete', {
+        audit.addEntry("agent.run.complete", {
           taskId: event.taskId,
           label: event.label,
           patternId: event.patternId,
           durationMs: event.durationMs,
-        })
+        });
       },
       onTaskError: (event) => {
-        audit.addEntry('agent.run.error', {
+        audit.addEntry("agent.run.error", {
           taskId: event.taskId,
           label: event.label,
           patternId: event.patternId,
           error: event.error.message,
-        })
+        });
       },
     },
     guardrails: {
@@ -426,12 +452,12 @@ Write in clear, professional prose. This is the final output the user will read.
     checkpointStore,
     debug: true,
     budgetWarningThreshold: 0.8,
-  })
+  });
 
-  const instance: DataPipelineInstance = { orchestrator, memory, audit }
-  setCached(instance)
+  const instance: DataPipelineInstance = { orchestrator, memory, audit };
+  setCached(instance);
 
-  return instance
+  return instance;
 }
 
 // ---------------------------------------------------------------------------
@@ -439,18 +465,17 @@ Write in clear, professional prose. This is the final output the user will read.
 // ---------------------------------------------------------------------------
 
 export function getDataPipelineTimeline() {
-  return getCached()?.orchestrator.timeline ?? null
+  return getCached()?.orchestrator.timeline ?? null;
 }
 
 export function getDataPipelineMemory() {
-  return getCached()?.memory ?? null
+  return getCached()?.memory ?? null;
 }
 
 export function getDataPipelineAudit() {
-  return getCached()?.audit ?? null
+  return getCached()?.audit ?? null;
 }
 
 export function getDataPipelineInputGuardrails() {
-  return inputGuardrails
+  return inputGuardrails;
 }
-

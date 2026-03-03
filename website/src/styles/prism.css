@@ -1,5 +1,5 @@
 /* Dark mode (default — matches bg-brand-code-bg) */
-pre[class*='language-'] {
+pre[class*="language-"] {
   color: var(--color-slate-50);
 }
 
@@ -48,7 +48,7 @@ pre[class*='language-'] {
 }
 
 /* Light mode overrides */
-:root:not(.dark) pre[class*='language-'] {
+:root:not(.dark) pre[class*="language-"] {
   color: var(--color-slate-800);
 }
 
@@ -97,104 +97,151 @@ pre[class*='language-'] {
 }
 
 /* Forced light code theme — :is() matches <html> itself OR descendants */
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) pre[class*='language-'] {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  pre[class*="language-"] {
   color: var(--color-slate-800);
   background-color: var(--color-slate-50);
   --tw-ring-color: var(--color-slate-200);
 }
 
 :is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.tag,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.class-name,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.selector,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.selector .class,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.selector.class,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.function {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.class-name,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.selector,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.selector
+  .class,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.selector.class,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.function {
   color: var(--color-pink-600);
 }
 
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.attr-name,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.keyword,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.rule,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.pseudo-class,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.important {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.attr-name,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.keyword,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.rule,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.pseudo-class,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.important {
   color: var(--color-purple-600);
 }
 
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.module {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.module {
   color: var(--color-pink-600);
 }
 
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.attr-value,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.class,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.string,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.property {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.attr-value,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.class,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.string,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.property {
   color: var(--brand-primary-600);
 }
 
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.punctuation,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.attr-equals {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.punctuation,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.attr-equals {
   color: var(--color-slate-500);
 }
 
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.unit,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .language-css .token.function {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.unit,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .language-css
+  .token.function {
   color: var(--color-teal-700);
 }
 
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.comment,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.operator,
-:is(:root[data-code-theme="light"], :root [data-code-theme="light"]) .token.combinator {
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.comment,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.operator,
+:is(:root[data-code-theme="light"], :root [data-code-theme="light"])
+  .token.combinator {
   color: var(--color-slate-400);
 }
 
 /* Forced dark code theme — :is() matches <html> itself OR descendants */
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) pre[class*='language-'] {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  pre[class*="language-"] {
   color: var(--color-slate-50);
   background-color: var(--brand-code-bg);
   --tw-ring-color: rgb(203 213 225 / 0.1);
 }
 
 :is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.tag,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.class-name,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.selector,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.selector .class,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.selector.class,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.function {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.class-name,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.selector,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.selector
+  .class,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.selector.class,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.function {
   color: var(--color-pink-400);
 }
 
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.attr-name,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.keyword,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.attr-name,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.keyword,
 :is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.rule,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.pseudo-class,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.important {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.pseudo-class,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.important {
   color: var(--color-slate-300);
 }
 
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.module {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.module {
   color: var(--color-pink-400);
 }
 
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.attr-value,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.attr-value,
 :is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.class,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.string,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.property {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.string,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.property {
   color: var(--brand-primary-300);
 }
 
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.punctuation,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.attr-equals {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.punctuation,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.attr-equals {
   color: var(--color-slate-500);
 }
 
 :is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.unit,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .language-css .token.function {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .language-css
+  .token.function {
   color: var(--color-teal-200);
 }
 
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.comment,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.operator,
-:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"]) .token.combinator {
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.comment,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.operator,
+:is(:root[data-code-theme="dark"], :root [data-code-theme="dark"])
+  .token.combinator {
   color: var(--color-slate-400);
 }
 
@@ -202,11 +249,13 @@ pre[class*='language-'] {
 /* :root sets light base; :root[data-code-theme="light"] (0,2,0) overrides .dark (0,1,0) */
 /* .dark sets dark mode; :root[data-code-theme="dark"] (0,2,0) overrides :root (0,1,0) */
 
-:root, :root[data-code-theme="light"] {
+:root,
+:root[data-code-theme="light"] {
   /* Hero editor */
   --hero-editor-bg: var(--color-slate-50);
   --hero-editor-ring: var(--color-slate-200);
-  --hero-editor-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --hero-editor-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px
+    rgb(0 0 0 / 0.1);
   --hero-editor-backdrop: none;
   --hero-traffic-stroke: var(--color-slate-300);
   --hero-pill-active-text: var(--brand-primary-700);
@@ -219,7 +268,8 @@ pre[class*='language-'] {
   /* Code blocks (Fence, CodeTabs, CodeEditor) */
   --code-bg: var(--color-slate-50);
   --code-ring: var(--color-slate-200);
-  --code-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --code-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px
+    rgb(0 0 0 / 0.05);
   --code-title-border: var(--color-slate-200);
   --code-title-text: var(--color-slate-500);
   --code-tab-active-text: var(--color-slate-800);
@@ -235,7 +285,8 @@ pre[class*='language-'] {
   --code-copy-hover-text: var(--color-slate-700);
 }
 
-.dark, :root[data-code-theme="dark"] {
+.dark,
+:root[data-code-theme="dark"] {
   /* Hero editor */
   --hero-editor-bg: rgba(10, 16, 31, 0.8);
   --hero-editor-ring: rgba(255, 255, 255, 0.1);

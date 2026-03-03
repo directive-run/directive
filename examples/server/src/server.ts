@@ -10,18 +10,18 @@
  * Run: npx tsx --watch src/server.ts
  */
 
-import express from "express";
-import {
-  createSystem,
-  signSnapshot,
-  verifySnapshotSignature,
-  isSnapshotExpired,
-} from "@directive-run/core";
 import {
   createAuditTrail,
   createCompliance,
   createInMemoryComplianceStorage,
 } from "@directive-run/ai";
+import {
+  createSystem,
+  isSnapshotExpired,
+  signSnapshot,
+  verifySnapshotSignature,
+} from "@directive-run/core";
+import express from "express";
 import { userProfile } from "./module.js";
 
 const app = express();
@@ -31,7 +31,8 @@ app.use(express.json());
 // Shared Infrastructure
 // ============================================================================
 
-const SIGNING_SECRET = process.env.SIGNING_SECRET ?? "dev-secret-change-in-production";
+const SIGNING_SECRET =
+  process.env.SIGNING_SECRET ?? "dev-secret-change-in-production";
 
 // Audit trail – shared across requests, acts as a Directive plugin
 const audit = createAuditTrail({
@@ -51,7 +52,10 @@ const compliance = createCompliance({
 });
 
 // In-memory snapshot cache (use Redis in production)
-const snapshotCache = new Map<string, { snapshot: unknown; cachedAt: number }>();
+const snapshotCache = new Map<
+  string,
+  { snapshot: unknown; cachedAt: number }
+>();
 const CACHE_TTL_MS = 60_000; // 1 minute
 
 // ============================================================================
@@ -222,7 +226,9 @@ app.post("/compliance/:subjectId/export", async (req, res) => {
     res.json({
       subjectId,
       exportedAt: new Date(result.exportedAt).toISOString(),
-      expiresAt: result.expiresAt ? new Date(result.expiresAt).toISOString() : null,
+      expiresAt: result.expiresAt
+        ? new Date(result.expiresAt).toISOString()
+        : null,
       recordCount: result.recordCount,
       checksum: result.checksum,
       data: JSON.parse(result.data),
@@ -292,7 +298,9 @@ app.listen(PORT, () => {
   console.log(`Directive server example running on http://localhost:${PORT}`);
   console.log();
   console.log("Endpoints:");
-  console.log(`  GET  /snapshot/:userId           Distributable snapshot with TTL`);
+  console.log(
+    `  GET  /snapshot/:userId           Distributable snapshot with TTL`,
+  );
   console.log(`  POST /snapshot/:userId/verify     Sign and verify snapshots`);
   console.log(`  GET  /audit                      Query audit entries`);
   console.log(`  GET  /audit/verify               Verify hash chain integrity`);

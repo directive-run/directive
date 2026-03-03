@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { useFact } from "@directive-run/svelte";
-  import { useRequirementStatus } from "@directive-run/svelte";
-  import { system, statusPlugin } from "../system";
-  import { TestIds } from "../../../../shared/test-ids";
+import { useFact } from "@directive-run/svelte";
+import { useRequirementStatus } from "@directive-run/svelte";
+import { statusPlugin, system } from "../system";
 
-  const reqStatus = useRequirementStatus(statusPlugin, "LOAD_DATA");
-  const status = useFact(system, "status");
+const reqStatus = useRequirementStatus(statusPlugin, "LOAD_DATA");
+const status = useFact(system, "status");
 </script>
 
 <div>

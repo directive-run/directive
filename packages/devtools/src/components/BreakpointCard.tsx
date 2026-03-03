@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { BreakpointRequest } from "../lib/types";
 
 interface BreakpointCardProps {
   breakpoint: BreakpointRequest;
-  onResume: (id: string, modifications?: { input?: string; skip?: boolean }) => void;
+  onResume: (
+    id: string,
+    modifications?: { input?: string; skip?: boolean },
+  ) => void;
   onCancel: (id: string, reason?: string) => void;
 }
 
@@ -16,13 +19,19 @@ const TYPE_LABELS: Record<string, string> = {
   pre_pattern_step: "Before Pattern Step",
 };
 
-export function BreakpointCard({ breakpoint, onResume, onCancel }: BreakpointCardProps) {
+export function BreakpointCard({
+  breakpoint,
+  onResume,
+  onCancel,
+}: BreakpointCardProps) {
   const [showEditor, setShowEditor] = useState(false);
   const [modifiedInput, setModifiedInput] = useState(breakpoint.input);
   const [cancelReason, setCancelReason] = useState("");
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const [waitTime, setWaitTime] = useState(Math.round((Date.now() - breakpoint.requestedAt) / 1000));
+  const [waitTime, setWaitTime] = useState(
+    Math.round((Date.now() - breakpoint.requestedAt) / 1000),
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -44,30 +53,47 @@ export function BreakpointCard({ breakpoint, onResume, onCancel }: BreakpointCar
           <div className="flex items-center gap-2">
             <span className="text-amber-400 text-lg">⏸</span>
             <span className="text-sm font-medium text-zinc-100">
-              {breakpoint.label ?? TYPE_LABELS[breakpoint.type] ?? breakpoint.type}
+              {breakpoint.label ??
+                TYPE_LABELS[breakpoint.type] ??
+                breakpoint.type}
             </span>
           </div>
           <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
-            <span>Agent: <span className="text-zinc-300">{breakpoint.agentId}</span></span>
-            <span>Phase: <span className="text-zinc-300">{breakpoint.type}</span></span>
-            <span>Waiting: <span className="text-amber-400">{waitTime}s</span></span>
+            <span>
+              Agent: <span className="text-zinc-300">{breakpoint.agentId}</span>
+            </span>
+            <span>
+              Phase: <span className="text-zinc-300">{breakpoint.type}</span>
+            </span>
+            <span>
+              Waiting: <span className="text-amber-400">{waitTime}s</span>
+            </span>
           </div>
         </div>
-        <span className="text-[10px] text-zinc-600 font-mono">{breakpoint.id}</span>
+        <span className="text-[10px] text-zinc-600 font-mono">
+          {breakpoint.id}
+        </span>
       </div>
 
       {/* Input preview */}
       <div className="mt-3 rounded bg-zinc-900 p-2 text-xs">
         <div className="text-[10px] text-zinc-500 mb-1">Input</div>
         <div className="text-zinc-300 font-mono text-[11px] max-h-20 overflow-auto whitespace-pre-wrap break-all">
-          {breakpoint.input.length > 500 ? `${breakpoint.input.slice(0, 500)}...` : breakpoint.input}
+          {breakpoint.input.length > 500
+            ? `${breakpoint.input.slice(0, 500)}...`
+            : breakpoint.input}
         </div>
       </div>
 
       {/* Input editor */}
       {showEditor && (
         <div className="mt-3">
-          <label htmlFor={`bp-input-${breakpoint.id}`} className="text-[10px] text-zinc-500">Modify Input</label>
+          <label
+            htmlFor={`bp-input-${breakpoint.id}`}
+            className="text-[10px] text-zinc-500"
+          >
+            Modify Input
+          </label>
           <textarea
             id={`bp-input-${breakpoint.id}`}
             value={modifiedInput}
@@ -82,7 +108,12 @@ export function BreakpointCard({ breakpoint, onResume, onCancel }: BreakpointCar
       {/* Cancel dialog */}
       {showCancelDialog && (
         <div className="mt-3">
-          <label htmlFor={`bp-cancel-${breakpoint.id}`} className="text-[10px] text-zinc-500">Cancel Reason (optional)</label>
+          <label
+            htmlFor={`bp-cancel-${breakpoint.id}`}
+            className="text-[10px] text-zinc-500"
+          >
+            Cancel Reason (optional)
+          </label>
           <input
             id={`bp-cancel-${breakpoint.id}`}
             type="text"
@@ -99,9 +130,10 @@ export function BreakpointCard({ breakpoint, onResume, onCancel }: BreakpointCar
       <div className="mt-3 flex items-center gap-2">
         <button
           onClick={() => {
-            const mods = showEditor && modifiedInput !== breakpoint.input
-              ? { input: modifiedInput }
-              : undefined;
+            const mods =
+              showEditor && modifiedInput !== breakpoint.input
+                ? { input: modifiedInput }
+                : undefined;
             onResume(breakpoint.id, mods);
           }}
           className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"

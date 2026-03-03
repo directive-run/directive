@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 // @ts-nocheck
 /**
  * Notification Banner Directive Module
@@ -6,15 +7,14 @@
  * Notification definitions live in config.ts – only dismissal tracking
  * is reactive state.
  */
-import { createModule, t } from '@directive-run/core'
-import { STORAGE_KEYS } from '@/lib/storage-keys'
-import { NOTIFICATION_DEFS, type NotificationDef } from './config'
+import { createModule, t } from "@directive-run/core";
+import { NOTIFICATION_DEFS, type NotificationDef } from "./config";
 
 // ---------------------------------------------------------------------------
 // Module
 // ---------------------------------------------------------------------------
 
-export const notifications = createModule('notifications', {
+export const notifications = createModule("notifications", {
   schema: {
     facts: {
       dismissedIds: t.array(t.string()),
@@ -30,7 +30,7 @@ export const notifications = createModule('notifications', {
   },
 
   init: (facts) => {
-    facts.dismissedIds = []
+    facts.dismissedIds = [];
   },
 
   derive: {
@@ -43,31 +43,31 @@ export const notifications = createModule('notifications', {
   events: {
     dismiss: (facts, { id }) => {
       if (!facts.dismissedIds.includes(id)) {
-        facts.dismissedIds = [...facts.dismissedIds, id]
+        facts.dismissedIds = [...facts.dismissedIds, id];
       }
     },
     hydrateDismissed: (facts, { ids }) => {
-      facts.dismissedIds = ids
+      facts.dismissedIds = ids;
     },
   },
 
   effects: {
     persistDismissed: {
-      deps: ['dismissedIds'],
+      deps: ["dismissedIds"],
       run: (facts, prev) => {
         if (!prev) {
-          return
+          return;
         }
 
         try {
           localStorage.setItem(
             STORAGE_KEYS.DISMISSED_NOTIFICATIONS,
             JSON.stringify(facts.dismissedIds),
-          )
+          );
         } catch {
           // localStorage unavailable
         }
       },
     },
   },
-})
+});

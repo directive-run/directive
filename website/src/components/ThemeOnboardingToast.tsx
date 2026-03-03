@@ -1,79 +1,89 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
-import { Palette, X } from '@phosphor-icons/react'
-import { findColorPreset } from '@/lib/brand-presets'
-import { STORAGE_KEYS, safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/storage-keys'
+import { findColorPreset } from "@/lib/brand-presets";
+import {
+  STORAGE_KEYS,
+  safeGetItem,
+  safeRemoveItem,
+  safeSetItem,
+} from "@/lib/storage-keys";
+import { Palette, X } from "@phosphor-icons/react";
+import { useCallback, useEffect, useState } from "react";
 
-const SHOW_DELAY = 2000
-const AUTO_DISMISS_DELAY = 8000
+const SHOW_DELAY = 2000;
+const AUTO_DISMISS_DELAY = 8000;
 
 export function ThemeOnboardingToast() {
-  const [visible, setVisible] = useState(false)
-  const [presetName, setPresetName] = useState('')
-  const [exiting, setExiting] = useState(false)
-  const [reducedMotion, setReducedMotion] = useState(false)
+  const [visible, setVisible] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [exiting, setExiting] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    setReducedMotion(
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    );
 
-    const isFirstVisit = safeGetItem(STORAGE_KEYS.FIRST_VISIT)
-    const alreadyOnboarded = safeGetItem(STORAGE_KEYS.ONBOARDED)
-    if (!isFirstVisit || alreadyOnboarded) return
+    const isFirstVisit = safeGetItem(STORAGE_KEYS.FIRST_VISIT);
+    const alreadyOnboarded = safeGetItem(STORAGE_KEYS.ONBOARDED);
+    if (!isFirstVisit || alreadyOnboarded) return;
 
-    const colorId = safeGetItem(STORAGE_KEYS.COLOR)
-    if (!colorId) return
+    const colorId = safeGetItem(STORAGE_KEYS.COLOR);
+    if (!colorId) return;
 
-    const preset = findColorPreset(colorId)
-    if (!preset) return
+    const preset = findColorPreset(colorId);
+    if (!preset) return;
 
-    setPresetName(preset.name)
+    setPresetName(preset.name);
 
-    const showTimer = setTimeout(() => setVisible(true), SHOW_DELAY)
-    const dismissTimer = setTimeout(() => dismiss(), SHOW_DELAY + AUTO_DISMISS_DELAY)
+    const showTimer = setTimeout(() => setVisible(true), SHOW_DELAY);
+    const dismissTimer = setTimeout(
+      () => dismiss(),
+      SHOW_DELAY + AUTO_DISMISS_DELAY,
+    );
 
     return () => {
-      clearTimeout(showTimer)
-      clearTimeout(dismissTimer)
-    }
-  }, [])
+      clearTimeout(showTimer);
+      clearTimeout(dismissTimer);
+    };
+  }, []);
 
   const dismiss = useCallback(() => {
-    setExiting(true)
-    const delay = reducedMotion ? 0 : 300
+    setExiting(true);
+    const delay = reducedMotion ? 0 : 300;
     setTimeout(() => {
-      setVisible(false)
-      setExiting(false)
-      safeSetItem(STORAGE_KEYS.ONBOARDED, '1')
-      safeRemoveItem(STORAGE_KEYS.FIRST_VISIT)
-    }, delay)
-  }, [reducedMotion])
+      setVisible(false);
+      setExiting(false);
+      safeSetItem(STORAGE_KEYS.ONBOARDED, "1");
+      safeRemoveItem(STORAGE_KEYS.FIRST_VISIT);
+    }, delay);
+  }, [reducedMotion]);
 
   const handleVote = useCallback(() => {
-    dismiss()
-    const switcher = document.querySelector('[aria-label="Toggle labs panel"]')
+    dismiss();
+    const switcher = document.querySelector('[aria-label="Toggle labs panel"]');
     if (switcher instanceof HTMLElement) {
-      switcher.click()
+      switcher.click();
       setTimeout(() => {
-        const voteSection = document.getElementById('cast-your-vote')
+        const voteSection = document.getElementById("cast-your-vote");
         voteSection?.scrollIntoView({
-          behavior: reducedMotion ? 'auto' : 'smooth',
-          block: 'nearest',
-        })
-      }, 200)
+          behavior: reducedMotion ? "auto" : "smooth",
+          block: "nearest",
+        });
+      }, 200);
     }
-  }, [dismiss, reducedMotion])
+  }, [dismiss, reducedMotion]);
 
-  if (!visible) return null
+  if (!visible) return null;
 
   return (
     <div
       className={`fixed right-4 bottom-4 z-50 flex max-w-sm items-start gap-3 rounded-xl bg-white p-4 shadow-lg ring-1 ring-black/5 dark:bg-brand-surface-raised dark:ring-white/10 ${
         reducedMotion
           ? exiting
-            ? 'opacity-0'
-            : 'opacity-100'
-          : `transition-all duration-300 ${exiting ? 'translate-y-2 opacity-0' : 'translate-y-0 opacity-100'}`
+            ? "opacity-0"
+            : "opacity-100"
+          : `transition-all duration-300 ${exiting ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100"}`
       }`}
       role="status"
       aria-live="polite"
@@ -115,5 +125,5 @@ export function ThemeOnboardingToast() {
         <X className="h-4 w-4" />
       </button>
     </div>
-  )
+  );
 }

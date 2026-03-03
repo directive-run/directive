@@ -6,7 +6,7 @@
  * constraints, resolvers, and derivations across independent modules.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import { mockFetchWeather } from "./mock-weather.js";
 
 // ============================================================================
@@ -23,11 +23,7 @@ export interface EventLogEntry {
 // Helpers
 // ============================================================================
 
-function addLogEntry(
-  facts: any,
-  event: string,
-  detail: string,
-): void {
+function addLogEntry(facts: any, event: string, detail: string): void {
   const log = [...(facts.eventLog as EventLogEntry[])];
   log.push({ timestamp: Date.now(), event, detail });
   if (log.length > 50) {
@@ -113,7 +109,10 @@ export const counterModule = createModule("counter", {
       facts.count = (facts.count as number) + (facts.step as number);
     },
     decrement: (facts) => {
-      facts.count = Math.max(0, (facts.count as number) - (facts.step as number));
+      facts.count = Math.max(
+        0,
+        (facts.count as number) - (facts.step as number),
+      );
     },
     setStep: (facts, { value }) => {
       facts.step = value;

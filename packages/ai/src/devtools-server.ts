@@ -12,8 +12,8 @@
  */
 
 import type { DebugTimeline } from "./debug-timeline.js";
-import type { HealthMonitor, AgentHealthMetrics } from "./health-monitor.js";
-import type { DebugEvent, BreakpointState } from "./types.js";
+import type { AgentHealthMetrics, HealthMonitor } from "./health-monitor.js";
+import type { BreakpointState, DebugEvent } from "./types.js";
 
 // ============================================================================
 // Transport Interface (WebSocket abstraction)
@@ -63,7 +63,13 @@ export interface DevToolsClient {
  */
 export interface DevToolsTransport {
   /** Register a handler for new client connections */
-  onConnection(handler: (client: DevToolsClient, onMessage: (handler: (data: string) => void) => void, onClose: (handler: () => void) => void) => void): void;
+  onConnection(
+    handler: (
+      client: DevToolsClient,
+      onMessage: (handler: (data: string) => void) => void,
+      onClose: (handler: () => void) => void,
+    ) => void,
+  ): void;
   /** Shut down the transport */
   close(): void;
 }
@@ -89,7 +95,12 @@ export type DevToolsServerMessage =
   // Fork
   | { type: "fork_complete"; eventId: number; newEventCount: number }
   // Token streaming
-  | { type: "token_stream"; agentId: string; tokens: string; tokenCount: number }
+  | {
+      type: "token_stream";
+      agentId: string;
+      tokens: string;
+      tokenCount: number;
+    }
   | { type: "stream_done"; agentId: string; totalTokens: number }
   | { type: "error"; code: string; message: string };
 
@@ -100,7 +111,11 @@ export type DevToolsClientMessage =
   | { type: "request_health" }
   | { type: "request_events"; since?: number }
   | { type: "request_breakpoints" }
-  | { type: "resume_breakpoint"; breakpointId: string; modifications?: { input?: string; skip?: boolean } }
+  | {
+      type: "resume_breakpoint";
+      breakpointId: string;
+      modifications?: { input?: string; skip?: boolean };
+    }
   | { type: "cancel_breakpoint"; breakpointId: string; reason?: string }
   | { type: "export_session" }
   | { type: "import_session"; data: string }
@@ -114,13 +129,16 @@ export type DevToolsClientMessage =
 /** System snapshot sent to clients on demand */
 export interface DevToolsSnapshot {
   timestamp: number;
-  agents: Record<string, {
-    status: string;
-    lastInput?: string;
-    lastOutput?: unknown;
-    totalTokens: number;
-    runCount: number;
-  }>;
+  agents: Record<
+    string,
+    {
+      status: string;
+      lastInput?: string;
+      lastOutput?: unknown;
+      totalTokens: number;
+      runCount: number;
+    }
+  >;
   coordinator?: { globalTokens: number; status: string };
   derived?: Record<string, unknown>;
   eventCount: number;
@@ -143,7 +161,10 @@ export interface DevToolsServerConfig {
   /** Callback to get current breakpoint state */
   getBreakpointState?: () => BreakpointState;
   /** Callback to resume a breakpoint */
-  onResumeBreakpoint?: (id: string, modifications?: { input?: string; skip?: boolean }) => void;
+  onResumeBreakpoint?: (
+    id: string,
+    modifications?: { input?: string; skip?: boolean },
+  ) => void;
   /** Callback to cancel a breakpoint */
   onCancelBreakpoint?: (id: string, reason?: string) => void;
   /** Callback to get current scratchpad state */
@@ -208,7 +229,9 @@ const PROTOCOL_VERSION = 1;
  * });
  * ```
  */
-export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServer {
+export function createDevToolsServer(
+  config: DevToolsServerConfig,
+): DevToolsServer {
   const {
     transport,
     timeline,
@@ -238,7 +261,10 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
   // Helpers
   // ------------------------------------------------------------------
 
-  function sendToClient(client: DevToolsClient, message: DevToolsServerMessage): void {
+  function sendToClient(
+    client: DevToolsClient,
+    message: DevToolsServerMessage,
+  ): void {
     try {
       client.send(JSON.stringify(message));
     } catch {
@@ -277,22 +303,24 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
   // Timeline subscription
   // ------------------------------------------------------------------
 
-  const unsubscribeTimeline: () => void = timeline.subscribe((event: DebugEvent) => {
-    if (clients.size === 0) {
-      return;
-    }
+  const unsubscribeTimeline: () => void = timeline.subscribe(
+    (event: DebugEvent) => {
+      if (clients.size === 0) {
+        return;
+      }
 
-    if (batchSize <= 1) {
-      broadcastMessage({ type: "event", event });
+      if (batchSize <= 1) {
+        broadcastMessage({ type: "event", event });
 
-      return;
-    }
+        return;
+      }
 
-    batchBuffer.push(event);
-    if (batchBuffer.length >= batchSize) {
-      flushBatch();
-    }
-  });
+      batchBuffer.push(event);
+      if (batchBuffer.length >= batchSize) {
+        flushBatch();
+      }
+    },
+  );
 
   // Start batch flush timer if batching enabled
   if (batchSize > 1 && batchIntervalMs > 0) {
@@ -303,7 +331,10 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
   if (healthPushIntervalMs > 0 && healthMonitor) {
     healthTimer = setInterval(() => {
       if (clients.size > 0) {
-        broadcastMessage({ type: "health", metrics: healthMonitor.getAllMetrics() });
+        broadcastMessage({
+          type: "health",
+          metrics: healthMonitor.getAllMetrics(),
+        });
       }
     }, healthPushIntervalMs);
   }
@@ -317,13 +348,21 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     try {
       msg = JSON.parse(raw) as DevToolsClientMessage;
     } catch {
-      sendToClient(client, { type: "error", code: "INVALID_JSON", message: "Could not parse message" });
+      sendToClient(client, {
+        type: "error",
+        code: "INVALID_JSON",
+        message: "Could not parse message",
+      });
 
       return;
     }
 
     if (!msg || typeof msg !== "object" || typeof msg.type !== "string") {
-      sendToClient(client, { type: "error", code: "INVALID_MESSAGE", message: "Missing type field" });
+      sendToClient(client, {
+        type: "error",
+        code: "INVALID_MESSAGE",
+        message: "Missing type field",
+      });
 
       return;
     }
@@ -331,7 +370,11 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     const now = Date.now();
     const last = clientLastMessage.get(client) ?? 0;
     if (now - last < MIN_MESSAGE_INTERVAL_MS) {
-      sendToClient(client, { type: "error", code: "RATE_LIMITED", message: "Too many requests" });
+      sendToClient(client, {
+        type: "error",
+        code: "RATE_LIMITED",
+        message: "Too many requests",
+      });
 
       return;
     }
@@ -341,20 +384,32 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
     if (msg.type === "authenticate") {
       if (!authenticate) {
         // No auth configured — treat as unknown command
-        sendToClient(client, { type: "error", code: "UNKNOWN_COMMAND", message: "Authentication not configured on this server" });
+        sendToClient(client, {
+          type: "error",
+          code: "UNKNOWN_COMMAND",
+          message: "Authentication not configured on this server",
+        });
 
         return;
       }
 
       if (!pendingAuthClients.has(client)) {
         // Already authenticated
-        sendToClient(client, { type: "error", code: "ALREADY_AUTHENTICATED", message: "Already authenticated" });
+        sendToClient(client, {
+          type: "error",
+          code: "ALREADY_AUTHENTICATED",
+          message: "Already authenticated",
+        });
 
         return;
       }
 
       if (typeof msg.token !== "string") {
-        sendToClient(client, { type: "error", code: "AUTH_FAILED", message: "Missing token" });
+        sendToClient(client, {
+          type: "error",
+          code: "AUTH_FAILED",
+          message: "Missing token",
+        });
         client.close();
         pendingAuthClients.delete(client);
 
@@ -373,7 +428,11 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
             timestamp: Date.now(),
           });
         } else {
-          sendToClient(client, { type: "error", code: "AUTH_FAILED", message: "Invalid token" });
+          sendToClient(client, {
+            type: "error",
+            code: "AUTH_FAILED",
+            message: "Invalid token",
+          });
           pendingAuthClients.delete(client);
           client.close();
         }
@@ -381,7 +440,11 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
       if (result instanceof Promise) {
         result.then(handleResult).catch(() => {
-          sendToClient(client, { type: "error", code: "AUTH_FAILED", message: "Authentication error" });
+          sendToClient(client, {
+            type: "error",
+            code: "AUTH_FAILED",
+            message: "Authentication error",
+          });
           pendingAuthClients.delete(client);
           client.close();
         });
@@ -394,7 +457,11 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
     // Reject commands from clients pending authentication
     if (pendingAuthClients.has(client)) {
-      sendToClient(client, { type: "error", code: "AUTH_REQUIRED", message: "Authentication required" });
+      sendToClient(client, {
+        type: "error",
+        code: "AUTH_REQUIRED",
+        message: "Authentication required",
+      });
 
       return;
     }
@@ -408,31 +475,50 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
         if (getSnapshot) {
           sendToClient(client, { type: "snapshot", data: getSnapshot() });
         } else {
-          sendToClient(client, { type: "error", code: "NO_SNAPSHOT", message: "Snapshot provider not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_SNAPSHOT",
+            message: "Snapshot provider not configured",
+          });
         }
         break;
 
       case "request_health":
         if (healthMonitor) {
-          sendToClient(client, { type: "health", metrics: healthMonitor.getAllMetrics() });
+          sendToClient(client, {
+            type: "health",
+            metrics: healthMonitor.getAllMetrics(),
+          });
         } else {
-          sendToClient(client, { type: "error", code: "NO_HEALTH", message: "Health monitor not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_HEALTH",
+            message: "Health monitor not configured",
+          });
         }
         break;
 
       case "request_events": {
         const events = timeline.getEvents();
         const since = msg.since;
-        const filtered = since != null ? events.filter((e) => e.id > since) : events;
+        const filtered =
+          since != null ? events.filter((e) => e.id > since) : events;
         sendToClient(client, { type: "event_batch", events: filtered });
         break;
       }
 
       case "request_breakpoints":
         if (getBreakpointState) {
-          sendToClient(client, { type: "breakpoints", state: getBreakpointState() });
+          sendToClient(client, {
+            type: "breakpoints",
+            state: getBreakpointState(),
+          });
         } else {
-          sendToClient(client, { type: "error", code: "NO_BREAKPOINTS", message: "Breakpoint provider not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_BREAKPOINTS",
+            message: "Breakpoint provider not configured",
+          });
         }
         break;
 
@@ -444,36 +530,63 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
             : undefined;
           onResumeBreakpoint(msg.breakpointId, mods);
         } else {
-          sendToClient(client, { type: "error", code: "NO_BREAKPOINTS", message: "Breakpoint resume not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_BREAKPOINTS",
+            message: "Breakpoint resume not configured",
+          });
         }
         break;
 
       case "cancel_breakpoint":
         if (onCancelBreakpoint && typeof msg.breakpointId === "string") {
-          const safeReason = typeof msg.reason === "string" ? msg.reason : undefined;
+          const safeReason =
+            typeof msg.reason === "string" ? msg.reason : undefined;
           onCancelBreakpoint(msg.breakpointId, safeReason);
         } else {
-          sendToClient(client, { type: "error", code: "NO_BREAKPOINTS", message: "Breakpoint cancel not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_BREAKPOINTS",
+            message: "Breakpoint cancel not configured",
+          });
         }
         break;
 
       case "export_session":
-        sendToClient(client, { type: "event_batch", events: timeline.getEvents() });
+        sendToClient(client, {
+          type: "event_batch",
+          events: timeline.getEvents(),
+        });
         break;
 
       case "import_session": {
         const MAX_IMPORT_SIZE = 10 * 1024 * 1024; // ~10M characters (string .length check, not byte size)
         if (typeof msg.data !== "string") {
-          sendToClient(client, { type: "error", code: "INVALID_DATA", message: "Missing data field for import" });
+          sendToClient(client, {
+            type: "error",
+            code: "INVALID_DATA",
+            message: "Missing data field for import",
+          });
         } else if (msg.data.length > MAX_IMPORT_SIZE) {
-          sendToClient(client, { type: "error", code: "IMPORT_TOO_LARGE", message: `Import data exceeds ${MAX_IMPORT_SIZE / 1024 / 1024} MB limit` });
+          sendToClient(client, {
+            type: "error",
+            code: "IMPORT_TOO_LARGE",
+            message: `Import data exceeds ${MAX_IMPORT_SIZE / 1024 / 1024} MB limit`,
+          });
         } else {
           try {
             timeline.import(msg.data);
-            sendToClient(client, { type: "event_batch", events: timeline.getEvents() });
+            sendToClient(client, {
+              type: "event_batch",
+              events: timeline.getEvents(),
+            });
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
-            sendToClient(client, { type: "error", code: "IMPORT_FAILED", message: errMsg });
+            sendToClient(client, {
+              type: "error",
+              code: "IMPORT_FAILED",
+              message: errMsg,
+            });
           }
         }
         break;
@@ -481,17 +594,31 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
       case "request_scratchpad":
         if (getScratchpadState) {
-          sendToClient(client, { type: "scratchpad_state", data: getScratchpadState() });
+          sendToClient(client, {
+            type: "scratchpad_state",
+            data: getScratchpadState(),
+          });
         } else {
-          sendToClient(client, { type: "error", code: "NO_SCRATCHPAD", message: "Scratchpad provider not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_SCRATCHPAD",
+            message: "Scratchpad provider not configured",
+          });
         }
         break;
 
       case "request_derived":
         if (getDerivedState) {
-          sendToClient(client, { type: "derived_state", data: getDerivedState() });
+          sendToClient(client, {
+            type: "derived_state",
+            data: getDerivedState(),
+          });
         } else {
-          sendToClient(client, { type: "error", code: "NO_DERIVED", message: "Derived state provider not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_DERIVED",
+            message: "Derived state provider not configured",
+          });
         }
         break;
 
@@ -499,19 +626,35 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
         if (onForkFromSnapshot && typeof msg.eventId === "number") {
           try {
             const result = onForkFromSnapshot(msg.eventId);
-            sendToClient(client, { type: "fork_complete", eventId: msg.eventId, newEventCount: result.newEventCount });
+            sendToClient(client, {
+              type: "fork_complete",
+              eventId: msg.eventId,
+              newEventCount: result.newEventCount,
+            });
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
-            sendToClient(client, { type: "error", code: "FORK_FAILED", message: errMsg });
+            sendToClient(client, {
+              type: "error",
+              code: "FORK_FAILED",
+              message: errMsg,
+            });
           }
         } else {
-          sendToClient(client, { type: "error", code: "NO_FORK", message: "Fork provider not configured" });
+          sendToClient(client, {
+            type: "error",
+            code: "NO_FORK",
+            message: "Fork provider not configured",
+          });
         }
         break;
       }
 
       default:
-        sendToClient(client, { type: "error", code: "UNKNOWN_COMMAND", message: `Unknown message type: ${String((msg as { type: string }).type).slice(0, 100)}` });
+        sendToClient(client, {
+          type: "error",
+          code: "UNKNOWN_COMMAND",
+          message: `Unknown message type: ${String((msg as { type: string }).type).slice(0, 100)}`,
+        });
     }
   }
 
@@ -529,9 +672,15 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
   transport.onConnection((client, onMessage, onClose) => {
     if (clients.size + pendingAuthClients.size >= maxClients) {
       try {
-        const msg: DevToolsServerMessage = { type: "error", code: "MAX_CLIENTS", message: "Connection limit reached" };
+        const msg: DevToolsServerMessage = {
+          type: "error",
+          code: "MAX_CLIENTS",
+          message: "Connection limit reached",
+        };
         client.send(JSON.stringify(msg));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       client.close();
 
       return;
@@ -574,7 +723,10 @@ export function createDevToolsServer(config: DevToolsServerConfig): DevToolsServ
 
     pushHealth(): void {
       if (healthMonitor && clients.size > 0) {
-        broadcastMessage({ type: "health", metrics: healthMonitor.getAllMetrics() });
+        broadcastMessage({
+          type: "health",
+          metrics: healthMonitor.getAllMetrics(),
+        });
       }
     },
 
@@ -666,12 +818,39 @@ export interface ConnectDevToolsOptions {
 
 /** Minimal orchestrator interface for DevTools connection */
 export interface DevToolsCompatibleOrchestrator {
-  timeline: { subscribe: (listener: (event: DebugEvent) => void) => () => void; getEvents: () => DebugEvent[]; import: (json: string) => void; export: () => string; forkFrom?: (eventId: number) => void } | null;
-  healthMonitor?: { getAllMetrics: () => Record<string, AgentHealthMetrics> } | null;
-  getPendingBreakpoints?: () => Array<{ id: string; type: string; agentId: string; input: string; label?: string; requestedAt: number }>;
-  resumeBreakpoint?: (id: string, modifications?: { input?: string; skip?: boolean }) => void;
+  timeline: {
+    subscribe: (listener: (event: DebugEvent) => void) => () => void;
+    getEvents: () => DebugEvent[];
+    import: (json: string) => void;
+    export: () => string;
+    forkFrom?: (eventId: number) => void;
+  } | null;
+  healthMonitor?: {
+    getAllMetrics: () => Record<string, AgentHealthMetrics>;
+  } | null;
+  getPendingBreakpoints?: () => Array<{
+    id: string;
+    type: string;
+    agentId: string;
+    input: string;
+    label?: string;
+    requestedAt: number;
+  }>;
+  resumeBreakpoint?: (
+    id: string,
+    modifications?: { input?: string; skip?: boolean },
+  ) => void;
   cancelBreakpoint?: (id: string, reason?: string) => void;
-  getAllAgentStates?: () => Record<string, { status: string; lastInput?: string; lastOutput?: unknown; totalTokens: number; runCount: number }>;
+  getAllAgentStates?: () => Record<
+    string,
+    {
+      status: string;
+      lastInput?: string;
+      lastOutput?: unknown;
+      totalTokens: number;
+      runCount: number;
+    }
+  >;
   /** Get current scratchpad state (multi-agent only) */
   getScratchpadState?: () => Record<string, unknown>;
   /** Get current derived values (multi-agent only) */
@@ -703,7 +882,9 @@ export async function connectDevTools(
   options: ConnectDevToolsOptions = {},
 ): Promise<DevToolsServer> {
   if (!orchestrator.timeline) {
-    throw new Error("[Directive DevTools] Orchestrator must have debug: true to use DevTools");
+    throw new Error(
+      "[Directive DevTools] Orchestrator must have debug: true to use DevTools",
+    );
   }
 
   const transport = await createWsTransport({
@@ -720,21 +901,21 @@ export async function connectDevTools(
     authenticate: options.authenticate,
     getSnapshot: orchestrator.getAllAgentStates
       ? () => {
-        const agents = orchestrator.getAllAgentStates!();
+          const agents = orchestrator.getAllAgentStates!();
 
-        return {
-          timestamp: Date.now(),
-          agents,
-          eventCount: orchestrator.timeline!.getEvents().length,
-        };
-      }
+          return {
+            timestamp: Date.now(),
+            agents,
+            eventCount: orchestrator.timeline!.getEvents().length,
+          };
+        }
       : undefined,
     getBreakpointState: orchestrator.getPendingBreakpoints
       ? () => ({
-        pending: orchestrator.getPendingBreakpoints!(),
-        resolved: [],
-        cancelled: [],
-      })
+          pending: orchestrator.getPendingBreakpoints!(),
+          resolved: [],
+          cancelled: [],
+        })
       : undefined,
     onResumeBreakpoint: orchestrator.resumeBreakpoint,
     onCancelBreakpoint: orchestrator.cancelBreakpoint,
@@ -742,11 +923,11 @@ export async function connectDevTools(
     getDerivedState: orchestrator.getDerivedState,
     onForkFromSnapshot: orchestrator.timeline?.forkFrom
       ? (eventId: number) => {
-        orchestrator.timeline!.forkFrom!(eventId);
-        const newEventCount = orchestrator.timeline!.getEvents().length;
+          orchestrator.timeline!.forkFrom!(eventId);
+          const newEventCount = orchestrator.timeline!.getEvents().length;
 
-        return { newEventCount };
-      }
+          return { newEventCount };
+        }
       : undefined,
   });
 }
@@ -781,20 +962,28 @@ export interface WsTransportConfig {
  * const server = createDevToolsServer({ transport, timeline });
  * ```
  */
-export async function createWsTransport(config: WsTransportConfig = {}): Promise<DevToolsTransport> {
+export async function createWsTransport(
+  config: WsTransportConfig = {},
+): Promise<DevToolsTransport> {
   const port = config.port ?? 4040;
   const host = config.host ?? "localhost";
 
   // Dynamic import so ws is not a hard dependency
   const { WebSocketServer } = await import("ws");
   // maxPayload is supported at runtime but missing from @types/ws ServerOptions
-  const wss = new WebSocketServer({ port, host, ...{ maxPayload: config.maxPayloadBytes ?? 1_048_576 } });
+  const wss = new WebSocketServer({
+    port,
+    host,
+    ...{ maxPayload: config.maxPayloadBytes ?? 1_048_576 },
+  });
 
-  let connectionHandler: ((
-    client: DevToolsClient,
-    onMessage: (handler: (data: string) => void) => void,
-    onClose: (handler: () => void) => void,
-  ) => void) | null = null;
+  let connectionHandler:
+    | ((
+        client: DevToolsClient,
+        onMessage: (handler: (data: string) => void) => void,
+        onClose: (handler: () => void) => void,
+      ) => void)
+    | null = null;
 
   // biome-ignore lint/suspicious/noExplicitAny: ws types resolved at runtime via dynamic import
   wss.on("connection", (ws: any) => {
@@ -826,8 +1015,12 @@ export async function createWsTransport(config: WsTransportConfig = {}): Promise
 
     connectionHandler?.(
       client,
-      (handler) => { messageHandler = handler; },
-      (handler) => { closeHandler = handler; },
+      (handler) => {
+        messageHandler = handler;
+      },
+      (handler) => {
+        closeHandler = handler;
+      },
     );
   });
 

@@ -8,12 +8,12 @@
  * Cross-module derivations drive the `when()` conditions.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import {
-  validateSession,
-  fetchPermissions,
-  fetchDashboard,
   type DashboardWidget,
+  fetchDashboard,
+  fetchPermissions,
+  validateSession,
 } from "./mock-api.js";
 
 // ============================================================================
@@ -93,7 +93,10 @@ export const authModule = createModule("auth", {
         context.facts.status = "validating";
 
         try {
-          const result = await validateSession(req.token, context.facts.failRate);
+          const result = await validateSession(
+            req.token,
+            context.facts.failRate,
+          );
           if (result.valid) {
             context.facts.status = "valid";
             context.facts.userId = result.userId;
@@ -147,7 +150,8 @@ export const permissionsModule = createModule("permissions", {
 
   derive: {
     canEdit: (facts) => facts.self.permissions.includes("write"),
-    canPublish: (facts) => facts.self.permissions.includes("write") && facts.self.role !== "viewer",
+    canPublish: (facts) =>
+      facts.self.permissions.includes("write") && facts.self.role !== "viewer",
     canManageUsers: (facts) => facts.self.permissions.includes("manage-users"),
   },
 

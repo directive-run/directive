@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound } from "next/navigation";
 
 /**
  * Catch-all for unmatched /docs/* routes.
@@ -7,5 +7,5 @@ import { notFound } from 'next/navigation'
  * routes that don't have a dedicated page file.
  */
 export default function DocsCatchAll() {
-  notFound()
+  notFound();
 }

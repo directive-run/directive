@@ -7,9 +7,9 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import { heistModule, advanceStep } from "./goal-module.js";
-import type { NodeStatus, StrategyId } from "./goal-module.js";
 import { AGENTS, AGENT_ORDER, getApiKey } from "./agents.js";
+import { advanceStep, heistModule } from "./goal-module.js";
+import type { NodeStatus, StrategyId } from "./goal-module.js";
 
 // ============================================================================
 // System
@@ -132,7 +132,10 @@ document.querySelectorAll("[data-node]").forEach((el) => {
     system.dispatch({ type: "selectNode", nodeId });
   });
   el.addEventListener("keydown", (e) => {
-    if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") {
+    if (
+      (e as KeyboardEvent).key === "Enter" ||
+      (e as KeyboardEvent).key === " "
+    ) {
       (e as Event).preventDefault();
       const nodeId = (el as HTMLElement).dataset.node!;
       system.dispatch({ type: "selectNode", nodeId });
@@ -343,11 +346,16 @@ function render() {
   // ── Event log (append only new entries, no innerHTML) ──
   const totalEntries = stepHistory.length + relaxations.length;
 
-  if (totalEntries > lastRenderedLogCount || (achieved && !logEntries.querySelector(".completion"))) {
+  if (
+    totalEntries > lastRenderedLogCount ||
+    (achieved && !logEntries.querySelector(".completion"))
+  ) {
     // Render new step entries
     for (let i = lastRenderedLogCount; i < stepHistory.length; i++) {
       const entry = stepHistory[i];
-      const names = entry.nodesRun.map((nid) => AGENTS[nid]?.name ?? nid).join(", ");
+      const names = entry.nodesRun
+        .map((nid) => AGENTS[nid]?.name ?? nid)
+        .join(", ");
       const deltaClass = entry.satisfactionDelta > 0 ? "" : "zero";
       const deltaSign = entry.satisfactionDelta > 0 ? "+" : "";
 
@@ -365,7 +373,9 @@ function render() {
 
     // Render relaxation entries
     for (const rel of relaxations) {
-      const existing = logEntries.querySelector(`[data-rel-step="${rel.step}-${rel.strategy}"]`);
+      const existing = logEntries.querySelector(
+        `[data-rel-step="${rel.step}-${rel.strategy}"]`,
+      );
 
       if (!existing) {
         const div = document.createElement("div");

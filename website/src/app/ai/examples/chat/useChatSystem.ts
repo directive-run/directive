@@ -1,11 +1,11 @@
 // @ts-nocheck
-'use client'
+"use client";
 
-import { useEffect, useRef } from 'react'
-import { createSystem } from '@directive-run/core'
-import { devtoolsPlugin } from '@directive-run/core/plugins'
-import { chatSession } from './chat-session-module'
-import { getStore } from '@/components/InlineChat'
+import { getStore } from "@/components/InlineChat";
+import { createSystem } from "@directive-run/core";
+import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { useEffect, useRef } from "react";
+import { chatSession } from "./chat-session-module";
 
 /**
  * Creates a Directive system backed by the chat-session module, and keeps it
@@ -13,48 +13,48 @@ import { getStore } from '@/components/InlineChat'
  * via devtoolsPlugin so the DevToolsProvider auto-detects it.
  */
 export function useChatSystem(apiEndpoint: string) {
-  const systemRef = useRef<ReturnType<typeof createSystem> | null>(null)
+  const systemRef = useRef<ReturnType<typeof createSystem> | null>(null);
 
   // Create the system once
   if (!systemRef.current) {
     systemRef.current = createSystem({
       module: chatSession,
-      plugins: [devtoolsPlugin({ name: 'ai-chat' })],
+      plugins: [devtoolsPlugin({ name: "ai-chat" })],
       debug: { timeTravel: true, maxSnapshots: 50, runHistory: true },
-    })
+    });
   }
 
-  const system = systemRef.current
+  const system = systemRef.current;
 
   useEffect(() => {
-    system.initialize()
-    system.start()
+    system.initialize();
+    system.start();
 
-    const store = getStore(apiEndpoint)
+    const store = getStore(apiEndpoint);
 
     // Sync InlineChat state → Directive facts
     function syncState() {
-      const state = store.getSnapshot()
-      const messages = state.messages
+      const state = store.getSnapshot();
+      const messages = state.messages;
 
-      let totalCharsSent = 0
-      let totalCharsReceived = 0
-      let userCount = 0
-      let assistantCount = 0
+      let totalCharsSent = 0;
+      let totalCharsReceived = 0;
+      let userCount = 0;
+      let assistantCount = 0;
 
       for (const msg of messages) {
-        if (msg.role === 'user') {
-          userCount++
-          totalCharsSent += msg.content.length
+        if (msg.role === "user") {
+          userCount++;
+          totalCharsSent += msg.content.length;
         } else {
-          assistantCount++
-          totalCharsReceived += msg.content.length
+          assistantCount++;
+          totalCharsReceived += msg.content.length;
         }
       }
 
       // Include streaming content in received chars
       if (state.streamingContent) {
-        totalCharsReceived += state.streamingContent.length
+        totalCharsReceived += state.streamingContent.length;
       }
 
       system.events.updateMessages({
@@ -63,24 +63,24 @@ export function useChatSystem(apiEndpoint: string) {
         assistantMessages: assistantCount,
         totalCharsSent,
         totalCharsReceived,
-      })
+      });
 
-      system.events.setStreaming({ isStreaming: state.isLoading })
-      system.events.setError({ error: state.error ?? '' })
+      system.events.setStreaming({ isStreaming: state.isLoading });
+      system.events.setError({ error: state.error ?? "" });
     }
 
     // Initial sync
-    syncState()
+    syncState();
 
     // Subscribe to store changes
-    const unsubscribe = store.subscribe(syncState)
+    const unsubscribe = store.subscribe(syncState);
 
     return () => {
-      unsubscribe()
-      system.stop()
-      system.destroy()
-    }
-  }, [apiEndpoint, system])
+      unsubscribe();
+      system.stop();
+      system.destroy();
+    };
+  }, [apiEndpoint, system]);
 
-  return system
+  return system;
 }

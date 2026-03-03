@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("AI Checkpoint example", () => {
@@ -7,12 +7,20 @@ test.describe("AI Checkpoint example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/ai-checkpoint");
     try {
-      await page.waitForSelector("directive-ai-checkpoint", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-ai-checkpoint", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-ai-checkpoint", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-ai-checkpoint", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-ai-checkpoint-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-ai-checkpoint-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and UI renders", async ({ page }) => {
@@ -36,13 +44,17 @@ test.describe("AI Checkpoint example", () => {
     await tid(page, "cp-auto-run").click();
 
     // Should reach done
-    await expect(tid(page, "cp-current-stage")).toHaveText("done", { timeout: 15_000 });
+    await expect(tid(page, "cp-current-stage")).toHaveText("done", {
+      timeout: 15_000,
+    });
     await expect(tid(page, "cp-completion")).toHaveText("100%");
   });
 
   test("total tokens accumulate", async ({ page }) => {
     await tid(page, "cp-auto-run").click();
-    await expect(tid(page, "cp-current-stage")).toHaveText("done", { timeout: 15_000 });
+    await expect(tid(page, "cp-current-stage")).toHaveText("done", {
+      timeout: 15_000,
+    });
 
     const tokens = await tid(page, "cp-total-tokens").textContent();
     expect(Number(tokens)).toBeGreaterThan(0);
@@ -57,13 +69,17 @@ test.describe("AI Checkpoint example", () => {
 
     // Checkpoint list should have entry
     const list = tid(page, "cp-checkpoint-list");
-    await expect(list.locator(".cp-checkpoint-entry")).toBeVisible({ timeout: 5_000 });
+    await expect(list.locator(".cp-checkpoint-entry")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("restore checkpoint reverts state", async ({ page }) => {
     // Run pipeline
     await tid(page, "cp-auto-run").click();
-    await expect(tid(page, "cp-current-stage")).toHaveText("done", { timeout: 15_000 });
+    await expect(tid(page, "cp-current-stage")).toHaveText("done", {
+      timeout: 15_000,
+    });
 
     // Save checkpoint
     await tid(page, "cp-save-ckpt").click();
@@ -75,7 +91,9 @@ test.describe("AI Checkpoint example", () => {
     await expect(tid(page, "cp-current-stage")).toHaveText("idle");
 
     // Restore
-    const restoreBtn = tid(page, "cp-checkpoint-list").locator("button[data-restore]").first();
+    const restoreBtn = tid(page, "cp-checkpoint-list")
+      .locator("button[data-restore]")
+      .first();
     await restoreBtn.click();
     await page.waitForTimeout(500);
 
@@ -87,7 +105,9 @@ test.describe("AI Checkpoint example", () => {
     await page.waitForTimeout(500);
 
     const list = tid(page, "cp-checkpoint-list");
-    await expect(list.locator(".cp-checkpoint-entry")).toBeVisible({ timeout: 5_000 });
+    await expect(list.locator(".cp-checkpoint-entry")).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Delete it
     const deleteBtn = list.locator("button[data-delete]").first();
@@ -114,7 +134,9 @@ test.describe("AI Checkpoint example", () => {
     await tid(page, "cp-auto-run").click();
 
     // Should reach error state after retries
-    await expect(tid(page, "cp-current-stage")).toHaveText("error", { timeout: 20_000 });
+    await expect(tid(page, "cp-current-stage")).toHaveText("error", {
+      timeout: 20_000,
+    });
     await expect(tid(page, "cp-last-error")).not.toHaveText("\u2014");
   });
 
@@ -122,14 +144,18 @@ test.describe("AI Checkpoint example", () => {
     await expect(tid(page, "cp-completion")).toHaveText("0%");
 
     await tid(page, "cp-auto-run").click();
-    await expect(tid(page, "cp-current-stage")).toHaveText("done", { timeout: 15_000 });
+    await expect(tid(page, "cp-current-stage")).toHaveText("done", {
+      timeout: 15_000,
+    });
 
     await expect(tid(page, "cp-completion")).toHaveText("100%");
   });
 
   test("reset clears all state", async ({ page }) => {
     await tid(page, "cp-auto-run").click();
-    await expect(tid(page, "cp-current-stage")).toHaveText("done", { timeout: 15_000 });
+    await expect(tid(page, "cp-current-stage")).toHaveText("done", {
+      timeout: 15_000,
+    });
 
     await tid(page, "cp-reset").click();
     await page.waitForTimeout(500);

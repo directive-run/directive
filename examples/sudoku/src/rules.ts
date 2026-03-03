@@ -151,8 +151,16 @@ export function findConflicts(grid: Grid): Conflict[] {
           if (!seen.has(keyA)) {
             seen.add(keyA);
             seen.add(keyB);
-            conflicts.push({ index: indices[i], value: val, peerIndex: indices[j] });
-            conflicts.push({ index: indices[j], value: val, peerIndex: indices[i] });
+            conflicts.push({
+              index: indices[i],
+              value: val,
+              peerIndex: indices[j],
+            });
+            conflicts.push({
+              index: indices[j],
+              value: val,
+              peerIndex: indices[i],
+            });
           }
         }
       }

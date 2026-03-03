@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // Test the pure logic parts of the replay system
 // The hook itself uses React state, but the boundary logic is testable
@@ -107,7 +107,12 @@ describe("replay visibleEvents slicing", () => {
   });
 
   it("returns empty when events array is empty and replay is active", () => {
-    const events: { id: number; type: "agent_start"; timestamp: number; snapshotId: null }[] = [];
+    const events: {
+      id: number;
+      type: "agent_start";
+      timestamp: number;
+      snapshotId: null;
+    }[] = [];
     const active = true;
     const clampedIndex = 0;
 
@@ -298,7 +303,8 @@ describe("replay cursor timestamp computation", () => {
     const visibleRange = { start: 1000, duration: 2000 };
     const cursorTimestamp = 1500;
 
-    const pct = ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
+    const pct =
+      ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
     expect(pct).toBe(25);
   });
 
@@ -306,7 +312,8 @@ describe("replay cursor timestamp computation", () => {
     const visibleRange = { start: 1000, duration: 2000 };
     const cursorTimestamp = 500; // before range
 
-    const pct = ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
+    const pct =
+      ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
     // pct is -25, which is < 0, so the UI check (pct >= 0 && pct <= 100) would exclude it
     expect(pct < 0).toBe(true);
   });
@@ -316,7 +323,8 @@ describe("replay cursor timestamp computation", () => {
     const cursorTimestamp = 1000;
 
     // Division by zero → NaN or Infinity
-    const pct = ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
+    const pct =
+      ((cursorTimestamp - visibleRange.start) / visibleRange.duration) * 100;
     expect(Number.isFinite(pct)).toBe(false);
   });
 });

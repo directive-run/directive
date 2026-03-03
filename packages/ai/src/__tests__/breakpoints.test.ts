@@ -1,18 +1,28 @@
-import { describe, it, expect, vi } from "vitest";
-import { matchBreakpoint, createBreakpointId, createInitialBreakpointState } from "../breakpoints.js";
-import type { BreakpointConfig, BreakpointContext, BreakpointRequest } from "../breakpoints.js";
+import { describe, expect, it, vi } from "vitest";
 import {
-  createTestOrchestrator,
-  createTestMultiAgentOrchestrator,
-  createBreakpointSimulator,
-} from "../testing.js";
+  createBreakpointId,
+  createInitialBreakpointState,
+  matchBreakpoint,
+} from "../breakpoints.js";
+import type {
+  BreakpointConfig,
+  BreakpointContext,
+  BreakpointRequest,
+} from "../breakpoints.js";
 import { sequential } from "../multi-agent-orchestrator.js";
+import {
+  createBreakpointSimulator,
+  createTestMultiAgentOrchestrator,
+  createTestOrchestrator,
+} from "../testing.js";
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
-function makeContext(overrides: Partial<BreakpointContext> = {}): BreakpointContext {
+function makeContext(
+  overrides: Partial<BreakpointContext> = {},
+): BreakpointContext {
   return {
     agentId: "test-agent",
     agentName: "test-agent",
@@ -77,9 +87,7 @@ describe("matchBreakpoint", () => {
   });
 
   it("returns null when no type matches", () => {
-    const configs: BreakpointConfig[] = [
-      { type: "post_run" },
-    ];
+    const configs: BreakpointConfig[] = [{ type: "post_run" }];
     const result = matchBreakpoint(configs, "pre_agent_run", context);
     expect(result).toBeNull();
   });
@@ -102,9 +110,7 @@ describe("matchBreakpoint", () => {
   });
 
   it("returns config with no when (always matches)", () => {
-    const configs: BreakpointConfig[] = [
-      { type: "pre_agent_run" },
-    ];
+    const configs: BreakpointConfig[] = [{ type: "pre_agent_run" }];
     const result = matchBreakpoint(configs, "pre_agent_run", context);
     expect(result).toEqual({ type: "pre_agent_run" });
   });
@@ -374,7 +380,9 @@ describe("Multi-agent breakpoints", () => {
 
     await orchestrator.runPattern("pipeline", "start");
 
-    const stepHits = simulator.hits.filter((h) => h.type === "pre_pattern_step");
+    const stepHits = simulator.hits.filter(
+      (h) => h.type === "pre_pattern_step",
+    );
     expect(stepHits.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -414,7 +422,9 @@ describe("Multi-agent breakpoints", () => {
     });
     simulator.attachTo(orchestrator);
 
-    await expect(orchestrator.runAgent("alpha", "test")).rejects.toThrow(/cancelled/i);
+    await expect(orchestrator.runAgent("alpha", "test")).rejects.toThrow(
+      /cancelled/i,
+    );
   });
 
   it("getPendingBreakpoints returns pending breakpoints", async () => {
@@ -452,7 +462,7 @@ describe("Multi-agent breakpoints", () => {
   });
 
   it("multiple agents can have concurrent breakpoints with parallel execution", async () => {
-    let capturedRequests: BreakpointRequest[] = [];
+    const capturedRequests: BreakpointRequest[] = [];
     const handler = (req: BreakpointRequest) => {
       capturedRequests.push(req);
     };

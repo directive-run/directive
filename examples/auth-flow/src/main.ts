@@ -9,10 +9,10 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
+  type AuthStatus,
+  type EventLogEntry,
   authFlowModule,
   authFlowSchema,
-  type EventLogEntry,
-  type AuthStatus,
 } from "./auth-flow.js";
 import type { User } from "./mock-auth.js";
 
@@ -43,20 +43,30 @@ const countdownText = document.getElementById("af-countdown-text")!;
 
 // Login & Actions
 const emailInput = document.getElementById("af-email") as HTMLInputElement;
-const passwordInput = document.getElementById("af-password") as HTMLInputElement;
+const passwordInput = document.getElementById(
+  "af-password",
+) as HTMLInputElement;
 const loginBtn = document.getElementById("af-login-btn") as HTMLButtonElement;
 const logoutBtn = document.getElementById("af-logout-btn") as HTMLButtonElement;
-const forceExpireBtn = document.getElementById("af-force-expire-btn") as HTMLButtonElement;
+const forceExpireBtn = document.getElementById(
+  "af-force-expire-btn",
+) as HTMLButtonElement;
 const loginError = document.getElementById("af-login-error")!;
 
 // Config sliders
 const ttlSlider = document.getElementById("af-token-ttl") as HTMLInputElement;
 const ttlVal = document.getElementById("af-ttl-val")!;
-const bufferSlider = document.getElementById("af-refresh-buffer") as HTMLInputElement;
+const bufferSlider = document.getElementById(
+  "af-refresh-buffer",
+) as HTMLInputElement;
 const bufferVal = document.getElementById("af-buffer-val")!;
-const loginFailSlider = document.getElementById("af-login-failrate") as HTMLInputElement;
+const loginFailSlider = document.getElementById(
+  "af-login-failrate",
+) as HTMLInputElement;
 const loginFailVal = document.getElementById("af-login-fail-val")!;
-const refreshFailSlider = document.getElementById("af-refresh-failrate") as HTMLInputElement;
+const refreshFailSlider = document.getElementById(
+  "af-refresh-failrate",
+) as HTMLInputElement;
 const refreshFailVal = document.getElementById("af-refresh-fail-val")!;
 
 // Timeline
@@ -132,7 +142,8 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML = '<div class="af-timeline-empty">Events will appear here after login</div>';
+    timelineEl.innerHTML =
+      '<div class="af-timeline-empty">Events will appear here after login</div>';
   } else {
     timelineEl.innerHTML = "";
     for (let i = eventLog.length - 1; i >= 0; i--) {

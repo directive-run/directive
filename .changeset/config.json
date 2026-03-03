@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "directive-run/directive" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "directive-run/directive" }
+  ],
   "commit": false,
   "fixed": [
     [
@@ -11,9 +14,7 @@
       "@directive-run/solid",
       "@directive-run/lit"
     ],
-    [
-      "@directive-run/ai"
-    ]
+    ["@directive-run/ai"]
   ],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "onlyUpdatePeerDependentsWhenOutOfRange": true

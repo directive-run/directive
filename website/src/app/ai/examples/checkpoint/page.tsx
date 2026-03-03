@@ -1,30 +1,36 @@
-'use client'
+"use client";
 
-import { useCallback, useMemo, useState } from 'react'
-import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
-import { InlineChat } from '@/components/InlineChat'
-import { ProviderConfig, type ProviderConfigState } from '@/components/ProviderConfig'
+import { DevToolsWithProvider } from "@/components/DevToolsWithProvider";
+import { InlineChat } from "@/components/InlineChat";
+import {
+  ProviderConfig,
+  type ProviderConfigState,
+} from "@/components/ProviderConfig";
+import { useCallback, useMemo, useState } from "react";
 
 const EXAMPLE_PROMPTS = [
-  'Process this document through the full pipeline',
-  'Checkpoint after extraction and resume later',
-  'What happens when a stage fails mid-pipeline?',
-]
+  "Process this document through the full pipeline",
+  "Checkpoint after extraction and resume later",
+  "What happens when a stage fails mid-pipeline?",
+];
 
 export default function CheckpointPage() {
-  const [config, setConfig] = useState<ProviderConfigState>({ provider: 'anthropic', apiKey: '' })
+  const [config, setConfig] = useState<ProviderConfigState>({
+    provider: "anthropic",
+    apiKey: "",
+  });
 
   const handleConfigChange = useCallback((next: ProviderConfigState) => {
-    setConfig(next)
-  }, [])
+    setConfig(next);
+  }, []);
 
   const headers = useMemo(() => {
     if (!config.apiKey) {
-      return undefined
+      return undefined;
     }
 
-    return { 'x-api-key': config.apiKey, 'x-provider': config.provider }
-  }, [config.apiKey, config.provider])
+    return { "x-api-key": config.apiKey, "x-provider": config.provider };
+  }, [config.apiKey, config.provider]);
 
   return (
     <DevToolsWithProvider mode="ai" label="Checkpoint">
@@ -34,8 +40,9 @@ export default function CheckpointPage() {
             Pipeline Checkpoint
           </h1>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            4-stage document pipeline with checkpoint save/restore, retry with exponential backoff, and failure injection.
-            Open DevTools to watch pipeline stages execute.
+            4-stage document pipeline with checkpoint save/restore, retry with
+            exponential backoff, and failure injection. Open DevTools to watch
+            pipeline stages execute.
           </p>
         </div>
 
@@ -58,5 +65,5 @@ export default function CheckpointPage() {
         </div>
       </div>
     </DevToolsWithProvider>
-  )
+  );
 }

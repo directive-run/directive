@@ -1,9 +1,9 @@
-import Image from 'next/image'
+import Image from "next/image";
 
-import { Button } from '@/components/Button'
-import { NotFoundContent } from '@/components/NotFoundContent'
-import blurCyanImage from '@/images/blur-cyan.png'
-import blurIndigoImage from '@/images/blur-indigo.png'
+import { Button } from "@/components/Button";
+import { NotFoundContent } from "@/components/NotFoundContent";
+import blurCyanImage from "@/images/blur-cyan.png";
+import blurIndigoImage from "@/images/blur-indigo.png";
 
 export default function DocsNotFound() {
   return (
@@ -34,11 +34,9 @@ export default function DocsNotFound() {
           <Button variant="secondary" href="/blog">
             Read the blog
           </Button>
-          <Button href="/docs/quick-start">
-            Browse docs
-          </Button>
+          <Button href="/docs/quick-start">Browse docs</Button>
         </div>
       </div>
     </div>
-  )
+  );
 }

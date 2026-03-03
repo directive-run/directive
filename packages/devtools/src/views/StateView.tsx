@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScratchpadPanel } from "../components/ScratchpadPanel";
 import { DerivedPanel } from "../components/DerivedPanel";
+import { ScratchpadPanel } from "../components/ScratchpadPanel";
 import type { DevToolsSnapshot } from "../lib/types";
 
 interface StateViewProps {
@@ -15,7 +15,14 @@ interface StateViewProps {
 
 type SubTab = "scratchpad" | "derived";
 
-export function StateView({ scratchpadState, derivedState, onRequestScratchpad, onRequestDerived, snapshot, onEditSnapshot }: StateViewProps) {
+export function StateView({
+  scratchpadState,
+  derivedState,
+  onRequestScratchpad,
+  onRequestDerived,
+  snapshot,
+  onEditSnapshot,
+}: StateViewProps) {
   const [subTab, setSubTab] = useState<SubTab>("scratchpad");
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,7 +56,11 @@ export function StateView({ scratchpadState, derivedState, onRequestScratchpad, 
   return (
     <div className="flex h-full flex-col">
       {/* Sub-tab bar */}
-      <div className="flex items-center gap-4 border-b border-zinc-800 px-6 py-2" role="tablist" aria-label="State view tabs">
+      <div
+        className="flex items-center gap-4 border-b border-zinc-800 px-6 py-2"
+        role="tablist"
+        aria-label="State view tabs"
+      >
         <button
           role="tab"
           id="tab-scratchpad"
@@ -111,10 +122,22 @@ export function StateView({ scratchpadState, derivedState, onRequestScratchpad, 
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div role="tabpanel" id="panel-scratchpad" aria-labelledby="tab-scratchpad" hidden={subTab !== "scratchpad"}>
-          {subTab === "scratchpad" && <ScratchpadPanel data={scratchpadState} />}
+        <div
+          role="tabpanel"
+          id="panel-scratchpad"
+          aria-labelledby="tab-scratchpad"
+          hidden={subTab !== "scratchpad"}
+        >
+          {subTab === "scratchpad" && (
+            <ScratchpadPanel data={scratchpadState} />
+          )}
         </div>
-        <div role="tabpanel" id="panel-derived" aria-labelledby="tab-derived" hidden={subTab !== "derived"}>
+        <div
+          role="tabpanel"
+          id="panel-derived"
+          aria-labelledby="tab-derived"
+          hidden={subTab !== "derived"}
+        >
           {subTab === "derived" && <DerivedPanel data={derivedState} />}
         </div>
       </div>

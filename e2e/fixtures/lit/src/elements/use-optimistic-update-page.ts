@@ -1,13 +1,18 @@
+import { FactController, OptimisticUpdateController } from "@directive-run/lit";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { FactController, OptimisticUpdateController } from "@directive-run/lit";
-import { system, statusPlugin } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { statusPlugin, system } from "../system";
 
 @customElement("use-optimistic-update-page")
 export class UseOptimisticUpdatePage extends LitElement {
   private _count = new FactController<number>(this, system, "count");
-  private _optimistic = new OptimisticUpdateController(this, system, statusPlugin, "LOAD_DATA");
+  private _optimistic = new OptimisticUpdateController(
+    this,
+    system,
+    statusPlugin,
+    "LOAD_DATA",
+  );
 
   render() {
     return html`

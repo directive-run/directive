@@ -1,36 +1,42 @@
-'use client'
+"use client";
 
-import { useCallback, useMemo, useState } from 'react'
-import { DevToolsWithProvider } from '@/components/DevToolsWithProvider'
-import { InlineChat } from '@/components/InlineChat'
-import { ProviderConfig, type ProviderConfigState } from '@/components/ProviderConfig'
-import { useChatSystem } from './useChatSystem'
+import { DevToolsWithProvider } from "@/components/DevToolsWithProvider";
+import { InlineChat } from "@/components/InlineChat";
+import {
+  ProviderConfig,
+  type ProviderConfigState,
+} from "@/components/ProviderConfig";
+import { useCallback, useMemo, useState } from "react";
+import { useChatSystem } from "./useChatSystem";
 
 const EXAMPLE_PROMPTS = [
   "Tell me about Directive's constraint system",
-  'What happens if I send personal data?',
-  'Compare resolvers and effects',
-]
+  "What happens if I send personal data?",
+  "Compare resolvers and effects",
+];
 
 export default function AIChatPage() {
   // Create a Directive system that tracks chat metrics.
   // Registers on window.__DIRECTIVE__ so DevToolsProvider auto-detects it,
   // enabling System tabs (Facts, Derivations, Pipeline) alongside AI tabs.
-  useChatSystem('/api/chat')
+  useChatSystem("/api/chat");
 
-  const [config, setConfig] = useState<ProviderConfigState>({ provider: 'anthropic', apiKey: '' })
+  const [config, setConfig] = useState<ProviderConfigState>({
+    provider: "anthropic",
+    apiKey: "",
+  });
 
   const handleConfigChange = useCallback((next: ProviderConfigState) => {
-    setConfig(next)
-  }, [])
+    setConfig(next);
+  }, []);
 
   const headers = useMemo(() => {
     if (!config.apiKey) {
-      return undefined
+      return undefined;
     }
 
-    return { 'x-api-key': config.apiKey, 'x-provider': config.provider }
-  }, [config.apiKey, config.provider])
+    return { "x-api-key": config.apiKey, "x-provider": config.provider };
+  }, [config.apiKey, config.provider]);
 
   return (
     <DevToolsWithProvider mode="ai">
@@ -64,5 +70,5 @@ export default function AIChatPage() {
         </div>
       </div>
     </DevToolsWithProvider>
-  )
+  );
 }

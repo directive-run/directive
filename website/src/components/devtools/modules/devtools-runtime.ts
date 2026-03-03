@@ -1,65 +1,88 @@
 // @ts-nocheck — createModule inference collapses with complex object/array schema types (t.array<T>, t.object<T>).
 // All errors below cascade from the same root cause. Fix by improving InferSchema for nested generics in core.
-import { createModule, t } from '@directive-run/core'
-import type { RunChangelogEntry } from '@directive-run/core'
-import type { FactBreakpointDef, FactBreakpointHit, EventBreakpointDef, EventBreakpointHit, NormalizedTraceEvent } from '../types'
+import { createModule, t } from "@directive-run/core";
+import type { RunChangelogEntry } from "@directive-run/core";
+import type {
+  EventBreakpointDef,
+  EventBreakpointHit,
+  FactBreakpointDef,
+  FactBreakpointHit,
+  NormalizedTraceEvent,
+} from "../types";
 
 // ---------------------------------------------------------------------------
 // Types for runtime bridge data
 // ---------------------------------------------------------------------------
 
 export interface RuntimeConstraintInfo {
-  id: string
-  active: boolean
-  disabled: boolean
-  priority: number | undefined
-  hitCount: number
-  lastActiveAt: number | null
+  id: string;
+  active: boolean;
+  disabled: boolean;
+  priority: number | undefined;
+  hitCount: number;
+  lastActiveAt: number | null;
 }
 
 export interface RuntimeResolverStats {
-  count: number
-  totalMs: number
-  errors: number
+  count: number;
+  totalMs: number;
+  errors: number;
 }
 
 export interface RuntimeRequirementInfo {
-  id: string
-  type: string
-  fromConstraint: string
-  status: 'inflight' | 'unmet'
+  id: string;
+  type: string;
+  fromConstraint: string;
+  status: "inflight" | "unmet";
 }
 
 export interface RuntimeResolverDef {
-  id: string
-  requirement: string
+  id: string;
+  requirement: string;
 }
 
 /** Shape returned by window.__DIRECTIVE__.inspect() */
 interface InspectionResult {
-  facts?: Record<string, unknown>
-  derivations?: Record<string, unknown>
-  constraints?: Array<{ id?: string; active?: boolean; disabled?: boolean; priority?: number; hitCount?: number; lastActiveAt?: number | null }>
-  inflight?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
-  unmet?: Array<{ id?: string; requirement?: { type?: string }; type?: string; fromConstraint?: string }>
-  resolverStats?: Record<string, RuntimeResolverStats>
-  resolverDefs?: Array<{ id?: string; requirement?: string }>
-  runHistoryEnabled?: boolean
-  runHistory?: RunChangelogEntry[]
-  timeTravel?: { currentIndex?: number; snapshotCount?: number }
+  facts?: Record<string, unknown>;
+  derivations?: Record<string, unknown>;
+  constraints?: Array<{
+    id?: string;
+    active?: boolean;
+    disabled?: boolean;
+    priority?: number;
+    hitCount?: number;
+    lastActiveAt?: number | null;
+  }>;
+  inflight?: Array<{
+    id?: string;
+    requirement?: { type?: string };
+    type?: string;
+    fromConstraint?: string;
+  }>;
+  unmet?: Array<{
+    id?: string;
+    requirement?: { type?: string };
+    type?: string;
+    fromConstraint?: string;
+  }>;
+  resolverStats?: Record<string, RuntimeResolverStats>;
+  resolverDefs?: Array<{ id?: string; requirement?: string }>;
+  runHistoryEnabled?: boolean;
+  runHistory?: RunChangelogEntry[];
+  timeTravel?: { currentIndex?: number; snapshotCount?: number };
 }
 
 /** Subset of a Directive system instance used for direct proxy reads */
 interface DirectiveSystemRef {
-  facts?: Record<string, unknown>
-  derive?: Record<string, unknown>
+  facts?: Record<string, unknown>;
+  derive?: Record<string, unknown>;
   debug?: {
-    isEnabled?: boolean
-    currentIndex?: number
-    snapshots?: unknown[]
-    goBack?: (steps: number) => void
-    goForward?: (steps: number) => void
-  }
+    isEnabled?: boolean;
+    currentIndex?: number;
+    snapshots?: unknown[];
+    goBack?: (steps: number) => void;
+    goForward?: (steps: number) => void;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -67,17 +90,20 @@ interface DirectiveSystemRef {
 // Uses WeakMap keyed by context to avoid singleton corruption on HMR/dual-mount
 // ---------------------------------------------------------------------------
 
-const _runtimeUnsubs = new WeakMap<object, () => void>()
-const _breakpointUnsubs = new WeakMap<object, Map<string, { unsub: () => void; condition: string }>>()
+const _runtimeUnsubs = new WeakMap<object, () => void>();
+const _breakpointUnsubs = new WeakMap<
+  object,
+  Map<string, { unsub: () => void; condition: string }>
+>();
 
-const MAX_BREAKPOINT_HITS = 500
-const MAX_TRACE_EVENTS = 2000
+const MAX_BREAKPOINT_HITS = 500;
+const MAX_TRACE_EVENTS = 2000;
 
 // ---------------------------------------------------------------------------
 // Module
 // ---------------------------------------------------------------------------
 
-export const devtoolsRuntime = createModule('runtime', {
+export const devtoolsRuntime = createModule("runtime", {
   schema: {
     facts: {
       connected: t.boolean(),
@@ -147,159 +173,179 @@ export const devtoolsRuntime = createModule('runtime', {
   },
 
   init: (facts) => {
-    facts.connected = false
-    facts.systemName = null
-    facts.facts = {}
-    facts.derivations = {}
-    facts.constraints = []
-    facts.inflight = []
-    facts.unmet = []
-    facts.resolverStats = {}
-    facts.resolverDefs = []
-    facts.timeTravelEnabled = false
-    facts.snapshotIndex = -1
-    facts.snapshotCount = 0
-    facts.lastEventType = null
-    facts.runHistory = []
-    facts.runHistoryEnabled = false
-    facts.tick = 0
-    facts.traceEvents = []
-    facts.traceEventIdCounter = 0
-    facts.factBreakpoints = []
-    facts.factBreakpointHits = []
-    facts.eventBreakpoints = []
-    facts.eventBreakpointHits = []
-    facts.breakpointPaused = false
-    facts.pausedOnHit = null
+    facts.connected = false;
+    facts.systemName = null;
+    facts.facts = {};
+    facts.derivations = {};
+    facts.constraints = [];
+    facts.inflight = [];
+    facts.unmet = [];
+    facts.resolverStats = {};
+    facts.resolverDefs = [];
+    facts.timeTravelEnabled = false;
+    facts.snapshotIndex = -1;
+    facts.snapshotCount = 0;
+    facts.lastEventType = null;
+    facts.runHistory = [];
+    facts.runHistoryEnabled = false;
+    facts.tick = 0;
+    facts.traceEvents = [];
+    facts.traceEventIdCounter = 0;
+    facts.factBreakpoints = [];
+    facts.factBreakpointHits = [];
+    facts.eventBreakpoints = [];
+    facts.eventBreakpointHits = [];
+    facts.breakpointPaused = false;
+    facts.pausedOnHit = null;
   },
 
   derive: {
-    hasTimeTravel: (facts) => facts.timeTravelEnabled && facts.snapshotCount > 0,
+    hasTimeTravel: (facts) =>
+      facts.timeTravelEnabled && facts.snapshotCount > 0,
     canUndo: (facts) => facts.timeTravelEnabled && facts.snapshotIndex > 0,
-    canRedo: (facts) => facts.timeTravelEnabled && facts.snapshotIndex < facts.snapshotCount - 1,
+    canRedo: (facts) =>
+      facts.timeTravelEnabled && facts.snapshotIndex < facts.snapshotCount - 1,
     factCount: (facts) => Object.keys(facts.facts).length,
     derivationCount: (facts) => Object.keys(facts.derivations).length,
-    activeConstraintCount: (facts) => facts.constraints.filter((c) => c.active).length,
+    activeConstraintCount: (facts) =>
+      facts.constraints.filter((c) => c.active).length,
     inflightCount: (facts) => facts.inflight.length,
     unmetCount: (facts) => facts.unmet.length,
     latestRun: (facts) => {
-      const h = facts.runHistory
-      return h && h.length > 0 ? h[h.length - 1] : null
+      const h = facts.runHistory;
+      return h && h.length > 0 ? h[h.length - 1] : null;
     },
     runCount: (facts) => facts.runHistory?.length ?? 0,
     factBreakpointHitCount: (facts) => facts.factBreakpointHits.length,
     eventBreakpointHitCount: (facts) => facts.eventBreakpointHits.length,
-    totalBreakpointHitCount: (facts) => facts.factBreakpointHits.length + facts.eventBreakpointHits.length,
-    activeFactBreakpointCount: (facts) => facts.factBreakpoints.filter((bp) => bp.enabled).length,
-    activeEventBreakpointCount: (facts) => facts.eventBreakpoints.filter((bp) => bp.enabled).length,
+    totalBreakpointHitCount: (facts) =>
+      facts.factBreakpointHits.length + facts.eventBreakpointHits.length,
+    activeFactBreakpointCount: (facts) =>
+      facts.factBreakpoints.filter((bp) => bp.enabled).length,
+    activeEventBreakpointCount: (facts) =>
+      facts.eventBreakpoints.filter((bp) => bp.enabled).length,
     traceEventCount: (facts) => facts.traceEvents.length,
   },
 
   events: {
     attach: (facts, { systemName }) => {
-      facts.systemName = systemName
+      facts.systemName = systemName;
     },
     detach: (facts) => {
       // Clean up runtime subscription via WeakMap keyed on facts proxy
-      _runtimeUnsubs.get(facts)?.()
-      _runtimeUnsubs.delete(facts)
+      _runtimeUnsubs.get(facts)?.();
+      _runtimeUnsubs.delete(facts);
 
       // Clean up breakpoint watchers
-      const bpMap = _breakpointUnsubs.get(facts)
+      const bpMap = _breakpointUnsubs.get(facts);
       if (bpMap) {
         for (const entry of bpMap.values()) {
-          entry.unsub()
+          entry.unsub();
         }
-        bpMap.clear()
+        bpMap.clear();
       }
-      _breakpointUnsubs.delete(facts)
+      _breakpointUnsubs.delete(facts);
 
-      facts.connected = false
-      facts.systemName = null
-      facts.facts = {}
-      facts.derivations = {}
-      facts.constraints = []
-      facts.inflight = []
-      facts.unmet = []
-      facts.resolverStats = {}
-      facts.resolverDefs = []
-      facts.timeTravelEnabled = false
-      facts.snapshotIndex = -1
-      facts.snapshotCount = 0
-      facts.lastEventType = null
-      facts.runHistory = []
-      facts.runHistoryEnabled = false
-      facts.tick = 0
-      facts.traceEvents = []
-      facts.traceEventIdCounter = 0
-      facts.factBreakpoints = []
-      facts.factBreakpointHits = []
-      facts.eventBreakpoints = []
-      facts.eventBreakpointHits = []
-      facts.breakpointPaused = false
-      facts.pausedOnHit = null
+      facts.connected = false;
+      facts.systemName = null;
+      facts.facts = {};
+      facts.derivations = {};
+      facts.constraints = [];
+      facts.inflight = [];
+      facts.unmet = [];
+      facts.resolverStats = {};
+      facts.resolverDefs = [];
+      facts.timeTravelEnabled = false;
+      facts.snapshotIndex = -1;
+      facts.snapshotCount = 0;
+      facts.lastEventType = null;
+      facts.runHistory = [];
+      facts.runHistoryEnabled = false;
+      facts.tick = 0;
+      facts.traceEvents = [];
+      facts.traceEventIdCounter = 0;
+      facts.factBreakpoints = [];
+      facts.factBreakpointHits = [];
+      facts.eventBreakpoints = [];
+      facts.eventBreakpointHits = [];
+      facts.breakpointPaused = false;
+      facts.pausedOnHit = null;
     },
     refresh: () => {
       // No-op event — triggers constraint re-evaluation
     },
     forceSync: (facts) => {
-      facts.tick++
+      facts.tick++;
     },
     addFactBreakpoint: (facts, { breakpoint }) => {
-      const idx = facts.factBreakpoints.findIndex((bp) => bp.id === breakpoint.id)
+      const idx = facts.factBreakpoints.findIndex(
+        (bp) => bp.id === breakpoint.id,
+      );
       if (idx >= 0) {
-        facts.factBreakpoints = facts.factBreakpoints.map((bp) => bp.id === breakpoint.id ? breakpoint : bp)
+        facts.factBreakpoints = facts.factBreakpoints.map((bp) =>
+          bp.id === breakpoint.id ? breakpoint : bp,
+        );
       } else {
-        facts.factBreakpoints = [...facts.factBreakpoints, breakpoint]
+        facts.factBreakpoints = [...facts.factBreakpoints, breakpoint];
       }
     },
     removeFactBreakpoint: (facts, { id }) => {
-      facts.factBreakpoints = facts.factBreakpoints.filter((bp) => bp.id !== id)
+      facts.factBreakpoints = facts.factBreakpoints.filter(
+        (bp) => bp.id !== id,
+      );
     },
     toggleFactBreakpoint: (facts, { id }) => {
       facts.factBreakpoints = facts.factBreakpoints.map((bp) =>
         bp.id === id ? { ...bp, enabled: !bp.enabled } : bp,
-      )
+      );
     },
     clearFactBreakpointHits: (facts) => {
-      facts.factBreakpointHits = []
+      facts.factBreakpointHits = [];
     },
     addEventBreakpoint: (facts, { breakpoint }) => {
-      const idx = facts.eventBreakpoints.findIndex((bp) => bp.id === breakpoint.id)
+      const idx = facts.eventBreakpoints.findIndex(
+        (bp) => bp.id === breakpoint.id,
+      );
       if (idx >= 0) {
-        facts.eventBreakpoints = facts.eventBreakpoints.map((bp) => bp.id === breakpoint.id ? breakpoint : bp)
+        facts.eventBreakpoints = facts.eventBreakpoints.map((bp) =>
+          bp.id === breakpoint.id ? breakpoint : bp,
+        );
       } else {
-        facts.eventBreakpoints = [...facts.eventBreakpoints, breakpoint]
+        facts.eventBreakpoints = [...facts.eventBreakpoints, breakpoint];
       }
     },
     removeEventBreakpoint: (facts, { id }) => {
-      facts.eventBreakpoints = facts.eventBreakpoints.filter((bp) => bp.id !== id)
+      facts.eventBreakpoints = facts.eventBreakpoints.filter(
+        (bp) => bp.id !== id,
+      );
     },
     toggleEventBreakpoint: (facts, { id }) => {
       facts.eventBreakpoints = facts.eventBreakpoints.map((bp) =>
         bp.id === id ? { ...bp, enabled: !bp.enabled } : bp,
-      )
+      );
     },
     clearEventBreakpointHits: (facts) => {
-      facts.eventBreakpointHits = []
+      facts.eventBreakpointHits = [];
     },
     clearTraceEvents: (facts) => {
-      facts.traceEvents = []
+      facts.traceEvents = [];
       // Keep traceEventIdCounter — don't reset to avoid ID reuse
     },
     resumeFromBreakpoint: (facts) => {
       if (!facts.breakpointPaused) {
-        return
+        return;
       }
 
-      facts.breakpointPaused = false
-      facts.pausedOnHit = null
+      facts.breakpointPaused = false;
+      facts.pausedOnHit = null;
 
       // Resume time-travel recording if paused
-      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
-        const sys = window.__DIRECTIVE__.getSystem(facts.systemName ?? undefined)
-        if (sys?.debug && typeof (sys.debug as any).resume === 'function') {
-          ;(sys.debug as any).resume()
+      if (typeof window !== "undefined" && window.__DIRECTIVE__) {
+        const sys = window.__DIRECTIVE__.getSystem(
+          facts.systemName ?? undefined,
+        );
+        if (sys?.debug && typeof (sys.debug as any).resume === "function") {
+          (sys.debug as any).resume();
         }
       }
     },
@@ -309,84 +355,96 @@ export const devtoolsRuntime = createModule('runtime', {
   constraints: {
     needsConnection: {
       when: (facts) => !facts.connected && facts.systemName !== null,
-      require: { type: 'CONNECT_RUNTIME' },
+      require: { type: "CONNECT_RUNTIME" },
     },
   },
 
   // Resolver: connect to window.__DIRECTIVE__ and set up subscription
   resolvers: {
     connectRuntime: {
-      requirement: 'CONNECT_RUNTIME',
-      key: () => 'connect-runtime',
+      requirement: "CONNECT_RUNTIME",
+      key: () => "connect-runtime",
       resolve: async (req, context) => {
-        const maxAttempts = 20
-        const baseDelay = 100
+        const maxAttempts = 20;
+        const baseDelay = 100;
 
         for (let i = 0; i < maxAttempts; i++) {
-          if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
-            const directive = window.__DIRECTIVE__
-            const systemName = context.facts.systemName ?? undefined
+          if (typeof window !== "undefined" && window.__DIRECTIVE__) {
+            const directive = window.__DIRECTIVE__;
+            const systemName = context.facts.systemName ?? undefined;
 
             // Verify the system exists
-            const system = directive.getSystem(systemName)
+            const system = directive.getSystem(systemName);
             if (!system) {
-              await new Promise((r) => setTimeout(r, Math.min(baseDelay * (i + 1), 2000)))
-              continue
+              await new Promise((r) =>
+                setTimeout(r, Math.min(baseDelay * (i + 1), 2000)),
+              );
+              continue;
             }
 
             // Do initial inspection (augmented with facts + derivations from the system)
             try {
-              const inspection = directive.inspect(systemName)
+              const inspection = directive.inspect(systemName);
               if (inspection) {
-                applyInspection(context.facts, inspection, system)
+                applyInspection(context.facts, inspection, system);
               }
             } catch (err) {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('[DevTools] inspect() failed during initial connection:', err)
+              if (process.env.NODE_ENV === "development") {
+                console.warn(
+                  "[DevTools] inspect() failed during initial connection:",
+                  err,
+                );
               }
             }
 
-            context.facts.connected = true
+            context.facts.connected = true;
 
             // Subscribe to events
             const unsub = directive.subscribe((event) => {
               // Guard against late callbacks after detach
               if (!context.facts.connected) {
-                return
+                return;
               }
 
-              context.facts.lastEventType = event.type
-              context.facts.tick++
+              context.facts.lastEventType = event.type;
+              context.facts.tick++;
 
               // Accumulate trace event for timeline (capped)
-              const nextId = (context.facts.traceEventIdCounter as number) + 1
-              context.facts.traceEventIdCounter = nextId
+              const nextId = (context.facts.traceEventIdCounter as number) + 1;
+              context.facts.traceEventIdCounter = nextId;
               const traceEvent: NormalizedTraceEvent = {
                 id: nextId,
                 timestamp: Date.now(),
                 type: event.type,
                 data: event.data,
-              }
-              const current = context.facts.traceEvents as NormalizedTraceEvent[]
-              const next = current.length >= MAX_TRACE_EVENTS
-                ? [...current.slice(current.length - MAX_TRACE_EVENTS + 1), traceEvent]
-                : [...current, traceEvent]
-              context.facts.traceEvents = next
+              };
+              const current = context.facts
+                .traceEvents as NormalizedTraceEvent[];
+              const next =
+                current.length >= MAX_TRACE_EVENTS
+                  ? [
+                      ...current.slice(current.length - MAX_TRACE_EVENTS + 1),
+                      traceEvent,
+                    ]
+                  : [...current, traceEvent];
+              context.facts.traceEvents = next;
 
               // Check event breakpoints
-              checkEventBreakpoints(context.facts, event)
+              checkEventBreakpoints(context.facts, event);
 
               // Debounced re-inspection happens via effect
-            }, systemName)
+            }, systemName);
 
             // Store unsubscribe keyed by facts proxy for cleanup on detach
-            _runtimeUnsubs.get(context.facts)?.()
-            _runtimeUnsubs.set(context.facts, unsub)
+            _runtimeUnsubs.get(context.facts)?.();
+            _runtimeUnsubs.set(context.facts, unsub);
 
-            return
+            return;
           }
 
-          await new Promise((r) => setTimeout(r, Math.min(baseDelay * (i + 1), 2000)))
+          await new Promise((r) =>
+            setTimeout(r, Math.min(baseDelay * (i + 1), 2000)),
+          );
         }
       },
     },
@@ -397,23 +455,23 @@ export const devtoolsRuntime = createModule('runtime', {
     syncInspection: {
       run: (facts, prev) => {
         if (!facts.connected || facts.tick === prev?.tick) {
-          return
+          return;
         }
 
-        if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
-          return
+        if (typeof window === "undefined" || !window.__DIRECTIVE__) {
+          return;
         }
 
-        const systemName = facts.systemName ?? undefined
+        const systemName = facts.systemName ?? undefined;
         try {
-          const inspection = window.__DIRECTIVE__.inspect(systemName)
-          const system = window.__DIRECTIVE__.getSystem(systemName)
+          const inspection = window.__DIRECTIVE__.inspect(systemName);
+          const system = window.__DIRECTIVE__.getSystem(systemName);
           if (inspection) {
-            applyInspection(facts, inspection, system)
+            applyInspection(facts, inspection, system);
           }
         } catch (err) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[DevTools] inspect() failed during sync:', err)
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[DevTools] inspect() failed during sync:", err);
           }
         }
       },
@@ -421,92 +479,104 @@ export const devtoolsRuntime = createModule('runtime', {
 
     // Sync fact breakpoint watchers — subscribe/unsubscribe based on breakpoint list
     syncFactBreakpoints: {
-      deps: ['factBreakpoints', 'connected', 'systemName'],
+      deps: ["factBreakpoints", "connected", "systemName"],
       run: (facts) => {
-        if (typeof window === 'undefined' || !window.__DIRECTIVE__) {
-          return
+        if (typeof window === "undefined" || !window.__DIRECTIVE__) {
+          return;
         }
 
         if (!facts.connected) {
-          return
+          return;
         }
 
-        const sys = window.__DIRECTIVE__.getSystem(facts.systemName ?? undefined)
-        if (!sys || typeof (sys as any).watch !== 'function') {
-          return
+        const sys = window.__DIRECTIVE__.getSystem(
+          facts.systemName ?? undefined,
+        );
+        if (!sys || typeof (sys as any).watch !== "function") {
+          return;
         }
 
         // Get or create the unsub map for this facts proxy
         if (!_breakpointUnsubs.has(facts)) {
-          _breakpointUnsubs.set(facts, new Map())
+          _breakpointUnsubs.set(facts, new Map());
         }
-        const unsubMap = _breakpointUnsubs.get(facts)!
+        const unsubMap = _breakpointUnsubs.get(facts)!;
 
         // Build map of active breakpoint ID → condition
-        const activeMap = new Map<string, string>()
+        const activeMap = new Map<string, string>();
         for (const bp of facts.factBreakpoints) {
           if (bp.enabled) {
-            activeMap.set(bp.id, bp.condition)
+            activeMap.set(bp.id, bp.condition);
           }
         }
 
         // Unsubscribe removed/disabled breakpoints AND those with changed conditions
         for (const [id, entry] of unsubMap) {
-          const newCondition = activeMap.get(id)
+          const newCondition = activeMap.get(id);
           if (newCondition === undefined || newCondition !== entry.condition) {
-            entry.unsub()
-            unsubMap.delete(id)
+            entry.unsub();
+            unsubMap.delete(id);
           }
         }
 
         // Subscribe new/enabled breakpoints (including re-subscriptions for changed conditions)
         for (const bp of facts.factBreakpoints) {
           if (!bp.enabled || unsubMap.has(bp.id)) {
-            continue
+            continue;
           }
 
-          const bpId = bp.id
-          const bpFactKey = bp.factKey
-          const bpCondition = bp.condition
+          const bpId = bp.id;
+          const bpFactKey = bp.factKey;
+          const bpCondition = bp.condition;
 
           try {
-            const unsub = (sys as any).watch(bpFactKey, (newValue: unknown, oldValue: unknown) => {
-              let conditionMet = true
-              if (bpCondition) {
-                try {
-                  conditionMet = evaluateBreakpointCondition(bpCondition, { newValue, oldValue })
-                } catch {
-                  conditionMet = false
+            const unsub = (sys as any).watch(
+              bpFactKey,
+              (newValue: unknown, oldValue: unknown) => {
+                let conditionMet = true;
+                if (bpCondition) {
+                  try {
+                    conditionMet = evaluateBreakpointCondition(bpCondition, {
+                      newValue,
+                      oldValue,
+                    });
+                  } catch {
+                    conditionMet = false;
+                  }
                 }
-              }
 
-              const hit: FactBreakpointHit = {
-                id: `fbh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                breakpointId: bpId,
-                factKey: bpFactKey,
-                oldValue,
-                newValue,
-                timestamp: Date.now(),
-                conditionMet,
-              }
+                const hit: FactBreakpointHit = {
+                  id: `fbh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  breakpointId: bpId,
+                  factKey: bpFactKey,
+                  oldValue,
+                  newValue,
+                  timestamp: Date.now(),
+                  conditionMet,
+                };
 
-              // Append hit (capped at MAX_BREAKPOINT_HITS)
-              const hits = [...facts.factBreakpointHits, hit]
-              facts.factBreakpointHits = hits.length > MAX_BREAKPOINT_HITS
-                ? hits.slice(hits.length - MAX_BREAKPOINT_HITS)
-                : hits
+                // Append hit (capped at MAX_BREAKPOINT_HITS)
+                const hits = [...facts.factBreakpointHits, hit];
+                facts.factBreakpointHits =
+                  hits.length > MAX_BREAKPOINT_HITS
+                    ? hits.slice(hits.length - MAX_BREAKPOINT_HITS)
+                    : hits;
 
-              // Pause if condition met
-              if (conditionMet && !facts.breakpointPaused) {
-                facts.breakpointPaused = true
-                facts.pausedOnHit = 'fact'
-                if (sys?.debug && typeof (sys.debug as any).pause === 'function') {
-                  ;(sys.debug as any).pause()
+                // Pause if condition met
+                if (conditionMet && !facts.breakpointPaused) {
+                  facts.breakpointPaused = true;
+                  facts.pausedOnHit = "fact";
+                  if (
+                    sys?.debug &&
+                    typeof (sys.debug as any).pause === "function"
+                  ) {
+                    (sys.debug as any).pause();
+                  }
                 }
-              }
-            })
+              },
+            );
 
-            unsubMap.set(bpId, { unsub, condition: bpCondition })
+            unsubMap.set(bpId, { unsub, condition: bpCondition });
           } catch {
             // watch() may not be available
           }
@@ -514,34 +584,40 @@ export const devtoolsRuntime = createModule('runtime', {
       },
     },
   },
-})
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function checkEventBreakpoints(facts: Record<string, any>, event: { type: string; [key: string]: unknown }) {
-  const breakpoints = facts.eventBreakpoints as EventBreakpointDef[]
+function checkEventBreakpoints(
+  facts: Record<string, any>,
+  event: { type: string; [key: string]: unknown },
+) {
+  const breakpoints = facts.eventBreakpoints as EventBreakpointDef[];
   if (!breakpoints || breakpoints.length === 0) {
-    return
+    return;
   }
 
   for (const bp of breakpoints) {
     if (!bp.enabled) {
-      continue
+      continue;
     }
 
     // Match event type — "*" is wildcard for all events
-    if (bp.eventType !== '*' && bp.eventType !== event.type) {
-      continue
+    if (bp.eventType !== "*" && bp.eventType !== event.type) {
+      continue;
     }
 
-    let conditionMet = true
+    let conditionMet = true;
     if (bp.condition) {
       try {
-        conditionMet = evaluateBreakpointCondition(bp.condition, { data: event, type: event.type })
+        conditionMet = evaluateBreakpointCondition(bp.condition, {
+          data: event,
+          type: event.type,
+        });
       } catch {
-        conditionMet = false
+        conditionMet = false;
       }
     }
 
@@ -552,22 +628,25 @@ function checkEventBreakpoints(facts: Record<string, any>, event: { type: string
       eventData: event,
       timestamp: Date.now(),
       conditionMet,
-    }
+    };
 
     // Append hit (capped)
-    const hits = [...(facts.eventBreakpointHits as EventBreakpointHit[]), hit]
-    facts.eventBreakpointHits = hits.length > MAX_BREAKPOINT_HITS
-      ? hits.slice(hits.length - MAX_BREAKPOINT_HITS)
-      : hits
+    const hits = [...(facts.eventBreakpointHits as EventBreakpointHit[]), hit];
+    facts.eventBreakpointHits =
+      hits.length > MAX_BREAKPOINT_HITS
+        ? hits.slice(hits.length - MAX_BREAKPOINT_HITS)
+        : hits;
 
     // Pause if condition met
     if (conditionMet && !facts.breakpointPaused) {
-      facts.breakpointPaused = true
-      facts.pausedOnHit = 'event'
-      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
-        const sys = window.__DIRECTIVE__.getSystem(facts.systemName ?? undefined)
-        if (sys?.debug && typeof (sys.debug as any).pause === 'function') {
-          ;(sys.debug as any).pause()
+      facts.breakpointPaused = true;
+      facts.pausedOnHit = "event";
+      if (typeof window !== "undefined" && window.__DIRECTIVE__) {
+        const sys = window.__DIRECTIVE__.getSystem(
+          facts.systemName ?? undefined,
+        );
+        if (sys?.debug && typeof (sys.debug as any).pause === "function") {
+          (sys.debug as any).pause();
         }
       }
     }
@@ -579,7 +658,7 @@ function checkEventBreakpoints(facts: Record<string, any>, event: { type: string
  * Only allows simple comparisons and property access — no function calls,
  * assignments, or arbitrary code execution.
  */
-const SAFE_CONDITION_RE = /^[\w\s.!<>=&|?:'"()\-+*/\[\],%]+$/
+const SAFE_CONDITION_RE = /^[\w\s.!<>=&|?:'"()\-+*/\[\],%]+$/;
 function evaluateBreakpointCondition(
   condition: string,
   vars: Record<string, unknown>,
@@ -587,114 +666,129 @@ function evaluateBreakpointCondition(
   // Block anything that could execute arbitrary code
   if (
     !SAFE_CONDITION_RE.test(condition) ||
-    /\b(function|=>|import|require|eval|new |class |delete |void |typeof |with |yield )\b/.test(condition)
+    /\b(function|=>|import|require|eval|new |class |delete |void |typeof |with |yield )\b/.test(
+      condition,
+    )
   ) {
-    return false
+    return false;
   }
   // Cap length to prevent abuse
   if (condition.length > 200) {
-    return false
+    return false;
   }
   try {
-    const keys = Object.keys(vars)
-    const values = keys.map((k) => vars[k])
+    const keys = Object.keys(vars);
+    const values = keys.map((k) => vars[k]);
     // eslint-disable-next-line no-new-func
-    const fn = new Function(...keys, `"use strict"; return (${condition})`)
-    return !!fn(...values)
+    const fn = new Function(...keys, `"use strict"; return (${condition})`);
+    return !!fn(...values);
   } catch {
-    return false
+    return false;
   }
 }
 
-function applyInspection(facts: Record<string, unknown>, inspection: InspectionResult, system?: DirectiveSystemRef) {
+function applyInspection(
+  facts: Record<string, unknown>,
+  inspection: InspectionResult,
+  system?: DirectiveSystemRef,
+) {
   // Facts — read directly from the system (inspect() doesn't include them)
-  if (system?.facts && typeof system.facts === 'object') {
+  if (system?.facts && typeof system.facts === "object") {
     try {
-      const snapshot: Record<string, unknown> = {}
+      const snapshot: Record<string, unknown> = {};
       for (const key of Object.keys(system.facts)) {
-        snapshot[key] = system.facts[key]
+        snapshot[key] = system.facts[key];
       }
-      facts.facts = snapshot
+      facts.facts = snapshot;
     } catch {
       // Proxy access may fail
     }
-  } else if (inspection.facts && typeof inspection.facts === 'object') {
-    facts.facts = { ...inspection.facts }
+  } else if (inspection.facts && typeof inspection.facts === "object") {
+    facts.facts = { ...inspection.facts };
   }
 
   // Derivations — read directly from the system
-  if (system?.derive && typeof system.derive === 'object') {
+  if (system?.derive && typeof system.derive === "object") {
     try {
-      const snapshot: Record<string, unknown> = {}
+      const snapshot: Record<string, unknown> = {};
       for (const key of Object.keys(system.derive)) {
-        snapshot[key] = system.derive[key]
+        snapshot[key] = system.derive[key];
       }
-      facts.derivations = snapshot
+      facts.derivations = snapshot;
     } catch {
       // Proxy access may fail
     }
-  } else if (inspection.derivations && typeof inspection.derivations === 'object') {
-    facts.derivations = { ...inspection.derivations }
+  } else if (
+    inspection.derivations &&
+    typeof inspection.derivations === "object"
+  ) {
+    facts.derivations = { ...inspection.derivations };
   }
 
   // Constraints
   if (Array.isArray(inspection.constraints)) {
     facts.constraints = inspection.constraints.map((c: any) => ({
-      id: c.id ?? '',
+      id: c.id ?? "",
       active: c.active ?? false,
       disabled: c.disabled ?? false,
       priority: c.priority,
       hitCount: c.hitCount ?? 0,
       lastActiveAt: c.lastActiveAt ?? null,
-    }))
+    }));
   }
 
   // Requirements (inflight + unmet)
   if (Array.isArray(inspection.inflight)) {
     facts.inflight = inspection.inflight.map((r: any) => ({
-      id: r.id ?? '',
-      type: r.requirement?.type ?? r.type ?? '',
-      fromConstraint: r.fromConstraint ?? '',
-      status: 'inflight' as const,
-    }))
+      id: r.id ?? "",
+      type: r.requirement?.type ?? r.type ?? "",
+      fromConstraint: r.fromConstraint ?? "",
+      status: "inflight" as const,
+    }));
   }
   if (Array.isArray(inspection.unmet)) {
     facts.unmet = inspection.unmet.map((r: any) => ({
-      id: r.id ?? '',
-      type: r.requirement?.type ?? r.type ?? '',
-      fromConstraint: r.fromConstraint ?? '',
-      status: 'unmet' as const,
-    }))
+      id: r.id ?? "",
+      type: r.requirement?.type ?? r.type ?? "",
+      fromConstraint: r.fromConstraint ?? "",
+      status: "unmet" as const,
+    }));
   }
 
   // Resolver stats
-  if (inspection.resolverStats && typeof inspection.resolverStats === 'object') {
-    facts.resolverStats = { ...inspection.resolverStats }
+  if (
+    inspection.resolverStats &&
+    typeof inspection.resolverStats === "object"
+  ) {
+    facts.resolverStats = { ...inspection.resolverStats };
   }
 
   // Resolver definitions
   if (Array.isArray(inspection.resolverDefs)) {
     facts.resolverDefs = inspection.resolverDefs.map((d: any) => ({
-      id: d.id ?? '',
-      requirement: d.requirement ?? '',
-    }))
+      id: d.id ?? "",
+      requirement: d.requirement ?? "",
+    }));
   }
 
   // Run history
-  facts.runHistoryEnabled = inspection.runHistoryEnabled ?? false
+  facts.runHistoryEnabled = inspection.runHistoryEnabled ?? false;
   if (Array.isArray(inspection.runHistory)) {
-    facts.runHistory = inspection.runHistory
+    facts.runHistory = inspection.runHistory;
   }
 
   // Time-travel — prefer inspect() data, fall back to system.debug
   if (inspection.timeTravel) {
-    facts.timeTravelEnabled = true
-    facts.snapshotIndex = inspection.timeTravel.currentIndex ?? -1
-    facts.snapshotCount = inspection.timeTravel.snapshotCount ?? 0
+    facts.timeTravelEnabled = true;
+    facts.snapshotIndex = inspection.timeTravel.currentIndex ?? -1;
+    facts.snapshotCount = inspection.timeTravel.snapshotCount ?? 0;
   } else if (system?.debug?.isEnabled) {
-    const debug = system.debug
-    facts.timeTravelEnabled = true
-    facts.snapshotIndex = typeof debug.currentIndex === 'number' ? debug.currentIndex : -1
-    facts.snapshotCount = Array.isArray(debug.snapshots) ? debug.snapshots.length : 0
+    const debug = system.debug;
+    facts.timeTravelEnabled = true;
+    facts.snapshotIndex =
+      typeof debug.currentIndex === "number" ? debug.currentIndex : -1;
+    facts.snapshotCount = Array.isArray(debug.snapshots)
+      ? debug.snapshots.length
+      : 0;
   }
 }

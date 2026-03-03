@@ -9,13 +9,13 @@
  * streaming, multi-agent, communication bus, semantic cache, observability, OTLP.
  */
 
+import type { DashboardData } from "@directive-run/ai";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import { checkersGame } from "./game.js";
-import { checkersChat } from "./chat.js";
 import { createCheckersAI } from "./ai-orchestrator.js";
+import { checkersChat } from "./chat.js";
 import { getApiKey, setApiKey } from "./claude-adapter.js";
-import type { DashboardData } from "@directive-run/ai";
+import { checkersGame } from "./game.js";
 import type { Board, Player } from "./rules.js";
 import { getAllValidMoves, toRowCol } from "./rules.js";
 
@@ -54,8 +54,12 @@ function syncAI(): void {
 // DOM References
 // ============================================================================
 
-const undoBtn = document.getElementById("checkers-undo-btn") as HTMLButtonElement;
-const redoBtn = document.getElementById("checkers-redo-btn") as HTMLButtonElement;
+const undoBtn = document.getElementById(
+  "checkers-undo-btn",
+) as HTMLButtonElement;
+const redoBtn = document.getElementById(
+  "checkers-redo-btn",
+) as HTMLButtonElement;
 const boardEl = document.getElementById("checkers-board")!;
 const messageEl = document.getElementById("checkers-message")!;
 const currentPlayerEl = document.getElementById("checkers-current-player")!;
@@ -72,9 +76,13 @@ const modeAiBtn = document.getElementById("checkers-mode-ai")!;
 const chatPanel = document.getElementById("checkers-chat-panel")!;
 const chatMessages = document.getElementById("checkers-chat-messages")!;
 const apiKeySection = document.getElementById("checkers-api-key-section")!;
-const apiKeyInput = document.getElementById("checkers-api-key-input") as HTMLInputElement;
+const apiKeyInput = document.getElementById(
+  "checkers-api-key-input",
+) as HTMLInputElement;
 const apiKeySaveBtn = document.getElementById("checkers-api-key-save")!;
-const chatInput = document.getElementById("checkers-chat-input") as HTMLInputElement;
+const chatInput = document.getElementById(
+  "checkers-chat-input",
+) as HTMLInputElement;
 const chatSendBtn = document.getElementById("checkers-chat-send")!;
 const tokenCountEl = document.getElementById("checkers-token-count");
 const circuitDotEl = document.getElementById("checkers-circuit-dot");
@@ -94,7 +102,10 @@ let dashboardOpen = false;
 
 function renderDashboard(container: HTMLElement): void {
   const obs = checkersAI.observability;
-  if (!obs) { container.innerHTML = "<div>Observability not available</div>"; return; }
+  if (!obs) {
+    container.innerHTML = "<div>Observability not available</div>";
+    return;
+  }
 
   const data: DashboardData = obs.getDashboard();
   const health = obs.getHealthStatus();
@@ -136,24 +147,43 @@ function renderDashboard(container: HTMLElement): void {
         <div class="metric-label">Uptime</div>
       </div>
     </div>
-    ${data.traces.length > 0 ? `
+    ${
+      data.traces.length > 0
+        ? `
     <div class="traces-section">
       <div class="traces-title">Recent Traces</div>
-      ${data.traces.slice(-5).reverse().map((t) => `
+      ${data.traces
+        .slice(-5)
+        .reverse()
+        .map(
+          (t) => `
         <div class="trace-item">
           <span class="trace-op">${t.operationName}</span>
           <span class="trace-duration">${t.duration ?? "..."}ms</span>
           <span class="trace-status ${t.status}">${t.status}</span>
         </div>
-      `).join("")}
-    </div>` : ""}
-    ${data.alerts.length > 0 ? `
+      `,
+        )
+        .join("")}
+    </div>`
+        : ""
+    }
+    ${
+      data.alerts.length > 0
+        ? `
     <div class="alerts-section">
       <div class="traces-title">Alerts</div>
-      ${data.alerts.slice(-3).map((a) => `
+      ${data.alerts
+        .slice(-3)
+        .map(
+          (a) => `
         <div class="alert-item">${a.message}</div>
-      `).join("")}
-    </div>` : ""}
+      `,
+        )
+        .join("")}
+    </div>`
+        : ""
+    }
   `;
 }
 
@@ -163,7 +193,11 @@ function renderDashboard(container: HTMLElement): void {
 
 let lastHumanMoveDesc: string | undefined;
 
-function describeMoveForClaude(from: number, to: number, captured: boolean): string {
+function describeMoveForClaude(
+  from: number,
+  to: number,
+  captured: boolean,
+): string {
   const [fr, fc] = toRowCol(from);
   const [tr, tc] = toRowCol(to);
   const captureStr = captured ? " (captured a piece)" : "";
@@ -183,26 +217,48 @@ async function handleAITurn() {
   const aiPlayer = system.facts.game.aiPlayer;
   const gameOver = system.facts.game.gameOver;
 
-  if (gameMode !== "ai" || currentPlayer !== aiPlayer || gameOver || aiTurnPending) return;
+  if (
+    gameMode !== "ai" ||
+    currentPlayer !== aiPlayer ||
+    gameOver ||
+    aiTurnPending
+  )
+    return;
 
   aiTurnPending = true;
   system.events.chat.setThinking({ thinking: true });
 
   const legalMoves = getAllValidMoves(board, aiPlayer);
-  const result = await checkersAI.requestMove(board, aiPlayer, legalMoves, lastHumanMoveDesc);
+  const result = await checkersAI.requestMove(
+    board,
+    aiPlayer,
+    legalMoves,
+    lastHumanMoveDesc,
+  );
   lastHumanMoveDesc = undefined;
 
   system.events.chat.setThinking({ thinking: false });
 
   // Cache hit notification
   if (result.isCached) {
-    system.events.chat.addMessage({ message: { sender: "system", text: "Instant response — cached!" } });
+    system.events.chat.addMessage({
+      message: { sender: "system", text: "Instant response — cached!" },
+    });
   }
 
   if (result.isLocalFallback) {
-    system.events.chat.addMessage({ message: { sender: "system", text: result.chat } });
+    system.events.chat.addMessage({
+      message: { sender: "system", text: result.chat },
+    });
   } else {
-    system.events.chat.addMessage({ message: { sender: "claude", text: result.chat, reasoning: result.reasoning, analysis: result.analysis ?? undefined } });
+    system.events.chat.addMessage({
+      message: {
+        sender: "claude",
+        text: result.chat,
+        reasoning: result.reasoning,
+        analysis: result.analysis ?? undefined,
+      },
+    });
   }
 
   // Update analysis display
@@ -233,7 +289,12 @@ function trackHumanMove() {
   const aiPlayer = system.facts.game.aiPlayer;
   const board = system.facts.game.board;
 
-  if (gameMode === "ai" && currentPlayer === aiPlayer && prevPlayer !== aiPlayer && prevBoard) {
+  if (
+    gameMode === "ai" &&
+    currentPlayer === aiPlayer &&
+    prevPlayer !== aiPlayer &&
+    prevBoard
+  ) {
     let fromIdx = -1;
     let toIdx = -1;
     let captured = false;
@@ -298,9 +359,8 @@ function render() {
 
   // Token count display
   if (tokenCountEl) {
-    tokenCountEl.textContent = totalTokens > 0
-      ? `${totalTokens} ($${estimatedCost.toFixed(4)})`
-      : "0";
+    tokenCountEl.textContent =
+      totalTokens > 0 ? `${totalTokens} ($${estimatedCost.toFixed(4)})` : "0";
   }
 
   // Circuit breaker indicator
@@ -327,7 +387,8 @@ function render() {
       if (isDark) {
         if (index === selectedIndex) square.classList.add("selected");
         if (highlightSet.has(index)) square.classList.add("highlight");
-        if (selectableSet.has(index) && !gameOver) square.classList.add("selectable");
+        if (selectableSet.has(index) && !gameOver)
+          square.classList.add("selectable");
 
         square.addEventListener("click", () => {
           system.events.game.clickSquare({ index });
@@ -386,7 +447,12 @@ function render() {
   }
 
   // Claude AI turn
-  if (gameMode === "ai" && currentPlayer === aiPlayer && !gameOver && !aiTurnPending) {
+  if (
+    gameMode === "ai" &&
+    currentPlayer === aiPlayer &&
+    !gameOver &&
+    !aiTurnPending
+  ) {
     handleAITurn();
   }
 
@@ -462,7 +528,8 @@ function renderChat() {
   } else if (thinking) {
     const dots = document.createElement("div");
     dots.className = "chat-bubble claude thinking-bubble";
-    dots.innerHTML = '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>';
+    dots.innerHTML =
+      '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>';
     chatMessages.appendChild(dots);
   }
 
@@ -473,7 +540,10 @@ function renderChat() {
 // Subscribe
 // ============================================================================
 
-const onUpdate = () => { trackHumanMove(); render(); };
+const onUpdate = () => {
+  trackHumanMove();
+  render();
+};
 system.subscribeModule("game", onUpdate);
 system.subscribeModule("chat", onUpdate);
 
@@ -492,10 +562,12 @@ document.getElementById("checkers-new-game")!.addEventListener("click", () => {
   system.events.game.newGame();
 });
 
-document.getElementById("checkers-modal-new-game")!.addEventListener("click", () => {
-  resetAll();
-  system.events.game.newGame();
-});
+document
+  .getElementById("checkers-modal-new-game")!
+  .addEventListener("click", () => {
+    resetAll();
+    system.events.game.newGame();
+  });
 
 mode2pBtn.addEventListener("click", () => {
   resetAll();
@@ -518,7 +590,9 @@ apiKeySaveBtn.addEventListener("click", () => {
   if (key) {
     setApiKey(key);
     apiKeyInput.value = "";
-    system.events.chat.addMessage({ message: { sender: "system", text: "API key saved! Let's play." } });
+    system.events.chat.addMessage({
+      message: { sender: "system", text: "API key saved! Let's play." },
+    });
   }
 });
 
@@ -542,23 +616,35 @@ function sendChat() {
   system.events.chat.addMessage({ message: { sender: "user", text } });
   system.events.chat.startStream();
 
-  checkersAI.sendChat(text, (token) => {
-    // Streaming: append each token for live display
-    system.events.chat.appendStreamToken({ token });
-  }).then((reply) => {
-    system.events.chat.finishStream({ finalText: reply ?? "" });
-    if (reply) {
-      system.events.chat.addMessage({ message: { sender: "claude", text: reply } });
-    } else {
-      system.events.chat.addMessage({ message: { sender: "system", text: "No response — check API key." } });
-    }
+  checkersAI
+    .sendChat(text, (token) => {
+      // Streaming: append each token for live display
+      system.events.chat.appendStreamToken({ token });
+    })
+    .then((reply) => {
+      system.events.chat.finishStream({ finalText: reply ?? "" });
+      if (reply) {
+        system.events.chat.addMessage({
+          message: { sender: "claude", text: reply },
+        });
+      } else {
+        system.events.chat.addMessage({
+          message: { sender: "system", text: "No response — check API key." },
+        });
+      }
 
-    // Sync AI state → directive system
-    syncAI();
-  }).catch((err) => {
-    system.events.chat.finishStream({ finalText: "" });
-    system.events.chat.addMessage({ message: { sender: "system", text: `Error: ${err instanceof Error ? err.message : "Unknown error"}` } });
-  });
+      // Sync AI state → directive system
+      syncAI();
+    })
+    .catch((err) => {
+      system.events.chat.finishStream({ finalText: "" });
+      system.events.chat.addMessage({
+        message: {
+          sender: "system",
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+        },
+      });
+    });
 }
 
 chatSendBtn.addEventListener("click", sendChat);

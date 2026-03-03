@@ -11,7 +11,7 @@
  * - No constraints or resolvers - purely reactive UI state
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import type { Notification } from "../types";
 import { authSchema } from "./auth";
 import { dataSchema } from "./data";
@@ -30,7 +30,10 @@ export const uiSchema = {
     statusSummary: t.string(),
   },
   events: {
-    addNotification: { type: t.string<"success" | "error" | "info">(), message: t.string() },
+    addNotification: {
+      type: t.string<"success" | "error" | "info">(),
+      message: t.string(),
+    },
     dismissNotification: { id: t.string() },
     clearNotifications: {},
   },
@@ -56,7 +59,9 @@ export const uiModule = createModule("ui", {
     hasNotifications: (facts) => facts.self.notifications.length > 0,
     latestNotification: (facts) => {
       const notifications = facts.self.notifications;
-      return notifications.length > 0 ? notifications[notifications.length - 1]! : null;
+      return notifications.length > 0
+        ? notifications[notifications.length - 1]!
+        : null;
     },
     // Cross-module derivation: can user see the dashboard?
     canShowDashboard: (facts) => {

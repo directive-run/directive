@@ -6,8 +6,8 @@
  * debounce delay, and efficiency stats (keystrokes vs API calls).
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
-import { mockSearch, type SearchResult } from "./mock-search.js";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
+import { type SearchResult, mockSearch } from "./mock-search.js";
 
 // ============================================================================
 // Types
@@ -67,11 +67,7 @@ export const debounceSearchSchema = {
 // Helpers
 // ============================================================================
 
-function addLogEntry(
-  facts: any,
-  event: string,
-  detail: string,
-): void {
+function addLogEntry(facts: any, event: string, detail: string): void {
   const log = [...(facts.eventLog as EventLogEntry[])];
   log.push({ timestamp: Date.now(), event, detail });
   if (log.length > 100) {
@@ -129,7 +125,10 @@ export const debounceSearchModule = createModule("debounce-search", {
     resultCount: (facts) => (facts.results as SearchResult[]).length,
 
     savedCalls: (facts) => {
-      return Math.max(0, (facts.keystrokeCount as number) - (facts.apiCallCount as number));
+      return Math.max(
+        0,
+        (facts.keystrokeCount as number) - (facts.apiCallCount as number),
+      );
     },
   },
 
@@ -187,7 +186,8 @@ export const debounceSearchModule = createModule("debounce-search", {
         return (
           facts.query !== facts.debouncedQuery &&
           (facts.queryChangedAt as number) > 0 &&
-          (facts.now as number) - (facts.queryChangedAt as number) >= (facts.debounceDelay as number)
+          (facts.now as number) - (facts.queryChangedAt as number) >=
+            (facts.debounceDelay as number)
         );
       },
       require: () => ({
@@ -199,7 +199,8 @@ export const debounceSearchModule = createModule("debounce-search", {
       priority: 90,
       when: (facts) => {
         return (
-          (facts.debouncedQuery as string).length >= (facts.minChars as number) &&
+          (facts.debouncedQuery as string).length >=
+            (facts.minChars as number) &&
           facts.debouncedQuery !== facts.lastSearchedQuery &&
           !(facts.isSearching as boolean)
         );
@@ -248,9 +249,17 @@ export const debounceSearchModule = createModule("debounce-search", {
         if ((context.facts.debouncedQuery as string) === req.query) {
           context.facts.results = results;
           context.facts.lastSearchedQuery = req.query;
-          addLogEntry(context.facts, "search-complete", `${results.length} results for "${req.query}"`);
+          addLogEntry(
+            context.facts,
+            "search-complete",
+            `${results.length} results for "${req.query}"`,
+          );
         } else {
-          addLogEntry(context.facts, "search-stale", `Discarded results for "${req.query}"`);
+          addLogEntry(
+            context.facts,
+            "search-stale",
+            `Discarded results for "${req.query}"`,
+          );
         }
 
         context.facts.isSearching = false;

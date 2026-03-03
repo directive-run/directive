@@ -1,8 +1,6 @@
-import { describe, it, expect } from "vitest";
-import {
-  createTestMultiAgentOrchestrator,
-} from "../testing.js";
+import { describe, expect, it } from "vitest";
 import { race } from "../multi-agent-orchestrator.js";
+import { createTestMultiAgentOrchestrator } from "../testing.js";
 
 // ============================================================================
 // Tests
@@ -24,7 +22,10 @@ describe("race pattern", () => {
       },
     });
 
-    const result = await orchestrator.runPattern<{ winnerId: string; result: unknown }>("myRace", "go");
+    const result = await orchestrator.runPattern<{
+      winnerId: string;
+      result: unknown;
+    }>("myRace", "go");
 
     // runPattern extracts the result, so we get the output directly
     expect(result).toBe("fast result");
@@ -37,7 +38,12 @@ describe("race pattern", () => {
         slow: { agent: { name: "slow" } },
       },
       mockResponses: {
-        fast: { output: "n/a", totalTokens: 0, delay: 10, error: new Error("Fast failed") },
+        fast: {
+          output: "n/a",
+          totalTokens: 0,
+          delay: 10,
+          error: new Error("Fast failed"),
+        },
         slow: { output: "slow wins", totalTokens: 20, delay: 50 },
       },
       patterns: {
@@ -65,9 +71,9 @@ describe("race pattern", () => {
       },
     });
 
-    await expect(
-      orchestrator.runPattern("myRace", "go"),
-    ).rejects.toThrow("all 2 agents failed");
+    await expect(orchestrator.runPattern("myRace", "go")).rejects.toThrow(
+      "all 2 agents failed",
+    );
   });
 
   it("custom extract function", async () => {
@@ -77,8 +83,16 @@ describe("race pattern", () => {
         b: { agent: { name: "b" } },
       },
       mockResponses: {
-        a: { output: { data: "important", meta: "ignore" }, totalTokens: 10, delay: 10 },
-        b: { output: { data: "other", meta: "also" }, totalTokens: 10, delay: 100 },
+        a: {
+          output: { data: "important", meta: "ignore" },
+          totalTokens: 10,
+          delay: 10,
+        },
+        b: {
+          output: { data: "other", meta: "also" },
+          totalTokens: 10,
+          delay: 100,
+        },
       },
     });
 
@@ -221,8 +235,10 @@ describe("race pattern", () => {
         myRace: race(["a", "b"]),
       },
       hooks: {
-        onPatternStart: (event) => hookEvents.push({ patternType: event.patternType }),
-        onPatternComplete: (event) => hookEvents.push({ patternType: event.patternType }),
+        onPatternStart: (event) =>
+          hookEvents.push({ patternType: event.patternType }),
+        onPatternComplete: (event) =>
+          hookEvents.push({ patternType: event.patternType }),
       },
     });
 
@@ -242,7 +258,11 @@ describe("race pattern", () => {
       },
       mockResponses: {
         x: { output: "n/a", totalTokens: 0, error: new Error("X timeout") },
-        y: { output: "n/a", totalTokens: 0, error: new Error("Y rate limited") },
+        y: {
+          output: "n/a",
+          totalTokens: 0,
+          error: new Error("Y rate limited"),
+        },
       },
     });
 
@@ -283,7 +303,9 @@ describe("race pattern", () => {
       },
     });
 
-    const result = await orchestrator.runRace(["a", "b", "c"], "go", { minSuccess: 2 });
+    const result = await orchestrator.runRace(["a", "b", "c"], "go", {
+      minSuccess: 2,
+    });
 
     expect(result.winnerId).toBe("a");
     expect(result.result).toBe("a-out");
@@ -305,7 +327,9 @@ describe("race pattern", () => {
       },
     });
 
-    const result = await orchestrator.runRace(["a", "b"], "go", { minSuccess: 2 });
+    const result = await orchestrator.runRace(["a", "b"], "go", {
+      minSuccess: 2,
+    });
 
     expect(result.allResults).toHaveLength(2);
     // Both agents should be in allResults
@@ -342,7 +366,9 @@ describe("race pattern", () => {
       },
     });
 
-    const result = await orchestrator.runRace(["a", "b"], "go", { minSuccess: 1 });
+    const result = await orchestrator.runRace(["a", "b"], "go", {
+      minSuccess: 1,
+    });
 
     expect(result.winnerId).toBe("a");
     expect(result.result).toBe("a-out");

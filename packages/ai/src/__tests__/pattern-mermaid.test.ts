@@ -1,16 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  dag,
+  debate,
   parallel,
+  patternToJSON,
+  race,
+  reflect,
   sequential,
   supervisor,
-  dag,
-  reflect,
-  race,
-  debate,
-  patternToJSON,
 } from "../multi-agent-orchestrator.js";
-import { patternToMermaid } from "../pattern-mermaid.js";
 import type { SerializedPattern } from "../multi-agent-orchestrator.js";
+import { patternToMermaid } from "../pattern-mermaid.js";
 
 // ============================================================================
 // Tests
@@ -63,13 +63,7 @@ describe("patternToMermaid", () => {
     const p = sequential(["solo"]);
     const result = patternToMermaid(p);
 
-    expect(result).toBe(
-      [
-        "graph LR",
-        "  solo[solo]",
-        "",
-      ].join("\n"),
-    );
+    expect(result).toBe(["graph LR", "  solo[solo]", ""].join("\n"));
   });
 
   // ---------- supervisor ----------
@@ -222,13 +216,7 @@ describe("patternToMermaid", () => {
     };
     const result = patternToMermaid(json);
 
-    expect(result).toBe(
-      [
-        "graph LR",
-        "  a[a] --> b[b]",
-        "",
-      ].join("\n"),
-    );
+    expect(result).toBe(["graph LR", "  a[a] --> b[b]", ""].join("\n"));
   });
 
   it("accepts SerializedPattern from patternToJSON", () => {
@@ -301,8 +289,16 @@ describe("patternToMermaid", () => {
       type: "goal",
       nodes: {
         fetch: { handler: "fetcher", produces: ["data"], requires: [] },
-        analyze: { handler: "analyzer", produces: ["analysis"], requires: ["data"] },
-        report: { handler: "reporter", produces: ["report"], requires: ["analysis"] },
+        analyze: {
+          handler: "analyzer",
+          produces: ["analysis"],
+          requires: ["data"],
+        },
+        report: {
+          handler: "reporter",
+          produces: ["report"],
+          requires: ["analysis"],
+        },
       },
     };
     const result = patternToMermaid(json, { direction: "TD" });
@@ -355,9 +351,21 @@ describe("patternToMermaid", () => {
       type: "goal",
       nodes: {
         root: { handler: "root-agent", produces: ["raw"], requires: [] },
-        left: { handler: "left-agent", produces: ["left-out"], requires: ["raw"] },
-        right: { handler: "right-agent", produces: ["right-out"], requires: ["raw"] },
-        merge: { handler: "merge-agent", produces: ["final"], requires: ["left-out", "right-out"] },
+        left: {
+          handler: "left-agent",
+          produces: ["left-out"],
+          requires: ["raw"],
+        },
+        right: {
+          handler: "right-agent",
+          produces: ["right-out"],
+          requires: ["raw"],
+        },
+        merge: {
+          handler: "merge-agent",
+          produces: ["final"],
+          requires: ["left-out", "right-out"],
+        },
       },
     };
     const result = patternToMermaid(json);
@@ -365,15 +373,23 @@ describe("patternToMermaid", () => {
     expect(result).toContain("root[root-agent]");
     expect(result).toContain("root[root-agent] -->|raw| left[left-agent]");
     expect(result).toContain("root[root-agent] -->|raw| right[right-agent]");
-    expect(result).toContain("left[left-agent] -->|left-out| merge[merge-agent]");
-    expect(result).toContain("right[right-agent] -->|right-out| merge[merge-agent]");
+    expect(result).toContain(
+      "left[left-agent] -->|left-out| merge[merge-agent]",
+    );
+    expect(result).toContain(
+      "right[right-agent] -->|right-out| merge[merge-agent]",
+    );
   });
 
   it("goal pattern — missing producer gracefully skipped", () => {
     const json: SerializedPattern = {
       type: "goal",
       nodes: {
-        analyzer: { handler: "analyzer", produces: ["analysis"], requires: ["external-data"] },
+        analyzer: {
+          handler: "analyzer",
+          produces: ["analysis"],
+          requires: ["external-data"],
+        },
       },
     };
     const result = patternToMermaid(json);

@@ -1,21 +1,21 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { FormWizardDemo } from './FormWizardDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { FormWizardDemo } from "./FormWizardDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'Form Wizard',
+  title: "Form Wizard",
   description:
-    'Interactive multi-step form wizard demo built with Directive. Constraint-gated step advancement, per-step validation, and persistence.',
-  path: '/docs/examples/form-wizard',
-  section: 'Docs',
-})
+    "Interactive multi-step form wizard demo built with Directive. Constraint-gated step advancement, per-step validation, and persistence.",
+  path: "/docs/examples/form-wizard",
+  section: "Docs",
+});
 
 export default function FormWizardPage() {
-  const build = parseExampleBuild('form-wizard')
-  const sources = readExampleSources('form-wizard', [
-    'form-wizard.ts',
-    'main.ts',
-  ])
+  const build = parseExampleBuild("form-wizard");
+  const sources = readExampleSources("form-wizard", [
+    "form-wizard.ts",
+    "main.ts",
+  ]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -34,5 +34,5 @@ export default function FormWizardPage() {
 
       <FormWizardDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

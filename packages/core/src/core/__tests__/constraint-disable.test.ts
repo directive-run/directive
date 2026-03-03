@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 
 // ============================================================================
@@ -6,48 +6,48 @@ import { createModule, createSystem, t } from "../../index.js";
 // ============================================================================
 
 function createTestModule() {
-	return createModule("test", {
-		schema: {
-			facts: {
-				count: t.number(),
-			},
-			events: {
-				increment: {},
-			},
-			requirements: {
-				LOAD_DATA: { source: t.string() },
-			},
-		},
-		init: (facts) => {
-			facts.count = 0;
-		},
-		events: {
-			increment: (facts) => {
-				facts.count = (facts.count as number) + 1;
-			},
-		},
-		constraints: {
-			needsData: {
-				priority: 10,
-				when: (facts) => (facts.count as number) > 5,
-				require: { type: "LOAD_DATA", source: "api" },
-			},
-			alwaysActive: {
-				priority: 5,
-				when: () => true,
-				require: { type: "LOAD_DATA", source: "always" },
-			},
-		},
-		resolvers: {
-			loadData: {
-				requirement: "LOAD_DATA",
-				key: (req) => `load-${req.source}`,
-				resolve: async () => {
-					// No-op
-				},
-			},
-		},
-	});
+  return createModule("test", {
+    schema: {
+      facts: {
+        count: t.number(),
+      },
+      events: {
+        increment: {},
+      },
+      requirements: {
+        LOAD_DATA: { source: t.string() },
+      },
+    },
+    init: (facts) => {
+      facts.count = 0;
+    },
+    events: {
+      increment: (facts) => {
+        facts.count = (facts.count as number) + 1;
+      },
+    },
+    constraints: {
+      needsData: {
+        priority: 10,
+        when: (facts) => (facts.count as number) > 5,
+        require: { type: "LOAD_DATA", source: "api" },
+      },
+      alwaysActive: {
+        priority: 5,
+        when: () => true,
+        require: { type: "LOAD_DATA", source: "always" },
+      },
+    },
+    resolvers: {
+      loadData: {
+        requirement: "LOAD_DATA",
+        key: (req) => `load-${req.source}`,
+        resolve: async () => {
+          // No-op
+        },
+      },
+    },
+  });
 }
 
 // ============================================================================
@@ -55,118 +55,124 @@ function createTestModule() {
 // ============================================================================
 
 describe("constraints.disable / constraints.enable / constraints.isDisabled", () => {
-	it("isDisabled returns false for enabled constraints", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("isDisabled returns false for enabled constraints", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		expect(system.constraints.isDisabled("alwaysActive")).toBe(false);
-		expect(system.constraints.isDisabled("needsData")).toBe(false);
+    expect(system.constraints.isDisabled("alwaysActive")).toBe(false);
+    expect(system.constraints.isDisabled("needsData")).toBe(false);
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("isDisabled returns true after disable()", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("isDisabled returns true after disable()", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		system.constraints.disable("alwaysActive");
-		expect(system.constraints.isDisabled("alwaysActive")).toBe(true);
-		expect(system.constraints.isDisabled("needsData")).toBe(false);
+    system.constraints.disable("alwaysActive");
+    expect(system.constraints.isDisabled("alwaysActive")).toBe(true);
+    expect(system.constraints.isDisabled("needsData")).toBe(false);
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("isDisabled returns false after enable()", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("isDisabled returns false after enable()", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		system.constraints.disable("alwaysActive");
-		expect(system.constraints.isDisabled("alwaysActive")).toBe(true);
+    system.constraints.disable("alwaysActive");
+    expect(system.constraints.isDisabled("alwaysActive")).toBe(true);
 
-		system.constraints.enable("alwaysActive");
-		expect(system.constraints.isDisabled("alwaysActive")).toBe(false);
+    system.constraints.enable("alwaysActive");
+    expect(system.constraints.isDisabled("alwaysActive")).toBe(false);
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("disable() on unknown constraint does not throw", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("disable() on unknown constraint does not throw", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		expect(() => system.constraints.disable("nonexistent")).not.toThrow();
+    expect(() => system.constraints.disable("nonexistent")).not.toThrow();
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("enable() on unknown constraint does not throw", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("enable() on unknown constraint does not throw", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		expect(() => system.constraints.enable("nonexistent")).not.toThrow();
+    expect(() => system.constraints.enable("nonexistent")).not.toThrow();
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 });
 
 describe("inspect() includes disabled field on constraints", () => {
-	it("inspect().constraints includes disabled: false by default", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("inspect().constraints includes disabled: false by default", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		const inspection = system.inspect();
-		const alwaysActive = inspection.constraints.find((c) => c.id === "alwaysActive");
+    const inspection = system.inspect();
+    const alwaysActive = inspection.constraints.find(
+      (c) => c.id === "alwaysActive",
+    );
 
-		expect(alwaysActive).toBeDefined();
-		expect(alwaysActive!.disabled).toBe(false);
+    expect(alwaysActive).toBeDefined();
+    expect(alwaysActive!.disabled).toBe(false);
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("inspect().constraints shows disabled: true after disable()", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("inspect().constraints shows disabled: true after disable()", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		system.constraints.disable("alwaysActive");
+    system.constraints.disable("alwaysActive");
 
-		const inspection = system.inspect();
-		const alwaysActive = inspection.constraints.find((c) => c.id === "alwaysActive");
-		const needsData = inspection.constraints.find((c) => c.id === "needsData");
+    const inspection = system.inspect();
+    const alwaysActive = inspection.constraints.find(
+      (c) => c.id === "alwaysActive",
+    );
+    const needsData = inspection.constraints.find((c) => c.id === "needsData");
 
-		expect(alwaysActive).toBeDefined();
-		expect(alwaysActive!.disabled).toBe(true);
-		expect(needsData).toBeDefined();
-		expect(needsData!.disabled).toBe(false);
+    expect(alwaysActive).toBeDefined();
+    expect(alwaysActive!.disabled).toBe(true);
+    expect(needsData).toBeDefined();
+    expect(needsData!.disabled).toBe(false);
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("inspect().constraints shows disabled: false after re-enable()", () => {
-		const system = createSystem({ module: createTestModule() });
-		system.start();
+  it("inspect().constraints shows disabled: false after re-enable()", () => {
+    const system = createSystem({ module: createTestModule() });
+    system.start();
 
-		system.constraints.disable("alwaysActive");
-		system.constraints.enable("alwaysActive");
+    system.constraints.disable("alwaysActive");
+    system.constraints.enable("alwaysActive");
 
-		const inspection = system.inspect();
-		const alwaysActive = inspection.constraints.find((c) => c.id === "alwaysActive");
+    const inspection = system.inspect();
+    const alwaysActive = inspection.constraints.find(
+      (c) => c.id === "alwaysActive",
+    );
 
-		expect(alwaysActive!.disabled).toBe(false);
+    expect(alwaysActive!.disabled).toBe(false);
 
-		system.destroy();
-	});
+    system.destroy();
+  });
 
-	it("inspect().runHistoryEnabled reflects debug config", () => {
-		const withHistory = createSystem({
-			module: createTestModule(),
-			debug: { runHistory: true },
-		});
-		withHistory.start();
-		expect(withHistory.inspect().runHistoryEnabled).toBe(true);
-		withHistory.destroy();
+  it("inspect().runHistoryEnabled reflects debug config", () => {
+    const withHistory = createSystem({
+      module: createTestModule(),
+      debug: { runHistory: true },
+    });
+    withHistory.start();
+    expect(withHistory.inspect().runHistoryEnabled).toBe(true);
+    withHistory.destroy();
 
-		const withoutHistory = createSystem({ module: createTestModule() });
-		withoutHistory.start();
-		expect(withoutHistory.inspect().runHistoryEnabled).toBe(false);
-		withoutHistory.destroy();
-	});
+    const withoutHistory = createSystem({ module: createTestModule() });
+    withoutHistory.start();
+    expect(withoutHistory.inspect().runHistoryEnabled).toBe(false);
+    withoutHistory.destroy();
+  });
 });

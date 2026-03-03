@@ -1,81 +1,84 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
-import { Eye, EyeSlash, Key } from '@phosphor-icons/react'
+import { Eye, EyeSlash, Key } from "@phosphor-icons/react";
+import { useCallback, useEffect, useState } from "react";
 
-const STORAGE_KEY = 'directive-provider-config'
+const STORAGE_KEY = "directive-provider-config";
 
-export type Provider = 'anthropic' | 'openai'
+export type Provider = "anthropic" | "openai";
 
 export interface ProviderConfigState {
-  provider: Provider
-  apiKey: string
+  provider: Provider;
+  apiKey: string;
 }
 
-const DEFAULT_STATE: ProviderConfigState = { provider: 'anthropic', apiKey: '' }
+const DEFAULT_STATE: ProviderConfigState = {
+  provider: "anthropic",
+  apiKey: "",
+};
 
 function loadConfig(): ProviderConfigState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return DEFAULT_STATE
+      return DEFAULT_STATE;
     }
 
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(raw);
 
     return {
-      provider: parsed.provider === 'openai' ? 'openai' : 'anthropic',
-      apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
-    }
+      provider: parsed.provider === "openai" ? "openai" : "anthropic",
+      apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+    };
   } catch {
-    return DEFAULT_STATE
+    return DEFAULT_STATE;
   }
 }
 
 function saveConfig(config: ProviderConfigState) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch {
     // localStorage unavailable
   }
 }
 
 interface ProviderConfigProps {
-  onChange: (config: ProviderConfigState) => void
+  onChange: (config: ProviderConfigState) => void;
 }
 
 export function ProviderConfig({ onChange }: ProviderConfigProps) {
-  const [config, setConfig] = useState<ProviderConfigState>(DEFAULT_STATE)
-  const [showKey, setShowKey] = useState(false)
-  const [hydrated, setHydrated] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [config, setConfig] = useState<ProviderConfigState>(DEFAULT_STATE);
+  const [showKey, setShowKey] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    const loaded = loadConfig()
-    setConfig(loaded)
-    onChange(loaded)
-    setHydrated(true)
+    const loaded = loadConfig();
+    setConfig(loaded);
+    onChange(loaded);
+    setHydrated(true);
     // Auto-expand if user already has a key saved
     if (loaded.apiKey) {
-      setExpanded(true)
+      setExpanded(true);
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = useCallback(
     (patch: Partial<ProviderConfigState>) => {
       setConfig((prev) => {
-        const next = { ...prev, ...patch }
-        saveConfig(next)
-        onChange(next)
+        const next = { ...prev, ...patch };
+        saveConfig(next);
+        onChange(next);
 
-        return next
-      })
+        return next;
+      });
     },
     [onChange],
-  )
+  );
 
   if (!hydrated) {
-    return null
+    return null;
   }
 
   // When user has a BYOK key active, show a compact badge
@@ -94,7 +97,7 @@ export function ProviderConfig({ onChange }: ProviderConfigProps) {
           Change
         </button>
       </div>
-    )
+    );
   }
 
   // Collapsed state: just a small link
@@ -108,7 +111,7 @@ export function ProviderConfig({ onChange }: ProviderConfigProps) {
         <Key weight="bold" className="h-3 w-3" />
         Use your own key for unlimited access
       </button>
-    )
+    );
   }
 
   // Expanded state: full config panel
@@ -131,17 +134,19 @@ export function ProviderConfig({ onChange }: ProviderConfigProps) {
           API Key
           <div className="relative flex-1">
             <input
-              type={showKey ? 'text' : 'password'}
+              type={showKey ? "text" : "password"}
               value={config.apiKey}
               onChange={(e) => update({ apiKey: e.target.value })}
-              placeholder={config.provider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+              placeholder={
+                config.provider === "anthropic" ? "sk-ant-..." : "sk-..."
+              }
               className="w-full rounded border border-zinc-300 bg-white py-1 pl-2 pr-8 text-xs text-zinc-900 placeholder-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500"
             />
             <button
               type="button"
               onClick={() => setShowKey((v) => !v)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-              aria-label={showKey ? 'Hide API key' : 'Show API key'}
+              aria-label={showKey ? "Hide API key" : "Show API key"}
             >
               {showKey ? (
                 <EyeSlash weight="bold" className="h-3.5 w-3.5" />
@@ -162,5 +167,5 @@ export function ProviderConfig({ onChange }: ProviderConfigProps) {
         </button>
       </div>
     </div>
-  )
+  );
 }

@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from "react";
 
 export type ExampleBuild = {
-  css: string
-  html: string
-  scriptSrc: string
-}
+  css: string;
+  html: string;
+  scriptSrc: string;
+};
 
 /**
  * Embeds a pre-built Directive example as a light DOM custom element.
@@ -19,85 +19,86 @@ export function ExampleEmbed({
   html,
   scriptSrc,
 }: {
-  name: string
+  name: string;
 } & ExampleBuild) {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const tag = `directive-${name}`
+  const hostRef = useRef<HTMLDivElement>(null);
+  const tag = `directive-${name}`;
 
   useEffect(() => {
-    if (typeof customElements === 'undefined') {
-      return
+    if (typeof customElements === "undefined") {
+      return;
     }
 
     // Snapshot existing systems before this example mounts
-    const systemsBefore = typeof window !== 'undefined' && window.__DIRECTIVE__
-      ? [...window.__DIRECTIVE__.getSystems()]
-      : []
+    const systemsBefore =
+      typeof window !== "undefined" && window.__DIRECTIVE__
+        ? [...window.__DIRECTIVE__.getSystems()]
+        : [];
 
     if (!customElements.get(tag)) {
-      const capturedCss = css
-      const capturedHtml = html
-      const capturedScript = scriptSrc
-      const capturedTag = tag
+      const capturedCss = css;
+      const capturedHtml = html;
+      const capturedScript = scriptSrc;
+      const capturedTag = tag;
 
       class DirectiveExample extends HTMLElement {
         connectedCallback() {
           // Only inject styles if not already present
           if (!document.head.querySelector(`style[data-${capturedTag}]`)) {
-            const style = document.createElement('style')
-            style.setAttribute(`data-${capturedTag}`, '')
-            style.textContent = capturedCss
-            document.head.appendChild(style)
+            const style = document.createElement("style");
+            style.setAttribute(`data-${capturedTag}`, "");
+            style.textContent = capturedCss;
+            document.head.appendChild(style);
           }
 
-          this.innerHTML = capturedHtml
+          this.innerHTML = capturedHtml;
 
           if (capturedScript) {
             // Append with cache-bust query so the module re-executes on re-mount
-            const script = document.createElement('script')
-            script.type = 'module'
-            script.src = `${capturedScript}${capturedScript.includes('?') ? '&' : '?'}t=${Date.now()}`
-            document.head.appendChild(script)
+            const script = document.createElement("script");
+            script.type = "module";
+            script.src = `${capturedScript}${capturedScript.includes("?") ? "&" : "?"}t=${Date.now()}`;
+            document.head.appendChild(script);
           }
         }
 
         disconnectedCallback() {
           document
             .querySelectorAll(`style[data-${capturedTag}]`)
-            .forEach((el) => el.remove())
+            .forEach((el) => el.remove());
         }
       }
 
-      customElements.define(capturedTag, DirectiveExample)
+      customElements.define(capturedTag, DirectiveExample);
     }
 
-    const host = hostRef.current
+    const host = hostRef.current;
     if (host && !host.querySelector(tag)) {
-      host.innerHTML = ''
-      const el = document.createElement(tag)
-      host.appendChild(el)
+      host.innerHTML = "";
+      const el = document.createElement(tag);
+      host.appendChild(el);
     }
 
     return () => {
-      const host = hostRef.current
+      const host = hostRef.current;
       if (host) {
-        const el = host.querySelector(tag)
+        const el = host.querySelector(tag);
         if (el) {
-          host.removeChild(el)
+          host.removeChild(el);
         }
       }
 
       // Destroy any Directive systems this example registered
-      if (typeof window !== 'undefined' && window.__DIRECTIVE__) {
-        const systemsNow = window.__DIRECTIVE__.getSystems()
+      if (typeof window !== "undefined" && window.__DIRECTIVE__) {
+        const systemsNow = window.__DIRECTIVE__.getSystems();
         for (const sysName of systemsNow) {
           if (!systemsBefore.includes(sysName)) {
-            window.__DIRECTIVE__.getSystem(sysName)?.destroy?.()
+            window.__DIRECTIVE__.getSystem(sysName)?.destroy?.();
           }
         }
       }
-    }
-  }, [css, html, scriptSrc, tag])
+    };
+  }, [css, html, scriptSrc, tag]);
 
   return (
     <div
@@ -110,5 +111,5 @@ export function ExampleEmbed({
         Loading example&hellip;
       </div>
     </div>
-  )
+  );
 }

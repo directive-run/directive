@@ -1,6 +1,6 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react";
-import type { DagNodeStatus } from "../lib/types";
+import { Handle, type NodeProps, Position } from "@xyflow/react";
 import { DAG_NODE_COLORS } from "../lib/colors";
+import type { DagNodeStatus } from "../lib/types";
 
 export interface DagNodeData {
   label: string;
@@ -34,21 +34,32 @@ export function DagNode({ data, selected }: NodeProps) {
       } ${status === "running" ? "motion-safe:animate-pulse" : ""}`}
       style={{ borderColor: color }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-zinc-600 !w-2 !h-2" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-zinc-600 !w-2 !h-2"
+      />
 
       <div className="flex items-center gap-2">
-        <span style={{ color }} className="text-lg">{STATUS_ICONS[status]}</span>
+        <span style={{ color }} className="text-lg">
+          {STATUS_ICONS[status]}
+        </span>
         <div>
           <div className="text-sm font-medium text-zinc-100">{label}</div>
           {agentState && (
             <div className="text-[10px] text-zinc-500">
-              {agentState.totalTokens.toLocaleString()} tokens &middot; {agentState.runCount} runs
+              {agentState.totalTokens.toLocaleString()} tokens &middot;{" "}
+              {agentState.runCount} runs
             </div>
           )}
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} className="!bg-zinc-600 !w-2 !h-2" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-zinc-600 !w-2 !h-2"
+      />
     </div>
   );
 }

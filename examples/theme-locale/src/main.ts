@@ -7,13 +7,13 @@
  */
 
 import { createSystem } from "@directive-run/core";
-import {persistencePlugin, devtoolsPlugin } from "@directive-run/core/plugins";
+import { devtoolsPlugin, persistencePlugin } from "@directive-run/core/plugins";
 import {
-  preferencesModule,
-  layoutModule,
-  type Translations,
-  type ThemeChoice,
   type Breakpoint,
+  type ThemeChoice,
+  type Translations,
+  layoutModule,
+  preferencesModule,
 } from "./theme-locale.js";
 
 // ============================================================================
@@ -30,7 +30,11 @@ const system = createSystem({
     persistencePlugin({
       storage: localStorage,
       key: "directive-theme-locale-example",
-      include: ["preferences::theme", "preferences::locale", "preferences::sidebarOpen"],
+      include: [
+        "preferences::theme",
+        "preferences::locale",
+        "preferences::sidebarOpen",
+      ],
     }),
   ],
 });
@@ -73,11 +77,21 @@ window.addEventListener("resize", () => {
 // DOM References
 // ============================================================================
 
-const themeLightBtn = document.getElementById("tl-theme-light") as HTMLButtonElement;
-const themeDarkBtn = document.getElementById("tl-theme-dark") as HTMLButtonElement;
-const themeSystemBtn = document.getElementById("tl-theme-system") as HTMLButtonElement;
-const localeSelect = document.getElementById("tl-locale-select") as HTMLSelectElement;
-const sidebarToggle = document.getElementById("tl-sidebar-toggle") as HTMLButtonElement;
+const themeLightBtn = document.getElementById(
+  "tl-theme-light",
+) as HTMLButtonElement;
+const themeDarkBtn = document.getElementById(
+  "tl-theme-dark",
+) as HTMLButtonElement;
+const themeSystemBtn = document.getElementById(
+  "tl-theme-system",
+) as HTMLButtonElement;
+const localeSelect = document.getElementById(
+  "tl-locale-select",
+) as HTMLSelectElement;
+const sidebarToggle = document.getElementById(
+  "tl-sidebar-toggle",
+) as HTMLButtonElement;
 
 const effectiveThemeEl = document.getElementById("tl-effective-theme")!;
 const headerLocaleEl = document.getElementById("tl-header-locale")!;
@@ -125,9 +139,10 @@ function render(): void {
   sidebarToggle.classList.toggle("tl-btn-active", sidebarOpen);
 
   // --- Preview area ---
-  const themeColors = effectiveTheme === "dark"
-    ? { bg: "#1e293b", text: "#cbd5e1", accent: "#5ba3a3", muted: "#94a3b8" }
-    : { bg: "#f8fafc", text: "#1e293b", accent: "#0d9488", muted: "#64748b" };
+  const themeColors =
+    effectiveTheme === "dark"
+      ? { bg: "#1e293b", text: "#cbd5e1", accent: "#5ba3a3", muted: "#94a3b8" }
+      : { bg: "#f8fafc", text: "#1e293b", accent: "#0d9488", muted: "#64748b" };
 
   previewEl.style.background = themeColors.bg;
   previewEl.style.color = themeColors.text;
@@ -156,7 +171,6 @@ function render(): void {
       </div>
     </div>
   `;
-
 }
 
 // ============================================================================

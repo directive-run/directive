@@ -32,7 +32,7 @@
  * ```
  */
 
-import type { AgentRunner, AgentLike, RunResult, RunOptions } from "./types.js";
+import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
 // Types
@@ -49,7 +49,11 @@ export interface BatchQueueConfig {
 
 export interface BatchQueue {
   /** Submit a call to the queue. Returns a promise that resolves when the call completes. */
-  submit<T = unknown>(agent: AgentLike, input: string, options?: RunOptions): Promise<RunResult<T>>;
+  submit<T = unknown>(
+    agent: AgentLike,
+    input: string,
+    options?: RunOptions,
+  ): Promise<RunResult<T>>;
   /** Flush all pending calls immediately. */
   flush(): Promise<void>;
   /** Get the number of pending calls. */
@@ -100,24 +104,26 @@ export function createBatchQueue(
   runner: AgentRunner,
   config: BatchQueueConfig = {},
 ): BatchQueue {
-  const {
-    maxBatchSize = 20,
-    maxWaitMs = 5000,
-    concurrency = 5,
-  } = config;
+  const { maxBatchSize = 20, maxWaitMs = 5000, concurrency = 5 } = config;
 
   // Validate config
   if (!Number.isFinite(maxBatchSize) || maxBatchSize < 1) {
-    throw new Error("[Directive] createBatchQueue: maxBatchSize must be a positive finite number (>= 1).");
+    throw new Error(
+      "[Directive] createBatchQueue: maxBatchSize must be a positive finite number (>= 1).",
+    );
   }
   if (!Number.isFinite(maxWaitMs) || maxWaitMs < 0) {
-    throw new Error("[Directive] createBatchQueue: maxWaitMs must be a non-negative finite number.");
+    throw new Error(
+      "[Directive] createBatchQueue: maxWaitMs must be a non-negative finite number.",
+    );
   }
   if (!Number.isFinite(concurrency) || concurrency < 1) {
-    throw new Error("[Directive] createBatchQueue: concurrency must be a positive finite number (>= 1).");
+    throw new Error(
+      "[Directive] createBatchQueue: concurrency must be a positive finite number (>= 1).",
+    );
   }
 
-  let queue: QueuedCall[] = [];
+  const queue: QueuedCall[] = [];
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
   let flushPromise: Promise<void> | null = null;
@@ -201,7 +207,9 @@ export function createBatchQueue(
       options?: RunOptions,
     ): Promise<RunResult<T>> {
       if (disposed) {
-        return Promise.reject(new Error("[Directive] BatchQueue has been disposed."));
+        return Promise.reject(
+          new Error("[Directive] BatchQueue has been disposed."),
+        );
       }
 
       return new Promise<RunResult<T>>((resolve, reject) => {

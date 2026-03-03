@@ -1,18 +1,20 @@
-'use client'
+"use client";
 
-import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CodeTabs } from '@/components/CodeTabs'
+import { CodeTabs } from "@/components/CodeTabs";
+import { ExampleEmbed } from "@/components/ExampleEmbed";
 
 export function DashboardLoaderDemo({
   build,
   sources,
 }: {
-  build: import('@/lib/examples').ExampleBuild | null
-  sources: import('@/lib/examples').ExampleSource[]
+  build: import("@/lib/examples").ExampleBuild | null;
+  sources: import("@/lib/examples").ExampleSource[];
 }) {
-  const moduleSource = sources.find((s) => s.filename === 'dashboard-loader.ts')
-  const mockApiSource = sources.find((s) => s.filename === 'mock-api.ts')
-  const mainSource = sources.find((s) => s.filename === 'main.ts')
+  const moduleSource = sources.find(
+    (s) => s.filename === "dashboard-loader.ts",
+  );
+  const mockApiSource = sources.find((s) => s.filename === "mock-api.ts");
+  const mainSource = sources.find((s) => s.filename === "main.ts");
 
   return (
     <div className="space-y-8">
@@ -31,10 +33,10 @@ export function DashboardLoaderDemo({
           />
         ) : (
           <div className="rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)] p-8 text-center text-sm text-slate-400">
-            Example not built yet. Run{' '}
+            Example not built yet. Run{" "}
             <code className="text-slate-300">
               pnpm build:example dashboard-loader
-            </code>{' '}
+            </code>{" "}
             to generate the embed.
           </div>
         )}
@@ -52,24 +54,24 @@ export function DashboardLoaderDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            A dashboard needs profile, preferences, and permissions data
-            before it can render. Each resource is fetched concurrently via
+            A dashboard needs profile, preferences, and permissions data before
+            it can render. Each resource is fetched concurrently via
             Directive&rsquo;s constraint&ndash;resolver flow.
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Constraints
-              </strong>{' '}
-              &ndash; <code>needsProfile</code> (priority 100),{' '}
-              <code>needsPreferences</code> (90),{' '}
-              <code>needsPermissions</code> (80) &ndash; fire concurrently
-              when <code>userId</code> is set and the resource is idle
+              </strong>{" "}
+              &ndash; <code>needsProfile</code> (priority 100),{" "}
+              <code>needsPreferences</code> (90), <code>needsPermissions</code>{" "}
+              (80) &ndash; fire concurrently when <code>userId</code> is set and
+              the resource is idle
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Resolvers
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Each resolver fetches data with configurable delay and
               failure rate. Retry with exponential backoff handles transient
               failures automatically
@@ -77,15 +79,15 @@ export function DashboardLoaderDemo({
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Derivations
-              </strong>{' '}
-              &ndash; <code>loadedCount</code>, <code>allLoaded</code>,{' '}
+              </strong>{" "}
+              &ndash; <code>loadedCount</code>, <code>allLoaded</code>,{" "}
               <code>anyError</code>, <code>combinedStatus</code> &ndash;
               auto-tracked, no manual dependency lists
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
                 Event Timeline
-              </strong>{' '}
+              </strong>{" "}
               &ndash; Every state change is logged so you can see the exact
               sequence of constraint evaluation, resolver execution, and retry
               attempts
@@ -103,15 +105,13 @@ export function DashboardLoaderDemo({
           <p>
             <strong className="text-slate-900 dark:text-slate-200">
               What:
-            </strong>{' '}
+            </strong>{" "}
             A dashboard data loader that concurrently fetches profile,
             preferences, and permissions with configurable mock delays and
             failure rates.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">
-              How:
-            </strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{" "}
             Three constraints fire when <code>userId</code> is set, each
             requiring a different fetch. Resolvers handle the async work with
             exponential backoff retry. Derivations automatically compute
@@ -120,7 +120,7 @@ export function DashboardLoaderDemo({
           <p>
             <strong className="text-slate-900 dark:text-slate-200">
               Why it works:
-            </strong>{' '}
+            </strong>{" "}
             Loading states are a natural fit for constraints &ndash; each
             resource declares what it needs, and the runtime resolves them
             concurrently. No manual boolean flags, no race conditions, no
@@ -137,26 +137,26 @@ export function DashboardLoaderDemo({
         <CodeTabs
           tabs={[
             moduleSource && {
-              filename: 'dashboard-loader.ts',
-              label: 'dashboard-loader.ts - Directive module',
+              filename: "dashboard-loader.ts",
+              label: "dashboard-loader.ts - Directive module",
               code: moduleSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             mockApiSource && {
-              filename: 'mock-api.ts',
-              label: 'mock-api.ts - Mock fetch logic',
+              filename: "mock-api.ts",
+              label: "mock-api.ts - Mock fetch logic",
               code: mockApiSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
             mainSource && {
-              filename: 'main.ts',
-              label: 'main.ts - DOM wiring',
+              filename: "main.ts",
+              label: "main.ts - DOM wiring",
               code: mainSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
           ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
         />
       </section>
     </div>
-  )
+  );
 }

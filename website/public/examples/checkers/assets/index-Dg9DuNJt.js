@@ -1,5 +1,3242 @@
-(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const n of document.querySelectorAll('link[rel="modulepreload"]'))r(n);new MutationObserver(n=>{for(const o of n)if(o.type==="childList")for(const i of o.addedNodes)i.tagName==="LINK"&&i.rel==="modulepreload"&&r(i)}).observe(document,{childList:!0,subtree:!0});function a(n){const o={};return n.integrity&&(o.integrity=n.integrity),n.referrerPolicy&&(o.referrerPolicy=n.referrerPolicy),n.crossOrigin==="use-credentials"?o.credentials="include":n.crossOrigin==="anonymous"?o.credentials="omit":o.credentials="same-origin",o}function r(n){if(n.ep)return;n.ep=!0;const o=a(n);fetch(n.href,o)}})();var Nn=class extends Error{constructor(t,a,r,n,o=!0){super(t),this.source=a,this.sourceId=r,this.context=n,this.recoverable=o,this.name="DirectiveError"}},er=[];function lo(){let e=new Set;return{get isTracking(){return!0},track(t){e.add(t)},getDependencies(){return e}}}var uo={isTracking:!1,track(){},getDependencies(){return new Set}};function co(){return er[er.length-1]??uo}function Jr(e){let t=lo();er.push(t);try{return{value:e(),deps:t.getDependencies()}}finally{er.pop()}}function Pn(e){let t=er.splice(0,er.length);try{return e()}finally{er.push(...t)}}function mn(e){co().track(e)}function fo(e,t=100){try{return JSON.stringify(e)?.slice(0,t)??String(e)}catch{return"[circular or non-serializable]"}}function Gr(e=[],t,a,r,n,o){return{_type:void 0,_validators:e,_typeName:t,_default:a,_transform:r,_description:n,_refinements:o,validate(i){return Gr([...e,i],t,a,r,n,o)}}}function lt(e,t,a,r,n,o){return{...Gr(e,t,a,r,n,o),default(i){return lt(e,t,i,r,n,o)},transform(i){return lt([],t,void 0,u=>{let c=r?r(u):u;return i(c)},n)},brand(){return lt(e,`Branded<${t}>`,a,r,n,o)},describe(i){return lt(e,t,a,r,i,o)},refine(i,u){let c=[...o??[],{predicate:i,message:u}];return lt([...e,i],t,a,r,n,c)},nullable(){return lt([i=>i===null||e.every(u=>u(i))],`${t} | null`,a,r,n)},optional(){return lt([i=>i===void 0||e.every(u=>u(i))],`${t} | undefined`,a,r,n)}}}var $e={string(){return lt([e=>typeof e=="string"],"string")},number(){let e=(t,a,r,n,o)=>({...lt(t,"number",a,r,n,o),min(i){return e([...t,u=>u>=i],a,r,n,o)},max(i){return e([...t,u=>u<=i],a,r,n,o)},default(i){return e(t,i,r,n,o)},describe(i){return e(t,a,r,i,o)},refine(i,u){let c=[...o??[],{predicate:i,message:u}];return e([...t,i],a,r,n,c)}});return e([t=>typeof t=="number"])},boolean(){return lt([e=>typeof e=="boolean"],"boolean")},array(){let e=(t,a,r,n,o)=>{let i=lt(t,"array",r,void 0,n),u=o??{value:-1};return{...i,get _lastFailedIndex(){return u.value},set _lastFailedIndex(c){u.value=c},of(c){let d={value:-1};return e([...t,f=>{for(let w=0;w<f.length;w++){let O=f[w];if(!c._validators.every(_=>_(O)))return d.value=w,!1}return!0}],c,r,n,d)},nonEmpty(){return e([...t,c=>c.length>0],a,r,n,u)},maxLength(c){return e([...t,d=>d.length<=c],a,r,n,u)},minLength(c){return e([...t,d=>d.length>=c],a,r,n,u)},default(c){return e(t,a,c,n,u)},describe(c){return e(t,a,r,c,u)}}};return e([t=>Array.isArray(t)])},object(){let e=(t,a,r)=>({...lt(t,"object",a,void 0,r),shape(n){return e([...t,o=>{for(let[i,u]of Object.entries(n)){let c=o[i],d=u;if(d&&!d._validators.every(f=>f(c)))return!1}return!0}],a,r)},nonNull(){return e([...t,n=>n!=null],a,r)},hasKeys(...n){return e([...t,o=>n.every(i=>i in o)],a,r)},default(n){return e(t,n,r)},describe(n){return e(t,a,n)}});return e([t=>typeof t=="object"&&t!==null&&!Array.isArray(t)])},enum(...e){let t=new Set(e);return lt([a=>typeof a=="string"&&t.has(a)],`enum(${e.join("|")})`)},literal(e){return lt([t=>t===e],`literal(${String(e)})`)},nullable(e){let t=e._typeName??"unknown";return Gr([a=>a===null?!0:e._validators.every(r=>r(a))],`${t} | null`)},optional(e){let t=e._typeName??"unknown";return Gr([a=>a===void 0?!0:e._validators.every(r=>r(a))],`${t} | undefined`)},union(...e){let t=e.map(a=>a._typeName??"unknown");return lt([a=>e.some(r=>r._validators.every(n=>n(a)))],t.join(" | "))},record(e){let t=e._typeName??"unknown";return lt([a=>typeof a!="object"||a===null||Array.isArray(a)?!1:Object.values(a).every(r=>e._validators.every(n=>n(r)))],`Record<string, ${t}>`)},tuple(...e){let t=e.map(a=>a._typeName??"unknown");return lt([a=>!Array.isArray(a)||a.length!==e.length?!1:e.every((r,n)=>r._validators.every(o=>o(a[n])))],`[${t.join(", ")}]`)},date(){return lt([e=>e instanceof Date&&!isNaN(e.getTime())],"Date")},uuid(){let e=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;return lt([t=>typeof t=="string"&&e.test(t)],"uuid")},email(){let e=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;return lt([t=>typeof t=="string"&&e.test(t)],"email")},url(){return lt([e=>{if(typeof e!="string")return!1;try{return new URL(e),!0}catch{return!1}}],"url")},bigint(){return lt([e=>typeof e=="bigint"],"bigint")}};function po(e){let{schema:t,onChange:a,onBatch:r}=e;Object.keys(t).length;let n=e.validate??!1,o=e.strictKeys??!1,i=e.redactErrors??!1,u=new Map,c=new Set,d=new Map,f=new Set,w=0,O=[],_=new Set,U=!1,D=[],E=100;function T(k){return k!==null&&typeof k=="object"&&"safeParse"in k&&typeof k.safeParse=="function"&&"_def"in k&&"parse"in k&&typeof k.parse=="function"}function G(k){let R=k;if(R._typeName)return R._typeName;if(T(k)){let $=k._def;if($?.typeName)return $.typeName.replace(/^Zod/,"").toLowerCase()}return"unknown"}function J(k){return i?"[redacted]":fo(k)}function m(k,R){if(!n)return;let $=t[k];if(!$){if(o)throw new Error(`[Directive] Unknown fact key: "${k}". Key not defined in schema.`);console.warn(`[Directive] Unknown fact key: "${k}"`);return}if(T($)){let V=$.safeParse(R);if(!V.success){let y=R===null?"null":Array.isArray(R)?"array":typeof R,z=J(R),v=V.error?.message??V.error?.issues?.[0]?.message??"Validation failed",l=G($);throw new Error(`[Directive] Validation failed for "${k}": expected ${l}, got ${y} ${z}. ${v}`)}return}let I=$,H=I._validators;if(!H||!Array.isArray(H)||H.length===0)return;let ee=I._typeName??"unknown";for(let V=0;V<H.length;V++){let y=H[V];if(typeof y=="function"&&!y(R)){let z=R===null?"null":Array.isArray(R)?"array":typeof R,v=J(R),l="";typeof I._lastFailedIndex=="number"&&I._lastFailedIndex>=0&&(l=` (element at index ${I._lastFailedIndex} failed)`,I._lastFailedIndex=-1);let x=V===0?"":` (validator ${V+1} failed)`;throw new Error(`[Directive] Validation failed for "${k}": expected ${ee}, got ${z} ${v}${x}${l}`)}}}function M(k){d.get(k)?.forEach(R=>R())}function S(){f.forEach(k=>k())}function j(k,R,$){if(U){D.push({key:k,value:R,prev:$});return}U=!0;try{a?.(k,R,$),M(k),S();let I=0;for(;D.length>0;){if(++I>E)throw D.length=0,new Error(`[Directive] Infinite notification loop detected after ${E} iterations. A listener is repeatedly mutating facts that re-trigger notifications.`);let H=[...D];D.length=0;for(let ee of H)a?.(ee.key,ee.value,ee.prev),M(ee.key);S()}}finally{U=!1}}function F(){if(!(w>0)){if(r&&O.length>0&&r([...O]),_.size>0){U=!0;try{for(let R of _)M(R);S();let k=0;for(;D.length>0;){if(++k>E)throw D.length=0,new Error(`[Directive] Infinite notification loop detected during flush after ${E} iterations.`);let R=[...D];D.length=0;for(let $ of R)a?.($.key,$.value,$.prev),M($.key);S()}}finally{U=!1}}O.length=0,_.clear()}}let ne={get(k){return mn(k),u.get(k)},has(k){return mn(k),u.has(k)},set(k,R){m(k,R);let $=u.get(k);Object.is($,R)||(u.set(k,R),c.add(k),w>0?(O.push({key:k,value:R,prev:$,type:"set"}),_.add(k)):j(k,R,$))},delete(k){let R=u.get(k);u.delete(k),c.delete(k),w>0?(O.push({key:k,value:void 0,prev:R,type:"delete"}),_.add(k)):j(k,void 0,R)},batch(k){w++;try{k()}finally{w--,F()}},subscribe(k,R){for(let $ of k){let I=$;d.has(I)||d.set(I,new Set),d.get(I).add(R)}return()=>{for(let $ of k){let I=d.get($);I&&(I.delete(R),I.size===0&&d.delete($))}}},subscribeAll(k){return f.add(k),()=>f.delete(k)},toObject(){let k={};for(let R of c)u.has(R)&&(k[R]=u.get(R));return k}};return ne.registerKeys=k=>{for(let R of Object.keys(k))Sr.has(R)||(t[R]=k[R],c.add(R))},ne}var Sr=Object.freeze(new Set(["__proto__","constructor","prototype"]));function mo(e,t){let a=()=>({get:r=>Pn(()=>e.get(r)),has:r=>Pn(()=>e.has(r))});return new Proxy({},{get(r,n){if(n==="$store")return e;if(n==="$snapshot")return a;if(typeof n!="symbol"&&!Sr.has(n))return e.get(n)},set(r,n,o){return typeof n=="symbol"||n==="$store"||n==="$snapshot"||Sr.has(n)?!1:(e.set(n,o),!0)},deleteProperty(r,n){return typeof n=="symbol"||n==="$store"||n==="$snapshot"||Sr.has(n)?!1:(e.delete(n),!0)},has(r,n){return n==="$store"||n==="$snapshot"?!0:typeof n=="symbol"||Sr.has(n)?!1:e.has(n)},ownKeys(){return Object.keys(t)},getOwnPropertyDescriptor(r,n){return n==="$store"||n==="$snapshot"?{configurable:!0,enumerable:!1,writable:!1}:{configurable:!0,enumerable:!0,writable:!0}}})}function go(e){let t=po(e),a=mo(t,e.schema);return{store:t,facts:a}}function dr(e,t){let a="crossModuleDeps"in t?t.crossModuleDeps:void 0;return{id:e,schema:t.schema,init:t.init,derive:t.derive??{},events:t.events??{},effects:t.effects,constraints:t.constraints,resolvers:t.resolvers,hooks:t.hooks,snapshotEvents:t.snapshotEvents,crossModuleDeps:a}}async function Br(e,t,a){let r,n=new Promise((o,i)=>{r=setTimeout(()=>i(new Error(a)),t)});try{return await Promise.race([e,n])}finally{clearTimeout(r)}}function ma(e,t=50){let a=new WeakSet;function r(n,o){if(o>t)return'"[max depth exceeded]"';if(n===null)return"null";if(n===void 0)return"undefined";let i=typeof n;if(i==="string")return JSON.stringify(n);if(i==="number"||i==="boolean")return String(n);if(i==="function")return'"[function]"';if(i==="symbol")return'"[symbol]"';if(Array.isArray(n)){if(a.has(n))return'"[circular]"';a.add(n);let u=`[${n.map(c=>r(c,o+1)).join(",")}]`;return a.delete(n),u}if(i==="object"){let u=n;if(a.has(u))return'"[circular]"';a.add(u);let c=`{${Object.keys(u).sort().map(d=>`${JSON.stringify(d)}:${r(u[d],o+1)}`).join(",")}}`;return a.delete(u),c}return'"[unknown]"'}return r(e,0)}function Cr(e,t=50){let a=new Set(["__proto__","constructor","prototype"]),r=new WeakSet;function n(o,i){if(i>t)return!1;if(o==null||typeof o!="object")return!0;let u=o;if(r.has(u))return!0;if(r.add(u),Array.isArray(u)){for(let c of u)if(!n(c,i+1))return r.delete(u),!1;return r.delete(u),!0}for(let c of Object.keys(u))if(a.has(c)||!n(u[c],i+1))return r.delete(u),!1;return r.delete(u),!0}return n(e,0)}function ho(e){let t=ma(e),a=5381;for(let r=0;r<t.length;r++)a=(a<<5)+a^t.charCodeAt(r);return(a>>>0).toString(16)}function yo(e,t){if(t)return t(e);let{type:a,...r}=e,n=ma(r);return`${a}:${n}`}function vo(e,t,a){return{requirement:e,id:yo(e,a),fromConstraint:t}}var gn=class ga{map=new Map;add(t){this.map.has(t.id)||this.map.set(t.id,t)}remove(t){return this.map.delete(t)}has(t){return this.map.has(t)}get(t){return this.map.get(t)}all(){return[...this.map.values()]}ids(){return[...this.map.keys()]}get size(){return this.map.size}clear(){this.map.clear()}clone(){let t=new ga;for(let a of this.map.values())t.add(a);return t}diff(t){let a=[],r=[],n=[];for(let o of this.map.values())t.has(o.id)?n.push(o):a.push(o);for(let o of t.map.values())this.map.has(o.id)||r.push(o);return{added:a,removed:r,unchanged:n}}},bo=5e3;function wo(e){let{definitions:t,facts:a,requirementKeys:r={},defaultTimeout:n=bo,onEvaluate:o,onError:i}=e,u=new Map,c=new Set,d=new Set,f=new Map,w=new Map,O=new Set,_=new Map,U=new Map,D=!1,E=new Set,T=new Set,G=new Map,J=[],m=new Map;function M(){for(let[v,l]of Object.entries(t))if(l.after)for(let x of l.after)t[x]&&(G.has(x)||G.set(x,new Set),G.get(x).add(v))}function S(){let v=new Set,l=new Set,x=[];function P(K,ae){if(v.has(K))return;if(l.has(K)){let _e=ae.indexOf(K),we=[...ae.slice(_e),K].join(" → ");throw new Error(`[Directive] Constraint cycle detected: ${we}. Remove one of the \`after\` dependencies to break the cycle.`)}l.add(K),ae.push(K);let Ne=t[K];if(Ne?.after)for(let _e of Ne.after)t[_e]&&P(_e,ae);ae.pop(),l.delete(K),v.add(K),x.push(K)}for(let K of Object.keys(t))P(K,[]);J=x,m=new Map(J.map((K,ae)=>[K,ae]))}S(),M();function j(v,l){return l.async!==void 0?l.async:!!d.has(v)}function F(v){let l=t[v];if(!l)throw new Error(`[Directive] Unknown constraint: ${v}`);let x=j(v,l);x&&d.add(v);let P={id:v,priority:l.priority??0,isAsync:x,lastResult:null,isEvaluating:!1,error:null,lastResolvedAt:null,after:l.after??[],hitCount:0,lastActiveAt:null};return u.set(v,P),P}function ne(v){return u.get(v)??F(v)}function k(v,l){let x=f.get(v)??new Set;for(let P of x){let K=w.get(P);K?.delete(v),K&&K.size===0&&w.delete(P)}for(let P of l)w.has(P)||w.set(P,new Set),w.get(P).add(v);f.set(v,l)}function R(v){let l=t[v];if(!l)return!1;let x=ne(v);x.isEvaluating=!0,x.error=null;try{let P;if(l.deps)P=l.when(a),_.set(v,new Set(l.deps));else{let K=Jr(()=>l.when(a));P=K.value,_.set(v,K.deps)}return P instanceof Promise?(d.add(v),x.isAsync=!0,P.then(K=>(x.lastResult=K,K&&(x.hitCount++,x.lastActiveAt=Date.now()),x.isEvaluating=!1,o?.(v,K),K)).catch(K=>(x.error=K instanceof Error?K:new Error(String(K)),x.lastResult=!1,x.isEvaluating=!1,i?.(v,K),!1))):(x.lastResult=P,P&&(x.hitCount++,x.lastActiveAt=Date.now()),x.isEvaluating=!1,o?.(v,P),P)}catch(P){return x.error=P instanceof Error?P:new Error(String(P)),x.lastResult=!1,x.isEvaluating=!1,i?.(v,P),!1}}async function $(v){let l=t[v];if(!l)return!1;let x=ne(v),P=l.timeout??n;if(x.isEvaluating=!0,x.error=null,l.deps?.length){let K=new Set(l.deps);k(v,K),_.set(v,K)}try{let K=l.when(a),ae=await Br(K,P,`Constraint "${v}" timed out after ${P}ms`);return x.lastResult=ae,ae&&(x.hitCount++,x.lastActiveAt=Date.now()),x.isEvaluating=!1,o?.(v,ae),ae}catch(K){return x.error=K instanceof Error?K:new Error(String(K)),x.lastResult=!1,x.isEvaluating=!1,i?.(v,K),!1}}function I(v,l){return v==null?[]:Array.isArray(v)?v.filter(P=>P!=null):[v]}function H(v){let l=t[v];if(!l)return{requirements:[],deps:new Set};let x=l.require;if(typeof x=="function"){let{value:P,deps:K}=Jr(()=>x(a));return{requirements:I(P),deps:K}}return{requirements:I(x),deps:new Set}}function ee(v,l){if(l.size===0)return;let x=f.get(v)??new Set;for(let P of l)x.add(P),w.has(P)||w.set(P,new Set),w.get(P).add(v);f.set(v,x)}let V=null;function y(){return V||(V=Object.keys(t).sort((v,l)=>{let x=ne(v),P=ne(l).priority-x.priority;if(P!==0)return P;let K=m.get(v)??0,ae=m.get(l)??0;return K-ae})),V}for(let v of Object.keys(t))F(v);function z(v){let l=u.get(v);if(!l||l.after.length===0)return!0;for(let x of l.after)if(t[x]&&!c.has(x)&&!T.has(x)&&!E.has(x))return!1;return!0}return{async evaluate(v){let l=new gn;T.clear();let x=y().filter(we=>!c.has(we)),P;if(!D||!v||v.size===0)P=x,D=!0;else{let we=new Set;for(let ze of v){let We=w.get(ze);if(We)for(let Qe of We)c.has(Qe)||we.add(Qe)}for(let ze of O)c.has(ze)||we.add(ze);O.clear(),P=[...we];for(let ze of x)if(!we.has(ze)){let We=U.get(ze);if(We)for(let Qe of We)l.add(Qe)}}function K(we,ze){if(c.has(we))return;let We=_.get(we);if(!ze){We!==void 0&&k(we,We),T.add(we),U.set(we,[]);return}T.delete(we);let Qe,ve;try{let q=H(we);Qe=q.requirements,ve=q.deps}catch(q){i?.(we,q),We!==void 0&&k(we,We),U.set(we,[]);return}if(We!==void 0){let q=new Set(We);for(let N of ve)q.add(N);k(we,q)}else ee(we,ve);if(Qe.length>0){let q=r[we],N=Qe.map(ie=>vo(ie,we,q));for(let ie of N)l.add(ie);U.set(we,N)}else U.set(we,[])}async function ae(we){let ze=[],We=[];for(let N of we)if(z(N))We.push(N);else{ze.push(N);let ie=U.get(N);if(ie)for(let le of ie)l.add(le)}if(We.length===0)return ze;let Qe=[],ve=[];for(let N of We)ne(N).isAsync?ve.push(N):Qe.push(N);let q=[];for(let N of Qe){let ie=R(N);if(ie instanceof Promise){q.push({id:N,promise:ie});continue}K(N,ie)}if(q.length>0){let N=await Promise.all(q.map(async({id:ie,promise:le})=>({id:ie,active:await le})));for(let{id:ie,active:le}of N)K(ie,le)}if(ve.length>0){let N=await Promise.all(ve.map(async ie=>({id:ie,active:await $(ie)})));for(let{id:ie,active:le}of N)K(ie,le)}return ze}let Ne=P,_e=P.length+1;for(;Ne.length>0&&_e>0;){let we=Ne.length;if(Ne=await ae(Ne),Ne.length===we)break;_e--}return l.all()},getState(v){return u.get(v)},getDependencies(v){return f.get(v)},getAllStates(){return[...u.values()]},disable(v){if(!u.has(v)){console.warn(`[Directive] constraints.disable("${v}") — no such constraint`);return}c.add(v),V=null,U.delete(v);let l=f.get(v);if(l){for(let x of l){let P=w.get(x);P&&(P.delete(v),P.size===0&&w.delete(x))}f.delete(v)}_.delete(v)},enable(v){if(!u.has(v)){console.warn(`[Directive] constraints.enable("${v}") — no such constraint`);return}c.delete(v),V=null,O.add(v)},isDisabled(v){return c.has(v)},invalidate(v){let l=w.get(v);if(l)for(let x of l)O.add(x)},markResolved(v){E.add(v);let l=u.get(v);l&&(l.lastResolvedAt=Date.now());let x=G.get(v);if(x)for(let P of x)O.add(P)},isResolved(v){return E.has(v)},registerDefinitions(v){for(let[l,x]of Object.entries(v))t[l]=x,F(l),O.add(l);V=null,S(),M()}}}function ko(e){let{definitions:t,facts:a,onCompute:r,onInvalidate:n,onError:o}=e,i=new Map,u=new Map,c=new Map,d=new Map,f=new Set(["__proto__","constructor","prototype"]),w=0,O=new Set,_=!1,U=100,D;function E(S){if(!t[S])throw new Error(`[Directive] Unknown derivation: ${S}`);let j={id:S,compute:()=>G(S),cachedValue:void 0,dependencies:new Set,isStale:!0,isComputing:!1};return i.set(S,j),j}function T(S){return i.get(S)??E(S)}function G(S){let j=T(S),F=t[S];if(!F)throw new Error(`[Directive] Unknown derivation: ${S}`);if(j.isComputing)throw new Error(`[Directive] Circular dependency detected in derivation: ${S}`);j.isComputing=!0;try{let ne=j.cachedValue,{value:k,deps:R}=Jr(()=>F(a,D));return j.cachedValue=k,j.isStale=!1,J(S,R),r?.(S,k,ne,[...R]),k}catch(ne){throw o?.(S,ne),ne}finally{j.isComputing=!1}}function J(S,j){let F=T(S),ne=F.dependencies;for(let k of ne)if(i.has(k)){let R=d.get(k);R?.delete(S),R&&R.size===0&&d.delete(k)}else{let R=c.get(k);R?.delete(S),R&&R.size===0&&c.delete(k)}for(let k of j)t[k]?(d.has(k)||d.set(k,new Set),d.get(k).add(S)):(c.has(k)||c.set(k,new Set),c.get(k).add(S));F.dependencies=j}function m(){if(!(w>0||_)){_=!0;try{let S=0;for(;O.size>0;){if(++S>U){let F=[...O];throw O.clear(),new Error(`[Directive] Infinite derivation notification loop detected after ${U} iterations. Remaining: ${F.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`)}let j=[...O];O.clear();for(let F of j)u.get(F)?.forEach(ne=>ne())}}finally{_=!1}}}function M(S,j=new Set){if(j.has(S))return;j.add(S);let F=i.get(S);if(!F||F.isStale)return;F.isStale=!0,n?.(S),O.add(S);let ne=d.get(S);if(ne)for(let k of ne)M(k,j)}return D=new Proxy({},{get(S,j){if(typeof j=="symbol"||f.has(j))return;mn(j);let F=T(j);return F.isStale&&G(j),F.cachedValue}}),{get(S){let j=T(S);return j.isStale&&G(S),j.cachedValue},isStale(S){return i.get(S)?.isStale??!0},invalidate(S){let j=c.get(S);if(j){w++;try{for(let F of j)M(F)}finally{w--,m()}}},invalidateMany(S){w++;try{for(let j of S){let F=c.get(j);if(F)for(let ne of F)M(ne)}}finally{w--,m()}},invalidateAll(){w++;try{for(let S of i.values())S.isStale||(S.isStale=!0,O.add(S.id))}finally{w--,m()}},subscribe(S,j){for(let F of S){let ne=F;u.has(ne)||u.set(ne,new Set),u.get(ne).add(j)}return()=>{for(let F of S){let ne=F,k=u.get(ne);k?.delete(j),k&&k.size===0&&u.delete(ne)}}},getProxy(){return D},getDependencies(S){return T(S).dependencies},registerDefinitions(S){for(let[j,F]of Object.entries(S))t[j]=F,E(j)}}}function So(e){let{definitions:t,facts:a,store:r,onRun:n,onError:o}=e,i=new Map,u=null,c=!1;function d(E){let T=t[E];if(!T)throw new Error(`[Directive] Unknown effect: ${E}`);let G={id:E,enabled:!0,hasExplicitDeps:!!T.deps,dependencies:T.deps?new Set(T.deps):null,cleanup:null};return i.set(E,G),G}function f(E){return i.get(E)??d(E)}function w(){return r.toObject()}function O(E,T){let G=f(E);if(!G.enabled)return!1;if(G.dependencies){for(let J of G.dependencies)if(T.has(J))return!0;return!1}return!0}function _(E){if(E.cleanup){try{E.cleanup()}catch(T){o?.(E.id,T),console.error(`[Directive] Effect "${E.id}" cleanup threw an error:`,T)}E.cleanup=null}}function U(E,T){if(typeof T=="function")if(c)try{T()}catch(G){o?.(E.id,G),console.error(`[Directive] Effect "${E.id}" cleanup threw an error:`,G)}else E.cleanup=T}async function D(E){let T=f(E),G=t[E];if(!(!T.enabled||!G)){_(T),n?.(E,T.dependencies?[...T.dependencies]:[]);try{if(T.hasExplicitDeps){let J;if(r.batch(()=>{J=G.run(a,u)}),J instanceof Promise){let m=await J;U(T,m)}else U(T,J)}else{let J=null,m,M=Jr(()=>(r.batch(()=>{m=G.run(a,u)}),m));J=M.deps;let S=M.value;S instanceof Promise&&(S=await S),U(T,S),T.dependencies=J.size>0?J:null}}catch(J){o?.(E,J),console.error(`[Directive] Effect "${E}" threw an error:`,J)}}}for(let E of Object.keys(t))d(E);return{async runEffects(E){let T=[];for(let G of Object.keys(t))O(G,E)&&T.push(G);await Promise.all(T.map(D)),u=w()},async runAll(){let E=Object.keys(t);await Promise.all(E.map(T=>f(T).enabled?D(T):Promise.resolve())),u=w()},disable(E){let T=f(E);T.enabled=!1},enable(E){let T=f(E);T.enabled=!0},isEnabled(E){return f(E).enabled},cleanupAll(){c=!0;for(let E of i.values())_(E)},registerDefinitions(E){for(let[T,G]of Object.entries(E))t[T]=G,d(T)}}}function Eo(e={}){let{delayMs:t=1e3,maxRetries:a=3,backoffMultiplier:r=2,maxDelayMs:n=3e4}=e,o=new Map;function i(u){let c=t*Math.pow(r,u-1);return Math.min(c,n)}return{scheduleRetry(u,c,d,f,w){if(f>a)return null;let O=i(f),_={source:u,sourceId:c,context:d,attempt:f,nextRetryTime:Date.now()+O,callback:w};return o.set(c,_),_},getPendingRetries(){return Array.from(o.values())},processDueRetries(){let u=Date.now(),c=[];for(let[d,f]of o)f.nextRetryTime<=u&&(c.push(f),o.delete(d));return c},cancelRetry(u){o.delete(u)},clearAll(){o.clear()}}}var Co={constraint:"skip",resolver:"skip",effect:"skip",derivation:"skip",system:"throw"};function xo(e={}){let{config:t={},onError:a,onRecovery:r}=e,n=[],o=100,i=Eo(t.retryLater),u=new Map;function c(f,w,O,_){if(O instanceof Nn)return O;let U=O instanceof Error?O.message:String(O),D=f!=="system";return new Nn(U,f,w,_,D)}function d(f,w,O){let _=(()=>{switch(f){case"constraint":return t.onConstraintError;case"resolver":return t.onResolverError;case"effect":return t.onEffectError;case"derivation":return t.onDerivationError;default:return}})();if(typeof _=="function"){try{_(O,w)}catch(U){console.error("[Directive] Error in error handler callback:",U)}return"skip"}return typeof _=="string"?_:Co[f]}return{handleError(f,w,O,_){let U=c(f,w,O,_);n.push(U),n.length>o&&n.shift();try{a?.(U)}catch(E){console.error("[Directive] Error in onError callback:",E)}try{t.onError?.(U)}catch(E){console.error("[Directive] Error in config.onError callback:",E)}let D=d(f,w,O instanceof Error?O:new Error(String(O)));if(D==="retry-later"){let E=(u.get(w)??0)+1;u.set(w,E),i.scheduleRetry(f,w,_,E)||(D="skip",u.delete(w),typeof process<"u")}try{r?.(U,D)}catch(E){console.error("[Directive] Error in onRecovery callback:",E)}if(D==="throw")throw U;return D},getLastError(){return n[n.length-1]??null},getAllErrors(){return[...n]},clearErrors(){n.length=0},getRetryLaterManager(){return i},processDueRetries(){return i.processDueRetries()},clearRetryAttempts(f){u.delete(f),i.cancelRetry(f)}}}function Do(){let e=[];function t(r){if(r)try{return r()}catch(n){console.error("[Directive] Plugin error:",n);return}}async function a(r){if(r)try{return await r()}catch(n){console.error("[Directive] Plugin error:",n);return}}return{register(r){e.some(n=>n.name===r.name)&&(console.warn(`[Directive] Plugin "${r.name}" is already registered, replacing...`),this.unregister(r.name)),e.push(r)},unregister(r){let n=e.findIndex(o=>o.name===r);n!==-1&&e.splice(n,1)},getPlugins(){return[...e]},async emitInit(r){for(let n of e)await a(()=>n.onInit?.(r))},emitStart(r){for(let n of e)t(()=>n.onStart?.(r))},emitStop(r){for(let n of e)t(()=>n.onStop?.(r))},emitDestroy(r){for(let n of e)t(()=>n.onDestroy?.(r))},emitFactSet(r,n,o){for(let i of e)t(()=>i.onFactSet?.(r,n,o))},emitFactDelete(r,n){for(let o of e)t(()=>o.onFactDelete?.(r,n))},emitFactsBatch(r){for(let n of e)t(()=>n.onFactsBatch?.(r))},emitDerivationCompute(r,n,o){for(let i of e)t(()=>i.onDerivationCompute?.(r,n,o))},emitDerivationInvalidate(r){for(let n of e)t(()=>n.onDerivationInvalidate?.(r))},emitReconcileStart(r){for(let n of e)t(()=>n.onReconcileStart?.(r))},emitReconcileEnd(r){for(let n of e)t(()=>n.onReconcileEnd?.(r))},emitConstraintEvaluate(r,n){for(let o of e)t(()=>o.onConstraintEvaluate?.(r,n))},emitConstraintError(r,n){for(let o of e)t(()=>o.onConstraintError?.(r,n))},emitRequirementCreated(r){for(let n of e)t(()=>n.onRequirementCreated?.(r))},emitRequirementMet(r,n){for(let o of e)t(()=>o.onRequirementMet?.(r,n))},emitRequirementCanceled(r){for(let n of e)t(()=>n.onRequirementCanceled?.(r))},emitResolverStart(r,n){for(let o of e)t(()=>o.onResolverStart?.(r,n))},emitResolverComplete(r,n,o){for(let i of e)t(()=>i.onResolverComplete?.(r,n,o))},emitResolverError(r,n,o){for(let i of e)t(()=>i.onResolverError?.(r,n,o))},emitResolverRetry(r,n,o){for(let i of e)t(()=>i.onResolverRetry?.(r,n,o))},emitResolverCancel(r,n){for(let o of e)t(()=>o.onResolverCancel?.(r,n))},emitEffectRun(r){for(let n of e)t(()=>n.onEffectRun?.(r))},emitEffectError(r,n){for(let o of e)t(()=>o.onEffectError?.(r,n))},emitSnapshot(r){for(let n of e)t(()=>n.onSnapshot?.(r))},emitTimeTravel(r,n){for(let o of e)t(()=>o.onTimeTravel?.(r,n))},emitError(r){for(let n of e)t(()=>n.onError?.(r))},emitErrorRecovery(r,n){for(let o of e)t(()=>o.onErrorRecovery?.(r,n))},emitRunComplete(r){for(let n of e)t(()=>n.onRunComplete?.(r))}}}var Ln={attempts:1,backoff:"none",initialDelay:100,maxDelay:3e4},Bn={enabled:!1,windowMs:50};function Fn(e,t){let{backoff:a,initialDelay:r=100,maxDelay:n=3e4}=e,o;switch(a){case"none":o=r;break;case"linear":o=r*t;break;case"exponential":o=r*Math.pow(2,t-1);break;default:o=r}return Math.max(1,Math.min(o,n))}function $o(e){let{definitions:t,facts:a,store:r,onStart:n,onComplete:o,onError:i,onRetry:u,onCancel:c,onResolutionComplete:d}=e,f=new Map,w=new Map,O=1e3,_=new Map,U=new Map,D=1e3;function E(){if(w.size>O){let k=w.size-O,R=w.keys();for(let $=0;$<k;$++){let I=R.next().value;I&&w.delete(I)}}}function T(k){return typeof k=="object"&&k!==null&&"requirement"in k&&typeof k.requirement=="string"}function G(k){return typeof k=="object"&&k!==null&&"requirement"in k&&typeof k.requirement=="function"}function J(k,R){return T(k)?R.type===k.requirement:G(k)?k.requirement(R):!1}function m(k){let R=k.type,$=U.get(R);if($)for(let I of $){let H=t[I];if(H&&J(H,k))return I}for(let[I,H]of Object.entries(t))if(J(H,k)){if(!U.has(R)){if(U.size>=D){let V=U.keys().next().value;V!==void 0&&U.delete(V)}U.set(R,[])}let ee=U.get(R);return ee.includes(I)||ee.push(I),I}return null}function M(k){return{facts:a,signal:k,snapshot:()=>a.$snapshot()}}async function S(k,R,$){let I=t[k];if(!I)return;let H={...Ln,...I.retry},ee=null;for(let V=1;V<=H.attempts;V++){if($.signal.aborted)return;let y=f.get(R.id);y&&(y.attempt=V,y.status={state:"running",requirementId:R.id,startedAt:y.startedAt,attempt:V});try{let z=M($.signal);if(I.resolve){let l;r.batch(()=>{l=I.resolve(R.requirement,z)});let x=I.timeout;x&&x>0?await Br(l,x,`Resolver "${k}" timed out after ${x}ms`):await l}let v=Date.now()-(y?.startedAt??Date.now());w.set(R.id,{state:"success",requirementId:R.id,completedAt:Date.now(),duration:v}),E(),o?.(k,R,v);return}catch(z){if(ee=z instanceof Error?z:new Error(String(z)),$.signal.aborted)return;if(H.shouldRetry&&!H.shouldRetry(ee,V))break;if(V<H.attempts){if($.signal.aborted)return;let v=Fn(H,V);if(u?.(k,R,V+1),await new Promise(l=>{let x=setTimeout(l,v),P=()=>{clearTimeout(x),l()};$.signal.addEventListener("abort",P,{once:!0})}),$.signal.aborted)return}}}w.set(R.id,{state:"error",requirementId:R.id,error:ee,failedAt:Date.now(),attempts:H.attempts}),E(),i?.(k,R,ee)}async function j(k,R){let $=t[k];if(!$)return;if(!$.resolveBatch&&!$.resolveBatchWithResults){await Promise.all(R.map(v=>{let l=new AbortController;return S(k,v,l)}));return}let I={...Ln,...$.retry},H={...Bn,...$.batch},ee=new AbortController,V=Date.now(),y=null,z=H.timeoutMs??$.timeout;for(let v=1;v<=I.attempts;v++){if(ee.signal.aborted)return;try{let l=M(ee.signal),x=R.map(P=>P.requirement);if($.resolveBatchWithResults){let P,K;if(r.batch(()=>{K=$.resolveBatchWithResults(x,l)}),z&&z>0?P=await Br(K,z,`Batch resolver "${k}" timed out after ${z}ms`):P=await K,P.length!==R.length)throw new Error(`[Directive] Batch resolver "${k}" returned ${P.length} results but expected ${R.length}. Results array must match input order.`);let ae=Date.now()-V,Ne=!1;for(let _e=0;_e<R.length;_e++){let we=R[_e],ze=P[_e];if(ze.success)w.set(we.id,{state:"success",requirementId:we.id,completedAt:Date.now(),duration:ae}),o?.(k,we,ae);else{Ne=!0;let We=ze.error??new Error("Batch item failed");w.set(we.id,{state:"error",requirementId:we.id,error:We,failedAt:Date.now(),attempts:v}),i?.(k,we,We)}}if(!Ne||R.some((_e,we)=>P[we]?.success))return}else{let P;r.batch(()=>{P=$.resolveBatch(x,l)}),z&&z>0?await Br(P,z,`Batch resolver "${k}" timed out after ${z}ms`):await P;let K=Date.now()-V;for(let ae of R)w.set(ae.id,{state:"success",requirementId:ae.id,completedAt:Date.now(),duration:K}),o?.(k,ae,K);return}}catch(l){if(y=l instanceof Error?l:new Error(String(l)),ee.signal.aborted)return;if(I.shouldRetry&&!I.shouldRetry(y,v))break;if(v<I.attempts){let x=Fn(I,v);for(let P of R)u?.(k,P,v+1);if(await new Promise(P=>{let K=setTimeout(P,x),ae=()=>{clearTimeout(K),P()};ee.signal.addEventListener("abort",ae,{once:!0})}),ee.signal.aborted)return}}}for(let v of R)w.set(v.id,{state:"error",requirementId:v.id,error:y,failedAt:Date.now(),attempts:I.attempts}),i?.(k,v,y);E()}function F(k,R){let $=t[k];if(!$)return;let I={...Bn,...$.batch};_.has(k)||_.set(k,{resolverId:k,requirements:[],timer:null});let H=_.get(k);H.requirements.push(R),H.timer&&clearTimeout(H.timer),H.timer=setTimeout(()=>{ne(k)},I.windowMs)}function ne(k){let R=_.get(k);if(!R||R.requirements.length===0)return;let $=[...R.requirements];R.requirements=[],R.timer=null,j(k,$).then(()=>{d?.()})}return{resolve(k){if(f.has(k.id))return;let R=m(k.requirement);if(!R){console.warn(`[Directive] No resolver found for requirement: ${k.id}`);return}let $=t[R];if(!$)return;if($.batch?.enabled){F(R,k);return}let I=new AbortController,H=Date.now(),ee={requirementId:k.id,resolverId:R,controller:I,startedAt:H,attempt:1,status:{state:"pending",requirementId:k.id,startedAt:H},originalRequirement:k};f.set(k.id,ee),n?.(R,k),S(R,k,I).finally(()=>{f.delete(k.id)&&d?.()})},cancel(k){let R=f.get(k);R&&(R.controller.abort(),f.delete(k),w.set(k,{state:"canceled",requirementId:k,canceledAt:Date.now()}),E(),c?.(R.resolverId,R.originalRequirement))},cancelAll(){for(let[k]of f)this.cancel(k);for(let k of _.values())k.timer&&clearTimeout(k.timer);_.clear()},getStatus(k){let R=f.get(k);return R?R.status:w.get(k)||{state:"idle"}},getInflight(){return[...f.keys()]},getInflightInfo(){return[...f.values()].map(k=>({id:k.requirementId,resolverId:k.resolverId,startedAt:k.startedAt}))},isResolving(k){return f.has(k)},processBatches(){for(let k of _.keys())ne(k)},registerDefinitions(k){for(let[R,$]of Object.entries(k))t[R]=$;U.clear()}}}function Ao(e){let{config:t,facts:a,store:r,onSnapshot:n,onTimeTravel:o}=e,i=t.timeTravel??!1,u=t.maxSnapshots??100,c=[],d=-1,f=1,w=!1,O=!1,_=[],U=null,D=-1;function E(){return r.toObject()}function T(){let J=E();return structuredClone(J)}function G(J){if(!Cr(J)){console.error("[Directive] Potential prototype pollution detected in snapshot data, skipping restore");return}r.batch(()=>{for(let[m,M]of Object.entries(J)){if(m==="__proto__"||m==="constructor"||m==="prototype"){console.warn(`[Directive] Skipping dangerous key "${m}" during fact restoration`);continue}a[m]=M}})}return{get isEnabled(){return i},get isRestoring(){return O},get isPaused(){return w},get snapshots(){return[...c]},get currentIndex(){return d},takeSnapshot(J){if(!i||w)return{id:-1,timestamp:Date.now(),facts:{},trigger:J};let m={id:f++,timestamp:Date.now(),facts:T(),trigger:J};for(d<c.length-1&&c.splice(d+1),c.push(m),d=c.length-1;c.length>u;)c.shift(),d--;return n?.(m),m},restore(J){if(i){w=!0,O=!0;try{G(J.facts)}finally{w=!1,O=!1}}},goBack(J=1){if(!i||c.length===0)return;let m=d,M=d,S=_.find(F=>d>F.startIndex&&d<=F.endIndex);if(S)M=S.startIndex;else if(_.find(F=>d===F.startIndex)){let F=_.find(ne=>ne.endIndex<d&&d-ne.endIndex<=J);M=F?F.startIndex:Math.max(0,d-J)}else M=Math.max(0,d-J);if(m===M)return;d=M;let j=c[d];j&&(this.restore(j),o?.(m,M))},goForward(J=1){if(!i||c.length===0)return;let m=d,M=d,S=_.find(F=>d>=F.startIndex&&d<F.endIndex);if(S?M=S.endIndex:M=Math.min(c.length-1,d+J),m===M)return;d=M;let j=c[d];j&&(this.restore(j),o?.(m,M))},goTo(J){if(!i)return;let m=c.findIndex(j=>j.id===J);if(m===-1){console.warn(`[Directive] Snapshot ${J} not found`);return}let M=d;d=m;let S=c[d];S&&(this.restore(S),o?.(M,m))},replay(){if(!i||c.length===0)return;d=0;let J=c[0];J&&this.restore(J)},export(){return JSON.stringify({version:1,snapshots:c,currentIndex:d})},import(J){if(i)try{let m=JSON.parse(J);if(typeof m!="object"||m===null)throw new Error("Invalid time-travel data: expected object");if(m.version!==1)throw new Error(`Unsupported time-travel export version: ${m.version}`);if(!Array.isArray(m.snapshots))throw new Error("Invalid time-travel data: snapshots must be an array");if(typeof m.currentIndex!="number")throw new Error("Invalid time-travel data: currentIndex must be a number");for(let S of m.snapshots){if(typeof S!="object"||S===null)throw new Error("Invalid snapshot: expected object");if(typeof S.id!="number"||typeof S.timestamp!="number"||typeof S.trigger!="string"||typeof S.facts!="object")throw new Error("Invalid snapshot structure");if(!Cr(S.facts))throw new Error("Invalid fact data: potential prototype pollution detected in nested objects")}c.length=0,c.push(...m.snapshots),d=m.currentIndex;let M=c[d];M&&this.restore(M)}catch(m){console.error("[Directive] Failed to import time-travel data:",m)}},beginChangeset(J){i&&(U=J,D=d)},endChangeset(){!i||U===null||(d>D&&_.push({label:U,startIndex:D,endIndex:d}),U=null,D=-1)},pause(){w=!0},resume(){w=!1}}}function Io(){let e={id:-1,timestamp:0,facts:{},trigger:""};return{isEnabled:!1,isRestoring:!1,isPaused:!1,snapshots:[],currentIndex:-1,takeSnapshot:()=>e,restore:()=>{},goBack:()=>{},goForward:()=>{},goTo:()=>{},replay:()=>{},export:()=>"{}",import:()=>{},beginChangeset:()=>{},endChangeset:()=>{},pause:()=>{},resume:()=>{}}}var Rt=new Set(["__proto__","constructor","prototype"]);function ha(e){let t=Object.create(null),a=Object.create(null),r=Object.create(null),n=Object.create(null),o=Object.create(null),i=Object.create(null);for(let p of e.modules){let A=(Y,Z)=>{if(Y){for(let xe of Object.keys(Y))if(Rt.has(xe))throw new Error(`[Directive] Security: Module "${p.id}" has dangerous key "${xe}" in ${Z}. This could indicate a prototype pollution attempt.`)}};A(p.schema,"schema"),A(p.events,"events"),A(p.derive,"derive"),A(p.effects,"effects"),A(p.constraints,"constraints"),A(p.resolvers,"resolvers"),Object.assign(t,p.schema),p.events&&Object.assign(a,p.events),p.derive&&Object.assign(r,p.derive),p.effects&&Object.assign(n,p.effects),p.constraints&&Object.assign(o,p.constraints),p.resolvers&&Object.assign(i,p.resolvers)}let u=null;if(e.modules.some(p=>p.snapshotEvents)){u=new Set;for(let p of e.modules){let A=p;if(A.snapshotEvents)for(let Y of A.snapshotEvents)u.add(Y);else if(A.events)for(let Y of Object.keys(A.events))u.add(Y)}}let c=0,d=!1,f=Do();for(let p of e.plugins??[])f.register(p);let w=xo({config:e.errorBoundary,onError:p=>f.emitError(p),onRecovery:(p,A)=>f.emitErrorRecovery(p,A)}),O=()=>{},_=()=>{},U=null,D=e.debug?.runHistory??!1,E=e.debug?.maxRuns??100,T=[],G=new Map,J=0,m=null,M=[],S=new Map,j=new Map,F=new Map,ne=null,k=0,R=0,$={count:0,totalDuration:0,avgDuration:0,maxDuration:0,avgResolverCount:0,totalResolverCount:0,avgFactChangeCount:0,totalFactChangeCount:0},{store:I,facts:H}=go({schema:t,onChange:(p,A,Y)=>{f.emitFactSet(p,A,Y),O(p),D&&M.push({key:String(p),oldValue:Y,newValue:A}),!U?.isRestoring&&(c===0&&(d=!0),ve.changedKeys.add(p),q())},onBatch:p=>{f.emitFactsBatch(p);let A=[];for(let Y of p)A.push(Y.key);if(D)for(let Y of p)Y.type==="delete"?M.push({key:Y.key,oldValue:Y.prev,newValue:void 0}):M.push({key:Y.key,oldValue:Y.prev,newValue:Y.value});if(_(A),!U?.isRestoring){c===0&&(d=!0);for(let Y of p)ve.changedKeys.add(Y.key);q()}}}),ee=ko({definitions:r,facts:H,onCompute:(p,A,Y,Z)=>{f.emitDerivationCompute(p,A,Z),m&&m.derivationsRecomputed.push({id:p,deps:Z?[...Z]:[],oldValue:Y,newValue:A})},onInvalidate:p=>f.emitDerivationInvalidate(p),onError:(p,A)=>{w.handleError("derivation",p,A)}});O=p=>ee.invalidate(p),_=p=>ee.invalidateMany(p);let V=So({definitions:n,facts:H,store:I,onRun:(p,A)=>{f.emitEffectRun(p),m&&m.effectsRun.push({id:p,triggeredBy:A})},onError:(p,A)=>{w.handleError("effect",p,A),f.emitEffectError(p,A),m&&m.effectErrors.push({id:p,error:String(A)})}}),y=wo({definitions:o,facts:H,onEvaluate:(p,A)=>f.emitConstraintEvaluate(p,A),onError:(p,A)=>{w.handleError("constraint",p,A),f.emitConstraintError(p,A)}});function z(p){let A=G.get(p);if(A&&A.status==="pending"){A.status="settled";let Y=F.get(p);A.duration=Y!==void 0?performance.now()-Y:Date.now()-A.timestamp,F.delete(p),j.delete(p),A.causalChain=x(A),P(A),R++,f.emitRunComplete(A)}}function v(p){let A=S.get(p);if(S.delete(p),A!==void 0){let Y=(j.get(A)??1)-1;Y<=0?z(A):j.set(A,Y)}}function l(){let p=T.shift();if(p&&(G.delete(p.id),F.delete(p.id),p.status==="pending")){j.delete(p.id);for(let[A,Y]of S)Y===p.id&&S.delete(A)}}function x(p){let A=[];for(let Y of p.factChanges)A.push(`${Y.key} changed`);for(let Y of p.derivationsRecomputed)A.push(`${Y.id} recomputed`);for(let Y of p.constraintsHit)A.push(`${Y.id} constraint hit`);for(let Y of p.requirementsAdded)A.push(`${Y.type} requirement added`);for(let Y of p.resolversCompleted)A.push(`${Y.resolver} resolved (${Y.duration.toFixed(0)}ms)`);for(let Y of p.resolversErrored)A.push(`${Y.resolver} errored`);for(let Y of p.effectsRun)A.push(`${Y.id} effect ran`);return A.join(" → ")}function P(p){$.count++,$.totalDuration+=p.duration,$.avgDuration=$.totalDuration/$.count,p.duration>$.maxDuration&&($.maxDuration=p.duration);let A=p.resolversStarted.length;$.totalResolverCount+=A,$.avgResolverCount=$.totalResolverCount/$.count;let Y=p.factChanges.length;$.totalFactChangeCount+=Y,$.avgFactChangeCount=$.totalFactChangeCount/$.count;let Z=[];$.count>3&&p.duration>$.avgDuration*5&&Z.push(`Duration ${p.duration.toFixed(0)}ms is 5x+ above average (${$.avgDuration.toFixed(0)}ms)`),p.resolversErrored.length>0&&Z.push(`${p.resolversErrored.length} resolver(s) errored`),Z.length>0&&(p.anomalies=Z)}let K=$o({definitions:i,facts:H,store:I,onStart:(p,A)=>f.emitResolverStart(p,A),onComplete:(p,A,Y)=>{if(f.emitResolverComplete(p,A,Y),f.emitRequirementMet(A,p),y.markResolved(A.fromConstraint),D){let Z=S.get(A.id);if(Z!==void 0){let xe=G.get(Z);xe&&xe.resolversCompleted.push({resolver:p,requirementId:A.id,duration:Y})}v(A.id)}},onError:(p,A,Y)=>{if(w.handleError("resolver",p,Y,A),f.emitResolverError(p,A,Y),D){let Z=S.get(A.id);if(Z!==void 0){let xe=G.get(Z);xe&&xe.resolversErrored.push({resolver:p,requirementId:A.id,error:String(Y)})}v(A.id)}},onRetry:(p,A,Y)=>f.emitResolverRetry(p,A,Y),onCancel:(p,A)=>{f.emitResolverCancel(p,A),f.emitRequirementCanceled(A),D&&v(A.id)},onResolutionComplete:()=>{ze(),q()}}),ae=new Set;function Ne(){for(let p of ae)p()}let _e=e.debug?.timeTravel?Ao({config:e.debug,facts:H,store:I,onSnapshot:p=>{f.emitSnapshot(p),Ne()},onTimeTravel:(p,A)=>{f.emitTimeTravel(p,A),Ne()}}):Io();U=_e;let we=new Set;function ze(){for(let p of we)p()}let We=50,Qe=0,ve={isRunning:!1,isReconciling:!1,reconcileScheduled:!1,isInitializing:!1,isInitialized:!1,isReady:!1,isDestroyed:!1,changedKeys:new Set,previousRequirements:new gn,readyPromise:null,readyResolve:null};function q(){!ve.isRunning||ve.reconcileScheduled||ve.isInitializing||(ve.reconcileScheduled=!0,ze(),queueMicrotask(()=>{ve.reconcileScheduled=!1,ve.isRunning&&!ve.isInitializing&&N().catch(p=>{})}))}async function N(){if(ve.isReconciling)return;if(Qe++,Qe>We){D&&(M.length=0),Qe=0;return}ve.isReconciling=!0,ze();let p=D?performance.now():0;if(D){let A=++J;F.set(A,p),m={id:A,timestamp:Date.now(),duration:0,status:"pending",factChanges:M.splice(0),derivationsRecomputed:[],constraintsHit:[],requirementsAdded:[],requirementsRemoved:[],resolversStarted:[],resolversCompleted:[],resolversErrored:[],effectsRun:[],effectErrors:[]}}try{ve.changedKeys.size>0&&((u===null||d)&&_e.takeSnapshot(`facts-changed:${[...ve.changedKeys].join(",")}`),d=!1);let A=H.$snapshot();f.emitReconcileStart(A),await V.runEffects(ve.changedKeys);let Y=new Set(ve.changedKeys);ve.changedKeys.clear();let Z=await y.evaluate(Y),xe=new gn;for(let re of Z)xe.add(re),f.emitRequirementCreated(re);if(m){let re=new Set(Z.map(ke=>ke.fromConstraint));for(let ke of re){let Ie=y.getState(ke);if(Ie){let Le=y.getDependencies(ke);m.constraintsHit.push({id:ke,priority:Ie.priority,deps:Le?[...Le]:[]})}}}let{added:te,removed:Je}=xe.diff(ve.previousRequirements);if(m){for(let re of te)m.requirementsAdded.push({id:re.id,type:re.requirement.type,fromConstraint:re.fromConstraint});for(let re of Je)m.requirementsRemoved.push({id:re.id,type:re.requirement.type,fromConstraint:re.fromConstraint})}for(let re of Je)K.cancel(re.id);for(let re of te)K.resolve(re);if(m){let re=K.getInflightInfo();for(let ke of te){let Ie=re.find(Le=>Le.id===ke.id);m.resolversStarted.push({resolver:Ie?.resolverId??"unknown",requirementId:ke.id}),S.set(ke.id,m.id)}}ve.previousRequirements=xe;let Fe=K.getInflightInfo(),Ue={unmet:Z.filter(re=>!K.isResolving(re.id)),inflight:Fe,completed:[],canceled:Je.map(re=>({id:re.id,resolverId:Fe.find(ke=>ke.id===re.id)?.resolverId??"unknown"}))};f.emitReconcileEnd(Ue),ve.isReady||(ve.isReady=!0,ve.readyResolve&&(ve.readyResolve(),ve.readyResolve=null))}finally{if(m){if(m.duration=performance.now()-p,m.factChanges.length>0||m.constraintsHit.length>0||m.requirementsAdded.length>0||m.effectsRun.length>0){let A=m.resolversStarted.length;A===0?(m.status="settled",m.causalChain=x(m),P(m),T.push(m),G.set(m.id,m),T.length>E&&l(),R++,f.emitRunComplete(m)):(m.status="pending",T.push(m),G.set(m.id,m),T.length>E&&l(),R++,j.set(m.id,A))}else F.delete(m.id);m=null}ve.isReconciling=!1,ve.changedKeys.size>0?q():ve.reconcileScheduled||(Qe=0),ze()}}let ie=new Proxy({},{get(p,A){if(typeof A!="symbol"&&!Rt.has(A))return ee.get(A)},has(p,A){return typeof A=="symbol"||Rt.has(A)?!1:A in r},ownKeys(){return Object.keys(r)},getOwnPropertyDescriptor(p,A){if(typeof A!="symbol"&&!Rt.has(A)&&A in r)return{configurable:!0,enumerable:!0}}}),le=new Proxy({},{get(p,A){if(typeof A!="symbol"&&!Rt.has(A))return Y=>{let Z=a[A];if(Z){c++,(u===null||u.has(A))&&(d=!0);try{I.batch(()=>{Z(H,{type:A,...Y})})}finally{c--}}}},has(p,A){return typeof A=="symbol"||Rt.has(A)?!1:A in a},ownKeys(){return Object.keys(a)},getOwnPropertyDescriptor(p,A){if(typeof A!="symbol"&&!Rt.has(A)&&A in a)return{configurable:!0,enumerable:!0}}}),de={facts:H,debug:_e.isEnabled?_e:null,derive:ie,events:le,constraints:{disable:p=>y.disable(p),enable:p=>y.enable(p),isDisabled:p=>y.isDisabled(p)},effects:{disable:p=>V.disable(p),enable:p=>V.enable(p),isEnabled:p=>V.isEnabled(p)},get runHistory(){return D?((!ne||k!==R)&&(ne=[...T],k=R),ne):null},initialize(){if(!ve.isInitialized){ve.isInitializing=!0;for(let p of e.modules)p.init&&I.batch(()=>{p.init(H)});e.onAfterModuleInit&&I.batch(()=>{e.onAfterModuleInit()}),ve.isInitializing=!1,ve.isInitialized=!0;for(let p of Object.keys(r))ee.get(p)}},start(){if(!ve.isRunning){ve.isInitialized||this.initialize(),ve.isRunning=!0;for(let p of e.modules)p.hooks?.onStart?.(de);f.emitStart(de),q()}},stop(){if(ve.isRunning){ve.isRunning=!1,K.cancelAll(),V.cleanupAll();for(let p of e.modules)p.hooks?.onStop?.(de);f.emitStop(de)}},destroy(){this.stop(),ve.isDestroyed=!0,we.clear(),ae.clear(),T.length=0,G.clear(),S.clear(),j.clear(),F.clear(),M.length=0,m=null,ne=null,f.emitDestroy(de)},dispatch(p){if(Rt.has(p.type))return;let A=a[p.type];if(A){c++,(u===null||u.has(p.type))&&(d=!0);try{I.batch(()=>{A(H,p)})}finally{c--}}},read(p){return ee.get(p)},subscribe(p,A){let Y=[],Z=[];for(let te of p)te in r?Y.push(te):te in t&&Z.push(te);let xe=[];return Y.length>0&&xe.push(ee.subscribe(Y,A)),Z.length>0&&xe.push(I.subscribe(Z,A)),()=>{for(let te of xe)te()}},watch(p,A,Y){let Z=Y?.equalityFn?(te,Je)=>Y.equalityFn(te,Je):(te,Je)=>Object.is(te,Je);if(p in r){let te=ee.get(p);return ee.subscribe([p],()=>{let Je=ee.get(p);if(!Z(Je,te)){let Fe=te;te=Je,A(Je,Fe)}})}let xe=I.get(p);return I.subscribe([p],()=>{let te=I.get(p);if(!Z(te,xe)){let Je=xe;xe=te,A(te,Je)}})},when(p,A){return new Promise((Y,Z)=>{let xe=I.toObject();if(p(xe)){Y();return}let te,Je,Fe=()=>{te?.(),Je!==void 0&&clearTimeout(Je)};te=I.subscribeAll(()=>{let Ue=I.toObject();p(Ue)&&(Fe(),Y())}),A?.timeout!==void 0&&A.timeout>0&&(Je=setTimeout(()=>{Fe(),Z(new Error(`[Directive] when: timed out after ${A.timeout}ms`))},A.timeout))})},inspect(){return{unmet:ve.previousRequirements.all(),inflight:K.getInflightInfo(),constraints:y.getAllStates().map(p=>({id:p.id,active:p.lastResult??!1,disabled:y.isDisabled(p.id),priority:p.priority,hitCount:p.hitCount,lastActiveAt:p.lastActiveAt})),resolvers:Object.fromEntries(K.getInflight().map(p=>[p,K.getStatus(p)])),resolverDefs:Object.entries(i).map(([p,A])=>({id:p,requirement:typeof A.requirement=="string"?A.requirement:"(predicate)"})),runHistoryEnabled:D,...D?{runHistory:T.map(p=>({...p,factChanges:p.factChanges.map(A=>({...A})),derivationsRecomputed:p.derivationsRecomputed.map(A=>({...A,deps:[...A.deps]})),constraintsHit:p.constraintsHit.map(A=>({...A,deps:[...A.deps]})),requirementsAdded:p.requirementsAdded.map(A=>({...A})),requirementsRemoved:p.requirementsRemoved.map(A=>({...A})),resolversStarted:p.resolversStarted.map(A=>({...A})),resolversCompleted:p.resolversCompleted.map(A=>({...A})),resolversErrored:p.resolversErrored.map(A=>({...A})),effectsRun:p.effectsRun.map(A=>({...A,triggeredBy:[...A.triggeredBy]})),effectErrors:p.effectErrors.map(A=>({...A}))}))}:{}}},explain(p){let A=ve.previousRequirements.all().find(re=>re.id===p);if(!A)return null;let Y=y.getState(A.fromConstraint),Z=K.getStatus(p),xe={},te=I.toObject();for(let[re,ke]of Object.entries(te))xe[re]=ke;let Je=[`Requirement "${A.requirement.type}" (id: ${A.id})`,`├─ Produced by constraint: ${A.fromConstraint}`,`├─ Constraint priority: ${Y?.priority??0}`,`├─ Constraint active: ${Y?.lastResult??"unknown"}`,`├─ Resolver status: ${Z.state}`],Fe=Object.entries(A.requirement).filter(([re])=>re!=="type").map(([re,ke])=>`${re}=${JSON.stringify(ke)}`).join(", ");Fe&&Je.push(`├─ Requirement payload: { ${Fe} }`);let Ue=Object.entries(xe).slice(0,10);return Ue.length>0&&(Je.push("└─ Relevant facts:"),Ue.forEach(([re,ke],Ie)=>{let Le=Ie===Ue.length-1?"   └─":"   ├─",Me=typeof ke=="object"?JSON.stringify(ke):String(ke);Je.push(`${Le} ${re} = ${Me.slice(0,50)}${Me.length>50?"...":""}`)})),Je.join(`
-`)},async settle(p=5e3){let A=Date.now();for(;;){await new Promise(Z=>setTimeout(Z,0));let Y=this.inspect();if(Y.inflight.length===0&&!ve.isReconciling&&!ve.reconcileScheduled)return;if(Date.now()-A>p){let Z=[];Y.inflight.length>0&&Z.push(`${Y.inflight.length} resolvers inflight: ${Y.inflight.map(te=>te.resolverId).join(", ")}`),ve.isReconciling&&Z.push("reconciliation in progress"),ve.reconcileScheduled&&Z.push("reconcile scheduled");let xe=ve.previousRequirements.all();throw xe.length>0&&Z.push(`${xe.length} unmet requirements: ${xe.map(te=>te.requirement.type).join(", ")}`),new Error(`[Directive] settle() timed out after ${p}ms. ${Z.join("; ")}`)}await new Promise(Z=>setTimeout(Z,10))}},getSnapshot(){return{facts:I.toObject(),version:1}},getDistributableSnapshot(p={}){let{includeDerivations:A,excludeDerivations:Y,includeFacts:Z,ttlSeconds:xe,metadata:te,includeVersion:Je}=p,Fe={},Ue=Object.keys(r),re;if(A?re=A.filter(Le=>Ue.includes(Le)):re=Ue,Y){let Le=new Set(Y);re=re.filter(Me=>!Le.has(Me))}for(let Le of re)try{Fe[Le]=ee.get(Le)}catch{}if(Z&&Z.length>0){let Le=I.toObject();for(let Me of Z)Me in Le&&(Fe[Me]=Le[Me])}let ke=Date.now(),Ie={data:Fe,createdAt:ke};return xe!==void 0&&xe>0&&(Ie.expiresAt=ke+xe*1e3),Je&&(Ie.version=ho(Fe)),te&&(Ie.metadata=te),Ie},watchDistributableSnapshot(p,A){let{includeDerivations:Y,excludeDerivations:Z}=p,xe=Object.keys(r),te;if(Y?te=Y.filter(Fe=>xe.includes(Fe)):te=xe,Z){let Fe=new Set(Z);te=te.filter(Ue=>!Fe.has(Ue))}if(te.length===0)return()=>{};let Je=this.getDistributableSnapshot({...p,includeVersion:!0}).version;return ee.subscribe(te,()=>{let Fe=this.getDistributableSnapshot({...p,includeVersion:!0});Fe.version!==Je&&(Je=Fe.version,A(Fe))})},restore(p){if(!p||typeof p!="object")throw new Error("[Directive] restore() requires a valid snapshot object");if(!p.facts||typeof p.facts!="object")throw new Error("[Directive] restore() snapshot must have a facts object");if(!Cr(p))throw new Error("[Directive] restore() rejected: snapshot contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.");I.batch(()=>{for(let[A,Y]of Object.entries(p.facts))Rt.has(A)||I.set(A,Y)})},onSettledChange(p){return we.add(p),()=>{we.delete(p)}},onTimeTravelChange(p){return ae.add(p),()=>{ae.delete(p)}},batch(p){I.batch(p)},get isSettled(){return this.inspect().inflight.length===0&&!ve.isReconciling&&!ve.reconcileScheduled},get isRunning(){return ve.isRunning},get isInitialized(){return ve.isInitialized},get isReady(){return ve.isReady},whenReady(){return ve.isReady?Promise.resolve():ve.isRunning?(ve.readyPromise||(ve.readyPromise=new Promise(p=>{ve.readyResolve=p})),ve.readyPromise):Promise.reject(new Error("[Directive] whenReady() called before start(). Call system.start() first, then await system.whenReady()."))}};function Ae(p){if(ve.isReconciling)throw new Error(`[Directive] Cannot register module "${p.id}" during reconciliation. Wait for the current reconciliation cycle to complete.`);if(ve.isDestroyed)throw new Error(`[Directive] Cannot register module "${p.id}" on a destroyed system.`);let A=(Y,Z)=>{if(Y){for(let xe of Object.keys(Y))if(Rt.has(xe))throw new Error(`[Directive] Security: Module "${p.id}" has dangerous key "${xe}" in ${Z}.`)}};A(p.schema,"schema"),A(p.events,"events"),A(p.derive,"derive"),A(p.effects,"effects"),A(p.constraints,"constraints"),A(p.resolvers,"resolvers");for(let Y of Object.keys(p.schema))if(Y in t)throw new Error(`[Directive] Schema collision: Fact "${Y}" already exists. Cannot register module "${p.id}".`);if(p.snapshotEvents){u===null&&(u=new Set(Object.keys(a)));for(let Y of p.snapshotEvents)u.add(Y)}else if(u!==null&&p.events)for(let Y of Object.keys(p.events))u.add(Y);Object.assign(t,p.schema),p.events&&Object.assign(a,p.events),p.derive&&(Object.assign(r,p.derive),ee.registerDefinitions(p.derive)),p.effects&&(Object.assign(n,p.effects),V.registerDefinitions(p.effects)),p.constraints&&(Object.assign(o,p.constraints),y.registerDefinitions(p.constraints)),p.resolvers&&(Object.assign(i,p.resolvers),K.registerDefinitions(p.resolvers)),I.registerKeys(p.schema),e.modules.push(p),p.init&&I.batch(()=>{p.init(H)}),p.hooks?.onInit?.(de),ve.isRunning&&(p.hooks?.onStart?.(de),q())}de.registerModule=Ae,f.emitInit(de);for(let p of e.modules)p.hooks?.onInit?.(de);return de}var ut=Object.freeze(new Set(["__proto__","constructor","prototype"])),je="::";function Oo(e){let t=Object.keys(e),a=new Set,r=new Set,n=[],o=[];function i(u){if(a.has(u))return;if(r.has(u)){let d=o.indexOf(u),f=[...o.slice(d),u].join(" → ");throw new Error(`[Directive] Circular dependency detected: ${f}. Modules cannot have circular crossModuleDeps. Break the cycle by removing one of the cross-module references.`)}r.add(u),o.push(u);let c=e[u];if(c?.crossModuleDeps)for(let d of Object.keys(c.crossModuleDeps))t.includes(d)&&i(d);o.pop(),r.delete(u),a.add(u),n.push(u)}for(let u of t)i(u);return n}var Un=new WeakMap,zn=new WeakMap,Jn=new WeakMap,Gn=new WeakMap;function xn(e){if("module"in e){if(!e.module)throw new Error("[Directive] createSystem requires a module. Got: "+typeof e.module);return Ro(e)}let t=e;if(Array.isArray(t.modules))throw new Error(`[Directive] createSystem expects modules as an object, not an array.
+(() => {
+  const t = document.createElement("link").relList;
+  if (t && t.supports && t.supports("modulepreload")) return;
+  for (const n of document.querySelectorAll('link[rel="modulepreload"]')) r(n);
+  new MutationObserver((n) => {
+    for (const o of n)
+      if (o.type === "childList")
+        for (const i of o.addedNodes)
+          i.tagName === "LINK" && i.rel === "modulepreload" && r(i);
+  }).observe(document, { childList: !0, subtree: !0 });
+  function a(n) {
+    const o = {};
+    return (
+      n.integrity && (o.integrity = n.integrity),
+      n.referrerPolicy && (o.referrerPolicy = n.referrerPolicy),
+      n.crossOrigin === "use-credentials"
+        ? (o.credentials = "include")
+        : n.crossOrigin === "anonymous"
+          ? (o.credentials = "omit")
+          : (o.credentials = "same-origin"),
+      o
+    );
+  }
+  function r(n) {
+    if (n.ep) return;
+    n.ep = !0;
+    const o = a(n);
+    fetch(n.href, o);
+  }
+})();
+var Nn = class extends Error {
+    constructor(t, a, r, n, o = !0) {
+      super(t),
+        (this.source = a),
+        (this.sourceId = r),
+        (this.context = n),
+        (this.recoverable = o),
+        (this.name = "DirectiveError");
+    }
+  },
+  er = [];
+function lo() {
+  const e = new Set();
+  return {
+    get isTracking() {
+      return !0;
+    },
+    track(t) {
+      e.add(t);
+    },
+    getDependencies() {
+      return e;
+    },
+  };
+}
+var uo = {
+  isTracking: !1,
+  track() {},
+  getDependencies() {
+    return new Set();
+  },
+};
+function co() {
+  return er[er.length - 1] ?? uo;
+}
+function Jr(e) {
+  const t = lo();
+  er.push(t);
+  try {
+    return { value: e(), deps: t.getDependencies() };
+  } finally {
+    er.pop();
+  }
+}
+function Pn(e) {
+  const t = er.splice(0, er.length);
+  try {
+    return e();
+  } finally {
+    er.push(...t);
+  }
+}
+function mn(e) {
+  co().track(e);
+}
+function fo(e, t = 100) {
+  try {
+    return JSON.stringify(e)?.slice(0, t) ?? String(e);
+  } catch {
+    return "[circular or non-serializable]";
+  }
+}
+function Gr(e = [], t, a, r, n, o) {
+  return {
+    _type: void 0,
+    _validators: e,
+    _typeName: t,
+    _default: a,
+    _transform: r,
+    _description: n,
+    _refinements: o,
+    validate(i) {
+      return Gr([...e, i], t, a, r, n, o);
+    },
+  };
+}
+function lt(e, t, a, r, n, o) {
+  return {
+    ...Gr(e, t, a, r, n, o),
+    default(i) {
+      return lt(e, t, i, r, n, o);
+    },
+    transform(i) {
+      return lt(
+        [],
+        t,
+        void 0,
+        (u) => {
+          const c = r ? r(u) : u;
+          return i(c);
+        },
+        n,
+      );
+    },
+    brand() {
+      return lt(e, `Branded<${t}>`, a, r, n, o);
+    },
+    describe(i) {
+      return lt(e, t, a, r, i, o);
+    },
+    refine(i, u) {
+      const c = [...(o ?? []), { predicate: i, message: u }];
+      return lt([...e, i], t, a, r, n, c);
+    },
+    nullable() {
+      return lt(
+        [(i) => i === null || e.every((u) => u(i))],
+        `${t} | null`,
+        a,
+        r,
+        n,
+      );
+    },
+    optional() {
+      return lt(
+        [(i) => i === void 0 || e.every((u) => u(i))],
+        `${t} | undefined`,
+        a,
+        r,
+        n,
+      );
+    },
+  };
+}
+var $e = {
+  string() {
+    return lt([(e) => typeof e == "string"], "string");
+  },
+  number() {
+    const e = (t, a, r, n, o) => ({
+      ...lt(t, "number", a, r, n, o),
+      min(i) {
+        return e([...t, (u) => u >= i], a, r, n, o);
+      },
+      max(i) {
+        return e([...t, (u) => u <= i], a, r, n, o);
+      },
+      default(i) {
+        return e(t, i, r, n, o);
+      },
+      describe(i) {
+        return e(t, a, r, i, o);
+      },
+      refine(i, u) {
+        const c = [...(o ?? []), { predicate: i, message: u }];
+        return e([...t, i], a, r, n, c);
+      },
+    });
+    return e([(t) => typeof t == "number"]);
+  },
+  boolean() {
+    return lt([(e) => typeof e == "boolean"], "boolean");
+  },
+  array() {
+    const e = (t, a, r, n, o) => {
+      const i = lt(t, "array", r, void 0, n),
+        u = o ?? { value: -1 };
+      return {
+        ...i,
+        get _lastFailedIndex() {
+          return u.value;
+        },
+        set _lastFailedIndex(c) {
+          u.value = c;
+        },
+        of(c) {
+          const d = { value: -1 };
+          return e(
+            [
+              ...t,
+              (f) => {
+                for (let w = 0; w < f.length; w++) {
+                  const O = f[w];
+                  if (!c._validators.every((_) => _(O)))
+                    return (d.value = w), !1;
+                }
+                return !0;
+              },
+            ],
+            c,
+            r,
+            n,
+            d,
+          );
+        },
+        nonEmpty() {
+          return e([...t, (c) => c.length > 0], a, r, n, u);
+        },
+        maxLength(c) {
+          return e([...t, (d) => d.length <= c], a, r, n, u);
+        },
+        minLength(c) {
+          return e([...t, (d) => d.length >= c], a, r, n, u);
+        },
+        default(c) {
+          return e(t, a, c, n, u);
+        },
+        describe(c) {
+          return e(t, a, r, c, u);
+        },
+      };
+    };
+    return e([(t) => Array.isArray(t)]);
+  },
+  object() {
+    const e = (t, a, r) => ({
+      ...lt(t, "object", a, void 0, r),
+      shape(n) {
+        return e(
+          [
+            ...t,
+            (o) => {
+              for (const [i, u] of Object.entries(n)) {
+                const c = o[i],
+                  d = u;
+                if (d && !d._validators.every((f) => f(c))) return !1;
+              }
+              return !0;
+            },
+          ],
+          a,
+          r,
+        );
+      },
+      nonNull() {
+        return e([...t, (n) => n != null], a, r);
+      },
+      hasKeys(...n) {
+        return e([...t, (o) => n.every((i) => i in o)], a, r);
+      },
+      default(n) {
+        return e(t, n, r);
+      },
+      describe(n) {
+        return e(t, a, n);
+      },
+    });
+    return e([(t) => typeof t == "object" && t !== null && !Array.isArray(t)]);
+  },
+  enum(...e) {
+    const t = new Set(e);
+    return lt(
+      [(a) => typeof a == "string" && t.has(a)],
+      `enum(${e.join("|")})`,
+    );
+  },
+  literal(e) {
+    return lt([(t) => t === e], `literal(${String(e)})`);
+  },
+  nullable(e) {
+    const t = e._typeName ?? "unknown";
+    return Gr(
+      [(a) => (a === null ? !0 : e._validators.every((r) => r(a)))],
+      `${t} | null`,
+    );
+  },
+  optional(e) {
+    const t = e._typeName ?? "unknown";
+    return Gr(
+      [(a) => (a === void 0 ? !0 : e._validators.every((r) => r(a)))],
+      `${t} | undefined`,
+    );
+  },
+  union(...e) {
+    const t = e.map((a) => a._typeName ?? "unknown");
+    return lt(
+      [(a) => e.some((r) => r._validators.every((n) => n(a)))],
+      t.join(" | "),
+    );
+  },
+  record(e) {
+    const t = e._typeName ?? "unknown";
+    return lt(
+      [
+        (a) =>
+          typeof a != "object" || a === null || Array.isArray(a)
+            ? !1
+            : Object.values(a).every((r) => e._validators.every((n) => n(r))),
+      ],
+      `Record<string, ${t}>`,
+    );
+  },
+  tuple(...e) {
+    const t = e.map((a) => a._typeName ?? "unknown");
+    return lt(
+      [
+        (a) =>
+          !Array.isArray(a) || a.length !== e.length
+            ? !1
+            : e.every((r, n) => r._validators.every((o) => o(a[n]))),
+      ],
+      `[${t.join(", ")}]`,
+    );
+  },
+  date() {
+    return lt([(e) => e instanceof Date && !isNaN(e.getTime())], "Date");
+  },
+  uuid() {
+    const e =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return lt([(t) => typeof t == "string" && e.test(t)], "uuid");
+  },
+  email() {
+    const e = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return lt([(t) => typeof t == "string" && e.test(t)], "email");
+  },
+  url() {
+    return lt(
+      [
+        (e) => {
+          if (typeof e != "string") return !1;
+          try {
+            return new URL(e), !0;
+          } catch {
+            return !1;
+          }
+        },
+      ],
+      "url",
+    );
+  },
+  bigint() {
+    return lt([(e) => typeof e == "bigint"], "bigint");
+  },
+};
+function po(e) {
+  const { schema: t, onChange: a, onBatch: r } = e;
+  Object.keys(t).length;
+  let n = e.validate ?? !1,
+    o = e.strictKeys ?? !1,
+    i = e.redactErrors ?? !1,
+    u = new Map(),
+    c = new Set(),
+    d = new Map(),
+    f = new Set(),
+    w = 0,
+    O = [],
+    _ = new Set(),
+    U = !1,
+    D = [],
+    E = 100;
+  function T(k) {
+    return (
+      k !== null &&
+      typeof k == "object" &&
+      "safeParse" in k &&
+      typeof k.safeParse == "function" &&
+      "_def" in k &&
+      "parse" in k &&
+      typeof k.parse == "function"
+    );
+  }
+  function G(k) {
+    const R = k;
+    if (R._typeName) return R._typeName;
+    if (T(k)) {
+      const $ = k._def;
+      if ($?.typeName) return $.typeName.replace(/^Zod/, "").toLowerCase();
+    }
+    return "unknown";
+  }
+  function J(k) {
+    return i ? "[redacted]" : fo(k);
+  }
+  function m(k, R) {
+    if (!n) return;
+    const $ = t[k];
+    if (!$) {
+      if (o)
+        throw new Error(
+          `[Directive] Unknown fact key: "${k}". Key not defined in schema.`,
+        );
+      console.warn(`[Directive] Unknown fact key: "${k}"`);
+      return;
+    }
+    if (T($)) {
+      const V = $.safeParse(R);
+      if (!V.success) {
+        const y = R === null ? "null" : Array.isArray(R) ? "array" : typeof R,
+          z = J(R),
+          v =
+            V.error?.message ??
+            V.error?.issues?.[0]?.message ??
+            "Validation failed",
+          l = G($);
+        throw new Error(
+          `[Directive] Validation failed for "${k}": expected ${l}, got ${y} ${z}. ${v}`,
+        );
+      }
+      return;
+    }
+    const I = $,
+      H = I._validators;
+    if (!H || !Array.isArray(H) || H.length === 0) return;
+    const ee = I._typeName ?? "unknown";
+    for (let V = 0; V < H.length; V++) {
+      const y = H[V];
+      if (typeof y == "function" && !y(R)) {
+        let z = R === null ? "null" : Array.isArray(R) ? "array" : typeof R,
+          v = J(R),
+          l = "";
+        typeof I._lastFailedIndex == "number" &&
+          I._lastFailedIndex >= 0 &&
+          ((l = ` (element at index ${I._lastFailedIndex} failed)`),
+          (I._lastFailedIndex = -1));
+        const x = V === 0 ? "" : ` (validator ${V + 1} failed)`;
+        throw new Error(
+          `[Directive] Validation failed for "${k}": expected ${ee}, got ${z} ${v}${x}${l}`,
+        );
+      }
+    }
+  }
+  function M(k) {
+    d.get(k)?.forEach((R) => R());
+  }
+  function S() {
+    f.forEach((k) => k());
+  }
+  function j(k, R, $) {
+    if (U) {
+      D.push({ key: k, value: R, prev: $ });
+      return;
+    }
+    U = !0;
+    try {
+      a?.(k, R, $), M(k), S();
+      let I = 0;
+      while (D.length > 0) {
+        if (++I > E)
+          throw (
+            ((D.length = 0),
+            new Error(
+              `[Directive] Infinite notification loop detected after ${E} iterations. A listener is repeatedly mutating facts that re-trigger notifications.`,
+            ))
+          );
+        const H = [...D];
+        D.length = 0;
+        for (const ee of H) a?.(ee.key, ee.value, ee.prev), M(ee.key);
+        S();
+      }
+    } finally {
+      U = !1;
+    }
+  }
+  function F() {
+    if (!(w > 0)) {
+      if ((r && O.length > 0 && r([...O]), _.size > 0)) {
+        U = !0;
+        try {
+          for (const R of _) M(R);
+          S();
+          let k = 0;
+          while (D.length > 0) {
+            if (++k > E)
+              throw (
+                ((D.length = 0),
+                new Error(
+                  `[Directive] Infinite notification loop detected during flush after ${E} iterations.`,
+                ))
+              );
+            const R = [...D];
+            D.length = 0;
+            for (const $ of R) a?.($.key, $.value, $.prev), M($.key);
+            S();
+          }
+        } finally {
+          U = !1;
+        }
+      }
+      (O.length = 0), _.clear();
+    }
+  }
+  const ne = {
+    get(k) {
+      return mn(k), u.get(k);
+    },
+    has(k) {
+      return mn(k), u.has(k);
+    },
+    set(k, R) {
+      m(k, R);
+      const $ = u.get(k);
+      Object.is($, R) ||
+        (u.set(k, R),
+        c.add(k),
+        w > 0
+          ? (O.push({ key: k, value: R, prev: $, type: "set" }), _.add(k))
+          : j(k, R, $));
+    },
+    delete(k) {
+      const R = u.get(k);
+      u.delete(k),
+        c.delete(k),
+        w > 0
+          ? (O.push({ key: k, value: void 0, prev: R, type: "delete" }),
+            _.add(k))
+          : j(k, void 0, R);
+    },
+    batch(k) {
+      w++;
+      try {
+        k();
+      } finally {
+        w--, F();
+      }
+    },
+    subscribe(k, R) {
+      for (const $ of k) {
+        const I = $;
+        d.has(I) || d.set(I, new Set()), d.get(I).add(R);
+      }
+      return () => {
+        for (const $ of k) {
+          const I = d.get($);
+          I && (I.delete(R), I.size === 0 && d.delete($));
+        }
+      };
+    },
+    subscribeAll(k) {
+      return f.add(k), () => f.delete(k);
+    },
+    toObject() {
+      const k = {};
+      for (const R of c) u.has(R) && (k[R] = u.get(R));
+      return k;
+    },
+  };
+  return (
+    (ne.registerKeys = (k) => {
+      for (const R of Object.keys(k)) Sr.has(R) || ((t[R] = k[R]), c.add(R));
+    }),
+    ne
+  );
+}
+var Sr = Object.freeze(new Set(["__proto__", "constructor", "prototype"]));
+function mo(e, t) {
+  const a = () => ({
+    get: (r) => Pn(() => e.get(r)),
+    has: (r) => Pn(() => e.has(r)),
+  });
+  return new Proxy(
+    {},
+    {
+      get(r, n) {
+        if (n === "$store") return e;
+        if (n === "$snapshot") return a;
+        if (typeof n != "symbol" && !Sr.has(n)) return e.get(n);
+      },
+      set(r, n, o) {
+        return typeof n == "symbol" ||
+          n === "$store" ||
+          n === "$snapshot" ||
+          Sr.has(n)
+          ? !1
+          : (e.set(n, o), !0);
+      },
+      deleteProperty(r, n) {
+        return typeof n == "symbol" ||
+          n === "$store" ||
+          n === "$snapshot" ||
+          Sr.has(n)
+          ? !1
+          : (e.delete(n), !0);
+      },
+      has(r, n) {
+        return n === "$store" || n === "$snapshot"
+          ? !0
+          : typeof n == "symbol" || Sr.has(n)
+            ? !1
+            : e.has(n);
+      },
+      ownKeys() {
+        return Object.keys(t);
+      },
+      getOwnPropertyDescriptor(r, n) {
+        return n === "$store" || n === "$snapshot"
+          ? { configurable: !0, enumerable: !1, writable: !1 }
+          : { configurable: !0, enumerable: !0, writable: !0 };
+      },
+    },
+  );
+}
+function go(e) {
+  const t = po(e),
+    a = mo(t, e.schema);
+  return { store: t, facts: a };
+}
+function dr(e, t) {
+  const a = "crossModuleDeps" in t ? t.crossModuleDeps : void 0;
+  return {
+    id: e,
+    schema: t.schema,
+    init: t.init,
+    derive: t.derive ?? {},
+    events: t.events ?? {},
+    effects: t.effects,
+    constraints: t.constraints,
+    resolvers: t.resolvers,
+    hooks: t.hooks,
+    snapshotEvents: t.snapshotEvents,
+    crossModuleDeps: a,
+  };
+}
+async function Br(e, t, a) {
+  let r,
+    n = new Promise((o, i) => {
+      r = setTimeout(() => i(new Error(a)), t);
+    });
+  try {
+    return await Promise.race([e, n]);
+  } finally {
+    clearTimeout(r);
+  }
+}
+function ma(e, t = 50) {
+  const a = new WeakSet();
+  function r(n, o) {
+    if (o > t) return '"[max depth exceeded]"';
+    if (n === null) return "null";
+    if (n === void 0) return "undefined";
+    const i = typeof n;
+    if (i === "string") return JSON.stringify(n);
+    if (i === "number" || i === "boolean") return String(n);
+    if (i === "function") return '"[function]"';
+    if (i === "symbol") return '"[symbol]"';
+    if (Array.isArray(n)) {
+      if (a.has(n)) return '"[circular]"';
+      a.add(n);
+      const u = `[${n.map((c) => r(c, o + 1)).join(",")}]`;
+      return a.delete(n), u;
+    }
+    if (i === "object") {
+      const u = n;
+      if (a.has(u)) return '"[circular]"';
+      a.add(u);
+      const c = `{${Object.keys(u)
+        .sort()
+        .map((d) => `${JSON.stringify(d)}:${r(u[d], o + 1)}`)
+        .join(",")}}`;
+      return a.delete(u), c;
+    }
+    return '"[unknown]"';
+  }
+  return r(e, 0);
+}
+function Cr(e, t = 50) {
+  const a = new Set(["__proto__", "constructor", "prototype"]),
+    r = new WeakSet();
+  function n(o, i) {
+    if (i > t) return !1;
+    if (o == null || typeof o != "object") return !0;
+    const u = o;
+    if (r.has(u)) return !0;
+    if ((r.add(u), Array.isArray(u))) {
+      for (const c of u) if (!n(c, i + 1)) return r.delete(u), !1;
+      return r.delete(u), !0;
+    }
+    for (const c of Object.keys(u))
+      if (a.has(c) || !n(u[c], i + 1)) return r.delete(u), !1;
+    return r.delete(u), !0;
+  }
+  return n(e, 0);
+}
+function ho(e) {
+  let t = ma(e),
+    a = 5381;
+  for (let r = 0; r < t.length; r++) a = ((a << 5) + a) ^ t.charCodeAt(r);
+  return (a >>> 0).toString(16);
+}
+function yo(e, t) {
+  if (t) return t(e);
+  const { type: a, ...r } = e,
+    n = ma(r);
+  return `${a}:${n}`;
+}
+function vo(e, t, a) {
+  return { requirement: e, id: yo(e, a), fromConstraint: t };
+}
+var gn = class ga {
+    map = new Map();
+    add(t) {
+      this.map.has(t.id) || this.map.set(t.id, t);
+    }
+    remove(t) {
+      return this.map.delete(t);
+    }
+    has(t) {
+      return this.map.has(t);
+    }
+    get(t) {
+      return this.map.get(t);
+    }
+    all() {
+      return [...this.map.values()];
+    }
+    ids() {
+      return [...this.map.keys()];
+    }
+    get size() {
+      return this.map.size;
+    }
+    clear() {
+      this.map.clear();
+    }
+    clone() {
+      const t = new ga();
+      for (const a of this.map.values()) t.add(a);
+      return t;
+    }
+    diff(t) {
+      const a = [],
+        r = [],
+        n = [];
+      for (const o of this.map.values()) t.has(o.id) ? n.push(o) : a.push(o);
+      for (const o of t.map.values()) this.map.has(o.id) || r.push(o);
+      return { added: a, removed: r, unchanged: n };
+    }
+  },
+  bo = 5e3;
+function wo(e) {
+  let {
+      definitions: t,
+      facts: a,
+      requirementKeys: r = {},
+      defaultTimeout: n = bo,
+      onEvaluate: o,
+      onError: i,
+    } = e,
+    u = new Map(),
+    c = new Set(),
+    d = new Set(),
+    f = new Map(),
+    w = new Map(),
+    O = new Set(),
+    _ = new Map(),
+    U = new Map(),
+    D = !1,
+    E = new Set(),
+    T = new Set(),
+    G = new Map(),
+    J = [],
+    m = new Map();
+  function M() {
+    for (const [v, l] of Object.entries(t))
+      if (l.after)
+        for (const x of l.after)
+          t[x] && (G.has(x) || G.set(x, new Set()), G.get(x).add(v));
+  }
+  function S() {
+    const v = new Set(),
+      l = new Set(),
+      x = [];
+    function P(K, ae) {
+      if (v.has(K)) return;
+      if (l.has(K)) {
+        const _e = ae.indexOf(K),
+          we = [...ae.slice(_e), K].join(" → ");
+        throw new Error(
+          `[Directive] Constraint cycle detected: ${we}. Remove one of the \`after\` dependencies to break the cycle.`,
+        );
+      }
+      l.add(K), ae.push(K);
+      const Ne = t[K];
+      if (Ne?.after) for (const _e of Ne.after) t[_e] && P(_e, ae);
+      ae.pop(), l.delete(K), v.add(K), x.push(K);
+    }
+    for (const K of Object.keys(t)) P(K, []);
+    (J = x), (m = new Map(J.map((K, ae) => [K, ae])));
+  }
+  S(), M();
+  function j(v, l) {
+    return l.async !== void 0 ? l.async : !!d.has(v);
+  }
+  function F(v) {
+    const l = t[v];
+    if (!l) throw new Error(`[Directive] Unknown constraint: ${v}`);
+    const x = j(v, l);
+    x && d.add(v);
+    const P = {
+      id: v,
+      priority: l.priority ?? 0,
+      isAsync: x,
+      lastResult: null,
+      isEvaluating: !1,
+      error: null,
+      lastResolvedAt: null,
+      after: l.after ?? [],
+      hitCount: 0,
+      lastActiveAt: null,
+    };
+    return u.set(v, P), P;
+  }
+  function ne(v) {
+    return u.get(v) ?? F(v);
+  }
+  function k(v, l) {
+    const x = f.get(v) ?? new Set();
+    for (const P of x) {
+      const K = w.get(P);
+      K?.delete(v), K && K.size === 0 && w.delete(P);
+    }
+    for (const P of l) w.has(P) || w.set(P, new Set()), w.get(P).add(v);
+    f.set(v, l);
+  }
+  function R(v) {
+    const l = t[v];
+    if (!l) return !1;
+    const x = ne(v);
+    (x.isEvaluating = !0), (x.error = null);
+    try {
+      let P;
+      if (l.deps) (P = l.when(a)), _.set(v, new Set(l.deps));
+      else {
+        const K = Jr(() => l.when(a));
+        (P = K.value), _.set(v, K.deps);
+      }
+      return P instanceof Promise
+        ? (d.add(v),
+          (x.isAsync = !0),
+          P.then(
+            (K) => (
+              (x.lastResult = K),
+              K && (x.hitCount++, (x.lastActiveAt = Date.now())),
+              (x.isEvaluating = !1),
+              o?.(v, K),
+              K
+            ),
+          ).catch(
+            (K) => (
+              (x.error = K instanceof Error ? K : new Error(String(K))),
+              (x.lastResult = !1),
+              (x.isEvaluating = !1),
+              i?.(v, K),
+              !1
+            ),
+          ))
+        : ((x.lastResult = P),
+          P && (x.hitCount++, (x.lastActiveAt = Date.now())),
+          (x.isEvaluating = !1),
+          o?.(v, P),
+          P);
+    } catch (P) {
+      return (
+        (x.error = P instanceof Error ? P : new Error(String(P))),
+        (x.lastResult = !1),
+        (x.isEvaluating = !1),
+        i?.(v, P),
+        !1
+      );
+    }
+  }
+  async function $(v) {
+    const l = t[v];
+    if (!l) return !1;
+    const x = ne(v),
+      P = l.timeout ?? n;
+    if (((x.isEvaluating = !0), (x.error = null), l.deps?.length)) {
+      const K = new Set(l.deps);
+      k(v, K), _.set(v, K);
+    }
+    try {
+      const K = l.when(a),
+        ae = await Br(K, P, `Constraint "${v}" timed out after ${P}ms`);
+      return (
+        (x.lastResult = ae),
+        ae && (x.hitCount++, (x.lastActiveAt = Date.now())),
+        (x.isEvaluating = !1),
+        o?.(v, ae),
+        ae
+      );
+    } catch (K) {
+      return (
+        (x.error = K instanceof Error ? K : new Error(String(K))),
+        (x.lastResult = !1),
+        (x.isEvaluating = !1),
+        i?.(v, K),
+        !1
+      );
+    }
+  }
+  function I(v, l) {
+    return v == null ? [] : Array.isArray(v) ? v.filter((P) => P != null) : [v];
+  }
+  function H(v) {
+    const l = t[v];
+    if (!l) return { requirements: [], deps: new Set() };
+    const x = l.require;
+    if (typeof x == "function") {
+      const { value: P, deps: K } = Jr(() => x(a));
+      return { requirements: I(P), deps: K };
+    }
+    return { requirements: I(x), deps: new Set() };
+  }
+  function ee(v, l) {
+    if (l.size === 0) return;
+    const x = f.get(v) ?? new Set();
+    for (const P of l)
+      x.add(P), w.has(P) || w.set(P, new Set()), w.get(P).add(v);
+    f.set(v, x);
+  }
+  let V = null;
+  function y() {
+    return (
+      V ||
+        (V = Object.keys(t).sort((v, l) => {
+          const x = ne(v),
+            P = ne(l).priority - x.priority;
+          if (P !== 0) return P;
+          const K = m.get(v) ?? 0,
+            ae = m.get(l) ?? 0;
+          return K - ae;
+        })),
+      V
+    );
+  }
+  for (const v of Object.keys(t)) F(v);
+  function z(v) {
+    const l = u.get(v);
+    if (!l || l.after.length === 0) return !0;
+    for (const x of l.after)
+      if (t[x] && !c.has(x) && !T.has(x) && !E.has(x)) return !1;
+    return !0;
+  }
+  return {
+    async evaluate(v) {
+      const l = new gn();
+      T.clear();
+      let x = y().filter((we) => !c.has(we)),
+        P;
+      if (!D || !v || v.size === 0) (P = x), (D = !0);
+      else {
+        const we = new Set();
+        for (const ze of v) {
+          const We = w.get(ze);
+          if (We) for (const Qe of We) c.has(Qe) || we.add(Qe);
+        }
+        for (const ze of O) c.has(ze) || we.add(ze);
+        O.clear(), (P = [...we]);
+        for (const ze of x)
+          if (!we.has(ze)) {
+            const We = U.get(ze);
+            if (We) for (const Qe of We) l.add(Qe);
+          }
+      }
+      function K(we, ze) {
+        if (c.has(we)) return;
+        const We = _.get(we);
+        if (!ze) {
+          We !== void 0 && k(we, We), T.add(we), U.set(we, []);
+          return;
+        }
+        T.delete(we);
+        let Qe, ve;
+        try {
+          const q = H(we);
+          (Qe = q.requirements), (ve = q.deps);
+        } catch (q) {
+          i?.(we, q), We !== void 0 && k(we, We), U.set(we, []);
+          return;
+        }
+        if (We !== void 0) {
+          const q = new Set(We);
+          for (const N of ve) q.add(N);
+          k(we, q);
+        } else ee(we, ve);
+        if (Qe.length > 0) {
+          const q = r[we],
+            N = Qe.map((ie) => vo(ie, we, q));
+          for (const ie of N) l.add(ie);
+          U.set(we, N);
+        } else U.set(we, []);
+      }
+      async function ae(we) {
+        const ze = [],
+          We = [];
+        for (const N of we)
+          if (z(N)) We.push(N);
+          else {
+            ze.push(N);
+            const ie = U.get(N);
+            if (ie) for (const le of ie) l.add(le);
+          }
+        if (We.length === 0) return ze;
+        const Qe = [],
+          ve = [];
+        for (const N of We) ne(N).isAsync ? ve.push(N) : Qe.push(N);
+        const q = [];
+        for (const N of Qe) {
+          const ie = R(N);
+          if (ie instanceof Promise) {
+            q.push({ id: N, promise: ie });
+            continue;
+          }
+          K(N, ie);
+        }
+        if (q.length > 0) {
+          const N = await Promise.all(
+            q.map(async ({ id: ie, promise: le }) => ({
+              id: ie,
+              active: await le,
+            })),
+          );
+          for (const { id: ie, active: le } of N) K(ie, le);
+        }
+        if (ve.length > 0) {
+          const N = await Promise.all(
+            ve.map(async (ie) => ({ id: ie, active: await $(ie) })),
+          );
+          for (const { id: ie, active: le } of N) K(ie, le);
+        }
+        return ze;
+      }
+      let Ne = P,
+        _e = P.length + 1;
+      while (Ne.length > 0 && _e > 0) {
+        const we = Ne.length;
+        if (((Ne = await ae(Ne)), Ne.length === we)) break;
+        _e--;
+      }
+      return l.all();
+    },
+    getState(v) {
+      return u.get(v);
+    },
+    getDependencies(v) {
+      return f.get(v);
+    },
+    getAllStates() {
+      return [...u.values()];
+    },
+    disable(v) {
+      if (!u.has(v)) {
+        console.warn(
+          `[Directive] constraints.disable("${v}") — no such constraint`,
+        );
+        return;
+      }
+      c.add(v), (V = null), U.delete(v);
+      const l = f.get(v);
+      if (l) {
+        for (const x of l) {
+          const P = w.get(x);
+          P && (P.delete(v), P.size === 0 && w.delete(x));
+        }
+        f.delete(v);
+      }
+      _.delete(v);
+    },
+    enable(v) {
+      if (!u.has(v)) {
+        console.warn(
+          `[Directive] constraints.enable("${v}") — no such constraint`,
+        );
+        return;
+      }
+      c.delete(v), (V = null), O.add(v);
+    },
+    isDisabled(v) {
+      return c.has(v);
+    },
+    invalidate(v) {
+      const l = w.get(v);
+      if (l) for (const x of l) O.add(x);
+    },
+    markResolved(v) {
+      E.add(v);
+      const l = u.get(v);
+      l && (l.lastResolvedAt = Date.now());
+      const x = G.get(v);
+      if (x) for (const P of x) O.add(P);
+    },
+    isResolved(v) {
+      return E.has(v);
+    },
+    registerDefinitions(v) {
+      for (const [l, x] of Object.entries(v)) (t[l] = x), F(l), O.add(l);
+      (V = null), S(), M();
+    },
+  };
+}
+function ko(e) {
+  let {
+      definitions: t,
+      facts: a,
+      onCompute: r,
+      onInvalidate: n,
+      onError: o,
+    } = e,
+    i = new Map(),
+    u = new Map(),
+    c = new Map(),
+    d = new Map(),
+    f = new Set(["__proto__", "constructor", "prototype"]),
+    w = 0,
+    O = new Set(),
+    _ = !1,
+    U = 100,
+    D;
+  function E(S) {
+    if (!t[S]) throw new Error(`[Directive] Unknown derivation: ${S}`);
+    const j = {
+      id: S,
+      compute: () => G(S),
+      cachedValue: void 0,
+      dependencies: new Set(),
+      isStale: !0,
+      isComputing: !1,
+    };
+    return i.set(S, j), j;
+  }
+  function T(S) {
+    return i.get(S) ?? E(S);
+  }
+  function G(S) {
+    const j = T(S),
+      F = t[S];
+    if (!F) throw new Error(`[Directive] Unknown derivation: ${S}`);
+    if (j.isComputing)
+      throw new Error(
+        `[Directive] Circular dependency detected in derivation: ${S}`,
+      );
+    j.isComputing = !0;
+    try {
+      const ne = j.cachedValue,
+        { value: k, deps: R } = Jr(() => F(a, D));
+      return (
+        (j.cachedValue = k), (j.isStale = !1), J(S, R), r?.(S, k, ne, [...R]), k
+      );
+    } catch (ne) {
+      throw (o?.(S, ne), ne);
+    } finally {
+      j.isComputing = !1;
+    }
+  }
+  function J(S, j) {
+    const F = T(S),
+      ne = F.dependencies;
+    for (const k of ne)
+      if (i.has(k)) {
+        const R = d.get(k);
+        R?.delete(S), R && R.size === 0 && d.delete(k);
+      } else {
+        const R = c.get(k);
+        R?.delete(S), R && R.size === 0 && c.delete(k);
+      }
+    for (const k of j)
+      t[k]
+        ? (d.has(k) || d.set(k, new Set()), d.get(k).add(S))
+        : (c.has(k) || c.set(k, new Set()), c.get(k).add(S));
+    F.dependencies = j;
+  }
+  function m() {
+    if (!(w > 0 || _)) {
+      _ = !0;
+      try {
+        let S = 0;
+        while (O.size > 0) {
+          if (++S > U) {
+            const F = [...O];
+            throw (
+              (O.clear(),
+              new Error(
+                `[Directive] Infinite derivation notification loop detected after ${U} iterations. Remaining: ${F.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+              ))
+            );
+          }
+          const j = [...O];
+          O.clear();
+          for (const F of j) u.get(F)?.forEach((ne) => ne());
+        }
+      } finally {
+        _ = !1;
+      }
+    }
+  }
+  function M(S, j = new Set()) {
+    if (j.has(S)) return;
+    j.add(S);
+    const F = i.get(S);
+    if (!F || F.isStale) return;
+    (F.isStale = !0), n?.(S), O.add(S);
+    const ne = d.get(S);
+    if (ne) for (const k of ne) M(k, j);
+  }
+  return (
+    (D = new Proxy(
+      {},
+      {
+        get(S, j) {
+          if (typeof j == "symbol" || f.has(j)) return;
+          mn(j);
+          const F = T(j);
+          return F.isStale && G(j), F.cachedValue;
+        },
+      },
+    )),
+    {
+      get(S) {
+        const j = T(S);
+        return j.isStale && G(S), j.cachedValue;
+      },
+      isStale(S) {
+        return i.get(S)?.isStale ?? !0;
+      },
+      invalidate(S) {
+        const j = c.get(S);
+        if (j) {
+          w++;
+          try {
+            for (const F of j) M(F);
+          } finally {
+            w--, m();
+          }
+        }
+      },
+      invalidateMany(S) {
+        w++;
+        try {
+          for (const j of S) {
+            const F = c.get(j);
+            if (F) for (const ne of F) M(ne);
+          }
+        } finally {
+          w--, m();
+        }
+      },
+      invalidateAll() {
+        w++;
+        try {
+          for (const S of i.values())
+            S.isStale || ((S.isStale = !0), O.add(S.id));
+        } finally {
+          w--, m();
+        }
+      },
+      subscribe(S, j) {
+        for (const F of S) {
+          const ne = F;
+          u.has(ne) || u.set(ne, new Set()), u.get(ne).add(j);
+        }
+        return () => {
+          for (const F of S) {
+            const ne = F,
+              k = u.get(ne);
+            k?.delete(j), k && k.size === 0 && u.delete(ne);
+          }
+        };
+      },
+      getProxy() {
+        return D;
+      },
+      getDependencies(S) {
+        return T(S).dependencies;
+      },
+      registerDefinitions(S) {
+        for (const [j, F] of Object.entries(S)) (t[j] = F), E(j);
+      },
+    }
+  );
+}
+function So(e) {
+  let { definitions: t, facts: a, store: r, onRun: n, onError: o } = e,
+    i = new Map(),
+    u = null,
+    c = !1;
+  function d(E) {
+    const T = t[E];
+    if (!T) throw new Error(`[Directive] Unknown effect: ${E}`);
+    const G = {
+      id: E,
+      enabled: !0,
+      hasExplicitDeps: !!T.deps,
+      dependencies: T.deps ? new Set(T.deps) : null,
+      cleanup: null,
+    };
+    return i.set(E, G), G;
+  }
+  function f(E) {
+    return i.get(E) ?? d(E);
+  }
+  function w() {
+    return r.toObject();
+  }
+  function O(E, T) {
+    const G = f(E);
+    if (!G.enabled) return !1;
+    if (G.dependencies) {
+      for (const J of G.dependencies) if (T.has(J)) return !0;
+      return !1;
+    }
+    return !0;
+  }
+  function _(E) {
+    if (E.cleanup) {
+      try {
+        E.cleanup();
+      } catch (T) {
+        o?.(E.id, T),
+          console.error(
+            `[Directive] Effect "${E.id}" cleanup threw an error:`,
+            T,
+          );
+      }
+      E.cleanup = null;
+    }
+  }
+  function U(E, T) {
+    if (typeof T == "function")
+      if (c)
+        try {
+          T();
+        } catch (G) {
+          o?.(E.id, G),
+            console.error(
+              `[Directive] Effect "${E.id}" cleanup threw an error:`,
+              G,
+            );
+        }
+      else E.cleanup = T;
+  }
+  async function D(E) {
+    const T = f(E),
+      G = t[E];
+    if (!(!T.enabled || !G)) {
+      _(T), n?.(E, T.dependencies ? [...T.dependencies] : []);
+      try {
+        if (T.hasExplicitDeps) {
+          let J;
+          if (
+            (r.batch(() => {
+              J = G.run(a, u);
+            }),
+            J instanceof Promise)
+          ) {
+            const m = await J;
+            U(T, m);
+          } else U(T, J);
+        } else {
+          let J = null,
+            m,
+            M = Jr(
+              () => (
+                r.batch(() => {
+                  m = G.run(a, u);
+                }),
+                m
+              ),
+            );
+          J = M.deps;
+          let S = M.value;
+          S instanceof Promise && (S = await S),
+            U(T, S),
+            (T.dependencies = J.size > 0 ? J : null);
+        }
+      } catch (J) {
+        o?.(E, J),
+          console.error(`[Directive] Effect "${E}" threw an error:`, J);
+      }
+    }
+  }
+  for (const E of Object.keys(t)) d(E);
+  return {
+    async runEffects(E) {
+      const T = [];
+      for (const G of Object.keys(t)) O(G, E) && T.push(G);
+      await Promise.all(T.map(D)), (u = w());
+    },
+    async runAll() {
+      const E = Object.keys(t);
+      await Promise.all(
+        E.map((T) => (f(T).enabled ? D(T) : Promise.resolve())),
+      ),
+        (u = w());
+    },
+    disable(E) {
+      const T = f(E);
+      T.enabled = !1;
+    },
+    enable(E) {
+      const T = f(E);
+      T.enabled = !0;
+    },
+    isEnabled(E) {
+      return f(E).enabled;
+    },
+    cleanupAll() {
+      c = !0;
+      for (const E of i.values()) _(E);
+    },
+    registerDefinitions(E) {
+      for (const [T, G] of Object.entries(E)) (t[T] = G), d(T);
+    },
+  };
+}
+function Eo(e = {}) {
+  const {
+      delayMs: t = 1e3,
+      maxRetries: a = 3,
+      backoffMultiplier: r = 2,
+      maxDelayMs: n = 3e4,
+    } = e,
+    o = new Map();
+  function i(u) {
+    const c = t * Math.pow(r, u - 1);
+    return Math.min(c, n);
+  }
+  return {
+    scheduleRetry(u, c, d, f, w) {
+      if (f > a) return null;
+      const O = i(f),
+        _ = {
+          source: u,
+          sourceId: c,
+          context: d,
+          attempt: f,
+          nextRetryTime: Date.now() + O,
+          callback: w,
+        };
+      return o.set(c, _), _;
+    },
+    getPendingRetries() {
+      return Array.from(o.values());
+    },
+    processDueRetries() {
+      const u = Date.now(),
+        c = [];
+      for (const [d, f] of o) f.nextRetryTime <= u && (c.push(f), o.delete(d));
+      return c;
+    },
+    cancelRetry(u) {
+      o.delete(u);
+    },
+    clearAll() {
+      o.clear();
+    },
+  };
+}
+var Co = {
+  constraint: "skip",
+  resolver: "skip",
+  effect: "skip",
+  derivation: "skip",
+  system: "throw",
+};
+function xo(e = {}) {
+  const { config: t = {}, onError: a, onRecovery: r } = e,
+    n = [],
+    o = 100,
+    i = Eo(t.retryLater),
+    u = new Map();
+  function c(f, w, O, _) {
+    if (O instanceof Nn) return O;
+    const U = O instanceof Error ? O.message : String(O),
+      D = f !== "system";
+    return new Nn(U, f, w, _, D);
+  }
+  function d(f, w, O) {
+    const _ = (() => {
+      switch (f) {
+        case "constraint":
+          return t.onConstraintError;
+        case "resolver":
+          return t.onResolverError;
+        case "effect":
+          return t.onEffectError;
+        case "derivation":
+          return t.onDerivationError;
+        default:
+          return;
+      }
+    })();
+    if (typeof _ == "function") {
+      try {
+        _(O, w);
+      } catch (U) {
+        console.error("[Directive] Error in error handler callback:", U);
+      }
+      return "skip";
+    }
+    return typeof _ == "string" ? _ : Co[f];
+  }
+  return {
+    handleError(f, w, O, _) {
+      const U = c(f, w, O, _);
+      n.push(U), n.length > o && n.shift();
+      try {
+        a?.(U);
+      } catch (E) {
+        console.error("[Directive] Error in onError callback:", E);
+      }
+      try {
+        t.onError?.(U);
+      } catch (E) {
+        console.error("[Directive] Error in config.onError callback:", E);
+      }
+      let D = d(f, w, O instanceof Error ? O : new Error(String(O)));
+      if (D === "retry-later") {
+        const E = (u.get(w) ?? 0) + 1;
+        u.set(w, E),
+          i.scheduleRetry(f, w, _, E) ||
+            ((D = "skip"), u.delete(w), typeof process < "u");
+      }
+      try {
+        r?.(U, D);
+      } catch (E) {
+        console.error("[Directive] Error in onRecovery callback:", E);
+      }
+      if (D === "throw") throw U;
+      return D;
+    },
+    getLastError() {
+      return n[n.length - 1] ?? null;
+    },
+    getAllErrors() {
+      return [...n];
+    },
+    clearErrors() {
+      n.length = 0;
+    },
+    getRetryLaterManager() {
+      return i;
+    },
+    processDueRetries() {
+      return i.processDueRetries();
+    },
+    clearRetryAttempts(f) {
+      u.delete(f), i.cancelRetry(f);
+    },
+  };
+}
+function Do() {
+  const e = [];
+  function t(r) {
+    if (r)
+      try {
+        return r();
+      } catch (n) {
+        console.error("[Directive] Plugin error:", n);
+        return;
+      }
+  }
+  async function a(r) {
+    if (r)
+      try {
+        return await r();
+      } catch (n) {
+        console.error("[Directive] Plugin error:", n);
+        return;
+      }
+  }
+  return {
+    register(r) {
+      e.some((n) => n.name === r.name) &&
+        (console.warn(
+          `[Directive] Plugin "${r.name}" is already registered, replacing...`,
+        ),
+        this.unregister(r.name)),
+        e.push(r);
+    },
+    unregister(r) {
+      const n = e.findIndex((o) => o.name === r);
+      n !== -1 && e.splice(n, 1);
+    },
+    getPlugins() {
+      return [...e];
+    },
+    async emitInit(r) {
+      for (const n of e) await a(() => n.onInit?.(r));
+    },
+    emitStart(r) {
+      for (const n of e) t(() => n.onStart?.(r));
+    },
+    emitStop(r) {
+      for (const n of e) t(() => n.onStop?.(r));
+    },
+    emitDestroy(r) {
+      for (const n of e) t(() => n.onDestroy?.(r));
+    },
+    emitFactSet(r, n, o) {
+      for (const i of e) t(() => i.onFactSet?.(r, n, o));
+    },
+    emitFactDelete(r, n) {
+      for (const o of e) t(() => o.onFactDelete?.(r, n));
+    },
+    emitFactsBatch(r) {
+      for (const n of e) t(() => n.onFactsBatch?.(r));
+    },
+    emitDerivationCompute(r, n, o) {
+      for (const i of e) t(() => i.onDerivationCompute?.(r, n, o));
+    },
+    emitDerivationInvalidate(r) {
+      for (const n of e) t(() => n.onDerivationInvalidate?.(r));
+    },
+    emitReconcileStart(r) {
+      for (const n of e) t(() => n.onReconcileStart?.(r));
+    },
+    emitReconcileEnd(r) {
+      for (const n of e) t(() => n.onReconcileEnd?.(r));
+    },
+    emitConstraintEvaluate(r, n) {
+      for (const o of e) t(() => o.onConstraintEvaluate?.(r, n));
+    },
+    emitConstraintError(r, n) {
+      for (const o of e) t(() => o.onConstraintError?.(r, n));
+    },
+    emitRequirementCreated(r) {
+      for (const n of e) t(() => n.onRequirementCreated?.(r));
+    },
+    emitRequirementMet(r, n) {
+      for (const o of e) t(() => o.onRequirementMet?.(r, n));
+    },
+    emitRequirementCanceled(r) {
+      for (const n of e) t(() => n.onRequirementCanceled?.(r));
+    },
+    emitResolverStart(r, n) {
+      for (const o of e) t(() => o.onResolverStart?.(r, n));
+    },
+    emitResolverComplete(r, n, o) {
+      for (const i of e) t(() => i.onResolverComplete?.(r, n, o));
+    },
+    emitResolverError(r, n, o) {
+      for (const i of e) t(() => i.onResolverError?.(r, n, o));
+    },
+    emitResolverRetry(r, n, o) {
+      for (const i of e) t(() => i.onResolverRetry?.(r, n, o));
+    },
+    emitResolverCancel(r, n) {
+      for (const o of e) t(() => o.onResolverCancel?.(r, n));
+    },
+    emitEffectRun(r) {
+      for (const n of e) t(() => n.onEffectRun?.(r));
+    },
+    emitEffectError(r, n) {
+      for (const o of e) t(() => o.onEffectError?.(r, n));
+    },
+    emitSnapshot(r) {
+      for (const n of e) t(() => n.onSnapshot?.(r));
+    },
+    emitTimeTravel(r, n) {
+      for (const o of e) t(() => o.onTimeTravel?.(r, n));
+    },
+    emitError(r) {
+      for (const n of e) t(() => n.onError?.(r));
+    },
+    emitErrorRecovery(r, n) {
+      for (const o of e) t(() => o.onErrorRecovery?.(r, n));
+    },
+    emitRunComplete(r) {
+      for (const n of e) t(() => n.onRunComplete?.(r));
+    },
+  };
+}
+var Ln = { attempts: 1, backoff: "none", initialDelay: 100, maxDelay: 3e4 },
+  Bn = { enabled: !1, windowMs: 50 };
+function Fn(e, t) {
+  let { backoff: a, initialDelay: r = 100, maxDelay: n = 3e4 } = e,
+    o;
+  switch (a) {
+    case "none":
+      o = r;
+      break;
+    case "linear":
+      o = r * t;
+      break;
+    case "exponential":
+      o = r * Math.pow(2, t - 1);
+      break;
+    default:
+      o = r;
+  }
+  return Math.max(1, Math.min(o, n));
+}
+function $o(e) {
+  const {
+      definitions: t,
+      facts: a,
+      store: r,
+      onStart: n,
+      onComplete: o,
+      onError: i,
+      onRetry: u,
+      onCancel: c,
+      onResolutionComplete: d,
+    } = e,
+    f = new Map(),
+    w = new Map(),
+    O = 1e3,
+    _ = new Map(),
+    U = new Map(),
+    D = 1e3;
+  function E() {
+    if (w.size > O) {
+      const k = w.size - O,
+        R = w.keys();
+      for (let $ = 0; $ < k; $++) {
+        const I = R.next().value;
+        I && w.delete(I);
+      }
+    }
+  }
+  function T(k) {
+    return (
+      typeof k == "object" &&
+      k !== null &&
+      "requirement" in k &&
+      typeof k.requirement == "string"
+    );
+  }
+  function G(k) {
+    return (
+      typeof k == "object" &&
+      k !== null &&
+      "requirement" in k &&
+      typeof k.requirement == "function"
+    );
+  }
+  function J(k, R) {
+    return T(k) ? R.type === k.requirement : G(k) ? k.requirement(R) : !1;
+  }
+  function m(k) {
+    const R = k.type,
+      $ = U.get(R);
+    if ($)
+      for (const I of $) {
+        const H = t[I];
+        if (H && J(H, k)) return I;
+      }
+    for (const [I, H] of Object.entries(t))
+      if (J(H, k)) {
+        if (!U.has(R)) {
+          if (U.size >= D) {
+            const V = U.keys().next().value;
+            V !== void 0 && U.delete(V);
+          }
+          U.set(R, []);
+        }
+        const ee = U.get(R);
+        return ee.includes(I) || ee.push(I), I;
+      }
+    return null;
+  }
+  function M(k) {
+    return { facts: a, signal: k, snapshot: () => a.$snapshot() };
+  }
+  async function S(k, R, $) {
+    const I = t[k];
+    if (!I) return;
+    let H = { ...Ln, ...I.retry },
+      ee = null;
+    for (let V = 1; V <= H.attempts; V++) {
+      if ($.signal.aborted) return;
+      const y = f.get(R.id);
+      y &&
+        ((y.attempt = V),
+        (y.status = {
+          state: "running",
+          requirementId: R.id,
+          startedAt: y.startedAt,
+          attempt: V,
+        }));
+      try {
+        const z = M($.signal);
+        if (I.resolve) {
+          let l;
+          r.batch(() => {
+            l = I.resolve(R.requirement, z);
+          });
+          const x = I.timeout;
+          x && x > 0
+            ? await Br(l, x, `Resolver "${k}" timed out after ${x}ms`)
+            : await l;
+        }
+        const v = Date.now() - (y?.startedAt ?? Date.now());
+        w.set(R.id, {
+          state: "success",
+          requirementId: R.id,
+          completedAt: Date.now(),
+          duration: v,
+        }),
+          E(),
+          o?.(k, R, v);
+        return;
+      } catch (z) {
+        if (
+          ((ee = z instanceof Error ? z : new Error(String(z))),
+          $.signal.aborted)
+        )
+          return;
+        if (H.shouldRetry && !H.shouldRetry(ee, V)) break;
+        if (V < H.attempts) {
+          if ($.signal.aborted) return;
+          const v = Fn(H, V);
+          if (
+            (u?.(k, R, V + 1),
+            await new Promise((l) => {
+              const x = setTimeout(l, v),
+                P = () => {
+                  clearTimeout(x), l();
+                };
+              $.signal.addEventListener("abort", P, { once: !0 });
+            }),
+            $.signal.aborted)
+          )
+            return;
+        }
+      }
+    }
+    w.set(R.id, {
+      state: "error",
+      requirementId: R.id,
+      error: ee,
+      failedAt: Date.now(),
+      attempts: H.attempts,
+    }),
+      E(),
+      i?.(k, R, ee);
+  }
+  async function j(k, R) {
+    const $ = t[k];
+    if (!$) return;
+    if (!$.resolveBatch && !$.resolveBatchWithResults) {
+      await Promise.all(
+        R.map((v) => {
+          const l = new AbortController();
+          return S(k, v, l);
+        }),
+      );
+      return;
+    }
+    let I = { ...Ln, ...$.retry },
+      H = { ...Bn, ...$.batch },
+      ee = new AbortController(),
+      V = Date.now(),
+      y = null,
+      z = H.timeoutMs ?? $.timeout;
+    for (let v = 1; v <= I.attempts; v++) {
+      if (ee.signal.aborted) return;
+      try {
+        const l = M(ee.signal),
+          x = R.map((P) => P.requirement);
+        if ($.resolveBatchWithResults) {
+          let P, K;
+          if (
+            (r.batch(() => {
+              K = $.resolveBatchWithResults(x, l);
+            }),
+            z && z > 0
+              ? (P = await Br(
+                  K,
+                  z,
+                  `Batch resolver "${k}" timed out after ${z}ms`,
+                ))
+              : (P = await K),
+            P.length !== R.length)
+          )
+            throw new Error(
+              `[Directive] Batch resolver "${k}" returned ${P.length} results but expected ${R.length}. Results array must match input order.`,
+            );
+          let ae = Date.now() - V,
+            Ne = !1;
+          for (let _e = 0; _e < R.length; _e++) {
+            const we = R[_e],
+              ze = P[_e];
+            if (ze.success)
+              w.set(we.id, {
+                state: "success",
+                requirementId: we.id,
+                completedAt: Date.now(),
+                duration: ae,
+              }),
+                o?.(k, we, ae);
+            else {
+              Ne = !0;
+              const We = ze.error ?? new Error("Batch item failed");
+              w.set(we.id, {
+                state: "error",
+                requirementId: we.id,
+                error: We,
+                failedAt: Date.now(),
+                attempts: v,
+              }),
+                i?.(k, we, We);
+            }
+          }
+          if (!Ne || R.some((_e, we) => P[we]?.success)) return;
+        } else {
+          let P;
+          r.batch(() => {
+            P = $.resolveBatch(x, l);
+          }),
+            z && z > 0
+              ? await Br(P, z, `Batch resolver "${k}" timed out after ${z}ms`)
+              : await P;
+          const K = Date.now() - V;
+          for (const ae of R)
+            w.set(ae.id, {
+              state: "success",
+              requirementId: ae.id,
+              completedAt: Date.now(),
+              duration: K,
+            }),
+              o?.(k, ae, K);
+          return;
+        }
+      } catch (l) {
+        if (
+          ((y = l instanceof Error ? l : new Error(String(l))),
+          ee.signal.aborted)
+        )
+          return;
+        if (I.shouldRetry && !I.shouldRetry(y, v)) break;
+        if (v < I.attempts) {
+          const x = Fn(I, v);
+          for (const P of R) u?.(k, P, v + 1);
+          if (
+            (await new Promise((P) => {
+              const K = setTimeout(P, x),
+                ae = () => {
+                  clearTimeout(K), P();
+                };
+              ee.signal.addEventListener("abort", ae, { once: !0 });
+            }),
+            ee.signal.aborted)
+          )
+            return;
+        }
+      }
+    }
+    for (const v of R)
+      w.set(v.id, {
+        state: "error",
+        requirementId: v.id,
+        error: y,
+        failedAt: Date.now(),
+        attempts: I.attempts,
+      }),
+        i?.(k, v, y);
+    E();
+  }
+  function F(k, R) {
+    const $ = t[k];
+    if (!$) return;
+    const I = { ...Bn, ...$.batch };
+    _.has(k) || _.set(k, { resolverId: k, requirements: [], timer: null });
+    const H = _.get(k);
+    H.requirements.push(R),
+      H.timer && clearTimeout(H.timer),
+      (H.timer = setTimeout(() => {
+        ne(k);
+      }, I.windowMs));
+  }
+  function ne(k) {
+    const R = _.get(k);
+    if (!R || R.requirements.length === 0) return;
+    const $ = [...R.requirements];
+    (R.requirements = []),
+      (R.timer = null),
+      j(k, $).then(() => {
+        d?.();
+      });
+  }
+  return {
+    resolve(k) {
+      if (f.has(k.id)) return;
+      const R = m(k.requirement);
+      if (!R) {
+        console.warn(`[Directive] No resolver found for requirement: ${k.id}`);
+        return;
+      }
+      const $ = t[R];
+      if (!$) return;
+      if ($.batch?.enabled) {
+        F(R, k);
+        return;
+      }
+      const I = new AbortController(),
+        H = Date.now(),
+        ee = {
+          requirementId: k.id,
+          resolverId: R,
+          controller: I,
+          startedAt: H,
+          attempt: 1,
+          status: { state: "pending", requirementId: k.id, startedAt: H },
+          originalRequirement: k,
+        };
+      f.set(k.id, ee),
+        n?.(R, k),
+        S(R, k, I).finally(() => {
+          f.delete(k.id) && d?.();
+        });
+    },
+    cancel(k) {
+      const R = f.get(k);
+      R &&
+        (R.controller.abort(),
+        f.delete(k),
+        w.set(k, {
+          state: "canceled",
+          requirementId: k,
+          canceledAt: Date.now(),
+        }),
+        E(),
+        c?.(R.resolverId, R.originalRequirement));
+    },
+    cancelAll() {
+      for (const [k] of f) this.cancel(k);
+      for (const k of _.values()) k.timer && clearTimeout(k.timer);
+      _.clear();
+    },
+    getStatus(k) {
+      const R = f.get(k);
+      return R ? R.status : w.get(k) || { state: "idle" };
+    },
+    getInflight() {
+      return [...f.keys()];
+    },
+    getInflightInfo() {
+      return [...f.values()].map((k) => ({
+        id: k.requirementId,
+        resolverId: k.resolverId,
+        startedAt: k.startedAt,
+      }));
+    },
+    isResolving(k) {
+      return f.has(k);
+    },
+    processBatches() {
+      for (const k of _.keys()) ne(k);
+    },
+    registerDefinitions(k) {
+      for (const [R, $] of Object.entries(k)) t[R] = $;
+      U.clear();
+    },
+  };
+}
+function Ao(e) {
+  let { config: t, facts: a, store: r, onSnapshot: n, onTimeTravel: o } = e,
+    i = t.timeTravel ?? !1,
+    u = t.maxSnapshots ?? 100,
+    c = [],
+    d = -1,
+    f = 1,
+    w = !1,
+    O = !1,
+    _ = [],
+    U = null,
+    D = -1;
+  function E() {
+    return r.toObject();
+  }
+  function T() {
+    const J = E();
+    return structuredClone(J);
+  }
+  function G(J) {
+    if (!Cr(J)) {
+      console.error(
+        "[Directive] Potential prototype pollution detected in snapshot data, skipping restore",
+      );
+      return;
+    }
+    r.batch(() => {
+      for (const [m, M] of Object.entries(J)) {
+        if (m === "__proto__" || m === "constructor" || m === "prototype") {
+          console.warn(
+            `[Directive] Skipping dangerous key "${m}" during fact restoration`,
+          );
+          continue;
+        }
+        a[m] = M;
+      }
+    });
+  }
+  return {
+    get isEnabled() {
+      return i;
+    },
+    get isRestoring() {
+      return O;
+    },
+    get isPaused() {
+      return w;
+    },
+    get snapshots() {
+      return [...c];
+    },
+    get currentIndex() {
+      return d;
+    },
+    takeSnapshot(J) {
+      if (!i || w)
+        return { id: -1, timestamp: Date.now(), facts: {}, trigger: J };
+      const m = { id: f++, timestamp: Date.now(), facts: T(), trigger: J };
+      for (
+        d < c.length - 1 && c.splice(d + 1), c.push(m), d = c.length - 1;
+        c.length > u;
+      )
+        c.shift(), d--;
+      return n?.(m), m;
+    },
+    restore(J) {
+      if (i) {
+        (w = !0), (O = !0);
+        try {
+          G(J.facts);
+        } finally {
+          (w = !1), (O = !1);
+        }
+      }
+    },
+    goBack(J = 1) {
+      if (!i || c.length === 0) return;
+      let m = d,
+        M = d,
+        S = _.find((F) => d > F.startIndex && d <= F.endIndex);
+      if (S) M = S.startIndex;
+      else if (_.find((F) => d === F.startIndex)) {
+        const F = _.find((ne) => ne.endIndex < d && d - ne.endIndex <= J);
+        M = F ? F.startIndex : Math.max(0, d - J);
+      } else M = Math.max(0, d - J);
+      if (m === M) return;
+      d = M;
+      const j = c[d];
+      j && (this.restore(j), o?.(m, M));
+    },
+    goForward(J = 1) {
+      if (!i || c.length === 0) return;
+      let m = d,
+        M = d,
+        S = _.find((F) => d >= F.startIndex && d < F.endIndex);
+      if ((S ? (M = S.endIndex) : (M = Math.min(c.length - 1, d + J)), m === M))
+        return;
+      d = M;
+      const j = c[d];
+      j && (this.restore(j), o?.(m, M));
+    },
+    goTo(J) {
+      if (!i) return;
+      const m = c.findIndex((j) => j.id === J);
+      if (m === -1) {
+        console.warn(`[Directive] Snapshot ${J} not found`);
+        return;
+      }
+      const M = d;
+      d = m;
+      const S = c[d];
+      S && (this.restore(S), o?.(M, m));
+    },
+    replay() {
+      if (!i || c.length === 0) return;
+      d = 0;
+      const J = c[0];
+      J && this.restore(J);
+    },
+    export() {
+      return JSON.stringify({ version: 1, snapshots: c, currentIndex: d });
+    },
+    import(J) {
+      if (i)
+        try {
+          const m = JSON.parse(J);
+          if (typeof m != "object" || m === null)
+            throw new Error("Invalid time-travel data: expected object");
+          if (m.version !== 1)
+            throw new Error(
+              `Unsupported time-travel export version: ${m.version}`,
+            );
+          if (!Array.isArray(m.snapshots))
+            throw new Error(
+              "Invalid time-travel data: snapshots must be an array",
+            );
+          if (typeof m.currentIndex != "number")
+            throw new Error(
+              "Invalid time-travel data: currentIndex must be a number",
+            );
+          for (const S of m.snapshots) {
+            if (typeof S != "object" || S === null)
+              throw new Error("Invalid snapshot: expected object");
+            if (
+              typeof S.id != "number" ||
+              typeof S.timestamp != "number" ||
+              typeof S.trigger != "string" ||
+              typeof S.facts != "object"
+            )
+              throw new Error("Invalid snapshot structure");
+            if (!Cr(S.facts))
+              throw new Error(
+                "Invalid fact data: potential prototype pollution detected in nested objects",
+              );
+          }
+          (c.length = 0), c.push(...m.snapshots), (d = m.currentIndex);
+          const M = c[d];
+          M && this.restore(M);
+        } catch (m) {
+          console.error("[Directive] Failed to import time-travel data:", m);
+        }
+    },
+    beginChangeset(J) {
+      i && ((U = J), (D = d));
+    },
+    endChangeset() {
+      !i ||
+        U === null ||
+        (d > D && _.push({ label: U, startIndex: D, endIndex: d }),
+        (U = null),
+        (D = -1));
+    },
+    pause() {
+      w = !0;
+    },
+    resume() {
+      w = !1;
+    },
+  };
+}
+function Io() {
+  const e = { id: -1, timestamp: 0, facts: {}, trigger: "" };
+  return {
+    isEnabled: !1,
+    isRestoring: !1,
+    isPaused: !1,
+    snapshots: [],
+    currentIndex: -1,
+    takeSnapshot: () => e,
+    restore: () => {},
+    goBack: () => {},
+    goForward: () => {},
+    goTo: () => {},
+    replay: () => {},
+    export: () => "{}",
+    import: () => {},
+    beginChangeset: () => {},
+    endChangeset: () => {},
+    pause: () => {},
+    resume: () => {},
+  };
+}
+var Rt = new Set(["__proto__", "constructor", "prototype"]);
+function ha(e) {
+  const t = Object.create(null),
+    a = Object.create(null),
+    r = Object.create(null),
+    n = Object.create(null),
+    o = Object.create(null),
+    i = Object.create(null);
+  for (const p of e.modules) {
+    const A = (Y, Z) => {
+      if (Y) {
+        for (const xe of Object.keys(Y))
+          if (Rt.has(xe))
+            throw new Error(
+              `[Directive] Security: Module "${p.id}" has dangerous key "${xe}" in ${Z}. This could indicate a prototype pollution attempt.`,
+            );
+      }
+    };
+    A(p.schema, "schema"),
+      A(p.events, "events"),
+      A(p.derive, "derive"),
+      A(p.effects, "effects"),
+      A(p.constraints, "constraints"),
+      A(p.resolvers, "resolvers"),
+      Object.assign(t, p.schema),
+      p.events && Object.assign(a, p.events),
+      p.derive && Object.assign(r, p.derive),
+      p.effects && Object.assign(n, p.effects),
+      p.constraints && Object.assign(o, p.constraints),
+      p.resolvers && Object.assign(i, p.resolvers);
+  }
+  let u = null;
+  if (e.modules.some((p) => p.snapshotEvents)) {
+    u = new Set();
+    for (const p of e.modules) {
+      const A = p;
+      if (A.snapshotEvents) for (const Y of A.snapshotEvents) u.add(Y);
+      else if (A.events) for (const Y of Object.keys(A.events)) u.add(Y);
+    }
+  }
+  let c = 0,
+    d = !1,
+    f = Do();
+  for (const p of e.plugins ?? []) f.register(p);
+  let w = xo({
+      config: e.errorBoundary,
+      onError: (p) => f.emitError(p),
+      onRecovery: (p, A) => f.emitErrorRecovery(p, A),
+    }),
+    O = () => {},
+    _ = () => {},
+    U = null,
+    D = e.debug?.runHistory ?? !1,
+    E = e.debug?.maxRuns ?? 100,
+    T = [],
+    G = new Map(),
+    J = 0,
+    m = null,
+    M = [],
+    S = new Map(),
+    j = new Map(),
+    F = new Map(),
+    ne = null,
+    k = 0,
+    R = 0,
+    $ = {
+      count: 0,
+      totalDuration: 0,
+      avgDuration: 0,
+      maxDuration: 0,
+      avgResolverCount: 0,
+      totalResolverCount: 0,
+      avgFactChangeCount: 0,
+      totalFactChangeCount: 0,
+    },
+    { store: I, facts: H } = go({
+      schema: t,
+      onChange: (p, A, Y) => {
+        f.emitFactSet(p, A, Y),
+          O(p),
+          D && M.push({ key: String(p), oldValue: Y, newValue: A }),
+          !U?.isRestoring && (c === 0 && (d = !0), ve.changedKeys.add(p), q());
+      },
+      onBatch: (p) => {
+        f.emitFactsBatch(p);
+        const A = [];
+        for (const Y of p) A.push(Y.key);
+        if (D)
+          for (const Y of p)
+            Y.type === "delete"
+              ? M.push({ key: Y.key, oldValue: Y.prev, newValue: void 0 })
+              : M.push({ key: Y.key, oldValue: Y.prev, newValue: Y.value });
+        if ((_(A), !U?.isRestoring)) {
+          c === 0 && (d = !0);
+          for (const Y of p) ve.changedKeys.add(Y.key);
+          q();
+        }
+      },
+    }),
+    ee = ko({
+      definitions: r,
+      facts: H,
+      onCompute: (p, A, Y, Z) => {
+        f.emitDerivationCompute(p, A, Z),
+          m &&
+            m.derivationsRecomputed.push({
+              id: p,
+              deps: Z ? [...Z] : [],
+              oldValue: Y,
+              newValue: A,
+            });
+      },
+      onInvalidate: (p) => f.emitDerivationInvalidate(p),
+      onError: (p, A) => {
+        w.handleError("derivation", p, A);
+      },
+    });
+  (O = (p) => ee.invalidate(p)), (_ = (p) => ee.invalidateMany(p));
+  const V = So({
+      definitions: n,
+      facts: H,
+      store: I,
+      onRun: (p, A) => {
+        f.emitEffectRun(p), m && m.effectsRun.push({ id: p, triggeredBy: A });
+      },
+      onError: (p, A) => {
+        w.handleError("effect", p, A),
+          f.emitEffectError(p, A),
+          m && m.effectErrors.push({ id: p, error: String(A) });
+      },
+    }),
+    y = wo({
+      definitions: o,
+      facts: H,
+      onEvaluate: (p, A) => f.emitConstraintEvaluate(p, A),
+      onError: (p, A) => {
+        w.handleError("constraint", p, A), f.emitConstraintError(p, A);
+      },
+    });
+  function z(p) {
+    const A = G.get(p);
+    if (A && A.status === "pending") {
+      A.status = "settled";
+      const Y = F.get(p);
+      (A.duration =
+        Y !== void 0 ? performance.now() - Y : Date.now() - A.timestamp),
+        F.delete(p),
+        j.delete(p),
+        (A.causalChain = x(A)),
+        P(A),
+        R++,
+        f.emitRunComplete(A);
+    }
+  }
+  function v(p) {
+    const A = S.get(p);
+    if ((S.delete(p), A !== void 0)) {
+      const Y = (j.get(A) ?? 1) - 1;
+      Y <= 0 ? z(A) : j.set(A, Y);
+    }
+  }
+  function l() {
+    const p = T.shift();
+    if (p && (G.delete(p.id), F.delete(p.id), p.status === "pending")) {
+      j.delete(p.id);
+      for (const [A, Y] of S) Y === p.id && S.delete(A);
+    }
+  }
+  function x(p) {
+    const A = [];
+    for (const Y of p.factChanges) A.push(`${Y.key} changed`);
+    for (const Y of p.derivationsRecomputed) A.push(`${Y.id} recomputed`);
+    for (const Y of p.constraintsHit) A.push(`${Y.id} constraint hit`);
+    for (const Y of p.requirementsAdded) A.push(`${Y.type} requirement added`);
+    for (const Y of p.resolversCompleted)
+      A.push(`${Y.resolver} resolved (${Y.duration.toFixed(0)}ms)`);
+    for (const Y of p.resolversErrored) A.push(`${Y.resolver} errored`);
+    for (const Y of p.effectsRun) A.push(`${Y.id} effect ran`);
+    return A.join(" → ");
+  }
+  function P(p) {
+    $.count++,
+      ($.totalDuration += p.duration),
+      ($.avgDuration = $.totalDuration / $.count),
+      p.duration > $.maxDuration && ($.maxDuration = p.duration);
+    const A = p.resolversStarted.length;
+    ($.totalResolverCount += A),
+      ($.avgResolverCount = $.totalResolverCount / $.count);
+    const Y = p.factChanges.length;
+    ($.totalFactChangeCount += Y),
+      ($.avgFactChangeCount = $.totalFactChangeCount / $.count);
+    const Z = [];
+    $.count > 3 &&
+      p.duration > $.avgDuration * 5 &&
+      Z.push(
+        `Duration ${p.duration.toFixed(0)}ms is 5x+ above average (${$.avgDuration.toFixed(0)}ms)`,
+      ),
+      p.resolversErrored.length > 0 &&
+        Z.push(`${p.resolversErrored.length} resolver(s) errored`),
+      Z.length > 0 && (p.anomalies = Z);
+  }
+  const K = $o({
+      definitions: i,
+      facts: H,
+      store: I,
+      onStart: (p, A) => f.emitResolverStart(p, A),
+      onComplete: (p, A, Y) => {
+        if (
+          (f.emitResolverComplete(p, A, Y),
+          f.emitRequirementMet(A, p),
+          y.markResolved(A.fromConstraint),
+          D)
+        ) {
+          const Z = S.get(A.id);
+          if (Z !== void 0) {
+            const xe = G.get(Z);
+            xe &&
+              xe.resolversCompleted.push({
+                resolver: p,
+                requirementId: A.id,
+                duration: Y,
+              });
+          }
+          v(A.id);
+        }
+      },
+      onError: (p, A, Y) => {
+        if (
+          (w.handleError("resolver", p, Y, A), f.emitResolverError(p, A, Y), D)
+        ) {
+          const Z = S.get(A.id);
+          if (Z !== void 0) {
+            const xe = G.get(Z);
+            xe &&
+              xe.resolversErrored.push({
+                resolver: p,
+                requirementId: A.id,
+                error: String(Y),
+              });
+          }
+          v(A.id);
+        }
+      },
+      onRetry: (p, A, Y) => f.emitResolverRetry(p, A, Y),
+      onCancel: (p, A) => {
+        f.emitResolverCancel(p, A), f.emitRequirementCanceled(A), D && v(A.id);
+      },
+      onResolutionComplete: () => {
+        ze(), q();
+      },
+    }),
+    ae = new Set();
+  function Ne() {
+    for (const p of ae) p();
+  }
+  const _e = e.debug?.timeTravel
+    ? Ao({
+        config: e.debug,
+        facts: H,
+        store: I,
+        onSnapshot: (p) => {
+          f.emitSnapshot(p), Ne();
+        },
+        onTimeTravel: (p, A) => {
+          f.emitTimeTravel(p, A), Ne();
+        },
+      })
+    : Io();
+  U = _e;
+  const we = new Set();
+  function ze() {
+    for (const p of we) p();
+  }
+  let We = 50,
+    Qe = 0,
+    ve = {
+      isRunning: !1,
+      isReconciling: !1,
+      reconcileScheduled: !1,
+      isInitializing: !1,
+      isInitialized: !1,
+      isReady: !1,
+      isDestroyed: !1,
+      changedKeys: new Set(),
+      previousRequirements: new gn(),
+      readyPromise: null,
+      readyResolve: null,
+    };
+  function q() {
+    !ve.isRunning ||
+      ve.reconcileScheduled ||
+      ve.isInitializing ||
+      ((ve.reconcileScheduled = !0),
+      ze(),
+      queueMicrotask(() => {
+        (ve.reconcileScheduled = !1),
+          ve.isRunning && !ve.isInitializing && N().catch((p) => {});
+      }));
+  }
+  async function N() {
+    if (ve.isReconciling) return;
+    if ((Qe++, Qe > We)) {
+      D && (M.length = 0), (Qe = 0);
+      return;
+    }
+    (ve.isReconciling = !0), ze();
+    const p = D ? performance.now() : 0;
+    if (D) {
+      const A = ++J;
+      F.set(A, p),
+        (m = {
+          id: A,
+          timestamp: Date.now(),
+          duration: 0,
+          status: "pending",
+          factChanges: M.splice(0),
+          derivationsRecomputed: [],
+          constraintsHit: [],
+          requirementsAdded: [],
+          requirementsRemoved: [],
+          resolversStarted: [],
+          resolversCompleted: [],
+          resolversErrored: [],
+          effectsRun: [],
+          effectErrors: [],
+        });
+    }
+    try {
+      ve.changedKeys.size > 0 &&
+        ((u === null || d) &&
+          _e.takeSnapshot(`facts-changed:${[...ve.changedKeys].join(",")}`),
+        (d = !1));
+      const A = H.$snapshot();
+      f.emitReconcileStart(A), await V.runEffects(ve.changedKeys);
+      const Y = new Set(ve.changedKeys);
+      ve.changedKeys.clear();
+      const Z = await y.evaluate(Y),
+        xe = new gn();
+      for (const re of Z) xe.add(re), f.emitRequirementCreated(re);
+      if (m) {
+        const re = new Set(Z.map((ke) => ke.fromConstraint));
+        for (const ke of re) {
+          const Ie = y.getState(ke);
+          if (Ie) {
+            const Le = y.getDependencies(ke);
+            m.constraintsHit.push({
+              id: ke,
+              priority: Ie.priority,
+              deps: Le ? [...Le] : [],
+            });
+          }
+        }
+      }
+      const { added: te, removed: Je } = xe.diff(ve.previousRequirements);
+      if (m) {
+        for (const re of te)
+          m.requirementsAdded.push({
+            id: re.id,
+            type: re.requirement.type,
+            fromConstraint: re.fromConstraint,
+          });
+        for (const re of Je)
+          m.requirementsRemoved.push({
+            id: re.id,
+            type: re.requirement.type,
+            fromConstraint: re.fromConstraint,
+          });
+      }
+      for (const re of Je) K.cancel(re.id);
+      for (const re of te) K.resolve(re);
+      if (m) {
+        const re = K.getInflightInfo();
+        for (const ke of te) {
+          const Ie = re.find((Le) => Le.id === ke.id);
+          m.resolversStarted.push({
+            resolver: Ie?.resolverId ?? "unknown",
+            requirementId: ke.id,
+          }),
+            S.set(ke.id, m.id);
+        }
+      }
+      ve.previousRequirements = xe;
+      const Fe = K.getInflightInfo(),
+        Ue = {
+          unmet: Z.filter((re) => !K.isResolving(re.id)),
+          inflight: Fe,
+          completed: [],
+          canceled: Je.map((re) => ({
+            id: re.id,
+            resolverId:
+              Fe.find((ke) => ke.id === re.id)?.resolverId ?? "unknown",
+          })),
+        };
+      f.emitReconcileEnd(Ue),
+        ve.isReady ||
+          ((ve.isReady = !0),
+          ve.readyResolve && (ve.readyResolve(), (ve.readyResolve = null)));
+    } finally {
+      if (m) {
+        if (
+          ((m.duration = performance.now() - p),
+          m.factChanges.length > 0 ||
+            m.constraintsHit.length > 0 ||
+            m.requirementsAdded.length > 0 ||
+            m.effectsRun.length > 0)
+        ) {
+          const A = m.resolversStarted.length;
+          A === 0
+            ? ((m.status = "settled"),
+              (m.causalChain = x(m)),
+              P(m),
+              T.push(m),
+              G.set(m.id, m),
+              T.length > E && l(),
+              R++,
+              f.emitRunComplete(m))
+            : ((m.status = "pending"),
+              T.push(m),
+              G.set(m.id, m),
+              T.length > E && l(),
+              R++,
+              j.set(m.id, A));
+        } else F.delete(m.id);
+        m = null;
+      }
+      (ve.isReconciling = !1),
+        ve.changedKeys.size > 0 ? q() : ve.reconcileScheduled || (Qe = 0),
+        ze();
+    }
+  }
+  const ie = new Proxy(
+      {},
+      {
+        get(p, A) {
+          if (typeof A != "symbol" && !Rt.has(A)) return ee.get(A);
+        },
+        has(p, A) {
+          return typeof A == "symbol" || Rt.has(A) ? !1 : A in r;
+        },
+        ownKeys() {
+          return Object.keys(r);
+        },
+        getOwnPropertyDescriptor(p, A) {
+          if (typeof A != "symbol" && !Rt.has(A) && A in r)
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    ),
+    le = new Proxy(
+      {},
+      {
+        get(p, A) {
+          if (typeof A != "symbol" && !Rt.has(A))
+            return (Y) => {
+              const Z = a[A];
+              if (Z) {
+                c++, (u === null || u.has(A)) && (d = !0);
+                try {
+                  I.batch(() => {
+                    Z(H, { type: A, ...Y });
+                  });
+                } finally {
+                  c--;
+                }
+              }
+            };
+        },
+        has(p, A) {
+          return typeof A == "symbol" || Rt.has(A) ? !1 : A in a;
+        },
+        ownKeys() {
+          return Object.keys(a);
+        },
+        getOwnPropertyDescriptor(p, A) {
+          if (typeof A != "symbol" && !Rt.has(A) && A in a)
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    ),
+    de = {
+      facts: H,
+      debug: _e.isEnabled ? _e : null,
+      derive: ie,
+      events: le,
+      constraints: {
+        disable: (p) => y.disable(p),
+        enable: (p) => y.enable(p),
+        isDisabled: (p) => y.isDisabled(p),
+      },
+      effects: {
+        disable: (p) => V.disable(p),
+        enable: (p) => V.enable(p),
+        isEnabled: (p) => V.isEnabled(p),
+      },
+      get runHistory() {
+        return D ? ((!ne || k !== R) && ((ne = [...T]), (k = R)), ne) : null;
+      },
+      initialize() {
+        if (!ve.isInitialized) {
+          ve.isInitializing = !0;
+          for (const p of e.modules)
+            p.init &&
+              I.batch(() => {
+                p.init(H);
+              });
+          e.onAfterModuleInit &&
+            I.batch(() => {
+              e.onAfterModuleInit();
+            }),
+            (ve.isInitializing = !1),
+            (ve.isInitialized = !0);
+          for (const p of Object.keys(r)) ee.get(p);
+        }
+      },
+      start() {
+        if (!ve.isRunning) {
+          ve.isInitialized || this.initialize(), (ve.isRunning = !0);
+          for (const p of e.modules) p.hooks?.onStart?.(de);
+          f.emitStart(de), q();
+        }
+      },
+      stop() {
+        if (ve.isRunning) {
+          (ve.isRunning = !1), K.cancelAll(), V.cleanupAll();
+          for (const p of e.modules) p.hooks?.onStop?.(de);
+          f.emitStop(de);
+        }
+      },
+      destroy() {
+        this.stop(),
+          (ve.isDestroyed = !0),
+          we.clear(),
+          ae.clear(),
+          (T.length = 0),
+          G.clear(),
+          S.clear(),
+          j.clear(),
+          F.clear(),
+          (M.length = 0),
+          (m = null),
+          (ne = null),
+          f.emitDestroy(de);
+      },
+      dispatch(p) {
+        if (Rt.has(p.type)) return;
+        const A = a[p.type];
+        if (A) {
+          c++, (u === null || u.has(p.type)) && (d = !0);
+          try {
+            I.batch(() => {
+              A(H, p);
+            });
+          } finally {
+            c--;
+          }
+        }
+      },
+      read(p) {
+        return ee.get(p);
+      },
+      subscribe(p, A) {
+        const Y = [],
+          Z = [];
+        for (const te of p) te in r ? Y.push(te) : te in t && Z.push(te);
+        const xe = [];
+        return (
+          Y.length > 0 && xe.push(ee.subscribe(Y, A)),
+          Z.length > 0 && xe.push(I.subscribe(Z, A)),
+          () => {
+            for (const te of xe) te();
+          }
+        );
+      },
+      watch(p, A, Y) {
+        const Z = Y?.equalityFn
+          ? (te, Je) => Y.equalityFn(te, Je)
+          : (te, Je) => Object.is(te, Je);
+        if (p in r) {
+          let te = ee.get(p);
+          return ee.subscribe([p], () => {
+            const Je = ee.get(p);
+            if (!Z(Je, te)) {
+              const Fe = te;
+              (te = Je), A(Je, Fe);
+            }
+          });
+        }
+        let xe = I.get(p);
+        return I.subscribe([p], () => {
+          const te = I.get(p);
+          if (!Z(te, xe)) {
+            const Je = xe;
+            (xe = te), A(te, Je);
+          }
+        });
+      },
+      when(p, A) {
+        return new Promise((Y, Z) => {
+          const xe = I.toObject();
+          if (p(xe)) {
+            Y();
+            return;
+          }
+          let te,
+            Je,
+            Fe = () => {
+              te?.(), Je !== void 0 && clearTimeout(Je);
+            };
+          (te = I.subscribeAll(() => {
+            const Ue = I.toObject();
+            p(Ue) && (Fe(), Y());
+          })),
+            A?.timeout !== void 0 &&
+              A.timeout > 0 &&
+              (Je = setTimeout(() => {
+                Fe(),
+                  Z(
+                    new Error(
+                      `[Directive] when: timed out after ${A.timeout}ms`,
+                    ),
+                  );
+              }, A.timeout));
+        });
+      },
+      inspect() {
+        return {
+          unmet: ve.previousRequirements.all(),
+          inflight: K.getInflightInfo(),
+          constraints: y
+            .getAllStates()
+            .map((p) => ({
+              id: p.id,
+              active: p.lastResult ?? !1,
+              disabled: y.isDisabled(p.id),
+              priority: p.priority,
+              hitCount: p.hitCount,
+              lastActiveAt: p.lastActiveAt,
+            })),
+          resolvers: Object.fromEntries(
+            K.getInflight().map((p) => [p, K.getStatus(p)]),
+          ),
+          resolverDefs: Object.entries(i).map(([p, A]) => ({
+            id: p,
+            requirement:
+              typeof A.requirement == "string" ? A.requirement : "(predicate)",
+          })),
+          runHistoryEnabled: D,
+          ...(D
+            ? {
+                runHistory: T.map((p) => ({
+                  ...p,
+                  factChanges: p.factChanges.map((A) => ({ ...A })),
+                  derivationsRecomputed: p.derivationsRecomputed.map((A) => ({
+                    ...A,
+                    deps: [...A.deps],
+                  })),
+                  constraintsHit: p.constraintsHit.map((A) => ({
+                    ...A,
+                    deps: [...A.deps],
+                  })),
+                  requirementsAdded: p.requirementsAdded.map((A) => ({ ...A })),
+                  requirementsRemoved: p.requirementsRemoved.map((A) => ({
+                    ...A,
+                  })),
+                  resolversStarted: p.resolversStarted.map((A) => ({ ...A })),
+                  resolversCompleted: p.resolversCompleted.map((A) => ({
+                    ...A,
+                  })),
+                  resolversErrored: p.resolversErrored.map((A) => ({ ...A })),
+                  effectsRun: p.effectsRun.map((A) => ({
+                    ...A,
+                    triggeredBy: [...A.triggeredBy],
+                  })),
+                  effectErrors: p.effectErrors.map((A) => ({ ...A })),
+                })),
+              }
+            : {}),
+        };
+      },
+      explain(p) {
+        const A = ve.previousRequirements.all().find((re) => re.id === p);
+        if (!A) return null;
+        const Y = y.getState(A.fromConstraint),
+          Z = K.getStatus(p),
+          xe = {},
+          te = I.toObject();
+        for (const [re, ke] of Object.entries(te)) xe[re] = ke;
+        const Je = [
+            `Requirement "${A.requirement.type}" (id: ${A.id})`,
+            `├─ Produced by constraint: ${A.fromConstraint}`,
+            `├─ Constraint priority: ${Y?.priority ?? 0}`,
+            `├─ Constraint active: ${Y?.lastResult ?? "unknown"}`,
+            `├─ Resolver status: ${Z.state}`,
+          ],
+          Fe = Object.entries(A.requirement)
+            .filter(([re]) => re !== "type")
+            .map(([re, ke]) => `${re}=${JSON.stringify(ke)}`)
+            .join(", ");
+        Fe && Je.push(`├─ Requirement payload: { ${Fe} }`);
+        const Ue = Object.entries(xe).slice(0, 10);
+        return (
+          Ue.length > 0 &&
+            (Je.push("└─ Relevant facts:"),
+            Ue.forEach(([re, ke], Ie) => {
+              const Le = Ie === Ue.length - 1 ? "   └─" : "   ├─",
+                Me = typeof ke == "object" ? JSON.stringify(ke) : String(ke);
+              Je.push(
+                `${Le} ${re} = ${Me.slice(0, 50)}${Me.length > 50 ? "..." : ""}`,
+              );
+            })),
+          Je.join(`
+`)
+        );
+      },
+      async settle(p = 5e3) {
+        const A = Date.now();
+        for (;;) {
+          await new Promise((Z) => setTimeout(Z, 0));
+          const Y = this.inspect();
+          if (
+            Y.inflight.length === 0 &&
+            !ve.isReconciling &&
+            !ve.reconcileScheduled
+          )
+            return;
+          if (Date.now() - A > p) {
+            const Z = [];
+            Y.inflight.length > 0 &&
+              Z.push(
+                `${Y.inflight.length} resolvers inflight: ${Y.inflight.map((te) => te.resolverId).join(", ")}`,
+              ),
+              ve.isReconciling && Z.push("reconciliation in progress"),
+              ve.reconcileScheduled && Z.push("reconcile scheduled");
+            const xe = ve.previousRequirements.all();
+            throw (
+              (xe.length > 0 &&
+                Z.push(
+                  `${xe.length} unmet requirements: ${xe.map((te) => te.requirement.type).join(", ")}`,
+                ),
+              new Error(
+                `[Directive] settle() timed out after ${p}ms. ${Z.join("; ")}`,
+              ))
+            );
+          }
+          await new Promise((Z) => setTimeout(Z, 10));
+        }
+      },
+      getSnapshot() {
+        return { facts: I.toObject(), version: 1 };
+      },
+      getDistributableSnapshot(p = {}) {
+        let {
+            includeDerivations: A,
+            excludeDerivations: Y,
+            includeFacts: Z,
+            ttlSeconds: xe,
+            metadata: te,
+            includeVersion: Je,
+          } = p,
+          Fe = {},
+          Ue = Object.keys(r),
+          re;
+        if ((A ? (re = A.filter((Le) => Ue.includes(Le))) : (re = Ue), Y)) {
+          const Le = new Set(Y);
+          re = re.filter((Me) => !Le.has(Me));
+        }
+        for (const Le of re)
+          try {
+            Fe[Le] = ee.get(Le);
+          } catch {}
+        if (Z && Z.length > 0) {
+          const Le = I.toObject();
+          for (const Me of Z) Me in Le && (Fe[Me] = Le[Me]);
+        }
+        const ke = Date.now(),
+          Ie = { data: Fe, createdAt: ke };
+        return (
+          xe !== void 0 && xe > 0 && (Ie.expiresAt = ke + xe * 1e3),
+          Je && (Ie.version = ho(Fe)),
+          te && (Ie.metadata = te),
+          Ie
+        );
+      },
+      watchDistributableSnapshot(p, A) {
+        let { includeDerivations: Y, excludeDerivations: Z } = p,
+          xe = Object.keys(r),
+          te;
+        if ((Y ? (te = Y.filter((Fe) => xe.includes(Fe))) : (te = xe), Z)) {
+          const Fe = new Set(Z);
+          te = te.filter((Ue) => !Fe.has(Ue));
+        }
+        if (te.length === 0) return () => {};
+        let Je = this.getDistributableSnapshot({
+          ...p,
+          includeVersion: !0,
+        }).version;
+        return ee.subscribe(te, () => {
+          const Fe = this.getDistributableSnapshot({
+            ...p,
+            includeVersion: !0,
+          });
+          Fe.version !== Je && ((Je = Fe.version), A(Fe));
+        });
+      },
+      restore(p) {
+        if (!p || typeof p != "object")
+          throw new Error(
+            "[Directive] restore() requires a valid snapshot object",
+          );
+        if (!p.facts || typeof p.facts != "object")
+          throw new Error(
+            "[Directive] restore() snapshot must have a facts object",
+          );
+        if (!Cr(p))
+          throw new Error(
+            "[Directive] restore() rejected: snapshot contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.",
+          );
+        I.batch(() => {
+          for (const [A, Y] of Object.entries(p.facts))
+            Rt.has(A) || I.set(A, Y);
+        });
+      },
+      onSettledChange(p) {
+        return (
+          we.add(p),
+          () => {
+            we.delete(p);
+          }
+        );
+      },
+      onTimeTravelChange(p) {
+        return (
+          ae.add(p),
+          () => {
+            ae.delete(p);
+          }
+        );
+      },
+      batch(p) {
+        I.batch(p);
+      },
+      get isSettled() {
+        return (
+          this.inspect().inflight.length === 0 &&
+          !ve.isReconciling &&
+          !ve.reconcileScheduled
+        );
+      },
+      get isRunning() {
+        return ve.isRunning;
+      },
+      get isInitialized() {
+        return ve.isInitialized;
+      },
+      get isReady() {
+        return ve.isReady;
+      },
+      whenReady() {
+        return ve.isReady
+          ? Promise.resolve()
+          : ve.isRunning
+            ? (ve.readyPromise ||
+                (ve.readyPromise = new Promise((p) => {
+                  ve.readyResolve = p;
+                })),
+              ve.readyPromise)
+            : Promise.reject(
+                new Error(
+                  "[Directive] whenReady() called before start(). Call system.start() first, then await system.whenReady().",
+                ),
+              );
+      },
+    };
+  function Ae(p) {
+    if (ve.isReconciling)
+      throw new Error(
+        `[Directive] Cannot register module "${p.id}" during reconciliation. Wait for the current reconciliation cycle to complete.`,
+      );
+    if (ve.isDestroyed)
+      throw new Error(
+        `[Directive] Cannot register module "${p.id}" on a destroyed system.`,
+      );
+    const A = (Y, Z) => {
+      if (Y) {
+        for (const xe of Object.keys(Y))
+          if (Rt.has(xe))
+            throw new Error(
+              `[Directive] Security: Module "${p.id}" has dangerous key "${xe}" in ${Z}.`,
+            );
+      }
+    };
+    A(p.schema, "schema"),
+      A(p.events, "events"),
+      A(p.derive, "derive"),
+      A(p.effects, "effects"),
+      A(p.constraints, "constraints"),
+      A(p.resolvers, "resolvers");
+    for (const Y of Object.keys(p.schema))
+      if (Y in t)
+        throw new Error(
+          `[Directive] Schema collision: Fact "${Y}" already exists. Cannot register module "${p.id}".`,
+        );
+    if (p.snapshotEvents) {
+      u === null && (u = new Set(Object.keys(a)));
+      for (const Y of p.snapshotEvents) u.add(Y);
+    } else if (u !== null && p.events)
+      for (const Y of Object.keys(p.events)) u.add(Y);
+    Object.assign(t, p.schema),
+      p.events && Object.assign(a, p.events),
+      p.derive &&
+        (Object.assign(r, p.derive), ee.registerDefinitions(p.derive)),
+      p.effects &&
+        (Object.assign(n, p.effects), V.registerDefinitions(p.effects)),
+      p.constraints &&
+        (Object.assign(o, p.constraints), y.registerDefinitions(p.constraints)),
+      p.resolvers &&
+        (Object.assign(i, p.resolvers), K.registerDefinitions(p.resolvers)),
+      I.registerKeys(p.schema),
+      e.modules.push(p),
+      p.init &&
+        I.batch(() => {
+          p.init(H);
+        }),
+      p.hooks?.onInit?.(de),
+      ve.isRunning && (p.hooks?.onStart?.(de), q());
+  }
+  (de.registerModule = Ae), f.emitInit(de);
+  for (const p of e.modules) p.hooks?.onInit?.(de);
+  return de;
+}
+var ut = Object.freeze(new Set(["__proto__", "constructor", "prototype"])),
+  je = "::";
+function Oo(e) {
+  const t = Object.keys(e),
+    a = new Set(),
+    r = new Set(),
+    n = [],
+    o = [];
+  function i(u) {
+    if (a.has(u)) return;
+    if (r.has(u)) {
+      const d = o.indexOf(u),
+        f = [...o.slice(d), u].join(" → ");
+      throw new Error(
+        `[Directive] Circular dependency detected: ${f}. Modules cannot have circular crossModuleDeps. Break the cycle by removing one of the cross-module references.`,
+      );
+    }
+    r.add(u), o.push(u);
+    const c = e[u];
+    if (c?.crossModuleDeps)
+      for (const d of Object.keys(c.crossModuleDeps)) t.includes(d) && i(d);
+    o.pop(), r.delete(u), a.add(u), n.push(u);
+  }
+  for (const u of t) i(u);
+  return n;
+}
+var Un = new WeakMap(),
+  zn = new WeakMap(),
+  Jn = new WeakMap(),
+  Gn = new WeakMap();
+function xn(e) {
+  if ("module" in e) {
+    if (!e.module)
+      throw new Error(
+        "[Directive] createSystem requires a module. Got: " + typeof e.module,
+      );
+    return Ro(e);
+  }
+  const t = e;
+  if (Array.isArray(t.modules))
+    throw new Error(`[Directive] createSystem expects modules as an object, not an array.
 
 Instead of:
   createSystem({ modules: [authModule, dataModule] })
@@ -8,64 +3245,10725 @@ Use:
   createSystem({ modules: { auth: authModule, data: dataModule } })
 
 Or for a single module:
-  createSystem({ module: counterModule })`);return Mo(t)}function Mo(e){let t=e.modules,a=new Set(Object.keys(t)),r=e.debug?.snapshotModules?new Set(e.debug.snapshotModules):null;if(e.tickMs!==void 0&&e.tickMs<=0)throw new Error("[Directive] tickMs must be a positive number");let n,o=e.initOrder??"auto";if(Array.isArray(o)){let m=o,M=Object.keys(t).filter(S=>!m.includes(S));if(M.length>0)throw new Error(`[Directive] initOrder is missing modules: ${M.join(", ")}. All modules must be included in the explicit order.`);n=m}else o==="declaration"?n=Object.keys(t):n=Oo(t);let i=e.debug,u=e.errorBoundary;e.zeroConfig&&(i={timeTravel:!1,maxSnapshots:100,...e.debug},u={onConstraintError:"skip",onResolverError:"skip",onEffectError:"skip",onDerivationError:"skip",...e.errorBoundary});for(let m of Object.keys(t)){if(m.includes(je))throw new Error(`[Directive] Module name "${m}" contains the reserved separator "${je}". Module names cannot contain "${je}".`);let M=t[m];if(M){for(let S of Object.keys(M.schema.facts))if(S.includes(je))throw new Error(`[Directive] Schema key "${S}" in module "${m}" contains the reserved separator "${je}". Schema keys cannot contain "${je}".`)}}let c=[];for(let m of n){let M=t[m];if(!M)continue;let S=M.crossModuleDeps&&Object.keys(M.crossModuleDeps).length>0,j=S?Object.keys(M.crossModuleDeps):[],F={};for(let[y,z]of Object.entries(M.schema.facts))F[`${m}${je}${y}`]=z;let ne={};if(M.schema.derivations)for(let[y,z]of Object.entries(M.schema.derivations))ne[`${m}${je}${y}`]=z;let k={};if(M.schema.events)for(let[y,z]of Object.entries(M.schema.events))k[`${m}${je}${y}`]=z;let R=M.init?y=>{let z=vt(y,m);M.init(z)}:void 0,$={};if(M.derive)for(let[y,z]of Object.entries(M.derive))$[`${m}${je}${y}`]=(v,l)=>{let x=S?_t(v,m,j):vt(v,m),P=hn(l,m);return z(x,P)};let I={};if(M.events)for(let[y,z]of Object.entries(M.events))I[`${m}${je}${y}`]=(v,l)=>{let x=vt(v,m);z(x,l)};let H={};if(M.constraints)for(let[y,z]of Object.entries(M.constraints)){let v=z;H[`${m}${je}${y}`]={...v,deps:v.deps?.map(l=>`${m}${je}${l}`),when:l=>{let x=S?_t(l,m,j):vt(l,m);return v.when(x)},require:typeof v.require=="function"?l=>{let x=S?_t(l,m,j):vt(l,m);return v.require(x)}:v.require}}let ee={};if(M.resolvers)for(let[y,z]of Object.entries(M.resolvers)){let v=z;ee[`${m}${je}${y}`]={...v,resolve:async(l,x)=>{let P=on(x.facts,t,()=>Object.keys(t));await v.resolve(l,{facts:P[m],signal:x.signal})}}}let V={};if(M.effects)for(let[y,z]of Object.entries(M.effects)){let v=z;V[`${m}${je}${y}`]={...v,run:(l,x)=>{let P=S?_t(l,m,j):vt(l,m),K=x?S?_t(x,m,j):vt(x,m):void 0;return v.run(P,K)},deps:v.deps?.map(l=>`${m}${je}${l}`)}}c.push({id:M.id,schema:{facts:F,derivations:ne,events:k,requirements:M.schema.requirements??{}},init:R,derive:$,events:I,effects:V,constraints:H,resolvers:ee,hooks:M.hooks,snapshotEvents:r&&!r.has(m)?[]:M.snapshotEvents?.map(y=>`${m}${je}${y}`)})}let d=null,f=null;function w(m){for(let[M,S]of Object.entries(m))if(!ut.has(M)&&a.has(M)){if(S&&typeof S=="object"&&!Cr(S))throw new Error(`[Directive] initialFacts/hydrate for namespace "${M}" contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.`);for(let[j,F]of Object.entries(S))ut.has(j)||(f.facts[`${M}${je}${j}`]=F)}}f=ha({modules:c.map(m=>({id:m.id,schema:m.schema.facts,requirements:m.schema.requirements,init:m.init,derive:m.derive,events:m.events,effects:m.effects,constraints:m.constraints,resolvers:m.resolvers,hooks:m.hooks,snapshotEvents:m.snapshotEvents})),plugins:e.plugins,debug:i,errorBoundary:u,tickMs:e.tickMs,onAfterModuleInit:()=>{e.initialFacts&&w(e.initialFacts),d&&(w(d),d=null)}});let O=new Map;for(let m of Object.keys(t)){let M=t[m];if(!M)continue;let S=[];for(let j of Object.keys(M.schema.facts))S.push(`${m}${je}${j}`);if(M.schema.derivations)for(let j of Object.keys(M.schema.derivations))S.push(`${m}${je}${j}`);O.set(m,S)}let _={names:null};function U(){return _.names===null&&(_.names=Object.keys(t)),_.names}let D=on(f.facts,t,U),E=To(f.derive,t,U),T=jo(f,t,U),G=null,J=e.tickMs;return{_mode:"namespaced",facts:D,debug:f.debug,derive:E,events:T,constraints:f.constraints,effects:f.effects,get runHistory(){return f.runHistory},get isRunning(){return f.isRunning},get isSettled(){return f.isSettled},get isInitialized(){return f.isInitialized},get isReady(){return f.isReady},whenReady:f.whenReady.bind(f),async hydrate(m){if(f.isRunning)throw new Error("[Directive] hydrate() must be called before start(). The system is already running.");let M=await m();M&&typeof M=="object"&&(d=M)},initialize(){f.initialize()},start(){if(f.start(),J&&J>0){let m=Object.keys(c[0]?.events??{}).find(M=>M.endsWith(`${je}tick`));m&&(G=setInterval(()=>{f.dispatch({type:m})},J))}},stop(){G&&(clearInterval(G),G=null),f.stop()},destroy(){this.stop(),f.destroy()},dispatch(m){f.dispatch(m)},batch:f.batch.bind(f),read(m){return f.read(Pt(m))},subscribe(m,M){let S=[];for(let j of m)if(j.endsWith(".*")){let F=j.slice(0,-2),ne=O.get(F);ne&&S.push(...ne)}else S.push(Pt(j));return f.subscribe(S,M)},subscribeModule(m,M){let S=O.get(m);return!S||S.length===0?()=>{}:f.subscribe(S,M)},watch(m,M,S){return f.watch(Pt(m),M,S)},when(m,M){return f.when(()=>m(D),M)},onSettledChange:f.onSettledChange.bind(f),onTimeTravelChange:f.onTimeTravelChange.bind(f),inspect:f.inspect.bind(f),settle:f.settle.bind(f),explain:f.explain.bind(f),getSnapshot:f.getSnapshot.bind(f),restore:f.restore.bind(f),getDistributableSnapshot(m){let M={...m,includeDerivations:m?.includeDerivations?.map(Pt),excludeDerivations:m?.excludeDerivations?.map(Pt),includeFacts:m?.includeFacts?.map(Pt)},S=f.getDistributableSnapshot(M),j={};for(let[F,ne]of Object.entries(S.data)){let k=F.indexOf(je);if(k>0){let R=F.slice(0,k),$=F.slice(k+je.length);j[R]||(j[R]={}),j[R][$]=ne}else j._root||(j._root={}),j._root[F]=ne}return{...S,data:j}},watchDistributableSnapshot(m,M){let S={...m,includeDerivations:m?.includeDerivations?.map(Pt),excludeDerivations:m?.excludeDerivations?.map(Pt),includeFacts:m?.includeFacts?.map(Pt)};return f.watchDistributableSnapshot(S,j=>{let F={};for(let[ne,k]of Object.entries(j.data)){let R=ne.indexOf(je);if(R>0){let $=ne.slice(0,R),I=ne.slice(R+je.length);F[$]||(F[$]={}),F[$][I]=k}else F._root||(F._root={}),F._root[ne]=k}M({...j,data:F})})},registerModule(m,M){if(a.has(m))throw new Error(`[Directive] Module namespace "${m}" already exists. Cannot register a duplicate namespace.`);if(m.includes(je))throw new Error(`[Directive] Module name "${m}" contains the reserved separator "${je}".`);if(ut.has(m))throw new Error(`[Directive] Module name "${m}" is a blocked property.`);for(let y of Object.keys(M.schema.facts))if(y.includes(je))throw new Error(`[Directive] Schema key "${y}" in module "${m}" contains the reserved separator "${je}".`);let S=M,j=S.crossModuleDeps&&Object.keys(S.crossModuleDeps).length>0,F=j?Object.keys(S.crossModuleDeps):[],ne={};for(let[y,z]of Object.entries(S.schema.facts))ne[`${m}${je}${y}`]=z;let k=S.init?y=>{let z=vt(y,m);S.init(z)}:void 0,R={};if(S.derive)for(let[y,z]of Object.entries(S.derive))R[`${m}${je}${y}`]=(v,l)=>{let x=j?_t(v,m,F):vt(v,m),P=hn(l,m);return z(x,P)};let $={};if(S.events)for(let[y,z]of Object.entries(S.events))$[`${m}${je}${y}`]=(v,l)=>{let x=vt(v,m);z(x,l)};let I={};if(S.constraints)for(let[y,z]of Object.entries(S.constraints)){let v=z;I[`${m}${je}${y}`]={...v,deps:v.deps?.map(l=>`${m}${je}${l}`),when:l=>{let x=j?_t(l,m,F):vt(l,m);return v.when(x)},require:typeof v.require=="function"?l=>{let x=j?_t(l,m,F):vt(l,m);return v.require(x)}:v.require}}let H={};if(S.resolvers)for(let[y,z]of Object.entries(S.resolvers)){let v=z;H[`${m}${je}${y}`]={...v,resolve:async(l,x)=>{let P=on(x.facts,t,U);await v.resolve(l,{facts:P[m],signal:x.signal})}}}let ee={};if(S.effects)for(let[y,z]of Object.entries(S.effects)){let v=z;ee[`${m}${je}${y}`]={...v,run:(l,x)=>{let P=j?_t(l,m,F):vt(l,m),K=x?j?_t(x,m,F):vt(x,m):void 0;return v.run(P,K)},deps:v.deps?.map(l=>`${m}${je}${l}`)}}a.add(m),t[m]=S,_.names=null;let V=[];for(let y of Object.keys(S.schema.facts))V.push(`${m}${je}${y}`);if(S.schema.derivations)for(let y of Object.keys(S.schema.derivations))V.push(`${m}${je}${y}`);O.set(m,V),f.registerModule({id:S.id,schema:ne,requirements:S.schema.requirements??{},init:k,derive:Object.keys(R).length>0?R:void 0,events:Object.keys($).length>0?$:void 0,effects:Object.keys(ee).length>0?ee:void 0,constraints:Object.keys(I).length>0?I:void 0,resolvers:Object.keys(H).length>0?H:void 0,hooks:S.hooks,snapshotEvents:r&&!r.has(m)?[]:S.snapshotEvents?.map(y=>`${m}${je}${y}`)})}}}function Pt(e){if(e.includes(".")){let[t,...a]=e.split(".");return`${t}${je}${a.join(je)}`}return e}function vt(e,t){let a=Un.get(e);if(a){let n=a.get(t);if(n)return n}else a=new Map,Un.set(e,a);let r=new Proxy({},{get(n,o){if(typeof o!="symbol"&&!ut.has(o))return o==="$store"||o==="$snapshot"?e[o]:e[`${t}${je}${o}`]},set(n,o,i){return typeof o=="symbol"||ut.has(o)?!1:(e[`${t}${je}${o}`]=i,!0)},has(n,o){return typeof o=="symbol"||ut.has(o)?!1:`${t}${je}${o}`in e},deleteProperty(n,o){return typeof o=="symbol"||ut.has(o)?!1:(delete e[`${t}${je}${o}`],!0)}});return a.set(t,r),r}function on(e,t,a){let r=zn.get(e);if(r)return r;let n=new Proxy({},{get(o,i){if(typeof i!="symbol"&&!ut.has(i)&&Object.hasOwn(t,i))return vt(e,i)},has(o,i){return typeof i=="symbol"||ut.has(i)?!1:Object.hasOwn(t,i)},ownKeys(){return a()},getOwnPropertyDescriptor(o,i){if(typeof i!="symbol"&&Object.hasOwn(t,i))return{configurable:!0,enumerable:!0}}});return zn.set(e,n),n}var Hn=new WeakMap;function _t(e,t,a){let r=`${t}:${JSON.stringify([...a].sort())}`,n=Hn.get(e);if(n){let c=n.get(r);if(c)return c}else n=new Map,Hn.set(e,n);let o=new Set(a),i=["self",...a],u=new Proxy({},{get(c,d){if(typeof d!="symbol"&&!ut.has(d)){if(d==="self")return vt(e,t);if(o.has(d))return vt(e,d)}},has(c,d){return typeof d=="symbol"||ut.has(d)?!1:d==="self"||o.has(d)},ownKeys(){return i},getOwnPropertyDescriptor(c,d){if(typeof d!="symbol"&&(d==="self"||o.has(d)))return{configurable:!0,enumerable:!0}}});return n.set(r,u),u}function hn(e,t){let a=Gn.get(e);if(a){let n=a.get(t);if(n)return n}else a=new Map,Gn.set(e,a);let r=new Proxy({},{get(n,o){if(typeof o!="symbol"&&!ut.has(o))return e[`${t}${je}${o}`]},has(n,o){return typeof o=="symbol"||ut.has(o)?!1:`${t}${je}${o}`in e}});return a.set(t,r),r}function To(e,t,a){let r=Jn.get(e);if(r)return r;let n=new Proxy({},{get(o,i){if(typeof i!="symbol"&&!ut.has(i)&&Object.hasOwn(t,i))return hn(e,i)},has(o,i){return typeof i=="symbol"||ut.has(i)?!1:Object.hasOwn(t,i)},ownKeys(){return a()},getOwnPropertyDescriptor(o,i){if(typeof i!="symbol"&&Object.hasOwn(t,i))return{configurable:!0,enumerable:!0}}});return Jn.set(e,n),n}var Wn=new WeakMap;function jo(e,t,a){let r=Wn.get(e);return r||(r=new Map,Wn.set(e,r)),new Proxy({},{get(n,o){if(typeof o=="symbol"||ut.has(o)||!Object.hasOwn(t,o))return;let i=r.get(o);if(i)return i;let u=new Proxy({},{get(c,d){if(typeof d!="symbol"&&!ut.has(d))return f=>{e.dispatch({type:`${o}${je}${d}`,...f})}}});return r.set(o,u),u},has(n,o){return typeof o=="symbol"||ut.has(o)?!1:Object.hasOwn(t,o)},ownKeys(){return a()},getOwnPropertyDescriptor(n,o){if(typeof o!="symbol"&&Object.hasOwn(t,o))return{configurable:!0,enumerable:!0}}})}function Ro(e){let t=e.module;if(!t)throw new Error("[Directive] createSystem requires a module. Got: "+typeof t);if(e.tickMs!==void 0&&e.tickMs<=0)throw new Error("[Directive] tickMs must be a positive number");if(e.initialFacts&&!Cr(e.initialFacts))throw new Error("[Directive] initialFacts contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.");let a=e.debug,r=e.errorBoundary;e.zeroConfig&&(a={timeTravel:!1,maxSnapshots:100,...e.debug},r={onConstraintError:"skip",onResolverError:"skip",onEffectError:"skip",onDerivationError:"skip",...e.errorBoundary});let n=null,o=null;o=ha({modules:[{id:t.id,schema:t.schema.facts,requirements:t.schema.requirements,init:t.init,derive:t.derive,events:t.events,effects:t.effects,constraints:t.constraints,resolvers:t.resolvers,hooks:t.hooks,snapshotEvents:t.snapshotEvents}],plugins:e.plugins,debug:a,errorBoundary:r,tickMs:e.tickMs,onAfterModuleInit:()=>{if(e.initialFacts)for(let[d,f]of Object.entries(e.initialFacts))ut.has(d)||(o.facts[d]=f);if(n){for(let[d,f]of Object.entries(n))ut.has(d)||(o.facts[d]=f);n=null}}});let i=new Proxy({},{get(d,f){if(typeof f!="symbol"&&!ut.has(f))return w=>{o.dispatch({type:f,...w})}}}),u=null,c=e.tickMs;return{_mode:"single",facts:o.facts,debug:o.debug,derive:o.derive,events:i,constraints:o.constraints,effects:o.effects,get runHistory(){return o.runHistory},get isRunning(){return o.isRunning},get isSettled(){return o.isSettled},get isInitialized(){return o.isInitialized},get isReady(){return o.isReady},whenReady:o.whenReady.bind(o),async hydrate(d){if(o.isRunning)throw new Error("[Directive] hydrate() must be called before start(). The system is already running.");let f=await d();f&&typeof f=="object"&&(n=f)},initialize(){o.initialize()},start(){o.start(),c&&c>0&&t.events&&"tick"in t.events&&(u=setInterval(()=>{o.dispatch({type:"tick"})},c))},stop(){u&&(clearInterval(u),u=null),o.stop()},destroy(){this.stop(),o.destroy()},dispatch(d){o.dispatch(d)},batch:o.batch.bind(o),read(d){return o.read(d)},subscribe(d,f){return o.subscribe(d,f)},watch(d,f,w){return o.watch(d,f,w)},when(d,f){return o.when(d,f)},onSettledChange:o.onSettledChange.bind(o),onTimeTravelChange:o.onTimeTravelChange.bind(o),inspect:o.inspect.bind(o),settle:o.settle.bind(o),explain:o.explain.bind(o),getSnapshot:o.getSnapshot.bind(o),restore:o.restore.bind(o),getDistributableSnapshot:o.getDistributableSnapshot.bind(o),watchDistributableSnapshot:o.watchDistributableSnapshot.bind(o),registerModule(d){o.registerModule({id:d.id,schema:d.schema.facts,requirements:d.schema.requirements,init:d.init,derive:d.derive,events:d.events,effects:d.effects,constraints:d.constraints,resolvers:d.resolvers,hooks:d.hooks,snapshotEvents:d.snapshotEvents})}}}var ya=class{constructor(e){this.capacity=e,this.buf=new Array(e)}buf;head=0;_size=0;get size(){return this._size}push(e){this.buf[this.head]=e,this.head=(this.head+1)%this.capacity,this._size<this.capacity&&this._size++}toArray(){return this._size===0?[]:this._size<this.capacity?this.buf.slice(0,this._size):[...this.buf.slice(this.head),...this.buf.slice(0,this.head)]}clear(){this.buf=new Array(this.capacity),this.head=0,this._size=0}};function Dn(){try{if(typeof process<"u")return!1}catch{}try{if(typeof import.meta<"u")return!1}catch{}return!0}function va(e){try{if(e===void 0)return"undefined";if(e===null)return"null";if(typeof e=="bigint")return String(e)+"n";if(typeof e=="symbol")return String(e);if(typeof e=="object"){let t=JSON.stringify(e,(a,r)=>typeof r=="bigint"?String(r)+"n":typeof r=="symbol"?String(r):r);return t.length>120?t.slice(0,117)+"...":t}return String(e)}catch{return"<error>"}}function Zt(e,t){return e.length<=t?e:e.slice(0,t-3)+"..."}function Fr(e){try{return e.inspect()}catch{return null}}function _o(e){try{return e==null||typeof e!="object"?e:JSON.parse(JSON.stringify(e))}catch{return null}}function qo(e){return e===void 0?1e3:!Number.isFinite(e)||e<1?(Dn()&&console.warn(`[directive:devtools] Invalid maxEvents value (${e}), using default 1000`),1e3):Math.floor(e)}function No(){return{reconcileCount:0,reconcileTotalMs:0,resolverStats:new Map,effectRunCount:0,effectErrorCount:0,lastReconcileStartMs:0}}var Po=200,Hr=340,yr=16,vr=80,Kn=2,Vn=["#8b9aff","#4ade80","#fbbf24","#c084fc","#f472b6","#22d3ee"];function Lo(){return{entries:new ya(Po),inflight:new Map}}function Bo(){return{derivationDeps:new Map,activeConstraints:new Set,recentlyChangedFacts:new Set,recentlyComputedDerivations:new Set,recentlyActiveConstraints:new Set,animationTimer:null}}var Fo=1e4,Uo=100;function zo(){return{isRecording:!1,recordedEvents:[],snapshots:[]}}var Jo=50,Yn=200,ce={bg:"#1a1a2e",text:"#e0e0e0",accent:"#8b9aff",muted:"#b0b0d0",border:"#333",rowBorder:"#2a2a4a",green:"#4ade80",yellow:"#fbbf24",red:"#f87171",closeBtn:"#aaa",font:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"},ot={nodeW:90,nodeH:16,nodeGap:6,startY:16,colGap:20,fontSize:10,labelMaxChars:11};function Go(e,t,a,r){let n=!1,o={position:"fixed",zIndex:"99999",...t.includes("bottom")?{bottom:"12px"}:{top:"12px"},...t.includes("right")?{right:"12px"}:{left:"12px"}},i=document.createElement("style");i.textContent=`[data-directive-devtools] summary:focus-visible{outline:2px solid ${ce.accent};outline-offset:2px;border-radius:2px}[data-directive-devtools] button:focus-visible{outline:2px solid ${ce.accent};outline-offset:2px}`,document.head.appendChild(i);let u=document.createElement("button");u.setAttribute("aria-label","Open Directive DevTools"),u.setAttribute("aria-expanded",String(a)),u.title="Ctrl+Shift+D to toggle",Object.assign(u.style,{...o,background:ce.bg,color:ce.text,border:`1px solid ${ce.border}`,borderRadius:"6px",padding:"10px 14px",minWidth:"44px",minHeight:"44px",cursor:"pointer",fontFamily:ce.font,fontSize:"12px",display:a?"none":"block"}),u.textContent="Directive";let c=document.createElement("div");c.setAttribute("role","region"),c.setAttribute("aria-label","Directive DevTools"),c.setAttribute("data-directive-devtools",""),c.tabIndex=-1,Object.assign(c.style,{...o,background:ce.bg,color:ce.text,border:`1px solid ${ce.border}`,borderRadius:"8px",padding:"12px",fontFamily:ce.font,fontSize:"11px",maxWidth:"min(380px, calc(100vw - 24px))",maxHeight:"min(500px, calc(100vh - 24px))",overflow:"auto",boxShadow:"0 4px 20px rgba(0,0,0,0.5)",display:a?"block":"none"});let d=document.createElement("div");Object.assign(d.style,{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"});let f=document.createElement("strong");f.style.color=ce.accent,f.textContent=e==="default"?"Directive DevTools":`DevTools (${e})`;let w=document.createElement("button");w.setAttribute("aria-label","Close DevTools"),Object.assign(w.style,{background:"none",border:"none",color:ce.closeBtn,cursor:"pointer",fontSize:"16px",padding:"8px 12px",minWidth:"44px",minHeight:"44px",lineHeight:"1",display:"flex",alignItems:"center",justifyContent:"center"}),w.textContent="×",d.appendChild(f),d.appendChild(w),c.appendChild(d);let O=document.createElement("div");O.style.marginBottom="6px",O.setAttribute("aria-live","polite");let _=document.createElement("span");_.style.color=ce.green,_.textContent="Settled",O.appendChild(_),c.appendChild(O);let U=document.createElement("div");Object.assign(U.style,{display:"none",marginBottom:"8px",padding:"4px 8px",background:"#252545",borderRadius:"4px",alignItems:"center",gap:"6px"});let D=document.createElement("button");Object.assign(D.style,{background:"none",border:`1px solid ${ce.border}`,color:ce.text,cursor:"pointer",padding:"4px 10px",borderRadius:"3px",fontFamily:ce.font,fontSize:"11px",minWidth:"44px",minHeight:"44px"}),D.textContent="◀ Undo",D.disabled=!0;let E=document.createElement("button");Object.assign(E.style,{background:"none",border:`1px solid ${ce.border}`,color:ce.text,cursor:"pointer",padding:"4px 10px",borderRadius:"3px",fontFamily:ce.font,fontSize:"11px",minWidth:"44px",minHeight:"44px"}),E.textContent="Redo ▶",E.disabled=!0;let T=document.createElement("span");T.style.color=ce.muted,T.style.fontSize="10px",U.appendChild(D),U.appendChild(E),U.appendChild(T),c.appendChild(U);function G(N,ie){let le=document.createElement("details");ie&&(le.open=!0),le.style.marginBottom="4px";let de=document.createElement("summary");Object.assign(de.style,{cursor:"pointer",color:ce.accent,marginBottom:"4px"});let Ae=document.createElement("span");de.textContent=`${N} (`,de.appendChild(Ae),de.appendChild(document.createTextNode(")")),Ae.textContent="0",le.appendChild(de);let p=document.createElement("table");Object.assign(p.style,{width:"100%",borderCollapse:"collapse",fontSize:"11px"});let A=document.createElement("thead"),Y=document.createElement("tr");for(let xe of["Key","Value"]){let te=document.createElement("th");te.scope="col",Object.assign(te.style,{textAlign:"left",padding:"2px 4px",color:ce.accent}),te.textContent=xe,Y.appendChild(te)}A.appendChild(Y),p.appendChild(A);let Z=document.createElement("tbody");return p.appendChild(Z),le.appendChild(p),{details:le,tbody:Z,countSpan:Ae}}function J(N,ie){let le=document.createElement("details");le.style.marginBottom="4px";let de=document.createElement("summary");Object.assign(de.style,{cursor:"pointer",color:ie,marginBottom:"4px"});let Ae=document.createElement("span");de.textContent=`${N} (`,de.appendChild(Ae),de.appendChild(document.createTextNode(")")),Ae.textContent="0",le.appendChild(de);let p=document.createElement("ul");return Object.assign(p.style,{margin:"0",paddingLeft:"16px"}),le.appendChild(p),{details:le,list:p,countSpan:Ae}}let m=G("Facts",!0);c.appendChild(m.details);let M=G("Derivations",!1);c.appendChild(M.details);let S=J("Inflight",ce.yellow);c.appendChild(S.details);let j=J("Unmet",ce.red);c.appendChild(j.details);let F=document.createElement("details");F.style.marginBottom="4px";let ne=document.createElement("summary");Object.assign(ne.style,{cursor:"pointer",color:ce.accent,marginBottom:"4px"}),ne.textContent="Performance",F.appendChild(ne);let k=document.createElement("div");k.style.fontSize="10px",k.style.color=ce.muted,k.textContent="No data yet",F.appendChild(k),c.appendChild(F);let R=document.createElement("details");R.style.marginBottom="4px";let $=document.createElement("summary");Object.assign($.style,{cursor:"pointer",color:ce.accent,marginBottom:"4px"}),$.textContent="Dependency Graph",R.appendChild($);let I=document.createElementNS("http://www.w3.org/2000/svg","svg");I.setAttribute("width","100%"),I.setAttribute("height","120"),I.setAttribute("role","img"),I.setAttribute("aria-label","System dependency graph"),I.style.display="block",I.setAttribute("viewBox","0 0 460 120"),I.setAttribute("preserveAspectRatio","xMinYMin meet"),R.appendChild(I),c.appendChild(R);let H=document.createElement("details");H.style.marginBottom="4px";let ee=document.createElement("summary");Object.assign(ee.style,{cursor:"pointer",color:ce.accent,marginBottom:"4px"}),ee.textContent="Timeline",H.appendChild(ee);let V=document.createElementNS("http://www.w3.org/2000/svg","svg");V.setAttribute("width","100%"),V.setAttribute("height","60"),V.setAttribute("role","img"),V.setAttribute("aria-label","Resolver execution timeline"),V.style.display="block",V.setAttribute("viewBox",`0 0 ${Hr} 60`),V.setAttribute("preserveAspectRatio","xMinYMin meet");let y=document.createElementNS("http://www.w3.org/2000/svg","text");y.setAttribute("x",String(Hr/2)),y.setAttribute("y","30"),y.setAttribute("text-anchor","middle"),y.setAttribute("fill",ce.muted),y.setAttribute("font-size","10"),y.setAttribute("font-family",ce.font),y.textContent="No resolver activity yet",V.appendChild(y),H.appendChild(V),c.appendChild(H);let z,v,l,x;if(r){let N=document.createElement("details");N.style.marginBottom="4px";let ie=document.createElement("summary");Object.assign(ie.style,{cursor:"pointer",color:ce.accent,marginBottom:"4px"}),l=document.createElement("span"),l.textContent="0",ie.textContent="Events (",ie.appendChild(l),ie.appendChild(document.createTextNode(")")),N.appendChild(ie),v=document.createElement("div"),Object.assign(v.style,{maxHeight:"150px",overflow:"auto",fontSize:"10px"}),v.setAttribute("role","log"),v.setAttribute("aria-live","polite"),v.tabIndex=0;let le=document.createElement("div");le.style.color=ce.muted,le.style.padding="4px",le.textContent="Waiting for events...",le.className="dt-events-empty",v.appendChild(le),N.appendChild(v),c.appendChild(N),z=N,x=document.createElement("div")}else z=document.createElement("details"),v=document.createElement("div"),l=document.createElement("span"),x=document.createElement("div"),x.style.fontSize="10px",x.style.color=ce.muted,x.style.marginTop="4px",x.style.fontStyle="italic",x.textContent="Enable trace: true for event log",c.appendChild(x);let P=document.createElement("div");Object.assign(P.style,{display:"flex",gap:"6px",marginTop:"6px"});let K=document.createElement("button");Object.assign(K.style,{background:"none",border:`1px solid ${ce.border}`,color:ce.text,cursor:"pointer",padding:"8px 12px",borderRadius:"3px",fontFamily:ce.font,fontSize:"10px",minWidth:"44px",minHeight:"44px"}),K.textContent="⏺ Record";let ae=document.createElement("button");Object.assign(ae.style,{background:"none",border:`1px solid ${ce.border}`,color:ce.text,cursor:"pointer",padding:"8px 12px",borderRadius:"3px",fontFamily:ce.font,fontSize:"10px",minWidth:"44px",minHeight:"44px"}),ae.textContent="⤓ Export",P.appendChild(K),P.appendChild(ae),c.appendChild(P),c.addEventListener("wheel",N=>{let ie=c,le=ie.scrollTop===0&&N.deltaY<0,de=ie.scrollTop+ie.clientHeight>=ie.scrollHeight&&N.deltaY>0;(le||de)&&N.preventDefault()},{passive:!1});let Ne=a,_e=new Set;function we(){Ne=!0,c.style.display="block",u.style.display="none",u.setAttribute("aria-expanded","true"),w.focus()}function ze(){Ne=!1,c.style.display="none",u.style.display="block",u.setAttribute("aria-expanded","false"),u.focus()}u.addEventListener("click",we),w.addEventListener("click",ze);function We(N){N.key==="Escape"&&Ne&&ze()}c.addEventListener("keydown",We);function Qe(N){N.key==="d"&&N.shiftKey&&(N.ctrlKey||N.metaKey)&&(N.preventDefault(),Ne?ze():we())}document.addEventListener("keydown",Qe);function ve(){n||(document.body.appendChild(u),document.body.appendChild(c))}document.body?ve():document.addEventListener("DOMContentLoaded",ve,{once:!0});function q(){n=!0,u.removeEventListener("click",we),w.removeEventListener("click",ze),c.removeEventListener("keydown",We),document.removeEventListener("keydown",Qe),document.removeEventListener("DOMContentLoaded",ve);for(let N of _e)clearTimeout(N);_e.clear(),u.remove(),c.remove(),i.remove()}return{refs:{container:c,toggleBtn:u,titleEl:f,statusEl:_,factsBody:m.tbody,factsCount:m.countSpan,derivBody:M.tbody,derivCount:M.countSpan,derivSection:M.details,inflightList:S.list,inflightSection:S.details,inflightCount:S.countSpan,unmetList:j.list,unmetSection:j.details,unmetCount:j.countSpan,perfSection:F,perfBody:k,timeTravelSection:U,timeTravelLabel:T,undoBtn:D,redoBtn:E,flowSection:R,flowSvg:I,timelineSection:H,timelineSvg:V,eventsSection:z,eventsList:v,eventsCount:l,traceHint:x,recordBtn:K,exportBtn:ae},destroy:q,isOpen:()=>Ne,flashTimers:_e}}function Ur(e,t,a,r,n,o){let i=va(r),u=e.get(a);if(u){let c=u.cells;if(c[1]&&(c[1].textContent=i,n&&o)){let d=c[1];d.style.background="rgba(139, 154, 255, 0.25)";let f=setTimeout(()=>{d.style.background="",o.delete(f)},300);o.add(f)}}else{u=document.createElement("tr"),u.style.borderBottom=`1px solid ${ce.rowBorder}`;let c=document.createElement("td");Object.assign(c.style,{padding:"2px 4px",color:ce.muted}),c.textContent=a;let d=document.createElement("td");d.style.padding="2px 4px",d.textContent=i,u.appendChild(c),u.appendChild(d),t.appendChild(u),e.set(a,u)}}function Ho(e,t){let a=e.get(t);a&&(a.remove(),e.delete(t))}function sn(e,t,a){if(e.inflightList.replaceChildren(),e.inflightCount.textContent=String(t.length),t.length>0)for(let r of t){let n=document.createElement("li");n.style.fontSize="11px",n.textContent=`${r.resolverId} (${r.id})`,e.inflightList.appendChild(n)}else{let r=document.createElement("li");r.style.fontSize="10px",r.style.color=ce.muted,r.textContent="None",e.inflightList.appendChild(r)}if(e.unmetList.replaceChildren(),e.unmetCount.textContent=String(a.length),a.length>0)for(let r of a){let n=document.createElement("li");n.style.fontSize="11px",n.textContent=`${r.requirement.type} from ${r.fromConstraint}`,e.unmetList.appendChild(n)}else{let r=document.createElement("li");r.style.fontSize="10px",r.style.color=ce.muted,r.textContent="None",e.unmetList.appendChild(r)}}function ln(e,t,a){let r=t===0&&a===0;e.statusEl.style.color=r?ce.green:ce.yellow,e.statusEl.textContent=r?"Settled":"Working...",e.toggleBtn.textContent=r?"Directive":"Directive...",e.toggleBtn.setAttribute("aria-label",`Open Directive DevTools${r?"":" (system working)"}`)}function Xn(e,t,a,r){let n=Object.keys(a.derive);if(e.derivCount.textContent=String(n.length),n.length===0){t.clear(),e.derivBody.replaceChildren();let i=document.createElement("tr"),u=document.createElement("td");u.colSpan=2,u.style.color=ce.muted,u.style.fontSize="10px",u.textContent="No derivations defined",i.appendChild(u),e.derivBody.appendChild(i);return}let o=new Set(n);for(let[i,u]of t)o.has(i)||(u.remove(),t.delete(i));for(let i of n){let u;try{u=va(a.read(i))}catch{u="<error>"}Ur(t,e.derivBody,i,u,!0,r)}}function Wo(e,t,a,r){let n=e.eventsList.querySelector(".dt-events-empty");n&&n.remove();let o=document.createElement("div");Object.assign(o.style,{padding:"2px 4px",borderBottom:`1px solid ${ce.rowBorder}`,fontFamily:"inherit"});let i=new Date,u=`${String(i.getHours()).padStart(2,"0")}:${String(i.getMinutes()).padStart(2,"0")}:${String(i.getSeconds()).padStart(2,"0")}.${String(i.getMilliseconds()).padStart(3,"0")}`,c;try{let O=JSON.stringify(a);c=Zt(O,60)}catch{c="{}"}let d=document.createElement("span");d.style.color=ce.closeBtn,d.textContent=u;let f=document.createElement("span");f.style.color=ce.accent,f.textContent=` ${t} `;let w=document.createElement("span");for(w.style.color=ce.muted,w.textContent=c,o.appendChild(d),o.appendChild(f),o.appendChild(w),e.eventsList.prepend(o);e.eventsList.childElementCount>Jo;)e.eventsList.lastElementChild?.remove();e.eventsCount.textContent=String(r)}function Ko(e,t){e.perfBody.replaceChildren();let a=t.reconcileCount>0?(t.reconcileTotalMs/t.reconcileCount).toFixed(1):"—",r=[`Reconciles: ${t.reconcileCount}  (avg ${a}ms)`,`Effects: ${t.effectRunCount} run, ${t.effectErrorCount} errors`];for(let n of r){let o=document.createElement("div");o.style.marginBottom="2px",o.textContent=n,e.perfBody.appendChild(o)}if(t.resolverStats.size>0){let n=document.createElement("div");n.style.marginTop="4px",n.style.marginBottom="2px",n.style.color=ce.accent,n.textContent="Resolvers:",e.perfBody.appendChild(n);let o=[...t.resolverStats.entries()].sort((i,u)=>u[1].totalMs-i[1].totalMs);for(let[i,u]of o){let c=u.count>0?(u.totalMs/u.count).toFixed(1):"0",d=document.createElement("div");d.style.paddingLeft="8px",d.textContent=`${i}: ${u.count}x, avg ${c}ms${u.errors>0?`, ${u.errors} err`:""}`,u.errors>0&&(d.style.color=ce.red),e.perfBody.appendChild(d)}}}function Qn(e,t){let a=t.debug;if(!a){e.timeTravelSection.style.display="none";return}e.timeTravelSection.style.display="flex";let r=a.currentIndex,n=a.snapshots.length;e.timeTravelLabel.textContent=n>0?`${r+1} / ${n}`:"0 snapshots";let o=r>0,i=r<n-1;e.undoBtn.disabled=!o,e.undoBtn.style.opacity=o?"1":"0.4",e.redoBtn.disabled=!i,e.redoBtn.style.opacity=i?"1":"0.4"}function Vo(e,t){e.undoBtn.addEventListener("click",()=>{t.debug&&t.debug.currentIndex>0&&t.debug.goBack(1)}),e.redoBtn.addEventListener("click",()=>{t.debug&&t.debug.currentIndex<t.debug.snapshots.length-1&&t.debug.goForward(1)})}var un=new WeakMap;function Yo(e,t,a,r,n,o){return[e.join(","),t.join(","),a.map(i=>`${i.id}:${i.active}`).join(","),[...r.entries()].map(([i,u])=>`${i}:${u.status}:${u.type}`).join(","),n.join(","),o.join(",")].join("|")}function Xo(e,t,a,r,n){for(let o of a){let i=e.nodes.get(`0:${o}`);if(!i)continue;let u=t.recentlyChangedFacts.has(o);i.rect.setAttribute("fill",u?ce.text+"33":"none"),i.rect.setAttribute("stroke-width",u?"2":"1")}for(let o of r){let i=e.nodes.get(`1:${o}`);if(!i)continue;let u=t.recentlyComputedDerivations.has(o);i.rect.setAttribute("fill",u?ce.accent+"33":"none"),i.rect.setAttribute("stroke-width",u?"2":"1")}for(let o of n){let i=e.nodes.get(`2:${o}`);if(!i)continue;let u=t.recentlyActiveConstraints.has(o),c=i.rect.getAttribute("stroke")??ce.muted;i.rect.setAttribute("fill",u?c+"33":"none"),i.rect.setAttribute("stroke-width",u?"2":"1")}}function Zn(e,t,a){let r=Fr(t);if(!r)return;let n;try{n=Object.keys(t.facts.$store.toObject())}catch{n=[]}let o=Object.keys(t.derive),i=r.constraints,u=r.unmet,c=r.inflight,d=Object.keys(r.resolvers),f=new Map;for(let y of u)f.set(y.id,{type:y.requirement.type,fromConstraint:y.fromConstraint,status:"unmet"});for(let y of c)f.set(y.id,{type:y.resolverId,fromConstraint:"",status:"inflight"});if(n.length===0&&o.length===0&&i.length===0&&d.length===0){un.delete(e.flowSvg),e.flowSvg.replaceChildren(),e.flowSvg.setAttribute("viewBox","0 0 460 40");let y=document.createElementNS("http://www.w3.org/2000/svg","text");y.setAttribute("x","230"),y.setAttribute("y","24"),y.setAttribute("text-anchor","middle"),y.setAttribute("fill",ce.muted),y.setAttribute("font-size","10"),y.setAttribute("font-family",ce.font),y.textContent="No system topology",e.flowSvg.appendChild(y);return}let w=c.map(y=>y.resolverId).sort(),O=Yo(n,o,i,f,d,w),_=un.get(e.flowSvg);if(_&&_.fingerprint===O){Xo(_,a,n,o,i.map(y=>y.id));return}let U=ot.nodeW+ot.colGap,D=[5,5+U,5+U*2,5+U*3,5+U*4],E=D[4]+ot.nodeW+5;function T(y){let z=ot.startY+12;return y.map(v=>{let l={...v,y:z};return z+=ot.nodeH+ot.nodeGap,l})}let G=T(n.map(y=>({id:y,label:Zt(y,ot.labelMaxChars)}))),J=T(o.map(y=>({id:y,label:Zt(y,ot.labelMaxChars)}))),m=T(i.map(y=>({id:y.id,label:Zt(y.id,ot.labelMaxChars),active:y.active,priority:y.priority}))),M=T([...f.entries()].map(([y,z])=>({id:y,type:z.type,fromConstraint:z.fromConstraint,status:z.status}))),S=T(d.map(y=>({id:y,label:Zt(y,ot.labelMaxChars)}))),j=Math.max(G.length,J.length,m.length,M.length,S.length,1),F=ot.startY+12+j*(ot.nodeH+ot.nodeGap)+8;e.flowSvg.replaceChildren(),e.flowSvg.setAttribute("viewBox",`0 0 ${E} ${F}`),e.flowSvg.setAttribute("aria-label",`Dependency graph: ${n.length} facts, ${o.length} derivations, ${i.length} constraints, ${f.size} requirements, ${d.length} resolvers`);let ne=["Facts","Derivations","Constraints","Reqs","Resolvers"];for(let[y,z]of ne.entries()){let v=document.createElementNS("http://www.w3.org/2000/svg","text");v.setAttribute("x",String(D[y]??0)),v.setAttribute("y","10"),v.setAttribute("fill",ce.accent),v.setAttribute("font-size",String(ot.fontSize)),v.setAttribute("font-family",ce.font),v.textContent=z,e.flowSvg.appendChild(v)}let k={fingerprint:O,nodes:new Map};function R(y,z,v,l,x,P,K,ae){let Ne=document.createElementNS("http://www.w3.org/2000/svg","g"),_e=document.createElementNS("http://www.w3.org/2000/svg","rect");_e.setAttribute("x",String(z)),_e.setAttribute("y",String(v-6)),_e.setAttribute("width",String(ot.nodeW)),_e.setAttribute("height",String(ot.nodeH)),_e.setAttribute("rx","3"),_e.setAttribute("fill",ae?P+"33":"none"),_e.setAttribute("stroke",P),_e.setAttribute("stroke-width",ae?"2":"1"),_e.setAttribute("opacity",K?"0.35":"1"),Ne.appendChild(_e);let we=document.createElementNS("http://www.w3.org/2000/svg","text");return we.setAttribute("x",String(z+4)),we.setAttribute("y",String(v+4)),we.setAttribute("fill",P),we.setAttribute("font-size",String(ot.fontSize)),we.setAttribute("font-family",ce.font),we.setAttribute("opacity",K?"0.35":"1"),we.textContent=x,Ne.appendChild(we),e.flowSvg.appendChild(Ne),k.nodes.set(`${y}:${l}`,{g:Ne,rect:_e,text:we}),{midX:z+ot.nodeW/2,midY:v}}function $(y,z,v,l,x,P){let K=document.createElementNS("http://www.w3.org/2000/svg","line");K.setAttribute("x1",String(y)),K.setAttribute("y1",String(z)),K.setAttribute("x2",String(v)),K.setAttribute("y2",String(l)),K.setAttribute("stroke",x),K.setAttribute("stroke-width","1"),K.setAttribute("stroke-dasharray","3,2"),K.setAttribute("opacity","0.7"),e.flowSvg.appendChild(K)}let I=new Map,H=new Map,ee=new Map,V=new Map;for(let y of G){let z=a.recentlyChangedFacts.has(y.id),v=R(0,D[0],y.y,y.id,y.label,ce.text,!1,z);I.set(y.id,v)}for(let y of J){let z=a.recentlyComputedDerivations.has(y.id),v=R(1,D[1],y.y,y.id,y.label,ce.accent,!1,z);H.set(y.id,v)}for(let y of m){let z=a.recentlyActiveConstraints.has(y.id),v=R(2,D[2],y.y,y.id,y.label,y.active?ce.yellow:ce.muted,!y.active,z);ee.set(y.id,v)}for(let y of M){let z=y.status==="unmet"?ce.red:ce.yellow,v=R(3,D[3],y.y,y.id,Zt(y.type,ot.labelMaxChars),z,!1,!1);V.set(y.id,v)}for(let y of S){let z=c.some(v=>v.resolverId===y.id);R(4,D[4],y.y,y.id,y.label,z?ce.green:ce.muted,!z,!1)}for(let y of J){let z=a.derivationDeps.get(y.id),v=H.get(y.id);if(z&&v)for(let l of z){let x=I.get(l);x&&$(x.midX+ot.nodeW/2,x.midY,v.midX-ot.nodeW/2,v.midY,ce.accent)}}for(let y of M){let z=ee.get(y.fromConstraint),v=V.get(y.id);z&&v&&$(z.midX+ot.nodeW/2,z.midY,v.midX-ot.nodeW/2,v.midY,ce.muted)}for(let y of c){let z=V.get(y.id);if(z){let v=S.find(l=>l.id===y.resolverId);v&&$(z.midX+ot.nodeW/2,z.midY,D[4],v.y,ce.green)}}un.set(e.flowSvg,k)}function Qo(e){e.animationTimer&&clearTimeout(e.animationTimer),e.animationTimer=setTimeout(()=>{e.recentlyChangedFacts.clear(),e.recentlyComputedDerivations.clear(),e.recentlyActiveConstraints.clear(),e.animationTimer=null},600)}function Zo(e,t){let a=t.entries.toArray();if(a.length===0)return;e.timelineSvg.replaceChildren();let r=1/0,n=-1/0;for(let _ of a)_.startMs<r&&(r=_.startMs),_.endMs>n&&(n=_.endMs);let o=performance.now();for(let _ of t.inflight.values())_<r&&(r=_),o>n&&(n=o);let i=n-r||1,u=Hr-vr-10,c=[],d=new Set;for(let _ of a)d.has(_.resolver)||(d.add(_.resolver),c.push(_.resolver));for(let _ of t.inflight.keys())d.has(_)||(d.add(_),c.push(_));let f=c.slice(-12),w=yr*f.length+20;e.timelineSvg.setAttribute("viewBox",`0 0 ${Hr} ${w}`),e.timelineSvg.setAttribute("height",String(Math.min(w,200)));let O=5;for(let _=0;_<=O;_++){let U=vr+u*_/O,D=i*_/O,E=document.createElementNS("http://www.w3.org/2000/svg","text");E.setAttribute("x",String(U)),E.setAttribute("y","8"),E.setAttribute("fill",ce.muted),E.setAttribute("font-size","6"),E.setAttribute("font-family",ce.font),E.setAttribute("text-anchor","middle"),E.textContent=D<1e3?`${D.toFixed(0)}ms`:`${(D/1e3).toFixed(1)}s`,e.timelineSvg.appendChild(E);let T=document.createElementNS("http://www.w3.org/2000/svg","line");T.setAttribute("x1",String(U)),T.setAttribute("y1","10"),T.setAttribute("x2",String(U)),T.setAttribute("y2",String(w)),T.setAttribute("stroke",ce.border),T.setAttribute("stroke-width","0.5"),e.timelineSvg.appendChild(T)}for(let _=0;_<f.length;_++){let U=f[_],D=12+_*yr,E=_%Vn.length,T=Vn[E],G=document.createElementNS("http://www.w3.org/2000/svg","text");G.setAttribute("x",String(vr-4)),G.setAttribute("y",String(D+yr/2+3)),G.setAttribute("fill",ce.muted),G.setAttribute("font-size","7"),G.setAttribute("font-family",ce.font),G.setAttribute("text-anchor","end"),G.textContent=Zt(U,12),e.timelineSvg.appendChild(G);let J=a.filter(M=>M.resolver===U);for(let M of J){let S=vr+(M.startMs-r)/i*u,j=Math.max((M.endMs-M.startMs)/i*u,Kn),F=document.createElementNS("http://www.w3.org/2000/svg","rect");F.setAttribute("x",String(S)),F.setAttribute("y",String(D+2)),F.setAttribute("width",String(j)),F.setAttribute("height",String(yr-4)),F.setAttribute("rx","2"),F.setAttribute("fill",M.error?ce.red:T),F.setAttribute("opacity","0.8");let ne=document.createElementNS("http://www.w3.org/2000/svg","title"),k=M.endMs-M.startMs;ne.textContent=`${U}: ${k.toFixed(1)}ms${M.error?" (error)":""}`,F.appendChild(ne),e.timelineSvg.appendChild(F)}let m=t.inflight.get(U);if(m!==void 0){let M=vr+(m-r)/i*u,S=Math.max((o-m)/i*u,Kn),j=document.createElementNS("http://www.w3.org/2000/svg","rect");j.setAttribute("x",String(M)),j.setAttribute("y",String(D+2)),j.setAttribute("width",String(S)),j.setAttribute("height",String(yr-4)),j.setAttribute("rx","2"),j.setAttribute("fill",T),j.setAttribute("opacity","0.4"),j.setAttribute("stroke",T),j.setAttribute("stroke-width","1"),j.setAttribute("stroke-dasharray","3,2");let F=document.createElementNS("http://www.w3.org/2000/svg","title");F.textContent=`${U}: inflight ${(o-m).toFixed(0)}ms`,j.appendChild(F),e.timelineSvg.appendChild(j)}}e.timelineSvg.setAttribute("aria-label",`Timeline: ${a.length} resolver executions across ${f.length} resolvers`)}function es(){if(typeof window>"u")return{systems:new Map,getSystem:()=>null,getSystems:()=>[],inspect:()=>null,getEvents:()=>[],explain:()=>null,exportSession:()=>null,importSession:()=>!1,clearEvents:()=>{},subscribe:()=>()=>{}};if(!window.__DIRECTIVE__){let e=new Map,t={systems:e,getSystem(a){return a?e.get(a)?.system??null:e.values().next().value?.system??null},getSystems(){return[...e.keys()]},inspect(a){let r=this.getSystem(a),n=a?e.get(a):e.values().next().value,o=r?.inspect()??null;return o&&n&&(o.resolverStats=n.resolverStats?Object.fromEntries(n.resolverStats):{}),o},getEvents(a){return a?e.get(a)?.events.toArray()??[]:e.values().next().value?.events.toArray()??[]},explain(a,r){return this.getSystem(r)?.explain(a)??null},subscribe(a,r){let n=r?e.get(r):e.values().next().value;if(!n){let o=!1,i=setInterval(()=>{let c=r?e.get(r):e.values().next().value;c&&!o&&(o=!0,c.subscribers.add(a))},100),u=setTimeout(()=>clearInterval(i),1e4);return()=>{clearInterval(i),clearTimeout(u);for(let c of e.values())c.subscribers.delete(a)}}return n.subscribers.add(a),()=>{n.subscribers.delete(a)}},exportSession(a){let r=a?e.get(a):e.values().next().value;return r?JSON.stringify({version:1,name:a??e.keys().next().value??"default",exportedAt:Date.now(),events:r.events.toArray()}):null},importSession(a,r){try{if(a.length>10*1024*1024)return!1;let n=JSON.parse(a);if(!n||typeof n!="object"||Array.isArray(n)||!Array.isArray(n.events))return!1;let o=r?e.get(r):e.values().next().value;if(!o)return!1;let i=o.maxEvents,u=n.events,c=u.length>i?u.length-i:0;o.events.clear();for(let d=c;d<u.length;d++){let f=u[d];f&&typeof f=="object"&&!Array.isArray(f)&&typeof f.timestamp=="number"&&typeof f.type=="string"&&f.type!=="__proto__"&&f.type!=="constructor"&&f.type!=="prototype"&&o.events.push({timestamp:f.timestamp,type:f.type,data:f.data??null})}return!0}catch{return!1}},clearEvents(a){let r=a?e.get(a):e.values().next().value;r&&r.events.clear()}};return Object.defineProperty(window,"__DIRECTIVE__",{value:t,writable:!1,configurable:Dn(),enumerable:!0}),t}return window.__DIRECTIVE__}function ts(e={}){let{name:t="default",trace:a=!1,maxEvents:r,panel:n=!1,position:o="bottom-right",defaultOpen:i=!1}=e,u=qo(r),c=es(),d={system:null,events:new ya(u),maxEvents:u,subscribers:new Set,resolverStats:new Map};c.systems.set(t,d);let f=(l,x)=>{let P={timestamp:Date.now(),type:l,data:x};a&&d.events.push(P);for(let K of d.subscribers)try{K(P)}catch{}},w=null,O=new Map,_=new Map,U=No(),D=Bo(),E=zo(),T=Lo(),G=n&&typeof window<"u"&&typeof document<"u"&&Dn(),J=null,m=0,M=1,S=2,j=4,F=8,ne=16,k=32,R=64,$=128,I=new Map,H=new Set,ee=null;function V(l){m|=l,J===null&&typeof requestAnimationFrame<"u"&&(J=requestAnimationFrame(y))}function y(){if(J=null,!w||!d.system){m=0;return}let l=w.refs,x=d.system,P=m;if(m=0,P&M){for(let K of H)Ho(O,K);H.clear();for(let[K,{value:ae,flash:Ne}]of I)Ur(O,l.factsBody,K,ae,Ne,w.flashTimers);I.clear(),l.factsCount.textContent=String(O.size)}if(P&S&&Xn(l,_,x,w.flashTimers),P&F)if(ee)ln(l,ee.inflight.length,ee.unmet.length);else{let K=Fr(x);K&&ln(l,K.inflight.length,K.unmet.length)}if(P&j)if(ee)sn(l,ee.inflight,ee.unmet);else{let K=Fr(x);K&&sn(l,K.inflight,K.unmet)}P&ne&&Ko(l,U),P&k&&Zn(l,x,D),P&R&&Qn(l,x),P&$&&Zo(l,T)}function z(l,x){w&&a&&Wo(w.refs,l,x,d.events.size)}function v(l,x){E.isRecording&&E.recordedEvents.length<Fo&&E.recordedEvents.push({timestamp:Date.now(),type:l,data:_o(x)})}return{name:"devtools",onInit:l=>{if(d.system=l,f("init",{}),typeof window<"u"&&console.log(`%c[Directive Devtools]%c System "${t}" initialized. Access via window.__DIRECTIVE__`,"color: #7c3aed; font-weight: bold","color: inherit"),G){let x=d.system;w=Go(t,o,i,a);let P=w.refs;try{let ae=x.facts.$store.toObject();for(let[Ne,_e]of Object.entries(ae))Ur(O,P.factsBody,Ne,_e,!1);P.factsCount.textContent=String(Object.keys(ae).length)}catch{}Xn(P,_,x);let K=Fr(x);K&&(ln(P,K.inflight.length,K.unmet.length),sn(P,K.inflight,K.unmet)),Qn(P,x),Vo(P,x),Zn(P,x,D),P.recordBtn.addEventListener("click",()=>{if(E.isRecording=!E.isRecording,P.recordBtn.textContent=E.isRecording?"⏹ Stop":"⏺ Record",P.recordBtn.style.color=E.isRecording?ce.red:ce.text,E.isRecording){E.recordedEvents=[],E.snapshots=[];try{E.snapshots.push({timestamp:Date.now(),facts:x.facts.$store.toObject()})}catch{}}}),P.exportBtn.addEventListener("click",()=>{let ae=E.recordedEvents.length>0?E.recordedEvents:d.events.toArray(),Ne=JSON.stringify({version:1,name:t,exportedAt:Date.now(),events:ae,snapshots:E.snapshots},null,2),_e=new Blob([Ne],{type:"application/json"}),we=URL.createObjectURL(_e),ze=document.createElement("a");ze.href=we,ze.download=`directive-session-${t}-${Date.now()}.json`,ze.click(),URL.revokeObjectURL(we)})}},onStart:l=>{f("start",{}),z("start",{}),v("start",{})},onStop:l=>{f("stop",{}),z("stop",{}),v("stop",{})},onDestroy:l=>{f("destroy",{}),c.systems.delete(t),J!==null&&typeof cancelAnimationFrame<"u"&&(cancelAnimationFrame(J),J=null),D.animationTimer&&clearTimeout(D.animationTimer),w&&(w.destroy(),w=null,O.clear(),_.clear())},onFactSet:(l,x,P)=>{f("fact.set",{key:l,value:x,prev:P}),v("fact.set",{key:l,value:x,prev:P}),D.recentlyChangedFacts.add(l),w&&d.system&&(I.set(l,{value:x,flash:!0}),H.delete(l),V(M),z("fact.set",{key:l,value:x}))},onFactDelete:(l,x)=>{f("fact.delete",{key:l,prev:x}),v("fact.delete",{key:l,prev:x}),w&&(H.add(l),I.delete(l),V(M),z("fact.delete",{key:l}))},onFactsBatch:l=>{if(f("facts.batch",{changes:l}),v("facts.batch",{count:l.length}),w&&d.system){for(let x of l)x.type==="delete"?(H.add(x.key),I.delete(x.key)):(D.recentlyChangedFacts.add(x.key),I.set(x.key,{value:x.value,flash:!0}),H.delete(x.key));V(M),z("facts.batch",{count:l.length})}},onDerivationCompute:(l,x,P)=>{f("derivation.compute",{id:l,value:x,deps:P}),v("derivation.compute",{id:l,deps:P}),D.derivationDeps.set(l,P),D.recentlyComputedDerivations.add(l),z("derivation.compute",{id:l,deps:P})},onDerivationInvalidate:l=>{f("derivation.invalidate",{id:l}),z("derivation.invalidate",{id:l})},onReconcileStart:l=>{f("reconcile.start",{}),U.lastReconcileStartMs=performance.now(),z("reconcile.start",{}),v("reconcile.start",{})},onReconcileEnd:l=>{if(f("reconcile.end",l),v("reconcile.end",{unmet:l.unmet.length,inflight:l.inflight.length,completed:l.completed.length}),U.lastReconcileStartMs>0){let x=performance.now()-U.lastReconcileStartMs;U.reconcileCount++,U.reconcileTotalMs+=x,U.lastReconcileStartMs=0}if(E.isRecording&&d.system&&E.snapshots.length<Uo)try{E.snapshots.push({timestamp:Date.now(),facts:d.system.facts.$store.toObject()})}catch{}w&&d.system&&(ee=l,Qo(D),V(S|F|j|ne|k|R),z("reconcile.end",{unmet:l.unmet.length,inflight:l.inflight.length}))},onConstraintEvaluate:(l,x)=>{f("constraint.evaluate",{id:l,active:x}),v("constraint.evaluate",{id:l,active:x}),x?(D.activeConstraints.add(l),D.recentlyActiveConstraints.add(l)):D.activeConstraints.delete(l),z("constraint.evaluate",{id:l,active:x})},onConstraintError:(l,x)=>{f("constraint.error",{id:l,error:String(x)}),z("constraint.error",{id:l,error:String(x)})},onRequirementCreated:l=>{f("requirement.created",{id:l.id,type:l.requirement.type}),v("requirement.created",{id:l.id,type:l.requirement.type}),z("requirement.created",{id:l.id,type:l.requirement.type})},onRequirementMet:(l,x)=>{f("requirement.met",{id:l.id,byResolver:x}),v("requirement.met",{id:l.id,byResolver:x}),z("requirement.met",{id:l.id,byResolver:x})},onRequirementCanceled:l=>{f("requirement.canceled",{id:l.id}),v("requirement.canceled",{id:l.id}),z("requirement.canceled",{id:l.id})},onResolverStart:(l,x)=>{f("resolver.start",{resolver:l,requirementId:x.id}),v("resolver.start",{resolver:l,requirementId:x.id}),T.inflight.set(l,performance.now()),w&&d.system&&(V(j|F|$),z("resolver.start",{resolver:l,requirementId:x.id}))},onResolverComplete:(l,x,P)=>{f("resolver.complete",{resolver:l,requirementId:x.id,duration:P}),v("resolver.complete",{resolver:l,requirementId:x.id,duration:P});let K=d.resolverStats.get(l)??{count:0,totalMs:0,errors:0};if(K.count++,K.totalMs+=P,d.resolverStats.set(l,K),d.resolverStats.size>Yn){let Ne=d.resolverStats.keys().next().value;Ne!==void 0&&d.resolverStats.delete(Ne)}U.resolverStats.set(l,{...K});let ae=T.inflight.get(l);T.inflight.delete(l),ae!==void 0&&T.entries.push({resolver:l,startMs:ae,endMs:performance.now(),error:!1}),w&&d.system&&(V(j|F|ne|$),z("resolver.complete",{resolver:l,duration:P}))},onResolverError:(l,x,P)=>{f("resolver.error",{resolver:l,requirementId:x.id,error:String(P)}),v("resolver.error",{resolver:l,requirementId:x.id,error:String(P)});let K=d.resolverStats.get(l)??{count:0,totalMs:0,errors:0};if(K.errors++,d.resolverStats.set(l,K),d.resolverStats.size>Yn){let Ne=d.resolverStats.keys().next().value;Ne!==void 0&&d.resolverStats.delete(Ne)}U.resolverStats.set(l,{...K});let ae=T.inflight.get(l);T.inflight.delete(l),ae!==void 0&&T.entries.push({resolver:l,startMs:ae,endMs:performance.now(),error:!0}),w&&d.system&&(V(j|F|ne|$),z("resolver.error",{resolver:l,error:String(P)}))},onResolverRetry:(l,x,P)=>{f("resolver.retry",{resolver:l,requirementId:x.id,attempt:P}),v("resolver.retry",{resolver:l,requirementId:x.id,attempt:P}),z("resolver.retry",{resolver:l,attempt:P})},onResolverCancel:(l,x)=>{f("resolver.cancel",{resolver:l,requirementId:x.id}),v("resolver.cancel",{resolver:l,requirementId:x.id}),T.inflight.delete(l),z("resolver.cancel",{resolver:l})},onEffectRun:l=>{f("effect.run",{id:l}),v("effect.run",{id:l}),U.effectRunCount++,z("effect.run",{id:l})},onEffectError:(l,x)=>{f("effect.error",{id:l,error:String(x)}),U.effectErrorCount++,z("effect.error",{id:l,error:String(x)})},onSnapshot:l=>{f("timetravel.snapshot",{id:l.id,trigger:l.trigger}),w&&d.system&&V(R),z("timetravel.snapshot",{id:l.id,trigger:l.trigger})},onTimeTravel:(l,x)=>{if(f("timetravel.jump",{from:l,to:x}),v("timetravel.jump",{from:l,to:x}),w&&d.system){let P=d.system;try{let K=P.facts.$store.toObject();O.clear(),w.refs.factsBody.replaceChildren();for(let[ae,Ne]of Object.entries(K))Ur(O,w.refs.factsBody,ae,Ne,!1);w.refs.factsCount.textContent=String(Object.keys(K).length)}catch{}_.clear(),D.derivationDeps.clear(),w.refs.derivBody.replaceChildren(),ee=null,V(S|F|j|k|R),z("timetravel.jump",{from:l,to:x})}},onError:l=>{f("error",{source:l.source,sourceId:l.sourceId,message:l.message}),v("error",{source:l.source,message:l.message}),z("error",{source:l.source,message:l.message})},onErrorRecovery:(l,x)=>{f("error.recovery",{source:l.source,sourceId:l.sourceId,strategy:x}),z("error.recovery",{source:l.source,strategy:x})},onRunComplete:l=>{f("run.complete",{id:l.id,status:l.status,facts:l.factChanges.length,constraints:l.constraintsHit.length,requirements:l.requirementsAdded.length,resolvers:l.resolversStarted.length,effects:l.effectsRun.length}),z("run.complete",{id:l.id})}}}Math.random().toString(36).slice(2,8);function _r(){return globalThis.crypto?.randomUUID?.()??`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,11)}`}function cn(e,t){if(e.length===0)return 0;let a=[...e].sort((n,o)=>n-o),r=Math.ceil(t/100*a.length)-1;return a[Math.max(0,r)]??0}function rs(e={}){let{serviceName:t="directive-agents",metrics:a={},tracing:r={},alerts:n=[],summaryMetrics:o={},events:i={}}=e,u={requests:o.requests??"agent.requests",errors:o.errors??"agent.errors",latency:o.latency??"agent.latency",tokens:o.tokens??"agent.tokens",cost:o.cost??"agent.cost"},{enabled:c=!0,exportInterval:d,exporter:f,maxDataPoints:w=1e3}=a,{enabled:O=!0,sampleRate:_=1,maxSpans:U=1e3,exporter:D}=r,E=Date.now(),T=new Map,G=new Map,J=[],m=[],M=new Map,S=new Map,j;d&&(f||D)&&(j=setInterval(async()=>{try{if(f&&c&&await f(Array.from(S.values())),D&&O){let $=J.splice(0,100);$.length>0&&await D($)}}catch($){console.error("[Directive Observability] Export error:",$)}},d));function F($){if(!c)return;let I=`${$.name}:${JSON.stringify(Object.fromEntries(Object.entries($.labels).sort()))}`,H=T.get(I);H||(H=[],T.set(I,H)),H.push($),H.length>w&&H.shift(),ne($.name,H),i.onMetricRecorded?.($),k($.name)}function ne($,I){if(I.length===0)return;let H=I.map(v=>v.value),ee=H.reduce((v,l)=>v+l,0),V=I[0],y=H[H.length-1],z={name:$,type:V.type,count:I.length,sum:ee,min:Math.min(...H),max:Math.max(...H),avg:ee/I.length,lastValue:y,lastUpdated:Date.now()};S.set($,z)}function k($){for(let I of n){if(I.metric!==$)continue;let H=S.get($);if(!H)continue;let ee=`${I.metric}:${I.threshold}`,V=M.get(ee),y=I.cooldownMs??6e4;if(V&&Date.now()-V<y)continue;let z=I.operator??">",v=H.lastValue,l=I.threshold,x=!1;switch(z){case">":x=v>l;break;case"<":x=v<l;break;case">=":x=v>=l;break;case"<=":x=v<=l;break;case"==":x=v===l;break}if(x){let P={alertId:_r(),metric:$,currentValue:v,threshold:l,operator:z,action:I.action,timestamp:Date.now(),message:`Alert: ${$} ${z} ${l} (current: ${v})`};switch(m.push(P),m.length>1e3&&m.splice(0,m.length-1e3),M.set(ee,Date.now()),i.onAlert?.(P),I.action){case"log":console.log(`[Observability] ${P.message}`);break;case"warn":console.warn(`[Observability] ${P.message}`);break;case"alert":console.error(`[Observability ALERT] ${P.message}`);break;case"callback":I.callback?.(H,l);break}}}}function R($){let I=[];for(let[H,ee]of T)if(H.startsWith(`${$}:`))for(let V of ee)I.push(V.value);return I.length===0?{}:{p50:cn(I,50),p90:cn(I,90),p99:cn(I,99)}}return{incrementCounter($,I={},H=1){F({name:$,type:"counter",value:H,labels:I,timestamp:Date.now()})},setGauge($,I,H={}){F({name:$,type:"gauge",value:I,labels:H,timestamp:Date.now()})},observeHistogram($,I,H={}){F({name:$,type:"histogram",value:I,labels:H,timestamp:Date.now()})},startSpan($,I){if(Math.random()>_)return{traceId:"sampled-out",spanId:"sampled-out",operationName:$,serviceName:t,startTime:Date.now(),status:"ok",tags:{},logs:[]};let H={traceId:I?G.get(I)?.traceId??_r():_r(),spanId:_r(),parentSpanId:I,operationName:$,serviceName:t,startTime:Date.now(),status:"ok",tags:{},logs:[]};return O&&(G.set(H.spanId,H),i.onSpanStart?.(H)),H},endSpan($,I="ok"){if($==="sampled-out")return;let H=G.get($);if(H){for(H.endTime=Date.now(),H.duration=H.endTime-H.startTime,H.status=I,G.delete($),J.push(H);J.length>U;)J.shift();F({name:`${H.operationName}.latency`,type:"histogram",value:H.duration,labels:{},timestamp:Date.now()}),I==="error"&&F({name:`${H.operationName}.errors`,type:"counter",value:1,labels:{},timestamp:Date.now()}),i.onSpanEnd?.(H)}},addSpanLog($,I,H="info"){if($==="sampled-out")return;let ee=G.get($);ee&&ee.logs.push({timestamp:Date.now(),message:I,level:H})},addSpanTag($,I,H){if($==="sampled-out")return;let ee=G.get($);ee&&(ee.tags[I]=H)},getDashboard(){let $=S.get(u.requests),I=S.get(u.errors),H=S.get(u.latency),ee=S.get(u.tokens),V=S.get(u.cost),y=$?.sum??0,z=I?.sum??0,v=y>0?z/y:0,l=H?R(u.latency):{};return{service:{name:t,uptime:Date.now()-E,startTime:E},metrics:Object.fromEntries(S),traces:[...J].slice(-100),alerts:[...m].slice(-50),summary:{totalRequests:y,totalErrors:z,errorRate:v,avgLatency:H?.avg??0,p99Latency:l.p99??0,activeSpans:G.size,totalTokens:ee?.sum??0,totalCost:V?.sum??0}}},getMetric($){let I=S.get($);if(!I)return;let H=R($);return{...I,...H}},getTraces($=100){return[...J].slice(-$)},getAlerts(){return[...m]},export(){return{metrics:Array.from(S.values()),traces:[...J],alerts:[...m]}},clear(){T.clear(),S.clear(),G.clear(),J.length=0,m.length=0,M.clear()},async dispose(){j&&(clearInterval(j),j=void 0);try{f&&c&&S.size>0&&await f(Array.from(S.values())),D&&O&&J.length>0&&await D([...J])}catch($){console.error("[Directive Observability] Error flushing data during dispose:",$)}T.clear(),S.clear(),G.clear(),J.length=0,m.length=0,M.clear()},getHealthStatus(){let $=S.get(u.requests),I=S.get(u.errors),H=$?.sum??0,ee=I?.sum??0,V=H>0?ee/H:0,y=m.filter(z=>Date.now()-z.timestamp<3e5).length;return{healthy:V<.1&&y===0,uptime:Date.now()-E,errorRate:V,activeAlerts:y}}}}function ns(e){return{trackRun(t,a){let r={agent:t};e.incrementCounter("agent.requests",r),a.success||e.incrementCounter("agent.errors",r),e.observeHistogram("agent.latency",a.latencyMs,r),a.inputTokens!==void 0&&(e.incrementCounter("agent.tokens.input",r,a.inputTokens),e.incrementCounter("agent.tokens",r,a.inputTokens)),a.outputTokens!==void 0&&(e.incrementCounter("agent.tokens.output",r,a.outputTokens),e.incrementCounter("agent.tokens",r,a.outputTokens)),a.cost!==void 0&&e.incrementCounter("agent.cost",r,a.cost),a.toolCalls!==void 0&&e.incrementCounter("agent.tool_calls",r,a.toolCalls)},trackGuardrail(t,a){let r={guardrail:t};e.incrementCounter("guardrail.checks",r),a.passed||e.incrementCounter("guardrail.failures",r),a.blocked&&e.incrementCounter("guardrail.blocks",r),e.observeHistogram("guardrail.latency",a.latencyMs,r)},trackApproval(t,a){let r={tool:t};e.incrementCounter("approval.requests",r),a.approved?e.incrementCounter("approval.approved",r):e.incrementCounter("approval.rejected",r),a.timedOut&&e.incrementCounter("approval.timeouts",r),e.observeHistogram("approval.wait_time",a.waitTimeMs,r)},trackHandoff(t,a,r){e.incrementCounter("handoff.count",{from:t,to:a}),e.observeHistogram("handoff.latency",r)}}}function as(e){let t=[{key:"service.name",value:{stringValue:e.serviceName??"directive-agents"}}];if(e.serviceVersion&&t.push({key:"service.version",value:{stringValue:e.serviceVersion}}),e.resourceAttributes)for(let[a,r]of Object.entries(e.resourceAttributes))t.push({key:a,value:{stringValue:r}});return{attributes:t}}function Ht(e){return`${BigInt(e)*BigInt(1e6)}`}function os(e){switch(e){case"counter":return"sum";case"gauge":return"gauge";case"histogram":return"histogram";default:return"gauge"}}function ss(e,t,a){let r=e.map(n=>{let o=n.lastUpdated-6e4,i=[{asInt:n.type==="counter"?n.sum:void 0,asDouble:n.type!=="counter"?n.lastValue:void 0,timeUnixNano:Ht(n.lastUpdated),startTimeUnixNano:Ht(o),attributes:[]}],u=os(n.type),c={name:n.name,unit:""};return u==="sum"?c.sum={dataPoints:i,aggregationTemporality:2,isMonotonic:!0}:u==="histogram"?c.histogram={dataPoints:[{count:n.count,sum:n.sum,min:n.min,max:n.max,timeUnixNano:Ht(n.lastUpdated),startTimeUnixNano:Ht(o),attributes:[]}],aggregationTemporality:2}:c.gauge={dataPoints:i},c});return{resourceMetrics:[{resource:t,scopeMetrics:[{scope:{name:"directive",version:a},metrics:r}]}]}}function is(e,t,a){let r=e.map(n=>{let o=n.logs.map(c=>({timeUnixNano:Ht(c.timestamp),name:c.level,attributes:[{key:"message",value:{stringValue:c.message}},{key:"level",value:{stringValue:c.level}}]})),i=Object.entries(n.tags).map(([c,d])=>({key:c,value:typeof d=="string"?{stringValue:d}:typeof d=="number"?{intValue:`${d}`}:{boolValue:d}})),u=n.status==="ok"?1:n.status==="error"?2:0;return{traceId:n.traceId.replace(/-/g,"").padEnd(32,"0").slice(0,32),spanId:n.spanId.replace(/-/g,"").padEnd(16,"0").slice(0,16),parentSpanId:n.parentSpanId?n.parentSpanId.replace(/-/g,"").padEnd(16,"0").slice(0,16):void 0,name:n.operationName,kind:1,startTimeUnixNano:Ht(n.startTime),endTimeUnixNano:n.endTime?Ht(n.endTime):Ht(n.startTime),attributes:i,events:o,status:{code:u}}});return{resourceSpans:[{resource:t,scopeSpans:[{scope:{name:"directive",version:a},spans:r}]}]}}function ls(e){let{endpoint:t,headers:a={},scopeVersion:r="0.1.0",timeoutMs:n=1e4,fetch:o=globalThis.fetch,onError:i}=e;try{let d=new URL(t);if(d.protocol!=="http:"&&d.protocol!=="https:")throw new Error("Only http: and https: protocols are supported")}catch(d){throw new Error(`[Directive OTLP] Invalid endpoint URL "${t}": ${d instanceof Error?d.message:String(d)}`)}if(/\/v1\/(metrics|traces)/.test(t)&&console.warn(`[Directive OTLP] Endpoint "${t}" already contains a /v1/metrics or /v1/traces path. The exporter will append /v1/metrics or /v1/traces automatically. Use the base URL (e.g., "http://localhost:4318") instead.`),n<=0||!Number.isFinite(n))throw new Error(`[Directive OTLP] timeoutMs must be > 0, got ${n}`);let u=as(e);async function c(d,f,w){let O=`${t.replace(/\/$/,"")}${d}`,_=new AbortController,U=setTimeout(()=>_.abort(),n);try{let D=await o(O,{method:"POST",headers:{"Content-Type":"application/json",...a},body:JSON.stringify(f),signal:_.signal});if(!D.ok)throw new Error(`OTLP export failed: ${D.status} ${D.statusText}`)}catch(D){let E=D instanceof Error?D:new Error(String(D));i?i(E,w):console.error(`[Directive OTLP] Export ${w} error:`,E.message)}finally{clearTimeout(U)}}return{async exportMetrics(d){if(d.length===0)return;let f=ss(d,u,r);await c("/v1/metrics",f,"metrics")},async exportTraces(d){if(d.length===0)return;let f=is(d,u,r);await c("/v1/traces",f,"traces")}}}var Wr=class extends Error{code="CIRCUIT_OPEN";retryAfterMs;state;constructor(e,t,a="OPEN",r){let n=r?`[Directive CircuitBreaker] Circuit "${e}" is ${a}. ${r}`:`[Directive CircuitBreaker] Circuit "${e}" is ${a}. Request rejected. Try again in ${Math.ceil(t/1e3)}s.`;super(n),this.name="CircuitBreakerOpenError",this.retryAfterMs=t,this.state=a}};function us(e={}){let{failureThreshold:t=5,recoveryTimeMs:a=3e4,halfOpenMaxRequests:r=3,failureWindowMs:n=6e4,observability:o,metricPrefix:i="circuit_breaker",name:u="default",isFailure:c=()=>!0,onStateChange:d}=e;if(t<1||!Number.isFinite(t))throw new Error(`[Directive CircuitBreaker] failureThreshold must be >= 1, got ${t}`);if(a<=0||!Number.isFinite(a))throw new Error(`[Directive CircuitBreaker] recoveryTimeMs must be > 0, got ${a}`);if(r<1||!Number.isFinite(r))throw new Error(`[Directive CircuitBreaker] halfOpenMaxRequests must be >= 1, got ${r}`);if(n<=0||!Number.isFinite(n))throw new Error(`[Directive CircuitBreaker] failureWindowMs must be > 0, got ${n}`);let f="CLOSED",w=[],O=0,_=0,U=Date.now(),D=0,E=0,T=0,G=0,J=0,m=null,M=null;function S(k){if(f===k)return;let R=f;f=k,U=Date.now(),k==="OPEN"&&(D=Date.now()),k==="HALF_OPEN"&&(O=0,_=0),d?.(R,k),o&&o.incrementCounter(`${i}.state_change`,{name:u,from:R,to:k})}function j(){let k=Date.now()-n;return w=w.filter(R=>R>k),w.length}function F(){G++,M=Date.now(),o&&o.incrementCounter(`${i}.success`,{name:u}),f==="HALF_OPEN"&&(_++,_>=r&&(S("CLOSED"),w=[]))}function ne(k){if(!c(k)){F();return}T++,m=Date.now(),w.push(Date.now());let R=t*2;if(w.length>R&&(w=w.slice(-R)),o&&o.incrementCounter(`${i}.failure`,{name:u}),f==="HALF_OPEN"){S("OPEN");return}f==="CLOSED"&&j()>=t&&S("OPEN")}return{async execute(k){if(E++,o&&o.incrementCounter(`${i}.requests`,{name:u}),f==="OPEN")if(Date.now()-D>=a)S("HALF_OPEN");else throw J++,o&&o.incrementCounter(`${i}.rejected`,{name:u}),new Wr(u,a-(Date.now()-D));if(f==="HALF_OPEN"){if(O>=r)throw J++,new Wr(u,a,"HALF_OPEN",`Max trial requests (${r}) reached.`);O++}let R=Date.now();try{let $=await k();return F(),o&&o.observeHistogram(`${i}.latency`,Date.now()-R,{name:u}),$}catch($){let I=$ instanceof Error?$:new Error(String($));throw ne(I),o&&o.observeHistogram(`${i}.latency`,Date.now()-R,{name:u}),$}},getState(){return f==="OPEN"&&Date.now()-D>=a&&S("HALF_OPEN"),f},getStats(){return{state:this.getState(),totalRequests:E,totalFailures:T,totalSuccesses:G,totalRejected:J,recentFailures:j(),lastFailureTime:m,lastSuccessTime:M,lastStateChange:U}},forceState(k){S(k)},reset(){let k=f;f="CLOSED",w=[],O=0,_=0,U=Date.now(),D=0,E=0,T=0,G=0,J=0,m=null,M=null,k!=="CLOSED"&&d?.(k,"CLOSED")},isAllowed(){return f==="CLOSED"?!0:f==="OPEN"?Date.now()-D>=a:O<r}}}function tr(e){return[Math.floor(e/8),e%8]}function xr(e,t){return e*8+t}function ba(e,t){return e>=0&&e<8&&t>=0&&t<8}function cs(e,t){return(e+t)%2===1}function dn(){const e=new Array(64).fill(null);for(let t=0;t<8;t++)for(let a=0;a<8;a++){if(!cs(t,a))continue;const r=xr(t,a);t<3?e[r]={player:"black",king:!1}:t>4&&(e[r]={player:"red",king:!1})}return e}function wa(e){return e.king?[[-1,-1],[-1,1],[1,-1],[1,1]]:e.player==="red"?[[-1,-1],[-1,1]]:[[1,-1],[1,1]]}function ka(e,t){const a=e[t];if(!a)return[];const[r,n]=tr(t),o=[];for(const[i,u]of wa(a)){const c=r+i,d=n+u;ba(c,d)&&e[xr(c,d)]===null&&o.push({from:t,to:xr(c,d),captured:null})}return o}function Kt(e,t){const a=e[t];if(!a)return[];const[r,n]=tr(t),o=[];for(const[i,u]of wa(a)){const c=r+i,d=n+u,f=r+i*2,w=n+u*2;if(!ba(f,w))continue;const O=xr(c,d),_=xr(f,w),U=e[O];U&&U.player!==a.player&&e[_]===null&&o.push({from:t,to:_,captured:O})}return o}function br(e,t){const a=Kt(e,t);return a.length>0?a:ka(e,t)}function Ar(e,t){let a=[],r=[];for(let n=0;n<64;n++){const o=e[n];!o||o.player!==t||(a=a.concat(Kt(e,n)),r=r.concat(ka(e,n)))}return a.length>0?a:r}function ea(e,t){for(let a=0;a<64;a++){const r=e[a];if(!(!r||r.player!==t)&&Kt(e,a).length>0)return!0}return!1}function rr(e,t){const a=[...e];return a[t.to]=a[t.from],a[t.from]=null,t.captured!==null&&(a[t.captured]=null),a}function Vt(e,t){const a=e[t];if(!a||a.king)return!1;const[r]=tr(t);return a.player==="red"&&r===0||a.player==="black"&&r===7}function fr(e,t){const a=e[t];if(!a)return e;const r=[...e];return r[t]={...a,king:!0},r}function qr(e){let t=0,a=0;for(const r of e)r?.player==="red"?t++:r?.player==="black"&&a++;return{red:t,black:a}}function Er(e){return e==="red"?"black":"red"}function Sa(e,t){return Ar(e,t).length===0}function Ea(e,t){let a=0;for(let r=0;r<64;r++){const n=e[r];if(!n)continue;const[o,i]=tr(r);let u=n.king?2.5:1;n.king||(n.player==="red"&&o>=5&&(u+=.5),n.player==="black"&&o<=2&&(u+=.5)),i>=2&&i<=5&&o>=2&&o<=5&&(u+=.3),a+=n.player===t?u:-u}return a}function Kr(e,t){if(!e[t])return[];const r=Kt(e,t);if(r.length===0)return[];const n=[];for(const o of r){const i=rr(e,o);if(Vt(i,o.to)){n.push([o]);continue}const u=Kr(i,o.to);if(u.length===0)n.push([o]);else for(const c of u)n.push([o,...c])}return n}function yn(e,t){let a=e;for(const r of t)a=rr(a,r),Vt(a,r.to)&&(a=fr(a,r.to));return a}function cr(e,t,a,r,n,o,i){const u=o?i:Er(i);if(a===0||Sa(e,u))return Ea(e,i);const c=Ar(e,u);if(o){let d=-1/0;for(const f of c)if(f.captured!==null){const w=Kr(e,f.from);for(const O of w){const _=yn(e,O),U=cr(_,t,a-1,r,n,!1,i);if(d=Math.max(d,U),r=Math.max(r,U),n<=r)break}if(n<=r)break}else{let w=rr(e,f);Vt(w,f.to)&&(w=fr(w,f.to));const O=cr(w,t,a-1,r,n,!1,i);if(d=Math.max(d,O),r=Math.max(r,O),n<=r)break}return d}else{let d=1/0;for(const f of c)if(f.captured!==null){const w=Kr(e,f.from);for(const O of w){const _=yn(e,O),U=cr(_,t,a-1,r,n,!0,i);if(d=Math.min(d,U),n=Math.min(n,U),n<=r)break}if(n<=r)break}else{let w=rr(e,f);Vt(w,f.to)&&(w=fr(w,f.to));const O=cr(w,t,a-1,r,n,!0,i);if(d=Math.min(d,O),n=Math.min(n,O),n<=r)break}return d}}function Ca(e,t){const a=Ar(e,t);if(a.length===0)return null;let r=-1/0,n=a[0];const o=new Set;for(const i of a){const u=`${i.from}-${i.to}`;if(!o.has(u))if(o.add(u),i.captured!==null){const c=Kr(e,i.from);for(const d of c){const f=yn(e,d),w=cr(f,t,3,-1/0,1/0,!1,t);w>r&&(r=w,n=d[0])}}else{let c=rr(e,i);Vt(c,i.to)&&(c=fr(c,i.to));const d=cr(c,t,3,-1/0,1/0,!1,t);d>r&&(r=d,n=i)}}return n}function ds(e,t,a){const r=Kt(e,t);if(r.length===0)return null;if(r.length===1)return r[0];let n=-1/0,o=r[0];for(const i of r){const u=rr(e,i),c=Ea(u,a);c>n&&(n=c,o=i)}return o}const fs={facts:{board:$e.object(),currentPlayer:$e.object(),selectedIndex:$e.object(),targetIndex:$e.object(),mustContinueFrom:$e.object(),message:$e.string(),moveCount:$e.number(),capturedCount:$e.object(),gameOver:$e.boolean(),winner:$e.object(),gameMode:$e.object(),aiPlayer:$e.object()},derivations:{validMoves:$e.object(),jumpRequired:$e.boolean(),highlightSquares:$e.object(),selectableSquares:$e.object(),redCount:$e.number(),blackCount:$e.number(),score:$e.string()},events:{clickSquare:{index:$e.number()},newGame:{},setGameMode:{mode:$e.object()},aiMove:{},claudeMove:{from:$e.number(),to:$e.number()}},requirements:{EXECUTE_MOVE:{from:$e.number(),to:$e.number(),captured:$e.object()},KING_PIECE:{index:$e.number()},END_GAME:{winner:$e.object(),reason:$e.string()}}},ps=dr("checkers",{schema:fs,init:e=>{e.board=dn(),e.currentPlayer="red",e.selectedIndex=null,e.targetIndex=null,e.mustContinueFrom=null,e.message="Red's turn. Select a piece to move.",e.moveCount=0,e.capturedCount={red:0,black:0},e.gameOver=!1,e.winner=null,e.gameMode="2player",e.aiPlayer="black"},derive:{validMoves:e=>{const t=e.selectedIndex;return t===null?[]:br(e.board,t)},jumpRequired:e=>ea(e.board,e.currentPlayer),highlightSquares:e=>{const t=e.selectedIndex;return t===null?[]:br(e.board,t).map(r=>r.to)},selectableSquares:e=>{if(e.gameOver)return[];if(e.gameMode!=="2player"&&e.currentPlayer===e.aiPlayer)return[];const t=e.mustContinueFrom;if(t!==null)return[t];const a=Ar(e.board,e.currentPlayer);return[...new Set(a.map(n=>n.from))]},redCount:e=>qr(e.board).red,blackCount:e=>qr(e.board).black,score:(e,t)=>(e.board,`Red ${t.redCount} — Black ${t.blackCount}`)},events:{clickSquare:(e,{index:t})=>{if(e.gameOver||e.gameMode!=="2player"&&e.currentPlayer===e.aiPlayer)return;const a=e.board,r=e.currentPlayer,n=e.selectedIndex,o=e.mustContinueFrom,i=a[t];if(o!==null){Kt(a,o).find(d=>d.to===t)?(e.selectedIndex=o,e.targetIndex=t):t!==o&&(e.message="You must continue jumping with the same piece.");return}if(i&&i.player===r){if(ea(a,r)&&Kt(a,t).length===0){e.message="You must make a jump! Select a piece that can capture.";return}e.selectedIndex=t,e.targetIndex=null,e.message="Selected. Choose a destination.";return}if(n!==null&&br(a,n).find(d=>d.to===t)){e.targetIndex=t;return}e.selectedIndex=null,e.targetIndex=null,n!==null&&(e.message="Invalid move. Select one of your pieces.")},newGame:e=>{const t=e.gameMode;e.board=dn(),e.currentPlayer="red",e.selectedIndex=null,e.targetIndex=null,e.mustContinueFrom=null,e.message="Red's turn. Select a piece to move.",e.moveCount=0,e.capturedCount={red:0,black:0},e.gameOver=!1,e.winner=null,e.gameMode=t,e.aiPlayer="black"},setGameMode:(e,{mode:t})=>{e.board=dn(),e.currentPlayer="red",e.selectedIndex=null,e.targetIndex=null,e.mustContinueFrom=null,e.message="Red's turn. Select a piece to move.",e.moveCount=0,e.capturedCount={red:0,black:0},e.gameOver=!1,e.winner=null,e.gameMode=t,e.aiPlayer="black"},aiMove:e=>{if(e.gameOver||e.gameMode!=="computer"||e.currentPlayer!==e.aiPlayer)return;const t=e.board,a=e.currentPlayer,r=e.mustContinueFrom;if(r!==null){const n=ds(t,r,a);n&&(e.selectedIndex=r,e.targetIndex=n.to)}else{const n=Ca(t,a);n&&(e.selectedIndex=n.from,e.targetIndex=n.to)}},claudeMove:(e,{from:t,to:a})=>{e.gameOver||e.gameMode==="ai"&&e.currentPlayer===e.aiPlayer&&(e.selectedIndex=t,e.targetIndex=a)}},constraints:{executeMove:{priority:100,when:e=>{if(e.gameOver)return!1;const t=e.selectedIndex,a=e.targetIndex;return t===null||a===null?!1:br(e.board,t).some(n=>n.to===a)},require:e=>{const t=e.selectedIndex,a=e.targetIndex,n=br(e.board,t).find(o=>o.to===a);return{type:"EXECUTE_MOVE",from:n.from,to:n.to,captured:n.captured}}},kingPiece:{priority:80,when:e=>{if(e.gameOver)return!1;const t=e.board;for(let a=0;a<64;a++)if(Vt(t,a))return!0;return!1},require:e=>{const t=e.board;for(let a=0;a<64;a++)if(Vt(t,a))return{type:"KING_PIECE",index:a};return{type:"KING_PIECE",index:0}}},gameOver:{priority:50,when:e=>e.gameOver||e.mustContinueFrom!==null?!1:Sa(e.board,e.currentPlayer),require:e=>({type:"END_GAME",winner:Er(e.currentPlayer),reason:`${Er(e.currentPlayer)} wins! ${e.currentPlayer} has no valid moves.`})}},resolvers:{executeMove:{requirement:"EXECUTE_MOVE",resolve:async(e,t)=>{const a=t.facts.board,r={from:e.from,to:e.to,captured:e.captured};let n=rr(a,r);if(e.captured!==null){const i=a[e.captured];if(i){const u={...t.facts.capturedCount};u[i.player]++,t.facts.capturedCount=u}}if(t.facts.moveCount++,Vt(n,e.to)){n=fr(n,e.to),t.facts.board=n,t.facts.selectedIndex=null,t.facts.targetIndex=null,t.facts.mustContinueFrom=null;const i=Er(t.facts.currentPlayer);t.facts.currentPlayer=i,t.facts.message=`Kinged! ${i}'s turn.`;return}if(e.captured!==null&&Kt(n,e.to).length>0){t.facts.board=n,t.facts.selectedIndex=e.to,t.facts.targetIndex=null,t.facts.mustContinueFrom=e.to,t.facts.message="Jump again! You must continue capturing.";return}t.facts.board=n,t.facts.selectedIndex=null,t.facts.targetIndex=null,t.facts.mustContinueFrom=null;const o=Er(t.facts.currentPlayer);t.facts.currentPlayer=o,t.facts.message=`${o}'s turn.`}},kingPiece:{requirement:"KING_PIECE",resolve:async(e,t)=>{t.facts.board=fr(t.facts.board,e.index)}},endGame:{requirement:"END_GAME",resolve:async(e,t)=>{t.facts.gameOver=!0,t.facts.winner=e.winner,t.facts.selectedIndex=null,t.facts.targetIndex=null,t.facts.mustContinueFrom=null,t.facts.message=e.reason}}},effects:{moveLog:{deps:["moveCount"],run:e=>{if(e.moveCount>0){const{red:t,black:a}=qr(e.board);console.log(`[Checkers] Move ${e.moveCount} | Red: ${t}, Black: ${a}`)}}},gameOverLog:{deps:["gameOver"],run:e=>{if(e.gameOver){const{red:t,black:a}=qr(e.board);console.log(`[Checkers] Game Over! Winner: ${e.winner} | Moves: ${e.moveCount} | Red: ${t}, Black: ${a}`)}}}}}),ms={facts:{messages:$e.object(),thinking:$e.boolean(),totalTokens:$e.number(),estimatedCost:$e.number(),circuitState:$e.string(),streamingText:$e.string(),isStreaming:$e.boolean(),analysisText:$e.string(),cacheHitRate:$e.number(),cacheEntries:$e.number()},derivations:{},events:{addMessage:{message:$e.object()},setThinking:{thinking:$e.boolean()},updateAIState:{totalTokens:$e.number(),estimatedCost:$e.number(),circuitState:$e.string()},clearChat:{},appendStreamToken:{token:$e.string()},finishStream:{finalText:$e.string()},startStream:{},setAnalysis:{text:$e.string()},updateCacheStats:{hitRate:$e.number(),entries:$e.number()}},requirements:{}},gs=dr("checkers-chat",{schema:ms,init:e=>{e.messages=[],e.thinking=!1,e.totalTokens=0,e.estimatedCost=0,e.circuitState="CLOSED",e.streamingText="",e.isStreaming=!1,e.analysisText="",e.cacheHitRate=0,e.cacheEntries=0},events:{addMessage:(e,{message:t})=>{e.messages=[...e.messages,t]},setThinking:(e,{thinking:t})=>{e.thinking=t},updateAIState:(e,{totalTokens:t,estimatedCost:a,circuitState:r})=>{e.totalTokens=t,e.estimatedCost=a,e.circuitState=r},clearChat:e=>{e.messages=[],e.thinking=!1,e.totalTokens=0,e.estimatedCost=0,e.circuitState="CLOSED",e.streamingText="",e.isStreaming=!1,e.analysisText="",e.cacheHitRate=0,e.cacheEntries=0},startStream:e=>{e.isStreaming=!0,e.streamingText=""},appendStreamToken:(e,{token:t})=>{e.streamingText=e.streamingText+t},finishStream:(e,{finalText:t})=>{e.isStreaming=!1,e.streamingText=t},setAnalysis:(e,{text:t})=>{e.analysisText=t},updateCacheStats:(e,{hitRate:t,entries:a})=>{e.cacheHitRate=t,e.cacheEntries=a}}});function Xe(e,t,a){e[t]=a}function kt(e,t){return e[t]}function xa(e,t){return{name:e,onRequirementCreated:t.onRequirementCreated?a=>t.onRequirementCreated(a.requirement):void 0,onRequirementMet:t.onRequirementResolved?a=>t.onRequirementResolved(a.requirement):void 0,onError:t.onError}}function $n(e){return t=>t.type===e}var qt=class extends Error{code;guardrailName;guardrailType;userMessage;agentName;constructor(e){super(e.message,{cause:e.cause}),this.name="GuardrailError",this.code=e.code,this.guardrailName=e.guardrailName,this.guardrailType=e.guardrailType,this.userMessage=e.userMessage??e.message,this.agentName=e.agentName,Object.defineProperty(this,"input",{value:e.input,enumerable:!1,writable:!1,configurable:!1}),Object.defineProperty(this,"data",{value:e.data,enumerable:!1,writable:!1,configurable:!1})}toJSON(){return{name:this.name,code:this.code,message:this.message,guardrailName:this.guardrailName,guardrailType:this.guardrailType,userMessage:this.userMessage,agentName:this.agentName}}},An="__agent",Ir="__approval",In="__conversation",On="__toolCalls",Or="__breakpoints",Et="__scratchpad",vn={facts:{[An]:$e.object(),[Ir]:$e.object(),[In]:$e.array(),[On]:$e.array(),[Or]:$e.object()},derivations:{},events:{},requirements:{}},hs=new Set(["agent_start","agent_complete","agent_error","agent_retry","guardrail_check","constraint_evaluate","resolver_start","resolver_complete","resolver_error","approval_request","approval_response","handoff_start","handoff_complete","pattern_start","pattern_complete","dag_node_update","breakpoint_hit","breakpoint_resumed","derivation_update","scratchpad_update","reflection_iteration","race_start","race_winner","race_cancelled","debate_round","reroute","checkpoint_save","checkpoint_restore"]),ta=new Set(["__proto__","constructor","prototype","toString","valueOf","hasOwnProperty"]);function Da(e={}){let t=e.maxEvents??2e3,a=e.goToSnapshot;if(!Number.isFinite(t)||t<1)throw new Error("[Directive DebugTimeline] maxEvents must be >= 1");let r=[],n=0,o=new Set;return{record(i){let u={...i,id:n++};r.push(u);let c=r.length-t;c>0&&r.splice(0,c);for(let d of o)try{d(u)}catch{}return u},getEvents(){return[...r]},getEventsForAgent(i){return r.filter(u=>u.agentId===i)},getEventsByType(i){return r.filter(u=>u.type===i)},getEventsAtSnapshot(i){return r.filter(u=>u.snapshotId===i)},getEventsInRange(i,u){return r.filter(c=>c.timestamp>=i&&c.timestamp<=u)},forkFrom(i){let u=-1;for(let c=r.length-1;c>=0;c--)if(r[c].snapshotId!==null&&r[c].snapshotId<=i){u=r[c].id;break}if(u>=0){let c=r.length;for(let d=r.length-1;d>=0;d--)if(r[d].id<=u){c=d+1;break}r=r.slice(0,c)}else r=[];a&&a(i)},export(){return JSON.stringify({version:1,events:r,nextId:n})},import(i){let u;try{u=JSON.parse(i)}catch{throw new Error("[Directive DebugTimeline] Invalid JSON")}if(!u||typeof u!="object")throw new Error("[Directive DebugTimeline] Invalid timeline data");for(let f of Object.keys(u))if(ta.has(f))throw new Error(`[Directive DebugTimeline] Blocked key in import: ${f}`);let c=u;if(!Array.isArray(c.events))throw new Error("[Directive DebugTimeline] Missing events array");let d=[];for(let f of c.events){if(!f||typeof f!="object")continue;for(let O of Object.keys(f))if(ta.has(O))throw new Error(`[Directive DebugTimeline] Blocked key in event: ${O}`);let w=f;typeof w.id=="number"&&typeof w.type=="string"&&hs.has(w.type)&&typeof w.timestamp=="number"&&d.push(f)}r=d.length>t?d.slice(-t):d,n=typeof c.nextId=="number"?c.nextId:d.length},clear(){r=[],n=0},subscribe(i){return o.add(i),()=>{o.delete(i)}},get length(){return r.length}}}function $a(e,t){let a=new Map;return{name:"directive-ai-debug-timeline",onConstraintEvaluate(r,n){e.record({type:"constraint_evaluate",timestamp:Date.now(),snapshotId:t(),constraintId:r,fired:n})},onResolverStart(r,n){a.set(r,Date.now()),e.record({type:"resolver_start",timestamp:Date.now(),snapshotId:t(),resolverId:r,requirementType:n.requirement.type})},onResolverComplete(r){let n=a.get(r);a.delete(r),e.record({type:"resolver_complete",timestamp:Date.now(),snapshotId:t(),resolverId:r,durationMs:n?Date.now()-n:0})},onResolverError(r,n,o){let i=a.get(r);a.delete(r);let u=o instanceof Error?o.message:String(o);e.record({type:"resolver_error",timestamp:Date.now(),snapshotId:t(),resolverId:r,errorMessage:u,durationMs:i?Date.now()-i:0})}}}function Lt(e,t,a){return typeof e=="function"?{name:`${a}-guardrail-${t}`,fn:e,critical:!0}:e}function ys(e,t){let{backoff:a="exponential",baseDelayMs:r=100,maxDelayMs:n=5e3}=t,o;switch(a){case"exponential":o=r*Math.pow(2,e-1);break;case"linear":o=r*e;break;default:o=r}return Math.min(o,n)}function Aa(e,t){return t?.aborted?Promise.reject(t.reason??new Error("Aborted")):new Promise((a,r)=>{if(!t){setTimeout(a,e);return}let n=()=>{clearTimeout(o),r(t.reason??new Error("Aborted"))},o=setTimeout(()=>{t.removeEventListener("abort",n),a()},e);t.addEventListener("abort",n,{once:!0})})}async function Bt(e,t,a,r){let{retry:n}=e,o=Math.max(n?.attempts??1,1),i;for(let u=1;u<=o;u++)try{return await e.fn(t,a)}catch(c){if(i=c instanceof Error?c:new Error(String(c)),u<o){let d=ys(u,n??{});await Aa(d,r)}}return{passed:!1,reason:`Guardrail "${e.name}" failed after ${o} attempt(s): ${i.message}`}}function vs(e,t){let{backoff:a="exponential",baseDelayMs:r=1e3,maxDelayMs:n=3e4}=t,o;switch(a){case"exponential":o=r*Math.pow(2,e-1);break;case"linear":o=r*e;break;default:o=r}return Math.min(o,n)}async function bn(e,t,a,r,n){let o=Math.max(n?.attempts??1,1),i=n?.isRetryable??(()=>!0),u=n?.onRetry,c;for(let d=1;d<=o;d++)try{return await e(t,a,r)}catch(f){if(c=f instanceof Error?f:new Error(String(f)),d<o){let w=!0;try{w=i(c)}catch{break}if(!w)break;let O=vs(d,n??{});try{u?.(d,c,O)}catch{}await Aa(O,r?.signal)}else break}throw c}function wt(e){return kt(e,An)}function St(e,t){Xe(e,An,t)}function Nt(e){return kt(e,Ir)}function xt(e,t){Xe(e,Ir,t)}function Vr(e){return kt(e,In)}function Ft(e,t){Xe(e,In,t)}function Yr(e){return kt(e,On)}function Ut(e,t){Xe(e,On,t)}function At(e){return kt(e,Or)}function It(e,t){Xe(e,Or,t)}function Dt(e){return{agent:wt(e),approval:Nt(e),conversation:Vr(e),toolCalls:Yr(e)}}function zr(e){let t=Object.create(null);for(let[a,r]of Object.entries(e))t[a]={priority:r.priority??0,when:n=>{let o=Dt(n),i={...n,...o};return r.when(i)},require:n=>{let o=Dt(n),i={...n,...o};return typeof r.require=="function"?r.require(i):r.require}};return t}function bs(e,t,a){let r=Object.create(null);for(let[n,o]of Object.entries(e))r[n]={requirement:o.requirement,key:o.key,resolve:async(i,u)=>{let c=Dt(u.facts),d={facts:{...u.facts,...c},runAgent:async(f,w,O)=>t(f,w,Dt(a()),O),signal:u.signal};await o.resolve(i,d)}};return r}function ws(e){if(e.length>1048576)throw new Error(`[Directive] Output too large for JSON extraction (${e.length} chars, max 1048576).`);let t=e.trim();try{return JSON.parse(t)}catch{}let a=t.indexOf("{"),r=t.indexOf("["),n,o,i;if(a===-1&&r===-1)throw new Error("[Directive] No JSON object or array found in output");a===-1?(n=r,o="[",i="]"):r===-1?(n=a,o="{",i="}"):(n=Math.min(a,r),o=n===a?"{":"[",i=n===a?"}":"]");let u=0,c=!1,d=!1;for(let f=n;f<t.length;f++){let w=t[f];if(d){d=!1;continue}if(w==="\\"){d=!0;continue}if(w==='"'){c=!c;continue}if(!c){if(w===o)u++;else if(w===i&&(u--,u===0)){let O=t.slice(n,f+1);return JSON.parse(O)}}}throw new Error("[Directive] No valid JSON found in output")}function ks(e){return e?e.issues&&e.issues.length>0?e.issues.map(t=>t.message).join("; "):e.message??"Validation failed":"Validation failed"}function Ia(e,t){let{schema:a,maxRetries:r=2,extractJson:n=ws,schemaDescription:o}=t;if(!Number.isFinite(r)||r<0)throw new Error("[Directive] withStructuredOutput: maxRetries must be a non-negative finite number.");let i=o??a.description??"the specified JSON schema";return async(u,c,d)=>{let f={...u,instructions:(u.instructions??"")+`
+  createSystem({ module: counterModule })`);
+  return Mo(t);
+}
+function Mo(e) {
+  const t = e.modules,
+    a = new Set(Object.keys(t)),
+    r = e.debug?.snapshotModules ? new Set(e.debug.snapshotModules) : null;
+  if (e.tickMs !== void 0 && e.tickMs <= 0)
+    throw new Error("[Directive] tickMs must be a positive number");
+  let n,
+    o = e.initOrder ?? "auto";
+  if (Array.isArray(o)) {
+    const m = o,
+      M = Object.keys(t).filter((S) => !m.includes(S));
+    if (M.length > 0)
+      throw new Error(
+        `[Directive] initOrder is missing modules: ${M.join(", ")}. All modules must be included in the explicit order.`,
+      );
+    n = m;
+  } else o === "declaration" ? (n = Object.keys(t)) : (n = Oo(t));
+  let i = e.debug,
+    u = e.errorBoundary;
+  e.zeroConfig &&
+    ((i = { timeTravel: !1, maxSnapshots: 100, ...e.debug }),
+    (u = {
+      onConstraintError: "skip",
+      onResolverError: "skip",
+      onEffectError: "skip",
+      onDerivationError: "skip",
+      ...e.errorBoundary,
+    }));
+  for (const m of Object.keys(t)) {
+    if (m.includes(je))
+      throw new Error(
+        `[Directive] Module name "${m}" contains the reserved separator "${je}". Module names cannot contain "${je}".`,
+      );
+    const M = t[m];
+    if (M) {
+      for (const S of Object.keys(M.schema.facts))
+        if (S.includes(je))
+          throw new Error(
+            `[Directive] Schema key "${S}" in module "${m}" contains the reserved separator "${je}". Schema keys cannot contain "${je}".`,
+          );
+    }
+  }
+  const c = [];
+  for (const m of n) {
+    const M = t[m];
+    if (!M) continue;
+    const S = M.crossModuleDeps && Object.keys(M.crossModuleDeps).length > 0,
+      j = S ? Object.keys(M.crossModuleDeps) : [],
+      F = {};
+    for (const [y, z] of Object.entries(M.schema.facts)) F[`${m}${je}${y}`] = z;
+    const ne = {};
+    if (M.schema.derivations)
+      for (const [y, z] of Object.entries(M.schema.derivations))
+        ne[`${m}${je}${y}`] = z;
+    const k = {};
+    if (M.schema.events)
+      for (const [y, z] of Object.entries(M.schema.events))
+        k[`${m}${je}${y}`] = z;
+    const R = M.init
+        ? (y) => {
+            const z = vt(y, m);
+            M.init(z);
+          }
+        : void 0,
+      $ = {};
+    if (M.derive)
+      for (const [y, z] of Object.entries(M.derive))
+        $[`${m}${je}${y}`] = (v, l) => {
+          const x = S ? _t(v, m, j) : vt(v, m),
+            P = hn(l, m);
+          return z(x, P);
+        };
+    const I = {};
+    if (M.events)
+      for (const [y, z] of Object.entries(M.events))
+        I[`${m}${je}${y}`] = (v, l) => {
+          const x = vt(v, m);
+          z(x, l);
+        };
+    const H = {};
+    if (M.constraints)
+      for (const [y, z] of Object.entries(M.constraints)) {
+        const v = z;
+        H[`${m}${je}${y}`] = {
+          ...v,
+          deps: v.deps?.map((l) => `${m}${je}${l}`),
+          when: (l) => {
+            const x = S ? _t(l, m, j) : vt(l, m);
+            return v.when(x);
+          },
+          require:
+            typeof v.require == "function"
+              ? (l) => {
+                  const x = S ? _t(l, m, j) : vt(l, m);
+                  return v.require(x);
+                }
+              : v.require,
+        };
+      }
+    const ee = {};
+    if (M.resolvers)
+      for (const [y, z] of Object.entries(M.resolvers)) {
+        const v = z;
+        ee[`${m}${je}${y}`] = {
+          ...v,
+          resolve: async (l, x) => {
+            const P = on(x.facts, t, () => Object.keys(t));
+            await v.resolve(l, { facts: P[m], signal: x.signal });
+          },
+        };
+      }
+    const V = {};
+    if (M.effects)
+      for (const [y, z] of Object.entries(M.effects)) {
+        const v = z;
+        V[`${m}${je}${y}`] = {
+          ...v,
+          run: (l, x) => {
+            const P = S ? _t(l, m, j) : vt(l, m),
+              K = x ? (S ? _t(x, m, j) : vt(x, m)) : void 0;
+            return v.run(P, K);
+          },
+          deps: v.deps?.map((l) => `${m}${je}${l}`),
+        };
+      }
+    c.push({
+      id: M.id,
+      schema: {
+        facts: F,
+        derivations: ne,
+        events: k,
+        requirements: M.schema.requirements ?? {},
+      },
+      init: R,
+      derive: $,
+      events: I,
+      effects: V,
+      constraints: H,
+      resolvers: ee,
+      hooks: M.hooks,
+      snapshotEvents:
+        r && !r.has(m) ? [] : M.snapshotEvents?.map((y) => `${m}${je}${y}`),
+    });
+  }
+  let d = null,
+    f = null;
+  function w(m) {
+    for (const [M, S] of Object.entries(m))
+      if (!ut.has(M) && a.has(M)) {
+        if (S && typeof S == "object" && !Cr(S))
+          throw new Error(
+            `[Directive] initialFacts/hydrate for namespace "${M}" contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.`,
+          );
+        for (const [j, F] of Object.entries(S))
+          ut.has(j) || (f.facts[`${M}${je}${j}`] = F);
+      }
+  }
+  f = ha({
+    modules: c.map((m) => ({
+      id: m.id,
+      schema: m.schema.facts,
+      requirements: m.schema.requirements,
+      init: m.init,
+      derive: m.derive,
+      events: m.events,
+      effects: m.effects,
+      constraints: m.constraints,
+      resolvers: m.resolvers,
+      hooks: m.hooks,
+      snapshotEvents: m.snapshotEvents,
+    })),
+    plugins: e.plugins,
+    debug: i,
+    errorBoundary: u,
+    tickMs: e.tickMs,
+    onAfterModuleInit: () => {
+      e.initialFacts && w(e.initialFacts), d && (w(d), (d = null));
+    },
+  });
+  const O = new Map();
+  for (const m of Object.keys(t)) {
+    const M = t[m];
+    if (!M) continue;
+    const S = [];
+    for (const j of Object.keys(M.schema.facts)) S.push(`${m}${je}${j}`);
+    if (M.schema.derivations)
+      for (const j of Object.keys(M.schema.derivations))
+        S.push(`${m}${je}${j}`);
+    O.set(m, S);
+  }
+  const _ = { names: null };
+  function U() {
+    return _.names === null && (_.names = Object.keys(t)), _.names;
+  }
+  let D = on(f.facts, t, U),
+    E = To(f.derive, t, U),
+    T = jo(f, t, U),
+    G = null,
+    J = e.tickMs;
+  return {
+    _mode: "namespaced",
+    facts: D,
+    debug: f.debug,
+    derive: E,
+    events: T,
+    constraints: f.constraints,
+    effects: f.effects,
+    get runHistory() {
+      return f.runHistory;
+    },
+    get isRunning() {
+      return f.isRunning;
+    },
+    get isSettled() {
+      return f.isSettled;
+    },
+    get isInitialized() {
+      return f.isInitialized;
+    },
+    get isReady() {
+      return f.isReady;
+    },
+    whenReady: f.whenReady.bind(f),
+    async hydrate(m) {
+      if (f.isRunning)
+        throw new Error(
+          "[Directive] hydrate() must be called before start(). The system is already running.",
+        );
+      const M = await m();
+      M && typeof M == "object" && (d = M);
+    },
+    initialize() {
+      f.initialize();
+    },
+    start() {
+      if ((f.start(), J && J > 0)) {
+        const m = Object.keys(c[0]?.events ?? {}).find((M) =>
+          M.endsWith(`${je}tick`),
+        );
+        m &&
+          (G = setInterval(() => {
+            f.dispatch({ type: m });
+          }, J));
+      }
+    },
+    stop() {
+      G && (clearInterval(G), (G = null)), f.stop();
+    },
+    destroy() {
+      this.stop(), f.destroy();
+    },
+    dispatch(m) {
+      f.dispatch(m);
+    },
+    batch: f.batch.bind(f),
+    read(m) {
+      return f.read(Pt(m));
+    },
+    subscribe(m, M) {
+      const S = [];
+      for (const j of m)
+        if (j.endsWith(".*")) {
+          const F = j.slice(0, -2),
+            ne = O.get(F);
+          ne && S.push(...ne);
+        } else S.push(Pt(j));
+      return f.subscribe(S, M);
+    },
+    subscribeModule(m, M) {
+      const S = O.get(m);
+      return !S || S.length === 0 ? () => {} : f.subscribe(S, M);
+    },
+    watch(m, M, S) {
+      return f.watch(Pt(m), M, S);
+    },
+    when(m, M) {
+      return f.when(() => m(D), M);
+    },
+    onSettledChange: f.onSettledChange.bind(f),
+    onTimeTravelChange: f.onTimeTravelChange.bind(f),
+    inspect: f.inspect.bind(f),
+    settle: f.settle.bind(f),
+    explain: f.explain.bind(f),
+    getSnapshot: f.getSnapshot.bind(f),
+    restore: f.restore.bind(f),
+    getDistributableSnapshot(m) {
+      const M = {
+          ...m,
+          includeDerivations: m?.includeDerivations?.map(Pt),
+          excludeDerivations: m?.excludeDerivations?.map(Pt),
+          includeFacts: m?.includeFacts?.map(Pt),
+        },
+        S = f.getDistributableSnapshot(M),
+        j = {};
+      for (const [F, ne] of Object.entries(S.data)) {
+        const k = F.indexOf(je);
+        if (k > 0) {
+          const R = F.slice(0, k),
+            $ = F.slice(k + je.length);
+          j[R] || (j[R] = {}), (j[R][$] = ne);
+        } else j._root || (j._root = {}), (j._root[F] = ne);
+      }
+      return { ...S, data: j };
+    },
+    watchDistributableSnapshot(m, M) {
+      const S = {
+        ...m,
+        includeDerivations: m?.includeDerivations?.map(Pt),
+        excludeDerivations: m?.excludeDerivations?.map(Pt),
+        includeFacts: m?.includeFacts?.map(Pt),
+      };
+      return f.watchDistributableSnapshot(S, (j) => {
+        const F = {};
+        for (const [ne, k] of Object.entries(j.data)) {
+          const R = ne.indexOf(je);
+          if (R > 0) {
+            const $ = ne.slice(0, R),
+              I = ne.slice(R + je.length);
+            F[$] || (F[$] = {}), (F[$][I] = k);
+          } else F._root || (F._root = {}), (F._root[ne] = k);
+        }
+        M({ ...j, data: F });
+      });
+    },
+    registerModule(m, M) {
+      if (a.has(m))
+        throw new Error(
+          `[Directive] Module namespace "${m}" already exists. Cannot register a duplicate namespace.`,
+        );
+      if (m.includes(je))
+        throw new Error(
+          `[Directive] Module name "${m}" contains the reserved separator "${je}".`,
+        );
+      if (ut.has(m))
+        throw new Error(
+          `[Directive] Module name "${m}" is a blocked property.`,
+        );
+      for (const y of Object.keys(M.schema.facts))
+        if (y.includes(je))
+          throw new Error(
+            `[Directive] Schema key "${y}" in module "${m}" contains the reserved separator "${je}".`,
+          );
+      const S = M,
+        j = S.crossModuleDeps && Object.keys(S.crossModuleDeps).length > 0,
+        F = j ? Object.keys(S.crossModuleDeps) : [],
+        ne = {};
+      for (const [y, z] of Object.entries(S.schema.facts))
+        ne[`${m}${je}${y}`] = z;
+      const k = S.init
+          ? (y) => {
+              const z = vt(y, m);
+              S.init(z);
+            }
+          : void 0,
+        R = {};
+      if (S.derive)
+        for (const [y, z] of Object.entries(S.derive))
+          R[`${m}${je}${y}`] = (v, l) => {
+            const x = j ? _t(v, m, F) : vt(v, m),
+              P = hn(l, m);
+            return z(x, P);
+          };
+      const $ = {};
+      if (S.events)
+        for (const [y, z] of Object.entries(S.events))
+          $[`${m}${je}${y}`] = (v, l) => {
+            const x = vt(v, m);
+            z(x, l);
+          };
+      const I = {};
+      if (S.constraints)
+        for (const [y, z] of Object.entries(S.constraints)) {
+          const v = z;
+          I[`${m}${je}${y}`] = {
+            ...v,
+            deps: v.deps?.map((l) => `${m}${je}${l}`),
+            when: (l) => {
+              const x = j ? _t(l, m, F) : vt(l, m);
+              return v.when(x);
+            },
+            require:
+              typeof v.require == "function"
+                ? (l) => {
+                    const x = j ? _t(l, m, F) : vt(l, m);
+                    return v.require(x);
+                  }
+                : v.require,
+          };
+        }
+      const H = {};
+      if (S.resolvers)
+        for (const [y, z] of Object.entries(S.resolvers)) {
+          const v = z;
+          H[`${m}${je}${y}`] = {
+            ...v,
+            resolve: async (l, x) => {
+              const P = on(x.facts, t, U);
+              await v.resolve(l, { facts: P[m], signal: x.signal });
+            },
+          };
+        }
+      const ee = {};
+      if (S.effects)
+        for (const [y, z] of Object.entries(S.effects)) {
+          const v = z;
+          ee[`${m}${je}${y}`] = {
+            ...v,
+            run: (l, x) => {
+              const P = j ? _t(l, m, F) : vt(l, m),
+                K = x ? (j ? _t(x, m, F) : vt(x, m)) : void 0;
+              return v.run(P, K);
+            },
+            deps: v.deps?.map((l) => `${m}${je}${l}`),
+          };
+        }
+      a.add(m), (t[m] = S), (_.names = null);
+      const V = [];
+      for (const y of Object.keys(S.schema.facts)) V.push(`${m}${je}${y}`);
+      if (S.schema.derivations)
+        for (const y of Object.keys(S.schema.derivations))
+          V.push(`${m}${je}${y}`);
+      O.set(m, V),
+        f.registerModule({
+          id: S.id,
+          schema: ne,
+          requirements: S.schema.requirements ?? {},
+          init: k,
+          derive: Object.keys(R).length > 0 ? R : void 0,
+          events: Object.keys($).length > 0 ? $ : void 0,
+          effects: Object.keys(ee).length > 0 ? ee : void 0,
+          constraints: Object.keys(I).length > 0 ? I : void 0,
+          resolvers: Object.keys(H).length > 0 ? H : void 0,
+          hooks: S.hooks,
+          snapshotEvents:
+            r && !r.has(m) ? [] : S.snapshotEvents?.map((y) => `${m}${je}${y}`),
+        });
+    },
+  };
+}
+function Pt(e) {
+  if (e.includes(".")) {
+    const [t, ...a] = e.split(".");
+    return `${t}${je}${a.join(je)}`;
+  }
+  return e;
+}
+function vt(e, t) {
+  let a = Un.get(e);
+  if (a) {
+    const n = a.get(t);
+    if (n) return n;
+  } else (a = new Map()), Un.set(e, a);
+  const r = new Proxy(
+    {},
+    {
+      get(n, o) {
+        if (typeof o != "symbol" && !ut.has(o))
+          return o === "$store" || o === "$snapshot"
+            ? e[o]
+            : e[`${t}${je}${o}`];
+      },
+      set(n, o, i) {
+        return typeof o == "symbol" || ut.has(o)
+          ? !1
+          : ((e[`${t}${je}${o}`] = i), !0);
+      },
+      has(n, o) {
+        return typeof o == "symbol" || ut.has(o) ? !1 : `${t}${je}${o}` in e;
+      },
+      deleteProperty(n, o) {
+        return typeof o == "symbol" || ut.has(o)
+          ? !1
+          : (delete e[`${t}${je}${o}`], !0);
+      },
+    },
+  );
+  return a.set(t, r), r;
+}
+function on(e, t, a) {
+  const r = zn.get(e);
+  if (r) return r;
+  const n = new Proxy(
+    {},
+    {
+      get(o, i) {
+        if (typeof i != "symbol" && !ut.has(i) && Object.hasOwn(t, i))
+          return vt(e, i);
+      },
+      has(o, i) {
+        return typeof i == "symbol" || ut.has(i) ? !1 : Object.hasOwn(t, i);
+      },
+      ownKeys() {
+        return a();
+      },
+      getOwnPropertyDescriptor(o, i) {
+        if (typeof i != "symbol" && Object.hasOwn(t, i))
+          return { configurable: !0, enumerable: !0 };
+      },
+    },
+  );
+  return zn.set(e, n), n;
+}
+var Hn = new WeakMap();
+function _t(e, t, a) {
+  let r = `${t}:${JSON.stringify([...a].sort())}`,
+    n = Hn.get(e);
+  if (n) {
+    const c = n.get(r);
+    if (c) return c;
+  } else (n = new Map()), Hn.set(e, n);
+  const o = new Set(a),
+    i = ["self", ...a],
+    u = new Proxy(
+      {},
+      {
+        get(c, d) {
+          if (typeof d != "symbol" && !ut.has(d)) {
+            if (d === "self") return vt(e, t);
+            if (o.has(d)) return vt(e, d);
+          }
+        },
+        has(c, d) {
+          return typeof d == "symbol" || ut.has(d)
+            ? !1
+            : d === "self" || o.has(d);
+        },
+        ownKeys() {
+          return i;
+        },
+        getOwnPropertyDescriptor(c, d) {
+          if (typeof d != "symbol" && (d === "self" || o.has(d)))
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    );
+  return n.set(r, u), u;
+}
+function hn(e, t) {
+  let a = Gn.get(e);
+  if (a) {
+    const n = a.get(t);
+    if (n) return n;
+  } else (a = new Map()), Gn.set(e, a);
+  const r = new Proxy(
+    {},
+    {
+      get(n, o) {
+        if (typeof o != "symbol" && !ut.has(o)) return e[`${t}${je}${o}`];
+      },
+      has(n, o) {
+        return typeof o == "symbol" || ut.has(o) ? !1 : `${t}${je}${o}` in e;
+      },
+    },
+  );
+  return a.set(t, r), r;
+}
+function To(e, t, a) {
+  const r = Jn.get(e);
+  if (r) return r;
+  const n = new Proxy(
+    {},
+    {
+      get(o, i) {
+        if (typeof i != "symbol" && !ut.has(i) && Object.hasOwn(t, i))
+          return hn(e, i);
+      },
+      has(o, i) {
+        return typeof i == "symbol" || ut.has(i) ? !1 : Object.hasOwn(t, i);
+      },
+      ownKeys() {
+        return a();
+      },
+      getOwnPropertyDescriptor(o, i) {
+        if (typeof i != "symbol" && Object.hasOwn(t, i))
+          return { configurable: !0, enumerable: !0 };
+      },
+    },
+  );
+  return Jn.set(e, n), n;
+}
+var Wn = new WeakMap();
+function jo(e, t, a) {
+  let r = Wn.get(e);
+  return (
+    r || ((r = new Map()), Wn.set(e, r)),
+    new Proxy(
+      {},
+      {
+        get(n, o) {
+          if (typeof o == "symbol" || ut.has(o) || !Object.hasOwn(t, o)) return;
+          const i = r.get(o);
+          if (i) return i;
+          const u = new Proxy(
+            {},
+            {
+              get(c, d) {
+                if (typeof d != "symbol" && !ut.has(d))
+                  return (f) => {
+                    e.dispatch({ type: `${o}${je}${d}`, ...f });
+                  };
+              },
+            },
+          );
+          return r.set(o, u), u;
+        },
+        has(n, o) {
+          return typeof o == "symbol" || ut.has(o) ? !1 : Object.hasOwn(t, o);
+        },
+        ownKeys() {
+          return a();
+        },
+        getOwnPropertyDescriptor(n, o) {
+          if (typeof o != "symbol" && Object.hasOwn(t, o))
+            return { configurable: !0, enumerable: !0 };
+        },
+      },
+    )
+  );
+}
+function Ro(e) {
+  const t = e.module;
+  if (!t)
+    throw new Error(
+      "[Directive] createSystem requires a module. Got: " + typeof t,
+    );
+  if (e.tickMs !== void 0 && e.tickMs <= 0)
+    throw new Error("[Directive] tickMs must be a positive number");
+  if (e.initialFacts && !Cr(e.initialFacts))
+    throw new Error(
+      "[Directive] initialFacts contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.",
+    );
+  let a = e.debug,
+    r = e.errorBoundary;
+  e.zeroConfig &&
+    ((a = { timeTravel: !1, maxSnapshots: 100, ...e.debug }),
+    (r = {
+      onConstraintError: "skip",
+      onResolverError: "skip",
+      onEffectError: "skip",
+      onDerivationError: "skip",
+      ...e.errorBoundary,
+    }));
+  let n = null,
+    o = null;
+  o = ha({
+    modules: [
+      {
+        id: t.id,
+        schema: t.schema.facts,
+        requirements: t.schema.requirements,
+        init: t.init,
+        derive: t.derive,
+        events: t.events,
+        effects: t.effects,
+        constraints: t.constraints,
+        resolvers: t.resolvers,
+        hooks: t.hooks,
+        snapshotEvents: t.snapshotEvents,
+      },
+    ],
+    plugins: e.plugins,
+    debug: a,
+    errorBoundary: r,
+    tickMs: e.tickMs,
+    onAfterModuleInit: () => {
+      if (e.initialFacts)
+        for (const [d, f] of Object.entries(e.initialFacts))
+          ut.has(d) || (o.facts[d] = f);
+      if (n) {
+        for (const [d, f] of Object.entries(n)) ut.has(d) || (o.facts[d] = f);
+        n = null;
+      }
+    },
+  });
+  let i = new Proxy(
+      {},
+      {
+        get(d, f) {
+          if (typeof f != "symbol" && !ut.has(f))
+            return (w) => {
+              o.dispatch({ type: f, ...w });
+            };
+        },
+      },
+    ),
+    u = null,
+    c = e.tickMs;
+  return {
+    _mode: "single",
+    facts: o.facts,
+    debug: o.debug,
+    derive: o.derive,
+    events: i,
+    constraints: o.constraints,
+    effects: o.effects,
+    get runHistory() {
+      return o.runHistory;
+    },
+    get isRunning() {
+      return o.isRunning;
+    },
+    get isSettled() {
+      return o.isSettled;
+    },
+    get isInitialized() {
+      return o.isInitialized;
+    },
+    get isReady() {
+      return o.isReady;
+    },
+    whenReady: o.whenReady.bind(o),
+    async hydrate(d) {
+      if (o.isRunning)
+        throw new Error(
+          "[Directive] hydrate() must be called before start(). The system is already running.",
+        );
+      const f = await d();
+      f && typeof f == "object" && (n = f);
+    },
+    initialize() {
+      o.initialize();
+    },
+    start() {
+      o.start(),
+        c &&
+          c > 0 &&
+          t.events &&
+          "tick" in t.events &&
+          (u = setInterval(() => {
+            o.dispatch({ type: "tick" });
+          }, c));
+    },
+    stop() {
+      u && (clearInterval(u), (u = null)), o.stop();
+    },
+    destroy() {
+      this.stop(), o.destroy();
+    },
+    dispatch(d) {
+      o.dispatch(d);
+    },
+    batch: o.batch.bind(o),
+    read(d) {
+      return o.read(d);
+    },
+    subscribe(d, f) {
+      return o.subscribe(d, f);
+    },
+    watch(d, f, w) {
+      return o.watch(d, f, w);
+    },
+    when(d, f) {
+      return o.when(d, f);
+    },
+    onSettledChange: o.onSettledChange.bind(o),
+    onTimeTravelChange: o.onTimeTravelChange.bind(o),
+    inspect: o.inspect.bind(o),
+    settle: o.settle.bind(o),
+    explain: o.explain.bind(o),
+    getSnapshot: o.getSnapshot.bind(o),
+    restore: o.restore.bind(o),
+    getDistributableSnapshot: o.getDistributableSnapshot.bind(o),
+    watchDistributableSnapshot: o.watchDistributableSnapshot.bind(o),
+    registerModule(d) {
+      o.registerModule({
+        id: d.id,
+        schema: d.schema.facts,
+        requirements: d.schema.requirements,
+        init: d.init,
+        derive: d.derive,
+        events: d.events,
+        effects: d.effects,
+        constraints: d.constraints,
+        resolvers: d.resolvers,
+        hooks: d.hooks,
+        snapshotEvents: d.snapshotEvents,
+      });
+    },
+  };
+}
+var ya = class {
+  constructor(e) {
+    (this.capacity = e), (this.buf = new Array(e));
+  }
+  buf;
+  head = 0;
+  _size = 0;
+  get size() {
+    return this._size;
+  }
+  push(e) {
+    (this.buf[this.head] = e),
+      (this.head = (this.head + 1) % this.capacity),
+      this._size < this.capacity && this._size++;
+  }
+  toArray() {
+    return this._size === 0
+      ? []
+      : this._size < this.capacity
+        ? this.buf.slice(0, this._size)
+        : [...this.buf.slice(this.head), ...this.buf.slice(0, this.head)];
+  }
+  clear() {
+    (this.buf = new Array(this.capacity)), (this.head = 0), (this._size = 0);
+  }
+};
+function Dn() {
+  try {
+    if (typeof process < "u") return !1;
+  } catch {}
+  try {
+    if (typeof import.meta < "u") return !1;
+  } catch {}
+  return !0;
+}
+function va(e) {
+  try {
+    if (e === void 0) return "undefined";
+    if (e === null) return "null";
+    if (typeof e == "bigint") return String(e) + "n";
+    if (typeof e == "symbol") return String(e);
+    if (typeof e == "object") {
+      const t = JSON.stringify(e, (a, r) =>
+        typeof r == "bigint"
+          ? String(r) + "n"
+          : typeof r == "symbol"
+            ? String(r)
+            : r,
+      );
+      return t.length > 120 ? t.slice(0, 117) + "..." : t;
+    }
+    return String(e);
+  } catch {
+    return "<error>";
+  }
+}
+function Zt(e, t) {
+  return e.length <= t ? e : e.slice(0, t - 3) + "...";
+}
+function Fr(e) {
+  try {
+    return e.inspect();
+  } catch {
+    return null;
+  }
+}
+function _o(e) {
+  try {
+    return e == null || typeof e != "object"
+      ? e
+      : JSON.parse(JSON.stringify(e));
+  } catch {
+    return null;
+  }
+}
+function qo(e) {
+  return e === void 0
+    ? 1e3
+    : !Number.isFinite(e) || e < 1
+      ? (Dn() &&
+          console.warn(
+            `[directive:devtools] Invalid maxEvents value (${e}), using default 1000`,
+          ),
+        1e3)
+      : Math.floor(e);
+}
+function No() {
+  return {
+    reconcileCount: 0,
+    reconcileTotalMs: 0,
+    resolverStats: new Map(),
+    effectRunCount: 0,
+    effectErrorCount: 0,
+    lastReconcileStartMs: 0,
+  };
+}
+var Po = 200,
+  Hr = 340,
+  yr = 16,
+  vr = 80,
+  Kn = 2,
+  Vn = ["#8b9aff", "#4ade80", "#fbbf24", "#c084fc", "#f472b6", "#22d3ee"];
+function Lo() {
+  return { entries: new ya(Po), inflight: new Map() };
+}
+function Bo() {
+  return {
+    derivationDeps: new Map(),
+    activeConstraints: new Set(),
+    recentlyChangedFacts: new Set(),
+    recentlyComputedDerivations: new Set(),
+    recentlyActiveConstraints: new Set(),
+    animationTimer: null,
+  };
+}
+var Fo = 1e4,
+  Uo = 100;
+function zo() {
+  return { isRecording: !1, recordedEvents: [], snapshots: [] };
+}
+var Jo = 50,
+  Yn = 200,
+  ce = {
+    bg: "#1a1a2e",
+    text: "#e0e0e0",
+    accent: "#8b9aff",
+    muted: "#b0b0d0",
+    border: "#333",
+    rowBorder: "#2a2a4a",
+    green: "#4ade80",
+    yellow: "#fbbf24",
+    red: "#f87171",
+    closeBtn: "#aaa",
+    font: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  },
+  ot = {
+    nodeW: 90,
+    nodeH: 16,
+    nodeGap: 6,
+    startY: 16,
+    colGap: 20,
+    fontSize: 10,
+    labelMaxChars: 11,
+  };
+function Go(e, t, a, r) {
+  let n = !1,
+    o = {
+      position: "fixed",
+      zIndex: "99999",
+      ...(t.includes("bottom") ? { bottom: "12px" } : { top: "12px" }),
+      ...(t.includes("right") ? { right: "12px" } : { left: "12px" }),
+    },
+    i = document.createElement("style");
+  (i.textContent = `[data-directive-devtools] summary:focus-visible{outline:2px solid ${ce.accent};outline-offset:2px;border-radius:2px}[data-directive-devtools] button:focus-visible{outline:2px solid ${ce.accent};outline-offset:2px}`),
+    document.head.appendChild(i);
+  const u = document.createElement("button");
+  u.setAttribute("aria-label", "Open Directive DevTools"),
+    u.setAttribute("aria-expanded", String(a)),
+    (u.title = "Ctrl+Shift+D to toggle"),
+    Object.assign(u.style, {
+      ...o,
+      background: ce.bg,
+      color: ce.text,
+      border: `1px solid ${ce.border}`,
+      borderRadius: "6px",
+      padding: "10px 14px",
+      minWidth: "44px",
+      minHeight: "44px",
+      cursor: "pointer",
+      fontFamily: ce.font,
+      fontSize: "12px",
+      display: a ? "none" : "block",
+    }),
+    (u.textContent = "Directive");
+  const c = document.createElement("div");
+  c.setAttribute("role", "region"),
+    c.setAttribute("aria-label", "Directive DevTools"),
+    c.setAttribute("data-directive-devtools", ""),
+    (c.tabIndex = -1),
+    Object.assign(c.style, {
+      ...o,
+      background: ce.bg,
+      color: ce.text,
+      border: `1px solid ${ce.border}`,
+      borderRadius: "8px",
+      padding: "12px",
+      fontFamily: ce.font,
+      fontSize: "11px",
+      maxWidth: "min(380px, calc(100vw - 24px))",
+      maxHeight: "min(500px, calc(100vh - 24px))",
+      overflow: "auto",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+      display: a ? "block" : "none",
+    });
+  const d = document.createElement("div");
+  Object.assign(d.style, {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "8px",
+  });
+  const f = document.createElement("strong");
+  (f.style.color = ce.accent),
+    (f.textContent =
+      e === "default" ? "Directive DevTools" : `DevTools (${e})`);
+  const w = document.createElement("button");
+  w.setAttribute("aria-label", "Close DevTools"),
+    Object.assign(w.style, {
+      background: "none",
+      border: "none",
+      color: ce.closeBtn,
+      cursor: "pointer",
+      fontSize: "16px",
+      padding: "8px 12px",
+      minWidth: "44px",
+      minHeight: "44px",
+      lineHeight: "1",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }),
+    (w.textContent = "×"),
+    d.appendChild(f),
+    d.appendChild(w),
+    c.appendChild(d);
+  const O = document.createElement("div");
+  (O.style.marginBottom = "6px"), O.setAttribute("aria-live", "polite");
+  const _ = document.createElement("span");
+  (_.style.color = ce.green),
+    (_.textContent = "Settled"),
+    O.appendChild(_),
+    c.appendChild(O);
+  const U = document.createElement("div");
+  Object.assign(U.style, {
+    display: "none",
+    marginBottom: "8px",
+    padding: "4px 8px",
+    background: "#252545",
+    borderRadius: "4px",
+    alignItems: "center",
+    gap: "6px",
+  });
+  const D = document.createElement("button");
+  Object.assign(D.style, {
+    background: "none",
+    border: `1px solid ${ce.border}`,
+    color: ce.text,
+    cursor: "pointer",
+    padding: "4px 10px",
+    borderRadius: "3px",
+    fontFamily: ce.font,
+    fontSize: "11px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (D.textContent = "◀ Undo"),
+    (D.disabled = !0);
+  const E = document.createElement("button");
+  Object.assign(E.style, {
+    background: "none",
+    border: `1px solid ${ce.border}`,
+    color: ce.text,
+    cursor: "pointer",
+    padding: "4px 10px",
+    borderRadius: "3px",
+    fontFamily: ce.font,
+    fontSize: "11px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (E.textContent = "Redo ▶"),
+    (E.disabled = !0);
+  const T = document.createElement("span");
+  (T.style.color = ce.muted),
+    (T.style.fontSize = "10px"),
+    U.appendChild(D),
+    U.appendChild(E),
+    U.appendChild(T),
+    c.appendChild(U);
+  function G(N, ie) {
+    const le = document.createElement("details");
+    ie && (le.open = !0), (le.style.marginBottom = "4px");
+    const de = document.createElement("summary");
+    Object.assign(de.style, {
+      cursor: "pointer",
+      color: ce.accent,
+      marginBottom: "4px",
+    });
+    const Ae = document.createElement("span");
+    (de.textContent = `${N} (`),
+      de.appendChild(Ae),
+      de.appendChild(document.createTextNode(")")),
+      (Ae.textContent = "0"),
+      le.appendChild(de);
+    const p = document.createElement("table");
+    Object.assign(p.style, {
+      width: "100%",
+      borderCollapse: "collapse",
+      fontSize: "11px",
+    });
+    const A = document.createElement("thead"),
+      Y = document.createElement("tr");
+    for (const xe of ["Key", "Value"]) {
+      const te = document.createElement("th");
+      (te.scope = "col"),
+        Object.assign(te.style, {
+          textAlign: "left",
+          padding: "2px 4px",
+          color: ce.accent,
+        }),
+        (te.textContent = xe),
+        Y.appendChild(te);
+    }
+    A.appendChild(Y), p.appendChild(A);
+    const Z = document.createElement("tbody");
+    return (
+      p.appendChild(Z),
+      le.appendChild(p),
+      { details: le, tbody: Z, countSpan: Ae }
+    );
+  }
+  function J(N, ie) {
+    const le = document.createElement("details");
+    le.style.marginBottom = "4px";
+    const de = document.createElement("summary");
+    Object.assign(de.style, {
+      cursor: "pointer",
+      color: ie,
+      marginBottom: "4px",
+    });
+    const Ae = document.createElement("span");
+    (de.textContent = `${N} (`),
+      de.appendChild(Ae),
+      de.appendChild(document.createTextNode(")")),
+      (Ae.textContent = "0"),
+      le.appendChild(de);
+    const p = document.createElement("ul");
+    return (
+      Object.assign(p.style, { margin: "0", paddingLeft: "16px" }),
+      le.appendChild(p),
+      { details: le, list: p, countSpan: Ae }
+    );
+  }
+  const m = G("Facts", !0);
+  c.appendChild(m.details);
+  const M = G("Derivations", !1);
+  c.appendChild(M.details);
+  const S = J("Inflight", ce.yellow);
+  c.appendChild(S.details);
+  const j = J("Unmet", ce.red);
+  c.appendChild(j.details);
+  const F = document.createElement("details");
+  F.style.marginBottom = "4px";
+  const ne = document.createElement("summary");
+  Object.assign(ne.style, {
+    cursor: "pointer",
+    color: ce.accent,
+    marginBottom: "4px",
+  }),
+    (ne.textContent = "Performance"),
+    F.appendChild(ne);
+  const k = document.createElement("div");
+  (k.style.fontSize = "10px"),
+    (k.style.color = ce.muted),
+    (k.textContent = "No data yet"),
+    F.appendChild(k),
+    c.appendChild(F);
+  const R = document.createElement("details");
+  R.style.marginBottom = "4px";
+  const $ = document.createElement("summary");
+  Object.assign($.style, {
+    cursor: "pointer",
+    color: ce.accent,
+    marginBottom: "4px",
+  }),
+    ($.textContent = "Dependency Graph"),
+    R.appendChild($);
+  const I = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  I.setAttribute("width", "100%"),
+    I.setAttribute("height", "120"),
+    I.setAttribute("role", "img"),
+    I.setAttribute("aria-label", "System dependency graph"),
+    (I.style.display = "block"),
+    I.setAttribute("viewBox", "0 0 460 120"),
+    I.setAttribute("preserveAspectRatio", "xMinYMin meet"),
+    R.appendChild(I),
+    c.appendChild(R);
+  const H = document.createElement("details");
+  H.style.marginBottom = "4px";
+  const ee = document.createElement("summary");
+  Object.assign(ee.style, {
+    cursor: "pointer",
+    color: ce.accent,
+    marginBottom: "4px",
+  }),
+    (ee.textContent = "Timeline"),
+    H.appendChild(ee);
+  const V = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  V.setAttribute("width", "100%"),
+    V.setAttribute("height", "60"),
+    V.setAttribute("role", "img"),
+    V.setAttribute("aria-label", "Resolver execution timeline"),
+    (V.style.display = "block"),
+    V.setAttribute("viewBox", `0 0 ${Hr} 60`),
+    V.setAttribute("preserveAspectRatio", "xMinYMin meet");
+  const y = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  y.setAttribute("x", String(Hr / 2)),
+    y.setAttribute("y", "30"),
+    y.setAttribute("text-anchor", "middle"),
+    y.setAttribute("fill", ce.muted),
+    y.setAttribute("font-size", "10"),
+    y.setAttribute("font-family", ce.font),
+    (y.textContent = "No resolver activity yet"),
+    V.appendChild(y),
+    H.appendChild(V),
+    c.appendChild(H);
+  let z, v, l, x;
+  if (r) {
+    const N = document.createElement("details");
+    N.style.marginBottom = "4px";
+    const ie = document.createElement("summary");
+    Object.assign(ie.style, {
+      cursor: "pointer",
+      color: ce.accent,
+      marginBottom: "4px",
+    }),
+      (l = document.createElement("span")),
+      (l.textContent = "0"),
+      (ie.textContent = "Events ("),
+      ie.appendChild(l),
+      ie.appendChild(document.createTextNode(")")),
+      N.appendChild(ie),
+      (v = document.createElement("div")),
+      Object.assign(v.style, {
+        maxHeight: "150px",
+        overflow: "auto",
+        fontSize: "10px",
+      }),
+      v.setAttribute("role", "log"),
+      v.setAttribute("aria-live", "polite"),
+      (v.tabIndex = 0);
+    const le = document.createElement("div");
+    (le.style.color = ce.muted),
+      (le.style.padding = "4px"),
+      (le.textContent = "Waiting for events..."),
+      (le.className = "dt-events-empty"),
+      v.appendChild(le),
+      N.appendChild(v),
+      c.appendChild(N),
+      (z = N),
+      (x = document.createElement("div"));
+  } else
+    (z = document.createElement("details")),
+      (v = document.createElement("div")),
+      (l = document.createElement("span")),
+      (x = document.createElement("div")),
+      (x.style.fontSize = "10px"),
+      (x.style.color = ce.muted),
+      (x.style.marginTop = "4px"),
+      (x.style.fontStyle = "italic"),
+      (x.textContent = "Enable trace: true for event log"),
+      c.appendChild(x);
+  const P = document.createElement("div");
+  Object.assign(P.style, { display: "flex", gap: "6px", marginTop: "6px" });
+  const K = document.createElement("button");
+  Object.assign(K.style, {
+    background: "none",
+    border: `1px solid ${ce.border}`,
+    color: ce.text,
+    cursor: "pointer",
+    padding: "8px 12px",
+    borderRadius: "3px",
+    fontFamily: ce.font,
+    fontSize: "10px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (K.textContent = "⏺ Record");
+  const ae = document.createElement("button");
+  Object.assign(ae.style, {
+    background: "none",
+    border: `1px solid ${ce.border}`,
+    color: ce.text,
+    cursor: "pointer",
+    padding: "8px 12px",
+    borderRadius: "3px",
+    fontFamily: ce.font,
+    fontSize: "10px",
+    minWidth: "44px",
+    minHeight: "44px",
+  }),
+    (ae.textContent = "⤓ Export"),
+    P.appendChild(K),
+    P.appendChild(ae),
+    c.appendChild(P),
+    c.addEventListener(
+      "wheel",
+      (N) => {
+        const ie = c,
+          le = ie.scrollTop === 0 && N.deltaY < 0,
+          de =
+            ie.scrollTop + ie.clientHeight >= ie.scrollHeight && N.deltaY > 0;
+        (le || de) && N.preventDefault();
+      },
+      { passive: !1 },
+    );
+  let Ne = a,
+    _e = new Set();
+  function we() {
+    (Ne = !0),
+      (c.style.display = "block"),
+      (u.style.display = "none"),
+      u.setAttribute("aria-expanded", "true"),
+      w.focus();
+  }
+  function ze() {
+    (Ne = !1),
+      (c.style.display = "none"),
+      (u.style.display = "block"),
+      u.setAttribute("aria-expanded", "false"),
+      u.focus();
+  }
+  u.addEventListener("click", we), w.addEventListener("click", ze);
+  function We(N) {
+    N.key === "Escape" && Ne && ze();
+  }
+  c.addEventListener("keydown", We);
+  function Qe(N) {
+    N.key === "d" &&
+      N.shiftKey &&
+      (N.ctrlKey || N.metaKey) &&
+      (N.preventDefault(), Ne ? ze() : we());
+  }
+  document.addEventListener("keydown", Qe);
+  function ve() {
+    n || (document.body.appendChild(u), document.body.appendChild(c));
+  }
+  document.body
+    ? ve()
+    : document.addEventListener("DOMContentLoaded", ve, { once: !0 });
+  function q() {
+    (n = !0),
+      u.removeEventListener("click", we),
+      w.removeEventListener("click", ze),
+      c.removeEventListener("keydown", We),
+      document.removeEventListener("keydown", Qe),
+      document.removeEventListener("DOMContentLoaded", ve);
+    for (const N of _e) clearTimeout(N);
+    _e.clear(), u.remove(), c.remove(), i.remove();
+  }
+  return {
+    refs: {
+      container: c,
+      toggleBtn: u,
+      titleEl: f,
+      statusEl: _,
+      factsBody: m.tbody,
+      factsCount: m.countSpan,
+      derivBody: M.tbody,
+      derivCount: M.countSpan,
+      derivSection: M.details,
+      inflightList: S.list,
+      inflightSection: S.details,
+      inflightCount: S.countSpan,
+      unmetList: j.list,
+      unmetSection: j.details,
+      unmetCount: j.countSpan,
+      perfSection: F,
+      perfBody: k,
+      timeTravelSection: U,
+      timeTravelLabel: T,
+      undoBtn: D,
+      redoBtn: E,
+      flowSection: R,
+      flowSvg: I,
+      timelineSection: H,
+      timelineSvg: V,
+      eventsSection: z,
+      eventsList: v,
+      eventsCount: l,
+      traceHint: x,
+      recordBtn: K,
+      exportBtn: ae,
+    },
+    destroy: q,
+    isOpen: () => Ne,
+    flashTimers: _e,
+  };
+}
+function Ur(e, t, a, r, n, o) {
+  let i = va(r),
+    u = e.get(a);
+  if (u) {
+    const c = u.cells;
+    if (c[1] && ((c[1].textContent = i), n && o)) {
+      const d = c[1];
+      d.style.background = "rgba(139, 154, 255, 0.25)";
+      const f = setTimeout(() => {
+        (d.style.background = ""), o.delete(f);
+      }, 300);
+      o.add(f);
+    }
+  } else {
+    (u = document.createElement("tr")),
+      (u.style.borderBottom = `1px solid ${ce.rowBorder}`);
+    const c = document.createElement("td");
+    Object.assign(c.style, { padding: "2px 4px", color: ce.muted }),
+      (c.textContent = a);
+    const d = document.createElement("td");
+    (d.style.padding = "2px 4px"),
+      (d.textContent = i),
+      u.appendChild(c),
+      u.appendChild(d),
+      t.appendChild(u),
+      e.set(a, u);
+  }
+}
+function Ho(e, t) {
+  const a = e.get(t);
+  a && (a.remove(), e.delete(t));
+}
+function sn(e, t, a) {
+  if (
+    (e.inflightList.replaceChildren(),
+    (e.inflightCount.textContent = String(t.length)),
+    t.length > 0)
+  )
+    for (const r of t) {
+      const n = document.createElement("li");
+      (n.style.fontSize = "11px"),
+        (n.textContent = `${r.resolverId} (${r.id})`),
+        e.inflightList.appendChild(n);
+    }
+  else {
+    const r = document.createElement("li");
+    (r.style.fontSize = "10px"),
+      (r.style.color = ce.muted),
+      (r.textContent = "None"),
+      e.inflightList.appendChild(r);
+  }
+  if (
+    (e.unmetList.replaceChildren(),
+    (e.unmetCount.textContent = String(a.length)),
+    a.length > 0)
+  )
+    for (const r of a) {
+      const n = document.createElement("li");
+      (n.style.fontSize = "11px"),
+        (n.textContent = `${r.requirement.type} from ${r.fromConstraint}`),
+        e.unmetList.appendChild(n);
+    }
+  else {
+    const r = document.createElement("li");
+    (r.style.fontSize = "10px"),
+      (r.style.color = ce.muted),
+      (r.textContent = "None"),
+      e.unmetList.appendChild(r);
+  }
+}
+function ln(e, t, a) {
+  const r = t === 0 && a === 0;
+  (e.statusEl.style.color = r ? ce.green : ce.yellow),
+    (e.statusEl.textContent = r ? "Settled" : "Working..."),
+    (e.toggleBtn.textContent = r ? "Directive" : "Directive..."),
+    e.toggleBtn.setAttribute(
+      "aria-label",
+      `Open Directive DevTools${r ? "" : " (system working)"}`,
+    );
+}
+function Xn(e, t, a, r) {
+  const n = Object.keys(a.derive);
+  if (((e.derivCount.textContent = String(n.length)), n.length === 0)) {
+    t.clear(), e.derivBody.replaceChildren();
+    const i = document.createElement("tr"),
+      u = document.createElement("td");
+    (u.colSpan = 2),
+      (u.style.color = ce.muted),
+      (u.style.fontSize = "10px"),
+      (u.textContent = "No derivations defined"),
+      i.appendChild(u),
+      e.derivBody.appendChild(i);
+    return;
+  }
+  const o = new Set(n);
+  for (const [i, u] of t) o.has(i) || (u.remove(), t.delete(i));
+  for (const i of n) {
+    let u;
+    try {
+      u = va(a.read(i));
+    } catch {
+      u = "<error>";
+    }
+    Ur(t, e.derivBody, i, u, !0, r);
+  }
+}
+function Wo(e, t, a, r) {
+  const n = e.eventsList.querySelector(".dt-events-empty");
+  n && n.remove();
+  const o = document.createElement("div");
+  Object.assign(o.style, {
+    padding: "2px 4px",
+    borderBottom: `1px solid ${ce.rowBorder}`,
+    fontFamily: "inherit",
+  });
+  let i = new Date(),
+    u = `${String(i.getHours()).padStart(2, "0")}:${String(i.getMinutes()).padStart(2, "0")}:${String(i.getSeconds()).padStart(2, "0")}.${String(i.getMilliseconds()).padStart(3, "0")}`,
+    c;
+  try {
+    const O = JSON.stringify(a);
+    c = Zt(O, 60);
+  } catch {
+    c = "{}";
+  }
+  const d = document.createElement("span");
+  (d.style.color = ce.closeBtn), (d.textContent = u);
+  const f = document.createElement("span");
+  (f.style.color = ce.accent), (f.textContent = ` ${t} `);
+  const w = document.createElement("span");
+  for (
+    w.style.color = ce.muted,
+      w.textContent = c,
+      o.appendChild(d),
+      o.appendChild(f),
+      o.appendChild(w),
+      e.eventsList.prepend(o);
+    e.eventsList.childElementCount > Jo;
+  )
+    e.eventsList.lastElementChild?.remove();
+  e.eventsCount.textContent = String(r);
+}
+function Ko(e, t) {
+  e.perfBody.replaceChildren();
+  const a =
+      t.reconcileCount > 0
+        ? (t.reconcileTotalMs / t.reconcileCount).toFixed(1)
+        : "—",
+    r = [
+      `Reconciles: ${t.reconcileCount}  (avg ${a}ms)`,
+      `Effects: ${t.effectRunCount} run, ${t.effectErrorCount} errors`,
+    ];
+  for (const n of r) {
+    const o = document.createElement("div");
+    (o.style.marginBottom = "2px"),
+      (o.textContent = n),
+      e.perfBody.appendChild(o);
+  }
+  if (t.resolverStats.size > 0) {
+    const n = document.createElement("div");
+    (n.style.marginTop = "4px"),
+      (n.style.marginBottom = "2px"),
+      (n.style.color = ce.accent),
+      (n.textContent = "Resolvers:"),
+      e.perfBody.appendChild(n);
+    const o = [...t.resolverStats.entries()].sort(
+      (i, u) => u[1].totalMs - i[1].totalMs,
+    );
+    for (const [i, u] of o) {
+      const c = u.count > 0 ? (u.totalMs / u.count).toFixed(1) : "0",
+        d = document.createElement("div");
+      (d.style.paddingLeft = "8px"),
+        (d.textContent = `${i}: ${u.count}x, avg ${c}ms${u.errors > 0 ? `, ${u.errors} err` : ""}`),
+        u.errors > 0 && (d.style.color = ce.red),
+        e.perfBody.appendChild(d);
+    }
+  }
+}
+function Qn(e, t) {
+  const a = t.debug;
+  if (!a) {
+    e.timeTravelSection.style.display = "none";
+    return;
+  }
+  e.timeTravelSection.style.display = "flex";
+  const r = a.currentIndex,
+    n = a.snapshots.length;
+  e.timeTravelLabel.textContent = n > 0 ? `${r + 1} / ${n}` : "0 snapshots";
+  const o = r > 0,
+    i = r < n - 1;
+  (e.undoBtn.disabled = !o),
+    (e.undoBtn.style.opacity = o ? "1" : "0.4"),
+    (e.redoBtn.disabled = !i),
+    (e.redoBtn.style.opacity = i ? "1" : "0.4");
+}
+function Vo(e, t) {
+  e.undoBtn.addEventListener("click", () => {
+    t.debug && t.debug.currentIndex > 0 && t.debug.goBack(1);
+  }),
+    e.redoBtn.addEventListener("click", () => {
+      t.debug &&
+        t.debug.currentIndex < t.debug.snapshots.length - 1 &&
+        t.debug.goForward(1);
+    });
+}
+var un = new WeakMap();
+function Yo(e, t, a, r, n, o) {
+  return [
+    e.join(","),
+    t.join(","),
+    a.map((i) => `${i.id}:${i.active}`).join(","),
+    [...r.entries()].map(([i, u]) => `${i}:${u.status}:${u.type}`).join(","),
+    n.join(","),
+    o.join(","),
+  ].join("|");
+}
+function Xo(e, t, a, r, n) {
+  for (const o of a) {
+    const i = e.nodes.get(`0:${o}`);
+    if (!i) continue;
+    const u = t.recentlyChangedFacts.has(o);
+    i.rect.setAttribute("fill", u ? ce.text + "33" : "none"),
+      i.rect.setAttribute("stroke-width", u ? "2" : "1");
+  }
+  for (const o of r) {
+    const i = e.nodes.get(`1:${o}`);
+    if (!i) continue;
+    const u = t.recentlyComputedDerivations.has(o);
+    i.rect.setAttribute("fill", u ? ce.accent + "33" : "none"),
+      i.rect.setAttribute("stroke-width", u ? "2" : "1");
+  }
+  for (const o of n) {
+    const i = e.nodes.get(`2:${o}`);
+    if (!i) continue;
+    const u = t.recentlyActiveConstraints.has(o),
+      c = i.rect.getAttribute("stroke") ?? ce.muted;
+    i.rect.setAttribute("fill", u ? c + "33" : "none"),
+      i.rect.setAttribute("stroke-width", u ? "2" : "1");
+  }
+}
+function Zn(e, t, a) {
+  const r = Fr(t);
+  if (!r) return;
+  let n;
+  try {
+    n = Object.keys(t.facts.$store.toObject());
+  } catch {
+    n = [];
+  }
+  const o = Object.keys(t.derive),
+    i = r.constraints,
+    u = r.unmet,
+    c = r.inflight,
+    d = Object.keys(r.resolvers),
+    f = new Map();
+  for (const y of u)
+    f.set(y.id, {
+      type: y.requirement.type,
+      fromConstraint: y.fromConstraint,
+      status: "unmet",
+    });
+  for (const y of c)
+    f.set(y.id, { type: y.resolverId, fromConstraint: "", status: "inflight" });
+  if (n.length === 0 && o.length === 0 && i.length === 0 && d.length === 0) {
+    un.delete(e.flowSvg),
+      e.flowSvg.replaceChildren(),
+      e.flowSvg.setAttribute("viewBox", "0 0 460 40");
+    const y = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    y.setAttribute("x", "230"),
+      y.setAttribute("y", "24"),
+      y.setAttribute("text-anchor", "middle"),
+      y.setAttribute("fill", ce.muted),
+      y.setAttribute("font-size", "10"),
+      y.setAttribute("font-family", ce.font),
+      (y.textContent = "No system topology"),
+      e.flowSvg.appendChild(y);
+    return;
+  }
+  const w = c.map((y) => y.resolverId).sort(),
+    O = Yo(n, o, i, f, d, w),
+    _ = un.get(e.flowSvg);
+  if (_ && _.fingerprint === O) {
+    Xo(
+      _,
+      a,
+      n,
+      o,
+      i.map((y) => y.id),
+    );
+    return;
+  }
+  const U = ot.nodeW + ot.colGap,
+    D = [5, 5 + U, 5 + U * 2, 5 + U * 3, 5 + U * 4],
+    E = D[4] + ot.nodeW + 5;
+  function T(y) {
+    let z = ot.startY + 12;
+    return y.map((v) => {
+      const l = { ...v, y: z };
+      return (z += ot.nodeH + ot.nodeGap), l;
+    });
+  }
+  const G = T(n.map((y) => ({ id: y, label: Zt(y, ot.labelMaxChars) }))),
+    J = T(o.map((y) => ({ id: y, label: Zt(y, ot.labelMaxChars) }))),
+    m = T(
+      i.map((y) => ({
+        id: y.id,
+        label: Zt(y.id, ot.labelMaxChars),
+        active: y.active,
+        priority: y.priority,
+      })),
+    ),
+    M = T(
+      [...f.entries()].map(([y, z]) => ({
+        id: y,
+        type: z.type,
+        fromConstraint: z.fromConstraint,
+        status: z.status,
+      })),
+    ),
+    S = T(d.map((y) => ({ id: y, label: Zt(y, ot.labelMaxChars) }))),
+    j = Math.max(G.length, J.length, m.length, M.length, S.length, 1),
+    F = ot.startY + 12 + j * (ot.nodeH + ot.nodeGap) + 8;
+  e.flowSvg.replaceChildren(),
+    e.flowSvg.setAttribute("viewBox", `0 0 ${E} ${F}`),
+    e.flowSvg.setAttribute(
+      "aria-label",
+      `Dependency graph: ${n.length} facts, ${o.length} derivations, ${i.length} constraints, ${f.size} requirements, ${d.length} resolvers`,
+    );
+  const ne = ["Facts", "Derivations", "Constraints", "Reqs", "Resolvers"];
+  for (const [y, z] of ne.entries()) {
+    const v = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    v.setAttribute("x", String(D[y] ?? 0)),
+      v.setAttribute("y", "10"),
+      v.setAttribute("fill", ce.accent),
+      v.setAttribute("font-size", String(ot.fontSize)),
+      v.setAttribute("font-family", ce.font),
+      (v.textContent = z),
+      e.flowSvg.appendChild(v);
+  }
+  const k = { fingerprint: O, nodes: new Map() };
+  function R(y, z, v, l, x, P, K, ae) {
+    const Ne = document.createElementNS("http://www.w3.org/2000/svg", "g"),
+      _e = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    _e.setAttribute("x", String(z)),
+      _e.setAttribute("y", String(v - 6)),
+      _e.setAttribute("width", String(ot.nodeW)),
+      _e.setAttribute("height", String(ot.nodeH)),
+      _e.setAttribute("rx", "3"),
+      _e.setAttribute("fill", ae ? P + "33" : "none"),
+      _e.setAttribute("stroke", P),
+      _e.setAttribute("stroke-width", ae ? "2" : "1"),
+      _e.setAttribute("opacity", K ? "0.35" : "1"),
+      Ne.appendChild(_e);
+    const we = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    return (
+      we.setAttribute("x", String(z + 4)),
+      we.setAttribute("y", String(v + 4)),
+      we.setAttribute("fill", P),
+      we.setAttribute("font-size", String(ot.fontSize)),
+      we.setAttribute("font-family", ce.font),
+      we.setAttribute("opacity", K ? "0.35" : "1"),
+      (we.textContent = x),
+      Ne.appendChild(we),
+      e.flowSvg.appendChild(Ne),
+      k.nodes.set(`${y}:${l}`, { g: Ne, rect: _e, text: we }),
+      { midX: z + ot.nodeW / 2, midY: v }
+    );
+  }
+  function $(y, z, v, l, x, P) {
+    const K = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    K.setAttribute("x1", String(y)),
+      K.setAttribute("y1", String(z)),
+      K.setAttribute("x2", String(v)),
+      K.setAttribute("y2", String(l)),
+      K.setAttribute("stroke", x),
+      K.setAttribute("stroke-width", "1"),
+      K.setAttribute("stroke-dasharray", "3,2"),
+      K.setAttribute("opacity", "0.7"),
+      e.flowSvg.appendChild(K);
+  }
+  const I = new Map(),
+    H = new Map(),
+    ee = new Map(),
+    V = new Map();
+  for (const y of G) {
+    const z = a.recentlyChangedFacts.has(y.id),
+      v = R(0, D[0], y.y, y.id, y.label, ce.text, !1, z);
+    I.set(y.id, v);
+  }
+  for (const y of J) {
+    const z = a.recentlyComputedDerivations.has(y.id),
+      v = R(1, D[1], y.y, y.id, y.label, ce.accent, !1, z);
+    H.set(y.id, v);
+  }
+  for (const y of m) {
+    const z = a.recentlyActiveConstraints.has(y.id),
+      v = R(
+        2,
+        D[2],
+        y.y,
+        y.id,
+        y.label,
+        y.active ? ce.yellow : ce.muted,
+        !y.active,
+        z,
+      );
+    ee.set(y.id, v);
+  }
+  for (const y of M) {
+    const z = y.status === "unmet" ? ce.red : ce.yellow,
+      v = R(3, D[3], y.y, y.id, Zt(y.type, ot.labelMaxChars), z, !1, !1);
+    V.set(y.id, v);
+  }
+  for (const y of S) {
+    const z = c.some((v) => v.resolverId === y.id);
+    R(4, D[4], y.y, y.id, y.label, z ? ce.green : ce.muted, !z, !1);
+  }
+  for (const y of J) {
+    const z = a.derivationDeps.get(y.id),
+      v = H.get(y.id);
+    if (z && v)
+      for (const l of z) {
+        const x = I.get(l);
+        x &&
+          $(
+            x.midX + ot.nodeW / 2,
+            x.midY,
+            v.midX - ot.nodeW / 2,
+            v.midY,
+            ce.accent,
+          );
+      }
+  }
+  for (const y of M) {
+    const z = ee.get(y.fromConstraint),
+      v = V.get(y.id);
+    z &&
+      v &&
+      $(z.midX + ot.nodeW / 2, z.midY, v.midX - ot.nodeW / 2, v.midY, ce.muted);
+  }
+  for (const y of c) {
+    const z = V.get(y.id);
+    if (z) {
+      const v = S.find((l) => l.id === y.resolverId);
+      v && $(z.midX + ot.nodeW / 2, z.midY, D[4], v.y, ce.green);
+    }
+  }
+  un.set(e.flowSvg, k);
+}
+function Qo(e) {
+  e.animationTimer && clearTimeout(e.animationTimer),
+    (e.animationTimer = setTimeout(() => {
+      e.recentlyChangedFacts.clear(),
+        e.recentlyComputedDerivations.clear(),
+        e.recentlyActiveConstraints.clear(),
+        (e.animationTimer = null);
+    }, 600));
+}
+function Zo(e, t) {
+  const a = t.entries.toArray();
+  if (a.length === 0) return;
+  e.timelineSvg.replaceChildren();
+  let r = 1 / 0,
+    n = -1 / 0;
+  for (const _ of a)
+    _.startMs < r && (r = _.startMs), _.endMs > n && (n = _.endMs);
+  const o = performance.now();
+  for (const _ of t.inflight.values()) _ < r && (r = _), o > n && (n = o);
+  const i = n - r || 1,
+    u = Hr - vr - 10,
+    c = [],
+    d = new Set();
+  for (const _ of a)
+    d.has(_.resolver) || (d.add(_.resolver), c.push(_.resolver));
+  for (const _ of t.inflight.keys()) d.has(_) || (d.add(_), c.push(_));
+  const f = c.slice(-12),
+    w = yr * f.length + 20;
+  e.timelineSvg.setAttribute("viewBox", `0 0 ${Hr} ${w}`),
+    e.timelineSvg.setAttribute("height", String(Math.min(w, 200)));
+  const O = 5;
+  for (let _ = 0; _ <= O; _++) {
+    const U = vr + (u * _) / O,
+      D = (i * _) / O,
+      E = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    E.setAttribute("x", String(U)),
+      E.setAttribute("y", "8"),
+      E.setAttribute("fill", ce.muted),
+      E.setAttribute("font-size", "6"),
+      E.setAttribute("font-family", ce.font),
+      E.setAttribute("text-anchor", "middle"),
+      (E.textContent =
+        D < 1e3 ? `${D.toFixed(0)}ms` : `${(D / 1e3).toFixed(1)}s`),
+      e.timelineSvg.appendChild(E);
+    const T = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    T.setAttribute("x1", String(U)),
+      T.setAttribute("y1", "10"),
+      T.setAttribute("x2", String(U)),
+      T.setAttribute("y2", String(w)),
+      T.setAttribute("stroke", ce.border),
+      T.setAttribute("stroke-width", "0.5"),
+      e.timelineSvg.appendChild(T);
+  }
+  for (let _ = 0; _ < f.length; _++) {
+    const U = f[_],
+      D = 12 + _ * yr,
+      E = _ % Vn.length,
+      T = Vn[E],
+      G = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    G.setAttribute("x", String(vr - 4)),
+      G.setAttribute("y", String(D + yr / 2 + 3)),
+      G.setAttribute("fill", ce.muted),
+      G.setAttribute("font-size", "7"),
+      G.setAttribute("font-family", ce.font),
+      G.setAttribute("text-anchor", "end"),
+      (G.textContent = Zt(U, 12)),
+      e.timelineSvg.appendChild(G);
+    const J = a.filter((M) => M.resolver === U);
+    for (const M of J) {
+      const S = vr + ((M.startMs - r) / i) * u,
+        j = Math.max(((M.endMs - M.startMs) / i) * u, Kn),
+        F = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      F.setAttribute("x", String(S)),
+        F.setAttribute("y", String(D + 2)),
+        F.setAttribute("width", String(j)),
+        F.setAttribute("height", String(yr - 4)),
+        F.setAttribute("rx", "2"),
+        F.setAttribute("fill", M.error ? ce.red : T),
+        F.setAttribute("opacity", "0.8");
+      const ne = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "title",
+        ),
+        k = M.endMs - M.startMs;
+      (ne.textContent = `${U}: ${k.toFixed(1)}ms${M.error ? " (error)" : ""}`),
+        F.appendChild(ne),
+        e.timelineSvg.appendChild(F);
+    }
+    const m = t.inflight.get(U);
+    if (m !== void 0) {
+      const M = vr + ((m - r) / i) * u,
+        S = Math.max(((o - m) / i) * u, Kn),
+        j = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      j.setAttribute("x", String(M)),
+        j.setAttribute("y", String(D + 2)),
+        j.setAttribute("width", String(S)),
+        j.setAttribute("height", String(yr - 4)),
+        j.setAttribute("rx", "2"),
+        j.setAttribute("fill", T),
+        j.setAttribute("opacity", "0.4"),
+        j.setAttribute("stroke", T),
+        j.setAttribute("stroke-width", "1"),
+        j.setAttribute("stroke-dasharray", "3,2");
+      const F = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      (F.textContent = `${U}: inflight ${(o - m).toFixed(0)}ms`),
+        j.appendChild(F),
+        e.timelineSvg.appendChild(j);
+    }
+  }
+  e.timelineSvg.setAttribute(
+    "aria-label",
+    `Timeline: ${a.length} resolver executions across ${f.length} resolvers`,
+  );
+}
+function es() {
+  if (typeof window > "u")
+    return {
+      systems: new Map(),
+      getSystem: () => null,
+      getSystems: () => [],
+      inspect: () => null,
+      getEvents: () => [],
+      explain: () => null,
+      exportSession: () => null,
+      importSession: () => !1,
+      clearEvents: () => {},
+      subscribe: () => () => {},
+    };
+  if (!window.__DIRECTIVE__) {
+    const e = new Map(),
+      t = {
+        systems: e,
+        getSystem(a) {
+          return a
+            ? (e.get(a)?.system ?? null)
+            : (e.values().next().value?.system ?? null);
+        },
+        getSystems() {
+          return [...e.keys()];
+        },
+        inspect(a) {
+          const r = this.getSystem(a),
+            n = a ? e.get(a) : e.values().next().value,
+            o = r?.inspect() ?? null;
+          return (
+            o &&
+              n &&
+              (o.resolverStats = n.resolverStats
+                ? Object.fromEntries(n.resolverStats)
+                : {}),
+            o
+          );
+        },
+        getEvents(a) {
+          return a
+            ? (e.get(a)?.events.toArray() ?? [])
+            : (e.values().next().value?.events.toArray() ?? []);
+        },
+        explain(a, r) {
+          return this.getSystem(r)?.explain(a) ?? null;
+        },
+        subscribe(a, r) {
+          const n = r ? e.get(r) : e.values().next().value;
+          if (!n) {
+            let o = !1,
+              i = setInterval(() => {
+                const c = r ? e.get(r) : e.values().next().value;
+                c && !o && ((o = !0), c.subscribers.add(a));
+              }, 100),
+              u = setTimeout(() => clearInterval(i), 1e4);
+            return () => {
+              clearInterval(i), clearTimeout(u);
+              for (const c of e.values()) c.subscribers.delete(a);
+            };
+          }
+          return (
+            n.subscribers.add(a),
+            () => {
+              n.subscribers.delete(a);
+            }
+          );
+        },
+        exportSession(a) {
+          const r = a ? e.get(a) : e.values().next().value;
+          return r
+            ? JSON.stringify({
+                version: 1,
+                name: a ?? e.keys().next().value ?? "default",
+                exportedAt: Date.now(),
+                events: r.events.toArray(),
+              })
+            : null;
+        },
+        importSession(a, r) {
+          try {
+            if (a.length > 10 * 1024 * 1024) return !1;
+            const n = JSON.parse(a);
+            if (
+              !n ||
+              typeof n != "object" ||
+              Array.isArray(n) ||
+              !Array.isArray(n.events)
+            )
+              return !1;
+            const o = r ? e.get(r) : e.values().next().value;
+            if (!o) return !1;
+            const i = o.maxEvents,
+              u = n.events,
+              c = u.length > i ? u.length - i : 0;
+            o.events.clear();
+            for (let d = c; d < u.length; d++) {
+              const f = u[d];
+              f &&
+                typeof f == "object" &&
+                !Array.isArray(f) &&
+                typeof f.timestamp == "number" &&
+                typeof f.type == "string" &&
+                f.type !== "__proto__" &&
+                f.type !== "constructor" &&
+                f.type !== "prototype" &&
+                o.events.push({
+                  timestamp: f.timestamp,
+                  type: f.type,
+                  data: f.data ?? null,
+                });
+            }
+            return !0;
+          } catch {
+            return !1;
+          }
+        },
+        clearEvents(a) {
+          const r = a ? e.get(a) : e.values().next().value;
+          r && r.events.clear();
+        },
+      };
+    return (
+      Object.defineProperty(window, "__DIRECTIVE__", {
+        value: t,
+        writable: !1,
+        configurable: Dn(),
+        enumerable: !0,
+      }),
+      t
+    );
+  }
+  return window.__DIRECTIVE__;
+}
+function ts(e = {}) {
+  const {
+      name: t = "default",
+      trace: a = !1,
+      maxEvents: r,
+      panel: n = !1,
+      position: o = "bottom-right",
+      defaultOpen: i = !1,
+    } = e,
+    u = qo(r),
+    c = es(),
+    d = {
+      system: null,
+      events: new ya(u),
+      maxEvents: u,
+      subscribers: new Set(),
+      resolverStats: new Map(),
+    };
+  c.systems.set(t, d);
+  let f = (l, x) => {
+      const P = { timestamp: Date.now(), type: l, data: x };
+      a && d.events.push(P);
+      for (const K of d.subscribers)
+        try {
+          K(P);
+        } catch {}
+    },
+    w = null,
+    O = new Map(),
+    _ = new Map(),
+    U = No(),
+    D = Bo(),
+    E = zo(),
+    T = Lo(),
+    G = n && typeof window < "u" && typeof document < "u" && Dn(),
+    J = null,
+    m = 0,
+    M = 1,
+    S = 2,
+    j = 4,
+    F = 8,
+    ne = 16,
+    k = 32,
+    R = 64,
+    $ = 128,
+    I = new Map(),
+    H = new Set(),
+    ee = null;
+  function V(l) {
+    (m |= l),
+      J === null &&
+        typeof requestAnimationFrame < "u" &&
+        (J = requestAnimationFrame(y));
+  }
+  function y() {
+    if (((J = null), !w || !d.system)) {
+      m = 0;
+      return;
+    }
+    const l = w.refs,
+      x = d.system,
+      P = m;
+    if (((m = 0), P & M)) {
+      for (const K of H) Ho(O, K);
+      H.clear();
+      for (const [K, { value: ae, flash: Ne }] of I)
+        Ur(O, l.factsBody, K, ae, Ne, w.flashTimers);
+      I.clear(), (l.factsCount.textContent = String(O.size));
+    }
+    if ((P & S && Xn(l, _, x, w.flashTimers), P & F))
+      if (ee) ln(l, ee.inflight.length, ee.unmet.length);
+      else {
+        const K = Fr(x);
+        K && ln(l, K.inflight.length, K.unmet.length);
+      }
+    if (P & j)
+      if (ee) sn(l, ee.inflight, ee.unmet);
+      else {
+        const K = Fr(x);
+        K && sn(l, K.inflight, K.unmet);
+      }
+    P & ne && Ko(l, U),
+      P & k && Zn(l, x, D),
+      P & R && Qn(l, x),
+      P & $ && Zo(l, T);
+  }
+  function z(l, x) {
+    w && a && Wo(w.refs, l, x, d.events.size);
+  }
+  function v(l, x) {
+    E.isRecording &&
+      E.recordedEvents.length < Fo &&
+      E.recordedEvents.push({ timestamp: Date.now(), type: l, data: _o(x) });
+  }
+  return {
+    name: "devtools",
+    onInit: (l) => {
+      if (
+        ((d.system = l),
+        f("init", {}),
+        typeof window < "u" &&
+          console.log(
+            `%c[Directive Devtools]%c System "${t}" initialized. Access via window.__DIRECTIVE__`,
+            "color: #7c3aed; font-weight: bold",
+            "color: inherit",
+          ),
+        G)
+      ) {
+        const x = d.system;
+        w = Go(t, o, i, a);
+        const P = w.refs;
+        try {
+          const ae = x.facts.$store.toObject();
+          for (const [Ne, _e] of Object.entries(ae))
+            Ur(O, P.factsBody, Ne, _e, !1);
+          P.factsCount.textContent = String(Object.keys(ae).length);
+        } catch {}
+        Xn(P, _, x);
+        const K = Fr(x);
+        K &&
+          (ln(P, K.inflight.length, K.unmet.length),
+          sn(P, K.inflight, K.unmet)),
+          Qn(P, x),
+          Vo(P, x),
+          Zn(P, x, D),
+          P.recordBtn.addEventListener("click", () => {
+            if (
+              ((E.isRecording = !E.isRecording),
+              (P.recordBtn.textContent = E.isRecording ? "⏹ Stop" : "⏺ Record"),
+              (P.recordBtn.style.color = E.isRecording ? ce.red : ce.text),
+              E.isRecording)
+            ) {
+              (E.recordedEvents = []), (E.snapshots = []);
+              try {
+                E.snapshots.push({
+                  timestamp: Date.now(),
+                  facts: x.facts.$store.toObject(),
+                });
+              } catch {}
+            }
+          }),
+          P.exportBtn.addEventListener("click", () => {
+            const ae =
+                E.recordedEvents.length > 0
+                  ? E.recordedEvents
+                  : d.events.toArray(),
+              Ne = JSON.stringify(
+                {
+                  version: 1,
+                  name: t,
+                  exportedAt: Date.now(),
+                  events: ae,
+                  snapshots: E.snapshots,
+                },
+                null,
+                2,
+              ),
+              _e = new Blob([Ne], { type: "application/json" }),
+              we = URL.createObjectURL(_e),
+              ze = document.createElement("a");
+            (ze.href = we),
+              (ze.download = `directive-session-${t}-${Date.now()}.json`),
+              ze.click(),
+              URL.revokeObjectURL(we);
+          });
+      }
+    },
+    onStart: (l) => {
+      f("start", {}), z("start", {}), v("start", {});
+    },
+    onStop: (l) => {
+      f("stop", {}), z("stop", {}), v("stop", {});
+    },
+    onDestroy: (l) => {
+      f("destroy", {}),
+        c.systems.delete(t),
+        J !== null &&
+          typeof cancelAnimationFrame < "u" &&
+          (cancelAnimationFrame(J), (J = null)),
+        D.animationTimer && clearTimeout(D.animationTimer),
+        w && (w.destroy(), (w = null), O.clear(), _.clear());
+    },
+    onFactSet: (l, x, P) => {
+      f("fact.set", { key: l, value: x, prev: P }),
+        v("fact.set", { key: l, value: x, prev: P }),
+        D.recentlyChangedFacts.add(l),
+        w &&
+          d.system &&
+          (I.set(l, { value: x, flash: !0 }),
+          H.delete(l),
+          V(M),
+          z("fact.set", { key: l, value: x }));
+    },
+    onFactDelete: (l, x) => {
+      f("fact.delete", { key: l, prev: x }),
+        v("fact.delete", { key: l, prev: x }),
+        w && (H.add(l), I.delete(l), V(M), z("fact.delete", { key: l }));
+    },
+    onFactsBatch: (l) => {
+      if (
+        (f("facts.batch", { changes: l }),
+        v("facts.batch", { count: l.length }),
+        w && d.system)
+      ) {
+        for (const x of l)
+          x.type === "delete"
+            ? (H.add(x.key), I.delete(x.key))
+            : (D.recentlyChangedFacts.add(x.key),
+              I.set(x.key, { value: x.value, flash: !0 }),
+              H.delete(x.key));
+        V(M), z("facts.batch", { count: l.length });
+      }
+    },
+    onDerivationCompute: (l, x, P) => {
+      f("derivation.compute", { id: l, value: x, deps: P }),
+        v("derivation.compute", { id: l, deps: P }),
+        D.derivationDeps.set(l, P),
+        D.recentlyComputedDerivations.add(l),
+        z("derivation.compute", { id: l, deps: P });
+    },
+    onDerivationInvalidate: (l) => {
+      f("derivation.invalidate", { id: l }),
+        z("derivation.invalidate", { id: l });
+    },
+    onReconcileStart: (l) => {
+      f("reconcile.start", {}),
+        (U.lastReconcileStartMs = performance.now()),
+        z("reconcile.start", {}),
+        v("reconcile.start", {});
+    },
+    onReconcileEnd: (l) => {
+      if (
+        (f("reconcile.end", l),
+        v("reconcile.end", {
+          unmet: l.unmet.length,
+          inflight: l.inflight.length,
+          completed: l.completed.length,
+        }),
+        U.lastReconcileStartMs > 0)
+      ) {
+        const x = performance.now() - U.lastReconcileStartMs;
+        U.reconcileCount++,
+          (U.reconcileTotalMs += x),
+          (U.lastReconcileStartMs = 0);
+      }
+      if (E.isRecording && d.system && E.snapshots.length < Uo)
+        try {
+          E.snapshots.push({
+            timestamp: Date.now(),
+            facts: d.system.facts.$store.toObject(),
+          });
+        } catch {}
+      w &&
+        d.system &&
+        ((ee = l),
+        Qo(D),
+        V(S | F | j | ne | k | R),
+        z("reconcile.end", {
+          unmet: l.unmet.length,
+          inflight: l.inflight.length,
+        }));
+    },
+    onConstraintEvaluate: (l, x) => {
+      f("constraint.evaluate", { id: l, active: x }),
+        v("constraint.evaluate", { id: l, active: x }),
+        x
+          ? (D.activeConstraints.add(l), D.recentlyActiveConstraints.add(l))
+          : D.activeConstraints.delete(l),
+        z("constraint.evaluate", { id: l, active: x });
+    },
+    onConstraintError: (l, x) => {
+      f("constraint.error", { id: l, error: String(x) }),
+        z("constraint.error", { id: l, error: String(x) });
+    },
+    onRequirementCreated: (l) => {
+      f("requirement.created", { id: l.id, type: l.requirement.type }),
+        v("requirement.created", { id: l.id, type: l.requirement.type }),
+        z("requirement.created", { id: l.id, type: l.requirement.type });
+    },
+    onRequirementMet: (l, x) => {
+      f("requirement.met", { id: l.id, byResolver: x }),
+        v("requirement.met", { id: l.id, byResolver: x }),
+        z("requirement.met", { id: l.id, byResolver: x });
+    },
+    onRequirementCanceled: (l) => {
+      f("requirement.canceled", { id: l.id }),
+        v("requirement.canceled", { id: l.id }),
+        z("requirement.canceled", { id: l.id });
+    },
+    onResolverStart: (l, x) => {
+      f("resolver.start", { resolver: l, requirementId: x.id }),
+        v("resolver.start", { resolver: l, requirementId: x.id }),
+        T.inflight.set(l, performance.now()),
+        w &&
+          d.system &&
+          (V(j | F | $),
+          z("resolver.start", { resolver: l, requirementId: x.id }));
+    },
+    onResolverComplete: (l, x, P) => {
+      f("resolver.complete", { resolver: l, requirementId: x.id, duration: P }),
+        v("resolver.complete", {
+          resolver: l,
+          requirementId: x.id,
+          duration: P,
+        });
+      const K = d.resolverStats.get(l) ?? { count: 0, totalMs: 0, errors: 0 };
+      if (
+        (K.count++,
+        (K.totalMs += P),
+        d.resolverStats.set(l, K),
+        d.resolverStats.size > Yn)
+      ) {
+        const Ne = d.resolverStats.keys().next().value;
+        Ne !== void 0 && d.resolverStats.delete(Ne);
+      }
+      U.resolverStats.set(l, { ...K });
+      const ae = T.inflight.get(l);
+      T.inflight.delete(l),
+        ae !== void 0 &&
+          T.entries.push({
+            resolver: l,
+            startMs: ae,
+            endMs: performance.now(),
+            error: !1,
+          }),
+        w &&
+          d.system &&
+          (V(j | F | ne | $),
+          z("resolver.complete", { resolver: l, duration: P }));
+    },
+    onResolverError: (l, x, P) => {
+      f("resolver.error", {
+        resolver: l,
+        requirementId: x.id,
+        error: String(P),
+      }),
+        v("resolver.error", {
+          resolver: l,
+          requirementId: x.id,
+          error: String(P),
+        });
+      const K = d.resolverStats.get(l) ?? { count: 0, totalMs: 0, errors: 0 };
+      if ((K.errors++, d.resolverStats.set(l, K), d.resolverStats.size > Yn)) {
+        const Ne = d.resolverStats.keys().next().value;
+        Ne !== void 0 && d.resolverStats.delete(Ne);
+      }
+      U.resolverStats.set(l, { ...K });
+      const ae = T.inflight.get(l);
+      T.inflight.delete(l),
+        ae !== void 0 &&
+          T.entries.push({
+            resolver: l,
+            startMs: ae,
+            endMs: performance.now(),
+            error: !0,
+          }),
+        w &&
+          d.system &&
+          (V(j | F | ne | $),
+          z("resolver.error", { resolver: l, error: String(P) }));
+    },
+    onResolverRetry: (l, x, P) => {
+      f("resolver.retry", { resolver: l, requirementId: x.id, attempt: P }),
+        v("resolver.retry", { resolver: l, requirementId: x.id, attempt: P }),
+        z("resolver.retry", { resolver: l, attempt: P });
+    },
+    onResolverCancel: (l, x) => {
+      f("resolver.cancel", { resolver: l, requirementId: x.id }),
+        v("resolver.cancel", { resolver: l, requirementId: x.id }),
+        T.inflight.delete(l),
+        z("resolver.cancel", { resolver: l });
+    },
+    onEffectRun: (l) => {
+      f("effect.run", { id: l }),
+        v("effect.run", { id: l }),
+        U.effectRunCount++,
+        z("effect.run", { id: l });
+    },
+    onEffectError: (l, x) => {
+      f("effect.error", { id: l, error: String(x) }),
+        U.effectErrorCount++,
+        z("effect.error", { id: l, error: String(x) });
+    },
+    onSnapshot: (l) => {
+      f("timetravel.snapshot", { id: l.id, trigger: l.trigger }),
+        w && d.system && V(R),
+        z("timetravel.snapshot", { id: l.id, trigger: l.trigger });
+    },
+    onTimeTravel: (l, x) => {
+      if (
+        (f("timetravel.jump", { from: l, to: x }),
+        v("timetravel.jump", { from: l, to: x }),
+        w && d.system)
+      ) {
+        const P = d.system;
+        try {
+          const K = P.facts.$store.toObject();
+          O.clear(), w.refs.factsBody.replaceChildren();
+          for (const [ae, Ne] of Object.entries(K))
+            Ur(O, w.refs.factsBody, ae, Ne, !1);
+          w.refs.factsCount.textContent = String(Object.keys(K).length);
+        } catch {}
+        _.clear(),
+          D.derivationDeps.clear(),
+          w.refs.derivBody.replaceChildren(),
+          (ee = null),
+          V(S | F | j | k | R),
+          z("timetravel.jump", { from: l, to: x });
+      }
+    },
+    onError: (l) => {
+      f("error", {
+        source: l.source,
+        sourceId: l.sourceId,
+        message: l.message,
+      }),
+        v("error", { source: l.source, message: l.message }),
+        z("error", { source: l.source, message: l.message });
+    },
+    onErrorRecovery: (l, x) => {
+      f("error.recovery", {
+        source: l.source,
+        sourceId: l.sourceId,
+        strategy: x,
+      }),
+        z("error.recovery", { source: l.source, strategy: x });
+    },
+    onRunComplete: (l) => {
+      f("run.complete", {
+        id: l.id,
+        status: l.status,
+        facts: l.factChanges.length,
+        constraints: l.constraintsHit.length,
+        requirements: l.requirementsAdded.length,
+        resolvers: l.resolversStarted.length,
+        effects: l.effectsRun.length,
+      }),
+        z("run.complete", { id: l.id });
+    },
+  };
+}
+Math.random().toString(36).slice(2, 8);
+function _r() {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`
+  );
+}
+function cn(e, t) {
+  if (e.length === 0) return 0;
+  const a = [...e].sort((n, o) => n - o),
+    r = Math.ceil((t / 100) * a.length) - 1;
+  return a[Math.max(0, r)] ?? 0;
+}
+function rs(e = {}) {
+  let {
+      serviceName: t = "directive-agents",
+      metrics: a = {},
+      tracing: r = {},
+      alerts: n = [],
+      summaryMetrics: o = {},
+      events: i = {},
+    } = e,
+    u = {
+      requests: o.requests ?? "agent.requests",
+      errors: o.errors ?? "agent.errors",
+      latency: o.latency ?? "agent.latency",
+      tokens: o.tokens ?? "agent.tokens",
+      cost: o.cost ?? "agent.cost",
+    },
+    {
+      enabled: c = !0,
+      exportInterval: d,
+      exporter: f,
+      maxDataPoints: w = 1e3,
+    } = a,
+    { enabled: O = !0, sampleRate: _ = 1, maxSpans: U = 1e3, exporter: D } = r,
+    E = Date.now(),
+    T = new Map(),
+    G = new Map(),
+    J = [],
+    m = [],
+    M = new Map(),
+    S = new Map(),
+    j;
+  d &&
+    (f || D) &&
+    (j = setInterval(async () => {
+      try {
+        if ((f && c && (await f(Array.from(S.values()))), D && O)) {
+          const $ = J.splice(0, 100);
+          $.length > 0 && (await D($));
+        }
+      } catch ($) {
+        console.error("[Directive Observability] Export error:", $);
+      }
+    }, d));
+  function F($) {
+    if (!c) return;
+    let I = `${$.name}:${JSON.stringify(Object.fromEntries(Object.entries($.labels).sort()))}`,
+      H = T.get(I);
+    H || ((H = []), T.set(I, H)),
+      H.push($),
+      H.length > w && H.shift(),
+      ne($.name, H),
+      i.onMetricRecorded?.($),
+      k($.name);
+  }
+  function ne($, I) {
+    if (I.length === 0) return;
+    const H = I.map((v) => v.value),
+      ee = H.reduce((v, l) => v + l, 0),
+      V = I[0],
+      y = H[H.length - 1],
+      z = {
+        name: $,
+        type: V.type,
+        count: I.length,
+        sum: ee,
+        min: Math.min(...H),
+        max: Math.max(...H),
+        avg: ee / I.length,
+        lastValue: y,
+        lastUpdated: Date.now(),
+      };
+    S.set($, z);
+  }
+  function k($) {
+    for (const I of n) {
+      if (I.metric !== $) continue;
+      const H = S.get($);
+      if (!H) continue;
+      const ee = `${I.metric}:${I.threshold}`,
+        V = M.get(ee),
+        y = I.cooldownMs ?? 6e4;
+      if (V && Date.now() - V < y) continue;
+      let z = I.operator ?? ">",
+        v = H.lastValue,
+        l = I.threshold,
+        x = !1;
+      switch (z) {
+        case ">":
+          x = v > l;
+          break;
+        case "<":
+          x = v < l;
+          break;
+        case ">=":
+          x = v >= l;
+          break;
+        case "<=":
+          x = v <= l;
+          break;
+        case "==":
+          x = v === l;
+          break;
+      }
+      if (x) {
+        const P = {
+          alertId: _r(),
+          metric: $,
+          currentValue: v,
+          threshold: l,
+          operator: z,
+          action: I.action,
+          timestamp: Date.now(),
+          message: `Alert: ${$} ${z} ${l} (current: ${v})`,
+        };
+        switch (
+          (m.push(P),
+          m.length > 1e3 && m.splice(0, m.length - 1e3),
+          M.set(ee, Date.now()),
+          i.onAlert?.(P),
+          I.action)
+        ) {
+          case "log":
+            console.log(`[Observability] ${P.message}`);
+            break;
+          case "warn":
+            console.warn(`[Observability] ${P.message}`);
+            break;
+          case "alert":
+            console.error(`[Observability ALERT] ${P.message}`);
+            break;
+          case "callback":
+            I.callback?.(H, l);
+            break;
+        }
+      }
+    }
+  }
+  function R($) {
+    const I = [];
+    for (const [H, ee] of T)
+      if (H.startsWith(`${$}:`)) for (const V of ee) I.push(V.value);
+    return I.length === 0
+      ? {}
+      : { p50: cn(I, 50), p90: cn(I, 90), p99: cn(I, 99) };
+  }
+  return {
+    incrementCounter($, I = {}, H = 1) {
+      F({
+        name: $,
+        type: "counter",
+        value: H,
+        labels: I,
+        timestamp: Date.now(),
+      });
+    },
+    setGauge($, I, H = {}) {
+      F({ name: $, type: "gauge", value: I, labels: H, timestamp: Date.now() });
+    },
+    observeHistogram($, I, H = {}) {
+      F({
+        name: $,
+        type: "histogram",
+        value: I,
+        labels: H,
+        timestamp: Date.now(),
+      });
+    },
+    startSpan($, I) {
+      if (Math.random() > _)
+        return {
+          traceId: "sampled-out",
+          spanId: "sampled-out",
+          operationName: $,
+          serviceName: t,
+          startTime: Date.now(),
+          status: "ok",
+          tags: {},
+          logs: [],
+        };
+      const H = {
+        traceId: I ? (G.get(I)?.traceId ?? _r()) : _r(),
+        spanId: _r(),
+        parentSpanId: I,
+        operationName: $,
+        serviceName: t,
+        startTime: Date.now(),
+        status: "ok",
+        tags: {},
+        logs: [],
+      };
+      return O && (G.set(H.spanId, H), i.onSpanStart?.(H)), H;
+    },
+    endSpan($, I = "ok") {
+      if ($ === "sampled-out") return;
+      const H = G.get($);
+      if (H) {
+        for (
+          H.endTime = Date.now(),
+            H.duration = H.endTime - H.startTime,
+            H.status = I,
+            G.delete($),
+            J.push(H);
+          J.length > U;
+        )
+          J.shift();
+        F({
+          name: `${H.operationName}.latency`,
+          type: "histogram",
+          value: H.duration,
+          labels: {},
+          timestamp: Date.now(),
+        }),
+          I === "error" &&
+            F({
+              name: `${H.operationName}.errors`,
+              type: "counter",
+              value: 1,
+              labels: {},
+              timestamp: Date.now(),
+            }),
+          i.onSpanEnd?.(H);
+      }
+    },
+    addSpanLog($, I, H = "info") {
+      if ($ === "sampled-out") return;
+      const ee = G.get($);
+      ee && ee.logs.push({ timestamp: Date.now(), message: I, level: H });
+    },
+    addSpanTag($, I, H) {
+      if ($ === "sampled-out") return;
+      const ee = G.get($);
+      ee && (ee.tags[I] = H);
+    },
+    getDashboard() {
+      const $ = S.get(u.requests),
+        I = S.get(u.errors),
+        H = S.get(u.latency),
+        ee = S.get(u.tokens),
+        V = S.get(u.cost),
+        y = $?.sum ?? 0,
+        z = I?.sum ?? 0,
+        v = y > 0 ? z / y : 0,
+        l = H ? R(u.latency) : {};
+      return {
+        service: { name: t, uptime: Date.now() - E, startTime: E },
+        metrics: Object.fromEntries(S),
+        traces: [...J].slice(-100),
+        alerts: [...m].slice(-50),
+        summary: {
+          totalRequests: y,
+          totalErrors: z,
+          errorRate: v,
+          avgLatency: H?.avg ?? 0,
+          p99Latency: l.p99 ?? 0,
+          activeSpans: G.size,
+          totalTokens: ee?.sum ?? 0,
+          totalCost: V?.sum ?? 0,
+        },
+      };
+    },
+    getMetric($) {
+      const I = S.get($);
+      if (!I) return;
+      const H = R($);
+      return { ...I, ...H };
+    },
+    getTraces($ = 100) {
+      return [...J].slice(-$);
+    },
+    getAlerts() {
+      return [...m];
+    },
+    export() {
+      return {
+        metrics: Array.from(S.values()),
+        traces: [...J],
+        alerts: [...m],
+      };
+    },
+    clear() {
+      T.clear(),
+        S.clear(),
+        G.clear(),
+        (J.length = 0),
+        (m.length = 0),
+        M.clear();
+    },
+    async dispose() {
+      j && (clearInterval(j), (j = void 0));
+      try {
+        f && c && S.size > 0 && (await f(Array.from(S.values()))),
+          D && O && J.length > 0 && (await D([...J]));
+      } catch ($) {
+        console.error(
+          "[Directive Observability] Error flushing data during dispose:",
+          $,
+        );
+      }
+      T.clear(),
+        S.clear(),
+        G.clear(),
+        (J.length = 0),
+        (m.length = 0),
+        M.clear();
+    },
+    getHealthStatus() {
+      const $ = S.get(u.requests),
+        I = S.get(u.errors),
+        H = $?.sum ?? 0,
+        ee = I?.sum ?? 0,
+        V = H > 0 ? ee / H : 0,
+        y = m.filter((z) => Date.now() - z.timestamp < 3e5).length;
+      return {
+        healthy: V < 0.1 && y === 0,
+        uptime: Date.now() - E,
+        errorRate: V,
+        activeAlerts: y,
+      };
+    },
+  };
+}
+function ns(e) {
+  return {
+    trackRun(t, a) {
+      const r = { agent: t };
+      e.incrementCounter("agent.requests", r),
+        a.success || e.incrementCounter("agent.errors", r),
+        e.observeHistogram("agent.latency", a.latencyMs, r),
+        a.inputTokens !== void 0 &&
+          (e.incrementCounter("agent.tokens.input", r, a.inputTokens),
+          e.incrementCounter("agent.tokens", r, a.inputTokens)),
+        a.outputTokens !== void 0 &&
+          (e.incrementCounter("agent.tokens.output", r, a.outputTokens),
+          e.incrementCounter("agent.tokens", r, a.outputTokens)),
+        a.cost !== void 0 && e.incrementCounter("agent.cost", r, a.cost),
+        a.toolCalls !== void 0 &&
+          e.incrementCounter("agent.tool_calls", r, a.toolCalls);
+    },
+    trackGuardrail(t, a) {
+      const r = { guardrail: t };
+      e.incrementCounter("guardrail.checks", r),
+        a.passed || e.incrementCounter("guardrail.failures", r),
+        a.blocked && e.incrementCounter("guardrail.blocks", r),
+        e.observeHistogram("guardrail.latency", a.latencyMs, r);
+    },
+    trackApproval(t, a) {
+      const r = { tool: t };
+      e.incrementCounter("approval.requests", r),
+        a.approved
+          ? e.incrementCounter("approval.approved", r)
+          : e.incrementCounter("approval.rejected", r),
+        a.timedOut && e.incrementCounter("approval.timeouts", r),
+        e.observeHistogram("approval.wait_time", a.waitTimeMs, r);
+    },
+    trackHandoff(t, a, r) {
+      e.incrementCounter("handoff.count", { from: t, to: a }),
+        e.observeHistogram("handoff.latency", r);
+    },
+  };
+}
+function as(e) {
+  const t = [
+    {
+      key: "service.name",
+      value: { stringValue: e.serviceName ?? "directive-agents" },
+    },
+  ];
+  if (
+    (e.serviceVersion &&
+      t.push({
+        key: "service.version",
+        value: { stringValue: e.serviceVersion },
+      }),
+    e.resourceAttributes)
+  )
+    for (const [a, r] of Object.entries(e.resourceAttributes))
+      t.push({ key: a, value: { stringValue: r } });
+  return { attributes: t };
+}
+function Ht(e) {
+  return `${BigInt(e) * BigInt(1e6)}`;
+}
+function os(e) {
+  switch (e) {
+    case "counter":
+      return "sum";
+    case "gauge":
+      return "gauge";
+    case "histogram":
+      return "histogram";
+    default:
+      return "gauge";
+  }
+}
+function ss(e, t, a) {
+  const r = e.map((n) => {
+    const o = n.lastUpdated - 6e4,
+      i = [
+        {
+          asInt: n.type === "counter" ? n.sum : void 0,
+          asDouble: n.type !== "counter" ? n.lastValue : void 0,
+          timeUnixNano: Ht(n.lastUpdated),
+          startTimeUnixNano: Ht(o),
+          attributes: [],
+        },
+      ],
+      u = os(n.type),
+      c = { name: n.name, unit: "" };
+    return (
+      u === "sum"
+        ? (c.sum = {
+            dataPoints: i,
+            aggregationTemporality: 2,
+            isMonotonic: !0,
+          })
+        : u === "histogram"
+          ? (c.histogram = {
+              dataPoints: [
+                {
+                  count: n.count,
+                  sum: n.sum,
+                  min: n.min,
+                  max: n.max,
+                  timeUnixNano: Ht(n.lastUpdated),
+                  startTimeUnixNano: Ht(o),
+                  attributes: [],
+                },
+              ],
+              aggregationTemporality: 2,
+            })
+          : (c.gauge = { dataPoints: i }),
+      c
+    );
+  });
+  return {
+    resourceMetrics: [
+      {
+        resource: t,
+        scopeMetrics: [
+          { scope: { name: "directive", version: a }, metrics: r },
+        ],
+      },
+    ],
+  };
+}
+function is(e, t, a) {
+  const r = e.map((n) => {
+    const o = n.logs.map((c) => ({
+        timeUnixNano: Ht(c.timestamp),
+        name: c.level,
+        attributes: [
+          { key: "message", value: { stringValue: c.message } },
+          { key: "level", value: { stringValue: c.level } },
+        ],
+      })),
+      i = Object.entries(n.tags).map(([c, d]) => ({
+        key: c,
+        value:
+          typeof d == "string"
+            ? { stringValue: d }
+            : typeof d == "number"
+              ? { intValue: `${d}` }
+              : { boolValue: d },
+      })),
+      u = n.status === "ok" ? 1 : n.status === "error" ? 2 : 0;
+    return {
+      traceId: n.traceId.replace(/-/g, "").padEnd(32, "0").slice(0, 32),
+      spanId: n.spanId.replace(/-/g, "").padEnd(16, "0").slice(0, 16),
+      parentSpanId: n.parentSpanId
+        ? n.parentSpanId.replace(/-/g, "").padEnd(16, "0").slice(0, 16)
+        : void 0,
+      name: n.operationName,
+      kind: 1,
+      startTimeUnixNano: Ht(n.startTime),
+      endTimeUnixNano: n.endTime ? Ht(n.endTime) : Ht(n.startTime),
+      attributes: i,
+      events: o,
+      status: { code: u },
+    };
+  });
+  return {
+    resourceSpans: [
+      {
+        resource: t,
+        scopeSpans: [{ scope: { name: "directive", version: a }, spans: r }],
+      },
+    ],
+  };
+}
+function ls(e) {
+  const {
+    endpoint: t,
+    headers: a = {},
+    scopeVersion: r = "0.1.0",
+    timeoutMs: n = 1e4,
+    fetch: o = globalThis.fetch,
+    onError: i,
+  } = e;
+  try {
+    const d = new URL(t);
+    if (d.protocol !== "http:" && d.protocol !== "https:")
+      throw new Error("Only http: and https: protocols are supported");
+  } catch (d) {
+    throw new Error(
+      `[Directive OTLP] Invalid endpoint URL "${t}": ${d instanceof Error ? d.message : String(d)}`,
+    );
+  }
+  if (
+    (/\/v1\/(metrics|traces)/.test(t) &&
+      console.warn(
+        `[Directive OTLP] Endpoint "${t}" already contains a /v1/metrics or /v1/traces path. The exporter will append /v1/metrics or /v1/traces automatically. Use the base URL (e.g., "http://localhost:4318") instead.`,
+      ),
+    n <= 0 || !Number.isFinite(n))
+  )
+    throw new Error(`[Directive OTLP] timeoutMs must be > 0, got ${n}`);
+  const u = as(e);
+  async function c(d, f, w) {
+    const O = `${t.replace(/\/$/, "")}${d}`,
+      _ = new AbortController(),
+      U = setTimeout(() => _.abort(), n);
+    try {
+      const D = await o(O, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...a },
+        body: JSON.stringify(f),
+        signal: _.signal,
+      });
+      if (!D.ok)
+        throw new Error(`OTLP export failed: ${D.status} ${D.statusText}`);
+    } catch (D) {
+      const E = D instanceof Error ? D : new Error(String(D));
+      i
+        ? i(E, w)
+        : console.error(`[Directive OTLP] Export ${w} error:`, E.message);
+    } finally {
+      clearTimeout(U);
+    }
+  }
+  return {
+    async exportMetrics(d) {
+      if (d.length === 0) return;
+      const f = ss(d, u, r);
+      await c("/v1/metrics", f, "metrics");
+    },
+    async exportTraces(d) {
+      if (d.length === 0) return;
+      const f = is(d, u, r);
+      await c("/v1/traces", f, "traces");
+    },
+  };
+}
+var Wr = class extends Error {
+  code = "CIRCUIT_OPEN";
+  retryAfterMs;
+  state;
+  constructor(e, t, a = "OPEN", r) {
+    const n = r
+      ? `[Directive CircuitBreaker] Circuit "${e}" is ${a}. ${r}`
+      : `[Directive CircuitBreaker] Circuit "${e}" is ${a}. Request rejected. Try again in ${Math.ceil(t / 1e3)}s.`;
+    super(n),
+      (this.name = "CircuitBreakerOpenError"),
+      (this.retryAfterMs = t),
+      (this.state = a);
+  }
+};
+function us(e = {}) {
+  const {
+    failureThreshold: t = 5,
+    recoveryTimeMs: a = 3e4,
+    halfOpenMaxRequests: r = 3,
+    failureWindowMs: n = 6e4,
+    observability: o,
+    metricPrefix: i = "circuit_breaker",
+    name: u = "default",
+    isFailure: c = () => !0,
+    onStateChange: d,
+  } = e;
+  if (t < 1 || !Number.isFinite(t))
+    throw new Error(
+      `[Directive CircuitBreaker] failureThreshold must be >= 1, got ${t}`,
+    );
+  if (a <= 0 || !Number.isFinite(a))
+    throw new Error(
+      `[Directive CircuitBreaker] recoveryTimeMs must be > 0, got ${a}`,
+    );
+  if (r < 1 || !Number.isFinite(r))
+    throw new Error(
+      `[Directive CircuitBreaker] halfOpenMaxRequests must be >= 1, got ${r}`,
+    );
+  if (n <= 0 || !Number.isFinite(n))
+    throw new Error(
+      `[Directive CircuitBreaker] failureWindowMs must be > 0, got ${n}`,
+    );
+  let f = "CLOSED",
+    w = [],
+    O = 0,
+    _ = 0,
+    U = Date.now(),
+    D = 0,
+    E = 0,
+    T = 0,
+    G = 0,
+    J = 0,
+    m = null,
+    M = null;
+  function S(k) {
+    if (f === k) return;
+    const R = f;
+    (f = k),
+      (U = Date.now()),
+      k === "OPEN" && (D = Date.now()),
+      k === "HALF_OPEN" && ((O = 0), (_ = 0)),
+      d?.(R, k),
+      o && o.incrementCounter(`${i}.state_change`, { name: u, from: R, to: k });
+  }
+  function j() {
+    const k = Date.now() - n;
+    return (w = w.filter((R) => R > k)), w.length;
+  }
+  function F() {
+    G++,
+      (M = Date.now()),
+      o && o.incrementCounter(`${i}.success`, { name: u }),
+      f === "HALF_OPEN" && (_++, _ >= r && (S("CLOSED"), (w = [])));
+  }
+  function ne(k) {
+    if (!c(k)) {
+      F();
+      return;
+    }
+    T++, (m = Date.now()), w.push(Date.now());
+    const R = t * 2;
+    if (
+      (w.length > R && (w = w.slice(-R)),
+      o && o.incrementCounter(`${i}.failure`, { name: u }),
+      f === "HALF_OPEN")
+    ) {
+      S("OPEN");
+      return;
+    }
+    f === "CLOSED" && j() >= t && S("OPEN");
+  }
+  return {
+    async execute(k) {
+      if (
+        (E++,
+        o && o.incrementCounter(`${i}.requests`, { name: u }),
+        f === "OPEN")
+      )
+        if (Date.now() - D >= a) S("HALF_OPEN");
+        else
+          throw (
+            (J++,
+            o && o.incrementCounter(`${i}.rejected`, { name: u }),
+            new Wr(u, a - (Date.now() - D)))
+          );
+      if (f === "HALF_OPEN") {
+        if (O >= r)
+          throw (
+            (J++,
+            new Wr(u, a, "HALF_OPEN", `Max trial requests (${r}) reached.`))
+          );
+        O++;
+      }
+      const R = Date.now();
+      try {
+        const $ = await k();
+        return (
+          F(),
+          o && o.observeHistogram(`${i}.latency`, Date.now() - R, { name: u }),
+          $
+        );
+      } catch ($) {
+        const I = $ instanceof Error ? $ : new Error(String($));
+        throw (
+          (ne(I),
+          o && o.observeHistogram(`${i}.latency`, Date.now() - R, { name: u }),
+          $)
+        );
+      }
+    },
+    getState() {
+      return f === "OPEN" && Date.now() - D >= a && S("HALF_OPEN"), f;
+    },
+    getStats() {
+      return {
+        state: this.getState(),
+        totalRequests: E,
+        totalFailures: T,
+        totalSuccesses: G,
+        totalRejected: J,
+        recentFailures: j(),
+        lastFailureTime: m,
+        lastSuccessTime: M,
+        lastStateChange: U,
+      };
+    },
+    forceState(k) {
+      S(k);
+    },
+    reset() {
+      const k = f;
+      (f = "CLOSED"),
+        (w = []),
+        (O = 0),
+        (_ = 0),
+        (U = Date.now()),
+        (D = 0),
+        (E = 0),
+        (T = 0),
+        (G = 0),
+        (J = 0),
+        (m = null),
+        (M = null),
+        k !== "CLOSED" && d?.(k, "CLOSED");
+    },
+    isAllowed() {
+      return f === "CLOSED" ? !0 : f === "OPEN" ? Date.now() - D >= a : O < r;
+    },
+  };
+}
+function tr(e) {
+  return [Math.floor(e / 8), e % 8];
+}
+function xr(e, t) {
+  return e * 8 + t;
+}
+function ba(e, t) {
+  return e >= 0 && e < 8 && t >= 0 && t < 8;
+}
+function cs(e, t) {
+  return (e + t) % 2 === 1;
+}
+function dn() {
+  const e = new Array(64).fill(null);
+  for (let t = 0; t < 8; t++)
+    for (let a = 0; a < 8; a++) {
+      if (!cs(t, a)) continue;
+      const r = xr(t, a);
+      t < 3
+        ? (e[r] = { player: "black", king: !1 })
+        : t > 4 && (e[r] = { player: "red", king: !1 });
+    }
+  return e;
+}
+function wa(e) {
+  return e.king
+    ? [
+        [-1, -1],
+        [-1, 1],
+        [1, -1],
+        [1, 1],
+      ]
+    : e.player === "red"
+      ? [
+          [-1, -1],
+          [-1, 1],
+        ]
+      : [
+          [1, -1],
+          [1, 1],
+        ];
+}
+function ka(e, t) {
+  const a = e[t];
+  if (!a) return [];
+  const [r, n] = tr(t),
+    o = [];
+  for (const [i, u] of wa(a)) {
+    const c = r + i,
+      d = n + u;
+    ba(c, d) &&
+      e[xr(c, d)] === null &&
+      o.push({ from: t, to: xr(c, d), captured: null });
+  }
+  return o;
+}
+function Kt(e, t) {
+  const a = e[t];
+  if (!a) return [];
+  const [r, n] = tr(t),
+    o = [];
+  for (const [i, u] of wa(a)) {
+    const c = r + i,
+      d = n + u,
+      f = r + i * 2,
+      w = n + u * 2;
+    if (!ba(f, w)) continue;
+    const O = xr(c, d),
+      _ = xr(f, w),
+      U = e[O];
+    U &&
+      U.player !== a.player &&
+      e[_] === null &&
+      o.push({ from: t, to: _, captured: O });
+  }
+  return o;
+}
+function br(e, t) {
+  const a = Kt(e, t);
+  return a.length > 0 ? a : ka(e, t);
+}
+function Ar(e, t) {
+  let a = [],
+    r = [];
+  for (let n = 0; n < 64; n++) {
+    const o = e[n];
+    !o ||
+      o.player !== t ||
+      ((a = a.concat(Kt(e, n))), (r = r.concat(ka(e, n))));
+  }
+  return a.length > 0 ? a : r;
+}
+function ea(e, t) {
+  for (let a = 0; a < 64; a++) {
+    const r = e[a];
+    if (!(!r || r.player !== t) && Kt(e, a).length > 0) return !0;
+  }
+  return !1;
+}
+function rr(e, t) {
+  const a = [...e];
+  return (
+    (a[t.to] = a[t.from]),
+    (a[t.from] = null),
+    t.captured !== null && (a[t.captured] = null),
+    a
+  );
+}
+function Vt(e, t) {
+  const a = e[t];
+  if (!a || a.king) return !1;
+  const [r] = tr(t);
+  return (a.player === "red" && r === 0) || (a.player === "black" && r === 7);
+}
+function fr(e, t) {
+  const a = e[t];
+  if (!a) return e;
+  const r = [...e];
+  return (r[t] = { ...a, king: !0 }), r;
+}
+function qr(e) {
+  let t = 0,
+    a = 0;
+  for (const r of e) r?.player === "red" ? t++ : r?.player === "black" && a++;
+  return { red: t, black: a };
+}
+function Er(e) {
+  return e === "red" ? "black" : "red";
+}
+function Sa(e, t) {
+  return Ar(e, t).length === 0;
+}
+function Ea(e, t) {
+  let a = 0;
+  for (let r = 0; r < 64; r++) {
+    const n = e[r];
+    if (!n) continue;
+    const [o, i] = tr(r);
+    let u = n.king ? 2.5 : 1;
+    n.king ||
+      (n.player === "red" && o >= 5 && (u += 0.5),
+      n.player === "black" && o <= 2 && (u += 0.5)),
+      i >= 2 && i <= 5 && o >= 2 && o <= 5 && (u += 0.3),
+      (a += n.player === t ? u : -u);
+  }
+  return a;
+}
+function Kr(e, t) {
+  if (!e[t]) return [];
+  const r = Kt(e, t);
+  if (r.length === 0) return [];
+  const n = [];
+  for (const o of r) {
+    const i = rr(e, o);
+    if (Vt(i, o.to)) {
+      n.push([o]);
+      continue;
+    }
+    const u = Kr(i, o.to);
+    if (u.length === 0) n.push([o]);
+    else for (const c of u) n.push([o, ...c]);
+  }
+  return n;
+}
+function yn(e, t) {
+  let a = e;
+  for (const r of t) (a = rr(a, r)), Vt(a, r.to) && (a = fr(a, r.to));
+  return a;
+}
+function cr(e, t, a, r, n, o, i) {
+  const u = o ? i : Er(i);
+  if (a === 0 || Sa(e, u)) return Ea(e, i);
+  const c = Ar(e, u);
+  if (o) {
+    let d = -1 / 0;
+    for (const f of c)
+      if (f.captured !== null) {
+        const w = Kr(e, f.from);
+        for (const O of w) {
+          const _ = yn(e, O),
+            U = cr(_, t, a - 1, r, n, !1, i);
+          if (((d = Math.max(d, U)), (r = Math.max(r, U)), n <= r)) break;
+        }
+        if (n <= r) break;
+      } else {
+        let w = rr(e, f);
+        Vt(w, f.to) && (w = fr(w, f.to));
+        const O = cr(w, t, a - 1, r, n, !1, i);
+        if (((d = Math.max(d, O)), (r = Math.max(r, O)), n <= r)) break;
+      }
+    return d;
+  } else {
+    let d = 1 / 0;
+    for (const f of c)
+      if (f.captured !== null) {
+        const w = Kr(e, f.from);
+        for (const O of w) {
+          const _ = yn(e, O),
+            U = cr(_, t, a - 1, r, n, !0, i);
+          if (((d = Math.min(d, U)), (n = Math.min(n, U)), n <= r)) break;
+        }
+        if (n <= r) break;
+      } else {
+        let w = rr(e, f);
+        Vt(w, f.to) && (w = fr(w, f.to));
+        const O = cr(w, t, a - 1, r, n, !0, i);
+        if (((d = Math.min(d, O)), (n = Math.min(n, O)), n <= r)) break;
+      }
+    return d;
+  }
+}
+function Ca(e, t) {
+  const a = Ar(e, t);
+  if (a.length === 0) return null;
+  let r = -1 / 0,
+    n = a[0];
+  const o = new Set();
+  for (const i of a) {
+    const u = `${i.from}-${i.to}`;
+    if (!o.has(u))
+      if ((o.add(u), i.captured !== null)) {
+        const c = Kr(e, i.from);
+        for (const d of c) {
+          const f = yn(e, d),
+            w = cr(f, t, 3, -1 / 0, 1 / 0, !1, t);
+          w > r && ((r = w), (n = d[0]));
+        }
+      } else {
+        let c = rr(e, i);
+        Vt(c, i.to) && (c = fr(c, i.to));
+        const d = cr(c, t, 3, -1 / 0, 1 / 0, !1, t);
+        d > r && ((r = d), (n = i));
+      }
+  }
+  return n;
+}
+function ds(e, t, a) {
+  const r = Kt(e, t);
+  if (r.length === 0) return null;
+  if (r.length === 1) return r[0];
+  let n = -1 / 0,
+    o = r[0];
+  for (const i of r) {
+    const u = rr(e, i),
+      c = Ea(u, a);
+    c > n && ((n = c), (o = i));
+  }
+  return o;
+}
+const fs = {
+    facts: {
+      board: $e.object(),
+      currentPlayer: $e.object(),
+      selectedIndex: $e.object(),
+      targetIndex: $e.object(),
+      mustContinueFrom: $e.object(),
+      message: $e.string(),
+      moveCount: $e.number(),
+      capturedCount: $e.object(),
+      gameOver: $e.boolean(),
+      winner: $e.object(),
+      gameMode: $e.object(),
+      aiPlayer: $e.object(),
+    },
+    derivations: {
+      validMoves: $e.object(),
+      jumpRequired: $e.boolean(),
+      highlightSquares: $e.object(),
+      selectableSquares: $e.object(),
+      redCount: $e.number(),
+      blackCount: $e.number(),
+      score: $e.string(),
+    },
+    events: {
+      clickSquare: { index: $e.number() },
+      newGame: {},
+      setGameMode: { mode: $e.object() },
+      aiMove: {},
+      claudeMove: { from: $e.number(), to: $e.number() },
+    },
+    requirements: {
+      EXECUTE_MOVE: {
+        from: $e.number(),
+        to: $e.number(),
+        captured: $e.object(),
+      },
+      KING_PIECE: { index: $e.number() },
+      END_GAME: { winner: $e.object(), reason: $e.string() },
+    },
+  },
+  ps = dr("checkers", {
+    schema: fs,
+    init: (e) => {
+      (e.board = dn()),
+        (e.currentPlayer = "red"),
+        (e.selectedIndex = null),
+        (e.targetIndex = null),
+        (e.mustContinueFrom = null),
+        (e.message = "Red's turn. Select a piece to move."),
+        (e.moveCount = 0),
+        (e.capturedCount = { red: 0, black: 0 }),
+        (e.gameOver = !1),
+        (e.winner = null),
+        (e.gameMode = "2player"),
+        (e.aiPlayer = "black");
+    },
+    derive: {
+      validMoves: (e) => {
+        const t = e.selectedIndex;
+        return t === null ? [] : br(e.board, t);
+      },
+      jumpRequired: (e) => ea(e.board, e.currentPlayer),
+      highlightSquares: (e) => {
+        const t = e.selectedIndex;
+        return t === null ? [] : br(e.board, t).map((r) => r.to);
+      },
+      selectableSquares: (e) => {
+        if (e.gameOver) return [];
+        if (e.gameMode !== "2player" && e.currentPlayer === e.aiPlayer)
+          return [];
+        const t = e.mustContinueFrom;
+        if (t !== null) return [t];
+        const a = Ar(e.board, e.currentPlayer);
+        return [...new Set(a.map((n) => n.from))];
+      },
+      redCount: (e) => qr(e.board).red,
+      blackCount: (e) => qr(e.board).black,
+      score: (e, t) => (e.board, `Red ${t.redCount} — Black ${t.blackCount}`),
+    },
+    events: {
+      clickSquare: (e, { index: t }) => {
+        if (
+          e.gameOver ||
+          (e.gameMode !== "2player" && e.currentPlayer === e.aiPlayer)
+        )
+          return;
+        const a = e.board,
+          r = e.currentPlayer,
+          n = e.selectedIndex,
+          o = e.mustContinueFrom,
+          i = a[t];
+        if (o !== null) {
+          Kt(a, o).find((d) => d.to === t)
+            ? ((e.selectedIndex = o), (e.targetIndex = t))
+            : t !== o &&
+              (e.message = "You must continue jumping with the same piece.");
+          return;
+        }
+        if (i && i.player === r) {
+          if (ea(a, r) && Kt(a, t).length === 0) {
+            e.message =
+              "You must make a jump! Select a piece that can capture.";
+            return;
+          }
+          (e.selectedIndex = t),
+            (e.targetIndex = null),
+            (e.message = "Selected. Choose a destination.");
+          return;
+        }
+        if (n !== null && br(a, n).find((d) => d.to === t)) {
+          e.targetIndex = t;
+          return;
+        }
+        (e.selectedIndex = null),
+          (e.targetIndex = null),
+          n !== null &&
+            (e.message = "Invalid move. Select one of your pieces.");
+      },
+      newGame: (e) => {
+        const t = e.gameMode;
+        (e.board = dn()),
+          (e.currentPlayer = "red"),
+          (e.selectedIndex = null),
+          (e.targetIndex = null),
+          (e.mustContinueFrom = null),
+          (e.message = "Red's turn. Select a piece to move."),
+          (e.moveCount = 0),
+          (e.capturedCount = { red: 0, black: 0 }),
+          (e.gameOver = !1),
+          (e.winner = null),
+          (e.gameMode = t),
+          (e.aiPlayer = "black");
+      },
+      setGameMode: (e, { mode: t }) => {
+        (e.board = dn()),
+          (e.currentPlayer = "red"),
+          (e.selectedIndex = null),
+          (e.targetIndex = null),
+          (e.mustContinueFrom = null),
+          (e.message = "Red's turn. Select a piece to move."),
+          (e.moveCount = 0),
+          (e.capturedCount = { red: 0, black: 0 }),
+          (e.gameOver = !1),
+          (e.winner = null),
+          (e.gameMode = t),
+          (e.aiPlayer = "black");
+      },
+      aiMove: (e) => {
+        if (
+          e.gameOver ||
+          e.gameMode !== "computer" ||
+          e.currentPlayer !== e.aiPlayer
+        )
+          return;
+        const t = e.board,
+          a = e.currentPlayer,
+          r = e.mustContinueFrom;
+        if (r !== null) {
+          const n = ds(t, r, a);
+          n && ((e.selectedIndex = r), (e.targetIndex = n.to));
+        } else {
+          const n = Ca(t, a);
+          n && ((e.selectedIndex = n.from), (e.targetIndex = n.to));
+        }
+      },
+      claudeMove: (e, { from: t, to: a }) => {
+        e.gameOver ||
+          (e.gameMode === "ai" &&
+            e.currentPlayer === e.aiPlayer &&
+            ((e.selectedIndex = t), (e.targetIndex = a)));
+      },
+    },
+    constraints: {
+      executeMove: {
+        priority: 100,
+        when: (e) => {
+          if (e.gameOver) return !1;
+          const t = e.selectedIndex,
+            a = e.targetIndex;
+          return t === null || a === null
+            ? !1
+            : br(e.board, t).some((n) => n.to === a);
+        },
+        require: (e) => {
+          const t = e.selectedIndex,
+            a = e.targetIndex,
+            n = br(e.board, t).find((o) => o.to === a);
+          return {
+            type: "EXECUTE_MOVE",
+            from: n.from,
+            to: n.to,
+            captured: n.captured,
+          };
+        },
+      },
+      kingPiece: {
+        priority: 80,
+        when: (e) => {
+          if (e.gameOver) return !1;
+          const t = e.board;
+          for (let a = 0; a < 64; a++) if (Vt(t, a)) return !0;
+          return !1;
+        },
+        require: (e) => {
+          const t = e.board;
+          for (let a = 0; a < 64; a++)
+            if (Vt(t, a)) return { type: "KING_PIECE", index: a };
+          return { type: "KING_PIECE", index: 0 };
+        },
+      },
+      gameOver: {
+        priority: 50,
+        when: (e) =>
+          e.gameOver || e.mustContinueFrom !== null
+            ? !1
+            : Sa(e.board, e.currentPlayer),
+        require: (e) => ({
+          type: "END_GAME",
+          winner: Er(e.currentPlayer),
+          reason: `${Er(e.currentPlayer)} wins! ${e.currentPlayer} has no valid moves.`,
+        }),
+      },
+    },
+    resolvers: {
+      executeMove: {
+        requirement: "EXECUTE_MOVE",
+        resolve: async (e, t) => {
+          const a = t.facts.board,
+            r = { from: e.from, to: e.to, captured: e.captured };
+          let n = rr(a, r);
+          if (e.captured !== null) {
+            const i = a[e.captured];
+            if (i) {
+              const u = { ...t.facts.capturedCount };
+              u[i.player]++, (t.facts.capturedCount = u);
+            }
+          }
+          if ((t.facts.moveCount++, Vt(n, e.to))) {
+            (n = fr(n, e.to)),
+              (t.facts.board = n),
+              (t.facts.selectedIndex = null),
+              (t.facts.targetIndex = null),
+              (t.facts.mustContinueFrom = null);
+            const i = Er(t.facts.currentPlayer);
+            (t.facts.currentPlayer = i),
+              (t.facts.message = `Kinged! ${i}'s turn.`);
+            return;
+          }
+          if (e.captured !== null && Kt(n, e.to).length > 0) {
+            (t.facts.board = n),
+              (t.facts.selectedIndex = e.to),
+              (t.facts.targetIndex = null),
+              (t.facts.mustContinueFrom = e.to),
+              (t.facts.message = "Jump again! You must continue capturing.");
+            return;
+          }
+          (t.facts.board = n),
+            (t.facts.selectedIndex = null),
+            (t.facts.targetIndex = null),
+            (t.facts.mustContinueFrom = null);
+          const o = Er(t.facts.currentPlayer);
+          (t.facts.currentPlayer = o), (t.facts.message = `${o}'s turn.`);
+        },
+      },
+      kingPiece: {
+        requirement: "KING_PIECE",
+        resolve: async (e, t) => {
+          t.facts.board = fr(t.facts.board, e.index);
+        },
+      },
+      endGame: {
+        requirement: "END_GAME",
+        resolve: async (e, t) => {
+          (t.facts.gameOver = !0),
+            (t.facts.winner = e.winner),
+            (t.facts.selectedIndex = null),
+            (t.facts.targetIndex = null),
+            (t.facts.mustContinueFrom = null),
+            (t.facts.message = e.reason);
+        },
+      },
+    },
+    effects: {
+      moveLog: {
+        deps: ["moveCount"],
+        run: (e) => {
+          if (e.moveCount > 0) {
+            const { red: t, black: a } = qr(e.board);
+            console.log(
+              `[Checkers] Move ${e.moveCount} | Red: ${t}, Black: ${a}`,
+            );
+          }
+        },
+      },
+      gameOverLog: {
+        deps: ["gameOver"],
+        run: (e) => {
+          if (e.gameOver) {
+            const { red: t, black: a } = qr(e.board);
+            console.log(
+              `[Checkers] Game Over! Winner: ${e.winner} | Moves: ${e.moveCount} | Red: ${t}, Black: ${a}`,
+            );
+          }
+        },
+      },
+    },
+  }),
+  ms = {
+    facts: {
+      messages: $e.object(),
+      thinking: $e.boolean(),
+      totalTokens: $e.number(),
+      estimatedCost: $e.number(),
+      circuitState: $e.string(),
+      streamingText: $e.string(),
+      isStreaming: $e.boolean(),
+      analysisText: $e.string(),
+      cacheHitRate: $e.number(),
+      cacheEntries: $e.number(),
+    },
+    derivations: {},
+    events: {
+      addMessage: { message: $e.object() },
+      setThinking: { thinking: $e.boolean() },
+      updateAIState: {
+        totalTokens: $e.number(),
+        estimatedCost: $e.number(),
+        circuitState: $e.string(),
+      },
+      clearChat: {},
+      appendStreamToken: { token: $e.string() },
+      finishStream: { finalText: $e.string() },
+      startStream: {},
+      setAnalysis: { text: $e.string() },
+      updateCacheStats: { hitRate: $e.number(), entries: $e.number() },
+    },
+    requirements: {},
+  },
+  gs = dr("checkers-chat", {
+    schema: ms,
+    init: (e) => {
+      (e.messages = []),
+        (e.thinking = !1),
+        (e.totalTokens = 0),
+        (e.estimatedCost = 0),
+        (e.circuitState = "CLOSED"),
+        (e.streamingText = ""),
+        (e.isStreaming = !1),
+        (e.analysisText = ""),
+        (e.cacheHitRate = 0),
+        (e.cacheEntries = 0);
+    },
+    events: {
+      addMessage: (e, { message: t }) => {
+        e.messages = [...e.messages, t];
+      },
+      setThinking: (e, { thinking: t }) => {
+        e.thinking = t;
+      },
+      updateAIState: (
+        e,
+        { totalTokens: t, estimatedCost: a, circuitState: r },
+      ) => {
+        (e.totalTokens = t), (e.estimatedCost = a), (e.circuitState = r);
+      },
+      clearChat: (e) => {
+        (e.messages = []),
+          (e.thinking = !1),
+          (e.totalTokens = 0),
+          (e.estimatedCost = 0),
+          (e.circuitState = "CLOSED"),
+          (e.streamingText = ""),
+          (e.isStreaming = !1),
+          (e.analysisText = ""),
+          (e.cacheHitRate = 0),
+          (e.cacheEntries = 0);
+      },
+      startStream: (e) => {
+        (e.isStreaming = !0), (e.streamingText = "");
+      },
+      appendStreamToken: (e, { token: t }) => {
+        e.streamingText = e.streamingText + t;
+      },
+      finishStream: (e, { finalText: t }) => {
+        (e.isStreaming = !1), (e.streamingText = t);
+      },
+      setAnalysis: (e, { text: t }) => {
+        e.analysisText = t;
+      },
+      updateCacheStats: (e, { hitRate: t, entries: a }) => {
+        (e.cacheHitRate = t), (e.cacheEntries = a);
+      },
+    },
+  });
+function Xe(e, t, a) {
+  e[t] = a;
+}
+function kt(e, t) {
+  return e[t];
+}
+function xa(e, t) {
+  return {
+    name: e,
+    onRequirementCreated: t.onRequirementCreated
+      ? (a) => t.onRequirementCreated(a.requirement)
+      : void 0,
+    onRequirementMet: t.onRequirementResolved
+      ? (a) => t.onRequirementResolved(a.requirement)
+      : void 0,
+    onError: t.onError,
+  };
+}
+function $n(e) {
+  return (t) => t.type === e;
+}
+var qt = class extends Error {
+    code;
+    guardrailName;
+    guardrailType;
+    userMessage;
+    agentName;
+    constructor(e) {
+      super(e.message, { cause: e.cause }),
+        (this.name = "GuardrailError"),
+        (this.code = e.code),
+        (this.guardrailName = e.guardrailName),
+        (this.guardrailType = e.guardrailType),
+        (this.userMessage = e.userMessage ?? e.message),
+        (this.agentName = e.agentName),
+        Object.defineProperty(this, "input", {
+          value: e.input,
+          enumerable: !1,
+          writable: !1,
+          configurable: !1,
+        }),
+        Object.defineProperty(this, "data", {
+          value: e.data,
+          enumerable: !1,
+          writable: !1,
+          configurable: !1,
+        });
+    }
+    toJSON() {
+      return {
+        name: this.name,
+        code: this.code,
+        message: this.message,
+        guardrailName: this.guardrailName,
+        guardrailType: this.guardrailType,
+        userMessage: this.userMessage,
+        agentName: this.agentName,
+      };
+    }
+  },
+  An = "__agent",
+  Ir = "__approval",
+  In = "__conversation",
+  On = "__toolCalls",
+  Or = "__breakpoints",
+  Et = "__scratchpad",
+  vn = {
+    facts: {
+      [An]: $e.object(),
+      [Ir]: $e.object(),
+      [In]: $e.array(),
+      [On]: $e.array(),
+      [Or]: $e.object(),
+    },
+    derivations: {},
+    events: {},
+    requirements: {},
+  },
+  hs = new Set([
+    "agent_start",
+    "agent_complete",
+    "agent_error",
+    "agent_retry",
+    "guardrail_check",
+    "constraint_evaluate",
+    "resolver_start",
+    "resolver_complete",
+    "resolver_error",
+    "approval_request",
+    "approval_response",
+    "handoff_start",
+    "handoff_complete",
+    "pattern_start",
+    "pattern_complete",
+    "dag_node_update",
+    "breakpoint_hit",
+    "breakpoint_resumed",
+    "derivation_update",
+    "scratchpad_update",
+    "reflection_iteration",
+    "race_start",
+    "race_winner",
+    "race_cancelled",
+    "debate_round",
+    "reroute",
+    "checkpoint_save",
+    "checkpoint_restore",
+  ]),
+  ta = new Set([
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
+function Da(e = {}) {
+  const t = e.maxEvents ?? 2e3,
+    a = e.goToSnapshot;
+  if (!Number.isFinite(t) || t < 1)
+    throw new Error("[Directive DebugTimeline] maxEvents must be >= 1");
+  let r = [],
+    n = 0,
+    o = new Set();
+  return {
+    record(i) {
+      const u = { ...i, id: n++ };
+      r.push(u);
+      const c = r.length - t;
+      c > 0 && r.splice(0, c);
+      for (const d of o)
+        try {
+          d(u);
+        } catch {}
+      return u;
+    },
+    getEvents() {
+      return [...r];
+    },
+    getEventsForAgent(i) {
+      return r.filter((u) => u.agentId === i);
+    },
+    getEventsByType(i) {
+      return r.filter((u) => u.type === i);
+    },
+    getEventsAtSnapshot(i) {
+      return r.filter((u) => u.snapshotId === i);
+    },
+    getEventsInRange(i, u) {
+      return r.filter((c) => c.timestamp >= i && c.timestamp <= u);
+    },
+    forkFrom(i) {
+      let u = -1;
+      for (let c = r.length - 1; c >= 0; c--)
+        if (r[c].snapshotId !== null && r[c].snapshotId <= i) {
+          u = r[c].id;
+          break;
+        }
+      if (u >= 0) {
+        let c = r.length;
+        for (let d = r.length - 1; d >= 0; d--)
+          if (r[d].id <= u) {
+            c = d + 1;
+            break;
+          }
+        r = r.slice(0, c);
+      } else r = [];
+      a && a(i);
+    },
+    export() {
+      return JSON.stringify({ version: 1, events: r, nextId: n });
+    },
+    import(i) {
+      let u;
+      try {
+        u = JSON.parse(i);
+      } catch {
+        throw new Error("[Directive DebugTimeline] Invalid JSON");
+      }
+      if (!u || typeof u != "object")
+        throw new Error("[Directive DebugTimeline] Invalid timeline data");
+      for (const f of Object.keys(u))
+        if (ta.has(f))
+          throw new Error(
+            `[Directive DebugTimeline] Blocked key in import: ${f}`,
+          );
+      const c = u;
+      if (!Array.isArray(c.events))
+        throw new Error("[Directive DebugTimeline] Missing events array");
+      const d = [];
+      for (const f of c.events) {
+        if (!f || typeof f != "object") continue;
+        for (const O of Object.keys(f))
+          if (ta.has(O))
+            throw new Error(
+              `[Directive DebugTimeline] Blocked key in event: ${O}`,
+            );
+        const w = f;
+        typeof w.id == "number" &&
+          typeof w.type == "string" &&
+          hs.has(w.type) &&
+          typeof w.timestamp == "number" &&
+          d.push(f);
+      }
+      (r = d.length > t ? d.slice(-t) : d),
+        (n = typeof c.nextId == "number" ? c.nextId : d.length);
+    },
+    clear() {
+      (r = []), (n = 0);
+    },
+    subscribe(i) {
+      return (
+        o.add(i),
+        () => {
+          o.delete(i);
+        }
+      );
+    },
+    get length() {
+      return r.length;
+    },
+  };
+}
+function $a(e, t) {
+  const a = new Map();
+  return {
+    name: "directive-ai-debug-timeline",
+    onConstraintEvaluate(r, n) {
+      e.record({
+        type: "constraint_evaluate",
+        timestamp: Date.now(),
+        snapshotId: t(),
+        constraintId: r,
+        fired: n,
+      });
+    },
+    onResolverStart(r, n) {
+      a.set(r, Date.now()),
+        e.record({
+          type: "resolver_start",
+          timestamp: Date.now(),
+          snapshotId: t(),
+          resolverId: r,
+          requirementType: n.requirement.type,
+        });
+    },
+    onResolverComplete(r) {
+      const n = a.get(r);
+      a.delete(r),
+        e.record({
+          type: "resolver_complete",
+          timestamp: Date.now(),
+          snapshotId: t(),
+          resolverId: r,
+          durationMs: n ? Date.now() - n : 0,
+        });
+    },
+    onResolverError(r, n, o) {
+      const i = a.get(r);
+      a.delete(r);
+      const u = o instanceof Error ? o.message : String(o);
+      e.record({
+        type: "resolver_error",
+        timestamp: Date.now(),
+        snapshotId: t(),
+        resolverId: r,
+        errorMessage: u,
+        durationMs: i ? Date.now() - i : 0,
+      });
+    },
+  };
+}
+function Lt(e, t, a) {
+  return typeof e == "function"
+    ? { name: `${a}-guardrail-${t}`, fn: e, critical: !0 }
+    : e;
+}
+function ys(e, t) {
+  let {
+      backoff: a = "exponential",
+      baseDelayMs: r = 100,
+      maxDelayMs: n = 5e3,
+    } = t,
+    o;
+  switch (a) {
+    case "exponential":
+      o = r * Math.pow(2, e - 1);
+      break;
+    case "linear":
+      o = r * e;
+      break;
+    default:
+      o = r;
+  }
+  return Math.min(o, n);
+}
+function Aa(e, t) {
+  return t?.aborted
+    ? Promise.reject(t.reason ?? new Error("Aborted"))
+    : new Promise((a, r) => {
+        if (!t) {
+          setTimeout(a, e);
+          return;
+        }
+        const n = () => {
+            clearTimeout(o), r(t.reason ?? new Error("Aborted"));
+          },
+          o = setTimeout(() => {
+            t.removeEventListener("abort", n), a();
+          }, e);
+        t.addEventListener("abort", n, { once: !0 });
+      });
+}
+async function Bt(e, t, a, r) {
+  let { retry: n } = e,
+    o = Math.max(n?.attempts ?? 1, 1),
+    i;
+  for (let u = 1; u <= o; u++)
+    try {
+      return await e.fn(t, a);
+    } catch (c) {
+      if (((i = c instanceof Error ? c : new Error(String(c))), u < o)) {
+        const d = ys(u, n ?? {});
+        await Aa(d, r);
+      }
+    }
+  return {
+    passed: !1,
+    reason: `Guardrail "${e.name}" failed after ${o} attempt(s): ${i.message}`,
+  };
+}
+function vs(e, t) {
+  let {
+      backoff: a = "exponential",
+      baseDelayMs: r = 1e3,
+      maxDelayMs: n = 3e4,
+    } = t,
+    o;
+  switch (a) {
+    case "exponential":
+      o = r * Math.pow(2, e - 1);
+      break;
+    case "linear":
+      o = r * e;
+      break;
+    default:
+      o = r;
+  }
+  return Math.min(o, n);
+}
+async function bn(e, t, a, r, n) {
+  let o = Math.max(n?.attempts ?? 1, 1),
+    i = n?.isRetryable ?? (() => !0),
+    u = n?.onRetry,
+    c;
+  for (let d = 1; d <= o; d++)
+    try {
+      return await e(t, a, r);
+    } catch (f) {
+      if (((c = f instanceof Error ? f : new Error(String(f))), d < o)) {
+        let w = !0;
+        try {
+          w = i(c);
+        } catch {
+          break;
+        }
+        if (!w) break;
+        const O = vs(d, n ?? {});
+        try {
+          u?.(d, c, O);
+        } catch {}
+        await Aa(O, r?.signal);
+      } else break;
+    }
+  throw c;
+}
+function wt(e) {
+  return kt(e, An);
+}
+function St(e, t) {
+  Xe(e, An, t);
+}
+function Nt(e) {
+  return kt(e, Ir);
+}
+function xt(e, t) {
+  Xe(e, Ir, t);
+}
+function Vr(e) {
+  return kt(e, In);
+}
+function Ft(e, t) {
+  Xe(e, In, t);
+}
+function Yr(e) {
+  return kt(e, On);
+}
+function Ut(e, t) {
+  Xe(e, On, t);
+}
+function At(e) {
+  return kt(e, Or);
+}
+function It(e, t) {
+  Xe(e, Or, t);
+}
+function Dt(e) {
+  return {
+    agent: wt(e),
+    approval: Nt(e),
+    conversation: Vr(e),
+    toolCalls: Yr(e),
+  };
+}
+function zr(e) {
+  const t = Object.create(null);
+  for (const [a, r] of Object.entries(e))
+    t[a] = {
+      priority: r.priority ?? 0,
+      when: (n) => {
+        const o = Dt(n),
+          i = { ...n, ...o };
+        return r.when(i);
+      },
+      require: (n) => {
+        const o = Dt(n),
+          i = { ...n, ...o };
+        return typeof r.require == "function" ? r.require(i) : r.require;
+      },
+    };
+  return t;
+}
+function bs(e, t, a) {
+  const r = Object.create(null);
+  for (const [n, o] of Object.entries(e))
+    r[n] = {
+      requirement: o.requirement,
+      key: o.key,
+      resolve: async (i, u) => {
+        const c = Dt(u.facts),
+          d = {
+            facts: { ...u.facts, ...c },
+            runAgent: async (f, w, O) => t(f, w, Dt(a()), O),
+            signal: u.signal,
+          };
+        await o.resolve(i, d);
+      },
+    };
+  return r;
+}
+function ws(e) {
+  if (e.length > 1048576)
+    throw new Error(
+      `[Directive] Output too large for JSON extraction (${e.length} chars, max 1048576).`,
+    );
+  const t = e.trim();
+  try {
+    return JSON.parse(t);
+  } catch {}
+  let a = t.indexOf("{"),
+    r = t.indexOf("["),
+    n,
+    o,
+    i;
+  if (a === -1 && r === -1)
+    throw new Error("[Directive] No JSON object or array found in output");
+  a === -1
+    ? ((n = r), (o = "["), (i = "]"))
+    : r === -1
+      ? ((n = a), (o = "{"), (i = "}"))
+      : ((n = Math.min(a, r)),
+        (o = n === a ? "{" : "["),
+        (i = n === a ? "}" : "]"));
+  let u = 0,
+    c = !1,
+    d = !1;
+  for (let f = n; f < t.length; f++) {
+    const w = t[f];
+    if (d) {
+      d = !1;
+      continue;
+    }
+    if (w === "\\") {
+      d = !0;
+      continue;
+    }
+    if (w === '"') {
+      c = !c;
+      continue;
+    }
+    if (!c) {
+      if (w === o) u++;
+      else if (w === i && (u--, u === 0)) {
+        const O = t.slice(n, f + 1);
+        return JSON.parse(O);
+      }
+    }
+  }
+  throw new Error("[Directive] No valid JSON found in output");
+}
+function ks(e) {
+  return e
+    ? e.issues && e.issues.length > 0
+      ? e.issues.map((t) => t.message).join("; ")
+      : (e.message ?? "Validation failed")
+    : "Validation failed";
+}
+function Ia(e, t) {
+  const {
+    schema: a,
+    maxRetries: r = 2,
+    extractJson: n = ws,
+    schemaDescription: o,
+  } = t;
+  if (!Number.isFinite(r) || r < 0)
+    throw new Error(
+      "[Directive] withStructuredOutput: maxRetries must be a non-negative finite number.",
+    );
+  const i = o ?? a.description ?? "the specified JSON schema";
+  return async (u, c, d) => {
+    let f = {
+        ...u,
+        instructions:
+          (u.instructions ?? "") +
+          `
 
-IMPORTANT: Respond with valid JSON matching `+i+". Output ONLY the JSON object, no additional text or markdown formatting."},w,O;for(let _=0;_<=r;_++){let U=_===0?c:`${c}
+IMPORTANT: Respond with valid JSON matching ` +
+          i +
+          ". Output ONLY the JSON object, no additional text or markdown formatting.",
+      },
+      w,
+      O;
+    for (let _ = 0; _ <= r; _++) {
+      const U =
+          _ === 0
+            ? c
+            : `${c}
 
 Your previous response was not valid JSON. Error: ${O}
-Please try again with valid JSON only.`,D=await e(f,U,d);w=D;let E=typeof D.output=="string"?D.output:JSON.stringify(D.output);try{let T=n(E),G=a.safeParse(T);if(G.success)return{...D,output:G.data};O=ks(G.error)}catch(T){O=T instanceof Error?T.message:String(T)}}throw new Ss(`[Directive] Failed to get valid structured output after ${r+1} attempts: ${O}`,w)}}var Ss=class extends Error{lastResult;constructor(e,t){super(e),this.name="StructuredOutputError",this.lastResult=t}},ra=new Set(["__proto__","constructor","prototype","toString","valueOf","hasOwnProperty"]);function Gt(){let e=Date.now().toString(36),t=crypto.randomUUID().slice(0,8);return`ckpt_${e}_${t}`}function Oa(e){if(!e||typeof e!="object")return!1;for(let r of Object.keys(e))if(ra.has(r))return!1;let t=e;if(t.version!==1||typeof t.id!="string"||t.id.length===0||typeof t.createdAt!="string"||typeof t.systemExport!="string"||t.timelineExport!==null&&typeof t.timelineExport!="string"||!t.localState||typeof t.localState!="object")return!1;for(let r of Object.keys(t.localState))if(ra.has(r))return!1;let a=t.localState;return!(a.type!=="single"&&a.type!=="multi"||t.orchestratorType!=="single"&&t.orchestratorType!=="multi")}var Wt=200,Es=0;function Ma(){return`bp_${Date.now().toString(36)}_${(++Es).toString(36)}`}function Ta(e,t,a){for(let r of e)if(r.type===t){if(!r.when)return r;try{if(r.when(a))return r}catch{}}return null}function Nr(){return{pending:[],resolved:[],cancelled:[]}}var na=500,aa=200;function Cs(e){let{runner:t,factsSchema:a={},init:r,constraints:n={},resolvers:o={},guardrails:i={},onApprovalRequest:u,autoApproveToolCalls:c=!0,maxTokenBudget:d,budgetWarningThreshold:f=.8,onBudgetWarning:w,plugins:O=[],debug:_=!1,approvalTimeoutMs:U=3e5,agentRetry:D,hooks:E={},memory:T,circuitBreaker:G,selfHealing:J,outputSchema:m,maxSchemaRetries:M,checkpointStore:S,breakpoints:j,onBreakpoint:F,breakpointTimeoutMs:ne}=e,k=typeof _=="object"?!0:!!_,R=typeof _=="object"?!!_.verboseTimeline:!1,$=5e3;if(k&&J&&!G&&console.warn("[Directive] selfHealing config has no effect without a circuitBreaker — fallback behavior requires the circuit breaker to detect failures."),f<0||f>1)throw new Error(`[Directive Orchestrator] budgetWarningThreshold must be between 0 and 1, got ${f}`);if(!c&&!u)throw new Error(`[Directive] Invalid approval configuration: autoApproveToolCalls is false but no onApprovalRequest callback provided. Tool calls would wait for approval indefinitely. Either:
+Please try again with valid JSON only.`,
+        D = await e(f, U, d);
+      w = D;
+      const E =
+        typeof D.output == "string" ? D.output : JSON.stringify(D.output);
+      try {
+        const T = n(E),
+          G = a.safeParse(T);
+        if (G.success) return { ...D, output: G.data };
+        O = ks(G.error);
+      } catch (T) {
+        O = T instanceof Error ? T.message : String(T);
+      }
+    }
+    throw new Ss(
+      `[Directive] Failed to get valid structured output after ${r + 1} attempts: ${O}`,
+      w,
+    );
+  };
+}
+var Ss = class extends Error {
+    lastResult;
+    constructor(e, t) {
+      super(e), (this.name = "StructuredOutputError"), (this.lastResult = t);
+    }
+  },
+  ra = new Set([
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
+function Gt() {
+  const e = Date.now().toString(36),
+    t = crypto.randomUUID().slice(0, 8);
+  return `ckpt_${e}_${t}`;
+}
+function Oa(e) {
+  if (!e || typeof e != "object") return !1;
+  for (const r of Object.keys(e)) if (ra.has(r)) return !1;
+  const t = e;
+  if (
+    t.version !== 1 ||
+    typeof t.id != "string" ||
+    t.id.length === 0 ||
+    typeof t.createdAt != "string" ||
+    typeof t.systemExport != "string" ||
+    (t.timelineExport !== null && typeof t.timelineExport != "string") ||
+    !t.localState ||
+    typeof t.localState != "object"
+  )
+    return !1;
+  for (const r of Object.keys(t.localState)) if (ra.has(r)) return !1;
+  const a = t.localState;
+  return !(
+    (a.type !== "single" && a.type !== "multi") ||
+    (t.orchestratorType !== "single" && t.orchestratorType !== "multi")
+  );
+}
+var Wt = 200,
+  Es = 0;
+function Ma() {
+  return `bp_${Date.now().toString(36)}_${(++Es).toString(36)}`;
+}
+function Ta(e, t, a) {
+  for (const r of e)
+    if (r.type === t) {
+      if (!r.when) return r;
+      try {
+        if (r.when(a)) return r;
+      } catch {}
+    }
+  return null;
+}
+function Nr() {
+  return { pending: [], resolved: [], cancelled: [] };
+}
+var na = 500,
+  aa = 200;
+function Cs(e) {
+  const {
+      runner: t,
+      factsSchema: a = {},
+      init: r,
+      constraints: n = {},
+      resolvers: o = {},
+      guardrails: i = {},
+      onApprovalRequest: u,
+      autoApproveToolCalls: c = !0,
+      maxTokenBudget: d,
+      budgetWarningThreshold: f = 0.8,
+      onBudgetWarning: w,
+      plugins: O = [],
+      debug: _ = !1,
+      approvalTimeoutMs: U = 3e5,
+      agentRetry: D,
+      hooks: E = {},
+      memory: T,
+      circuitBreaker: G,
+      selfHealing: J,
+      outputSchema: m,
+      maxSchemaRetries: M,
+      checkpointStore: S,
+      breakpoints: j,
+      onBreakpoint: F,
+      breakpointTimeoutMs: ne,
+    } = e,
+    k = typeof _ == "object" ? !0 : !!_,
+    R = typeof _ == "object" ? !!_.verboseTimeline : !1,
+    $ = 5e3;
+  if (
+    (k &&
+      J &&
+      !G &&
+      console.warn(
+        "[Directive] selfHealing config has no effect without a circuitBreaker — fallback behavior requires the circuit breaker to detect failures.",
+      ),
+    f < 0 || f > 1)
+  )
+    throw new Error(
+      `[Directive Orchestrator] budgetWarningThreshold must be between 0 and 1, got ${f}`,
+    );
+  if (!c && !u)
+    throw new Error(`[Directive] Invalid approval configuration: autoApproveToolCalls is false but no onApprovalRequest callback provided. Tool calls would wait for approval indefinitely. Either:
   - Set autoApproveToolCalls: true to auto-approve all tool calls
-  - Provide an onApprovalRequest callback to handle approvals programmatically`);function I(q,N){try{E[q]?.(N)}catch(ie){k&&console.debug(`[Directive] hooks.${q} threw:`,ie)}}let H=["agent","approval","conversation","toolCalls"];for(let q of Object.keys(a))if(H.includes(q))throw new Error(`[Directive] Facts schema key "${q}" conflicts with orchestrator state. Reserved keys: ${H.join(", ")}. Rename your fact to avoid the collision.`);let ee={facts:{...vn.facts,...a,__budgetWarningFired:$e.boolean()},derivations:{},events:{},requirements:{}},V,y,z=zr(n);d&&(z.__budgetLimit={priority:100,when:q=>wt(q).tokenUsage>d,require:{type:"__PAUSE_BUDGET_EXCEEDED"}});let v=bs(o,(q,N,ie,le)=>V(q,N,ie,le),()=>y.facts);v.__pause={requirement:$n("__PAUSE_BUDGET_EXCEEDED"),resolve:async(q,N)=>{let ie=wt(N.facts);St(N.facts,{...ie,status:"paused"})}};let l=null;k&&(l=Da({goToSnapshot:q=>{try{y.debug?.goTo?.(q)}catch{}}}));let x=xa("directive-ai-callbacks",{}),P=dr("directive-ai-orchestrator",{schema:ee,init:q=>{if(St(q,{status:"idle",currentAgent:null,input:null,output:null,error:null,tokenUsage:0,turnCount:0,startedAt:null,completedAt:null}),xt(q,{pending:[],approved:[],rejected:[]}),Ft(q,[]),Ut(q,[]),It(q,{pending:[],resolved:[],cancelled:[]}),Xe(q,"__budgetWarningFired",!1),r){let N=Dt(q),ie={...q,...N};r(ie)}},constraints:z,resolvers:v}),K=[...O,x];k&&l&&K.push($a(l,()=>{try{return y.debug?.currentIndex??null}catch{return null}})),y=xn({module:P,plugins:K,debug:k?{timeTravel:!0}:void 0}),y.start();async function ae(q,N,ie,le,de){if(G)try{return await G.execute(()=>Ne(q,N,ie,le,de))}catch(Ae){if(J){if(J.fallbackRunners)for(let p of J.fallbackRunners)try{let A={originalAgent:q.name,reroutedTo:"fallback-runner",reason:Ae instanceof Error?Ae.message:String(Ae),timestamp:Date.now()};try{J.onReroute?.(A)}catch{}return l&&l.record({type:"reroute",timestamp:Date.now(),agentId:q.name,snapshotId:null,from:q.name,to:"fallback-runner",reason:Ae instanceof Error?Ae.message:String(Ae)}),await p(q,N,le)}catch{}if(J.fallbackAgent)try{let p={originalAgent:q.name,reroutedTo:J.fallbackAgent.name,reason:Ae instanceof Error?Ae.message:String(Ae),timestamp:Date.now()};try{J.onReroute?.(p)}catch{}return l&&l.record({type:"reroute",timestamp:Date.now(),agentId:q.name,snapshotId:null,from:q.name,to:J.fallbackAgent.name,reason:Ae instanceof Error?Ae.message:String(Ae)}),await t(J.fallbackAgent,N,le)}catch{}if(J.degradation==="fallback-response"&&J.fallbackResponse!==void 0)return{output:J.fallbackResponse,messages:[],toolCalls:[],totalTokens:0}}throw Ae}return Ne(q,N,ie,le,de)}async function Ne(q,N,ie,le,de){let Ae=Date.now();if(T){let re=T.getContextMessages();if(re.length>0){let ke=re.map(Ie=>`${Ie.role}: ${Ie.content}`).join(`
-`);q={...q,instructions:(q.instructions??"")+`
+  - Provide an onApprovalRequest callback to handle approvals programmatically`);
+  function I(q, N) {
+    try {
+      E[q]?.(N);
+    } catch (ie) {
+      k && console.debug(`[Directive] hooks.${q} threw:`, ie);
+    }
+  }
+  const H = ["agent", "approval", "conversation", "toolCalls"];
+  for (const q of Object.keys(a))
+    if (H.includes(q))
+      throw new Error(
+        `[Directive] Facts schema key "${q}" conflicts with orchestrator state. Reserved keys: ${H.join(", ")}. Rename your fact to avoid the collision.`,
+      );
+  let ee = {
+      facts: { ...vn.facts, ...a, __budgetWarningFired: $e.boolean() },
+      derivations: {},
+      events: {},
+      requirements: {},
+    },
+    V,
+    y,
+    z = zr(n);
+  d &&
+    (z.__budgetLimit = {
+      priority: 100,
+      when: (q) => wt(q).tokenUsage > d,
+      require: { type: "__PAUSE_BUDGET_EXCEEDED" },
+    });
+  const v = bs(
+    o,
+    (q, N, ie, le) => V(q, N, ie, le),
+    () => y.facts,
+  );
+  v.__pause = {
+    requirement: $n("__PAUSE_BUDGET_EXCEEDED"),
+    resolve: async (q, N) => {
+      const ie = wt(N.facts);
+      St(N.facts, { ...ie, status: "paused" });
+    },
+  };
+  let l = null;
+  k &&
+    (l = Da({
+      goToSnapshot: (q) => {
+        try {
+          y.debug?.goTo?.(q);
+        } catch {}
+      },
+    }));
+  const x = xa("directive-ai-callbacks", {}),
+    P = dr("directive-ai-orchestrator", {
+      schema: ee,
+      init: (q) => {
+        if (
+          (St(q, {
+            status: "idle",
+            currentAgent: null,
+            input: null,
+            output: null,
+            error: null,
+            tokenUsage: 0,
+            turnCount: 0,
+            startedAt: null,
+            completedAt: null,
+          }),
+          xt(q, { pending: [], approved: [], rejected: [] }),
+          Ft(q, []),
+          Ut(q, []),
+          It(q, { pending: [], resolved: [], cancelled: [] }),
+          Xe(q, "__budgetWarningFired", !1),
+          r)
+        ) {
+          const N = Dt(q),
+            ie = { ...q, ...N };
+          r(ie);
+        }
+      },
+      constraints: z,
+      resolvers: v,
+    }),
+    K = [...O, x];
+  k &&
+    l &&
+    K.push(
+      $a(l, () => {
+        try {
+          return y.debug?.currentIndex ?? null;
+        } catch {
+          return null;
+        }
+      }),
+    ),
+    (y = xn({ module: P, plugins: K, debug: k ? { timeTravel: !0 } : void 0 })),
+    y.start();
+  async function ae(q, N, ie, le, de) {
+    if (G)
+      try {
+        return await G.execute(() => Ne(q, N, ie, le, de));
+      } catch (Ae) {
+        if (J) {
+          if (J.fallbackRunners)
+            for (const p of J.fallbackRunners)
+              try {
+                const A = {
+                  originalAgent: q.name,
+                  reroutedTo: "fallback-runner",
+                  reason: Ae instanceof Error ? Ae.message : String(Ae),
+                  timestamp: Date.now(),
+                };
+                try {
+                  J.onReroute?.(A);
+                } catch {}
+                return (
+                  l &&
+                    l.record({
+                      type: "reroute",
+                      timestamp: Date.now(),
+                      agentId: q.name,
+                      snapshotId: null,
+                      from: q.name,
+                      to: "fallback-runner",
+                      reason: Ae instanceof Error ? Ae.message : String(Ae),
+                    }),
+                  await p(q, N, le)
+                );
+              } catch {}
+          if (J.fallbackAgent)
+            try {
+              const p = {
+                originalAgent: q.name,
+                reroutedTo: J.fallbackAgent.name,
+                reason: Ae instanceof Error ? Ae.message : String(Ae),
+                timestamp: Date.now(),
+              };
+              try {
+                J.onReroute?.(p);
+              } catch {}
+              return (
+                l &&
+                  l.record({
+                    type: "reroute",
+                    timestamp: Date.now(),
+                    agentId: q.name,
+                    snapshotId: null,
+                    from: q.name,
+                    to: J.fallbackAgent.name,
+                    reason: Ae instanceof Error ? Ae.message : String(Ae),
+                  }),
+                await t(J.fallbackAgent, N, le)
+              );
+            } catch {}
+          if (
+            J.degradation === "fallback-response" &&
+            J.fallbackResponse !== void 0
+          )
+            return {
+              output: J.fallbackResponse,
+              messages: [],
+              toolCalls: [],
+              totalTokens: 0,
+            };
+        }
+        throw Ae;
+      }
+    return Ne(q, N, ie, le, de);
+  }
+  async function Ne(q, N, ie, le, de) {
+    const Ae = Date.now();
+    if (T) {
+      const re = T.getContextMessages();
+      if (re.length > 0) {
+        const ke = re
+          .map((Ie) => `${Ie.role}: ${Ie.content}`)
+          .join(`
+`);
+        q = {
+          ...q,
+          instructions:
+            (q.instructions ?? "") +
+            `
 
 Conversation context:
-`+ke}}}if(j&&j.length>0){let re={agentId:q.name,agentName:q.name,input:N,state:y.facts.$store.toObject(),breakpointType:"pre_input_guardrails"},ke=await We("pre_input_guardrails",re,de?.signal??le?.signal);if(ke?.skip)return{output:void 0,messages:[],toolCalls:[],totalTokens:0};ke?.input&&(N=ke.input)}let p=de?.inputGuardrails!==void 0?de.inputGuardrails:i.input??[],A=de?.outputGuardrails!==void 0?de.outputGuardrails:i.output??[],Y=p.map((re,ke)=>Lt(re,ke,"input"));for(let re of Y){let{name:ke}=re,Ie={agentName:q.name,input:N,facts:y.facts.$store.toObject()},Le=Date.now(),Me=await Bt(re,{input:N,agentName:q.name},Ie);if(I("onGuardrailCheck",{agentId:q.name,guardrailName:ke,guardrailType:"input",passed:Me.passed,reason:Me.reason,durationMs:Date.now()-Le,timestamp:Date.now()}),!Me.passed)throw new qt({code:"INPUT_GUARDRAIL_FAILED",message:`Input guardrail "${ke}" failed: ${Me.reason}`,guardrailName:ke,guardrailType:"input",userMessage:Me.reason??"Input validation failed",agentName:q.name,input:N});Me.transformed!==void 0&&(N=Me.transformed)}if(I("onAgentStart",{agentName:q.name,input:N,timestamp:Ae}),l&&l.record({type:"agent_start",timestamp:Date.now(),agentId:q.name,snapshotId:null,inputLength:N.length,modelId:q.model??void 0,...q.instructions?{instructions:q.instructions.slice(0,$)}:{},...R?{input:N.slice(0,$)}:{}}),y.batch(()=>{let re=wt(y.facts);St(y.facts,{...re,status:"running",currentAgent:q.name,input:N,startedAt:Date.now()})}),j&&j.length>0){let re={agentId:q.name,agentName:q.name,input:N,state:y.facts.$store.toObject(),breakpointType:"pre_agent_run"},ke=await We("pre_agent_run",re,de?.signal??le?.signal);if(ke?.skip)return{output:void 0,messages:[],toolCalls:[],totalTokens:0};ke?.input&&(N=ke.input)}let Z=de?.outputSchema!==void 0?de.outputSchema:m,xe=t;Z&&(xe=Ia(t,{schema:Z,maxRetries:de?.maxSchemaRetries??M??2}));let te=await bn(xe,q,N,{...le,signal:le?.signal,onMessage:re=>{let ke=[...Vr(y.facts),re];Ft(y.facts,ke.length>na?ke.slice(-na):ke),le?.onMessage?.(re)},onToolCall:async re=>{let ke=(i.toolCall??[]).map((Le,Me)=>Lt(Le,Me,"toolCall"));for(let Le of ke){let{name:Me}=Le,Ct={agentName:q.name,input:N,facts:y.facts.$store.toObject()},zt=Date.now(),Pe=await Bt(Le,{toolCall:re,agentName:q.name,input:N},Ct);if(I("onGuardrailCheck",{agentId:q.name,guardrailName:Me,guardrailType:"toolCall",passed:Pe.passed,reason:Pe.reason,durationMs:Date.now()-zt,timestamp:Date.now()}),!Pe.passed)throw new qt({code:"TOOL_CALL_GUARDRAIL_FAILED",message:`Tool call guardrail "${Me}" failed: ${Pe.reason}`,guardrailName:Me,guardrailType:"toolCall",userMessage:Pe.reason??"Tool call blocked",data:{toolCall:re},agentName:q.name,input:N})}if(!c){let Le=`tool-${re.id}`,Me={id:Le,type:"tool_call",agentName:q.name,description:`Tool call: ${re.name}`,data:re,requestedAt:Date.now()};y.batch(()=>{let Ct=Nt(y.facts);xt(y.facts,{...Ct,pending:[...Ct.pending,Me]})}),u?.(Me),await Qe(Le,de?.signal??le?.signal)}let Ie=[...Yr(y.facts),re];Ut(y.facts,Ie.length>aa?Ie.slice(-aa):Ie),le?.onToolCall?.(re)}},D?{...D,onRetry:(re,ke,Ie)=>{D.onRetry?.(re,ke,Ie),I("onAgentRetry",{agentName:q.name,input:N,attempt:re,error:ke,delayMs:Ie,timestamp:Date.now()})}}:void 0);if(j&&j.length>0){let re={agentId:q.name,agentName:q.name,input:N,state:y.facts.$store.toObject(),breakpointType:"pre_output_guardrails"},ke=await We("pre_output_guardrails",re,de?.signal??le?.signal);if(ke?.skip)return{output:void 0,messages:[],toolCalls:[],totalTokens:0};ke?.input&&(N=ke.input)}let Je=A.map((re,ke)=>Lt(re,ke,"output"));for(let re of Je){let{name:ke}=re,Ie={agentName:q.name,input:N,facts:y.facts.$store.toObject()},Le=Date.now(),Me=await Bt(re,{output:te.output,agentName:q.name,input:N,messages:te.messages},Ie);if(I("onGuardrailCheck",{agentId:q.name,guardrailName:ke,guardrailType:"output",passed:Me.passed,reason:Me.reason,durationMs:Date.now()-Le,timestamp:Date.now()}),!Me.passed)throw new qt({code:"OUTPUT_GUARDRAIL_FAILED",message:`Output guardrail "${ke}" failed: ${Me.reason}`,guardrailName:ke,guardrailType:"output",userMessage:Me.reason??"Output validation failed",agentName:q.name,input:N});Me.transformed!==void 0&&(te.output=Me.transformed)}let Fe=!1,Ue=0;if(y.batch(()=>{let re=wt(y.facts),ke=re.tokenUsage+te.totalTokens;if(St(y.facts,{...re,status:"completed",output:te.output,tokenUsage:ke,turnCount:re.turnCount+te.messages.length,completedAt:Date.now()}),d&&w){Ue=ke/d;let Ie=kt(y.facts,"__budgetWarningFired");Ue>=f&&!Ie&&(Xe(y.facts,"__budgetWarningFired",!0),Fe=!0)}}),Fe)try{w({currentTokens:wt(y.facts).tokenUsage,maxBudget:d,percentage:Ue})}catch(re){k&&console.debug("[Directive Orchestrator] onBudgetWarning threw:",re)}if(T&&te.messages.length>0)try{T.addMessages(te.messages)}catch(re){k&&console.debug("[Directive] Memory addMessages failed:",re)}if(I("onAgentComplete",{agentName:q.name,input:N,output:te.output,tokenUsage:te.totalTokens,durationMs:Date.now()-Ae,timestamp:Date.now()}),l){let re=typeof te.output=="string"?te.output:JSON.stringify(te.output);l.record({type:"agent_complete",timestamp:Date.now(),agentId:q.name,snapshotId:null,outputLength:re?.length??0,totalTokens:te.totalTokens,inputTokens:te.tokenUsage?.inputTokens??0,outputTokens:te.tokenUsage?.outputTokens??0,durationMs:Date.now()-Ae,modelId:q.model??void 0,...R?{output:re.slice(0,$)}:{}})}if(j&&j.length>0){let re={agentId:q.name,agentName:q.name,input:N,state:y.facts.$store.toObject(),breakpointType:"post_run"},ke=await We("post_run",re,de?.signal??le?.signal);if(ke?.skip)return{output:void 0,messages:[],toolCalls:[],totalTokens:0};ke?.input&&(N=ke.input)}return te}V=ae;let _e=new Map,we=new Map;function ze(q,N){return N?.aborted?Promise.reject(N.reason??new Error("Aborted while waiting for breakpoint")):new Promise((ie,le)=>{let de=!1,Ae=null,p=()=>{de||(de=!0,Ae&&(clearTimeout(Ae),Ae=null),N&&N.removeEventListener("abort",A),Y())},A=()=>{p(),le(N.reason??new Error(`Breakpoint wait for ${q} aborted`))};N&&N.addEventListener("abort",A,{once:!0});let Y=y.facts.$store.subscribe([Or],()=>{if(de)return;let xe=At(y.facts);if(xe.resolved.includes(q)){p();let te=_e.get(q)??null;_e.delete(q),ie(te)}else if(xe.cancelled.includes(q)){p(),_e.delete(q);let te=we.get(q);we.delete(q),le(new Error(te?`Breakpoint ${q} was cancelled: ${te}`:`Breakpoint ${q} was cancelled`))}}),Z=ne??3e5;Ae=setTimeout(()=>{de||(p(),_e.delete(q),we.delete(q),le(new Error(`[Directive] Breakpoint timeout: ${q} not resolved within ${Math.round(Z/1e3)}s`)))},Z)})}async function We(q,N,ie){if(!j||j.length===0)return null;let le=Ta(j,q,N);if(!le)return null;let de=Ma(),Ae={id:de,type:q,agentId:N.agentId,input:N.input,label:le.label,requestedAt:Date.now()};y.batch(()=>{let A=At(y.facts);It(y.facts,{...A,pending:[...A.pending,Ae]})});try{F?.(Ae)}catch{}try{E.onBreakpoint?.(Ae)}catch{}l&&l.record({type:"breakpoint_hit",timestamp:Date.now(),snapshotId:null,agentId:N.agentId,breakpointId:de,breakpointType:q,label:le.label});let p=await ze(de,ie);return l&&l.record({type:"breakpoint_resumed",timestamp:Date.now(),snapshotId:null,agentId:N.agentId,breakpointId:de,modified:!!p?.input,skipped:!!p?.skip}),p}function Qe(q,N){return N?.aborted?Promise.reject(N.reason??new Error("Aborted while waiting for approval")):new Promise((ie,le)=>{let de=!1,Ae=null,p=()=>{de||(de=!0,Ae&&(clearTimeout(Ae),Ae=null),N&&N.removeEventListener("abort",A),Y())},A=()=>{p(),le(N.reason??new Error(`Approval wait for ${q} aborted`))};N&&N.addEventListener("abort",A,{once:!0});let Y=y.facts.$store.subscribe([Ir],()=>{if(de)return;let Z=Nt(y.facts);if(Z.approved.includes(q))p(),ie();else{let xe=Z.rejected.find(te=>te.id===q);if(xe){p();let te=xe.reason?`Request ${q} rejected: ${xe.reason}`:`Request ${q} rejected`;le(new Error(te))}}});Ae=setTimeout(()=>{if(de)return;p();let Z=Math.round(U/1e3);le(new Error(`[Directive] Approval timeout: Request ${q} not resolved within ${Z}s.
+` +
+            ke,
+        };
+      }
+    }
+    if (j && j.length > 0) {
+      const re = {
+          agentId: q.name,
+          agentName: q.name,
+          input: N,
+          state: y.facts.$store.toObject(),
+          breakpointType: "pre_input_guardrails",
+        },
+        ke = await We("pre_input_guardrails", re, de?.signal ?? le?.signal);
+      if (ke?.skip)
+        return { output: void 0, messages: [], toolCalls: [], totalTokens: 0 };
+      ke?.input && (N = ke.input);
+    }
+    const p =
+        de?.inputGuardrails !== void 0 ? de.inputGuardrails : (i.input ?? []),
+      A =
+        de?.outputGuardrails !== void 0
+          ? de.outputGuardrails
+          : (i.output ?? []),
+      Y = p.map((re, ke) => Lt(re, ke, "input"));
+    for (const re of Y) {
+      const { name: ke } = re,
+        Ie = { agentName: q.name, input: N, facts: y.facts.$store.toObject() },
+        Le = Date.now(),
+        Me = await Bt(re, { input: N, agentName: q.name }, Ie);
+      if (
+        (I("onGuardrailCheck", {
+          agentId: q.name,
+          guardrailName: ke,
+          guardrailType: "input",
+          passed: Me.passed,
+          reason: Me.reason,
+          durationMs: Date.now() - Le,
+          timestamp: Date.now(),
+        }),
+        !Me.passed)
+      )
+        throw new qt({
+          code: "INPUT_GUARDRAIL_FAILED",
+          message: `Input guardrail "${ke}" failed: ${Me.reason}`,
+          guardrailName: ke,
+          guardrailType: "input",
+          userMessage: Me.reason ?? "Input validation failed",
+          agentName: q.name,
+          input: N,
+        });
+      Me.transformed !== void 0 && (N = Me.transformed);
+    }
+    if (
+      (I("onAgentStart", { agentName: q.name, input: N, timestamp: Ae }),
+      l &&
+        l.record({
+          type: "agent_start",
+          timestamp: Date.now(),
+          agentId: q.name,
+          snapshotId: null,
+          inputLength: N.length,
+          modelId: q.model ?? void 0,
+          ...(q.instructions
+            ? { instructions: q.instructions.slice(0, $) }
+            : {}),
+          ...(R ? { input: N.slice(0, $) } : {}),
+        }),
+      y.batch(() => {
+        const re = wt(y.facts);
+        St(y.facts, {
+          ...re,
+          status: "running",
+          currentAgent: q.name,
+          input: N,
+          startedAt: Date.now(),
+        });
+      }),
+      j && j.length > 0)
+    ) {
+      const re = {
+          agentId: q.name,
+          agentName: q.name,
+          input: N,
+          state: y.facts.$store.toObject(),
+          breakpointType: "pre_agent_run",
+        },
+        ke = await We("pre_agent_run", re, de?.signal ?? le?.signal);
+      if (ke?.skip)
+        return { output: void 0, messages: [], toolCalls: [], totalTokens: 0 };
+      ke?.input && (N = ke.input);
+    }
+    let Z = de?.outputSchema !== void 0 ? de.outputSchema : m,
+      xe = t;
+    Z &&
+      (xe = Ia(t, { schema: Z, maxRetries: de?.maxSchemaRetries ?? M ?? 2 }));
+    const te = await bn(
+      xe,
+      q,
+      N,
+      {
+        ...le,
+        signal: le?.signal,
+        onMessage: (re) => {
+          const ke = [...Vr(y.facts), re];
+          Ft(y.facts, ke.length > na ? ke.slice(-na) : ke), le?.onMessage?.(re);
+        },
+        onToolCall: async (re) => {
+          const ke = (i.toolCall ?? []).map((Le, Me) => Lt(Le, Me, "toolCall"));
+          for (const Le of ke) {
+            const { name: Me } = Le,
+              Ct = {
+                agentName: q.name,
+                input: N,
+                facts: y.facts.$store.toObject(),
+              },
+              zt = Date.now(),
+              Pe = await Bt(
+                Le,
+                { toolCall: re, agentName: q.name, input: N },
+                Ct,
+              );
+            if (
+              (I("onGuardrailCheck", {
+                agentId: q.name,
+                guardrailName: Me,
+                guardrailType: "toolCall",
+                passed: Pe.passed,
+                reason: Pe.reason,
+                durationMs: Date.now() - zt,
+                timestamp: Date.now(),
+              }),
+              !Pe.passed)
+            )
+              throw new qt({
+                code: "TOOL_CALL_GUARDRAIL_FAILED",
+                message: `Tool call guardrail "${Me}" failed: ${Pe.reason}`,
+                guardrailName: Me,
+                guardrailType: "toolCall",
+                userMessage: Pe.reason ?? "Tool call blocked",
+                data: { toolCall: re },
+                agentName: q.name,
+                input: N,
+              });
+          }
+          if (!c) {
+            const Le = `tool-${re.id}`,
+              Me = {
+                id: Le,
+                type: "tool_call",
+                agentName: q.name,
+                description: `Tool call: ${re.name}`,
+                data: re,
+                requestedAt: Date.now(),
+              };
+            y.batch(() => {
+              const Ct = Nt(y.facts);
+              xt(y.facts, { ...Ct, pending: [...Ct.pending, Me] });
+            }),
+              u?.(Me),
+              await Qe(Le, de?.signal ?? le?.signal);
+          }
+          const Ie = [...Yr(y.facts), re];
+          Ut(y.facts, Ie.length > aa ? Ie.slice(-aa) : Ie),
+            le?.onToolCall?.(re);
+        },
+      },
+      D
+        ? {
+            ...D,
+            onRetry: (re, ke, Ie) => {
+              D.onRetry?.(re, ke, Ie),
+                I("onAgentRetry", {
+                  agentName: q.name,
+                  input: N,
+                  attempt: re,
+                  error: ke,
+                  delayMs: Ie,
+                  timestamp: Date.now(),
+                });
+            },
+          }
+        : void 0,
+    );
+    if (j && j.length > 0) {
+      const re = {
+          agentId: q.name,
+          agentName: q.name,
+          input: N,
+          state: y.facts.$store.toObject(),
+          breakpointType: "pre_output_guardrails",
+        },
+        ke = await We("pre_output_guardrails", re, de?.signal ?? le?.signal);
+      if (ke?.skip)
+        return { output: void 0, messages: [], toolCalls: [], totalTokens: 0 };
+      ke?.input && (N = ke.input);
+    }
+    const Je = A.map((re, ke) => Lt(re, ke, "output"));
+    for (const re of Je) {
+      const { name: ke } = re,
+        Ie = { agentName: q.name, input: N, facts: y.facts.$store.toObject() },
+        Le = Date.now(),
+        Me = await Bt(
+          re,
+          {
+            output: te.output,
+            agentName: q.name,
+            input: N,
+            messages: te.messages,
+          },
+          Ie,
+        );
+      if (
+        (I("onGuardrailCheck", {
+          agentId: q.name,
+          guardrailName: ke,
+          guardrailType: "output",
+          passed: Me.passed,
+          reason: Me.reason,
+          durationMs: Date.now() - Le,
+          timestamp: Date.now(),
+        }),
+        !Me.passed)
+      )
+        throw new qt({
+          code: "OUTPUT_GUARDRAIL_FAILED",
+          message: `Output guardrail "${ke}" failed: ${Me.reason}`,
+          guardrailName: ke,
+          guardrailType: "output",
+          userMessage: Me.reason ?? "Output validation failed",
+          agentName: q.name,
+          input: N,
+        });
+      Me.transformed !== void 0 && (te.output = Me.transformed);
+    }
+    let Fe = !1,
+      Ue = 0;
+    if (
+      (y.batch(() => {
+        const re = wt(y.facts),
+          ke = re.tokenUsage + te.totalTokens;
+        if (
+          (St(y.facts, {
+            ...re,
+            status: "completed",
+            output: te.output,
+            tokenUsage: ke,
+            turnCount: re.turnCount + te.messages.length,
+            completedAt: Date.now(),
+          }),
+          d && w)
+        ) {
+          Ue = ke / d;
+          const Ie = kt(y.facts, "__budgetWarningFired");
+          Ue >= f &&
+            !Ie &&
+            (Xe(y.facts, "__budgetWarningFired", !0), (Fe = !0));
+        }
+      }),
+      Fe)
+    )
+      try {
+        w({
+          currentTokens: wt(y.facts).tokenUsage,
+          maxBudget: d,
+          percentage: Ue,
+        });
+      } catch (re) {
+        k &&
+          console.debug("[Directive Orchestrator] onBudgetWarning threw:", re);
+      }
+    if (T && te.messages.length > 0)
+      try {
+        T.addMessages(te.messages);
+      } catch (re) {
+        k && console.debug("[Directive] Memory addMessages failed:", re);
+      }
+    if (
+      (I("onAgentComplete", {
+        agentName: q.name,
+        input: N,
+        output: te.output,
+        tokenUsage: te.totalTokens,
+        durationMs: Date.now() - Ae,
+        timestamp: Date.now(),
+      }),
+      l)
+    ) {
+      const re =
+        typeof te.output == "string" ? te.output : JSON.stringify(te.output);
+      l.record({
+        type: "agent_complete",
+        timestamp: Date.now(),
+        agentId: q.name,
+        snapshotId: null,
+        outputLength: re?.length ?? 0,
+        totalTokens: te.totalTokens,
+        inputTokens: te.tokenUsage?.inputTokens ?? 0,
+        outputTokens: te.tokenUsage?.outputTokens ?? 0,
+        durationMs: Date.now() - Ae,
+        modelId: q.model ?? void 0,
+        ...(R ? { output: re.slice(0, $) } : {}),
+      });
+    }
+    if (j && j.length > 0) {
+      const re = {
+          agentId: q.name,
+          agentName: q.name,
+          input: N,
+          state: y.facts.$store.toObject(),
+          breakpointType: "post_run",
+        },
+        ke = await We("post_run", re, de?.signal ?? le?.signal);
+      if (ke?.skip)
+        return { output: void 0, messages: [], toolCalls: [], totalTokens: 0 };
+      ke?.input && (N = ke.input);
+    }
+    return te;
+  }
+  V = ae;
+  const _e = new Map(),
+    we = new Map();
+  function ze(q, N) {
+    return N?.aborted
+      ? Promise.reject(
+          N.reason ?? new Error("Aborted while waiting for breakpoint"),
+        )
+      : new Promise((ie, le) => {
+          let de = !1,
+            Ae = null,
+            p = () => {
+              de ||
+                ((de = !0),
+                Ae && (clearTimeout(Ae), (Ae = null)),
+                N && N.removeEventListener("abort", A),
+                Y());
+            },
+            A = () => {
+              p(),
+                le(N.reason ?? new Error(`Breakpoint wait for ${q} aborted`));
+            };
+          N && N.addEventListener("abort", A, { once: !0 });
+          const Y = y.facts.$store.subscribe([Or], () => {
+              if (de) return;
+              const xe = At(y.facts);
+              if (xe.resolved.includes(q)) {
+                p();
+                const te = _e.get(q) ?? null;
+                _e.delete(q), ie(te);
+              } else if (xe.cancelled.includes(q)) {
+                p(), _e.delete(q);
+                const te = we.get(q);
+                we.delete(q),
+                  le(
+                    new Error(
+                      te
+                        ? `Breakpoint ${q} was cancelled: ${te}`
+                        : `Breakpoint ${q} was cancelled`,
+                    ),
+                  );
+              }
+            }),
+            Z = ne ?? 3e5;
+          Ae = setTimeout(() => {
+            de ||
+              (p(),
+              _e.delete(q),
+              we.delete(q),
+              le(
+                new Error(
+                  `[Directive] Breakpoint timeout: ${q} not resolved within ${Math.round(Z / 1e3)}s`,
+                ),
+              ));
+          }, Z);
+        });
+  }
+  async function We(q, N, ie) {
+    if (!j || j.length === 0) return null;
+    const le = Ta(j, q, N);
+    if (!le) return null;
+    const de = Ma(),
+      Ae = {
+        id: de,
+        type: q,
+        agentId: N.agentId,
+        input: N.input,
+        label: le.label,
+        requestedAt: Date.now(),
+      };
+    y.batch(() => {
+      const A = At(y.facts);
+      It(y.facts, { ...A, pending: [...A.pending, Ae] });
+    });
+    try {
+      F?.(Ae);
+    } catch {}
+    try {
+      E.onBreakpoint?.(Ae);
+    } catch {}
+    l &&
+      l.record({
+        type: "breakpoint_hit",
+        timestamp: Date.now(),
+        snapshotId: null,
+        agentId: N.agentId,
+        breakpointId: de,
+        breakpointType: q,
+        label: le.label,
+      });
+    const p = await ze(de, ie);
+    return (
+      l &&
+        l.record({
+          type: "breakpoint_resumed",
+          timestamp: Date.now(),
+          snapshotId: null,
+          agentId: N.agentId,
+          breakpointId: de,
+          modified: !!p?.input,
+          skipped: !!p?.skip,
+        }),
+      p
+    );
+  }
+  function Qe(q, N) {
+    return N?.aborted
+      ? Promise.reject(
+          N.reason ?? new Error("Aborted while waiting for approval"),
+        )
+      : new Promise((ie, le) => {
+          let de = !1,
+            Ae = null,
+            p = () => {
+              de ||
+                ((de = !0),
+                Ae && (clearTimeout(Ae), (Ae = null)),
+                N && N.removeEventListener("abort", A),
+                Y());
+            },
+            A = () => {
+              p(), le(N.reason ?? new Error(`Approval wait for ${q} aborted`));
+            };
+          N && N.addEventListener("abort", A, { once: !0 });
+          const Y = y.facts.$store.subscribe([Ir], () => {
+            if (de) return;
+            const Z = Nt(y.facts);
+            if (Z.approved.includes(q)) p(), ie();
+            else {
+              const xe = Z.rejected.find((te) => te.id === q);
+              if (xe) {
+                p();
+                const te = xe.reason
+                  ? `Request ${q} rejected: ${xe.reason}`
+                  : `Request ${q} rejected`;
+                le(new Error(te));
+              }
+            }
+          });
+          Ae = setTimeout(() => {
+            if (de) return;
+            p();
+            const Z = Math.round(U / 1e3);
+            le(
+              new Error(`[Directive] Approval timeout: Request ${q} not resolved within ${Z}s.
 Solutions:
   1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()
   2. Set autoApproveToolCalls: true to auto-approve
   3. Increase approvalTimeoutMs (current: ${U}ms)
-See: https://directive.run/docs/ai/running-agents`))},U)})}function ve(){return{...Dt(y.facts)}}return{system:y,get facts(){return ve()},get totalTokens(){return wt(y.facts).tokenUsage},get timeline(){return l},async run(q,N,ie){return ae(q,N,ve(),void 0,ie)},runStream(q,N,ie={}){let le=new AbortController,de=1e4,Ae=[],p=[],A=!1,Y=Date.now(),Z=0,xe=1e5,te="",Je;ie.signal&&(Je=()=>le.abort(),ie.signal.addEventListener("abort",Je,{once:!0}));let Fe=()=>{Je&&ie.signal&&ie.signal.removeEventListener("abort",Je)},Ue=Ie=>{if(A)return;let Le=p.shift();Le?Le(Ie):(Ae.push(Ie),Ae.length>de&&Ae.shift())},re=()=>{A=!0,Fe();for(let Ie of p)Ie(null);p.length=0},ke=(async()=>{Ue({type:"progress",phase:"starting",message:"Running input guardrails"});try{let Ie=N,Le=(i.input??[]).map((Pe,Ze)=>Lt(Pe,Ze,"input"));for(let Pe of Le){let{name:Ze}=Pe,$t={agentName:q.name,input:Ie,facts:y.facts.$store.toObject()},Ve=await Bt(Pe,{input:Ie,agentName:q.name},$t);if(!Ve.passed)throw Ue({type:"guardrail_triggered",guardrailName:Ze,reason:Ve.reason??"Input validation failed",partialOutput:te,stopped:!0}),new qt({code:"INPUT_GUARDRAIL_FAILED",message:`Input guardrail "${Ze}" failed: ${Ve.reason}`,guardrailName:Ze,guardrailType:"input",userMessage:Ve.reason??"Input validation failed",agentName:q.name,input:Ie});Ve.transformed!==void 0&&(Ie=Ve.transformed)}Ue({type:"progress",phase:"generating",message:"Starting agent"}),y.batch(()=>{let Pe=wt(y.facts);St(y.facts,{...Pe,status:"running",currentAgent:q.name,input:Ie,startedAt:Date.now()})});let Me=await bn(t,q,Ie,{signal:le.signal,onMessage:Pe=>{let Ze=Vr(y.facts);if(Ft(y.facts,[...Ze,Pe]),Ue({type:"message",message:Pe}),Pe.role==="assistant"&&Pe.content){let $t=Math.ceil(Pe.content.length/4);Z+=$t,te+=Pe.content,te.length>xe&&(te=te.slice(-xe)),Ue({type:"token",data:Pe.content,tokenCount:Z})}},onToolCall:async Pe=>{Ue({type:"tool_start",tool:Pe.name,toolCallId:Pe.id,arguments:Pe.arguments});let Ze=(i.toolCall??[]).map((Ve,Mt)=>Lt(Ve,Mt,"toolCall"));for(let Ve of Ze){let{name:Mt}=Ve,Jt={agentName:q.name,input:Ie,facts:y.facts.$store.toObject()},Ot=await Bt(Ve,{toolCall:Pe,agentName:q.name,input:Ie},Jt);if(!Ot.passed)throw Ue({type:"guardrail_triggered",guardrailName:Mt,reason:Ot.reason??"Tool call blocked",partialOutput:te,stopped:!0}),new qt({code:"TOOL_CALL_GUARDRAIL_FAILED",message:`Tool call guardrail "${Mt}" failed: ${Ot.reason}`,guardrailName:Mt,guardrailType:"toolCall",userMessage:Ot.reason??"Tool call blocked",data:{toolCall:Pe},agentName:q.name,input:Ie})}if(!c){let Ve=`tool-${Pe.id}`;Ue({type:"approval_required",requestId:Ve,toolName:Pe.name});let Mt={id:Ve,type:"tool_call",agentName:q.name,description:`Tool call: ${Pe.name}`,data:Pe,requestedAt:Date.now()};y.batch(()=>{let Jt=Nt(y.facts);xt(y.facts,{...Jt,pending:[...Jt.pending,Mt]})}),u?.(Mt),await Qe(Ve,le.signal),Ue({type:"approval_resolved",requestId:Ve,approved:!0})}let $t=Yr(y.facts);Ut(y.facts,[...$t,Pe]),Pe.result&&Ue({type:"tool_end",tool:Pe.name,toolCallId:Pe.id,result:Pe.result})}},D);Ue({type:"progress",phase:"finishing",message:"Running output guardrails"});let Ct=(i.output??[]).map((Pe,Ze)=>Lt(Pe,Ze,"output"));for(let Pe of Ct){let{name:Ze}=Pe,$t={agentName:q.name,input:Ie,facts:y.facts.$store.toObject()},Ve=await Bt(Pe,{output:Me.output,agentName:q.name,input:Ie,messages:Me.messages},$t);if(!Ve.passed)throw Ue({type:"guardrail_triggered",guardrailName:Ze,reason:Ve.reason??"Output validation failed",partialOutput:typeof Me.output=="string"?Me.output:"",stopped:!0}),new qt({code:"OUTPUT_GUARDRAIL_FAILED",message:`Output guardrail "${Ze}" failed: ${Ve.reason}`,guardrailName:Ze,guardrailType:"output",userMessage:Ve.reason??"Output validation failed",agentName:q.name,input:Ie});Ve.transformed!==void 0&&(Me.output=Ve.transformed)}y.batch(()=>{let Pe=wt(y.facts);St(y.facts,{...Pe,status:"completed",output:Me.output,tokenUsage:Pe.tokenUsage+Me.totalTokens,turnCount:Pe.turnCount+Me.messages.length,completedAt:Date.now()})});let zt=Date.now()-Y;return Ue({type:"done",totalTokens:Me.totalTokens,duration:zt,droppedTokens:0}),re(),Me}catch(Ie){throw Ue({type:"error",error:Ie instanceof Error?Ie:new Error(String(Ie))}),re(),Ie}})();return ke.catch(()=>{}),{stream:{[Symbol.asyncIterator](){return{async next(){return Ae.length>0?{done:!1,value:Ae.shift()}:A?{done:!0,value:void 0}:new Promise(Ie=>{p.push(Le=>{Ie(Le===null?{done:!0,value:void 0}:{done:!1,value:Le})})})}}}},result:ke,abort:()=>{le.abort(),re()}}},async waitForIdle(q){let N=()=>wt(y.facts).status!=="running";if(N())return;let ie=Date.now();for(;!N();){if(q!==void 0&&Date.now()-ie>q)throw new Error("[Directive Orchestrator] waitForIdle timed out");await new Promise(le=>setTimeout(le,50))}},approve(q){y.batch(()=>{let N=Nt(y.facts);if(!N.pending.some(de=>de.id===q)){k&&console.debug(`[Directive] approve() ignored: no pending request "${q}"`);return}let ie=200,le=[...N.approved,q];xt(y.facts,{...N,pending:N.pending.filter(de=>de.id!==q),approved:le.length>ie?le.slice(-ie):le})})},reject(q,N){y.batch(()=>{let ie=Nt(y.facts);if(!ie.pending.some(p=>p.id===q)){k&&console.debug(`[Directive] reject() ignored: no pending request "${q}"`);return}N&&k&&console.debug(`[Directive] Request ${q} rejected: ${N}`);let le={id:q,reason:N,rejectedAt:Date.now()},de=200,Ae=[...ie.rejected,le];xt(y.facts,{...ie,pending:ie.pending.filter(p=>p.id!==q),rejected:Ae.length>de?Ae.slice(-de):Ae})})},pause(){let q=wt(y.facts);St(y.facts,{...q,status:"paused"})},resume(){let q=wt(y.facts);q.status==="paused"&&St(y.facts,{...q,status:q.currentAgent?"running":"idle"})},reset(){y.batch(()=>{St(y.facts,{status:"idle",currentAgent:null,input:null,output:null,error:null,tokenUsage:0,turnCount:0,startedAt:null,completedAt:null}),xt(y.facts,{pending:[],approved:[],rejected:[]}),Ft(y.facts,[]),Ut(y.facts,[]),It(y.facts,{pending:[],resolved:[],cancelled:[]}),Xe(y.facts,"__budgetWarningFired",!1)}),_e.clear(),we.clear()},async checkpoint(q){if(wt(y.facts).status==="running")throw new Error("[Directive] Cannot checkpoint while agent is running");if(!y.debug?.export)throw new Error("[Directive] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.");let N={version:1,id:Gt(),createdAt:new Date().toISOString(),label:q?.label,systemExport:y.debug.export(),timelineExport:l?.export()??null,localState:{type:"single"},memoryExport:T?T.export?.()??null:null,orchestratorType:"single"};return S&&await S.save(N),N},restore(q,N){if(!Oa(q))throw new Error("[Directive] Invalid checkpoint data");if(q.orchestratorType!=="single")throw new Error("[Directive] Cannot restore multi-agent checkpoint in single-agent orchestrator");if(!y.debug?.import)throw new Error("[Directive] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.");y.debug.import(q.systemExport),N?.restoreTimeline!==!1&&q.timelineExport&&l&&l.import(q.timelineExport),q.memoryExport!==null&&T&&T.import&&T.import(q.memoryExport)},resumeBreakpoint(q,N){N&&_e.set(q,N),y.batch(()=>{let ie=At(y.facts),le=[...ie.resolved,q];It(y.facts,{...ie,pending:ie.pending.filter(de=>de.id!==q),resolved:le.length>Wt?le.slice(-Wt):le})})},cancelBreakpoint(q,N){N&&we.set(q,N),y.batch(()=>{let ie=At(y.facts),le=[...ie.cancelled,q];It(y.facts,{...ie,pending:ie.pending.filter(de=>de.id!==q),cancelled:le.length>Wt?le.slice(-Wt):le})})},getPendingBreakpoints(){return[...At(y.facts).pending]},dispose(){y.destroy()}}}function xs(e){let{validate:t,errorPrefix:a="Output schema validation failed"}=e;return r=>{let n=t(r.output);return typeof n=="boolean"?{passed:n,reason:n?void 0:a}:n.valid?{passed:!0}:{passed:!1,reason:n.errors?.length?`${a}: ${n.errors.join("; ")}`:a}}}function Ds(e,t){return e/1e6*t}function $s(e){let{fetch:t=globalThis.fetch,buildRequest:a,parseResponse:r,parseOutput:n,hooks:o}=e,i=n??(u=>{try{return JSON.parse(u)}catch{return u}});return async(u,c,d)=>{let f=Date.now();o?.onBeforeCall?.({agent:u,input:c,timestamp:f});let w=[{role:"user",content:c}];try{let{url:O,init:_}=a(u,c,w),U=d?.signal?{..._,signal:d.signal}:_,D=await t(O,U);if(!D.ok){let M=await D.text().catch(()=>"");throw new Error(`[Directive] AgentRunner request failed: ${D.status} ${D.statusText}${M?` – ${M.slice(0,300)}`:""}`)}let E=await r(D,w),T={inputTokens:E.inputTokens??0,outputTokens:E.outputTokens??0},G={role:"assistant",content:E.text},J=[...w,G];d?.onMessage?.(G);let m=Date.now()-f;return o?.onAfterCall?.({agent:u,input:c,output:E.text,totalTokens:E.totalTokens,tokenUsage:T,durationMs:m,timestamp:Date.now()}),{output:i(E.text),messages:J,toolCalls:[],totalTokens:E.totalTokens,tokenUsage:T}}catch(O){let _=Date.now()-f;throw O instanceof Error&&o?.onError?.({agent:u,input:c,error:O,durationMs:_,timestamp:Date.now()}),O}}}function wn(e,t){let a=typeof e.content=="string"?e.content:JSON.stringify(e.content);return Math.ceil(a.length/4)}function kn(e,t){return e.reduce((a,r)=>a+wn(r),0)}function As(e={}){return(t,a={})=>{let r={...e,...a},n=r.maxMessages??100,o=r.preserveRecentCount??5;if(t.length<=n)return{keep:[...t],toSummarize:[],estimatedTokens:kn(t)};let i=t.slice(-o),u=t.slice(0,-o),c=Math.max(0,n-o),d=u.slice(-c),f=u.slice(0,-c||void 0),w=[...d,...i];return{keep:w,toSummarize:f.length>0?f:[],estimatedTokens:kn(w)}}}function Is(e){let{strategy:t,summarizer:a,strategyConfig:r={},autoManage:n=!1,onMemoryManaged:o,onManageError:i,maxContextTokens:u}=e,c={messages:[],summaries:[],totalMessagesProcessed:0,estimatedTokens:0},d=!1;async function f(){if(d)return{messagesBefore:c.messages.length,messagesAfter:c.messages.length,messagesSummarized:0,estimatedTokensBefore:c.estimatedTokens,estimatedTokensAfter:c.estimatedTokens};d=!0;try{let O=c.messages.length,_=c.estimatedTokens,U=t(c.messages,r);if(U.toSummarize.length===0)return{messagesBefore:O,messagesAfter:O,messagesSummarized:0,estimatedTokensBefore:_,estimatedTokensAfter:U.estimatedTokens};let D;a&&U.toSummarize.length>0&&(D=await a(U.toSummarize),c.summaries.push({content:D,messagesCount:U.toSummarize.length,createdAt:Date.now()})),c.messages=U.keep,c.estimatedTokens=U.estimatedTokens;let E={messagesBefore:O,messagesAfter:c.messages.length,messagesSummarized:U.toSummarize.length,summary:D,estimatedTokensBefore:_,estimatedTokensAfter:U.estimatedTokens};return o?.(E),E}finally{d=!1}}function w(){d||t(c.messages,r).toSummarize.length>0&&f().catch(O=>{let _=O instanceof Error?O:new Error(String(O));i?i(_):console.error("[Directive Memory] Auto-manage error:",_)})}return{getState(){return{...c,messages:[...c.messages],summaries:c.summaries.map(O=>({...O}))}},addMessage(O){c.messages.push(O),c.totalMessagesProcessed++,c.estimatedTokens+=wn(O),n&&w()},addMessages(O){for(let _ of O)c.messages.push(_),c.totalMessagesProcessed++,c.estimatedTokens+=wn(_);n&&w()},getContextMessages(){let O=[];if(c.summaries.length>0){let _=c.summaries.map(U=>U.content).join(`
+See: https://directive.run/docs/ai/running-agents`),
+            );
+          }, U);
+        });
+  }
+  function ve() {
+    return { ...Dt(y.facts) };
+  }
+  return {
+    system: y,
+    get facts() {
+      return ve();
+    },
+    get totalTokens() {
+      return wt(y.facts).tokenUsage;
+    },
+    get timeline() {
+      return l;
+    },
+    async run(q, N, ie) {
+      return ae(q, N, ve(), void 0, ie);
+    },
+    runStream(q, N, ie = {}) {
+      let le = new AbortController(),
+        de = 1e4,
+        Ae = [],
+        p = [],
+        A = !1,
+        Y = Date.now(),
+        Z = 0,
+        xe = 1e5,
+        te = "",
+        Je;
+      ie.signal &&
+        ((Je = () => le.abort()),
+        ie.signal.addEventListener("abort", Je, { once: !0 }));
+      const Fe = () => {
+          Je && ie.signal && ie.signal.removeEventListener("abort", Je);
+        },
+        Ue = (Ie) => {
+          if (A) return;
+          const Le = p.shift();
+          Le ? Le(Ie) : (Ae.push(Ie), Ae.length > de && Ae.shift());
+        },
+        re = () => {
+          (A = !0), Fe();
+          for (const Ie of p) Ie(null);
+          p.length = 0;
+        },
+        ke = (async () => {
+          Ue({
+            type: "progress",
+            phase: "starting",
+            message: "Running input guardrails",
+          });
+          try {
+            let Ie = N,
+              Le = (i.input ?? []).map((Pe, Ze) => Lt(Pe, Ze, "input"));
+            for (const Pe of Le) {
+              const { name: Ze } = Pe,
+                $t = {
+                  agentName: q.name,
+                  input: Ie,
+                  facts: y.facts.$store.toObject(),
+                },
+                Ve = await Bt(Pe, { input: Ie, agentName: q.name }, $t);
+              if (!Ve.passed)
+                throw (
+                  (Ue({
+                    type: "guardrail_triggered",
+                    guardrailName: Ze,
+                    reason: Ve.reason ?? "Input validation failed",
+                    partialOutput: te,
+                    stopped: !0,
+                  }),
+                  new qt({
+                    code: "INPUT_GUARDRAIL_FAILED",
+                    message: `Input guardrail "${Ze}" failed: ${Ve.reason}`,
+                    guardrailName: Ze,
+                    guardrailType: "input",
+                    userMessage: Ve.reason ?? "Input validation failed",
+                    agentName: q.name,
+                    input: Ie,
+                  }))
+                );
+              Ve.transformed !== void 0 && (Ie = Ve.transformed);
+            }
+            Ue({
+              type: "progress",
+              phase: "generating",
+              message: "Starting agent",
+            }),
+              y.batch(() => {
+                const Pe = wt(y.facts);
+                St(y.facts, {
+                  ...Pe,
+                  status: "running",
+                  currentAgent: q.name,
+                  input: Ie,
+                  startedAt: Date.now(),
+                });
+              });
+            const Me = await bn(
+              t,
+              q,
+              Ie,
+              {
+                signal: le.signal,
+                onMessage: (Pe) => {
+                  const Ze = Vr(y.facts);
+                  if (
+                    (Ft(y.facts, [...Ze, Pe]),
+                    Ue({ type: "message", message: Pe }),
+                    Pe.role === "assistant" && Pe.content)
+                  ) {
+                    const $t = Math.ceil(Pe.content.length / 4);
+                    (Z += $t),
+                      (te += Pe.content),
+                      te.length > xe && (te = te.slice(-xe)),
+                      Ue({ type: "token", data: Pe.content, tokenCount: Z });
+                  }
+                },
+                onToolCall: async (Pe) => {
+                  Ue({
+                    type: "tool_start",
+                    tool: Pe.name,
+                    toolCallId: Pe.id,
+                    arguments: Pe.arguments,
+                  });
+                  const Ze = (i.toolCall ?? []).map((Ve, Mt) =>
+                    Lt(Ve, Mt, "toolCall"),
+                  );
+                  for (const Ve of Ze) {
+                    const { name: Mt } = Ve,
+                      Jt = {
+                        agentName: q.name,
+                        input: Ie,
+                        facts: y.facts.$store.toObject(),
+                      },
+                      Ot = await Bt(
+                        Ve,
+                        { toolCall: Pe, agentName: q.name, input: Ie },
+                        Jt,
+                      );
+                    if (!Ot.passed)
+                      throw (
+                        (Ue({
+                          type: "guardrail_triggered",
+                          guardrailName: Mt,
+                          reason: Ot.reason ?? "Tool call blocked",
+                          partialOutput: te,
+                          stopped: !0,
+                        }),
+                        new qt({
+                          code: "TOOL_CALL_GUARDRAIL_FAILED",
+                          message: `Tool call guardrail "${Mt}" failed: ${Ot.reason}`,
+                          guardrailName: Mt,
+                          guardrailType: "toolCall",
+                          userMessage: Ot.reason ?? "Tool call blocked",
+                          data: { toolCall: Pe },
+                          agentName: q.name,
+                          input: Ie,
+                        }))
+                      );
+                  }
+                  if (!c) {
+                    const Ve = `tool-${Pe.id}`;
+                    Ue({
+                      type: "approval_required",
+                      requestId: Ve,
+                      toolName: Pe.name,
+                    });
+                    const Mt = {
+                      id: Ve,
+                      type: "tool_call",
+                      agentName: q.name,
+                      description: `Tool call: ${Pe.name}`,
+                      data: Pe,
+                      requestedAt: Date.now(),
+                    };
+                    y.batch(() => {
+                      const Jt = Nt(y.facts);
+                      xt(y.facts, { ...Jt, pending: [...Jt.pending, Mt] });
+                    }),
+                      u?.(Mt),
+                      await Qe(Ve, le.signal),
+                      Ue({
+                        type: "approval_resolved",
+                        requestId: Ve,
+                        approved: !0,
+                      });
+                  }
+                  const $t = Yr(y.facts);
+                  Ut(y.facts, [...$t, Pe]),
+                    Pe.result &&
+                      Ue({
+                        type: "tool_end",
+                        tool: Pe.name,
+                        toolCallId: Pe.id,
+                        result: Pe.result,
+                      });
+                },
+              },
+              D,
+            );
+            Ue({
+              type: "progress",
+              phase: "finishing",
+              message: "Running output guardrails",
+            });
+            const Ct = (i.output ?? []).map((Pe, Ze) => Lt(Pe, Ze, "output"));
+            for (const Pe of Ct) {
+              const { name: Ze } = Pe,
+                $t = {
+                  agentName: q.name,
+                  input: Ie,
+                  facts: y.facts.$store.toObject(),
+                },
+                Ve = await Bt(
+                  Pe,
+                  {
+                    output: Me.output,
+                    agentName: q.name,
+                    input: Ie,
+                    messages: Me.messages,
+                  },
+                  $t,
+                );
+              if (!Ve.passed)
+                throw (
+                  (Ue({
+                    type: "guardrail_triggered",
+                    guardrailName: Ze,
+                    reason: Ve.reason ?? "Output validation failed",
+                    partialOutput:
+                      typeof Me.output == "string" ? Me.output : "",
+                    stopped: !0,
+                  }),
+                  new qt({
+                    code: "OUTPUT_GUARDRAIL_FAILED",
+                    message: `Output guardrail "${Ze}" failed: ${Ve.reason}`,
+                    guardrailName: Ze,
+                    guardrailType: "output",
+                    userMessage: Ve.reason ?? "Output validation failed",
+                    agentName: q.name,
+                    input: Ie,
+                  }))
+                );
+              Ve.transformed !== void 0 && (Me.output = Ve.transformed);
+            }
+            y.batch(() => {
+              const Pe = wt(y.facts);
+              St(y.facts, {
+                ...Pe,
+                status: "completed",
+                output: Me.output,
+                tokenUsage: Pe.tokenUsage + Me.totalTokens,
+                turnCount: Pe.turnCount + Me.messages.length,
+                completedAt: Date.now(),
+              });
+            });
+            const zt = Date.now() - Y;
+            return (
+              Ue({
+                type: "done",
+                totalTokens: Me.totalTokens,
+                duration: zt,
+                droppedTokens: 0,
+              }),
+              re(),
+              Me
+            );
+          } catch (Ie) {
+            throw (
+              (Ue({
+                type: "error",
+                error: Ie instanceof Error ? Ie : new Error(String(Ie)),
+              }),
+              re(),
+              Ie)
+            );
+          }
+        })();
+      return (
+        ke.catch(() => {}),
+        {
+          stream: {
+            [Symbol.asyncIterator]() {
+              return {
+                async next() {
+                  return Ae.length > 0
+                    ? { done: !1, value: Ae.shift() }
+                    : A
+                      ? { done: !0, value: void 0 }
+                      : new Promise((Ie) => {
+                          p.push((Le) => {
+                            Ie(
+                              Le === null
+                                ? { done: !0, value: void 0 }
+                                : { done: !1, value: Le },
+                            );
+                          });
+                        });
+                },
+              };
+            },
+          },
+          result: ke,
+          abort: () => {
+            le.abort(), re();
+          },
+        }
+      );
+    },
+    async waitForIdle(q) {
+      const N = () => wt(y.facts).status !== "running";
+      if (N()) return;
+      const ie = Date.now();
+      while (!N()) {
+        if (q !== void 0 && Date.now() - ie > q)
+          throw new Error("[Directive Orchestrator] waitForIdle timed out");
+        await new Promise((le) => setTimeout(le, 50));
+      }
+    },
+    approve(q) {
+      y.batch(() => {
+        const N = Nt(y.facts);
+        if (!N.pending.some((de) => de.id === q)) {
+          k &&
+            console.debug(
+              `[Directive] approve() ignored: no pending request "${q}"`,
+            );
+          return;
+        }
+        const ie = 200,
+          le = [...N.approved, q];
+        xt(y.facts, {
+          ...N,
+          pending: N.pending.filter((de) => de.id !== q),
+          approved: le.length > ie ? le.slice(-ie) : le,
+        });
+      });
+    },
+    reject(q, N) {
+      y.batch(() => {
+        const ie = Nt(y.facts);
+        if (!ie.pending.some((p) => p.id === q)) {
+          k &&
+            console.debug(
+              `[Directive] reject() ignored: no pending request "${q}"`,
+            );
+          return;
+        }
+        N && k && console.debug(`[Directive] Request ${q} rejected: ${N}`);
+        const le = { id: q, reason: N, rejectedAt: Date.now() },
+          de = 200,
+          Ae = [...ie.rejected, le];
+        xt(y.facts, {
+          ...ie,
+          pending: ie.pending.filter((p) => p.id !== q),
+          rejected: Ae.length > de ? Ae.slice(-de) : Ae,
+        });
+      });
+    },
+    pause() {
+      const q = wt(y.facts);
+      St(y.facts, { ...q, status: "paused" });
+    },
+    resume() {
+      const q = wt(y.facts);
+      q.status === "paused" &&
+        St(y.facts, { ...q, status: q.currentAgent ? "running" : "idle" });
+    },
+    reset() {
+      y.batch(() => {
+        St(y.facts, {
+          status: "idle",
+          currentAgent: null,
+          input: null,
+          output: null,
+          error: null,
+          tokenUsage: 0,
+          turnCount: 0,
+          startedAt: null,
+          completedAt: null,
+        }),
+          xt(y.facts, { pending: [], approved: [], rejected: [] }),
+          Ft(y.facts, []),
+          Ut(y.facts, []),
+          It(y.facts, { pending: [], resolved: [], cancelled: [] }),
+          Xe(y.facts, "__budgetWarningFired", !1);
+      }),
+        _e.clear(),
+        we.clear();
+    },
+    async checkpoint(q) {
+      if (wt(y.facts).status === "running")
+        throw new Error("[Directive] Cannot checkpoint while agent is running");
+      if (!y.debug?.export)
+        throw new Error(
+          "[Directive] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.",
+        );
+      const N = {
+        version: 1,
+        id: Gt(),
+        createdAt: new Date().toISOString(),
+        label: q?.label,
+        systemExport: y.debug.export(),
+        timelineExport: l?.export() ?? null,
+        localState: { type: "single" },
+        memoryExport: T ? (T.export?.() ?? null) : null,
+        orchestratorType: "single",
+      };
+      return S && (await S.save(N)), N;
+    },
+    restore(q, N) {
+      if (!Oa(q)) throw new Error("[Directive] Invalid checkpoint data");
+      if (q.orchestratorType !== "single")
+        throw new Error(
+          "[Directive] Cannot restore multi-agent checkpoint in single-agent orchestrator",
+        );
+      if (!y.debug?.import)
+        throw new Error(
+          "[Directive] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.",
+        );
+      y.debug.import(q.systemExport),
+        N?.restoreTimeline !== !1 &&
+          q.timelineExport &&
+          l &&
+          l.import(q.timelineExport),
+        q.memoryExport !== null && T && T.import && T.import(q.memoryExport);
+    },
+    resumeBreakpoint(q, N) {
+      N && _e.set(q, N),
+        y.batch(() => {
+          const ie = At(y.facts),
+            le = [...ie.resolved, q];
+          It(y.facts, {
+            ...ie,
+            pending: ie.pending.filter((de) => de.id !== q),
+            resolved: le.length > Wt ? le.slice(-Wt) : le,
+          });
+        });
+    },
+    cancelBreakpoint(q, N) {
+      N && we.set(q, N),
+        y.batch(() => {
+          const ie = At(y.facts),
+            le = [...ie.cancelled, q];
+          It(y.facts, {
+            ...ie,
+            pending: ie.pending.filter((de) => de.id !== q),
+            cancelled: le.length > Wt ? le.slice(-Wt) : le,
+          });
+        });
+    },
+    getPendingBreakpoints() {
+      return [...At(y.facts).pending];
+    },
+    dispose() {
+      y.destroy();
+    },
+  };
+}
+function xs(e) {
+  const { validate: t, errorPrefix: a = "Output schema validation failed" } = e;
+  return (r) => {
+    const n = t(r.output);
+    return typeof n == "boolean"
+      ? { passed: n, reason: n ? void 0 : a }
+      : n.valid
+        ? { passed: !0 }
+        : {
+            passed: !1,
+            reason: n.errors?.length ? `${a}: ${n.errors.join("; ")}` : a,
+          };
+  };
+}
+function Ds(e, t) {
+  return (e / 1e6) * t;
+}
+function $s(e) {
+  const {
+      fetch: t = globalThis.fetch,
+      buildRequest: a,
+      parseResponse: r,
+      parseOutput: n,
+      hooks: o,
+    } = e,
+    i =
+      n ??
+      ((u) => {
+        try {
+          return JSON.parse(u);
+        } catch {
+          return u;
+        }
+      });
+  return async (u, c, d) => {
+    const f = Date.now();
+    o?.onBeforeCall?.({ agent: u, input: c, timestamp: f });
+    const w = [{ role: "user", content: c }];
+    try {
+      const { url: O, init: _ } = a(u, c, w),
+        U = d?.signal ? { ..._, signal: d.signal } : _,
+        D = await t(O, U);
+      if (!D.ok) {
+        const M = await D.text().catch(() => "");
+        throw new Error(
+          `[Directive] AgentRunner request failed: ${D.status} ${D.statusText}${M ? ` – ${M.slice(0, 300)}` : ""}`,
+        );
+      }
+      const E = await r(D, w),
+        T = {
+          inputTokens: E.inputTokens ?? 0,
+          outputTokens: E.outputTokens ?? 0,
+        },
+        G = { role: "assistant", content: E.text },
+        J = [...w, G];
+      d?.onMessage?.(G);
+      const m = Date.now() - f;
+      return (
+        o?.onAfterCall?.({
+          agent: u,
+          input: c,
+          output: E.text,
+          totalTokens: E.totalTokens,
+          tokenUsage: T,
+          durationMs: m,
+          timestamp: Date.now(),
+        }),
+        {
+          output: i(E.text),
+          messages: J,
+          toolCalls: [],
+          totalTokens: E.totalTokens,
+          tokenUsage: T,
+        }
+      );
+    } catch (O) {
+      const _ = Date.now() - f;
+      throw (
+        (O instanceof Error &&
+          o?.onError?.({
+            agent: u,
+            input: c,
+            error: O,
+            durationMs: _,
+            timestamp: Date.now(),
+          }),
+        O)
+      );
+    }
+  };
+}
+function wn(e, t) {
+  const a =
+    typeof e.content == "string" ? e.content : JSON.stringify(e.content);
+  return Math.ceil(a.length / 4);
+}
+function kn(e, t) {
+  return e.reduce((a, r) => a + wn(r), 0);
+}
+function As(e = {}) {
+  return (t, a = {}) => {
+    const r = { ...e, ...a },
+      n = r.maxMessages ?? 100,
+      o = r.preserveRecentCount ?? 5;
+    if (t.length <= n)
+      return { keep: [...t], toSummarize: [], estimatedTokens: kn(t) };
+    const i = t.slice(-o),
+      u = t.slice(0, -o),
+      c = Math.max(0, n - o),
+      d = u.slice(-c),
+      f = u.slice(0, -c || void 0),
+      w = [...d, ...i];
+    return {
+      keep: w,
+      toSummarize: f.length > 0 ? f : [],
+      estimatedTokens: kn(w),
+    };
+  };
+}
+function Is(e) {
+  let {
+      strategy: t,
+      summarizer: a,
+      strategyConfig: r = {},
+      autoManage: n = !1,
+      onMemoryManaged: o,
+      onManageError: i,
+      maxContextTokens: u,
+    } = e,
+    c = {
+      messages: [],
+      summaries: [],
+      totalMessagesProcessed: 0,
+      estimatedTokens: 0,
+    },
+    d = !1;
+  async function f() {
+    if (d)
+      return {
+        messagesBefore: c.messages.length,
+        messagesAfter: c.messages.length,
+        messagesSummarized: 0,
+        estimatedTokensBefore: c.estimatedTokens,
+        estimatedTokensAfter: c.estimatedTokens,
+      };
+    d = !0;
+    try {
+      const O = c.messages.length,
+        _ = c.estimatedTokens,
+        U = t(c.messages, r);
+      if (U.toSummarize.length === 0)
+        return {
+          messagesBefore: O,
+          messagesAfter: O,
+          messagesSummarized: 0,
+          estimatedTokensBefore: _,
+          estimatedTokensAfter: U.estimatedTokens,
+        };
+      let D;
+      a &&
+        U.toSummarize.length > 0 &&
+        ((D = await a(U.toSummarize)),
+        c.summaries.push({
+          content: D,
+          messagesCount: U.toSummarize.length,
+          createdAt: Date.now(),
+        })),
+        (c.messages = U.keep),
+        (c.estimatedTokens = U.estimatedTokens);
+      const E = {
+        messagesBefore: O,
+        messagesAfter: c.messages.length,
+        messagesSummarized: U.toSummarize.length,
+        summary: D,
+        estimatedTokensBefore: _,
+        estimatedTokensAfter: U.estimatedTokens,
+      };
+      return o?.(E), E;
+    } finally {
+      d = !1;
+    }
+  }
+  function w() {
+    d ||
+      (t(c.messages, r).toSummarize.length > 0 &&
+        f().catch((O) => {
+          const _ = O instanceof Error ? O : new Error(String(O));
+          i ? i(_) : console.error("[Directive Memory] Auto-manage error:", _);
+        }));
+  }
+  return {
+    getState() {
+      return {
+        ...c,
+        messages: [...c.messages],
+        summaries: c.summaries.map((O) => ({ ...O })),
+      };
+    },
+    addMessage(O) {
+      c.messages.push(O),
+        c.totalMessagesProcessed++,
+        (c.estimatedTokens += wn(O)),
+        n && w();
+    },
+    addMessages(O) {
+      for (const _ of O)
+        c.messages.push(_),
+          c.totalMessagesProcessed++,
+          (c.estimatedTokens += wn(_));
+      n && w();
+    },
+    getContextMessages() {
+      const O = [];
+      if (c.summaries.length > 0) {
+        const _ = c.summaries
+          .map((U) => U.content)
+          .join(`
 
 ---
 
-`);O.push({role:"system",content:`[Previous conversation summary]
+`);
+        O.push({
+          role: "system",
+          content: `[Previous conversation summary]
 
-${_}`})}if(O.push(...c.messages),u){let _=kn(O);_>u&&console.warn(`[Directive Memory] Context messages (${_} tokens) exceed maxContextTokens (${u}). Consider calling manage() or reducing message count.`)}return O},manage:f,isManaging(){return d},clear(){c={messages:[],summaries:[],totalMessagesProcessed:0,estimatedTokens:0}},export(){return{...c,messages:[...c.messages],summaries:c.summaries.map(O=>({...O}))}},import(O){c={...O,messages:[...O.messages],summaries:O.summaries.map(_=>({..._}))}}}}var Os=class{buffer=[];maxSize;strategy;pullWaiters=[];pushWaiters=[];closed=!1;droppedCount=0;constructor(e="buffer",t=1e3){this.strategy=e,this.maxSize=t}async push(e){if(this.closed)return!1;let t=this.pullWaiters.shift();if(t)return t(e),!0;if(this.buffer.length>=this.maxSize)switch(this.strategy){case"drop":return this.droppedCount++,!1;case"block":if(await new Promise(a=>{this.pushWaiters.push(a)}),this.closed)return!1;break}return this.buffer.push(e),!0}async pull(){let e=this.pushWaiters.shift();return e&&e(),this.buffer.length>0?this.buffer.shift():this.closed?null:new Promise(t=>{this.pullWaiters.push(t)})}close(){this.closed=!0;for(let e of this.pullWaiters)e(null);this.pullWaiters=[];for(let e of this.pushWaiters)e();this.pushWaiters=[]}getDroppedCount(){return this.droppedCount}};function Ms(e,t={}){let{streamingGuardrails:a=[]}=t;return(r,n,o={})=>{let{signal:i,backpressure:u="buffer",bufferSize:c=1e3,guardrailCheckInterval:d=50,stopOnGuardrail:f=!0}=o;if(d<=0||!Number.isFinite(d))throw new Error(`[Directive Streaming] guardrailCheckInterval must be a positive number, got ${d}`);let w=new Os(u,c),O=new AbortController,_="",U=0,D=!1,E=Date.now(),T;i&&(T=()=>O.abort(),i.addEventListener("abort",T));let G=()=>{T&&i&&i.removeEventListener("abort",T)};async function J(){for(let M of a)try{let S=await M.check(_,U);if(!S.passed){let j=M.stopOnFail!==!1,F={type:"guardrail_triggered",guardrailName:M.name,reason:S.reason??"Guardrail check failed",partialOutput:_,stopped:j};return await w.push(F),j&&(typeof f=="function"?f:()=>f)(F)&&(D=!0,O.abort()),F}}catch{}return null}let m=(async()=>{await w.push({type:"progress",phase:"starting",message:"Starting agent"});try{let M=await e(r,n,{signal:O.signal,onToken:async F=>{D||(U++,_+=F,await w.push({type:"token",data:F,tokenCount:U}),U%d===0&&await J())},onToolStart:async(F,ne,k)=>{await w.push({type:"progress",phase:"tool_calling",message:`Calling ${F}`}),await w.push({type:"tool_start",tool:F,toolCallId:ne,arguments:k})},onToolEnd:async(F,ne,k)=>{await w.push({type:"tool_end",tool:F,toolCallId:ne,result:k}),await w.push({type:"progress",phase:"generating",message:"Continuing generation"})},onMessage:async F=>{await w.push({type:"message",message:F})}});await J();let S=Date.now()-E,j=w.getDroppedCount();return await w.push({type:"done",totalTokens:M.totalTokens,duration:S,droppedTokens:j}),w.close(),M}catch(M){let S={type:"error",error:M instanceof Error?M:new Error(String(M)),partialOutput:_||void 0};throw await w.push(S),w.close(),M}finally{G()}})();return{stream:{[Symbol.asyncIterator](){return{async next(){let M=await w.pull();return M===null?{done:!0,value:void 0}:{done:!1,value:M}}}}},result:m,abort:()=>O.abort()}}}function Ts(e){let{maxTokens:t,warnAt:a,stopOnFail:r=!0}=e,n=!1;return{name:"length-streaming",stopOnFail:r,check(o,i){return i>=t?{passed:!1,reason:`Output exceeded maximum length of ${t} tokens`,severity:"error"}:a&&i>=a&&!n?(n=!0,{passed:!0,warning:`Approaching maximum length: ${i}/${t} tokens`,severity:"warning"}):{passed:!0}}}}var js=1e4;function Rs(e){if(e.length===0)return{stream:{[Symbol.asyncIterator](){let c={done:!0,value:void 0};return{async next(){return c},async return(){return c}}}},getDroppedCount:()=>0};let t=[],a=[],r=e.length,n=!1,o=0;function i(c){if(n)return;let d=a.shift();if(d){d(c);return}t.length<js?t.push(c):o++}function u(){if(r--,r<=0){n=!0;for(let c of a)c(null);a.length=0}}for(let c of e)(async()=>{try{for await(let d of c.stream)i({chunk:d,agentId:c.agentId})}catch(d){i({chunk:{type:"error",error:d instanceof Error?d:new Error(String(d))},agentId:c.agentId})}finally{u()}})();return{stream:{[Symbol.asyncIterator](){return{async next(){return t.length>0?{done:!1,value:t.shift()}:n?{done:!0,value:void 0}:new Promise(c=>{a.push(d=>{c(d===null?{done:!0,value:void 0}:{done:!1,value:d})})})},return(){n=!0,t.length=0;for(let c of a)c(null);return a.length=0,Promise.resolve({done:!0,value:void 0})}}}},getDroppedCount:()=>o}}var _s=class extends Error{iterations;history;lastResult;totalTokens;constructor(e){super(`[Directive Reflection] Exhausted ${e.iterations} iterations without passing evaluation. Last feedback: ${e.history[e.history.length-1]?.feedback??"(none)"}`),this.name="ReflectionExhaustedError",this.iterations=e.iterations,this.history=e.history,this.lastResult=e.lastResult,this.totalTokens=e.totalTokens}},fn={successRate:.5,latency:.3,circuitState:.2};function qs(e={}){let t=e.windowMs??6e4,a=e.maxNormalLatencyMs??5e3,r=e.maxEventsPerAgent??1e3,n={successRate:e.weights?.successRate??fn.successRate,latency:e.weights?.latency??fn.latency,circuitState:e.weights?.circuitState??fn.circuitState};if(!Number.isFinite(t)||t<=0)throw new Error("[Directive HealthMonitor] windowMs must be a positive number");if(!Number.isFinite(a)||a<=0)throw new Error("[Directive HealthMonitor] maxNormalLatencyMs must be a positive number");if(!Number.isFinite(r)||r<1)throw new Error("[Directive HealthMonitor] maxEventsPerAgent must be >= 1");for(let[D,E]of Object.entries(n))if(E<0||E>1)throw new Error(`[Directive HealthMonitor] weight "${D}" must be between 0 and 1 (got ${E})`);let o=n.successRate+n.latency+n.circuitState;if(Math.abs(o-1)>.01)throw new Error(`[Directive HealthMonitor] weights must sum to ~1.0 (tolerance: ±0.01, got ${o.toFixed(4)})`);let i=new Map,u=new Map,c=0,d=null,f=-1;function w(D){let E=i.get(D);return E||(E=[],i.set(D,E)),E}function O(D,E){let T=E-t,G=0;for(;G<D.length&&D[G].timestamp<T;)G++;let J=D.length-G-r;J>0&&(G+=J),G>0&&D.splice(0,G)}function _(D){let E=i.get(D);if(!E||E.length===0)return 50;let T=Date.now();if(O(E,T),E.length===0)return 50;let G=E.filter(F=>F.success).length/E.length,J=E.reduce((F,ne)=>F+ne.latencyMs,0)/E.length,m=Math.min(J/a,1),M=u.get(D)??"CLOSED",S=M==="CLOSED"?1:M==="HALF_OPEN"?.5:0,j=G*n.successRate+(1-m)*n.latency+S*n.circuitState;return Math.round(j*100)}function U(D){let E=w(D),T=Date.now();O(E,T);let G=E.filter(j=>j.success).length,J=E.length-G,m=E.length>0?G/E.length:0,M=E.length>0?E.reduce((j,F)=>j+F.latencyMs,0)/E.length:0,S=[];for(let j=E.length-1;j>=0&&S.length<5;j--)E[j].errorMessage&&S.unshift(E[j].errorMessage);return{agentId:D,circuitState:u.get(D)??"CLOSED",successRate:m,avgLatencyMs:M,recentFailures:J,recentSuccesses:G,healthScore:_(D),lastErrors:S}}return{recordSuccess(D,E){let T=w(D);T.push({success:!0,latencyMs:E,timestamp:Date.now()}),O(T,Date.now()),c++},recordFailure(D,E,T){let G=w(D);G.push({success:!1,latencyMs:E,timestamp:Date.now(),errorMessage:T?.message}),O(G,Date.now()),c++},getMetrics(D){return U(D)},getAllMetrics(){if(c===f&&d)return d;let D=Object.create(null);for(let E of i.keys())D[E]=U(E);return d=D,f=c,D},getHealthScore(D){return _(D)},updateCircuitState(D,E){u.set(D,E),c++},reset(){i.clear(),u.clear(),c++,d=null,f=-1}}}function ir(e){if(typeof e=="string")return e;try{return JSON.stringify(e)}catch{return String(e)}}function Ns(e,t){if(Object.is(e,t))return!0;if(typeof e!=typeof t||e===null||t===null||typeof e!="object")return!1;if(Array.isArray(e)){if(!Array.isArray(t)||e.length!==t.length)return!1;for(let i=0;i<e.length;i++)if(e[i]!==t[i])return!1;return!0}let a=e,r=t,n=Object.keys(a),o=Object.keys(r);if(n.length!==o.length)return!1;for(let i of n)if(a[i]!==r[i])return!1;return!0}function oa(e){switch(e.type){case"sequential":return e.step;case"supervisor":return e.round;case"reflect":return e.iteration;case"debate":return e.round;case"dag":return e.completedCount;case"goal":return e.step}}var Pr=class{count;maxPermits;queue=[];constructor(e){if(e<1||!Number.isFinite(e))throw new Error(`[Directive Semaphore] Invalid max permits: ${e}. Must be a finite number >= 1.`);this.maxPermits=e,this.count=e}createReleaseFn(){let e=!1;return()=>{e||(e=!0,this.release())}}async acquire(e){if(e?.aborted)throw new Error("[Directive Semaphore] Aborted before acquiring permit");return this.count>0?(this.count--,this.createReleaseFn()):new Promise((t,a)=>{let r,n={resolve:o=>{r&&e&&e.removeEventListener("abort",r),t(o)},reject:a};this.queue.push(n),e&&(r=()=>{let o=this.queue.indexOf(n);o>=0&&(this.queue.splice(o,1),a(new Error("[Directive Semaphore] Aborted while waiting for permit")))},e.addEventListener("abort",r,{once:!0}))})}tryAcquire(){return this.count>0?(this.count--,this.createReleaseFn()):null}release(){this.count++;let e=this.queue.shift();e&&(this.count--,e.resolve(this.createReleaseFn()))}get available(){return this.count}get waiting(){return this.queue.length}get max(){return this.maxPermits}drain(){let e=new Error("[Directive Semaphore] Semaphore drained - all pending acquisitions rejected"),t=this.queue.splice(0,this.queue.length);for(let a of t)a.reject(e);this.count=this.maxPermits}},Ps=$n("RUN_AGENT");function Ls(e){let{runner:t,agents:a,patterns:r={},onHandoff:n,onHandoffComplete:o,maxHandoffHistory:i=1e3,debug:u=!1,guardrails:c={},hooks:d={},memory:f,agentRetry:w,maxTokenBudget:O,plugins:_=[],onApprovalRequest:U,autoApproveToolCalls:D=!0,approvalTimeoutMs:E=3e5,constraints:T={},resolvers:G={},circuitBreaker:J,budgetWarningThreshold:m=.8,onBudgetWarning:M,selfHealing:S,checkpointStore:j,breakpoints:F=[],onBreakpoint:ne,breakpointTimeoutMs:k=3e5,derive:R,scratchpad:$}=e,I=typeof u=="object"?!0:!!u,H=typeof u=="object"?!!u.verboseTimeline:!1,ee=5e3,V={...a};if(!D&&!U)throw new Error(`[Directive MultiAgent] Invalid approval configuration: autoApproveToolCalls is false but no onApprovalRequest callback provided. Tool calls would wait for approval indefinitely. Either:
+${_}`,
+        });
+      }
+      if ((O.push(...c.messages), u)) {
+        const _ = kn(O);
+        _ > u &&
+          console.warn(
+            `[Directive Memory] Context messages (${_} tokens) exceed maxContextTokens (${u}). Consider calling manage() or reducing message count.`,
+          );
+      }
+      return O;
+    },
+    manage: f,
+    isManaging() {
+      return d;
+    },
+    clear() {
+      c = {
+        messages: [],
+        summaries: [],
+        totalMessagesProcessed: 0,
+        estimatedTokens: 0,
+      };
+    },
+    export() {
+      return {
+        ...c,
+        messages: [...c.messages],
+        summaries: c.summaries.map((O) => ({ ...O })),
+      };
+    },
+    import(O) {
+      c = {
+        ...O,
+        messages: [...O.messages],
+        summaries: O.summaries.map((_) => ({ ..._ })),
+      };
+    },
+  };
+}
+var Os = class {
+  buffer = [];
+  maxSize;
+  strategy;
+  pullWaiters = [];
+  pushWaiters = [];
+  closed = !1;
+  droppedCount = 0;
+  constructor(e = "buffer", t = 1e3) {
+    (this.strategy = e), (this.maxSize = t);
+  }
+  async push(e) {
+    if (this.closed) return !1;
+    const t = this.pullWaiters.shift();
+    if (t) return t(e), !0;
+    if (this.buffer.length >= this.maxSize)
+      switch (this.strategy) {
+        case "drop":
+          return this.droppedCount++, !1;
+        case "block":
+          if (
+            (await new Promise((a) => {
+              this.pushWaiters.push(a);
+            }),
+            this.closed)
+          )
+            return !1;
+          break;
+      }
+    return this.buffer.push(e), !0;
+  }
+  async pull() {
+    const e = this.pushWaiters.shift();
+    return (
+      e && e(),
+      this.buffer.length > 0
+        ? this.buffer.shift()
+        : this.closed
+          ? null
+          : new Promise((t) => {
+              this.pullWaiters.push(t);
+            })
+    );
+  }
+  close() {
+    this.closed = !0;
+    for (const e of this.pullWaiters) e(null);
+    this.pullWaiters = [];
+    for (const e of this.pushWaiters) e();
+    this.pushWaiters = [];
+  }
+  getDroppedCount() {
+    return this.droppedCount;
+  }
+};
+function Ms(e, t = {}) {
+  const { streamingGuardrails: a = [] } = t;
+  return (r, n, o = {}) => {
+    const {
+      signal: i,
+      backpressure: u = "buffer",
+      bufferSize: c = 1e3,
+      guardrailCheckInterval: d = 50,
+      stopOnGuardrail: f = !0,
+    } = o;
+    if (d <= 0 || !Number.isFinite(d))
+      throw new Error(
+        `[Directive Streaming] guardrailCheckInterval must be a positive number, got ${d}`,
+      );
+    let w = new Os(u, c),
+      O = new AbortController(),
+      _ = "",
+      U = 0,
+      D = !1,
+      E = Date.now(),
+      T;
+    i && ((T = () => O.abort()), i.addEventListener("abort", T));
+    const G = () => {
+      T && i && i.removeEventListener("abort", T);
+    };
+    async function J() {
+      for (const M of a)
+        try {
+          const S = await M.check(_, U);
+          if (!S.passed) {
+            const j = M.stopOnFail !== !1,
+              F = {
+                type: "guardrail_triggered",
+                guardrailName: M.name,
+                reason: S.reason ?? "Guardrail check failed",
+                partialOutput: _,
+                stopped: j,
+              };
+            return (
+              await w.push(F),
+              j &&
+                (typeof f == "function" ? f : () => f)(F) &&
+                ((D = !0), O.abort()),
+              F
+            );
+          }
+        } catch {}
+      return null;
+    }
+    const m = (async () => {
+      await w.push({
+        type: "progress",
+        phase: "starting",
+        message: "Starting agent",
+      });
+      try {
+        const M = await e(r, n, {
+          signal: O.signal,
+          onToken: async (F) => {
+            D ||
+              (U++,
+              (_ += F),
+              await w.push({ type: "token", data: F, tokenCount: U }),
+              U % d === 0 && (await J()));
+          },
+          onToolStart: async (F, ne, k) => {
+            await w.push({
+              type: "progress",
+              phase: "tool_calling",
+              message: `Calling ${F}`,
+            }),
+              await w.push({
+                type: "tool_start",
+                tool: F,
+                toolCallId: ne,
+                arguments: k,
+              });
+          },
+          onToolEnd: async (F, ne, k) => {
+            await w.push({
+              type: "tool_end",
+              tool: F,
+              toolCallId: ne,
+              result: k,
+            }),
+              await w.push({
+                type: "progress",
+                phase: "generating",
+                message: "Continuing generation",
+              });
+          },
+          onMessage: async (F) => {
+            await w.push({ type: "message", message: F });
+          },
+        });
+        await J();
+        const S = Date.now() - E,
+          j = w.getDroppedCount();
+        return (
+          await w.push({
+            type: "done",
+            totalTokens: M.totalTokens,
+            duration: S,
+            droppedTokens: j,
+          }),
+          w.close(),
+          M
+        );
+      } catch (M) {
+        const S = {
+          type: "error",
+          error: M instanceof Error ? M : new Error(String(M)),
+          partialOutput: _ || void 0,
+        };
+        throw (await w.push(S), w.close(), M);
+      } finally {
+        G();
+      }
+    })();
+    return {
+      stream: {
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              const M = await w.pull();
+              return M === null
+                ? { done: !0, value: void 0 }
+                : { done: !1, value: M };
+            },
+          };
+        },
+      },
+      result: m,
+      abort: () => O.abort(),
+    };
+  };
+}
+function Ts(e) {
+  let { maxTokens: t, warnAt: a, stopOnFail: r = !0 } = e,
+    n = !1;
+  return {
+    name: "length-streaming",
+    stopOnFail: r,
+    check(o, i) {
+      return i >= t
+        ? {
+            passed: !1,
+            reason: `Output exceeded maximum length of ${t} tokens`,
+            severity: "error",
+          }
+        : a && i >= a && !n
+          ? ((n = !0),
+            {
+              passed: !0,
+              warning: `Approaching maximum length: ${i}/${t} tokens`,
+              severity: "warning",
+            })
+          : { passed: !0 };
+    },
+  };
+}
+var js = 1e4;
+function Rs(e) {
+  if (e.length === 0)
+    return {
+      stream: {
+        [Symbol.asyncIterator]() {
+          const c = { done: !0, value: void 0 };
+          return {
+            async next() {
+              return c;
+            },
+            async return() {
+              return c;
+            },
+          };
+        },
+      },
+      getDroppedCount: () => 0,
+    };
+  let t = [],
+    a = [],
+    r = e.length,
+    n = !1,
+    o = 0;
+  function i(c) {
+    if (n) return;
+    const d = a.shift();
+    if (d) {
+      d(c);
+      return;
+    }
+    t.length < js ? t.push(c) : o++;
+  }
+  function u() {
+    if ((r--, r <= 0)) {
+      n = !0;
+      for (const c of a) c(null);
+      a.length = 0;
+    }
+  }
+  for (const c of e)
+    (async () => {
+      try {
+        for await (const d of c.stream) i({ chunk: d, agentId: c.agentId });
+      } catch (d) {
+        i({
+          chunk: {
+            type: "error",
+            error: d instanceof Error ? d : new Error(String(d)),
+          },
+          agentId: c.agentId,
+        });
+      } finally {
+        u();
+      }
+    })();
+  return {
+    stream: {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            return t.length > 0
+              ? { done: !1, value: t.shift() }
+              : n
+                ? { done: !0, value: void 0 }
+                : new Promise((c) => {
+                    a.push((d) => {
+                      c(
+                        d === null
+                          ? { done: !0, value: void 0 }
+                          : { done: !1, value: d },
+                      );
+                    });
+                  });
+          },
+          return() {
+            (n = !0), (t.length = 0);
+            for (const c of a) c(null);
+            return (a.length = 0), Promise.resolve({ done: !0, value: void 0 });
+          },
+        };
+      },
+    },
+    getDroppedCount: () => o,
+  };
+}
+var _s = class extends Error {
+    iterations;
+    history;
+    lastResult;
+    totalTokens;
+    constructor(e) {
+      super(
+        `[Directive Reflection] Exhausted ${e.iterations} iterations without passing evaluation. Last feedback: ${e.history[e.history.length - 1]?.feedback ?? "(none)"}`,
+      ),
+        (this.name = "ReflectionExhaustedError"),
+        (this.iterations = e.iterations),
+        (this.history = e.history),
+        (this.lastResult = e.lastResult),
+        (this.totalTokens = e.totalTokens);
+    }
+  },
+  fn = { successRate: 0.5, latency: 0.3, circuitState: 0.2 };
+function qs(e = {}) {
+  const t = e.windowMs ?? 6e4,
+    a = e.maxNormalLatencyMs ?? 5e3,
+    r = e.maxEventsPerAgent ?? 1e3,
+    n = {
+      successRate: e.weights?.successRate ?? fn.successRate,
+      latency: e.weights?.latency ?? fn.latency,
+      circuitState: e.weights?.circuitState ?? fn.circuitState,
+    };
+  if (!Number.isFinite(t) || t <= 0)
+    throw new Error(
+      "[Directive HealthMonitor] windowMs must be a positive number",
+    );
+  if (!Number.isFinite(a) || a <= 0)
+    throw new Error(
+      "[Directive HealthMonitor] maxNormalLatencyMs must be a positive number",
+    );
+  if (!Number.isFinite(r) || r < 1)
+    throw new Error("[Directive HealthMonitor] maxEventsPerAgent must be >= 1");
+  for (const [D, E] of Object.entries(n))
+    if (E < 0 || E > 1)
+      throw new Error(
+        `[Directive HealthMonitor] weight "${D}" must be between 0 and 1 (got ${E})`,
+      );
+  const o = n.successRate + n.latency + n.circuitState;
+  if (Math.abs(o - 1) > 0.01)
+    throw new Error(
+      `[Directive HealthMonitor] weights must sum to ~1.0 (tolerance: ±0.01, got ${o.toFixed(4)})`,
+    );
+  let i = new Map(),
+    u = new Map(),
+    c = 0,
+    d = null,
+    f = -1;
+  function w(D) {
+    let E = i.get(D);
+    return E || ((E = []), i.set(D, E)), E;
+  }
+  function O(D, E) {
+    let T = E - t,
+      G = 0;
+    while (G < D.length && D[G].timestamp < T) G++;
+    const J = D.length - G - r;
+    J > 0 && (G += J), G > 0 && D.splice(0, G);
+  }
+  function _(D) {
+    const E = i.get(D);
+    if (!E || E.length === 0) return 50;
+    const T = Date.now();
+    if ((O(E, T), E.length === 0)) return 50;
+    const G = E.filter((F) => F.success).length / E.length,
+      J = E.reduce((F, ne) => F + ne.latencyMs, 0) / E.length,
+      m = Math.min(J / a, 1),
+      M = u.get(D) ?? "CLOSED",
+      S = M === "CLOSED" ? 1 : M === "HALF_OPEN" ? 0.5 : 0,
+      j = G * n.successRate + (1 - m) * n.latency + S * n.circuitState;
+    return Math.round(j * 100);
+  }
+  function U(D) {
+    const E = w(D),
+      T = Date.now();
+    O(E, T);
+    const G = E.filter((j) => j.success).length,
+      J = E.length - G,
+      m = E.length > 0 ? G / E.length : 0,
+      M = E.length > 0 ? E.reduce((j, F) => j + F.latencyMs, 0) / E.length : 0,
+      S = [];
+    for (let j = E.length - 1; j >= 0 && S.length < 5; j--)
+      E[j].errorMessage && S.unshift(E[j].errorMessage);
+    return {
+      agentId: D,
+      circuitState: u.get(D) ?? "CLOSED",
+      successRate: m,
+      avgLatencyMs: M,
+      recentFailures: J,
+      recentSuccesses: G,
+      healthScore: _(D),
+      lastErrors: S,
+    };
+  }
+  return {
+    recordSuccess(D, E) {
+      const T = w(D);
+      T.push({ success: !0, latencyMs: E, timestamp: Date.now() }),
+        O(T, Date.now()),
+        c++;
+    },
+    recordFailure(D, E, T) {
+      const G = w(D);
+      G.push({
+        success: !1,
+        latencyMs: E,
+        timestamp: Date.now(),
+        errorMessage: T?.message,
+      }),
+        O(G, Date.now()),
+        c++;
+    },
+    getMetrics(D) {
+      return U(D);
+    },
+    getAllMetrics() {
+      if (c === f && d) return d;
+      const D = Object.create(null);
+      for (const E of i.keys()) D[E] = U(E);
+      return (d = D), (f = c), D;
+    },
+    getHealthScore(D) {
+      return _(D);
+    },
+    updateCircuitState(D, E) {
+      u.set(D, E), c++;
+    },
+    reset() {
+      i.clear(), u.clear(), c++, (d = null), (f = -1);
+    },
+  };
+}
+function ir(e) {
+  if (typeof e == "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+}
+function Ns(e, t) {
+  if (Object.is(e, t)) return !0;
+  if (typeof e != typeof t || e === null || t === null || typeof e != "object")
+    return !1;
+  if (Array.isArray(e)) {
+    if (!Array.isArray(t) || e.length !== t.length) return !1;
+    for (let i = 0; i < e.length; i++) if (e[i] !== t[i]) return !1;
+    return !0;
+  }
+  const a = e,
+    r = t,
+    n = Object.keys(a),
+    o = Object.keys(r);
+  if (n.length !== o.length) return !1;
+  for (const i of n) if (a[i] !== r[i]) return !1;
+  return !0;
+}
+function oa(e) {
+  switch (e.type) {
+    case "sequential":
+      return e.step;
+    case "supervisor":
+      return e.round;
+    case "reflect":
+      return e.iteration;
+    case "debate":
+      return e.round;
+    case "dag":
+      return e.completedCount;
+    case "goal":
+      return e.step;
+  }
+}
+var Pr = class {
+    count;
+    maxPermits;
+    queue = [];
+    constructor(e) {
+      if (e < 1 || !Number.isFinite(e))
+        throw new Error(
+          `[Directive Semaphore] Invalid max permits: ${e}. Must be a finite number >= 1.`,
+        );
+      (this.maxPermits = e), (this.count = e);
+    }
+    createReleaseFn() {
+      let e = !1;
+      return () => {
+        e || ((e = !0), this.release());
+      };
+    }
+    async acquire(e) {
+      if (e?.aborted)
+        throw new Error(
+          "[Directive Semaphore] Aborted before acquiring permit",
+        );
+      return this.count > 0
+        ? (this.count--, this.createReleaseFn())
+        : new Promise((t, a) => {
+            let r,
+              n = {
+                resolve: (o) => {
+                  r && e && e.removeEventListener("abort", r), t(o);
+                },
+                reject: a,
+              };
+            this.queue.push(n),
+              e &&
+                ((r = () => {
+                  const o = this.queue.indexOf(n);
+                  o >= 0 &&
+                    (this.queue.splice(o, 1),
+                    a(
+                      new Error(
+                        "[Directive Semaphore] Aborted while waiting for permit",
+                      ),
+                    ));
+                }),
+                e.addEventListener("abort", r, { once: !0 }));
+          });
+    }
+    tryAcquire() {
+      return this.count > 0 ? (this.count--, this.createReleaseFn()) : null;
+    }
+    release() {
+      this.count++;
+      const e = this.queue.shift();
+      e && (this.count--, e.resolve(this.createReleaseFn()));
+    }
+    get available() {
+      return this.count;
+    }
+    get waiting() {
+      return this.queue.length;
+    }
+    get max() {
+      return this.maxPermits;
+    }
+    drain() {
+      const e = new Error(
+          "[Directive Semaphore] Semaphore drained - all pending acquisitions rejected",
+        ),
+        t = this.queue.splice(0, this.queue.length);
+      for (const a of t) a.reject(e);
+      this.count = this.maxPermits;
+    }
+  },
+  Ps = $n("RUN_AGENT");
+function Ls(e) {
+  const {
+      runner: t,
+      agents: a,
+      patterns: r = {},
+      onHandoff: n,
+      onHandoffComplete: o,
+      maxHandoffHistory: i = 1e3,
+      debug: u = !1,
+      guardrails: c = {},
+      hooks: d = {},
+      memory: f,
+      agentRetry: w,
+      maxTokenBudget: O,
+      plugins: _ = [],
+      onApprovalRequest: U,
+      autoApproveToolCalls: D = !0,
+      approvalTimeoutMs: E = 3e5,
+      constraints: T = {},
+      resolvers: G = {},
+      circuitBreaker: J,
+      budgetWarningThreshold: m = 0.8,
+      onBudgetWarning: M,
+      selfHealing: S,
+      checkpointStore: j,
+      breakpoints: F = [],
+      onBreakpoint: ne,
+      breakpointTimeoutMs: k = 3e5,
+      derive: R,
+      scratchpad: $,
+    } = e,
+    I = typeof u == "object" ? !0 : !!u,
+    H = typeof u == "object" ? !!u.verboseTimeline : !1,
+    ee = 5e3,
+    V = { ...a };
+  if (!D && !U)
+    throw new Error(`[Directive MultiAgent] Invalid approval configuration: autoApproveToolCalls is false but no onApprovalRequest callback provided. Tool calls would wait for approval indefinitely. Either:
   - Set autoApproveToolCalls: true to auto-approve all tool calls
-  - Provide an onApprovalRequest callback to handle approvals programmatically`);if(m<0||m>1)throw new Error(`[Directive MultiAgent] budgetWarningThreshold must be between 0 and 1, got ${m}`);let y=new Set(["__coord","__proto__","constructor","prototype","toString","valueOf","hasOwnProperty"]);for(let s of Object.keys(V))if(y.has(s))throw new Error(`[Directive MultiAgent] Agent ID "${s}" is reserved and cannot be used`);let z=new Set(Object.keys(V)),v=[];for(let[s,h]of Object.entries(r)){let C=[];switch(h.type){case"parallel":C.push(...h.agents);break;case"sequential":C.push(...h.agents);break;case"supervisor":C.push(h.supervisor,...h.workers);break;case"dag":for(let g of Object.values(h.nodes))C.push(g.agent);break;case"reflect":C.push(h.agent,h.evaluator);break;case"race":C.push(...h.agents);break;case"debate":C.push(...h.agents,h.evaluator);break}for(let g of C)z.has(g)||v.push({patternId:s,agentId:g})}if(v.length>0){let s=v.map(({patternId:h,agentId:C})=>`  - Pattern "${h}" references unknown agent "${C}"`).join(`
-`);throw new Error(`[Directive MultiAgent] Pattern validation failed. The following agents are not registered:
+  - Provide an onApprovalRequest callback to handle approvals programmatically`);
+  if (m < 0 || m > 1)
+    throw new Error(
+      `[Directive MultiAgent] budgetWarningThreshold must be between 0 and 1, got ${m}`,
+    );
+  const y = new Set([
+    "__coord",
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
+  for (const s of Object.keys(V))
+    if (y.has(s))
+      throw new Error(
+        `[Directive MultiAgent] Agent ID "${s}" is reserved and cannot be used`,
+      );
+  const z = new Set(Object.keys(V)),
+    v = [];
+  for (const [s, h] of Object.entries(r)) {
+    const C = [];
+    switch (h.type) {
+      case "parallel":
+        C.push(...h.agents);
+        break;
+      case "sequential":
+        C.push(...h.agents);
+        break;
+      case "supervisor":
+        C.push(h.supervisor, ...h.workers);
+        break;
+      case "dag":
+        for (const g of Object.values(h.nodes)) C.push(g.agent);
+        break;
+      case "reflect":
+        C.push(h.agent, h.evaluator);
+        break;
+      case "race":
+        C.push(...h.agents);
+        break;
+      case "debate":
+        C.push(...h.agents, h.evaluator);
+        break;
+    }
+    for (const g of C) z.has(g) || v.push({ patternId: s, agentId: g });
+  }
+  if (v.length > 0) {
+    const s = v
+      .map(
+        ({ patternId: h, agentId: C }) =>
+          `  - Pattern "${h}" references unknown agent "${C}"`,
+      )
+      .join(`
+`);
+    throw new Error(`[Directive MultiAgent] Pattern validation failed. The following agents are not registered:
 ${s}
 
-Registered agents: ${[...z].join(", ")||"(none)"}`)}for(let[s,h]of Object.entries(r))h.type==="dag"&&Fs(s,h.nodes);let l=null,x=null;I&&(l=Da({goToSnapshot:s=>{try{N.debug?.goTo?.(s)}catch{}}}));let P=null,K=null;S&&(P=qs(S.healthMonitor),S.selectionStrategy==="round-robin"&&(K=new Map));function ae(s,h){try{d[s]?.(h)}catch(C){I&&console.debug(`[Directive MultiAgent] hooks.${s} threw:`,C)}}let Ne={__globalTokens:$e.number(),__status:$e.string(),__handoffs:$e.array(),__handoffResults:$e.array(),__budgetWarningFired:$e.boolean()};$&&(Ne[Et]=$e.object()),R&&Object.keys(R).length>0&&(Ne.__derived=$e.object());let _e={facts:Ne,derivations:{},events:{},requirements:{}},we=zr(T);O&&(we.__budgetLimit={priority:100,when:s=>kt(s,"__globalTokens")>O,require:{type:"__PAUSE_BUDGET_EXCEEDED"}});let ze=Object.create(null);for(let[s,h]of Object.entries(G))ze[s]={requirement:h.requirement,key:h.key,resolve:async(C,g)=>{let b=Dt(g.facts),L={facts:{...g.facts,...b},runAgent:async(B,W,X)=>t(B,W,X),signal:g.signal};return h.resolve(C,L)}};ze.__pause={requirement:$n("__PAUSE_BUDGET_EXCEEDED"),resolve:async()=>{Ae="paused",I&&console.debug("[Directive MultiAgent] Budget exceeded — all agents paused")}},ze.__runAgent={requirement:Ps,resolve:async s=>{await ct(s.agent,s.input)}};let We=dr("__coord",{schema:_e,init:s=>{Xe(s,"__globalTokens",0),Xe(s,"__status","idle"),Xe(s,"__handoffs",[]),Xe(s,"__handoffResults",[]),Xe(s,"__budgetWarningFired",!1),$&&Xe(s,Et,{...$.init})},constraints:we,resolvers:ze}),Qe=Object.create(null);Qe.__coord=We;for(let[s,h]of Object.entries(V)){let C=h.constraints?zr(h.constraints):{},g=Object.create(null);if(h.resolvers)for(let[b,L]of Object.entries(h.resolvers))g[b]={requirement:L.requirement,key:L.key,resolve:async(B,W)=>{let X=Dt(W.facts),ue={facts:{...W.facts,...X},runAgent:async(ge,he,fe)=>t(ge,he,fe),signal:W.signal};return L.resolve(B,ue)}};Qe[s]=dr(s,{schema:vn,init:b=>{St(b,{status:"idle",currentAgent:h.agent.name,input:null,output:null,error:null,tokenUsage:0,turnCount:0,startedAt:null,completedAt:null}),xt(b,{pending:[],approved:[],rejected:[]}),Ft(b,[]),Ut(b,[]),It(b,Nr())},constraints:C,resolvers:Object.keys(g).length>0?g:void 0})}let ve=xa("directive-multi-agent-callbacks",{}),q=[..._,ve];I&&l&&(x=$a(l,()=>{try{return N.debug?.currentIndex??null}catch{return null}}),q.push(x));let N=xn({modules:Qe,plugins:q,debug:I?{timeTravel:!0}:void 0});N.start();let ie=500,le=200,de=0,Ae="idle",p=!1,A=0,Y=null;function Z(){if(p)throw new Error("[Directive MultiAgent] Orchestrator has been disposed")}let xe=new Map;for(let[s,h]of Object.entries(V))xe.set(s,new Pr(h.maxConcurrent??1));let te=Object.create(null);for(let s of Object.keys(V))te[s]={status:"idle",runCount:0,totalTokens:0};let Je=i,Fe=[],Ue=[],re=0;function ke(s){for(Ue.push(s);Ue.length>Je;)Ue.shift()}let Ie=new Map,Le=new Set;function Me(){for(let s of Le)s()}let Ct=Object.create(null),zt=new Set;function Pe(){let s=Object.create(null);for(let[g,b]of Object.entries(te))s[g]={status:b.status,lastInput:b.lastInput,lastOutput:b.lastOutput,lastError:b.lastError,runCount:b.runCount,totalTokens:b.totalTokens};let h=it("__coord"),C={agents:s,coordinator:{globalTokens:de,status:Ae}};return $&&h&&(C.scratchpad=kt(h,Et)??{}),C}function Ze(){if(!R)return;let s=Pe(),h=[],C=[];N.batch(()=>{for(let[b,L]of Object.entries(R))try{let B=L(s),W=Ct[b],X=!Ns(B,W);Ct[b]=B,X&&h.push({derivId:b,newValue:B})}catch(B){C.push({derivId:b,derivError:B})}let g=it("__coord");g&&Xe(g,"__derived",{...Ct})});for(let{derivId:g,newValue:b}of h){l&&l.record({type:"derivation_update",timestamp:Date.now(),snapshotId:null,derivationId:g,valueType:typeof b}),ae("onDerivationUpdate",{derivationId:g,value:b,timestamp:Date.now()});for(let L of zt)try{L(g,b)}catch{}}for(let{derivId:g,derivError:b}of C)I&&console.warn(`[Directive MultiAgent] Derivation "${g}" threw:`,b),ae("onDerivationError",{derivationId:g,error:b instanceof Error?b:new Error(String(b)),timestamp:Date.now()})}let $t=new Set,Ve=new Map,Mt=$?{get(s){let h=it("__coord"),C=kt(h,Et);if(!(C==null||!Object.hasOwn(C,s)))return C[s]},set(s,h){if(s==="__proto__"||s==="constructor"||s==="prototype")return;let C=it("__coord"),g=[s];N.batch(()=>{let b=kt(C,Et)??{};Xe(C,Et,{...b,[s]:h})}),Jt(g,s,h),Ze()},has(s){let h=it("__coord"),C=kt(h,Et);return C!=null&&Object.hasOwn(C,s)},delete(s){if(s==="__proto__"||s==="constructor"||s==="prototype")return;let h=it("__coord");N.batch(()=>{let C=kt(h,Et)??{},{[s]:g,...b}=C;Xe(h,Et,b)}),Jt([s],s,void 0),Ze()},update(s){let h=Object.create(null);for(let b of Object.keys(s))b==="__proto__"||b==="constructor"||b==="prototype"||(h[b]=s[b]);let C=it("__coord"),g=Object.keys(h);if(g.length!==0){N.batch(()=>{let b=kt(C,Et)??{};Xe(C,Et,{...b,...h})});for(let[b,L]of Object.entries(h))Jt(g,b,L);Ze()}},getAll(){let s=it("__coord");return{...kt(s,Et)??{}}},subscribe(s,h){for(let C of s)Ve.has(C)||Ve.set(C,new Set),Ve.get(C).add(h);return()=>{for(let C of s)Ve.get(C)?.delete(h)}},onChange(s){return $t.add(s),()=>{$t.delete(s)}},reset(){if(!$)return;let s=it("__coord");N.batch(()=>{Xe(s,Et,{...$.init})})}}:null;function Jt(s,h,C){let g=Ve.get(h);if(g)for(let b of g)try{b(h,C)}catch{}for(let b of $t)try{b(h,C)}catch{}l&&h===s[s.length-1]&&l.record({type:"scratchpad_update",timestamp:Date.now(),snapshotId:null,keys:s}),h===s[s.length-1]&&ae("onScratchpadUpdate",{keys:s,timestamp:Date.now()})}let Ot=new Map,mr=new Map;function Ga(s,h,C){return new Promise((g,b)=>{let L=null,B=!1,W,X=it(s),ue=()=>{B||(B=!0,L&&(clearTimeout(L),L=null),W&&C&&C.removeEventListener("abort",W),ge())},ge=N.subscribe([`${s}.${Or}`],()=>{let he=At(X);if(he.resolved.includes(h)){ue();let fe=Ot.get(h)??null;Ot.delete(h),g(fe)}else if(he.cancelled.includes(h)){ue(),Ot.delete(h);let fe=mr.get(h);mr.delete(h),b(new Error(fe?`[Directive MultiAgent] Breakpoint ${h} cancelled: ${fe}`:`[Directive MultiAgent] Breakpoint ${h} cancelled`))}});if(C){if(W=()=>{ue(),b(new Error(`[Directive MultiAgent] Breakpoint wait aborted for ${h}`))},C.aborted){ue(),b(new Error(`[Directive MultiAgent] Breakpoint wait aborted for ${h}`));return}C.addEventListener("abort",W,{once:!0})}L=setTimeout(()=>{ue(),Ot.delete(h),mr.delete(h),b(new Error(`[Directive MultiAgent] Breakpoint timeout: ${h} not resolved within ${Math.round(k/1e3)}s`))},k)})}async function nr(s,h,C,g,b,L){if(F.length===0)return{input:g,skip:!1};let B=it(h),W={agentId:h,agentName:C,input:g,state:Dt(B),breakpointType:s,patternId:L?.patternId,handoff:L?.handoff},X=Ta(F,s,W);if(!X)return{input:g,skip:!1};let ue=Ma(),ge={id:ue,type:s,agentId:h,input:g,label:X.label,requestedAt:Date.now()};N.batch(()=>{let fe=At(B);It(B,{...fe,pending:[...fe.pending,ge]})});try{ne?.(ge)}catch{}try{d.onBreakpoint?.(ge)}catch{}l&&l.record({type:"breakpoint_hit",timestamp:Date.now(),agentId:h,snapshotId:null,breakpointId:ue,breakpointType:s,label:X.label});let he=await Ga(h,ue,b);return l&&l.record({type:"breakpoint_resumed",timestamp:Date.now(),agentId:h,snapshotId:null,breakpointId:ue,modified:!!he?.input,skipped:!!he?.skip}),{input:he?.input??g,skip:he?.skip??!1}}function it(s){return N.facts[s]}function Ha(s,h,C){return new Promise((g,b)=>{let L=null,B=!1,W,X=it(s),ue=()=>{B||(B=!0,L&&(clearTimeout(L),L=null),W&&C&&C.removeEventListener("abort",W),ge())},ge=N.subscribe([`${s}.${Ir}`],()=>{let he=Nt(X);if(he.approved.includes(h))ue(),g();else{let fe=he.rejected.find(qe=>qe.id===h);if(fe){ue();let qe=fe.reason?`Request ${h} rejected: ${fe.reason}`:`Request ${h} rejected`;b(new Error(qe))}}});if(C){if(W=()=>{ue(),b(new Error(`[Directive MultiAgent] Approval wait aborted for request ${h}`))},C.aborted){ue(),b(new Error(`[Directive MultiAgent] Approval wait aborted for request ${h}`));return}C.addEventListener("abort",W,{once:!0})}L=setTimeout(()=>{ue();let he=Math.round(E/1e3);b(new Error(`[Directive MultiAgent] Approval timeout: Request ${h} not resolved within ${he}s.
+Registered agents: ${[...z].join(", ") || "(none)"}`);
+  }
+  for (const [s, h] of Object.entries(r)) h.type === "dag" && Fs(s, h.nodes);
+  let l = null,
+    x = null;
+  I &&
+    (l = Da({
+      goToSnapshot: (s) => {
+        try {
+          N.debug?.goTo?.(s);
+        } catch {}
+      },
+    }));
+  let P = null,
+    K = null;
+  S &&
+    ((P = qs(S.healthMonitor)),
+    S.selectionStrategy === "round-robin" && (K = new Map()));
+  function ae(s, h) {
+    try {
+      d[s]?.(h);
+    } catch (C) {
+      I && console.debug(`[Directive MultiAgent] hooks.${s} threw:`, C);
+    }
+  }
+  const Ne = {
+    __globalTokens: $e.number(),
+    __status: $e.string(),
+    __handoffs: $e.array(),
+    __handoffResults: $e.array(),
+    __budgetWarningFired: $e.boolean(),
+  };
+  $ && (Ne[Et] = $e.object()),
+    R && Object.keys(R).length > 0 && (Ne.__derived = $e.object());
+  const _e = { facts: Ne, derivations: {}, events: {}, requirements: {} },
+    we = zr(T);
+  O &&
+    (we.__budgetLimit = {
+      priority: 100,
+      when: (s) => kt(s, "__globalTokens") > O,
+      require: { type: "__PAUSE_BUDGET_EXCEEDED" },
+    });
+  const ze = Object.create(null);
+  for (const [s, h] of Object.entries(G))
+    ze[s] = {
+      requirement: h.requirement,
+      key: h.key,
+      resolve: async (C, g) => {
+        const b = Dt(g.facts),
+          L = {
+            facts: { ...g.facts, ...b },
+            runAgent: async (B, W, X) => t(B, W, X),
+            signal: g.signal,
+          };
+        return h.resolve(C, L);
+      },
+    };
+  (ze.__pause = {
+    requirement: $n("__PAUSE_BUDGET_EXCEEDED"),
+    resolve: async () => {
+      (Ae = "paused"),
+        I &&
+          console.debug(
+            "[Directive MultiAgent] Budget exceeded — all agents paused",
+          );
+    },
+  }),
+    (ze.__runAgent = {
+      requirement: Ps,
+      resolve: async (s) => {
+        await ct(s.agent, s.input);
+      },
+    });
+  const We = dr("__coord", {
+      schema: _e,
+      init: (s) => {
+        Xe(s, "__globalTokens", 0),
+          Xe(s, "__status", "idle"),
+          Xe(s, "__handoffs", []),
+          Xe(s, "__handoffResults", []),
+          Xe(s, "__budgetWarningFired", !1),
+          $ && Xe(s, Et, { ...$.init });
+      },
+      constraints: we,
+      resolvers: ze,
+    }),
+    Qe = Object.create(null);
+  Qe.__coord = We;
+  for (const [s, h] of Object.entries(V)) {
+    const C = h.constraints ? zr(h.constraints) : {},
+      g = Object.create(null);
+    if (h.resolvers)
+      for (const [b, L] of Object.entries(h.resolvers))
+        g[b] = {
+          requirement: L.requirement,
+          key: L.key,
+          resolve: async (B, W) => {
+            const X = Dt(W.facts),
+              ue = {
+                facts: { ...W.facts, ...X },
+                runAgent: async (ge, he, fe) => t(ge, he, fe),
+                signal: W.signal,
+              };
+            return L.resolve(B, ue);
+          },
+        };
+    Qe[s] = dr(s, {
+      schema: vn,
+      init: (b) => {
+        St(b, {
+          status: "idle",
+          currentAgent: h.agent.name,
+          input: null,
+          output: null,
+          error: null,
+          tokenUsage: 0,
+          turnCount: 0,
+          startedAt: null,
+          completedAt: null,
+        }),
+          xt(b, { pending: [], approved: [], rejected: [] }),
+          Ft(b, []),
+          Ut(b, []),
+          It(b, Nr());
+      },
+      constraints: C,
+      resolvers: Object.keys(g).length > 0 ? g : void 0,
+    });
+  }
+  const ve = xa("directive-multi-agent-callbacks", {}),
+    q = [..._, ve];
+  I &&
+    l &&
+    ((x = $a(l, () => {
+      try {
+        return N.debug?.currentIndex ?? null;
+      } catch {
+        return null;
+      }
+    })),
+    q.push(x));
+  const N = xn({
+    modules: Qe,
+    plugins: q,
+    debug: I ? { timeTravel: !0 } : void 0,
+  });
+  N.start();
+  let ie = 500,
+    le = 200,
+    de = 0,
+    Ae = "idle",
+    p = !1,
+    A = 0,
+    Y = null;
+  function Z() {
+    if (p)
+      throw new Error("[Directive MultiAgent] Orchestrator has been disposed");
+  }
+  const xe = new Map();
+  for (const [s, h] of Object.entries(V))
+    xe.set(s, new Pr(h.maxConcurrent ?? 1));
+  const te = Object.create(null);
+  for (const s of Object.keys(V))
+    te[s] = { status: "idle", runCount: 0, totalTokens: 0 };
+  let Je = i,
+    Fe = [],
+    Ue = [],
+    re = 0;
+  function ke(s) {
+    for (Ue.push(s); Ue.length > Je; ) Ue.shift();
+  }
+  const Ie = new Map(),
+    Le = new Set();
+  function Me() {
+    for (const s of Le) s();
+  }
+  const Ct = Object.create(null),
+    zt = new Set();
+  function Pe() {
+    const s = Object.create(null);
+    for (const [g, b] of Object.entries(te))
+      s[g] = {
+        status: b.status,
+        lastInput: b.lastInput,
+        lastOutput: b.lastOutput,
+        lastError: b.lastError,
+        runCount: b.runCount,
+        totalTokens: b.totalTokens,
+      };
+    const h = it("__coord"),
+      C = { agents: s, coordinator: { globalTokens: de, status: Ae } };
+    return $ && h && (C.scratchpad = kt(h, Et) ?? {}), C;
+  }
+  function Ze() {
+    if (!R) return;
+    const s = Pe(),
+      h = [],
+      C = [];
+    N.batch(() => {
+      for (const [b, L] of Object.entries(R))
+        try {
+          const B = L(s),
+            W = Ct[b],
+            X = !Ns(B, W);
+          (Ct[b] = B), X && h.push({ derivId: b, newValue: B });
+        } catch (B) {
+          C.push({ derivId: b, derivError: B });
+        }
+      const g = it("__coord");
+      g && Xe(g, "__derived", { ...Ct });
+    });
+    for (const { derivId: g, newValue: b } of h) {
+      l &&
+        l.record({
+          type: "derivation_update",
+          timestamp: Date.now(),
+          snapshotId: null,
+          derivationId: g,
+          valueType: typeof b,
+        }),
+        ae("onDerivationUpdate", {
+          derivationId: g,
+          value: b,
+          timestamp: Date.now(),
+        });
+      for (const L of zt)
+        try {
+          L(g, b);
+        } catch {}
+    }
+    for (const { derivId: g, derivError: b } of C)
+      I && console.warn(`[Directive MultiAgent] Derivation "${g}" threw:`, b),
+        ae("onDerivationError", {
+          derivationId: g,
+          error: b instanceof Error ? b : new Error(String(b)),
+          timestamp: Date.now(),
+        });
+  }
+  const $t = new Set(),
+    Ve = new Map(),
+    Mt = $
+      ? {
+          get(s) {
+            const h = it("__coord"),
+              C = kt(h, Et);
+            if (!(C == null || !Object.hasOwn(C, s))) return C[s];
+          },
+          set(s, h) {
+            if (s === "__proto__" || s === "constructor" || s === "prototype")
+              return;
+            const C = it("__coord"),
+              g = [s];
+            N.batch(() => {
+              const b = kt(C, Et) ?? {};
+              Xe(C, Et, { ...b, [s]: h });
+            }),
+              Jt(g, s, h),
+              Ze();
+          },
+          has(s) {
+            const h = it("__coord"),
+              C = kt(h, Et);
+            return C != null && Object.hasOwn(C, s);
+          },
+          delete(s) {
+            if (s === "__proto__" || s === "constructor" || s === "prototype")
+              return;
+            const h = it("__coord");
+            N.batch(() => {
+              const C = kt(h, Et) ?? {},
+                { [s]: g, ...b } = C;
+              Xe(h, Et, b);
+            }),
+              Jt([s], s, void 0),
+              Ze();
+          },
+          update(s) {
+            const h = Object.create(null);
+            for (const b of Object.keys(s))
+              b === "__proto__" ||
+                b === "constructor" ||
+                b === "prototype" ||
+                (h[b] = s[b]);
+            const C = it("__coord"),
+              g = Object.keys(h);
+            if (g.length !== 0) {
+              N.batch(() => {
+                const b = kt(C, Et) ?? {};
+                Xe(C, Et, { ...b, ...h });
+              });
+              for (const [b, L] of Object.entries(h)) Jt(g, b, L);
+              Ze();
+            }
+          },
+          getAll() {
+            const s = it("__coord");
+            return { ...(kt(s, Et) ?? {}) };
+          },
+          subscribe(s, h) {
+            for (const C of s)
+              Ve.has(C) || Ve.set(C, new Set()), Ve.get(C).add(h);
+            return () => {
+              for (const C of s) Ve.get(C)?.delete(h);
+            };
+          },
+          onChange(s) {
+            return (
+              $t.add(s),
+              () => {
+                $t.delete(s);
+              }
+            );
+          },
+          reset() {
+            if (!$) return;
+            const s = it("__coord");
+            N.batch(() => {
+              Xe(s, Et, { ...$.init });
+            });
+          },
+        }
+      : null;
+  function Jt(s, h, C) {
+    const g = Ve.get(h);
+    if (g)
+      for (const b of g)
+        try {
+          b(h, C);
+        } catch {}
+    for (const b of $t)
+      try {
+        b(h, C);
+      } catch {}
+    l &&
+      h === s[s.length - 1] &&
+      l.record({
+        type: "scratchpad_update",
+        timestamp: Date.now(),
+        snapshotId: null,
+        keys: s,
+      }),
+      h === s[s.length - 1] &&
+        ae("onScratchpadUpdate", { keys: s, timestamp: Date.now() });
+  }
+  const Ot = new Map(),
+    mr = new Map();
+  function Ga(s, h, C) {
+    return new Promise((g, b) => {
+      let L = null,
+        B = !1,
+        W,
+        X = it(s),
+        ue = () => {
+          B ||
+            ((B = !0),
+            L && (clearTimeout(L), (L = null)),
+            W && C && C.removeEventListener("abort", W),
+            ge());
+        },
+        ge = N.subscribe([`${s}.${Or}`], () => {
+          const he = At(X);
+          if (he.resolved.includes(h)) {
+            ue();
+            const fe = Ot.get(h) ?? null;
+            Ot.delete(h), g(fe);
+          } else if (he.cancelled.includes(h)) {
+            ue(), Ot.delete(h);
+            const fe = mr.get(h);
+            mr.delete(h),
+              b(
+                new Error(
+                  fe
+                    ? `[Directive MultiAgent] Breakpoint ${h} cancelled: ${fe}`
+                    : `[Directive MultiAgent] Breakpoint ${h} cancelled`,
+                ),
+              );
+          }
+        });
+      if (C) {
+        if (
+          ((W = () => {
+            ue(),
+              b(
+                new Error(
+                  `[Directive MultiAgent] Breakpoint wait aborted for ${h}`,
+                ),
+              );
+          }),
+          C.aborted)
+        ) {
+          ue(),
+            b(
+              new Error(
+                `[Directive MultiAgent] Breakpoint wait aborted for ${h}`,
+              ),
+            );
+          return;
+        }
+        C.addEventListener("abort", W, { once: !0 });
+      }
+      L = setTimeout(() => {
+        ue(),
+          Ot.delete(h),
+          mr.delete(h),
+          b(
+            new Error(
+              `[Directive MultiAgent] Breakpoint timeout: ${h} not resolved within ${Math.round(k / 1e3)}s`,
+            ),
+          );
+      }, k);
+    });
+  }
+  async function nr(s, h, C, g, b, L) {
+    if (F.length === 0) return { input: g, skip: !1 };
+    const B = it(h),
+      W = {
+        agentId: h,
+        agentName: C,
+        input: g,
+        state: Dt(B),
+        breakpointType: s,
+        patternId: L?.patternId,
+        handoff: L?.handoff,
+      },
+      X = Ta(F, s, W);
+    if (!X) return { input: g, skip: !1 };
+    const ue = Ma(),
+      ge = {
+        id: ue,
+        type: s,
+        agentId: h,
+        input: g,
+        label: X.label,
+        requestedAt: Date.now(),
+      };
+    N.batch(() => {
+      const fe = At(B);
+      It(B, { ...fe, pending: [...fe.pending, ge] });
+    });
+    try {
+      ne?.(ge);
+    } catch {}
+    try {
+      d.onBreakpoint?.(ge);
+    } catch {}
+    l &&
+      l.record({
+        type: "breakpoint_hit",
+        timestamp: Date.now(),
+        agentId: h,
+        snapshotId: null,
+        breakpointId: ue,
+        breakpointType: s,
+        label: X.label,
+      });
+    const he = await Ga(h, ue, b);
+    return (
+      l &&
+        l.record({
+          type: "breakpoint_resumed",
+          timestamp: Date.now(),
+          agentId: h,
+          snapshotId: null,
+          breakpointId: ue,
+          modified: !!he?.input,
+          skipped: !!he?.skip,
+        }),
+      { input: he?.input ?? g, skip: he?.skip ?? !1 }
+    );
+  }
+  function it(s) {
+    return N.facts[s];
+  }
+  function Ha(s, h, C) {
+    return new Promise((g, b) => {
+      let L = null,
+        B = !1,
+        W,
+        X = it(s),
+        ue = () => {
+          B ||
+            ((B = !0),
+            L && (clearTimeout(L), (L = null)),
+            W && C && C.removeEventListener("abort", W),
+            ge());
+        },
+        ge = N.subscribe([`${s}.${Ir}`], () => {
+          const he = Nt(X);
+          if (he.approved.includes(h)) ue(), g();
+          else {
+            const fe = he.rejected.find((qe) => qe.id === h);
+            if (fe) {
+              ue();
+              const qe = fe.reason
+                ? `Request ${h} rejected: ${fe.reason}`
+                : `Request ${h} rejected`;
+              b(new Error(qe));
+            }
+          }
+        });
+      if (C) {
+        if (
+          ((W = () => {
+            ue(),
+              b(
+                new Error(
+                  `[Directive MultiAgent] Approval wait aborted for request ${h}`,
+                ),
+              );
+          }),
+          C.aborted)
+        ) {
+          ue(),
+            b(
+              new Error(
+                `[Directive MultiAgent] Approval wait aborted for request ${h}`,
+              ),
+            );
+          return;
+        }
+        C.addEventListener("abort", W, { once: !0 });
+      }
+      L = setTimeout(() => {
+        ue();
+        const he = Math.round(E / 1e3);
+        b(
+          new Error(`[Directive MultiAgent] Approval timeout: Request ${h} not resolved within ${he}s.
 Solutions:
   1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()
   2. Set autoApproveToolCalls: true to auto-approve
   3. Increase approvalTimeoutMs (current: ${E}ms)
-See: https://directive.run/docs/ai/multi-agent`))},E)})}async function ct(s,h,C){Z();let g=V[s];if(!g){let b=Object.keys(V).join(", ")||"(none)";throw new Error(`[Directive MultiAgent] Unknown agent "${s}". Registered agents: ${b}`)}if(C?.signal?.aborted)throw new Error(`[Directive MultiAgent] Agent "${s}" run aborted before starting`);if(Ae==="paused")throw new Error("[Directive MultiAgent] Orchestrator is paused (budget exceeded or manual pause)");A++;try{let b=g.circuitBreaker??J;return b?await b.execute(()=>Tn(s,g,h,C)):await Tn(s,g,h,C)}catch(b){if(S&&!C?.__isReroute){let B=Qa(s),W=Za(B);if(W){let X={originalAgent:s,reroutedTo:W,reason:b instanceof Error?b.message:String(b),timestamp:Date.now()};try{S.onReroute?.(X)}catch{}return ae("onReroute",X),l&&l.record({type:"reroute",timestamp:Date.now(),agentId:s,snapshotId:null,from:s,to:W,reason:b instanceof Error?b.message:String(b)}),ct(W,h,{...C,__isReroute:!0})}if(S.degradation==="fallback-response"&&S.fallbackResponse!==void 0)return{output:S.fallbackResponse,messages:[],toolCalls:[],totalTokens:0}}let L=te[s];throw L&&L.status!=="error"&&(L.status="error",L.lastError=b instanceof Error?b.message:String(b)),b}finally{A--,Me()}}async function Tn(s,h,C,g){let b=Date.now(),L=it(s),B=te[s],W=h.agent,X=C,ue=xe.get(s);if(!ue){let Q=Object.keys(V).join(", ")||"(none)";throw new Error(`[Directive MultiAgent] Unknown agent "${s}". Registered agents: ${Q}`)}let ge=await ue.acquire(g?.signal),he=new AbortController,fe,qe;try{h.timeout&&(fe=setTimeout(()=>he.abort(),h.timeout)),g?.signal&&(qe=()=>he.abort(),g.signal.addEventListener("abort",qe,{once:!0}));let Q=h.memory??f;if(Q){let se=Q.getContextMessages();if(se.length>0){let ye=se.map(oe=>`${oe.role}: ${oe.content}`).join(`
-`);W={...W,instructions:(W.instructions??"")+`
+See: https://directive.run/docs/ai/multi-agent`),
+        );
+      }, E);
+    });
+  }
+  async function ct(s, h, C) {
+    Z();
+    const g = V[s];
+    if (!g) {
+      const b = Object.keys(V).join(", ") || "(none)";
+      throw new Error(
+        `[Directive MultiAgent] Unknown agent "${s}". Registered agents: ${b}`,
+      );
+    }
+    if (C?.signal?.aborted)
+      throw new Error(
+        `[Directive MultiAgent] Agent "${s}" run aborted before starting`,
+      );
+    if (Ae === "paused")
+      throw new Error(
+        "[Directive MultiAgent] Orchestrator is paused (budget exceeded or manual pause)",
+      );
+    A++;
+    try {
+      const b = g.circuitBreaker ?? J;
+      return b ? await b.execute(() => Tn(s, g, h, C)) : await Tn(s, g, h, C);
+    } catch (b) {
+      if (S && !C?.__isReroute) {
+        const B = Qa(s),
+          W = Za(B);
+        if (W) {
+          const X = {
+            originalAgent: s,
+            reroutedTo: W,
+            reason: b instanceof Error ? b.message : String(b),
+            timestamp: Date.now(),
+          };
+          try {
+            S.onReroute?.(X);
+          } catch {}
+          return (
+            ae("onReroute", X),
+            l &&
+              l.record({
+                type: "reroute",
+                timestamp: Date.now(),
+                agentId: s,
+                snapshotId: null,
+                from: s,
+                to: W,
+                reason: b instanceof Error ? b.message : String(b),
+              }),
+            ct(W, h, { ...C, __isReroute: !0 })
+          );
+        }
+        if (
+          S.degradation === "fallback-response" &&
+          S.fallbackResponse !== void 0
+        )
+          return {
+            output: S.fallbackResponse,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
+      }
+      const L = te[s];
+      throw (
+        (L &&
+          L.status !== "error" &&
+          ((L.status = "error"),
+          (L.lastError = b instanceof Error ? b.message : String(b))),
+        b)
+      );
+    } finally {
+      A--, Me();
+    }
+  }
+  async function Tn(s, h, C, g) {
+    let b = Date.now(),
+      L = it(s),
+      B = te[s],
+      W = h.agent,
+      X = C,
+      ue = xe.get(s);
+    if (!ue) {
+      const Q = Object.keys(V).join(", ") || "(none)";
+      throw new Error(
+        `[Directive MultiAgent] Unknown agent "${s}". Registered agents: ${Q}`,
+      );
+    }
+    let ge = await ue.acquire(g?.signal),
+      he = new AbortController(),
+      fe,
+      qe;
+    try {
+      h.timeout && (fe = setTimeout(() => he.abort(), h.timeout)),
+        g?.signal &&
+          ((qe = () => he.abort()),
+          g.signal.addEventListener("abort", qe, { once: !0 }));
+      const Q = h.memory ?? f;
+      if (Q) {
+        const se = Q.getContextMessages();
+        if (se.length > 0) {
+          const ye = se
+            .map((oe) => `${oe.role}: ${oe.content}`)
+            .join(`
+`);
+          W = {
+            ...W,
+            instructions:
+              (W.instructions ?? "") +
+              `
 
 Conversation context:
-`+ye}}}{let se=await nr("pre_input_guardrails",s,W.name,X,g?.signal);if(se.skip)return B.status="completed",Me(),{output:void 0,messages:[],toolCalls:[],totalTokens:0};X=se.input}let be=[...c.input??[],...h.guardrails?.input??[]].map((se,ye)=>Lt(se,ye,"input"));for(let se of be){let{name:ye}=se,oe={agentName:W.name,input:X,facts:Dt(L)},Ee=Date.now(),Te=await Bt(se,{input:X,agentName:W.name},oe);if(ae("onGuardrailCheck",{agentId:s,guardrailName:ye,guardrailType:"input",passed:Te.passed,reason:Te.reason,durationMs:Date.now()-Ee,timestamp:Date.now()}),!Te.passed)throw new qt({code:"INPUT_GUARDRAIL_FAILED",message:`Input guardrail "${ye}" failed: ${Te.reason}`,guardrailName:ye,guardrailType:"input",userMessage:Te.reason??"Input validation failed",agentName:W.name,input:X});Te.transformed!==void 0&&(X=Te.transformed)}ae("onAgentStart",{agentId:s,agentName:W.name,input:X,timestamp:b}),l&&l.record({type:"agent_start",timestamp:Date.now(),agentId:s,snapshotId:null,inputLength:X.length,...W.instructions?{instructions:W.instructions.slice(0,ee)}:{},...H?{input:X.slice(0,ee)}:{}}),N.batch(()=>{let se=wt(L);St(L,{...se,status:"running",input:X,startedAt:Date.now()})}),B.status="running",B.lastInput=X;{let se=await nr("pre_agent_run",s,W.name,X,g?.signal);if(se.skip)return B.status="completed",Me(),{output:void 0,messages:[],toolCalls:[],totalTokens:0};X=se.input}let Be=t,Re=g?.outputSchema!==void 0?g.outputSchema:h.outputSchema;Re&&(Be=Ia(t,{schema:Re,maxRetries:g?.maxSchemaRetries??h.maxSchemaRetries??2,extractJson:h.extractJson,schemaDescription:h.schemaDescription}));let Oe=h.retry??w,Se=await bn(Be,W,X,{...h.runOptions,...g,signal:he.signal,onMessage:se=>{let ye=[...Vr(L),se];Ft(L,ye.length>ie?ye.slice(-ie):ye),g?.onMessage?.(se)},onToolCall:async se=>{let ye=[...c.toolCall??[],...h.guardrails?.toolCall??[]].map((Ee,Te)=>Lt(Ee,Te,"toolCall"));for(let Ee of ye){let{name:Te}=Ee,et={agentName:W.name,input:X,facts:Dt(L)},tt=Date.now(),yt=await Bt(Ee,{toolCall:se,agentName:W.name,input:X},et);if(ae("onGuardrailCheck",{agentId:s,guardrailName:Te,guardrailType:"toolCall",passed:yt.passed,reason:yt.reason,durationMs:Date.now()-tt,timestamp:Date.now()}),!yt.passed)throw new qt({code:"TOOL_CALL_GUARDRAIL_FAILED",message:`Tool call guardrail "${Te}" failed: ${yt.reason}`,guardrailName:Te,guardrailType:"toolCall",userMessage:yt.reason??"Tool call blocked",data:{toolCall:se},agentName:W.name,input:X})}if(!D){let Ee=`tool-${s}-${se.id}`,Te={id:Ee,type:"tool_call",agentName:W.name,description:`Tool call: ${se.name}`,data:se,requestedAt:Date.now()};Ie.set(Ee,s),N.batch(()=>{let et=Nt(L);xt(L,{...et,pending:[...et.pending,Te]})}),U?.(Te),await Ha(s,Ee,g?.signal)}let oe=[...Yr(L),se];Ut(L,oe.length>le?oe.slice(-le):oe),g?.onToolCall?.(se)}},Oe?{...Oe,onRetry:(se,ye,oe)=>{Oe.onRetry?.(se,ye,oe),ae("onAgentRetry",{agentId:s,agentName:W.name,input:X,attempt:se,error:ye,delayMs:oe,timestamp:Date.now()})}}:void 0);if((await nr("pre_output_guardrails",s,W.name,X,g?.signal)).skip)return B.status="completed",Me(),Se;let pe=[...c.output??[],...h.guardrails?.output??[]].map((se,ye)=>Lt(se,ye,"output"));for(let se of pe){let{name:ye}=se,oe={agentName:W.name,input:X,facts:Dt(L)},Ee=Date.now(),Te=await Bt(se,{output:Se.output,agentName:W.name,input:X,messages:Se.messages},oe);if(ae("onGuardrailCheck",{agentId:s,guardrailName:ye,guardrailType:"output",passed:Te.passed,reason:Te.reason,durationMs:Date.now()-Ee,timestamp:Date.now()}),!Te.passed)throw new qt({code:"OUTPUT_GUARDRAIL_FAILED",message:`Output guardrail "${ye}" failed: ${Te.reason}`,guardrailName:ye,guardrailType:"output",userMessage:Te.reason??"Output validation failed",agentName:W.name,input:X});Te.transformed!==void 0&&(Se.output=Te.transformed)}N.batch(()=>{let se=wt(L);St(L,{...se,status:"completed",output:Se.output,tokenUsage:se.tokenUsage+Se.totalTokens,turnCount:se.turnCount+Se.messages.length,completedAt:Date.now()})}),B.status="completed",B.lastOutput=Se.output,B.runCount++,B.totalTokens+=Se.totalTokens,Me();let Ce=it("__coord"),me=!1,He=0;if(N.batch(()=>{let se=kt(Ce,"__globalTokens")+Se.totalTokens;if(de=se,Xe(Ce,"__globalTokens",se),O&&M){He=se/O;let ye=kt(Ce,"__budgetWarningFired");He>=m&&!ye&&(Xe(Ce,"__budgetWarningFired",!0),me=!0)}}),me)try{M({currentTokens:de,maxBudget:O,percentage:He})}catch(se){I&&console.debug("[Directive MultiAgent] onBudgetWarning threw:",se)}if(Q&&Se.messages.length>0)try{Q.addMessages(Se.messages)}catch(se){I&&console.debug("[Directive MultiAgent] Memory addMessages failed:",se)}if(ae("onAgentComplete",{agentId:s,agentName:W.name,input:X,output:Se.output,tokenUsage:Se.totalTokens,durationMs:Date.now()-b,timestamp:Date.now()}),l){let se=typeof Se.output=="string"?Se.output:ir(Se.output);l.record({type:"agent_complete",timestamp:Date.now(),agentId:s,snapshotId:null,outputLength:se.length,totalTokens:Se.totalTokens,inputTokens:Se.tokenUsage?.inputTokens??0,outputTokens:Se.tokenUsage?.outputTokens??0,durationMs:Date.now()-b,modelId:h.agent.model??void 0,...H?{output:se.slice(0,ee)}:{}})}return P&&P.recordSuccess(s,Date.now()-b),Ze(),await nr("post_run",s,W.name,X,g?.signal),Se}catch(Q){throw B.status="error",B.lastError=Q instanceof Error?Q.message:String(Q),Me(),N.batch(()=>{let be=wt(L);St(L,{...be,status:"error",error:Q instanceof Error?Q.message:String(Q),completedAt:Date.now()})}),ae("onAgentError",{agentId:s,agentName:W.name,input:X,error:Q instanceof Error?Q:new Error(String(Q)),durationMs:Date.now()-b,timestamp:Date.now()}),l&&l.record({type:"agent_error",timestamp:Date.now(),agentId:s,snapshotId:null,errorMessage:Q instanceof Error?Q.message:String(Q),durationMs:Date.now()-b}),P&&P.recordFailure(s,Date.now()-b,Q instanceof Error?Q:new Error(String(Q))),Ze(),Q}finally{fe&&clearTimeout(fe),qe&&g?.signal&&g.signal.removeEventListener("abort",qe),ge()}}function Xr(s,h,C={}){if(Z(),!V[s]){let Oe=Object.keys(V).join(", ")||"(none)";throw new Error(`[Directive MultiAgent] Unknown agent "${s}". Registered agents: ${Oe}`)}let g=1e4,b=1e5,L=new AbortController,B=[],W=[],X=!1,ue=Date.now(),ge=0,he="",fe;C.signal&&(fe=()=>L.abort(),C.signal.addEventListener("abort",fe,{once:!0}));let qe=()=>{fe&&C.signal&&C.signal.removeEventListener("abort",fe)},Q=Oe=>{if(X)return;let Se=W.shift();Se?Se(Oe):(B.length>=g&&B.shift(),B.push(Oe))},be=()=>{X=!0,qe();for(let Oe of W)Oe(null);W.length=0},Be=(async()=>{Q({type:"progress",phase:"starting",message:"Running input guardrails"});try{let Oe=await ct(s,h,{signal:L.signal,onMessage:pe=>{if(Q({type:"message",message:pe}),pe.role==="assistant"&&pe.content){let Ce=Math.ceil(pe.content.length/4);ge+=Ce,he+=pe.content,he.length>b&&(he=he.slice(-b)),Q({type:"token",data:pe.content,tokenCount:ge})}},onToolCall:async pe=>{Q({type:"tool_start",tool:pe.name,toolCallId:pe.id,arguments:pe.arguments}),pe.result&&Q({type:"tool_end",tool:pe.name,toolCallId:pe.id,result:pe.result})}}),Se=Date.now()-ue;return Q({type:"done",totalTokens:Oe.totalTokens,duration:Se,droppedTokens:0}),be(),Oe}catch(Oe){throw Oe instanceof qt&&Q({type:"guardrail_triggered",guardrailName:Oe.guardrailName,reason:Oe.message,partialOutput:he,stopped:!0}),Q({type:"error",error:Oe instanceof Error?Oe:new Error(String(Oe))}),be(),Oe}})(),Re={[Symbol.asyncIterator](){return{async next(){return B.length>0?{done:!1,value:B.shift()}:X?{done:!0,value:void 0}:new Promise(Oe=>{W.push(Se=>{Oe(Se===null?{done:!0,value:void 0}:{done:!1,value:Se})})})}}}};return Be.catch(()=>{}),{stream:Re,result:Be,abort:()=>{L.abort(),be()}}}async function Wa(s,h,C){let g=Date.now();C&&ae("onPatternStart",{patternId:C,patternType:"parallel",input:h,timestamp:g});let b=new AbortController,L;s.timeout&&(L=setTimeout(()=>b.abort(),s.timeout));let B;try{let W=s.agents.map(ge=>ct(ge,h,{signal:b.signal}).catch(he=>{if(s.minSuccess===void 0)throw he;return null})),X=await Promise.all(W),ue=X.filter(ge=>ge!==null);if(s.minSuccess!==void 0&&ue.length<s.minSuccess){let ge=X.length-ue.length;throw new Error(`[Directive MultiAgent] Parallel pattern: Only ${ue.length}/${s.agents.length} agents succeeded (minimum required: ${s.minSuccess}, failed: ${ge})`)}return s.merge(ue)}catch(W){throw B=W instanceof Error?W:new Error(String(W)),W}finally{L&&clearTimeout(L),C&&ae("onPatternComplete",{patternId:C,patternType:"parallel",durationMs:Date.now()-g,timestamp:Date.now(),error:B})}}async function ar(s,h,C){let g=oa(s);if(C?.when)try{if(!C.when({step:g,patternType:s.type,facts:s.type==="goal"?s.facts:void 0,satisfaction:s.type==="goal"?s.lastSatisfaction:void 0}))return null}catch{return null}try{let b={version:1,id:s.id,createdAt:s.createdAt,label:s.label,systemExport:JSON.stringify(s),timelineExport:null,localState:{type:"multi",globalTokenCount:0,globalStatus:"idle",agentStates:{},handoffCounter:0,pendingHandoffs:[],handoffResults:[],roundRobinCounters:null},memoryExport:null,orchestratorType:"multi",metadata:{patternType:s.type}};return await h.save(b),l&&l.record({type:"checkpoint_save",timestamp:Date.now(),snapshotId:null,checkpointId:s.id,patternType:s.type,step:g}),ae("onCheckpointSave",{checkpointId:s.id,patternType:s.type,step:g,timestamp:Date.now()}),s.id}catch(b){let L=b instanceof Error?b:new Error(String(b));return console.error(`[Directive MultiAgent] ${s.type}: checkpoint save failed:`,L),ae("onCheckpointError",{patternType:s.type,step:g,error:L,timestamp:Date.now()}),null}}async function Qr(s,h,C,g){let b=Date.now(),L=C??"__inline_sequential";C&&ae("onPatternStart",{patternId:C,patternType:"sequential",input:h,timestamp:b});let B=s.checkpoint,W=B?.store??j,X=B?.everyN??5,ue=B?.labelPrefix??"sequential",ge=g?.currentInput??h,he,fe=g?.results?[...g.results]:[],qe=g?.step??0,Q;if(g&&fe.length>0){let be=fe[fe.length-1];he={output:be.output,totalTokens:be.totalTokens,messages:[],toolCalls:[]}}try{for(let be=qe;be<s.agents.length;be++){let Be=s.agents[be];{let Re=await nr("pre_pattern_step",Be,V[Be]?.agent.name??Be,ge,void 0,{patternId:C});if(Re.skip)continue;ge=Re.input}try{if(he=await ct(Be,ge),fe.push({agentId:Be,output:he.output,totalTokens:he.totalTokens}),be<s.agents.length-1&&(s.transform?ge=s.transform(he.output,Be,be):ge=typeof he.output=="string"?he.output:ir(he.output)),B&&W&&be>qe&&(be-qe)%X===0){let Re=be<s.agents.length-1?ge:h;await ar({type:"sequential",version:1,id:Gt(),createdAt:new Date().toISOString(),label:`${ue}:step-${be+1}`,patternId:L,stepsTotal:s.agents.length,step:be+1,currentInput:Re,results:[...fe]},W,B)}}catch(Re){if(!s.continueOnError)throw Re}}if(!he)throw new Error("[Directive MultiAgent] No successful results in sequential pattern");return s.extract?s.extract(he.output):he.output}catch(be){throw Q=be instanceof Error?be:new Error(String(be)),be}finally{C&&ae("onPatternComplete",{patternId:C,patternType:"sequential",durationMs:Date.now()-b,timestamp:Date.now(),error:Q})}}async function Zr(s,h,C,g){let b=Date.now(),L=C??"__inline_supervisor";C&&ae("onPatternStart",{patternId:C,patternType:"supervisor",input:h,timestamp:b});let B=s.checkpoint,W=B?.store??j,X=B?.everyN??5,ue=B?.labelPrefix??"supervisor",ge=[],he=g?.workerResults?[...g.workerResults]:[],fe=s.maxRounds??5;if(fe<1||!Number.isFinite(fe))throw new Error("[Directive MultiAgent] supervisor maxRounds must be >= 1");let qe;if(g)for(let be of g.workerResults)ge.push({output:be.output,totalTokens:be.totalTokens,messages:[],toolCalls:[]});let Q=g?.round??0;try{let be;g?be={output:g.supervisorOutput,totalTokens:0,messages:[],toolCalls:[]}:be=await ct(s.supervisor,h);let Be=g?.currentInput??h;for(let Re=Q;Re<fe;Re++){let Oe=be.output,Se;if(typeof Oe=="string")try{Se=JSON.parse(Oe)}catch{throw new Error(`[Directive MultiAgent] Supervisor "${s.supervisor}" returned unparseable output (round ${Re+1}). Expected JSON with { action, worker?, workerInput? } but got: ${Oe.slice(0,200)}`)}else if(Oe&&typeof Oe=="object"&&"action"in Oe)Se=Oe;else throw new Error(`[Directive MultiAgent] Supervisor "${s.supervisor}" returned invalid output (round ${Re+1}). Expected { action: "delegate"|"complete", worker?, workerInput? }`);if(Se.action==="complete"||!Se.worker)break;if(!s.workers.includes(Se.worker)){let Ce=s.workers.join(", ");throw new Error(`[Directive MultiAgent] Supervisor delegated to unknown worker "${Se.worker}". Available workers: ${Ce}`)}let pe=await ct(Se.worker,Se.workerInput??"");ge.push(pe),he.push({output:pe.output,totalTokens:pe.totalTokens}),Be=`Worker ${Se.worker} completed with result: ${ir(pe.output)}`,be=await ct(s.supervisor,Be),B&&W&&Re>Q&&(Re-Q)%X===0&&await ar({type:"supervisor",version:1,id:Gt(),createdAt:new Date().toISOString(),label:`${ue}:round-${Re+1}`,patternId:L,stepsTotal:s.maxRounds??10,round:Re+1,supervisorOutput:be.output,workerResults:[...he],currentInput:Be},W,B)}return s.extract?s.extract(be.output,ge):be.output}catch(be){throw qe=be instanceof Error?be:new Error(String(be)),be}finally{C&&ae("onPatternComplete",{patternId:C,patternType:"supervisor",durationMs:Date.now()-b,timestamp:Date.now(),error:qe})}}async function en(s,h,C,g){let b=Date.now(),L=C??"__inline_dag";C&&ae("onPatternStart",{patternId:C,patternType:"dag",input:h,timestamp:b});let B=s.checkpoint,W=B?.store??j,X=B?.everyN??5,ue=B?.labelPrefix??"dag",ge=g?.completedCount??0,he=0,fe=Promise.resolve(),qe=Object.keys(s.nodes).length,Q={input:g?.input??h,outputs:Object.create(null),statuses:Object.create(null),errors:Object.create(null),results:Object.create(null)};for(let Ce of Object.keys(s.nodes))Q.statuses[Ce]="pending";if(g){for(let[Ce,me]of Object.entries(g.statuses))Q.statuses[Ce]=me;for(let[Ce,me]of Object.entries(g.outputs))Q.outputs[Ce]=me;for(let[Ce,me]of Object.entries(g.errors))Q.errors[Ce]=me;for(let[Ce,me]of Object.entries(g.nodeResults))Q.results[Ce]={output:me.output,totalTokens:me.totalTokens,messages:[],toolCalls:[]}}let be=s.onNodeError??"fail",Be=s.maxConcurrent??1/0,Re=new AbortController,Oe,Se;s.timeout&&(Oe=setTimeout(()=>Re.abort(),s.timeout));try{let Ce=function(){for(let[ye,oe]of Object.entries(s.nodes)){if(Q.statuses[ye]!=="pending")continue;let Ee=be==="fail"?new Set(["completed","skipped"]):new Set(["completed","skipped","error"]);if((oe.deps??[]).every(Te=>Ee.has(Q.statuses[Te]))){if(be==="skip-downstream"&&(oe.deps??[]).some(Te=>Q.statuses[Te]==="error"||Q.statuses[Te]==="skipped")){Q.statuses[ye]="skipped",l&&l.record({type:"dag_node_update",timestamp:Date.now(),snapshotId:null,nodeId:ye,status:"skipped",deps:oe.deps??[]}),ae("onDagNodeSkipped",{patternId:L,nodeId:ye,agentId:oe.agent,reason:"upstream dependency errored",timestamp:Date.now()});continue}if(oe.when)try{if(!oe.when(Q)){Q.statuses[ye]="skipped",l&&l.record({type:"dag_node_update",timestamp:Date.now(),snapshotId:null,nodeId:ye,status:"skipped",deps:oe.deps??[]}),ae("onDagNodeSkipped",{patternId:L,nodeId:ye,agentId:oe.agent,reason:"when() returned false",timestamp:Date.now()});continue}}catch{Q.statuses[ye]="skipped";continue}Q.statuses[ye]="ready"}}};var pe=Ce;if(!g)for(let[ye,oe]of Object.entries(s.nodes))(!oe.deps||oe.deps.length===0)&&(Q.statuses[ye]="ready");let me=new Set,He=0;async function se(ye,oe){let Ee=Date.now();Q.statuses[ye]="running",l&&l.record({type:"dag_node_update",timestamp:Ee,snapshotId:null,nodeId:ye,status:"running",deps:oe.deps??[]}),ae("onDagNodeStart",{patternId:L,nodeId:ye,agentId:oe.agent,timestamp:Ee});let Te;if(oe.transform)Te=oe.transform(Q);else if(oe.deps&&oe.deps.length>0){let Ye=Object.create(null);for(let dt of oe.deps)Q.outputs[dt]!==void 0&&(Ye[dt]=Q.outputs[dt]);Te=JSON.stringify(Ye)}else Te=h;let et=new AbortController,tt;oe.timeout&&(tt=setTimeout(()=>et.abort(),oe.timeout));let yt=()=>et.abort();Re.signal.addEventListener("abort",yt,{once:!0});try{let Ye=await ct(oe.agent,Te,{signal:et.signal});if(Q.outputs[ye]=Ye.output,Q.results[ye]=Ye,Q.statuses[ye]="completed",l&&l.record({type:"dag_node_update",timestamp:Date.now(),snapshotId:null,nodeId:ye,status:"completed",deps:oe.deps??[]}),ae("onDagNodeComplete",{patternId:L,nodeId:ye,agentId:oe.agent,durationMs:Date.now()-Ee,timestamp:Date.now()}),ge++,B&&W&&ge>he&&ge-he>=X){he=ge;let dt=Object.create(null);for(let[rn,hr]of Object.entries(Q.results))dt[rn]={output:hr.output,totalTokens:hr.totalTokens};let Tt={type:"dag",version:1,id:Gt(),createdAt:new Date().toISOString(),label:`${ue}:node-${ge}`,patternId:L,stepsTotal:qe,statuses:{...Q.statuses},outputs:{...Q.outputs},errors:{...Q.errors},completedCount:ge,nodeResults:dt,input:Q.input};fe=fe.then(()=>ar(Tt,W,B)),await fe}}catch(Ye){if(Q.statuses[ye]="error",Q.errors[ye]=Ye instanceof Error?Ye.message:String(Ye),l&&l.record({type:"dag_node_update",timestamp:Date.now(),snapshotId:null,nodeId:ye,status:"error",deps:oe.deps??[]}),ae("onDagNodeError",{patternId:L,nodeId:ye,agentId:oe.agent,error:Ye instanceof Error?Ye:new Error(String(Ye)),durationMs:Date.now()-Ee,timestamp:Date.now()}),be==="fail")throw Re.abort(),Ye}finally{tt&&clearTimeout(tt),Re.signal.removeEventListener("abort",yt),He--}}for(;!Re.signal.aborted;){Ce();let ye=Object.entries(s.nodes).filter(([oe])=>Q.statuses[oe]==="ready").sort(([,oe],[,Ee])=>(Ee.priority??0)-(oe.priority??0));for(let[oe,Ee]of ye){if(He>=Be)break;He++;let Te=se(oe,Ee).finally(()=>{me.delete(Te)});me.add(Te)}if(!Object.values(Q.statuses).some(oe=>oe==="pending"||oe==="running"||oe==="ready"))break;if(me.size>0)await Promise.race(me);else break}return me.size>0&&await Promise.allSettled(me),await s.merge(Q)}catch(Ce){throw Se=Ce instanceof Error?Ce:new Error(String(Ce)),Ce}finally{Oe&&clearTimeout(Oe),C&&ae("onPatternComplete",{patternId:C,patternType:"dag",durationMs:Date.now()-b,timestamp:Date.now(),error:Se})}}async function Tr(s,h,C,g){let b=Date.now(),L=C??"__inline_reflect",B=s.maxIterations??2;if(B<1)throw new Error("[Directive MultiAgent] Reflect pattern maxIterations must be >= 1");I&&B>3&&console.warn("[Directive MultiAgent] Reflection loops > 3 iterations rarely improve quality. Consider reducing maxIterations.");let W=s.signal,X,ue;if(s.timeout&&!W){let Ce=new AbortController;X=setTimeout(()=>Ce.abort(),s.timeout),W=Ce.signal}else if(s.timeout&&W){let Ce=new AbortController;X=setTimeout(()=>Ce.abort(),s.timeout),ue=()=>Ce.abort(),W.addEventListener("abort",ue,{once:!0}),W=Ce.signal}let ge=s.parseEvaluation??(Ce=>{if(typeof Ce=="string")try{return JSON.parse(Ce)}catch{return{passed:!1,feedback:`Evaluator returned unparseable output: ${Ce.slice(0,200)}`}}return Ce&&typeof Ce=="object"&&"passed"in Ce?Ce:{passed:!1,feedback:"Evaluator returned invalid format"}}),he=s.buildRetryInput??((Ce,me,He)=>`${Ce}
+` +
+              ye,
+          };
+        }
+      }
+      {
+        const se = await nr("pre_input_guardrails", s, W.name, X, g?.signal);
+        if (se.skip)
+          return (
+            (B.status = "completed"),
+            Me(),
+            { output: void 0, messages: [], toolCalls: [], totalTokens: 0 }
+          );
+        X = se.input;
+      }
+      const be = [...(c.input ?? []), ...(h.guardrails?.input ?? [])].map(
+        (se, ye) => Lt(se, ye, "input"),
+      );
+      for (const se of be) {
+        const { name: ye } = se,
+          oe = { agentName: W.name, input: X, facts: Dt(L) },
+          Ee = Date.now(),
+          Te = await Bt(se, { input: X, agentName: W.name }, oe);
+        if (
+          (ae("onGuardrailCheck", {
+            agentId: s,
+            guardrailName: ye,
+            guardrailType: "input",
+            passed: Te.passed,
+            reason: Te.reason,
+            durationMs: Date.now() - Ee,
+            timestamp: Date.now(),
+          }),
+          !Te.passed)
+        )
+          throw new qt({
+            code: "INPUT_GUARDRAIL_FAILED",
+            message: `Input guardrail "${ye}" failed: ${Te.reason}`,
+            guardrailName: ye,
+            guardrailType: "input",
+            userMessage: Te.reason ?? "Input validation failed",
+            agentName: W.name,
+            input: X,
+          });
+        Te.transformed !== void 0 && (X = Te.transformed);
+      }
+      ae("onAgentStart", {
+        agentId: s,
+        agentName: W.name,
+        input: X,
+        timestamp: b,
+      }),
+        l &&
+          l.record({
+            type: "agent_start",
+            timestamp: Date.now(),
+            agentId: s,
+            snapshotId: null,
+            inputLength: X.length,
+            ...(W.instructions
+              ? { instructions: W.instructions.slice(0, ee) }
+              : {}),
+            ...(H ? { input: X.slice(0, ee) } : {}),
+          }),
+        N.batch(() => {
+          const se = wt(L);
+          St(L, { ...se, status: "running", input: X, startedAt: Date.now() });
+        }),
+        (B.status = "running"),
+        (B.lastInput = X);
+      {
+        const se = await nr("pre_agent_run", s, W.name, X, g?.signal);
+        if (se.skip)
+          return (
+            (B.status = "completed"),
+            Me(),
+            { output: void 0, messages: [], toolCalls: [], totalTokens: 0 }
+          );
+        X = se.input;
+      }
+      let Be = t,
+        Re = g?.outputSchema !== void 0 ? g.outputSchema : h.outputSchema;
+      Re &&
+        (Be = Ia(t, {
+          schema: Re,
+          maxRetries: g?.maxSchemaRetries ?? h.maxSchemaRetries ?? 2,
+          extractJson: h.extractJson,
+          schemaDescription: h.schemaDescription,
+        }));
+      const Oe = h.retry ?? w,
+        Se = await bn(
+          Be,
+          W,
+          X,
+          {
+            ...h.runOptions,
+            ...g,
+            signal: he.signal,
+            onMessage: (se) => {
+              const ye = [...Vr(L), se];
+              Ft(L, ye.length > ie ? ye.slice(-ie) : ye), g?.onMessage?.(se);
+            },
+            onToolCall: async (se) => {
+              const ye = [
+                ...(c.toolCall ?? []),
+                ...(h.guardrails?.toolCall ?? []),
+              ].map((Ee, Te) => Lt(Ee, Te, "toolCall"));
+              for (const Ee of ye) {
+                const { name: Te } = Ee,
+                  et = { agentName: W.name, input: X, facts: Dt(L) },
+                  tt = Date.now(),
+                  yt = await Bt(
+                    Ee,
+                    { toolCall: se, agentName: W.name, input: X },
+                    et,
+                  );
+                if (
+                  (ae("onGuardrailCheck", {
+                    agentId: s,
+                    guardrailName: Te,
+                    guardrailType: "toolCall",
+                    passed: yt.passed,
+                    reason: yt.reason,
+                    durationMs: Date.now() - tt,
+                    timestamp: Date.now(),
+                  }),
+                  !yt.passed)
+                )
+                  throw new qt({
+                    code: "TOOL_CALL_GUARDRAIL_FAILED",
+                    message: `Tool call guardrail "${Te}" failed: ${yt.reason}`,
+                    guardrailName: Te,
+                    guardrailType: "toolCall",
+                    userMessage: yt.reason ?? "Tool call blocked",
+                    data: { toolCall: se },
+                    agentName: W.name,
+                    input: X,
+                  });
+              }
+              if (!D) {
+                const Ee = `tool-${s}-${se.id}`,
+                  Te = {
+                    id: Ee,
+                    type: "tool_call",
+                    agentName: W.name,
+                    description: `Tool call: ${se.name}`,
+                    data: se,
+                    requestedAt: Date.now(),
+                  };
+                Ie.set(Ee, s),
+                  N.batch(() => {
+                    const et = Nt(L);
+                    xt(L, { ...et, pending: [...et.pending, Te] });
+                  }),
+                  U?.(Te),
+                  await Ha(s, Ee, g?.signal);
+              }
+              const oe = [...Yr(L), se];
+              Ut(L, oe.length > le ? oe.slice(-le) : oe), g?.onToolCall?.(se);
+            },
+          },
+          Oe
+            ? {
+                ...Oe,
+                onRetry: (se, ye, oe) => {
+                  Oe.onRetry?.(se, ye, oe),
+                    ae("onAgentRetry", {
+                      agentId: s,
+                      agentName: W.name,
+                      input: X,
+                      attempt: se,
+                      error: ye,
+                      delayMs: oe,
+                      timestamp: Date.now(),
+                    });
+                },
+              }
+            : void 0,
+        );
+      if ((await nr("pre_output_guardrails", s, W.name, X, g?.signal)).skip)
+        return (B.status = "completed"), Me(), Se;
+      const pe = [...(c.output ?? []), ...(h.guardrails?.output ?? [])].map(
+        (se, ye) => Lt(se, ye, "output"),
+      );
+      for (const se of pe) {
+        const { name: ye } = se,
+          oe = { agentName: W.name, input: X, facts: Dt(L) },
+          Ee = Date.now(),
+          Te = await Bt(
+            se,
+            {
+              output: Se.output,
+              agentName: W.name,
+              input: X,
+              messages: Se.messages,
+            },
+            oe,
+          );
+        if (
+          (ae("onGuardrailCheck", {
+            agentId: s,
+            guardrailName: ye,
+            guardrailType: "output",
+            passed: Te.passed,
+            reason: Te.reason,
+            durationMs: Date.now() - Ee,
+            timestamp: Date.now(),
+          }),
+          !Te.passed)
+        )
+          throw new qt({
+            code: "OUTPUT_GUARDRAIL_FAILED",
+            message: `Output guardrail "${ye}" failed: ${Te.reason}`,
+            guardrailName: ye,
+            guardrailType: "output",
+            userMessage: Te.reason ?? "Output validation failed",
+            agentName: W.name,
+            input: X,
+          });
+        Te.transformed !== void 0 && (Se.output = Te.transformed);
+      }
+      N.batch(() => {
+        const se = wt(L);
+        St(L, {
+          ...se,
+          status: "completed",
+          output: Se.output,
+          tokenUsage: se.tokenUsage + Se.totalTokens,
+          turnCount: se.turnCount + Se.messages.length,
+          completedAt: Date.now(),
+        });
+      }),
+        (B.status = "completed"),
+        (B.lastOutput = Se.output),
+        B.runCount++,
+        (B.totalTokens += Se.totalTokens),
+        Me();
+      let Ce = it("__coord"),
+        me = !1,
+        He = 0;
+      if (
+        (N.batch(() => {
+          const se = kt(Ce, "__globalTokens") + Se.totalTokens;
+          if (((de = se), Xe(Ce, "__globalTokens", se), O && M)) {
+            He = se / O;
+            const ye = kt(Ce, "__budgetWarningFired");
+            He >= m && !ye && (Xe(Ce, "__budgetWarningFired", !0), (me = !0));
+          }
+        }),
+        me)
+      )
+        try {
+          M({ currentTokens: de, maxBudget: O, percentage: He });
+        } catch (se) {
+          I &&
+            console.debug("[Directive MultiAgent] onBudgetWarning threw:", se);
+        }
+      if (Q && Se.messages.length > 0)
+        try {
+          Q.addMessages(Se.messages);
+        } catch (se) {
+          I &&
+            console.debug(
+              "[Directive MultiAgent] Memory addMessages failed:",
+              se,
+            );
+        }
+      if (
+        (ae("onAgentComplete", {
+          agentId: s,
+          agentName: W.name,
+          input: X,
+          output: Se.output,
+          tokenUsage: Se.totalTokens,
+          durationMs: Date.now() - b,
+          timestamp: Date.now(),
+        }),
+        l)
+      ) {
+        const se = typeof Se.output == "string" ? Se.output : ir(Se.output);
+        l.record({
+          type: "agent_complete",
+          timestamp: Date.now(),
+          agentId: s,
+          snapshotId: null,
+          outputLength: se.length,
+          totalTokens: Se.totalTokens,
+          inputTokens: Se.tokenUsage?.inputTokens ?? 0,
+          outputTokens: Se.tokenUsage?.outputTokens ?? 0,
+          durationMs: Date.now() - b,
+          modelId: h.agent.model ?? void 0,
+          ...(H ? { output: se.slice(0, ee) } : {}),
+        });
+      }
+      return (
+        P && P.recordSuccess(s, Date.now() - b),
+        Ze(),
+        await nr("post_run", s, W.name, X, g?.signal),
+        Se
+      );
+    } catch (Q) {
+      throw (
+        ((B.status = "error"),
+        (B.lastError = Q instanceof Error ? Q.message : String(Q)),
+        Me(),
+        N.batch(() => {
+          const be = wt(L);
+          St(L, {
+            ...be,
+            status: "error",
+            error: Q instanceof Error ? Q.message : String(Q),
+            completedAt: Date.now(),
+          });
+        }),
+        ae("onAgentError", {
+          agentId: s,
+          agentName: W.name,
+          input: X,
+          error: Q instanceof Error ? Q : new Error(String(Q)),
+          durationMs: Date.now() - b,
+          timestamp: Date.now(),
+        }),
+        l &&
+          l.record({
+            type: "agent_error",
+            timestamp: Date.now(),
+            agentId: s,
+            snapshotId: null,
+            errorMessage: Q instanceof Error ? Q.message : String(Q),
+            durationMs: Date.now() - b,
+          }),
+        P &&
+          P.recordFailure(
+            s,
+            Date.now() - b,
+            Q instanceof Error ? Q : new Error(String(Q)),
+          ),
+        Ze(),
+        Q)
+      );
+    } finally {
+      fe && clearTimeout(fe),
+        qe && g?.signal && g.signal.removeEventListener("abort", qe),
+        ge();
+    }
+  }
+  function Xr(s, h, C = {}) {
+    if ((Z(), !V[s])) {
+      const Oe = Object.keys(V).join(", ") || "(none)";
+      throw new Error(
+        `[Directive MultiAgent] Unknown agent "${s}". Registered agents: ${Oe}`,
+      );
+    }
+    let g = 1e4,
+      b = 1e5,
+      L = new AbortController(),
+      B = [],
+      W = [],
+      X = !1,
+      ue = Date.now(),
+      ge = 0,
+      he = "",
+      fe;
+    C.signal &&
+      ((fe = () => L.abort()),
+      C.signal.addEventListener("abort", fe, { once: !0 }));
+    const qe = () => {
+        fe && C.signal && C.signal.removeEventListener("abort", fe);
+      },
+      Q = (Oe) => {
+        if (X) return;
+        const Se = W.shift();
+        Se ? Se(Oe) : (B.length >= g && B.shift(), B.push(Oe));
+      },
+      be = () => {
+        (X = !0), qe();
+        for (const Oe of W) Oe(null);
+        W.length = 0;
+      },
+      Be = (async () => {
+        Q({
+          type: "progress",
+          phase: "starting",
+          message: "Running input guardrails",
+        });
+        try {
+          const Oe = await ct(s, h, {
+              signal: L.signal,
+              onMessage: (pe) => {
+                if (
+                  (Q({ type: "message", message: pe }),
+                  pe.role === "assistant" && pe.content)
+                ) {
+                  const Ce = Math.ceil(pe.content.length / 4);
+                  (ge += Ce),
+                    (he += pe.content),
+                    he.length > b && (he = he.slice(-b)),
+                    Q({ type: "token", data: pe.content, tokenCount: ge });
+                }
+              },
+              onToolCall: async (pe) => {
+                Q({
+                  type: "tool_start",
+                  tool: pe.name,
+                  toolCallId: pe.id,
+                  arguments: pe.arguments,
+                }),
+                  pe.result &&
+                    Q({
+                      type: "tool_end",
+                      tool: pe.name,
+                      toolCallId: pe.id,
+                      result: pe.result,
+                    });
+              },
+            }),
+            Se = Date.now() - ue;
+          return (
+            Q({
+              type: "done",
+              totalTokens: Oe.totalTokens,
+              duration: Se,
+              droppedTokens: 0,
+            }),
+            be(),
+            Oe
+          );
+        } catch (Oe) {
+          throw (
+            (Oe instanceof qt &&
+              Q({
+                type: "guardrail_triggered",
+                guardrailName: Oe.guardrailName,
+                reason: Oe.message,
+                partialOutput: he,
+                stopped: !0,
+              }),
+            Q({
+              type: "error",
+              error: Oe instanceof Error ? Oe : new Error(String(Oe)),
+            }),
+            be(),
+            Oe)
+          );
+        }
+      })(),
+      Re = {
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              return B.length > 0
+                ? { done: !1, value: B.shift() }
+                : X
+                  ? { done: !0, value: void 0 }
+                  : new Promise((Oe) => {
+                      W.push((Se) => {
+                        Oe(
+                          Se === null
+                            ? { done: !0, value: void 0 }
+                            : { done: !1, value: Se },
+                        );
+                      });
+                    });
+            },
+          };
+        },
+      };
+    return (
+      Be.catch(() => {}),
+      {
+        stream: Re,
+        result: Be,
+        abort: () => {
+          L.abort(), be();
+        },
+      }
+    );
+  }
+  async function Wa(s, h, C) {
+    const g = Date.now();
+    C &&
+      ae("onPatternStart", {
+        patternId: C,
+        patternType: "parallel",
+        input: h,
+        timestamp: g,
+      });
+    let b = new AbortController(),
+      L;
+    s.timeout && (L = setTimeout(() => b.abort(), s.timeout));
+    let B;
+    try {
+      const W = s.agents.map((ge) =>
+          ct(ge, h, { signal: b.signal }).catch((he) => {
+            if (s.minSuccess === void 0) throw he;
+            return null;
+          }),
+        ),
+        X = await Promise.all(W),
+        ue = X.filter((ge) => ge !== null);
+      if (s.minSuccess !== void 0 && ue.length < s.minSuccess) {
+        const ge = X.length - ue.length;
+        throw new Error(
+          `[Directive MultiAgent] Parallel pattern: Only ${ue.length}/${s.agents.length} agents succeeded (minimum required: ${s.minSuccess}, failed: ${ge})`,
+        );
+      }
+      return s.merge(ue);
+    } catch (W) {
+      throw ((B = W instanceof Error ? W : new Error(String(W))), W);
+    } finally {
+      L && clearTimeout(L),
+        C &&
+          ae("onPatternComplete", {
+            patternId: C,
+            patternType: "parallel",
+            durationMs: Date.now() - g,
+            timestamp: Date.now(),
+            error: B,
+          });
+    }
+  }
+  async function ar(s, h, C) {
+    const g = oa(s);
+    if (C?.when)
+      try {
+        if (
+          !C.when({
+            step: g,
+            patternType: s.type,
+            facts: s.type === "goal" ? s.facts : void 0,
+            satisfaction: s.type === "goal" ? s.lastSatisfaction : void 0,
+          })
+        )
+          return null;
+      } catch {
+        return null;
+      }
+    try {
+      const b = {
+        version: 1,
+        id: s.id,
+        createdAt: s.createdAt,
+        label: s.label,
+        systemExport: JSON.stringify(s),
+        timelineExport: null,
+        localState: {
+          type: "multi",
+          globalTokenCount: 0,
+          globalStatus: "idle",
+          agentStates: {},
+          handoffCounter: 0,
+          pendingHandoffs: [],
+          handoffResults: [],
+          roundRobinCounters: null,
+        },
+        memoryExport: null,
+        orchestratorType: "multi",
+        metadata: { patternType: s.type },
+      };
+      return (
+        await h.save(b),
+        l &&
+          l.record({
+            type: "checkpoint_save",
+            timestamp: Date.now(),
+            snapshotId: null,
+            checkpointId: s.id,
+            patternType: s.type,
+            step: g,
+          }),
+        ae("onCheckpointSave", {
+          checkpointId: s.id,
+          patternType: s.type,
+          step: g,
+          timestamp: Date.now(),
+        }),
+        s.id
+      );
+    } catch (b) {
+      const L = b instanceof Error ? b : new Error(String(b));
+      return (
+        console.error(
+          `[Directive MultiAgent] ${s.type}: checkpoint save failed:`,
+          L,
+        ),
+        ae("onCheckpointError", {
+          patternType: s.type,
+          step: g,
+          error: L,
+          timestamp: Date.now(),
+        }),
+        null
+      );
+    }
+  }
+  async function Qr(s, h, C, g) {
+    const b = Date.now(),
+      L = C ?? "__inline_sequential";
+    C &&
+      ae("onPatternStart", {
+        patternId: C,
+        patternType: "sequential",
+        input: h,
+        timestamp: b,
+      });
+    let B = s.checkpoint,
+      W = B?.store ?? j,
+      X = B?.everyN ?? 5,
+      ue = B?.labelPrefix ?? "sequential",
+      ge = g?.currentInput ?? h,
+      he,
+      fe = g?.results ? [...g.results] : [],
+      qe = g?.step ?? 0,
+      Q;
+    if (g && fe.length > 0) {
+      const be = fe[fe.length - 1];
+      he = {
+        output: be.output,
+        totalTokens: be.totalTokens,
+        messages: [],
+        toolCalls: [],
+      };
+    }
+    try {
+      for (let be = qe; be < s.agents.length; be++) {
+        const Be = s.agents[be];
+        {
+          const Re = await nr(
+            "pre_pattern_step",
+            Be,
+            V[Be]?.agent.name ?? Be,
+            ge,
+            void 0,
+            { patternId: C },
+          );
+          if (Re.skip) continue;
+          ge = Re.input;
+        }
+        try {
+          if (
+            ((he = await ct(Be, ge)),
+            fe.push({
+              agentId: Be,
+              output: he.output,
+              totalTokens: he.totalTokens,
+            }),
+            be < s.agents.length - 1 &&
+              (s.transform
+                ? (ge = s.transform(he.output, Be, be))
+                : (ge =
+                    typeof he.output == "string" ? he.output : ir(he.output))),
+            B && W && be > qe && (be - qe) % X === 0)
+          ) {
+            const Re = be < s.agents.length - 1 ? ge : h;
+            await ar(
+              {
+                type: "sequential",
+                version: 1,
+                id: Gt(),
+                createdAt: new Date().toISOString(),
+                label: `${ue}:step-${be + 1}`,
+                patternId: L,
+                stepsTotal: s.agents.length,
+                step: be + 1,
+                currentInput: Re,
+                results: [...fe],
+              },
+              W,
+              B,
+            );
+          }
+        } catch (Re) {
+          if (!s.continueOnError) throw Re;
+        }
+      }
+      if (!he)
+        throw new Error(
+          "[Directive MultiAgent] No successful results in sequential pattern",
+        );
+      return s.extract ? s.extract(he.output) : he.output;
+    } catch (be) {
+      throw ((Q = be instanceof Error ? be : new Error(String(be))), be);
+    } finally {
+      C &&
+        ae("onPatternComplete", {
+          patternId: C,
+          patternType: "sequential",
+          durationMs: Date.now() - b,
+          timestamp: Date.now(),
+          error: Q,
+        });
+    }
+  }
+  async function Zr(s, h, C, g) {
+    const b = Date.now(),
+      L = C ?? "__inline_supervisor";
+    C &&
+      ae("onPatternStart", {
+        patternId: C,
+        patternType: "supervisor",
+        input: h,
+        timestamp: b,
+      });
+    const B = s.checkpoint,
+      W = B?.store ?? j,
+      X = B?.everyN ?? 5,
+      ue = B?.labelPrefix ?? "supervisor",
+      ge = [],
+      he = g?.workerResults ? [...g.workerResults] : [],
+      fe = s.maxRounds ?? 5;
+    if (fe < 1 || !Number.isFinite(fe))
+      throw new Error(
+        "[Directive MultiAgent] supervisor maxRounds must be >= 1",
+      );
+    let qe;
+    if (g)
+      for (const be of g.workerResults)
+        ge.push({
+          output: be.output,
+          totalTokens: be.totalTokens,
+          messages: [],
+          toolCalls: [],
+        });
+    const Q = g?.round ?? 0;
+    try {
+      let be;
+      g
+        ? (be = {
+            output: g.supervisorOutput,
+            totalTokens: 0,
+            messages: [],
+            toolCalls: [],
+          })
+        : (be = await ct(s.supervisor, h));
+      let Be = g?.currentInput ?? h;
+      for (let Re = Q; Re < fe; Re++) {
+        let Oe = be.output,
+          Se;
+        if (typeof Oe == "string")
+          try {
+            Se = JSON.parse(Oe);
+          } catch {
+            throw new Error(
+              `[Directive MultiAgent] Supervisor "${s.supervisor}" returned unparseable output (round ${Re + 1}). Expected JSON with { action, worker?, workerInput? } but got: ${Oe.slice(0, 200)}`,
+            );
+          }
+        else if (Oe && typeof Oe == "object" && "action" in Oe) Se = Oe;
+        else
+          throw new Error(
+            `[Directive MultiAgent] Supervisor "${s.supervisor}" returned invalid output (round ${Re + 1}). Expected { action: "delegate"|"complete", worker?, workerInput? }`,
+          );
+        if (Se.action === "complete" || !Se.worker) break;
+        if (!s.workers.includes(Se.worker)) {
+          const Ce = s.workers.join(", ");
+          throw new Error(
+            `[Directive MultiAgent] Supervisor delegated to unknown worker "${Se.worker}". Available workers: ${Ce}`,
+          );
+        }
+        const pe = await ct(Se.worker, Se.workerInput ?? "");
+        ge.push(pe),
+          he.push({ output: pe.output, totalTokens: pe.totalTokens }),
+          (Be = `Worker ${Se.worker} completed with result: ${ir(pe.output)}`),
+          (be = await ct(s.supervisor, Be)),
+          B &&
+            W &&
+            Re > Q &&
+            (Re - Q) % X === 0 &&
+            (await ar(
+              {
+                type: "supervisor",
+                version: 1,
+                id: Gt(),
+                createdAt: new Date().toISOString(),
+                label: `${ue}:round-${Re + 1}`,
+                patternId: L,
+                stepsTotal: s.maxRounds ?? 10,
+                round: Re + 1,
+                supervisorOutput: be.output,
+                workerResults: [...he],
+                currentInput: Be,
+              },
+              W,
+              B,
+            ));
+      }
+      return s.extract ? s.extract(be.output, ge) : be.output;
+    } catch (be) {
+      throw ((qe = be instanceof Error ? be : new Error(String(be))), be);
+    } finally {
+      C &&
+        ae("onPatternComplete", {
+          patternId: C,
+          patternType: "supervisor",
+          durationMs: Date.now() - b,
+          timestamp: Date.now(),
+          error: qe,
+        });
+    }
+  }
+  async function en(s, h, C, g) {
+    const b = Date.now(),
+      L = C ?? "__inline_dag";
+    C &&
+      ae("onPatternStart", {
+        patternId: C,
+        patternType: "dag",
+        input: h,
+        timestamp: b,
+      });
+    let B = s.checkpoint,
+      W = B?.store ?? j,
+      X = B?.everyN ?? 5,
+      ue = B?.labelPrefix ?? "dag",
+      ge = g?.completedCount ?? 0,
+      he = 0,
+      fe = Promise.resolve(),
+      qe = Object.keys(s.nodes).length,
+      Q = {
+        input: g?.input ?? h,
+        outputs: Object.create(null),
+        statuses: Object.create(null),
+        errors: Object.create(null),
+        results: Object.create(null),
+      };
+    for (const Ce of Object.keys(s.nodes)) Q.statuses[Ce] = "pending";
+    if (g) {
+      for (const [Ce, me] of Object.entries(g.statuses)) Q.statuses[Ce] = me;
+      for (const [Ce, me] of Object.entries(g.outputs)) Q.outputs[Ce] = me;
+      for (const [Ce, me] of Object.entries(g.errors)) Q.errors[Ce] = me;
+      for (const [Ce, me] of Object.entries(g.nodeResults))
+        Q.results[Ce] = {
+          output: me.output,
+          totalTokens: me.totalTokens,
+          messages: [],
+          toolCalls: [],
+        };
+    }
+    let be = s.onNodeError ?? "fail",
+      Be = s.maxConcurrent ?? 1 / 0,
+      Re = new AbortController(),
+      Oe,
+      Se;
+    s.timeout && (Oe = setTimeout(() => Re.abort(), s.timeout));
+    try {
+      const Ce = () => {
+        for (const [ye, oe] of Object.entries(s.nodes)) {
+          if (Q.statuses[ye] !== "pending") continue;
+          const Ee =
+            be === "fail"
+              ? new Set(["completed", "skipped"])
+              : new Set(["completed", "skipped", "error"]);
+          if ((oe.deps ?? []).every((Te) => Ee.has(Q.statuses[Te]))) {
+            if (
+              be === "skip-downstream" &&
+              (oe.deps ?? []).some(
+                (Te) =>
+                  Q.statuses[Te] === "error" || Q.statuses[Te] === "skipped",
+              )
+            ) {
+              (Q.statuses[ye] = "skipped"),
+                l &&
+                  l.record({
+                    type: "dag_node_update",
+                    timestamp: Date.now(),
+                    snapshotId: null,
+                    nodeId: ye,
+                    status: "skipped",
+                    deps: oe.deps ?? [],
+                  }),
+                ae("onDagNodeSkipped", {
+                  patternId: L,
+                  nodeId: ye,
+                  agentId: oe.agent,
+                  reason: "upstream dependency errored",
+                  timestamp: Date.now(),
+                });
+              continue;
+            }
+            if (oe.when)
+              try {
+                if (!oe.when(Q)) {
+                  (Q.statuses[ye] = "skipped"),
+                    l &&
+                      l.record({
+                        type: "dag_node_update",
+                        timestamp: Date.now(),
+                        snapshotId: null,
+                        nodeId: ye,
+                        status: "skipped",
+                        deps: oe.deps ?? [],
+                      }),
+                    ae("onDagNodeSkipped", {
+                      patternId: L,
+                      nodeId: ye,
+                      agentId: oe.agent,
+                      reason: "when() returned false",
+                      timestamp: Date.now(),
+                    });
+                  continue;
+                }
+              } catch {
+                Q.statuses[ye] = "skipped";
+                continue;
+              }
+            Q.statuses[ye] = "ready";
+          }
+        }
+      };
+      var pe = Ce;
+      if (!g)
+        for (const [ye, oe] of Object.entries(s.nodes))
+          (!oe.deps || oe.deps.length === 0) && (Q.statuses[ye] = "ready");
+      let me = new Set(),
+        He = 0;
+      async function se(ye, oe) {
+        const Ee = Date.now();
+        (Q.statuses[ye] = "running"),
+          l &&
+            l.record({
+              type: "dag_node_update",
+              timestamp: Ee,
+              snapshotId: null,
+              nodeId: ye,
+              status: "running",
+              deps: oe.deps ?? [],
+            }),
+          ae("onDagNodeStart", {
+            patternId: L,
+            nodeId: ye,
+            agentId: oe.agent,
+            timestamp: Ee,
+          });
+        let Te;
+        if (oe.transform) Te = oe.transform(Q);
+        else if (oe.deps && oe.deps.length > 0) {
+          const Ye = Object.create(null);
+          for (const dt of oe.deps)
+            Q.outputs[dt] !== void 0 && (Ye[dt] = Q.outputs[dt]);
+          Te = JSON.stringify(Ye);
+        } else Te = h;
+        let et = new AbortController(),
+          tt;
+        oe.timeout && (tt = setTimeout(() => et.abort(), oe.timeout));
+        const yt = () => et.abort();
+        Re.signal.addEventListener("abort", yt, { once: !0 });
+        try {
+          const Ye = await ct(oe.agent, Te, { signal: et.signal });
+          if (
+            ((Q.outputs[ye] = Ye.output),
+            (Q.results[ye] = Ye),
+            (Q.statuses[ye] = "completed"),
+            l &&
+              l.record({
+                type: "dag_node_update",
+                timestamp: Date.now(),
+                snapshotId: null,
+                nodeId: ye,
+                status: "completed",
+                deps: oe.deps ?? [],
+              }),
+            ae("onDagNodeComplete", {
+              patternId: L,
+              nodeId: ye,
+              agentId: oe.agent,
+              durationMs: Date.now() - Ee,
+              timestamp: Date.now(),
+            }),
+            ge++,
+            B && W && ge > he && ge - he >= X)
+          ) {
+            he = ge;
+            const dt = Object.create(null);
+            for (const [rn, hr] of Object.entries(Q.results))
+              dt[rn] = { output: hr.output, totalTokens: hr.totalTokens };
+            const Tt = {
+              type: "dag",
+              version: 1,
+              id: Gt(),
+              createdAt: new Date().toISOString(),
+              label: `${ue}:node-${ge}`,
+              patternId: L,
+              stepsTotal: qe,
+              statuses: { ...Q.statuses },
+              outputs: { ...Q.outputs },
+              errors: { ...Q.errors },
+              completedCount: ge,
+              nodeResults: dt,
+              input: Q.input,
+            };
+            (fe = fe.then(() => ar(Tt, W, B))), await fe;
+          }
+        } catch (Ye) {
+          if (
+            ((Q.statuses[ye] = "error"),
+            (Q.errors[ye] = Ye instanceof Error ? Ye.message : String(Ye)),
+            l &&
+              l.record({
+                type: "dag_node_update",
+                timestamp: Date.now(),
+                snapshotId: null,
+                nodeId: ye,
+                status: "error",
+                deps: oe.deps ?? [],
+              }),
+            ae("onDagNodeError", {
+              patternId: L,
+              nodeId: ye,
+              agentId: oe.agent,
+              error: Ye instanceof Error ? Ye : new Error(String(Ye)),
+              durationMs: Date.now() - Ee,
+              timestamp: Date.now(),
+            }),
+            be === "fail")
+          )
+            throw (Re.abort(), Ye);
+        } finally {
+          tt && clearTimeout(tt),
+            Re.signal.removeEventListener("abort", yt),
+            He--;
+        }
+      }
+      while (!Re.signal.aborted) {
+        Ce();
+        const ye = Object.entries(s.nodes)
+          .filter(([oe]) => Q.statuses[oe] === "ready")
+          .sort(([, oe], [, Ee]) => (Ee.priority ?? 0) - (oe.priority ?? 0));
+        for (const [oe, Ee] of ye) {
+          if (He >= Be) break;
+          He++;
+          const Te = se(oe, Ee).finally(() => {
+            me.delete(Te);
+          });
+          me.add(Te);
+        }
+        if (
+          !Object.values(Q.statuses).some(
+            (oe) => oe === "pending" || oe === "running" || oe === "ready",
+          )
+        )
+          break;
+        if (me.size > 0) await Promise.race(me);
+        else break;
+      }
+      return me.size > 0 && (await Promise.allSettled(me)), await s.merge(Q);
+    } catch (Ce) {
+      throw ((Se = Ce instanceof Error ? Ce : new Error(String(Ce))), Ce);
+    } finally {
+      Oe && clearTimeout(Oe),
+        C &&
+          ae("onPatternComplete", {
+            patternId: C,
+            patternType: "dag",
+            durationMs: Date.now() - b,
+            timestamp: Date.now(),
+            error: Se,
+          });
+    }
+  }
+  async function Tr(s, h, C, g) {
+    const b = Date.now(),
+      L = C ?? "__inline_reflect",
+      B = s.maxIterations ?? 2;
+    if (B < 1)
+      throw new Error(
+        "[Directive MultiAgent] Reflect pattern maxIterations must be >= 1",
+      );
+    I &&
+      B > 3 &&
+      console.warn(
+        "[Directive MultiAgent] Reflection loops > 3 iterations rarely improve quality. Consider reducing maxIterations.",
+      );
+    let W = s.signal,
+      X,
+      ue;
+    if (s.timeout && !W) {
+      const Ce = new AbortController();
+      (X = setTimeout(() => Ce.abort(), s.timeout)), (W = Ce.signal);
+    } else if (s.timeout && W) {
+      const Ce = new AbortController();
+      (X = setTimeout(() => Ce.abort(), s.timeout)),
+        (ue = () => Ce.abort()),
+        W.addEventListener("abort", ue, { once: !0 }),
+        (W = Ce.signal);
+    }
+    const ge =
+        s.parseEvaluation ??
+        ((Ce) => {
+          if (typeof Ce == "string")
+            try {
+              return JSON.parse(Ce);
+            } catch {
+              return {
+                passed: !1,
+                feedback: `Evaluator returned unparseable output: ${Ce.slice(0, 200)}`,
+              };
+            }
+          return Ce && typeof Ce == "object" && "passed" in Ce
+            ? Ce
+            : { passed: !1, feedback: "Evaluator returned invalid format" };
+        }),
+      he =
+        s.buildRetryInput ??
+        ((Ce, me, He) => `${Ce}
 
 Feedback on your previous response:
 ${me}
 
-Please improve your response.`);C&&ae("onPatternStart",{patternId:L,patternType:"reflect",input:h,timestamp:b});let fe=s.checkpoint,qe=fe?.store??j,Q=fe?.everyN??5,be=fe?.labelPrefix??"reflect",Be,Re,Oe=g?.history?[...g.history]:[],Se=g?.producerOutputs?[...g.producerOutputs]:[],pe=g?.iteration??0;g?.lastProducerOutput!=null&&(Re={output:g.lastProducerOutput,totalTokens:0,messages:[],toolCalls:[]});try{let Ce=g?.effectiveInput??h;for(let me=pe;me<B;me++){if(W?.aborted){if(Re)return Y=Oe,s.extract?s.extract(Re.output):Re.output;throw new DOMException("Reflect pattern aborted","AbortError")}let He=Date.now(),se=await ct(s.agent,Ce,{signal:W});Re=se;let ye=typeof se.output=="string"?se.output:ir(se.output);if(W?.aborted)return Y=Oe,s.extract?s.extract(se.output):se.output;let oe=await ct(s.evaluator,ye,{signal:W}),Ee;try{Ee=ge(oe.output)}catch(tt){Ee={passed:!1,feedback:`Evaluation parse error: ${tt instanceof Error?tt.message:String(tt)}`}}if(!Ee.passed&&s.threshold!=null&&Ee.score!=null){let tt=typeof s.threshold=="function"?s.threshold(me):s.threshold;Ee.score>=tt&&(Ee={...Ee,passed:!0})}let Te=Date.now()-He;Se.push({output:se.output,score:Ee.score});let et={iteration:me,passed:Ee.passed,score:Ee.score,feedback:Ee.feedback,durationMs:Te,producerTokens:se.totalTokens??0,evaluatorTokens:oe.totalTokens??0};if(Oe.push(et),s.onIteration)try{s.onIteration(et)}catch(tt){I&&console.warn("[Directive MultiAgent] onIteration callback threw:",tt)}if(l&&l.record({type:"reflection_iteration",timestamp:Date.now(),snapshotId:null,iteration:me,passed:Ee.passed,score:Ee.score,durationMs:Te,producerTokens:se.totalTokens,evaluatorTokens:oe.totalTokens}),Ee.passed)return Y=Oe,s.extract?s.extract(se.output):se.output;if(me<B-1&&Ee.feedback)try{Ce=he(h,Ee.feedback,me)}catch(tt){I&&console.warn("[Directive MultiAgent] buildRetryInput threw, using default format:",tt),Ce=`${h}
+Please improve your response.`);
+    C &&
+      ae("onPatternStart", {
+        patternId: L,
+        patternType: "reflect",
+        input: h,
+        timestamp: b,
+      });
+    let fe = s.checkpoint,
+      qe = fe?.store ?? j,
+      Q = fe?.everyN ?? 5,
+      be = fe?.labelPrefix ?? "reflect",
+      Be,
+      Re,
+      Oe = g?.history ? [...g.history] : [],
+      Se = g?.producerOutputs ? [...g.producerOutputs] : [],
+      pe = g?.iteration ?? 0;
+    g?.lastProducerOutput != null &&
+      (Re = {
+        output: g.lastProducerOutput,
+        totalTokens: 0,
+        messages: [],
+        toolCalls: [],
+      });
+    try {
+      let Ce = g?.effectiveInput ?? h;
+      for (let me = pe; me < B; me++) {
+        if (W?.aborted) {
+          if (Re) return (Y = Oe), s.extract ? s.extract(Re.output) : Re.output;
+          throw new DOMException("Reflect pattern aborted", "AbortError");
+        }
+        const He = Date.now(),
+          se = await ct(s.agent, Ce, { signal: W });
+        Re = se;
+        const ye = typeof se.output == "string" ? se.output : ir(se.output);
+        if (W?.aborted)
+          return (Y = Oe), s.extract ? s.extract(se.output) : se.output;
+        let oe = await ct(s.evaluator, ye, { signal: W }),
+          Ee;
+        try {
+          Ee = ge(oe.output);
+        } catch (tt) {
+          Ee = {
+            passed: !1,
+            feedback: `Evaluation parse error: ${tt instanceof Error ? tt.message : String(tt)}`,
+          };
+        }
+        if (!Ee.passed && s.threshold != null && Ee.score != null) {
+          const tt =
+            typeof s.threshold == "function" ? s.threshold(me) : s.threshold;
+          Ee.score >= tt && (Ee = { ...Ee, passed: !0 });
+        }
+        const Te = Date.now() - He;
+        Se.push({ output: se.output, score: Ee.score });
+        const et = {
+          iteration: me,
+          passed: Ee.passed,
+          score: Ee.score,
+          feedback: Ee.feedback,
+          durationMs: Te,
+          producerTokens: se.totalTokens ?? 0,
+          evaluatorTokens: oe.totalTokens ?? 0,
+        };
+        if ((Oe.push(et), s.onIteration))
+          try {
+            s.onIteration(et);
+          } catch (tt) {
+            I &&
+              console.warn(
+                "[Directive MultiAgent] onIteration callback threw:",
+                tt,
+              );
+          }
+        if (
+          (l &&
+            l.record({
+              type: "reflection_iteration",
+              timestamp: Date.now(),
+              snapshotId: null,
+              iteration: me,
+              passed: Ee.passed,
+              score: Ee.score,
+              durationMs: Te,
+              producerTokens: se.totalTokens,
+              evaluatorTokens: oe.totalTokens,
+            }),
+          Ee.passed)
+        )
+          return (Y = Oe), s.extract ? s.extract(se.output) : se.output;
+        if (me < B - 1 && Ee.feedback)
+          try {
+            Ce = he(h, Ee.feedback, me);
+          } catch (tt) {
+            I &&
+              console.warn(
+                "[Directive MultiAgent] buildRetryInput threw, using default format:",
+                tt,
+              ),
+              (Ce = `${h}
 
 Feedback on your previous response:
 ${Ee.feedback}
 
-Please improve your response.`}fe&&qe&&me>=pe&&(me-pe+1)%Q===0&&await ar({type:"reflect",version:1,id:Gt(),createdAt:new Date().toISOString(),label:`${be}:iter-${me+1}`,patternId:L,stepsTotal:B,iteration:me+1,effectiveInput:Ce,history:[...Oe],producerOutputs:[...Se],lastProducerOutput:se.output},qe,fe)}if(Y=Oe,s.onExhausted==="throw")throw new _s({iterations:B,history:Oe.map(me=>({passed:me.passed,feedback:me.feedback,score:me.score})),lastResult:Re,totalTokens:Re.totalTokens??0});if(s.onExhausted==="accept-best"&&Se.length>0){!Se.some(ye=>ye.score!=null)&&I&&console.warn("[Directive MultiAgent] accept-best exhaustion strategy used but no iterations returned scores. Falling back to last output.");let me=Se.length-1,He=-1/0;for(let ye=0;ye<Se.length;ye++){let oe=Se[ye].score;oe!=null&&oe>He&&(He=oe,me=ye)}let se=Se[me].output;return s.extract?s.extract(se):se}return s.extract?s.extract(Re.output):Re.output}catch(Ce){throw Y=Oe,Be=Ce instanceof Error?Ce:new Error(String(Ce)),Ce}finally{X&&clearTimeout(X),ue&&s.signal&&s.signal.removeEventListener("abort",ue),C&&ae("onPatternComplete",{patternId:L,patternType:"reflect",durationMs:Date.now()-b,timestamp:Date.now(),error:Be})}}async function jn(s,h,C){if(s.agents.length===0)throw new Error("[Directive MultiAgent] Race pattern requires at least one agent");let g=s.minSuccess??1;if(!Number.isInteger(g)||g<1)throw new Error("[Directive MultiAgent] Race pattern minSuccess must be a positive integer");if(g>s.agents.length)throw new Error(`[Directive MultiAgent] Race pattern minSuccess (${g}) exceeds agent count (${s.agents.length})`);for(let fe of s.agents)if(!V[fe])throw new Error(`[Directive MultiAgent] Race: unknown agent "${fe}"`);let b=Date.now(),L=C??"__inline_race",B=new AbortController,W,X;s.signal&&(s.signal.aborted?B.abort():(X=()=>B.abort(),s.signal.addEventListener("abort",X,{once:!0}))),C&&ae("onPatternStart",{patternId:L,patternType:"race",input:h,timestamp:b}),l&&l.record({type:"race_start",timestamp:b,snapshotId:null,patternId:L,agents:s.agents}),s.timeout&&(W=setTimeout(()=>B.abort(),s.timeout));let ue,ge=Object.create(null),he=[...s.agents];try{let fe=s.agents.map(me=>({agentId:me,promise:ct(me,h,{signal:B.signal}).then(He=>({agentId:me,result:He}))})),qe=fe.map(me=>me.promise.catch(()=>{})),Q=[],be=await new Promise((me,He)=>{let se=0,ye=!1;for(let oe of fe)oe.promise.then(Ee=>{se++,!ye&&(Q.push(Ee),Q.length>=g&&(ye=!0,B.abort(),me([...Q])))}).catch(Ee=>{if(ge[oe.agentId]=Ee instanceof Error?Ee.message:String(Ee),se++,ye)return;let Te=Object.keys(ge).length,et=Q.length+(fe.length-se);se===fe.length&&Te===fe.length?(ye=!0,He(new Error(`[Directive MultiAgent] Race: all ${fe.length} agents failed.
-`+Object.entries(ge).map(([tt,yt])=>`  - ${tt}: ${yt}`).join(`
-`)))):et<g&&(ye=!0,He(new Error(`[Directive MultiAgent] Race: cannot reach minSuccess (${g}). ${Te} agent(s) failed.
-`+Object.entries(ge).map(([tt,yt])=>`  - ${tt}: ${yt}`).join(`
-`))))})});await Promise.all(qe).catch(()=>{});let Be=be[0],Re=Be.agentId,Oe=new Set(be.map(me=>me.agentId)),Se=he.filter(me=>!Oe.has(me)&&!(me in ge));l&&(l.record({type:"race_winner",timestamp:Date.now(),snapshotId:null,patternId:L,winnerId:Re,durationMs:Date.now()-b}),Se.length>0&&l.record({type:"race_cancelled",timestamp:Date.now(),snapshotId:null,patternId:L,cancelledIds:Se,reason:"winner_found"}));let pe=s.extract?s.extract(Be.result):Be.result.output,Ce=g>1?be.map(me=>({agentId:me.agentId,result:s.extract?s.extract(me.result):me.result.output})):void 0;return{winnerId:Re,result:pe,allResults:Ce}}catch(fe){throw ue=fe instanceof Error?fe:new Error(String(fe)),l&&l.record({type:"race_cancelled",timestamp:Date.now(),snapshotId:null,patternId:L,cancelledIds:he,reason:B.signal.aborted?"timeout":"all_failed"}),fe}finally{W&&clearTimeout(W),X&&s.signal&&s.signal.removeEventListener("abort",X),C&&ae("onPatternComplete",{patternId:L,patternType:"race",durationMs:Date.now()-b,timestamp:Date.now(),error:ue})}}async function jr(s,h,C,g){let{agents:b,evaluator:L,maxRounds:B=2,extract:W,parseJudgement:X}=s;if(b.length<2)throw new Error("[Directive MultiAgent] debate requires at least 2 agents");if(B<1||!Number.isFinite(B))throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");let ue=s.signal,ge,he;if(s.timeout&&!ue){let oe=new AbortController;ge=setTimeout(()=>oe.abort(),s.timeout),ue=oe.signal}else if(s.timeout&&ue){let oe=new AbortController;ge=setTimeout(()=>oe.abort(),s.timeout),he=()=>oe.abort(),ue.addEventListener("abort",he,{once:!0}),ue=oe.signal}let fe=X??(oe=>{if(typeof oe=="string")try{let Ee=JSON.parse(oe);return Ee&&typeof Ee=="object"&&typeof Ee.winnerId=="string"?Ee:(I&&console.warn("[Directive MultiAgent] defaultParseJudgement: parsed JSON missing winnerId, falling back to first agent"),{winnerId:b[0]})}catch{return I&&console.warn("[Directive MultiAgent] defaultParseJudgement: output is not valid JSON, falling back to first agent"),{winnerId:b[0]}}return oe&&typeof oe=="object"&&"winnerId"in oe&&typeof oe.winnerId=="string"?oe:(I&&console.warn("[Directive MultiAgent] defaultParseJudgement: unrecognized output format, falling back to first agent"),{winnerId:b[0]})}),qe=g?.rounds?[...g.rounds]:[],Q=g?.currentInput??h,be=g?.lastWinnerId??b[0],Be=g?.lastWinnerOutput??void 0,Re=g?.round??0,Oe=s.checkpoint,Se=Oe?.store??j,pe=Oe?.everyN??5,Ce=Oe?.labelPrefix??"debate",me=C??"__inline_debate",He=Date.now(),se=g?.tokensConsumed??0;C&&ae("onPatternStart",{patternId:me,patternType:"debate",input:h,timestamp:He});let ye;try{for(let Ee=Re;Ee<B&&!ue?.aborted;Ee++){let Te=b.map(async dt=>{let Tt=await ct(dt,Q,{signal:ue});return se+=Tt.totalTokens,{agentId:dt,output:Tt.output}}),et=await Promise.all(Te);if(ue?.aborted)break;let tt=JSON.stringify({round:Ee+1,totalRounds:B,proposals:et.map(dt=>({agentId:dt.agentId,proposal:dt.output}))}),yt=await ct(L,tt,{signal:ue});se+=yt.totalTokens;let Ye=fe(yt.output);if(b.includes(Ye.winnerId)||(Ye.winnerId=b[0]),qe.push({proposals:et,judgement:Ye}),l&&l.record({type:"debate_round",timestamp:Date.now(),snapshotId:null,patternId:me,round:Ee+1,totalRounds:B,winnerId:Ye.winnerId,score:Ye.score,agentCount:b.length}),be=Ye.winnerId,Be=et.find(dt=>dt.agentId===Ye.winnerId)?.output??et[0].output,Oe&&Se&&Ee>Re&&(Ee-Re)%pe===0){let dt={type:"debate",version:1,id:Gt(),createdAt:new Date().toISOString(),label:`${Ce}:round-${Ee+1}`,patternId:me,stepsTotal:B,round:Ee+1,currentInput:Q,rounds:[...qe],lastWinnerId:be,lastWinnerOutput:Be,tokensConsumed:se};await ar(dt,Se,Oe)}Ee<B-1&&Ye.feedback&&(Q=`Previous round feedback: ${Ye.feedback}
+Please improve your response.`);
+          }
+        fe &&
+          qe &&
+          me >= pe &&
+          (me - pe + 1) % Q === 0 &&
+          (await ar(
+            {
+              type: "reflect",
+              version: 1,
+              id: Gt(),
+              createdAt: new Date().toISOString(),
+              label: `${be}:iter-${me + 1}`,
+              patternId: L,
+              stepsTotal: B,
+              iteration: me + 1,
+              effectiveInput: Ce,
+              history: [...Oe],
+              producerOutputs: [...Se],
+              lastProducerOutput: se.output,
+            },
+            qe,
+            fe,
+          ));
+      }
+      if (((Y = Oe), s.onExhausted === "throw"))
+        throw new _s({
+          iterations: B,
+          history: Oe.map((me) => ({
+            passed: me.passed,
+            feedback: me.feedback,
+            score: me.score,
+          })),
+          lastResult: Re,
+          totalTokens: Re.totalTokens ?? 0,
+        });
+      if (s.onExhausted === "accept-best" && Se.length > 0) {
+        !Se.some((ye) => ye.score != null) &&
+          I &&
+          console.warn(
+            "[Directive MultiAgent] accept-best exhaustion strategy used but no iterations returned scores. Falling back to last output.",
+          );
+        let me = Se.length - 1,
+          He = -1 / 0;
+        for (let ye = 0; ye < Se.length; ye++) {
+          const oe = Se[ye].score;
+          oe != null && oe > He && ((He = oe), (me = ye));
+        }
+        const se = Se[me].output;
+        return s.extract ? s.extract(se) : se;
+      }
+      return s.extract ? s.extract(Re.output) : Re.output;
+    } catch (Ce) {
+      throw (
+        ((Y = Oe), (Be = Ce instanceof Error ? Ce : new Error(String(Ce))), Ce)
+      );
+    } finally {
+      X && clearTimeout(X),
+        ue && s.signal && s.signal.removeEventListener("abort", ue),
+        C &&
+          ae("onPatternComplete", {
+            patternId: L,
+            patternType: "reflect",
+            durationMs: Date.now() - b,
+            timestamp: Date.now(),
+            error: Be,
+          });
+    }
+  }
+  async function jn(s, h, C) {
+    if (s.agents.length === 0)
+      throw new Error(
+        "[Directive MultiAgent] Race pattern requires at least one agent",
+      );
+    const g = s.minSuccess ?? 1;
+    if (!Number.isInteger(g) || g < 1)
+      throw new Error(
+        "[Directive MultiAgent] Race pattern minSuccess must be a positive integer",
+      );
+    if (g > s.agents.length)
+      throw new Error(
+        `[Directive MultiAgent] Race pattern minSuccess (${g}) exceeds agent count (${s.agents.length})`,
+      );
+    for (const fe of s.agents)
+      if (!V[fe])
+        throw new Error(`[Directive MultiAgent] Race: unknown agent "${fe}"`);
+    let b = Date.now(),
+      L = C ?? "__inline_race",
+      B = new AbortController(),
+      W,
+      X;
+    s.signal &&
+      (s.signal.aborted
+        ? B.abort()
+        : ((X = () => B.abort()),
+          s.signal.addEventListener("abort", X, { once: !0 }))),
+      C &&
+        ae("onPatternStart", {
+          patternId: L,
+          patternType: "race",
+          input: h,
+          timestamp: b,
+        }),
+      l &&
+        l.record({
+          type: "race_start",
+          timestamp: b,
+          snapshotId: null,
+          patternId: L,
+          agents: s.agents,
+        }),
+      s.timeout && (W = setTimeout(() => B.abort(), s.timeout));
+    let ue,
+      ge = Object.create(null),
+      he = [...s.agents];
+    try {
+      const fe = s.agents.map((me) => ({
+          agentId: me,
+          promise: ct(me, h, { signal: B.signal }).then((He) => ({
+            agentId: me,
+            result: He,
+          })),
+        })),
+        qe = fe.map((me) => me.promise.catch(() => {})),
+        Q = [],
+        be = await new Promise((me, He) => {
+          let se = 0,
+            ye = !1;
+          for (const oe of fe)
+            oe.promise
+              .then((Ee) => {
+                se++,
+                  !ye &&
+                    (Q.push(Ee),
+                    Q.length >= g && ((ye = !0), B.abort(), me([...Q])));
+              })
+              .catch((Ee) => {
+                if (
+                  ((ge[oe.agentId] =
+                    Ee instanceof Error ? Ee.message : String(Ee)),
+                  se++,
+                  ye)
+                )
+                  return;
+                const Te = Object.keys(ge).length,
+                  et = Q.length + (fe.length - se);
+                se === fe.length && Te === fe.length
+                  ? ((ye = !0),
+                    He(
+                      new Error(
+                        `[Directive MultiAgent] Race: all ${fe.length} agents failed.
+` +
+                          Object.entries(ge)
+                            .map(([tt, yt]) => `  - ${tt}: ${yt}`)
+                            .join(`
+`),
+                      ),
+                    ))
+                  : et < g &&
+                    ((ye = !0),
+                    He(
+                      new Error(
+                        `[Directive MultiAgent] Race: cannot reach minSuccess (${g}). ${Te} agent(s) failed.
+` +
+                          Object.entries(ge)
+                            .map(([tt, yt]) => `  - ${tt}: ${yt}`)
+                            .join(`
+`),
+                      ),
+                    ));
+              });
+        });
+      await Promise.all(qe).catch(() => {});
+      const Be = be[0],
+        Re = Be.agentId,
+        Oe = new Set(be.map((me) => me.agentId)),
+        Se = he.filter((me) => !Oe.has(me) && !(me in ge));
+      l &&
+        (l.record({
+          type: "race_winner",
+          timestamp: Date.now(),
+          snapshotId: null,
+          patternId: L,
+          winnerId: Re,
+          durationMs: Date.now() - b,
+        }),
+        Se.length > 0 &&
+          l.record({
+            type: "race_cancelled",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId: L,
+            cancelledIds: Se,
+            reason: "winner_found",
+          }));
+      const pe = s.extract ? s.extract(Be.result) : Be.result.output,
+        Ce =
+          g > 1
+            ? be.map((me) => ({
+                agentId: me.agentId,
+                result: s.extract ? s.extract(me.result) : me.result.output,
+              }))
+            : void 0;
+      return { winnerId: Re, result: pe, allResults: Ce };
+    } catch (fe) {
+      throw (
+        ((ue = fe instanceof Error ? fe : new Error(String(fe))),
+        l &&
+          l.record({
+            type: "race_cancelled",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId: L,
+            cancelledIds: he,
+            reason: B.signal.aborted ? "timeout" : "all_failed",
+          }),
+        fe)
+      );
+    } finally {
+      W && clearTimeout(W),
+        X && s.signal && s.signal.removeEventListener("abort", X),
+        C &&
+          ae("onPatternComplete", {
+            patternId: L,
+            patternType: "race",
+            durationMs: Date.now() - b,
+            timestamp: Date.now(),
+            error: ue,
+          });
+    }
+  }
+  async function jr(s, h, C, g) {
+    const {
+      agents: b,
+      evaluator: L,
+      maxRounds: B = 2,
+      extract: W,
+      parseJudgement: X,
+    } = s;
+    if (b.length < 2)
+      throw new Error(
+        "[Directive MultiAgent] debate requires at least 2 agents",
+      );
+    if (B < 1 || !Number.isFinite(B))
+      throw new Error("[Directive MultiAgent] debate maxRounds must be >= 1");
+    let ue = s.signal,
+      ge,
+      he;
+    if (s.timeout && !ue) {
+      const oe = new AbortController();
+      (ge = setTimeout(() => oe.abort(), s.timeout)), (ue = oe.signal);
+    } else if (s.timeout && ue) {
+      const oe = new AbortController();
+      (ge = setTimeout(() => oe.abort(), s.timeout)),
+        (he = () => oe.abort()),
+        ue.addEventListener("abort", he, { once: !0 }),
+        (ue = oe.signal);
+    }
+    let fe =
+        X ??
+        ((oe) => {
+          if (typeof oe == "string")
+            try {
+              const Ee = JSON.parse(oe);
+              return Ee &&
+                typeof Ee == "object" &&
+                typeof Ee.winnerId == "string"
+                ? Ee
+                : (I &&
+                    console.warn(
+                      "[Directive MultiAgent] defaultParseJudgement: parsed JSON missing winnerId, falling back to first agent",
+                    ),
+                  { winnerId: b[0] });
+            } catch {
+              return (
+                I &&
+                  console.warn(
+                    "[Directive MultiAgent] defaultParseJudgement: output is not valid JSON, falling back to first agent",
+                  ),
+                { winnerId: b[0] }
+              );
+            }
+          return oe &&
+            typeof oe == "object" &&
+            "winnerId" in oe &&
+            typeof oe.winnerId == "string"
+            ? oe
+            : (I &&
+                console.warn(
+                  "[Directive MultiAgent] defaultParseJudgement: unrecognized output format, falling back to first agent",
+                ),
+              { winnerId: b[0] });
+        }),
+      qe = g?.rounds ? [...g.rounds] : [],
+      Q = g?.currentInput ?? h,
+      be = g?.lastWinnerId ?? b[0],
+      Be = g?.lastWinnerOutput ?? void 0,
+      Re = g?.round ?? 0,
+      Oe = s.checkpoint,
+      Se = Oe?.store ?? j,
+      pe = Oe?.everyN ?? 5,
+      Ce = Oe?.labelPrefix ?? "debate",
+      me = C ?? "__inline_debate",
+      He = Date.now(),
+      se = g?.tokensConsumed ?? 0;
+    C &&
+      ae("onPatternStart", {
+        patternId: me,
+        patternType: "debate",
+        input: h,
+        timestamp: He,
+      });
+    let ye;
+    try {
+      for (let Ee = Re; Ee < B && !ue?.aborted; Ee++) {
+        const Te = b.map(async (dt) => {
+            const Tt = await ct(dt, Q, { signal: ue });
+            return (se += Tt.totalTokens), { agentId: dt, output: Tt.output };
+          }),
+          et = await Promise.all(Te);
+        if (ue?.aborted) break;
+        const tt = JSON.stringify({
+            round: Ee + 1,
+            totalRounds: B,
+            proposals: et.map((dt) => ({
+              agentId: dt.agentId,
+              proposal: dt.output,
+            })),
+          }),
+          yt = await ct(L, tt, { signal: ue });
+        se += yt.totalTokens;
+        const Ye = fe(yt.output);
+        if (
+          (b.includes(Ye.winnerId) || (Ye.winnerId = b[0]),
+          qe.push({ proposals: et, judgement: Ye }),
+          l &&
+            l.record({
+              type: "debate_round",
+              timestamp: Date.now(),
+              snapshotId: null,
+              patternId: me,
+              round: Ee + 1,
+              totalRounds: B,
+              winnerId: Ye.winnerId,
+              score: Ye.score,
+              agentCount: b.length,
+            }),
+          (be = Ye.winnerId),
+          (Be =
+            et.find((dt) => dt.agentId === Ye.winnerId)?.output ??
+            et[0].output),
+          Oe && Se && Ee > Re && (Ee - Re) % pe === 0)
+        ) {
+          const dt = {
+            type: "debate",
+            version: 1,
+            id: Gt(),
+            createdAt: new Date().toISOString(),
+            label: `${Ce}:round-${Ee + 1}`,
+            patternId: me,
+            stepsTotal: B,
+            round: Ee + 1,
+            currentInput: Q,
+            rounds: [...qe],
+            lastWinnerId: be,
+            lastWinnerOutput: Be,
+            tokensConsumed: se,
+          };
+          await ar(dt, Se, Oe);
+        }
+        Ee < B - 1 &&
+          Ye.feedback &&
+          (Q = `Previous round feedback: ${Ye.feedback}
 
-Original task: ${h}`)}if(qe.length===0)throw new Error("[Directive MultiAgent] Debate aborted before any round completed");let oe=W?W(Be):Be;return{winnerId:be,result:oe,rounds:qe}}catch(oe){throw ye=oe instanceof Error?oe:new Error(String(oe)),oe}finally{ge&&clearTimeout(ge),he&&s.signal&&s.signal.removeEventListener("abort",he),C&&ae("onPatternComplete",{patternId:me,patternType:"debate",durationMs:Date.now()-He,timestamp:Date.now(),error:ye})}}let Ka=new Set(["__proto__","constructor","prototype","toString","valueOf","hasOwnProperty"]);function or(s,h){for(let C of Object.keys(h))Ka.has(C)||(s[C]=h[C])}function Va(s,h){let C=Object.create(null);for(let[X,ue]of Object.entries(h))for(let ge of ue.produces)C[ge]||(C[ge]=[]),C[ge].push(X);let g=Object.keys(h),b=Object.create(null),L=Object.create(null);for(let X of g)b[X]=0,L[X]=[];for(let[X,ue]of Object.entries(h))for(let ge of ue.requires??[]){let he=C[ge];if(he)for(let fe of he)fe!==X&&(L[fe].push(X),b[X]=(b[X]??0)+1)}let B=[];for(let X of g)b[X]===0&&B.push(X);let W=0;for(;B.length>0;){let X=B.shift();W++;for(let ue of L[X]??[])b[ue]--,b[ue]===0&&B.push(ue)}if(W!==g.length)throw new Error(`[Directive MultiAgent] goal pattern "${s}": cycle detected in produces/requires graph. Visited ${W}/${g.length} nodes.`)}function Ya(s,h){let C=Object.create(null);for(let[g,b]of Object.entries(h))for(let L of b.produces)C[L]||(C[L]=[]),C[L].push(g);for(let[g,b]of Object.entries(C))b.length>1&&console.warn(`[Directive MultiAgent] goal pattern "${s}": fact key "${g}" is produced by multiple nodes: ${b.join(", ")}. Last writer wins.`)}function ht(s,...h){if(s)try{return s(...h)}catch(C){console.error("[Directive MultiAgent] goal: user callback threw:",C);return}}async function Xa(s,...h){if(s)try{return await s(...h)}catch(C){console.error("[Directive MultiAgent] goal: user callback threw:",C);return}}function tn(s,h,C){let g=h.slice(-3),b=g.length>0?g.reduce((W,X)=>W+X.satisfactionDelta,0)/g.length:0,L=null;b>0&&s<1&&(L=Math.ceil((1-s)/b));let B=!1;if(h.length>=6){let W=h.slice(-3),X=h.slice(-6,-3),ue=W.reduce((he,fe)=>he+fe.satisfactionDelta,0)/3,ge=X.reduce((he,fe)=>he+fe.satisfactionDelta,0)/3;B=ue<ge*.5}return{satisfaction:s,progressRate:b,estimatedStepsRemaining:L,decelerating:B}}function gr(s){return s==null||!Number.isFinite(s)?0:Math.max(0,Math.min(1,s))}async function Rr(s,h,C,g){let{nodes:b,when:L,satisfaction:B,maxSteps:W=50,extract:X,selectionStrategy:ue,relaxation:ge,onStep:he,onStall:fe}=s,qe=Object.create(null);for(let[at,ft]of Object.entries(b))qe[at]={...ft};if(Object.keys(qe).length===0)throw new Error("[Directive MultiAgent] goal requires at least one node");let Q=C??"__goal";for(let[at,ft]of Object.entries(qe))if(!V[ft.agent])throw new Error(`[Directive MultiAgent] goal node "${at}" references unregistered agent "${ft.agent}"`);Va(Q,qe),Ya(Q,qe);for(let[at,ft]of Object.entries(qe))ft.extractOutput||console.warn(`[Directive MultiAgent] goal node "${at}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`);let be=s.signal,Be,Re,Oe=s.timeout??3e5;if(Oe&&!be){let at=new AbortController;Be=setTimeout(()=>at.abort(),Oe),be=at.signal}else if(Oe&&be){let at=new AbortController;Be=setTimeout(()=>at.abort(),Oe),Re=()=>at.abort(),be.addEventListener("abort",Re,{once:!0}),be=at.signal}let Se=Date.now();l&&l.record({type:"pattern_start",timestamp:Se,snapshotId:null,patternId:Q,patternType:"goal"}),ae("onPatternStart",{patternId:Q,patternType:"goal",input:typeof h=="string"?h:JSON.stringify(h),timestamp:Se});let pe=Object.create(null);g?or(pe,g.facts):typeof h=="string"?pe.input=h:or(pe,h);let Ce=g?[...g.executionOrder]:[],me=Object.create(null);if(g)for(let[at,ft]of Object.entries(g.nodeOutputs))me[at]={output:ft.output,totalTokens:ft.totalTokens};let He=g?[...g.stepMetrics]:[],se=g?[...g.relaxations]:[],ye=new Set(g?.completedNodes??[]),oe=new Map(g?Object.entries(g.failedNodes).map(([at,ft])=>[at,ft]):[]),Ee=new Map(g?Object.entries(g.nodeInputHashes):[]),Te=Object.create(null);if(g)for(let[at,ft]of Object.entries(g.agentMetrics))Te[at]={runs:ft.runs,avgSatisfactionDelta:ft.runs>0?ft.totalDelta/ft.runs:0,tokens:ft.tokens,totalDelta:ft.totalDelta};let et=g?.stallSteps??0,tt=g?.appliedRelaxationTiers??0,yt=g?.lastSatisfaction??0,Ye,dt=g?.step??0,Tt=s.checkpoint,rn=Tt?.everyN??5,hr=Tt?.store??j,eo=Tt?.labelPrefix??"goal",to,ro=3;try{for(let pt=dt;pt<W;pt++){if(ht(L,pe)===!0){let Ke=Date.now()-Se,Ge=Object.values(me).reduce((rt,st)=>rt+st.totalTokens,0);return{achieved:!0,result:ht(X,pe)??pe,facts:{...pe},executionOrder:Ce,nodeResults:me,steps:pt,totalTokens:Ge,durationMs:Ke,stepMetrics:He,relaxations:se}}if(be?.aborted){let Ke=Date.now()-Se,Ge=Object.values(me).reduce((rt,st)=>rt+st.totalTokens,0);return{achieved:!1,result:ht(X,pe)??pe,facts:{...pe},executionOrder:Ce,nodeResults:me,steps:pt,totalTokens:Ge,durationMs:Ke,stepMetrics:He,relaxations:se,error:"Aborted or timed out"}}let Xt=[];for(let[Ke,Ge]of Object.entries(qe)){if((oe.get(Ke)??0)>=ro)continue;let rt=Ge.requires??[];if(rt.every(st=>pe[st]!=null)){if(ye.has(Ke)){if(!Ge.allowRerun)continue;let st=JSON.stringify(rt.map(mt=>pe[mt]));if(Ee.get(Ke)===st)continue}Xt.push(Ke)}}let Qt=Xt;if(ue&&Xt.length>0){let Ke=B?ht(B,pe)??0:ht(L,pe)===!0?1:0,Ge=gr(Ke),rt=tn(Ge,He,pt),st=Object.create(null);for(let[bt,nt]of Object.entries(Te))st[bt]={runs:nt.runs,avgSatisfactionDelta:nt.runs>0?nt.totalDelta/nt.runs:0,tokens:nt.tokens};let mt=ue.select(Xt,st,rt);Qt=mt&&mt.length>0?mt:Xt}if(Qt.sort((Ke,Ge)=>(qe[Ge].priority??0)-(qe[Ke].priority??0)),ht(he,pt,{...pe},Qt),Qt.length===0){et++;let Ke=!1;if(ge)for(let Ge=tt;Ge<ge.length;Ge++){let rt=ge[Ge],st=rt.afterStallSteps??3;if(et>=st){let mt=rt.strategy;switch(mt.type){case"allow_rerun":for(let bt of mt.nodes)ye.delete(bt),Ee.delete(bt);break;case"alternative_nodes":for(let bt of mt.nodes){let nt=`__relaxation_${Ge}_${bt.agent}`;qe[nt]={...bt}}break;case"inject_facts":or(pe,mt.facts);break;case"accept_partial":{let bt=Date.now()-Se,nt=Object.values(me).reduce((gt,jt)=>gt+jt.totalTokens,0);return{achieved:!1,result:ht(X,pe)??pe,facts:{...pe},executionOrder:Ce,nodeResults:me,steps:pt,totalTokens:nt,durationMs:bt,stepMetrics:He,relaxations:se,error:`Accepted partial result via relaxation tier "${rt.label}"`}}case"custom":{let bt=ht(B,pe)??0,nt={step:pt,facts:{...pe},metrics:tn(gr(bt),He,pt),completedNodes:new Set(ye),failedNodes:new Map(oe)};await Xa(mt.apply,nt);break}}se.push({step:pt,tierIndex:Ge,label:rt.label,strategy:mt.type}),tt=Ge+1,et=0,Ke=!0;break}}if(!Ke){let Ge=ht(B,pe)??0,rt=tn(gr(Ge),He,pt);if(ht(fe,pt,rt),!ge||tt>=ge.length){let st=Date.now()-Se,mt=Object.values(me).reduce((bt,nt)=>bt+nt.totalTokens,0);return{achieved:!1,result:ht(X,pe)??pe,facts:{...pe},executionOrder:Ce,nodeResults:me,steps:pt,totalTokens:mt,durationMs:st,stepMetrics:He,relaxations:se,error:"Goal stalled: no ready nodes and no remaining relaxation tiers"}}}continue}et=0;let no=Date.now(),ao=B?ht(B,pe)??0:ht(L,pe)===!0?1:0,oo=gr(ao),_n=0,sr=[],so=Qt.map(async Ke=>{let Ge=qe[Ke],rt=Ge.requires??[],st=JSON.stringify(rt.map(nt=>pe[nt]));Ee.set(Ke,st);let mt,bt=ht(Ge.buildInput,pe);if(bt!=null)mt=bt;else{let nt=Object.create(null);for(let gt of rt)pe[gt]!=null&&(nt[gt]=pe[gt]);Object.keys(nt).length>0?mt=JSON.stringify(nt):pe.input!=null?mt=String(pe.input):mt=JSON.stringify(pe)}try{let nt=await ct(Ge.agent,mt,{signal:be??void 0});if(me[Ke]=nt,Ce.push(Ke),ye.add(Ke),oe.delete(Ke),Ge.extractOutput){let gt=ht(Ge.extractOutput,nt);gt&&(or(pe,gt),sr.push(...Object.keys(gt)))}else{let gt=nt.output;if(gt&&typeof gt=="object")or(pe,gt),sr.push(...Object.keys(gt));else if(typeof gt=="string")try{let jt=JSON.parse(gt);if(jt&&typeof jt=="object"&&!Array.isArray(jt))or(pe,jt),sr.push(...Object.keys(jt));else for(let qn of Ge.produces)pe[qn]=gt,sr.push(qn)}catch{for(let jt of Ge.produces)pe[jt]=gt,sr.push(jt)}}return _n+=nt.totalTokens,{nodeId:Ke,success:!0}}catch(nt){let gt=(oe.get(Ke)??0)+1;return oe.set(Ke,gt),{nodeId:Ke,success:!1,error:nt}}});await Promise.allSettled(so);let io=B?ht(B,pe)??0:ht(L,pe)===!0?1:0,nn=gr(io),an=nn-oo;He.push({step:pt,durationMs:Date.now()-no,nodesRun:[...Qt],factsProduced:sr,satisfaction:nn,satisfactionDelta:an,tokensConsumed:_n});for(let Ke of Qt){let Ge=qe[Ke];Te[Ge.agent]||(Te[Ge.agent]={runs:0,avgSatisfactionDelta:0,tokens:0,totalDelta:0});let rt=Te[Ge.agent];rt.runs++,rt.totalDelta+=an,rt.tokens+=me[Ke]?.totalTokens??0}if(yt=nn,an<=0?et++:et=0,Tt&&hr&&pt>dt&&(pt-dt)%rn===0){let Ke={type:"goal",version:1,id:Gt(),createdAt:new Date().toISOString(),label:`${eo}:step-${pt}`,patternId:Q,stepsTotal:W,step:pt+1,facts:structuredClone(pe),completedNodes:[...ye],failedNodes:Object.fromEntries(oe),nodeInputHashes:Object.fromEntries(Ee),nodeOutputs:Object.fromEntries(Object.entries(me).map(([rt,st])=>[rt,{output:st.output,totalTokens:st.totalTokens}])),executionOrder:[...Ce],stepMetrics:[...He],relaxations:[...se],appliedRelaxationTiers:tt,stallSteps:et,lastSatisfaction:yt,agentMetrics:Object.fromEntries(Object.entries(Te).map(([rt,st])=>[rt,{runs:st.runs,totalDelta:st.totalDelta,tokens:st.tokens}]))},Ge=await ar(Ke,hr,Tt);Ge&&(to=Ge)}}let at=Date.now()-Se,ft=Object.values(me).reduce((pt,Xt)=>pt+Xt.totalTokens,0);return{achieved:!1,result:ht(X,pe)??pe,facts:{...pe},executionOrder:Ce,nodeResults:me,steps:W,totalTokens:ft,durationMs:at,stepMetrics:He,relaxations:se,error:`Max steps (${W}) exhausted without achieving goal`}}catch(at){throw Ye=at instanceof Error?at:new Error(String(at)),at}finally{Be!=null&&clearTimeout(Be),Re&&s.signal&&s.signal.removeEventListener("abort",Re),l&&l.record({type:"pattern_complete",timestamp:Date.now(),snapshotId:null,patternId:Q,patternType:"goal",durationMs:Date.now()-Se,...Ye?{error:Ye.message}:{}}),ae("onPatternComplete",{patternId:Q,patternType:"goal",durationMs:Date.now()-Se,timestamp:Date.now(),error:Ye})}}function Qa(s){if(!S)return[];let h=[],C=new Set;if(C.add(s),S.equivalencyGroups){for(let g of Object.values(S.equivalencyGroups))if(g.includes(s))for(let b of g)!C.has(b)&&V[b]&&(h.push(b),C.add(b))}if(S.useCapabilities!==!1){let g=V[s];if(g?.capabilities&&g.capabilities.length>0)for(let[b,L]of Object.entries(V)){if(C.has(b))continue;let B=L.capabilities??[];g.capabilities.every(W=>B.includes(W))&&(h.push(b),C.add(b))}}if(P){let g=S.healthThreshold??30;return h.filter(b=>P.getHealthScore(b)>g)}return h}function Za(s){if(s.length===0)return null;if(!S||!P)return s[0]??null;if(S.selectionStrategy==="round-robin"&&K){let g=[...s].sort().join(","),b=K.get(g)??0,L=s[b%s.length];return K.set(g,b+1),L}let h=s[0],C=P.getHealthScore(h);for(let g=1;g<s.length;g++){let b=P.getHealthScore(s[g]);b>C&&(h=s[g],C=b)}return h}let Rn={system:N,get facts(){return N.facts},get timeline(){return l},get healthMonitor(){return P},get derived(){return Object.freeze({...Ct})},onDerivedChange(s){return zt.add(s),()=>{zt.delete(s)}},get scratchpad(){return Mt},runAgent:ct,runAgentStream:Xr,async runPattern(s,h){Z();let C=r[s];if(!C){let L=Object.keys(r).join(", ")||"(none)";throw new Error(`[Directive MultiAgent] Unknown pattern "${s}". Available patterns: ${L}`)}let g=Date.now();l&&l.record({type:"pattern_start",timestamp:g,snapshotId:null,patternId:s,patternType:C.type});let b;try{switch(C.type){case"parallel":return await Wa(C,h,s);case"sequential":return await Qr(C,h,s);case"supervisor":return await Zr(C,h,s);case"dag":return await en(C,h,s);case"reflect":return await Tr(C,h,s);case"race":return(await jn(C,h,s)).result;case"debate":return(await jr(C,h,s)).result;case"goal":return(await Rr(C,h,s)).result;default:throw new Error(`[Directive MultiAgent] Unknown pattern type: ${C.type}`)}}catch(L){throw b=L instanceof Error?L:new Error(String(L)),L}finally{l&&l.record({type:"pattern_complete",timestamp:Date.now(),snapshotId:null,patternId:s,patternType:C.type,durationMs:Date.now()-g,...b?{error:b.message}:{}})}},async runParallel(s,h,C,g){Z();let b=Array.isArray(h)?h:s.map(()=>h);if(b.length!==s.length)throw new Error(`[Directive MultiAgent] Input count (${b.length}) must match agent count (${s.length})`);let L=new AbortController,B;g?.timeout&&(B=setTimeout(()=>L.abort(),g.timeout));try{let W=s.map((ge,he)=>ct(ge,b[he],{signal:L.signal}).catch(fe=>{if(g?.minSuccess!==void 0)return null;throw fe})),X=await Promise.all(W),ue=X.filter(ge=>ge!==null);if(g?.minSuccess!==void 0&&ue.length<g.minSuccess){let ge=X.length-ue.length;throw new Error(`[Directive MultiAgent] runParallel: Only ${ue.length}/${s.length} agents succeeded (minimum required: ${g.minSuccess}, failed: ${ge})`)}return C(ue)}finally{B&&clearTimeout(B)}},async runSequential(s,h,C){Z();let g=[],b=h;for(let L=0;L<s.length;L++){let B=s[L],W=await ct(B,b);g.push(W),L<s.length-1&&(C?.transform?b=C.transform(W.output,B,L):b=typeof W.output=="string"?W.output:ir(W.output))}return g},async handoff(s,h,C,g){if(Z(),!V[s]){let B=Object.keys(V).join(", ")||"(none)";throw new Error(`[Directive MultiAgent] Handoff source agent "${s}" not found. Registered: ${B}`)}if(!V[h]){let B=Object.keys(V).join(", ")||"(none)";throw new Error(`[Directive MultiAgent] Handoff target agent "${h}" not found. Registered: ${B}`)}{let B=await nr("pre_handoff",s,V[s].agent.name,C,void 0,{handoff:{fromAgent:s,toAgent:h}});if(B.skip)return{output:void 0,messages:[],toolCalls:[],totalTokens:0};C=B.input}let b={id:`handoff-${++re}`,fromAgent:s,toAgent:h,input:C,context:g,requestedAt:Date.now()};Fe.push(b);try{n?.(b)}catch(B){I&&console.debug("[Directive MultiAgent] onHandoff threw:",B)}ae("onHandoff",b),l&&l.record({type:"handoff_start",timestamp:Date.now(),snapshotId:null,fromAgent:s,toAgent:h});let L=V[h].memory??f;if(L&&g)try{let B=Object.entries(g).map(([W,X])=>`${W}: ${ir(X)}`).join(", ");L.addMessages([{role:"system",content:`[Handoff from ${s}] Context: ${B}`}])}catch(B){I&&console.debug("[Directive MultiAgent] Handoff addMessages failed:",B)}try{let B=await ct(h,C),W={request:b,result:B,completedAt:Date.now()};ke(W);try{o?.(W)}catch(ue){I&&console.debug("[Directive MultiAgent] onHandoffComplete threw:",ue)}ae("onHandoffComplete",W),l&&l.record({type:"handoff_complete",timestamp:Date.now(),snapshotId:null,fromAgent:s,toAgent:h,durationMs:W.completedAt-b.requestedAt});let X=Fe.indexOf(b);return X>=0&&Fe.splice(X,1),B}catch(B){let W=Fe.indexOf(b);throw W>=0&&Fe.splice(W,1),B}},approve(s){Z();let h=Ie.get(s);if(h){Ie.delete(s);let C=it(h);N.batch(()=>{let g=Nt(C),b=200,L=[...g.approved,s];xt(C,{...g,pending:g.pending.filter(B=>B.id!==s),approved:L.length>b?L.slice(-b):L})});return}I&&console.debug(`[Directive MultiAgent] approve() ignored: no pending request "${s}"`)},reject(s,h){Z();let C=Ie.get(s);if(C){Ie.delete(s);let g=it(C);N.batch(()=>{let b=Nt(g);h&&I&&console.debug(`[Directive MultiAgent] Request ${s} rejected: ${h}`);let L={id:s,reason:h,rejectedAt:Date.now()},B=200,W=[...b.rejected,L];xt(g,{...b,pending:b.pending.filter(X=>X.id!==s),rejected:W.length>B?W.slice(-B):W})});return}I&&console.debug(`[Directive MultiAgent] reject() ignored: no pending request "${s}"`)},pause(){Z(),Ae="paused",I&&console.debug("[Directive MultiAgent] Orchestrator paused")},resume(){Z(),Ae==="paused"&&(Ae="idle",I&&console.debug("[Directive MultiAgent] Orchestrator resumed"))},getAgentState(s){let h=te[s];return h?{...h}:void 0},getAllAgentStates(){return Object.fromEntries(Object.entries(te).map(([s,h])=>[s,{...h}]))},getPendingHandoffs(){return[...Fe]},get totalTokens(){return de},waitForIdle(s){let h=()=>A===0&&Object.values(te).every(C=>C.status==="idle"||C.status==="completed"||C.status==="error");return h()?Promise.resolve():new Promise((C,g)=>{let b=null,L=()=>{Le.delete(B),b&&clearTimeout(b)},B=()=>{h()&&(L(),C())};Le.add(B),s!==void 0&&(b=setTimeout(()=>{L(),g(new Error(`[Directive MultiAgent] waitForIdle timed out after ${s}ms`))},s))})},run(s,h,C){return ct(s,h,C)},runStream(s,h,C){return Xr(s,h,C)},registerAgent(s,h){if(Z(),y.has(s))throw new Error(`[Directive MultiAgent] Agent ID "${s}" is reserved and cannot be used`);if(V[s])throw new Error(`[Directive MultiAgent] Agent "${s}" is already registered. Unregister first.`);let C=h.constraints?zr(h.constraints):{},g=Object.create(null);if(h.resolvers)for(let[L,B]of Object.entries(h.resolvers))g[L]={requirement:B.requirement,key:B.key,resolve:async(W,X)=>{let ue=Dt(X.facts),ge={facts:{...X.facts,...ue},runAgent:async(he,fe,qe)=>t(he,fe,qe),signal:X.signal};return B.resolve(W,ge)}};let b=dr(s,{schema:vn,init:L=>{St(L,{status:"idle",currentAgent:h.agent.name,input:null,output:null,error:null,tokenUsage:0,turnCount:0,startedAt:null,completedAt:null}),xt(L,{pending:[],approved:[],rejected:[]}),Ft(L,[]),Ut(L,[]),It(L,Nr())},constraints:C,resolvers:Object.keys(g).length>0?g:void 0});N.registerModule(s,b),V[s]=h,xe.set(s,new Pr(h.maxConcurrent??1)),te[s]={status:"idle",runCount:0,totalTokens:0},I&&console.debug(`[Directive MultiAgent] Registered agent "${s}" (${h.agent.name})`),Ze()},unregisterAgent(s){if(Z(),!V[s])throw new Error(`[Directive MultiAgent] Agent "${s}" is not registered`);if(te[s]?.status==="running")throw new Error(`[Directive MultiAgent] Cannot unregister agent "${s}" while it is running`);for(let[g,b]of Object.entries(r)){let L;switch(b.type){case"supervisor":L=[b.supervisor,...b.workers];break;case"dag":L=Object.values(b.nodes).map(B=>B.agent);break;case"reflect":L=[b.agent,b.evaluator];break;case"parallel":case"sequential":case"race":L=b.agents;break;case"debate":L=[...b.agents,b.evaluator];break;default:L=[]}L.includes(s)&&console.warn(`[Directive MultiAgent] Warning: Pattern "${g}" references unregistered agent "${s}"`)}let h=xe.get(s);h&&(h.drain(),xe.delete(s));let C=it(s);C&&N.batch(()=>{St(C,{status:"idle",currentAgent:null,input:null,output:null,error:null,tokenUsage:0,turnCount:0,startedAt:null,completedAt:null}),xt(C,{pending:[],approved:[],rejected:[]}),Ft(C,[]),Ut(C,[]),It(C,Nr())}),delete V[s],delete te[s],I&&console.debug(`[Directive MultiAgent] Unregistered agent "${s}"`),Ze()},getAgentIds(){return Object.keys(V)},reset(){Z();for(let h of Object.keys(V)){let C=V[h]?.maxConcurrent??1;te[h]={status:"idle",runCount:0,totalTokens:0};let g=xe.get(h);g&&g.drain(),xe.set(h,new Pr(C));let b=it(h);N.batch(()=>{St(b,{status:"idle",currentAgent:V[h].agent.name,input:null,output:null,error:null,tokenUsage:0,turnCount:0,startedAt:null,completedAt:null}),xt(b,{pending:[],approved:[],rejected:[]}),Ft(b,[]),Ut(b,[]),It(b,Nr())})}Ot.clear(),mr.clear(),Ie.clear(),Fe.length=0,Ue.length=0,re=0,de=0,Ae="idle",A=0,Me();let s=it("__coord");N.batch(()=>{Xe(s,"__globalTokens",0),Xe(s,"__status","idle"),Xe(s,"__handoffs",[]),Xe(s,"__handoffResults",[]),Xe(s,"__budgetWarningFired",!1),$&&Xe(s,Et,{...$.init})}),P&&P.reset(),Y=null;for(let h of Object.keys(Ct))delete Ct[h];Ze()},async checkpoint(s){Z();for(let[C,g]of Object.entries(te))if(g.status==="running")throw new Error(`[Directive MultiAgent] Cannot checkpoint while agent "${C}" is running`);if(!N.debug?.export)throw new Error("[Directive MultiAgent] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.");let h={version:1,id:Gt(),createdAt:new Date().toISOString(),label:s?.label,systemExport:N.debug.export(),timelineExport:l?.export()??null,localState:{type:"multi",globalTokenCount:de,globalStatus:Ae,agentStates:Object.fromEntries(Object.entries(te).map(([C,g])=>[C,structuredClone(g)])),handoffCounter:re,pendingHandoffs:[...Fe],handoffResults:[...Ue],roundRobinCounters:K?Object.fromEntries(K):null},memoryExport:f?f.export?.()??null:null,orchestratorType:"multi"};return j&&await j.save(h),h},restore(s,h){if(Z(),!Oa(s))throw new Error("[Directive MultiAgent] Invalid checkpoint data");if(s.orchestratorType!=="multi")throw new Error(`[Directive MultiAgent] Expected multi-agent checkpoint, got "${s.orchestratorType}"`);if(!N.debug?.import)throw new Error("[Directive MultiAgent] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.");N.debug.import(s.systemExport),h?.restoreTimeline!==!1&&s.timelineExport&&l&&l.import(s.timelineExport),s.memoryExport&&f&&f.import&&f.import(s.memoryExport);let C=s.localState;de=C.globalTokenCount,Ae=C.globalStatus,re=C.handoffCounter,Fe.length=0,Fe.push(...C.pendingHandoffs),Ue.length=0,Ue.push(...C.handoffResults);for(let[g,b]of Object.entries(C.agentStates))te[g]&&(te[g]={...b});if(C.roundRobinCounters&&K){K.clear();for(let[g,b]of Object.entries(C.roundRobinCounters))K.set(g,b)}for(let[g,b]of Object.entries(V)){let L=xe.get(g);L&&L.drain(),xe.set(g,new Pr(b.maxConcurrent??1))}Ze()},runParallelStream(s,h,C,g){Z();let b=Array.isArray(h)?h:s.map(()=>h);if(b.length!==s.length)throw new Error(`[Directive MultiAgent] Input count (${b.length}) must match agent count (${s.length})`);let L=new AbortController,B;g?.timeout&&(B=setTimeout(()=>L.abort(),g.timeout));let W=s.map((Q,be)=>{let Be=Xr(Q,b[be],{signal:L.signal});return{agentId:Q,streamResult:Be}}),X=W.map(({agentId:Q,streamResult:be})=>({agentId:Q,stream:be.stream})),{stream:ue,getDroppedCount:ge}=Rs(X),he;g?.signal&&(he=()=>L.abort(),g.signal.addEventListener("abort",he,{once:!0}));let fe=Promise.allSettled(W.map(({streamResult:Q})=>Q.result)).then(Q=>{B&&clearTimeout(B),he&&g?.signal&&g.signal.removeEventListener("abort",he);let be=[];for(let Be of Q)Be.status==="fulfilled"&&be.push(Be.value);if(g?.minSuccess!==void 0&&be.length<g.minSuccess)throw new Error(`[Directive MultiAgent] runParallelStream: Only ${be.length}/${s.length} agents succeeded (minimum required: ${g.minSuccess})`);return be}),qe=fe.then(Q=>C(Q));return fe.catch(()=>{}),qe.catch(()=>{}),{stream:ue,results:fe,merge:qe,getDroppedCount:ge,abort:()=>{L.abort(),he&&g?.signal&&g.signal.removeEventListener("abort",he);for(let{streamResult:Q}of W)Q.abort()}}},async runRace(s,h,C){Z();let g={type:"race",agents:s,extract:C?.extract,timeout:C?.timeout,minSuccess:C?.minSuccess,signal:C?.signal};return jn(g,h,"__imperative_race")},async runReflect(s,h,C,g){Z();let b={type:"reflect",agent:s,evaluator:h,maxIterations:g?.maxIterations,parseEvaluation:g?.parseEvaluation,buildRetryInput:g?.buildRetryInput,extract:g?.extract,onExhausted:g?.onExhausted,onIteration:g?.onIteration,signal:g?.signal,timeout:g?.timeout,threshold:g?.threshold},L=await Tr(b,C,"__imperative_reflect"),B=Y?[...Y]:[],W=g?.maxIterations??2,X=B.length>0&&!B[B.length-1].passed&&B.length>=W;return{result:L,iterations:B.length,history:B,exhausted:X}},async runDebate(s,h,C,g){return Z(),jr({agents:s,evaluator:h,maxRounds:g?.maxRounds,extract:g?.extract,parseJudgement:g?.parseJudgement,signal:g?.signal,timeout:g?.timeout},C,"__imperative_debate")},async runGoal(s,h,C,g){return Z(),Rr({nodes:s,when:C,satisfaction:g?.satisfaction,maxSteps:g?.maxSteps,extract:g?.extract,timeout:g?.timeout,signal:g?.signal,selectionStrategy:g?.selectionStrategy,relaxation:g?.relaxation,onStep:g?.onStep,onStall:g?.onStall,checkpoint:g?.checkpoint},h,"__imperative_goal")},async resumeGoal(s,h){if(Z(),!s||s.version!==1||s.type!=="goal"&&s.type!=="converge")throw new Error("[Directive MultiAgent] Invalid goal checkpoint state");let C=s.type==="converge"?{...s}:s;return Rr(h,{},C.patternId,C)},async resumeSequential(s,h){if(Z(),!s||s.version!==1||s.type!=="sequential")throw new Error("[Directive MultiAgent] Invalid sequential checkpoint state");return Qr(h,s.currentInput,s.patternId,s)},async resumeSupervisor(s,h,C){if(Z(),!s||s.version!==1||s.type!=="supervisor")throw new Error("[Directive MultiAgent] Invalid supervisor checkpoint state");let g=C?.input??s.currentInput;return Zr(h,g,s.patternId,s)},async resumeReflect(s,h,C){if(Z(),!s||s.version!==1||s.type!=="reflect")throw new Error("[Directive MultiAgent] Invalid reflect checkpoint state");let g=C?.input??s.effectiveInput;return Tr(h,g,s.patternId,s)},async resumeDebate(s,h){if(Z(),!s||s.version!==1||s.type!=="debate")throw new Error("[Directive MultiAgent] Invalid debate checkpoint state");return jr(h,s.currentInput,s.patternId,s)},async resumeDag(s,h,C){if(Z(),!s||s.version!==1||s.type!=="dag")throw new Error("[Directive MultiAgent] Invalid DAG checkpoint state");let g=C?.input??s.input;return en(h,g,s.patternId,s)},async replay(s,h,C){if(Z(),!j)throw new Error("[Directive MultiAgent] No checkpoint store configured");let g=await j.load(s);if(!g)throw new Error(`[Directive MultiAgent] Checkpoint not found: ${s}`);let b;try{let W=JSON.parse(g.systemExport);if(!W||typeof W!="object")throw new Error("Parsed checkpoint state is not an object");let X=new Set(["__proto__","constructor","prototype"]);for(let ue of Object.keys(W))if(X.has(ue))throw new Error(`Checkpoint state contains blocked key: ${ue}`);if(!new Set(["sequential","supervisor","reflect","debate","dag","goal","converge"]).has(W.type))throw new Error(`Unknown checkpoint pattern type: ${W.type}`);if(W.version!==1)throw new Error(`Unsupported checkpoint version: ${W.version}`);b=W}catch(W){throw new Error(`[Directive MultiAgent] Invalid checkpoint state: ${W instanceof Error?W.message:String(W)}`)}let L=oa(b),B=C?.input??("currentInput"in b?b.currentInput:"");switch(l&&l.record({type:"checkpoint_restore",timestamp:Date.now(),snapshotId:null,checkpointId:s,patternType:b.type,step:L}),b.type){case"sequential":return Qr(h,B,b.patternId,b);case"supervisor":return Zr(h,B,b.patternId,b);case"reflect":return Tr(h,B,b.patternId,b);case"debate":return jr(h,B,b.patternId,b);case"dag":return en(h,B,b.patternId,b);case"goal":return Rr(h,b.facts,b.patternId,b)}},resumeBreakpoint(s,h){Z(),h&&Ot.set(s,h);for(let C of Object.keys(V)){let g=it(C);if(At(g).pending.some(b=>b.id===s)){N.batch(()=>{let b=At(g),L=[...b.resolved,s];It(g,{...b,pending:b.pending.filter(B=>B.id!==s),resolved:L.length>Wt?L.slice(-Wt):L})});return}}I&&console.debug(`[Directive MultiAgent] resumeBreakpoint() ignored: no pending breakpoint "${s}"`)},cancelBreakpoint(s,h){Z(),h&&mr.set(s,h);for(let C of Object.keys(V)){let g=it(C);if(At(g).pending.some(b=>b.id===s)){N.batch(()=>{let b=At(g),L=[...b.cancelled,s];It(g,{...b,pending:b.pending.filter(B=>B.id!==s),cancelled:L.length>Wt?L.slice(-Wt):L})});return}}I&&console.debug(`[Directive MultiAgent] cancelBreakpoint() ignored: no pending breakpoint "${s}"`)},getPendingBreakpoints(){let s=[];for(let h of Object.keys(V)){let C=it(h),g=At(C);s.push(...g.pending)}return s},getLastReflectionHistory(){return Y?[...Y]:null},dispose(){p||(Rn.reset(),$t.clear(),Ve.clear(),zt.clear(),Le.clear(),p=!0,N.destroy())}};return Ze(),Rn}function Bs(e,t,a){return{type:"parallel",agents:e,merge:t,...a}}function Fs(e,t){let a=Object.keys(t);for(let[u,c]of Object.entries(t))for(let d of c.deps??[])if(!t[d])throw new Error(`[Directive MultiAgent] DAG pattern "${e}": node "${u}" depends on unknown node "${d}"`);if(!a.some(u=>{let c=t[u]?.deps;return!c||c.length===0}))throw new Error(`[Directive MultiAgent] DAG pattern "${e}": no root nodes (every node has dependencies)`);let r=Object.create(null),n=Object.create(null);for(let u of a)n[u]=[];for(let[u,c]of Object.entries(t)){r[u]=(c.deps??[]).length;for(let d of c.deps??[])n[d].push(u)}let o=[];for(let u of a)r[u]===0&&o.push(u);let i=0;for(;o.length>0;){let u=o.shift();i++;for(let c of n[u]??[])r[c]--,r[c]===0&&o.push(c)}if(i!==a.length)throw new Error(`[Directive MultiAgent] DAG pattern "${e}": cycle detected. Visited ${i}/${a.length} nodes.`)}function sa(){return globalThis.crypto?.randomUUID?.()??`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,11)}`}function Us(e={}){let{maxHistory:t=1e3,defaultTtlMs:a=36e5,maxPendingPerAgent:r=100,persistence:n,onDelivery:o,onDeliveryError:i}=e,u=new Map,c=[],d=new Map,f=new Map;function w(D,E){if(E.types&&!E.types.includes(D.type)||E.from&&!(Array.isArray(E.from)?E.from:[E.from]).includes(D.from))return!1;if(E.topics){let T=D.topic;if(T&&!E.topics.includes(T))return!1}return!(E.priority&&D.priority&&!E.priority.includes(D.priority)||E.custom&&!E.custom(D))}function O(D){return D.ttlMs?Date.now()-D.timestamp>D.ttlMs:!1}function _(D){return D.to==="*"?Array.from(u.keys()):Array.isArray(D.to)?D.to:[D.to]}async function U(D){if(O(D))return;let E=_(D),T=[],G=[];for(let J of E){let m=u.get(J)??[];if(m.length===0){let M=f.get(J)??[];for(M.push(D);M.length>r;)M.shift();f.set(J,M);continue}for(let M of m)(!M.filter||w(D,M.filter))&&G.push(Promise.resolve(M.handler(D)).then(()=>{T.push(J)},S=>{i?.(D,S instanceof Error?S:new Error(String(S)))}))}G.length>0&&await Promise.allSettled(G),T.length>0&&o?.(D,T),n&&await n.save(D)}return{publish(D){let E={...D,id:sa(),timestamp:Date.now(),priority:D.priority??"normal",ttlMs:D.ttlMs??a};for(c.push(E),d.set(E.id,E);c.length>t;){let T=c.shift();T&&d.delete(T.id)}return U(E).catch(T=>{let G=T instanceof Error?T:new Error(String(T));i?i(E,G):console.error("[Directive MessageBus] Delivery error:",G)}),E.id},subscribe(D,E,T){let G=sa(),J={id:G,agentId:D,handler:E,filter:T,unsubscribe:()=>{let S=u.get(D)??[],j=S.findIndex(F=>F.id===G);j>=0&&S.splice(j,1)}},m=u.get(D)??[];m.push(J),u.set(D,m);let M=f.get(D)??[];f.delete(D);for(let S of M)if(!T||w(S,T)){let j=E(S);j instanceof Promise&&j.catch(F=>{let ne=F instanceof Error?F:new Error(String(F));i?i(S,ne):console.error("[Directive MessageBus] Pending delivery error:",ne)})}return J},getHistory(D,E=100){let T=c.filter(G=>!O(G));return D&&(T=T.filter(G=>w(G,D))),T.slice(-E)},getMessage(D){let E=d.get(D);if(!(E&&O(E)))return E},getPending(D){return(f.get(D)??[]).filter(E=>!O(E))},clear(){c.length=0,d.clear(),f.clear()},dispose(){c.length=0,d.clear(),f.clear(),u.clear()}}}function zs(e,t){if(e.length!==t.length)throw new Error(`Vector dimensions must match: ${e.length} vs ${t.length}`);let a=0,r=0,n=0;for(let o=0;o<e.length;o++){let i=e[o],u=t[o];a+=i*u,r+=i*i,n+=u*u}return r=Math.sqrt(r),n=Math.sqrt(n),r===0||n===0?0:a/(r*n)}function Js(e,t,a,r){let n=null;for(let o of t){if(r&&o.agentName&&o.agentName!==r)continue;let i=zs(e,o.queryEmbedding);i>=a&&(!n||i>n.similarity)&&(n={entry:o,similarity:i})}return n}function Gs(){let e=new Map;function t(a){let r=e.get(a);return r||(r=new Map,e.set(a,r)),r}return{async getEntries(a){return Array.from(t(a).values())},async addEntry(a,r){t(a).set(r.id,r)},async updateEntry(a,r,n){let o=t(a),i=o.get(r);i&&o.set(r,{...i,...n})},async removeEntry(a,r){t(a).delete(r)},async clear(a){e.delete(a)}}}function Hs(e){let{embedder:t,similarityThreshold:a=.9,maxCacheSize:r=1e3,ttlMs:n=36e5,namespace:o="default",storage:i=Gs(),onHit:u,onMiss:c,onError:d,perAgent:f=!1}=e,w={totalEntries:0,totalHits:0,totalMisses:0,hitRate:0,avgSimilarityOnHit:0,oldestEntry:null,newestEntry:null},O=0;function _(D){if(w.totalEntries=D.length,w.hitRate=w.totalHits+w.totalMisses>0?w.totalHits/(w.totalHits+w.totalMisses):0,w.avgSimilarityOnHit=w.totalHits>0?O/w.totalHits:0,D.length>0){let E=D.map(T=>T.createdAt);w.oldestEntry=Math.min(...E),w.newestEntry=Math.max(...E)}else w.oldestEntry=null,w.newestEntry=null}async function U(){let D=await i.getEntries(o),E=Date.now();for(let G of D)E-G.createdAt>n&&await i.removeEntry(o,G.id);let T=await i.getEntries(o);if(T.length>r){let G=T.sort((J,m)=>J.accessedAt-m.accessedAt).slice(0,T.length-r);for(let J of G)await i.removeEntry(o,J.id)}}return{async lookup(D,E){let T=Date.now();try{let G=await t(D),J=await i.getEntries(o),m=Js(G,J,a,f?E:void 0);return m?(await i.updateEntry(o,m.entry.id,{accessedAt:Date.now(),accessCount:m.entry.accessCount+1}),w.totalHits++,O+=m.similarity,_(J),u?.(m.entry,m.similarity),{hit:!0,entry:m.entry,similarity:m.similarity,latencyMs:Date.now()-T}):(w.totalMisses++,_(J),c?.(D),{hit:!1,latencyMs:Date.now()-T})}catch(G){return w.totalMisses++,d?.(G instanceof Error?G:new Error(String(G))),{hit:!1,latencyMs:Date.now()-T}}},async store(D,E,T,G={}){let J=await t(D),m={id:globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random().toString(36).slice(2,11)}`,query:D,queryEmbedding:J,response:E,metadata:G,createdAt:Date.now(),accessedAt:Date.now(),accessCount:0,agentName:f?T:void 0};await i.addEntry(o,m),await U();let M=await i.getEntries(o);_(M)},async invalidate(D){let E=await i.getEntries(o),T=0;for(let J of E)D(J)&&(await i.removeEntry(o,J.id),T++);let G=await i.getEntries(o);return _(G),T},async clear(){await i.clear(o),w={totalEntries:0,totalHits:0,totalMisses:0,hitRate:0,avgSimilarityOnHit:0,oldestEntry:null,newestEntry:null},O=0},getStats(){return{...w}},async export(){return i.getEntries(o)},async import(D){for(let T of D)await i.addEntry(o,T);await U();let E=await i.getEntries(o);_(E)}}}function Ws(e=128){return async t=>{let a=new Array(e).fill(0);for(let n=0;n<t.length;n++){let o=t.charCodeAt(n);a[n%e]+=o/256}let r=Math.sqrt(a.reduce((n,o)=>n+o*o,0));if(r>0)for(let n=0;n<e;n++)a[n]/=r;return a}}const ja="checkers-claude-api-key";function Mn(){return localStorage.getItem(ja)}function Ks(e){localStorage.setItem(ja,e)}function Vs(e){return e?e.player==="red"?e.king?"R":"r":e.king?"B":"b":"."}function Ys(e){let t=`    0  1  2  3  4  5  6  7
-`;for(let a=0;a<8;a++){t+=`${a}  `;for(let r=0;r<8;r++){const n=a*8+r,o=Vs(e[n]);t+=` ${o} `}t+=`
-`}return t+=`
-r=Red, R=Red King, b=Black, B=Black King, .=empty`,t}function ia(e){const[t,a]=tr(e);return`(row ${t}, col ${a}, index ${e})`}function Xs(e){return e.map(t=>{const a=ia(t.from),r=ia(t.to),n=t.captured!==null?` capturing piece at index ${t.captured}`:"";return`  from ${t.from} ${a} → to ${t.to} ${r}${n}`}).join(`
-`)}const Qs=`You are a friendly, competitive checkers opponent playing as Black. You're chatty, fun, and love the game. You offer light trash talk, genuine compliments on good moves, and strategic commentary.
+Original task: ${h}`);
+      }
+      if (qe.length === 0)
+        throw new Error(
+          "[Directive MultiAgent] Debate aborted before any round completed",
+        );
+      const oe = W ? W(Be) : Be;
+      return { winnerId: be, result: oe, rounds: qe };
+    } catch (oe) {
+      throw ((ye = oe instanceof Error ? oe : new Error(String(oe))), oe);
+    } finally {
+      ge && clearTimeout(ge),
+        he && s.signal && s.signal.removeEventListener("abort", he),
+        C &&
+          ae("onPatternComplete", {
+            patternId: me,
+            patternType: "debate",
+            durationMs: Date.now() - He,
+            timestamp: Date.now(),
+            error: ye,
+          });
+    }
+  }
+  const Ka = new Set([
+    "__proto__",
+    "constructor",
+    "prototype",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+  ]);
+  function or(s, h) {
+    for (const C of Object.keys(h)) Ka.has(C) || (s[C] = h[C]);
+  }
+  function Va(s, h) {
+    const C = Object.create(null);
+    for (const [X, ue] of Object.entries(h))
+      for (const ge of ue.produces) C[ge] || (C[ge] = []), C[ge].push(X);
+    const g = Object.keys(h),
+      b = Object.create(null),
+      L = Object.create(null);
+    for (const X of g) (b[X] = 0), (L[X] = []);
+    for (const [X, ue] of Object.entries(h))
+      for (const ge of ue.requires ?? []) {
+        const he = C[ge];
+        if (he)
+          for (const fe of he)
+            fe !== X && (L[fe].push(X), (b[X] = (b[X] ?? 0) + 1));
+      }
+    const B = [];
+    for (const X of g) b[X] === 0 && B.push(X);
+    let W = 0;
+    while (B.length > 0) {
+      const X = B.shift();
+      W++;
+      for (const ue of L[X] ?? []) b[ue]--, b[ue] === 0 && B.push(ue);
+    }
+    if (W !== g.length)
+      throw new Error(
+        `[Directive MultiAgent] goal pattern "${s}": cycle detected in produces/requires graph. Visited ${W}/${g.length} nodes.`,
+      );
+  }
+  function Ya(s, h) {
+    const C = Object.create(null);
+    for (const [g, b] of Object.entries(h))
+      for (const L of b.produces) C[L] || (C[L] = []), C[L].push(g);
+    for (const [g, b] of Object.entries(C))
+      b.length > 1 &&
+        console.warn(
+          `[Directive MultiAgent] goal pattern "${s}": fact key "${g}" is produced by multiple nodes: ${b.join(", ")}. Last writer wins.`,
+        );
+  }
+  function ht(s, ...h) {
+    if (s)
+      try {
+        return s(...h);
+      } catch (C) {
+        console.error("[Directive MultiAgent] goal: user callback threw:", C);
+        return;
+      }
+  }
+  async function Xa(s, ...h) {
+    if (s)
+      try {
+        return await s(...h);
+      } catch (C) {
+        console.error("[Directive MultiAgent] goal: user callback threw:", C);
+        return;
+      }
+  }
+  function tn(s, h, C) {
+    let g = h.slice(-3),
+      b =
+        g.length > 0
+          ? g.reduce((W, X) => W + X.satisfactionDelta, 0) / g.length
+          : 0,
+      L = null;
+    b > 0 && s < 1 && (L = Math.ceil((1 - s) / b));
+    let B = !1;
+    if (h.length >= 6) {
+      const W = h.slice(-3),
+        X = h.slice(-6, -3),
+        ue = W.reduce((he, fe) => he + fe.satisfactionDelta, 0) / 3,
+        ge = X.reduce((he, fe) => he + fe.satisfactionDelta, 0) / 3;
+      B = ue < ge * 0.5;
+    }
+    return {
+      satisfaction: s,
+      progressRate: b,
+      estimatedStepsRemaining: L,
+      decelerating: B,
+    };
+  }
+  function gr(s) {
+    return s == null || !Number.isFinite(s) ? 0 : Math.max(0, Math.min(1, s));
+  }
+  async function Rr(s, h, C, g) {
+    const {
+        nodes: b,
+        when: L,
+        satisfaction: B,
+        maxSteps: W = 50,
+        extract: X,
+        selectionStrategy: ue,
+        relaxation: ge,
+        onStep: he,
+        onStall: fe,
+      } = s,
+      qe = Object.create(null);
+    for (const [at, ft] of Object.entries(b)) qe[at] = { ...ft };
+    if (Object.keys(qe).length === 0)
+      throw new Error("[Directive MultiAgent] goal requires at least one node");
+    const Q = C ?? "__goal";
+    for (const [at, ft] of Object.entries(qe))
+      if (!V[ft.agent])
+        throw new Error(
+          `[Directive MultiAgent] goal node "${at}" references unregistered agent "${ft.agent}"`,
+        );
+    Va(Q, qe), Ya(Q, qe);
+    for (const [at, ft] of Object.entries(qe))
+      ft.extractOutput ||
+        console.warn(
+          `[Directive MultiAgent] goal node "${at}": no extractOutput defined. Output will be auto-parsed from agent response. Define extractOutput for reliable fact extraction.`,
+        );
+    let be = s.signal,
+      Be,
+      Re,
+      Oe = s.timeout ?? 3e5;
+    if (Oe && !be) {
+      const at = new AbortController();
+      (Be = setTimeout(() => at.abort(), Oe)), (be = at.signal);
+    } else if (Oe && be) {
+      const at = new AbortController();
+      (Be = setTimeout(() => at.abort(), Oe)),
+        (Re = () => at.abort()),
+        be.addEventListener("abort", Re, { once: !0 }),
+        (be = at.signal);
+    }
+    const Se = Date.now();
+    l &&
+      l.record({
+        type: "pattern_start",
+        timestamp: Se,
+        snapshotId: null,
+        patternId: Q,
+        patternType: "goal",
+      }),
+      ae("onPatternStart", {
+        patternId: Q,
+        patternType: "goal",
+        input: typeof h == "string" ? h : JSON.stringify(h),
+        timestamp: Se,
+      });
+    const pe = Object.create(null);
+    g ? or(pe, g.facts) : typeof h == "string" ? (pe.input = h) : or(pe, h);
+    const Ce = g ? [...g.executionOrder] : [],
+      me = Object.create(null);
+    if (g)
+      for (const [at, ft] of Object.entries(g.nodeOutputs))
+        me[at] = { output: ft.output, totalTokens: ft.totalTokens };
+    const He = g ? [...g.stepMetrics] : [],
+      se = g ? [...g.relaxations] : [],
+      ye = new Set(g?.completedNodes ?? []),
+      oe = new Map(
+        g ? Object.entries(g.failedNodes).map(([at, ft]) => [at, ft]) : [],
+      ),
+      Ee = new Map(g ? Object.entries(g.nodeInputHashes) : []),
+      Te = Object.create(null);
+    if (g)
+      for (const [at, ft] of Object.entries(g.agentMetrics))
+        Te[at] = {
+          runs: ft.runs,
+          avgSatisfactionDelta: ft.runs > 0 ? ft.totalDelta / ft.runs : 0,
+          tokens: ft.tokens,
+          totalDelta: ft.totalDelta,
+        };
+    let et = g?.stallSteps ?? 0,
+      tt = g?.appliedRelaxationTiers ?? 0,
+      yt = g?.lastSatisfaction ?? 0,
+      Ye,
+      dt = g?.step ?? 0,
+      Tt = s.checkpoint,
+      rn = Tt?.everyN ?? 5,
+      hr = Tt?.store ?? j,
+      eo = Tt?.labelPrefix ?? "goal",
+      to,
+      ro = 3;
+    try {
+      for (let pt = dt; pt < W; pt++) {
+        if (ht(L, pe) === !0) {
+          const Ke = Date.now() - Se,
+            Ge = Object.values(me).reduce((rt, st) => rt + st.totalTokens, 0);
+          return {
+            achieved: !0,
+            result: ht(X, pe) ?? pe,
+            facts: { ...pe },
+            executionOrder: Ce,
+            nodeResults: me,
+            steps: pt,
+            totalTokens: Ge,
+            durationMs: Ke,
+            stepMetrics: He,
+            relaxations: se,
+          };
+        }
+        if (be?.aborted) {
+          const Ke = Date.now() - Se,
+            Ge = Object.values(me).reduce((rt, st) => rt + st.totalTokens, 0);
+          return {
+            achieved: !1,
+            result: ht(X, pe) ?? pe,
+            facts: { ...pe },
+            executionOrder: Ce,
+            nodeResults: me,
+            steps: pt,
+            totalTokens: Ge,
+            durationMs: Ke,
+            stepMetrics: He,
+            relaxations: se,
+            error: "Aborted or timed out",
+          };
+        }
+        const Xt = [];
+        for (const [Ke, Ge] of Object.entries(qe)) {
+          if ((oe.get(Ke) ?? 0) >= ro) continue;
+          const rt = Ge.requires ?? [];
+          if (rt.every((st) => pe[st] != null)) {
+            if (ye.has(Ke)) {
+              if (!Ge.allowRerun) continue;
+              const st = JSON.stringify(rt.map((mt) => pe[mt]));
+              if (Ee.get(Ke) === st) continue;
+            }
+            Xt.push(Ke);
+          }
+        }
+        let Qt = Xt;
+        if (ue && Xt.length > 0) {
+          const Ke = B ? (ht(B, pe) ?? 0) : ht(L, pe) === !0 ? 1 : 0,
+            Ge = gr(Ke),
+            rt = tn(Ge, He, pt),
+            st = Object.create(null);
+          for (const [bt, nt] of Object.entries(Te))
+            st[bt] = {
+              runs: nt.runs,
+              avgSatisfactionDelta: nt.runs > 0 ? nt.totalDelta / nt.runs : 0,
+              tokens: nt.tokens,
+            };
+          const mt = ue.select(Xt, st, rt);
+          Qt = mt && mt.length > 0 ? mt : Xt;
+        }
+        if (
+          (Qt.sort((Ke, Ge) => (qe[Ge].priority ?? 0) - (qe[Ke].priority ?? 0)),
+          ht(he, pt, { ...pe }, Qt),
+          Qt.length === 0)
+        ) {
+          et++;
+          let Ke = !1;
+          if (ge)
+            for (let Ge = tt; Ge < ge.length; Ge++) {
+              const rt = ge[Ge],
+                st = rt.afterStallSteps ?? 3;
+              if (et >= st) {
+                const mt = rt.strategy;
+                switch (mt.type) {
+                  case "allow_rerun":
+                    for (const bt of mt.nodes) ye.delete(bt), Ee.delete(bt);
+                    break;
+                  case "alternative_nodes":
+                    for (const bt of mt.nodes) {
+                      const nt = `__relaxation_${Ge}_${bt.agent}`;
+                      qe[nt] = { ...bt };
+                    }
+                    break;
+                  case "inject_facts":
+                    or(pe, mt.facts);
+                    break;
+                  case "accept_partial": {
+                    const bt = Date.now() - Se,
+                      nt = Object.values(me).reduce(
+                        (gt, jt) => gt + jt.totalTokens,
+                        0,
+                      );
+                    return {
+                      achieved: !1,
+                      result: ht(X, pe) ?? pe,
+                      facts: { ...pe },
+                      executionOrder: Ce,
+                      nodeResults: me,
+                      steps: pt,
+                      totalTokens: nt,
+                      durationMs: bt,
+                      stepMetrics: He,
+                      relaxations: se,
+                      error: `Accepted partial result via relaxation tier "${rt.label}"`,
+                    };
+                  }
+                  case "custom": {
+                    const bt = ht(B, pe) ?? 0,
+                      nt = {
+                        step: pt,
+                        facts: { ...pe },
+                        metrics: tn(gr(bt), He, pt),
+                        completedNodes: new Set(ye),
+                        failedNodes: new Map(oe),
+                      };
+                    await Xa(mt.apply, nt);
+                    break;
+                  }
+                }
+                se.push({
+                  step: pt,
+                  tierIndex: Ge,
+                  label: rt.label,
+                  strategy: mt.type,
+                }),
+                  (tt = Ge + 1),
+                  (et = 0),
+                  (Ke = !0);
+                break;
+              }
+            }
+          if (!Ke) {
+            const Ge = ht(B, pe) ?? 0,
+              rt = tn(gr(Ge), He, pt);
+            if ((ht(fe, pt, rt), !ge || tt >= ge.length)) {
+              const st = Date.now() - Se,
+                mt = Object.values(me).reduce(
+                  (bt, nt) => bt + nt.totalTokens,
+                  0,
+                );
+              return {
+                achieved: !1,
+                result: ht(X, pe) ?? pe,
+                facts: { ...pe },
+                executionOrder: Ce,
+                nodeResults: me,
+                steps: pt,
+                totalTokens: mt,
+                durationMs: st,
+                stepMetrics: He,
+                relaxations: se,
+                error:
+                  "Goal stalled: no ready nodes and no remaining relaxation tiers",
+              };
+            }
+          }
+          continue;
+        }
+        et = 0;
+        let no = Date.now(),
+          ao = B ? (ht(B, pe) ?? 0) : ht(L, pe) === !0 ? 1 : 0,
+          oo = gr(ao),
+          _n = 0,
+          sr = [],
+          so = Qt.map(async (Ke) => {
+            const Ge = qe[Ke],
+              rt = Ge.requires ?? [],
+              st = JSON.stringify(rt.map((nt) => pe[nt]));
+            Ee.set(Ke, st);
+            let mt,
+              bt = ht(Ge.buildInput, pe);
+            if (bt != null) mt = bt;
+            else {
+              const nt = Object.create(null);
+              for (const gt of rt) pe[gt] != null && (nt[gt] = pe[gt]);
+              Object.keys(nt).length > 0
+                ? (mt = JSON.stringify(nt))
+                : pe.input != null
+                  ? (mt = String(pe.input))
+                  : (mt = JSON.stringify(pe));
+            }
+            try {
+              const nt = await ct(Ge.agent, mt, { signal: be ?? void 0 });
+              if (
+                ((me[Ke] = nt),
+                Ce.push(Ke),
+                ye.add(Ke),
+                oe.delete(Ke),
+                Ge.extractOutput)
+              ) {
+                const gt = ht(Ge.extractOutput, nt);
+                gt && (or(pe, gt), sr.push(...Object.keys(gt)));
+              } else {
+                const gt = nt.output;
+                if (gt && typeof gt == "object")
+                  or(pe, gt), sr.push(...Object.keys(gt));
+                else if (typeof gt == "string")
+                  try {
+                    const jt = JSON.parse(gt);
+                    if (jt && typeof jt == "object" && !Array.isArray(jt))
+                      or(pe, jt), sr.push(...Object.keys(jt));
+                    else
+                      for (const qn of Ge.produces) (pe[qn] = gt), sr.push(qn);
+                  } catch {
+                    for (const jt of Ge.produces) (pe[jt] = gt), sr.push(jt);
+                  }
+              }
+              return (_n += nt.totalTokens), { nodeId: Ke, success: !0 };
+            } catch (nt) {
+              const gt = (oe.get(Ke) ?? 0) + 1;
+              return oe.set(Ke, gt), { nodeId: Ke, success: !1, error: nt };
+            }
+          });
+        await Promise.allSettled(so);
+        const io = B ? (ht(B, pe) ?? 0) : ht(L, pe) === !0 ? 1 : 0,
+          nn = gr(io),
+          an = nn - oo;
+        He.push({
+          step: pt,
+          durationMs: Date.now() - no,
+          nodesRun: [...Qt],
+          factsProduced: sr,
+          satisfaction: nn,
+          satisfactionDelta: an,
+          tokensConsumed: _n,
+        });
+        for (const Ke of Qt) {
+          const Ge = qe[Ke];
+          Te[Ge.agent] ||
+            (Te[Ge.agent] = {
+              runs: 0,
+              avgSatisfactionDelta: 0,
+              tokens: 0,
+              totalDelta: 0,
+            });
+          const rt = Te[Ge.agent];
+          rt.runs++,
+            (rt.totalDelta += an),
+            (rt.tokens += me[Ke]?.totalTokens ?? 0);
+        }
+        if (
+          ((yt = nn),
+          an <= 0 ? et++ : (et = 0),
+          Tt && hr && pt > dt && (pt - dt) % rn === 0)
+        ) {
+          const Ke = {
+              type: "goal",
+              version: 1,
+              id: Gt(),
+              createdAt: new Date().toISOString(),
+              label: `${eo}:step-${pt}`,
+              patternId: Q,
+              stepsTotal: W,
+              step: pt + 1,
+              facts: structuredClone(pe),
+              completedNodes: [...ye],
+              failedNodes: Object.fromEntries(oe),
+              nodeInputHashes: Object.fromEntries(Ee),
+              nodeOutputs: Object.fromEntries(
+                Object.entries(me).map(([rt, st]) => [
+                  rt,
+                  { output: st.output, totalTokens: st.totalTokens },
+                ]),
+              ),
+              executionOrder: [...Ce],
+              stepMetrics: [...He],
+              relaxations: [...se],
+              appliedRelaxationTiers: tt,
+              stallSteps: et,
+              lastSatisfaction: yt,
+              agentMetrics: Object.fromEntries(
+                Object.entries(Te).map(([rt, st]) => [
+                  rt,
+                  {
+                    runs: st.runs,
+                    totalDelta: st.totalDelta,
+                    tokens: st.tokens,
+                  },
+                ]),
+              ),
+            },
+            Ge = await ar(Ke, hr, Tt);
+          Ge && (to = Ge);
+        }
+      }
+      const at = Date.now() - Se,
+        ft = Object.values(me).reduce((pt, Xt) => pt + Xt.totalTokens, 0);
+      return {
+        achieved: !1,
+        result: ht(X, pe) ?? pe,
+        facts: { ...pe },
+        executionOrder: Ce,
+        nodeResults: me,
+        steps: W,
+        totalTokens: ft,
+        durationMs: at,
+        stepMetrics: He,
+        relaxations: se,
+        error: `Max steps (${W}) exhausted without achieving goal`,
+      };
+    } catch (at) {
+      throw ((Ye = at instanceof Error ? at : new Error(String(at))), at);
+    } finally {
+      Be != null && clearTimeout(Be),
+        Re && s.signal && s.signal.removeEventListener("abort", Re),
+        l &&
+          l.record({
+            type: "pattern_complete",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId: Q,
+            patternType: "goal",
+            durationMs: Date.now() - Se,
+            ...(Ye ? { error: Ye.message } : {}),
+          }),
+        ae("onPatternComplete", {
+          patternId: Q,
+          patternType: "goal",
+          durationMs: Date.now() - Se,
+          timestamp: Date.now(),
+          error: Ye,
+        });
+    }
+  }
+  function Qa(s) {
+    if (!S) return [];
+    const h = [],
+      C = new Set();
+    if ((C.add(s), S.equivalencyGroups)) {
+      for (const g of Object.values(S.equivalencyGroups))
+        if (g.includes(s))
+          for (const b of g) !C.has(b) && V[b] && (h.push(b), C.add(b));
+    }
+    if (S.useCapabilities !== !1) {
+      const g = V[s];
+      if (g?.capabilities && g.capabilities.length > 0)
+        for (const [b, L] of Object.entries(V)) {
+          if (C.has(b)) continue;
+          const B = L.capabilities ?? [];
+          g.capabilities.every((W) => B.includes(W)) && (h.push(b), C.add(b));
+        }
+    }
+    if (P) {
+      const g = S.healthThreshold ?? 30;
+      return h.filter((b) => P.getHealthScore(b) > g);
+    }
+    return h;
+  }
+  function Za(s) {
+    if (s.length === 0) return null;
+    if (!S || !P) return s[0] ?? null;
+    if (S.selectionStrategy === "round-robin" && K) {
+      const g = [...s].sort().join(","),
+        b = K.get(g) ?? 0,
+        L = s[b % s.length];
+      return K.set(g, b + 1), L;
+    }
+    let h = s[0],
+      C = P.getHealthScore(h);
+    for (let g = 1; g < s.length; g++) {
+      const b = P.getHealthScore(s[g]);
+      b > C && ((h = s[g]), (C = b));
+    }
+    return h;
+  }
+  const Rn = {
+    system: N,
+    get facts() {
+      return N.facts;
+    },
+    get timeline() {
+      return l;
+    },
+    get healthMonitor() {
+      return P;
+    },
+    get derived() {
+      return Object.freeze({ ...Ct });
+    },
+    onDerivedChange(s) {
+      return (
+        zt.add(s),
+        () => {
+          zt.delete(s);
+        }
+      );
+    },
+    get scratchpad() {
+      return Mt;
+    },
+    runAgent: ct,
+    runAgentStream: Xr,
+    async runPattern(s, h) {
+      Z();
+      const C = r[s];
+      if (!C) {
+        const L = Object.keys(r).join(", ") || "(none)";
+        throw new Error(
+          `[Directive MultiAgent] Unknown pattern "${s}". Available patterns: ${L}`,
+        );
+      }
+      const g = Date.now();
+      l &&
+        l.record({
+          type: "pattern_start",
+          timestamp: g,
+          snapshotId: null,
+          patternId: s,
+          patternType: C.type,
+        });
+      let b;
+      try {
+        switch (C.type) {
+          case "parallel":
+            return await Wa(C, h, s);
+          case "sequential":
+            return await Qr(C, h, s);
+          case "supervisor":
+            return await Zr(C, h, s);
+          case "dag":
+            return await en(C, h, s);
+          case "reflect":
+            return await Tr(C, h, s);
+          case "race":
+            return (await jn(C, h, s)).result;
+          case "debate":
+            return (await jr(C, h, s)).result;
+          case "goal":
+            return (await Rr(C, h, s)).result;
+          default:
+            throw new Error(
+              `[Directive MultiAgent] Unknown pattern type: ${C.type}`,
+            );
+        }
+      } catch (L) {
+        throw ((b = L instanceof Error ? L : new Error(String(L))), L);
+      } finally {
+        l &&
+          l.record({
+            type: "pattern_complete",
+            timestamp: Date.now(),
+            snapshotId: null,
+            patternId: s,
+            patternType: C.type,
+            durationMs: Date.now() - g,
+            ...(b ? { error: b.message } : {}),
+          });
+      }
+    },
+    async runParallel(s, h, C, g) {
+      Z();
+      const b = Array.isArray(h) ? h : s.map(() => h);
+      if (b.length !== s.length)
+        throw new Error(
+          `[Directive MultiAgent] Input count (${b.length}) must match agent count (${s.length})`,
+        );
+      let L = new AbortController(),
+        B;
+      g?.timeout && (B = setTimeout(() => L.abort(), g.timeout));
+      try {
+        const W = s.map((ge, he) =>
+            ct(ge, b[he], { signal: L.signal }).catch((fe) => {
+              if (g?.minSuccess !== void 0) return null;
+              throw fe;
+            }),
+          ),
+          X = await Promise.all(W),
+          ue = X.filter((ge) => ge !== null);
+        if (g?.minSuccess !== void 0 && ue.length < g.minSuccess) {
+          const ge = X.length - ue.length;
+          throw new Error(
+            `[Directive MultiAgent] runParallel: Only ${ue.length}/${s.length} agents succeeded (minimum required: ${g.minSuccess}, failed: ${ge})`,
+          );
+        }
+        return C(ue);
+      } finally {
+        B && clearTimeout(B);
+      }
+    },
+    async runSequential(s, h, C) {
+      Z();
+      let g = [],
+        b = h;
+      for (let L = 0; L < s.length; L++) {
+        const B = s[L],
+          W = await ct(B, b);
+        g.push(W),
+          L < s.length - 1 &&
+            (C?.transform
+              ? (b = C.transform(W.output, B, L))
+              : (b = typeof W.output == "string" ? W.output : ir(W.output)));
+      }
+      return g;
+    },
+    async handoff(s, h, C, g) {
+      if ((Z(), !V[s])) {
+        const B = Object.keys(V).join(", ") || "(none)";
+        throw new Error(
+          `[Directive MultiAgent] Handoff source agent "${s}" not found. Registered: ${B}`,
+        );
+      }
+      if (!V[h]) {
+        const B = Object.keys(V).join(", ") || "(none)";
+        throw new Error(
+          `[Directive MultiAgent] Handoff target agent "${h}" not found. Registered: ${B}`,
+        );
+      }
+      {
+        const B = await nr("pre_handoff", s, V[s].agent.name, C, void 0, {
+          handoff: { fromAgent: s, toAgent: h },
+        });
+        if (B.skip)
+          return {
+            output: void 0,
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          };
+        C = B.input;
+      }
+      const b = {
+        id: `handoff-${++re}`,
+        fromAgent: s,
+        toAgent: h,
+        input: C,
+        context: g,
+        requestedAt: Date.now(),
+      };
+      Fe.push(b);
+      try {
+        n?.(b);
+      } catch (B) {
+        I && console.debug("[Directive MultiAgent] onHandoff threw:", B);
+      }
+      ae("onHandoff", b),
+        l &&
+          l.record({
+            type: "handoff_start",
+            timestamp: Date.now(),
+            snapshotId: null,
+            fromAgent: s,
+            toAgent: h,
+          });
+      const L = V[h].memory ?? f;
+      if (L && g)
+        try {
+          const B = Object.entries(g)
+            .map(([W, X]) => `${W}: ${ir(X)}`)
+            .join(", ");
+          L.addMessages([
+            { role: "system", content: `[Handoff from ${s}] Context: ${B}` },
+          ]);
+        } catch (B) {
+          I &&
+            console.debug(
+              "[Directive MultiAgent] Handoff addMessages failed:",
+              B,
+            );
+        }
+      try {
+        const B = await ct(h, C),
+          W = { request: b, result: B, completedAt: Date.now() };
+        ke(W);
+        try {
+          o?.(W);
+        } catch (ue) {
+          I &&
+            console.debug(
+              "[Directive MultiAgent] onHandoffComplete threw:",
+              ue,
+            );
+        }
+        ae("onHandoffComplete", W),
+          l &&
+            l.record({
+              type: "handoff_complete",
+              timestamp: Date.now(),
+              snapshotId: null,
+              fromAgent: s,
+              toAgent: h,
+              durationMs: W.completedAt - b.requestedAt,
+            });
+        const X = Fe.indexOf(b);
+        return X >= 0 && Fe.splice(X, 1), B;
+      } catch (B) {
+        const W = Fe.indexOf(b);
+        throw (W >= 0 && Fe.splice(W, 1), B);
+      }
+    },
+    approve(s) {
+      Z();
+      const h = Ie.get(s);
+      if (h) {
+        Ie.delete(s);
+        const C = it(h);
+        N.batch(() => {
+          const g = Nt(C),
+            b = 200,
+            L = [...g.approved, s];
+          xt(C, {
+            ...g,
+            pending: g.pending.filter((B) => B.id !== s),
+            approved: L.length > b ? L.slice(-b) : L,
+          });
+        });
+        return;
+      }
+      I &&
+        console.debug(
+          `[Directive MultiAgent] approve() ignored: no pending request "${s}"`,
+        );
+    },
+    reject(s, h) {
+      Z();
+      const C = Ie.get(s);
+      if (C) {
+        Ie.delete(s);
+        const g = it(C);
+        N.batch(() => {
+          const b = Nt(g);
+          h &&
+            I &&
+            console.debug(`[Directive MultiAgent] Request ${s} rejected: ${h}`);
+          const L = { id: s, reason: h, rejectedAt: Date.now() },
+            B = 200,
+            W = [...b.rejected, L];
+          xt(g, {
+            ...b,
+            pending: b.pending.filter((X) => X.id !== s),
+            rejected: W.length > B ? W.slice(-B) : W,
+          });
+        });
+        return;
+      }
+      I &&
+        console.debug(
+          `[Directive MultiAgent] reject() ignored: no pending request "${s}"`,
+        );
+    },
+    pause() {
+      Z(),
+        (Ae = "paused"),
+        I && console.debug("[Directive MultiAgent] Orchestrator paused");
+    },
+    resume() {
+      Z(),
+        Ae === "paused" &&
+          ((Ae = "idle"),
+          I && console.debug("[Directive MultiAgent] Orchestrator resumed"));
+    },
+    getAgentState(s) {
+      const h = te[s];
+      return h ? { ...h } : void 0;
+    },
+    getAllAgentStates() {
+      return Object.fromEntries(
+        Object.entries(te).map(([s, h]) => [s, { ...h }]),
+      );
+    },
+    getPendingHandoffs() {
+      return [...Fe];
+    },
+    get totalTokens() {
+      return de;
+    },
+    waitForIdle(s) {
+      const h = () =>
+        A === 0 &&
+        Object.values(te).every(
+          (C) =>
+            C.status === "idle" ||
+            C.status === "completed" ||
+            C.status === "error",
+        );
+      return h()
+        ? Promise.resolve()
+        : new Promise((C, g) => {
+            let b = null,
+              L = () => {
+                Le.delete(B), b && clearTimeout(b);
+              },
+              B = () => {
+                h() && (L(), C());
+              };
+            Le.add(B),
+              s !== void 0 &&
+                (b = setTimeout(() => {
+                  L(),
+                    g(
+                      new Error(
+                        `[Directive MultiAgent] waitForIdle timed out after ${s}ms`,
+                      ),
+                    );
+                }, s));
+          });
+    },
+    run(s, h, C) {
+      return ct(s, h, C);
+    },
+    runStream(s, h, C) {
+      return Xr(s, h, C);
+    },
+    registerAgent(s, h) {
+      if ((Z(), y.has(s)))
+        throw new Error(
+          `[Directive MultiAgent] Agent ID "${s}" is reserved and cannot be used`,
+        );
+      if (V[s])
+        throw new Error(
+          `[Directive MultiAgent] Agent "${s}" is already registered. Unregister first.`,
+        );
+      const C = h.constraints ? zr(h.constraints) : {},
+        g = Object.create(null);
+      if (h.resolvers)
+        for (const [L, B] of Object.entries(h.resolvers))
+          g[L] = {
+            requirement: B.requirement,
+            key: B.key,
+            resolve: async (W, X) => {
+              const ue = Dt(X.facts),
+                ge = {
+                  facts: { ...X.facts, ...ue },
+                  runAgent: async (he, fe, qe) => t(he, fe, qe),
+                  signal: X.signal,
+                };
+              return B.resolve(W, ge);
+            },
+          };
+      const b = dr(s, {
+        schema: vn,
+        init: (L) => {
+          St(L, {
+            status: "idle",
+            currentAgent: h.agent.name,
+            input: null,
+            output: null,
+            error: null,
+            tokenUsage: 0,
+            turnCount: 0,
+            startedAt: null,
+            completedAt: null,
+          }),
+            xt(L, { pending: [], approved: [], rejected: [] }),
+            Ft(L, []),
+            Ut(L, []),
+            It(L, Nr());
+        },
+        constraints: C,
+        resolvers: Object.keys(g).length > 0 ? g : void 0,
+      });
+      N.registerModule(s, b),
+        (V[s] = h),
+        xe.set(s, new Pr(h.maxConcurrent ?? 1)),
+        (te[s] = { status: "idle", runCount: 0, totalTokens: 0 }),
+        I &&
+          console.debug(
+            `[Directive MultiAgent] Registered agent "${s}" (${h.agent.name})`,
+          ),
+        Ze();
+    },
+    unregisterAgent(s) {
+      if ((Z(), !V[s]))
+        throw new Error(
+          `[Directive MultiAgent] Agent "${s}" is not registered`,
+        );
+      if (te[s]?.status === "running")
+        throw new Error(
+          `[Directive MultiAgent] Cannot unregister agent "${s}" while it is running`,
+        );
+      for (const [g, b] of Object.entries(r)) {
+        let L;
+        switch (b.type) {
+          case "supervisor":
+            L = [b.supervisor, ...b.workers];
+            break;
+          case "dag":
+            L = Object.values(b.nodes).map((B) => B.agent);
+            break;
+          case "reflect":
+            L = [b.agent, b.evaluator];
+            break;
+          case "parallel":
+          case "sequential":
+          case "race":
+            L = b.agents;
+            break;
+          case "debate":
+            L = [...b.agents, b.evaluator];
+            break;
+          default:
+            L = [];
+        }
+        L.includes(s) &&
+          console.warn(
+            `[Directive MultiAgent] Warning: Pattern "${g}" references unregistered agent "${s}"`,
+          );
+      }
+      const h = xe.get(s);
+      h && (h.drain(), xe.delete(s));
+      const C = it(s);
+      C &&
+        N.batch(() => {
+          St(C, {
+            status: "idle",
+            currentAgent: null,
+            input: null,
+            output: null,
+            error: null,
+            tokenUsage: 0,
+            turnCount: 0,
+            startedAt: null,
+            completedAt: null,
+          }),
+            xt(C, { pending: [], approved: [], rejected: [] }),
+            Ft(C, []),
+            Ut(C, []),
+            It(C, Nr());
+        }),
+        delete V[s],
+        delete te[s],
+        I && console.debug(`[Directive MultiAgent] Unregistered agent "${s}"`),
+        Ze();
+    },
+    getAgentIds() {
+      return Object.keys(V);
+    },
+    reset() {
+      Z();
+      for (const h of Object.keys(V)) {
+        const C = V[h]?.maxConcurrent ?? 1;
+        te[h] = { status: "idle", runCount: 0, totalTokens: 0 };
+        const g = xe.get(h);
+        g && g.drain(), xe.set(h, new Pr(C));
+        const b = it(h);
+        N.batch(() => {
+          St(b, {
+            status: "idle",
+            currentAgent: V[h].agent.name,
+            input: null,
+            output: null,
+            error: null,
+            tokenUsage: 0,
+            turnCount: 0,
+            startedAt: null,
+            completedAt: null,
+          }),
+            xt(b, { pending: [], approved: [], rejected: [] }),
+            Ft(b, []),
+            Ut(b, []),
+            It(b, Nr());
+        });
+      }
+      Ot.clear(),
+        mr.clear(),
+        Ie.clear(),
+        (Fe.length = 0),
+        (Ue.length = 0),
+        (re = 0),
+        (de = 0),
+        (Ae = "idle"),
+        (A = 0),
+        Me();
+      const s = it("__coord");
+      N.batch(() => {
+        Xe(s, "__globalTokens", 0),
+          Xe(s, "__status", "idle"),
+          Xe(s, "__handoffs", []),
+          Xe(s, "__handoffResults", []),
+          Xe(s, "__budgetWarningFired", !1),
+          $ && Xe(s, Et, { ...$.init });
+      }),
+        P && P.reset(),
+        (Y = null);
+      for (const h of Object.keys(Ct)) delete Ct[h];
+      Ze();
+    },
+    async checkpoint(s) {
+      Z();
+      for (const [C, g] of Object.entries(te))
+        if (g.status === "running")
+          throw new Error(
+            `[Directive MultiAgent] Cannot checkpoint while agent "${C}" is running`,
+          );
+      if (!N.debug?.export)
+        throw new Error(
+          "[Directive MultiAgent] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.",
+        );
+      const h = {
+        version: 1,
+        id: Gt(),
+        createdAt: new Date().toISOString(),
+        label: s?.label,
+        systemExport: N.debug.export(),
+        timelineExport: l?.export() ?? null,
+        localState: {
+          type: "multi",
+          globalTokenCount: de,
+          globalStatus: Ae,
+          agentStates: Object.fromEntries(
+            Object.entries(te).map(([C, g]) => [C, structuredClone(g)]),
+          ),
+          handoffCounter: re,
+          pendingHandoffs: [...Fe],
+          handoffResults: [...Ue],
+          roundRobinCounters: K ? Object.fromEntries(K) : null,
+        },
+        memoryExport: f ? (f.export?.() ?? null) : null,
+        orchestratorType: "multi",
+      };
+      return j && (await j.save(h)), h;
+    },
+    restore(s, h) {
+      if ((Z(), !Oa(s)))
+        throw new Error("[Directive MultiAgent] Invalid checkpoint data");
+      if (s.orchestratorType !== "multi")
+        throw new Error(
+          `[Directive MultiAgent] Expected multi-agent checkpoint, got "${s.orchestratorType}"`,
+        );
+      if (!N.debug?.import)
+        throw new Error(
+          "[Directive MultiAgent] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.",
+        );
+      N.debug.import(s.systemExport),
+        h?.restoreTimeline !== !1 &&
+          s.timelineExport &&
+          l &&
+          l.import(s.timelineExport),
+        s.memoryExport && f && f.import && f.import(s.memoryExport);
+      const C = s.localState;
+      (de = C.globalTokenCount),
+        (Ae = C.globalStatus),
+        (re = C.handoffCounter),
+        (Fe.length = 0),
+        Fe.push(...C.pendingHandoffs),
+        (Ue.length = 0),
+        Ue.push(...C.handoffResults);
+      for (const [g, b] of Object.entries(C.agentStates))
+        te[g] && (te[g] = { ...b });
+      if (C.roundRobinCounters && K) {
+        K.clear();
+        for (const [g, b] of Object.entries(C.roundRobinCounters)) K.set(g, b);
+      }
+      for (const [g, b] of Object.entries(V)) {
+        const L = xe.get(g);
+        L && L.drain(), xe.set(g, new Pr(b.maxConcurrent ?? 1));
+      }
+      Ze();
+    },
+    runParallelStream(s, h, C, g) {
+      Z();
+      const b = Array.isArray(h) ? h : s.map(() => h);
+      if (b.length !== s.length)
+        throw new Error(
+          `[Directive MultiAgent] Input count (${b.length}) must match agent count (${s.length})`,
+        );
+      let L = new AbortController(),
+        B;
+      g?.timeout && (B = setTimeout(() => L.abort(), g.timeout));
+      let W = s.map((Q, be) => {
+          const Be = Xr(Q, b[be], { signal: L.signal });
+          return { agentId: Q, streamResult: Be };
+        }),
+        X = W.map(({ agentId: Q, streamResult: be }) => ({
+          agentId: Q,
+          stream: be.stream,
+        })),
+        { stream: ue, getDroppedCount: ge } = Rs(X),
+        he;
+      g?.signal &&
+        ((he = () => L.abort()),
+        g.signal.addEventListener("abort", he, { once: !0 }));
+      const fe = Promise.allSettled(
+          W.map(({ streamResult: Q }) => Q.result),
+        ).then((Q) => {
+          B && clearTimeout(B),
+            he && g?.signal && g.signal.removeEventListener("abort", he);
+          const be = [];
+          for (const Be of Q) Be.status === "fulfilled" && be.push(Be.value);
+          if (g?.minSuccess !== void 0 && be.length < g.minSuccess)
+            throw new Error(
+              `[Directive MultiAgent] runParallelStream: Only ${be.length}/${s.length} agents succeeded (minimum required: ${g.minSuccess})`,
+            );
+          return be;
+        }),
+        qe = fe.then((Q) => C(Q));
+      return (
+        fe.catch(() => {}),
+        qe.catch(() => {}),
+        {
+          stream: ue,
+          results: fe,
+          merge: qe,
+          getDroppedCount: ge,
+          abort: () => {
+            L.abort(),
+              he && g?.signal && g.signal.removeEventListener("abort", he);
+            for (const { streamResult: Q } of W) Q.abort();
+          },
+        }
+      );
+    },
+    async runRace(s, h, C) {
+      Z();
+      const g = {
+        type: "race",
+        agents: s,
+        extract: C?.extract,
+        timeout: C?.timeout,
+        minSuccess: C?.minSuccess,
+        signal: C?.signal,
+      };
+      return jn(g, h, "__imperative_race");
+    },
+    async runReflect(s, h, C, g) {
+      Z();
+      const b = {
+          type: "reflect",
+          agent: s,
+          evaluator: h,
+          maxIterations: g?.maxIterations,
+          parseEvaluation: g?.parseEvaluation,
+          buildRetryInput: g?.buildRetryInput,
+          extract: g?.extract,
+          onExhausted: g?.onExhausted,
+          onIteration: g?.onIteration,
+          signal: g?.signal,
+          timeout: g?.timeout,
+          threshold: g?.threshold,
+        },
+        L = await Tr(b, C, "__imperative_reflect"),
+        B = Y ? [...Y] : [],
+        W = g?.maxIterations ?? 2,
+        X = B.length > 0 && !B[B.length - 1].passed && B.length >= W;
+      return { result: L, iterations: B.length, history: B, exhausted: X };
+    },
+    async runDebate(s, h, C, g) {
+      return (
+        Z(),
+        jr(
+          {
+            agents: s,
+            evaluator: h,
+            maxRounds: g?.maxRounds,
+            extract: g?.extract,
+            parseJudgement: g?.parseJudgement,
+            signal: g?.signal,
+            timeout: g?.timeout,
+          },
+          C,
+          "__imperative_debate",
+        )
+      );
+    },
+    async runGoal(s, h, C, g) {
+      return (
+        Z(),
+        Rr(
+          {
+            nodes: s,
+            when: C,
+            satisfaction: g?.satisfaction,
+            maxSteps: g?.maxSteps,
+            extract: g?.extract,
+            timeout: g?.timeout,
+            signal: g?.signal,
+            selectionStrategy: g?.selectionStrategy,
+            relaxation: g?.relaxation,
+            onStep: g?.onStep,
+            onStall: g?.onStall,
+            checkpoint: g?.checkpoint,
+          },
+          h,
+          "__imperative_goal",
+        )
+      );
+    },
+    async resumeGoal(s, h) {
+      if (
+        (Z(),
+        !s || s.version !== 1 || (s.type !== "goal" && s.type !== "converge"))
+      )
+        throw new Error("[Directive MultiAgent] Invalid goal checkpoint state");
+      const C = s.type === "converge" ? { ...s } : s;
+      return Rr(h, {}, C.patternId, C);
+    },
+    async resumeSequential(s, h) {
+      if ((Z(), !s || s.version !== 1 || s.type !== "sequential"))
+        throw new Error(
+          "[Directive MultiAgent] Invalid sequential checkpoint state",
+        );
+      return Qr(h, s.currentInput, s.patternId, s);
+    },
+    async resumeSupervisor(s, h, C) {
+      if ((Z(), !s || s.version !== 1 || s.type !== "supervisor"))
+        throw new Error(
+          "[Directive MultiAgent] Invalid supervisor checkpoint state",
+        );
+      const g = C?.input ?? s.currentInput;
+      return Zr(h, g, s.patternId, s);
+    },
+    async resumeReflect(s, h, C) {
+      if ((Z(), !s || s.version !== 1 || s.type !== "reflect"))
+        throw new Error(
+          "[Directive MultiAgent] Invalid reflect checkpoint state",
+        );
+      const g = C?.input ?? s.effectiveInput;
+      return Tr(h, g, s.patternId, s);
+    },
+    async resumeDebate(s, h) {
+      if ((Z(), !s || s.version !== 1 || s.type !== "debate"))
+        throw new Error(
+          "[Directive MultiAgent] Invalid debate checkpoint state",
+        );
+      return jr(h, s.currentInput, s.patternId, s);
+    },
+    async resumeDag(s, h, C) {
+      if ((Z(), !s || s.version !== 1 || s.type !== "dag"))
+        throw new Error("[Directive MultiAgent] Invalid DAG checkpoint state");
+      const g = C?.input ?? s.input;
+      return en(h, g, s.patternId, s);
+    },
+    async replay(s, h, C) {
+      if ((Z(), !j))
+        throw new Error(
+          "[Directive MultiAgent] No checkpoint store configured",
+        );
+      const g = await j.load(s);
+      if (!g)
+        throw new Error(`[Directive MultiAgent] Checkpoint not found: ${s}`);
+      let b;
+      try {
+        const W = JSON.parse(g.systemExport);
+        if (!W || typeof W != "object")
+          throw new Error("Parsed checkpoint state is not an object");
+        const X = new Set(["__proto__", "constructor", "prototype"]);
+        for (const ue of Object.keys(W))
+          if (X.has(ue))
+            throw new Error(`Checkpoint state contains blocked key: ${ue}`);
+        if (
+          !new Set([
+            "sequential",
+            "supervisor",
+            "reflect",
+            "debate",
+            "dag",
+            "goal",
+            "converge",
+          ]).has(W.type)
+        )
+          throw new Error(`Unknown checkpoint pattern type: ${W.type}`);
+        if (W.version !== 1)
+          throw new Error(`Unsupported checkpoint version: ${W.version}`);
+        b = W;
+      } catch (W) {
+        throw new Error(
+          `[Directive MultiAgent] Invalid checkpoint state: ${W instanceof Error ? W.message : String(W)}`,
+        );
+      }
+      const L = oa(b),
+        B = C?.input ?? ("currentInput" in b ? b.currentInput : "");
+      switch (
+        (l &&
+          l.record({
+            type: "checkpoint_restore",
+            timestamp: Date.now(),
+            snapshotId: null,
+            checkpointId: s,
+            patternType: b.type,
+            step: L,
+          }),
+        b.type)
+      ) {
+        case "sequential":
+          return Qr(h, B, b.patternId, b);
+        case "supervisor":
+          return Zr(h, B, b.patternId, b);
+        case "reflect":
+          return Tr(h, B, b.patternId, b);
+        case "debate":
+          return jr(h, B, b.patternId, b);
+        case "dag":
+          return en(h, B, b.patternId, b);
+        case "goal":
+          return Rr(h, b.facts, b.patternId, b);
+      }
+    },
+    resumeBreakpoint(s, h) {
+      Z(), h && Ot.set(s, h);
+      for (const C of Object.keys(V)) {
+        const g = it(C);
+        if (At(g).pending.some((b) => b.id === s)) {
+          N.batch(() => {
+            const b = At(g),
+              L = [...b.resolved, s];
+            It(g, {
+              ...b,
+              pending: b.pending.filter((B) => B.id !== s),
+              resolved: L.length > Wt ? L.slice(-Wt) : L,
+            });
+          });
+          return;
+        }
+      }
+      I &&
+        console.debug(
+          `[Directive MultiAgent] resumeBreakpoint() ignored: no pending breakpoint "${s}"`,
+        );
+    },
+    cancelBreakpoint(s, h) {
+      Z(), h && mr.set(s, h);
+      for (const C of Object.keys(V)) {
+        const g = it(C);
+        if (At(g).pending.some((b) => b.id === s)) {
+          N.batch(() => {
+            const b = At(g),
+              L = [...b.cancelled, s];
+            It(g, {
+              ...b,
+              pending: b.pending.filter((B) => B.id !== s),
+              cancelled: L.length > Wt ? L.slice(-Wt) : L,
+            });
+          });
+          return;
+        }
+      }
+      I &&
+        console.debug(
+          `[Directive MultiAgent] cancelBreakpoint() ignored: no pending breakpoint "${s}"`,
+        );
+    },
+    getPendingBreakpoints() {
+      const s = [];
+      for (const h of Object.keys(V)) {
+        const C = it(h),
+          g = At(C);
+        s.push(...g.pending);
+      }
+      return s;
+    },
+    getLastReflectionHistory() {
+      return Y ? [...Y] : null;
+    },
+    dispose() {
+      p ||
+        (Rn.reset(),
+        $t.clear(),
+        Ve.clear(),
+        zt.clear(),
+        Le.clear(),
+        (p = !0),
+        N.destroy());
+    },
+  };
+  return Ze(), Rn;
+}
+function Bs(e, t, a) {
+  return { type: "parallel", agents: e, merge: t, ...a };
+}
+function Fs(e, t) {
+  const a = Object.keys(t);
+  for (const [u, c] of Object.entries(t))
+    for (const d of c.deps ?? [])
+      if (!t[d])
+        throw new Error(
+          `[Directive MultiAgent] DAG pattern "${e}": node "${u}" depends on unknown node "${d}"`,
+        );
+  if (
+    !a.some((u) => {
+      const c = t[u]?.deps;
+      return !c || c.length === 0;
+    })
+  )
+    throw new Error(
+      `[Directive MultiAgent] DAG pattern "${e}": no root nodes (every node has dependencies)`,
+    );
+  const r = Object.create(null),
+    n = Object.create(null);
+  for (const u of a) n[u] = [];
+  for (const [u, c] of Object.entries(t)) {
+    r[u] = (c.deps ?? []).length;
+    for (const d of c.deps ?? []) n[d].push(u);
+  }
+  const o = [];
+  for (const u of a) r[u] === 0 && o.push(u);
+  let i = 0;
+  while (o.length > 0) {
+    const u = o.shift();
+    i++;
+    for (const c of n[u] ?? []) r[c]--, r[c] === 0 && o.push(c);
+  }
+  if (i !== a.length)
+    throw new Error(
+      `[Directive MultiAgent] DAG pattern "${e}": cycle detected. Visited ${i}/${a.length} nodes.`,
+    );
+}
+function sa() {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`
+  );
+}
+function Us(e = {}) {
+  const {
+      maxHistory: t = 1e3,
+      defaultTtlMs: a = 36e5,
+      maxPendingPerAgent: r = 100,
+      persistence: n,
+      onDelivery: o,
+      onDeliveryError: i,
+    } = e,
+    u = new Map(),
+    c = [],
+    d = new Map(),
+    f = new Map();
+  function w(D, E) {
+    if (
+      (E.types && !E.types.includes(D.type)) ||
+      (E.from && !(Array.isArray(E.from) ? E.from : [E.from]).includes(D.from))
+    )
+      return !1;
+    if (E.topics) {
+      const T = D.topic;
+      if (T && !E.topics.includes(T)) return !1;
+    }
+    return !(
+      (E.priority && D.priority && !E.priority.includes(D.priority)) ||
+      (E.custom && !E.custom(D))
+    );
+  }
+  function O(D) {
+    return D.ttlMs ? Date.now() - D.timestamp > D.ttlMs : !1;
+  }
+  function _(D) {
+    return D.to === "*"
+      ? Array.from(u.keys())
+      : Array.isArray(D.to)
+        ? D.to
+        : [D.to];
+  }
+  async function U(D) {
+    if (O(D)) return;
+    const E = _(D),
+      T = [],
+      G = [];
+    for (const J of E) {
+      const m = u.get(J) ?? [];
+      if (m.length === 0) {
+        const M = f.get(J) ?? [];
+        for (M.push(D); M.length > r; ) M.shift();
+        f.set(J, M);
+        continue;
+      }
+      for (const M of m)
+        (!M.filter || w(D, M.filter)) &&
+          G.push(
+            Promise.resolve(M.handler(D)).then(
+              () => {
+                T.push(J);
+              },
+              (S) => {
+                i?.(D, S instanceof Error ? S : new Error(String(S)));
+              },
+            ),
+          );
+    }
+    G.length > 0 && (await Promise.allSettled(G)),
+      T.length > 0 && o?.(D, T),
+      n && (await n.save(D));
+  }
+  return {
+    publish(D) {
+      const E = {
+        ...D,
+        id: sa(),
+        timestamp: Date.now(),
+        priority: D.priority ?? "normal",
+        ttlMs: D.ttlMs ?? a,
+      };
+      for (c.push(E), d.set(E.id, E); c.length > t; ) {
+        const T = c.shift();
+        T && d.delete(T.id);
+      }
+      return (
+        U(E).catch((T) => {
+          const G = T instanceof Error ? T : new Error(String(T));
+          i
+            ? i(E, G)
+            : console.error("[Directive MessageBus] Delivery error:", G);
+        }),
+        E.id
+      );
+    },
+    subscribe(D, E, T) {
+      const G = sa(),
+        J = {
+          id: G,
+          agentId: D,
+          handler: E,
+          filter: T,
+          unsubscribe: () => {
+            const S = u.get(D) ?? [],
+              j = S.findIndex((F) => F.id === G);
+            j >= 0 && S.splice(j, 1);
+          },
+        },
+        m = u.get(D) ?? [];
+      m.push(J), u.set(D, m);
+      const M = f.get(D) ?? [];
+      f.delete(D);
+      for (const S of M)
+        if (!T || w(S, T)) {
+          const j = E(S);
+          j instanceof Promise &&
+            j.catch((F) => {
+              const ne = F instanceof Error ? F : new Error(String(F));
+              i
+                ? i(S, ne)
+                : console.error(
+                    "[Directive MessageBus] Pending delivery error:",
+                    ne,
+                  );
+            });
+        }
+      return J;
+    },
+    getHistory(D, E = 100) {
+      let T = c.filter((G) => !O(G));
+      return D && (T = T.filter((G) => w(G, D))), T.slice(-E);
+    },
+    getMessage(D) {
+      const E = d.get(D);
+      if (!(E && O(E))) return E;
+    },
+    getPending(D) {
+      return (f.get(D) ?? []).filter((E) => !O(E));
+    },
+    clear() {
+      (c.length = 0), d.clear(), f.clear();
+    },
+    dispose() {
+      (c.length = 0), d.clear(), f.clear(), u.clear();
+    },
+  };
+}
+function zs(e, t) {
+  if (e.length !== t.length)
+    throw new Error(`Vector dimensions must match: ${e.length} vs ${t.length}`);
+  let a = 0,
+    r = 0,
+    n = 0;
+  for (let o = 0; o < e.length; o++) {
+    const i = e[o],
+      u = t[o];
+    (a += i * u), (r += i * i), (n += u * u);
+  }
+  return (
+    (r = Math.sqrt(r)), (n = Math.sqrt(n)), r === 0 || n === 0 ? 0 : a / (r * n)
+  );
+}
+function Js(e, t, a, r) {
+  let n = null;
+  for (const o of t) {
+    if (r && o.agentName && o.agentName !== r) continue;
+    const i = zs(e, o.queryEmbedding);
+    i >= a && (!n || i > n.similarity) && (n = { entry: o, similarity: i });
+  }
+  return n;
+}
+function Gs() {
+  const e = new Map();
+  function t(a) {
+    let r = e.get(a);
+    return r || ((r = new Map()), e.set(a, r)), r;
+  }
+  return {
+    async getEntries(a) {
+      return Array.from(t(a).values());
+    },
+    async addEntry(a, r) {
+      t(a).set(r.id, r);
+    },
+    async updateEntry(a, r, n) {
+      const o = t(a),
+        i = o.get(r);
+      i && o.set(r, { ...i, ...n });
+    },
+    async removeEntry(a, r) {
+      t(a).delete(r);
+    },
+    async clear(a) {
+      e.delete(a);
+    },
+  };
+}
+function Hs(e) {
+  let {
+      embedder: t,
+      similarityThreshold: a = 0.9,
+      maxCacheSize: r = 1e3,
+      ttlMs: n = 36e5,
+      namespace: o = "default",
+      storage: i = Gs(),
+      onHit: u,
+      onMiss: c,
+      onError: d,
+      perAgent: f = !1,
+    } = e,
+    w = {
+      totalEntries: 0,
+      totalHits: 0,
+      totalMisses: 0,
+      hitRate: 0,
+      avgSimilarityOnHit: 0,
+      oldestEntry: null,
+      newestEntry: null,
+    },
+    O = 0;
+  function _(D) {
+    if (
+      ((w.totalEntries = D.length),
+      (w.hitRate =
+        w.totalHits + w.totalMisses > 0
+          ? w.totalHits / (w.totalHits + w.totalMisses)
+          : 0),
+      (w.avgSimilarityOnHit = w.totalHits > 0 ? O / w.totalHits : 0),
+      D.length > 0)
+    ) {
+      const E = D.map((T) => T.createdAt);
+      (w.oldestEntry = Math.min(...E)), (w.newestEntry = Math.max(...E));
+    } else (w.oldestEntry = null), (w.newestEntry = null);
+  }
+  async function U() {
+    const D = await i.getEntries(o),
+      E = Date.now();
+    for (const G of D) E - G.createdAt > n && (await i.removeEntry(o, G.id));
+    const T = await i.getEntries(o);
+    if (T.length > r) {
+      const G = T.sort((J, m) => J.accessedAt - m.accessedAt).slice(
+        0,
+        T.length - r,
+      );
+      for (const J of G) await i.removeEntry(o, J.id);
+    }
+  }
+  return {
+    async lookup(D, E) {
+      const T = Date.now();
+      try {
+        const G = await t(D),
+          J = await i.getEntries(o),
+          m = Js(G, J, a, f ? E : void 0);
+        return m
+          ? (await i.updateEntry(o, m.entry.id, {
+              accessedAt: Date.now(),
+              accessCount: m.entry.accessCount + 1,
+            }),
+            w.totalHits++,
+            (O += m.similarity),
+            _(J),
+            u?.(m.entry, m.similarity),
+            {
+              hit: !0,
+              entry: m.entry,
+              similarity: m.similarity,
+              latencyMs: Date.now() - T,
+            })
+          : (w.totalMisses++,
+            _(J),
+            c?.(D),
+            { hit: !1, latencyMs: Date.now() - T });
+      } catch (G) {
+        return (
+          w.totalMisses++,
+          d?.(G instanceof Error ? G : new Error(String(G))),
+          { hit: !1, latencyMs: Date.now() - T }
+        );
+      }
+    },
+    async store(D, E, T, G = {}) {
+      const J = await t(D),
+        m = {
+          id:
+            globalThis.crypto?.randomUUID?.() ??
+            `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          query: D,
+          queryEmbedding: J,
+          response: E,
+          metadata: G,
+          createdAt: Date.now(),
+          accessedAt: Date.now(),
+          accessCount: 0,
+          agentName: f ? T : void 0,
+        };
+      await i.addEntry(o, m), await U();
+      const M = await i.getEntries(o);
+      _(M);
+    },
+    async invalidate(D) {
+      let E = await i.getEntries(o),
+        T = 0;
+      for (const J of E) D(J) && (await i.removeEntry(o, J.id), T++);
+      const G = await i.getEntries(o);
+      return _(G), T;
+    },
+    async clear() {
+      await i.clear(o),
+        (w = {
+          totalEntries: 0,
+          totalHits: 0,
+          totalMisses: 0,
+          hitRate: 0,
+          avgSimilarityOnHit: 0,
+          oldestEntry: null,
+          newestEntry: null,
+        }),
+        (O = 0);
+    },
+    getStats() {
+      return { ...w };
+    },
+    async export() {
+      return i.getEntries(o);
+    },
+    async import(D) {
+      for (const T of D) await i.addEntry(o, T);
+      await U();
+      const E = await i.getEntries(o);
+      _(E);
+    },
+  };
+}
+function Ws(e = 128) {
+  return async (t) => {
+    const a = new Array(e).fill(0);
+    for (let n = 0; n < t.length; n++) {
+      const o = t.charCodeAt(n);
+      a[n % e] += o / 256;
+    }
+    const r = Math.sqrt(a.reduce((n, o) => n + o * o, 0));
+    if (r > 0) for (let n = 0; n < e; n++) a[n] /= r;
+    return a;
+  };
+}
+const ja = "checkers-claude-api-key";
+function Mn() {
+  return localStorage.getItem(ja);
+}
+function Ks(e) {
+  localStorage.setItem(ja, e);
+}
+function Vs(e) {
+  return e
+    ? e.player === "red"
+      ? e.king
+        ? "R"
+        : "r"
+      : e.king
+        ? "B"
+        : "b"
+    : ".";
+}
+function Ys(e) {
+  let t = `    0  1  2  3  4  5  6  7
+`;
+  for (let a = 0; a < 8; a++) {
+    t += `${a}  `;
+    for (let r = 0; r < 8; r++) {
+      const n = a * 8 + r,
+        o = Vs(e[n]);
+      t += ` ${o} `;
+    }
+    t += `
+`;
+  }
+  return (
+    (t += `
+r=Red, R=Red King, b=Black, B=Black King, .=empty`),
+    t
+  );
+}
+function ia(e) {
+  const [t, a] = tr(e);
+  return `(row ${t}, col ${a}, index ${e})`;
+}
+function Xs(e) {
+  return e
+    .map((t) => {
+      const a = ia(t.from),
+        r = ia(t.to),
+        n =
+          t.captured !== null ? ` capturing piece at index ${t.captured}` : "";
+      return `  from ${t.from} ${a} → to ${t.to} ${r}${n}`;
+    })
+    .join(`
+`);
+}
+const Qs = `You are a friendly, competitive checkers opponent playing as Black. You're chatty, fun, and love the game. You offer light trash talk, genuine compliments on good moves, and strategic commentary.
 
 Rules reminder:
 - 8x8 board, pieces on dark squares only
@@ -78,23 +13976,528 @@ Rules reminder:
 You will receive the board state and a list of your legal moves. You MUST pick one of the listed legal moves.
 
 Respond with ONLY a JSON object (no markdown, no code fences):
-{"from": <index>, "to": <index>, "reasoning": "<1-2 sentences of strategic thinking>", "chat": "<casual banter, friendly trash talk, or compliment>"}`,Zs=`You are a friendly, competitive checkers opponent playing as Black. You're chatty, fun, and love the game. You offer light trash talk, genuine compliments on good moves, and strategic commentary.
+{"from": <index>, "to": <index>, "reasoning": "<1-2 sentences of strategic thinking>", "chat": "<casual banter, friendly trash talk, or compliment>"}`,
+  Zs = `You are a friendly, competitive checkers opponent playing as Black. You're chatty, fun, and love the game. You offer light trash talk, genuine compliments on good moves, and strategic commentary.
 
-The human is chatting with you between moves. Respond naturally and in character — no JSON needed, just plain text.`,ei=`You are a checkers strategy analyst. Given a board position and a move that was chosen, provide brief strategic commentary (2-3 sentences max).
+The human is chatting with you between moves. Respond naturally and in character — no JSON needed, just plain text.`,
+  ei = `You are a checkers strategy analyst. Given a board position and a move that was chosen, provide brief strategic commentary (2-3 sentences max).
 
-Analyze: board control, piece advantage, king potential, traps/threats. Be concise.`,ti={name:"checkers-move",instructions:Qs,model:"claude-haiku-4-5-20251001"},ri={name:"checkers-chat",instructions:Zs,model:"claude-haiku-4-5-20251001"},ni={name:"checkers-analysis",instructions:ei,model:"claude-haiku-4-5-20251001"};function ai(e){return e.replace(/^```(?:json)?\s*\n?/i,"").replace(/\n?```\s*$/i,"").trim()}const la=$s({buildRequest:(e,t,a)=>({url:"/api/claude",init:{method:"POST",headers:{"Content-Type":"application/json","x-api-key":Mn()??""},body:JSON.stringify({model:e.model??"claude-haiku-4-5-20251001",max_tokens:300,system:e.instructions??"",messages:a})}}),parseResponse:async e=>{const t=await e.json();return{text:t.content?.[0]?.text??"",totalTokens:(t.usage?.input_tokens??0)+(t.usage?.output_tokens??0)}},parseOutput:e=>{try{return JSON.parse(ai(e))}catch{return e}}});async function oi(e,t,a){const r=Mn(),n=[{role:"user",content:t}],o={"Content-Type":"application/json"};r&&(o["x-api-key"]=r);const i=await fetch("/api/claude",{method:"POST",headers:o,body:JSON.stringify({model:e.model??"claude-haiku-4-5-20251001",max_tokens:500,system:e.instructions??"",messages:n,stream:!0}),signal:a.signal});if(!i.ok){const O=await i.text();throw new Error(`API error ${i.status}: ${O}`)}const u=i.headers.get("content-type")??"";let c="",d=0;if(u.includes("text/event-stream")&&i.body){const O=i.body.getReader(),_=new TextDecoder;let U="";for(;;){const{done:D,value:E}=await O.read();if(D)break;U+=_.decode(E,{stream:!0});const T=U.split(`
-`);U=T.pop()??"";for(const G of T){if(!G.startsWith("data: "))continue;const J=G.slice(6).trim();if(J!=="[DONE]")try{const m=JSON.parse(J);if(m.type==="content_block_delta"&&m.delta?.text){const M=m.delta.text;c+=M,a.onToken?.(M)}m.type==="message_delta"&&m.usage&&(d=(m.usage.input_tokens??0)+(m.usage.output_tokens??0)),m.type==="message_start"&&m.message?.usage&&(d=m.message.usage.input_tokens??0)}catch{}}}}else{const O=await i.json();c=O.content?.[0]?.text??"",d=(O.usage?.input_tokens??0)+(O.usage?.output_tokens??0);const _=c.split(/(\s+)/);for(const U of _)U&&a.onToken?.(U)}const f={role:"assistant",content:c};a.onMessage?.(f);let w;try{const O=c.replace(/^```(?:json)?\s*\n?/i,"").replace(/\n?```\s*$/i,"").trim();w=JSON.parse(O)}catch{w=c}return{output:w,messages:[...n,f],toolCalls:[],totalTokens:d}}function si(e){if(typeof e!="object"||e===null)return{valid:!1,errors:["Expected an object"]};const t=e,a=[];return typeof t.from!="number"&&a.push("'from' must be a number"),typeof t.to!="number"&&a.push("'to' must be a number"),typeof t.reasoning!="string"&&a.push("'reasoning' must be a string"),typeof t.chat!="string"&&a.push("'chat' must be a string"),a.length>0?{valid:!1,errors:a}:{valid:!0}}function ii(e){const t=e[0]?.output,a=e[1]?.output;return{move:t??{from:-1,to:-1,reasoning:"No result",chat:"Something went wrong"},analysis:a??null}}function li(){let e=!1,t=0;const a=2.4,r=Is({strategy:As(),strategyConfig:{maxMessages:30,preserveRecentCount:6},autoManage:!0}),n=us({failureThreshold:3,recoveryTimeMs:3e4,name:"checkers-ai"}),o=Hs({embedder:Ws(),similarityThreshold:.98,maxCacheSize:200,ttlMs:6e5}),i=rs({serviceName:"checkers-ai",metrics:{enabled:!0},tracing:{enabled:!0,sampleRate:1},alerts:[{metric:"agent.errors",threshold:5,operator:">",action:"warn"},{metric:"agent.latency",threshold:1e4,operator:">",action:"warn"}]}),u=ns(i),c=ls({endpoint:"http://localhost:4318",serviceName:"checkers-ai",onError:$=>{console.debug("[OTLP] export failed (collector not running?):",$.message)}}),d=setInterval(()=>{try{const $=i.export();$.metrics.length>0&&c.exportMetrics($.metrics),$.traces.length>0&&c.exportTraces($.traces)}catch($){console.debug("[OTLP] periodic export error:",$)}},15e3),f=Us({maxHistory:100}),w=[];let O=0;const _=10,U={name:"rate-limit",fn:()=>{const $=Date.now(),I=$-6e4;for(;O<w.length&&w[O]<I;)O++;return O>w.length/2&&O>100&&(w.splice(0,O),O=0),w.length-O>=_?{passed:!1,reason:`Rate limit exceeded (${_}/min)`}:(w.push($),{passed:!0})}},D=xs({validate:si,errorPrefix:"Invalid move response"}),E=Cs({runner:la,maxTokenBudget:5e4,memory:r,circuitBreaker:n,guardrails:{input:[U],output:[D]}}),T={move:{agent:ti,description:"Selects the best move",capabilities:["move"]},chat:{agent:ri,description:"Free-form chat",capabilities:["chat"]},analysis:{agent:ni,description:"Strategic analysis",capabilities:["analysis"]}},G=Ls({runner:la,agents:T,patterns:{moveWithAnalysis:Bs(["move","analysis"],ii,{minSuccess:1,timeout:15e3})}}),J=Ms(oi,{streamingGuardrails:[Ts({maxTokens:500})]});function m($){const I=T[$];if(!I)throw new Error(`[CheckersAI] Agent "${$}" not found`);return I.agent}function M($,I,H,ee){const V=Ys($),y=Xs(H);let z="";return ee&&(z+=`Human's move: ${ee}
+Analyze: board control, piece advantage, king potential, traps/threats. Be concise.`,
+  ti = {
+    name: "checkers-move",
+    instructions: Qs,
+    model: "claude-haiku-4-5-20251001",
+  },
+  ri = {
+    name: "checkers-chat",
+    instructions: Zs,
+    model: "claude-haiku-4-5-20251001",
+  },
+  ni = {
+    name: "checkers-analysis",
+    instructions: ei,
+    model: "claude-haiku-4-5-20251001",
+  };
+function ai(e) {
+  return e
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+}
+const la = $s({
+  buildRequest: (e, t, a) => ({
+    url: "/api/claude",
+    init: {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": Mn() ?? "" },
+      body: JSON.stringify({
+        model: e.model ?? "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        system: e.instructions ?? "",
+        messages: a,
+      }),
+    },
+  }),
+  parseResponse: async (e) => {
+    const t = await e.json();
+    return {
+      text: t.content?.[0]?.text ?? "",
+      totalTokens: (t.usage?.input_tokens ?? 0) + (t.usage?.output_tokens ?? 0),
+    };
+  },
+  parseOutput: (e) => {
+    try {
+      return JSON.parse(ai(e));
+    } catch {
+      return e;
+    }
+  },
+});
+async function oi(e, t, a) {
+  const r = Mn(),
+    n = [{ role: "user", content: t }],
+    o = { "Content-Type": "application/json" };
+  r && (o["x-api-key"] = r);
+  const i = await fetch("/api/claude", {
+    method: "POST",
+    headers: o,
+    body: JSON.stringify({
+      model: e.model ?? "claude-haiku-4-5-20251001",
+      max_tokens: 500,
+      system: e.instructions ?? "",
+      messages: n,
+      stream: !0,
+    }),
+    signal: a.signal,
+  });
+  if (!i.ok) {
+    const O = await i.text();
+    throw new Error(`API error ${i.status}: ${O}`);
+  }
+  const u = i.headers.get("content-type") ?? "";
+  let c = "",
+    d = 0;
+  if (u.includes("text/event-stream") && i.body) {
+    const O = i.body.getReader(),
+      _ = new TextDecoder();
+    let U = "";
+    for (;;) {
+      const { done: D, value: E } = await O.read();
+      if (D) break;
+      U += _.decode(E, { stream: !0 });
+      const T = U.split(`
+`);
+      U = T.pop() ?? "";
+      for (const G of T) {
+        if (!G.startsWith("data: ")) continue;
+        const J = G.slice(6).trim();
+        if (J !== "[DONE]")
+          try {
+            const m = JSON.parse(J);
+            if (m.type === "content_block_delta" && m.delta?.text) {
+              const M = m.delta.text;
+              (c += M), a.onToken?.(M);
+            }
+            m.type === "message_delta" &&
+              m.usage &&
+              (d = (m.usage.input_tokens ?? 0) + (m.usage.output_tokens ?? 0)),
+              m.type === "message_start" &&
+                m.message?.usage &&
+                (d = m.message.usage.input_tokens ?? 0);
+          } catch {}
+      }
+    }
+  } else {
+    const O = await i.json();
+    (c = O.content?.[0]?.text ?? ""),
+      (d = (O.usage?.input_tokens ?? 0) + (O.usage?.output_tokens ?? 0));
+    const _ = c.split(/(\s+)/);
+    for (const U of _) U && a.onToken?.(U);
+  }
+  const f = { role: "assistant", content: c };
+  a.onMessage?.(f);
+  let w;
+  try {
+    const O = c
+      .replace(/^```(?:json)?\s*\n?/i, "")
+      .replace(/\n?```\s*$/i, "")
+      .trim();
+    w = JSON.parse(O);
+  } catch {
+    w = c;
+  }
+  return { output: w, messages: [...n, f], toolCalls: [], totalTokens: d };
+}
+function si(e) {
+  if (typeof e != "object" || e === null)
+    return { valid: !1, errors: ["Expected an object"] };
+  const t = e,
+    a = [];
+  return (
+    typeof t.from != "number" && a.push("'from' must be a number"),
+    typeof t.to != "number" && a.push("'to' must be a number"),
+    typeof t.reasoning != "string" && a.push("'reasoning' must be a string"),
+    typeof t.chat != "string" && a.push("'chat' must be a string"),
+    a.length > 0 ? { valid: !1, errors: a } : { valid: !0 }
+  );
+}
+function ii(e) {
+  const t = e[0]?.output,
+    a = e[1]?.output;
+  return {
+    move: t ?? {
+      from: -1,
+      to: -1,
+      reasoning: "No result",
+      chat: "Something went wrong",
+    },
+    analysis: a ?? null,
+  };
+}
+function li() {
+  let e = !1,
+    t = 0;
+  const a = 2.4,
+    r = Is({
+      strategy: As(),
+      strategyConfig: { maxMessages: 30, preserveRecentCount: 6 },
+      autoManage: !0,
+    }),
+    n = us({ failureThreshold: 3, recoveryTimeMs: 3e4, name: "checkers-ai" }),
+    o = Hs({
+      embedder: Ws(),
+      similarityThreshold: 0.98,
+      maxCacheSize: 200,
+      ttlMs: 6e5,
+    }),
+    i = rs({
+      serviceName: "checkers-ai",
+      metrics: { enabled: !0 },
+      tracing: { enabled: !0, sampleRate: 1 },
+      alerts: [
+        { metric: "agent.errors", threshold: 5, operator: ">", action: "warn" },
+        {
+          metric: "agent.latency",
+          threshold: 1e4,
+          operator: ">",
+          action: "warn",
+        },
+      ],
+    }),
+    u = ns(i),
+    c = ls({
+      endpoint: "http://localhost:4318",
+      serviceName: "checkers-ai",
+      onError: ($) => {
+        console.debug(
+          "[OTLP] export failed (collector not running?):",
+          $.message,
+        );
+      },
+    }),
+    d = setInterval(() => {
+      try {
+        const $ = i.export();
+        $.metrics.length > 0 && c.exportMetrics($.metrics),
+          $.traces.length > 0 && c.exportTraces($.traces);
+      } catch ($) {
+        console.debug("[OTLP] periodic export error:", $);
+      }
+    }, 15e3),
+    f = Us({ maxHistory: 100 }),
+    w = [];
+  let O = 0;
+  const _ = 10,
+    U = {
+      name: "rate-limit",
+      fn: () => {
+        const $ = Date.now(),
+          I = $ - 6e4;
+        while (O < w.length && w[O] < I) O++;
+        return (
+          O > w.length / 2 && O > 100 && (w.splice(0, O), (O = 0)),
+          w.length - O >= _
+            ? { passed: !1, reason: `Rate limit exceeded (${_}/min)` }
+            : (w.push($), { passed: !0 })
+        );
+      },
+    },
+    D = xs({ validate: si, errorPrefix: "Invalid move response" }),
+    E = Cs({
+      runner: la,
+      maxTokenBudget: 5e4,
+      memory: r,
+      circuitBreaker: n,
+      guardrails: { input: [U], output: [D] },
+    }),
+    T = {
+      move: {
+        agent: ti,
+        description: "Selects the best move",
+        capabilities: ["move"],
+      },
+      chat: {
+        agent: ri,
+        description: "Free-form chat",
+        capabilities: ["chat"],
+      },
+      analysis: {
+        agent: ni,
+        description: "Strategic analysis",
+        capabilities: ["analysis"],
+      },
+    },
+    G = Ls({
+      runner: la,
+      agents: T,
+      patterns: {
+        moveWithAnalysis: Bs(["move", "analysis"], ii, {
+          minSuccess: 1,
+          timeout: 15e3,
+        }),
+      },
+    }),
+    J = Ms(oi, { streamingGuardrails: [Ts({ maxTokens: 500 })] });
+  function m($) {
+    const I = T[$];
+    if (!I) throw new Error(`[CheckersAI] Agent "${$}" not found`);
+    return I.agent;
+  }
+  function M($, I, H, ee) {
+    const V = Ys($),
+      y = Xs(H);
+    let z = "";
+    return (
+      ee &&
+        (z += `Human's move: ${ee}
 
-`),z+=`Current board:
+`),
+      (z += `Current board:
 ${V}
 
 Your legal moves (you MUST pick one):
 ${y}
 
-Pick your move.`,z}function S($,I,H,ee){const V=Ca($,I)??H[0];return{from:V.from,to:V.to,reasoning:`Local AI: ${ee}`,chat:ee,analysis:null,isLocalFallback:!0,isCached:!1}}async function j($,I,H,ee){if(H.length===0)return{from:-1,to:-1,reasoning:"No moves",chat:"No moves!",analysis:null,isLocalFallback:!0,isCached:!1};e=!0;const V=M($,I,H,ee);try{const v=await o.lookup(V,"moveWithAnalysis");if(v.hit&&v.entry){i.incrementCounter("cache.hits");try{const l=JSON.parse(v.entry.response);return e=!1,{from:l.move.from,to:l.move.to,reasoning:l.move.reasoning,chat:l.move.chat,analysis:l.analysis,isLocalFallback:!1,isCached:!0}}catch{}}i.incrementCounter("cache.misses")}catch{}const y=i.startSpan("pattern.moveWithAnalysis"),z=Date.now();try{const v=await G.runPattern("moveWithAnalysis",V),l=Date.now()-z,x=v.move;i.endSpan(y.spanId,"ok"),u.trackRun("moveWithAnalysis",{success:!0,latencyMs:l});try{await o.store(V,JSON.stringify(v),"moveWithAnalysis")}catch{}return f.publish({type:"INFORM",from:"moveWithAnalysis",to:"*",topic:"moveWithAnalysis.completed",content:{}}),H.some(K=>K.from===x.from&&K.to===x.to)?(e=!1,{from:x.from,to:x.to,reasoning:x.reasoning,chat:x.chat,analysis:v.analysis,isLocalFallback:!1,isCached:!1}):(console.warn("[CheckersAI] Illegal move returned, falling back",x),e=!1,S($,I,H,"Hmm, I tried an illegal move. Let me pick again!"))}catch(v){e=!1;const l=Date.now()-z;if(i.endSpan(y.spanId,"error"),u.trackRun("moveWithAnalysis",{success:!1,latencyMs:l}),v instanceof Wr)return S($,I,H,"Circuit breaker open — using local AI while I recover.");console.error("[CheckersAI] Move error:",v);const x=v instanceof Error?v.message:"Unknown error";return S($,I,H,`Error: ${x}. Using local AI.`)}}async function F($,I){try{const H=m("chat");let ee;if(I&&J){const{stream:V,result:y}=J(H,$);for await(const v of V)v.type==="token"&&v.data&&I(v.data);const z=await y;t+=z.totalTokens,ee=typeof z.output=="string"?z.output:String(z.output)}else{const V=await E.run(H,$,{outputGuardrails:[]});t+=V.totalTokens,ee=V.output}return ee}catch(H){return H instanceof Wr?"I'm having trouble connecting right now. Try again in a bit!":(console.error("[CheckersAI] Chat error:",H),null)}}function ne(){r.clear(),n.reset(),o.clear(),i.clear(),f.clear(),G.reset(),E.reset(),w.length=0,O=0,t=0,e=!1}function k(){return{isThinking:e,totalTokens:t,estimatedCost:Ds(t,a),circuitState:n.getState(),memoryMessageCount:r.getState()?.messages?.length??0,cacheStats:o.getStats(),busMessageCount:f.getHistory()?.length??0}}function R(){clearInterval(d);try{const $=i.export();$.metrics.length>0&&c.exportMetrics($.metrics),$.traces.length>0&&c.exportTraces($.traces)}catch{}E.dispose(),G.dispose(),i.dispose()}return{requestMove:j,sendChat:F,reset:ne,getState:k,dispose:R,get observability(){return i}}}const De=xn({modules:{game:ps,chat:gs},debug:{timeTravel:!0,maxSnapshots:200,runHistory:!0},plugins:[ts({name:"checkers"})]});De.start();const Mr=li();function Ra(){const e=Mr.getState();De.events.chat.updateAIState({totalTokens:e.totalTokens,estimatedCost:e.estimatedCost,circuitState:e.circuitState}),De.events.chat.updateCacheStats({hitRate:e.cacheStats.hitRate,entries:e.cacheStats.totalEntries})}const _a=document.getElementById("checkers-undo-btn"),qa=document.getElementById("checkers-redo-btn"),ua=document.getElementById("checkers-board"),Dr=document.getElementById("checkers-message"),ui=document.getElementById("checkers-current-player"),ci=document.getElementById("checkers-player-dot"),di=document.getElementById("checkers-score"),fi=document.getElementById("checkers-moves"),pi=document.getElementById("checkers-captured-red"),mi=document.getElementById("checkers-captured-black"),ca=document.getElementById("checkers-game-over-modal"),gi=document.getElementById("checkers-modal-message"),Na=document.getElementById("checkers-mode-2p"),Pa=document.getElementById("checkers-mode-computer"),La=document.getElementById("checkers-mode-ai"),hi=document.getElementById("checkers-chat-panel"),lr=document.getElementById("checkers-chat-messages"),yi=document.getElementById("checkers-api-key-section"),$r=document.getElementById("checkers-api-key-input"),Ba=document.getElementById("checkers-api-key-save"),Sn=document.getElementById("checkers-chat-input"),vi=document.getElementById("checkers-chat-send"),da=document.getElementById("checkers-token-count"),pn=document.getElementById("checkers-circuit-dot"),fa=document.getElementById("checkers-ai-info"),bi=document.getElementById("checkers-ai-dashboard"),wi=document.getElementById("checkers-dashboard-toggle"),ki=document.getElementById("checkers-dashboard-arrow"),En=document.getElementById("checkers-dashboard-content");let wr=null,kr=null,ur=!1;function Fa(e){const t=Mr.observability;if(!t){e.innerHTML="<div>Observability not available</div>";return}const a=t.getDashboard(),r=t.getHealthStatus(),n=a.summary,o=(n.errorRate*100).toFixed(1),i=n.avgLatency.toFixed(0),u=n.totalCost.toFixed(4),c=Math.floor(a.service.uptime/1e3);e.innerHTML=`
+Pick your move.`),
+      z
+    );
+  }
+  function S($, I, H, ee) {
+    const V = Ca($, I) ?? H[0];
+    return {
+      from: V.from,
+      to: V.to,
+      reasoning: `Local AI: ${ee}`,
+      chat: ee,
+      analysis: null,
+      isLocalFallback: !0,
+      isCached: !1,
+    };
+  }
+  async function j($, I, H, ee) {
+    if (H.length === 0)
+      return {
+        from: -1,
+        to: -1,
+        reasoning: "No moves",
+        chat: "No moves!",
+        analysis: null,
+        isLocalFallback: !0,
+        isCached: !1,
+      };
+    e = !0;
+    const V = M($, I, H, ee);
+    try {
+      const v = await o.lookup(V, "moveWithAnalysis");
+      if (v.hit && v.entry) {
+        i.incrementCounter("cache.hits");
+        try {
+          const l = JSON.parse(v.entry.response);
+          return (
+            (e = !1),
+            {
+              from: l.move.from,
+              to: l.move.to,
+              reasoning: l.move.reasoning,
+              chat: l.move.chat,
+              analysis: l.analysis,
+              isLocalFallback: !1,
+              isCached: !0,
+            }
+          );
+        } catch {}
+      }
+      i.incrementCounter("cache.misses");
+    } catch {}
+    const y = i.startSpan("pattern.moveWithAnalysis"),
+      z = Date.now();
+    try {
+      const v = await G.runPattern("moveWithAnalysis", V),
+        l = Date.now() - z,
+        x = v.move;
+      i.endSpan(y.spanId, "ok"),
+        u.trackRun("moveWithAnalysis", { success: !0, latencyMs: l });
+      try {
+        await o.store(V, JSON.stringify(v), "moveWithAnalysis");
+      } catch {}
+      return (
+        f.publish({
+          type: "INFORM",
+          from: "moveWithAnalysis",
+          to: "*",
+          topic: "moveWithAnalysis.completed",
+          content: {},
+        }),
+        H.some((K) => K.from === x.from && K.to === x.to)
+          ? ((e = !1),
+            {
+              from: x.from,
+              to: x.to,
+              reasoning: x.reasoning,
+              chat: x.chat,
+              analysis: v.analysis,
+              isLocalFallback: !1,
+              isCached: !1,
+            })
+          : (console.warn(
+              "[CheckersAI] Illegal move returned, falling back",
+              x,
+            ),
+            (e = !1),
+            S($, I, H, "Hmm, I tried an illegal move. Let me pick again!"))
+      );
+    } catch (v) {
+      e = !1;
+      const l = Date.now() - z;
+      if (
+        (i.endSpan(y.spanId, "error"),
+        u.trackRun("moveWithAnalysis", { success: !1, latencyMs: l }),
+        v instanceof Wr)
+      )
+        return S(
+          $,
+          I,
+          H,
+          "Circuit breaker open — using local AI while I recover.",
+        );
+      console.error("[CheckersAI] Move error:", v);
+      const x = v instanceof Error ? v.message : "Unknown error";
+      return S($, I, H, `Error: ${x}. Using local AI.`);
+    }
+  }
+  async function F($, I) {
+    try {
+      const H = m("chat");
+      let ee;
+      if (I && J) {
+        const { stream: V, result: y } = J(H, $);
+        for await (const v of V) v.type === "token" && v.data && I(v.data);
+        const z = await y;
+        (t += z.totalTokens),
+          (ee = typeof z.output == "string" ? z.output : String(z.output));
+      } else {
+        const V = await E.run(H, $, { outputGuardrails: [] });
+        (t += V.totalTokens), (ee = V.output);
+      }
+      return ee;
+    } catch (H) {
+      return H instanceof Wr
+        ? "I'm having trouble connecting right now. Try again in a bit!"
+        : (console.error("[CheckersAI] Chat error:", H), null);
+    }
+  }
+  function ne() {
+    r.clear(),
+      n.reset(),
+      o.clear(),
+      i.clear(),
+      f.clear(),
+      G.reset(),
+      E.reset(),
+      (w.length = 0),
+      (O = 0),
+      (t = 0),
+      (e = !1);
+  }
+  function k() {
+    return {
+      isThinking: e,
+      totalTokens: t,
+      estimatedCost: Ds(t, a),
+      circuitState: n.getState(),
+      memoryMessageCount: r.getState()?.messages?.length ?? 0,
+      cacheStats: o.getStats(),
+      busMessageCount: f.getHistory()?.length ?? 0,
+    };
+  }
+  function R() {
+    clearInterval(d);
+    try {
+      const $ = i.export();
+      $.metrics.length > 0 && c.exportMetrics($.metrics),
+        $.traces.length > 0 && c.exportTraces($.traces);
+    } catch {}
+    E.dispose(), G.dispose(), i.dispose();
+  }
+  return {
+    requestMove: j,
+    sendChat: F,
+    reset: ne,
+    getState: k,
+    dispose: R,
+    get observability() {
+      return i;
+    },
+  };
+}
+const De = xn({
+  modules: { game: ps, chat: gs },
+  debug: { timeTravel: !0, maxSnapshots: 200, runHistory: !0 },
+  plugins: [ts({ name: "checkers" })],
+});
+De.start();
+const Mr = li();
+function Ra() {
+  const e = Mr.getState();
+  De.events.chat.updateAIState({
+    totalTokens: e.totalTokens,
+    estimatedCost: e.estimatedCost,
+    circuitState: e.circuitState,
+  }),
+    De.events.chat.updateCacheStats({
+      hitRate: e.cacheStats.hitRate,
+      entries: e.cacheStats.totalEntries,
+    });
+}
+const _a = document.getElementById("checkers-undo-btn"),
+  qa = document.getElementById("checkers-redo-btn"),
+  ua = document.getElementById("checkers-board"),
+  Dr = document.getElementById("checkers-message"),
+  ui = document.getElementById("checkers-current-player"),
+  ci = document.getElementById("checkers-player-dot"),
+  di = document.getElementById("checkers-score"),
+  fi = document.getElementById("checkers-moves"),
+  pi = document.getElementById("checkers-captured-red"),
+  mi = document.getElementById("checkers-captured-black"),
+  ca = document.getElementById("checkers-game-over-modal"),
+  gi = document.getElementById("checkers-modal-message"),
+  Na = document.getElementById("checkers-mode-2p"),
+  Pa = document.getElementById("checkers-mode-computer"),
+  La = document.getElementById("checkers-mode-ai"),
+  hi = document.getElementById("checkers-chat-panel"),
+  lr = document.getElementById("checkers-chat-messages"),
+  yi = document.getElementById("checkers-api-key-section"),
+  $r = document.getElementById("checkers-api-key-input"),
+  Ba = document.getElementById("checkers-api-key-save"),
+  Sn = document.getElementById("checkers-chat-input"),
+  vi = document.getElementById("checkers-chat-send"),
+  da = document.getElementById("checkers-token-count"),
+  pn = document.getElementById("checkers-circuit-dot"),
+  fa = document.getElementById("checkers-ai-info"),
+  bi = document.getElementById("checkers-ai-dashboard"),
+  wi = document.getElementById("checkers-dashboard-toggle"),
+  ki = document.getElementById("checkers-dashboard-arrow"),
+  En = document.getElementById("checkers-dashboard-content");
+let wr = null,
+  kr = null,
+  ur = !1;
+function Fa(e) {
+  const t = Mr.observability;
+  if (!t) {
+    e.innerHTML = "<div>Observability not available</div>";
+    return;
+  }
+  const a = t.getDashboard(),
+    r = t.getHealthStatus(),
+    n = a.summary,
+    o = (n.errorRate * 100).toFixed(1),
+    i = n.avgLatency.toFixed(0),
+    u = n.totalCost.toFixed(4),
+    c = Math.floor(a.service.uptime / 1e3);
+  e.innerHTML = `
     <div class="dashboard-header">
       <span>AI Dashboard</span>
-      <span class="health-badge ${r.healthy?"healthy":"unhealthy"}">${r.healthy?"Healthy":"Degraded"}</span>
+      <span class="health-badge ${r.healthy ? "healthy" : "unhealthy"}">${r.healthy ? "Healthy" : "Degraded"}</span>
     </div>
     <div class="metrics-grid">
       <div class="metric-card">
@@ -122,22 +14525,352 @@ Pick your move.`,z}function S($,I,H,ee){const V=Ca($,I)??H[0];return{from:V.from
         <div class="metric-label">Uptime</div>
       </div>
     </div>
-    ${a.traces.length>0?`
+    ${
+      a.traces.length > 0
+        ? `
     <div class="traces-section">
       <div class="traces-title">Recent Traces</div>
-      ${a.traces.slice(-5).reverse().map(d=>`
+      ${a.traces
+        .slice(-5)
+        .reverse()
+        .map(
+          (d) => `
         <div class="trace-item">
           <span class="trace-op">${d.operationName}</span>
-          <span class="trace-duration">${d.duration??"..."}ms</span>
+          <span class="trace-duration">${d.duration ?? "..."}ms</span>
           <span class="trace-status ${d.status}">${d.status}</span>
         </div>
-      `).join("")}
-    </div>`:""}
-    ${a.alerts.length>0?`
+      `,
+        )
+        .join("")}
+    </div>`
+        : ""
+    }
+    ${
+      a.alerts.length > 0
+        ? `
     <div class="alerts-section">
       <div class="traces-title">Alerts</div>
-      ${a.alerts.slice(-3).map(d=>`
+      ${a.alerts
+        .slice(-3)
+        .map(
+          (d) => `
         <div class="alert-item">${d.message}</div>
-      `).join("")}
-    </div>`:""}
-  `}let Cn;function Si(e,t,a){const[r,n]=tr(e),[o,i]=tr(t);return`Moved from (${r},${n}) to (${o},${i})${a?" (captured a piece)":""}`}let Yt=!1;async function Ei(){const e=De.facts.game.board,t=De.facts.game.currentPlayer,a=De.facts.game.gameMode,r=De.facts.game.aiPlayer,n=De.facts.game.gameOver;if(a!=="ai"||t!==r||n||Yt)return;Yt=!0,De.events.chat.setThinking({thinking:!0});const o=Ar(e,r),i=await Mr.requestMove(e,r,o,Cn);Cn=void 0,De.events.chat.setThinking({thinking:!1}),i.isCached&&De.events.chat.addMessage({message:{sender:"system",text:"Instant response — cached!"}}),i.isLocalFallback?De.events.chat.addMessage({message:{sender:"system",text:i.chat}}):De.events.chat.addMessage({message:{sender:"claude",text:i.chat,reasoning:i.reasoning,analysis:i.analysis??void 0}}),i.analysis&&De.events.chat.setAnalysis({text:i.analysis}),i.from>=0&&i.to>=0&&De.events.game.claudeMove({from:i.from,to:i.to}),Ra(),Yt=!1}let pa=null,Lr=null;function Ci(){const e=De.facts.game.currentPlayer,t=De.facts.game.gameMode,a=De.facts.game.aiPlayer,r=De.facts.game.board;if(t==="ai"&&e===a&&pa!==a&&Lr){let n=-1,o=-1,i=!1;for(let u=0;u<64;u++){const c=Lr[u],d=r[u];c&&!d&&c.player!==a&&(n=u),!Lr[u]&&d&&d.player!==a&&(o=u),c&&!d&&c.player===a&&(i=!0)}n>=0&&o>=0&&(Cn=Si(n,o,i))}pa=e,Lr=[...r]}function Ua(){const e=De.facts.game.board,t=De.facts.game.currentPlayer,a=De.facts.game.selectedIndex,r=De.facts.game.gameOver,n=De.facts.game.winner,o=De.facts.game.moveCount,i=De.facts.game.capturedCount,u=De.facts.game.message,c=De.facts.game.gameMode,d=De.facts.game.aiPlayer,f=De.derive.game.highlightSquares,w=De.derive.game.selectableSquares,O=De.derive.game.score,_=De.facts.chat.totalTokens,U=De.facts.chat.estimatedCost,D=De.facts.chat.circuitState,E=De.debug;E&&(_a.disabled=E.currentIndex<=0,qa.disabled=E.currentIndex>=E.snapshots.length-1),ui.textContent=t,ci.className=`player-dot ${t}`,di.textContent=O,fi.textContent=String(o),pi.textContent=String(i.red),mi.textContent=String(i.black),Dr.textContent=u,da&&(da.textContent=_>0?`${_} ($${U.toFixed(4)})`:"0"),pn&&(pn.className=`circuit-dot ${D.toLowerCase()}`,pn.title=`Circuit: ${D}`),ua.innerHTML="";const T=new Set(f),G=new Set(w);for(let J=0;J<8;J++)for(let m=0;m<8;m++){const M=J*8+m,S=(J+m)%2===1,j=e[M],F=document.createElement("div");if(F.className=`square ${S?"dark":"light"}`,F.dataset.testid=`checkers-square-${M}`,S&&(M===a&&F.classList.add("selected"),T.has(M)&&F.classList.add("highlight"),G.has(M)&&!r&&F.classList.add("selectable"),F.addEventListener("click",()=>{De.events.game.clickSquare({index:M})})),j){const ne=document.createElement("div");ne.className=`piece ${j.player}${j.king?" king":""}`,F.appendChild(ne)}ua.appendChild(F)}r&&n?(gi.textContent=`${n.charAt(0).toUpperCase()+n.slice(1)} wins!`,ca.classList.remove("hidden")):ca.classList.add("hidden"),Na.classList.toggle("active",c==="2player"),Pa.classList.toggle("active",c==="computer"),La.classList.toggle("active",c==="ai"),hi.classList.toggle("hidden",c!=="ai"),yi.classList.toggle("hidden",c!=="ai"),bi.classList.toggle("hidden",c!=="ai"),fa&&(fa.style.display=c==="ai"?"":"none"),c==="ai"&&!kr?kr=setInterval(()=>{ur&&Fa(En)},2e3):c!=="ai"&&kr&&(clearInterval(kr),kr=null),wr!==null&&(clearTimeout(wr),wr=null),c==="computer"&&t===d&&!r&&(wr=setTimeout(()=>{wr=null,De.events.game.aiMove()},400)),c==="ai"&&t===d&&!r&&!Yt&&Ei(),xi()}function xi(){const e=De.facts.chat.messages,t=De.facts.chat.thinking,a=De.facts.chat.isStreaming,r=De.facts.chat.streamingText;lr.innerHTML="";for(const n of e){const o=document.createElement("div");o.className=`chat-bubble ${n.sender}`;const i=document.createElement("div");if(i.className="chat-text",i.textContent=n.text,o.appendChild(i),n.reasoning){const u=document.createElement("div");u.className="chat-reasoning",u.textContent=n.reasoning,o.appendChild(u)}if(n.analysis){const u=document.createElement("div");u.className="analysis-section";const c=document.createElement("div");c.className="analysis-toggle",c.innerHTML='<span class="arrow">▶</span> Strategic Analysis';const d=document.createElement("div");d.className="analysis-content",d.textContent=n.analysis,c.addEventListener("click",()=>{const f=c.querySelector(".arrow"),w=d.classList.toggle("open");f.classList.toggle("open",w)}),u.appendChild(c),u.appendChild(d),o.appendChild(u)}lr.appendChild(o)}if(a&&r){const n=document.createElement("div");n.className="chat-bubble claude";const o=document.createElement("div");o.className="chat-text streaming-cursor",o.textContent=r,n.appendChild(o),lr.appendChild(n)}else if(t){const n=document.createElement("div");n.className="chat-bubble claude thinking-bubble",n.innerHTML='<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>',lr.appendChild(n)}lr.scrollTop=lr.scrollHeight}const za=()=>{Ci(),Ua()};De.subscribeModule("game",za);De.subscribeModule("chat",za);function pr(){Yt=!1,Mr.reset(),De.events.chat.clearChat()}document.getElementById("checkers-new-game").addEventListener("click",()=>{pr(),De.events.game.newGame()});document.getElementById("checkers-modal-new-game").addEventListener("click",()=>{pr(),De.events.game.newGame()});Na.addEventListener("click",()=>{pr(),De.events.game.setGameMode({mode:"2player"})});Pa.addEventListener("click",()=>{pr(),De.events.game.setGameMode({mode:"computer"})});La.addEventListener("click",()=>{pr(),De.events.game.setGameMode({mode:"ai"})});Ba.addEventListener("click",()=>{const e=$r.value.trim();e&&(Ks(e),$r.value="",De.events.chat.addMessage({message:{sender:"system",text:"API key saved! Let's play."}}))});$r.addEventListener("keydown",e=>{e.key==="Enter"&&Ba.click()});const Di=Mn();Di?$r.placeholder="Key saved — enter new to replace":$r.placeholder="Optional — server key used if empty";function Ja(){const e=Sn.value.trim();!e||Yt||(Sn.value="",De.events.chat.addMessage({message:{sender:"user",text:e}}),De.events.chat.startStream(),Mr.sendChat(e,t=>{De.events.chat.appendStreamToken({token:t})}).then(t=>{De.events.chat.finishStream({finalText:t??""}),t?De.events.chat.addMessage({message:{sender:"claude",text:t}}):De.events.chat.addMessage({message:{sender:"system",text:"No response — check API key."}}),Ra()}).catch(t=>{De.events.chat.finishStream({finalText:""}),De.events.chat.addMessage({message:{sender:"system",text:`Error: ${t instanceof Error?t.message:"Unknown error"}`}})}))}vi.addEventListener("click",Ja);Sn.addEventListener("keydown",e=>{e.key==="Enter"&&Ja()});wi.addEventListener("click",()=>{ur=!ur,ki.classList.toggle("open",ur),En.classList.toggle("open",ur),ur&&Fa(En)});_a.addEventListener("click",()=>{Yt=!1,De.debug?.goBack(),Dr.textContent="Undone."});qa.addEventListener("click",()=>{De.debug?.goForward(),Dr.textContent="Redone."});document.addEventListener("keydown",e=>{(e.ctrlKey||e.metaKey)&&e.key==="n"&&(e.preventDefault(),pr(),De.events.game.newGame()),(e.ctrlKey||e.metaKey)&&e.key==="z"&&(e.preventDefault(),e.shiftKey?(De.debug?.goForward(),Dr.textContent="Redone."):(Yt=!1,De.debug?.goBack(),Dr.textContent="Undone."))});Ua();
+      `,
+        )
+        .join("")}
+    </div>`
+        : ""
+    }
+  `;
+}
+let Cn;
+function Si(e, t, a) {
+  const [r, n] = tr(e),
+    [o, i] = tr(t);
+  return `Moved from (${r},${n}) to (${o},${i})${a ? " (captured a piece)" : ""}`;
+}
+let Yt = !1;
+async function Ei() {
+  const e = De.facts.game.board,
+    t = De.facts.game.currentPlayer,
+    a = De.facts.game.gameMode,
+    r = De.facts.game.aiPlayer,
+    n = De.facts.game.gameOver;
+  if (a !== "ai" || t !== r || n || Yt) return;
+  (Yt = !0), De.events.chat.setThinking({ thinking: !0 });
+  const o = Ar(e, r),
+    i = await Mr.requestMove(e, r, o, Cn);
+  (Cn = void 0),
+    De.events.chat.setThinking({ thinking: !1 }),
+    i.isCached &&
+      De.events.chat.addMessage({
+        message: { sender: "system", text: "Instant response — cached!" },
+      }),
+    i.isLocalFallback
+      ? De.events.chat.addMessage({
+          message: { sender: "system", text: i.chat },
+        })
+      : De.events.chat.addMessage({
+          message: {
+            sender: "claude",
+            text: i.chat,
+            reasoning: i.reasoning,
+            analysis: i.analysis ?? void 0,
+          },
+        }),
+    i.analysis && De.events.chat.setAnalysis({ text: i.analysis }),
+    i.from >= 0 &&
+      i.to >= 0 &&
+      De.events.game.claudeMove({ from: i.from, to: i.to }),
+    Ra(),
+    (Yt = !1);
+}
+let pa = null,
+  Lr = null;
+function Ci() {
+  const e = De.facts.game.currentPlayer,
+    t = De.facts.game.gameMode,
+    a = De.facts.game.aiPlayer,
+    r = De.facts.game.board;
+  if (t === "ai" && e === a && pa !== a && Lr) {
+    let n = -1,
+      o = -1,
+      i = !1;
+    for (let u = 0; u < 64; u++) {
+      const c = Lr[u],
+        d = r[u];
+      c && !d && c.player !== a && (n = u),
+        !Lr[u] && d && d.player !== a && (o = u),
+        c && !d && c.player === a && (i = !0);
+    }
+    n >= 0 && o >= 0 && (Cn = Si(n, o, i));
+  }
+  (pa = e), (Lr = [...r]);
+}
+function Ua() {
+  const e = De.facts.game.board,
+    t = De.facts.game.currentPlayer,
+    a = De.facts.game.selectedIndex,
+    r = De.facts.game.gameOver,
+    n = De.facts.game.winner,
+    o = De.facts.game.moveCount,
+    i = De.facts.game.capturedCount,
+    u = De.facts.game.message,
+    c = De.facts.game.gameMode,
+    d = De.facts.game.aiPlayer,
+    f = De.derive.game.highlightSquares,
+    w = De.derive.game.selectableSquares,
+    O = De.derive.game.score,
+    _ = De.facts.chat.totalTokens,
+    U = De.facts.chat.estimatedCost,
+    D = De.facts.chat.circuitState,
+    E = De.debug;
+  E &&
+    ((_a.disabled = E.currentIndex <= 0),
+    (qa.disabled = E.currentIndex >= E.snapshots.length - 1)),
+    (ui.textContent = t),
+    (ci.className = `player-dot ${t}`),
+    (di.textContent = O),
+    (fi.textContent = String(o)),
+    (pi.textContent = String(i.red)),
+    (mi.textContent = String(i.black)),
+    (Dr.textContent = u),
+    da && (da.textContent = _ > 0 ? `${_} ($${U.toFixed(4)})` : "0"),
+    pn &&
+      ((pn.className = `circuit-dot ${D.toLowerCase()}`),
+      (pn.title = `Circuit: ${D}`)),
+    (ua.innerHTML = "");
+  const T = new Set(f),
+    G = new Set(w);
+  for (let J = 0; J < 8; J++)
+    for (let m = 0; m < 8; m++) {
+      const M = J * 8 + m,
+        S = (J + m) % 2 === 1,
+        j = e[M],
+        F = document.createElement("div");
+      if (
+        ((F.className = `square ${S ? "dark" : "light"}`),
+        (F.dataset.testid = `checkers-square-${M}`),
+        S &&
+          (M === a && F.classList.add("selected"),
+          T.has(M) && F.classList.add("highlight"),
+          G.has(M) && !r && F.classList.add("selectable"),
+          F.addEventListener("click", () => {
+            De.events.game.clickSquare({ index: M });
+          })),
+        j)
+      ) {
+        const ne = document.createElement("div");
+        (ne.className = `piece ${j.player}${j.king ? " king" : ""}`),
+          F.appendChild(ne);
+      }
+      ua.appendChild(F);
+    }
+  r && n
+    ? ((gi.textContent = `${n.charAt(0).toUpperCase() + n.slice(1)} wins!`),
+      ca.classList.remove("hidden"))
+    : ca.classList.add("hidden"),
+    Na.classList.toggle("active", c === "2player"),
+    Pa.classList.toggle("active", c === "computer"),
+    La.classList.toggle("active", c === "ai"),
+    hi.classList.toggle("hidden", c !== "ai"),
+    yi.classList.toggle("hidden", c !== "ai"),
+    bi.classList.toggle("hidden", c !== "ai"),
+    fa && (fa.style.display = c === "ai" ? "" : "none"),
+    c === "ai" && !kr
+      ? (kr = setInterval(() => {
+          ur && Fa(En);
+        }, 2e3))
+      : c !== "ai" && kr && (clearInterval(kr), (kr = null)),
+    wr !== null && (clearTimeout(wr), (wr = null)),
+    c === "computer" &&
+      t === d &&
+      !r &&
+      (wr = setTimeout(() => {
+        (wr = null), De.events.game.aiMove();
+      }, 400)),
+    c === "ai" && t === d && !r && !Yt && Ei(),
+    xi();
+}
+function xi() {
+  const e = De.facts.chat.messages,
+    t = De.facts.chat.thinking,
+    a = De.facts.chat.isStreaming,
+    r = De.facts.chat.streamingText;
+  lr.innerHTML = "";
+  for (const n of e) {
+    const o = document.createElement("div");
+    o.className = `chat-bubble ${n.sender}`;
+    const i = document.createElement("div");
+    if (
+      ((i.className = "chat-text"),
+      (i.textContent = n.text),
+      o.appendChild(i),
+      n.reasoning)
+    ) {
+      const u = document.createElement("div");
+      (u.className = "chat-reasoning"),
+        (u.textContent = n.reasoning),
+        o.appendChild(u);
+    }
+    if (n.analysis) {
+      const u = document.createElement("div");
+      u.className = "analysis-section";
+      const c = document.createElement("div");
+      (c.className = "analysis-toggle"),
+        (c.innerHTML = '<span class="arrow">▶</span> Strategic Analysis');
+      const d = document.createElement("div");
+      (d.className = "analysis-content"),
+        (d.textContent = n.analysis),
+        c.addEventListener("click", () => {
+          const f = c.querySelector(".arrow"),
+            w = d.classList.toggle("open");
+          f.classList.toggle("open", w);
+        }),
+        u.appendChild(c),
+        u.appendChild(d),
+        o.appendChild(u);
+    }
+    lr.appendChild(o);
+  }
+  if (a && r) {
+    const n = document.createElement("div");
+    n.className = "chat-bubble claude";
+    const o = document.createElement("div");
+    (o.className = "chat-text streaming-cursor"),
+      (o.textContent = r),
+      n.appendChild(o),
+      lr.appendChild(n);
+  } else if (t) {
+    const n = document.createElement("div");
+    (n.className = "chat-bubble claude thinking-bubble"),
+      (n.innerHTML =
+        '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>'),
+      lr.appendChild(n);
+  }
+  lr.scrollTop = lr.scrollHeight;
+}
+const za = () => {
+  Ci(), Ua();
+};
+De.subscribeModule("game", za);
+De.subscribeModule("chat", za);
+function pr() {
+  (Yt = !1), Mr.reset(), De.events.chat.clearChat();
+}
+document.getElementById("checkers-new-game").addEventListener("click", () => {
+  pr(), De.events.game.newGame();
+});
+document
+  .getElementById("checkers-modal-new-game")
+  .addEventListener("click", () => {
+    pr(), De.events.game.newGame();
+  });
+Na.addEventListener("click", () => {
+  pr(), De.events.game.setGameMode({ mode: "2player" });
+});
+Pa.addEventListener("click", () => {
+  pr(), De.events.game.setGameMode({ mode: "computer" });
+});
+La.addEventListener("click", () => {
+  pr(), De.events.game.setGameMode({ mode: "ai" });
+});
+Ba.addEventListener("click", () => {
+  const e = $r.value.trim();
+  e &&
+    (Ks(e),
+    ($r.value = ""),
+    De.events.chat.addMessage({
+      message: { sender: "system", text: "API key saved! Let's play." },
+    }));
+});
+$r.addEventListener("keydown", (e) => {
+  e.key === "Enter" && Ba.click();
+});
+const Di = Mn();
+Di
+  ? ($r.placeholder = "Key saved — enter new to replace")
+  : ($r.placeholder = "Optional — server key used if empty");
+function Ja() {
+  const e = Sn.value.trim();
+  !e ||
+    Yt ||
+    ((Sn.value = ""),
+    De.events.chat.addMessage({ message: { sender: "user", text: e } }),
+    De.events.chat.startStream(),
+    Mr.sendChat(e, (t) => {
+      De.events.chat.appendStreamToken({ token: t });
+    })
+      .then((t) => {
+        De.events.chat.finishStream({ finalText: t ?? "" }),
+          t
+            ? De.events.chat.addMessage({
+                message: { sender: "claude", text: t },
+              })
+            : De.events.chat.addMessage({
+                message: {
+                  sender: "system",
+                  text: "No response — check API key.",
+                },
+              }),
+          Ra();
+      })
+      .catch((t) => {
+        De.events.chat.finishStream({ finalText: "" }),
+          De.events.chat.addMessage({
+            message: {
+              sender: "system",
+              text: `Error: ${t instanceof Error ? t.message : "Unknown error"}`,
+            },
+          });
+      }));
+}
+vi.addEventListener("click", Ja);
+Sn.addEventListener("keydown", (e) => {
+  e.key === "Enter" && Ja();
+});
+wi.addEventListener("click", () => {
+  (ur = !ur),
+    ki.classList.toggle("open", ur),
+    En.classList.toggle("open", ur),
+    ur && Fa(En);
+});
+_a.addEventListener("click", () => {
+  (Yt = !1), De.debug?.goBack(), (Dr.textContent = "Undone.");
+});
+qa.addEventListener("click", () => {
+  De.debug?.goForward(), (Dr.textContent = "Redone.");
+});
+document.addEventListener("keydown", (e) => {
+  (e.ctrlKey || e.metaKey) &&
+    e.key === "n" &&
+    (e.preventDefault(), pr(), De.events.game.newGame()),
+    (e.ctrlKey || e.metaKey) &&
+      e.key === "z" &&
+      (e.preventDefault(),
+      e.shiftKey
+        ? (De.debug?.goForward(), (Dr.textContent = "Redone."))
+        : ((Yt = !1), De.debug?.goBack(), (Dr.textContent = "Undone.")));
+});
+Ua();

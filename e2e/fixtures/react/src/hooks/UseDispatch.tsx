@@ -1,6 +1,6 @@
-import { useFact, useDispatch } from "@directive-run/react";
-import { system } from "../system";
+import { useDispatch, useFact } from "@directive-run/react";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 export function UseDispatchPage() {
   const count = useFact(system, "count");

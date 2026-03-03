@@ -1,28 +1,26 @@
 // @ts-nocheck
-'use client'
+"use client";
 
-import { useCallback } from 'react'
-import Link from 'next/link'
-import type { Metadata } from 'next'
-import { DirectiveCallout } from '@/components/DirectiveCallout'
+import { CardLink } from "@/components/CardLink";
+import { DirectiveCallout } from "@/components/DirectiveCallout";
 import {
   ChatCircle,
   CheckCircle,
   CircleNotch,
-  PaperPlaneTilt,
   GithubLogo,
+  PaperPlaneTilt,
   Warning,
   XCircle,
-} from '@phosphor-icons/react'
-import { CardLink } from '@/components/CardLink'
+} from "@phosphor-icons/react";
+import { useCallback } from "react";
 
 import {
-  useContactField,
-  useContactDerived,
-  useContactFormEvents,
   useCanSubmit,
+  useContactDerived,
+  useContactField,
+  useContactFormEvents,
   useFormStatus,
-} from '@/lib/contact-form'
+} from "@/lib/contact-form";
 
 // ---------------------------------------------------------------------------
 // Metadata (exported from a separate layout if needed; inlined for standalone)
@@ -36,31 +34,31 @@ import {
 // ---------------------------------------------------------------------------
 
 const SUBJECTS = [
-  { value: '', label: 'Select a subject' },
-  { value: 'general', label: 'General inquiry' },
-  { value: 'bug', label: 'Bug report' },
-  { value: 'feature', label: 'Feature request' },
-  { value: 'partnership', label: 'Partnership' },
-]
+  { value: "", label: "Select a subject" },
+  { value: "general", label: "General inquiry" },
+  { value: "bug", label: "Bug report" },
+  { value: "feature", label: "Feature request" },
+  { value: "partnership", label: "Partnership" },
+];
 
 // ---------------------------------------------------------------------------
 // Social links (SVG icons inline to avoid extra deps)
 // ---------------------------------------------------------------------------
 
-function BlueSkyIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
+function BlueSkyIcon(props: React.ComponentPropsWithoutRef<"svg">) {
   return (
     <svg viewBox="0 0 600 530" fill="currentColor" {...props}>
       <path d="M135.72 44.03C202.216 93.951 273.74 195.401 300 249.98c26.262-54.578 97.784-156.028 164.28-205.95C512.26 8.009 590-19.862 590 68.825c0 17.746-10.188 149.032-16.172 170.346-20.794 74.052-96.502 92.942-163.348 81.478 116.73 19.964 146.413 86.086 82.265 152.208C419.135 546.456 313.526 485.855 303.326 460.93c-1.86-4.55-2.726-9.404-3.326-13.163-.6 3.76-1.466 8.613-3.326 13.162-10.2 24.926-115.81 85.527-189.418 11.928-64.148-66.122-34.465-132.244 82.265-152.208-66.846 11.464-142.554-7.426-163.348-81.478C20.188 217.857 10 86.571 10 68.825 10-19.862 87.74 8.01 135.72 44.03Z" />
     </svg>
-  )
+  );
 }
 
-function XIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
+function XIcon(props: React.ComponentPropsWithoutRef<"svg">) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -73,10 +71,10 @@ function Field({
   error,
   children,
 }: {
-  label: string
-  name: string
-  error: string
-  children: React.ReactNode
+  label: string;
+  name: string;
+  error: string;
+  children: React.ReactNode;
 }) {
   return (
     <div>
@@ -94,7 +92,7 @@ function Field({
         </p>
       )}
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -102,52 +100,57 @@ function Field({
 // ---------------------------------------------------------------------------
 
 function ContactForm() {
-  const name = useContactField('name')
-  const email = useContactField('email')
-  const subject = useContactField('subject')
-  const message = useContactField('message')
-  const status = useFormStatus()
-  const errorMessage = useContactField('errorMessage')
+  const name = useContactField("name");
+  const email = useContactField("email");
+  const subject = useContactField("subject");
+  const message = useContactField("message");
+  const status = useFormStatus();
+  const errorMessage = useContactField("errorMessage");
 
-  const nameError = useContactDerived('nameError')
-  const emailError = useContactDerived('emailError')
-  const subjectError = useContactDerived('subjectError')
-  const messageError = useContactDerived('messageError')
-  const charCount = useContactDerived('messageCharCount')
-  const canSubmit = useCanSubmit()
+  const nameError = useContactDerived("nameError");
+  const emailError = useContactDerived("emailError");
+  const subjectError = useContactDerived("subjectError");
+  const messageError = useContactDerived("messageError");
+  const charCount = useContactDerived("messageCharCount");
+  const canSubmit = useCanSubmit();
 
-  const events = useContactFormEvents()
+  const events = useContactFormEvents();
 
   const handleChange = useCallback(
-    (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      events.updateField({ field, value: e.target.value })
-    },
+    (field: string) =>
+      (
+        e: React.ChangeEvent<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >,
+      ) => {
+        events.updateField({ field, value: e.target.value });
+      },
     [events],
-  )
+  );
 
   const handleBlur = useCallback(
     (field: string) => () => {
-      events.touchField({ field })
+      events.touchField({ field });
     },
     [events],
-  )
+  );
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
-      e.preventDefault()
-      events.submit({})
+      e.preventDefault();
+      events.submit({});
     },
     [events],
-  )
+  );
 
   const handleReset = useCallback(() => {
-    events.reset({})
-  }, [events])
+    events.reset({});
+  }, [events]);
 
   const inputClass =
-    'block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-brand-primary-400 dark:focus:ring-brand-primary-400/20'
+    "block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-brand-primary-400 dark:focus:ring-brand-primary-400/20";
 
-  if (status === 'success') {
+  if (status === "success") {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 px-6 py-10 text-center dark:border-emerald-800/30 dark:bg-emerald-950/20">
         <CheckCircle
@@ -164,18 +167,20 @@ function ContactForm() {
           This form will reset automatically in a few seconds.
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
-      {status === 'error' && errorMessage && (
+      {status === "error" && errorMessage && (
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 dark:border-red-800/30 dark:bg-red-950/20">
           <XCircle
             weight="fill"
             className="mt-0.5 h-5 w-5 shrink-0 text-red-500 dark:text-red-400"
           />
-          <p className="text-sm text-red-700 dark:text-red-300">{errorMessage}</p>
+          <p className="text-sm text-red-700 dark:text-red-300">
+            {errorMessage}
+          </p>
         </div>
       )}
 
@@ -185,8 +190,8 @@ function ContactForm() {
             id="name"
             type="text"
             value={name}
-            onChange={handleChange('name')}
-            onBlur={handleBlur('name')}
+            onChange={handleChange("name")}
+            onBlur={handleBlur("name")}
             placeholder="Your name"
             className={inputClass}
           />
@@ -197,8 +202,8 @@ function ContactForm() {
             id="email"
             type="email"
             value={email}
-            onChange={handleChange('email')}
-            onBlur={handleBlur('email')}
+            onChange={handleChange("email")}
+            onBlur={handleBlur("email")}
             placeholder="you@example.com"
             className={inputClass}
           />
@@ -209,9 +214,12 @@ function ContactForm() {
         <select
           id="subject"
           value={subject}
-          onChange={handleChange('subject')}
-          onBlur={handleBlur('subject')}
-          className={inputClass + ' appearance-none bg-[length:16px_16px] bg-[position:right_12px_center] bg-no-repeat bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20fill%3D%27%2394a3b8%27%3E%3Cpath%20d%3D%27M4.22%206.22a.75.75%200%20011.06%200L8%208.94l2.72-2.72a.75.75%200%20111.06%201.06l-3.25%203.25a.75.75%200%2001-1.06%200L4.22%207.28a.75.75%200%20010-1.06z%27/%3E%3C/svg%3E")] pr-10'}
+          onChange={handleChange("subject")}
+          onBlur={handleBlur("subject")}
+          className={
+            inputClass +
+            ' appearance-none bg-[length:16px_16px] bg-[position:right_12px_center] bg-no-repeat bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20fill%3D%27%2394a3b8%27%3E%3Cpath%20d%3D%27M4.22%206.22a.75.75%200%20011.06%200L8%208.94l2.72-2.72a.75.75%200%20111.06%201.06l-3.25%203.25a.75.75%200%2001-1.06%200L4.22%207.28a.75.75%200%20010-1.06z%27/%3E%3C/svg%3E")] pr-10'
+          }
         >
           {SUBJECTS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -227,10 +235,10 @@ function ContactForm() {
             id="message"
             rows={5}
             value={message}
-            onChange={handleChange('message')}
-            onBlur={handleBlur('message')}
+            onChange={handleChange("message")}
+            onBlur={handleBlur("message")}
             placeholder="What can we help with?"
-            className={inputClass + ' resize-none'}
+            className={inputClass + " resize-none"}
           />
           <span className="absolute bottom-2 right-3 text-xs text-slate-400 dark:text-slate-500">
             {charCount} / 10 min
@@ -244,7 +252,7 @@ function ContactForm() {
           disabled={!canSubmit}
           className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-primary-600 dark:hover:bg-brand-primary-500"
         >
-          {status === 'submitting' ? (
+          {status === "submitting" ? (
             <>
               <CircleNotch weight="bold" className="h-4 w-4 animate-spin" />
               Sending&hellip;
@@ -257,7 +265,7 @@ function ContactForm() {
           )}
         </button>
 
-        {(name || email || subject || message) && status === 'idle' && (
+        {(name || email || subject || message) && status === "idle" && (
           <button
             type="button"
             onClick={handleReset}
@@ -268,7 +276,7 @@ function ContactForm() {
         )}
       </div>
     </form>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -376,11 +384,12 @@ export default function ContactPage() {
               Try the AI chat
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Have a question about the API? The docs chatbot in the bottom-right can answer most technical questions instantly.
+              Have a question about the API? The docs chatbot in the
+              bottom-right can answer most technical questions instantly.
             </p>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

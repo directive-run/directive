@@ -42,13 +42,13 @@ const DEBUG_EVENT_TYPES = [
 export type DebugEventType = (typeof DEBUG_EVENT_TYPES)[number];
 
 /** Error event types (for quick filtering) */
-export const ERROR_EVENT_TYPES: ReadonlySet<DebugEventType> = new Set<DebugEventType>([
-  "agent_error",
-  "resolver_error",
-]);
+export const ERROR_EVENT_TYPES: ReadonlySet<DebugEventType> =
+  new Set<DebugEventType>(["agent_error", "resolver_error"]);
 
 /** Runtime set of all valid DebugEventType values (for validation at import boundaries) */
-export const VALID_EVENT_TYPES: ReadonlySet<string> = new Set(DEBUG_EVENT_TYPES);
+export const VALID_EVENT_TYPES: ReadonlySet<string> = new Set(
+  DEBUG_EVENT_TYPES,
+);
 
 export interface DebugEvent {
   id: number;
@@ -120,7 +120,6 @@ export function isReroute(e: DebugEvent): e is RerouteEvent {
   return e.type === "reroute";
 }
 
-
 // ============================================================================
 // Health Types
 // ============================================================================
@@ -150,7 +149,13 @@ export interface BreakpointState {
 // DAG Types
 // ============================================================================
 
-export type DagNodeStatus = "pending" | "ready" | "running" | "completed" | "error" | "skipped";
+export type DagNodeStatus =
+  | "pending"
+  | "ready"
+  | "running"
+  | "completed"
+  | "error"
+  | "skipped";
 
 // ============================================================================
 // Scratchpad & Derived State Types
@@ -201,13 +206,16 @@ export interface StreamDoneData {
 
 export interface DevToolsSnapshot {
   timestamp: number;
-  agents: Record<string, {
-    status: string;
-    lastInput?: string;
-    lastOutput?: unknown;
-    totalTokens: number;
-    runCount: number;
-  }>;
+  agents: Record<
+    string,
+    {
+      status: string;
+      lastInput?: string;
+      lastOutput?: unknown;
+      totalTokens: number;
+      runCount: number;
+    }
+  >;
   coordinator?: { globalTokens: number; status: string };
   derived?: Record<string, unknown>;
   eventCount: number;
@@ -234,7 +242,9 @@ const SERVER_MESSAGE_TYPES = [
 export type ServerMessageType = (typeof SERVER_MESSAGE_TYPES)[number];
 
 /** Runtime set of all valid ServerMessage type discriminators */
-export const VALID_SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set(SERVER_MESSAGE_TYPES);
+export const VALID_SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set(
+  SERVER_MESSAGE_TYPES,
+);
 
 export type ServerMessage =
   | { type: "welcome"; version: number; sessionId: string; timestamp: number }
@@ -251,7 +261,12 @@ export type ServerMessage =
   // Fork
   | { type: "fork_complete"; eventId: number; newEventCount: number }
   // Token streaming
-  | { type: "token_stream"; agentId: string; tokens: string; tokenCount: number }
+  | {
+      type: "token_stream";
+      agentId: string;
+      tokens: string;
+      tokenCount: number;
+    }
   | { type: "stream_done"; agentId: string; totalTokens: number }
   | { type: "error"; code: string; message: string };
 
@@ -260,7 +275,11 @@ export type ClientMessage =
   | { type: "request_snapshot" }
   | { type: "request_events"; since?: number }
   | { type: "request_breakpoints" }
-  | { type: "resume_breakpoint"; breakpointId: string; modifications?: { input?: string; skip?: boolean } }
+  | {
+      type: "resume_breakpoint";
+      breakpointId: string;
+      modifications?: { input?: string; skip?: boolean };
+    }
   | { type: "cancel_breakpoint"; breakpointId: string; reason?: string }
   | { type: "export_session" }
   | { type: "import_session"; data: string }
@@ -275,4 +294,8 @@ export type ClientMessage =
 // Connection State
 // ============================================================================
 
-export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+export type ConnectionStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "error";

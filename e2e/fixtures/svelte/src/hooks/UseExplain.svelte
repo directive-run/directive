@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { useFact, useExplain } from "@directive-run/svelte";
-  import { system } from "../system";
-  import { TestIds } from "../../../../shared/test-ids";
+import { useExplain, useFact } from "@directive-run/svelte";
+import { system } from "../system";
 
-  const status = useFact(system, "status");
-  const explanation = useExplain(system, "LOAD_DATA:{}");
+const status = useFact(system, "status");
+const explanation = useExplain(system, "LOAD_DATA:{}");
 </script>
 
 <div>

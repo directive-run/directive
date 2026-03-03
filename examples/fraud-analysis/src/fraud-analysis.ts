@@ -10,19 +10,24 @@
  * - DevTools panel with time-travel debugging
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import { detectPII, redactPII } from "./pii.js";
 import { InMemoryCheckpointStore } from "./checkpoint.js";
+import { detectPII, redactPII } from "./pii.js";
 
 import {
-  type PipelineStage,
+  type CheckpointEntry,
+  type Disposition,
   type FlagEvent,
   type FraudCase,
-  type CheckpointEntry,
-  type TimelineEntry,
+  type PipelineStage,
   type Severity,
-  type Disposition,
+  type TimelineEntry,
   getMockEnrichment,
 } from "./mock-data.js";
 
@@ -203,8 +208,13 @@ export const fraudAnalysisModule = createModule("fraud", {
 
     completionPercentage: (facts) => {
       const stages: PipelineStage[] = [
-        "idle", "ingesting", "normalizing", "grouping",
-        "enriching", "analyzing", "complete",
+        "idle",
+        "ingesting",
+        "normalizing",
+        "grouping",
+        "enriching",
+        "analyzing",
+        "complete",
       ];
       const idx = stages.indexOf(facts.stage);
       if (idx < 0) {
@@ -282,10 +292,7 @@ export const fraudAnalysisModule = createModule("fraud", {
     normalizeNeeded: {
       priority: 100,
       when: (facts) => {
-        return (
-          facts.stage === "ingesting" &&
-          facts.flagEvents.length > 0
-        );
+        return facts.stage === "ingesting" && facts.flagEvents.length > 0;
       },
       require: { type: "NORMALIZE_EVENTS" },
     },
@@ -303,9 +310,7 @@ export const fraudAnalysisModule = createModule("fraud", {
       priority: 80,
       after: ["groupingNeeded"],
       when: (facts) => {
-        return facts.cases.some(
-          (c) => !c.enriched && c.signals.length < 3,
-        );
+        return facts.cases.some((c) => !c.enriched && c.signals.length < 3);
       },
       require: (facts) => {
         const target = facts.cases.find(
@@ -326,9 +331,7 @@ export const fraudAnalysisModule = createModule("fraud", {
         );
       },
       require: (facts) => {
-        const target = facts.cases.find(
-          (c) => c.enriched && !c.analyzed,
-        );
+        const target = facts.cases.find((c) => c.enriched && !c.analyzed);
 
         return { type: "ANALYZE_CASE", caseId: target?.id ?? "" };
       },
@@ -394,14 +397,12 @@ export const fraudAnalysisModule = createModule("fraud", {
           const event = events[i];
 
           // Run PII detection on merchant + memo fields
-          const merchantResult = await detectPII(
-            event.merchant,
-            { types: ["credit_card", "bank_account", "ssn"] },
-          );
-          const memoResult = await detectPII(
-            event.memo,
-            { types: ["credit_card", "bank_account", "ssn"] },
-          );
+          const merchantResult = await detectPII(event.merchant, {
+            types: ["credit_card", "bank_account", "ssn"],
+          });
+          const memoResult = await detectPII(event.memo, {
+            types: ["credit_card", "bank_account", "ssn"],
+          });
 
           const hasPii = merchantResult.detected || memoResult.detected;
           if (hasPii) {
@@ -532,16 +533,22 @@ export const fraudAnalysisModule = createModule("fraud", {
         // Deterministic analysis
         await delay(500);
         const result = analyzeWithFormula(fraudCase);
-        if (result.disposition === "pending" && result.riskScore <= context.facts.riskThreshold) {
+        if (
+          result.disposition === "pending" &&
+          result.riskScore <= context.facts.riskThreshold
+        ) {
           result.disposition = "flagged";
-          result.analysisNotes += " Auto-flagged: below human review threshold.";
+          result.analysisNotes +=
+            " Auto-flagged: below human review threshold.";
         }
 
         // All fact mutations at the end — no more awaits after this
         cases[idx] = { ...fraudCase, ...result, analyzed: true };
         context.facts.stage = "analyzing";
-        context.facts.analysisBudget =
-          Math.max(0, context.facts.analysisBudget - cost);
+        context.facts.analysisBudget = Math.max(
+          0,
+          context.facts.analysisBudget - cost,
+        );
         context.facts.cases = cases;
       },
     },
@@ -609,7 +616,10 @@ export const fraudAnalysisModule = createModule("fraud", {
       deps: ["totalPiiDetections"],
       run: (facts, prev) => {
         if (prev && facts.totalPiiDetections !== prev.totalPiiDetections) {
-          addTimeline("pii", `PII guardrail fired (${facts.totalPiiDetections} total detections)`);
+          addTimeline(
+            "pii",
+            `PII guardrail fired (${facts.totalPiiDetections} total detections)`,
+          );
         }
       },
     },
@@ -631,9 +641,7 @@ export const fraudAnalysisModule = createModule("fraud", {
 
 export const system = createSystem({
   module: fraudAnalysisModule,
-  plugins: [
-    devtoolsPlugin({ name: "fraud-analysis", panel: true }),
-  ],
+  plugins: [devtoolsPlugin({ name: "fraud-analysis", panel: true })],
   debug: {
     timeTravel: true,
     maxSnapshots: 50,

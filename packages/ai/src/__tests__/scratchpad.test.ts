@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  createTestMultiAgentOrchestrator,
   assertScratchpadState,
+  createTestMultiAgentOrchestrator,
 } from "../testing.js";
 import type { CrossAgentSnapshot } from "../types.js";
 

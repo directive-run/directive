@@ -1,21 +1,23 @@
-import Link from 'next/link'
-import { ArrowRight } from '@phosphor-icons/react/dist/ssr'
+import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 
-import type { BlogPost } from '@/lib/blog'
-import { resolveAuthor } from '@/lib/blog'
+import type { BlogPost } from "@/lib/blog";
+import { resolveAuthor } from "@/lib/blog";
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00')
+  const date = new Date(
+    dateStr.includes("T") ? dateStr : dateStr + "T00:00:00",
+  );
 
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function BlogListItem({ post }: { post: BlogPost }) {
-  const author = resolveAuthor(post.author)
+  const author = resolveAuthor(post.author);
 
   return (
     <article className="grid grid-cols-1 border-b border-slate-200 py-10 last:border-b-0 sm:grid-cols-3 dark:border-slate-800">
@@ -63,5 +65,5 @@ export function BlogListItem({ post }: { post: BlogPost }) {
         </Link>
       </div>
     </article>
-  )
+  );
 }

@@ -3,12 +3,12 @@
  */
 
 import type {
+  AgentState,
   GuardrailFn,
   InputGuardrailData,
   OutputGuardrailData,
-  ToolCallGuardrailData,
   SchemaValidator,
-  AgentState,
+  ToolCallGuardrailData,
 } from "./types.js";
 import { AGENT_KEY } from "./types.js";
 
@@ -230,18 +230,30 @@ export function createToolGuardrail(options: {
 }): GuardrailFn<ToolCallGuardrailData> {
   const { allowlist, denylist, caseSensitive = false } = options;
 
-  const normalizedAllowlist = allowlist?.map((t) => caseSensitive ? t : t.toLowerCase());
-  const normalizedDenylist = denylist?.map((t) => caseSensitive ? t : t.toLowerCase());
+  const normalizedAllowlist = allowlist?.map((t) =>
+    caseSensitive ? t : t.toLowerCase(),
+  );
+  const normalizedDenylist = denylist?.map((t) =>
+    caseSensitive ? t : t.toLowerCase(),
+  );
 
   return (data) => {
-    const toolName = caseSensitive ? data.toolCall.name : data.toolCall.name.toLowerCase();
+    const toolName = caseSensitive
+      ? data.toolCall.name
+      : data.toolCall.name.toLowerCase();
 
     if (normalizedAllowlist && !normalizedAllowlist.includes(toolName)) {
-      return { passed: false, reason: `Tool "${data.toolCall.name}" not in allowlist` };
+      return {
+        passed: false,
+        reason: `Tool "${data.toolCall.name}" not in allowlist`,
+      };
     }
 
-    if (normalizedDenylist && normalizedDenylist.includes(toolName)) {
-      return { passed: false, reason: `Tool "${data.toolCall.name}" is blocked` };
+    if (normalizedDenylist?.includes(toolName)) {
+      return {
+        passed: false,
+        reason: `Tool "${data.toolCall.name}" is blocked`,
+      };
     }
 
     return { passed: true };
@@ -313,48 +325,82 @@ export function createOutputTypeGuardrail(options: {
     switch (type) {
       case "string":
         if (typeof output !== "string") {
-          return { passed: false, reason: `Expected string, got ${typeof output}` };
+          return {
+            passed: false,
+            reason: `Expected string, got ${typeof output}`,
+          };
         }
         if (minStringLength !== undefined && output.length < minStringLength) {
-          return { passed: false, reason: `String too short: ${output.length} < ${minStringLength}` };
+          return {
+            passed: false,
+            reason: `String too short: ${output.length} < ${minStringLength}`,
+          };
         }
         if (maxStringLength !== undefined && output.length > maxStringLength) {
-          return { passed: false, reason: `String too long: ${output.length} > ${maxStringLength}` };
+          return {
+            passed: false,
+            reason: `String too long: ${output.length} > ${maxStringLength}`,
+          };
         }
         return { passed: true };
 
       case "number":
         if (typeof output !== "number" || Number.isNaN(output)) {
-          return { passed: false, reason: `Expected number, got ${typeof output}` };
+          return {
+            passed: false,
+            reason: `Expected number, got ${typeof output}`,
+          };
         }
         return { passed: true };
 
       case "boolean":
         if (typeof output !== "boolean") {
-          return { passed: false, reason: `Expected boolean, got ${typeof output}` };
+          return {
+            passed: false,
+            reason: `Expected boolean, got ${typeof output}`,
+          };
         }
         return { passed: true };
 
       case "object":
-        if (typeof output !== "object" || output === null || Array.isArray(output)) {
-          return { passed: false, reason: `Expected object, got ${Array.isArray(output) ? "array" : typeof output}` };
+        if (
+          typeof output !== "object" ||
+          output === null ||
+          Array.isArray(output)
+        ) {
+          return {
+            passed: false,
+            reason: `Expected object, got ${Array.isArray(output) ? "array" : typeof output}`,
+          };
         }
         for (const field of requiredFields) {
           if (!(field in output)) {
-            return { passed: false, reason: `Missing required field: ${field}` };
+            return {
+              passed: false,
+              reason: `Missing required field: ${field}`,
+            };
           }
         }
         return { passed: true };
 
       case "array":
         if (!Array.isArray(output)) {
-          return { passed: false, reason: `Expected array, got ${typeof output}` };
+          return {
+            passed: false,
+            reason: `Expected array, got ${typeof output}`,
+          };
         }
         if (minLength !== undefined && output.length < minLength) {
-          return { passed: false, reason: `Array too short: ${output.length} < ${minLength}` };
+          return {
+            passed: false,
+            reason: `Array too short: ${output.length} < ${minLength}`,
+          };
         }
         if (maxLength !== undefined && output.length > maxLength) {
-          return { passed: false, reason: `Array too long: ${output.length} > ${maxLength}` };
+          return {
+            passed: false,
+            reason: `Array too long: ${output.length} > ${maxLength}`,
+          };
         }
         return { passed: true };
 
@@ -443,7 +489,9 @@ export function createContentFilterGuardrail(options: {
   const { blockedPatterns, caseSensitive = false } = options;
 
   if (blockedPatterns.length === 0) {
-    console.warn("[Directive] createContentFilterGuardrail: blockedPatterns is empty — no content will be filtered");
+    console.warn(
+      "[Directive] createContentFilterGuardrail: blockedPatterns is empty — no content will be filtered",
+    );
   }
 
   const compiledPatterns = blockedPatterns.map((p) => {

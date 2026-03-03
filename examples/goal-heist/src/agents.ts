@@ -140,9 +140,7 @@ export const WEIGHTS: Record<string, number> = {
   all_clear: 0.2,
 };
 
-export function computeSatisfaction(
-  facts: Record<string, unknown>,
-): number {
+export function computeSatisfaction(facts: Record<string, unknown>): number {
   let score = 0;
 
   for (const [key, weight] of Object.entries(WEIGHTS)) {

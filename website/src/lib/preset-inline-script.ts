@@ -2,36 +2,41 @@
 // This runs synchronously before first paint to prevent FOUC when a user
 // has a stored brand preset or is a first-time visitor getting a random one.
 
-import {
-  getAllColors,
-  getAllTypos,
-  ROTATION_POOL_IDS,
-} from './brand-presets'
-import { STORAGE_KEYS } from './storage-keys'
+import { ROTATION_POOL_IDS, getAllColors, getAllTypos } from "./brand-presets";
+import { STORAGE_KEYS } from "./storage-keys";
 
 export function buildPresetInlineScript(): string {
   // Build compact color lookup: { presetId: { p: { shade: hex }, a: { shade: hex }, g: [from, via, to] } }
-  const colorLookup: Record<string, { p: Record<string, string>; a: Record<string, string>; g: [string, string, string] }> = {}
+  const colorLookup: Record<
+    string,
+    {
+      p: Record<string, string>;
+      a: Record<string, string>;
+      g: [string, string, string];
+    }
+  > = {};
   for (const preset of getAllColors()) {
     colorLookup[preset.id] = {
       p: preset.primary.scale,
       a: preset.accent.scale,
       g: [preset.gradient.from, preset.gradient.via, preset.gradient.to],
-    }
+    };
   }
 
   // Build compact typo lookup: { presetId: { d: cssVar|family, b: cssVar|family, c: cssVar|family } }
-  const typoLookup: Record<number, { d: string; b: string; c: string }> = {}
+  const typoLookup: Record<number, { d: string; b: string; c: string }> = {};
   for (const preset of getAllTypos()) {
     typoLookup[preset.id] = {
-      d: preset.display.cssVar ? `var(${preset.display.cssVar})` : preset.display.family,
+      d: preset.display.cssVar
+        ? `var(${preset.display.cssVar})`
+        : preset.display.family,
       b: preset.body.cssVar ? `var(${preset.body.cssVar})` : preset.body.family,
       c: preset.code.cssVar ? `var(${preset.code.cssVar})` : preset.code.family,
-    }
+    };
   }
 
-  const rotationPool = JSON.stringify(ROTATION_POOL_IDS)
-  const typoIds = JSON.stringify(getAllTypos().map(t => t.id))
+  const rotationPool = JSON.stringify(ROTATION_POOL_IDS);
+  const typoIds = JSON.stringify(getAllTypos().map((t) => t.id));
 
   // The inline script -- must be self-contained, no imports
   return `(function(){try{
@@ -74,5 +79,5 @@ if(fs){var fv=parseFloat(fs);if(!isNaN(fv))document.documentElement.style.fontSi
 var EK='${STORAGE_KEYS.EXPERIMENTS}';
 var ex=localStorage.getItem(EK);
 if(ex){try{var ep=JSON.parse(ex);if(ep&&typeof ep==='object'){for(var k in ep){if(ep.hasOwnProperty(k)&&typeof ep[k]==='string'&&/^[a-z0-9-]+$/i.test(k)){var v=ep[k].slice(0,100);if(v)document.documentElement.setAttribute('data-'+k,v);}}}}catch(e2){}}
-}catch(e){}})();`
+}catch(e){}})();`;
 }

@@ -1,18 +1,18 @@
-import { buildPageMetadata } from '@/lib/metadata'
-import { parseExampleBuild, readExampleSources } from '@/lib/examples'
-import { AiCheckpointDemo } from './AiCheckpointDemo'
+import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import { buildPageMetadata } from "@/lib/metadata";
+import { AiCheckpointDemo } from "./AiCheckpointDemo";
 
 export const metadata = buildPageMetadata({
-  title: 'AI Pipeline Checkpoint',
+  title: "AI Pipeline Checkpoint",
   description:
-    '4-stage document processing pipeline with checkpoint save/restore, retry with exponential backoff, and stage failure injection.',
-  path: '/docs/examples/checkpoint',
-  section: 'Docs',
-})
+    "4-stage document processing pipeline with checkpoint save/restore, retry with exponential backoff, and stage failure injection.",
+  path: "/docs/examples/checkpoint",
+  section: "Docs",
+});
 
 export default function AiCheckpointPage() {
-  const build = parseExampleBuild('ai-checkpoint')
-  const sources = readExampleSources('ai-checkpoint', ['main.ts'])
+  const build = parseExampleBuild("ai-checkpoint");
+  const sources = readExampleSources("ai-checkpoint", ["main.ts"]);
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -31,5 +31,5 @@ export default function AiCheckpointPage() {
 
       <AiCheckpointDemo build={build} sources={sources} />
     </div>
-  )
+  );
 }

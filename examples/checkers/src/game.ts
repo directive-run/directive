@@ -5,24 +5,24 @@
  * this file coordinates it through Directive's fact→derivation→constraint→resolver flow.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import {
   type Board,
-  type Player,
   type Move,
+  type Player,
+  applyMove,
+  countPieces,
   createInitialBoard,
   getAllValidMoves,
   getJumpMoves,
   getValidMovesForPiece,
-  playerHasJumps,
-  applyMove,
-  shouldKing,
-  promotePiece,
-  countPieces,
-  opponent,
   hasNoValidMoves,
-  pickAiMove,
+  opponent,
   pickAiJumpFrom,
+  pickAiMove,
+  playerHasJumps,
+  promotePiece,
+  shouldKing,
 } from "./rules.js";
 
 // ============================================================================
@@ -117,7 +117,11 @@ export const checkersGame = createModule("checkers", {
 
     selectableSquares: (facts) => {
       if (facts.gameOver) return [];
-      if (facts.gameMode !== "2player" && facts.currentPlayer === facts.aiPlayer) return [];
+      if (
+        facts.gameMode !== "2player" &&
+        facts.currentPlayer === facts.aiPlayer
+      )
+        return [];
       const cont = facts.mustContinueFrom as number | null;
       if (cont !== null) return [cont];
       const allMoves = getAllValidMoves(facts.board, facts.currentPlayer);
@@ -143,7 +147,11 @@ export const checkersGame = createModule("checkers", {
     clickSquare: (facts, { index }) => {
       if (facts.gameOver) return;
       // Ignore clicks during AI's turn in computer/ai mode
-      if (facts.gameMode !== "2player" && facts.currentPlayer === facts.aiPlayer) return;
+      if (
+        facts.gameMode !== "2player" &&
+        facts.currentPlayer === facts.aiPlayer
+      )
+        return;
 
       const board = facts.board as Board;
       const player = facts.currentPlayer as Player;
@@ -169,7 +177,8 @@ export const checkersGame = createModule("checkers", {
         // Enforce forced capture: if jumps exist globally, only pieces with jumps are selectable
         const hasJumps = playerHasJumps(board, player);
         if (hasJumps && getJumpMoves(board, index).length === 0) {
-          facts.message = "You must make a jump! Select a piece that can capture.";
+          facts.message =
+            "You must make a jump! Select a piece that can capture.";
           return;
         }
         facts.selectedIndex = index;
@@ -340,7 +349,11 @@ export const checkersGame = createModule("checkers", {
       requirement: "EXECUTE_MOVE",
       resolve: async (req, context) => {
         const board = context.facts.board as Board;
-        const move: Move = { from: req.from, to: req.to, captured: req.captured };
+        const move: Move = {
+          from: req.from,
+          to: req.to,
+          captured: req.captured,
+        };
 
         // Apply the move
         let newBoard = applyMove(board, move);
@@ -349,7 +362,12 @@ export const checkersGame = createModule("checkers", {
         if (req.captured !== null) {
           const capturedPiece = board[req.captured];
           if (capturedPiece) {
-            const counts = { ...(context.facts.capturedCount as { red: number; black: number }) };
+            const counts = {
+              ...(context.facts.capturedCount as {
+                red: number;
+                black: number;
+              }),
+            };
             counts[capturedPiece.player]++;
             context.facts.capturedCount = counts;
           }
@@ -425,7 +443,9 @@ export const checkersGame = createModule("checkers", {
       run: (facts) => {
         if (facts.moveCount > 0) {
           const { red, black } = countPieces(facts.board);
-          console.log(`[Checkers] Move ${facts.moveCount} | Red: ${red}, Black: ${black}`);
+          console.log(
+            `[Checkers] Move ${facts.moveCount} | Red: ${red}, Black: ${black}`,
+          );
         }
       },
     },
@@ -437,7 +457,7 @@ export const checkersGame = createModule("checkers", {
           const { red, black } = countPieces(facts.board);
           console.log(
             `[Checkers] Game Over! Winner: ${facts.winner} | ` +
-            `Moves: ${facts.moveCount} | Red: ${red}, Black: ${black}`
+              `Moves: ${facts.moveCount} | Red: ${red}, Black: ${black}`,
           );
         }
       },

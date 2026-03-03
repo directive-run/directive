@@ -22,9 +22,13 @@ export function ScratchpadPanel({ data }: ScratchpadPanelProps) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-500">
         <div className="text-center">
-          <div className="mb-2 text-2xl" aria-hidden="true">📋</div>
+          <div className="mb-2 text-2xl" aria-hidden="true">
+            📋
+          </div>
           <p className="text-sm">No scratchpad data</p>
-          <p className="mt-1 text-xs">Scratchpad entries appear when agents write to shared state</p>
+          <p className="mt-1 text-xs">
+            Scratchpad entries appear when agents write to shared state
+          </p>
         </div>
       </div>
     );
@@ -54,8 +58,10 @@ export function ScratchpadPanel({ data }: ScratchpadPanelProps) {
             </span>
             <span className="min-w-0 break-all font-mono text-xs text-zinc-300">
               {typeof value === "string"
-                ? value.length > 300 ? `${value.slice(0, 300)}...` : value
-                : JSON.stringify(value, null, 2)?.slice(0, 500) ?? "null"}
+                ? value.length > 300
+                  ? `${value.slice(0, 300)}...`
+                  : value
+                : (JSON.stringify(value, null, 2)?.slice(0, 500) ?? "null")}
             </span>
           </div>
         ))}

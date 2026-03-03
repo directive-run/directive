@@ -1,8 +1,8 @@
+import { DirectiveSelectorController } from "@directive-run/lit";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { DirectiveSelectorController } from "@directive-run/lit";
-import { system } from "../system";
 import { TestIds } from "../../../../shared/test-ids";
+import { system } from "../system";
 
 @customElement("use-selector-page")
 export class UseSelectorPage extends LitElement {

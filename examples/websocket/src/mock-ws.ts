@@ -135,7 +135,11 @@ export class MockWebSocket {
       }
 
       messageCounter++;
-      const types: Array<"system" | "chat" | "data"> = ["system", "chat", "data"];
+      const types: Array<"system" | "chat" | "data"> = [
+        "system",
+        "chat",
+        "data",
+      ];
       const type = types[messageCounter % 3];
 
       let text: string;

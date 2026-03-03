@@ -89,7 +89,11 @@ export interface SemanticCacheStorage {
   /** Add an entry to the cache */
   addEntry(namespace: string, entry: CacheEntry): Promise<void>;
   /** Update an entry (e.g., access count) */
-  updateEntry(namespace: string, id: string, updates: Partial<CacheEntry>): Promise<void>;
+  updateEntry(
+    namespace: string,
+    id: string,
+    updates: Partial<CacheEntry>,
+  ): Promise<void>;
   /** Remove an entry */
   removeEntry(namespace: string, id: string): Promise<void>;
   /** Clear all entries in a namespace */
@@ -101,7 +105,12 @@ export interface SemanticCache {
   /** Look up a query in the cache */
   lookup(query: string, agentName?: string): Promise<CacheLookupResult>;
   /** Store a response in the cache */
-  store(query: string, response: string, agentName?: string, metadata?: Record<string, unknown>): Promise<void>;
+  store(
+    query: string,
+    response: string,
+    agentName?: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void>;
   /** Invalidate cache entries matching a predicate */
   invalidate(predicate: (entry: CacheEntry) => boolean): Promise<number>;
   /** Clear all cache entries */
@@ -166,7 +175,7 @@ function findSimilar(
   queryEmbedding: Embedding,
   entries: CacheEntry[],
   threshold: number,
-  agentName?: string
+  agentName?: string,
 ): { entry: CacheEntry; similarity: number } | null {
   let bestMatch: { entry: CacheEntry; similarity: number } | null = null;
 
@@ -216,7 +225,11 @@ export function createInMemoryStorage(): SemanticCacheStorage {
       getNamespace(namespace).set(entry.id, entry);
     },
 
-    async updateEntry(namespace: string, id: string, updates: Partial<CacheEntry>): Promise<void> {
+    async updateEntry(
+      namespace: string,
+      id: string,
+      updates: Partial<CacheEntry>,
+    ): Promise<void> {
       const ns = getNamespace(namespace);
       const entry = ns.get(id);
       if (entry) {
@@ -267,7 +280,9 @@ export function createInMemoryStorage(): SemanticCacheStorage {
  * await cache.store(userQuery, response);
  * ```
  */
-export function createSemanticCache(config: SemanticCacheConfig): SemanticCache {
+export function createSemanticCache(
+  config: SemanticCacheConfig,
+): SemanticCache {
   const {
     embedder,
     similarityThreshold = 0.9,
@@ -329,7 +344,9 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
 
     // Remove oldest entries if over max size (LRU based on accessedAt)
     if (remainingEntries.length > maxCacheSize) {
-      const sorted = remainingEntries.sort((a, b) => a.accessedAt - b.accessedAt);
+      const sorted = remainingEntries.sort(
+        (a, b) => a.accessedAt - b.accessedAt,
+      );
       const toRemove = sorted.slice(0, remainingEntries.length - maxCacheSize);
       for (const entry of toRemove) {
         await storage.removeEntry(namespace, entry.id);
@@ -338,7 +355,10 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
   }
 
   return {
-    async lookup(query: string, agentName?: string): Promise<CacheLookupResult> {
+    async lookup(
+      query: string,
+      agentName?: string,
+    ): Promise<CacheLookupResult> {
       const start = Date.now();
 
       try {
@@ -353,7 +373,7 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
           queryEmbedding,
           entries,
           similarityThreshold,
-          perAgent ? agentName : undefined
+          perAgent ? agentName : undefined,
         );
 
         if (match) {
@@ -401,13 +421,15 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
       query: string,
       response: string,
       agentName?: string,
-      metadata: Record<string, unknown> = {}
+      metadata: Record<string, unknown> = {},
     ): Promise<void> {
       // Generate embedding
       const queryEmbedding = await embedder(query);
 
       const entry: CacheEntry = {
-        id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        id:
+          globalThis.crypto?.randomUUID?.() ??
+          `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         query,
         queryEmbedding,
         response,
@@ -427,7 +449,9 @@ export function createSemanticCache(config: SemanticCacheConfig): SemanticCache 
       updateStats(entries);
     },
 
-    async invalidate(predicate: (entry: CacheEntry) => boolean): Promise<number> {
+    async invalidate(
+      predicate: (entry: CacheEntry) => boolean,
+    ): Promise<number> {
       const entries = await storage.getEntries(namespace);
       let removed = 0;
 
@@ -554,10 +578,14 @@ export interface SemanticCacheGuardrailResult {
  */
 export function createSemanticCacheGuardrail(config: {
   cache: SemanticCache;
-}): (data: SemanticCacheGuardrailData) => Promise<SemanticCacheGuardrailResult> {
+}): (
+  data: SemanticCacheGuardrailData,
+) => Promise<SemanticCacheGuardrailResult> {
   const { cache } = config;
 
-  return async (data: SemanticCacheGuardrailData): Promise<SemanticCacheGuardrailResult> => {
+  return async (
+    data: SemanticCacheGuardrailData,
+  ): Promise<SemanticCacheGuardrailResult> => {
     const result = await cache.lookup(data.input, data.agentName);
 
     if (result.hit && result.entry) {
@@ -655,7 +683,9 @@ export function createBatchedEmbedder(config: {
   const { batchSize = 20, embedBatch, maxWaitMs = 50 } = config;
 
   if (batchSize < 1 || !Number.isFinite(batchSize)) {
-    throw new Error(`[Directive SemanticCache] batchSize must be >= 1, got ${batchSize}`);
+    throw new Error(
+      `[Directive SemanticCache] batchSize must be >= 1, got ${batchSize}`,
+    );
   }
 
   let pendingBatch: Array<{
@@ -684,7 +714,7 @@ export function createBatchedEmbedder(config: {
       if (embeddings.length !== batch.length) {
         throw new Error(
           `[Directive SemanticCache] embedBatch returned ${embeddings.length} embeddings for ${batch.length} texts. ` +
-          `The embedBatch function must return exactly one embedding per input text.`
+            `The embedBatch function must return exactly one embedding per input text.`,
         );
       }
 

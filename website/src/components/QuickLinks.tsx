@@ -1,12 +1,12 @@
-import { Icon } from '@/components/Icon'
-import { CardLink } from '@/components/CardLink'
+import { CardLink } from "@/components/CardLink";
+import { Icon } from "@/components/Icon";
 
 export function QuickLinks({ children }: { children: React.ReactNode }) {
   return (
     <div className="not-prose my-12 grid grid-cols-1 gap-6 sm:grid-cols-2">
       {children}
     </div>
-  )
+  );
 }
 
 export function QuickLink({
@@ -15,10 +15,10 @@ export function QuickLink({
   href,
   icon,
 }: {
-  title: string
-  description: string
-  href: string
-  icon: React.ComponentProps<typeof Icon>['icon']
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ComponentProps<typeof Icon>["icon"];
 }) {
   return (
     <CardLink href={href} className="p-6">
@@ -30,5 +30,5 @@ export function QuickLink({
         {description}
       </p>
     </CardLink>
-  )
+  );
 }

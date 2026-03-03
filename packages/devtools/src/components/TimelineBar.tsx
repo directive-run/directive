@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
-import type { DebugEvent } from "../lib/types";
 import { EVENT_COLORS } from "../lib/colors";
+import type { DebugEvent } from "../lib/types";
 
 interface TimelineBarProps {
   event: DebugEvent;
@@ -25,13 +25,19 @@ function getEventDuration(event: DebugEvent): number {
 // React.memo prevents re-rendering all bars when only selection changes
 // D1: onSelect is a stable callback ref — memo comparison succeeds when only
 //     a different bar's isSelected changes, preventing O(n) re-renders.
-export const TimelineBar = React.memo(function TimelineBar({ event, timeRange, isSelected, onSelect, row = 0, isAnomaly = false }: TimelineBarProps) {
+export const TimelineBar = React.memo(function TimelineBar({
+  event,
+  timeRange,
+  isSelected,
+  onSelect,
+  row = 0,
+  isAnomaly = false,
+}: TimelineBarProps) {
   const offset = event.timestamp - timeRange.start;
   const leftPct = (offset / timeRange.duration) * 100;
   const duration = getEventDuration(event);
-  const widthPct = duration > 0
-    ? Math.max((duration / timeRange.duration) * 100, 0.5)
-    : 0;
+  const widthPct =
+    duration > 0 ? Math.max((duration / timeRange.duration) * 100, 0.5) : 0;
 
   const color = EVENT_COLORS[event.type];
   const isPoint = widthPct === 0;

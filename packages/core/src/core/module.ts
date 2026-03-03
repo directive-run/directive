@@ -5,19 +5,19 @@
  */
 
 import type {
-	ModuleSchema,
-	Facts,
-	ModuleDef,
-	ModuleHooks,
-	EffectsDef,
-	TypedDerivationsDef,
-	TypedEventsDef,
-	TypedConstraintsDef,
-	TypedResolversDef,
-	CrossModuleDeps,
-	CrossModuleConstraintsDef,
-	CrossModuleEffectsDef,
-	CrossModuleDerivationsDef,
+  CrossModuleConstraintsDef,
+  CrossModuleDeps,
+  CrossModuleDerivationsDef,
+  CrossModuleEffectsDef,
+  EffectsDef,
+  Facts,
+  ModuleDef,
+  ModuleHooks,
+  ModuleSchema,
+  TypedConstraintsDef,
+  TypedDerivationsDef,
+  TypedEventsDef,
+  TypedResolversDef,
 } from "./types.js";
 
 // ============================================================================
@@ -30,16 +30,21 @@ import type {
  * derive and events are optional - omit them if your schema has empty derivations/events.
  */
 export interface ModuleConfig<M extends ModuleSchema> {
-	schema: M;
-	init?: (facts: Facts<M["facts"]>) => void;
-	derive?: TypedDerivationsDef<M>;
-	events?: TypedEventsDef<M>;
-	effects?: EffectsDef<M["facts"]>;
-	constraints?: TypedConstraintsDef<M>;
-	resolvers?: TypedResolversDef<M>;
-	hooks?: ModuleHooks<M>;
-	/** Events that create time-travel snapshots for undo/redo. Omit to snapshot all events. */
-	snapshotEvents?: Array<keyof (M["events"] extends Record<string, unknown> ? M["events"] : Record<string, never>) & string>;
+  schema: M;
+  init?: (facts: Facts<M["facts"]>) => void;
+  derive?: TypedDerivationsDef<M>;
+  events?: TypedEventsDef<M>;
+  effects?: EffectsDef<M["facts"]>;
+  constraints?: TypedConstraintsDef<M>;
+  resolvers?: TypedResolversDef<M>;
+  hooks?: ModuleHooks<M>;
+  /** Events that create time-travel snapshots for undo/redo. Omit to snapshot all events. */
+  snapshotEvents?: Array<
+    keyof (M["events"] extends Record<string, unknown>
+      ? M["events"]
+      : Record<string, never>) &
+      string
+  >;
 }
 
 /**
@@ -77,44 +82,49 @@ export interface ModuleConfig<M extends ModuleSchema> {
  * ```
  */
 export interface ModuleConfigWithDeps<
-	M extends ModuleSchema,
-	Deps extends CrossModuleDeps,
+  M extends ModuleSchema,
+  Deps extends CrossModuleDeps,
 > {
-	schema: M;
-	/**
-	 * Cross-module dependencies for type-safe access in derive/effects/constraints.
-	 *
-	 * **Access patterns by context:**
-	 * - `derive`, `effects`, `constraints`: Use `facts.self.*` for own module, `facts.{dep}.*` for cross-module
-	 * - `init`, `events`, `resolvers`: Use flat access (`facts.myFact`) - no cross-module access
-	 *
-	 * This separation ensures initialization and event handling stay scoped to own module,
-	 * while observers (derive/effects/constraints) can see across modules.
-	 *
-	 * @example
-	 * ```typescript
-	 * crossModuleDeps: { auth: authSchema },
-	 * init: (facts) => { facts.users = []; },              // flat access
-	 * derive: { count: (facts) => facts.self.users.length }, // facts.self.*
-	 * effects: { log: { run: (facts) => console.log(facts.auth.token) } }, // facts.{dep}.*
-	 * ```
-	 */
-	crossModuleDeps: Deps;
-	/** Initialize module facts. Uses flat access (`facts.myFact`) to ensure modules initialize independently. */
-	init?: (facts: Facts<M["facts"]>) => void;
-	/** Derivations with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
-	derive?: CrossModuleDerivationsDef<M, Deps>;
-	/** Event handlers. Uses flat access (`facts.myFact`) to keep mutations scoped to own module. */
-	events?: TypedEventsDef<M>;
-	/** Effects with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
-	effects?: CrossModuleEffectsDef<M, Deps>;
-	/** Constraints with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
-	constraints?: CrossModuleConstraintsDef<M, Deps>;
-	/** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
-	resolvers?: TypedResolversDef<M>;
-	hooks?: ModuleHooks<M>;
-	/** Events that create time-travel snapshots for undo/redo. Omit to snapshot all events. */
-	snapshotEvents?: Array<keyof (M["events"] extends Record<string, unknown> ? M["events"] : Record<string, never>) & string>;
+  schema: M;
+  /**
+   * Cross-module dependencies for type-safe access in derive/effects/constraints.
+   *
+   * **Access patterns by context:**
+   * - `derive`, `effects`, `constraints`: Use `facts.self.*` for own module, `facts.{dep}.*` for cross-module
+   * - `init`, `events`, `resolvers`: Use flat access (`facts.myFact`) - no cross-module access
+   *
+   * This separation ensures initialization and event handling stay scoped to own module,
+   * while observers (derive/effects/constraints) can see across modules.
+   *
+   * @example
+   * ```typescript
+   * crossModuleDeps: { auth: authSchema },
+   * init: (facts) => { facts.users = []; },              // flat access
+   * derive: { count: (facts) => facts.self.users.length }, // facts.self.*
+   * effects: { log: { run: (facts) => console.log(facts.auth.token) } }, // facts.{dep}.*
+   * ```
+   */
+  crossModuleDeps: Deps;
+  /** Initialize module facts. Uses flat access (`facts.myFact`) to ensure modules initialize independently. */
+  init?: (facts: Facts<M["facts"]>) => void;
+  /** Derivations with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
+  derive?: CrossModuleDerivationsDef<M, Deps>;
+  /** Event handlers. Uses flat access (`facts.myFact`) to keep mutations scoped to own module. */
+  events?: TypedEventsDef<M>;
+  /** Effects with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
+  effects?: CrossModuleEffectsDef<M, Deps>;
+  /** Constraints with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
+  constraints?: CrossModuleConstraintsDef<M, Deps>;
+  /** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
+  resolvers?: TypedResolversDef<M>;
+  hooks?: ModuleHooks<M>;
+  /** Events that create time-travel snapshots for undo/redo. Omit to snapshot all events. */
+  snapshotEvents?: Array<
+    keyof (M["events"] extends Record<string, unknown>
+      ? M["events"]
+      : Record<string, never>) &
+      string
+  >;
 }
 
 /**
@@ -202,138 +212,146 @@ export interface ModuleConfigWithDeps<
  */
 // Overload 1: With crossModuleDeps
 export function createModule<
-	const M extends ModuleSchema,
-	const Deps extends CrossModuleDeps,
->(
-	id: string,
-	config: ModuleConfigWithDeps<M, Deps>,
-): ModuleDef<M>;
+  const M extends ModuleSchema,
+  const Deps extends CrossModuleDeps,
+>(id: string, config: ModuleConfigWithDeps<M, Deps>): ModuleDef<M>;
 
 // Overload 2: Without crossModuleDeps (original signature)
 export function createModule<const M extends ModuleSchema>(
-	id: string,
-	config: ModuleConfig<M>,
+  id: string,
+  config: ModuleConfig<M>,
 ): ModuleDef<M>;
 
 // Overload 3: Union (used by createModuleFactory)
 export function createModule<const M extends ModuleSchema>(
-	id: string,
-	config: ModuleConfigWithDeps<M, CrossModuleDeps> | ModuleConfig<M>,
+  id: string,
+  config: ModuleConfigWithDeps<M, CrossModuleDeps> | ModuleConfig<M>,
 ): ModuleDef<M>;
 
 // Implementation (must immediately follow overload declarations)
 export function createModule<const M extends ModuleSchema>(
-	id: string,
-	config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+  id: string,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): ModuleDef<M> {
-	// Dev-mode validations
-	if (process.env.NODE_ENV !== "production") {
-		if (!id || typeof id !== "string") {
-			console.warn("[Directive] Module ID must be a non-empty string");
-		} else if (!/^[a-z][a-z0-9-]*$/i.test(id)) {
-			console.warn(
-				`[Directive] Module ID "${id}" should follow kebab-case convention (e.g., "my-module")`,
-			);
-		}
+  // Dev-mode validations
+  if (process.env.NODE_ENV !== "production") {
+    if (!id || typeof id !== "string") {
+      console.warn("[Directive] Module ID must be a non-empty string");
+    } else if (!/^[a-z][a-z0-9-]*$/i.test(id)) {
+      console.warn(
+        `[Directive] Module ID "${id}" should follow kebab-case convention (e.g., "my-module")`,
+      );
+    }
 
-		if (!config.schema) {
-			console.warn("[Directive] Module schema is required");
-		} else {
-			if (!config.schema.facts) {
-				console.warn("[Directive] Module schema.facts is required");
-			}
-			// derivations, events, and requirements default to {} if not provided
-		}
+    if (!config.schema) {
+      console.warn("[Directive] Module schema is required");
+    } else {
+      if (!config.schema.facts) {
+        console.warn("[Directive] Module schema.facts is required");
+      }
+      // derivations, events, and requirements default to {} if not provided
+    }
 
-		// Validate derive keys match schema.derivations (if either is provided)
-		const schemaDerivations = config.schema?.derivations ?? {};
-		const deriveImpl = config.derive ?? {};
-		const schemaDerivationKeys = new Set(Object.keys(schemaDerivations));
-		const deriveKeys = new Set(Object.keys(deriveImpl));
+    // Validate derive keys match schema.derivations (if either is provided)
+    const schemaDerivations = config.schema?.derivations ?? {};
+    const deriveImpl = config.derive ?? {};
+    const schemaDerivationKeys = new Set(Object.keys(schemaDerivations));
+    const deriveKeys = new Set(Object.keys(deriveImpl));
 
-		for (const key of deriveKeys) {
-			if (!schemaDerivationKeys.has(key)) {
-				console.warn(`[Directive] Derivation "${key}" not declared in schema.derivations`);
-			}
-		}
-		for (const key of schemaDerivationKeys) {
-			if (!deriveKeys.has(key)) {
-				console.warn(`[Directive] schema.derivations["${key}"] has no matching implementation in derive`);
-			}
-		}
+    for (const key of deriveKeys) {
+      if (!schemaDerivationKeys.has(key)) {
+        console.warn(
+          `[Directive] Derivation "${key}" not declared in schema.derivations`,
+        );
+      }
+    }
+    for (const key of schemaDerivationKeys) {
+      if (!deriveKeys.has(key)) {
+        console.warn(
+          `[Directive] schema.derivations["${key}"] has no matching implementation in derive`,
+        );
+      }
+    }
 
-		// Validate events keys match schema.events (if either is provided)
-		const schemaEvents = config.schema?.events ?? {};
-		const eventImpl = config.events ?? {};
-		const schemaEventKeys = new Set(Object.keys(schemaEvents));
-		const eventKeys = new Set(Object.keys(eventImpl));
+    // Validate events keys match schema.events (if either is provided)
+    const schemaEvents = config.schema?.events ?? {};
+    const eventImpl = config.events ?? {};
+    const schemaEventKeys = new Set(Object.keys(schemaEvents));
+    const eventKeys = new Set(Object.keys(eventImpl));
 
-		for (const key of eventKeys) {
-			if (!schemaEventKeys.has(key)) {
-				console.warn(`[Directive] Event "${key}" not declared in schema.events`);
-			}
-		}
-		for (const key of schemaEventKeys) {
-			if (!eventKeys.has(key)) {
-				console.warn(`[Directive] schema.events["${key}"] has no matching handler in events`);
-			}
-		}
+    for (const key of eventKeys) {
+      if (!schemaEventKeys.has(key)) {
+        console.warn(
+          `[Directive] Event "${key}" not declared in schema.events`,
+        );
+      }
+    }
+    for (const key of schemaEventKeys) {
+      if (!eventKeys.has(key)) {
+        console.warn(
+          `[Directive] schema.events["${key}"] has no matching handler in events`,
+        );
+      }
+    }
 
-		// Validate snapshotEvents reference valid event names
-		if (config.snapshotEvents) {
-			if (config.snapshotEvents.length === 0) {
-				console.warn(
-					`[Directive] snapshotEvents is an empty array — no events will create time-travel snapshots. ` +
-						`Omit snapshotEvents entirely to snapshot all events, or list specific events.`,
-				);
-			}
-			const schemaEventKeysForValidation = new Set(Object.keys(config.schema?.events ?? {}));
-			for (const eventName of config.snapshotEvents) {
-				if (!schemaEventKeysForValidation.has(eventName)) {
-					console.warn(
-						`[Directive] snapshotEvents entry "${eventName}" not declared in schema.events. ` +
-							`Available events: ${[...schemaEventKeysForValidation].join(", ") || "(none)"}`,
-					);
-				}
-			}
-		}
+    // Validate snapshotEvents reference valid event names
+    if (config.snapshotEvents) {
+      if (config.snapshotEvents.length === 0) {
+        console.warn(
+          `[Directive] snapshotEvents is an empty array — no events will create time-travel snapshots. ` +
+            `Omit snapshotEvents entirely to snapshot all events, or list specific events.`,
+        );
+      }
+      const schemaEventKeysForValidation = new Set(
+        Object.keys(config.schema?.events ?? {}),
+      );
+      for (const eventName of config.snapshotEvents) {
+        if (!schemaEventKeysForValidation.has(eventName)) {
+          console.warn(
+            `[Directive] snapshotEvents entry "${eventName}" not declared in schema.events. ` +
+              `Available events: ${[...schemaEventKeysForValidation].join(", ") || "(none)"}`,
+          );
+        }
+      }
+    }
 
-		// Validate resolvers reference valid requirement types
-		if (config.resolvers && config.schema?.requirements) {
-			const requirementTypes = new Set(Object.keys(config.schema.requirements));
-			for (const [resolverName, resolver] of Object.entries(config.resolvers)) {
-				const resolverDef = resolver as { requirement?: string };
-				if (
-					typeof resolverDef.requirement === "string" &&
-					!requirementTypes.has(resolverDef.requirement)
-				) {
-					console.warn(
-						`[Directive] Resolver "${resolverName}" references unknown requirement type "${resolverDef.requirement}". ` +
-							`Available types: ${[...requirementTypes].join(", ") || "(none)"}`,
-					);
-				}
-			}
-		}
-	}
+    // Validate resolvers reference valid requirement types
+    if (config.resolvers && config.schema?.requirements) {
+      const requirementTypes = new Set(Object.keys(config.schema.requirements));
+      for (const [resolverName, resolver] of Object.entries(config.resolvers)) {
+        const resolverDef = resolver as { requirement?: string };
+        if (
+          typeof resolverDef.requirement === "string" &&
+          !requirementTypes.has(resolverDef.requirement)
+        ) {
+          console.warn(
+            `[Directive] Resolver "${resolverName}" references unknown requirement type "${resolverDef.requirement}". ` +
+              `Available types: ${[...requirementTypes].join(", ") || "(none)"}`,
+          );
+        }
+      }
+    }
+  }
 
-	// Extract crossModuleDeps if present (for runtime proxy creation)
-	const crossModuleDeps = "crossModuleDeps" in config ? config.crossModuleDeps : undefined;
+  // Extract crossModuleDeps if present (for runtime proxy creation)
+  const crossModuleDeps =
+    "crossModuleDeps" in config ? config.crossModuleDeps : undefined;
 
-	return {
-		id,
-		schema: config.schema,
-		init: config.init,
-		// Cast to TypedDerivationsDef for ModuleDef compatibility (runtime handles both types)
-		derive: (config.derive ?? {}) as TypedDerivationsDef<M>,
-		events: config.events ?? ({} as TypedEventsDef<M>),
-		effects: config.effects as EffectsDef<M["facts"]> | undefined,
-		constraints: config.constraints as TypedConstraintsDef<M> | undefined,
-		resolvers: config.resolvers,
-		hooks: config.hooks,
-		snapshotEvents: config.snapshotEvents,
-		// Store crossModuleDeps for runtime proxy creation
-		crossModuleDeps: crossModuleDeps as CrossModuleDeps | undefined,
-	};
+  return {
+    id,
+    schema: config.schema,
+    init: config.init,
+    // Cast to TypedDerivationsDef for ModuleDef compatibility (runtime handles both types)
+    derive: (config.derive ?? {}) as TypedDerivationsDef<M>,
+    events: config.events ?? ({} as TypedEventsDef<M>),
+    effects: config.effects as EffectsDef<M["facts"]> | undefined,
+    constraints: config.constraints as TypedConstraintsDef<M> | undefined,
+    resolvers: config.resolvers,
+    hooks: config.hooks,
+    snapshotEvents: config.snapshotEvents,
+    // Store crossModuleDeps for runtime proxy creation
+    crossModuleDeps: crossModuleDeps as CrossModuleDeps | undefined,
+  };
 }
 
 /**
@@ -361,18 +379,16 @@ export function createModule<const M extends ModuleSchema>(
  * ```
  */
 export function createModuleFactory<const M extends ModuleSchema>(
-	config: ModuleConfig<M>,
+  config: ModuleConfig<M>,
 ): (name: string) => ModuleDef<M>;
 export function createModuleFactory<
-	const M extends ModuleSchema,
-	const Deps extends CrossModuleDeps,
->(
-	config: ModuleConfigWithDeps<M, Deps>,
-): (name: string) => ModuleDef<M>;
+  const M extends ModuleSchema,
+  const Deps extends CrossModuleDeps,
+>(config: ModuleConfigWithDeps<M, Deps>): (name: string) => ModuleDef<M>;
 export function createModuleFactory<const M extends ModuleSchema>(
-	config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): (name: string) => ModuleDef<M> {
-	// Pass config directly — createModule's implementation overload handles both types.
-	// Do NOT cast to ModuleConfig<M> which would strip crossModuleDeps.
-	return (name: string) => createModule(name, config);
+  // Pass config directly — createModule's implementation overload handles both types.
+  // Do NOT cast to ModuleConfig<M> which would strip crossModuleDeps.
+  return (name: string) => createModule(name, config);
 }

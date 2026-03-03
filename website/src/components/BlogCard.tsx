@@ -1,20 +1,22 @@
-import Link from 'next/link'
+import Link from "next/link";
 
-import type { BlogPost } from '@/lib/blog'
-import { resolveAuthor } from '@/lib/blog'
+import type { BlogPost } from "@/lib/blog";
+import { resolveAuthor } from "@/lib/blog";
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00')
+  const date = new Date(
+    dateStr.includes("T") ? dateStr : dateStr + "T00:00:00",
+  );
 
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function BlogCard({ post }: { post: BlogPost }) {
-  const author = resolveAuthor(post.author)
+  const author = resolveAuthor(post.author);
 
   return (
     <Link
@@ -44,7 +46,7 @@ export function BlogCard({ post }: { post: BlogPost }) {
             className="h-6 w-6 rounded-full"
             style={{
               background:
-                'linear-gradient(to bottom right, var(--brand-primary-400), var(--brand-accent-400))',
+                "linear-gradient(to bottom right, var(--brand-primary-400), var(--brand-accent-400))",
             }}
           />
           <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
@@ -53,5 +55,5 @@ export function BlogCard({ post }: { post: BlogPost }) {
         </div>
       </div>
     </Link>
-  )
+  );
 }

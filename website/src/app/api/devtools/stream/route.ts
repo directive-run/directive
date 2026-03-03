@@ -5,124 +5,131 @@
  * If the orchestrator hasn't been initialized yet (no chat messages sent),
  * the stream stays open and polls until the timeline becomes available.
  */
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-import { getTimeline } from '../../chat/orchestrator-singleton'
+import { getTimeline } from "../../chat/orchestrator-singleton";
 
-let activeStreams = 0
-const MAX_STREAMS = 10
+let activeStreams = 0;
+const MAX_STREAMS = 10;
 
 export async function GET(request: Request) {
   if (activeStreams >= MAX_STREAMS) {
-    return Response.json({ error: 'Too many DevTools connections' }, { status: 429 })
+    return Response.json(
+      { error: "Too many DevTools connections" },
+      { status: 429 },
+    );
   }
 
-  const tokenEnv = process.env.DEVTOOLS_TOKEN
+  const tokenEnv = process.env.DEVTOOLS_TOKEN;
   if (tokenEnv) {
-    const provided = request.headers.get('X-DevTools-Token')
+    const provided = request.headers.get("X-DevTools-Token");
     if (provided !== tokenEnv) {
-      return Response.json({ error: 'Unauthorized' }, { status: 403 })
+      return Response.json({ error: "Unauthorized" }, { status: 403 });
     }
   }
 
-  activeStreams++
+  activeStreams++;
 
-  let unsubscribe: (() => void) | null = null
-  let pollTimer: ReturnType<typeof setInterval> | null = null
-  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
-  let cleaned = false
+  let unsubscribe: (() => void) | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let cleaned = false;
 
   const cleanup = () => {
     if (cleaned) {
-      return
+      return;
     }
-    cleaned = true
-    activeStreams--
-    unsubscribe?.()
-    unsubscribe = null
+    cleaned = true;
+    activeStreams--;
+    unsubscribe?.();
+    unsubscribe = null;
     if (pollTimer) {
-      clearInterval(pollTimer)
-      pollTimer = null
+      clearInterval(pollTimer);
+      pollTimer = null;
     }
     if (heartbeatTimer) {
-      clearInterval(heartbeatTimer)
-      heartbeatTimer = null
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
     }
-  }
+  };
 
   const stream = new ReadableStream({
     start(controller) {
-      const encoder = new TextEncoder()
+      const encoder = new TextEncoder();
 
       const send = (data: unknown) => {
         try {
-          const payload = data as { id?: number }
-          const id = payload.id
-          controller.enqueue(encoder.encode(`${id != null ? `id: ${id}\n` : ''}data: ${JSON.stringify(data)}\n\n`))
+          const payload = data as { id?: number };
+          const id = payload.id;
+          controller.enqueue(
+            encoder.encode(
+              `${id != null ? `id: ${id}\n` : ""}data: ${JSON.stringify(data)}\n\n`,
+            ),
+          );
         } catch {
           // Stream closed
         }
-      }
+      };
 
       const attachToTimeline = () => {
-        const timeline = getTimeline()
+        const timeline = getTimeline();
         if (!timeline) {
-          return false
+          return false;
         }
 
         if (pollTimer) {
-          clearInterval(pollTimer)
-          pollTimer = null
+          clearInterval(pollTimer);
+          pollTimer = null;
         }
 
-        const existing = timeline.getEvents()
+        const existing = timeline.getEvents();
         for (const event of existing) {
-          send(event)
+          send(event);
         }
 
         unsubscribe = timeline.subscribe((event) => {
-          send(event)
-        })
+          send(event);
+        });
 
-        return true
-      }
+        return true;
+      };
 
       if (!attachToTimeline()) {
         pollTimer = setInterval(() => {
-          attachToTimeline()
-        }, 1000)
+          attachToTimeline();
+        }, 1000);
       }
 
       heartbeatTimer = setInterval(() => {
         try {
-          controller.enqueue(encoder.encode(': heartbeat\n\n'))
+          controller.enqueue(encoder.encode(": heartbeat\n\n"));
         } catch {
           // Stream closed
         }
-      }, 15000)
+      }, 15000);
 
-      request.signal.addEventListener('abort', () => {
-        cleanup()
+      request.signal.addEventListener("abort", () => {
+        cleanup();
         try {
-          controller.close()
+          controller.close();
         } catch {
           // Already closed
         }
-      })
+      });
     },
 
     cancel() {
-      cleanup()
+      cleanup();
     },
-  })
+  });
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
-  })
+  });
 }

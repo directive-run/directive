@@ -1,60 +1,68 @@
 // @ts-nocheck -- TODO: fix createModule generic inference in @directive-run/core for complex schemas
-import { createModule, t } from '@directive-run/core'
-import { VIEWS } from '../constants'
+import { createModule, t } from "@directive-run/core";
+import type { VIEWS } from "../constants";
 
-type ViewName = (typeof VIEWS)[number]
-type DrawerPosition = 'bottom' | 'right'
+type ViewName = (typeof VIEWS)[number];
+type DrawerPosition = "bottom" | "right";
 
 // ---------------------------------------------------------------------------
 // localStorage persistence for drawer preferences
 // ---------------------------------------------------------------------------
 
-const DRAWER_PREFS_KEY = 'directive-devtools-prefs'
+const DRAWER_PREFS_KEY = "directive-devtools-prefs";
 
 interface DrawerPrefs {
-  position: DrawerPosition
-  height: number
-  width: number
+  position: DrawerPosition;
+  height: number;
+  width: number;
 }
 
 function loadDrawerPrefs(): Partial<DrawerPrefs> {
-  if (typeof window === 'undefined') {
-    return {}
+  if (typeof window === "undefined") {
+    return {};
   }
 
   try {
-    const raw = localStorage.getItem(DRAWER_PREFS_KEY)
+    const raw = localStorage.getItem(DRAWER_PREFS_KEY);
     if (!raw) {
-      return {}
+      return {};
     }
 
-    const parsed = JSON.parse(raw)
-    const result: Partial<DrawerPrefs> = {}
+    const parsed = JSON.parse(raw);
+    const result: Partial<DrawerPrefs> = {};
 
     // #15: Validate parsed values — reject anything out of range
-    if (parsed.position === 'bottom' || parsed.position === 'right') {
-      result.position = parsed.position
+    if (parsed.position === "bottom" || parsed.position === "right") {
+      result.position = parsed.position;
     }
-    if (typeof parsed.height === 'number' && parsed.height >= 200 && parsed.height <= 2000) {
-      result.height = parsed.height
+    if (
+      typeof parsed.height === "number" &&
+      parsed.height >= 200 &&
+      parsed.height <= 2000
+    ) {
+      result.height = parsed.height;
     }
-    if (typeof parsed.width === 'number' && parsed.width >= 320 && parsed.width <= 2000) {
-      result.width = parsed.width
+    if (
+      typeof parsed.width === "number" &&
+      parsed.width >= 320 &&
+      parsed.width <= 2000
+    ) {
+      result.width = parsed.width;
     }
 
-    return result
+    return result;
   } catch {
-    return {}
+    return {};
   }
 }
 
 function saveDrawerPrefs(prefs: DrawerPrefs) {
-  if (typeof window === 'undefined') {
-    return
+  if (typeof window === "undefined") {
+    return;
   }
 
   try {
-    localStorage.setItem(DRAWER_PREFS_KEY, JSON.stringify(prefs))
+    localStorage.setItem(DRAWER_PREFS_KEY, JSON.stringify(prefs));
   } catch {
     // Silently ignore quota errors
   }
@@ -64,7 +72,7 @@ function saveDrawerPrefs(prefs: DrawerPrefs) {
 // Module
 // ---------------------------------------------------------------------------
 
-export const devtoolsShell = createModule('shell', {
+export const devtoolsShell = createModule("shell", {
   schema: {
     facts: {
       activeView: t.string<ViewName>(),
@@ -93,53 +101,53 @@ export const devtoolsShell = createModule('shell', {
   },
 
   init: (facts) => {
-    const prefs = loadDrawerPrefs()
-    facts.activeView = 'Facts'
-    facts.isFullscreen = false
-    facts.confirmClear = false
-    facts.drawerOpen = false
-    facts.drawerPosition = prefs.position ?? 'bottom'
-    facts.drawerHeight = prefs.height ?? 400
-    facts.drawerWidth = prefs.width ?? 480
+    const prefs = loadDrawerPrefs();
+    facts.activeView = "Facts";
+    facts.isFullscreen = false;
+    facts.confirmClear = false;
+    facts.drawerOpen = false;
+    facts.drawerPosition = prefs.position ?? "bottom";
+    facts.drawerHeight = prefs.height ?? 400;
+    facts.drawerWidth = prefs.width ?? 480;
   },
 
   events: {
     setView: (facts, { view }) => {
-      facts.activeView = view
+      facts.activeView = view;
     },
     toggleFullscreen: (facts) => {
-      facts.isFullscreen = !facts.isFullscreen
+      facts.isFullscreen = !facts.isFullscreen;
     },
     exitFullscreen: (facts) => {
-      facts.isFullscreen = false
+      facts.isFullscreen = false;
     },
     startClear: (facts) => {
-      facts.confirmClear = true
+      facts.confirmClear = true;
     },
     executeClear: (facts) => {
-      facts.confirmClear = false
+      facts.confirmClear = false;
     },
     cancelClear: (facts) => {
-      facts.confirmClear = false
+      facts.confirmClear = false;
     },
     openDrawer: (facts) => {
-      facts.drawerOpen = true
+      facts.drawerOpen = true;
     },
     closeDrawer: (facts) => {
-      facts.drawerOpen = false
+      facts.drawerOpen = false;
     },
     toggleDrawer: (facts) => {
-      facts.drawerOpen = !facts.drawerOpen
+      facts.drawerOpen = !facts.drawerOpen;
     },
     setDrawerPosition: (facts, { position }) => {
-      facts.drawerPosition = position
+      facts.drawerPosition = position;
     },
     setDrawerSize: (facts, { height, width }) => {
       if (height !== undefined) {
-        facts.drawerHeight = height
+        facts.drawerHeight = height;
       }
       if (width !== undefined) {
-        facts.drawerWidth = width
+        facts.drawerWidth = width;
       }
     },
   },
@@ -158,7 +166,7 @@ export const devtoolsShell = createModule('shell', {
             position: facts.drawerPosition as DrawerPosition,
             height: facts.drawerHeight,
             width: facts.drawerWidth,
-          })
+          });
         }
       },
     },
@@ -168,21 +176,21 @@ export const devtoolsShell = createModule('shell', {
   constraints: {
     clearTimeout: {
       when: (facts) => facts.confirmClear === true,
-      require: { type: 'CANCEL_STALE_CLEAR' },
+      require: { type: "CANCEL_STALE_CLEAR" },
     },
   },
 
   resolvers: {
     cancelStaleClear: {
-      requirement: 'CANCEL_STALE_CLEAR',
+      requirement: "CANCEL_STALE_CLEAR",
       // Dedupe key prevents duplicate resolvers when constraint re-fires
-      key: () => 'cancel-stale-clear',
+      key: () => "cancel-stale-clear",
       resolve: async (req, context) => {
-        await new Promise((r) => setTimeout(r, 5000))
+        await new Promise((r) => setTimeout(r, 5000));
         if (context.facts.confirmClear) {
-          context.facts.confirmClear = false
+          context.facts.confirmClear = false;
         }
       },
     },
   },
-})
+});

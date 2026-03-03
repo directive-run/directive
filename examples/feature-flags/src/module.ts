@@ -72,22 +72,16 @@ export const featureFlagsModule = createModule("feature-flags", {
   },
 
   derive: {
-    canUseChat: (facts) =>
-      facts.chatEnabled && !facts.maintenanceMode,
-    canUseSearch: (facts) =>
-      facts.searchEnabled && !facts.maintenanceMode,
+    canUseChat: (facts) => facts.chatEnabled && !facts.maintenanceMode,
+    canUseSearch: (facts) => facts.searchEnabled && !facts.maintenanceMode,
     canUsePlayground: (facts) =>
       facts.playgroundEnabled && !facts.maintenanceMode,
-    canUseBrandSwitcher: (facts) =>
-      facts.brandSwitcherEnabled,
-    canUseThemeSelector: (facts) =>
-      facts.themeSelectorEnabled,
+    canUseBrandSwitcher: (facts) => facts.brandSwitcherEnabled,
+    canUseThemeSelector: (facts) => facts.themeSelectorEnabled,
     canShowOnboardingToast: (facts) =>
       facts.onboardingToastEnabled && facts.brandSwitcherEnabled,
-    canUseVersionSelector: (facts) =>
-      facts.versionSelectorEnabled,
-    canUseVoteApi: (facts) =>
-      facts.voteApiEnabled && !facts.maintenanceMode,
+    canUseVersionSelector: (facts) => facts.versionSelectorEnabled,
+    canUseVoteApi: (facts) => facts.voteApiEnabled && !facts.maintenanceMode,
     enabledCount: (facts) => {
       let count = 0;
       if (facts.chatEnabled) count++;
@@ -150,7 +144,8 @@ export const featureFlagsModule = createModule("feature-flags", {
 
   constraints: {
     onboardingRequiresBrandSwitcher: {
-      when: (facts) => facts.onboardingToastEnabled && !facts.brandSwitcherEnabled,
+      when: (facts) =>
+        facts.onboardingToastEnabled && !facts.brandSwitcherEnabled,
       require: { type: "ENABLE_BRAND_SWITCHER" },
     },
 
@@ -210,7 +205,9 @@ export const featureFlagsModule = createModule("feature-flags", {
 
         for (const flag of flags) {
           if (facts[flag] !== prev[flag]) {
-            console.log(`[feature-flags] ${flag}: ${prev[flag]} → ${facts[flag]}`);
+            console.log(
+              `[feature-flags] ${flag}: ${prev[flag]} → ${facts[flag]}`,
+            );
           }
         }
       },

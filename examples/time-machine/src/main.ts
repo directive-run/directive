@@ -6,10 +6,10 @@
  */
 
 import {
+  type ModuleSchema,
   createModule,
   createSystem,
   t,
-  type ModuleSchema,
 } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 
@@ -29,7 +29,15 @@ interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
-  type: "stroke" | "undo" | "redo" | "changeset" | "export" | "import" | "replay" | "goto";
+  type:
+    | "stroke"
+    | "undo"
+    | "redo"
+    | "changeset"
+    | "export"
+    | "import"
+    | "replay"
+    | "goto";
 }
 
 // ============================================================================
@@ -38,7 +46,11 @@ interface TimelineEntry {
 
 const timeline: TimelineEntry[] = [];
 
-function addTimeline(event: string, detail: string, type: TimelineEntry["type"]) {
+function addTimeline(
+  event: string,
+  detail: string,
+  type: TimelineEntry["type"],
+) {
   timeline.unshift({ time: Date.now(), event, detail, type });
   if (timeline.length > 50) {
     timeline.length = 50;
@@ -140,19 +152,29 @@ const tt = system.debug!;
 const canvasEl = document.getElementById("tm-canvas") as HTMLCanvasElement;
 const ctx = canvasEl.getContext("2d")!;
 const colorPicker = document.getElementById("tm-color") as HTMLInputElement;
-const brushSlider = document.getElementById("tm-brush-size") as HTMLInputElement;
+const brushSlider = document.getElementById(
+  "tm-brush-size",
+) as HTMLInputElement;
 const brushVal = document.getElementById("tm-brush-val")!;
 const undoBtn = document.getElementById("tm-undo") as HTMLButtonElement;
 const redoBtn = document.getElementById("tm-redo") as HTMLButtonElement;
 const replayBtn = document.getElementById("tm-replay") as HTMLButtonElement;
 const clearBtn = document.getElementById("tm-clear") as HTMLButtonElement;
-const snapshotSlider = document.getElementById("tm-snapshot-slider") as HTMLInputElement;
+const snapshotSlider = document.getElementById(
+  "tm-snapshot-slider",
+) as HTMLInputElement;
 const snapshotInfo = document.getElementById("tm-snapshot-info")!;
 const exportBtn = document.getElementById("tm-export") as HTMLButtonElement;
 const importBtn = document.getElementById("tm-import") as HTMLButtonElement;
-const exportArea = document.getElementById("tm-export-area") as HTMLTextAreaElement;
-const beginChangesetBtn = document.getElementById("tm-begin-changeset") as HTMLButtonElement;
-const endChangesetBtn = document.getElementById("tm-end-changeset") as HTMLButtonElement;
+const exportArea = document.getElementById(
+  "tm-export-area",
+) as HTMLTextAreaElement;
+const beginChangesetBtn = document.getElementById(
+  "tm-begin-changeset",
+) as HTMLButtonElement;
+const endChangesetBtn = document.getElementById(
+  "tm-end-changeset",
+) as HTMLButtonElement;
 const changesetStatus = document.getElementById("tm-changeset-status")!;
 
 // Timeline
@@ -213,7 +235,8 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML = '<div class="tm-timeline-empty">Events appear after drawing</div>';
+    timelineEl.innerHTML =
+      '<div class="tm-timeline-empty">Events appear after drawing</div>';
   } else {
     timelineEl.innerHTML = "";
     for (const entry of timeline) {
@@ -349,7 +372,11 @@ importBtn.addEventListener("click", () => {
     addTimeline("import", "snapshots restored", "import");
     render();
   } catch (err) {
-    addTimeline("import", `error: ${err instanceof Error ? err.message : String(err)}`, "import");
+    addTimeline(
+      "import",
+      `error: ${err instanceof Error ? err.message : String(err)}`,
+      "import",
+    );
     render();
   }
 });

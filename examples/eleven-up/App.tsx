@@ -4,20 +4,12 @@
  * A solitaire card game using Directive for state management.
  */
 
-import { useCallback } from "react";
-import type React from "react";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import {
-  useFact,
-  useDerived,
-} from "@directive-run/react";
-import {
-  elevenUpGame,
-  type Card,
-  getSuitSymbol,
-  isRedSuit,
-} from "./game";
+import { useDerived, useFact } from "@directive-run/react";
+import { useCallback } from "react";
+import type React from "react";
+import { type Card, elevenUpGame, getSuitSymbol, isRedSuit } from "./game";
 
 // ============================================================================
 // Styles
@@ -240,9 +232,7 @@ function CardComponent({ card, selected, onSelect }: CardProps) {
         <span>{symbol}</span>
       </div>
       <div style={styles.cardCenter}>{symbol}</div>
-      <div
-        style={{ ...styles.cardCorner, transform: "rotate(180deg)" }}
-      >
+      <div style={{ ...styles.cardCorner, transform: "rotate(180deg)" }}>
         <span>{card.rank}</span>
         <span>{symbol}</span>
       </div>
@@ -255,7 +245,10 @@ function CardComponent({ card, selected, onSelect }: CardProps) {
 // ============================================================================
 
 // Create the system
-const system = createSystem({ module: elevenUpGame, plugins: [devtoolsPlugin({ name: "eleven-up" })] });
+const system = createSystem({
+  module: elevenUpGame,
+  plugins: [devtoolsPlugin({ name: "eleven-up" })],
+});
 system.start();
 
 /**
@@ -288,7 +281,7 @@ export function App() {
         system.events.selectCard({ cardId });
       }
     },
-    [selected]
+    [selected],
   );
 
   const handleNewGame = useCallback(() => {
@@ -310,26 +303,32 @@ export function App() {
 
       {/* Score label */}
       {scoreLabel && (
-        <div style={{
-          textAlign: "center" as const,
-          fontSize: "1.1rem",
-          marginBottom: "0.75rem",
-          color: streakInfo?.isHot ? "#ffd700" : "#8fbc8f",
-          fontWeight: streakInfo?.isHot ? "bold" as const : "normal" as const,
-        }}>
+        <div
+          style={{
+            textAlign: "center" as const,
+            fontSize: "1.1rem",
+            marginBottom: "0.75rem",
+            color: streakInfo?.isHot ? "#ffd700" : "#8fbc8f",
+            fontWeight: streakInfo?.isHot
+              ? ("bold" as const)
+              : ("normal" as const),
+          }}
+        >
           {scoreLabel}
         </div>
       )}
 
       {/* Combo message */}
       {comboMessage && (
-        <div style={{
-          textAlign: "center" as const,
-          fontSize: "0.9rem",
-          marginBottom: "0.75rem",
-          color: "#ff9800",
-          fontWeight: "bold" as const,
-        }}>
+        <div
+          style={{
+            textAlign: "center" as const,
+            fontSize: "0.9rem",
+            marginBottom: "0.75rem",
+            color: "#ff9800",
+            fontWeight: "bold" as const,
+          }}
+        >
           {comboMessage}
         </div>
       )}
@@ -346,10 +345,12 @@ export function App() {
         </div>
         <div style={styles.stat}>
           <div style={styles.statLabel}>Streak</div>
-          <div style={{
-            ...styles.statValue,
-            color: streakInfo?.isHot ? "#ffd700" : "#fff",
-          }}>
+          <div
+            style={{
+              ...styles.statValue,
+              color: streakInfo?.isHot ? "#ffd700" : "#fff",
+            }}
+          >
             {streakInfo?.current ?? 0}
           </div>
         </div>
@@ -360,9 +361,7 @@ export function App() {
       </div>
 
       {/* Feedback message */}
-      {selectionFeedback && (
-        <div style={styles.hint}>{selectionFeedback}</div>
-      )}
+      {selectionFeedback && <div style={styles.hint}>{selectionFeedback}</div>}
 
       {/* Table */}
       <div style={styles.table}>

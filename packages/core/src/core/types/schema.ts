@@ -8,10 +8,10 @@
 
 /** Primitive type definitions for schema */
 export interface SchemaType<T> {
-	readonly _type: T;
-	// biome-ignore lint/suspicious/noExplicitAny: Validators must use any for covariance
-	readonly _validators: Array<(value: any) => boolean>;
-	validate(fn: (value: T) => boolean): SchemaType<T>;
+  readonly _type: T;
+  // biome-ignore lint/suspicious/noExplicitAny: Validators must use any for covariance
+  readonly _validators: Array<(value: any) => boolean>;
+  validate(fn: (value: T) => boolean): SchemaType<T>;
 }
 
 /**
@@ -28,14 +28,15 @@ export type Schema = Record<string, SchemaType<unknown> | unknown>;
  * - If it has `_output` (Zod schema), extract it
  * - Otherwise use the type directly (type assertion)
  */
-export type InferSchemaType<T> =
-	T extends SchemaType<infer U> ? U :
-	T extends { _output: infer Z } ? Z :
-	T;
+export type InferSchemaType<T> = T extends SchemaType<infer U>
+  ? U
+  : T extends { _output: infer Z }
+    ? Z
+    : T;
 
 /** Extract the TypeScript type from a schema (removes readonly from const type params) */
 export type InferSchema<S extends Schema> = {
-	-readonly [K in keyof S]: InferSchemaType<S[K]>;
+  -readonly [K in keyof S]: InferSchemaType<S[K]>;
 };
 
 // ============================================================================
@@ -67,7 +68,10 @@ export type DerivationsSchema = Record<string, SchemaType<unknown> | unknown>;
  * Requirement payload schema - maps property names to their types.
  * Supports both `t.*()` builders and plain types.
  */
-export type RequirementPayloadSchema = Record<string, SchemaType<unknown> | unknown>;
+export type RequirementPayloadSchema = Record<
+  string,
+  SchemaType<unknown> | unknown
+>;
 
 /**
  * Requirements schema - maps requirement type names to their payload schemas.
@@ -111,14 +115,14 @@ export type RequirementsSchema = Record<string, RequirementPayloadSchema>;
  * ```
  */
 export interface ModuleSchema {
-	/** Facts (state) schema - required */
-	facts: Schema;
-	/** Derivation return types - optional, defaults to {} */
-	derivations?: DerivationsSchema;
-	/** Event payload schemas - optional, defaults to {} */
-	events?: EventsSchema;
-	/** Requirement payload schemas - optional, defaults to {} */
-	requirements?: RequirementsSchema;
+  /** Facts (state) schema - required */
+  facts: Schema;
+  /** Derivation return types - optional, defaults to {} */
+  derivations?: DerivationsSchema;
+  /** Event payload schemas - optional, defaults to {} */
+  events?: EventsSchema;
+  /** Requirement payload schemas - optional, defaults to {} */
+  requirements?: RequirementsSchema;
 }
 
 // ============================================================================
@@ -126,13 +130,21 @@ export interface ModuleSchema {
 // ============================================================================
 
 /** Helper to get derivations, defaulting to empty */
-type GetDerivations<M extends ModuleSchema> = M["derivations"] extends DerivationsSchema ? M["derivations"] : Record<string, never>;
+type GetDerivations<M extends ModuleSchema> =
+  M["derivations"] extends DerivationsSchema
+    ? M["derivations"]
+    : Record<string, never>;
 
 /** Helper to get events, defaulting to empty */
-type GetEvents<M extends ModuleSchema> = M["events"] extends EventsSchema ? M["events"] : Record<string, never>;
+type GetEvents<M extends ModuleSchema> = M["events"] extends EventsSchema
+  ? M["events"]
+  : Record<string, never>;
 
 /** Helper to get requirements, defaulting to empty */
-type GetRequirements<M extends ModuleSchema> = M["requirements"] extends RequirementsSchema ? M["requirements"] : Record<string, never>;
+type GetRequirements<M extends ModuleSchema> =
+  M["requirements"] extends RequirementsSchema
+    ? M["requirements"]
+    : Record<string, never>;
 
 /**
  * Infer the facts type from a module schema.
@@ -144,43 +156,51 @@ export type InferFacts<M extends ModuleSchema> = InferSchema<M["facts"]>;
  * Each key maps to the return type declared in schema.derivations.
  */
 export type InferDerivations<M extends ModuleSchema> = {
-	readonly [K in keyof GetDerivations<M>]: InferSchemaType<GetDerivations<M>[K]>;
+  readonly [K in keyof GetDerivations<M>]: InferSchemaType<
+    GetDerivations<M>[K]
+  >;
 };
 
 /** Combined facts + derivations — matches the useSelector proxy at runtime. */
-export type InferSelectorState<M extends ModuleSchema> = InferFacts<M> & InferDerivations<M>;
+export type InferSelectorState<M extends ModuleSchema> = InferFacts<M> &
+  InferDerivations<M>;
 
 /**
  * Infer event payload type from an event payload schema.
  */
 export type InferEventPayloadFromSchema<P extends EventPayloadSchema> = {
-	[K in keyof P]: InferSchemaType<P[K]>;
+  [K in keyof P]: InferSchemaType<P[K]>;
 };
 
 /**
  * Infer all events from a module schema as a discriminated union.
  */
 export type InferEvents<M extends ModuleSchema> = {
-	[K in keyof GetEvents<M>]: keyof GetEvents<M>[K] extends never
-		? { type: K }
-		: { type: K } & InferEventPayloadFromSchema<GetEvents<M>[K]>;
+  [K in keyof GetEvents<M>]: keyof GetEvents<M>[K] extends never
+    ? { type: K }
+    : { type: K } & InferEventPayloadFromSchema<GetEvents<M>[K]>;
 }[keyof GetEvents<M>];
 
 /**
  * Infer requirement payload type from a requirement payload schema.
  */
-export type InferRequirementPayloadFromSchema<P extends RequirementPayloadSchema> = {
-	[K in keyof P]: InferSchemaType<P[K]>;
+export type InferRequirementPayloadFromSchema<
+  P extends RequirementPayloadSchema,
+> = {
+  [K in keyof P]: InferSchemaType<P[K]>;
 };
 
 /**
  * Infer all requirements from a module schema as a discriminated union.
  */
 export type InferRequirements<M extends ModuleSchema> = {
-	[K in keyof GetRequirements<M>]: { type: K } & InferRequirementPayloadFromSchema<GetRequirements<M>[K]>;
+  [K in keyof GetRequirements<M>]: {
+    type: K;
+  } & InferRequirementPayloadFromSchema<GetRequirements<M>[K]>;
 }[keyof GetRequirements<M>];
 
 /**
  * Infer requirement type names from a module schema.
  */
-export type InferRequirementTypes<M extends ModuleSchema> = keyof GetRequirements<M> & string;
+export type InferRequirementTypes<M extends ModuleSchema> =
+  keyof GetRequirements<M> & string;

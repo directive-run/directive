@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
 test.describe("Permissions example", () => {
@@ -7,10 +7,16 @@ test.describe("Permissions example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/permissions");
     try {
-      await page.waitForSelector("directive-permissions", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-permissions", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-permissions", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-permissions", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
     await page.waitForSelector("[data-permissions-ready]", { timeout: 15_000 });
   });
@@ -24,7 +30,9 @@ test.describe("Permissions example", () => {
     await expect(tid(page, "pm-perm-analytics")).toHaveClass(/denied/);
 
     // Article list shows sign-in message
-    await expect(tid(page, "pm-article-list")).toContainText("Sign in to view articles");
+    await expect(tid(page, "pm-article-list")).toContainText(
+      "Sign in to view articles",
+    );
 
     // Admin panel not visible
     await expect(tid(page, "pm-admin-panel")).not.toHaveClass(/visible/);
@@ -37,7 +45,9 @@ test.describe("Permissions example", () => {
     await tid(page, "pm-user-admin").click();
 
     // Wait for permissions to load (500ms mock API)
-    await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/, { timeout: 5_000 });
+    await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/, {
+      timeout: 5_000,
+    });
 
     // All 7 badges granted
     await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/);
@@ -57,7 +67,9 @@ test.describe("Permissions example", () => {
     await tid(page, "pm-user-editor").click();
 
     // Wait for permissions to load
-    await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/, { timeout: 5_000 });
+    await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/, {
+      timeout: 5_000,
+    });
 
     // Editor gets: edit, publish, analytics
     await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/);
@@ -78,7 +90,9 @@ test.describe("Permissions example", () => {
     await tid(page, "pm-user-viewer").click();
 
     // Wait for permissions to load
-    await expect(tid(page, "pm-perm-analytics")).toHaveClass(/granted/, { timeout: 5_000 });
+    await expect(tid(page, "pm-perm-analytics")).toHaveClass(/granted/, {
+      timeout: 5_000,
+    });
 
     // Viewer gets only analytics
     await expect(tid(page, "pm-perm-analytics")).toHaveClass(/granted/);
@@ -98,8 +112,12 @@ test.describe("Permissions example", () => {
     await expect(articles).toHaveCount(5, { timeout: 5_000 });
 
     // Check article content
-    await expect(tid(page, "pm-article-list")).toContainText("Getting Started with Directive");
-    await expect(tid(page, "pm-article-list")).toContainText("Constraint-Driven Architecture");
+    await expect(tid(page, "pm-article-list")).toContainText(
+      "Getting Started with Directive",
+    );
+    await expect(tid(page, "pm-article-list")).toContainText(
+      "Constraint-Driven Architecture",
+    );
   });
 
   test("admin can publish draft article", async ({ page }) => {
@@ -108,27 +126,37 @@ test.describe("Permissions example", () => {
     // Wait for articles + permissions to load
     const articles = tid(page, "pm-article-list").locator(".pm-article-card");
     await expect(articles).toHaveCount(5, { timeout: 5_000 });
-    await expect(tid(page, "pm-perm-publish")).toHaveClass(/granted/, { timeout: 5_000 });
+    await expect(tid(page, "pm-perm-publish")).toHaveClass(/granted/, {
+      timeout: 5_000,
+    });
 
     // Find a draft article's publish button
-    const publishBtn = tid(page, "pm-article-list").locator('[data-action="publish"]').first();
+    const publishBtn = tid(page, "pm-article-list")
+      .locator('[data-action="publish"]')
+      .first();
     await publishBtn.click();
 
     // Action status shows publishing then done
-    await expect(tid(page, "pm-action-status")).toContainText("Done", { timeout: 5_000 });
+    await expect(tid(page, "pm-action-status")).toContainText("Done", {
+      timeout: 5_000,
+    });
   });
 
   test("logout clears state", async ({ page }) => {
     // Login as admin
     await tid(page, "pm-user-admin").click();
-    await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/, { timeout: 5_000 });
+    await expect(tid(page, "pm-perm-edit")).toHaveClass(/granted/, {
+      timeout: 5_000,
+    });
 
     // Logout
     await tid(page, "pm-logout").click();
     await page.waitForTimeout(300);
 
     // Back to unauthenticated state
-    await expect(tid(page, "pm-article-list")).toContainText("Sign in to view articles");
+    await expect(tid(page, "pm-article-list")).toContainText(
+      "Sign in to view articles",
+    );
     await expect(tid(page, "pm-perm-edit")).toHaveClass(/denied/);
     await expect(tid(page, "pm-admin-panel")).not.toHaveClass(/visible/);
     await expect(tid(page, "pm-logout")).toBeDisabled();

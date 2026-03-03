@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  VALID_EVENT_TYPES,
   VALID_SERVER_MESSAGE_TYPES as EXPORTED_SERVER_MESSAGE_TYPES,
+  VALID_EVENT_TYPES,
 } from "../lib/types";
 import type { DebugEvent, DebugEventType } from "../lib/types";
 
@@ -29,7 +29,9 @@ const VALID_SERVER_MESSAGE_TYPES = new Set([
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /** Simulates the scratchpad_state/derived_state processing from the hook */
-function processBulkState(data: Record<string, unknown>): Record<string, unknown> {
+function processBulkState(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
   const safe: Record<string, unknown> = Object.create(null);
   for (const [k, v] of Object.entries(data)) {
     if (!BLOCKED_KEYS.has(k)) {
@@ -57,7 +59,9 @@ function isValidServerMessage(value: unknown): boolean {
 
   const obj = value as Record<string, unknown>;
 
-  return typeof obj.type === "string" && VALID_SERVER_MESSAGE_TYPES.has(obj.type);
+  return (
+    typeof obj.type === "string" && VALID_SERVER_MESSAGE_TYPES.has(obj.type)
+  );
 }
 
 function isValidEvent(value: unknown): value is DebugEvent {
@@ -85,13 +89,20 @@ function validateEvents(arr: unknown[]): DebugEvent[] {
 
 describe("isValidEvent", () => {
   it("accepts a valid event", () => {
-    const event = { id: 1, type: "agent_start", timestamp: 1000, snapshotId: null };
+    const event = {
+      id: 1,
+      type: "agent_start",
+      timestamp: 1000,
+      snapshotId: null,
+    };
     expect(isValidEvent(event)).toBe(true);
   });
 
   it("accepts all known event types", () => {
     for (const type of VALID_EVENT_TYPES) {
-      expect(isValidEvent({ id: 1, type, timestamp: 1000, snapshotId: null })).toBe(true);
+      expect(
+        isValidEvent({ id: 1, type, timestamp: 1000, snapshotId: null }),
+      ).toBe(true);
     }
   });
 
@@ -126,7 +137,9 @@ describe("isValidEvent", () => {
   });
 
   it("rejects object with string id", () => {
-    expect(isValidEvent({ id: "1", type: "agent_start", timestamp: 1000 })).toBe(false);
+    expect(
+      isValidEvent({ id: "1", type: "agent_start", timestamp: 1000 }),
+    ).toBe(false);
   });
 
   it("rejects object with numeric type", () => {
@@ -134,13 +147,21 @@ describe("isValidEvent", () => {
   });
 
   it("rejects object with string timestamp", () => {
-    expect(isValidEvent({ id: 1, type: "agent_start", timestamp: "1000" })).toBe(false);
+    expect(
+      isValidEvent({ id: 1, type: "agent_start", timestamp: "1000" }),
+    ).toBe(false);
   });
 
   it("rejects unknown event types (M3)", () => {
-    expect(isValidEvent({ id: 1, type: "unknown_type", timestamp: 1000 })).toBe(false);
-    expect(isValidEvent({ id: 1, type: "__proto__", timestamp: 1000 })).toBe(false);
-    expect(isValidEvent({ id: 1, type: "constructor", timestamp: 1000 })).toBe(false);
+    expect(isValidEvent({ id: 1, type: "unknown_type", timestamp: 1000 })).toBe(
+      false,
+    );
+    expect(isValidEvent({ id: 1, type: "__proto__", timestamp: 1000 })).toBe(
+      false,
+    );
+    expect(isValidEvent({ id: 1, type: "constructor", timestamp: 1000 })).toBe(
+      false,
+    );
   });
 
   it("accepts events with extra properties", () => {
@@ -242,18 +263,32 @@ describe("VALID_EVENT_TYPES", () => {
   it("matches the DebugEventType union", () => {
     // These are the event types from the union type
     const expectedTypes: DebugEventType[] = [
-      "agent_start", "agent_complete", "agent_error", "agent_retry",
-      "guardrail_check", "constraint_evaluate",
-      "resolver_start", "resolver_complete", "resolver_error",
-      "approval_request", "approval_response",
-      "handoff_start", "handoff_complete",
-      "pattern_start", "pattern_complete",
+      "agent_start",
+      "agent_complete",
+      "agent_error",
+      "agent_retry",
+      "guardrail_check",
+      "constraint_evaluate",
+      "resolver_start",
+      "resolver_complete",
+      "resolver_error",
+      "approval_request",
+      "approval_response",
+      "handoff_start",
+      "handoff_complete",
+      "pattern_start",
+      "pattern_complete",
       "dag_node_update",
-      "breakpoint_hit", "breakpoint_resumed",
-      "derivation_update", "scratchpad_update",
+      "breakpoint_hit",
+      "breakpoint_resumed",
+      "derivation_update",
+      "scratchpad_update",
       "reflection_iteration",
-      "race_start", "race_winner", "race_cancelled",
-      "reroute", "debate_round",
+      "race_start",
+      "race_winner",
+      "race_cancelled",
+      "reroute",
+      "debate_round",
     ];
 
     for (const type of expectedTypes) {
@@ -268,7 +303,9 @@ describe("VALID_EVENT_TYPES", () => {
 
 describe("VALID_SERVER_MESSAGE_TYPES (P7: exported from types.ts)", () => {
   it("local test set matches the exported set from types.ts", () => {
-    expect(VALID_SERVER_MESSAGE_TYPES.size).toBe(EXPORTED_SERVER_MESSAGE_TYPES.size);
+    expect(VALID_SERVER_MESSAGE_TYPES.size).toBe(
+      EXPORTED_SERVER_MESSAGE_TYPES.size,
+    );
     for (const type of VALID_SERVER_MESSAGE_TYPES) {
       expect(EXPORTED_SERVER_MESSAGE_TYPES.has(type)).toBe(true);
     }
@@ -350,12 +387,12 @@ describe("forkFromSnapshot eventId validation (M12)", () => {
   });
 
   it("rejects NaN", () => {
-    expect(isValidForkEventId(NaN)).toBe(false);
+    expect(isValidForkEventId(Number.NaN)).toBe(false);
   });
 
   it("rejects Infinity", () => {
-    expect(isValidForkEventId(Infinity)).toBe(false);
-    expect(isValidForkEventId(-Infinity)).toBe(false);
+    expect(isValidForkEventId(Number.POSITIVE_INFINITY)).toBe(false);
+    expect(isValidForkEventId(Number.NEGATIVE_INFINITY)).toBe(false);
   });
 
   it("accepts zero (valid event ID)", () => {
@@ -382,9 +419,10 @@ describe("pending buffer cap (D2)", () => {
       buffer.push(i);
     }
     // Simulate the cap logic
-    const capped = buffer.length > MAX_PENDING_WHILE_PAUSED
-      ? buffer.slice(-MAX_PENDING_WHILE_PAUSED)
-      : buffer;
+    const capped =
+      buffer.length > MAX_PENDING_WHILE_PAUSED
+        ? buffer.slice(-MAX_PENDING_WHILE_PAUSED)
+        : buffer;
     expect(capped.length).toBe(MAX_PENDING_WHILE_PAUSED);
     // Oldest events should be dropped
     expect(capped[0]).toBe(500);
@@ -392,9 +430,10 @@ describe("pending buffer cap (D2)", () => {
 
   it("does not cap when under limit", () => {
     const buffer = [1, 2, 3];
-    const capped = buffer.length > MAX_PENDING_WHILE_PAUSED
-      ? buffer.slice(-MAX_PENDING_WHILE_PAUSED)
-      : buffer;
+    const capped =
+      buffer.length > MAX_PENDING_WHILE_PAUSED
+        ? buffer.slice(-MAX_PENDING_WHILE_PAUSED)
+        : buffer;
     expect(capped.length).toBe(3);
   });
 });
@@ -404,9 +443,22 @@ describe("pending buffer cap (D2)", () => {
 // ============================================================================
 
 describe("EventDetail property filtering (D5)", () => {
-  const SKIP_PROPS = new Set(["id", "type", "timestamp", "snapshotId", "agentId", "input", "output", "__proto__", "constructor", "prototype"]);
+  const SKIP_PROPS = new Set([
+    "id",
+    "type",
+    "timestamp",
+    "snapshotId",
+    "agentId",
+    "input",
+    "output",
+    "__proto__",
+    "constructor",
+    "prototype",
+  ]);
 
-  function getEventProperties(event: Record<string, unknown>): [string, unknown][] {
+  function getEventProperties(
+    event: Record<string, unknown>,
+  ): [string, unknown][] {
     const entries: [string, unknown][] = [];
     for (const [key, value] of Object.entries(event)) {
       if (!SKIP_PROPS.has(key) && value !== undefined && value !== null) {
@@ -418,18 +470,31 @@ describe("EventDetail property filtering (D5)", () => {
   }
 
   it("filters __proto__ from event properties", () => {
-    const props = getEventProperties({ id: 1, type: "agent_start", __proto__: "evil", customProp: "ok" });
+    const props = getEventProperties({
+      id: 1,
+      type: "agent_start",
+      __proto__: "evil",
+      customProp: "ok",
+    });
     expect(props.find(([k]) => k === "__proto__")).toBeUndefined();
     expect(props.find(([k]) => k === "customProp")).toBeDefined();
   });
 
   it("filters constructor from event properties", () => {
-    const props = getEventProperties({ id: 1, constructor: "evil", customProp: "ok" });
+    const props = getEventProperties({
+      id: 1,
+      constructor: "evil",
+      customProp: "ok",
+    });
     expect(props.find(([k]) => k === "constructor")).toBeUndefined();
   });
 
   it("filters prototype from event properties", () => {
-    const props = getEventProperties({ id: 1, prototype: "evil", customProp: "ok" });
+    const props = getEventProperties({
+      id: 1,
+      prototype: "evil",
+      customProp: "ok",
+    });
     expect(props.find(([k]) => k === "prototype")).toBeUndefined();
   });
 });
@@ -442,7 +507,9 @@ describe("DagView safe deps extraction (D4)", () => {
   function extractDeps(state: Record<string, unknown>): string[] {
     const rawDeps = state.deps;
 
-    return Array.isArray(rawDeps) ? rawDeps.filter((d): d is string => typeof d === "string") : [];
+    return Array.isArray(rawDeps)
+      ? rawDeps.filter((d): d is string => typeof d === "string")
+      : [];
   }
 
   it("extracts valid string array deps", () => {
@@ -457,7 +524,11 @@ describe("DagView safe deps extraction (D4)", () => {
   });
 
   it("filters out non-string elements", () => {
-    expect(extractDeps({ deps: ["a", 42, "b", null, "c"] })).toEqual(["a", "b", "c"]);
+    expect(extractDeps({ deps: ["a", 42, "b", null, "c"] })).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
   });
 });
 
@@ -477,19 +548,47 @@ describe("isValidEvent edge cases", () => {
   it("accepts NaN id (typeof NaN === 'number' — no range check)", () => {
     // Note: typeof NaN === "number", so isValidEvent passes. This is a known
     // limitation — the validator checks typeof, not Number.isFinite.
-    expect(isValidEvent({ id: NaN, type: "agent_start", timestamp: 1000, snapshotId: null })).toBe(true);
+    expect(
+      isValidEvent({
+        id: Number.NaN,
+        type: "agent_start",
+        timestamp: 1000,
+        snapshotId: null,
+      }),
+    ).toBe(true);
   });
 
   it("accepts NaN timestamp (typeof NaN === 'number' — no range check)", () => {
-    expect(isValidEvent({ id: 1, type: "agent_start", timestamp: NaN, snapshotId: null })).toBe(true);
+    expect(
+      isValidEvent({
+        id: 1,
+        type: "agent_start",
+        timestamp: Number.NaN,
+        snapshotId: null,
+      }),
+    ).toBe(true);
   });
 
   it("accepts events with negative id (no range check)", () => {
     // id is just typeof "number" — no range validation
-    expect(isValidEvent({ id: -1, type: "agent_start", timestamp: 1000, snapshotId: null })).toBe(true);
+    expect(
+      isValidEvent({
+        id: -1,
+        type: "agent_start",
+        timestamp: 1000,
+        snapshotId: null,
+      }),
+    ).toBe(true);
   });
 
   it("accepts events with zero timestamp", () => {
-    expect(isValidEvent({ id: 1, type: "agent_start", timestamp: 0, snapshotId: null })).toBe(true);
+    expect(
+      isValidEvent({
+        id: 1,
+        type: "agent_start",
+        timestamp: 0,
+        snapshotId: null,
+      }),
+    ).toBe(true);
   });
 });

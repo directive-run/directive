@@ -1,30 +1,30 @@
-'use client'
+"use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import clsx from 'clsx'
+import clsx from "clsx";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
-import Link from 'next/link'
-import { ArrowRight, Flask } from '@phosphor-icons/react'
-import { IconButton } from '@/components/IconButton'
+import { IconButton } from "@/components/IconButton";
+import { ArrowRight, Flask } from "@phosphor-icons/react";
+import Link from "next/link";
 
 import {
   COLOR_PRESETS,
-  TYPO_PRESETS,
   DEFAULT_COLOR_PRESET,
   DEFAULT_TYPO_PRESET,
+  TYPO_PRESETS,
   findColorPreset,
   findTypoPreset,
-} from '@/lib/brand-presets'
-import { useThemePresets } from '@/lib/useThemePresets'
+} from "@/lib/brand-presets";
+import { useThemePresets } from "@/lib/useThemePresets";
 
 export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   className,
 }: {
-  className?: string
+  className?: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const firstColorRef = useRef<HTMLButtonElement>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstColorRef = useRef<HTMLButtonElement>(null);
 
   const {
     colorId,
@@ -37,58 +37,61 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
     handleReset,
     handleColorHover,
     handleColorLeave,
-  } = useThemePresets()
+  } = useThemePresets();
 
   // Close on click outside
   useEffect(() => {
     if (!isOpen) {
-      return
+      return;
     }
 
     function handleClick(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
+        setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClick)
+    document.addEventListener("mousedown", handleClick);
 
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [isOpen])
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) {
-      return
+      return;
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setIsOpen(false)
+      if (e.key === "Escape") {
+        setIsOpen(false);
       }
     }
-    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown);
 
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen])
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   // Focus first color button when panel opens
   useEffect(() => {
     if (isOpen) {
-      requestAnimationFrame(() => firstColorRef.current?.focus())
+      requestAnimationFrame(() => firstColorRef.current?.focus());
     }
-  }, [isOpen])
+  }, [isOpen]);
 
-  const handleFontSizeDelta = useCallback((delta: number) => {
-    handleFontSizeChange(fontScale + delta)
-  }, [fontScale, handleFontSizeChange])
+  const handleFontSizeDelta = useCallback(
+    (delta: number) => {
+      handleFontSizeChange(fontScale + delta);
+    },
+    [fontScale, handleFontSizeChange],
+  );
 
-  const allColors = [DEFAULT_COLOR_PRESET, ...COLOR_PRESETS]
-  const allTypos = [DEFAULT_TYPO_PRESET, ...TYPO_PRESETS]
-  const currentColor = findColorPreset(colorId) ?? DEFAULT_COLOR_PRESET
-  const currentTypo = findTypoPreset(typoId) ?? DEFAULT_TYPO_PRESET
+  const allColors = [DEFAULT_COLOR_PRESET, ...COLOR_PRESETS];
+  const allTypos = [DEFAULT_TYPO_PRESET, ...TYPO_PRESETS];
+  const currentColor = findColorPreset(colorId) ?? DEFAULT_COLOR_PRESET;
+  const currentTypo = findTypoPreset(typoId) ?? DEFAULT_TYPO_PRESET;
 
   return (
-    <div className={clsx('relative', className)} ref={panelRef}>
+    <div className={clsx("relative", className)} ref={panelRef}>
       <IconButton
         onClick={() => setIsOpen(!isOpen)}
         active={isOpen}
@@ -140,7 +143,8 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
               {currentColor.name}
             </p>
             <p className="text-[10px] text-slate-400">
-              {currentColor.primary.name} + {currentColor.accent.name} / {currentTypo.name}
+              {currentColor.primary.name} + {currentColor.accent.name} /{" "}
+              {currentTypo.name}
             </p>
             <p className="mt-0.5 text-[10px] italic text-slate-400">
               {currentColor.tagline}
@@ -152,7 +156,10 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               Color Combo
             </p>
-            <div className="grid grid-cols-4 gap-1.5" onMouseLeave={handleColorLeave}>
+            <div
+              className="grid grid-cols-4 gap-1.5"
+              onMouseLeave={handleColorLeave}
+            >
               {allColors.map((preset, index) => (
                 <button
                   key={preset.id}
@@ -160,10 +167,10 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                   onClick={() => handleColorChange(preset)}
                   onMouseEnter={() => handleColorHover(preset)}
                   className={clsx(
-                    'group relative flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1.5 pt-4 pb-2 transition',
+                    "group relative flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1.5 pt-4 pb-2 transition",
                     colorId === preset.id
-                      ? 'bg-slate-100 ring-2 ring-slate-900 dark:bg-slate-700 dark:ring-white'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-700/50',
+                      ? "bg-slate-100 ring-2 ring-slate-900 dark:bg-slate-700 dark:ring-white"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-700/50",
                   )}
                   aria-label={`${preset.name}: ${preset.primary.name} + ${preset.accent.name}`}
                   title={`${preset.name}: ${preset.primary.name} + ${preset.accent.name}`}
@@ -179,7 +186,7 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                     />
                   </div>
                   <span className="max-w-full truncate text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                    {preset.id === 'default' ? 'Def' : preset.id}
+                    {preset.id === "default" ? "Def" : preset.id}
                   </span>
                 </button>
               ))}
@@ -197,17 +204,19 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                   key={preset.id}
                   onClick={() => handleTypoChange(preset)}
                   className={clsx(
-                    'flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition',
+                    "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition",
                     typoId === preset.id
-                      ? 'bg-slate-100 font-medium text-slate-900 ring-1 ring-slate-300 dark:bg-slate-700 dark:text-white dark:ring-slate-500'
-                      : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50',
+                      ? "bg-slate-100 font-medium text-slate-900 ring-1 ring-slate-300 dark:bg-slate-700 dark:text-white dark:ring-slate-500"
+                      : "text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50",
                   )}
                 >
                   <span className="w-4 flex-none text-center font-mono text-[10px] text-slate-400">
-                    {preset.id === 0 ? '-' : preset.id}
+                    {preset.id === 0 ? "-" : preset.id}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{preset.name}</span>
+                    <span className="block truncate font-medium">
+                      {preset.name}
+                    </span>
                     <span className="block truncate text-[10px] text-slate-400">
                       {preset.display.name} + {preset.body.name}
                     </span>
@@ -227,10 +236,10 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                 onClick={() => handleFontSizeDelta(-10)}
                 disabled={fontScale <= 80}
                 className={clsx(
-                  'flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition',
+                  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition",
                   fontScale <= 80
-                    ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
+                    ? "cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600",
                 )}
                 aria-label="Decrease text size"
               >
@@ -243,10 +252,10 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                 onClick={() => handleFontSizeDelta(10)}
                 disabled={fontScale >= 150}
                 className={clsx(
-                  'flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition',
+                  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg text-sm font-bold transition",
                   fontScale >= 150
-                    ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600',
+                    ? "cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-slate-700 dark:text-slate-600"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600",
                 )}
                 aria-label="Increase text size"
               >
@@ -254,9 +263,8 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
               </button>
             </div>
           </div>
-
         </div>
       )}
     </div>
-  )
-})
+  );
+});

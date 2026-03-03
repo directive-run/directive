@@ -1,16 +1,16 @@
-'use client'
+"use client";
 
-import { ExampleEmbed } from '@/components/ExampleEmbed'
-import { CodeTabs } from '@/components/CodeTabs'
+import { CodeTabs } from "@/components/CodeTabs";
+import { ExampleEmbed } from "@/components/ExampleEmbed";
 
 export function CounterDemo({
   build,
   sources,
 }: {
-  build: import('@/lib/examples').ExampleBuild | null
-  sources: import('@/lib/examples').ExampleSource[]
+  build: import("@/lib/examples").ExampleBuild | null;
+  sources: import("@/lib/examples").ExampleSource[];
 }) {
-  const mainSource = sources.find((s) => s.filename === 'main.ts')
+  const mainSource = sources.find((s) => s.filename === "main.ts");
 
   return (
     <div className="space-y-8">
@@ -29,10 +29,8 @@ export function CounterDemo({
           />
         ) : (
           <div className="rounded-xl border border-slate-700/50 bg-[var(--brand-surface,#0f172a)] p-8 text-center text-sm text-slate-400">
-            Example not built yet. Run{' '}
-            <code className="text-slate-300">
-              pnpm build:example counter
-            </code>{' '}
+            Example not built yet. Run{" "}
+            <code className="text-slate-300">pnpm build:example counter</code>{" "}
             to generate the embed.
           </div>
         )}
@@ -57,24 +55,32 @@ export function CounterDemo({
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">pairAddsTen</strong>{' '}
-              &ndash; when two selected tiles sum to 10, emits{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                pairAddsTen
+              </strong>{" "}
+              &ndash; when two selected tiles sum to 10, emits{" "}
               <code>REMOVE_TILES</code>
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">refillTable</strong>{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                refillTable
+              </strong>{" "}
               &ndash; when the grid has fewer than 9 tiles and the pool is
               non-empty, emits <code>REFILL_TABLE</code>
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">noMovesLeft</strong>{' '}
-              &ndash; when the pool is empty and no valid pairs remain, emits{' '}
+              <strong className="text-slate-900 dark:text-slate-200">
+                noMovesLeft
+              </strong>{" "}
+              &ndash; when the pool is empty and no valid pairs remain, emits{" "}
               <code>END_GAME</code>
             </li>
             <li>
-              <strong className="text-slate-900 dark:text-slate-200">allCleared</strong>{' '}
-              &ndash; when all tiles are removed, emits{' '}
-              <code>END_GAME</code> with a win message
+              <strong className="text-slate-900 dark:text-slate-200">
+                allCleared
+              </strong>{" "}
+              &ndash; when all tiles are removed, emits <code>END_GAME</code>{" "}
+              with a win message
             </li>
           </ol>
         </div>
@@ -87,17 +93,21 @@ export function CounterDemo({
         </h2>
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">
+              What:
+            </strong>{" "}
             A Number Match game where you select pairs of tiles that sum to 10.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
-            Four priority-ordered constraints chain together: match &rarr; remove
-            &rarr; refill &rarr; end-game detection. Resolvers handle the
+            <strong className="text-slate-900 dark:text-slate-200">How:</strong>{" "}
+            Four priority-ordered constraints chain together: match &rarr;
+            remove &rarr; refill &rarr; end-game detection. Resolvers handle the
             multi-fact mutations.
           </p>
           <p>
-            <strong className="text-slate-900 dark:text-slate-200">Why it works:</strong>{' '}
+            <strong className="text-slate-900 dark:text-slate-200">
+              Why it works:
+            </strong>{" "}
             The constraint chain settles automatically. Each resolver mutates
             multiple facts in a single batch, and the engine re-evaluates
             constraints until no more fire.
@@ -113,14 +123,14 @@ export function CounterDemo({
         <CodeTabs
           tabs={[
             mainSource && {
-              filename: 'main.ts',
-              label: 'main.ts - Module + DOM wiring',
+              filename: "main.ts",
+              label: "main.ts - Module + DOM wiring",
               code: mainSource.code,
-              language: 'typescript',
+              language: "typescript",
             },
           ].filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))}
         />
       </section>
     </div>
-  )
+  );
 }

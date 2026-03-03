@@ -1,5 +1,8 @@
 import { useEffect } from "react";
-import type { ReplayControls as ReplayControlsType, ReplaySpeed } from "../hooks/use-replay";
+import type {
+  ReplayControls as ReplayControlsType,
+  ReplaySpeed,
+} from "../hooks/use-replay";
 
 interface ReplayControlsProps {
   replay: ReplayControlsType;
@@ -9,7 +12,16 @@ interface ReplayControlsProps {
 const SPEEDS: ReplaySpeed[] = [1, 2, 5, 10];
 
 export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
-  const { state, play, pause, stepBack, stepForward, goToStart, goToEnd, exit } = replay;
+  const {
+    state,
+    play,
+    pause,
+    stepBack,
+    stepForward,
+    goToStart,
+    goToEnd,
+    exit,
+  } = replay;
 
   // E3: Global keyboard shortcuts for replay
   // Destructure stable callbacks to avoid listener re-attachment on every render
@@ -20,7 +32,11 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't capture when typing in inputs
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) {
         return;
       }
 
@@ -58,7 +74,17 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.active, state.playing, play, pause, stepBack, stepForward, goToStart, goToEnd, exit]);
+  }, [
+    state.active,
+    state.playing,
+    play,
+    pause,
+    stepBack,
+    stepForward,
+    goToStart,
+    goToEnd,
+    exit,
+  ]);
 
   if (!state.active) {
     return (
@@ -67,7 +93,11 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
         disabled={totalEvents === 0}
         className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
         title={totalEvents === 0 ? "No events to replay" : "Enter replay mode"}
-        aria-label={totalEvents === 0 ? "Replay (no events available)" : "Enter replay mode"}
+        aria-label={
+          totalEvents === 0
+            ? "Replay (no events available)"
+            : "Enter replay mode"
+        }
       >
         Replay
       </button>
@@ -76,7 +106,9 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
 
   return (
     <div className="flex items-center gap-1 rounded border border-blue-500/30 bg-blue-950/30 px-2 py-1">
-      <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-blue-400">Replay</span>
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-blue-400">
+        Replay
+      </span>
 
       {/* Transport controls */}
       <button
@@ -156,7 +188,9 @@ export function ReplayControls({ replay, totalEvents }: ReplayControlsProps) {
         aria-label="Replay speed"
       >
         {SPEEDS.map((s) => (
-          <option key={s} value={s}>{s}x</option>
+          <option key={s} value={s}>
+            {s}x
+          </option>
         ))}
       </select>
 

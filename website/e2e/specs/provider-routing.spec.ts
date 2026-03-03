@@ -1,12 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { tid } from "../helpers/example-test.js";
 
-async function setSlider(page: import("@playwright/test").Page, testid: string, value: string) {
-  await page.evaluate(({ tid: t, val }) => {
-    const input = document.querySelector(`[data-testid="${t}"]`) as HTMLInputElement;
-    input.value = val;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, { tid: testid, val: value });
+async function setSlider(
+  page: import("@playwright/test").Page,
+  testid: string,
+  value: string,
+) {
+  await page.evaluate(
+    ({ tid: t, val }) => {
+      const input = document.querySelector(
+        `[data-testid="${t}"]`,
+      ) as HTMLInputElement;
+      input.value = val;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { tid: testid, val: value },
+  );
 }
 
 test.describe("Provider Routing example", () => {
@@ -15,12 +24,20 @@ test.describe("Provider Routing example", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/docs/examples/provider-routing");
     try {
-      await page.waitForSelector("directive-provider-routing", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-provider-routing", {
+        state: "attached",
+        timeout: 30_000,
+      });
     } catch {
       await page.reload();
-      await page.waitForSelector("directive-provider-routing", { state: "attached", timeout: 30_000 });
+      await page.waitForSelector("directive-provider-routing", {
+        state: "attached",
+        timeout: 30_000,
+      });
     }
-    await page.waitForSelector("[data-provider-routing-ready]", { timeout: 15_000 });
+    await page.waitForSelector("[data-provider-routing-ready]", {
+      timeout: 15_000,
+    });
   });
 
   test("page loads and UI renders", async ({ page }) => {
@@ -34,7 +51,9 @@ test.describe("Provider Routing example", () => {
     await tid(page, "pr-send").click();
     await page.waitForTimeout(1000);
 
-    await expect(tid(page, "pr-last-provider")).toHaveText("openai", { timeout: 5_000 });
+    await expect(tid(page, "pr-last-provider")).toHaveText("openai", {
+      timeout: 5_000,
+    });
     await expect(tid(page, "pr-total-requests")).not.toHaveText("0");
   });
 
@@ -59,7 +78,9 @@ test.describe("Provider Routing example", () => {
     await tid(page, "pr-send").click();
     await page.waitForTimeout(1000);
 
-    await expect(tid(page, "pr-last-provider")).toHaveText("ollama", { timeout: 5_000 });
+    await expect(tid(page, "pr-last-provider")).toHaveText("ollama", {
+      timeout: 5_000,
+    });
   });
 
   test("low budget routes to cheapest available", async ({ page }) => {
@@ -131,7 +152,7 @@ test.describe("Provider Routing example", () => {
 
     const budget = await tid(page, "pr-budget-remaining").textContent();
     // Budget should be less than $1
-    const value = parseFloat(budget?.replace("$", "") ?? "1");
+    const value = Number.parseFloat(budget?.replace("$", "") ?? "1");
     expect(value).toBeLessThan(1);
   });
 

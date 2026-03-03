@@ -6,7 +6,7 @@
  * reconnect countdown via time-based reactivity, and cleanup functions.
  */
 
-import { createModule, t, type ModuleSchema } from "@directive-run/core";
+import { type ModuleSchema, createModule, t } from "@directive-run/core";
 import { MockWebSocket, type WsMessage } from "./mock-ws.js";
 
 // ============================================================================
@@ -95,11 +95,7 @@ export const websocketSchema = {
 // Helpers
 // ============================================================================
 
-function addLogEntry(
-  facts: any,
-  event: string,
-  detail: string,
-): void {
+function addLogEntry(facts: any, event: string, detail: string): void {
   const log = [...(facts.eventLog as EventLogEntry[])];
   log.push({ timestamp: Date.now(), event, detail });
   // Cap at 100
@@ -156,7 +152,10 @@ export const websocketModule = createModule("websocket", {
         return 0;
       }
 
-      return Math.max(0, Math.ceil((facts.reconnectTargetTime - facts.now) / 1000));
+      return Math.max(
+        0,
+        Math.ceil((facts.reconnectTargetTime - facts.now) / 1000),
+      );
     },
 
     canSend: (facts) => {

@@ -6,7 +6,13 @@ interface SparklineProps {
   className?: string;
 }
 
-export function Sparkline({ data, width = 80, height = 24, color = "currentColor", className }: SparklineProps) {
+export function Sparkline({
+  data,
+  width = 80,
+  height = 24,
+  color = "currentColor",
+  className,
+}: SparklineProps) {
   if (data.length === 0) {
     return null;
   }
@@ -14,8 +20,20 @@ export function Sparkline({ data, width = 80, height = 24, color = "currentColor
   if (data.length === 1) {
     // Single point — horizontal line at midpoint
     return (
-      <svg width={width} height={height} className={className} aria-hidden="true">
-        <line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke={color} strokeWidth={1.5} />
+      <svg
+        width={width}
+        height={height}
+        className={className}
+        aria-hidden="true"
+      >
+        <line
+          x1={0}
+          y1={height / 2}
+          x2={width}
+          y2={height / 2}
+          stroke={color}
+          strokeWidth={1.5}
+        />
       </svg>
     );
   }

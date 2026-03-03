@@ -6,41 +6,46 @@ export type {
   AnimationConfig,
   DiagramNode,
   DiagramEdge,
-} from './types'
+} from "./types";
 
 // Theme
 export {
   getNodeColors,
   getEdgeColor,
   getEdgeColorDark,
-} from './theme'
+} from "./theme";
 
 // Wrapper & Controls
-export { DiagramWrapper } from './DiagramWrapper'
-export { AnimationController } from './AnimationController'
-export { DiagramToolbar } from './DiagramToolbar'
+export { DiagramWrapper } from "./DiagramWrapper";
+export { AnimationController } from "./AnimationController";
+export { DiagramToolbar } from "./DiagramToolbar";
 
 // Layout
-export { positionNode, horizontalRow, verticalColumn, edge } from './layout-utils'
+export {
+  positionNode,
+  horizontalRow,
+  verticalColumn,
+  edge,
+} from "./layout-utils";
 
 // Hooks
-export { useAnimationLoop } from './hooks/useAnimationLoop'
-export { useDiagramTheme } from './hooks/useDiagramTheme'
+export { useAnimationLoop } from "./hooks/useAnimationLoop";
+export { useDiagramTheme } from "./hooks/useDiagramTheme";
 
 // Node types
-export { StepNode } from './nodes/StepNode'
+export { StepNode } from "./nodes/StepNode";
 
 // Edge types
-export { LabeledEdge } from './edges/LabeledEdge'
+export { LabeledEdge } from "./edges/LabeledEdge";
 
+import { LabeledEdge } from "./edges/LabeledEdge";
 // Convenience: pre-built nodeTypes/edgeTypes maps for ReactFlow
-import { StepNode } from './nodes/StepNode'
-import { LabeledEdge } from './edges/LabeledEdge'
+import { StepNode } from "./nodes/StepNode";
 
 export const diagramNodeTypes = {
   step: StepNode,
-} as const
+} as const;
 
 export const diagramEdgeTypes = {
   labeled: LabeledEdge,
-} as const
+} as const;
