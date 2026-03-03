@@ -256,6 +256,7 @@ export type ServerMessage =
   | { type: "error"; code: string; message: string };
 
 export type ClientMessage =
+  | { type: "authenticate"; token: string }
   | { type: "request_snapshot" }
   | { type: "request_events"; since?: number }
   | { type: "request_breakpoints" }

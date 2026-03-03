@@ -26,7 +26,7 @@ export interface DevToolsConnection {
   isPaused: boolean;
   pendingCount: number;
   togglePause: () => void;
-  connect: (url: string) => void;
+  connect: (url: string, token?: string) => void;
   disconnect: () => void;
   send: (message: ClientMessage) => void;
   requestSnapshot: () => void;
@@ -106,6 +106,7 @@ export function useDevToolsConnection(): DevToolsConnection {
 
   const wsRef = useRef<WebSocket | null>(null);
   const urlRef = useRef<string | null>(null);
+  const tokenRef = useRef<string | undefined>(undefined);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnectRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
@@ -297,7 +298,7 @@ export function useDevToolsConnection(): DevToolsConnection {
   // Keep handleMessage ref in sync
   useEffect(() => { handleMessageRef.current = handleMessage; }, [handleMessage]);
 
-  const connect = useCallback((url: string) => {
+  const connect = useCallback((url: string, token?: string) => {
     // Clean up existing connection
     if (wsRef.current) {
       shouldReconnectRef.current = false;
@@ -310,6 +311,7 @@ export function useDevToolsConnection(): DevToolsConnection {
     }
 
     urlRef.current = url;
+    tokenRef.current = token;
     shouldReconnectRef.current = true;
     reconnectAttemptsRef.current = 0;
     reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS;
@@ -320,6 +322,10 @@ export function useDevToolsConnection(): DevToolsConnection {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      // If token provided, send authenticate message first
+      if (tokenRef.current) {
+        ws.send(JSON.stringify({ type: "authenticate", token: tokenRef.current }));
+      }
       // Welcome message from server sets status to "connected"
       // Start keepalive pings
       if (pingTimerRef.current) {
@@ -381,7 +387,7 @@ export function useDevToolsConnection(): DevToolsConnection {
         );
         reconnectTimerRef.current = setTimeout(() => {
           if (urlRef.current) {
-            connect(urlRef.current);
+            connect(urlRef.current, tokenRef.current);
           }
         }, delay);
         reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, MAX_RECONNECT_DELAY_MS);
