@@ -2674,7 +2674,7 @@ export function createMultiAgentOrchestrator(
           agentId,
           snapshotId: null,
           inputLength: processedInput.length,
-          ...(agent.description ? { description: agent.description } : {}),
+          ...("description" in agent && agent.description ? { description: String(agent.description) } : {}),
           ...(agent.instructions ? { instructions: agent.instructions.slice(0, MAX_VERBOSE_LENGTH) } : {}),
           input: processedInput.slice(0, MAX_VERBOSE_LENGTH),
         });
