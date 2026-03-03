@@ -2945,9 +2945,18 @@ export function createMultiAgentOrchestrator(
       }
 
       // Store messages in memory (best-effort — don't fail the run on memory errors)
+      // Only store the user message once — agent-utils includes it in every result,
+      // but memory already has it from the first agent call in a conversation.
       if (effectiveMemory && result.messages.length > 0) {
         try {
-          effectiveMemory.addMessages(result.messages);
+          const existingMessages = effectiveMemory.getContextMessages();
+          const hasUserMessage = existingMessages.some(
+            (m) => m.role === "user" && m.content === processedInput
+          );
+          const messagesToStore = hasUserMessage
+            ? result.messages.filter((m) => !(m.role === "user" && m.content === processedInput))
+            : result.messages;
+          effectiveMemory.addMessages(messagesToStore);
         } catch (memoryError) {
           if (debug) {
             console.debug("[Directive MultiAgent] Memory addMessages failed:", memoryError);
@@ -7772,7 +7781,7 @@ export function composePatterns(
                 action = JSON.parse(raw);
               } catch {
                 try {
-                  const stripped = raw.replace(/<[^>]+>/g, " ");
+                  const stripped = raw.replace(/```(?:json|JSON)?\s*\n?/g, "").replace(/<[^>]+>/g, " ");
                   const extracted = extractJsonFromOutput(stripped);
                   if (extracted && typeof extracted === "object" && "action" in (extracted as Record<string, unknown>)) {
                     action = extracted as typeof action;

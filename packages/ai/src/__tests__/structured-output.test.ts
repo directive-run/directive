@@ -92,6 +92,37 @@ describe("extractJsonFromOutput", () => {
 			extractJsonFromOutput('{"text": "he said \\"hello\\""}'),
 		).toEqual({ text: 'he said "hello"' });
 	});
+
+	it("extracts JSON wrapped in markdown code fences", () => {
+		const input = '```json\n{"action": "delegate", "worker": "analyzer"}\n```';
+		expect(extractJsonFromOutput(input)).toEqual({
+			action: "delegate",
+			worker: "analyzer",
+		});
+	});
+
+	it("handles literal newlines inside JSON string values", () => {
+		const input = '{"reason": "line one\nline two\nline three"}';
+		expect(extractJsonFromOutput(input)).toEqual({
+			reason: "line one\nline two\nline three",
+		});
+	});
+
+	it("handles literal carriage returns and tabs inside JSON string values", () => {
+		const input = '{"text": "col1\tcol2\r\nrow2"}';
+		expect(extractJsonFromOutput(input)).toEqual({
+			text: "col1\tcol2\r\nrow2",
+		});
+	});
+
+	it("handles markdown fences combined with literal newlines in values", () => {
+		const input =
+			'```json\n{"action": "delegate", "reason": "need to check\nmultiple things"}\n```';
+		expect(extractJsonFromOutput(input)).toEqual({
+			action: "delegate",
+			reason: "need to check\nmultiple things",
+		});
+	});
 });
 
 // ============================================================================
