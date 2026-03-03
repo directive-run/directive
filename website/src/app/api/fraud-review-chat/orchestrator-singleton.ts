@@ -71,7 +71,7 @@ export function getFraudReviewOrchestrator(): FraudReviewOrchestratorInstance | 
   let runner = createAnthropicRunner({
     apiKey: anthropicKey,
     model: 'claude-haiku-4-5-20251001',
-    maxTokens: 300,
+    maxTokens: 500,
   })
 
   runner = withRetry(runner, { maxRetries: 2, baseDelayMs: 1_000, maxDelayMs: 10_000 })
