@@ -163,7 +163,21 @@ export function extractJsonFromOutput(output: string): unknown {
       if (depth === 0) {
         const jsonStr = trimmed.slice(start, i + 1);
 
-        return JSON.parse(jsonStr);
+        try {
+          return JSON.parse(jsonStr);
+        } catch {
+          // LLMs emit literal newlines inside JSON string values — escape them
+          const sanitized = jsonStr.replace(
+            /"(?:[^"\\]|\\.)*"/g,
+            (match) =>
+              match
+                .replace(/\n/g, "\\n")
+                .replace(/\r/g, "\\r")
+                .replace(/\t/g, "\\t"),
+          );
+
+          return JSON.parse(sanitized);
+        }
       }
     }
   }
