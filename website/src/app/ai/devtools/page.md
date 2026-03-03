@@ -1,23 +1,57 @@
 ---
 title: DevTools
-description: Real-time visual debugging for AI agent orchestration via WebSocket or SSE transport.
+description: Visual debugger for AI agent orchestration — see what your agents did, why, and how long it took.
 ---
 
-A transport-agnostic debugging interface for agent orchestration with 13 specialized views (6 system + 7 AI). {% .lead %}
+A visual debugger that shows you what your AI agents did, why decisions were made, how long things took, and what went wrong. {% .lead %}
 
 {% callout type="note" title="Try it live" %}
 DevTools is active on all example pages. Visit [Safety Shield](/docs/examples/guardrails) or [Checkpoint](/docs/examples/checkpoint) and click the Directive logo button (bottom-left) to inspect the system. For the full AI DevTools experience with streaming events, try the [AI Chat demo](/ai/examples/chat).
 {% /callout %}
 
-The DevTools server (`@directive-run/ai`) bridges your orchestrator's timeline, health, breakpoints, and state into a visual debugging interface via WebSocket, SSE, or any custom transport.
+What you can see: agent execution timeline, cost breakdown, constraint evaluation, guardrail results, breakpoints, live token streaming, session replay, and state inspection across 13 specialized views.
 
 {% devtools-demo /%}
 
 ---
 
-## Setup
+## How It Works
 
-### Server
+When you enable `debug: true` on an orchestrator, it records every decision as a timestamped event in a debug timeline. The DevTools server streams these events over WebSocket to the DevTools UI, which visualizes them in real-time.
+
+```
+Your App → Orchestrator (debug: true) → Timeline (event log)
+                                              ↓
+                                        DevTools Server (WebSocket)
+                                              ↓
+                                    DevTools UI (browser)
+```
+
+---
+
+## DevTools vs SSE Transport
+
+These are two separate outputs from the same orchestrator. They serve different purposes and can be used independently.
+
+**DevTools** is for you, the developer. It streams debug events (timeline, health, state) to the DevTools UI so you can inspect what happened inside the orchestrator.
+
+**SSE Transport** (`createSSETransport`) is for your users. It streams agent text responses to your frontend — the typing effect you see in ChatGPT-style interfaces.
+
+| | DevTools | SSE Transport |
+|---|---------|---------------|
+| **Purpose** | Debug & inspect | Stream responses to users |
+| **Audience** | Developer | End user |
+| **Protocol** | WebSocket (bidirectional) | HTTP SSE (one-way) |
+| **Data** | Timeline events, health, state | Agent text tokens |
+| **Function** | `connectDevTools()` | `createSSETransport()` |
+
+You can use one, both, or neither.
+
+---
+
+## Quick Start
+
+One line to connect DevTools to your orchestrator:
 
 ```typescript
 import { connectDevTools } from '@directive-run/ai';
@@ -28,13 +62,18 @@ const orchestrator = createMultiAgentOrchestrator({
   debug: true,
 });
 
-// One-liner – creates WebSocket server and wires everything up
 const server = await connectDevTools(orchestrator, { port: 4040 });
 
 console.log(`DevTools server on ws://localhost:${4040}`);
 ```
 
-Or wire up manually for full control:
+Open the DevTools UI and connect to `ws://localhost:4040`.
+
+---
+
+## Manual Setup
+
+For full control over the server configuration:
 
 ```typescript
 import { createDevToolsServer, createWsTransport } from '@directive-run/ai';
@@ -62,9 +101,118 @@ const server = createDevToolsServer({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `port` | `number` | `4040` | WebSocket server port |
+| `host` | `string` | `"localhost"` | Host to bind to |
 | `maxClients` | `number` | `50` | Maximum concurrent DevTools clients |
 | `batchSize` | `number` | `1` | Events per batch message |
 | `batchIntervalMs` | `number` | `50` | Batch flush interval (ms) |
+| `authenticate` | `(token: string) => boolean \| Promise<boolean>` | — | Token validation callback (see [Authentication](#authentication)) |
+
+---
+
+## Remote Connections
+
+By default, the DevTools server binds to `localhost` — only accessible from the same machine. To debug a remote orchestrator (staging, production, another machine on your network):
+
+```typescript
+const server = await connectDevTools(orchestrator, {
+  port: 4040,
+  host: "0.0.0.0", // Expose to all network interfaces
+  authenticate: (token) => token === process.env.DEVTOOLS_TOKEN,
+});
+```
+
+{% callout type="warning" title="Security" %}
+Binding to `0.0.0.0` exposes the server to your entire network. Always use authentication when exposing DevTools beyond localhost. Use `wss://` (WebSocket over TLS) in production via a reverse proxy.
+{% /callout %}
+
+**When you need this:**
+- Debugging a staging/production orchestrator from your local DevTools UI
+- Team debugging — multiple developers inspecting the same orchestrator
+- Cloud-hosted DevTools connecting to your running server
+
+In the DevTools UI, enter the remote URL (e.g., `ws://staging.internal:4040`) and the auth token to connect.
+
+---
+
+## Authentication
+
+Token-based authentication for remote DevTools connections. Browser WebSocket doesn't support custom headers, so authentication happens as the first message after connection.
+
+### Server Side
+
+```typescript
+const server = await connectDevTools(orchestrator, {
+  port: 4040,
+  host: "0.0.0.0",
+  authenticate: async (token) => {
+    // Validate against your secret, database, or auth service
+    return token === process.env.DEVTOOLS_TOKEN;
+  },
+});
+```
+
+When `authenticate` is configured:
+1. New connections are held in a pending state
+2. The server waits for an `authenticate` message with the token
+3. If valid → sends `welcome`, proceeds normally
+4. If invalid → sends `error` with code `AUTH_FAILED`, closes connection
+
+When `authenticate` is **not** configured, connections work exactly as before — no auth required. This is fully backward compatible.
+
+### Client Side
+
+The DevTools UI has an optional "Auth Token" field in the sidebar. Enter your token before connecting to a remote server. The token is sent automatically as the first message after the WebSocket opens.
+
+### Manual Setup
+
+If using `createDevToolsServer` directly:
+
+```typescript
+const server = createDevToolsServer({
+  transport,
+  timeline: orchestrator.timeline!,
+  authenticate: async (token) => {
+    return token === process.env.DEVTOOLS_TOKEN;
+  },
+  // ... other config
+});
+```
+
+---
+
+## Custom Transports
+
+The DevTools server is transport-agnostic. It works with any WebSocket library via the `DevToolsTransport` interface:
+
+```typescript
+interface DevToolsTransport {
+  onConnection(handler: (
+    client: DevToolsClient,
+    onMessage: (handler: (data: string) => void) => void,
+    onClose: (handler: () => void) => void,
+  ) => void): void;
+  close(): void;
+}
+```
+
+The built-in `createWsTransport` uses the Node.js `ws` package, but you can implement this interface for Bun, Deno, or any other runtime.
+
+**When you'd build a custom transport:** HTTP long-polling for environments without WebSocket support, SSE-based transport for one-way streaming, or a custom auth layer that validates tokens at the transport level.
+
+```typescript
+function createMyTransport(port: number): DevToolsTransport {
+  // Your WebSocket/transport setup here
+  return {
+    onConnection(handler) { /* wire up new connections */ },
+    close() { /* shut down */ },
+  };
+}
+
+const server = createDevToolsServer({
+  transport: createMyTransport(4040),
+  timeline: orchestrator.timeline!,
+});
+```
 
 ---
 
@@ -224,7 +372,7 @@ The DevTools highlights error events in the Timeline view with red rings and dis
 
 | Message | Description |
 |---------|-------------|
-| `welcome` | Connection established |
+| `welcome` | Connection established (sent after successful auth if configured) |
 | `event` / `event_batch` | Timeline events |
 | `snapshot` | Full orchestrator state snapshot |
 | `health` | Agent health data |
@@ -233,13 +381,14 @@ The DevTools highlights error events in the Timeline view with red rings and dis
 | `derived_state` / `derived_update` | Derived values |
 | `token_stream` / `stream_done` | Live token streaming |
 | `fork_complete` | Fork operation completed |
-| `error` | Server error |
+| `error` | Server error (includes `AUTH_FAILED` for authentication failures) |
 | `pong` | Keepalive response |
 
 ### Client &rarr; Server
 
 | Message | Description |
 |---------|-------------|
+| `authenticate` | Send auth token (required when server has `authenticate` configured) |
 | `request_snapshot` | Request current state |
 | `request_health` | Request health data |
 | `request_events` | Request event history |

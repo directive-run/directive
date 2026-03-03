@@ -170,11 +170,18 @@ export function TimelineView() {
 
     // Order lanes: AI lanes first, then system category lanes (System last)
     const LANE_ORDER = ['Facts', 'Derivations', 'Constraints', 'Resolvers', 'Effects', 'System']
-    const aiLanes = ids.filter((id) => {
-      const first = map.get(id)?.[0]
+    const aiLanes = ids
+      .filter((id) => {
+        const first = map.get(id)?.[0]
 
-      return first?.source === 'ai'
-    })
+        return first?.source === 'ai'
+      })
+      .sort((a, b) => {
+        if (a === 'system') return 1
+        if (b === 'system') return -1
+
+        return 0
+      })
     const sysLanes = ids
       .filter((id) => {
         const first = map.get(id)?.[0]
