@@ -69,6 +69,14 @@ export interface EventBreakpointHit {
   conditionMet: boolean
 }
 
+// Normalized trace event — common shape for both AI and system events in the unified timeline
+export interface NormalizedTraceEvent {
+  id: number
+  timestamp: number
+  type: string
+  data: unknown
+}
+
 // Typed snapshot response — cast once at fetch boundary
 export interface SnapshotResponse {
   timestamp: number

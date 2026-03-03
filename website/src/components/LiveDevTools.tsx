@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from '@directive-run/react'
 import type { ConnectionStatus } from './devtools/types'
-import { SYSTEM_VIEWS, AI_VIEWS, ALL_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
+import { SYSTEM_VIEWS, AI_VIEWS, SHARED_VIEWS, ALL_VIEWS, VIEWS, SNAPSHOT_POLL_INTERVAL } from './devtools/constants'
 import { CountBadge } from './devtools/CountBadge'
 import { useDevToolsSystem } from './devtools/DevToolsSystemContext'
 import { DevToolsProvider } from './devtools/DevToolsProvider'
@@ -41,8 +41,9 @@ const VIEW_REGISTRY: Record<typeof ALL_VIEWS[number], React.ComponentType> = {
   'System Graph': SystemGraphView,
   'Time Travel': TimeTravelView,
   'Breakpoints': BreakpointsView,
-  // AI views
+  // Shared views (system + AI)
   'Timeline': TimelineView,
+  // AI views
   'Cost & Budget': CostBudgetView,
   'State': StateView,
   'Guardrails': GuardrailsView,
@@ -137,12 +138,21 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     [events],
   )
 
+  // Read system trace event count for Timeline visibility
+  const traceEventCount = useSelector(system, (s) => s.derive.runtime.traceEventCount ?? 0)
+
   // Visible views based on which groups are connected
   const visibleViews = useMemo(() => {
     const views: Array<typeof VIEWS[number]> = []
     if (showSystemTabs) {
       views.push(...SYSTEM_VIEWS)
     }
+
+    // Timeline is shared — show when runtime is connected or any events exist
+    if (eventCount > 0 || traceEventCount > 0 || runtimeConnected) {
+      views.push(...SHARED_VIEWS)
+    }
+
     if (showAiTabs) {
       if (hasGoalPattern) {
         views.push(...AI_VIEWS)
@@ -152,11 +162,11 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     }
     // Fallback: show system tabs if runtime is present, otherwise AI tabs
     if (views.length === 0) {
-      views.push(...(runtimeConnected ? SYSTEM_VIEWS : (aiEnabled ? AI_VIEWS : SYSTEM_VIEWS)))
+      views.push(...(runtimeConnected ? SYSTEM_VIEWS : (aiEnabled ? [...SHARED_VIEWS, ...AI_VIEWS] : SYSTEM_VIEWS)))
     }
 
     return views
-  }, [showSystemTabs, showAiTabs, hasGoalPattern, runtimeConnected, aiEnabled])
+  }, [showSystemTabs, showAiTabs, hasGoalPattern, runtimeConnected, aiEnabled, eventCount, traceEventCount])
 
   // Auto-switch active view when it's not in the visible set
   useEffect(() => {
@@ -178,12 +188,13 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     const badges: Partial<Record<string, number>> = {}
     if (factCount > 0) badges['Facts'] = factCount
     if (derivationCount > 0) badges['Derivations'] = derivationCount
-    if (eventCount > 0) badges['Timeline'] = eventCount
+    const totalTimelineEvents = eventCount + traceEventCount
+    if (totalTimelineEvents > 0) badges['Timeline'] = totalTimelineEvents
     const totalBreakpointHits = factBreakpointHitCount + eventBreakpointHitCount
     if (totalBreakpointHits > 0) badges['Breakpoints'] = totalBreakpointHits
 
     return badges
-  }, [factCount, derivationCount, eventCount, factBreakpointHitCount, eventBreakpointHitCount])
+  }, [factCount, derivationCount, eventCount, traceEventCount, factBreakpointHitCount, eventBreakpointHitCount])
 
   // Share button toast state
   const [shareToast, setShareToast] = useState(false)
@@ -198,6 +209,7 @@ export function DevToolsContent({ mode = 'standalone' }: DevToolsContentProps) {
     system.events.shell.executeClear()
     system.events.connection.clearEvents()
     system.events.snapshot.clearSnapshot()
+    system.events.runtime.clearTraceEvents()
   }, [confirmClear, system])
 
   // Arrow key navigation between visible tabs
