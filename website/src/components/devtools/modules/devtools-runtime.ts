@@ -2,7 +2,7 @@
 // All errors below cascade from the same root cause. Fix by improving InferSchema for nested generics in core.
 import { createModule, t } from '@directive-run/core'
 import type { RunChangelogEntry } from '@directive-run/core'
-import type { FactBreakpointDef, FactBreakpointHit, EventBreakpointDef, EventBreakpointHit } from '../types'
+import type { FactBreakpointDef, FactBreakpointHit, EventBreakpointDef, EventBreakpointHit, NormalizedTraceEvent } from '../types'
 
 // ---------------------------------------------------------------------------
 // Types for runtime bridge data
@@ -71,6 +71,7 @@ const _runtimeUnsubs = new WeakMap<object, () => void>()
 const _breakpointUnsubs = new WeakMap<object, Map<string, { unsub: () => void; condition: string }>>()
 
 const MAX_BREAKPOINT_HITS = 500
+const MAX_TRACE_EVENTS = 2000
 
 // ---------------------------------------------------------------------------
 // Module
@@ -98,6 +99,9 @@ export const devtoolsRuntime = createModule('runtime', {
       runHistoryEnabled: t.boolean(),
       // Tick counter bumped on each subscription callback — drives reactivity
       tick: t.number(),
+      // Accumulated trace events from the connected system (capped at MAX_TRACE_EVENTS)
+      traceEvents: t.array<NormalizedTraceEvent>(),
+      traceEventIdCounter: t.number(),
       // Breakpoint state
       factBreakpoints: t.array<FactBreakpointDef>(),
       factBreakpointHits: t.array<FactBreakpointHit>(),
@@ -122,6 +126,7 @@ export const devtoolsRuntime = createModule('runtime', {
       totalBreakpointHitCount: t.number(),
       activeFactBreakpointCount: t.number(),
       activeEventBreakpointCount: t.number(),
+      traceEventCount: t.number(),
     },
     events: {
       attach: { systemName: t.nullable(t.string()) },
@@ -137,6 +142,7 @@ export const devtoolsRuntime = createModule('runtime', {
       toggleEventBreakpoint: { id: t.string() },
       clearEventBreakpointHits: {},
       resumeFromBreakpoint: {},
+      clearTraceEvents: {},
     },
   },
 
@@ -157,6 +163,8 @@ export const devtoolsRuntime = createModule('runtime', {
     facts.runHistory = []
     facts.runHistoryEnabled = false
     facts.tick = 0
+    facts.traceEvents = []
+    facts.traceEventIdCounter = 0
     facts.factBreakpoints = []
     facts.factBreakpointHits = []
     facts.eventBreakpoints = []
@@ -184,6 +192,7 @@ export const devtoolsRuntime = createModule('runtime', {
     totalBreakpointHitCount: (facts) => facts.factBreakpointHits.length + facts.eventBreakpointHits.length,
     activeFactBreakpointCount: (facts) => facts.factBreakpoints.filter((bp) => bp.enabled).length,
     activeEventBreakpointCount: (facts) => facts.eventBreakpoints.filter((bp) => bp.enabled).length,
+    traceEventCount: (facts) => facts.traceEvents.length,
   },
 
   events: {
@@ -221,6 +230,8 @@ export const devtoolsRuntime = createModule('runtime', {
       facts.runHistory = []
       facts.runHistoryEnabled = false
       facts.tick = 0
+      facts.traceEvents = []
+      facts.traceEventIdCounter = 0
       facts.factBreakpoints = []
       facts.factBreakpointHits = []
       facts.eventBreakpoints = []
@@ -271,6 +282,10 @@ export const devtoolsRuntime = createModule('runtime', {
     },
     clearEventBreakpointHits: (facts) => {
       facts.eventBreakpointHits = []
+    },
+    clearTraceEvents: (facts) => {
+      facts.traceEvents = []
+      // Keep traceEventIdCounter — don't reset to avoid ID reuse
     },
     resumeFromBreakpoint: (facts) => {
       if (!facts.breakpointPaused) {
@@ -335,8 +350,28 @@ export const devtoolsRuntime = createModule('runtime', {
 
             // Subscribe to events
             const unsub = directive.subscribe((event) => {
+              // Guard against late callbacks after detach
+              if (!context.facts.connected) {
+                return
+              }
+
               context.facts.lastEventType = event.type
               context.facts.tick++
+
+              // Accumulate trace event for timeline (capped)
+              const nextId = (context.facts.traceEventIdCounter as number) + 1
+              context.facts.traceEventIdCounter = nextId
+              const traceEvent: NormalizedTraceEvent = {
+                id: nextId,
+                timestamp: Date.now(),
+                type: event.type,
+                data: event.data,
+              }
+              const current = context.facts.traceEvents as NormalizedTraceEvent[]
+              const next = current.length >= MAX_TRACE_EVENTS
+                ? [...current.slice(current.length - MAX_TRACE_EVENTS + 1), traceEvent]
+                : [...current, traceEvent]
+              context.facts.traceEvents = next
 
               // Check event breakpoints
               checkEventBreakpoints(context.facts, event)
