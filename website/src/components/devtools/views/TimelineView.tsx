@@ -2,16 +2,91 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { DebugEvent } from '../types'
+import type { DebugEvent, NormalizedTraceEvent } from '../types'
 import { useSelector } from '@directive-run/react'
 import { useDevToolsSystem } from '../DevToolsSystemContext'
-import { EVENT_COLORS, EVENT_LABELS, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '../constants'
+import {
+  EVENT_COLORS,
+  EVENT_LABELS,
+  SYSTEM_EVENT_COLORS,
+  SYSTEM_EVENT_LABELS,
+  TRACE_EVENT_CATEGORIES,
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_STEP,
+} from '../constants'
+import { Z_DRAWER } from '../z-index'
 import { EmptyState } from '../EmptyState'
+
+// ---------------------------------------------------------------------------
+// Unified lane event — normalized shape for both AI and system events
+// ---------------------------------------------------------------------------
+
+interface LaneEvent {
+  id: string
+  timestamp: number
+  type: string
+  laneId: string
+  source: 'ai' | 'system'
+  // AI-specific fields preserved for detail panel
+  agentId?: string
+  durationMs?: number
+  guardrailName?: string
+  guardrailType?: string
+  passed?: boolean
+  reason?: string
+  totalTokens?: number
+  inputTokens?: number
+  outputTokens?: number
+  inputLength?: number
+  outputLength?: number
+  modelId?: string
+  description?: string
+  errorMessage?: string
+  error?: string
+  errorCode?: string
+  breakpointLabel?: string
+  // System event data
+  data?: unknown
+  [key: string]: unknown
+}
+
+// Safe JSON.stringify that handles circular references and caps output size
+const SAFE_STRINGIFY_MAX = 2000
+function safeStringify(value: unknown): string {
+  try {
+    const raw = JSON.stringify(value)
+
+    return raw.length > SAFE_STRINGIFY_MAX ? raw.slice(0, SAFE_STRINGIFY_MAX) + '...' : raw
+  } catch {
+    return '[unserializable]'
+  }
+}
+
+// AI span pairs: start type → [complete type, error type]
+const AI_SPAN_PAIRS: Record<string, [string, string]> = {
+  agent_start: ['agent_complete', 'agent_error'],
+  task_start: ['task_complete', 'task_error'],
+}
+
+// System span pairs: start type → [complete type, error type]
+const SYSTEM_SPAN_PAIRS: Record<string, [string, string]> = {
+  'resolver.start': ['resolver.complete', 'resolver.error'],
+  'reconcile.start': ['reconcile.end', 'reconcile.end'],
+}
+
+// Merged color + label lookups
+const ALL_COLORS: Record<string, string> = { ...EVENT_COLORS, ...SYSTEM_EVENT_COLORS }
+const ALL_LABELS: Record<string, string> = { ...EVENT_LABELS, ...SYSTEM_EVENT_LABELS }
+
+// All span pair definitions merged
+const ALL_SPAN_PAIRS: Record<string, [string, string]> = { ...AI_SPAN_PAIRS, ...SYSTEM_SPAN_PAIRS }
 
 export function TimelineView() {
   const system = useDevToolsSystem()
-  const events = useSelector(system, (s) => s.facts.connection.events)
-  const [selected, setSelected] = useState<number | null>(null)
+  const aiEvents = useSelector(system, (s) => s.facts.connection.events) as DebugEvent[]
+  const systemTraceEvents = useSelector(system, (s) => s.facts.runtime.traceEvents) as NormalizedTraceEvent[]
+  const [selected, setSelected] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [follow, setFollow] = useState(true)
@@ -19,7 +94,7 @@ export function TimelineView() {
   const [tooltip, setTooltip] = useState<{
     x: number
     y: number
-    events: DebugEvent[]
+    events: LaneEvent[]
     laneId: string
   } | null>(null)
 
@@ -27,42 +102,130 @@ export function TimelineView() {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   useEffect(() => { setPortalTarget(document.body) }, [])
 
-  const { agentIds, agentEventsMap, noAgentEvents, minTs, range } = useMemo(() => {
-    if (events.length === 0) {
-      return { agentIds: [], agentEventsMap: new Map<string, DebugEvent[]>(), noAgentEvents: [], minTs: 0, range: 1 }
+  // Merge + normalize both sources into unified LaneEvent[]
+  const { laneIds, laneEventsMap, hasAiLanes, hasSystemLanes, minTs, range, allEvents, presentTypes, eventIndexById } = useMemo(() => {
+    const merged: LaneEvent[] = []
+
+    // Normalize AI events — string ID with "ai-" prefix
+    for (const e of aiEvents) {
+      merged.push({
+        ...e,
+        id: `ai-${e.id}`,
+        laneId: e.agentId || 'system',
+        source: 'ai',
+      })
     }
 
-    const ids: string[] = []
-    const map = new Map<string, DebugEvent[]>()
-    const noAgent: DebugEvent[] = []
+    // Normalize system trace events — string ID with "sys-" prefix
+    for (const e of systemTraceEvents) {
+      const category = TRACE_EVENT_CATEGORIES[e.type] ?? 'System'
+      merged.push({
+        id: `sys-${e.id}`,
+        timestamp: e.timestamp,
+        type: e.type,
+        laneId: category,
+        source: 'system',
+        data: e.data,
+      })
+    }
 
-    for (const e of events) {
-      if (e.agentId) {
-        if (!map.has(e.agentId)) {
-          ids.push(e.agentId)
-          map.set(e.agentId, [])
-        }
-        map.get(e.agentId)!.push(e)
-      } else {
-        noAgent.push(e)
+    if (merged.length === 0) {
+      return {
+        laneIds: [],
+        laneEventsMap: new Map<string, LaneEvent[]>(),
+        hasAiLanes: false,
+        hasSystemLanes: false,
+        minTs: 0,
+        range: 1,
+        allEvents: [],
+        presentTypes: new Set<string>(),
+        eventIndexById: new Map<string, number>(),
       }
     }
 
-    const min = events[0].timestamp
-    const max = events[events.length - 1].timestamp
-    // 2% padding so the rightmost marker doesn't overflow the lane
+    // Sort by timestamp
+    merged.sort((a, b) => a.timestamp - b.timestamp)
+
+    // Group by laneId, preserving insertion order
+    const ids: string[] = []
+    const map = new Map<string, LaneEvent[]>()
+    let hasAi = false
+    let hasSys = false
+    const types = new Set<string>()
+
+    for (const e of merged) {
+      types.add(e.type)
+      if (e.source === 'ai') {
+        hasAi = true
+      } else {
+        hasSys = true
+      }
+
+      if (!map.has(e.laneId)) {
+        ids.push(e.laneId)
+        map.set(e.laneId, [])
+      }
+      map.get(e.laneId)!.push(e)
+    }
+
+    // Order lanes: AI lanes first, then system category lanes (System last)
+    const LANE_ORDER = ['Facts', 'Derivations', 'Constraints', 'Resolvers', 'Effects', 'System']
+    const aiLanes = ids.filter((id) => {
+      const first = map.get(id)?.[0]
+
+      return first?.source === 'ai'
+    })
+    const sysLanes = ids
+      .filter((id) => {
+        const first = map.get(id)?.[0]
+
+        return first?.source === 'system'
+      })
+      .sort((a, b) => {
+        const ai = LANE_ORDER.indexOf(a)
+        const bi = LANE_ORDER.indexOf(b)
+
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+      })
+    const orderedIds = [...aiLanes, ...sysLanes]
+
+    const min = merged[0].timestamp
+    const max = merged[merged.length - 1].timestamp
     const raw = Math.max(max - min, 1)
     const padded = Math.ceil(raw * 1.02)
 
-    return { agentIds: ids, agentEventsMap: map, noAgentEvents: noAgent, minTs: min, range: padded }
-  }, [events])
+    // O(1) lookup for selected event by ID
+    const indexMap = new Map<string, number>()
+    for (let i = 0; i < merged.length; i++) {
+      indexMap.set(merged[i].id, i)
+    }
+
+    return {
+      laneIds: orderedIds,
+      laneEventsMap: map,
+      hasAiLanes: hasAi,
+      hasSystemLanes: hasSys,
+      minTs: min,
+      range: padded,
+      allEvents: merged,
+      presentTypes: types,
+      eventIndexById: indexMap,
+    }
+  }, [aiEvents, systemTraceEvents])
+
+  // Clear stale selection when the event no longer exists (e.g. after clear)
+  useEffect(() => {
+    if (selected !== null && !eventIndexById.has(selected)) {
+      setSelected(null)
+    }
+  }, [selected, eventIndexById])
 
   // Auto-scroll to right edge when new events arrive (if follow is on)
   useEffect(() => {
     if (follow && scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
     }
-  }, [events, follow, zoom])
+  }, [aiEvents, systemTraceEvents, follow, zoom])
 
   // Cmd/Ctrl + scroll wheel = zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -75,12 +238,16 @@ export function TimelineView() {
   // Keyboard shortcuts: +/- zoom, 0 reset, arrow keys pan
   const containerRef = useRef<HTMLDivElement>(null)
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Don't capture when typing in inputs
     if (e.target instanceof HTMLInputElement) {
       return
     }
 
     switch (e.key) {
+      case 'Escape':
+        e.preventDefault()
+        e.nativeEvent.stopImmediatePropagation()
+        setSelected(null)
+        break
       case '=':
       case '+':
         e.preventDefault()
@@ -125,48 +292,59 @@ export function TimelineView() {
   }, [follow])
 
   // Hover tooltip: find events near cursor position in a lane
-  const handleLaneMouseMove = useCallback((e: React.MouseEvent, laneEvents: DebugEvent[], laneId: string) => {
+  const handleLaneMouseMove = useCallback((e: React.MouseEvent, laneEvents: LaneEvent[], laneId: string) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const xRatio = (e.clientX - rect.left) / rect.width
     const cursorTs = minTs + xRatio * range
-    // Threshold: 1.5% of total range or 100ms, whichever is larger
     const threshold = Math.max(range * 0.015, 100)
 
-    const nearby = laneEvents.filter((ev) => Math.abs(ev.timestamp - cursorTs) <= threshold)
+    const nearby = laneEvents.filter((ev) => Math.abs(ev.timestamp - cursorTs) <= threshold && !hiddenTypes.has(ev.type))
 
     if (nearby.length > 0) {
       setTooltip({ x: e.clientX, y: e.clientY, events: nearby, laneId })
     } else {
       setTooltip(null)
     }
-  }, [minTs, range])
+  }, [minTs, range, hiddenTypes])
 
   const handleLaneMouseLeave = useCallback(() => {
     setTooltip(null)
   }, [])
 
-  if (events.length === 0) {
-    return <EmptyState message="Waiting for first message..." />
+  if (allEvents.length === 0) {
+    return <EmptyState message="Waiting for events..." />
   }
 
-  // Visible time range ticks (computed from zoom-adjusted range)
-  const visibleRange = range / zoom
   const tickCount = 5
-  const _tickStep = visibleRange / (tickCount - 1)
 
   // Render a single lane of events
-  const renderLane = (laneEvents: DebugEvent[], laneId: string) => {
-    // Build runtime spans by pairing agent_start -> agent_complete/agent_error.
-    // Each start is consumed by the NEXT complete or error, so a failed run
-    // produces a short span ending at the error — not stretching to the next run.
+  const renderLane = (laneEvents: LaneEvent[], laneId: string) => {
+    // Build runtime spans by pairing start → complete/error events
     const runtimeSpans: { startTs: number; endTs: number; durationMs: number; error: boolean }[] = []
-    const starts: number[] = []
+    const startStacks: Record<string, number[]> = {}
+
     for (const e of laneEvents) {
-      if (e.type === 'agent_start' || e.type === 'task_start') {
-        starts.push(e.timestamp)
-      } else if ((e.type === 'agent_complete' || e.type === 'agent_error' || e.type === 'task_complete' || e.type === 'task_error') && starts.length > 0) {
-        const startTs = starts.shift()!
-        runtimeSpans.push({ startTs, endTs: e.timestamp, durationMs: e.timestamp - startTs, error: e.type === 'agent_error' || e.type === 'task_error' })
+      if (ALL_SPAN_PAIRS[e.type]) {
+        if (!startStacks[e.type]) {
+          startStacks[e.type] = []
+        }
+        startStacks[e.type].push(e.timestamp)
+      } else {
+        // Check if this is an end event for any span pair
+        for (const [startType, [completeType, errorType]] of Object.entries(ALL_SPAN_PAIRS)) {
+          if (e.type === completeType || e.type === errorType) {
+            const stack = startStacks[startType]
+            if (stack && stack.length > 0) {
+              const startTs = stack.pop()!
+              runtimeSpans.push({
+                startTs,
+                endTs: e.timestamp,
+                durationMs: e.timestamp - startTs,
+                error: e.type === errorType && completeType !== errorType,
+              })
+            }
+          }
+        }
       }
     }
 
@@ -193,14 +371,14 @@ export function TimelineView() {
         {/* Event markers */}
         {laneEvents.filter((e) => !hiddenTypes.has(e.type)).map((e) => {
           const left = ((e.timestamp - minTs) / range) * 100
-          const label = EVENT_LABELS[e.type] ?? e.type
+          const label = ALL_LABELS[e.type] ?? e.type
           const isSelected = e.id === selected
 
           return (
             <button
               key={`evt-${e.id}-${e.timestamp}`}
               aria-label={`${label}: ${laneId}${e.durationMs ? `, ${e.durationMs}ms` : ''}${e.guardrailName ? `, ${e.guardrailName}` : ''}`}
-              className={`absolute top-1 z-10 h-5 cursor-pointer rounded-sm ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'} ${isSelected ? 'opacity-100 ring-2 ring-white' : 'opacity-80'} transition-opacity hover:opacity-100`}
+              className={`absolute top-1 z-10 h-5 cursor-pointer rounded-sm ${ALL_COLORS[e.type] ?? 'bg-zinc-400'} ${isSelected ? 'opacity-100 ring-2 ring-white' : 'opacity-80'} transition-opacity hover:opacity-100`}
               style={{ left: `${left}%`, width: '6px' }}
               onClick={() => setSelected(e.id === selected ? null : e.id)}
               title={`${e.type}${e.durationMs ? ` (${e.durationMs}ms)` : ''}${e.guardrailName ? `: ${e.guardrailName}` : ''}`}
@@ -210,6 +388,15 @@ export function TimelineView() {
       </div>
     )
   }
+
+  // Find the boundary index between AI and system lanes for the separator
+  const separatorAfterIndex = hasAiLanes && hasSystemLanes
+    ? laneIds.findIndex((id) => {
+        const first = laneEventsMap.get(id)?.[0]
+
+        return first?.source === 'system'
+      }) - 1
+    : -1
 
   return (
     <div
@@ -249,13 +436,12 @@ export function TimelineView() {
           +/- zoom · arrows pan · 0 reset
         </span>
         <div className="flex-1" />
-        {/* m2: Renamed "Following" to "Auto-scroll" for clarity */}
         <button
           className={`cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] transition ${follow ? 'bg-sky-500/20 text-sky-500' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
           onClick={() => { setFollow(!follow); if (!follow && scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth }}
           aria-label={follow ? 'Auto-scroll enabled' : 'Enable auto-scroll'}
         >
-          {follow ? 'Auto-scroll' : 'Auto-scroll'}
+          {follow ? 'Following' : 'Auto-scroll'}
         </button>
         {zoom > 1 && (
           <button
@@ -269,27 +455,28 @@ export function TimelineView() {
 
       {/* Timeline area: fixed labels on left, scrollable lanes on right */}
       <div className="flex gap-3">
-        {/* Fixed lane labels — m1: truncate class for long agent names */}
+        {/* Fixed lane labels */}
         <div className="w-28 shrink-0 space-y-2">
-          {agentIds.map((agentId) => (
-            <div key={agentId} className="flex h-7 items-center justify-end">
-              <span className="max-w-full truncate font-mono text-xs text-zinc-400 dark:text-zinc-500" title={agentId}>
-                {agentId}
-              </span>
+          {laneIds.map((laneId, i) => (
+            <div key={laneId}>
+              {i === separatorAfterIndex + 1 && separatorAfterIndex >= 0 && (
+                <div className="my-1.5 flex items-center gap-1.5" role="separator" aria-hidden="true">
+                  <div className="flex-1 border-t border-zinc-300/50 dark:border-zinc-600/50" />
+                  <span className="font-mono text-[9px] text-zinc-400/60 dark:text-zinc-600">System</span>
+                </div>
+              )}
+              <div className="flex h-7 items-center justify-end">
+                <span className="max-w-full truncate font-mono text-xs text-zinc-400 dark:text-zinc-500" title={laneId}>
+                  {laneId}
+                </span>
+              </div>
             </div>
           ))}
-          {noAgentEvents.length > 0 && (
-            <div className="flex h-7 items-center justify-end">
-              <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500">
-                system
-              </span>
-            </div>
-          )}
           {/* Spacer for time axis row */}
           <div className="h-4" />
         </div>
 
-        {/* Scrollable lanes + time axis below — M2: touch-pan-x for mobile */}
+        {/* Scrollable lanes + time axis below */}
         <div className="min-w-0 flex-1">
           <div
             ref={scrollRef}
@@ -299,12 +486,16 @@ export function TimelineView() {
             onScroll={handleScroll}
           >
             <div className="space-y-2" style={{ width: `${zoom * 100}%`, minWidth: '100%' }}>
-              {agentIds.map((agentId) => (
-                <div key={agentId}>
-                  {renderLane(agentEventsMap.get(agentId) ?? [], agentId)}
+              {laneIds.map((laneId, i) => (
+                <div key={laneId}>
+                  {i === separatorAfterIndex + 1 && separatorAfterIndex >= 0 && (
+                    <div className="my-1.5 flex items-center" role="separator" aria-hidden="true">
+                      <div className="flex-1 border-t border-zinc-300/50 dark:border-zinc-600/50" />
+                    </div>
+                  )}
+                  {renderLane(laneEventsMap.get(laneId) ?? [], laneId)}
                 </div>
               ))}
-              {noAgentEvents.length > 0 && renderLane(noAgentEvents, 'system')}
 
               {/* Time axis — inside scroll container so it scales with zoom */}
               <div className="relative h-4">
@@ -330,11 +521,11 @@ export function TimelineView() {
 
       {/* Selected event detail */}
       {selected !== null && (() => {
-        const idx = events.findIndex((ev) => ev.id === selected)
+        const idx = eventIndexById.get(selected) ?? -1
         if (idx === -1) {
           return null
         }
-        const e = events[idx]
+        const e = allEvents[idx]
 
         return (
           <div className="mt-2 rounded border border-zinc-200 bg-white p-3 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800">
@@ -344,18 +535,18 @@ export function TimelineView() {
                 <button
                   className="cursor-pointer rounded px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:cursor-default disabled:opacity-30 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
                   disabled={idx === 0}
-                  onClick={() => setSelected(events[idx - 1].id)}
+                  onClick={() => setSelected(allEvents[idx - 1].id)}
                   aria-label="Previous event"
                 >
                   ◀
                 </button>
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                  {idx + 1} of {events.length}
+                  {idx + 1} of {allEvents.length}
                 </span>
                 <button
                   className="cursor-pointer rounded px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 disabled:cursor-default disabled:opacity-30 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-                  disabled={idx === events.length - 1}
-                  onClick={() => setSelected(events[idx + 1].id)}
+                  disabled={idx === allEvents.length - 1}
+                  onClick={() => setSelected(allEvents[idx + 1].id)}
                   aria-label="Next event"
                 >
                   ▶
@@ -373,11 +564,12 @@ export function TimelineView() {
             <div className="space-y-1">
               <div>
                 <span className="text-zinc-500">type:</span>{' '}
-                <span className={`inline-block rounded px-1 py-0.5 text-white text-[10px] ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'}`}>
+                <span className={`inline-block rounded px-1 py-0.5 text-white text-[10px] ${ALL_COLORS[e.type] ?? 'bg-zinc-400'}`}>
                   {e.type}
                 </span>
               </div>
-              {e.agentId && (
+              <div><span className="text-zinc-500">lane:</span> {e.laneId}</div>
+              {e.source === 'ai' && e.agentId && (
                 <div><span className="text-zinc-500">{e.type.startsWith('task_') ? 'task' : 'agent'}:</span> {e.agentId}</div>
               )}
               {e.description && (
@@ -424,17 +616,19 @@ export function TimelineView() {
               {e.outputLength !== undefined && (
                 <div><span className="text-zinc-500">outputLength:</span> {e.outputLength}</div>
               )}
+              {/* System event data */}
+              <SystemEventDetail event={e} />
               <div><span className="text-zinc-500">time:</span> {new Date(e.timestamp).toLocaleTimeString()}</div>
             </div>
           </div>
         )
       })()}
 
-      {/* Legend — click labels to show/hide event types */}
+      {/* Legend — click labels to show/hide event types. Only shows types present in current data. */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <button
           onClick={() => {
-            const allTypes = Object.keys(EVENT_COLORS)
+            const allTypes = [...presentTypes]
             setHiddenTypes((prev) => prev.size > 0 ? new Set() : new Set(allTypes))
           }}
           className="cursor-pointer rounded px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
@@ -443,7 +637,17 @@ export function TimelineView() {
           {hiddenTypes.size > 0 ? 'All' : 'None'}
         </button>
         <div className="h-3 w-px bg-zinc-200 dark:bg-zinc-700" />
-        {Object.entries(EVENT_COLORS).map(([type, color]) => {
+        {[...presentTypes].sort((a, b) => {
+          // AI types (no dot) first, system types (with dot) second
+          const aIsSystem = a.includes('.')
+          const bIsSystem = b.includes('.')
+          if (aIsSystem !== bIsSystem) {
+            return aIsSystem ? 1 : -1
+          }
+
+          return a.localeCompare(b)
+        }).map((type) => {
+          const color = ALL_COLORS[type] ?? 'bg-zinc-400'
           const hidden = hiddenTypes.has(type)
 
           return (
@@ -462,12 +666,12 @@ export function TimelineView() {
                   return next
                 })
               }}
-              aria-label={`${hidden ? 'Show' : 'Hide'} ${EVENT_LABELS[type] ?? type} events`}
+              aria-label={`${hidden ? 'Show' : 'Hide'} ${ALL_LABELS[type] ?? type} events`}
               aria-pressed={!hidden}
             >
               <div className={`h-2.5 w-2.5 rounded-sm ${color}`} aria-hidden="true" />
               <span className={`font-mono text-[10px] ${hidden ? 'text-zinc-500 line-through dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'}`}>
-                {EVENT_LABELS[type] ?? type}
+                {ALL_LABELS[type] ?? type}
               </span>
             </button>
           )
@@ -477,11 +681,11 @@ export function TimelineView() {
       {/* Hover tooltip — portaled to body to escape DrawerPanel's transform containing block */}
       {tooltip && tooltip.events.length > 0 && portalTarget && createPortal(
         <div
-          className="pointer-events-none fixed z-50 max-w-xs rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 shadow-xl"
+          className="pointer-events-none fixed max-w-xs rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 shadow-xl"
           style={{
-            left: `${tooltip.x + 12}px`,
-            top: `${tooltip.y - 8}px`,
-            transform: 'translateY(-100%)',
+            zIndex: Z_DRAWER + 2,
+            left: `${Math.min(tooltip.x + 12, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 320)}px`,
+            top: `${Math.max(tooltip.y - 60, 8)}px`,
           }}
         >
           <div className="mb-1.5 font-mono text-[10px] font-medium text-zinc-400">
@@ -490,8 +694,8 @@ export function TimelineView() {
           <div className="space-y-1">
             {tooltip.events.slice(0, 8).map((e) => (
               <div key={e.id} className="flex items-center gap-2 font-mono text-[10px]">
-                <div className={`h-2 w-2 shrink-0 rounded-sm ${EVENT_COLORS[e.type] ?? 'bg-zinc-400'}`} />
-                <span className="text-zinc-300">{EVENT_LABELS[e.type] ?? e.type}</span>
+                <div className={`h-2 w-2 shrink-0 rounded-sm ${ALL_COLORS[e.type] ?? 'bg-zinc-400'}`} />
+                <span className="text-zinc-300">{ALL_LABELS[e.type] ?? e.type}</span>
                 {e.guardrailName && (
                   <span className="text-zinc-500">({e.guardrailName})</span>
                 )}
@@ -503,6 +707,7 @@ export function TimelineView() {
                 {e.durationMs !== undefined && (
                   <span className="text-zinc-500">{e.durationMs}ms</span>
                 )}
+                <TooltipSystemContext event={e} />
               </div>
             ))}
             {tooltip.events.length > 8 && (
@@ -515,5 +720,142 @@ export function TimelineView() {
         portalTarget,
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// TooltipSystemContext — renders system-specific context in the hover tooltip
+// ---------------------------------------------------------------------------
+
+function TooltipSystemContext({ event }: { event: LaneEvent }) {
+  if (event.source !== 'system' || !event.data || typeof event.data !== 'object') {
+    return null
+  }
+
+  const d = event.data as Record<string, unknown>
+
+  // Show the most relevant identifier for each event type
+  const label =
+    d.key !== undefined ? String(d.key)
+    : d.resolver !== undefined ? String(d.resolver)
+    : d.id !== undefined && event.type.startsWith('requirement') ? String(d.type ?? d.id)
+    : d.id !== undefined ? String(d.id)
+    : null
+
+  if (!label) {
+    return null
+  }
+
+  return <span className="ml-1 text-zinc-500">{label}</span>
+}
+
+function SystemEventDetail({ event }: { event: LaneEvent }) {
+  if (event.source !== 'system' || !event.data || typeof event.data !== 'object') {
+    return null
+  }
+
+  const d = event.data as Record<string, unknown>
+  const t = event.type
+
+  return (
+    <>
+      {/* Fact events: key, value, prev */}
+      {d.key !== undefined && (
+        <div><span className="text-zinc-500">key:</span> {String(d.key)}</div>
+      )}
+      {d.value !== undefined && (
+        <div><span className="text-zinc-500">value:</span> {safeStringify(d.value)}</div>
+      )}
+      {d.prev !== undefined && (
+        <div><span className="text-zinc-500">prev:</span> {safeStringify(d.prev)}</div>
+      )}
+      {/* facts.batch: change count */}
+      {t === 'facts.batch' && Array.isArray(d.changes) && (
+        <div><span className="text-zinc-500">changes:</span> {d.changes.length} fact{d.changes.length !== 1 ? 's' : ''}</div>
+      )}
+      {/* Derivation events: id, deps, value */}
+      {d.id !== undefined && (t === 'derivation.compute' || t === 'derivation.invalidate') && (
+        <div><span className="text-zinc-500">derivation:</span> {String(d.id)}</div>
+      )}
+      {Array.isArray(d.deps) && (
+        <div><span className="text-zinc-500">deps:</span> {d.deps.join(', ')}</div>
+      )}
+      {t === 'derivation.compute' && d.value !== undefined && !d.key && (
+        <div><span className="text-zinc-500">value:</span> {safeStringify(d.value)}</div>
+      )}
+      {/* Constraint events: id, active */}
+      {d.id !== undefined && (t === 'constraint.evaluate' || t === 'constraint.error') && (
+        <div><span className="text-zinc-500">constraint:</span> {String(d.id)}</div>
+      )}
+      {d.active !== undefined && (
+        <div>
+          <span className="text-zinc-500">active:</span>{' '}
+          <span className={d.active ? 'text-emerald-500' : 'text-zinc-500'}>{String(d.active)}</span>
+        </div>
+      )}
+      {/* Requirement events: id, type, byResolver */}
+      {d.id !== undefined && t.startsWith('requirement') && (
+        <>
+          <div><span className="text-zinc-500">requirement:</span> {String(d.id)}</div>
+          {d.type !== undefined && (
+            <div><span className="text-zinc-500">type:</span> {String(d.type)}</div>
+          )}
+        </>
+      )}
+      {d.byResolver !== undefined && (
+        <div><span className="text-zinc-500">met by:</span> {String(d.byResolver)}</div>
+      )}
+      {/* Resolver events: resolver name, requirementId, duration, attempt */}
+      {d.resolver !== undefined && (
+        <div><span className="text-zinc-500">resolver:</span> {String(d.resolver)}</div>
+      )}
+      {d.requirementId !== undefined && (
+        <div><span className="text-zinc-500">requirement:</span> {String(d.requirementId)}</div>
+      )}
+      {d.duration !== undefined && (
+        <div><span className="text-zinc-500">duration:</span> {Number(d.duration).toFixed(1)}ms</div>
+      )}
+      {d.attempt !== undefined && (
+        <div><span className="text-zinc-500">attempt:</span> {String(d.attempt)}</div>
+      )}
+      {/* Effect events: id */}
+      {d.id !== undefined && (t === 'effect.run' || t === 'effect.error') && (
+        <div><span className="text-zinc-500">effect:</span> {String(d.id)}</div>
+      )}
+      {/* Error events: source, sourceId, message, strategy */}
+      {d.source !== undefined && (t === 'error' || t === 'error.recovery') && (
+        <div><span className="text-zinc-500">source:</span> {String(d.source)}{d.sourceId ? ` (${String(d.sourceId)})` : ''}</div>
+      )}
+      {d.message !== undefined && (
+        <div><span className="text-zinc-500">message:</span> <span className="text-red-400">{String(d.message)}</span></div>
+      )}
+      {d.strategy !== undefined && (
+        <div><span className="text-zinc-500">strategy:</span> {String(d.strategy)}</div>
+      )}
+      {d.error !== undefined && (
+        <div><span className="text-zinc-500">error:</span> <span className="text-red-400">{String(d.error)}</span></div>
+      )}
+      {/* Time travel: trigger */}
+      {d.trigger !== undefined && (
+        <div><span className="text-zinc-500">trigger:</span> {String(d.trigger)}</div>
+      )}
+      {d.from !== undefined && d.to !== undefined && (
+        <div><span className="text-zinc-500">jump:</span> {String(d.from)} → {String(d.to)}</div>
+      )}
+      {/* Reconcile end: counts */}
+      {t === 'reconcile.end' && (
+        <>
+          {Array.isArray(d.unmet) && (
+            <div><span className="text-zinc-500">unmet:</span> {d.unmet.length}</div>
+          )}
+          {Array.isArray(d.inflight) && (
+            <div><span className="text-zinc-500">inflight:</span> {d.inflight.length}</div>
+          )}
+          {Array.isArray(d.completed) && (
+            <div><span className="text-zinc-500">completed:</span> {d.completed.length}</div>
+          )}
+        </>
+      )}
+    </>
   )
 }
