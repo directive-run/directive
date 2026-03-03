@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/vue",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Vue composition API adapter for Directive.",
   "license": "MIT",
   "author": "Jason Comes",
@@ -40,7 +40,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
