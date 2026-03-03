@@ -253,13 +253,9 @@ Format your response as a professional fraud investigation report.`,
   }
 
   // -------------------------------------------------------------------------
-  // Add user message to memory
-  // -------------------------------------------------------------------------
-
-  memory.addMessage({ role: 'user', content: message })
-
-  // -------------------------------------------------------------------------
   // Run pipeline → stream result as SSE
+  // (User + assistant messages are added to memory by the orchestrator
+  //  via effectiveMemory.addMessages(result.messages) in runSingleAgent)
   // -------------------------------------------------------------------------
 
   const encoder = new TextEncoder()
@@ -277,8 +273,6 @@ Format your response as a professional fraud investigation report.`,
         const result = await orchestrator.runPattern<string>('fraudReview', caseSummary)
         send({ type: 'text', text: result })
         send({ type: 'done' })
-
-        memory.addMessage({ role: 'assistant', content: result })
       } catch (err) {
         send({
           type: 'error',

@@ -444,7 +444,7 @@ function BudgetSection({ getPricing }: BudgetSectionProps) {
         {budgetData.map((b) => (
           <div key={b.window}>
             <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="font-medium capitalize text-zinc-700 dark:text-zinc-300">{b.window}ly budget</span>
+              <span className="font-medium capitalize text-zinc-700 dark:text-zinc-300">{b.window === 'day' ? 'Daily' : `${b.window}ly`} budget</span>
               <span className="font-mono text-zinc-500 dark:text-zinc-400">
                 {formatCost(b.spent)} / {formatCost(b.maxCost)}
               </span>

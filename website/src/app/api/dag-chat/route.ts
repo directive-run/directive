@@ -236,13 +236,9 @@ export async function POST(request: Request) {
   }
 
   // -------------------------------------------------------------------------
-  // Add user message to memory
-  // -------------------------------------------------------------------------
-
-  memory.addMessage({ role: 'user', content: message })
-
-  // -------------------------------------------------------------------------
   // Run pipeline → stream result as SSE
+  // (User + assistant messages are added to memory by the orchestrator
+  //  via effectiveMemory.addMessages(result.messages) in runSingleAgent)
   // -------------------------------------------------------------------------
 
   const encoder = new TextEncoder()
@@ -260,9 +256,6 @@ export async function POST(request: Request) {
         const result = await orchestrator.runPattern<string>('research', message)
         send({ type: 'text', text: result })
         send({ type: 'done' })
-
-        // Add assistant message to memory
-        memory.addMessage({ role: 'assistant', content: result })
       } catch (err) {
         send({
           type: 'error',

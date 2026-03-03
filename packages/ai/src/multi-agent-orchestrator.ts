@@ -3624,12 +3624,14 @@ export function createMultiAgentOrchestrator(
 
         if (typeof raw === "string") {
           try {
-            action = JSON.parse(raw);
+            // Strip markdown code fences LLMs often wrap JSON in
+            const cleaned = raw.replace(/```(?:json|JSON)?\s*\n?/g, "").trim();
+            action = JSON.parse(cleaned);
           } catch {
             // LLMs sometimes wrap JSON in conversational text or XML tool-call markup
             try {
-              // Strip XML tags first (models sometimes emit <function_calls>/<invoke>/<parameter> wrappers)
-              const stripped = raw.replace(/<[^>]+>/g, " ");
+              // Strip markdown fences + XML tags (models sometimes emit <function_calls>/<invoke>/<parameter> wrappers)
+              const stripped = raw.replace(/```(?:json|JSON)?\s*\n?/g, "").replace(/<[^>]+>/g, " ");
               const extracted = extractJsonFromOutput(stripped);
               if (extracted && typeof extracted === "object" && "action" in (extracted as Record<string, unknown>)) {
                 action = extracted as typeof action;

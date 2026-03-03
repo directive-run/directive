@@ -258,8 +258,9 @@ When you've gathered enough findings, compile a brief summary of the key finding
     },
 
     // Guardrails → Guardrails tab
+    // Input guardrails run at route level (route.ts) to avoid blocking internal
+    // supervisor rounds where worker results naturally contain sensitive terms.
     guardrails: {
-      input: inputGuardrails,
       output: outputGuardrails,
     },
 
@@ -280,7 +281,7 @@ When you've gathered enough findings, compile a brief summary of the key finding
       },
       selectionStrategy: 'healthiest',
       degradation: 'fallback-response',
-      fallbackResponse: 'Service temporarily degraded. Please try again shortly.',
+      fallbackResponse: '{"action":"complete","report":"Service temporarily degraded. Please try again shortly."}',
     },
 
     // Cross-agent derivations (4) → State tab

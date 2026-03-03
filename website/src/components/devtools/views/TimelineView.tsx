@@ -13,7 +13,7 @@ import {
   TRACE_EVENT_CATEGORIES,
   ZOOM_MIN,
   ZOOM_MAX,
-  ZOOM_STEP,
+  CLUSTER_GAP_MS,
 } from '../constants'
 import { Z_DRAWER } from '../z-index'
 import { EmptyState } from '../EmptyState'
@@ -101,6 +101,11 @@ export function TimelineView() {
   // SSR-safe portal target for tooltip (escapes DrawerPanel's transform containing block)
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   useEffect(() => { setPortalTarget(document.body) }, [])
+
+  // Logarithmic slider helpers — linear slider position is useless at high ZOOM_MAX
+  const LOG_RATIO = Math.log(ZOOM_MAX / ZOOM_MIN)
+  const zoomToSlider = (z: number) => (Math.log(z / ZOOM_MIN) / LOG_RATIO) * 100
+  const sliderToZoom = (v: number) => ZOOM_MIN * Math.exp((v / 100) * LOG_RATIO)
 
   // Merge + normalize both sources into unified LaneEvent[]
   const { laneIds, laneEventsMap, hasAiLanes, hasSystemLanes, minTs, range, allEvents, presentTypes, eventIndexById } = useMemo(() => {
@@ -234,15 +239,50 @@ export function TimelineView() {
     }
   }, [aiEvents, systemTraceEvents, follow, zoom])
 
-  // Cmd/Ctrl + scroll wheel = zoom
+  // Cmd/Ctrl + scroll wheel = zoom (exponential so high zoom is reachable)
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
-      setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z - e.deltaY * ZOOM_STEP * 0.01)))
+      const factor = Math.pow(1.003, -e.deltaY)
+      setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z * factor)))
     }
   }, [])
 
-  // Keyboard shortcuts: +/- zoom, 0 reset, arrow keys pan
+  // "Fit" — zoom + scroll to the latest cluster of events
+  const handleFitLatest = useCallback(() => {
+    if (allEvents.length === 0) {
+      return
+    }
+
+    // Walk backwards from the last event; a gap > CLUSTER_GAP_MS starts a new cluster
+    let clusterStartIdx = allEvents.length - 1
+    for (let i = allEvents.length - 1; i > 0; i--) {
+      if (allEvents[i].timestamp - allEvents[i - 1].timestamp > CLUSTER_GAP_MS) {
+        break
+      }
+      clusterStartIdx = i - 1
+    }
+
+    const clusterStart = allEvents[clusterStartIdx].timestamp
+    const clusterEnd = allEvents[allEvents.length - 1].timestamp
+    const clusterRange = Math.max(clusterEnd - clusterStart, 100) // at least 100ms
+    const fitRange = clusterRange * 1.4 // 40% padding
+
+    const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, range / fitRange))
+    setZoom(newZoom)
+    setFollow(false)
+
+    // Scroll to cluster start after layout updates with new zoom
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        const contentWidth = scrollRef.current.scrollWidth
+        const scrollPos = ((clusterStart - minTs) / range) * contentWidth
+        scrollRef.current.scrollLeft = Math.max(0, scrollPos - scrollRef.current.clientWidth * 0.1)
+      }
+    })
+  }, [allEvents, range, minTs])
+
+  // Keyboard shortcuts: +/- zoom, 0 reset, f fit, arrow keys pan
   const containerRef = useRef<HTMLDivElement>(null)
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement) {
@@ -270,18 +310,32 @@ export function TimelineView() {
         break
       case 'ArrowLeft':
         e.preventDefault()
-        if (scrollRef.current) {
+        if (selected !== null) {
+          const idx = eventIndexById.get(selected) ?? -1
+          if (idx > 0) {
+            setSelected(allEvents[idx - 1].id)
+          }
+        } else if (scrollRef.current) {
           scrollRef.current.scrollLeft -= 100
         }
         break
       case 'ArrowRight':
         e.preventDefault()
-        if (scrollRef.current) {
+        if (selected !== null) {
+          const idx = eventIndexById.get(selected) ?? -1
+          if (idx !== -1 && idx < allEvents.length - 1) {
+            setSelected(allEvents[idx + 1].id)
+          }
+        } else if (scrollRef.current) {
           scrollRef.current.scrollLeft += 100
         }
         break
+      case 'f':
+        e.preventDefault()
+        handleFitLatest()
+        break
     }
-  }, [])
+  }, [handleFitLatest, selected, eventIndexById, allEvents])
 
   // Disable follow when user manually scrolls left
   const handleScroll = useCallback(() => {
@@ -423,11 +477,11 @@ export function TimelineView() {
         </button>
         <input
           type="range"
-          min={ZOOM_MIN}
-          max={ZOOM_MAX}
+          min={0}
+          max={100}
           step={0.1}
-          value={zoom}
-          onChange={(e) => setZoom(Number(e.target.value))}
+          value={zoomToSlider(zoom)}
+          onChange={(e) => setZoom(sliderToZoom(Number(e.target.value)))}
           className="h-1 w-20 cursor-pointer accent-sky-500"
           aria-label="Timeline zoom"
         />
@@ -438,11 +492,19 @@ export function TimelineView() {
         >
           +
         </button>
-        <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{zoom.toFixed(1)}x</span>
-        <span className="font-mono text-[9px] text-zinc-400/50 dark:text-zinc-600" title="Cmd/Ctrl+scroll to zoom · +/- keys · Arrow keys to pan · 0 to reset">
-          +/- zoom · arrows pan · 0 reset
+        <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">{zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}</span>
+        <span className="font-mono text-[9px] text-zinc-400/50 dark:text-zinc-600" title="Cmd/Ctrl+scroll to zoom · +/- keys · f to fit · Arrow keys to pan · 0 to reset">
+          +/- zoom · f fit · arrows pan · 0 reset
         </span>
         <div className="flex-1" />
+        <button
+          className="cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] text-zinc-400 hover:bg-sky-500/20 hover:text-sky-400"
+          onClick={handleFitLatest}
+          aria-label="Fit to latest run"
+          title="Zoom to fit the latest cluster of events (f)"
+        >
+          Fit
+        </button>
         <button
           className={`cursor-pointer rounded px-2 py-0.5 font-mono text-[10px] transition ${follow ? 'bg-sky-500/20 text-sky-500' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
           onClick={() => { setFollow(!follow); if (!follow && scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth }}
@@ -623,6 +685,8 @@ export function TimelineView() {
               {e.outputLength !== undefined && (
                 <div><span className="text-zinc-500">outputLength:</span> {e.outputLength}</div>
               )}
+              {/* AI event type-specific data */}
+              <AiEventDetail event={e} />
               {/* System event data */}
               <SystemEventDetail event={e} />
               <div><span className="text-zinc-500">time:</span> {new Date(e.timestamp).toLocaleTimeString()}</div>
@@ -754,6 +818,247 @@ function TooltipSystemContext({ event }: { event: LaneEvent }) {
   }
 
   return <span className="ml-1 text-zinc-500">{label}</span>
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible long-content helper for AI event detail
+// ---------------------------------------------------------------------------
+
+function CollapsibleField({ label, value }: { label: string; value: unknown }) {
+  if (value == null || value === '') {
+    return null
+  }
+  const str = typeof value === 'string' ? value : safeStringify(value)
+  const isLong = str.length > 100
+
+  if (!isLong) {
+    return (
+      <div>
+        <span className="text-zinc-500">{label}:</span>{' '}
+        <span className="text-zinc-300">{str}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <span className="text-zinc-500">{label}:</span>
+      <details className="inline">
+        <summary className="ml-1 cursor-pointer text-zinc-400">
+          {str.slice(0, 80)}…
+        </summary>
+        <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-zinc-400 rounded bg-zinc-900 p-1.5">
+          {str}
+        </pre>
+      </details>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// AiEventDetail — renders type-specific fields for AI events
+// ---------------------------------------------------------------------------
+
+function AiEventDetail({ event }: { event: LaneEvent }) {
+  if (event.source !== 'ai') {
+    return null
+  }
+
+  const t = event.type
+
+  return (
+    <>
+      {/* agent_start: input, instructions */}
+      {t === 'agent_start' && (
+        <>
+          <CollapsibleField label="input" value={event.input} />
+          <CollapsibleField label="instructions" value={event.instructions} />
+        </>
+      )}
+
+      {/* agent_complete: output */}
+      {t === 'agent_complete' && (
+        <CollapsibleField label="output" value={event.output} />
+      )}
+
+      {/* pattern_start / pattern_complete: pattern metadata */}
+      {(t === 'pattern_start' || t === 'pattern_complete') && (
+        <>
+          {event.patternId && (
+            <div><span className="text-zinc-500">patternId:</span> {String(event.patternId)}</div>
+          )}
+          {event.patternType && (
+            <div><span className="text-zinc-500">patternType:</span> {String(event.patternType)}</div>
+          )}
+          {Array.isArray(event.handlers) && (
+            <div><span className="text-zinc-500">handlers:</span> {event.handlers.join(', ')}</div>
+          )}
+          {t === 'pattern_complete' && event.durationMs !== undefined && (
+            <div><span className="text-zinc-500">duration:</span> {String(event.durationMs)}ms</div>
+          )}
+          {event.achieved !== undefined && (
+            <div>
+              <span className="text-zinc-500">achieved:</span>{' '}
+              <span className={event.achieved ? 'text-emerald-500' : 'text-red-500'}>{String(event.achieved)}</span>
+            </div>
+          )}
+          {event.error && (
+            <div><span className="text-zinc-500">error:</span> <span className="text-red-400">{String(event.error)}</span></div>
+          )}
+        </>
+      )}
+
+      {/* dag_node_update: nodeId, status, deps */}
+      {t === 'dag_node_update' && (
+        <>
+          {event.nodeId && (
+            <div><span className="text-zinc-500">nodeId:</span> {String(event.nodeId)}</div>
+          )}
+          {event.status && (
+            <div>
+              <span className="text-zinc-500">status:</span>{' '}
+              <span className={
+                event.status === 'completed' ? 'text-emerald-500'
+                  : event.status === 'running' ? 'text-amber-500'
+                    : event.status === 'error' ? 'text-red-500'
+                      : 'text-zinc-400'
+              }>
+                {String(event.status)}
+              </span>
+            </div>
+          )}
+          {Array.isArray(event.deps) && event.deps.length > 0 && (
+            <div><span className="text-zinc-500">deps:</span> {event.deps.join(', ')}</div>
+          )}
+        </>
+      )}
+
+      {/* race_start / race_winner / race_cancelled */}
+      {(t === 'race_start' || t === 'race_winner' || t === 'race_cancelled') && (
+        <>
+          {event.patternId && (
+            <div><span className="text-zinc-500">patternId:</span> {String(event.patternId)}</div>
+          )}
+          {Array.isArray(event.agents) && (
+            <div><span className="text-zinc-500">agents:</span> {event.agents.join(', ')}</div>
+          )}
+          {event.winnerId && (
+            <div><span className="text-zinc-500">winner:</span> <span className="text-emerald-400">{String(event.winnerId)}</span></div>
+          )}
+          {event.durationMs !== undefined && t !== 'race_start' && (
+            <div><span className="text-zinc-500">duration:</span> {String(event.durationMs)}ms</div>
+          )}
+          {event.reason && t === 'race_cancelled' && (
+            <div><span className="text-zinc-500">reason:</span> <span className="text-red-400">{String(event.reason)}</span></div>
+          )}
+        </>
+      )}
+
+      {/* debate_round */}
+      {t === 'debate_round' && (
+        <>
+          {event.round !== undefined && (
+            <div><span className="text-zinc-500">round:</span> {String(event.round)}{event.totalRounds ? ` / ${event.totalRounds}` : ''}</div>
+          )}
+          {event.winnerId && (
+            <div><span className="text-zinc-500">winner:</span> <span className="text-emerald-400">{String(event.winnerId)}</span></div>
+          )}
+          {event.score !== undefined && (
+            <div><span className="text-zinc-500">score:</span> {String(event.score)}</div>
+          )}
+          {event.agentCount !== undefined && (
+            <div><span className="text-zinc-500">agents:</span> {String(event.agentCount)}</div>
+          )}
+        </>
+      )}
+
+      {/* reflection_iteration */}
+      {t === 'reflection_iteration' && (
+        <>
+          {event.iteration !== undefined && (
+            <div><span className="text-zinc-500">iteration:</span> {String(event.iteration)}</div>
+          )}
+          {event.passed !== undefined && (
+            <div>
+              <span className="text-zinc-500">passed:</span>{' '}
+              <span className={event.passed ? 'text-emerald-500' : 'text-red-500'}>{String(event.passed)}</span>
+            </div>
+          )}
+          {event.score !== undefined && (
+            <div><span className="text-zinc-500">score:</span> {String(event.score)}</div>
+          )}
+          {event.durationMs !== undefined && (
+            <div><span className="text-zinc-500">duration:</span> {String(event.durationMs)}ms</div>
+          )}
+        </>
+      )}
+
+      {/* reroute */}
+      {t === 'reroute' && (
+        <>
+          {(event.from != null || event.to != null) && (
+            <div>
+              <span className="text-zinc-500">route:</span>{' '}
+              {event.from != null && <span className="text-zinc-400">{String(event.from)}</span>}
+              {event.from != null && event.to != null && ' → '}
+              {event.to != null && <span className="text-zinc-300">{String(event.to)}</span>}
+            </div>
+          )}
+          {event.reason && (
+            <div><span className="text-zinc-500">reason:</span> {String(event.reason)}</div>
+          )}
+        </>
+      )}
+
+      {/* scratchpad_update */}
+      {t === 'scratchpad_update' && (
+        <>
+          {Array.isArray(event.keys) && event.keys.length > 0 && (
+            <div><span className="text-zinc-500">keys:</span> {event.keys.join(', ')}</div>
+          )}
+        </>
+      )}
+
+      {/* breakpoint_hit / breakpoint_resumed */}
+      {(t === 'breakpoint_hit' || t === 'breakpoint_resumed') && (
+        <>
+          {event.breakpointId && (
+            <div><span className="text-zinc-500">breakpointId:</span> {String(event.breakpointId)}</div>
+          )}
+          {event.breakpointType && (
+            <div><span className="text-zinc-500">breakpointType:</span> {String(event.breakpointType)}</div>
+          )}
+          {t === 'breakpoint_resumed' && event.modified !== undefined && (
+            <div>
+              <span className="text-zinc-500">modified:</span>{' '}
+              <span className={event.modified ? 'text-amber-400' : 'text-zinc-400'}>{String(event.modified)}</span>
+            </div>
+          )}
+          {t === 'breakpoint_resumed' && event.skipped !== undefined && (
+            <div>
+              <span className="text-zinc-500">skipped:</span>{' '}
+              <span className={event.skipped ? 'text-red-400' : 'text-zinc-400'}>{String(event.skipped)}</span>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* agent_retry */}
+      {t === 'agent_retry' && (
+        <>
+          {event.attempt !== undefined && (
+            <div><span className="text-zinc-500">attempt:</span> {String(event.attempt)}</div>
+          )}
+          {event.errorMessage && (
+            <div><span className="text-zinc-500">error:</span> <span className="text-red-400">{String(event.errorMessage)}</span></div>
+          )}
+          {event.delayMs !== undefined && (
+            <div><span className="text-zinc-500">delay:</span> {String(event.delayMs)}ms</div>
+          )}
+        </>
+      )}
+    </>
+  )
 }
 
 function SystemEventDetail({ event }: { event: LaneEvent }) {
