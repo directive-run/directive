@@ -14,7 +14,8 @@
       "@directive-run/solid",
       "@directive-run/lit"
     ],
-    ["@directive-run/ai"]
+    ["@directive-run/ai"],
+    ["@directive-run/cli", "@directive-run/knowledge"]
   ],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "onlyUpdatePeerDependentsWhenOutOfRange": true
